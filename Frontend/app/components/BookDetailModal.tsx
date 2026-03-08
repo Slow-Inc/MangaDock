@@ -49,6 +49,10 @@ type MangaChapter = {
   translatedLanguage: string;
   uploadedAt: string;
   pageCount: number;
+  /** True when chapter pages were confirmed via the pages API. */
+  pagesAvailable?: boolean;
+  /** True when the pages API was unavailable while verifying this chapter. */
+  pagesApiUnavailable?: boolean;
   /** forceLocal mode: true when this chapter has local cache for reader */
   readerAvailable?: boolean;
   /** True if returned from stale cache because the upstream API went offline */
@@ -257,14 +261,22 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   };
 
   const displayThumbnail = selectedCover ?? resolvedThumbnail(book);
+  const chapterNeedsBackup = (ch: MangaChapter) => forceLocalMode || ch.isOfflineFallback;
   const isChapterReadable = (ch: MangaChapter) => {
-    // If we're fully in forced local mode OR the API is down and we served a fallback,
-    // only allow chapters that have local cache.
-    if (forceLocalMode || ch.isOfflineFallback) {
+    if (chapterNeedsBackup(ch)) {
       return ch.readerAvailable === true;
     }
-    // Otherwise online mode, assume readable if it has pages
-    return ch.pageCount > 0;
+    return ch.pageCount > 0 || ch.pagesAvailable === true;
+  };
+
+  const getUnavailableChapterLabel = (ch: MangaChapter) => {
+    if (chapterNeedsBackup(ch) && ch.readerAvailable !== true) {
+      return "ไม่ได้สำรอง";
+    }
+    if (ch.pagesApiUnavailable) {
+      return "ไม่ได้สำรอง";
+    }
+    return "ล็อค";
   };
 
   const firstReadableChapter = chapters.find((ch) => isChapterReadable(ch));
@@ -645,7 +657,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       {/* Expand button */}
                       <div
                         onClick={(e) => { e.stopPropagation(); setLightboxSrc(displayUrl); }}
-                        className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-all duration-200 group-hover:opacity-100 hover:bg-black/90 hover:text-white"
+                        className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white/90 opacity-100 backdrop-blur-sm transition-all duration-200 hover:bg-black/90 hover:text-white md:opacity-0 md:text-white/70 md:group-hover:opacity-100"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
                           <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
@@ -718,7 +730,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                     .filter((ch) => langFilter === "all" || ch.translatedLanguage === langFilter)
                     .map((ch) => {
                     const readable = isChapterReadable(ch);
-                    const noDataInCache = (forceLocalMode || ch.isOfflineFallback) && ch.readerAvailable === false;
+                    const unavailableLabel = readable ? null : getUnavailableChapterLabel(ch);
                     const isHighlighted = ch.id === effectiveHighlightId;
                     return (
                       <button
@@ -758,11 +770,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         </span>
                         {readable ? (
                           <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
-                            {ch.pageCount} หน้า
+                            {ch.pageCount > 0 ? `${ch.pageCount} หน้า` : "พร้อมอ่าน"}
                           </span>
                         ) : (
                           <span className="shrink-0 rounded bg-white/8 px-1.5 py-0.5 text-[10px] font-medium text-white/30">
-                            {noDataInCache ? "ไม่มีข้อมูล" : "ล็อก"}
+                            {unavailableLabel}
                           </span>
                         )}
                         {readable && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 interface Props {
@@ -12,24 +12,47 @@ interface Props {
 export default function CoverLightbox({ src, alt, onClose }: Props) {
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setMounted(true);
-    // Double RAF: ensures browser paints the initial opacity-0 state before transitioning
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => setVisible(true));
-    });
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+
+    return () => {
+      window.removeEventListener("keydown", handleKey);
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    let raf1 = 0;
+    let raf2 = 0;
+
+    // Ensure there is one committed paint with opacity-0 before transitioning in.
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setVisible(true));
+    });
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [mounted]);
 
   const handleClose = () => {
     setVisible(false);
-    setTimeout(onClose, 300);
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+    closeTimeoutRef.current = setTimeout(onClose, 300);
   };
 
   const content = (

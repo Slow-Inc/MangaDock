@@ -123,6 +123,94 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
   );
 }
 
+function ChipBar({ categories, active, onSelect }: {
+  categories: string[];
+  active: string;
+  onSelect: (cat: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const checkScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 4);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (!el) return;
+
+    el.addEventListener("scroll", checkScroll, { passive: true });
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        el.scrollBy({ left: e.deltaY * 0.8, behavior: "auto" });
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+
+    return () => {
+      el.removeEventListener("scroll", checkScroll);
+      el.removeEventListener("wheel", onWheel);
+      ro.disconnect();
+    };
+  }, [categories]);
+
+  const scroll = (dir: -1 | 1) => {
+    scrollRef.current?.scrollBy({ left: dir * 200, behavior: "smooth" });
+  };
+
+  if (categories.length <= 1) return null;
+
+  return (
+    <div className="relative min-w-0 flex-1">
+      {canLeft && (
+        <>
+          <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12 bg-linear-to-r from-[#0a0a0a] to-transparent" />
+          <button
+            aria-label="เลื่อนซ้าย"
+            onClick={() => scroll(-1)}
+            className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] p-1.5 text-white/60 transition hover:border-white/30 hover:text-white"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        </>
+      )}
+
+      <div
+        ref={scrollRef}
+        className="flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {categories.map((cat) => (
+          <FilterChip key={cat} active={active === cat} onClick={() => onSelect(cat)}>
+            {cat === "all" ? "ทั้งหมด" : cat}
+          </FilterChip>
+        ))}
+      </div>
+
+      {canRight && (
+        <>
+          <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-linear-to-l from-[#0a0a0a] to-transparent" />
+          <button
+            aria-label="เลื่อนขวา"
+            onClick={() => scroll(1)}
+            className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] p-1.5 text-white/60 transition hover:border-white/30 hover:text-white"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── SearchResults ────────────────────────────────────────────────────────────
 function SearchResults() {
   const searchParams = useSearchParams();
@@ -250,40 +338,53 @@ function SearchResults() {
         {/* ── Filter bar ────────────────────────────────────────────── */}
         <div className="mb-7 space-y-3">
           {/* Row 1: แหล่งข้อมูล + ภาษา */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="shrink-0 text-[11px] font-medium text-white/30">แหล่งข้อมูล</span>
-            <FilterChip active={source === "all"}    onClick={() => setSource("all")}>ทั้งหมด</FilterChip>
-            <FilterChip active={source === "mylist"} onClick={() => setSource("mylist")}>
-              รายการของฉัน
-              {localBooks.length > 0 && (
-                <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-px text-[9px]">{localBooks.length}</span>
-              )}
-            </FilterChip>
+          <div className="space-y-2 sm:space-y-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="shrink-0 text-[11px] font-medium text-white/30">แหล่งข้อมูล</span>
+              <FilterChip active={source === "all"} onClick={() => setSource("all")}>ทั้งหมด</FilterChip>
+              <FilterChip active={source === "mylist"} onClick={() => setSource("mylist")}>
+                รายการของฉัน
+                {localBooks.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-px text-[9px]">{localBooks.length}</span>
+                )}
+              </FilterChip>
 
-            {/* ภาษา — only for "ทั้งหมด" source */}
+              {!isMyList && (
+                <>
+                  <span className="mx-1 hidden h-4 w-px shrink-0 bg-white/15 sm:block" />
+                  <span className="hidden shrink-0 text-[11px] font-medium text-white/30 sm:block">ภาษา</span>
+                  <div className="hidden flex-wrap items-center gap-2 sm:flex">
+                    {LANG_OPTIONS.map((opt) => (
+                      <FilterChip key={opt.value} active={langFilter === opt.value} onClick={() => setLangFilter(opt.value)}>
+                        {opt.label}
+                      </FilterChip>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
             {!isMyList && (
-              <>
-                <span className="mx-1 h-4 w-px shrink-0 bg-white/15" />
+              <div className="flex flex-wrap items-center gap-2 sm:hidden">
                 <span className="shrink-0 text-[11px] font-medium text-white/30">ภาษา</span>
                 {LANG_OPTIONS.map((opt) => (
                   <FilterChip key={opt.value} active={langFilter === opt.value} onClick={() => setLangFilter(opt.value)}>
                     {opt.label}
                   </FilterChip>
                 ))}
-              </>
+              </div>
             )}
           </div>
 
           {/* Row 2: หมวดหมู่ (dynamic from results) */}
           {availableCategories.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               <span className="shrink-0 text-[11px] font-medium text-white/30">หมวดหมู่</span>
-              <FilterChip active={categoryFilter === "all"} onClick={() => setCategoryFilter("all")}>ทั้งหมด</FilterChip>
-              {availableCategories.map((cat) => (
-                <FilterChip key={cat} active={categoryFilter === cat} onClick={() => setCategoryFilter(cat)}>
-                  {cat}
-                </FilterChip>
-              ))}
+              <ChipBar
+                categories={["all", ...availableCategories]}
+                active={categoryFilter}
+                onSelect={setCategoryFilter}
+              />
             </div>
           )}
         </div>

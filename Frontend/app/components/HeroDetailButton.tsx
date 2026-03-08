@@ -20,6 +20,13 @@ type LandingBook = {
 
 type Props = { book: LandingBook };
 
+type MangaChapterSummary = {
+  pageCount: number;
+  pagesAvailable?: boolean;
+  readerAvailable?: boolean;
+  isOfflineFallback?: boolean;
+};
+
 export default function HeroDetailButton({ book }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [scrollToChapters, setScrollToChapters] = useState(false);
@@ -29,10 +36,18 @@ export default function HeroDetailButton({ book }: Props) {
 
   useEffect(() => {
     if (!isManga) return;
-    fetch(`${API_BASE}/books/manga/${book.id}/chapters`)
+    const forceLocal = localStorage.getItem("imgCacheForceLocal") === "1";
+    const qs = forceLocal ? "?forceLocal=true" : "";
+
+    fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`)
       .then((r) => r.json())
-      .then((d: { pageCount: number }[]) => {
-        setHasReadable(d.some((ch) => ch.pageCount > 0));
+      .then((d: MangaChapterSummary[]) => {
+        setHasReadable(d.some((ch) => {
+          if (forceLocal || ch.isOfflineFallback) {
+            return ch.readerAvailable === true;
+          }
+          return ch.pageCount > 0 || ch.pagesAvailable === true;
+        }));
       })
       .catch(() => setHasReadable(false));
   }, [book.id, isManga]);

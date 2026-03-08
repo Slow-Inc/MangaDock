@@ -33,6 +33,10 @@ export type MangaChapter = {
   translatedLanguage: string;
   uploadedAt: string;
   pageCount: number;
+  /** True when chapter pages were confirmed via the pages API. */
+  pagesAvailable?: boolean;
+  /** True when the pages API was unavailable while verifying this chapter. */
+  pagesApiUnavailable?: boolean;
   /** True if chapter has local page cache. */
   readerAvailable?: boolean;
   /** True if returned from stale cache because the upstream API went offline */
