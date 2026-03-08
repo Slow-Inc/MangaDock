@@ -1,0 +1,16 @@
+result
+*.ckpt
+*.pt
+.vscode
+*.onnx
+__pycache__
+ocrs
+models/*
+test/testdata/bboxes
+/venv
+.git
+pip-modules
+front
+run-server.bat
+*.md
+LICENSE

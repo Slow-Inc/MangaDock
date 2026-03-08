@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manga Image Translator Manual Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+            line-height: 1.5;
+            background: #111;
+            color: #f3f3f3;
+        }
+        textarea, input, select, button {
+            font: inherit;
+        }
+        textarea {
+            width: 100%;
+            min-height: 180px;
+            padding: 12px;
+            box-sizing: border-box;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #181818;
+            color: #f3f3f3;
+        }
+        button {
+            padding: 10px 14px;
+            border: 0;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #2d6cdf;
+            color: white;
+        }
+        .muted {
+            color: #bdbdbd;
+        }
+        .box {
+            padding: 16px;
+            border: 1px solid #333;
+            border-radius: 12px;
+            background: #171717;
+            margin-bottom: 20px;
+        }
+        .row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #0c0c0c;
+            border: 1px solid #2b2b2b;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        img {
+            max-width: 100%;
+            border-radius: 12px;
+            border: 1px solid #2b2b2b;
+        }
+    </style>
+</head>
+<body>
+    <h1>Manga Image Translator Manual Test</h1>
+    <p class="muted">This page is a simple browser-side tester for the microservice running on the current host. It can be used by MetaBooks developers or by any other project integrating this service.</p>
+
+    <div class="box">
+        <h2>Endpoint</h2>
+        <div class="row">
+            <label for="mode">Mode</label>
+            <select id="mode">
+                <option value="image">Final image</option>
+                <option value="patches">Patch overlays</option>
+                <option value="json">JSON result</option>
+            </select>
+            <label for="fileInput">Image file</label>
+            <input type="file" id="fileInput" accept="image/*" title="Choose an image file">
+            <button id="submitButton">Send Request</button>
+        </div>
+    </div>
+
+    <div class="box">
+        <h2>Config JSON</h2>
+                <label for="configInput" class="muted">Request config JSON</label>
+                <textarea id="configInput" title="Request config JSON">{
+  "translator": {
+    "translator": "gemini",
+    "target_lang": "THA"
+  },
+  "inpainter": {
+    "inpainter": "lama_large"
+  },
+  "render": {
+    "direction": "auto"
+  }
+}</textarea>
+    </div>
+
+    <div class="box">
+        <h2>Status</h2>
+        <div id="status" class="muted">Idle</div>
+    </div>
+
+    <div class="box">
+        <h2>Result</h2>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const submitButton = document.getElementById("submitButton");
+        const statusNode = document.getElementById("status");
+        const resultNode = document.getElementById("result");
+
+        function endpointFor(mode) {
+            if (mode === "patches") return "/translate/with-form/patches";
+            if (mode === "json") return "/translate/with-form/json";
+            return "/translate/with-form/image";
+        }
+
+        submitButton.addEventListener("click", async () => {
+            const fileInput = document.getElementById("fileInput");
+            const mode = document.getElementById("mode").value;
+            const configInput = document.getElementById("configInput").value;
+            const file = fileInput.files[0];
+
+            resultNode.innerHTML = "";
+
+            if (!file) {
+                statusNode.textContent = "Please choose an image first.";
+                return;
+            }
+
+            statusNode.textContent = `Sending request to ${endpointFor(mode)} ...`;
+
+            const formData = new FormData();
+            formData.append("image", file);
+            formData.append("config", configInput);
+
+            try {
+                const response = await fetch(endpointFor(mode), {
+                    method: "POST",
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const text = await response.text().catch(() => response.statusText);
+                    statusNode.textContent = `Request failed: HTTP ${response.status}`;
+                    resultNode.innerHTML = `<pre>${text}</pre>`;
+                    return;
+                }
+
+                if (mode === "image") {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    statusNode.textContent = "Completed: translated image returned.";
+                    resultNode.innerHTML = `<p><a href="${url}" download="translated.png">Download translated image</a></p><img src="${url}" alt="Translated image">`;
+                    return;
+                }
+
+                const text = await response.text();
+                statusNode.textContent = "Completed.";
+                resultNode.innerHTML = `<pre>${text}</pre>`;
+            } catch (error) {
+                statusNode.textContent = "Request failed before completion.";
+                resultNode.innerHTML = `<pre>${String(error)}</pre>`;
+            }
+        });
+    </script>
+</body>
+</html>

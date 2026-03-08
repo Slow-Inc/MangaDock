@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIT API Test</title>
+</head>
+<body>
+<h1>MIT API Test</h1>
+
+<p>This page sends a multipart request to the current microservice endpoints. It can be used by MetaBooks developers or by other projects validating integration locally.</p>
+
+<form action="http://127.0.0.1:5003/translate/with-form/image" method="post" enctype="multipart/form-data">
+    <p>
+        <label>Image: <input name="image" type="file" accept="image/*"></label>
+    </p>
+    <p>
+        <label for="config">Config JSON:</label><br>
+        <textarea id="config" name="config" rows="10" cols="80" title="Request config JSON">{"translator":{"translator":"gemini","target_lang":"THA"},"inpainter":{"inpainter":"lama_large"},"render":{"direction":"auto"}}</textarea>
+    </p>
+    <input type="submit" value="Translate to final image">
+</form>
+
+</body>
+</html>
