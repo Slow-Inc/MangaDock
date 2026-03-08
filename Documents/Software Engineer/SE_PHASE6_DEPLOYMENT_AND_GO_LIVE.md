@@ -19,7 +19,7 @@
 
 ### Software
 
-- Node.js and npm for frontend and backend
+- Node.js and bun for frontend and backend
 - Python environment for MIT service
 - Redis สำหรับ cache
 - Firebase project configuration

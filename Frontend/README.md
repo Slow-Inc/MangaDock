@@ -13,7 +13,7 @@ Landing Page สำหรับ MetaBooks ในสไตล์ Netflix + Glassm
 1. ติดตั้งแพ็กเกจ
 
 ```bash
-npm install
+bun install
 ```
 
 2. สร้างไฟล์ `.env`
@@ -45,7 +45,7 @@ INTERNAL_API_URL=http://localhost:4001
 4. รัน Frontend
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 เปิดเว็บที่ http://localhost:4000
