@@ -119,6 +119,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [useSaver, setUseSaver] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [translatingCurrentPage, setTranslatingCurrentPage] = useState(false);
+  const [translatingCurrentPageIndex, setTranslatingCurrentPageIndex] = useState<number | null>(null);
   const [transProgress, setTransProgress] = useState({ done: 0, total: 0 });
   const [translatedPages, setTranslatedPages] = useState<Map<number, string>>(new Map());
   const [patchedPages, setPatchedPages] = useState<Map<number, PatchData[]>>(new Map());
@@ -186,6 +187,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     translateControllerRef.current?.abort();
     translateControllerRef.current = null;
     setTranslating(false);
+    setTranslatingCurrentPage(false);
+    setTranslatingCurrentPageIndex(null);
     setTransProgress({ done: 0, total: 0 });
     setTranslatedPages(new Map());
     setPatchedPages(new Map());
@@ -198,6 +201,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     translateControllerRef.current?.abort();
     translateControllerRef.current = null;
     setTranslating(false);
+    setTranslatingCurrentPage(false);
+    setTranslatingCurrentPageIndex(null);
     setTransProgress({ done: 0, total: 0 });
     setPatchedPages(new Map());
     setCompletedTranslatedPages(new Set());
@@ -421,6 +426,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     ? resolvePages(data?.dataSaverPages ?? [], data?.localDataSaverPages)
     : resolvePages(data?.pages ?? [], data?.localPages);
   const totalPages = pages.length;
+  const hasAnyTranslation = translatedPages.size > 0 || patchedPages.size > 0 || completedTranslatedPages.size > 0;
+  const hasFullTranslation = totalPages > 0 && completedTranslatedPages.size >= totalPages;
+  const hasPartialTranslation = hasAnyTranslation && !hasFullTranslation;
 
   // Keep last valid page count so counter can show it during chapter-change fade-out
   useEffect(() => {
@@ -660,25 +668,28 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   /** Translate only the current page — for debugging specific pages */
   const translateCurrentPage = async () => {
     if (!data || translatingCurrentPage || translating) return;
-    const pageUrl = data.pages[page];
+    const pageIndex = page;
+    const pageUrl = data.pages[pageIndex];
     if (!pageUrl) return;
     setTranslatingCurrentPage(true);
-    console.log(`[PageTranslate] Translating page ${page + 1} (index ${page}):`, pageUrl);
+    setTranslatingCurrentPageIndex(pageIndex);
+    console.log(`[PageTranslate] Translating page ${pageIndex + 1} (index ${pageIndex}):`, pageUrl);
     try {
-      const patches = await translateMangaPagePatches(chapterId, page, pageUrl, undefined, {
+      const patches = await translateMangaPagePatches(chapterId, pageIndex, pageUrl, undefined, {
         sourceLang: currentLang ?? undefined,
         targetLang,
       });
-      console.log(`[PageTranslate] Page ${page + 1} done — ${patches.length} patches:`, patches);
+      console.log(`[PageTranslate] Page ${pageIndex + 1} done — ${patches.length} patches:`, patches);
       if (patches.length > 0) {
-        setPatchedPages((prev) => new Map(prev).set(page, patches));
+        setPatchedPages((prev) => new Map(prev).set(pageIndex, patches));
       }
-      setCompletedTranslatedPages((prev) => new Set([...prev, page]));
+      setCompletedTranslatedPages((prev) => new Set([...prev, pageIndex]));
       setShowTranslation(true);
     } catch (err) {
-      console.error(`[PageTranslate] Page ${page + 1} failed:`, err);
+      console.error(`[PageTranslate] Page ${pageIndex + 1} failed:`, err);
     } finally {
       setTranslatingCurrentPage(false);
+      setTranslatingCurrentPageIndex(null);
     }
   };
 
@@ -752,7 +763,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                 ? "border-amber-400/30 bg-amber-500/10 text-amber-200 hover:border-amber-400/60"
                 : translating
                 ? "border-red-400/40 bg-red-500/10 text-red-300 hover:border-red-400/60"
-                : (translatedPages.size > 0 || patchedPages.size > 0)
+                : hasAnyTranslation
                 ? "border-blue-400/40 bg-blue-500/10 text-blue-300 hover:border-blue-400/60"
                 : "border-white/20 text-white/70 hover:border-white/40 hover:text-white";
 
@@ -783,10 +794,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   )}
                   {translating ? (
                     `${transProgress.done}/${transProgress.total}`
-                  ) : (translatedPages.size > 0 || patchedPages.size > 0) ? (
+                  ) : hasFullTranslation ? (
                     <>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3 w-3 shrink-0"><path d="M5 13l4 4L19 7" /></svg>
                       แปลแล้ว
+                    </>
+                  ) : hasPartialTranslation ? (
+                    <>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3 w-3 shrink-0"><path d="M12 6v6l4 2" /><circle cx="12" cy="12" r="9" /></svg>
+                      แปลบางหน้า
                     </>
                   ) : mitStatus === "offline" ? (
                     "แปล (ออฟไลน์)"
@@ -845,7 +861,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       {translatingCurrentPage ? (
                         <>
                           <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" strokeOpacity="0.3" /><path d="M12 3a9 9 0 0 1 9 9" /></svg>
-                          กำลังแปลหน้า {page + 1}...
+                          กำลังแปลหน้า {(translatingCurrentPageIndex ?? page) + 1}...
                         </>
                       ) : (
                         <>
@@ -865,7 +881,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                     </button>
 
                     {/* Show / hide translation toggle */}
-                    {(translatedPages.size > 0 || patchedPages.size > 0) && (
+                    {hasAnyTranslation && (
                       <>
                         <div className="my-1 border-t border-white/10" />
                         <button
@@ -1042,7 +1058,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         {translatingCurrentPage ? (
                           <>
                             <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" strokeOpacity="0.3" /><path d="M12 3a9 9 0 0 1 9 9" /></svg>
-                            กำลังแปลหน้า {page + 1}...
+                            กำลังแปลหน้า {(translatingCurrentPageIndex ?? page) + 1}...
                           </>
                         ) : (
                           <>
@@ -1067,7 +1083,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                           </>
                         )}
                       </button>
-                      {(translatedPages.size > 0 || patchedPages.size > 0) && (
+                      {hasAnyTranslation && (
                         <button
                           onClick={() => { setShowTranslation((s) => !s); setMoreMenuOpen(false); }}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition hover:bg-white/10 hover:text-white"
@@ -1215,7 +1231,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             </div>
           )}
           {!loading && !error && data && pages.map((src, i) => {
-            const pageIsPending = translating && !completedTranslatedPages.has(i);
+            const pageIsPending = (translating && !completedTranslatedPages.has(i)) || translatingCurrentPageIndex === i;
             const pageIsDone = completedTranslatedPages.has(i) && patchedPages.has(i);
             return (
               <div key={src} className="relative manga-continuous-img">
@@ -1371,10 +1387,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               {/* Translation status pill — paged mode, floats at bottom of viewing area above the strip */}
               {(translating || translatingCurrentPage) && (
                 <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
-                  {(translating && !completedTranslatedPages.has(page)) || translatingCurrentPage ? (
+                  {(translating && !completedTranslatedPages.has(page)) || translatingCurrentPageIndex === page ? (
                     <div className="flex items-center gap-2 rounded-full border border-blue-400/40 bg-black/85 px-4 py-2 shadow-xl shadow-black/60 backdrop-blur-sm">
                       <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400/30 border-t-blue-400" />
                       <span className="text-xs font-medium text-blue-300">กำลังแปลหน้า {page + 1}...</span>
+                    </div>
+                  ) : translatingCurrentPageIndex !== null ? (
+                    <div className="flex items-center gap-2 rounded-full border border-blue-400/40 bg-black/85 px-4 py-2 shadow-xl shadow-black/60 backdrop-blur-sm">
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400/30 border-t-blue-400" />
+                      <span className="text-xs font-medium text-blue-300">กำลังแปลหน้า {translatingCurrentPageIndex + 1}...</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 rounded-full border border-white/20 bg-black/85 px-4 py-2 shadow-xl shadow-black/60 backdrop-blur-sm">
@@ -1436,7 +1457,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       }`}>
         <div ref={stripScrollRef} className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-4">
           {pages.map((_, i: number) => {
-            const btnPending = translating && !completedTranslatedPages.has(i);
+            const btnPending = (translating && !completedTranslatedPages.has(i)) || translatingCurrentPageIndex === i;
             const btnDone = patchedPages.has(i);
             return (
               <button
