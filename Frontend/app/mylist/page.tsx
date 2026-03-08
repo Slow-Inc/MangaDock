@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "../components/Navbar";
 import MangaGrid, { GridBook } from "../components/MangaGrid";
@@ -248,7 +248,7 @@ function LoginPrompt({ onLogin }: { onLogin: () => void }) {
   );
 }
 
-export default function MyListPage() {
+function MyListContent() {
   const { user, loading, openLoginModal } = useContext(AuthContext);
   const searchParams = useSearchParams();
 
@@ -424,5 +424,13 @@ export default function MyListPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function MyListPage() {
+  return (
+    <Suspense>
+      <MyListContent />
+    </Suspense>
   );
 }

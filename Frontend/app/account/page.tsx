@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../contexts/AuthContext";
 import AccountModal from "../components/AccountModal";
 
-export default function AccountPage() {
+function AccountContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") ?? undefined;
@@ -21,5 +21,13 @@ export default function AccountPage() {
     <main className="bg-[#141414]">
       <AccountModal isOpen asPage onClose={() => router.back()} initialTab={tab} />
     </main>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense>
+      <AccountContent />
+    </Suspense>
   );
 }
