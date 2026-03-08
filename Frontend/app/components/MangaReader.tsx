@@ -127,6 +127,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [targetLang, setTargetLang] = useState<string>("th");
   const [translateMenuOpen, setTranslateMenuOpen] = useState(false);
   const translateMenuRef = useRef<HTMLDivElement | null>(null);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
   const translateControllerRef = useRef<AbortController | null>(null);
   const [mitStatus, setMitStatus] = useState<"unknown" | "online" | "offline">("unknown");
   const [imgLoading, setImgLoading] = useState(true);
@@ -135,7 +137,10 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [continuousMode, setContinuousMode] = useState(false);
+  // Default to continuous mode on mobile (< 640px) for better UX
+  const [continuousMode, setContinuousMode] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 640
+  );
 
   // Track last valid page count so the counter can show it during fade-out
   const lastValidTotalPagesRef = useRef(0);
@@ -219,6 +224,18 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     return () => document.removeEventListener("mousedown", handler);
   }, [translateMenuOpen]);
 
+  // Close mobile more menu on outside click
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [moreMenuOpen]);
+
   const zoomRef = useRef(1);
   const continuousModeRef = useRef(false);
   const isZoomingRef = useRef(false);
@@ -227,11 +244,30 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const continuousLenisRef = useRef<Lenis | null>(null);
   const pageRefs = useRef<(HTMLImageElement | null)[]>([]);
+  const stripScrollRef = useRef<HTMLDivElement>(null);
+  const activeStripBtnRef = useRef<HTMLButtonElement>(null);
   const dragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
   const panRef = useRef({ x: 0, y: 0 });
 
   useLocalLenis(scrollContainerRef, "vertical", continuousMode, continuousLenisRef);
+
+  // Auto-scroll bottom strip to keep current page button visible
+  // Debounced so rapid page updates (continuous mode scroll) don't spam smooth-scrolls
+  const stripScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (stripScrollTimerRef.current) clearTimeout(stripScrollTimerRef.current);
+    stripScrollTimerRef.current = setTimeout(() => {
+      const btn = activeStripBtnRef.current;
+      const container = stripScrollRef.current;
+      if (!btn || !container) return;
+      const btnLeft = btn.offsetLeft;
+      const btnWidth = btn.offsetWidth;
+      const containerWidth = container.offsetWidth;
+      const scrollTo = btnLeft - containerWidth / 2 + btnWidth / 2;
+      container.scrollTo({ left: Math.max(0, scrollTo), behavior: "smooth" });
+    }, 80);
+  }, [page]);
 
   const applyTransform = (z: number, px: number, py: number, animate = true) => {
     const el = zoomWrapperRef.current;
@@ -337,25 +373,34 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     });
   }, [continuousMode]);
 
+  // Persistent ratio map: keeps the last known intersection ratio of every page
+  // so the observer callback always has full visibility data, not just the delta.
+  const pageRatioMapRef = useRef<Map<number, number>>(new Map());
+
   // IntersectionObserver: track visible page in continuous mode
   useEffect(() => {
     if (!continuousMode || !data) return;
+    pageRatioMapRef.current.clear();
     const observer = new IntersectionObserver(
       (entries) => {
         if (isZoomingRef.current) return; // ignore reflows caused by zoom change
-        let best: { idx: number; ratio: number } | null = null;
+        // Update the persistent map with the latest ratios from this batch
         entries.forEach((entry) => {
           const idx = Number((entry.target as HTMLElement).dataset.pageIdx);
-          if (!best || entry.intersectionRatio > best.ratio)
-            best = { idx, ratio: entry.intersectionRatio };
+          pageRatioMapRef.current.set(idx, entry.intersectionRatio);
         });
-        if (best && (best as { idx: number; ratio: number }).ratio > 0)
-          setPage((best as { idx: number }).idx);
+        // Find the globally most-visible page across ALL observed pages
+        let bestIdx = -1;
+        let bestRatio = 0;
+        pageRatioMapRef.current.forEach((ratio, idx) => {
+          if (ratio > bestRatio) { bestRatio = ratio; bestIdx = idx; }
+        });
+        if (bestIdx >= 0 && bestRatio > 0) setPage(bestIdx);
       },
-      { root: scrollContainerRef.current, threshold: Array.from({ length: 11 }, (_, i) => i / 10) }
+      { root: scrollContainerRef.current, threshold: Array.from({ length: 21 }, (_, i) => i / 20) }
     );
     pageRefs.current.forEach((el) => { if (el) observer.observe(el); });
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); pageRatioMapRef.current.clear(); };
   }, [continuousMode, data]);
 
   const handleClose = () => { setVisible(false); setTimeout(onClose, 250); };
@@ -644,15 +689,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const content = (
     <div className={`fixed inset-0 z-300 flex flex-col bg-black transition-opacity duration-250 ${visible ? "opacity-100" : "opacity-0"}`}>
       {/* Top bar — z-10 ensures dropdown panel stacks above the reader area (flip buttons etc.) */}
-      <div className="relative z-10 flex shrink-0 items-center border-b border-white/10 bg-black/80 px-4 py-3 backdrop-blur-sm">
+      <div className="relative z-10 flex shrink-0 items-center border-b border-white/10 bg-black/80 px-2 py-2 sm:px-4 sm:py-3 backdrop-blur-sm">
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs text-white/50">{mangaTitle}</p>
           <p className="truncate text-sm font-semibold text-white">{chapterLabel}</p>
         </div>
 
-        {/* Page counter — centered absolutely so it's always in the middle */}
+        {/* Page counter — centered absolutely so it's always in the middle, hidden on mobile */}
         {(totalPages > 0 || lastValidTotalPagesRef.current > 0) && (
-          <span className={`pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-lg bg-white/10 px-3 py-1.5 text-xs text-white/80 transition-opacity duration-250 ${
+          <span className={`pointer-events-none hidden sm:inline absolute left-1/2 -translate-x-1/2 rounded-lg bg-white/10 px-3 py-1.5 text-xs text-white/80 transition-opacity duration-250 ${
             contentReady && !error && totalPages > 0 ? "opacity-100" : "opacity-0"
           }`}>
             {(!contentReady || error ? lastValidTotalPagesRef.current : totalPages) > 0
@@ -661,7 +706,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           </span>
         )}
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {/* Chapter navigation */}
           {sameLangList.length > 1 && (
             <div className="flex items-center gap-1 rounded-lg border border-white/15 bg-white/5">
@@ -838,8 +883,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             );
           })()}
 
-          {/* Read mode toggle */}
-          <div className="flex overflow-hidden rounded-lg border border-white/15 bg-white/5 text-[11px]">
+          {/* Read mode toggle — hidden on mobile, shown in more menu */}
+          <div className="hidden sm:flex overflow-hidden rounded-lg border border-white/15 bg-white/5 text-[11px]">
             <button
               onClick={() => setContinuousMode(false)}
               className={`px-2.5 py-1.5 transition ${!continuousMode ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
@@ -860,8 +905,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             </button>
           </div>
 
-          {/* Zoom controls */}
-          <div className="flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1.5 py-1">
+          {/* Zoom controls — hidden on mobile, shown in more menu */}
+          <div className="hidden sm:flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1.5 py-1">
             <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} title="ย่อ" className="flex h-6 w-6 items-center justify-center rounded text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-30">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5"><path d="M5 12h14" /></svg>
             </button>
@@ -871,6 +916,171 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} title="ขยาย" className="flex h-6 w-6 items-center justify-center rounded text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-30">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5"><path d="M12 5v14M5 12h14" /></svg>
             </button>
+          </div>
+
+          {/* Mobile more menu (⋮) — visible only on mobile */}
+          <div ref={moreMenuRef} className="relative sm:hidden">
+            <button
+              onClick={() => setMoreMenuOpen((o) => !o)}
+              title="เพิ่มเติม"
+              className={`flex h-9 w-9 items-center justify-center rounded-full border text-white/70 transition hover:bg-white/15 hover:text-white ${
+                moreMenuOpen ? "border-white/40 bg-white/10 text-white" : "border-white/20"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                <circle cx="12" cy="5" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="12" cy="19" r="2" />
+              </svg>
+            </button>
+
+            {/* Mobile dropdown panel */}
+            <div
+              className={`absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-white/15 bg-black/95 shadow-2xl backdrop-blur-xl transition-all duration-200 origin-top-right ${
+                moreMenuOpen
+                  ? "pointer-events-auto scale-100 opacity-100"
+                  : "pointer-events-none scale-95 opacity-0"
+              }`}
+            >
+              {/* Zoom section */}
+              <div className="border-b border-white/10 px-4 py-3">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">ซูม</p>
+                <div className="flex items-center gap-2">
+                  <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white disabled:opacity-30">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M5 12h14" /></svg>
+                  </button>
+                  <button onClick={zoomReset} className="flex-1 rounded-lg bg-white/10 py-1.5 text-center text-xs text-white/70 transition hover:bg-white/20 hover:text-white">
+                    {Math.round(zoom * 100)}%
+                  </button>
+                  <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white disabled:opacity-30">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M12 5v14M5 12h14" /></svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Read mode section */}
+              <div className="border-b border-white/10 px-4 py-3">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">โหมดอ่าน</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setContinuousMode(false)}
+                    className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs transition ${
+                      !continuousMode ? "bg-white/20 text-white" : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" /></svg>
+                    ทีละหน้า
+                  </button>
+                  <button
+                    onClick={() => setContinuousMode(true)}
+                    className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs transition ${
+                      continuousMode ? "bg-white/20 text-white" : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5"><path d="M4 4h16v4H4zm0 6h16v4H4zm0 6h16v4H4z" /></svg>
+                    ต่อเนื่อง
+                  </button>
+                </div>
+              </div>
+
+              {/* Data saver section */}
+              <div className={`${data && pages.length > 0 ? "border-b border-white/10" : ""} px-4 py-3`}>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">คุณภาพ</p>
+                <button
+                  onClick={() => setUseSaver((s) => !s)}
+                  className="flex w-full items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"
+                >
+                  <span>{useSaver ? "Data Saver" : "HD"}</span>
+                  <span className={`rounded px-2 py-0.5 text-[10px] ${
+                    useSaver ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"
+                  }`}>
+                    {useSaver ? "ประหยัดข้อมูล" : "คุณภาพสูง"}
+                  </span>
+                </button>
+              </div>
+
+              {/* Translate section — only when data available */}
+              {data && pages.length > 0 && (() => {
+                const source = (currentLang ?? "").toLowerCase();
+                const LANGS = TARGET_LANG_OPTIONS.filter((l) => l.code !== source);
+                const currentTarget = LANGS.find((l) => l.code === targetLang) ?? LANGS[0];
+                return (
+                  <div className="px-4 py-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/40">การแปล AI</p>
+                      <span className={`h-1.5 w-1.5 rounded-full ${
+                        mitStatus === "online" ? "bg-green-400" : mitStatus === "offline" ? "bg-red-500" : "bg-white/30"
+                      }`} />
+                    </div>
+
+                    {/* Language selector */}
+                    {LANGS.length > 0 && (
+                      <div className="mb-2 flex flex-wrap gap-1">
+                        {LANGS.map((l) => (
+                          <button
+                            key={l.code}
+                            onClick={() => setTargetLang(l.code)}
+                            className={`rounded-lg px-3 py-1.5 text-xs transition ${
+                              currentTarget?.code === l.code
+                                ? "bg-white/15 font-semibold text-white"
+                                : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                            }`}
+                          >
+                            {l.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Translate actions */}
+                    <div className="space-y-1">
+                      <button
+                        onClick={() => { translateCurrentPage(); setMoreMenuOpen(false); }}
+                        disabled={translatingCurrentPage || translating}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-purple-300/90 transition hover:bg-white/10 hover:text-purple-200 disabled:opacity-50"
+                      >
+                        {translatingCurrentPage ? (
+                          <>
+                            <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" strokeOpacity="0.3" /><path d="M12 3a9 9 0 0 1 9 9" /></svg>
+                            กำลังแปลหน้า {page + 1}...
+                          </>
+                        ) : (
+                          <>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 8h10M7 12h6" /></svg>
+                            แปลหน้านี้
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => { if (translating) { cancelTranslate(); } else { startTranslate(); setMoreMenuOpen(false); } }}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition hover:bg-white/10 hover:text-white"
+                      >
+                        {translating ? (
+                          <>
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0"><rect x="6" y="6" width="12" height="12" /></svg>
+                            หยุดแปล ({transProgress.done}/{transProgress.total})
+                          </>
+                        ) : (
+                          <>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M4 6h16M4 10h16M4 14h10M4 18h6" /></svg>
+                            แปลทั้งตอน
+                          </>
+                        )}
+                      </button>
+                      {(translatedPages.size > 0 || patchedPages.size > 0) && (
+                        <button
+                          onClick={() => { setShowTranslation((s) => !s); setMoreMenuOpen(false); }}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition hover:bg-white/10 hover:text-white"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                          {showTranslation ? "ดูต้นฉบับ" : "ดูฉบับแปล"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
 
           <button onClick={handleClose} title="ปิด" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white transition hover:bg-white/15">
@@ -1224,13 +1434,14 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       <div className={`shrink-0 overflow-hidden border-t border-white/10 bg-black/80 transition-all duration-300 ease-in-out ${
         contentReady && !error && totalPages > 0 ? "max-h-14 opacity-100 py-2" : "max-h-0 opacity-0 py-0"
       }`}>
-        <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-4">
+        <div ref={stripScrollRef} className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-4">
           {pages.map((_, i: number) => {
             const btnPending = translating && !completedTranslatedPages.has(i);
             const btnDone = patchedPages.has(i);
             return (
               <button
                 key={i}
+                ref={i === page ? activeStripBtnRef : undefined}
                 onClick={() => continuousMode ? scrollToPage(i) : setPage(i)}
                 className={`relative flex h-7 min-w-9 shrink-0 items-center justify-center rounded text-[10px] font-medium transition-all duration-200 ${
                   i === page ? "bg-white text-black" : "bg-white/10 text-white/60 hover:bg-white/20"

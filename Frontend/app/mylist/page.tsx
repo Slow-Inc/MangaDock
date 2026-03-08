@@ -20,6 +20,7 @@ import { AuthContext } from "../contexts/AuthContext";
 type TabKey = "favorites" | "liked" | "history";
 
 const PAGE_SIZE = 28;
+const TRANSITION_MS = 300;
 
 const TABS: { key: TabKey; label: string }[] = [
 
@@ -258,6 +259,9 @@ function MyListContent() {
   const [favorites, setFavorites]   = useState<GridBook[]>([]);
   const [likedBooks, setLikedBooks] = useState<GridBook[]>([]);
   const [history, setHistory]       = useState<GridBook[]>([]);
+  const [visible, setVisible] = useState(true);
+  const fadeOutStartRef = useRef<number>(0);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const requestedTab = searchParams.get("tab");
@@ -266,7 +270,22 @@ function MyListContent() {
     }
   }, [searchParams]);
 
-  useEffect(() => { setPage(1); setCategoryFilter("all"); }, [activeTab]);
+  useEffect(() => {
+    setPage(1);
+    setCategoryFilter("all");
+    setVisible(true);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (visible) return;
+    if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+    const elapsed = Date.now() - fadeOutStartRef.current;
+    const remaining = Math.max(0, TRANSITION_MS - elapsed);
+    fadeTimerRef.current = setTimeout(() => setVisible(true), remaining);
+    return () => {
+      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+    };
+  }, [visible, page, categoryFilter, activeTab]);
 
   useEffect(() => {
     const refresh = () => {
@@ -323,6 +342,11 @@ function MyListContent() {
     favorites: "ยังไม่มีรายการที่บันทึกไว้",
     liked:     "ยังไม่มีรายการที่ถูกใจ",
     history:   "ยังไม่มีประวัติการอ่าน",
+  };
+
+  const startFadeOut = () => {
+    setVisible(false);
+    fadeOutStartRef.current = Date.now();
   };
 
   return (
@@ -399,13 +423,22 @@ function MyListContent() {
                 <ChipBar
                   categories={availableCategories}
                   active={categoryFilter}
-                  onSelect={(cat) => { setCategoryFilter(cat); setPage(1); }}
+                  onSelect={(cat) => {
+                    startFadeOut();
+                    setCategoryFilter(cat);
+                    setPage(1);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                 />
               );
 
               const totalPages = Math.max(1, Math.ceil(filteredBooks.length / PAGE_SIZE));
               const paged = filteredBooks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-              const handlePageChange = (p: number) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); };
+              const handlePageChange = (p: number) => {
+                startFadeOut();
+                setPage(p);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              };
               return (
                 <>
                   {chips}
@@ -413,10 +446,20 @@ function MyListContent() {
                     {filteredBooks.length.toLocaleString()} เรื่อง
                     {categoryFilter !== "all" && ` · ${categoryFilter}`}
                   </p>
-                  {filteredBooks.length === 0
-                    ? <EmptyState label="ไม่มีรายการในหมวดหมู่นี้" />
-                    : <MangaGrid books={paged} />}
-                  <Pagination page={page} totalPages={totalPages} total={filteredBooks.length} onPageChange={handlePageChange} />
+                  <div
+                    className={`transition-all duration-300 ease-out ${
+                      visible
+                        ? "translate-y-0 opacity-100"
+                        : "pointer-events-none translate-y-3 opacity-0"
+                    }`}
+                  >
+                    {filteredBooks.length === 0
+                      ? <EmptyState label="ไม่มีรายการในหมวดหมู่นี้" />
+                      : <MangaGrid books={paged} />}
+                  </div>
+                  {visible && (
+                    <Pagination page={page} totalPages={totalPages} total={filteredBooks.length} onPageChange={handlePageChange} />
+                  )}
                 </>
               );
             })()}

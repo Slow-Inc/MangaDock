@@ -278,7 +278,7 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
 
           {/* Info */}
           <div className={`flex min-w-0 flex-1 flex-col justify-center overflow-hidden py-4 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-            <p className="mb-3 text-xs font-semibold tracking-[0.32em] text-red-400">Popular</p>
+            <p className="mb-3 text-xs font-semibold tracking-[0.32em] text-red-400">Top 10 หนังสือที่น่าอ่านวันนี้</p>
             <h1 className="text-4xl font-black uppercase leading-tight text-white lg:text-5xl xl:text-6xl">
               {titleMain}
             </h1>

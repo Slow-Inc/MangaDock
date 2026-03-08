@@ -1,34 +1,37 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
-import Navbar from "./components/Navbar";
+import { ToastProvider } from "./contexts/ToastContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import DevImageCacheToggle from "./components/DevImageCacheToggle";
+import SmoothScrolling from "./components/SmoothScrolling";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-playfair",
-  display: "swap",
+const notoSansThai = Noto_Sans_Thai({
+  variable: "--font-noto-sans-thai",
+  subsets: ["thai", "latin"],
 });
 
 export const metadata: Metadata = {
-  title: "MetaBooks — E-Book Platform สไตล์ Netflix",
-  description:
-    "Landing Page ขาย E-Book โทน Netflix พร้อม Google/Facebook OAuth ผ่าน NestJS และ Next.js",
+  title: "MetaBooks by Hayate | Manga Streaming Platform",
+  description: "แพลตฟอร์ม E-Book สไตล์ Netflix ด้วย MangaDex API",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="th" className={`${inter.variable} ${playfair.variable}`}>
-      <body className="antialiased">
-        <Navbar />
-        {children}
+    <html lang="th">
+      <body className={`${notoSansThai.variable} antialiased`}>
+        <SmoothScrolling>
+          <ToastProvider>
+            <AuthProvider>
+              {children}
+              <DevImageCacheToggle />
+            </AuthProvider>
+          </ToastProvider>
+        </SmoothScrolling>
       </body>
     </html>
   );

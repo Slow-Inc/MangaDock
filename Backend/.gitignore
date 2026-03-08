@@ -17,7 +17,9 @@ lerna-debug.log*
 
 # Cache
 /.cache
+/.cache_old
 uploads
+uploads_old
 
 # Tests
 /coverage
@@ -64,3 +66,5 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 metabooks-d3914-firebase-adminsdk-fbsvc-a87f27075e.json
+
+
