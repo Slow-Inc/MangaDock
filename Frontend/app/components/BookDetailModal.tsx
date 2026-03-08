@@ -81,7 +81,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(false);
   const { favorited, liked, handleToggleFavorite, handleToggleLiked } = useBookActions(book);
 
   // Auto-detect last read chapter from history when prop is not explicitly provided
@@ -330,172 +329,187 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
             </button>
           )}
 
-          {/* Hero banner */}
-          <div className={`relative w-full bg-black ${isLandscape ? "aspect-video" : "aspect-16/7"}`}>
-            <Image
-              src={displayThumbnail}
-              alt={book.title}
-              fill
-              onLoad={(e) => {
-                const img = e.currentTarget as HTMLImageElement;
-                if (!selectedCover && img.naturalWidth > img.naturalHeight) setIsLandscape(true);
-              }}
-              className={isLandscape ? "object-contain" : "object-cover object-top"}
-              sizes="768px"
-              priority
-            />
-            <div className="absolute inset-0 bg-linear-to-t from-[#141414] via-[#141414]/20 to-transparent" />
-            <div className="absolute bottom-0 left-0 p-6">
-              <h2 className="text-2xl font-black text-white drop-shadow-lg md:text-3xl">
-                {book.title}
-              </h2>
-              {book.subtitle && (
-                <p className="mt-1 text-sm font-semibold tracking-wide text-white/70">
-                  {book.subtitle}
-                </p>
-              )}
+          {/* Hero — two-panel card layout, matching HeroCarousel style */}
+          <div className="relative w-full overflow-hidden">
+            {/* Blurred background */}
+            <div className="absolute inset-0 overflow-hidden">
+              <Image
+                src={displayThumbnail}
+                alt=""
+                fill
+                aria-hidden
+                sizes="768px"
+                className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
+              />
+            </div>
+            <div className="absolute inset-0 bg-linear-to-b from-[#141414]/60 via-transparent to-[#141414]" />
+
+            {/* Two-panel card */}
+            <div className="relative z-10 flex gap-5 px-5 pb-6 pt-14">
+              {/* Portrait thumbnail */}
+              <div className="relative aspect-2/3 w-32 shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10 md:w-40">
+                <Image
+                  src={displayThumbnail}
+                  alt={book.title}
+                  fill
+                  className="object-cover object-center"
+                  sizes="160px"
+                  priority
+                />
+              </div>
+
+              {/* Info panel */}
+              <div className="flex min-w-0 flex-1 flex-col justify-end gap-3">
+                {/* Title */}
+                <div>
+                  <h2 className="text-xl font-black leading-tight text-white drop-shadow-lg md:text-2xl">
+                    {book.title}
+                  </h2>
+                  {book.subtitle && (
+                    <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-white/60">
+                      {book.subtitle}
+                    </p>
+                  )}
+                </div>
+
+                {/* Meta chips */}
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  {book.averageRating > 0 && (
+                    <span className="flex items-center gap-1 font-semibold text-green-400">
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                      </svg>
+                      {book.averageRating.toFixed(1)}
+                    </span>
+                  )}
+                  {book.publishedDate && (
+                    <span className="text-white/50">{book.publishedDate}</span>
+                  )}
+                  {categories.slice(0, 3).map((cat) => (
+                    <span key={cat} className="rounded-full border border-white/20 px-2 py-0.5 text-white/70">
+                      {cat}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {isManga ? (
+                    !loadingChapters && chapters.length === 0 ? (
+                      <button
+                        disabled
+                        className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-white/20 px-5 py-2 text-sm font-bold text-white/40"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                          <path d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        ไม่มีตอนให้อ่าน
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => chaptersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                        disabled={loadingChapters}
+                        className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-white/85 disabled:opacity-50"
+                      >
+                        {loadingChapters ? (
+                          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        )}
+                        {loadingChapters ? "กำลังโหลด..." : "ดูตอนทั้งหมด"}
+                      </button>
+                    )
+                  ) : (
+                    <button className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-white/85">
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                      อ่านเลย
+                    </button>
+                  )}
+                  {isManga && (
+                    <button
+                      onClick={() => {
+                        if (firstReadableChapter) {
+                          addToHistory({ ...book, lastChapterId: firstReadableChapter.id, lastChapterNumber: firstReadableChapter.chapterNumber });
+                          setActiveChapter({ id: firstReadableChapter.id, chapterNumber: firstReadableChapter.chapterNumber, title: firstReadableChapter.title });
+                        }
+                      }}
+                      disabled={chapters.length === 0 || !hasReadableChapter}
+                      className="flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-40"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                        <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      {loadingChapters
+                        ? "กำลังโหลด..."
+                        : hasReadableChapter
+                          ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}`
+                          : "ไม่มีตอน"}
+                    </button>
+                  )}
+                  <button
+                    title={favorited ? "อยู่ในรายการแล้ว" : "เพิ่มในรายการ"}
+                    onClick={handleToggleFavorite}
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+                      favorited ? "border-white bg-white text-black" : "border-white/40 text-white hover:border-white"
+                    }`}
+                  >
+                    {favorited ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                    )}
+                  </button>
+                  <button
+                    title={liked ? "เอาออก" : "ถูกใจ"}
+                    onClick={handleToggleLiked}
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+                      liked ? "border-red-500 text-red-500" : "border-white/40 text-white hover:border-white"
+                    }`}
+                  >
+                    <svg viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Main content area */}
-          <div className="flex gap-6 p-6 pt-4">
-            {/* Left */}
-            <div className="flex-1 space-y-5">
-              {/* Actions */}
-              <div className="flex items-center gap-3">
-                {isManga ? (
-                  // Manga: scroll to chapters section
-                  !loadingChapters && chapters.length === 0 ? (
-                    <button
-                      disabled
-                      className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-white/20 px-6 py-2.5 text-sm font-bold text-white/40"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-                        <path d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
-                      </svg>
-                      ไม่มีตอนให้อ่าน
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => chaptersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                      disabled={loadingChapters}
-                      className="flex items-center gap-2 rounded-lg bg-white px-6 py-2.5 text-sm font-bold text-black transition hover:bg-white/85 disabled:opacity-50"
-                    >
-                      {loadingChapters ? (
-                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                        </svg>
-                      ) : (
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      )}
-                      {loadingChapters ? "กำลังโหลด..." : "ดูตอนทั้งหมด"}
-                    </button>
-                  )
-                ) : (
-                  <button className="flex items-center gap-2 rounded-lg bg-white px-6 py-2.5 text-sm font-bold text-black transition hover:bg-white/85">
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                    อ่านเลย
-                  </button>
-                )}
-                {isManga && (
+          {/* Description + side details */}
+          <div className="flex gap-6 px-5 pb-2 pt-4">
+            {/* Description */}
+            <div className="flex-1 space-y-1.5">
+              <p className="text-sm leading-relaxed text-white/75">
+                {(translatedDesc && !showOriginalDesc) ? translatedDesc : (book.description || detail?.description || "ไม่มีคำอธิบายสำหรับเรื่องนี้")}
+              </p>
+              {translatingDesc && (
+                <p className="text-[10px] text-white/30">กำลังแปล...</p>
+              )}
+              {translatedDesc && !translatingDesc && (
+                <div className="flex items-center gap-2">
+                  <GeminiBadge small />
                   <button
-                    onClick={() => {
-                      if (firstReadableChapter) {
-                        addToHistory({ ...book, lastChapterId: firstReadableChapter.id, lastChapterNumber: firstReadableChapter.chapterNumber });
-                        setActiveChapter({ id: firstReadableChapter.id, chapterNumber: firstReadableChapter.chapterNumber, title: firstReadableChapter.title });
-                      }
-                    }}
-                    disabled={chapters.length === 0 || !hasReadableChapter}
-                    className="flex items-center gap-2 rounded-lg border border-white/30 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-40"
+                    onClick={() => setShowOriginalDesc((v) => !v)}
+                    className="text-[10px] text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-                      <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                    {loadingChapters
-                      ? "กำลังโหลด..."
-                      : hasReadableChapter
-                        ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}`
-                        : "ไม่มีตอน"}
+                    {showOriginalDesc ? "แสดงคำแปล" : "ต้นฉบับ"}
                   </button>
-                )}
-                <button
-                  title={favorited ? "อยู่ในรายการแล้ว" : "เพิ่มในรายการ"}
-                  onClick={handleToggleFavorite}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full border transition ${
-                    favorited ? "border-white bg-white text-black" : "border-white/40 text-white hover:border-white"
-                  }`}
-                >
-                  {favorited ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
-                      <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  )}
-                </button>
-                <button
-                  title={liked ? "เอาออก" : "ถูกใจ"}
-                  onClick={handleToggleLiked}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full border transition ${
-                    liked ? "border-red-500 text-red-500" : "border-white/40 text-white hover:border-white"
-                  }`}
-                >
-                  <svg viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Meta chips */}
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                {book.averageRating > 0 && (
-                  <span className="flex items-center gap-1 font-semibold text-green-400">
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
-                    {book.averageRating.toFixed(1)}
-                  </span>
-                )}
-                {book.publishedDate && (
-                  <span className="text-white/50">{book.publishedDate}</span>
-                )}
-                {categories.slice(0, 4).map((cat) => (
-                  <span key={cat} className="rounded-full border border-white/20 px-2.5 py-0.5 text-xs text-white/70">
-                    {cat}
-                  </span>
-                ))}
-              </div>
-
-              {/* Description */}
-              <div className="space-y-1.5">
-                <p className="text-sm leading-relaxed text-white/75">
-                  {(translatedDesc && !showOriginalDesc) ? translatedDesc : (book.description || detail?.description || "ไม่มีคำอธิบายสำหรับเรื่องนี้")}
-                </p>
-                {translatingDesc && (
-                  <p className="text-[10px] text-white/30">กำลังแปล...</p>
-                )}
-                {translatedDesc && !translatingDesc && (
-                  <div className="flex items-center gap-2">
-                    <GeminiBadge small />
-                    <button
-                      onClick={() => setShowOriginalDesc((v) => !v)}
-                      className="text-[10px] text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"
-                    >
-                      {showOriginalDesc ? "แสดงคำแปล" : "ต้นฉบับ"}
-                    </button>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
-            {/* Right — side details */}
-            <div className="hidden w-44 shrink-0 space-y-3 text-xs md:block">
+            {/* Side details */}
+            <div className="hidden w-40 shrink-0 space-y-3 text-xs md:block">
               {allAuthors.length > 0 && (
                 <div>
                   <span className="text-white/40">ผู้แต่ง: </span>
