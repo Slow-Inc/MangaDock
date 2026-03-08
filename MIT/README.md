@@ -27,6 +27,8 @@
      └────────────────┘
 ```
 
+**หมายเหตุเรื่อง Port:** Port 5003 คือ FastAPI server ที่รับ request จากภายนอก Port 5004 คือ worker process ที่รัน ML pipeline จริงๆ โดย server จะ **spawn worker อัตโนมัติ** ตอนเริ่มต้น (`port + 1` ของ port ที่ตั้งไว้) ไม่ต้องเปิด port นี้เองหรือตั้งค่าเพิ่มเติม ถ้าเห็น log `Uvicorn running on http://0.0.0.0:5004` แสดงว่า worker พร้อมทำงานแล้ว และเป็นพฤติกรรมปกติ
+
 ลำดับการทำงานหลักของ pipeline คือ detection → OCR → translation → inpainting → rendering
 
 ## โครงสร้างไดเรกทอรี
