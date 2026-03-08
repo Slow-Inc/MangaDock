@@ -26,7 +26,7 @@ flowchart LR
   B --> C[Open Reader]
   C --> D[Select Page]
   D --> E[Request Translation]
-  E --> F[Backend (NestJS) Calls MIT]
+  E --> F["Backend (NestJS) Calls MIT"]
   F --> G[Display Translated Page or Patches]
 ```
 
