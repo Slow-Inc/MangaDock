@@ -53,73 +53,52 @@ flowchart LR
 ## 2. UML Component Diagram
 
 ```mermaid
-classDiagram
-direction LR
+flowchart LR
+  User([User\nactor])
 
-class User <<actor>>
+  NextFrontend[NextFrontend\ncomponent\nHome Page\nSearch Page\nCategories Page\nMy List Page\nAccount Page\nHeroCarousel\nBookDetailModal\nMangaReader]
+  NextApiProxy[NextApiProxy\ncomponent\napi/proxy routes\nimg-proxy route]
+  NestBackend[NestBackend\ncomponent\nBooksController\nUsersController\nUsersPublicController\nStatusController]
 
-class NextFrontend <<component>> {
-  +Home Page
-  +Search Page
-  +Categories Page
-  +My List Page
-  +Account Page
-  +HeroCarousel
-  +BookDetailModal
-  +MangaReader
-}
+  BooksService[BooksService\nservice]
+  UsersService[UsersService\nservice]
+  CacheOrchestratorService[CacheOrchestratorService\nservice]
+  FirebaseService[FirebaseService\nservice]
+  StatusService[StatusService\nservice]
 
-class NextApiProxy <<component>> {
-  +GET POST PATCH DELETE /api/proxy/*
-  +GET /api/img-proxy
-}
+  GoogleBooksAPI[(Google Books API\nexternal)]
+  MangaDexAPI[(MangaDex API\nexternal)]
+  GeminiAPI[(Gemini API\nexternal)]
+  MangaImageTranslator[(Manga Image Translator\nexternal)]
+  FirebaseAuth[(Firebase Auth\nexternal)]
+  Firestore[(Firestore\ndatabase)]
+  Redis[(Redis\ndatabase)]
+  JsonCache[(JSON Cache\ndatabase)]
+  ImageCache[(Image Cache\ndatabase)]
+  UploadStorage[(Upload Storage\ndatabase)]
 
-class NestBackend <<component>> {
-  +BooksController
-  +UsersController
-  +UsersPublicController
-  +StatusController
-}
+  User -->|use via browser| NextFrontend
+  NextFrontend -->|relative HTTP requests| NextApiProxy
+  NextApiProxy -->|server-to-server forwarding| NestBackend
 
-class BooksService <<service>>
-class UsersService <<service>>
-class CacheOrchestratorService <<service>>
-class FirebaseService <<service>>
-class StatusService <<service>>
+  NestBackend --> BooksService
+  NestBackend --> UsersService
+  NestBackend --> StatusService
 
-class GoogleBooksAPI <<external>>
-class MangaDexAPI <<external>>
-class GeminiAPI <<external>>
-class MangaImageTranslator <<external>>
-class FirebaseAuth <<external>>
-class Firestore <<database>>
-class Redis <<database>>
-class JsonCache <<database>>
-class ImageCache <<database>>
-class UploadStorage <<database>>
+  BooksService -->|metadata and search| GoogleBooksAPI
+  BooksService -->|manga detail and chapter pages| MangaDexAPI
+  BooksService -->|description and dialogue translation| GeminiAPI
+  BooksService -->|page translation and patches| MangaImageTranslator
+  BooksService -->|cache lookup and write| CacheOrchestratorService
 
-User --> NextFrontend : use via browser
-NextFrontend --> NextApiProxy : relative HTTP requests
-NextApiProxy --> NestBackend : server-to-server forwarding
+  UsersService --> FirebaseService
+  FirebaseService --> FirebaseAuth
+  FirebaseService --> Firestore
 
-NestBackend --> BooksService
-NestBackend --> UsersService
-NestBackend --> StatusService
-
-BooksService --> GoogleBooksAPI : metadata and search
-BooksService --> MangaDexAPI : manga detail and chapter pages
-BooksService --> GeminiAPI : description and dialogue translation
-BooksService --> MangaImageTranslator : page translation and patches
-BooksService --> CacheOrchestratorService : cache lookup and write
-
-UsersService --> FirebaseService
-FirebaseService --> FirebaseAuth
-FirebaseService --> Firestore
-
-CacheOrchestratorService --> Redis
-CacheOrchestratorService --> JsonCache
-CacheOrchestratorService --> ImageCache
-NestBackend --> UploadStorage : avatars and translated assets
+  CacheOrchestratorService --> Redis
+  CacheOrchestratorService --> JsonCache
+  CacheOrchestratorService --> ImageCache
+  NestBackend -->|avatars and translated assets| UploadStorage
 ```
 
 ## 3. UML Package or Module Diagram
@@ -318,67 +297,65 @@ UsersService --> FirebaseService
 ## 5. UML Class Diagram for Frontend Structure
 
 ```mermaid
-classDiagram
-direction LR
+flowchart LR
+  Layout[Layout\ncomponent]
+  HomePage[HomePage\ncomponent]
+  SearchPage[SearchPage\ncomponent]
+  CategoriesPage[CategoriesPage\ncomponent]
+  MyListPage[MyListPage\ncomponent]
+  AccountPage[AccountPage\ncomponent]
 
-class Layout <<component>>
-class HomePage <<component>>
-class SearchPage <<component>>
-class CategoriesPage <<component>>
-class MyListPage <<component>>
-class AccountPage <<component>>
+  Navbar[Navbar\ncomponent]
+  HeroCarousel[HeroCarousel\ncomponent]
+  ContinueReadingRow[ContinueReadingRow\ncomponent]
+  TopTenRow[TopTenRow\ncomponent]
+  BookRow[BookRow\ncomponent]
+  MangaGrid[MangaGrid\ncomponent]
+  BookDetailModal[BookDetailModal\ncomponent]
+  MangaReader[MangaReader\ncomponent]
+  LoginModal[LoginModal\ncomponent]
+  AccountModal[AccountModal\ncomponent]
+  AuthContext[AuthContext\ncomponent]
+  ToastContext[ToastContext\ncomponent]
+  ReadingHistoryLib[ReadingHistoryLib\ncomponent]
+  UserCacheLib[UserCacheLib\ncomponent]
+  ProxyRoute[ProxyRoute\ncomponent]
+  ImgProxyRoute[ImgProxyRoute\ncomponent]
 
-class Navbar <<component>>
-class HeroCarousel <<component>>
-class ContinueReadingRow <<component>>
-class TopTenRow <<component>>
-class BookRow <<component>>
-class MangaGrid <<component>>
-class BookDetailModal <<component>>
-class MangaReader <<component>>
-class LoginModal <<component>>
-class AccountModal <<component>>
-class AuthContext <<component>>
-class ToastContext <<component>>
-class ReadingHistoryLib <<component>>
-class UserCacheLib <<component>>
-class ProxyRoute <<component>>
-class ImgProxyRoute <<component>>
+  Layout --> Navbar
+  Layout --> AuthContext
+  Layout --> ToastContext
 
-Layout --> Navbar
-Layout --> AuthContext
-Layout --> ToastContext
+  HomePage --> HeroCarousel
+  HomePage --> ContinueReadingRow
+  HomePage --> TopTenRow
+  HomePage --> BookRow
 
-HomePage --> HeroCarousel
-HomePage --> ContinueReadingRow
-HomePage --> TopTenRow
-HomePage --> BookRow
+  SearchPage --> MangaGrid
+  CategoriesPage --> MangaGrid
+  MyListPage --> MangaGrid
 
-SearchPage --> MangaGrid
-CategoriesPage --> MangaGrid
-MyListPage --> MangaGrid
+  HeroCarousel --> BookDetailModal
+  BookRow --> BookDetailModal
+  TopTenRow --> BookDetailModal
+  ContinueReadingRow --> BookDetailModal
+  MangaGrid --> BookDetailModal
+  BookDetailModal --> MangaReader
 
-HeroCarousel --> BookDetailModal
-BookRow --> BookDetailModal
-TopTenRow --> BookDetailModal
-ContinueReadingRow --> BookDetailModal
-MangaGrid --> BookDetailModal
-BookDetailModal --> MangaReader
+  Navbar --> LoginModal
+  Navbar --> AccountModal
+  AccountModal --> AuthContext
+  LoginModal --> AuthContext
 
-Navbar --> LoginModal
-Navbar --> AccountModal
-AccountModal --> AuthContext
-LoginModal --> AuthContext
-
-BookDetailModal --> ReadingHistoryLib
-AuthContext --> UserCacheLib
-AuthContext --> ProxyRoute
-HomePage --> ProxyRoute
-BookDetailModal --> ProxyRoute
-MangaReader --> ProxyRoute
-HeroCarousel --> ImgProxyRoute
-BookRow --> ImgProxyRoute
-MangaGrid --> ImgProxyRoute
+  BookDetailModal --> ReadingHistoryLib
+  AuthContext --> UserCacheLib
+  AuthContext --> ProxyRoute
+  HomePage --> ProxyRoute
+  BookDetailModal --> ProxyRoute
+  MangaReader --> ProxyRoute
+  HeroCarousel --> ImgProxyRoute
+  BookRow --> ImgProxyRoute
+  MangaGrid --> ImgProxyRoute
 ```
 
 ## 6. UML Sequence Diagram: User Reads and Translates Manga
@@ -502,59 +479,23 @@ flowchart TD
 ## 9. UML Deployment Diagram
 
 ```mermaid
-classDiagram
-direction LR
+flowchart LR
+  ClientDevice[ClientDevice\nnode\nBrowser]
+  FrontendServer[FrontendServer\nnode\nNext.js App Router\nReact 19 UI\nAPI Proxy Routes]
+  BackendServer[BackendServer\nnode\nNestJS API Server\nREST Controllers\nSSE Status Stream]
+  TranslationServer[TranslationServer\nnode\nPython Manga Image Translator]
+  FirebaseCloud[(FirebaseCloud\ncloud\nFirebase Auth\nFirestore)]
+  ExternalServices[(ExternalServices\ncloud\nGoogle Books API\nMangaDex API\nGemini API)]
+  CacheNodes[(CacheNodes\nnode\nRedis\nJSON Cache Files\nImage Cache Files)]
+  LocalStorage[(LocalStorage\nnode\nuploads/avatars\nuploads/patches\nuploads/translated)]
 
-class ClientDevice <<node>> {
-  Browser
-}
-
-class FrontendServer <<node>> {
-  Next.js App Router
-  React 19 UI
-  API Proxy Routes
-}
-
-class BackendServer <<node>> {
-  NestJS API Server
-  REST Controllers
-  SSE Status Stream
-}
-
-class TranslationServer <<node>> {
-  Python Manga Image Translator
-}
-
-class FirebaseCloud <<cloud>> {
-  Firebase Auth
-  Firestore
-}
-
-class ExternalServices <<cloud>> {
-  Google Books API
-  MangaDex API
-  Gemini API
-}
-
-class CacheNodes <<node>> {
-  Redis
-  JSON Cache Files
-  Image Cache Files
-}
-
-class LocalStorage <<node>> {
-  uploads/avatars
-  uploads/patches
-  uploads/translated
-}
-
-ClientDevice --> FrontendServer : HTTPS
-FrontendServer --> BackendServer : internal HTTP
-BackendServer --> TranslationServer : local HTTP
-BackendServer --> FirebaseCloud : Admin SDK
-BackendServer --> ExternalServices : HTTPS
-BackendServer --> CacheNodes : cache access
-BackendServer --> LocalStorage : file read and write
+  ClientDevice -->|HTTPS| FrontendServer
+  FrontendServer -->|internal HTTP| BackendServer
+  BackendServer -->|local HTTP| TranslationServer
+  BackendServer -->|Admin SDK| FirebaseCloud
+  BackendServer -->|HTTPS| ExternalServices
+  BackendServer -->|cache access| CacheNodes
+  BackendServer -->|file read and write| LocalStorage
 ```
 
 ## 10. Report Summary
