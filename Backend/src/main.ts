@@ -15,6 +15,11 @@ async function bootstrap() {
     prefix: '/img-cache/',
   });
 
+  // Serve translated patch overlays from uploads/ under /uploads/
+  app.useStaticAssets(path.resolve(process.cwd(), 'uploads'), {
+    prefix: '/uploads/',
+  });
+
   await app.listen(process.env.PORT ?? 3001);
 }
 bootstrap();
