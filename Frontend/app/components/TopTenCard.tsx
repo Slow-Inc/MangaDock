@@ -37,7 +37,7 @@ export default function TopTenCard({ book, index }: Props) {
       </span>
       <div
         onClick={() => setShowModal(true)}
-        className={`relative cursor-pointer overflow-hidden rounded-xl border border-white/10 bg-white/10 backdrop-blur-xl transition-all duration-300 hover:border-white/30 hover:scale-105 ${
+        className={`relative cursor-pointer overflow-hidden rounded-xl border border-white/10 bg-white/10 md:backdrop-blur-xl transition-all duration-300 hover:border-white/30 hover:scale-105 ${
           isLandscape ? "aspect-4/3 w-32 sm:w-40 md:w-48" : "h-32 w-24 sm:h-36 sm:w-28 md:h-40 md:w-28"
         }`}
       >

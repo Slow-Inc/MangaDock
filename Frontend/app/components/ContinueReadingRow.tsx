@@ -88,7 +88,7 @@ function HistoryCard({
     <article
       ref={articleRef}
       onMouseEnter={handleHover}
-      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-white/20 ${expandRight ? "origin-left" : "origin-right"} ${isNew ? "cr-card-enter" : ""}`}
+      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-white/10 bg-white/5 md:backdrop-blur-xl md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-white/20 ${expandRight ? "origin-left" : "origin-right"} ${isNew ? "cr-card-enter" : ""}`}
     >
       {/* Cover */}
       <div

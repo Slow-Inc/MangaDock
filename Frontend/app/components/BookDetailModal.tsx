@@ -110,6 +110,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const highlightChapterRef = useRef<HTMLButtonElement>(null);
   const modalScrollRef = useRef<HTMLDivElement>(null);
   const chaptersListScrollRef = useRef<HTMLDivElement>(null);
+  const closingRef = useRef(false);
+  const historyPushedRef = useRef(false);
   
   const [isHoveringCovers, setIsHoveringCovers] = useState(false);
   const [coverCanScrollLeft, setCoverCanScrollLeft] = useState(false);
@@ -140,7 +142,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   // Separate effect: trigger fade-in only AFTER mounted render is painted
   useEffect(() => {
     if (!mounted) return;
-    if (asPage) { setVisible(true); return; }
     const id = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(id);
   }, [mounted]);
@@ -154,20 +155,28 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   }, [detail]);
 
   useEffect(() => {
-    // On mobile (< 768px), navigate to the dedicated book page instead of showing a modal
-    if (!asPage && window.innerWidth < 768) {
-      try { sessionStorage.setItem(`mb:book:${book.id}`, JSON.stringify(book)); } catch { /* storage quota */ }
-      router.push(`/book/${book.id}`);
-      onClose();
-      return;
-    }
-
     setMounted(true);
+
+    // On mobile modal, push a history entry so the hardware back button closes
+    if (!asPage && window.innerWidth < 768) {
+      window.history.pushState({ mbModal: book.id }, "");
+      historyPushedRef.current = true;
+    }
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") handleClose();
     };
+    const onPop = () => {
+      if (!historyPushedRef.current) return;
+      historyPushedRef.current = false;
+      if (!closingRef.current) {
+        closingRef.current = true;
+        setVisible(false);
+        setTimeout(onClose, 300);
+      }
+    };
     window.addEventListener("keydown", onKey);
+    window.addEventListener("popstate", onPop);
     if (!asPage) document.body.style.overflow = "hidden";
 
     if (isManga) {
@@ -227,6 +236,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
     return () => {
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("popstate", onPop);
       if (!asPage) document.body.style.overflow = "";
     };
   }, []);
@@ -255,25 +265,40 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   }, [scrollToChapters, loadingChapters, effectiveHighlightId]);
 
   const handleClose = () => {
-    if (asPage) { onClose(); return; }
+    if (closingRef.current) return;
+    closingRef.current = true;
     setVisible(false);
-    setTimeout(onClose, 400);
+    if (asPage) {
+      setTimeout(onClose, 300);
+      return;
+    }
+    const delay = window.innerWidth < 768 ? 300 : 400;
+    setTimeout(() => {
+      if (historyPushedRef.current) {
+        historyPushedRef.current = false;
+        window.history.back();
+      }
+      onClose();
+    }, delay);
   };
 
   const displayThumbnail = selectedCover ?? resolvedThumbnail(book);
-  const chapterNeedsBackup = (ch: MangaChapter) => forceLocalMode || ch.isOfflineFallback;
+  const chapterNeedsBackup = (ch: MangaChapter) => ch.isOfflineFallback === true;
   const isChapterReadable = (ch: MangaChapter) => {
     if (chapterNeedsBackup(ch)) {
       return ch.readerAvailable === true;
     }
-    return ch.pageCount > 0 || ch.pagesAvailable === true;
+    if (ch.pageCount > 0 || ch.pagesAvailable === true) return true;
+    // API couldn't be reached — be optimistic, let the reader try on demand
+    if (ch.pagesApiUnavailable) return true;
+    // API confirmed zero pages — truly locked
+    if (ch.pagesAvailable === false) return false;
+    // Not probed yet — optimistic
+    return true;
   };
 
   const getUnavailableChapterLabel = (ch: MangaChapter) => {
     if (chapterNeedsBackup(ch) && ch.readerAvailable !== true) {
-      return "ไม่ได้สำรอง";
-    }
-    if (ch.pagesApiUnavailable) {
       return "ไม่ได้สำรอง";
     }
     return "ล็อค";
@@ -294,12 +319,12 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
   const content = (
     <div
-      className={asPage ? "relative w-full bg-[#141414]" : `fixed inset-0 z-200 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
+      className={asPage ? `relative w-full bg-[#141414] transition-[opacity,transform] duration-300 ease-out ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}` : `fixed inset-0 z-200 flex items-center justify-center md:p-4 md:backdrop-blur-sm transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
     >
       {/* Backdrop - modal mode only */}
       {!asPage && (
         <div
-          className="absolute inset-0 bg-black/80"
+          className="absolute inset-0 bg-black md:bg-black/80"
           onClick={handleClose}
         />
       )}
@@ -322,11 +347,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
       {/* Modal container */}
       <div
-        className={asPage ? "relative w-full" : `relative z-10 flex w-full max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-3xl bg-[#141414] shadow-2xl transition-all duration-400 ease-out ${visible ? "scale-100 translate-y-0 opacity-100" : "scale-90 translate-y-8 opacity-0"}`}
+        className={asPage ? "relative w-full" : `relative z-10 flex w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] flex-col overflow-hidden md:rounded-3xl bg-[#141414] shadow-2xl transition-[transform,opacity] duration-300 md:duration-400 ease-out ${visible ? "translate-y-0 md:scale-100 md:opacity-100" : "translate-y-full md:translate-y-8 md:scale-90 md:opacity-0"}`}
       >
         <div
           ref={modalScrollRef}
-          className={asPage ? "w-full pb-[calc(var(--mobile-nav-height)+1.5rem)]" : "overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]"}
+          className={asPage ? "w-full pb-[calc(var(--mobile-nav-height)+1.5rem)]" : "flex-1 min-h-0 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]"}
         >
           {/* Close button - modal mode only */}
           {!asPage && (

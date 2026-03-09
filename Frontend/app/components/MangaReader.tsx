@@ -150,6 +150,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const showChapterPickerRef = useRef(false);
   const [pickerLangFilter, setPickerLangFilter] = useState<string>("all");
   const pickerRef = useRef<HTMLDivElement>(null);
+  const pickerScrollRef = useRef<HTMLDivElement>(null);
   const activeChapterBtnRef = useRef<HTMLButtonElement>(null);
   const pickerCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -256,6 +257,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const panRef = useRef({ x: 0, y: 0 });
 
   useLocalLenis(scrollContainerRef, "vertical", continuousMode, continuousLenisRef);
+  useLocalLenis(pickerScrollRef, "vertical", pickerMounted && pickerVisible);
 
   // Auto-scroll bottom strip to keep current page button visible
   // Debounced so rapid page updates (continuous mode scroll) don't spam smooth-scrolls
@@ -1160,7 +1162,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               )}
 
               {/* Chapter list */}
-              <div data-lenis-prevent className="flex-1 overflow-y-auto p-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
+              <div
+                ref={pickerScrollRef}
+                data-lenis-prevent
+                className="flex-1 overflow-y-auto p-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]"
+              >
                 <div className="space-y-1">
                   {filtered.map((ch) => {
                     const isCurrent = ch.id === currentChapterId;
@@ -1453,31 +1459,34 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
       {/* Bottom page strip */}
       <div className={`shrink-0 overflow-hidden border-t border-white/10 bg-black/80 transition-all duration-300 ease-in-out ${
-        contentReady && !error && totalPages > 0 ? "max-h-14 opacity-100 py-2" : "max-h-0 opacity-0 py-0"
+        contentReady && !error && totalPages > 0 ? "max-h-10 opacity-100 pt-0.5 pb-2.5" : "max-h-0 opacity-0 py-0"
       }`}>
-        <div ref={stripScrollRef} className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-4">
+        <div ref={stripScrollRef} className="flex gap-1 overflow-x-auto px-4 pt-0.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {pages.map((_, i: number) => {
-            const btnPending = (translating && !completedTranslatedPages.has(i)) || translatingCurrentPageIndex === i;
+            const btnCurrentTranslating = translatingCurrentPageIndex === i;
+            const btnQueued = translating && !completedTranslatedPages.has(i) && !btnCurrentTranslating;
+            const btnPending = btnQueued || btnCurrentTranslating;
             const btnDone = patchedPages.has(i);
             return (
               <button
                 key={i}
                 ref={i === page ? activeStripBtnRef : undefined}
                 onClick={() => continuousMode ? scrollToPage(i) : setPage(i)}
-                className={`relative flex h-7 min-w-9 shrink-0 items-center justify-center rounded text-[10px] font-medium transition-all duration-200 ${
-                  i === page ? "bg-white text-black" : "bg-white/10 text-white/60 hover:bg-white/20"
+                className={`relative flex h-7 min-w-9 shrink-0 items-center justify-center rounded-md text-[10px] font-medium transition-[background-color,color,box-shadow,transform] duration-700 ease-out ${
+                  i === page
+                    ? "bg-white/90 text-black shadow-[0_0_0_1px_rgba(255,255,255,0.52),0_0_14px_rgba(255,255,255,0.12)]"
+                    : "bg-white/8 text-white/55 shadow-[0_0_0_1px_rgba(255,255,255,0)] hover:bg-white/14"
                 } ${
-                  btnPending ? "ring-1 ring-blue-400/50" : btnDone ? "ring-1 ring-green-400/50" : ""
+                  btnCurrentTranslating
+                    ? "ring-1 ring-slate-300/70 animate-pulse [animation-duration:1.8s]"
+                    : btnQueued
+                    ? "ring-1 ring-slate-500/55"
+                    : btnDone
+                    ? "ring-1 ring-white/55"
+                    : ""
                 }`}
               >
                 {i + 1}
-                {/* Status dot */}
-                {btnPending && (
-                  <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-blue-400" />
-                )}
-                {!btnPending && btnDone && (
-                  <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-green-400" />
-                )}
               </button>
             );
           })}

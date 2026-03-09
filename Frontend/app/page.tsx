@@ -1,6 +1,8 @@
 import BookRow from "./components/BookRow";
 import ContinueReadingRow from "./components/ContinueReadingRow";
 import HeroCarousel from "./components/HeroCarousel";
+import HomeCachedLanding from "./components/HomeCachedLanding";
+import HomeStatusLine from "./components/HomeStatusLine";
 import Navbar from "./components/Navbar";
 import TopTenRow from "./components/TopTenRow";
 
@@ -32,11 +34,19 @@ type LandingResponse = {
   hero: LandingBook | null;
   rows: LandingRow[];
   updatedAt: string;
+  fromStaleCache?: boolean;
+  staleUpdatedAt?: string;
+  apiOffline?: boolean;
+};
+
+type LandingFetchResult = {
+  data: LandingResponse | null;
+  backendUnavailable: boolean;
 };
 
 const API_BASE = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4001";
 
-const getLandingData = async (forceLocal = false): Promise<LandingResponse | null> => {
+const getLandingData = async (forceLocal = false): Promise<LandingFetchResult> => {
   try {
     const url = `${API_BASE}/books/landing${forceLocal ? "?forceLocal=true" : ""}`;
     const response = await fetch(url, {
@@ -44,12 +54,12 @@ const getLandingData = async (forceLocal = false): Promise<LandingResponse | nul
     });
 
     if (!response.ok) {
-      return null;
+      return { data: null, backendUnavailable: true };
     }
 
-    return (await response.json()) as LandingResponse;
+    return { data: (await response.json()) as LandingResponse, backendUnavailable: false };
   } catch {
-    return null;
+    return { data: null, backendUnavailable: true };
   }
 };
 
@@ -60,10 +70,13 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const forceLocal = params.forceLocal === "1";
-  const data = await getLandingData(forceLocal);
+  const { data, backendUnavailable } = await getLandingData(forceLocal);
   const rows = data?.rows?.filter((row) => row.items.length > 0) ?? [];
   const topRankedBooks = rows[0]?.items?.slice(0, 10) ?? [];
   const hasData = rows.length > 0;
+  const staleTimestamp = data?.fromStaleCache && hasData
+    ? (data.staleUpdatedAt ?? data.updatedAt)
+    : undefined;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -72,16 +85,9 @@ export default async function Home({
       {topRankedBooks.length > 0 && <HeroCarousel books={topRankedBooks} />}
 
       <main className="relative z-10 space-y-10 px-6 pb-20 md:pb-16 lg:px-12">
-        {!hasData && (
-          <section className="mx-auto max-w-5xl rounded-3xl border border-white/15 bg-white/8 p-8 text-white backdrop-blur-2xl">
-            <h2 className="text-2xl font-bold">ยังโหลดรายการหนังสือไม่ได้</h2>
-            <p className="mt-2 text-sm text-white/75">
-              ขณะนี้ Google Books API อาจติด rate limit ชั่วคราว ให้ลองรีเฟรชอีกครั้ง หรือตั้งค่า
-              <span className="mx-1 font-semibold">GOOGLE_BOOKS_API_KEY</span>
-              ใน backend เพื่อเพิ่มโควตา
-            </p>
-          </section>
-        )}
+        <HomeStatusLine serverUnavailable={backendUnavailable} staleTimestamp={staleTimestamp} />
+
+        {backendUnavailable && <HomeCachedLanding />}
 
         <ContinueReadingRow />
 
