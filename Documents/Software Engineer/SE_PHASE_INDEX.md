@@ -1,4 +1,4 @@
-# MetaBooks Software Engineering Documents
+# MangaDock Software Engineering Documents
 
 เอกสารชุดนี้แยกตาม Phase ของรายงานวิชา Software Engineering เพื่อให้โครงสร้างชัดเจนและลดความสับสนระหว่างเอกสารเชิงวิเคราะห์ เอกสารเชิงออกแบบ และเอกสารเชิงปฏิบัติการ
 

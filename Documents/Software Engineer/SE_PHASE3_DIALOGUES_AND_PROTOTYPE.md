@@ -1,6 +1,6 @@
 # Phase 3: Dialogues Diagram and Prototype
 
-เอกสารฉบับนี้อธิบายการออกแบบปฏิสัมพันธ์ระหว่างผู้ใช้กับระบบ MetaBooks ในระดับหน้าจอและ flow การใช้งาน โดยเน้น Dialogues Diagram และต้นแบบระบบที่ใช้สื่อสารแนวคิดก่อนและระหว่างการพัฒนา
+เอกสารฉบับนี้อธิบายการออกแบบปฏิสัมพันธ์ระหว่างผู้ใช้กับระบบ MangaDock ในระดับหน้าจอและ flow การใช้งาน โดยเน้น Dialogues Diagram และต้นแบบระบบที่ใช้สื่อสารแนวคิดก่อนและระหว่างการพัฒนา
 
 ## 1. Purpose
 
@@ -55,7 +55,7 @@ flowchart LR
 
 ## 4. Prototype Description
 
-Prototype ของ MetaBooks ถูกพัฒนาควบคู่กับระบบจริงในฝั่ง Frontend (Next.js) ทำให้ไม่ใช่เพียงภาพ mockup แต่เป็น clickable interface ที่สามารถแสดง flow การทำงานได้จริงในหลายส่วน เช่น การเปิดรายละเอียด การอ่านตอน และการจัดการบัญชีบน mobile และ desktop
+Prototype ของ MangaDock ถูกพัฒนาควบคู่กับระบบจริงในฝั่ง Frontend (Next.js) ทำให้ไม่ใช่เพียงภาพ mockup แต่เป็น clickable interface ที่สามารถแสดง flow การทำงานได้จริงในหลายส่วน เช่น การเปิดรายละเอียด การอ่านตอน และการจัดการบัญชีบน mobile และ desktop
 
 ลักษณะสำคัญของ prototype ได้แก่
 

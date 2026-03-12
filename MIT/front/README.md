@@ -1,112 +1,125 @@
 # MIT Front Utility
 
-This directory contains a standalone browser UI for manually testing the customized manga-image-translator microservice bundled in this repository.
+โฟลเดอร์นี้เป็นหน้าเว็บสำหรับใช้ทดสอบบริการ MIT ผ่านเบราว์เซอร์แบบแยกจากระบบหลัก
 
-It is a developer and operator tool. It is not the main MetaBooks frontend, and it can also be used by other projects that integrate this microservice.
+เครื่องมือนี้มีไว้สำหรับนักพัฒนาและผู้ดูแลระบบ ไม่ใช่ Frontend หลักของโปรเจกต์ โดย Frontend หลักของระบบอยู่ที่โฟลเดอร์ `Frontend/` ส่วนโฟลเดอร์นี้ใช้สำหรับทดสอบความสามารถของบริการใน `MIT/` เท่านั้น
 
-## Purpose
+## จุดประสงค์
 
-Use this app when you want to:
+ใช้ยูทิลิตีนี้เมื่อคุณต้องการ:
 
-- upload an image manually and inspect translation output
-- test the streaming endpoint without going through NestJS
-- debug rendering or model behavior on a single page
-- verify that the MIT service is alive before testing a larger integration flow
+- อัปโหลดภาพด้วยตนเองและตรวจสอบผลลัพธ์การแปล
+- ทดสอบ endpoint แบบ stream ของ MIT โดยไม่ต้องผ่าน Backend
+- วิเคราะห์ปัญหาเรื่อง rendering, model, หรือผลลัพธ์ของภาพรายหน้า
+- ตรวจสอบว่า MIT service พร้อมใช้งานก่อนนำไปทดสอบร่วมกับระบบหลัก
 
-## Stack
+## บทบาทภายในโปรเจกต์
+
+workspace นี้มีส่วนหลักอยู่เพียง:
+
+- `Frontend/` สำหรับหน้าเว็บหลักของ MangaDock
+- `Backend/` สำหรับ API และ logic ของระบบ
+- `MIT/` สำหรับบริการแปลภาพมังงะ
+- `.venv/` สำหรับ Python environment ภายในเครื่อง
+- `Documents/` สำหรับเอกสารของโครงการ
+
+README ฉบับนี้อธิบายเฉพาะส่วน `MIT/front/`
+
+## เทคโนโลยีที่ใช้
 
 - React 19
 - React Router 7
 - Vite 5
 - Tailwind CSS 4
-- Fetch streaming API
+- Fetch Streaming API
 
-## Prerequisites
+## สิ่งที่ต้องมีล่วงหน้า
 
-Before starting this UI, the MIT service must already be running.
+ก่อนเปิดใช้งานหน้านี้ ต้องมีบริการ MIT ทำงานอยู่ก่อนแล้ว
 
-Expected local service URL:
+ค่าเริ่มต้นของ service คือ:
 
 ```text
 http://localhost:5003
 ```
 
-Recommended startup order:
+ลำดับการเริ่มใช้งานที่แนะนำ:
 
-1. Start `backend/manga-image-translator/run-server.bat`
-2. Wait until the service is ready
-3. Start this front-end utility
+1. เปิดบริการ MIT จากโฟลเดอร์ `MIT/`
+2. รอจน service พร้อมรับคำขอ
+3. จึงค่อยเปิดยูทิลิตีใน `MIT/front/`
 
-If the microservice is hosted on another machine, point the front-end proxy at that machine instead of running the service locally.
+ถ้า MIT service รันอยู่บนอีกเครื่องหนึ่ง ให้ตั้งค่า proxy ของยูทิลิตีนี้ให้ชี้ไปยังเครื่องนั้นแทน
 
-## Install
+## การติดตั้ง
+
+จากโฟลเดอร์ `MIT/front/`
 
 ```bash
 npm install
 ```
 
-## Run In Development
+## การรันแบบพัฒนา
+
+จากโฟลเดอร์ `MIT/front/`
 
 ```bash
 npm run dev
 ```
 
-If the API is not running on the default local address, override the dev proxy target:
+ถ้า MIT service ไม่ได้รันที่ค่าเริ่มต้น ให้กำหนด `MIT_API_TARGET` เอง เช่น:
 
 ```bash
 MIT_API_TARGET=http://localhost:5003 npm run dev
 ```
 
-Example for a remote microservice:
+ตัวอย่างกรณี service อยู่คนละเครื่อง:
 
 ```bash
 MIT_API_TARGET=http://10.0.0.25:5003 npm run dev
 ```
 
-Then open the local URL printed by Vite, typically:
+จากนั้นเปิด URL ที่ Vite แสดงใน terminal โดยทั่วไปจะเป็น:
 
 ```text
 http://localhost:5173
 ```
 
-## Build
+## การ build
 
 ```bash
 npm run build
 ```
 
-## Start Production Build
+## การรัน production build
 
 ```bash
 npm run start
 ```
 
-## API Behavior
+## API ที่ยูทิลิตีนี้ใช้
 
-This UI is wired around the customized MIT service, especially the streaming browser endpoint:
+หน้านี้ถูกออกแบบมาเพื่อทดสอบบริการ MIT ที่ปรับใช้ในโปรเจกต์นี้ โดยเฉพาะ endpoint สำหรับการทำงานผ่านเบราว์เซอร์แบบ stream:
 
 ```text
 POST /translate/with-form/image/stream/web
 ```
 
-That endpoint is designed for browser-side progressive UX and is different from the plain full-image endpoint used by the NestJS backend.
+endpoint นี้เหมาะกับประสบการณ์ใช้งานแบบ progressive ในเบราว์เซอร์ และต่างจาก endpoint แบบ full-image ที่ Backend ใช้เรียกโดยตรง
 
-## Integration Notes
+## หมายเหตุในการใช้งาน
 
-- If this UI fails immediately, verify the MIT service is reachable on port `5003`.
-- If uploads stall on the first request, the worker may still be loading models.
-- If translation fails after upload, check `.env` in the MIT service directory, especially Gemini credentials.
+- ถ้าหน้านี้เรียก API ไม่ได้ ให้ตรวจสอบก่อนว่า MIT service เข้าถึงได้จริงที่พอร์ต `5003`
+- ถ้าคำขอแรกใช้เวลานาน อาจเป็นช่วงที่ worker กำลังโหลดโมเดล
+- ถ้าการแปลล้มเหลวหลังอัปโหลด ให้ตรวจสอบไฟล์ `.env` ในโฟลเดอร์ `MIT/` โดยเฉพาะค่าที่เกี่ยวกับ Gemini หรือ provider ที่ใช้งาน
+- ถ้าต้องการทดสอบ flow จริงของระบบ ให้ทดสอบผ่าน `Frontend/` และ `Backend/` แทน
 
-## Relationship To Upstream
+## เอกสารอ้างอิง
 
-This tool started from the upstream `manga-image-translator` front-end, but the repo around it has been customized into a reusable microservice setup.
+สำหรับการตั้งค่าและการใช้งานของบริการ MIT ให้ใช้ไฟล์ต่อไปนี้เป็นหลัก:
 
-Do not rely on old upstream assumptions such as:
+- `MIT/README.md`
 
-- old upstream default ports or bind addresses
-- original repository startup instructions
-- generic upstream readme flow
+สำหรับภาพรวมของระบบทั้งโปรเจกต์ ให้ดูเอกสารใน:
 
-Current default dev proxy target is `http://localhost:5003`.
-
-For the current service setup, use the root README in `backend/manga-image-translator/README.md` as the primary reference.
+- `Documents/`

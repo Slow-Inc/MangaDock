@@ -1,6 +1,6 @@
-# MetaBooks System Architecture Overview
+# MangaDock System Architecture Overview
 
-เอกสารนี้ใช้สรุปภาพรวมสถาปัตยกรรมของระบบ MetaBooks ในระดับ high-level เพื่ออธิบายความสัมพันธ์ระหว่าง Frontend, Backend, MIT, Firebase และ external integrations โดยไม่ลงลึกถึง implementation ของแต่ละ service
+เอกสารนี้ใช้สรุปภาพรวมสถาปัตยกรรมของระบบ MangaDock ในระดับ high-level เพื่ออธิบายความสัมพันธ์ระหว่าง Frontend, Backend, MIT, Firebase และ external integrations โดยไม่ลงลึกถึง implementation ของแต่ละ service
 
 ## 1. Recommended Use of This Document
 

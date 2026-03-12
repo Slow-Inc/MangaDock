@@ -215,7 +215,7 @@ export class ImageCacheService implements OnModuleInit {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'MetaBooks-ImageCache/1.0' },
+      headers: { 'User-Agent': 'MangaDock-ImageCache/1.0' },
       signal: AbortSignal.timeout(30_000),
     });
 

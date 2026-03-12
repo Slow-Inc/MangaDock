@@ -3,7 +3,7 @@ version: '3.9'
 services:
   redis:
     image: redis:7-alpine
-    container_name: metabooks_redis
+    container_name: mangadock_redis
     restart: unless-stopped
     ports:
       - '6379:6379'

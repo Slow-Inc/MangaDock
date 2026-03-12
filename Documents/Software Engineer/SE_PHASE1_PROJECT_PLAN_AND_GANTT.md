@@ -1,10 +1,10 @@
 # Phase 1: Project Plan and Gantt Chart
 
-เอกสารฉบับนี้จัดทำตามแนวคิดของ PMBOK ในระดับที่เหมาะกับรายงานวิชา Software Engineering เพื่อใช้อธิบายการวางแผนโครงการ MetaBooks ตั้งแต่ขอบเขตงาน ระยะเวลา การติดตามความคืบหน้า และ milestone สำคัญของโครงการ
+เอกสารฉบับนี้จัดทำตามแนวคิดของ PMBOK ในระดับที่เหมาะกับรายงานวิชา Software Engineering เพื่อใช้อธิบายการวางแผนโครงการ MangaDock ตั้งแต่ขอบเขตงาน ระยะเวลา การติดตามความคืบหน้า และ milestone สำคัญของโครงการ
 
 ## 1. Project Overview
 
-MetaBooks เป็นระบบสำหรับค้นหา อ่าน และจัดการหนังสือหรือมังงะ โดยมีความสามารถสำคัญ ได้แก่ การค้นหาหนังสือ การเปิดรายละเอียด การอ่านมังงะ การแปลภาพมังงะ และการจัดการบัญชีผู้ใช้ ระบบถูกพัฒนาในลักษณะ full-stack โดยมี Frontend (Next.js), Backend (NestJS) และ MIT (Manga Image Translator microservice) ทำงานร่วมกัน
+MangaDock เป็นระบบสำหรับค้นหา อ่าน และจัดการหนังสือหรือมังงะ โดยมีความสามารถสำคัญ ได้แก่ การค้นหาหนังสือ การเปิดรายละเอียด การอ่านมังงะ การแปลภาพมังงะ และการจัดการบัญชีผู้ใช้ ระบบถูกพัฒนาในลักษณะ full-stack โดยมี Frontend (Next.js), Backend (NestJS) และ MIT (Manga Image Translator microservice) ทำงานร่วมกัน
 
 ## 2. Project Objectives
 
@@ -64,7 +64,7 @@ MetaBooks เป็นระบบสำหรับค้นหา อ่าน
 
 ```mermaid
 gantt
-  title MetaBooks Project Plan
+  title MangaDock Project Plan
   dateFormat  YYYY-MM-DD
   axisFormat  %d/%m
 

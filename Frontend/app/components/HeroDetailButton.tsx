@@ -22,7 +22,6 @@ type Props = { book: LandingBook };
 
 type MangaChapterSummary = {
   pageCount: number;
-  pagesAvailable?: boolean;
   readerAvailable?: boolean;
   isOfflineFallback?: boolean;
 };
@@ -46,7 +45,7 @@ export default function HeroDetailButton({ book }: Props) {
           if (forceLocal || ch.isOfflineFallback) {
             return ch.readerAvailable === true;
           }
-          return ch.pageCount > 0 || ch.pagesAvailable === true;
+          return ch.pageCount > 0;
         }));
       })
       .catch(() => setHasReadable(false));

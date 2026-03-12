@@ -1,6 +1,6 @@
-# MetaBooks UML Report
+# MangaDock UML Report
 
-เอกสารนี้รวบรวมแผนภาพ UML หลักของโปรเจกต์ MetaBooks สำหรับใช้ในรายงานและการนำเสนอวิชา Software Engineering
+เอกสารนี้รวบรวมแผนภาพ UML หลักของโปรเจกต์ MangaDock สำหรับใช้ในรายงานและการนำเสนอวิชา Software Engineering
 
 หมายเหตุสำคัญ:
 
@@ -502,7 +502,7 @@ flowchart LR
 
 ### System Overview
 
-MetaBooks เป็นระบบอ่านหนังสือและมังงะที่ใช้สถาปัตยกรรมแบบแยก frontend และ backend อย่างชัดเจน โดย frontend พัฒนาด้วย Next.js และ backend พัฒนาด้วย NestJS พร้อมเชื่อมต่อบริการภายนอกหลายตัว เช่น Firebase, Google Books, MangaDex, Gemini และบริการแปลภาพมังงะ
+MangaDock เป็นระบบอ่านหนังสือและมังงะที่ใช้สถาปัตยกรรมแบบแยก frontend และ backend อย่างชัดเจน โดย frontend พัฒนาด้วย Next.js และ backend พัฒนาด้วย NestJS พร้อมเชื่อมต่อบริการภายนอกหลายตัว เช่น Firebase, Google Books, MangaDex, Gemini และบริการแปลภาพมังงะ
 
 ### Key Design Points
 

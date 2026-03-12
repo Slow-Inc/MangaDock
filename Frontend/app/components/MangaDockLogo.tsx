@@ -3,7 +3,7 @@ interface LogoProps {
   showText?: boolean;
 }
 
-export default function MetaBooksLogo({ className = "h-10", showText = true }: LogoProps) {
+export default function MangaDockLogo({ className = "h-10", showText = true }: LogoProps) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       {/* ---- Icon: Full Symmetrical Infinity ---- */}
@@ -52,7 +52,7 @@ export default function MetaBooksLogo({ className = "h-10", showText = true }: L
       {/* ---- Text ---- */}
       {showText && (
         <span className="text-lg font-extrabold leading-none tracking-tight text-white sm:text-xl md:text-2xl">
-          Meta<span className="font-medium text-blue-400">Books</span>
+          Manga<span className="font-medium text-blue-400">Dock</span>
         </span>
       )}
     </div>

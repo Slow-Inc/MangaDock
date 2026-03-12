@@ -1,6 +1,6 @@
 # Backend (NestJS API)
 
-Backend สำหรับ MetaBooks ใช้ NestJS เป็น API และ orchestration layer ของระบบ
+Backend สำหรับ MangaDock ใช้ NestJS เป็น API และ orchestration layer ของระบบ
 
 ## เทคโนโลยี
 

@@ -49,10 +49,6 @@ type MangaChapter = {
   translatedLanguage: string;
   uploadedAt: string;
   pageCount: number;
-  /** True when chapter pages were confirmed via the pages API. */
-  pagesAvailable?: boolean;
-  /** True when the pages API was unavailable while verifying this chapter. */
-  pagesApiUnavailable?: boolean;
   /** forceLocal mode: true when this chapter has local cache for reader */
   readerAvailable?: boolean;
   /** True if returned from stale cache because the upstream API went offline */
@@ -249,6 +245,19 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     return () => window.removeEventListener("scroll", onScroll);
   }, [asPage]);
 
+  // Scroll-aware header in mobile modal mode
+  useEffect(() => {
+    if (asPage || activeChapter !== null) return;
+    const scroller = modalScrollRef.current;
+    if (!scroller) return;
+
+    const onScroll = () => setHeaderScrolled(scroller.scrollTop > 44);
+    onScroll();
+
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", onScroll);
+  }, [asPage, activeChapter, visible]);
+
   // Auto-scroll to chapters section (and highlighted chapter) when opened via "อ่านต่อ"
   useEffect(() => {
     if (scrollToChapters && !loadingChapters) {
@@ -288,13 +297,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     if (chapterNeedsBackup(ch)) {
       return ch.readerAvailable === true;
     }
-    if (ch.pageCount > 0 || ch.pagesAvailable === true) return true;
-    // API couldn't be reached — be optimistic, let the reader try on demand
-    if (ch.pagesApiUnavailable) return true;
-    // API confirmed zero pages — truly locked
-    if (ch.pagesAvailable === false) return false;
-    // Not probed yet — optimistic
-    return true;
+    return ch.pageCount > 0;
   };
 
   const getUnavailableChapterLabel = (ch: MangaChapter) => {
@@ -349,6 +352,31 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       <div
         className={asPage ? "relative w-full" : `relative z-10 flex w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] flex-col overflow-hidden md:rounded-3xl bg-[#141414] shadow-2xl transition-[transform,opacity] duration-300 md:duration-400 ease-out ${visible ? "translate-y-0 md:scale-100 md:opacity-100" : "translate-y-full md:translate-y-8 md:scale-90 md:opacity-0"}`}
       >
+        {!asPage && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-30 md:hidden">
+            <div
+              className={`flex items-center gap-2.5 border-b px-3.5 pb-[0.55rem] pt-[calc(env(safe-area-inset-top)+0.6rem)] transition-[background-color,backdrop-filter,box-shadow,border-color,opacity] duration-300 ease-out ${
+                headerScrolled
+                  ? "border-white/8 bg-[#141414]/62 opacity-100 shadow-[0_6px_18px_rgba(0,0,0,0.16)] backdrop-blur-md"
+                  : "border-transparent bg-transparent opacity-0 shadow-none backdrop-blur-none"
+              }`}
+            >
+              <button
+                onClick={handleClose}
+                title="กลับ"
+                className="pointer-events-auto flex h-[2.2rem] w-[2.2rem] items-center justify-center rounded-full border border-white/10 bg-black/20 text-white transition hover:bg-white/10"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4.5 w-4.5">
+                  <path d="M19 12H5M12 5l-7 7 7 7" />
+                </svg>
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold tracking-[0.01em] text-white/98">{book.title}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div
           ref={modalScrollRef}
           className={asPage ? "w-full pb-[calc(var(--mobile-nav-height)+1.5rem)]" : "flex-1 min-h-0 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]"}
@@ -358,7 +386,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
             <button
               onClick={handleClose}
               title="ปิด"
-              className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition hover:bg-white/20"
+              className={`absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-[opacity,transform] duration-300 hover:bg-white/20 md:opacity-100 md:pointer-events-auto ${headerScrolled ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"}`}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
                 <path d="M18 6L6 18M6 6l12 12" />

@@ -415,7 +415,7 @@ export class BooksService {
     // Fetch original manga page image
     const imgRes = await fetch(pageUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MetaBooks/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
         'Referer': 'https://mangadex.org/',
       },
       signal: AbortSignal.timeout(30_000),
@@ -546,7 +546,7 @@ export class BooksService {
     // Fetch original manga page image
     const imgRes = await fetch(pageUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MetaBooks/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
         'Referer': 'https://mangadex.org/',
       },
       signal: AbortSignal.timeout(30_000),
@@ -789,7 +789,7 @@ export class BooksService {
         pages.map(async ({ pageUrl }) => {
           const imgRes = await fetch(pageUrl, {
             headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; MetaBooks/1.0)',
+              'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
               'Referer': 'https://mangadex.org/',
             },
             signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),

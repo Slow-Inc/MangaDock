@@ -96,13 +96,7 @@ export class MangaDexService {
     const cacheKey = `manga:chapters:v3:${mangaId}`;
     const cached = await this.cache.get<MangaChapter[]>(cacheKey);
     if (cached) {
-      const { chapters, changed } = await this.resolveAmbiguousChapterAvailability(cached.data);
-      if (changed) {
-        this.cache
-          .set(cacheKey, chapters, CACHE_TTL_MS)
-          .catch((err) => this.logger.warn(`[MangaDex] Chapter cache patch failed: ${String(err)}`));
-      }
-      return this.attachLocalStatus(chapters, false);
+      return this.attachLocalStatus(cached.data, false);
     }
 
     const lang = this.getMangaLanguage();
@@ -157,8 +151,6 @@ export class MangaDexService {
         uploadedAt: c.attributes.publishAt ?? '',
         pageCount: c.attributes.pages ?? 0,
       }));
-
-      ({ chapters } = await this.resolveAmbiguousChapterAvailability(chapters));
 
       if (chapters.length > 0) {
         await this.cache.set(cacheKey, chapters, CACHE_TTL_MS);
@@ -634,129 +626,6 @@ export class MangaDexService {
       readerAvailable: this.imageCache.hasChapterCache('_chapters', ch.id),
       isOfflineFallback
     }));
-  }
-
-  private chapterPagesCount(data: MangaChapterPages): number {
-    return data.pages.length > 0 ? data.pages.length : data.dataSaverPages.length;
-  }
-
-  private async probeChapterAvailability(
-    chapterId: string,
-  ): Promise<Pick<MangaChapter, 'pageCount' | 'pagesAvailable' | 'pagesApiUnavailable'>> {
-    const cacheKey = `manga:chapter-pages:${chapterId}`;
-
-    const resolveCount = (data: MangaChapterPages, original?: MangaChapterPages) => {
-      const enhanced = this.enhanceChapterPages(chapterId, data);
-      if (original && this.imageCache.enabled) {
-        this.patchChapterPagesCacheIfNeeded(cacheKey, original, enhanced);
-      }
-      const pageCount = this.chapterPagesCount(enhanced);
-      return {
-        pageCount,
-        pagesAvailable: pageCount > 0,
-        pagesApiUnavailable: false,
-      };
-    };
-
-    const cached = await this.cache.get<MangaChapterPages>(cacheKey);
-    if (cached) {
-      return resolveCount(cached.data, cached.data);
-    }
-
-    try {
-      const res = await fetch(
-        `https://api.mangadex.org/at-home/server/${chapterId}`,
-        { headers: { Accept: 'application/json' }, cache: 'no-store' },
-      );
-
-      if (!res.ok) {
-        const stale = this.cache.getStale<MangaChapterPages>(cacheKey);
-        if (stale) {
-          return resolveCount(stale.data, stale.data);
-        }
-
-        return {
-          pageCount: 0,
-          pagesAvailable: false,
-          pagesApiUnavailable: res.status === 429 || res.status >= 500,
-        };
-      }
-
-      const data = (await res.json()) as {
-        baseUrl: string;
-        chapter: { hash: string; data: string[]; dataSaver: string[] };
-      };
-
-      const result: MangaChapterPages = {
-        pages: data.chapter.data.map((f) => `${data.baseUrl}/data/${data.chapter.hash}/${f}`),
-        dataSaverPages: data.chapter.dataSaver.map((f) => `${data.baseUrl}/data-saver/${data.chapter.hash}/${f}`),
-      };
-
-      await this.cache.set(cacheKey, result, CACHE_TTL_MS);
-      return resolveCount(result, result);
-    } catch {
-      const stale = this.cache.getStale<MangaChapterPages>(cacheKey);
-      if (stale) {
-        return resolveCount(stale.data, stale.data);
-      }
-
-      return {
-        pageCount: 0,
-        pagesAvailable: false,
-        pagesApiUnavailable: true,
-      };
-    }
-  }
-
-  private async resolveAmbiguousChapterAvailability(
-    chapters: MangaChapter[],
-  ): Promise<{ chapters: MangaChapter[]; changed: boolean }> {
-    const candidates = chapters.filter((ch) => ch.pageCount <= 0);
-    if (candidates.length === 0) {
-      return { chapters, changed: false };
-    }
-
-    const updates = new Map<string, Pick<MangaChapter, 'pageCount' | 'pagesAvailable' | 'pagesApiUnavailable'>>();
-    const concurrency = 6;
-
-    for (let index = 0; index < candidates.length; index += concurrency) {
-      const batch = candidates.slice(index, index + concurrency);
-      const results = await Promise.allSettled(
-        batch.map((chapter) => this.probeChapterAvailability(chapter.id)),
-      );
-
-      batch.forEach((chapter, batchIndex) => {
-        const result = results[batchIndex];
-        if (result.status === 'fulfilled') {
-          updates.set(chapter.id, result.value);
-          return;
-        }
-
-        updates.set(chapter.id, {
-          pageCount: chapter.pageCount,
-          pagesAvailable: false,
-          pagesApiUnavailable: true,
-        });
-      });
-    }
-
-    let changed = false;
-    const resolved = chapters.map((chapter) => {
-      const update = updates.get(chapter.id);
-      if (!update) return chapter;
-
-      const next = { ...chapter, ...update };
-      if (
-        next.pageCount !== chapter.pageCount ||
-        next.pagesAvailable !== chapter.pagesAvailable ||
-        next.pagesApiUnavailable !== chapter.pagesApiUnavailable
-      ) {
-        changed = true;
-      }
-      return next;
-    });
-
-    return { chapters: resolved, changed };
   }
 
   private applyForceLocalMangaDetail(detail: MangaDetail): MangaDetail {

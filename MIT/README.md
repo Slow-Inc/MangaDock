@@ -3,7 +3,7 @@
 ไมโครเซอร์วิส HTTP สำหรับแปลภาพและมังงะ  
 รับรูปภาพเข้าไป ประมวลผลผ่าน translation pipeline แบบเต็มชุด และส่งผลลัพธ์กลับผ่าน REST API
 
-พัฒนาต่อยอดจาก [`zyddnys/manga-image-translator`](https://github.com/zyddnys/manga-image-translator) โดยตัดส่วนที่ไม่จำเป็นออกและจัดรูปแบบใหม่ให้ใช้งานเป็น service แยกได้โดยตรง  
+พัฒนาต่อยอดจาก [`zyddnys/manga-image-translator`](https://github.com/zyddnys/manga-image-translator) โดยตัดส่วนที่ไม่จำเป็นออก, Optimized(เพิ่ม Crop text region + Process only region + Queue Management)และจัดรูปแบบใหม่ให้ใช้งานเป็น service แยกได้โดยตรง  
 ทุกโปรเจกต์ที่เรียก HTTP ได้สามารถใช้งาน service นี้ได้ โดย MetaBooks เป็นเพียงหนึ่งในผู้ใช้งานเท่านั้น
 
 ## สถาปัตยกรรม
@@ -90,7 +90,7 @@ docker compose up -d
 
 1. ติดตั้ง service นี้บนเครื่องแยก
 2. เปิดพอร์ตที่ต้องการ เช่น `5003`
-3. ตั้งค่า `MANGA_TRANSLATOR_URL` ของ MetaBooks backend ให้ชี้ไปยังเครื่องนั้น
+3. ตั้งค่า `MANGA_TRANSLATOR_URL` ของ MangaDock backend ให้ชี้ไปยังเครื่องนั้น
 4. ถ้าใช้ front utility ให้ตั้ง `MIT_API_TARGET` ให้ชี้ไปยัง service เดียวกัน
 
 ตัวอย่าง:
@@ -206,7 +206,7 @@ service จะโหลด `.env` อัตโนมัติ ให้กำห
 เริ่มต้นได้ง่ายที่สุดโดย copy `.env.example` เป็น `.env` แล้วค่อยกรอกเฉพาะค่าที่ใช้งานจริง
 
 ```env
-# Gemini (เส้นทางหลักของ MetaBooks)
+# Gemini (เส้นทางหลักของ MangaDock)
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
 
@@ -260,7 +260,7 @@ with open("translated.png", "wb") as f:
     f.write(resp.content)
 ```
 
-### เรียกจาก MetaBooks (NestJS backend)
+### เรียกจาก MangaDock (NestJS backend)
 
 กำหนด `MANGA_TRANSLATOR_URL=http://localhost:5003` ในไฟล์ `.env` ของ NestJS  
 backend จะเรียก service นี้ผ่าน translation service ใน books module

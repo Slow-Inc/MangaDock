@@ -1,6 +1,6 @@
 # Phase 5: Test Specification and UAT
 
-เอกสารฉบับนี้จัดทำขึ้นเพื่ออธิบายแผนการทดสอบของระบบ MetaBooks ทั้งในระดับ test specification และผลการทดสอบ User Acceptance Test (UAT)
+เอกสารฉบับนี้จัดทำขึ้นเพื่ออธิบายแผนการทดสอบของระบบ MangaDock ทั้งในระดับ test specification และผลการทดสอบ User Acceptance Test (UAT)
 
 ## 1. Test Objectives
 
@@ -61,6 +61,6 @@
 
 ## 7. Summary
 
-Phase 5 มีบทบาทสำคัญในการยืนยันว่าระบบ MetaBooks ไม่เพียงพัฒนาได้ครบตาม requirement แต่ยังสามารถใช้งานได้จริงในมุมมองของผู้ใช้ปลายทาง โดยผล UAT เป็นหลักฐานสำคัญก่อนเข้าสู่การเตรียม deployment และ go-live
+Phase 5 มีบทบาทสำคัญในการยืนยันว่าระบบ MangaDock ไม่เพียงพัฒนาได้ครบตาม requirement แต่ยังสามารถใช้งานได้จริงในมุมมองของผู้ใช้ปลายทาง โดยผล UAT เป็นหลักฐานสำคัญก่อนเข้าสู่การเตรียม deployment และ go-live
 
 เอกสารประกอบที่ควรใช้อ้างอิงร่วมกับ phase นี้ ได้แก่ [../Frontend/FRONTEND_DOC_INDEX.md](../Frontend/FRONTEND_DOC_INDEX.md), [../Backend/BACKEND_DOC_INDEX.md](../Backend/BACKEND_DOC_INDEX.md), [../MIT/MIT_DOC_INDEX.md](../MIT/MIT_DOC_INDEX.md) และ [SE_PHASE6_DEPLOYMENT_AND_GO_LIVE.md](SE_PHASE6_DEPLOYMENT_AND_GO_LIVE.md)

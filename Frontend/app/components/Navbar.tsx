@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import MetaBooksLogo from "./MetaBooksLogo";
+import MangaDockLogo from "./MangaDockLogo";
 import NavbarActions from "./NavbarActions";
 
 const GENRES = [
@@ -111,7 +111,7 @@ export default function Navbar() {
       <div className="flex h-16 w-full items-center justify-between px-6 lg:px-10">
         <div className="flex items-center gap-8">
           <Link href="/">
-            <MetaBooksLogo className="h-9" />
+            <MangaDockLogo className="h-9" />
           </Link>
 
           <nav className="hidden items-center gap-1 text-sm md:flex">

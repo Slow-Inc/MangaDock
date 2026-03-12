@@ -11,8 +11,8 @@
  */
 
 const API_BASE = "/api/proxy";
-const STORAGE_KEY = "metabooks_reading_history";
-const SYNCED_KEY = "metabooks_history_synced";   // IDs known to be in Firebase
+const STORAGE_KEY = "mangadock_reading_history";
+const SYNCED_KEY = "mangadock_history_synced";   // IDs known to be in Firebase
 const MAX_ITEMS = 30;
 const FLUSH_DELAY = 5_000;
 

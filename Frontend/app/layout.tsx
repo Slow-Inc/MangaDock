@@ -12,7 +12,7 @@ const notoSansThai = Noto_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: "MetaBooks by Hayate | Manga Streaming Platform",
+  title: "MangaDock by Hayate | Manga Streaming Platform",
   description: "แพลตฟอร์ม E-Book สไตล์ Netflix ด้วย MangaDex API",
 };
 

@@ -1,6 +1,6 @@
-# MetaBooks
+# MangaDock
 
-MetaBooks เป็นระบบที่แยกออกเป็น 3 ส่วนหลัก:
+MangaDock เป็นระบบที่แยกออกเป็น 3 ส่วนหลัก:
 
 1. Frontend: Next.js web app
 2. Backend: NestJS API และ orchestration layer

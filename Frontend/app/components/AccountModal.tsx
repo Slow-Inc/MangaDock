@@ -308,7 +308,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
         message: (
           <>
             ลบบัญชีสำเร็จแล้ว —{" "}
-            <span className="font-semibold text-white">ขอบคุณที่ใช้บริการ MetaBooks</span>
+            <span className="font-semibold text-white">ขอบคุณที่ใช้บริการ MangaDock</span>
           </>
         ),
         duration: 5000,
@@ -506,7 +506,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       type: "warning",
       message: (
         <>
-          บัญชี <span className="font-semibold text-white">{info.provider === "google" ? "Google" : "Facebook"}</span> นี้ผูกกับ MetaBooks อีกบัญชีอยู่แล้ว
+          บัญชี <span className="font-semibold text-white">{info.provider === "google" ? "Google" : "Facebook"}</span> นี้ผูกกับ MangaDock อีกบัญชีอยู่แล้ว
         </>
       ),
       duration: 0, // no auto-dismiss — user must act

@@ -209,7 +209,7 @@ export class BooksController {
     try {
       const upstream = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; MetaBooks/1.0)',
+          'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
           'Accept': 'image/webp,image/avif,image/*,*/*',
           // MangaDex CDN blocks requests whose Referer is not mangadex.org
           'Referer': 'https://mangadex.org/',

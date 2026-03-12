@@ -1,6 +1,6 @@
 # Frontend (Next.js + TailwindCSS)
 
-Landing Page สำหรับ MetaBooks ในสไตล์ Netflix + Glassmorphism
+Landing Page สำหรับ MangaDock ในสไตล์ Netflix + Glassmorphism
 
 ## เทคโนโลยี
 
