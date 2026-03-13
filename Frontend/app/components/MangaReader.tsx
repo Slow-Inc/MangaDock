@@ -3,6 +3,7 @@
 import type Lenis from "lenis";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { translateMangaChapterBatchPatches, translateMangaPagePatches, checkMitHealth, type PatchData } from "../lib/mangaTranslatePage";
 import { useLocalLenis } from "../hooks/useLocalLenis";
@@ -44,6 +45,21 @@ const TARGET_LANG_OPTIONS: { code: string; label: string }[] = [
 ];
 
 export default function MangaReader({ chapterId: initialChapterId, chapterNumber: initialChapterNumber, chapterTitle: initialChapterTitle, mangaTitle, mangaId, onClose }: Props) {
+  // Cloudflare Turnstile state
+  const [turnstilePassed, setTurnstilePassed] = useState(false);
+  const [turnstileExiting, setTurnstileExiting] = useState(false);
+  const [clearanceToken, setClearanceToken] = useState<string | null>(null);
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
+  // Check valid clearance token on mount
+  useEffect(() => {
+    const savedToken = localStorage.getItem("cf_clearance_token");
+    if (savedToken) {
+      setClearanceToken(savedToken);
+      setTurnstilePassed(true);
+    }
+  }, []);
+
   // Current chapter state — can change via navigation
   const [currentChapterId, setCurrentChapterId] = useState(initialChapterId);
   const [currentChapterNumber, setCurrentChapterNumber] = useState(initialChapterNumber);
@@ -340,8 +356,23 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     requestAnimationFrame(() => setVisible(true));
     document.body.style.overflow = "hidden";
 
-    fetch(`${API_BASE}/books/chapters/${chapterId}/pages${localStorage.getItem("imgCacheForceLocal") === "1" ? "?forceLocal=true" : ""}`)
-      .then((r) => { if (!r.ok) throw new Error("not ok"); return r.json(); })
+    if (!turnstilePassed) return;
+
+    fetch(`${API_BASE}/books/chapters/${chapterId}/pages${localStorage.getItem("imgCacheForceLocal") === "1" ? "?forceLocal=true" : ""}`, {
+      headers: {
+        'x-captcha-clearance': clearanceToken || '',
+      }
+    })
+      .then((r) => {
+        if (r.status === 401) {
+          localStorage.removeItem('cf_clearance_token');
+          setClearanceToken(null);
+          setTurnstilePassed(false);
+          throw new Error("unauthorized");
+        }
+        if (!r.ok) throw new Error("not ok");
+        return r.json();
+      })
       .then((d: ChapterPages) => {
         // forceLocal mode: backend signals no pages are cached yet
         if (d.localCacheAvailable === false) {
@@ -365,8 +396,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       .catch(() => { setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300); });
 
     return () => { document.body.style.overflow = ""; };
-  }, [chapterId]);
-
+  }, [chapterId, turnstilePassed, clearanceToken]);
   useEffect(() => { resetPan(); }, [page]);
 
   // Sync continuousMode to ref so wheel handler can read it without re-binding
@@ -701,6 +731,85 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
   const content = (
     <div className={`fixed inset-0 z-300 flex flex-col bg-black transition-opacity duration-250 ${visible ? "opacity-100" : "opacity-0"}`}>
+      {/* Cloudflare Turnstile Modal / Bottom Sheet */}
+      {(!turnstilePassed || turnstileExiting) && mounted && turnstileSiteKey && (
+        <div className={`absolute inset-0 z-[400] flex items-end sm:items-center justify-center sm:pt-16 bg-black/10 backdrop-blur-[2px] transition-opacity duration-300 ${turnstileExiting ? "opacity-0" : "opacity-100"}`}>
+          <style>{`
+            @keyframes mobileSlideUp {
+              0% { transform: translateY(100%); opacity: 0; }
+              100% { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes mobileSlideDown {
+              0% { transform: translateY(0); opacity: 1; }
+              100% { transform: translateY(100%); opacity: 0; }
+            }
+            @keyframes desktopScaleIn {
+              0% { transform: scale(0.95); opacity: 0; }
+              100% { transform: scale(1); opacity: 1; }
+            }
+            @keyframes desktopScaleOut {
+              0% { transform: scale(1); opacity: 1; }
+              100% { transform: scale(0.95); opacity: 0; }
+            }
+            .animate-captcha-in {
+              animation: mobileSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+            .animate-captcha-out {
+              animation: mobileSlideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            }
+            @media (min-width: 640px) {
+              .animate-captcha-in {
+                animation: desktopScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+              }
+              .animate-captcha-out {
+                animation: desktopScaleOut 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+              }
+            }
+          `}</style>
+          
+          <div 
+            className={`relative flex w-full sm:max-w-sm flex-col items-center overflow-hidden rounded-t-[2rem] sm:rounded-3xl border-t sm:border border-white/10 bg-zinc-950/95 sm:bg-zinc-900 shadow-[0_-10px_60px_-15px_rgba(0,0,0,0.7)] sm:shadow-2xl backdrop-blur-2xl p-6 pb-12 sm:p-8 ${turnstileExiting ? "animate-captcha-out" : "animate-captcha-in"}`}
+          >
+            <div className="w-12 h-1.5 bg-white/20 rounded-full mb-6 sm:hidden"></div>
+
+            <div className="mb-6 text-center">
+              <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 tracking-tight">ยืนยันตัวตน</h3>
+              <p className="text-[13px] sm:text-sm text-white/50 px-2 leading-relaxed">
+                กำลังตรวจสอบความปลอดภัย<br />
+                {chapterLabel}
+              </p>
+            </div>
+            
+            <div className="flex justify-center w-full overflow-hidden rounded-xl border border-white/5 bg-black/50 p-2">
+              <Turnstile
+                siteKey={turnstileSiteKey}
+                onSuccess={(token) => {
+                  fetch(`${API_BASE}/books/verify-captcha`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                  })
+                    .then(r => r.json())
+                    .then(data => {
+                      if (data.clearanceToken) {
+                        localStorage.setItem("cf_clearance_token", data.clearanceToken);
+                        setClearanceToken(data.clearanceToken);
+                        setTurnstileExiting(true);
+                        setTimeout(() => {
+                          setTurnstilePassed(true);
+                          setTurnstileExiting(false);
+                        }, 300); // Wait for the slide down animation to finish
+                      }
+                    })
+                    .catch(console.error);
+                }}
+                options={{ theme: "dark" }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top bar — z-10 ensures dropdown panel stacks above the reader area (flip buttons etc.) */}
       <div className="relative z-10 flex shrink-0 items-center border-b border-white/10 bg-black/80 px-2 py-2 sm:px-4 sm:py-3 backdrop-blur-sm">
         <div className="min-w-0 flex-1">

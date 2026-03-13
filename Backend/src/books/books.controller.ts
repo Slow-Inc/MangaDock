@@ -1,10 +1,46 @@
-import { Body, Controller, Get, HttpException, HttpStatus, NotFoundException, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, NotFoundException, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { BooksService } from './books.service';
+import { TurnstileGuard, generateClearanceToken } from '../auth/turnstile.guard';
 
 @Controller('books')
 export class BooksController {
   constructor(private readonly booksService: BooksService) {}
+
+  @Post('verify-captcha')
+  async verifyCaptcha(@Body() body: { token: string }) {
+    if (!body.token) {
+      throw new HttpException('Token is required', HttpStatus.BAD_REQUEST);
+    }
+    const secretKey = process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA';
+    
+    // Ignore verification if disabled
+    if (process.env.TURNSTILE_ENABLED === 'false') {
+      return { clearanceToken: generateClearanceToken(secretKey) };
+    }
+
+    const formData = new URLSearchParams();
+    formData.append('secret', secretKey);
+    formData.append('response', body.token);
+
+    try {
+      const result = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        body: formData,
+      });
+      const outcome = await result.json();
+
+      if (outcome.success) {
+        return { clearanceToken: generateClearanceToken(secretKey) };
+      }
+      
+      console.error('Turnstile verification failed:', outcome['error-codes']);
+    } catch (e) {
+      console.error('Turnstile API request failed:', e);
+    }
+
+    throw new HttpException('Invalid Captcha token', HttpStatus.UNAUTHORIZED);
+  }
 
   @Get('landing')
   getLandingBooks(@Query('forceLocal') forceLocal?: string) {
@@ -58,6 +94,7 @@ export class BooksController {
     return this.booksService.getMangaChapters(id, forceLocal === 'true');
   }
 
+  @UseGuards(TurnstileGuard)
   @Get('chapters/:chapterId/pages')
   async getMangaChapterPages(
     @Param('chapterId') chapterId: string,
