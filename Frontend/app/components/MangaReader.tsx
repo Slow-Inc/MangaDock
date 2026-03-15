@@ -51,6 +51,21 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [clearanceToken, setClearanceToken] = useState<string | null>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
+  // Stores the last successfully loaded chapter so we can restore it when a
+  // navigation attempt fails with 401 (expired token). This lets the user keep
+  // reading the current chapter while completing the captcha, then automatically
+  // proceeds to the originally requested chapter afterwards.
+  const prevChapterDataRef = useRef<{
+    id: string;
+    number: string | null;
+    title: string | null;
+    data: ChapterPages;
+  } | null>(null);
+
+  // When a navigation is attempted while the captcha is needed, we store it
+  // here so it can be completed automatically after the captcha passes.
+  const pendingChapterNavRef = useRef<ChapterPageItem | null>(null);
+
   // Check valid clearance token on mount
   useEffect(() => {
     const savedToken = localStorage.getItem("cf_clearance_token");
@@ -337,6 +352,13 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   }, [mangaId]);
 
   const goToChapter = (ch: ChapterPageItem) => {
+    if (!turnstilePassed) {
+      // Captcha is currently showing — queue this navigation so it executes
+      // automatically once the captcha is passed instead of navigating now
+      // (which would clear the visible chapter and leave a blank screen).
+      pendingChapterNavRef.current = ch;
+      return;
+    }
     setCurrentChapterId(ch.id);
     setCurrentChapterNumber(ch.chapterNumber);
     setCurrentChapterTitle(ch.title);
@@ -344,6 +366,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
   useEffect(() => {
     setMounted(true);
+    requestAnimationFrame(() => setVisible(true));
+    document.body.style.overflow = "hidden";
+
+    if (!turnstilePassed) {
+      // Captcha is required — don't reset the view so the user can still see
+      // the current chapter content behind the captcha overlay.
+      return () => { document.body.style.overflow = ""; };
+    }
+
     setPage(0);
     setData(null);
     setError(false);
@@ -353,10 +384,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     if (contentReadyTimerRef.current) clearTimeout(contentReadyTimerRef.current);
     setZoom(1);
     resetPan();
-    requestAnimationFrame(() => setVisible(true));
-    document.body.style.overflow = "hidden";
-
-    if (!turnstilePassed) return;
 
     fetch(`${API_BASE}/books/chapters/${chapterId}/pages${localStorage.getItem("imgCacheForceLocal") === "1" ? "?forceLocal=true" : ""}`, {
       headers: {
@@ -367,6 +394,34 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
         if (r.status === 401) {
           localStorage.removeItem('cf_clearance_token');
           setClearanceToken(null);
+
+          // If there is a previously loaded chapter, restore it so the user
+          // sees their content while completing the captcha rather than a blank
+          // screen. Save the failed chapter as pending so it loads automatically
+          // after the captcha passes.
+          const prev = prevChapterDataRef.current;
+          if (prev) {
+            if (prev.id !== chapterId) {
+              // Navigating to a different chapter — queue that chapter for after captcha
+              // and restore the chapter the user was reading.
+              pendingChapterNavRef.current = {
+                id: chapterId,
+                chapterNumber,
+                title: chapterTitle,
+                translatedLanguage: currentLang ?? '',
+              };
+              setCurrentChapterId(prev.id);
+              setCurrentChapterNumber(prev.number);
+              setCurrentChapterTitle(prev.title);
+            }
+            // Restore the previous data regardless (prevents a blank reader
+            // screen even when re-fetching the same chapter with a new token).
+            setData(prev.data);
+            setLoading(false);
+            setError(false);
+            setContentReady(true);
+          }
+
           setTurnstilePassed(false);
           throw new Error("unauthorized");
         }
@@ -382,7 +437,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           return;
         }
         if (!d || (d.pages.length === 0 && d.dataSaverPages.length === 0)) setError(true);
-        else setData(d);
+        else {
+          setData(d);
+          // Save this chapter as the last successful state for 401 restoration
+          prevChapterDataRef.current = { id: chapterId, number: chapterNumber, title: chapterTitle, data: d };
+        }
         setLoading(false);
         contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300);
         // Update reading history chapter progress
@@ -393,7 +452,12 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           }
         }
       })
-      .catch(() => { setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300); });
+      .catch((err) => {
+        // "unauthorized" is already handled above (captcha restoration); don't
+        // overwrite the restored state with a generic error.
+        if (err instanceof Error && err.message === "unauthorized") return;
+        setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300);
+      });
 
     return () => { document.body.style.overflow = ""; };
   }, [chapterId, turnstilePassed, clearanceToken]);
@@ -796,6 +860,16 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         setClearanceToken(data.clearanceToken);
                         setTurnstileExiting(true);
                         setTimeout(() => {
+                          // Complete any navigation that was queued while the
+                          // captcha was required (e.g. user tried to change
+                          // chapter with an expired token).
+                          const pending = pendingChapterNavRef.current;
+                          if (pending) {
+                            pendingChapterNavRef.current = null;
+                            setCurrentChapterId(pending.id);
+                            setCurrentChapterNumber(pending.chapterNumber);
+                            setCurrentChapterTitle(pending.title);
+                          }
                           setTurnstilePassed(true);
                           setTurnstileExiting(false);
                         }, 300); // Wait for the slide down animation to finish
