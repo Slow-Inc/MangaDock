@@ -26,21 +26,17 @@ export class VersionsController {
     return this.versions.listVersionsByChapter(chapterId);
   }
 
-<<<<<<< HEAD
   /** List published versions for a title (public — no auth required). */
   @Get('title/:titleId')
   listByTitle(@Param('titleId') titleId: string) {
     return this.versions.listVersionsByTitle(titleId);
   }
 
-  /** Get a single version by ID (public). */
-=======
   /**
    * Get a single version by ID.
    * Public access is restricted to published versions only.
    * Authenticated owners can see their own draft/pending/rejected versions.
    */
->>>>>>> d64aa4d2576580af9d11cbce39741e0f04360ae8
   @Get(':versionId')
   async getVersion(
     @Param('versionId') versionId: string,

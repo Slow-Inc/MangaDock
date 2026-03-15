@@ -921,27 +921,6 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
                 <button onClick={handleUpdateProfile} disabled={loading || !displayName.trim()} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
                   {loading ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
                 </button>
-<<<<<<< HEAD
-=======
-
-                {/* ── Translator studio shortcut ── */}
-                <div className="rounded-xl border border-white/10 bg-white/3 px-4 py-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold text-white/70">สตูดิโอนักแปล</p>
-                      <p className="text-[11px] text-white/30">
-                        {isTranslator ? "จัดการงานแปลและอัปโหลดใหม่" : "สมัครเพื่อเริ่มอัปโหลดงานแปล"}
-                      </p>
-                    </div>
-                    <Link
-                      href="/studio"
-                      className="rounded-xl border border-indigo-500/40 bg-indigo-600/20 px-3 py-1.5 text-xs font-semibold text-indigo-300 transition hover:bg-indigo-600/30"
-                    >
-                      {isTranslator ? "เปิดสตูดิโอ" : "สมัคร"}
-                    </Link>
-                  </div>
-                </div>
->>>>>>> d64aa4d2576580af9d11cbce39741e0f04360ae8
               </div>
 
             </div>

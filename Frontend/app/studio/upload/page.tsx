@@ -115,7 +115,6 @@ export default function StudioUploadPage() {
     if (!loading && user && !isTranslator) router.replace("/studio");
   }, [loading, user, isTranslator, router]);
 
-<<<<<<< HEAD
   // Handle auto-updating synthetic chapterId when chapterNumber changes
   // since we aren't picking a specific chapter from MangaDex anymore
   useEffect(() => {
@@ -124,12 +123,9 @@ export default function StudioUploadPage() {
     }
   }, [titleId, chapterNumber, versionId]);
 
-  /** Create a draft version if one doesn't exist yet. Returns the versionId. */
-=======
   /** Create a draft version if one doesn't exist yet. Returns the versionId.
    *  All concurrent callers share the same in-flight promise so only one
    *  version is ever created per upload session. */
->>>>>>> d64aa4d2576580af9d11cbce39741e0f04360ae8
   const ensureVersion = async (token: string): Promise<string> => {
     // Fast path: version already exists
     if (versionId) return versionId;
