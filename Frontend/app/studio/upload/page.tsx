@@ -65,6 +65,18 @@ export default function StudioUploadPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  /**
+   * Single in-flight version-creation promise, shared across all concurrent
+   * uploadFile() calls. Without this, rapid multi-file selections can each
+   * see versionId === null and race to create multiple draft versions.
+   */
+  const ensureVersionPromiseRef = useRef<Promise<string> | null>(null);
+  /**
+   * Always-current ref to `pages` used by the unmount cleanup so that blob
+   * URLs added after mount are still revoked when the component unmounts.
+   */
+  const pagesRef = useRef<PageItem[]>(pages);
+  pagesRef.current = pages;
 
   // Load existing version data if editing
   useEffect(() => {
@@ -98,13 +110,21 @@ export default function StudioUploadPage() {
     if (!loading && user && !isTranslator) router.replace("/studio");
   }, [loading, user, isTranslator, router]);
 
-  /** Create a draft version if one doesn't exist yet. Returns the versionId. */
+  /** Create a draft version if one doesn't exist yet. Returns the versionId.
+   *  All concurrent callers share the same in-flight promise so only one
+   *  version is ever created per upload session. */
   const ensureVersion = async (token: string): Promise<string> => {
+    // Fast path: version already exists
     if (versionId) return versionId;
+
+    // If another concurrent call is already creating the version, await it
+    if (ensureVersionPromiseRef.current) return ensureVersionPromiseRef.current;
+
     if (!titleId || !chapterId || !language) {
       throw new Error("กรุณากรอก Title ID, Chapter ID และภาษาก่อน");
     }
-    const res = await fetch(`${API_BASE}/versions`, {
+
+    const creation = fetch(`${API_BASE}/versions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -117,14 +137,20 @@ export default function StudioUploadPage() {
         description,
         priceCoins,
       }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message ?? "ไม่สามารถสร้างงานแปลได้");
+      }
+      const data = await res.json();
+      setVersionId(data.versionId);
+      return data.versionId as string;
+    }).finally(() => {
+      ensureVersionPromiseRef.current = null;
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.message ?? "ไม่สามารถสร้างงานแปลได้");
-    }
-    const data = await res.json();
-    setVersionId(data.versionId);
-    return data.versionId;
+
+    ensureVersionPromiseRef.current = creation;
+    return creation;
   };
 
   /** Upload a single page file. */
@@ -151,22 +177,36 @@ export default function StudioUploadPage() {
           throw new Error(err?.message ?? "อัปโหลดไม่สำเร็จ");
         }
         const { pageUrl } = await res.json();
+        // Replace the placeholder with the real server URL, then revoke the
+        // blob so it doesn't leak — we now have the permanent URL.
         setPages((prev) =>
           prev.map((p) => (p.url === placeholderUrl ? { url: pageUrl } : p))
         );
+        URL.revokeObjectURL(placeholderUrl);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ";
+        // Keep the placeholder URL in state so the preview still renders while
+        // the error is visible. The blob will be revoked when the user removes
+        // the page or navigates away (handled by the cleanup effect below).
         setPages((prev) =>
           prev.map((p) => (p.url === placeholderUrl ? { ...p, uploading: false, error: msg } : p))
         );
         showToast({ message: msg });
-      } finally {
-        URL.revokeObjectURL(placeholderUrl);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, versionId, titleId, chapterId, language, titleName, chapterNumber, chapterTitle, description, priceCoins]
   );
+
+  // Revoke any remaining blob URLs (e.g. failed uploads) on unmount.
+  // pagesRef always holds the latest pages so URLs added after mount are covered.
+  useEffect(() => {
+    return () => {
+      pagesRef.current.forEach((p) => {
+        if (p.url.startsWith("blob:")) URL.revokeObjectURL(p.url);
+      });
+    };
+  }, []);
 
   const handleFilesSelected = (files: FileList | null) => {
     if (!files) return;
@@ -184,6 +224,12 @@ export default function StudioUploadPage() {
   };
 
   const handleDeletePage = async (pageUrl: string) => {
+    // If it's a local blob (upload error case), just remove it from state and revoke
+    if (pageUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(pageUrl);
+      setPages((prev) => prev.filter((p) => p.url !== pageUrl));
+      return;
+    }
     if (!user || !versionId) {
       setPages((prev) => prev.filter((p) => p.url !== pageUrl));
       return;

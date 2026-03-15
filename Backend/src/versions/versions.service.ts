@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import * as fs from 'fs';
+import * as path from 'path';
 import { FirebaseService } from '../firebase/firebase.service';
 import type { ChapterVersion, VersionStatus } from './versions.types';
 
@@ -76,7 +78,7 @@ export class VersionsService {
     return snap.docs.map((d) => d.data() as ChapterVersion);
   }
 
-  /** List all versions created by a specific translator. */
+  /** List all versions created by a specific translator (all statuses — requires auth). */
   async listVersionsByTranslator(translatorUid: string): Promise<ChapterVersion[]> {
     const snap = await this.col
       .where('translatorUid', '==', translatorUid)
@@ -84,6 +86,20 @@ export class VersionsService {
       .limit(50)
       .get();
     return snap.docs.map((d) => d.data() as ChapterVersion);
+  }
+
+  /** List published versions for a translator, excluding page URLs (suitable for public display). */
+  async listPublishedVersionsByTranslator(translatorUid: string): Promise<Omit<ChapterVersion, 'pages'>[]> {
+    const snap = await this.col
+      .where('translatorUid', '==', translatorUid)
+      .where('status', '==', 'published')
+      .orderBy('createdAt', 'desc')
+      .limit(50)
+      .get();
+    return snap.docs.map((d) => {
+      const { pages: _pages, ...rest } = d.data() as ChapterVersion;
+      return rest;
+    });
   }
 
   /** Update the pages list of a draft version. */
@@ -165,6 +181,12 @@ export class VersionsService {
     }
     if (ver.status === 'published') {
       throw new BadRequestException('Published versions cannot be deleted');
+    }
+    // Delete uploaded pages from disk before removing the Firestore document
+    const pagesDir = path.join(process.cwd(), 'uploads', 'chapters', versionId);
+    if (fs.existsSync(pagesDir)) {
+      fs.rmSync(pagesDir, { recursive: true, force: true });
+      this.logger.log(`Deleted pages directory for version ${versionId}`);
     }
     await this.col.doc(versionId).delete();
     this.logger.log(`Deleted chapter version ${versionId}`);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
@@ -930,12 +931,12 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
                         {isTranslator ? "จัดการงานแปลและอัปโหลดใหม่" : "สมัครเพื่อเริ่มอัปโหลดงานแปล"}
                       </p>
                     </div>
-                    <a
+                    <Link
                       href="/studio"
                       className="rounded-xl border border-indigo-500/40 bg-indigo-600/20 px-3 py-1.5 text-xs font-semibold text-indigo-300 transition hover:bg-indigo-600/30"
                     >
                       {isTranslator ? "เปิดสตูดิโอ" : "สมัคร"}
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </div>
