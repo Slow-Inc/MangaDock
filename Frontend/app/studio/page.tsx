@@ -101,7 +101,7 @@ function VersionCard({
               onClick={() => onSubmit(version)}
               className="flex-1 rounded-xl bg-indigo-600 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500"
             >
-              ส่งตรวจสอบ
+              เผยแพร่งานแปล
             </button>
           )}
           <button
@@ -178,14 +178,14 @@ export default function StudioPage() {
       const res = await fetch(`${API_BASE}/versions/${version.versionId}/status`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "pending_moderation" }),
+        body: JSON.stringify({ status: "published" }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        showToast({ message: err?.message ?? "ไม่สามารถส่งตรวจสอบได้" });
+        showToast({ message: err?.message ?? "ไม่สามารถเผยแพร่งานแปลได้" });
         return;
       }
-      showToast({ message: "ส่งงานแปลเพื่อตรวจสอบแล้ว" });
+      showToast({ message: "เผยแพร่งานแปลแล้ว" });
       await fetchVersions();
     } catch {
       showToast({ message: "เกิดข้อผิดพลาด" });

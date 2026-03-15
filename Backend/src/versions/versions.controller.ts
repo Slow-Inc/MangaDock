@@ -2,11 +2,12 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
-  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -25,19 +26,54 @@ export class VersionsController {
     return this.versions.listVersionsByChapter(chapterId);
   }
 
-  /** Get a single version by ID (public). */
-  @Get(':versionId')
-  getVersion(@Param('versionId') versionId: string) {
-    return this.versions.getVersion(versionId);
+<<<<<<< HEAD
+  /** List published versions for a title (public — no auth required). */
+  @Get('title/:titleId')
+  listByTitle(@Param('titleId') titleId: string) {
+    return this.versions.listVersionsByTitle(titleId);
   }
 
-  /** List all versions uploaded by a specific translator (public). */
+  /** Get a single version by ID (public). */
+=======
+  /**
+   * Get a single version by ID.
+   * Public access is restricted to published versions only.
+   * Authenticated owners can see their own draft/pending/rejected versions.
+   */
+>>>>>>> d64aa4d2576580af9d11cbce39741e0f04360ae8
+  @Get(':versionId')
+  async getVersion(
+    @Param('versionId') versionId: string,
+    @Req() req: Request & { [USER_KEY]?: DecodedIdToken },
+  ) {
+    const version = await this.versions.getVersion(versionId);
+    if (version.status !== 'published') {
+      // Require auth and ownership for non-published versions
+      const caller = req[USER_KEY];
+      if (!caller) {
+        throw new NotFoundException(`Chapter version ${versionId} not found`);
+      }
+      if (caller.uid !== version.translatorUid) {
+        throw new ForbiddenException('You do not have access to this version');
+      }
+    }
+    return version;
+  }
+
+  /** List published versions for a specific translator (public). */
   @Get('translator/:uid')
-  listByTranslator(@Param('uid') uid: string) {
-    return this.versions.listVersionsByTranslator(uid);
+  listByTranslatorPublic(@Param('uid') uid: string) {
+    return this.versions.listPublishedVersionsByTranslator(uid);
   }
 
   // ── Authenticated routes ─────────────────────────────────────────────────
+
+  /** List all versions (including drafts) for the currently signed-in translator. */
+  @Get('me/versions')
+  @UseGuards(AuthGuard)
+  listMyVersions(@Req() req: Request & { [USER_KEY]: DecodedIdToken }) {
+    return this.versions.listVersionsByTranslator(req[USER_KEY].uid);
+  }
 
   /** Create a new draft chapter version. */
   @Post()
@@ -48,6 +84,7 @@ export class VersionsController {
     body: {
       titleId: string;
       titleName: string;
+      titleAltName?: string;
       chapterId: string;
       chapterNumber: string;
       chapterTitle: string;
@@ -75,7 +112,7 @@ export class VersionsController {
     return this.versions.updateMetadata(versionId, req[USER_KEY].uid, body);
   }
 
-  /** Submit a draft version for moderation or retract a rejected version to draft. */
+  /** Publish a draft version or retract a rejected version to draft. */
   @Patch(':versionId/status')
   @UseGuards(AuthGuard)
   updateStatus(
