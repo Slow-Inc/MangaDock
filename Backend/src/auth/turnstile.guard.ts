@@ -3,8 +3,8 @@ import * as crypto from 'crypto';
 
 // Helper to generate a time-limited clearance token
 export function generateClearanceToken(secret: string): string {
-  // Valid for 2 hours
-  const expiresAt = Date.now() + 2 * 60 * 60 * 1000;
+  // Valid for 24 hours to prevent interrupting long reading sessions
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
   const data = expiresAt.toString();
   const hmac = crypto.createHmac('sha256', secret).update(data).digest('hex');
   return `${data}.${hmac}`;
