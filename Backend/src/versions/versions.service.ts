@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import * as fs from 'fs';
+import * as path from 'path';
 import { FirebaseService } from '../firebase/firebase.service';
 import type { ChapterVersion, VersionStatus } from './versions.types';
 
@@ -22,6 +24,7 @@ export class VersionsService {
   async createVersion(data: {
     titleId: string;
     titleName: string;
+    titleAltName?: string;
     chapterId: string;
     chapterNumber: string;
     chapterTitle: string;
@@ -39,6 +42,7 @@ export class VersionsService {
       versionId: ref.id,
       titleId: data.titleId,
       titleName: data.titleName ?? '',
+      titleAltName: data.titleAltName ?? '',
       chapterId: data.chapterId,
       chapterNumber: data.chapterNumber ?? '',
       chapterTitle: data.chapterTitle ?? '',
@@ -66,6 +70,20 @@ export class VersionsService {
     return snap.data() as ChapterVersion;
   }
 
+  /** List all published versions for a given title. */
+  async listVersionsByTitle(titleId: string): Promise<ChapterVersion[]> {
+    const snap = await this.col
+      .where('titleId', '==', titleId)
+      .where('status', '==', 'published')
+      .get();
+    return snap.docs.map((d) => d.data() as ChapterVersion).sort((a, b) => {
+      // Sort by chapter number naturally (assuming strings like "1", "2", "2.1")
+      const numA = parseFloat(a.chapterNumber) || 0;
+      const numB = parseFloat(b.chapterNumber) || 0;
+      return numA - numB;
+    });
+  }
+
   /** List all versions for a chapter (across languages and translators). */
   async listVersionsByChapter(chapterId: string): Promise<ChapterVersion[]> {
     const snap = await this.col
@@ -76,7 +94,7 @@ export class VersionsService {
     return snap.docs.map((d) => d.data() as ChapterVersion);
   }
 
-  /** List all versions created by a specific translator. */
+  /** List all versions created by a specific translator (all statuses — requires auth). */
   async listVersionsByTranslator(translatorUid: string): Promise<ChapterVersion[]> {
     const snap = await this.col
       .where('translatorUid', '==', translatorUid)
@@ -84,6 +102,20 @@ export class VersionsService {
       .limit(50)
       .get();
     return snap.docs.map((d) => d.data() as ChapterVersion);
+  }
+
+  /** List published versions for a translator, excluding page URLs (suitable for public display). */
+  async listPublishedVersionsByTranslator(translatorUid: string): Promise<Omit<ChapterVersion, 'pages'>[]> {
+    const snap = await this.col
+      .where('translatorUid', '==', translatorUid)
+      .where('status', '==', 'published')
+      .orderBy('createdAt', 'desc')
+      .limit(50)
+      .get();
+    return snap.docs.map((d) => {
+      const { pages: _pages, ...rest } = d.data() as ChapterVersion;
+      return rest;
+    });
   }
 
   /** Update the pages list of a draft version. */
@@ -111,16 +143,16 @@ export class VersionsService {
     if (ver.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
-    // Translators can only move draft → pending_moderation
+    // Translators can only move draft -> published directly
     const allowedTransitions: Partial<Record<VersionStatus, VersionStatus[]>> = {
-      draft: ['pending_moderation'],
+      draft: ['published'],
       rejected: ['draft'],
     };
     if (!allowedTransitions[ver.status]?.includes(status)) {
       throw new BadRequestException(`Cannot transition from ${ver.status} to ${status}`);
     }
-    if (status === 'pending_moderation' && ver.pages.length === 0) {
-      throw new BadRequestException('Cannot submit a version with no pages');
+    if (status === 'published' && ver.pages.length === 0) {
+      throw new BadRequestException('Cannot publish a version with no pages');
     }
     await this.col.doc(versionId).update({
       status,
@@ -165,6 +197,12 @@ export class VersionsService {
     }
     if (ver.status === 'published') {
       throw new BadRequestException('Published versions cannot be deleted');
+    }
+    // Delete uploaded pages from disk before removing the Firestore document
+    const pagesDir = path.join(process.cwd(), 'uploads', 'chapters', versionId);
+    if (fs.existsSync(pagesDir)) {
+      fs.rmSync(pagesDir, { recursive: true, force: true });
+      this.logger.log(`Deleted pages directory for version ${versionId}`);
     }
     await this.col.doc(versionId).delete();
     this.logger.log(`Deleted chapter version ${versionId}`);

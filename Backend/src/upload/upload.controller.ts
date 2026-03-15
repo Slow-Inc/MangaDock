@@ -13,11 +13,19 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import * as path from 'path';
 import * as os from 'os';
+import * as path from 'path';
+import * as crypto from 'crypto';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UploadService } from './upload.service';
 import type { DecodedIdToken } from 'firebase-admin/auth';
+
+/** Allowlist of accepted MIME types for page uploads. */
+const ALLOWED_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
 
 @Controller('upload')
 @UseGuards(AuthGuard)
@@ -34,8 +42,11 @@ export class UploadController {
     FileInterceptor('file', {
       limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per page
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
-          return cb(new BadRequestException('Only image files are allowed'), false);
+        if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
+          return cb(
+            new BadRequestException('Only JPEG, PNG and WebP images are allowed'),
+            false,
+          );
         }
         cb(null, true);
       },
@@ -44,9 +55,9 @@ export class UploadController {
           // Write to OS tmp first; UploadService moves it to the final location
           cb(null, os.tmpdir());
         },
-        filename: (_req, file, cb) => {
-          const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-          cb(null, `upload_${Date.now()}${ext}`);
+        filename: (_req, _file, cb) => {
+          // Use a UUID so concurrent in-flight files cannot collide in tmpdir
+          cb(null, `upload_${crypto.randomUUID()}`);
         },
       }),
     }),
@@ -61,7 +72,7 @@ export class UploadController {
       versionId,
       req[USER_KEY].uid,
       file.path,
-      file.originalname,
+      file.mimetype,
     );
   }
 

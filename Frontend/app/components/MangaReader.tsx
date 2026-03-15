@@ -330,10 +330,32 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
   useEffect(() => {
     if (!mangaId) return;
-    fetch(`${API_BASE}/books/manga/${mangaId}/chapters`)
-      .then((r) => r.json())
-      .then((d: ChapterPageItem[]) => { if (Array.isArray(d)) setChapterList(d); })
-      .catch(() => {});
+    Promise.allSettled([
+      fetch(`${API_BASE}/books/manga/${mangaId}/chapters`).then((r) => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/versions/title/${mangaId}`).then((r) => r.ok ? r.json() : [])
+    ]).then(([mdRes, customRes]) => {
+      const mdChapters = mdRes.status === "fulfilled" ? mdRes.value : [];
+      const customVersions = customRes.status === "fulfilled" ? customRes.value : [];
+      
+      const customChapters = customVersions.map((v: any) => ({
+        id: `custom-${v.versionId}`,
+        chapterNumber: v.chapterNumber,
+        title: v.chapterTitle ? `${v.chapterTitle} [แปลโดย ${v.translatorName || "นักแปลอิสระ"}]` : `[แปลโดย ${v.translatorName || "นักแปลอิสระ"}]`,
+        translatedLanguage: v.language || "th",
+      }));
+      
+      let combined = [];
+      if (Array.isArray(mdChapters)) combined = [...mdChapters];
+      combined = [...customChapters, ...combined];
+      
+      combined.sort((a, b) => {
+        const numA = parseFloat(a.chapterNumber || "0");
+        const numB = parseFloat(b.chapterNumber || "0");
+        return numB - numA;
+      });
+      
+      setChapterList(combined);
+    }).catch(() => {});
   }, [mangaId]);
 
   const goToChapter = (ch: ChapterPageItem) => {
@@ -358,21 +380,41 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
     if (!turnstilePassed) return;
 
-    fetch(`${API_BASE}/books/chapters/${chapterId}/pages${localStorage.getItem("imgCacheForceLocal") === "1" ? "?forceLocal=true" : ""}`, {
-      headers: {
-        'x-captcha-clearance': clearanceToken || '',
-      }
-    })
-      .then((r) => {
-        if (r.status === 401) {
-          localStorage.removeItem('cf_clearance_token');
-          setClearanceToken(null);
-          setTurnstilePassed(false);
-          throw new Error("unauthorized");
+    const isCustom = chapterId.startsWith("custom-");
+    let fetchPromise;
+
+    if (isCustom) {
+      const vid = chapterId.replace("custom-", "");
+      fetchPromise = fetch(`${API_BASE}/versions/${vid}`)
+        .then((r) => {
+          if (!r.ok) throw new Error("not ok");
+          return r.json().then(v => ({
+             pages: v.pages || [],
+             dataSaverPages: v.pages || [],
+             localPages: v.pages || [],
+             localDataSaverPages: v.pages || [],
+             localCacheAvailable: true
+          }));
+        });
+    } else {
+      fetchPromise = fetch(`${API_BASE}/books/chapters/${chapterId}/pages${localStorage.getItem("imgCacheForceLocal") === "1" ? "?forceLocal=true" : ""}`, {
+        headers: {
+          'x-captcha-clearance': clearanceToken || '',
         }
-        if (!r.ok) throw new Error("not ok");
-        return r.json();
       })
+        .then((r) => {
+          if (r.status === 401) {
+            localStorage.removeItem('cf_clearance_token');
+            setClearanceToken(null);
+            setTurnstilePassed(false);
+            throw new Error("unauthorized");
+          }
+          if (!r.ok) throw new Error("not ok");
+          return r.json();
+        });
+    }
+
+    fetchPromise
       .then((d: ChapterPages) => {
         // forceLocal mode: backend signals no pages are cached yet
         if (d.localCacheAvailable === false) {

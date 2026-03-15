@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
+import MangaSearchModal from "../../components/MangaSearchModal";
 
 const API_BASE = "/api/proxy";
 
@@ -31,6 +32,7 @@ type ExistingVersion = {
   versionId: string;
   titleId: string;
   titleName: string;
+  titleAltName?: string;
   chapterId: string;
   chapterNumber: string;
   chapterTitle: string;
@@ -49,8 +51,10 @@ export default function StudioUploadPage() {
   const { showToast } = useToast();
 
   // Form state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [titleId, setTitleId] = useState("");
   const [titleName, setTitleName] = useState("");
+  const [titleAltName, setTitleAltName] = useState("");
   const [chapterId, setChapterId] = useState("");
   const [chapterNumber, setChapterNumber] = useState("");
   const [chapterTitle, setChapterTitle] = useState("");
@@ -65,6 +69,18 @@ export default function StudioUploadPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  /**
+   * Single in-flight version-creation promise, shared across all concurrent
+   * uploadFile() calls. Without this, rapid multi-file selections can each
+   * see versionId === null and race to create multiple draft versions.
+   */
+  const ensureVersionPromiseRef = useRef<Promise<string> | null>(null);
+  /**
+   * Always-current ref to `pages` used by the unmount cleanup so that blob
+   * URLs added after mount are still revoked when the component unmounts.
+   */
+  const pagesRef = useRef<PageItem[]>(pages);
+  pagesRef.current = pages;
 
   // Load existing version data if editing
   useEffect(() => {
@@ -78,6 +94,7 @@ export default function StudioUploadPage() {
         const data: ExistingVersion = await res.json();
         setTitleId(data.titleId);
         setTitleName(data.titleName);
+        setTitleAltName(data.titleAltName ?? "");
         setChapterId(data.chapterId);
         setChapterNumber(data.chapterNumber);
         setChapterTitle(data.chapterTitle);
@@ -98,18 +115,39 @@ export default function StudioUploadPage() {
     if (!loading && user && !isTranslator) router.replace("/studio");
   }, [loading, user, isTranslator, router]);
 
-  /** Create a draft version if one doesn't exist yet. Returns the versionId. */
-  const ensureVersion = async (token: string): Promise<string> => {
-    if (versionId) return versionId;
-    if (!titleId || !chapterId || !language) {
-      throw new Error("กรุณากรอก Title ID, Chapter ID และภาษาก่อน");
+<<<<<<< HEAD
+  // Handle auto-updating synthetic chapterId when chapterNumber changes
+  // since we aren't picking a specific chapter from MangaDex anymore
+  useEffect(() => {
+    if (!versionId && titleId && chapterNumber) {
+      setChapterId(`custom-${titleId}-ch-${chapterNumber}`);
     }
-    const res = await fetch(`${API_BASE}/versions`, {
+  }, [titleId, chapterNumber, versionId]);
+
+  /** Create a draft version if one doesn't exist yet. Returns the versionId. */
+=======
+  /** Create a draft version if one doesn't exist yet. Returns the versionId.
+   *  All concurrent callers share the same in-flight promise so only one
+   *  version is ever created per upload session. */
+>>>>>>> d64aa4d2576580af9d11cbce39741e0f04360ae8
+  const ensureVersion = async (token: string): Promise<string> => {
+    // Fast path: version already exists
+    if (versionId) return versionId;
+
+    // If another concurrent call is already creating the version, await it
+    if (ensureVersionPromiseRef.current) return ensureVersionPromiseRef.current;
+
+    if (!titleId || !chapterId || !language) {
+      throw new Error("กรุณาค้นหามังงะ และระบุตอนให้ครบถ้วนก่อนเริ่มอัปโหลด");
+    }
+
+    const creation = fetch(`${API_BASE}/versions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         titleId,
         titleName,
+        titleAltName,
         chapterId,
         chapterNumber,
         chapterTitle,
@@ -117,14 +155,20 @@ export default function StudioUploadPage() {
         description,
         priceCoins,
       }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message ?? "ไม่สามารถสร้างงานแปลได้");
+      }
+      const data = await res.json();
+      setVersionId(data.versionId);
+      return data.versionId as string;
+    }).finally(() => {
+      ensureVersionPromiseRef.current = null;
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.message ?? "ไม่สามารถสร้างงานแปลได้");
-    }
-    const data = await res.json();
-    setVersionId(data.versionId);
-    return data.versionId;
+
+    ensureVersionPromiseRef.current = creation;
+    return creation;
   };
 
   /** Upload a single page file. */
@@ -151,22 +195,36 @@ export default function StudioUploadPage() {
           throw new Error(err?.message ?? "อัปโหลดไม่สำเร็จ");
         }
         const { pageUrl } = await res.json();
+        // Replace the placeholder with the real server URL, then revoke the
+        // blob so it doesn't leak — we now have the permanent URL.
         setPages((prev) =>
           prev.map((p) => (p.url === placeholderUrl ? { url: pageUrl } : p))
         );
+        URL.revokeObjectURL(placeholderUrl);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ";
+        // Keep the placeholder URL in state so the preview still renders while
+        // the error is visible. The blob will be revoked when the user removes
+        // the page or navigates away (handled by the cleanup effect below).
         setPages((prev) =>
           prev.map((p) => (p.url === placeholderUrl ? { ...p, uploading: false, error: msg } : p))
         );
         showToast({ message: msg });
-      } finally {
-        URL.revokeObjectURL(placeholderUrl);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, versionId, titleId, chapterId, language, titleName, chapterNumber, chapterTitle, description, priceCoins]
+    [user, versionId, titleId, chapterId, language, titleName, titleAltName, chapterNumber, chapterTitle, description, priceCoins]
   );
+
+  // Revoke any remaining blob URLs (e.g. failed uploads) on unmount.
+  // pagesRef always holds the latest pages so URLs added after mount are covered.
+  useEffect(() => {
+    return () => {
+      pagesRef.current.forEach((p) => {
+        if (p.url.startsWith("blob:")) URL.revokeObjectURL(p.url);
+      });
+    };
+  }, []);
 
   const handleFilesSelected = (files: FileList | null) => {
     if (!files) return;
@@ -184,6 +242,12 @@ export default function StudioUploadPage() {
   };
 
   const handleDeletePage = async (pageUrl: string) => {
+    // If it's a local blob (upload error case), just remove it from state and revoke
+    if (pageUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(pageUrl);
+      setPages((prev) => prev.filter((p) => p.url !== pageUrl));
+      return;
+    }
     if (!user || !versionId) {
       setPages((prev) => prev.filter((p) => p.url !== pageUrl));
       return;
@@ -261,37 +325,58 @@ export default function StudioUploadPage() {
       <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
         {/* Metadata form (disabled if version is already created) */}
         <div className="rounded-2xl border border-white/10 bg-white/3 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-white/80">ข้อมูลงานแปล</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-white/80">ข้อมูลโปรเจกต์มังงะ</h2>
+            {!hasVersion && (
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                ค้นหามังงะ
+              </button>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-xs text-white/50">Title ID (MangaDex)</label>
-              <input
-                value={titleId}
-                onChange={(e) => setTitleId(e.target.value)}
-                disabled={hasVersion}
-                placeholder="e.g. a96676be-9..."
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-indigo-400/60 focus:ring-1 focus:ring-indigo-400/30 disabled:opacity-40"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-white/50">ชื่อเรื่อง</label>
+              <label className="text-xs text-white/50">ชื่อเรื่องหลัก (จาก MangaDex)</label>
               <input
                 value={titleName}
-                onChange={(e) => setTitleName(e.target.value)}
+                readOnly
+                placeholder="ชื่อมังงะ (ค้นหาจากปุ่มด้านบน)"
+                className="w-full rounded-xl border border-white/10 bg-white/5 opacity-50 px-3 py-2 text-sm text-white placeholder-white/20 outline-none cursor-not-allowed"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-white/50">ชื่ออื่นของมังงะ / ชื่อเรื่องแปล (ไม่บังคับ)</label>
+              <input
+                value={titleAltName}
+                onChange={(e) => setTitleAltName(e.target.value)}
                 disabled={hasVersion}
-                placeholder="ชื่อมังงะ"
+                placeholder="ชื่อเรื่องเพิ่มเติม"
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-indigo-400/60 focus:ring-1 focus:ring-indigo-400/30 disabled:opacity-40"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-white/50">Chapter ID (MangaDex)</label>
+              <label className="text-xs text-white/50">Title ID</label>
+              <input
+                value={titleId}
+                readOnly
+                placeholder="e.g. a96676be-9..."
+                className="w-full rounded-xl border border-white/10 bg-white/5 opacity-50 px-3 py-2 text-xs text-white/70 outline-none cursor-not-allowed font-mono"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-white/50">Chapter ID</label>
               <input
                 value={chapterId}
-                onChange={(e) => setChapterId(e.target.value)}
-                disabled={hasVersion}
-                placeholder="e.g. d70a2bb5-..."
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-indigo-400/60 focus:ring-1 focus:ring-indigo-400/30 disabled:opacity-40"
+                readOnly
+                placeholder="สร้างอัตโนมัติ"
+                className="w-full rounded-xl border border-white/10 bg-white/5 opacity-50 px-3 py-2 text-xs text-white/70 outline-none cursor-not-allowed font-mono"
               />
             </div>
             <div className="space-y-1">
@@ -454,6 +539,14 @@ export default function StudioUploadPage() {
           เสร็จสิ้น — กลับสตูดิโอ
         </button>
       </div>
+      <MangaSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onSelect={(manga) => {
+          setTitleId(manga.id);
+          setTitleName(manga.title);
+        }}
+      />
     </div>
   );
 }

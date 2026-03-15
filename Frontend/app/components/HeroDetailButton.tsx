@@ -38,15 +38,27 @@ export default function HeroDetailButton({ book }: Props) {
     const forceLocal = localStorage.getItem("imgCacheForceLocal") === "1";
     const qs = forceLocal ? "?forceLocal=true" : "";
 
-    fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`)
-      .then((r) => r.json())
-      .then((d: MangaChapterSummary[]) => {
-        setHasReadable(d.some((ch) => {
-          if (forceLocal || ch.isOfflineFallback) {
-            return ch.readerAvailable === true;
-          }
-          return ch.pageCount > 0;
-        }));
+    Promise.allSettled([
+      fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/versions/title/${book.id}`).then((r) => r.ok ? r.json() : [])
+    ])
+      .then(([mdRes, customRes]) => {
+        const mdChapters = mdRes.status === "fulfilled" ? mdRes.value : [];
+        const customVersions = customRes.status === "fulfilled" ? customRes.value : [];
+        
+        const hasCustomReadable = customVersions.some((v: any) => v.pages && v.pages.length > 0);
+        
+        let hasMdReadable = false;
+        if (Array.isArray(mdChapters)) {
+          hasMdReadable = mdChapters.some((ch: MangaChapterSummary) => {
+            if (forceLocal || ch.isOfflineFallback) {
+              return ch.readerAvailable === true;
+            }
+            return ch.pageCount > 0;
+          });
+        }
+        
+        setHasReadable(hasCustomReadable || hasMdReadable);
       })
       .catch(() => setHasReadable(false));
   }, [book.id, isManga]);

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import SearchBar from "./SearchBar";
 import LoginModal from "./LoginModal";
 import AccountModal from "./AccountModal";
@@ -88,6 +89,17 @@ export default function NavbarActions() {
                   </p>
                   <p className="truncate text-[11px] text-white/40">{user.email}</p>
                 </div>
+                <Link
+                  href="/studio"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.866 8.21 8.21 0 003 2.48z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" />
+                  </svg>
+                  Studio
+                </Link>
                 <button
                   onClick={() => { 
                     setMenuOpen(false); 

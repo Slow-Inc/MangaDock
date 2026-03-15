@@ -204,14 +204,39 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
         })
         .catch(() => setLoadingDetail(false));
 
-      fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`)
-        .then((r) => r.json())
-        .then((d: MangaChapter[]) => {
-          setChapters(d);
+      Promise.allSettled([
+        fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => r.ok ? r.json() : []),
+        fetch(`${API_BASE}/versions/title/${book.id}`).then((r) => r.ok ? r.json() : [])
+      ])
+        .then(([mdRes, customRes]) => {
+          const mdChapters: MangaChapter[] = mdRes.status === "fulfilled" ? mdRes.value : [];
+          const customVersions: any[] = customRes.status === "fulfilled" ? customRes.value : [];
+
+          const customChapters: MangaChapter[] = customVersions.map((v) => {
+            let dateStr = new Date().toISOString();
+            if (v.createdAt && v.createdAt._seconds) {
+              dateStr = new Date(v.createdAt._seconds * 1000).toISOString();
+            } else if (typeof v.createdAt === "string") {
+              dateStr = v.createdAt;
+            }
+            return {
+              id: `custom-${v.versionId}`,
+              chapterNumber: v.chapterNumber,
+              title: v.chapterTitle ? `${v.chapterTitle} [แปลโดย ${v.translatorName || "นักแปลอิสระ"}]` : `[แปลโดย ${v.translatorName || "นักแปลอิสระ"}]`,
+              translatedLanguage: v.language || "th",
+              uploadedAt: dateStr,
+              pageCount: v.pages?.length || 0,
+              readerAvailable: true,
+            };
+          });
+
+          const combined = [...customChapters, ...(Array.isArray(mdChapters) ? mdChapters : [])];
+          
+          setChapters(combined);
           setLoadingChapters(false);
           // Auto-select the language of the highlighted (last-read) chapter
           if (effectiveHighlightId) {
-            const lang = d.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
+            const lang = combined.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
             if (lang) setLangFilter(lang);
           }
         })
