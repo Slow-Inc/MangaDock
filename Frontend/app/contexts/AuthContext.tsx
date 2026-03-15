@@ -50,6 +50,12 @@ const API_BASE = "/api/proxy";
 type AuthContextType = {
   user: User | null;
   loading: boolean;
+  /** The current user's role: 'user' | 'translator' | 'creator' | 'admin' */
+  userRole: "user" | "translator" | "creator" | "admin";
+  /** The current user's subscription plan: 'free' | 'premium' | 'pro' */
+  userPlan: "free" | "premium" | "pro";
+  /** Convenience flag — true when the user's role is translator, creator, or admin */
+  isTranslator: boolean;
   signInWithGoogle: () => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -90,11 +96,18 @@ type AuthContextType = {
   deleteAccount: () => Promise<void>;
   /** Re-send the Firebase email verification link to the currently signed-in user */
   resendVerificationEmail: () => Promise<void>;
+  /** Upgrade current user to translator role */
+  becomeTranslator: (data: { bio?: string; translatorLanguages?: string[] }) => Promise<void>;
+  /** Refresh the cached role/plan from the backend */
+  refreshUserProfile: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  userRole: "user",
+  userPlan: "free",
+  isTranslator: false,
   signInWithGoogle: async () => {},
   signUpWithEmail: async () => {},
   signInWithEmail: async () => {},
@@ -118,6 +131,8 @@ export const AuthContext = createContext<AuthContextType>({
   reauthenticateUser: async () => {},
   deleteAccount: async () => {},
   resendVerificationEmail: async () => {},
+  becomeTranslator: async () => {},
+  refreshUserProfile: async () => {},
 });
 
 /** BroadcastChannel used to notify other open tabs that providerData changed. */
@@ -126,6 +141,8 @@ const AUTH_SYNC_CHANNEL = "mb_auth_provider_sync";
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<"user" | "translator" | "creator" | "admin">("user");
+  const [userPlan, setUserPlan] = useState<"free" | "premium" | "pro">("free");
   const [loginOpen, setLoginOpen] = useState(false);
   const { showToast, dismissToast } = useToast();
   const [pendingLinkCredential, setPendingLinkCredential] = useState<AuthCredential | null>(null);
@@ -468,6 +485,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /** Fetch role/plan from the backend and update context state. */
+  const fetchUserProfile = async (token: string): Promise<void> => {
+    try {
+      const res = await fetch(`${API_BASE}/users/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.role) setUserRole(data.role as "user" | "translator" | "creator" | "admin");
+      if (data.plan) setUserPlan(data.plan as "free" | "premium" | "pro");
+    } catch {
+      // non-critical: fallback to defaults
+    }
+  };
+
   useEffect(() => {
     // Wire userCache to always have a fresh token
     setTokenSupplier(async () => {
@@ -501,11 +533,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await Promise.all([
           loadFromFirebase(token),
           loadHistoryFromFirebase(token),
+          fetchUserProfile(token),
         ]);
       } else {
         lastUidRef.current = null;
         clearUserCache();
         clearHistory();
+        setUserRole("user");
+        setUserPlan("free");
       }
     });
 
@@ -1021,10 +1056,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshUserProfile = async (): Promise<void> => {
+    if (!user) return;
+    const token = await user.getIdToken();
+    await fetchUserProfile(token);
+  };
+
+  const becomeTranslator = async (data: { bio?: string; translatorLanguages?: string[] }): Promise<void> => {
+    if (!user) throw new Error("Not authenticated");
+    const token = await user.getIdToken();
+    const res = await fetch(`${API_BASE}/users/me/become-translator`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.message ?? "Failed to become translator");
+    }
+    await fetchUserProfile(token);
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
-      loading, 
+      loading,
+      userRole,
+      userPlan,
+      isTranslator: userRole === "translator" || userRole === "creator" || userRole === "admin",
       signInWithGoogle, 
       signUpWithEmail, 
       signInWithEmail, 
@@ -1048,6 +1107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       reauthenticateUser,
       deleteAccount,
       resendVerificationEmail,
+      becomeTranslator,
+      refreshUserProfile,
     }}>
       {children}
 

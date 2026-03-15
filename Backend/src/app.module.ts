@@ -5,6 +5,8 @@ import { BooksModule } from './books/books.module';
 import { UsersModule } from './users/users.module';
 import { CacheModule } from './cache/cache.module';
 import { StatusModule } from './status/status.module';
+import { VersionsModule } from './versions/versions.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { StatusModule } from './status/status.module';
     BooksModule,
     UsersModule,
     StatusModule,
+    VersionsModule,
+    UploadModule,
   ],
 })
 export class AppModule {}

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -8,6 +9,9 @@ import { FirebaseService } from '../firebase/firebase.service';
 import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
+
+export type UserRole = 'user' | 'translator' | 'creator' | 'admin';
+export type UserPlan = 'free' | 'premium' | 'pro';
 
 export type FavoriteItem = {
   id: string;
@@ -28,7 +32,28 @@ export type UserProfile = {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
+  role: UserRole;
+  plan: UserPlan;
+  trustScore: number;
+  ratingAvg: number;
+  ratingCount: number;
+  country: string | null;
+  preferredLanguage: string | null;
+  bio: string | null;
+  translatorLanguages: string[];
   favorites: FavoriteItem[];
+};
+
+export type PublicTranslatorProfile = {
+  uid: string;
+  displayName: string | null;
+  photoURL: string | null;
+  bio: string | null;
+  translatorLanguages: string[];
+  trustScore: number;
+  ratingAvg: number;
+  ratingCount: number;
+  country: string | null;
 };
 
 @Injectable()
@@ -59,6 +84,15 @@ export class UsersService {
         email: data.email ?? null,
         displayName: data.displayName ?? null,
         photoURL: data.photoURL ?? null,
+        role: 'user',
+        plan: 'free',
+        trustScore: 0,
+        ratingAvg: 0,
+        ratingCount: 0,
+        country: null,
+        preferredLanguage: null,
+        bio: null,
+        translatorLanguages: [],
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       this.logger.log(`Created user: ${uid}`);
@@ -110,6 +144,15 @@ export class UsersService {
       email: data['email'] ?? null,
       displayName: data['displayName'] ?? null,
       photoURL: data['photoURL'] ?? null,
+      role: (data['role'] as UserRole) ?? 'user',
+      plan: (data['plan'] as UserPlan) ?? 'free',
+      trustScore: data['trustScore'] ?? 0,
+      ratingAvg: data['ratingAvg'] ?? 0,
+      ratingCount: data['ratingCount'] ?? 0,
+      country: data['country'] ?? null,
+      preferredLanguage: data['preferredLanguage'] ?? null,
+      bio: data['bio'] ?? null,
+      translatorLanguages: data['translatorLanguages'] ?? [],
       favorites,
     };
   }
@@ -294,5 +337,78 @@ export class UsersService {
         this.logger.log(`GC: deleted orphaned avatar ${file}`);
       }
     }
+  }
+
+  // ── Translator / Creator roles ────────────────────────────────────────────
+
+  /** Upgrade the user's role to 'translator'. Idempotent — safe to call multiple times. */
+  async becomeTranslator(
+    uid: string,
+    data: { bio?: string; translatorLanguages?: string[] },
+  ): Promise<void> {
+    const ref = this.userDoc(uid);
+    const snap = await ref.get();
+    if (!snap.exists) throw new NotFoundException('User not found');
+    const current = snap.data()!;
+    // Admins and creators keep their existing role; users are promoted to translator.
+    const currentRole: UserRole = (current['role'] as UserRole) ?? 'user';
+    const newRole: UserRole = currentRole === 'user' ? 'translator' : currentRole;
+    const update: Record<string, any> = {
+      role: newRole,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (data.bio !== undefined) update.bio = data.bio.trim().slice(0, 500);
+    if (data.translatorLanguages !== undefined) {
+      update.translatorLanguages = data.translatorLanguages.slice(0, 10);
+    }
+    await ref.update(update);
+    this.logger.log(`User ${uid} became translator (role: ${newRole})`);
+  }
+
+  /** Update translator-specific profile fields (bio, languages). */
+  async updateTranslatorProfile(
+    uid: string,
+    data: { bio?: string; translatorLanguages?: string[]; country?: string; preferredLanguage?: string },
+  ): Promise<void> {
+    const ref = this.userDoc(uid);
+    const snap = await ref.get();
+    if (!snap.exists) throw new NotFoundException('User not found');
+    const currentRole: UserRole = (snap.data()!['role'] as UserRole) ?? 'user';
+    if (currentRole === 'user') {
+      throw new ForbiddenException('Only translators or creators can update translator profile');
+    }
+    const update: Record<string, any> = {
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (data.bio !== undefined) update.bio = data.bio.trim().slice(0, 500);
+    if (data.translatorLanguages !== undefined) {
+      update.translatorLanguages = data.translatorLanguages.slice(0, 10);
+    }
+    if (data.country !== undefined) update.country = data.country;
+    if (data.preferredLanguage !== undefined) update.preferredLanguage = data.preferredLanguage;
+    await ref.update(update);
+    this.logger.log(`Translator profile updated for user: ${uid}`);
+  }
+
+  /** Return the public-facing translator profile (no PII). */
+  async getPublicTranslatorProfile(uid: string): Promise<PublicTranslatorProfile> {
+    const snap = await this.userDoc(uid).get();
+    if (!snap.exists) throw new NotFoundException('User not found');
+    const data = snap.data()!;
+    const role: UserRole = (data['role'] as UserRole) ?? 'user';
+    if (role !== 'translator' && role !== 'creator' && role !== 'admin') {
+      throw new NotFoundException('Translator not found');
+    }
+    return {
+      uid: data['uid'],
+      displayName: data['displayName'] ?? null,
+      photoURL: data['photoURL'] ?? null,
+      bio: data['bio'] ?? null,
+      translatorLanguages: data['translatorLanguages'] ?? [],
+      trustScore: data['trustScore'] ?? 0,
+      ratingAvg: data['ratingAvg'] ?? 0,
+      ratingCount: data['ratingCount'] ?? 0,
+      country: data['country'] ?? null,
+    };
   }
 }
