@@ -211,4 +211,26 @@ export class UsersController {
     if (!Array.isArray(body?.photos)) throw new BadRequestException('photos must be an array');
     return this.users.updatePhotoHistory(req[USER_KEY].uid, body.photos);
   }
+
+  // ── Translator profile ───────────────────────────────────────────────────
+
+  /** Upgrade current user's role to 'translator' and optionally set bio/languages. */
+  @Post('me/become-translator')
+  async becomeTranslator(
+    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Body() body: { bio?: string; translatorLanguages?: string[] },
+  ) {
+    await this.users.becomeTranslator(req[USER_KEY].uid, body ?? {});
+    return { ok: true };
+  }
+
+  /** Update translator-specific profile fields (bio, languages, country, etc.). */
+  @Patch('me/translator-profile')
+  async updateTranslatorProfile(
+    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Body() body: { bio?: string; translatorLanguages?: string[]; country?: string; preferredLanguage?: string },
+  ) {
+    await this.users.updateTranslatorProfile(req[USER_KEY].uid, body ?? {});
+    return { ok: true };
+  }
 }
