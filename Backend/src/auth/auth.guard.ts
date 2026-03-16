@@ -4,14 +4,14 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { FirebaseService } from '../firebase/firebase.service';
+import { SupabaseService, SupabaseUser } from '../supabase/supabase.service';
 
 export const UID_KEY = 'uid';
-export const USER_KEY = 'firebaseUser';
+export const USER_KEY = 'supabaseUser';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly firebase: FirebaseService) {}
+  constructor(private readonly supabase: SupabaseService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
@@ -21,11 +21,11 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing or invalid Authorization header');
     }
 
-    const idToken = authHeader.slice(7);
+    const accessToken = authHeader.slice(7);
     try {
-      const decoded = await this.firebase.verifyIdToken(idToken);
-      req[USER_KEY] = decoded;
-      req[UID_KEY] = decoded.uid;
+      const user = await this.supabase.verifyToken(accessToken);
+      req[USER_KEY] = user;
+      req[UID_KEY] = user.uid;
       return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired token');

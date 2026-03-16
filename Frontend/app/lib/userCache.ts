@@ -1,19 +1,19 @@
 /**
- * userCache — local-first favorites & liked store with batched Firebase sync.
+ * userCache — local-first favorites & liked store with batched sync.
  *
  * Flow:
  *  1. All toggles update localStorage + in-memory state immediately.
  *  2. A debounce timer (FLUSH_DELAY ms) is reset on each change.
  *  3. After FLUSH_DELAY with no new changes, all pending diffs are flushed
  *     to the backend in parallel.
- *  4. On login (AuthContext calls loadFromFirebase), Firebase state is fetched
+ *  4. On login (AuthContext calls loadUserData), server state is fetched
  *     and merged — local additions are preserved, remote state wins for removals.
  */
 
 const API_BASE = "/api/proxy";
 const LS_FAV = "mb_favorites";
 const LS_LIKED = "mb_liked";
-const LS_FAV_SYNCED = "mb_fav_synced"; // IDs known to be in Firebase
+const LS_FAV_SYNCED = "mb_fav_synced"; // IDs known to be synced to server
 const LS_LIKED_SYNCED = "mb_liked_synced";
 const FLUSH_DELAY = 5_000; // ms to wait before syncing
 
@@ -35,7 +35,7 @@ export type CachedBook = {
 // ─── In-memory state ───────────────────────────────────────────────────────
 let favorites: Map<string, CachedBook> = new Map();
 let liked: Set<string> = new Set();
-let syncedFavorites: Set<string> = new Set(); // what Firebase currently has
+let syncedFavorites: Set<string> = new Set(); // what server currently has
 let syncedLiked: Set<string> = new Set();
 let initialized = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -85,7 +85,7 @@ function scheduleFlush() {
 async function flush() {
   flushTimer = null;
   const token = await getTokenFn?.();
-  if (!token) return; // not logged in — skip Firebase sync
+  if (!token) return; // not logged in — skip sync
 
   const headers: HeadersInit = {
     Authorization: `Bearer ${token}`,
@@ -153,8 +153,8 @@ async function flush() {
   }
 }
 
-// ─── Load from Firebase (called on login) ──────────────────────────────────
-export async function loadFromFirebase(token: string) {
+// ─── Load from server (called on login) ────────────────────────────────────
+export async function loadUserData(token: string) {
   loadFromLS();
   const headers: HeadersInit = { Authorization: `Bearer ${token}` };
   try {
@@ -193,7 +193,7 @@ export async function loadFromFirebase(token: string) {
   } catch { /* ignore */ }
 }
 
-/** Immediately flush any pending changes to Firebase (call before logout). */
+/** Immediately flush any pending changes to server (call before logout). */
 export async function flushNow(): Promise<void> {
   if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
   await flush();

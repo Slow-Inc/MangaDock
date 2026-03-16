@@ -53,6 +53,10 @@ type MangaChapter = {
   readerAvailable?: boolean;
   /** True if returned from stale cache because the upstream API went offline */
   isOfflineFallback?: boolean;
+  /** 'mangadex' (default) or 'user' for user-uploaded translations */
+  source?: "mangadex" | "user";
+  /** Translator name for user-uploaded versions */
+  translatorName?: string | null;
 };
 
 type ActiveChapter = {
@@ -204,41 +208,48 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
         })
         .catch(() => setLoadingDetail(false));
 
-      Promise.allSettled([
-        fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => r.ok ? r.json() : []),
-        fetch(`${API_BASE}/versions/title/${book.id}`).then((r) => r.ok ? r.json() : [])
-      ])
-        .then(([mdRes, customRes]) => {
-          const mdChapters: MangaChapter[] = mdRes.status === "fulfilled" ? mdRes.value : [];
-          const customVersions: any[] = customRes.status === "fulfilled" ? customRes.value : [];
+      fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`)
+        .then((r) => r.json())
+        .then((mangaDexChapters: MangaChapter[]) => {
+          // Tag MangaDex chapters with source
+          const tagged = mangaDexChapters.map((ch) => ({ ...ch, source: "mangadex" as const }));
 
-          const customChapters: MangaChapter[] = customVersions.map((v) => {
-            let dateStr = new Date().toISOString();
-            if (v.createdAt && v.createdAt._seconds) {
-              dateStr = new Date(v.createdAt._seconds * 1000).toISOString();
-            } else if (typeof v.createdAt === "string") {
-              dateStr = v.createdAt;
-            }
-            return {
-              id: `custom-${v.versionId}`,
-              chapterNumber: v.chapterNumber,
-              title: v.chapterTitle ? `${v.chapterTitle} [แปลโดย ${v.translatorName || "นักแปลอิสระ"}]` : `[แปลโดย ${v.translatorName || "นักแปลอิสระ"}]`,
-              translatedLanguage: v.language || "th",
-              uploadedAt: dateStr,
-              pageCount: v.pages?.length || 0,
-              readerAvailable: true,
-            };
-          });
-
-          const combined = [...customChapters, ...(Array.isArray(mdChapters) ? mdChapters : [])];
-          
-          setChapters(combined);
-          setLoadingChapters(false);
-          // Auto-select the language of the highlighted (last-read) chapter
-          if (effectiveHighlightId) {
-            const lang = combined.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
-            if (lang) setLangFilter(lang);
-          }
+          // Also fetch user-uploaded versions for this title
+          fetch(`${API_BASE}/versions/title/${book.id}`)
+            .then((r) => r.ok ? r.json() : [])
+            .then((versions: any[]) => {
+              const userChapters: MangaChapter[] = (versions ?? []).map((v: any) => ({
+                id: `ver:${v.versionId}`,
+                chapterNumber: v.chapterNumber || null,
+                title: v.chapterTitle || null,
+                translatedLanguage: v.language || "th",
+                uploadedAt: v.createdAt || "",
+                pageCount: v.pages?.length ?? 0,
+                readerAvailable: true,
+                source: "user" as const,
+                translatorName: v.translatorName ?? null,
+              }));
+              // Merge: MangaDex first, then user-uploaded, sort by chapter number
+              const merged = [...tagged, ...userChapters].sort((a, b) => {
+                const numA = parseFloat(a.chapterNumber ?? "0") || 0;
+                const numB = parseFloat(b.chapterNumber ?? "0") || 0;
+                return numA - numB;
+              });
+              setChapters(merged);
+              setLoadingChapters(false);
+              if (effectiveHighlightId) {
+                const lang = merged.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
+                if (lang) setLangFilter(lang);
+              }
+            })
+            .catch(() => {
+              setChapters(tagged);
+              setLoadingChapters(false);
+              if (effectiveHighlightId) {
+                const lang = tagged.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
+                if (lang) setLangFilter(lang);
+              }
+            });
         })
         .catch(() => setLoadingChapters(false));
     } else {
@@ -835,6 +846,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         {isHighlighted && (
                           <span className="shrink-0 rounded bg-blue-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300">
                             อ่านค้างไว้
+                          </span>
+                        )}
+                        {ch.source === "user" && (
+                          <span className="shrink-0 rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-medium text-purple-300" title={ch.translatorName ? `แปลโดย ${ch.translatorName}` : "แปลโดยผู้ใช้"}>
+                            {ch.translatorName ? ch.translatorName : "ผู้ใช้แปล"}
                           </span>
                         )}
                         <span
