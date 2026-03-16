@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
@@ -46,16 +47,18 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Per-provider linking state
+  // Per-provider linking state — tracks which provider popup is open
   const [linking, setLinking] = useState<"google" | "facebook" | null>(null);
+  const linkingResolvedRef = useRef(false);
 
-  const { user, getIdToken, updateUserProfile, updateUserPassword, linkGoogleAccount, linkFacebookAccount, unlinkAccount, addEmailPassword, uploadProfilePhoto, updateUserPhotoURL, getPhotoHistory, savePhotoHistory, deleteAccount, reauthenticateUser, resendVerificationEmail } = useAuth();
+  const { user, getIdToken, updateUserProfile, updateUserPassword, linkGoogleAccount, linkFacebookAccount, unlinkAccount, addEmailPassword, uploadProfilePhoto, updateUserPhotoURL, getPhotoHistory, savePhotoHistory, switchToConflictingAccount, deleteAccount, reauthenticateUser, resendVerificationEmail, isTranslator, userRole } = useAuth();
   const { showToast, dismissToast } = useToast();
 
   const [deleteStep, setDeleteStep] = useState<"idle" | "reauth" | "confirm">("idle");
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [reauthPassword, setReauthPassword] = useState("");
   const [reauthenticating, setReauthenticating] = useState<"password" | "google" | "facebook" | null>(null);
+  const reauthResolvedRef = useRef(false);
   const [sendingVerification, setSendingVerification] = useState(false);
 
   const tabRefs: Record<Tab, React.RefObject<HTMLDivElement | null>> = {
@@ -252,16 +255,29 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
   };
 
   /**
-   * Trigger social re-auth for delete flow via popup.
+   * Step 1 → 2 (Google/Facebook): popup re-auth with focus-guard.
+   * If user closes popup mid-flow, reset loading state so delete UI remains usable.
    */
   const withDeleteReauthPopupGuard = (provider: "google" | "facebook") => async () => {
     setReauthenticating(provider);
     setErrorMessage(null);
+    reauthResolvedRef.current = false;
+
+    let focusTimer: ReturnType<typeof setTimeout> | null = null;
+    const onFocus = () => {
+      focusTimer = setTimeout(() => {
+        if (!reauthResolvedRef.current) setReauthenticating(null);
+      }, 2000);
+    };
+    window.addEventListener("focus", onFocus, { once: true });
+
     try {
       await reauthenticateUser(provider);
+      reauthResolvedRef.current = true;
       setDeleteStep("confirm");
       setDeleteConfirmText("");
     } catch (error: any) {
+      reauthResolvedRef.current = true;
       const code = error?.code ?? "";
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         // User closed popup — keep reauth step open and ready for retry
@@ -273,6 +289,8 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
         setErrorMessage(error?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
       }
     } finally {
+      window.removeEventListener("focus", onFocus);
+      if (focusTimer) clearTimeout(focusTimer);
       setReauthenticating(null);
     }
   };
@@ -349,7 +367,9 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       await applyPhotoChange(photoURL);
       setShowPhotoPicker(false);
     } catch (error: any) {
-      const msg = error?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่";
+      const msg = error?.code === "storage/unauthorized"
+        ? "ไม่มีสิทธิ์อัพโหลด — ตรวจสอบ Firebase Storage Rules"
+        : error?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่";
       setPhotoError(msg);
     } finally {
       setPhotoUploading(false);
@@ -367,7 +387,9 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       await applyPhotoChange(url);
       setShowPhotoPicker(false);
     } catch (error: any) {
-      const msg = error?.message || "อัพโหลดไม่สำเร็จ กรุณาลองใหม่";
+      const msg = error?.code === "storage/unauthorized"
+        ? "ไม่มีสิทธิ์อัพโหลด — ตรวจสอบ Firebase Storage Rules"
+        : error?.message || "อัพโหลดไม่สำเร็จ กรุณาลองใหม่";
       setPhotoError(msg);
     } finally {
       setPhotoUploading(false);
@@ -390,7 +412,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
             body: JSON.stringify({ filename }),
           });
         } catch {
-          // best-effort — server history is already updated
+          // best-effort — Firestore history is already updated
         }
       }
     }
@@ -436,29 +458,71 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
     }
   };
 
-  // Wraps a social provider link call via popup.
+  // Attach a window-focus listener while a provider popup is open.
+  // If the main window regains focus and the popup hasn't resolved within 2 s,
+  // the user closed it — force-reset the linking state.
   const withFocusGuard = (provider: "google" | "facebook", fn: () => Promise<void>) => async () => {
     clearMessages();
     setLinking(provider);
+    linkingResolvedRef.current = false;
+
+    let focusTimer: ReturnType<typeof setTimeout> | null = null;
+    const onFocus = () => {
+      focusTimer = setTimeout(() => {
+        if (!linkingResolvedRef.current) setLinking(null);
+      }, 2000);
+    };
+    window.addEventListener("focus", onFocus, { once: true });
+
     try {
       await fn();
+      linkingResolvedRef.current = true;
       setSuccessMessage(`เชื่อมต่อบัญชี ${provider === "google" ? "Google" : "Facebook"} สำเร็จ ✓`);
     } catch (error: any) {
+      linkingResolvedRef.current = true;
       const code = error?.code ?? "";
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-        // User closed popup — silent
-      } else if (code === "auth/popup-blocked") {
-        setErrorMessage("เบราว์เซอร์บล็อก popup กรุณาอนุญาต popup แล้วลองอีกครั้ง");
+        // User closed the popup — not an error, just silently reset
+      } else if (code === "auth/credential-already-in-use") {
+        const credential = (error as any).credential;
+        if (credential) {
+          showConflict({ credential, provider });
+        } else {
+          setErrorMessage(`บัญชี ${provider === "google" ? "Google" : "Facebook"} นี้เชื่อมต่อกับผู้ใช้อื่นแล้ว`);
+        }
       } else if (code === "auth/provider-already-linked") {
         setErrorMessage(`เชื่อมต่อกับ ${provider === "google" ? "Google" : "Facebook"} อยู่แล้ว`);
-      } else if (code === "auth/credential-already-in-use") {
-        setErrorMessage(`บัญชี ${provider === "google" ? "Google" : "Facebook"} นี้เชื่อมต่อกับ MangaDock อีกบัญชีอยู่แล้ว`);
       } else {
         setErrorMessage(error?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
       }
     } finally {
+      window.removeEventListener("focus", onFocus);
+      if (focusTimer) clearTimeout(focusTimer);
       setLinking(null);
     }
+  };
+
+  const showConflict = (info: { credential: any; provider: "google" | "facebook" }) => {
+    showToast({
+      type: "warning",
+      message: (
+        <>
+          บัญชี <span className="font-semibold text-white">{info.provider === "google" ? "Google" : "Facebook"}</span> นี้ผูกกับ MangaDock อีกบัญชีอยู่แล้ว
+        </>
+      ),
+      duration: 0, // no auto-dismiss — user must act
+      action: {
+        label: "เข้าบัญชีนั้น",
+        onClick: async () => {
+          try {
+            await switchToConflictingAccount(info.credential);
+            handleClose();
+          } catch (error: any) {
+            setErrorMessage(error.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+          }
+        },
+      },
+    });
   };
 
   const handleLinkGoogle = withFocusGuard("google", linkGoogleAccount);
@@ -640,7 +704,14 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
                 </div>
               </button>
               <div>
-                <p className="text-sm font-semibold text-white">{user.displayName || "ผู้ใช้"}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-white">{user.displayName || "ผู้ใช้"}</p>
+                  {isTranslator && (
+                    <span className="rounded-full bg-indigo-600/30 px-2 py-0.5 text-[10px] font-semibold text-indigo-300 ring-1 ring-indigo-500/30">
+                      {userRole === "admin" ? "Admin" : userRole === "creator" ? "Creator" : "นักแปล"}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-white/40">{user.email}</p>
                 <p className="mt-0.5 text-[11px] text-white/25">คลิกที่รูปเพื่อเปลี่ยน</p>
               </div>
@@ -850,6 +921,24 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
                 <button onClick={handleUpdateProfile} disabled={loading || !displayName.trim()} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
                   {loading ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
                 </button>
+
+                {/* ── Translator studio shortcut ── */}
+                <div className="rounded-xl border border-white/10 bg-white/3 px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-white/70">สตูดิโอนักแปล</p>
+                      <p className="text-[11px] text-white/30">
+                        {isTranslator ? "จัดการงานแปลและอัปโหลดใหม่" : "สมัครเพื่อเริ่มอัปโหลดงานแปล"}
+                      </p>
+                    </div>
+                    <Link
+                      href="/studio"
+                      className="rounded-xl border border-indigo-500/40 bg-indigo-600/20 px-3 py-1.5 text-xs font-semibold text-indigo-300 transition hover:bg-indigo-600/30"
+                    >
+                      {isTranslator ? "เปิดสตูดิโอ" : "สมัคร"}
+                    </Link>
+                  </div>
+                </div>
               </div>
 
             </div>

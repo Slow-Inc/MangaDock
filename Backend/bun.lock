@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "backend",
@@ -12,7 +11,7 @@
         "@nestjs/jwt": "^11.0.1",
         "@nestjs/passport": "^11.0.5",
         "@nestjs/platform-express": "^11.0.1",
-        "@supabase/supabase-js": "^2.99.1",
+        "@supabase/supabase-js": "^2.57.4",
         "ioredis": "^5.10.0",
         "passport": "^0.7.0",
         "passport-facebook": "^3.0.0",
