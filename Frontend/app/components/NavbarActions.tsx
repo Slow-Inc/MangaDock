@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import SearchBar from "./SearchBar";
 import LoginModal from "./LoginModal";
 import AccountModal from "./AccountModal";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function NavbarActions() {
+  const router = useRouter();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [accountInitialTab, setAccountInitialTab] = useState<string | undefined>(undefined);
@@ -44,7 +45,7 @@ export default function NavbarActions() {
         <SearchBar />
 
         {loading ? (
-          /* ── Skeleton while Firebase restores session ── */
+  /* ── Skeleton while auth session restores ── */
           <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2 py-1">
             <div className="h-6.5 w-6.5 animate-pulse rounded-full bg-white/15" />
             <div className="hidden h-3 w-16 animate-pulse rounded bg-white/10 md:block" />
@@ -89,17 +90,6 @@ export default function NavbarActions() {
                   </p>
                   <p className="truncate text-[11px] text-white/40">{user.email}</p>
                 </div>
-                <Link
-                  href="/studio"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.866 8.21 8.21 0 003 2.48z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" />
-                  </svg>
-                  Studio
-                </Link>
                 <button
                   onClick={() => { 
                     setMenuOpen(false); 
@@ -111,6 +101,18 @@ export default function NavbarActions() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   จัดการบัญชี
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    router.push("/studio");
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h10" />
+                  </svg>
+                  Studio
                 </button>
                 <button
                   onClick={async () => {

@@ -18,7 +18,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UploadService } from './upload.service';
-import type { DecodedIdToken } from 'firebase-admin/auth';
+import type { SupabaseUser } from '../supabase/supabase.service';
 
 /** Allowlist of accepted MIME types for page uploads. */
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -63,7 +63,7 @@ export class UploadController {
     }),
   )
   async uploadPage(
-    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]: SupabaseUser },
     @Param('versionId') versionId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
@@ -76,14 +76,9 @@ export class UploadController {
     );
   }
 
-  /**
-   * Reorder all pages in a draft version.
-   * PUT /upload/versions/:versionId/pages
-   * Body: { pages: string[] }  — ordered list of existing page URLs
-   */
   @Put('versions/:versionId/pages')
   async reorderPages(
-    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]: SupabaseUser },
     @Param('versionId') versionId: string,
     @Body() body: { pages: string[] },
   ) {
@@ -92,14 +87,9 @@ export class UploadController {
     return { ok: true };
   }
 
-  /**
-   * Delete a single page from a draft version.
-   * DELETE /upload/versions/:versionId/pages
-   * Body: { pageUrl: string }
-   */
   @Delete('versions/:versionId/pages')
   async deletePage(
-    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]: SupabaseUser },
     @Param('versionId') versionId: string,
     @Body() body: { pageUrl: string },
   ) {

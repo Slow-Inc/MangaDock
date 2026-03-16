@@ -7,9 +7,8 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { FirebaseService } from '../firebase/firebase.service';
+import { SupabaseService } from '../supabase/supabase.service';
 import { VersionsService } from '../versions/versions.service';
-import type { ChapterVersion } from '../versions/versions.types';
 
 /** Allowed image MIME types for page uploads. */
 const ALLOWED_MIME_TYPES = new Set([
@@ -30,9 +29,13 @@ export class UploadService {
   private readonly logger = new Logger(UploadService.name);
 
   constructor(
-    private readonly firebase: FirebaseService,
+    private readonly supabase: SupabaseService,
     private readonly versionsService: VersionsService,
   ) {}
+
+  private get db() {
+    return this.supabase.client;
+  }
 
   /** Return the absolute directory where pages for a version are stored. */
   private versionDir(versionId: string): string {
@@ -40,11 +43,8 @@ export class UploadService {
   }
 
   /**
-   * Persist one uploaded page file into the version's directory and atomically
-   * append its URL to the chapterVersions document using a Firestore transaction.
-   *
-   * Called after multer has written the file to a temp path.
-   * Performs a defensive MIME-type check in addition to the controller-level filter.
+   * Persist one uploaded page file and atomically append its URL to the
+   * chapter_versions row using a PostgreSQL read-then-update pattern.
    */
   async addPage(
     versionId: string,
@@ -52,14 +52,12 @@ export class UploadService {
     tempFilePath: string,
     mimeType: string,
   ): Promise<{ pageUrl: string; pageIndex: number }> {
-    // Validate MIME type (second layer of defence behind the controller filter)
     if (!ALLOWED_MIME_TYPES.has(mimeType)) {
       fs.unlinkSync(tempFilePath);
       throw new BadRequestException('Unsupported image format. Only JPEG, PNG and WebP are accepted.');
     }
 
     const ext = MIME_TO_EXT[mimeType];
-    // Use a UUID-based filename so concurrent uploads never collide
     const filename = `${crypto.randomUUID()}${ext}`;
     const dir = this.versionDir(versionId);
     fs.mkdirSync(dir, { recursive: true });
@@ -67,34 +65,42 @@ export class UploadService {
     fs.renameSync(tempFilePath, destPath);
 
     const pageUrl = `/uploads/chapters/${versionId}/${filename}`;
-    let pageIndex = 0;
 
-    // Atomically append the URL inside a Firestore transaction so concurrent
-    // uploads for the same version cannot produce duplicate indices or
-    // overwrite each other's pages via last-write-wins.
-    const versionRef = this.firebase.firestore.collection('chapterVersions').doc(versionId);
-    await this.firebase.firestore.runTransaction(async (tx) => {
-      const snap = await tx.get(versionRef);
-      if (!snap.exists) {
-        fs.unlinkSync(destPath);
-        throw new NotFoundException(`Chapter version ${versionId} not found`);
-      }
-      const ver = snap.data() as ChapterVersion;
-      if (ver.translatorUid !== translatorUid) {
-        fs.unlinkSync(destPath);
-        throw new BadRequestException('You do not own this chapter version');
-      }
-      if (ver.status !== 'draft') {
-        fs.unlinkSync(destPath);
-        throw new BadRequestException('Pages can only be added to draft versions');
-      }
-      const currentPages: string[] = ver.pages ?? [];
-      pageIndex = currentPages.length;
-      tx.update(versionRef, {
+    // Read current version row
+    const { data: ver, error } = await this.db
+      .from('chapter_versions')
+      .select('*')
+      .eq('version_id', versionId)
+      .single();
+
+    if (error || !ver) {
+      fs.unlinkSync(destPath);
+      throw new NotFoundException(`Chapter version ${versionId} not found`);
+    }
+    if (ver.translator_uid !== translatorUid) {
+      fs.unlinkSync(destPath);
+      throw new BadRequestException('You do not own this chapter version');
+    }
+    if (ver.status !== 'draft') {
+      fs.unlinkSync(destPath);
+      throw new BadRequestException('Pages can only be added to draft versions');
+    }
+
+    const currentPages: string[] = ver.pages ?? [];
+    const pageIndex = currentPages.length;
+
+    const { error: updateErr } = await this.db
+      .from('chapter_versions')
+      .update({
         pages: [...currentPages, pageUrl],
-        updatedAt: new Date(),
-      });
-    });
+        updated_at: new Date().toISOString(),
+      })
+      .eq('version_id', versionId);
+
+    if (updateErr) {
+      fs.unlinkSync(destPath);
+      throw new BadRequestException(updateErr.message);
+    }
 
     this.logger.log(`Page ${filename} added to version ${versionId} (index ${pageIndex})`);
     return { pageUrl, pageIndex };
@@ -102,7 +108,6 @@ export class UploadService {
 
   /**
    * Replace the entire pages array with a re-ordered list of existing page URLs.
-   * Used to reorder pages in the studio editor.
    */
   async reorderPages(
     versionId: string,
@@ -116,7 +121,6 @@ export class UploadService {
     if (version.status !== 'draft') {
       throw new BadRequestException('Pages can only be reordered on draft versions');
     }
-    // Validate that the caller only supplies URLs that already belong to this version
     const existingSet = new Set(version.pages);
     for (const url of orderedUrls) {
       if (!existingSet.has(url)) {
@@ -147,7 +151,6 @@ export class UploadService {
     if (!version.pages.includes(pageUrl)) {
       throw new NotFoundException(`Page not found in version ${versionId}`);
     }
-    // Remove from Firestore
     const newPages = version.pages.filter((p) => p !== pageUrl);
     await this.versionsService.setPages(versionId, translatorUid, newPages);
     // Remove from disk
