@@ -435,6 +435,20 @@ export class MangaDexService {
     return this.fetchMangaWithParamsPaged(params, `search:${query}${lang ? `:${lang}` : ''}`);
   }
 
+  /** Fetch specific manga by IDs and return as LandingBook[]. */
+  async fetchMangaByIds(ids: string[]): Promise<LandingBook[]> {
+    if (!ids.length) return [];
+    const params = new URLSearchParams();
+    for (const id of ids) params.append('ids[]', id);
+    params.set('limit', String(ids.length));
+    params.append('includes[]', 'cover_art');
+    params.append('contentRating[]', 'safe');
+    params.append('contentRating[]', 'suggestive');
+    params.append('contentRating[]', 'erotica');
+    const { items } = await this.fetchMangaWithParamsPaged(params, `byIds:${ids.length}`);
+    return items;
+  }
+
   async fetchMangaForRow(order: MangaOrder, limit = 10, offset = 0, tagId?: string): Promise<{ items: LandingBook[]; total: number }> {
     const params = new URLSearchParams();
     params.set('limit', String(limit));

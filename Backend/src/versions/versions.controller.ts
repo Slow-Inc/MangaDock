@@ -26,6 +26,12 @@ export class VersionsController {
     return this.versions.listVersionsByChapter(chapterId);
   }
 
+  /** List published versions for a title (public — no auth required). */
+  @Get('title/:titleId')
+  listByTitle(@Param('titleId') titleId: string) {
+    return this.versions.listVersionsByTitle(titleId);
+  }
+
   /**
    * Get a single version by ID.
    * Public access is restricted to published versions only.

@@ -330,10 +330,25 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
   useEffect(() => {
     if (!mangaId) return;
-    fetch(`${API_BASE}/books/manga/${mangaId}/chapters`)
-      .then((r) => r.json())
-      .then((d: ChapterPageItem[]) => { if (Array.isArray(d)) setChapterList(d); })
-      .catch(() => {});
+    // Fetch MangaDex chapters + user-uploaded versions and merge
+    Promise.all([
+      fetch(`${API_BASE}/books/manga/${mangaId}/chapters`).then((r) => r.json()).catch(() => []),
+      fetch(`${API_BASE}/versions/title/${mangaId}`).then((r) => r.ok ? r.json() : []).catch(() => []),
+    ]).then(([mangaDexChapters, userVersions]: [ChapterPageItem[], any[]]) => {
+      const mdxList = Array.isArray(mangaDexChapters) ? mangaDexChapters : [];
+      const userList: ChapterPageItem[] = (userVersions ?? []).map((v: any) => ({
+        id: `ver:${v.versionId}`,
+        chapterNumber: v.chapterNumber || null,
+        title: v.chapterTitle || null,
+        translatedLanguage: v.language || "th",
+      }));
+      const merged = [...mdxList, ...userList].sort((a, b) => {
+        const numA = parseFloat(a.chapterNumber ?? "0") || 0;
+        const numB = parseFloat(b.chapterNumber ?? "0") || 0;
+        return numA - numB;
+      });
+      setChapterList(merged);
+    });
   }, [mangaId]);
 
   const goToChapter = (ch: ChapterPageItem) => {
@@ -356,7 +371,38 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     requestAnimationFrame(() => setVisible(true));
     document.body.style.overflow = "hidden";
 
-    if (!turnstilePassed) return;
+    if (!turnstilePassed && !chapterId.startsWith("ver:")) return;
+
+    // User-uploaded version: fetch pages from /versions/:versionId
+    const isUserVersion = chapterId.startsWith("ver:");
+    if (isUserVersion) {
+      const versionId = chapterId.slice(4);
+      fetch(`${API_BASE}/versions/${versionId}`)
+        .then((r) => {
+          if (!r.ok) throw new Error("not ok");
+          return r.json();
+        })
+        .then((ver: { pages?: string[] }) => {
+          const pages = ver.pages ?? [];
+          if (pages.length === 0) { setError(true); }
+          else {
+            // Convert version pages to ChapterPages format
+            // Pages are relative URLs like /uploads/chapters/...
+            const resolvedPages = pages.map((p) => p.startsWith("/") ? `${API_BASE}${p}` : p);
+            setData({ pages: resolvedPages, dataSaverPages: resolvedPages });
+          }
+          setLoading(false);
+          contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300);
+          if (mangaId) {
+            const existing = getHistory().find((h) => h.id === mangaId);
+            if (existing) {
+              addToHistory({ ...existing, lastChapterId: chapterId, lastChapterNumber: chapterNumber ?? null });
+            }
+          }
+        })
+        .catch(() => { setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300); });
+      return () => { document.body.style.overflow = ""; };
+    }
 
     fetch(`${API_BASE}/books/chapters/${chapterId}/pages${localStorage.getItem("imgCacheForceLocal") === "1" ? "?forceLocal=true" : ""}`, {
       headers: {
@@ -448,6 +494,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   // MangaDex blocks with their "You can read this at mangadex.org" banner image.
   const resolvePages = (originals: string[], locals?: string[]) => {
     return originals.map((orig, i) => {
+      // Already proxied URLs (user-uploaded versions) — don't double-wrap
+      if (orig.startsWith("/api/")) return orig;
       const local = locals?.[i];
       if (local && local.startsWith("/img-cache")) return `${API_BASE}${local}`;
       return `/api/img-proxy?url=${encodeURIComponent(orig)}`;

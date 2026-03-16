@@ -138,6 +138,22 @@ export class VersionsService {
     return (data ?? []).map((row) => this.mapRow(row as ChapterVersionRow));
   }
 
+  async listVersionsByTitle(titleId: string): Promise<ChapterVersion[]> {
+    const { data, error } = await this.db
+      .from('chapter_versions')
+      .select('*')
+      .eq('title_id', titleId)
+      .eq('status', 'published');
+
+    if (error) {
+      throw new Error(`Failed to list title versions: ${error.message}`);
+    }
+
+    return (data ?? [])
+      .map((row) => this.mapRow(row as ChapterVersionRow))
+      .sort((a, b) => (parseFloat(a.chapterNumber) || 0) - (parseFloat(b.chapterNumber) || 0));
+  }
+
   async listVersionsByTranslator(translatorUid: string): Promise<ChapterVersion[]> {
     const { data, error } = await this.db
       .from('chapter_versions')
