@@ -4,7 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { SupabaseService, SupabaseUser } from '../supabase/supabase.service';
+import { SupabaseService } from '../supabase/supabase.service';
 
 export const UID_KEY = 'uid';
 export const USER_KEY = 'supabaseUser';
@@ -21,11 +21,11 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing or invalid Authorization header');
     }
 
-    const accessToken = authHeader.slice(7);
+    const idToken = authHeader.slice(7);
     try {
-      const user = await this.supabase.verifyToken(accessToken);
-      req[USER_KEY] = user;
-      req[UID_KEY] = user.uid;
+      const decoded = await this.supabase.verifyAccessToken(idToken);
+      req[USER_KEY] = decoded;
+      req[UID_KEY] = decoded.uid;
       return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired token');

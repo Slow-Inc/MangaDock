@@ -1,72 +1,65 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-export type SupabaseUser = {
-  uid: string;
-  email?: string;
-  name?: string;
-  picture?: string;
-  app_metadata?: Record<string, any>;
-  user_metadata?: Record<string, any>;
-};
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseAuthUser } from '../auth/auth.types';
 
 @Injectable()
 export class SupabaseService implements OnModuleInit {
   private readonly logger = new Logger(SupabaseService.name);
-  private adminClient: SupabaseClient;
+  private supabaseClient!: SupabaseClient;
 
   onModuleInit() {
-    const url = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const url = (process.env.SUPABASE_URL ?? '').trim();
+    const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim();
 
-    if (!url || !serviceKey) {
-      throw new Error(
-        'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in environment variables',
-      );
+    if (!url || !serviceRoleKey) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
     }
 
-    this.adminClient = createClient(url, serviceKey, {
+    this.supabaseClient = createClient(url, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
     });
 
-    this.logger.log(`Supabase Admin initialized — URL: ${url}`);
+    this.logger.log(`Supabase initialized: ${url}`);
   }
 
-  /** The admin (service-role) client — bypasses RLS, full access. */
   get client(): SupabaseClient {
-    return this.adminClient;
+    return this.supabaseClient;
   }
 
-  /** Verify a Supabase access token and return the user. */
-  async verifyToken(accessToken: string): Promise<SupabaseUser> {
-    const { data, error } = await this.adminClient.auth.getUser(accessToken);
-    if (error || !data?.user) {
-      throw new Error(error?.message ?? 'Invalid token');
+  async verifyAccessToken(accessToken: string): Promise<SupabaseAuthUser> {
+    const { data, error } = await this.supabaseClient.auth.getUser(accessToken);
+    if (error || !data.user) {
+      throw new Error('Invalid or expired token');
     }
-    const u = data.user;
+
+    const providers = (data.user.identities ?? [])
+      .map((identity) => identity.provider)
+      .filter((provider): provider is string => typeof provider === 'string');
+
+    const metadata = data.user.user_metadata ?? {};
+
     return {
-      uid: u.id,
-      email: u.email,
-      name:
-        (u.user_metadata?.full_name as string) ??
-        (u.user_metadata?.name as string) ??
-        undefined,
-      picture:
-        (u.user_metadata?.avatar_url as string) ??
-        (u.user_metadata?.picture as string) ??
-        undefined,
-      app_metadata: u.app_metadata,
-      user_metadata: u.user_metadata,
+      uid: data.user.id,
+      email: data.user.email ?? null,
+      name: typeof metadata['full_name'] === 'string'
+        ? metadata['full_name']
+        : (typeof metadata['name'] === 'string' ? metadata['name'] : null),
+      picture: typeof metadata['avatar_url'] === 'string'
+        ? metadata['avatar_url']
+        : (typeof metadata['picture'] === 'string' ? metadata['picture'] : null),
+      providers,
     };
   }
 
-  /** Look up a user by email via admin auth API. Returns null if not found. */
-  async getUserByEmail(email: string) {
-    const { data, error } = await this.adminClient.auth.admin.listUsers();
-    if (error) throw error;
-    return data.users.find((u) => u.email === email) ?? null;
+  async markEmailVerified(uid: string): Promise<void> {
+    const { error } = await this.supabaseClient.auth.admin.updateUserById(uid, {
+      email_confirm: true,
+    });
+    if (error) {
+      throw new Error(`Failed to mark email verified: ${error.message}`);
+    }
   }
 }

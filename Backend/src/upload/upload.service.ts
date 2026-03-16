@@ -9,15 +9,14 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { SupabaseService } from '../supabase/supabase.service';
 import { VersionsService } from '../versions/versions.service';
+import type { ChapterVersion } from '../versions/versions.types';
 
-/** Allowed image MIME types for page uploads. */
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
 ]);
 
-/** Map allowed MIME type to canonical file extension. */
 const MIME_TO_EXT: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
@@ -37,15 +36,10 @@ export class UploadService {
     return this.supabase.client;
   }
 
-  /** Return the absolute directory where pages for a version are stored. */
   private versionDir(versionId: string): string {
     return path.join(process.cwd(), 'uploads', 'chapters', versionId);
   }
 
-  /**
-   * Persist one uploaded page file and atomically append its URL to the
-   * chapter_versions row using a PostgreSQL read-then-update pattern.
-   */
   async addPage(
     versionId: string,
     translatorUid: string,
@@ -66,49 +60,71 @@ export class UploadService {
 
     const pageUrl = `/uploads/chapters/${versionId}/${filename}`;
 
-    // Read current version row
-    const { data: ver, error } = await this.db
-      .from('chapter_versions')
-      .select('*')
-      .eq('version_id', versionId)
-      .single();
+    let pageIndex = -1;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const { data: versionRow, error: readError } = await this.db
+        .from('chapter_versions')
+        .select('translator_uid, status, pages, updated_at')
+        .eq('version_id', versionId)
+        .maybeSingle<{
+          translator_uid: string;
+          status: ChapterVersion['status'];
+          pages: string[];
+          updated_at: string | null;
+        }>();
 
-    if (error || !ver) {
-      fs.unlinkSync(destPath);
-      throw new NotFoundException(`Chapter version ${versionId} not found`);
+      if (readError) {
+        fs.unlinkSync(destPath);
+        throw new Error(`Failed to read chapter version: ${readError.message}`);
+      }
+      if (!versionRow) {
+        fs.unlinkSync(destPath);
+        throw new NotFoundException(`Chapter version ${versionId} not found`);
+      }
+      if (versionRow.translator_uid !== translatorUid) {
+        fs.unlinkSync(destPath);
+        throw new BadRequestException('You do not own this chapter version');
+      }
+      if (versionRow.status !== 'draft') {
+        fs.unlinkSync(destPath);
+        throw new BadRequestException('Pages can only be added to draft versions');
+      }
+
+      const currentPages = versionRow.pages ?? [];
+      pageIndex = currentPages.length;
+      const nextPages = [...currentPages, pageUrl];
+
+      let query = this.db
+        .from('chapter_versions')
+        .update({
+          pages: nextPages,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('version_id', versionId)
+        .eq('translator_uid', translatorUid)
+        .eq('status', 'draft');
+
+      if (versionRow.updated_at) {
+        query = query.eq('updated_at', versionRow.updated_at);
+      }
+
+      const { data: updatedRows, error: updateError } = await query.select('version_id');
+
+      if (updateError) {
+        fs.unlinkSync(destPath);
+        throw new Error(`Failed to append page: ${updateError.message}`);
+      }
+
+      if ((updatedRows ?? []).length > 0) {
+        this.logger.log(`Page ${filename} added to version ${versionId} (index ${pageIndex})`);
+        return { pageUrl, pageIndex };
+      }
     }
-    if (ver.translator_uid !== translatorUid) {
-      fs.unlinkSync(destPath);
-      throw new BadRequestException('You do not own this chapter version');
-    }
-    if (ver.status !== 'draft') {
-      fs.unlinkSync(destPath);
-      throw new BadRequestException('Pages can only be added to draft versions');
-    }
 
-    const currentPages: string[] = ver.pages ?? [];
-    const pageIndex = currentPages.length;
-
-    const { error: updateErr } = await this.db
-      .from('chapter_versions')
-      .update({
-        pages: [...currentPages, pageUrl],
-        updated_at: new Date().toISOString(),
-      })
-      .eq('version_id', versionId);
-
-    if (updateErr) {
-      fs.unlinkSync(destPath);
-      throw new BadRequestException(updateErr.message);
-    }
-
-    this.logger.log(`Page ${filename} added to version ${versionId} (index ${pageIndex})`);
-    return { pageUrl, pageIndex };
+    fs.unlinkSync(destPath);
+    throw new BadRequestException('Concurrent update conflict, please retry upload');
   }
 
-  /**
-   * Replace the entire pages array with a re-ordered list of existing page URLs.
-   */
   async reorderPages(
     versionId: string,
     translatorUid: string,
@@ -121,6 +137,7 @@ export class UploadService {
     if (version.status !== 'draft') {
       throw new BadRequestException('Pages can only be reordered on draft versions');
     }
+
     const existingSet = new Set(version.pages);
     for (const url of orderedUrls) {
       if (!existingSet.has(url)) {
@@ -130,12 +147,10 @@ export class UploadService {
     if (orderedUrls.length !== version.pages.length) {
       throw new BadRequestException('Reorder list must contain all existing pages');
     }
+
     await this.versionsService.setPages(versionId, translatorUid, orderedUrls);
   }
 
-  /**
-   * Delete a specific page by URL and remove it from the version's page list.
-   */
   async deletePage(
     versionId: string,
     translatorUid: string,
@@ -151,9 +166,10 @@ export class UploadService {
     if (!version.pages.includes(pageUrl)) {
       throw new NotFoundException(`Page not found in version ${versionId}`);
     }
+
     const newPages = version.pages.filter((p) => p !== pageUrl);
     await this.versionsService.setPages(versionId, translatorUid, newPages);
-    // Remove from disk
+
     const filename = pageUrl.split('/').pop()!;
     const filePath = path.join(this.versionDir(versionId), filename);
     if (fs.existsSync(filePath)) {

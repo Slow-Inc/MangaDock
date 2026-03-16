@@ -5,7 +5,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 export type EmailValidationDecision = 'allow' | 'block' | 'warn';
 export type EmailValidationSource =
   | 'abstract'
-  | 'firebase'
+  | 'database'
   | 'cache'
   | 'provider-disabled'
   | 'provider-error';
@@ -61,12 +61,12 @@ export class EmailValidationService {
 
     const existingUser = await this.findUserByEmail(normalizedEmail);
     if (existingUser) {
-      this.logger.log(`Email already exists: ${this.maskEmail(normalizedEmail)}`);
+      this.logger.log(`Email already exists in profiles: ${this.maskEmail(normalizedEmail)}`);
       return {
         ok: false,
         decision: 'block',
         normalizedEmail,
-        source: 'firebase',
+        source: 'database',
         provider: 'supabase',
         reason: 'email_already_in_use',
         message: 'อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบแทนการสมัครใหม่',
@@ -317,10 +317,16 @@ export class EmailValidationService {
   }
 
   private async findUserByEmail(email: string) {
-    try {
-      return await this.supabase.getUserByEmail(email);
-    } catch {
-      return null;
+    const { data, error } = await this.supabase.client
+      .from('profiles')
+      .select('uid')
+      .eq('email', email)
+      .limit(1);
+
+    if (error) {
+      throw new Error(`Failed to check existing email: ${error.message}`);
     }
+
+    return (data ?? []).length > 0 ? data[0] : null;
   }
 }
