@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { VersionsService } from './versions.service';
-import type { DecodedIdToken } from 'firebase-admin/auth';
+import type { SupabaseAuthUser } from '../auth/auth.types';
 import type { VersionStatus } from './versions.types';
 
 @Controller('versions')
@@ -34,7 +34,7 @@ export class VersionsController {
   @Get(':versionId')
   async getVersion(
     @Param('versionId') versionId: string,
-    @Req() req: Request & { [USER_KEY]?: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]?: SupabaseAuthUser },
   ) {
     const version = await this.versions.getVersion(versionId);
     if (version.status !== 'published') {
@@ -61,7 +61,7 @@ export class VersionsController {
   /** List all versions (including drafts) for the currently signed-in translator. */
   @Get('me/versions')
   @UseGuards(AuthGuard)
-  listMyVersions(@Req() req: Request & { [USER_KEY]: DecodedIdToken }) {
+  listMyVersions(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
     return this.versions.listVersionsByTranslator(req[USER_KEY].uid);
   }
 
@@ -69,7 +69,7 @@ export class VersionsController {
   @Post()
   @UseGuards(AuthGuard)
   createVersion(
-    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Body()
     body: {
       titleId: string;
@@ -94,7 +94,7 @@ export class VersionsController {
   @Patch(':versionId')
   @UseGuards(AuthGuard)
   updateMetadata(
-    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('versionId') versionId: string,
     @Body() body: { description?: string; priceCoins?: number },
   ) {
@@ -105,7 +105,7 @@ export class VersionsController {
   @Patch(':versionId/status')
   @UseGuards(AuthGuard)
   updateStatus(
-    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('versionId') versionId: string,
     @Body() body: { status: VersionStatus },
   ) {
@@ -116,7 +116,7 @@ export class VersionsController {
   @Delete(':versionId')
   @UseGuards(AuthGuard)
   deleteVersion(
-    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('versionId') versionId: string,
   ) {
     return this.versions.deleteVersion(versionId, req[USER_KEY].uid);
