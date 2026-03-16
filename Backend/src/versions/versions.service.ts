@@ -4,23 +4,63 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
-import { FirebaseService } from '../firebase/firebase.service';
+import { SupabaseService } from '../supabase/supabase.service';
 import type { ChapterVersion, VersionStatus } from './versions.types';
+
+type ChapterVersionRow = {
+  version_id: string;
+  title_id: string;
+  title_name: string;
+  chapter_id: string;
+  chapter_number: string;
+  chapter_title: string;
+  language: string;
+  translator_uid: string;
+  translator_name: string | null;
+  status: VersionStatus;
+  pages: string[];
+  price_coins: number;
+  quality_score: number;
+  is_default: boolean;
+  description: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
 
 @Injectable()
 export class VersionsService {
   private readonly logger = new Logger(VersionsService.name);
 
-  constructor(private readonly firebase: FirebaseService) {}
+  constructor(private readonly supabase: SupabaseService) {}
 
-  private get col() {
-    return this.firebase.firestore.collection('chapterVersions');
+  private get db() {
+    return this.supabase.client;
   }
 
-  /** Create a new chapter version (initially in draft state). */
+  private mapRow(row: ChapterVersionRow): ChapterVersion {
+    return {
+      versionId: row.version_id,
+      titleId: row.title_id,
+      titleName: row.title_name,
+      chapterId: row.chapter_id,
+      chapterNumber: row.chapter_number,
+      chapterTitle: row.chapter_title,
+      language: row.language,
+      translatorUid: row.translator_uid,
+      translatorName: row.translator_name,
+      status: row.status,
+      pages: row.pages ?? [],
+      priceCoins: row.price_coins ?? 0,
+      qualityScore: row.quality_score ?? 0,
+      isDefault: row.is_default ?? false,
+      description: row.description ?? null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
   async createVersion(data: {
     titleId: string;
     titleName: string;
@@ -36,159 +76,214 @@ export class VersionsService {
     if (!data.titleId || !data.chapterId || !data.language || !data.translatorUid) {
       throw new BadRequestException('titleId, chapterId, language, and translatorUid are required');
     }
-    const ref = this.col.doc();
-    const version: ChapterVersion = {
-      versionId: ref.id,
-      titleId: data.titleId,
-      titleName: data.titleName ?? '',
-      chapterId: data.chapterId,
-      chapterNumber: data.chapterNumber ?? '',
-      chapterTitle: data.chapterTitle ?? '',
-      language: data.language,
-      translatorUid: data.translatorUid,
-      translatorName: data.translatorName ?? null,
-      status: 'draft',
-      pages: [],
-      priceCoins: data.priceCoins ?? 0,
-      qualityScore: 0,
-      isDefault: false,
-      description: data.description?.trim() ?? null,
-      createdAt: admin.firestore.FieldValue.serverTimestamp() as unknown as FirebaseFirestore.Timestamp,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp() as unknown as FirebaseFirestore.Timestamp,
-    };
-    await ref.set(version);
-    this.logger.log(`Created chapter version ${ref.id} for translator ${data.translatorUid}`);
-    return { ...version, versionId: ref.id };
+
+    const now = new Date().toISOString();
+    const { data: inserted, error } = await this.db
+      .from('chapter_versions')
+      .insert({
+        title_id: data.titleId,
+        title_name: data.titleName ?? '',
+        chapter_id: data.chapterId,
+        chapter_number: data.chapterNumber ?? '',
+        chapter_title: data.chapterTitle ?? '',
+        language: data.language,
+        translator_uid: data.translatorUid,
+        translator_name: data.translatorName ?? null,
+        status: 'draft',
+        pages: [],
+        price_coins: data.priceCoins ?? 0,
+        quality_score: 0,
+        is_default: false,
+        description: data.description?.trim() ?? null,
+        created_at: now,
+        updated_at: now,
+      })
+      .select('*')
+      .single<ChapterVersionRow>();
+
+    if (error || !inserted) {
+      throw new Error(`Failed to create chapter version: ${error?.message ?? 'unknown error'}`);
+    }
+
+    this.logger.log(`Created chapter version ${inserted.version_id} for translator ${data.translatorUid}`);
+    return this.mapRow(inserted);
   }
 
-  /** Get a single chapter version by ID. */
   async getVersion(versionId: string): Promise<ChapterVersion> {
-    const snap = await this.col.doc(versionId).get();
-    if (!snap.exists) throw new NotFoundException(`Chapter version ${versionId} not found`);
-    return snap.data() as ChapterVersion;
+    const { data, error } = await this.db
+      .from('chapter_versions')
+      .select('*')
+      .eq('version_id', versionId)
+      .maybeSingle<ChapterVersionRow>();
+
+    if (error) {
+      throw new Error(`Failed to fetch chapter version: ${error.message}`);
+    }
+    if (!data) throw new NotFoundException(`Chapter version ${versionId} not found`);
+    return this.mapRow(data);
   }
 
-  /** List all versions for a chapter (across languages and translators). */
   async listVersionsByChapter(chapterId: string): Promise<ChapterVersion[]> {
-    const snap = await this.col
-      .where('chapterId', '==', chapterId)
-      .where('status', '==', 'published')
-      .orderBy('qualityScore', 'desc')
-      .get();
-    return snap.docs.map((d) => d.data() as ChapterVersion);
+    const { data, error } = await this.db
+      .from('chapter_versions')
+      .select('*')
+      .eq('chapter_id', chapterId)
+      .eq('status', 'published')
+      .order('quality_score', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to list chapter versions: ${error.message}`);
+    }
+
+    return (data ?? []).map((row) => this.mapRow(row as ChapterVersionRow));
   }
 
-  /** List all versions created by a specific translator (all statuses — requires auth). */
   async listVersionsByTranslator(translatorUid: string): Promise<ChapterVersion[]> {
-    const snap = await this.col
-      .where('translatorUid', '==', translatorUid)
-      .orderBy('createdAt', 'desc')
-      .limit(50)
-      .get();
-    return snap.docs.map((d) => d.data() as ChapterVersion);
+    const { data, error } = await this.db
+      .from('chapter_versions')
+      .select('*')
+      .eq('translator_uid', translatorUid)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      throw new Error(`Failed to list versions by translator: ${error.message}`);
+    }
+
+    return (data ?? []).map((row) => this.mapRow(row as ChapterVersionRow));
   }
 
-  /** List published versions for a translator, excluding page URLs (suitable for public display). */
   async listPublishedVersionsByTranslator(translatorUid: string): Promise<Omit<ChapterVersion, 'pages'>[]> {
-    const snap = await this.col
-      .where('translatorUid', '==', translatorUid)
-      .where('status', '==', 'published')
-      .orderBy('createdAt', 'desc')
-      .limit(50)
-      .get();
-    return snap.docs.map((d) => {
-      const { pages: _pages, ...rest } = d.data() as ChapterVersion;
+    const { data, error } = await this.db
+      .from('chapter_versions')
+      .select('*')
+      .eq('translator_uid', translatorUid)
+      .eq('status', 'published')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      throw new Error(`Failed to list published versions by translator: ${error.message}`);
+    }
+
+    return (data ?? []).map((row) => {
+      const version = this.mapRow(row as ChapterVersionRow);
+      const { pages: _pages, ...rest } = version;
       return rest;
     });
   }
 
-  /** Update the pages list of a draft version. */
   async setPages(versionId: string, translatorUid: string, pages: string[]): Promise<void> {
-    const snap = await this.col.doc(versionId).get();
-    if (!snap.exists) throw new NotFoundException(`Chapter version ${versionId} not found`);
-    const ver = snap.data() as ChapterVersion;
-    if (ver.translatorUid !== translatorUid) {
+    const version = await this.getVersion(versionId);
+    if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
-    if (ver.status !== 'draft') {
+    if (version.status !== 'draft') {
       throw new BadRequestException('Pages can only be updated on draft versions');
     }
-    await this.col.doc(versionId).update({
-      pages,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+
+    const { error } = await this.db
+      .from('chapter_versions')
+      .update({
+        pages,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('version_id', versionId);
+
+    if (error) {
+      throw new Error(`Failed to update pages: ${error.message}`);
+    }
   }
 
-  /** Change the status of a version (e.g. submit for moderation, publish, reject). */
   async updateStatus(versionId: string, translatorUid: string, status: VersionStatus): Promise<void> {
-    const snap = await this.col.doc(versionId).get();
-    if (!snap.exists) throw new NotFoundException(`Chapter version ${versionId} not found`);
-    const ver = snap.data() as ChapterVersion;
-    if (ver.translatorUid !== translatorUid) {
+    const version = await this.getVersion(versionId);
+    if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
-    // Translators can only move draft → pending_moderation
+
     const allowedTransitions: Partial<Record<VersionStatus, VersionStatus[]>> = {
       draft: ['pending_moderation'],
       rejected: ['draft'],
     };
-    if (!allowedTransitions[ver.status]?.includes(status)) {
-      throw new BadRequestException(`Cannot transition from ${ver.status} to ${status}`);
+
+    if (!allowedTransitions[version.status]?.includes(status)) {
+      throw new BadRequestException(`Cannot transition from ${version.status} to ${status}`);
     }
-    if (status === 'pending_moderation' && ver.pages.length === 0) {
+    if (status === 'pending_moderation' && version.pages.length === 0) {
       throw new BadRequestException('Cannot submit a version with no pages');
     }
-    await this.col.doc(versionId).update({
-      status,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    this.logger.log(`Version ${versionId} status → ${status}`);
+
+    const { error } = await this.db
+      .from('chapter_versions')
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('version_id', versionId);
+
+    if (error) {
+      throw new Error(`Failed to update status: ${error.message}`);
+    }
+
+    this.logger.log(`Version ${versionId} status -> ${status}`);
   }
 
-  /** Update metadata (description, priceCoins) on a draft version. */
   async updateMetadata(
     versionId: string,
     translatorUid: string,
     data: { description?: string; priceCoins?: number },
   ): Promise<void> {
-    const snap = await this.col.doc(versionId).get();
-    if (!snap.exists) throw new NotFoundException(`Chapter version ${versionId} not found`);
-    const ver = snap.data() as ChapterVersion;
-    if (ver.translatorUid !== translatorUid) {
+    const version = await this.getVersion(versionId);
+    if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
-    if (ver.status !== 'draft') {
+    if (version.status !== 'draft') {
       throw new BadRequestException('Metadata can only be updated on draft versions');
     }
-    const update: Record<string, any> = {
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+
+    const update: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
     };
-    if (data.description !== undefined) update.description = data.description.trim().slice(0, 1000);
+    if (data.description !== undefined) update['description'] = data.description.trim().slice(0, 1000);
     if (data.priceCoins !== undefined) {
       if (data.priceCoins < 0) throw new BadRequestException('priceCoins cannot be negative');
-      update.priceCoins = Math.floor(data.priceCoins);
+      update['price_coins'] = Math.floor(data.priceCoins);
     }
-    await this.col.doc(versionId).update(update);
+
+    const { error } = await this.db
+      .from('chapter_versions')
+      .update(update)
+      .eq('version_id', versionId);
+
+    if (error) {
+      throw new Error(`Failed to update metadata: ${error.message}`);
+    }
   }
 
-  /** Delete a draft or rejected version and its uploaded pages on disk. */
   async deleteVersion(versionId: string, translatorUid: string): Promise<void> {
-    const snap = await this.col.doc(versionId).get();
-    if (!snap.exists) throw new NotFoundException(`Chapter version ${versionId} not found`);
-    const ver = snap.data() as ChapterVersion;
-    if (ver.translatorUid !== translatorUid) {
+    const version = await this.getVersion(versionId);
+    if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
-    if (ver.status === 'published') {
+    if (version.status === 'published') {
       throw new BadRequestException('Published versions cannot be deleted');
     }
-    // Delete uploaded pages from disk before removing the Firestore document
+
     const pagesDir = path.join(process.cwd(), 'uploads', 'chapters', versionId);
     if (fs.existsSync(pagesDir)) {
       fs.rmSync(pagesDir, { recursive: true, force: true });
       this.logger.log(`Deleted pages directory for version ${versionId}`);
     }
-    await this.col.doc(versionId).delete();
+
+    const { error } = await this.db
+      .from('chapter_versions')
+      .delete()
+      .eq('version_id', versionId);
+
+    if (error) {
+      throw new Error(`Failed to delete chapter version: ${error.message}`);
+    }
+
     this.logger.log(`Deleted chapter version ${versionId}`);
   }
 }
