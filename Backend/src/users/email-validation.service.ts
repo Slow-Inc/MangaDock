@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
-import { FirebaseService } from '../firebase/firebase.service';
+import { SupabaseService } from '../supabase/supabase.service';
 
 export type EmailValidationDecision = 'allow' | 'block' | 'warn';
 export type EmailValidationSource =
   | 'abstract'
-  | 'firebase'
+  | 'database'
   | 'cache'
   | 'provider-disabled'
   | 'provider-error';
@@ -52,22 +52,22 @@ export class EmailValidationService {
 
   constructor(
     private readonly cache: CacheOrchestratorService,
-    private readonly firebase: FirebaseService,
+    private readonly supabase: SupabaseService,
   ) {}
 
   async validateForSignup(email: string): Promise<EmailValidationResult> {
     const normalizedEmail = this.normalizeEmail(email);
     const provider = this.provider;
 
-    const existingUser = await this.findFirebaseUserByEmail(normalizedEmail);
+    const existingUser = await this.findUserByEmail(normalizedEmail);
     if (existingUser) {
-      this.logger.log(`Email already exists in Firebase: ${this.maskEmail(normalizedEmail)}`);
+      this.logger.log(`Email already exists in profiles: ${this.maskEmail(normalizedEmail)}`);
       return {
         ok: false,
         decision: 'block',
         normalizedEmail,
-        source: 'firebase',
-        provider: 'firebase',
+        source: 'database',
+        provider: 'supabase',
         reason: 'email_already_in_use',
         message: 'อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบแทนการสมัครใหม่',
         warning: null,
@@ -316,15 +316,17 @@ export class EmailValidationService {
     return `${maskedLocal}@${domain}`;
   }
 
-  private async findFirebaseUserByEmail(email: string) {
-    try {
-      return await this.firebase.auth.getUserByEmail(email);
-    } catch (error) {
-      const code = error instanceof Error && 'code' in error ? String(error.code) : '';
-      if (code === 'auth/user-not-found') {
-        return null;
-      }
-      throw error;
+  private async findUserByEmail(email: string) {
+    const { data, error } = await this.supabase.client
+      .from('profiles')
+      .select('uid')
+      .eq('email', email)
+      .limit(1);
+
+    if (error) {
+      throw new Error(`Failed to check existing email: ${error.message}`);
     }
+
+    return (data ?? []).length > 0 ? data[0] : null;
   }
 }

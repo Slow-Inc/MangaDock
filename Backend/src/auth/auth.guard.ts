@@ -4,14 +4,14 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { FirebaseService } from '../firebase/firebase.service';
+import { SupabaseService } from '../supabase/supabase.service';
 
 export const UID_KEY = 'uid';
-export const USER_KEY = 'firebaseUser';
+export const USER_KEY = 'supabaseUser';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly firebase: FirebaseService) {}
+  constructor(private readonly supabase: SupabaseService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
@@ -23,7 +23,7 @@ export class AuthGuard implements CanActivate {
 
     const idToken = authHeader.slice(7);
     try {
-      const decoded = await this.firebase.verifyIdToken(idToken);
+      const decoded = await this.supabase.verifyAccessToken(idToken);
       req[USER_KEY] = decoded;
       req[UID_KEY] = decoded.uid;
       return true;
