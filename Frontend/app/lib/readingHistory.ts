@@ -1,5 +1,5 @@
 /**
- * readingHistory — local-first reading history with batched Firebase sync.
+ * readingHistory — local-first reading history with batched sync.
  *
  * Flow:
  *  1. addToHistory / clearHistory update localStorage + in-memory immediately.
@@ -7,12 +7,12 @@
  *  3. After 5s idle, diffs are flushed to the backend:
  *     - upsert changed items (POST /users/me/history)
  *     - delete removed items (DELETE /users/me/history/:id or DELETE /users/me/history for clear-all)
- *  4. On login, AuthContext calls loadHistoryFromFirebase() to restore history.
+ *  4. On login, AuthContext calls loadHistoryData() to restore history.
  */
 
 const API_BASE = "/api/proxy";
 const STORAGE_KEY = "mangadock_reading_history";
-const SYNCED_KEY = "mangadock_history_synced";   // IDs known to be in Firebase
+const SYNCED_KEY = "mangadock_history_synced";   // IDs known to be synced to server
 const MAX_ITEMS = 30;
 const FLUSH_DELAY = 5_000;
 
@@ -38,7 +38,7 @@ export type HistoryBook = {
 
 // ─── In-memory state ────────────────────────────────────────────────────────
 let books: HistoryBook[] = [];
-let syncedIds: Set<string> = new Set();     // IDs currently in Firebase
+let syncedIds: Set<string> = new Set();     // IDs currently synced to server
 let pendingUpserts: Map<string, HistoryBook> = new Map();  // to add/update
 let pendingDeletes: Set<string> = new Set(); // to remove from Firebase
 let clearAll = false;                        // flag: DELETE /users/me/history
@@ -123,10 +123,10 @@ async function backfillChapterNumbers() {
 // ─── Debounced flush ─────────────────────────────────────────────────────────
 function scheduleFlush() {
   if (flushTimer) clearTimeout(flushTimer);
-  flushTimer = setTimeout(flushToFirebase, FLUSH_DELAY);
+  flushTimer = setTimeout(flushToServer, FLUSH_DELAY);
 }
 
-async function flushToFirebase() {
+async function flushToServer() {
   flushTimer = null;
   const token = await getTokenFn?.();
   if (!token) return;
@@ -166,8 +166,8 @@ async function flushToFirebase() {
   } catch { /* retry on next change */ }
 }
 
-// ─── Load from Firebase on login ────────────────────────────────────────────
-export async function loadHistoryFromFirebase(token: string) {
+// ─── Load from server on login ──────────────────────────────────────────────
+export async function loadHistoryData(token: string) {
   loadFromLS();
   try {
     const res = await fetch(`${API_BASE}/users/me/history`, {
@@ -191,16 +191,16 @@ export async function loadHistoryFromFirebase(token: string) {
 
     saveToLS();
     notify();
-    // Back-fill chapter numbers for any entry missing them (e.g. from old Firebase data)
+    // Back-fill chapter numbers for any entry missing them (e.g. from old sync data)
     backfillChapterNumbers();
   } catch { /* ignore */ }
 }
 
-/** Immediately flush any pending history changes to Firebase (call before logout). */
+/** Immediately flush any pending history changes to server (call before logout). */
 export async function flushHistoryNow(): Promise<void> {
   if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
   if (pendingUpserts.size > 0 || pendingDeletes.size > 0) {
-    await flushToFirebase();
+    await flushToServer();
   }
 }
 

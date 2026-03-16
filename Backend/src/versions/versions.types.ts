@@ -4,6 +4,7 @@ export type ChapterVersion = {
   versionId: string;
   titleId: string;
   titleName: string;
+  titleAltName?: string;
   chapterId: string;
   chapterNumber: string;
   chapterTitle: string;

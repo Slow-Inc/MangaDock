@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
 import { ImageCacheService } from '../cache/image-cache.service';
+import { SupabaseService } from '../supabase/supabase.service';
 import { GoogleBooksService } from './google-books.service';
 import { MangaDexService } from './mangadex.service';
 import {
@@ -90,6 +91,7 @@ export class BooksService {
     private readonly mangaDex: MangaDexService,
     private readonly cache: CacheOrchestratorService,
     private readonly imageCache: ImageCacheService,
+    private readonly supabase: SupabaseService,
   ) {}
 
   private get backendOrigin(): string {
@@ -1212,11 +1214,41 @@ export class BooksService {
         ? await this.mangaDex.searchManga(query, lang, limit, offset)
         : await this.googleBooks.fetchBooksForQuery(query, limit, offset);
 
+    // Enhance: also match user-uploaded alt names in chapter_versions
+    if (contentSource === 'manga') {
+      try {
+        const existingIds = new Set(result.items.map((b) => b.id));
+        const altMatches = await this.findTitleIdsByAltName(query);
+        const newIds = altMatches.filter((id) => !existingIds.has(id));
+        if (newIds.length > 0) {
+          const extra = await this.mangaDex.fetchMangaByIds(newIds);
+          result.items.push(...extra);
+          result.total += extra.length;
+          this.logger.log(`Alt-name search added ${extra.length} extra manga for "${query}"`);
+        }
+      } catch (err) {
+        this.logger.warn(`Alt-name lookup failed: ${String(err)}`);
+      }
+    }
+
     if (result.items.length > 0) {
       await this.cache.set(cacheKey, result, CACHE_TTL_MS);
     }
 
     return result;
+  }
+
+  /** Query chapter_versions for title_name / title_alt_name matching the search query. */
+  private async findTitleIdsByAltName(query: string): Promise<string[]> {
+    const pattern = `%${query}%`;
+    const { data, error } = await this.supabase.client
+      .from('chapter_versions')
+      .select('title_id')
+      .or(`title_name.ilike.${pattern},title_alt_name.ilike.${pattern}`)
+      .eq('status', 'published');
+    if (error) throw error;
+    // Deduplicate title_ids
+    return [...new Set((data ?? []).map((row: any) => row.title_id as string))];
   }
 
   // ─── Image cache enhancement (landing-level) ──────────────────────────────────
