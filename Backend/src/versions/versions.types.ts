@@ -16,6 +16,6 @@ export type ChapterVersion = {
   qualityScore: number;
   isDefault: boolean;
   description: string | null;
-  createdAt: FirebaseFirestore.Timestamp | null;
-  updatedAt: FirebaseFirestore.Timestamp | null;
+  createdAt: string | null;
+  updatedAt: string | null;
 };

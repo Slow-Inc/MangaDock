@@ -18,7 +18,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UploadService } from './upload.service';
-import type { DecodedIdToken } from 'firebase-admin/auth';
+import type { SupabaseAuthUser } from '../auth/auth.types';
 
 /** Allowlist of accepted MIME types for page uploads. */
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -63,7 +63,7 @@ export class UploadController {
     }),
   )
   async uploadPage(
-    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('versionId') versionId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
@@ -83,7 +83,7 @@ export class UploadController {
    */
   @Put('versions/:versionId/pages')
   async reorderPages(
-    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('versionId') versionId: string,
     @Body() body: { pages: string[] },
   ) {
@@ -99,7 +99,7 @@ export class UploadController {
    */
   @Delete('versions/:versionId/pages')
   async deletePage(
-    @Req() req: Request & { [USER_KEY]: DecodedIdToken },
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('versionId') versionId: string,
     @Body() body: { pageUrl: string },
   ) {
