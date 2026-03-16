@@ -1,0 +1,10 @@
+name = "mangadock-worker"
+main = "src/index.ts"
+compatibility_date = "2026-03-12"
+
+[observability]
+enabled = true
+
+[[r2_buckets]]
+binding = "MANGA_IMAGES"
+bucket_name = "mangadock"
