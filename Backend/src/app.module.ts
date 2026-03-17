@@ -7,6 +7,8 @@ import { CacheModule } from './cache/cache.module';
 import { StatusModule } from './status/status.module';
 import { VersionsModule } from './versions/versions.module';
 import { UploadModule } from './upload/upload.module';
+import { WalletModule } from './wallet/wallet.module';
+import { UnlockModule } from './unlock/unlock.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { UploadModule } from './upload/upload.module';
     StatusModule,
     VersionsModule,
     UploadModule,
+    WalletModule,
+    UnlockModule,
   ],
 })
 export class AppModule {}

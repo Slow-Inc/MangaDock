@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
+import { OptionalAuthGuard } from '../auth/optional-auth.guard';
 import { VersionsService } from './versions.service';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 import type { VersionStatus } from './versions.types';
@@ -38,6 +39,7 @@ export class VersionsController {
    * Authenticated owners can see their own draft/pending/rejected versions.
    */
   @Get(':versionId')
+  @UseGuards(OptionalAuthGuard)
   async getVersion(
     @Param('versionId') versionId: string,
     @Req() req: Request & { [USER_KEY]?: SupabaseAuthUser },
@@ -80,6 +82,7 @@ export class VersionsController {
     body: {
       titleId: string;
       titleName: string;
+      titleAltName?: string;
       chapterId: string;
       chapterNumber: string;
       chapterTitle: string;
@@ -96,13 +99,13 @@ export class VersionsController {
     });
   }
 
-  /** Update metadata (description, priceCoins) on a draft version. */
+  /** Update metadata on a draft version. */
   @Patch(':versionId')
   @UseGuards(AuthGuard)
   updateMetadata(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('versionId') versionId: string,
-    @Body() body: { description?: string; priceCoins?: number },
+    @Body() body: { description?: string; priceCoins?: number; titleAltName?: string; chapterTitle?: string; chapterNumber?: string; },
   ) {
     return this.versions.updateMetadata(versionId, req[USER_KEY].uid, body);
   }
