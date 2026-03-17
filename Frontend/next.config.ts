@@ -27,6 +27,19 @@ const nextConfig: NextConfig = {
   // Allow cross-origin HMR / hot-reload requests when accessing the dev server
   // from other devices on the local network (e.g. 192.168.x.x, 10.x.x.x, Radmin VPN).
   allowedDevOrigins: getLocalIPv4Addresses(),
+  async rewrites() {
+    const backendUrl = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+    return [
+      {
+        source: "/uploads/:path*",
+        destination: `${backendUrl}/uploads/:path*`,
+      },
+      {
+        source: "/img-cache/:path*",
+        destination: `${backendUrl}/img-cache/:path*`,
+      },
+    ];
+  },
   images: {
     // All images are served through /api/proxy or /api/img-proxy (relative URLs on
     // the same server) so Next.js image optimizer can resize and convert to WebP/AVIF

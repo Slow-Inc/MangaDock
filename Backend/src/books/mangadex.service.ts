@@ -130,7 +130,7 @@ export class MangaDexService {
 
         const res = await fetch(
           `https://api.mangadex.org/manga/${mangaId}/feed?${params.toString()}`,
-          { headers: { Accept: 'application/json' }, cache: 'no-store' },
+          { headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' }, cache: 'no-store' },
         );
         if (!res.ok) break;
 
@@ -189,7 +189,7 @@ export class MangaDexService {
     try {
       const res = await fetch(
         `https://api.mangadex.org/at-home/server/${chapterId}`,
-        { headers: { Accept: 'application/json' }, cache: 'no-store' },
+        { headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' }, cache: 'no-store' },
       );
       if (!res.ok) {
         const stale = this.cache.getStale<MangaChapterPages>(cacheKey);
@@ -244,7 +244,7 @@ export class MangaDexService {
 
       const feedRes = await fetch(
         `https://api.mangadex.org/manga/${mangaId}/feed?${feedParams.toString()}`,
-        { headers: { Accept: 'application/json' }, cache: 'no-store' },
+        { headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' }, cache: 'no-store' },
       );
       if (!feedRes.ok) {
         await this.cache.set(cacheKey, null, CACHE_TTL_MS);
@@ -269,7 +269,7 @@ export class MangaDexService {
 
       const atHomeRes = await fetch(
         `https://api.mangadex.org/at-home/server/${preferredChapter.id}`,
-        { headers: { Accept: 'application/json' }, cache: 'no-store' },
+        { headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' }, cache: 'no-store' },
       );
       if (!atHomeRes.ok) {
         await this.cache.set(cacheKey, null, CACHE_TTL_MS);
@@ -407,7 +407,7 @@ export class MangaDexService {
 
     try {
       const response = await fetch(`https://api.mangadex.org/manga?${params.toString()}`, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
         cache: 'no-store',
       });
       if (!response.ok) return { items: [], total: 0, slug };
@@ -470,7 +470,7 @@ export class MangaDexService {
 
     try {
       const res = await fetch('https://api.mangadex.org/manga/tag', {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
         cache: 'no-store',
       });
       if (!res.ok) return undefined;
@@ -495,7 +495,7 @@ export class MangaDexService {
       params.set('order[volume]', 'asc');
 
       const res = await fetch(`https://api.mangadex.org/cover?${params.toString()}`, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
         cache: 'no-store',
       });
       if (!res.ok) return [];
@@ -520,7 +520,7 @@ export class MangaDexService {
       params.append('includes[]', 'artist');
 
       const res = await fetch(`https://api.mangadex.org/manga/${mangaId}?${params.toString()}`, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
         cache: 'no-store',
       });
       if (!res.ok) return { authors: [], artists: [], genres: [], description: '' };
@@ -555,7 +555,7 @@ export class MangaDexService {
 
     try {
       const response = await fetch(`https://api.mangadex.org/manga?${params.toString()}`, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
         cache: 'no-store',
       });
 

@@ -1322,7 +1322,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               <div
                 ref={pickerScrollRef}
                 data-lenis-prevent
-                className="flex-1 overflow-y-auto p-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]"
+                className="flex-1 overflow-y-auto p-3 custom-scrollbar"
               >
                 <div className="space-y-1">
                   {filtered.map((ch) => {
@@ -1373,7 +1373,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       {/* Main reading area */}
       {continuousMode ? (
         /* ── Continuous mode ── */
-        <div data-lenis-prevent ref={scrollContainerRef} className="flex flex-1 flex-col items-center overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
+        <div data-lenis-prevent ref={scrollContainerRef} className="flex flex-1 flex-col items-center overflow-y-auto custom-scrollbar">
           {loading && (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 text-white/50">
               <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />

@@ -15,12 +15,14 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
+  'image/gif',
 ]);
 
 const MIME_TO_EXT: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
   'image/webp': '.webp',
+  'image/gif': '.gif',
 };
 
 @Injectable()
@@ -48,7 +50,7 @@ export class UploadService {
   ): Promise<{ pageUrl: string; pageIndex: number }> {
     if (!ALLOWED_MIME_TYPES.has(mimeType)) {
       fs.unlinkSync(tempFilePath);
-      throw new BadRequestException('Unsupported image format. Only JPEG, PNG and WebP are accepted.');
+      throw new BadRequestException('Unsupported image format. Only JPEG, PNG, WebP and GIF are accepted.');
     }
 
     const ext = MIME_TO_EXT[mimeType];
@@ -85,10 +87,6 @@ export class UploadService {
         fs.unlinkSync(destPath);
         throw new BadRequestException('You do not own this chapter version');
       }
-      if (versionRow.status !== 'draft') {
-        fs.unlinkSync(destPath);
-        throw new BadRequestException('Pages can only be added to draft versions');
-      }
 
       const currentPages = versionRow.pages ?? [];
       pageIndex = currentPages.length;
@@ -101,8 +99,7 @@ export class UploadService {
           updated_at: new Date().toISOString(),
         })
         .eq('version_id', versionId)
-        .eq('translator_uid', translatorUid)
-        .eq('status', 'draft');
+        .eq('translator_uid', translatorUid);
 
       if (versionRow.updated_at) {
         query = query.eq('updated_at', versionRow.updated_at);
@@ -134,9 +131,6 @@ export class UploadService {
     if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
-    if (version.status !== 'draft') {
-      throw new BadRequestException('Pages can only be reordered on draft versions');
-    }
 
     const existingSet = new Set(version.pages);
     for (const url of orderedUrls) {
@@ -159,9 +153,6 @@ export class UploadService {
     const version = await this.versionsService.getVersion(versionId);
     if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
-    }
-    if (version.status !== 'draft') {
-      throw new BadRequestException('Pages can only be deleted from draft versions');
     }
     if (!version.pages.includes(pageUrl)) {
       throw new NotFoundException(`Page not found in version ${versionId}`);

@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -13,6 +14,7 @@ type ChapterVersionRow = {
   version_id: string;
   title_id: string;
   title_name: string;
+  title_alt_name?: string;
   chapter_id: string;
   chapter_number: string;
   chapter_title: string;
@@ -44,6 +46,7 @@ export class VersionsService {
       versionId: row.version_id,
       titleId: row.title_id,
       titleName: row.title_name,
+      titleAltName: row.title_alt_name,
       chapterId: row.chapter_id,
       chapterNumber: row.chapter_number,
       chapterTitle: row.chapter_title,
@@ -64,7 +67,8 @@ export class VersionsService {
   async createVersion(data: {
     titleId: string;
     titleName: string;
-    chapterId: string;
+    titleAltName?: string;
+    chapterId?: string;
     chapterNumber: string;
     chapterTitle: string;
     language: string;
@@ -73,9 +77,11 @@ export class VersionsService {
     description?: string;
     priceCoins?: number;
   }): Promise<ChapterVersion> {
-    if (!data.titleId || !data.chapterId || !data.language || !data.translatorUid) {
-      throw new BadRequestException('titleId, chapterId, language, and translatorUid are required');
+    if (!data.titleId || !data.language || !data.translatorUid) {
+      throw new BadRequestException('titleId, language, and translatorUid are required');
     }
+
+    const chapterId = data.chapterId || crypto.randomUUID();
 
     const now = new Date().toISOString();
     const { data: inserted, error } = await this.db
@@ -83,7 +89,8 @@ export class VersionsService {
       .insert({
         title_id: data.titleId,
         title_name: data.titleName ?? '',
-        chapter_id: data.chapterId,
+        title_alt_name: data.titleAltName ?? '',
+        chapter_id: chapterId,
         chapter_number: data.chapterNumber ?? '',
         chapter_title: data.chapterTitle ?? '',
         language: data.language,
@@ -194,8 +201,8 @@ export class VersionsService {
     if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
-    if (version.status !== 'draft') {
-      throw new BadRequestException('Pages can only be updated on draft versions');
+    if (version.status !== 'draft' && version.status !== 'published') {
+      throw new BadRequestException('Pages can only be updated on draft or published versions');
     }
 
     const { error } = await this.db
@@ -218,8 +225,9 @@ export class VersionsService {
     }
 
     const allowedTransitions: Partial<Record<VersionStatus, VersionStatus[]>> = {
-      draft: ['pending_moderation'],
+      draft: ['pending_moderation', 'published'],
       rejected: ['draft'],
+      published: ['draft'],
     };
 
     if (!allowedTransitions[version.status]?.includes(status)) {
@@ -247,20 +255,23 @@ export class VersionsService {
   async updateMetadata(
     versionId: string,
     translatorUid: string,
-    data: { description?: string; priceCoins?: number },
+    data: { description?: string; priceCoins?: number; titleAltName?: string; chapterTitle?: string; chapterNumber?: string; },
   ): Promise<void> {
     const version = await this.getVersion(versionId);
     if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
-    if (version.status !== 'draft') {
-      throw new BadRequestException('Metadata can only be updated on draft versions');
+    if (version.status !== 'draft' && version.status !== 'published') {
+      throw new BadRequestException('Metadata can only be updated on draft or published versions');
     }
 
     const update: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
     if (data.description !== undefined) update['description'] = data.description.trim().slice(0, 1000);
+    if (data.titleAltName !== undefined) update['title_alt_name'] = data.titleAltName;
+    if (data.chapterTitle !== undefined) update['chapter_title'] = data.chapterTitle;
+    if (data.chapterNumber !== undefined) update['chapter_number'] = data.chapterNumber;
     if (data.priceCoins !== undefined) {
       if (data.priceCoins < 0) throw new BadRequestException('priceCoins cannot be negative');
       update['price_coins'] = Math.floor(data.priceCoins);
@@ -280,9 +291,6 @@ export class VersionsService {
     const version = await this.getVersion(versionId);
     if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
-    }
-    if (version.status === 'published') {
-      throw new BadRequestException('Published versions cannot be deleted');
     }
 
     const pagesDir = path.join(process.cwd(), 'uploads', 'chapters', versionId);

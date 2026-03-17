@@ -86,6 +86,21 @@ export class BooksController {
     return this.booksService.getMangaPreview(id);
   }
 
+  @Get('manga/:id/cover')
+  async getMangaCover(@Param('id') id: string, @Res() res: Response) {
+    try {
+      const detail = await this.booksService.getMangaDetail(id, false);
+      const cover = detail.covers[0]?.url;
+      if (!cover) {
+        return res.status(404).send('Cover not found');
+      }
+      // Pass directly to the internal proxy handling
+      return this.proxyImage(cover, res);
+    } catch {
+      return res.status(404).send('Cover not found');
+    }
+  }
+
   @Get('manga/:id/chapters')
   getMangaChapters(
     @Param('id') id: string,
