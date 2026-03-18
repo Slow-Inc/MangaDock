@@ -8,6 +8,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { useLocalLenis } from "../../hooks/useLocalLenis";
 import { searchBooks, StudioBook, getBookCoverUrl } from "../../lib/studioApi";
 import { resolvedThumbnail } from "../../lib/imgUrl";
+import { StudioSelect } from "../components/StudioSelect";
 
 const API_BASE = "/api/proxy";
 
@@ -353,7 +354,9 @@ function MangaPickerModal({
   );
 }
 
-export default function StudioUploadPage() {
+import { Suspense } from "react";
+
+function StudioUploadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const existingVersionId = searchParams.get("versionId");
@@ -663,18 +666,20 @@ export default function StudioUploadPage() {
       <div className={`sticky top-0 z-20 transition-all duration-500 ${scrolled ? "border-b border-white/10 shadow-lg" : "border-b border-transparent"}`}>
         {/* Blur + bg overlay */}
         <div className={`pointer-events-none absolute inset-0 -z-10 transition-all duration-500 ${scrolled ? "bg-black/60 backdrop-blur-xl" : "bg-[#141414]"}`} />
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-3xl items-center gap-[0.52rem] px-4 py-[0.52rem] md:gap-[0.66rem] md:py-[0.86rem]">
           <button
             onClick={() => titleId ? router.push(`/studio/manga/${encodeURIComponent(titleId)}?titleName=${encodeURIComponent(titleName)}`) : router.push("/studio")}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white"
+            className="flex h-[1.8rem] w-[1.8rem] items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white md:h-[2rem] md:w-[2rem]"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <div>
-            <h1 className="text-base font-bold">{hasVersion ? "แก้ไขงานแปล" : "อัปโหลดงานแปลใหม่"}</h1>
-            <p className="text-xs text-white/40">{hasVersion ? `ID: ${versionId}` : "กรอกข้อมูลและอัปโหลดหน้า"}</p>
+          <div className="min-w-0">
+            <h1 className="text-[15px] font-bold leading-tight md:text-base">{hasVersion ? "แก้ไขงานแปล" : "อัปโหลดงานแปลใหม่"}</h1>
+            <p className="truncate text-[11px] leading-tight text-white/40 md:text-xs">
+              {hasVersion ? `ID: ${versionId}` : "กรอกข้อมูลและอัปโหลดหน้า"}
+            </p>
           </div>
         </div>
       </div>
@@ -744,18 +749,15 @@ export default function StudioUploadPage() {
             </div>
             <div className="space-y-1">
               <label className="text-xs text-white/50">ภาษาที่แปล</label>
-              <select
+              <StudioSelect
                 value={language}
-                onChange={(e) => setLanguage(e.target.value)}
+                onChange={setLanguage}
                 disabled={hasVersion}
-                className="w-full rounded-xl border border-white/10 bg-[#1e1e1e] px-3 py-2 text-sm text-white outline-none transition focus:border-indigo-400/60 focus:ring-1 focus:ring-indigo-400/30 disabled:opacity-40"
-              >
-                {SUPPORTED_LANGUAGES.map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
+                options={SUPPORTED_LANGUAGES.map((languageOption) => ({
+                  value: languageOption.code,
+                  label: languageOption.label,
+                }))}
+              />
             </div>
           </div>
 
@@ -897,5 +899,13 @@ export default function StudioUploadPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function StudioUploadPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center text-white/50">กำลังโหลด...</div>}>
+      <StudioUploadContent />
+    </Suspense>
   );
 }

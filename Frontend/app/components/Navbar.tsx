@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import MangaDockLogo from "./MangaDockLogo";
 import NavbarActions from "./NavbarActions";
+import { getActiveStudioTab, STUDIO_TABS } from "../studio/components/studioTabs";
 
 const GENRES = [
   { slug: "action",        label: "แอคชัน" },
@@ -41,6 +42,8 @@ export default function Navbar() {
   const pathname                   = usePathname();
   const router                     = useRouter();
   const genreRef                   = useRef<HTMLDivElement>(null);
+  const isStudioPath               = pathname.startsWith("/studio");
+  const activeStudioTab            = getActiveStudioTab(pathname);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -62,7 +65,13 @@ export default function Navbar() {
   }, [genreOpen]);
 
   // Close genre dropdown on route change
-  useEffect(() => { setGenreOpen(false); setMobileGenreOpen(false); }, [pathname]);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setGenreOpen(false);
+      setMobileGenreOpen(false);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pathname]);
 
   const handleNavClick = (
     e: React.MouseEvent,
@@ -208,6 +217,28 @@ export default function Navbar() {
 
     {/* ── Mobile bottom navigation (Webtoon-style) ── */}
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-black md:hidden">
+      {isStudioPath ? (
+        <div className="flex h-16 items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
+            {STUDIO_TABS.map((tab) => {
+              const isActive = tab.key === activeStudioTab;
+              return (
+                <Link
+                  key={tab.key}
+                  href={tab.href}
+                  className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 text-[10px] transition-colors duration-200 ${
+                    isActive
+                      ? "text-white"
+                      : "text-white/45"
+                  }`}
+                >
+                  {tab.icon("h-5 w-5")}
+                  <span className="truncate">{tab.label}</span>
+                </Link>
+              );
+            })}
+        </div>
+      ) : (
+        <>
       {/* Genre dropdown (slides up from bottom nav) */}
       <div
         className={`overflow-hidden border-b border-white/10 transition-all duration-300 ${
@@ -235,7 +266,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      <div className="flex h-16 items-center justify-around px-2">
+      <div className="flex h-16 items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
         {/* หน้าหลัก */}
         <Link href="/" className={`flex flex-col items-center justify-center gap-0.5 px-2 text-[10px] transition-colors duration-200 ${pathname === "/" ? "text-white" : "text-white/45"}`}>
           <svg viewBox="0 0 24 24" fill={pathname === "/" ? "currentColor" : "none"} stroke="currentColor" strokeWidth={pathname === "/" ? 0 : 2} className="h-5 w-5" aria-hidden>
@@ -282,6 +313,8 @@ export default function Navbar() {
           <span>รายการของฉัน</span>
         </Link>
       </div>
+        </>
+      )}
     </nav>
     </>
   );
