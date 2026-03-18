@@ -14,6 +14,15 @@ import {
 } from "../../lib/studioApi";
 import { getCached, setCache } from "../../lib/studioCache";
 import StudioNav from "../components/StudioNav";
+import { MetricCard, StudioAnnouncement, StudioSection } from "../components/StudioDashboardWidgets";
+import {
+  StudioMobileHeader,
+  StudioMobileHero,
+  StudioMobileSection,
+} from "../components/StudioMobileShell";
+import { StudioSelect } from "../components/StudioSelect";
+import { formatCurrency, getOverviewStats } from "../lib/dashboardAnalytics";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 type MangaGroup = {
   titleId: string;
@@ -23,6 +32,7 @@ type MangaGroup = {
 };
 
 type ViewMode = "list" | "card";
+type WorksMobileView = "browse" | "filters";
 
 const STATUS_OPTIONS: { value: "" | VersionStatus; label: string }[] = [
   { value: "", label: "ทั้งหมด" },
@@ -126,6 +136,7 @@ export default function WorksPage() {
   const router = useRouter();
   const { user, loading, getIdToken } = useAuth();
   const { showToast } = useToast();
+  const isMobile = useIsMobile();
 
   const [versions, setVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("works:versions") ?? []);
   const [loadingVersions, setLoadingVersions] = useState(() => getCached("works:versions") === null);
@@ -133,6 +144,7 @@ export default function WorksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | VersionStatus>("");
   const [langFilter, setLangFilter] = useState("");
+  const [mobileView, setMobileView] = useState<WorksMobileView>("browse");
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -186,103 +198,246 @@ export default function WorksPage() {
   }, [versions, statusFilter, langFilter, searchQuery]);
 
   const hasFilters = searchQuery || statusFilter || langFilter;
+  const overviewStats = useMemo(
+    () => getOverviewStats(versions, [], 0),
+    [versions],
+  );
 
   if (loading) return <div className="flex min-h-dvh items-center justify-center bg-[#141414]"><div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" /></div>;
+
+  if (isMobile) {
+    const renderMobileResults = () => {
+      if (loadingVersions && mangaGroups.length === 0) {
+        return <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" /></div>;
+      }
+      if (!loadingVersions && mangaGroups.length === 0 && !hasFilters) return <EmptyState />;
+      if (mangaGroups.length === 0) {
+        return (
+          <div className="py-12 text-center">
+            <p className="text-sm text-white/40">ไม่พบผลงานที่ตรงกับตัวกรอง</p>
+            <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-indigo-400">ล้างตัวกรอง</button>
+          </div>
+        );
+      }
+      if (viewMode === "list") {
+        return <div className="space-y-3">{mangaGroups.map((group) => <MangaListCard key={group.titleId} group={group} />)}</div>;
+      }
+      return (
+        <div className="grid grid-cols-2 gap-x-3 gap-y-5">
+          {mangaGroups.map((group) => <MangaThumbnailCard key={group.titleId} group={group} />)}
+        </div>
+      );
+    };
+
+    return (
+      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-white">
+        <Navbar />
+        <div className="pt-[calc(4.9rem+env(safe-area-inset-top))]">
+          {mobileView === "filters" ? (
+            <div className="space-y-4 px-4 py-4">
+              <StudioMobileHeader
+                title="ตัวกรองผลงาน"
+                subtitle="แยกส่วนจัดการตัวกรองออกจากรายการหลักบนมือถือ"
+                onBack={() => setMobileView("browse")}
+              />
+              <StudioMobileSection title="ค้นหาและกรอง">
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="ชื่อเรื่อง..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-indigo-500"
+                  />
+                  <StudioSelect
+                    value={statusFilter}
+                    onChange={(value) => setStatusFilter(value as "" | VersionStatus)}
+                    options={STATUS_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+                  />
+                  <StudioSelect
+                    value={langFilter}
+                    onChange={setLangFilter}
+                    options={[
+                      { value: "", label: "ทุกภาษา" },
+                      ...availableLanguages.map((lang) => ({ value: lang, label: LANG_LABELS[lang] ?? lang })),
+                    ]}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setViewMode("list")}
+                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "list" ? "border-indigo-500 bg-indigo-600/20 text-indigo-300" : "border-white/10 bg-white/5 text-white/60"}`}
+                    >
+                      แบบรายการ
+                    </button>
+                    <button
+                      onClick={() => setViewMode("card")}
+                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "card" ? "border-indigo-500 bg-indigo-600/20 text-indigo-300" : "border-white/10 bg-white/5 text-white/60"}`}
+                    >
+                      แบบการ์ด
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }}
+                      className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/60"
+                    >
+                      ล้างค่า
+                    </button>
+                    <button
+                      onClick={() => setMobileView("browse")}
+                      className="rounded-2xl bg-indigo-600 px-3 py-3 text-sm font-semibold text-white"
+                    >
+                      ดูผลลัพธ์
+                    </button>
+                  </div>
+                </div>
+              </StudioMobileSection>
+            </div>
+          ) : (
+            <div className="space-y-4 px-4 py-4">
+              <StudioAnnouncement />
+              <StudioMobileHero
+                eyebrow="Works Manager"
+                title="ผลงานของฉัน"
+                description="มือถือจะโฟกัสที่รายการงานก่อน ส่วนตัวกรองและมุมมองจะถูกแยกเป็นหน้าจอย่อย"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="title ที่มีเวอร์ชัน" tone="indigo" />
+                <MetricCard label="จำนวนตอน" value={overviewStats.totalChapters} hint={`${overviewStats.totalPages} หน้า`} tone="violet" />
+                <MetricCard label="เผยแพร่แล้ว" value={overviewStats.published} hint={`ร่าง ${overviewStats.draft}`} tone="emerald" />
+                <MetricCard label="ตอนมีราคา" value={overviewStats.paidChapters} hint={`เฉลี่ย ${formatCurrency(overviewStats.avgPrice)}`} tone="amber" />
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="ค้นหาชื่อเรื่อง..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-indigo-500"
+                />
+                <button
+                  onClick={() => setMobileView("filters")}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80"
+                >
+                  กรอง
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-white/35">แสดง {mangaGroups.length} เรื่อง</p>
+                <Link href="/studio/upload" className="rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white">
+                  + อัปโหลด
+                </Link>
+              </div>
+              {renderMobileResults()}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-white md:pb-0">
       <Navbar />
-      <div className="mx-auto max-w-3xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
-        <div className="pb-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-xl font-bold">สตูดิโอของฉัน</h1>
-              <p className="text-sm text-white/40">อัปโหลดและจัดการงานแปลของคุณ</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <ViewToggle mode={viewMode} onChange={handleSetViewMode} />
-              <Link href="/studio/upload" className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95">
-                + อัปโหลดใหม่
-              </Link>
-            </div>
-          </div>
-        </div>
+      <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
+        <div className="space-y-5">
+          <StudioAnnouncement />
 
-        <StudioNav />
-
-        {/* ── ค้นหาผลงาน (Search & Filters) ── */}
-        <div className="space-y-3 pt-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white/70">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            ค้นหาผลงาน
-          </h2>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {/* Title search */}
-            <input
-              type="text"
-              placeholder="ชื่อเรื่อง..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none transition focus:border-indigo-500"
-            />
-            {/* Status filter */}
-            <div className="flex gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as "" | VersionStatus)}
-                className="custom-scrollbar rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-indigo-500"
-              >
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value} className="bg-[#1e1e24] text-white">{opt.label}</option>
-                ))}
-              </select>
-              {/* Language filter */}
-              <select
-                value={langFilter}
-                onChange={(e) => setLangFilter(e.target.value)}
-                className="custom-scrollbar rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-indigo-500"
-              >
-                <option value="" className="bg-[#1e1e24] text-white">ทุกภาษา</option>
-                {availableLanguages.map((lang) => (
-                  <option key={lang} value={lang} className="bg-[#1e1e24] text-white">{LANG_LABELS[lang] ?? lang}</option>
-                ))}
-              </select>
-              {/* Clear filters */}
-              {hasFilters && (
-                <button
-                  onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }}
-                  className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/50 transition hover:bg-white/10 hover:text-white"
-                >
-                  ล้างค่า
-                </button>
-              )}
+          <div className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(129,140,248,0.16),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.8)]">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.32em] text-white/35">Works Manager</p>
+                <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">ผลงานของฉัน</h1>
+                <p className="mt-2 text-sm text-white/45">จัดการ chapter/version ทั้งหมด พร้อมตัวกรองและภาพรวมแบบใกล้ dashboard นักเขียน</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <ViewToggle mode={viewMode} onChange={handleSetViewMode} />
+                <Link href="/studio/upload" className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95">
+                  + อัปโหลดใหม่
+                </Link>
+              </div>
             </div>
           </div>
 
-          {/* Result count */}
-          <p className="text-xs text-white/30">แสดง {mangaGroups.length} เรื่อง</p>
-        </div>
+          <StudioNav />
 
-        {/* ── Works list ── */}
-        <div className="pt-4">
-          {loadingVersions && mangaGroups.length === 0 ? (
-            <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" /></div>
-          ) : !loadingVersions && mangaGroups.length === 0 && !hasFilters ? (
-            <EmptyState />
-          ) : mangaGroups.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-sm text-white/40">ไม่พบผลงานที่ตรงกับตัวกรอง</p>
-              <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-indigo-400 transition hover:text-indigo-300">ล้างตัวกรอง</button>
+          <StudioSection title="ภาพรวมผลงาน" subtitle="สรุปจำนวนเรื่อง ตอน ภาษา และสถานะหลักก่อนลงไปจัดการรายละเอียด">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="นับจาก title ที่มีเวอร์ชัน" tone="indigo" />
+              <MetricCard label="จำนวนตอน" value={overviewStats.totalChapters} hint={`รวม ${overviewStats.totalPages} หน้า`} tone="violet" />
+              <MetricCard label="เผยแพร่แล้ว" value={overviewStats.published} hint={`ร่าง ${overviewStats.draft} | รอตรวจ ${overviewStats.pending}`} tone="emerald" />
+              <MetricCard label="ตอนมีราคา" value={overviewStats.paidChapters} hint={`ราคาเฉลี่ย ${formatCurrency(overviewStats.avgPrice)} เหรียญ`} tone="amber" />
             </div>
-          ) : viewMode === "list" ? (
+          </StudioSection>
+
+          {/* ── ค้นหาผลงาน (Search & Filters) ── */}
+          <StudioSection title="ค้นหาผลงาน" subtitle="ใช้ค้นหาชื่อเรื่อง กรองสถานะ และเลือกภาษาในมุมเดียวกับ dashboard จัดการนิยาย/การ์ตูน">
             <div className="space-y-3">
-              {mangaGroups.map((group) => <MangaListCard key={group.titleId} group={group} />)}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                {/* Title search */}
+                <input
+                  type="text"
+                  placeholder="ชื่อเรื่อง..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none transition focus:border-indigo-500"
+                />
+                {/* Status filter */}
+                <div className="flex gap-2">
+                  <div className="min-w-[10rem]">
+                    <StudioSelect
+                      value={statusFilter}
+                      onChange={(value) => setStatusFilter(value as "" | VersionStatus)}
+                      options={STATUS_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+                    />
+                  </div>
+                  <div className="min-w-[10rem]">
+                    <StudioSelect
+                      value={langFilter}
+                      onChange={setLangFilter}
+                      options={[
+                        { value: "", label: "ทุกภาษา" },
+                        ...availableLanguages.map((lang) => ({ value: lang, label: LANG_LABELS[lang] ?? lang })),
+                      ]}
+                    />
+                  </div>
+                  {/* Clear filters */}
+                  {hasFilters && (
+                    <button
+                      onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }}
+                      className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/50 transition hover:bg-white/10 hover:text-white"
+                    >
+                      ล้างค่า
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-white/30">แสดง {mangaGroups.length} เรื่อง</p>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 md:grid-cols-4">
-              {mangaGroups.map((group) => <MangaThumbnailCard key={group.titleId} group={group} />)}
-            </div>
-          )}
+          </StudioSection>
+
+          {/* ── Works list ── */}
+          <div>
+            {loadingVersions && mangaGroups.length === 0 ? (
+              <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" /></div>
+            ) : !loadingVersions && mangaGroups.length === 0 && !hasFilters ? (
+              <EmptyState />
+            ) : mangaGroups.length === 0 ? (
+              <div className="py-12 text-center">
+                <p className="text-sm text-white/40">ไม่พบผลงานที่ตรงกับตัวกรอง</p>
+                <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-indigo-400 transition hover:text-indigo-300">ล้างตัวกรอง</button>
+              </div>
+            ) : viewMode === "list" ? (
+              <div className="space-y-3">
+                {mangaGroups.map((group) => <MangaListCard key={group.titleId} group={group} />)}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 md:grid-cols-4 xl:grid-cols-5">
+                {mangaGroups.map((group) => <MangaThumbnailCard key={group.titleId} group={group} />)}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

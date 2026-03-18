@@ -30,6 +30,7 @@ export interface AppUser {
   displayName: string | null;
   photoURL: string | null;
   emailVerified: boolean;
+  role?: string | null;
   providerData: Array<{
     providerId: string;
     photoURL?: string | null;
@@ -50,6 +51,7 @@ function adaptUser(u: SupabaseUser): AppUser {
   const meta = (u.user_metadata ?? {}) as Record<string, string | null | undefined>;
   const displayName = meta.display_name ?? meta.full_name ?? meta.name ?? null;
   const photoURL = meta.avatar_url ?? meta.picture ?? null;
+  const role = meta.role ?? null;
 
   const providerData = (u.identities ?? []).map((identity) => {
     const idata = (identity.identity_data ?? {}) as Record<string, string | null | undefined>;
@@ -67,6 +69,7 @@ function adaptUser(u: SupabaseUser): AppUser {
     displayName,
     photoURL,
     emailVerified: !!u.email_confirmed_at,
+    role,
     providerData,
   };
 }
@@ -74,6 +77,7 @@ function adaptUser(u: SupabaseUser): AppUser {
 type BackendProfile = {
   displayName: string | null;
   photoURL: string | null;
+  role: string | null;
 };
 
 function extractBackendProfile(payload: unknown): BackendProfile | null {
@@ -95,13 +99,16 @@ function extractBackendProfile(payload: unknown): BackendProfile | null {
       read(obj.photoUrl) ??
       read(obj.avatarUrl) ??
       read(obj.avatar_url);
-    if (displayName || photoURL) return { displayName, photoURL };
+    const role = read(obj.role);
+    if (displayName || photoURL || role) return { displayName, photoURL, role };
   }
   return null;
 }
 
 type AuthContextType = {
   user: AppUser | null;
+  userRole: string | null;
+  isTranslator: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
@@ -147,6 +154,8 @@ type AuthContextType = {
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
+  userRole: null,
+  isTranslator: false,
   loading: true,
   signInWithGoogle: async () => {},
   signUpWithEmail: async () => {},
@@ -270,6 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 ...prev,
                 displayName: profile.displayName ?? prev.displayName,
                 photoURL: profile.photoURL ?? prev.photoURL,
+                role: profile.role ?? prev.role,
               };
             });
           }
@@ -702,9 +712,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     showToast({ type: "info", message: "กรุณาลงชื่อเข้าใช้ด้วยบัญชีอื่น", duration: 3000 });
   };
 
+  const userRole = user?.role ?? null;
+  const isTranslator = userRole === "translator" || userRole === "creator" || userRole === "admin";
+
   return (
     <AuthContext.Provider value={{
       user,
+      userRole,
+      isTranslator,
       loading,
       signInWithGoogle,
       signUpWithEmail,

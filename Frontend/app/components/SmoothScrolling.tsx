@@ -1,6 +1,8 @@
 'use client';
 
 import { ReactLenis } from 'lenis/react';
+import type { LenisRef } from 'lenis/react';
+import { usePathname } from 'next/navigation';
 import { ReactNode, useEffect, useRef } from 'react';
 
 interface SmoothScrollingProps {
@@ -13,20 +15,59 @@ export default function SmoothScrolling({ children }: SmoothScrollingProps) {
   // - wheelMultiplier: ความไวของลูกกลิ้งเมาส์ ค่าน้อยจะต้านมือหน่อยๆ
   // - smoothWheel: เปิดเพื่อให้ scroll ล้อเมาส์มีความนุ่ม
 
-  const lenisRef = useRef<any>(null);
+  const lenisRef = useRef<LenisRef | null>(null);
+  const pathname = usePathname();
 
-  // Force-stop Lenis during HMR so it doesn't block the page refresh
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'development') return;
+    let resizeFrame = 0;
+    let initialFrameA = 0;
+    let initialFrameB = 0;
+    let timer = 0;
 
-    const handler = (_data: any) => {
-      lenisRef.current?.lenis?.stop();
+    const scheduleResize = () => {
+      if (resizeFrame) cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0;
+        lenisRef.current?.lenis?.resize?.();
+      });
     };
 
-    if (typeof module !== 'undefined' && (module as any).hot) {
-      (module as any).hot.dispose(handler);
+    initialFrameA = requestAnimationFrame(() => {
+      scheduleResize();
+      initialFrameB = requestAnimationFrame(scheduleResize);
+    });
+    timer = window.setTimeout(scheduleResize, 180);
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => {
+            scheduleResize();
+          })
+        : null;
+
+    if (resizeObserver) {
+      resizeObserver.observe(document.documentElement);
+      resizeObserver.observe(document.body);
     }
-  }, []);
+
+    const onWindowResize = () => scheduleResize();
+    window.addEventListener('pageshow', onWindowResize);
+    window.addEventListener('resize', onWindowResize);
+
+    void document.fonts?.ready?.then(() => {
+      scheduleResize();
+    });
+
+    return () => {
+      cancelAnimationFrame(resizeFrame);
+      cancelAnimationFrame(initialFrameA);
+      cancelAnimationFrame(initialFrameB);
+      window.clearTimeout(timer);
+      resizeObserver?.disconnect();
+      window.removeEventListener('pageshow', onWindowResize);
+      window.removeEventListener('resize', onWindowResize);
+    };
+  }, [pathname]);
 
   return (
     <ReactLenis
