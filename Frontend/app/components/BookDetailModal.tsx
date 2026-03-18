@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import CoverLightbox from "./CoverLightbox";
 import GeminiBadge from "./GeminiBadge";
@@ -11,6 +11,8 @@ import { addToHistory, getHistory } from "../lib/readingHistory";
 import { useBookActions } from "../hooks/useBookActions";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
+import { useAuth } from "../contexts/AuthContext";
+import { getWalletBalance, purchaseUnlock, getUnlocksForTitle, topupCoins } from "../lib/studioApi";
 
 type LandingBook = {
   id: string;
@@ -57,6 +59,10 @@ type MangaChapter = {
   source?: "mangadex" | "user";
   /** Translator name for user-uploaded versions */
   translatorName?: string | null;
+  /** Coin price for user-uploaded versions (0 = free) */
+  priceCoins?: number;
+  /** The actual version ID (without ver: prefix) for unlock checks */
+  versionId?: string;
 };
 
 type ActiveChapter = {
@@ -116,6 +122,16 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [isHoveringCovers, setIsHoveringCovers] = useState(false);
   const [coverCanScrollLeft, setCoverCanScrollLeft] = useState(false);
   const [coverCanScrollRight, setCoverCanScrollRight] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  
+  // Coin / Unlock state
+  const { user, getIdToken } = useAuth();
+  const [coinBalance, setCoinBalance] = useState<number | null>(null);
+  const [unlockedVersions, setUnlockedVersions] = useState<Set<string>>(new Set());
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const [showTopup, setShowTopup] = useState(false);
+  const [topupAmount, setTopupAmount] = useState(100);
+  const [topupLoading, setTopupLoading] = useState(false);
 
   // Apply custom local Lenis smooth scrolling
   useLocalLenis(modalScrollRef, "vertical", !asPage && visible && activeChapter === null);
@@ -228,6 +244,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                 readerAvailable: true,
                 source: "user" as const,
                 translatorName: v.translatorName ?? null,
+                priceCoins: v.priceCoins ?? 0,
+                versionId: v.versionId,
               }));
               // Merge: MangaDex first, then user-uploaded, sort by chapter number
               const merged = [...tagged, ...userChapters].sort((a, b) => {
@@ -272,6 +290,67 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       if (!asPage) document.body.style.overflow = "";
     };
   }, []);
+
+  // Fetch wallet balance and unlock status for user-uploaded chapters
+  useEffect(() => {
+    if (!user) return;
+    const fetchWalletAndUnlocks = async () => {
+      try {
+        const token = await getIdToken();
+        if (!token) return;
+        const [walletData, unlockData] = await Promise.all([
+          getWalletBalance(token),
+          getUnlocksForTitle(token, book.id),
+        ]);
+        setCoinBalance(walletData.balance);
+        setUnlockedVersions(new Set(unlockData));
+      } catch {
+        // Wallet/unlock not available yet
+      }
+    };
+    fetchWalletAndUnlocks();
+  }, [user, book.id]);
+
+  const handlePurchaseUnlock = useCallback(async (ch: MangaChapter) => {
+    if (!user || !ch.versionId) return;
+    setPurchasingId(ch.versionId);
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+      const result = await purchaseUnlock(token, ch.versionId);
+      if (result.unlocked || result.alreadyUnlocked) {
+        setUnlockedVersions((prev) => new Set([...prev, ch.versionId!]));
+        if (result.balance !== undefined) setCoinBalance(result.balance);
+        // Auto-open the chapter after unlock
+        addToHistory({ ...book, lastChapterId: ch.id, lastChapterNumber: ch.chapterNumber });
+        setActiveChapter({ id: ch.id, chapterNumber: ch.chapterNumber, title: ch.title });
+      }
+    } catch (err: any) {
+      if (err.message?.includes("Insufficient") || err.message?.includes("ไม่พอ")) {
+        setShowTopup(true);
+      } else {
+        alert(err.message || "ไม่สามารถปลดล็อคได้");
+      }
+    } finally {
+      setPurchasingId(null);
+    }
+  }, [user, book]);
+
+  const handleTopup = useCallback(async () => {
+    if (!user) return;
+    setTopupLoading(true);
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+      const result = await topupCoins(token, topupAmount);
+      setCoinBalance(result.balance);
+      setShowTopup(false);
+    } catch (err: any) {
+      alert(err.message || "เติมเหรียญไม่สำเร็จ");
+    } finally {
+      setTopupLoading(false);
+    }
+  }, [user, topupAmount]);
 
   // Scroll-aware header in page mode
   useEffect(() => {
@@ -329,16 +408,28 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
   const displayThumbnail = selectedCover ?? resolvedThumbnail(book);
   const chapterNeedsBackup = (ch: MangaChapter) => ch.isOfflineFallback === true;
+  
+  const isChapterCoinLocked = (ch: MangaChapter) => {
+    if (ch.source !== "user") return false;
+    if (!ch.priceCoins || ch.priceCoins <= 0) return false;
+    if (!ch.versionId) return false;
+    return !unlockedVersions.has(ch.versionId);
+  };
+
   const isChapterReadable = (ch: MangaChapter) => {
     if (chapterNeedsBackup(ch)) {
       return ch.readerAvailable === true;
     }
+    if (isChapterCoinLocked(ch)) return false;
     return ch.pageCount > 0;
   };
 
   const getUnavailableChapterLabel = (ch: MangaChapter) => {
     if (chapterNeedsBackup(ch) && ch.readerAvailable !== true) {
       return "ไม่ได้สำรอง";
+    }
+    if (isChapterCoinLocked(ch)) {
+      return `🪙 ${ch.priceCoins}`;
     }
     return "ล็อค";
   };
@@ -415,7 +506,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
         <div
           ref={modalScrollRef}
-          className={asPage ? "w-full pb-[calc(var(--mobile-nav-height)+1.5rem)]" : "flex-1 min-h-0 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]"}
+          className={asPage ? "w-full pb-[calc(var(--mobile-nav-height)+1.5rem)]" : "flex-1 min-h-0 overflow-y-auto custom-scrollbar"}
         >
           {/* Close button - modal mode only */}
           {!asPage && (
@@ -710,7 +801,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
                   <div
                     ref={coverRowRef}
-                    className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]"
+                    className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar"
                     onScroll={updateCoverScroll}
                     onWheel={handleCoverRowWheel}
                   >
@@ -768,13 +859,24 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
             <div ref={chaptersRef} className="px-6 pb-7 scroll-mt-4">
               {/* Header row */}
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-white/80 shrink-0">
-                  {loadingChapters
-                    ? "กำลังโหลดตอน..."
-                    : langFilter === "all"
-                      ? `ตอนทั้งหมด (${chapters.length})`
-                      : `ตอนทั้งหมด (${chapters.filter((c) => c.translatedLanguage === langFilter).length})`}
-                </h3>
+                <div className="flex items-center gap-2 shrink-0">
+                  <h3 className="text-sm font-semibold text-white/80">
+                    {loadingChapters
+                      ? "กำลังโหลดตอน..."
+                      : langFilter === "all"
+                        ? `ตอนทั้งหมด (${chapters.length})`
+                        : `ตอนทั้งหมด (${chapters.filter((c) => c.translatedLanguage === langFilter).length})`}
+                  </h3>
+                  {coinBalance !== null && (
+                    <button
+                      onClick={() => setShowTopup(true)}
+                      className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300 transition hover:bg-amber-500/25"
+                      title="เติมเหรียญ"
+                    >
+                      🪙 {coinBalance}
+                    </button>
+                  )}
+                </div>
 
                 {/* Language filter tabs */}
                 {!loadingChapters && chapters.length > 0 && (() => {
@@ -814,71 +916,185 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   ))}
                 </div>
               ) : chapters.length > 0 ? (
-                <div ref={chaptersListScrollRef} className={`space-y-1.5 ${asPage ? "" : "max-h-72 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]"}`}>
-                  {chapters
-                    .filter((ch) => langFilter === "all" || ch.translatedLanguage === langFilter)
-                    .map((ch) => {
-                    const readable = isChapterReadable(ch);
-                    const unavailableLabel = readable ? null : getUnavailableChapterLabel(ch);
-                    const isHighlighted = ch.id === effectiveHighlightId;
-                    return (
-                      <button
-                        key={ch.id}
-                        ref={isHighlighted ? highlightChapterRef : undefined}
-                        onClick={() => { if (readable) { addToHistory({ ...book, lastChapterId: ch.id, lastChapterNumber: ch.chapterNumber }); setActiveChapter({ id: ch.id, chapterNumber: ch.chapterNumber, title: ch.title }); } }}
-                        disabled={!readable}
-                        className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left transition ${
-                          isHighlighted
-                            ? "border-blue-400/50 bg-blue-500/10 ring-1 ring-blue-400/30 cursor-pointer"
-                            : readable
-                            ? "border-white/10 hover:border-white/25 hover:bg-white/8 cursor-pointer"
-                            : "border-white/5 opacity-50 cursor-not-allowed"
-                        }`}
-                      >
-                        <span className="w-20 shrink-0 text-xs font-semibold text-white">
-                          ตอนที่ {ch.chapterNumber ?? "?"}
-                        </span>
-                        {ch.title ? (
-                          <span className="flex-1 truncate text-xs text-white/55">{ch.title}</span>
-                        ) : (
-                          <span className="flex-1" />
-                        )}
-                        {isHighlighted && (
-                          <span className="shrink-0 rounded bg-blue-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300">
-                            อ่านค้างไว้
-                          </span>
-                        )}
-                        {ch.source === "user" && (
-                          <span className="shrink-0 rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-medium text-purple-300" title={ch.translatorName ? `แปลโดย ${ch.translatorName}` : "แปลโดยผู้ใช้"}>
-                            {ch.translatorName ? ch.translatorName : "ผู้ใช้แปล"}
-                          </span>
-                        )}
-                        <span
-                          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                            ch.translatedLanguage === "th"
-                              ? "bg-blue-500/20 text-blue-300"
-                              : "bg-white/8 text-white/40"
+                <div ref={chaptersListScrollRef} className={`space-y-1.5 ${asPage ? "" : "max-h-72 overflow-y-auto custom-scrollbar"}`}>
+                  {(() => {
+                    const filtered = chapters.filter((ch) => langFilter === "all" || ch.translatedLanguage === langFilter);
+
+                    // Group by chapterNumber only when showing all languages
+                    // When a specific language is selected, show flat list
+                    const shouldGroup = langFilter === "all";
+                    const groupMap = new Map<string, MangaChapter[]>();
+                    for (const ch of filtered) {
+                      const key = shouldGroup ? (ch.chapterNumber ?? "?") : ch.id;
+                      if (!groupMap.has(key)) groupMap.set(key, []);
+                      groupMap.get(key)!.push(ch);
+                    }
+
+                    const ChapterRowInner = ({ ch, isTreeChild, isLast }: { ch: MangaChapter; isTreeChild: boolean; isLast?: boolean }) => {
+                      const readable = isChapterReadable(ch);
+                      const coinLocked = isChapterCoinLocked(ch);
+                      const unavailableLabel = readable ? null : getUnavailableChapterLabel(ch);
+                      const isHighlighted = ch.id === effectiveHighlightId;
+                      const isPurchasing = purchasingId === ch.versionId;
+                      const row = (
+                        <button
+                          key={ch.id}
+                          ref={isHighlighted ? highlightChapterRef : undefined}
+                          onClick={() => {
+                            if (coinLocked) {
+                              handlePurchaseUnlock(ch);
+                            } else if (readable) {
+                              addToHistory({ ...book, lastChapterId: ch.id, lastChapterNumber: ch.chapterNumber });
+                              setActiveChapter({ id: ch.id, chapterNumber: ch.chapterNumber, title: ch.title });
+                            }
+                          }}
+                          disabled={!readable && !coinLocked}
+                          className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left transition ${
+                            isHighlighted
+                              ? "border-blue-400/50 bg-blue-500/10 ring-1 ring-blue-400/30 cursor-pointer"
+                              : coinLocked
+                              ? "border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/5 cursor-pointer"
+                              : readable
+                              ? "border-white/10 hover:border-white/25 hover:bg-white/8 cursor-pointer"
+                              : "border-white/5 opacity-50 cursor-not-allowed"
                           }`}
                         >
-                          {ch.translatedLanguage === "th" ? "ภาษาไทย" : ch.translatedLanguage.toUpperCase()}
-                        </span>
-                        {readable ? (
-                          <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
-                            {ch.pageCount > 0 ? `${ch.pageCount} หน้า` : "พร้อมอ่าน"}
+                          {!isTreeChild && (
+                            <span className="w-20 shrink-0 text-xs font-semibold text-white">
+                              ตอนที่ {ch.chapterNumber ?? "?"}
+                            </span>
+                          )}
+                          {ch.title ? (
+                            <span className="flex-1 truncate text-xs text-white/55">{ch.title}</span>
+                          ) : (
+                            <span className="flex-1" />
+                          )}
+                          {isHighlighted && (
+                            <span className="shrink-0 rounded bg-blue-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300">
+                              อ่านค้างไว้
+                            </span>
+                          )}
+                          {ch.source === "user" && (
+                            <span className="shrink-0 rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-medium text-purple-300" title={ch.translatorName ? `แปลโดย ${ch.translatorName}` : "แปลโดยผู้ใช้"}>
+                              {ch.translatorName ? ch.translatorName : "ผู้ใช้แปล"}
+                            </span>
+                          )}
+                          <span
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                              ch.translatedLanguage === "th"
+                                ? "bg-blue-500/20 text-blue-300"
+                                : "bg-white/8 text-white/40"
+                            }`}
+                          >
+                            {ch.translatedLanguage === "th" ? "ภาษาไทย" : ch.translatedLanguage.toUpperCase()}
                           </span>
-                        ) : (
-                          <span className="shrink-0 rounded bg-white/8 px-1.5 py-0.5 text-[10px] font-medium text-white/30">
-                            {unavailableLabel}
-                          </span>
-                        )}
-                        {readable && (
-                          <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0 text-white/30">
-                            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
-                          </svg>
-                        )}
-                      </button>
-                    );
-                  })}
+                          {coinLocked ? (
+                            isPurchasing ? (
+                              <span className="shrink-0 flex items-center gap-1 rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                                <div className="h-3 w-3 animate-spin rounded-full border border-amber-300/30 border-t-amber-300" />
+                                ปลดล็อค...
+                              </span>
+                            ) : (
+                              <span className="shrink-0 rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                                🪙 {ch.priceCoins} ปลดล็อค
+                              </span>
+                            )
+                          ) : readable ? (
+                            <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+                              {ch.pageCount > 0 ? `${ch.pageCount} หน้า` : "พร้อมอ่าน"}
+                            </span>
+                          ) : (
+                            <span className="shrink-0 rounded bg-white/8 px-1.5 py-0.5 text-[10px] font-medium text-white/30">
+                              {unavailableLabel}
+                            </span>
+                          )}
+                          {readable && (
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0 text-white/30">
+                              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                      if (!isTreeChild) return row;
+                      return (
+                        <div key={ch.id} className="relative flex gap-0 pb-1">
+                          <div className="relative w-6 shrink-0 self-stretch">
+                            <div
+                              className="absolute left-2.5 top-0 w-px bg-white/10"
+                              style={{ bottom: isLast ? "50%" : "0" }}
+                            />
+                            <div className="absolute left-2.5 top-4 flex items-center">
+                              <div className="h-px w-3 bg-white/10" />
+                              <div className="h-1 w-1 rounded-full bg-white/20" />
+                            </div>
+                          </div>
+                          <div className="flex-1">{row}</div>
+                        </div>
+                      );
+                    };
+
+                    return Array.from(groupMap.entries()).map(([chNum, grp]) => {
+                      if (grp.length === 1) {
+                        return <ChapterRowInner key={grp[0].id} ch={grp[0]} isTreeChild={false} />;
+                      }
+                      const groupKey = chNum;
+                      const isOpen = expandedGroups.has(groupKey);
+                      const groupHasHighlight = grp.some((c) => c.id === effectiveHighlightId);
+                      return (
+                        <div key={groupKey}>
+                          {/* Group header */}
+                          <button
+                            onClick={() => setExpandedGroups((prev) => {
+                              const next = new Set(prev);
+                              next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey);
+                              return next;
+                            })}
+                            className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left transition ${
+                              groupHasHighlight && !isOpen
+                                ? "border-blue-400/50 bg-blue-500/10 ring-1 ring-blue-400/30 hover:border-blue-400/60 hover:bg-blue-500/15"
+                                : "border-white/10 hover:border-white/25 hover:bg-white/8"
+                            }`}
+                          >
+                            <span className="w-20 shrink-0 text-xs font-semibold text-white">
+                              ตอนที่ {chNum}
+                            </span>
+                            <span className="flex-1 text-xs text-white/40">{grp.length} เวอร์ชัน</span>
+                            {groupHasHighlight && !isOpen && (
+                              <span className="shrink-0 rounded bg-blue-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300">
+                                อ่านค้างไว้
+                              </span>
+                            )}
+                            <div className="flex gap-1">
+                              {Array.from(new Set(grp.map((c) => c.translatedLanguage))).map((lang) => (
+                                <span key={lang} className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${lang === "th" ? "bg-blue-500/20 text-blue-300" : "bg-white/8 text-white/40"}`}>
+                                  {lang === "th" ? "ภาษาไทย" : lang.toUpperCase()}
+                                </span>
+                              ))}
+                            </div>
+                            <svg
+                              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                              className={`h-3.5 w-3.5 shrink-0 text-white/30 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                          {/* Expanded children — grid slide animation */}
+                          <div
+                            className="grid transition-all duration-300 ease-in-out"
+                            style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
+                          >
+                            <div className="overflow-hidden">
+                              <div className="ml-3 mt-1">
+                                {grp.map((ch, i) => (
+                                  <ChapterRowInner key={ch.id} ch={ch} isTreeChild isLast={i === grp.length - 1} />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               ) : (
                 <p className="text-xs text-white/40">ไม่พบตอนที่แปลแล้ว</p>
@@ -887,6 +1103,44 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
           )}
         </div>
       </div>
+
+      {/* Topup Modal */}
+      {showTopup && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4" onClick={() => setShowTopup(false)}>
+          <div className="w-full max-w-xs rounded-2xl border border-white/10 bg-[#1a1a1a] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 text-center text-base font-bold text-white">เติมเหรียญ (ทดสอบ)</h3>
+            <p className="mb-4 text-center text-xs text-white/40">เหรียญปัจจุบัน: 🪙 {coinBalance ?? 0}</p>
+            <div className="mb-4 grid grid-cols-3 gap-2">
+              {[50, 100, 200, 500, 1000, 2000].map((amt) => (
+                <button
+                  key={amt}
+                  onClick={() => setTopupAmount(amt)}
+                  className={`rounded-xl border py-2.5 text-sm font-semibold transition ${
+                    topupAmount === amt
+                      ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+                      : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                  }`}
+                >
+                  🪙 {amt}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleTopup}
+              disabled={topupLoading}
+              className="w-full rounded-xl bg-amber-600 py-2.5 text-sm font-bold text-white transition hover:bg-amber-500 disabled:opacity-50"
+            >
+              {topupLoading ? "กำลังเติม..." : `เติม ${topupAmount} เหรียญ`}
+            </button>
+            <button
+              onClick={() => setShowTopup(false)}
+              className="mt-2 w-full rounded-xl border border-white/10 py-2 text-xs font-semibold text-white/50 transition hover:bg-white/5"
+            >
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 

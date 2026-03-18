@@ -22,6 +22,29 @@ body {
   color: var(--foreground);
   font-family: var(--font-noto-sans-thai), sans-serif;
   overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+body::-webkit-scrollbar {
+  width: 6px;
+}
+
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+body::-webkit-scrollbar-thumb:active {
+  background: rgba(99, 102, 241, 0.6);
 }
 
 img,
@@ -146,4 +169,32 @@ svg {
 
 .account-page-panel-detail-enter {
   animation: account-page-panel-in-right 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Custom scrollbar — thin, dark, fade on idle */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: rgba(99, 102, 241, 0.6);
 }

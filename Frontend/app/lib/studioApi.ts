@@ -19,7 +19,7 @@ export type StudioChapter = {
   pageCount: number;
 };
 
-export type VersionStatus = "draft" | "pending_moderation" | "published" | "rejected";
+export type VersionStatus = "draft" | "pending_moderation" | "published" | "approved" | "rejected";
 
 export type ChapterVersion = {
   versionId: string;
@@ -81,7 +81,9 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(message);
   }
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  const text = await res.text();
+  if (!text || text.trim() === "") return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 function authHeaders(token: string, extra?: HeadersInit): HeadersInit {
@@ -109,7 +111,7 @@ export async function searchBooks(query: string): Promise<{ items: StudioBook[];
 }
 
 export function getBookCoverUrl(bookId: string): string {
-  return `${API_BASE}/books/manga/${encodeURIComponent(bookId)}/preview`;
+  return `${API_BASE}/books/manga/${encodeURIComponent(bookId)}/cover`;
 }
 
 export async function getBookChapters(bookId: string): Promise<StudioChapter[]> {
@@ -191,4 +193,99 @@ export async function deletePage(token: string, versionId: string, pageUrl: stri
 
 export function toStudioImageUrl(pageUrl: string): string {
   return normalizeProxyUrl(pageUrl);
+}
+
+// ── Wallet API ──────────────────────────────────────────────────────────────
+
+export async function getWalletBalance(token: string): Promise<{ balance: number }> {
+  return apiFetch<{ balance: number }>("/wallet/balance", {
+    headers: authHeaders(token),
+  });
+}
+
+export async function topupCoins(token: string, amount: number): Promise<{ balance: number }> {
+  return apiFetch<{ balance: number }>("/wallet/topup", {
+    method: "POST",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ amount }),
+  });
+}
+
+export type WalletTransaction = {
+  id: string;
+  uid: string;
+  type: "topup" | "purchase" | "refund" | "reward";
+  amount: number;
+  balanceAfter: number;
+  description: string;
+  referenceId: string | null;
+  createdAt: string;
+};
+
+export async function getWalletTransactions(token: string): Promise<WalletTransaction[]> {
+  return apiFetch<WalletTransaction[]>("/wallet/transactions", {
+    headers: authHeaders(token),
+  });
+}
+
+// ── Unlock API ──────────────────────────────────────────────────────────────
+
+export async function checkUnlock(token: string, versionId: string): Promise<{ unlocked: boolean }> {
+  return apiFetch<{ unlocked: boolean }>(`/unlock/check/${encodeURIComponent(versionId)}`, {
+    headers: authHeaders(token),
+  });
+}
+
+export async function getUnlocksForTitle(token: string, titleId: string): Promise<string[]> {
+  return apiFetch<string[]>(`/unlock/title/${encodeURIComponent(titleId)}`, {
+    headers: authHeaders(token),
+  });
+}
+
+export type PurchaseResult = {
+  unlocked: boolean;
+  alreadyUnlocked?: boolean;
+  pricePaid?: number;
+  balance?: number;
+};
+
+export async function purchaseUnlock(token: string, versionId: string): Promise<PurchaseResult> {
+  return apiFetch<PurchaseResult>(`/unlock/${encodeURIComponent(versionId)}`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+}
+
+// ── Translator Profile API ──────────────────────────────────────────────────
+
+export type TranslatorProfile = {
+  bio: string;
+  translatorLanguages: string[];
+  country: string;
+  preferredLanguage: string;
+};
+
+export async function getMyProfile(token: string) {
+  return apiFetch<{
+    uid: string;
+    email: string;
+    displayName: string;
+    photoUrl: string;
+    role: string;
+    bio: string;
+    translatorLanguages: string[];
+    country: string;
+    preferredLanguage: string;
+  }>("/users/me", { headers: authHeaders(token) });
+}
+
+export async function updateTranslatorProfile(
+  token: string,
+  data: Partial<TranslatorProfile>,
+) {
+  return apiFetch<{ message: string }>("/users/me/translator-profile", {
+    method: "PATCH",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify(data),
+  });
 }
