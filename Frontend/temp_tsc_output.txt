@@ -1,0 +1,13 @@
+[96mapp/components/AccountModal.tsx[0m:[93m54[0m:[93m304[0m - [91merror[0m[90m TS2339: [0mProperty 'isTranslator' does not exist on type 'AuthContextType'.
+
+[7m54[0m   const { user, getIdToken, updateUserProfile, updateUserPassword, linkGoogleAccount, linkFacebookAccount, unlinkAccount, addEmailPassword, uploadProfilePhoto, updateUserPhotoURL, getPhotoHistory, savePhotoHistory, switchToConflictingAccount, deleteAccount, reauthenticateUser, resendVerificationEmail, isTranslator, userRole } = useAuth();
+[7m  [0m [91m                                                                                                                                                                                                                                                                                                               ~~~~~~~~~~~~[0m
+
+[96mapp/components/AccountModal.tsx[0m:[93m54[0m:[93m318[0m - [91merror[0m[90m TS2339: [0mProperty 'userRole' does not exist on type 'AuthContextType'.
+
+[7m54[0m   const { user, getIdToken, updateUserProfile, updateUserPassword, linkGoogleAccount, linkFacebookAccount, unlinkAccount, addEmailPassword, uploadProfilePhoto, updateUserPhotoURL, getPhotoHistory, savePhotoHistory, switchToConflictingAccount, deleteAccount, reauthenticateUser, resendVerificationEmail, isTranslator, userRole } = useAuth();
+[7m  [0m [91m                                                                                                                                                                                                                                                                                                                             ~~~~~~~~[0m
+
+
+Found 2 errors in the same file, starting at: app/components/AccountModal.tsx[90m:54[0m
+

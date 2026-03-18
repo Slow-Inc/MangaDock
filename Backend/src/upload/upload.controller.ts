@@ -25,6 +25,7 @@ const ALLOWED_IMAGE_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
+  'image/gif',
 ]);
 
 @Controller('upload')
@@ -44,7 +45,7 @@ export class UploadController {
       fileFilter: (_req, file, cb) => {
         if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
           return cb(
-            new BadRequestException('Only JPEG, PNG and WebP images are allowed'),
+            new BadRequestException('Only JPEG, PNG, WebP and GIF images are allowed'),
             false,
           );
         }
