@@ -1,14 +1,15 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
-import * as fs from 'fs';
 import * as path from 'path';
 import { SupabaseService } from '../supabase/supabase.service';
 import type { ChapterVersion, VersionStatus } from './versions.types';
+import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 
 type ChapterVersionRow = {
   version_id: string;
@@ -35,13 +36,44 @@ type ChapterVersionRow = {
 export class VersionsService {
   private readonly logger = new Logger(VersionsService.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
+  ) {}
 
   private get db() {
     return this.supabase.client;
   }
 
-  private mapRow(row: ChapterVersionRow): ChapterVersion {
+  private versionDir(versionId: string): string {
+    return `uploads/chapters/${versionId}`;
+  }
+
+  /**
+   * During local multi-machine development, DB rows may exist without the
+   * uploaded files being present on this backend instance yet.
+   */
+  private async isVersionAvailableOnBackend(row: ChapterVersionRow): Promise<boolean> {
+    const pages = row.pages ?? [];
+    if (pages.length === 0) return true;
+
+    for (const pageUrl of pages) {
+      if (!pageUrl || typeof pageUrl !== 'string') return false;
+      const expectedPrefix = `/uploads/chapters/${row.version_id}/`;
+
+      // Non-local URLs (future R2/worker flow) are treated as available here.
+      if (!pageUrl.startsWith(expectedPrefix)) continue;
+
+      const filename = pageUrl.split('/').pop();
+      if (!filename) return false;
+      const key = `${this.versionDir(row.version_id)}/${filename}`;
+      const exists = await this.storage.exists(key);
+      if (!exists) return false;
+    }
+    return true;
+  }
+
+  private async mapRow(row: ChapterVersionRow): Promise<ChapterVersion> {
     return {
       versionId: row.version_id,
       titleId: row.title_id,
@@ -61,6 +93,7 @@ export class VersionsService {
       description: row.description ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      backendAvailable: await this.isVersionAvailableOnBackend(row),
     };
   }
 
@@ -113,7 +146,7 @@ export class VersionsService {
     }
 
     this.logger.log(`Created chapter version ${inserted.version_id} for translator ${data.translatorUid}`);
-    return this.mapRow(inserted);
+    return await this.mapRow(inserted);
   }
 
   async getVersion(versionId: string): Promise<ChapterVersion> {
@@ -127,7 +160,7 @@ export class VersionsService {
       throw new Error(`Failed to fetch chapter version: ${error.message}`);
     }
     if (!data) throw new NotFoundException(`Chapter version ${versionId} not found`);
-    return this.mapRow(data);
+    return await this.mapRow(data);
   }
 
   async listVersionsByChapter(chapterId: string): Promise<ChapterVersion[]> {
@@ -142,7 +175,7 @@ export class VersionsService {
       throw new Error(`Failed to list chapter versions: ${error.message}`);
     }
 
-    return (data ?? []).map((row) => this.mapRow(row as ChapterVersionRow));
+    return await Promise.all((data ?? []).map((row) => this.mapRow(row as ChapterVersionRow)));
   }
 
   async listVersionsByTitle(titleId: string): Promise<ChapterVersion[]> {
@@ -156,9 +189,8 @@ export class VersionsService {
       throw new Error(`Failed to list title versions: ${error.message}`);
     }
 
-    return (data ?? [])
-      .map((row) => this.mapRow(row as ChapterVersionRow))
-      .sort((a, b) => (parseFloat(a.chapterNumber) || 0) - (parseFloat(b.chapterNumber) || 0));
+    const versions = await Promise.all((data ?? []).map((row) => this.mapRow(row as ChapterVersionRow)));
+    return versions.sort((a, b) => (parseFloat(a.chapterNumber) || 0) - (parseFloat(b.chapterNumber) || 0));
   }
 
   async listVersionsByTranslator(translatorUid: string): Promise<ChapterVersion[]> {
@@ -173,7 +205,7 @@ export class VersionsService {
       throw new Error(`Failed to list versions by translator: ${error.message}`);
     }
 
-    return (data ?? []).map((row) => this.mapRow(row as ChapterVersionRow));
+    return await Promise.all((data ?? []).map((row) => this.mapRow(row as ChapterVersionRow)));
   }
 
   async listPublishedVersionsByTranslator(translatorUid: string): Promise<Omit<ChapterVersion, 'pages'>[]> {
@@ -189,11 +221,11 @@ export class VersionsService {
       throw new Error(`Failed to list published versions by translator: ${error.message}`);
     }
 
-    return (data ?? []).map((row) => {
-      const version = this.mapRow(row as ChapterVersionRow);
+    return await Promise.all((data ?? []).map(async (row) => {
+      const version = await this.mapRow(row as ChapterVersionRow);
       const { pages: _pages, ...rest } = version;
       return rest;
-    });
+    }));
   }
 
   async setPages(versionId: string, translatorUid: string, pages: string[]): Promise<void> {
@@ -293,11 +325,9 @@ export class VersionsService {
       throw new BadRequestException('You do not own this chapter version');
     }
 
-    const pagesDir = path.join(process.cwd(), 'uploads', 'chapters', versionId);
-    if (fs.existsSync(pagesDir)) {
-      fs.rmSync(pagesDir, { recursive: true, force: true });
-      this.logger.log(`Deleted pages directory for version ${versionId}`);
-    }
+    const pagesDir = this.versionDir(versionId);
+    await this.storage.deleteDir(pagesDir);
+    this.logger.log(`Deleted pages directory for version ${versionId}`);
 
     const { error } = await this.db
       .from('chapter_versions')

@@ -4,20 +4,7 @@ import { useEffect, useState } from "react";
 import BookRow from "./BookRow";
 import { CACHE_EVENT, getFavorites, type CachedBook } from "../lib/userCache";
 import { getHistory, HISTORY_EVENT, type HistoryBook } from "../lib/readingHistory";
-
-type LandingBook = {
-  id: string;
-  title: string;
-  subtitle: string;
-  authors: string[];
-  description: string;
-  thumbnail: string;
-  thumbnailLocal?: string;
-  publishedDate: string;
-  categories: string[];
-  averageRating: number;
-  ratingsCount: number;
-};
+import type { LandingBook, LandingPayload } from "../lib/types";
 
 function cachedToLanding(book: CachedBook): LandingBook {
   return {

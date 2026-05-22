@@ -1,4 +1,7 @@
 import base64
+import hmac
+import hashlib
+import httpx
 import io
 import json
 import os
@@ -13,7 +16,7 @@ import asyncio
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form
+from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -182,21 +185,89 @@ async def patches_form(req: Request, image: UploadFile = File(...), config: str 
         "patches": normalized_patches,
     }
 
-@app.post("/translate/with-form/patches/batch", response_class=StreamingResponse, tags=["api", "form"])
+async def send_webhook(url: str, secret: str, payload: dict):
+    """Sends a signed POST request to the callback URL."""
+    data = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if secret:
+        signature = hmac.new(secret.encode("utf-8"), data, hashlib.sha256).hexdigest()
+        headers["x-mit-signature"] = signature
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.post(url, content=data, headers=headers, timeout=60.0)
+        except Exception as e:
+            # We use print as it's the current logging pattern in this file
+            print(f"Webhook delivery failed to {url}: {String(e) if 'String' in globals() else e}")
+
+async def run_batch_with_callbacks(
+    index_list: list[int],
+    images_data: list[bytes],
+    config_str: str,
+    taskId: str,
+    callback_url: str,
+    callback_secret: str,
+):
+    """Background task to process images and send webhooks."""
+    # Dummy request mock for internal pipeline compatibility
+    class DummyRequest:
+        async def is_disconnected(self): return False
+    
+    dummy_req = DummyRequest()
+
+    for img_bytes, page_idx in zip(images_data, index_list):
+        try:
+            # Re-parse config per page to avoid any state mutation
+            page_conf = Config.parse_raw(config_str)
+            patch_result = await get_patch_ctx(dummy_req, page_conf, img_bytes)
+            patches_out = []
+            for patch in patch_result.get("patches", []):
+                png_bytes = patch.get("img_png", b"")
+                patches_out.append({
+                    "x": patch.get("x", 0),
+                    "y": patch.get("y", 0),
+                    "w": patch.get("w", 0),
+                    "h": patch.get("h", 0),
+                    "img_b64": base64.b64encode(png_bytes).decode("utf-8"),
+                })
+            payload = {
+                "taskId": taskId,
+                "pageIndex": page_idx,
+                "imgWidth": patch_result.get("img_width", 0),
+                "imgHeight": patch_result.get("img_height", 0),
+                "patches": patches_out,
+                "error": None,
+            }
+        except Exception as exc:
+            payload = {
+                "taskId": taskId,
+                "pageIndex": page_idx,
+                "imgWidth": 0,
+                "imgHeight": 0,
+                "patches": [],
+                "error": str(exc),
+            }
+        
+        await send_webhook(callback_url, callback_secret, payload)
+
+@app.post("/translate/with-form/patches/batch", tags=["api", "form"])
 async def patches_batch_stream(
     req: Request,
+    background_tasks: BackgroundTasks,
     images: list[UploadFile] = File(...),
     config: str = Form("{}"),
     page_indices: str = Form(""),
-) -> StreamingResponse:
-    """Stream NDJSON patch results as each page in the batch completes.
+    taskId: str = Form(None),
+    callback_url: str = Form(None),
+    callback_secret: str = Form(None),
+):
+    """Process a batch of manga pages and return results either via streaming NDJSON or webhooks.
 
-    Each newline-delimited JSON line:
-      {"pageIndex": N, "imgWidth": W, "imgHeight": H, "patches": [{x,y,w,h,img_b64},...], "error": null}
+    If ``callback_url`` is provided, the task runs in the background and returns 202 immediately.
+    Otherwise, it streams NDJSON patch results as each page completes.
 
-    Images are processed sequentially in the order received.
-    Supply ``page_indices`` (comma-separated ints) to map position → pageIndex;
-    defaults to 0, 1, 2, …
+    Webhook payload:
+      {"taskId": taskId, "pageIndex": N, "imgWidth": W, "imgHeight": H, "patches": [...], "error": null}
     """
     conf = Config.parse_raw(config)
     index_list: list[int]
@@ -204,6 +275,25 @@ async def patches_batch_stream(
         index_list = [int(x) for x in page_indices.split(",") if x.strip()]
     else:
         index_list = list(range(len(images)))
+
+    if callback_url:
+        # Fire-and-forget background task
+        # We need to read images into memory because UploadFile objects might be closed
+        # after this function returns.
+        images_data = []
+        for img_file in images:
+            images_data.append(await img_file.read())
+        
+        background_tasks.add_task(
+            run_batch_with_callbacks,
+            index_list,
+            images_data,
+            config,
+            taskId,
+            callback_url,
+            callback_secret,
+        )
+        return {"status": "accepted", "taskId": taskId}
 
     async def generate():
         for image_file, page_idx in zip(images, index_list):

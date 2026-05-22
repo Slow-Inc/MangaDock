@@ -1,6 +1,6 @@
 # MangaDock System Architecture Overview
 
-เอกสารนี้ใช้สรุปภาพรวมสถาปัตยกรรมของระบบ MangaDock ในระดับ high-level เพื่ออธิบายความสัมพันธ์ระหว่าง Frontend, Backend, MIT, Firebase และ external integrations โดยไม่ลงลึกถึง implementation ของแต่ละ service
+เอกสารนี้ใช้สรุปภาพรวมสถาปัตยกรรมของระบบ MangaDock ในระดับ high-level เพื่ออธิบายความสัมพันธ์ระหว่าง Frontend, Backend, MIT, Supabase และ external integrations โดยไม่ลงลึกถึง implementation ของแต่ละ service
 
 ## 1. Recommended Use of This Document
 
@@ -16,19 +16,19 @@
 flowchart LR
   U[User Browser]
   FE[Frontend\nNext.js]
-  FC[Firebase Client SDK]
+  SC[Supabase Auth/Client]
   BE[Backend\nNestJS]
-  CA[Cache Layer\nRedis or Cache Service]
-  FA[Firebase Admin]
+  CA[Cache Layer\n2-Tier Cache]
+  SS[Supabase Service Role]
   EXT[External APIs\nGoogle Books, MangaDex, Others]
   MIT[MIT\nManga Image Translator]
   GM[Gemini API\nand Translator Providers]
 
   U --> FE
   FE <--> BE
-  FE <--> FC
+  FE <--> SC
   BE <--> CA
-  BE <--> FA
+  BE <--> SS
   BE <--> EXT
   BE <--> MIT
   MIT <--> GM
@@ -39,12 +39,13 @@ flowchart LR
 ความสัมพันธ์หลักของระบบสามารถสรุปได้ดังนี้
 
 1. Frontend (Next.js) ติดต่อกับ Backend (NestJS) เพื่อเรียกข้อมูลหนังสือ มังงะ ผู้ใช้ รายการโปรด และ flow การแปลภาพ
-2. Frontend ติดต่อกับ Firebase Client SDK สำหรับ authentication-related flows ฝั่ง client
-3. Backend ติดต่อกับ Cache Layer เพื่อลดการเรียกข้อมูลซ้ำและเก็บผลลัพธ์ที่ใช้บ่อย
-4. Backend ติดต่อกับ Firebase Admin สำหรับงานฝั่ง server เช่น validation และการจัดการข้อมูลผู้ใช้ที่เกี่ยวข้อง
+2. Frontend ติดต่อกับ Supabase สำหรับ authentication และ real-time data ฝั่ง client
+3. Backend ติดต่อกับ 2-Layer Cache (Memory + Redis) เพื่อลดการเรียกข้อมูลซ้ำและเก็บผลลัพธ์ที่ใช้บ่อย พร้อมระบบ Graceful Shutdown
+4. Backend ติดต่อกับ Supabase (Service Role) สำหรับงานฝั่ง server เช่น การจัดการข้อมูลที่ซับซ้อนและการตรวจสอบสิทธิ์
 5. Backend ติดต่อกับ External APIs เช่น Google Books, MangaDex และบริการภายนอกอื่นตาม flow ของระบบ
-6. Backend ติดต่อกับ MIT ผ่าน HTTP เพื่อสั่งงานแปลภาพมังงะ
-7. MIT ติดต่อกับ Gemini API หรือ translator providers อื่นเพื่อทำงานในส่วน translation pipeline
+6. Backend ติดต่อกับ MIT ผ่าน HTTP แบบ Asynchronous (Fire-and-forget) เพื่อสั่งงานแปลภาพมังงะ
+7. MIT ประมวลผลเสร็จแล้วส่งข้อมูลกลับมาที่ Backend ผ่าน Webhook Callback
+8. MIT ติดต่อกับ Gemini API หรือ translator providers อื่นเพื่อทำงานในส่วน translation pipeline
 
 ## 4. Responsibility by Layer
 
@@ -52,19 +53,22 @@ flowchart LR
 
 - แสดงผลหน้า UI และจัดการ interaction ของผู้ใช้
 - เรียก backend APIs สำหรับ business flows หลัก
-- ใช้ Firebase Client SDK สำหรับงาน authentication ฝั่ง client
+- ใช้ Supabase สำหรับงาน authentication และจัดการ session ฝั่ง client
+- มีระบบ SupabaseGuard แจ้งเตือนเมื่อฐานข้อมูลไม่พร้อมใช้งาน
 
 ### Backend
 
 - เป็น orchestration layer หลักของระบบ
 - รวม business logic, API contracts และ service integrations
-- ติดต่อ cache, Firebase Admin, external content providers และ MIT
+- จัดการ Cache 2 ชั้น และรักษาสถานะข้อมูลตอน Shutdown
+- ติดต่อ Supabase, external content providers และสั่งงาน MIT แบบ Non-blocking
 
 ### MIT
 
-- รับผิดชอบ image translation pipeline
+- รับผิดชอบ image translation pipeline (FastAPI)
 - ทำ OCR, translation, inpainting, rendering และ patch generation
-- พึ่งพา translator providers ภายนอกในบางโหมด เช่น Gemini
+- รองรับการทำงานแบบ Asynchronous ผ่าน Webhook Callback
+- พึ่งพา translator providers ภายนอก เช่น Gemini
 
 ## 5. Where To Read Next
 

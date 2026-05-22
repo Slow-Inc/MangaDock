@@ -7,17 +7,19 @@ export function useLocalLenis(
   ref: React.RefObject<HTMLElement | null>,
   orientation: "vertical" | "horizontal" = "vertical",
   active: boolean = true,
-  instanceRef?: { current: Lenis | null }
+  instanceRef?: { current: Lenis | null },
+  contentRef?: React.RefObject<HTMLElement | null>
 ) {
   const resolvedInstanceRef = instanceRef ?? null;
 
   useEffect(() => {
     const el = ref.current;
-    if (!active || !el) return;
+    const contentEl = contentRef?.current ?? el;
+    if (!active || !el || !contentEl) return;
 
     const lenis = new Lenis({
       wrapper: el,
-      content: el,
+      content: contentEl,
       eventsTarget: el,
       orientation,
       gestureOrientation: "both",
@@ -56,5 +58,5 @@ export function useLocalLenis(
       cancelAnimationFrame(rafId);
       lenis.destroy();
     };
-  }, [ref, orientation, active, resolvedInstanceRef]);
+  }, [ref, orientation, active, resolvedInstanceRef, contentRef]);
 }

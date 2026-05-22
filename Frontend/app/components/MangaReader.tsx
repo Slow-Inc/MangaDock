@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import type Lenis from "lenis";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { addToHistory, getHistory } from "../lib/readingHistory";
@@ -264,6 +264,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const zoomingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const zoomWrapperRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const continuousContentRef = useRef<HTMLDivElement>(null);
   const continuousLenisRef = useRef<Lenis | null>(null);
   const pageRefs = useRef<(HTMLImageElement | null)[]>([]);
   const stripScrollRef = useRef<HTMLDivElement>(null);
@@ -272,8 +273,118 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const lastPos = useRef({ x: 0, y: 0 });
   const panRef = useRef({ x: 0, y: 0 });
 
-  useLocalLenis(scrollContainerRef, "vertical", continuousMode, continuousLenisRef);
+  useLocalLenis(scrollContainerRef, "vertical", continuousMode, continuousLenisRef, continuousContentRef);
   useLocalLenis(pickerScrollRef, "vertical", pickerMounted && pickerVisible);
+
+  const syncContinuousPageFromViewport = useCallback(() => {
+    if (!continuousModeRef.current) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    let bestIdx = -1;
+    let bestVisible = 0;
+
+    pageRefs.current.forEach((img, idx) => {
+      if (!img) return;
+      const rect = img.getBoundingClientRect();
+      const visibleTop = Math.max(rect.top, containerRect.top);
+      const visibleBottom = Math.min(rect.bottom, containerRect.bottom);
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+      if (visibleHeight > bestVisible) {
+        bestVisible = visibleHeight;
+        bestIdx = idx;
+      }
+    });
+
+    if (bestIdx >= 0) {
+      setPage(bestIdx);
+    }
+  }, []);
+
+  const getContinuousZoomAnchor = useCallback(() => {
+    if (!continuousModeRef.current) return null;
+    const container = scrollContainerRef.current;
+    if (!container) return null;
+
+    const containerRect = container.getBoundingClientRect();
+    const viewportTop = containerRect.top + 1;
+    let anchorIndex = -1;
+    let anchorBlock: HTMLElement | null = null;
+
+    for (let idx = 0; idx < pageRefs.current.length; idx += 1) {
+      const img = pageRefs.current[idx];
+      if (!img) continue;
+      const block = img.parentElement as HTMLElement | null;
+      if (!block) continue;
+      const rect = block.getBoundingClientRect();
+      if (rect.top <= viewportTop && rect.bottom > viewportTop) {
+        anchorIndex = idx;
+        anchorBlock = block;
+        break;
+      }
+    }
+
+    if (anchorIndex === -1) {
+      for (let idx = 0; idx < pageRefs.current.length; idx += 1) {
+        const img = pageRefs.current[idx];
+        if (!img) continue;
+        const block = img.parentElement as HTMLElement | null;
+        if (!block) continue;
+        const rect = block.getBoundingClientRect();
+        if (rect.bottom > containerRect.top) {
+          anchorIndex = idx;
+          anchorBlock = block;
+          break;
+        }
+      }
+    }
+
+    if (anchorIndex === -1 || !anchorBlock) return null;
+
+    const blockRect = anchorBlock.getBoundingClientRect();
+    const blockTopInViewport = blockRect.top - containerRect.top;
+    const blockBottomInViewport = blockRect.bottom - containerRect.top;
+    const viewportAnchorPx = blockTopInViewport <= 0
+      ? 0
+      : Math.min(Math.max(0, blockTopInViewport), blockBottomInViewport);
+    const anchorRatio =
+      blockRect.height > 0
+        ? (viewportAnchorPx - blockTopInViewport) / blockRect.height
+        : 0.5;
+
+    return {
+      pageIndex: anchorIndex,
+      viewportAnchorPx,
+      anchorRatio: Math.max(0, Math.min(1, anchorRatio)),
+    };
+  }, []);
+
+  const restoreContinuousZoomAnchor = useCallback((
+    anchor: { pageIndex: number; viewportAnchorPx: number; anchorRatio: number } | null,
+  ) => {
+    if (!anchor || !continuousModeRef.current) return;
+    const container = scrollContainerRef.current;
+    const lenis = continuousLenisRef.current;
+    const targetImg = pageRefs.current[anchor.pageIndex];
+    const targetBlock = targetImg?.parentElement as HTMLElement | null;
+    if (!container || !targetBlock) return;
+
+    const currentScroll = lenis?.actualScroll ?? container.scrollTop ?? 0;
+    const containerRect = container.getBoundingClientRect();
+    const blockRect = targetBlock.getBoundingClientRect();
+    const blockTopAbsolute = currentScroll + (blockRect.top - containerRect.top);
+    const targetScroll = Math.max(
+      0,
+      blockTopAbsolute + anchor.anchorRatio * blockRect.height - anchor.viewportAnchorPx,
+    );
+
+    if (lenis) {
+      lenis.scrollTo(targetScroll, { immediate: true, force: true });
+    } else {
+      container.scrollTop = targetScroll;
+    }
+  }, []);
 
   // Auto-scroll bottom strip to keep current page button visible
   // Debounced so rapid page updates (continuous mode scroll) don't spam smooth-scrolls
@@ -313,14 +424,48 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     zoomingTimerRef.current = setTimeout(() => { isZoomingRef.current = false; }, 300);
   };
 
-  const zoomIn  = () => { markZooming(); setZoom((z) => { const nz = Math.min(+(z + ZOOM_STEP).toFixed(2), ZOOM_MAX); zoomRef.current = nz; return nz; }); };
-  const zoomOut = () => { markZooming(); setZoom((z) => {
-    const nz = Math.max(+(z - ZOOM_STEP).toFixed(2), ZOOM_MIN);
-    zoomRef.current = nz;
-    if (nz <= 1) resetPan();
-    return nz;
-  }); };
-  const zoomReset = () => { markZooming(); zoomRef.current = 1; setZoom(1); resetPan(); };
+  const updateZoom = useCallback((computeNext: (current: number) => number) => {
+    markZooming();
+    const currentZoom = zoomRef.current;
+    const nextZoom = computeNext(currentZoom);
+    if (nextZoom === currentZoom) return;
+
+    zoomRef.current = nextZoom;
+
+    if (!continuousModeRef.current) {
+      setZoom(nextZoom);
+      if (nextZoom <= 1) resetPan();
+      return;
+    }
+
+    const zoomAnchor = getContinuousZoomAnchor();
+
+    setZoom(nextZoom);
+    if (nextZoom <= 1) resetPan();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const nextContainer = scrollContainerRef.current;
+        const nextContent = continuousContentRef.current;
+        const nextLenis = continuousLenisRef.current;
+        if (!nextContainer || !nextContent) {
+          syncContinuousPageFromViewport();
+          return;
+        }
+
+        nextLenis?.resize();
+        restoreContinuousZoomAnchor(zoomAnchor);
+
+        requestAnimationFrame(() => {
+          syncContinuousPageFromViewport();
+        });
+      });
+    });
+  }, [getContinuousZoomAnchor, restoreContinuousZoomAnchor, syncContinuousPageFromViewport]);
+
+  const zoomIn  = () => updateZoom((z) => Math.min(+(z + ZOOM_STEP).toFixed(2), ZOOM_MAX));
+  const zoomOut = () => updateZoom((z) => Math.max(+(z - ZOOM_STEP).toFixed(2), ZOOM_MIN));
+  const zoomReset = () => updateZoom(() => 1);
 
   useEffect(() => {
     applyTransform(zoom, panX, panY);
@@ -336,12 +481,14 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       fetch(`${API_BASE}/versions/title/${mangaId}`).then((r) => r.ok ? r.json() : []).catch(() => []),
     ]).then(([mangaDexChapters, userVersions]: [ChapterPageItem[], any[]]) => {
       const mdxList = Array.isArray(mangaDexChapters) ? mangaDexChapters : [];
-      const userList: ChapterPageItem[] = (userVersions ?? []).map((v: any) => ({
-        id: `ver:${v.versionId}`,
-        chapterNumber: v.chapterNumber || null,
-        title: v.chapterTitle || null,
-        translatedLanguage: v.language || "th",
-      }));
+      const userList: ChapterPageItem[] = (userVersions ?? [])
+        .filter((v: any) => v?.backendAvailable !== false)
+        .map((v: any) => ({
+          id: `ver:${v.versionId}`,
+          chapterNumber: v.chapterNumber || null,
+          title: v.chapterTitle || null,
+          translatedLanguage: v.language || "th",
+        }));
       const merged = [...mdxList, ...userList].sort((a, b) => {
         const numA = parseFloat(a.chapterNumber ?? "0") || 0;
         const numB = parseFloat(b.chapterNumber ?? "0") || 0;
@@ -382,9 +529,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           if (!r.ok) throw new Error("not ok");
           return r.json();
         })
-        .then((ver: { pages?: string[] }) => {
+        .then((ver: { pages?: string[]; backendAvailable?: boolean }) => {
           const pages = ver.pages ?? [];
-          if (pages.length === 0) { setError(true); }
+          if (ver.backendAvailable === false || pages.length === 0) { setError(true); }
           else {
             // Convert version pages to ChapterPages format
             // Pages are relative URLs like /uploads/chapters/...
@@ -1374,6 +1521,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       {continuousMode ? (
         /* ── Continuous mode ── */
         <div data-lenis-prevent ref={scrollContainerRef} className="flex flex-1 flex-col items-center overflow-y-auto custom-scrollbar">
+          <div ref={continuousContentRef} className="flex w-full flex-col items-center">
           {loading && (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 text-white/50">
               <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
@@ -1471,6 +1619,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               )}
             </div>
           )}
+          </div>
         </div>
       ) : (
         /* ── Paged mode ── */
