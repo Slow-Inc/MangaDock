@@ -1,13 +1,14 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import * as fs from 'fs';
 import * as path from 'path';
 import { SupabaseService } from '../supabase/supabase.service';
+import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 
 export type UserRole = 'user' | 'translator' | 'creator' | 'admin';
 export type UserPlan = 'free' | 'premium' | 'pro';
@@ -88,10 +89,17 @@ type FavoriteRow = {
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
+  ) {}
 
   private get db() {
     return this.supabase.client;
+  }
+
+  private get avatarsDir() {
+    return 'uploads/avatars';
   }
 
   private isNotFound(error: { code?: string } | null): boolean {
@@ -475,19 +483,16 @@ export class UsersService {
       throw new Error(`Failed to delete profile: ${profileError.message}`);
     }
 
-    const avatarsDir = path.join(process.cwd(), 'uploads', 'avatars');
-    if (fs.existsSync(avatarsDir)) {
-      const files = fs.readdirSync(avatarsDir).filter((f) => f.startsWith(`${uid}_`));
-      files.forEach((f) => fs.unlinkSync(path.join(avatarsDir, f)));
+    const files = await this.storage.list(this.avatarsDir);
+    const userFiles = files.filter((f) => f.startsWith(`${uid}_`));
+    for (const file of userFiles) {
+      await this.storage.delete(`${this.avatarsDir}/${file}`);
     }
 
     this.logger.log(`Deleted all data for user: ${uid}`);
   }
 
   private async gcAvatars(uid: string, referencedUrls: string[]): Promise<void> {
-    const avatarsDir = path.join(process.cwd(), 'uploads', 'avatars');
-    if (!fs.existsSync(avatarsDir)) return;
-
     const { data } = await this.db
       .from('profiles')
       .select('photo_url')
@@ -504,10 +509,11 @@ export class UsersService {
       }
     }
 
-    const files = fs.readdirSync(avatarsDir).filter((f) => f.startsWith(`${uid}_`));
-    for (const file of files) {
+    const files = await this.storage.list(this.avatarsDir);
+    const userFiles = files.filter((f) => f.startsWith(`${uid}_`));
+    for (const file of userFiles) {
       if (!referenced.has(file)) {
-        fs.unlinkSync(path.join(avatarsDir, file));
+        await this.storage.delete(`${this.avatarsDir}/${file}`);
         this.logger.log(`GC: deleted orphaned avatar ${file}`);
       }
     }

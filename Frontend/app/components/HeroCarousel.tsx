@@ -5,28 +5,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import BookDetailModal from "./BookDetailModal";
 import HeroDescription from "./HeroDescription";
 import HeroDetailButton from "./HeroDetailButton";
+import type { LandingBook } from "../lib/types";
+import { resolvedThumbnail } from "../lib/imgUrl";
 
-type LandingBook = {
-  id: string;
-  title: string;
-  subtitle: string;
-  authors: string[];
-  description: string;
-  thumbnail: string;
-  thumbnailLocal?: string;
-  thumbnailCached?: boolean;
-  publishedDate: string;
-  categories: string[];
-  averageRating: number;
-  ratingsCount: number;
-};
-
-function resolveImageUrl(book: LandingBook): string {
-  if (book.thumbnailLocal) return `/api/proxy${book.thumbnailLocal}`;
-  if (book.thumbnail.includes("uploads.mangadex.org"))
-    return `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`;
-  return book.thumbnail;
-}
+type Props = { books: LandingBook[] };
 
 function splitTitle(book: LandingBook): [string, string] {
   const parts = book.title.split(/[:\-]/).map((p) => p.trim()).filter(Boolean);
@@ -182,7 +164,7 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
   }, [total]);
 
   const book = books[idx];
-  const imgUrl = resolveImageUrl(book);
+  const imgUrl = resolvedThumbnail(book);
   const [titleMain, titleSub] = splitTitle(book);
 
   return (

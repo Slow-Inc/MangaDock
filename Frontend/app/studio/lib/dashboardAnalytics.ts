@@ -1,6 +1,7 @@
 "use client";
 
-import type { ChapterVersion, WalletTransaction } from "../../lib/studioApi";
+import { createVersion, type WalletTransaction } from "../../lib/studioApi";
+import type { ChapterVersion } from "../../lib/types";
 
 export type ChartPoint = {
   label: string;

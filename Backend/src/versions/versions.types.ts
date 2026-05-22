@@ -19,4 +19,6 @@ export type ChapterVersion = {
   description: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  /** True when this backend can serve the uploaded chapter pages from local storage. */
+  backendAvailable?: boolean;
 };
