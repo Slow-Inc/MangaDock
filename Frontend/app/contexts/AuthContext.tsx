@@ -21,6 +21,7 @@ import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData
 import { useToast } from "./ToastContext";
 
 const API_BASE = "/api/proxy";
+const DEFAULT_PUBLIC_SITE_URL = "http://localhost:4000";
 
 // ─── AppUser — Firebase-compatible interface for UI components ───────────────
 export interface AppUser {
@@ -302,12 +303,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * The canonical frontend URL configured as Supabase's Site URL.
-   * OAuth popups always redirect here, so the callback page is always reachable
-   * even when the user is on a different IP/origin.
+   * Resolve the callback URL at the moment OAuth starts so it always matches
+   * the exact host/IP the user is currently visiting.
    */
-  const OAUTH_CALLBACK_URL =
-    (process.env.NEXT_PUBLIC_SITE_URL ?? (typeof window !== "undefined" ? window.location.origin : "")) +
+  const getOAuthCallbackUrl = () =>
+    (typeof window !== "undefined"
+      ? window.location.origin
+      : (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_URL)) +
     "/auth/callback";
 
   /** Open an OAuth URL in a centred popup and resolve when the callback postMessages the session back. */
@@ -328,7 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // The callback page postMessages the session tokens (or error) back to us.
-      // This works cross-origin (e.g. user on 192.168.x.x, popup lands on 26.17.141.205).
+      // This works even if the popup callback and opener are on different origins.
       const onMessage = async (event: MessageEvent) => {
         if (event.data?.type !== "supabase:oauth:callback") return;
         window.removeEventListener("message", onMessage);
@@ -383,18 +385,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: OAUTH_CALLBACK_URL, skipBrowserRedirect: true },
+      options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
     await openOAuthPopup(data.url);
   };
 
   const signInWithFacebook = async () => {
+    const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "facebook",
-      options: { redirectTo: OAUTH_CALLBACK_URL, skipBrowserRedirect: true },
+      options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
     await openOAuthPopup(data.url);
@@ -531,18 +535,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const linkGoogleAccount = async () => {
+    const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.linkIdentity({
       provider: "google",
-      options: { redirectTo: OAUTH_CALLBACK_URL, skipBrowserRedirect: true },
+      options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data?.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
     await openOAuthPopup(data.url);
   };
 
   const linkFacebookAccount = async () => {
+    const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.linkIdentity({
       provider: "facebook",
-      options: { redirectTo: OAUTH_CALLBACK_URL, skipBrowserRedirect: true },
+      options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data?.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
     await openOAuthPopup(data.url);
@@ -643,9 +649,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } else {
       // Social reauth via popup
+      const redirectTo = getOAuthCallbackUrl();
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: method,
-        options: { redirectTo: OAUTH_CALLBACK_URL, skipBrowserRedirect: true },
+        options: { redirectTo, skipBrowserRedirect: true },
       });
       if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
       await openOAuthPopup(data.url);

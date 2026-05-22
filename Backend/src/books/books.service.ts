@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
@@ -8,6 +8,7 @@ import { ImageCacheService } from '../cache/image-cache.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { GoogleBooksService } from './google-books.service';
 import { MangaDexService } from './mangadex.service';
+import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 import {
   CACHE_TTL_MS,
   type LandingBook,
@@ -75,6 +76,12 @@ interface BatchJobState {
   promise: Promise<void>;
   /** Abort this to stop MIT processing when the last listener disconnects */
   cancelController: AbortController;
+  /** Resolver for the promise */
+  resolve?: () => void;
+  /** Rejecter for the promise */
+  reject?: (err: any) => void;
+  /** Number of pages we are waiting for */
+  expectedCount: number;
 }
 
 @Injectable()
@@ -92,7 +99,83 @@ export class BooksService {
     private readonly cache: CacheOrchestratorService,
     private readonly imageCache: ImageCacheService,
     private readonly supabase: SupabaseService,
+    @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
   ) {}
+
+  /**
+   * Handle an asynchronous callback from the MIT Server.
+   * T4-STANDARD Pillar 2: Idempotent Webhook Processing.
+   */
+  async handleMitCallback(
+    jobKey: string,
+    pageIndex: number,
+    result: any,
+    error?: string,
+  ): Promise<void> {
+    const job = this.activeBatchJobs.get(jobKey);
+    if (!job) {
+      this.logger.warn(`[Webhook] Received callback for unknown/expired job: ${jobKey}`);
+      return;
+    }
+
+    // Idempotency: skip if already processed
+    if (job.completedPages.has(pageIndex)) {
+      this.logger.debug(`[Webhook] Skipping duplicate callback for job=${jobKey} page=${pageIndex}`);
+      return;
+    }
+
+    const chapterId = jobKey.split(':')[0];
+    const srcMIT = jobKey.split(':')[1];
+    const tgtMIT = jobKey.split(':')[2];
+
+    let pageResult: PageResult;
+
+    if (error) {
+      pageResult = { patches: [], error };
+    } else {
+      // Process patches (save to storage and cache)
+      const patchDir = `uploads/patches/${chapterId}`;
+
+      const patches: PatchEntry[] = [];
+      for (const [i, p] of (result.patches || []).entries()) {
+        const patchFilename = `${pageIndex}_${i}_${randomBytes(4).toString('hex')}.png`;
+        const key = `${patchDir}/${patchFilename}`;
+        const patchBuf = Buffer.from(p.img_b64, 'base64');
+        
+        await this.storage.put(key, patchBuf, { contentType: 'image/png' });
+
+        patches.push({
+          xPct: p.x,
+          yPct: p.y,
+          wPct: p.w,
+          hPct: p.h,
+          url: `/${key}`,
+        });
+      }
+
+      // Cache the result
+      const cacheKey = `translate:manga-patches:v3:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}`;
+      await this.cache.set(cacheKey, { patches }, 1000 * 60 * 60 * 24 * 7); // 7 days
+
+      pageResult = { patches };
+    }
+
+    // Notify listeners
+    job.completedPages.set(pageIndex, pageResult);
+    for (const listener of job.listeners) {
+      try {
+        listener(pageIndex, pageResult);
+      } catch (err) {
+        // Listener might have disconnected
+      }
+    }
+
+    // Check if job is complete
+    if (job.completedPages.size >= job.expectedCount) {
+      this.logger.log(`[Webhook] Job ${jobKey} fully completed via webhooks`);
+      job.resolve?.();
+    }
+  }
 
   private get backendOrigin(): string {
     return (
@@ -502,20 +585,17 @@ export class BooksService {
 
     const translatedBuffer = Buffer.from(await mitRes.arrayBuffer());
 
-    // Save translated PNG to uploads/translated/
-    const translatedDir = path.join(process.cwd(), 'uploads', 'translated');
-    fs.mkdirSync(translatedDir, { recursive: true });
-    const filename = `${chapterId}-p${pageIndex}.png`;
-    const filepath = path.join(translatedDir, filename);
-    fs.writeFileSync(filepath, translatedBuffer);
+    // Save translated PNG to storage
+    const key = `uploads/translated/${chapterId}-p${pageIndex}.png`;
+    await this.storage.put(key, translatedBuffer, { contentType: 'image/png' });
 
-    const translatedUrl = `${this.backendOrigin}/uploads/translated/${filename}`;
+    const translatedUrl = `${this.backendOrigin}/${key}`;
 
     // Cache permanently (TTL via setMangaCacheWithTiers uses manga tier = -1)
     await this.cache.setMangaCacheWithTiers(cacheKey, { translatedUrl });
 
     this.logger.log(
-      `[MangaTranslate] Translated chapter=${chapterId} page=${pageIndex} → ${filename} (${translatedBuffer.length} bytes)`,
+      `[MangaTranslate] Translated chapter=${chapterId} page=${pageIndex} → ${key} (${translatedBuffer.length} bytes)`,
     );
 
     return { translatedUrl, fromCache: false };
@@ -622,10 +702,7 @@ export class BooksService {
       patches: Array<{ x: number; y: number; w: number; h: number; img_b64: string }>;
     };
 
-    // Save each patch PNG to uploads/patches/{chapterId}/
-    const patchDir = path.join(process.cwd(), 'uploads', 'patches', chapterId);
-    fs.mkdirSync(patchDir, { recursive: true });
-
+    // Save each patch PNG to storage
     const { img_width: imgW, img_height: imgH } = patchData;
     const patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> = [];
 
@@ -633,13 +710,16 @@ export class BooksService {
       const p = patchData.patches[i];
       const pngBuf = Buffer.from(p.img_b64, 'base64');
       const filename = `${chapterId}-${srcMIT}-${tgtMIT}-p${pageIndex}-r${i}.png`;
-      fs.writeFileSync(path.join(patchDir, filename), pngBuf);
+      const key = `uploads/patches/${chapterId}/${filename}`;
+      
+      await this.storage.put(key, pngBuf, { contentType: 'image/png' });
+
       patches.push({
         xPct: imgW > 0 ? p.x / imgW : 0,
         yPct: imgH > 0 ? p.y / imgH : 0,
         wPct: imgW > 0 ? p.w / imgW : 0,
         hPct: imgH > 0 ? p.h / imgH : 0,
-        url: `${this.backendOrigin}/uploads/patches/${chapterId}/${filename}`,
+        url: `${this.backendOrigin}/${key}`,
       });
     }
 
@@ -738,32 +818,68 @@ export class BooksService {
 
     // 2. Create job state
     const cancelController = new AbortController();
+    let resolve: () => void;
+    let reject: (err: any) => void;
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+
     const job: BatchJobState = {
       completedPages: new Map(),
       listeners: new Set([listener]),
-      promise: Promise.resolve(), // placeholder; replaced below
+      promise,
       cancelController,
+      resolve: resolve!,
+      reject: reject!,
+      expectedCount: uncachedPages.length,
     };
 
     // 3. Inner notify: store result + fan-out to all listeners
     const notify = (pageIndex: number, result: PageResult) => {
       job.completedPages.set(pageIndex, result);
       for (const l of job.listeners) {
-        try { l(pageIndex, result); } catch { /* listener may be gone */ }
+        try {
+          l(pageIndex, result);
+        } catch {
+          /* listener may be gone */
+        }
       }
     };
 
     // 4. Start background MIT processing
-    const runPromise = this._runMitBatch(chapterId, uncachedPages, notify, cancelController.signal, srcMIT, tgtMIT, sourceLang, targetLang).finally(() => {
-      this.activeBatchJobs.delete(jobKey);
-      this.logger.log(`[BatchRegistry] job=${jobKey} completed & removed from registry`);
-    });
+    // We pass the jobKey so MIT can send it back in the webhook
+    this._runMitBatch(
+      chapterId,
+      uncachedPages,
+      notify,
+      cancelController.signal,
+      srcMIT,
+      tgtMIT,
+      jobKey, // Pass jobKey as taskId
+      sourceLang,
+      targetLang,
+    )
+      .then(() => {
+        // If we are using the streaming response, it will finish here.
+        // But if we are using webhooks, the handleMitCallback will resolve it.
+        // For safety, we check if it's already resolved.
+        if (job.completedPages.size >= job.expectedCount) {
+          job.resolve?.();
+        }
+      })
+      .catch((err) => {
+        job.reject?.(err);
+      })
+      .finally(() => {
+        this.activeBatchJobs.delete(jobKey);
+        this.logger.log(`[BatchRegistry] job=${jobKey} completed & removed from registry`);
+      });
 
-    job.promise = runPromise;
     this.activeBatchJobs.set(jobKey, job);
     this.logger.log(`[BatchRegistry] job=${jobKey} started (${uncachedPages.length} pages to process)`);
 
-    await runPromise;
+    await promise;
     job.listeners.delete(listener);
   }
 
@@ -778,6 +894,7 @@ export class BooksService {
     signal: AbortSignal,
     srcMIT: string,
     tgtMIT: string,
+    taskId: string,
     sourceLangIso?: string,
     targetLangIso?: string,
   ): Promise<void> {
@@ -826,6 +943,14 @@ export class BooksService {
     form.append('config', mitConfig);
     form.append('page_indices', pages.map((p) => p.pageIndex).join(','));
 
+    // T4-STANDARD Pillar 2: Asynchronous Fire-and-forget preparation
+    // Pass taskId and callbackUrl to MIT Server
+    form.append('taskId', taskId);
+    form.append('callback_url', `${this.backendOrigin}/webhooks/mit/callback`);
+    if (process.env.MIT_WEBHOOK_SECRET) {
+      form.append('callback_secret', process.env.MIT_WEBHOOK_SECRET);
+    }
+
     // ── 3. POST to MIT (no timeout — may take many minutes for large chapters) ──
     let mitRes: Response;
     try {
@@ -841,6 +966,18 @@ export class BooksService {
       return;
     }
 
+    // Handle Async Acceptance (202 Accepted)
+    if (mitRes.status === 202 || mitRes.status === 200) {
+      const contentType = mitRes.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const body = await mitRes.json().catch(() => ({}));
+        if (body.status === 'accepted') {
+          this.logger.log(`[BatchPatches] chapter=${chapterId} MIT accepted job async with taskId=${taskId}`);
+          return; // The webhook will handle the rest of the results
+        }
+      }
+    }
+
     if (!mitRes.ok || !mitRes.body) {
       const errText = await mitRes.text().catch(() => '');
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT HTTP ${mitRes.status}: ${errText.slice(0, 200)}`);
@@ -848,11 +985,7 @@ export class BooksService {
       return;
     }
 
-    // ── 4. Prepare patch output directory ─────────────────────────────────
-    const patchDir = path.join(process.cwd(), 'uploads', 'patches', chapterId);
-    fs.mkdirSync(patchDir, { recursive: true });
-
-    // ── 5. Read NDJSON stream, save patches, cache, notify ────────────────
+    // ── 4. Read NDJSON stream, save patches, cache, notify ────────────────
     const reader = (mitRes.body as unknown as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder();
     let lineBuf = '';
@@ -921,13 +1054,16 @@ export class BooksService {
               const p = data.patches[i];
               const pngBuf = Buffer.from(p.img_b64, 'base64');
               const filename = `${chapterId}-${srcMIT}-${tgtMIT}-p${data.pageIndex}-r${i}.png`;
-              fs.writeFileSync(path.join(patchDir, filename), pngBuf);
+              const key = `uploads/patches/${chapterId}/${filename}`;
+
+              await this.storage.put(key, pngBuf, { contentType: 'image/png' });
+
               patches.push({
                 xPct: imgW > 0 ? p.x / imgW : 0,
                 yPct: imgH > 0 ? p.y / imgH : 0,
                 wPct: imgW > 0 ? p.w / imgW : 0,
                 hPct: imgH > 0 ? p.h / imgH : 0,
-                url: `${this.backendOrigin}/uploads/patches/${chapterId}/${filename}`,
+                url: `${this.backendOrigin}/${key}`,
               });
             }
 
@@ -1301,23 +1437,28 @@ export class BooksService {
       );
   }
 
-  private enhanceLanding(payload: LandingPayload): LandingPayload {
+  private async enhanceLanding(payload: LandingPayload): Promise<LandingPayload> {
     if (!this.imageCache.enabled) return payload;
-    const enhanceBook = (book: LandingBook): LandingBook => ({
+    
+    const enhanceBook = async (book: LandingBook): Promise<LandingBook> => ({
       ...book,
       thumbnailLocal:
         book.thumbnailLocal
           ? book.thumbnailLocal
-          : (this.imageCache.localThumbnailPath(book.id, book.thumbnail) ?? undefined),
+          : ((await this.imageCache.localThumbnailPath(book.id, book.thumbnail)) ?? undefined),
     });
-    return {
-      ...payload,
-      hero: payload.hero ? enhanceBook(payload.hero) : null,
-      rows: payload.rows.map((row) => ({
-        ...row,
-        items: row.items.map(enhanceBook),
-      })),
-    };
+
+    const [hero, rows] = await Promise.all([
+      payload.hero ? enhanceBook(payload.hero) : Promise.resolve(null),
+      Promise.all(
+        payload.rows.map(async (row) => ({
+          ...row,
+          items: await Promise.all(row.items.map(enhanceBook)),
+        })),
+      ),
+    ]);
+
+    return { ...payload, hero, rows };
   }
 }
 

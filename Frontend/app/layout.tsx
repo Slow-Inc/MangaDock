@@ -3,6 +3,7 @@ import { Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "./contexts/ToastContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import SupabaseGuard from "./components/SupabaseGuard";
 import DevImageCacheToggle from "./components/DevImageCacheToggle";
 import SmoothScrolling from "./components/SmoothScrolling";
 
@@ -27,6 +28,7 @@ export default function RootLayout({
         <SmoothScrolling>
           <ToastProvider>
             <AuthProvider>
+              <SupabaseGuard />
               {children}
               <DevImageCacheToggle />
             </AuthProvider>

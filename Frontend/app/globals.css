@@ -105,7 +105,6 @@ svg {
   width: min(100%, calc(var(--mg-zoom, 1) * 900px));
   display: block;
   margin-inline: auto;
-  transition: width 0.15s ease;
 }
 
 /* Continue reading section reveal */

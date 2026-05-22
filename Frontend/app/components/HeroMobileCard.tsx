@@ -3,21 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import BookDetailModal from "./BookDetailModal";
-
-type LandingBook = {
-  id: string;
-  title: string;
-  subtitle: string;
-  authors: string[];
-  description: string;
-  thumbnail: string;
-  thumbnailLocal?: string;
-  thumbnailCached?: boolean;
-  publishedDate: string;
-  categories: string[];
-  averageRating: number;
-  ratingsCount: number;
-};
+import type { LandingBook } from "../lib/types";
 
 type Props = {
   book: LandingBook;

@@ -96,7 +96,7 @@ export class MangaDexService {
     const cacheKey = `manga:chapters:v3:${mangaId}`;
     const cached = await this.cache.get<MangaChapter[]>(cacheKey);
     if (cached) {
-      return this.attachLocalStatus(cached.data, false);
+      return await this.attachLocalStatus(cached.data, false);
     }
 
     const lang = this.getMangaLanguage();
@@ -179,7 +179,7 @@ export class MangaDexService {
     const cacheKey = `manga:chapter-pages:${chapterId}`;
     const cached = await this.cache.get<MangaChapterPages>(cacheKey);
     if (cached) {
-      const enhanced = this.enhanceChapterPages(chapterId, cached.data);
+      const enhanced = await this.enhanceChapterPages(chapterId, cached.data);
       if (this.imageCache.enabled) {
         this.patchChapterPagesCacheIfNeeded(cacheKey, cached.data, enhanced);
       }
@@ -195,7 +195,7 @@ export class MangaDexService {
         const stale = this.cache.getStale<MangaChapterPages>(cacheKey);
         if (stale) {
           this.logger.log(`[MangaDex] Serving stale chapter-pages cache chapter=${chapterId} updatedAt=${stale.updatedAt}`);
-          const enhanced = this.enhanceChapterPages(chapterId, stale.data);
+          const enhanced = await this.enhanceChapterPages(chapterId, stale.data);
           return forceLocal ? this.applyForceLocalChapterPages(enhanced) : enhanced;
         }
         return null;
@@ -213,14 +213,14 @@ export class MangaDexService {
       };
 
       await this.cache.set(cacheKey, result, CACHE_TTL_MS);
-      const chapterEnhanced = this.enhanceChapterPages(chapterId, result);
+      const chapterEnhanced = await this.enhanceChapterPages(chapterId, result);
       return forceLocal ? this.applyForceLocalChapterPages(chapterEnhanced) : chapterEnhanced;
     } catch (err) {
       this.logger.error(`[MangaDex] Chapter pages fetch error: ${String(err)}`);
       const stale = this.cache.getStale<MangaChapterPages>(cacheKey);
       if (stale) {
         this.logger.log(`[MangaDex] Serving stale chapter-pages cache chapter=${chapterId} updatedAt=${stale.updatedAt}`);
-        const enhanced = this.enhanceChapterPages(chapterId, stale.data);
+        const enhanced = await this.enhanceChapterPages(chapterId, stale.data);
         return forceLocal ? this.applyForceLocalChapterPages(enhanced) : enhanced;
       }
       return null;
@@ -630,16 +630,18 @@ export class MangaDexService {
 
   // ─── Image cache enhancement ─────────────────────────────────────────────────
 
-  private attachLocalStatus(chapters: MangaChapter[], isOfflineFallback = false): MangaChapter[] {
+  private async attachLocalStatus(chapters: MangaChapter[], isOfflineFallback = false): Promise<MangaChapter[]> {
     if (!this.imageCache.enabled) {
       return chapters.map((ch) => ({ ...ch, readerAvailable: false, isOfflineFallback }));
     }
 
-    return chapters.map((ch) => ({
-      ...ch,
-      readerAvailable: this.imageCache.hasChapterCache('_chapters', ch.id),
-      isOfflineFallback
-    }));
+    return await Promise.all(
+      chapters.map(async (ch) => ({
+        ...ch,
+        readerAvailable: await this.imageCache.hasChapterCache('_chapters', ch.id),
+        isOfflineFallback
+      }))
+    );
   }
 
   private applyForceLocalMangaDetail(detail: MangaDetail): MangaDetail {
@@ -654,13 +656,13 @@ export class MangaDexService {
     };
   }
 
-  private enhanceMangaDetail(mangaId: string, detail: MangaDetail): MangaDetail {
+  private async enhanceMangaDetail(mangaId: string, detail: MangaDetail): Promise<MangaDetail> {
     if (!this.imageCache.enabled || detail.covers.length === 0) return detail;
 
     if (detail.covers.every((c) => c.localUrl)) return detail;
 
     const coverUrls = detail.covers.map((c) => c.url);
-    const localPaths = this.imageCache.localCoverPaths(mangaId, coverUrls);
+    const localPaths = await this.imageCache.localCoverPaths(mangaId, coverUrls);
     return {
       ...detail,
       covers: detail.covers.map((c, i) => ({
@@ -736,10 +738,10 @@ export class MangaDexService {
       );
   }
 
-  private enhanceChapterPages(
+  private async enhanceChapterPages(
     chapterId: string,
     data: MangaChapterPages,
-  ): MangaChapterPages {
+  ): Promise<MangaChapterPages> {
     if (!this.imageCache.enabled) return data;
 
     const allLocalP = (data.localPages ?? []).every((p) =>
@@ -757,18 +759,20 @@ export class MangaDexService {
       allLocalDs;
     if (fullyPatched) return data;
 
-    const localPages = this.imageCache.localPagePaths(
-      '_chapters',
-      chapterId,
-      data.pages,
-      'p',
-    );
-    const localDataSaverPages = this.imageCache.localPagePaths(
-      '_chapters',
-      chapterId,
-      data.dataSaverPages,
-      'ds',
-    );
+    const [localPages, localDataSaverPages] = await Promise.all([
+      this.imageCache.localPagePaths(
+        '_chapters',
+        chapterId,
+        data.pages,
+        'p',
+      ),
+      this.imageCache.localPagePaths(
+        '_chapters',
+        chapterId,
+        data.dataSaverPages,
+        'ds',
+      ),
+    ]);
     return { ...data, localPages, localDataSaverPages };
   }
 }

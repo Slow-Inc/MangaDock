@@ -8,15 +8,22 @@ Frontend ของ MangaDock เป็น Next.js application ที่ทำห
 
 ฝั่งนี้เป็นชั้น presentation และ interaction ของระบบ โดยรับผิดชอบทั้ง server-rendered pages, client-side interactions, UI state และ route handlers ที่ใช้เป็น proxy บางจุดในการคุยกับ backend
 
+### 1.2 Tech Stack
+*   **Framework:** Next.js 16+ (Turbopack)
+*   **Library:** React 19, Tailwind CSS v4
+*   **Authentication:** Supabase Auth (@supabase/ssr)
+*   **Data Fetching:** Next.js Fetch API พร้อมระบบดักจับ Global Fetch สำหรับทำ Supabase Connectivity Guard
+
 ## 2. Main Responsibilities
 
 Frontend รับผิดชอบงานหลักดังนี้
 
 1. แสดงหน้า landing, search, categories, my list, account และหน้า detail ต่าง ๆ
-2. จัดการประสบการณ์ผู้ใช้ทั้ง desktop และ mobile
-3. เชื่อมต่อ Firebase client-side สำหรับ authentication-related flows
+2. จัดการประสบการณ์ผู้ใช้ทั้ง desktop และ mobile แบบ Responsive
+3. เชื่อมต่อ Supabase client-side สำหรับ authentication-related flows
 4. เรียก backend API เพื่อดึงข้อมูลหนังสือ มังงะ รายการโปรด และผลลัพธ์การแปล
-5. จัดการ local UI utilities เช่น toast, auth context, dev toggles และ caching helpers
+5. **SupabaseGuard:** ตรวจสอบความพร้อมของฐานข้อมูลและแสดงผลผ่าน Toast Notification หากโครงการถูก Pause
+6. จัดการ local UI utilities เช่น toast, auth context, dev toggles และ caching helpers
 
 ## 3. High-Level Architecture
 
@@ -24,7 +31,7 @@ Frontend รับผิดชอบงานหลักดังนี้
 User Browser
   -> Frontend (Next.js on port 4000)
   -> Backend API (NestJS on port 4001)
-  -> MIT microservice when backend triggers manga translation
+  -> MIT microservice when backend triggers manga translation (Async Webhook)
 ```
 
 Frontend ไม่เรียก MIT โดยตรงใน flow หลักของระบบ แต่ใช้ backend เป็นตัวกลางเพื่อรวม business logic, caching และ orchestration ไว้ที่ฝั่ง server
@@ -34,10 +41,10 @@ Frontend ไม่เรียก MIT โดยตรงใน flow หลัก
 โครงสร้างหลักของ frontend ประกอบด้วย
 
 1. `app/page.tsx` สำหรับหน้า landing และการดึงข้อมูลเริ่มต้น
-2. `app/components/` สำหรับ UI components เช่น navbar, rows, modal และ carousel
+2. `app/components/` สำหรับ UI components รวมถึง `SupabaseGuard` และ `MangaReader`
 3. `app/contexts/` สำหรับ shared state เช่น auth และ toast
 4. `app/api/` สำหรับ route handlers ที่ทำ proxy หรือช่วยงานฝั่ง server
-5. `app/lib/` สำหรับ utility integrations เช่น Firebase setup
+5. `app/lib/` สำหรับ utility integrations เช่น Supabase setup
 6. `app/hooks/` สำหรับ reusable client-side behavior
 
 ## 5. Runtime Configuration
@@ -45,9 +52,9 @@ Frontend ไม่เรียก MIT โดยตรงใน flow หลัก
 ค่าที่สำคัญในการรัน frontend ได้แก่
 
 1. `NEXT_PUBLIC_API_BASE_URL` สำหรับชี้ไปยัง backend API
-2. `INTERNAL_API_URL` สำหรับ server-side requests ภายใน Next.js
-3. Firebase public config เช่น `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID` และค่าที่เกี่ยวข้อง
-4. optional dev flags เช่น `NEXT_PUBLIC_IMAGE_CACHE_DEV_TOOLS` และ `NEXT_PUBLIC_AUTH_DEBUG`
+2. `NEXT_PUBLIC_SUPABASE_URL` และ `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. `INTERNAL_API_URL` สำหรับ server-side requests ภายใน Next.js
+4. `NEXT_PUBLIC_TURNSTILE_SITE_KEY` สำหรับ Cloudflare Turnstile
 
 โครงสร้างตัวอย่างของ environment สามารถอ้างอิงจาก `.env.example` ในโฟลเดอร์ frontend และรายละเอียดการรันดูได้ที่ [Frontend README](../../Frontend/README.md)
 
@@ -56,8 +63,8 @@ Frontend ไม่เรียก MIT โดยตรงใน flow หลัก
 Frontend เชื่อมต่อกับระบบอื่นในโปรเจ็กต์ดังนี้
 
 1. เชื่อมต่อ backend สำหรับข้อมูลหนังสือ มังงะ ผู้ใช้ และ translation workflows
-2. เชื่อมต่อ Firebase client SDK สำหรับ authentication context และ account linking flows
-3. แสดงผลลัพธ์จาก translation pipeline ที่ backend และ MIT ช่วยประมวลผลมาให้
+2. เชื่อมต่อ Supabase สำหรับ authentication context และ account session
+3. แสดงผลลัพธ์จาก translation pipeline แบบ Streaming (NDJSON) หรือรับผลผ่านการอัปเดตสเตตัสจาก backend
 
 แนวทางนี้ทำให้ frontend คงบทบาทเป็น presentation layer และไม่แบกรับ logic เชิงระบบที่ควรอยู่ใน backend
 

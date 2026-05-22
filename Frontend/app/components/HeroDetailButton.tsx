@@ -2,21 +2,9 @@
 
 import { useEffect, useState } from "react";
 import BookDetailModal from "./BookDetailModal";
+import type { LandingBook } from "../lib/types";
 
 const API_BASE = "/api/proxy";
-
-type LandingBook = {
-  id: string;
-  title: string;
-  subtitle: string;
-  authors: string[];
-  description: string;
-  thumbnail: string;
-  publishedDate: string;
-  categories: string[];
-  averageRating: number;
-  ratingsCount: number;
-};
 
 type Props = { book: LandingBook };
 

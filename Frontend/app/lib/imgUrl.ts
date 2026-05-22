@@ -14,28 +14,44 @@
 
 const API_BASE = "/api/proxy";
 
+/** Cloudflare Worker URL from env */
+const CF_WORKER_URL = process.env.NEXT_PUBLIC_CF_WORKER_URL || "";
+const USE_CF_WORKER = process.env.NEXT_PUBLIC_USE_CF_WORKER === "true";
+
 /** MangaDex CDN hostname — images from here get proxied through our backend. */
 const MANGADEX_CDN = "uploads.mangadex.org";
 
 /**
+ * Returns the effective base URL for local assets (/uploads or /img-cache).
+ * If USE_CF_WORKER is true, it points to the Worker; otherwise it uses the Frontend Proxy.
+ */
+function getAssetBaseUrl(): string {
+  if (USE_CF_WORKER && CF_WORKER_URL) {
+    return CF_WORKER_URL;
+  }
+  return API_BASE;
+}
+
+/**
  * Strip any hardcoded backend origin (http://localhost:PORT or http://hostname:PORT)
- * from a URL and replace with the frontend-relative proxy path.
- * This ensures images work correctly when the app is accessed from any device,
- * not just localhost.
+ * from a URL and replace with the effective asset base path.
  */
 export function toRelativeProxyUrl(url: string): string {
   if (!url) return url;
+  const assetBase = getAssetBaseUrl();
+
   if (url.startsWith('/uploads/') || url.startsWith('/img-cache/')) {
-    return `${API_BASE}${url}`;
+    return `${assetBase}${url}`;
   }
   try {
     const parsed = new URL(url);
     const pathWithQuery = `${parsed.pathname}${parsed.search}`;
     if (parsed.pathname.startsWith('/uploads/') || parsed.pathname.startsWith('/img-cache/')) {
-      return `${API_BASE}${pathWithQuery}`;
+      return `${assetBase}${pathWithQuery}`;
     }
-    if (parsed.protocol === 'http:') {
-      return `${API_BASE}${pathWithQuery}`;
+    // For legacy reasons, any HTTP URL from localhost is treated as a backend asset
+    if (parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
+      return `${assetBase}${pathWithQuery}`;
     }
   } catch {
     // Not an absolute URL — return as-is.
@@ -55,19 +71,18 @@ export function resolvedThumbnail(book: {
   thumbnail: string;
   thumbnailLocal?: string;
 }): string {
+  const assetBase = getAssetBaseUrl();
+
   if (book.thumbnailLocal) {
-    // thumbnailLocal may be stored as a full URL (e.g. http://localhost:3001/img-cache/...)
-    // from older history entries — strip the origin so we always get a relative path.
     const local = book.thumbnailLocal.startsWith("http")
       ? book.thumbnailLocal.replace(/^https?:\/\/[^/]+/, "")
       : book.thumbnailLocal;
-    return `${API_BASE}${local}`;
+    return `${assetBase}${local}`;
   }
-  // Route MangaDex images through our Next.js API proxy (relative URL — works on any host)
+  
   if (book.thumbnail.includes(MANGADEX_CDN)) {
     return `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`;
   }
-  // Convert any http://localhost:* or http://hostname:* URLs to relative proxy paths
-  // so they work when the app is accessed from other devices on the network.
+
   return toRelativeProxyUrl(book.thumbnail);
 }

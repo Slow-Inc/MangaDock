@@ -10,24 +10,9 @@ import MangaReader from "./MangaReader";
 import { useBookActions } from "../hooks/useBookActions";
 import { resolvedThumbnail } from "../lib/imgUrl";
 import { getHistory } from "../lib/readingHistory";
+import type { LandingBook } from "../lib/types";
 
 const API_BASE = "/api/proxy";
-
-type LandingBook = {
-  id: string;
-  title: string;
-  subtitle: string;
-  authors: string[];
-  description: string;
-  thumbnail: string;
-  thumbnailLocal?: string;
-  /** false = forceLocal mode and file not yet cached */
-  thumbnailCached?: boolean;
-  publishedDate: string;
-  categories: string[];
-  averageRating: number;
-  ratingsCount: number;
-};
 
 type BookRowProps = {
   rowId: string;

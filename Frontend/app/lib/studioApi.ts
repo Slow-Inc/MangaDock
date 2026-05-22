@@ -1,4 +1,5 @@
-"use client";
+import { supabase } from "./supabase";
+import type { ChapterVersion } from "./types";
 
 const API_BASE = "/api/proxy";
 
@@ -19,26 +20,6 @@ export type StudioChapter = {
   pageCount: number;
 };
 
-export type VersionStatus = "draft" | "pending_moderation" | "published" | "approved" | "rejected";
-
-export type ChapterVersion = {
-  versionId: string;
-  titleId: string;
-  titleName: string;
-  titleAltName?: string;
-  chapterId: string;
-  chapterNumber: string;
-  chapterTitle: string;
-  language: string;
-  translatorUid: string;
-  translatorName: string | null;
-  status: VersionStatus;
-  pages: string[];
-  priceCoins: number;
-  qualityScore: number;
-  isDefault: boolean;
-  description: string | null;
-};
 
 export type CreateVersionInput = {
   titleId: string;

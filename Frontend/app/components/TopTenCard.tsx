@@ -4,22 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import BookDetailModal from "./BookDetailModal";
 import { resolvedThumbnail } from "../lib/imgUrl";
-
-type LandingBook = {
-  id: string;
-  title: string;
-  subtitle: string;
-  authors: string[];
-  description: string;
-  thumbnail: string;
-  thumbnailLocal?: string;
-  /** false = forceLocal mode and file not yet cached */
-  thumbnailCached?: boolean;
-  publishedDate: string;
-  categories: string[];
-  averageRating: number;
-  ratingsCount: number;
-};
+import type { LandingBook } from "../lib/types";
 
 type Props = {
   book: LandingBook;

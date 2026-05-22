@@ -5,39 +5,7 @@ import HomeCachedLanding from "./components/HomeCachedLanding";
 import HomeStatusLine from "./components/HomeStatusLine";
 import Navbar from "./components/Navbar";
 import TopTenRow from "./components/TopTenRow";
-
-type LandingBook = {
-  id: string;
-  title: string;
-  subtitle: string;
-  authors: string[];
-  description: string;
-  thumbnail: string;
-  /** Local /img-cache/… path returned when backend IMAGE_CACHE_ENABLED=true */
-  thumbnailLocal?: string;
-  /** false = forceLocal mode and file not yet cached */
-  thumbnailCached?: boolean;
-  publishedDate: string;
-  categories: string[];
-  averageRating: number;
-  ratingsCount: number;
-};
-
-type LandingRow = {
-  id: string;
-  title: string;
-  query: string;
-  items: LandingBook[];
-};
-
-type LandingResponse = {
-  hero: LandingBook | null;
-  rows: LandingRow[];
-  updatedAt: string;
-  fromStaleCache?: boolean;
-  staleUpdatedAt?: string;
-  apiOffline?: boolean;
-};
+import type { LandingBook, LandingPayload as LandingResponse } from "./lib/types";
 
 type LandingFetchResult = {
   data: LandingResponse | null;
