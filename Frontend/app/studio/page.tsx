@@ -7,12 +7,12 @@ import Navbar from "../components/Navbar";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import {
-  ChapterVersion,
   getMyVersions,
   getWalletBalance,
   getWalletTransactions,
-  WalletTransaction,
+  type WalletTransaction,
 } from "../lib/studioApi";
+import type { ChapterVersion } from "../lib/types";
 import { getCached, setCache } from "../lib/studioCache";
 import StudioNav from "./components/StudioNav";
 import {

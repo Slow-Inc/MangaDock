@@ -21,27 +21,29 @@
  * served as a NestJS static assets route from main.ts.
  */
 
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import * as fs from 'fs';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as path from 'path';
+import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 
 @Injectable()
 export class ImageCacheService implements OnModuleInit {
   private readonly logger = new Logger(ImageCacheService.name);
-  private readonly imageDir: string;
+  private readonly imageDir = 'img-cache';
   private readonly publicPrefix = '/img-cache';
 
   /** Downloads currently in-flight (prevents duplicate concurrent downloads). */
   private readonly inFlight = new Set<string>();
 
-  constructor() {
-    this.imageDir = path.resolve(process.cwd(), '.cache', 'images');
-  }
+  constructor(
+    @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
+  ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
     if (this.enabled) {
-      fs.mkdirSync(this.imageDir, { recursive: true });
-      this.logger.log(`Image cache ENABLED — storage: ${this.imageDir}`);
+      if (this.storage.ensureDir) {
+        await this.storage.ensureDir(this.imageDir);
+      }
+      this.logger.log(`Image cache ENABLED — prefix: ${this.imageDir}`);
     } else {
       this.logger.log(
         'Image cache DISABLED (set IMAGE_CACHE_ENABLED=true to enable)',
@@ -60,17 +62,17 @@ export class ImageCacheService implements OnModuleInit {
    * otherwise triggers a background download and returns null (caller keeps
    * using the external URL for this request).
    */
-  localThumbnailPath(bookId: string, externalUrl: string): string | null {
+  async localThumbnailPath(bookId: string, externalUrl: string): Promise<string | null> {
     if (!this.enabled) return null;
     const ext = this.extFrom(externalUrl);
     const rel = `${bookId}/thumbnail.${ext}`;
-    const abs = path.join(this.imageDir, rel);
+    const key = `${this.imageDir}/${rel}`;
 
-    if (fs.existsSync(abs)) {
+    if (await this.storage.exists(key)) {
       return `${this.publicPrefix}/${rel}`;
     }
 
-    this.triggerDownload(externalUrl, abs);
+    this.triggerDownload(externalUrl, key);
     return null;
   }
 
@@ -79,30 +81,31 @@ export class ImageCacheService implements OnModuleInit {
    * Pages that are already cached → local path.
    * Pages not yet cached → external URL + background download triggered.
    */
-  localPagePaths(
+  async localPagePaths(
     bookId: string,
     chapterId: string,
     pages: string[],
     prefix: 'p' | 'ds',
-  ): string[] {
+  ): Promise<string[]> {
     if (!this.enabled || pages.length === 0) return pages;
 
-    const dir = path.join(this.imageDir, bookId, 'chapters', chapterId);
-    fs.mkdirSync(dir, { recursive: true });
+    const dir = `${this.imageDir}/${bookId}/chapters/${chapterId}`;
 
-    const missing: Array<{ url: string; abs: string }> = [];
-    const result = pages.map((url, i) => {
-      const ext = this.extFrom(url);
-      const filename = `${prefix}${i}.${ext}`;
-      const abs = path.join(dir, filename);
+    const missing: Array<{ url: string; key: string }> = [];
+    const results = await Promise.all(
+      pages.map(async (url, i) => {
+        const ext = this.extFrom(url);
+        const filename = `${prefix}${i}.${ext}`;
+        const key = `${dir}/${filename}`;
 
-      if (fs.existsSync(abs)) {
-        return `${this.publicPrefix}/${bookId}/chapters/${chapterId}/${filename}`;
-      }
+        if (await this.storage.exists(key)) {
+          return `${this.publicPrefix}/${bookId}/chapters/${chapterId}/${filename}`;
+        }
 
-      missing.push({ url, abs });
-      return url; // fall back to external URL for this request
-    });
+        missing.push({ url, key });
+        return url; // fall back to external URL for this request
+      }),
+    );
 
     if (missing.length > 0) {
       this.downloadBatch(missing, 4).catch(() => {
@@ -110,7 +113,7 @@ export class ImageCacheService implements OnModuleInit {
       });
     }
 
-    return result;
+    return results;
   }
 
   /**
@@ -118,31 +121,32 @@ export class ImageCacheService implements OnModuleInit {
    * Already-downloaded covers → local path; others → external URL + background download.
    * Storage: {mangaId}/covers/c{idx}.{ext}
    */
-  localCoverPaths(mangaId: string, coverUrls: string[]): string[] {
+  async localCoverPaths(mangaId: string, coverUrls: string[]): Promise<string[]> {
     if (!this.enabled || coverUrls.length === 0) return coverUrls;
 
-    const dir = path.join(this.imageDir, mangaId, 'covers');
-    fs.mkdirSync(dir, { recursive: true });
+    const dir = `${this.imageDir}/${mangaId}/covers`;
 
-    const missing: Array<{ url: string; abs: string }> = [];
-    const result = coverUrls.map((url, i) => {
-      const ext = this.extFrom(url);
-      const filename = `c${i}.${ext}`;
-      const abs = path.join(dir, filename);
+    const missing: Array<{ url: string; key: string }> = [];
+    const results = await Promise.all(
+      coverUrls.map(async (url, i) => {
+        const ext = this.extFrom(url);
+        const filename = `c${i}.${ext}`;
+        const key = `${dir}/${filename}`;
 
-      if (fs.existsSync(abs)) {
-        return `${this.publicPrefix}/${mangaId}/covers/${filename}`;
-      }
+        if (await this.storage.exists(key)) {
+          return `${this.publicPrefix}/${mangaId}/covers/${filename}`;
+        }
 
-      missing.push({ url, abs });
-      return url;
-    });
+        missing.push({ url, key });
+        return url;
+      }),
+    );
 
     if (missing.length > 0) {
       this.downloadBatch(missing, 4).catch(() => {});
     }
 
-    return result;
+    return results;
   }
 
   // ─── Internal helpers ────────────────────────────────────────────────────────
@@ -152,23 +156,22 @@ export class ImageCacheService implements OnModuleInit {
    * still exists on disk. Use this to guard against stale Redis cache entries
    * pointing to files that were deleted (e.g. cache dir wiped after restart).
    */
-  localPathExists(localPublicPath: string): boolean {
+  async localPathExists(localPublicPath: string): Promise<boolean> {
     if (!localPublicPath.startsWith(this.publicPrefix)) return false;
     const rel = localPublicPath.slice(this.publicPrefix.length + 1); // strip /img-cache/
-    const abs = path.join(this.imageDir, rel);
-    return fs.existsSync(abs);
+    const key = `${this.imageDir}/${rel}`;
+    return await this.storage.exists(key);
   }
 
   /**
    * Returns true when at least one cached page image exists for a chapter.
    * Used by forceLocal chapter list to decide whether reader should be unlocked.
    */
-  hasChapterCache(bookId: string, chapterId: string): boolean {
+  async hasChapterCache(bookId: string, chapterId: string): Promise<boolean> {
     if (!this.enabled) return false;
-    const dir = path.join(this.imageDir, bookId, 'chapters', chapterId);
-    if (!fs.existsSync(dir)) return false;
+    const dir = `${this.imageDir}/${bookId}/chapters/${chapterId}`;
     try {
-      const files = fs.readdirSync(dir);
+      const files = await this.storage.list(dir);
       return files.some((name) => /^(p|ds)\d+\./i.test(name));
     } catch {
       return false;
@@ -176,43 +179,43 @@ export class ImageCacheService implements OnModuleInit {
   }
 
   /** Fire-and-forget single file download (deduped). */
-  private triggerDownload(url: string, dest: string): void {
-    if (this.inFlight.has(dest) || fs.existsSync(dest)) return;
-    this.inFlight.add(dest);
-    this.downloadFile(url, dest)
-      .catch((err) =>
-        this.logger.warn(`Download failed [${path.basename(dest)}]: ${String(err)}`),
-      )
-      .finally(() => this.inFlight.delete(dest));
+  private triggerDownload(url: string, key: string): void {
+    this.storage.exists(key).then((exists) => {
+      if (exists || this.inFlight.has(key)) return;
+      this.inFlight.add(key);
+      this.downloadFile(url, key)
+        .catch((err) =>
+          this.logger.warn(`Download failed [${key}]: ${String(err)}`),
+        )
+        .finally(() => this.inFlight.delete(key));
+    });
   }
 
   /** Download a batch with limited concurrency (sequential batches of `limit`). */
   private async downloadBatch(
-    items: Array<{ url: string; abs: string }>,
+    items: Array<{ url: string; key: string }>,
     limit: number,
   ): Promise<void> {
     for (let i = 0; i < items.length; i += limit) {
       const batch = items.slice(i, i + limit);
       await Promise.allSettled(
-        batch.map(({ url, abs }) => {
-          if (this.inFlight.has(abs) || fs.existsSync(abs)) return Promise.resolve();
-          this.inFlight.add(abs);
-          return this.downloadFile(url, abs)
+        batch.map(async ({ url, key }) => {
+          if (this.inFlight.has(key) || (await this.storage.exists(key)))
+            return Promise.resolve();
+          this.inFlight.add(key);
+          return this.downloadFile(url, key)
             .catch((err) =>
               this.logger.warn(`Page download failed: ${String(err)}`),
             )
-            .finally(() => this.inFlight.delete(abs));
+            .finally(() => this.inFlight.delete(key));
         }),
       );
     }
   }
 
-  /** Download a single URL to disk using an atomic write. */
-  private async downloadFile(url: string, dest: string): Promise<void> {
-    if (fs.existsSync(dest)) return; // double-check (race)
-
-    const dir = path.dirname(dest);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  /** Download a single URL to storage using an atomic write. */
+  private async downloadFile(url: string, key: string): Promise<void> {
+    if (await this.storage.exists(key)) return;
 
     const res = await fetch(url, {
       headers: { 'User-Agent': 'MangaDock-ImageCache/1.0' },
@@ -222,9 +225,7 @@ export class ImageCacheService implements OnModuleInit {
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
 
     const buffer = await res.arrayBuffer();
-    const tmp = `${dest}.tmp`;
-    fs.writeFileSync(tmp, Buffer.from(buffer));
-    fs.renameSync(tmp, dest); // near-atomic on same filesystem
+    await this.storage.put(key, Buffer.from(buffer));
   }
 
   /** Extract file extension from a URL, defaulting to 'jpg'. */

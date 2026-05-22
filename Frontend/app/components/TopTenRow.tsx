@@ -1,24 +1,12 @@
 "use client";
-
 import { useEffect, useRef, useState } from "react";
 import TopTenCard from "./TopTenCard";
-
-type LandingBook = {
-  id: string;
-  title: string;
-  subtitle: string;
-  authors: string[];
-  description: string;
-  thumbnail: string;
-  publishedDate: string;
-  categories: string[];
-  averageRating: number;
-  ratingsCount: number;
-};
+import type { LandingBook } from "../lib/types";
 
 type Props = {
   books: LandingBook[];
 };
+
 
 export default function TopTenRow({ books }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);

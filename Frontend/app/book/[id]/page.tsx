@@ -3,20 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import BookDetailModal from "../../components/BookDetailModal";
-
-type LandingBook = {
-  id: string;
-  title: string;
-  subtitle: string;
-  authors: string[];
-  description: string;
-  thumbnail: string;
-  thumbnailLocal?: string;
-  publishedDate: string;
-  categories: string[];
-  averageRating: number;
-  ratingsCount: number;
-};
+import type { LandingBook } from "../../lib/types/manga";
 
 export default function BookDetailPage() {
   const { id } = useParams<{ id: string }>();

@@ -133,7 +133,7 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
             (jsonEntry.ttlMs - (Date.now() - new Date(jsonEntry.updatedAt).getTime())) / 1000,
           );
           if (ttlRemaining > 0) {
-            await this.redis.set(key, JSON.stringify(jsonEntry), ttlRemaining);
+            await this.setWithRetry(key, JSON.stringify(jsonEntry), ttlRemaining);
             this.logger.log(`Shutdown sync: wrote JSON→Redis for key=${key}`);
           }
           continue;
@@ -153,7 +153,7 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
             (jsonEntry.ttlMs - (Date.now() - jsonTime)) / 1000,
           );
           if (ttlSec > 0) {
-            await this.redis.set(key, JSON.stringify(jsonEntry), ttlSec);
+            await this.setWithRetry(key, JSON.stringify(jsonEntry), ttlSec);
             this.logger.log(`Shutdown sync: JSON→Redis (json newer) key=${key}`);
           }
         } else {
@@ -165,5 +165,35 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
     }
 
     this.logger.log('Cache sync complete — ready to exit');
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async setWithRetry(
+    key: string,
+    value: string,
+    ttlSec: number,
+  ): Promise<void> {
+    const maxRetries = 3;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        await this.redis.set(key, value, ttlSec);
+        return;
+      } catch (err) {
+        if (i === maxRetries - 1) {
+          this.logger.error(
+            `CRITICAL: Failed to sync key=${key} to Redis after ${maxRetries} attempts: ${String(err)}`,
+          );
+          return; // Don't throw to allow other keys to sync
+        }
+        const delay = Math.pow(2, i) * 500; // Exponential backoff
+        this.logger.warn(
+          `Shutdown sync retry ${i + 1}/${maxRetries} for key=${key} in ${delay}ms`,
+        );
+        await this.sleep(delay);
+      }
+    }
   }
 }

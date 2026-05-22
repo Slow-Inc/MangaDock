@@ -13,57 +13,7 @@ import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { useAuth } from "../contexts/AuthContext";
 import { getWalletBalance, purchaseUnlock, getUnlocksForTitle, topupCoins } from "../lib/studioApi";
-
-type LandingBook = {
-  id: string;
-  title: string;
-  subtitle: string;
-  authors: string[];
-  description: string;
-  thumbnail: string;
-  thumbnailLocal?: string;
-  publishedDate: string;
-  categories: string[];
-  averageRating: number;
-  ratingsCount: number;
-};
-
-type MangaCover = {
-  volume: string | null;
-  url: string;
-  /** Local /img-cache/… path returned when backend IMAGE_CACHE_ENABLED=true */
-  localUrl?: string;
-};
-
-type MangaDetail = {
-  id: string;
-  authors: string[];
-  artists: string[];
-  covers: MangaCover[];
-  genres?: string[];
-  description?: string;
-};
-
-type MangaChapter = {
-  id: string;
-  chapterNumber: string | null;
-  title: string | null;
-  translatedLanguage: string;
-  uploadedAt: string;
-  pageCount: number;
-  /** forceLocal mode: true when this chapter has local cache for reader */
-  readerAvailable?: boolean;
-  /** True if returned from stale cache because the upstream API went offline */
-  isOfflineFallback?: boolean;
-  /** 'mangadex' (default) or 'user' for user-uploaded translations */
-  source?: "mangadex" | "user";
-  /** Translator name for user-uploaded versions */
-  translatorName?: string | null;
-  /** Coin price for user-uploaded versions (0 = free) */
-  priceCoins?: number;
-  /** The actual version ID (without ver: prefix) for unlock checks */
-  versionId?: string;
-};
+import type { LandingBook, MangaCover, MangaDetail, MangaChapter } from "../lib/types";
 
 type ActiveChapter = {
   id: string;
@@ -241,11 +191,12 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                 translatedLanguage: v.language || "th",
                 uploadedAt: v.createdAt || "",
                 pageCount: v.pages?.length ?? 0,
-                readerAvailable: true,
+                readerAvailable: v.backendAvailable !== false,
                 source: "user" as const,
                 translatorName: v.translatorName ?? null,
                 priceCoins: v.priceCoins ?? 0,
                 versionId: v.versionId,
+                backendAvailable: v.backendAvailable !== false,
               }));
               // Merge: MangaDex first, then user-uploaded, sort by chapter number
               const merged = [...tagged, ...userChapters].sort((a, b) => {
@@ -408,8 +359,10 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
   const displayThumbnail = selectedCover ?? resolvedThumbnail(book);
   const chapterNeedsBackup = (ch: MangaChapter) => ch.isOfflineFallback === true;
+  const chapterMissingInBackend = (ch: MangaChapter) => ch.source === "user" && ch.backendAvailable === false;
   
   const isChapterCoinLocked = (ch: MangaChapter) => {
+    if (chapterMissingInBackend(ch)) return false;
     if (ch.source !== "user") return false;
     if (!ch.priceCoins || ch.priceCoins <= 0) return false;
     if (!ch.versionId) return false;
@@ -417,6 +370,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   };
 
   const isChapterReadable = (ch: MangaChapter) => {
+    if (chapterMissingInBackend(ch)) {
+      return false;
+    }
     if (chapterNeedsBackup(ch)) {
       return ch.readerAvailable === true;
     }
@@ -425,6 +381,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   };
 
   const getUnavailableChapterLabel = (ch: MangaChapter) => {
+    if (chapterMissingInBackend(ch)) {
+      return "ไม่มีใน backend";
+    }
     if (chapterNeedsBackup(ch) && ch.readerAvailable !== true) {
       return "ไม่ได้สำรอง";
     }

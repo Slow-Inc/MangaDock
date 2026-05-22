@@ -11,19 +11,23 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import * as path from 'path';
-import * as fs from 'fs';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UsersService } from './users.service';
 import type { SupabaseAuthUser } from '../auth/auth.types';
+import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 
 @Controller('users')
 @UseGuards(AuthGuard)
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
+  ) {}
 
   /** Called after login — creates/updates user doc (never overwrites displayName/photoURL) */
   @Post('me')
@@ -84,7 +88,7 @@ export class UsersController {
   }
 
   @Delete('me/avatar')
-  deleteAvatar(
+  async deleteAvatar(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Body() body: { filename: string },
   ) {
@@ -94,10 +98,8 @@ export class UsersController {
     if (!filename || !filename.startsWith(`${uid}_`)) {
       throw new BadRequestException('Invalid filename');
     }
-    const filePath = path.join(process.cwd(), 'uploads', 'avatars', filename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    const key = `uploads/avatars/${filename}`;
+    await this.storage.delete(key);
     return { ok: true };
   }
 
@@ -111,26 +113,23 @@ export class UsersController {
         }
         cb(null, true);
       },
-      storage: diskStorage({
-        destination: (_req, _file, cb) => {
-          const dir = path.join(process.cwd(), 'uploads', 'avatars');
-          fs.mkdirSync(dir, { recursive: true });
-          cb(null, dir);
-        },
-        filename: (req: any, file, cb) => {
-          const uid = (req[USER_KEY] as SupabaseAuthUser)?.uid ?? 'unknown';
-          const ext = path.extname(file.originalname) || '.jpg';
-          cb(null, `${uid}_${Date.now()}${ext}`);
-        },
-      }),
+      storage: memoryStorage(),
     }),
   )
-  uploadAvatar(
+  async uploadAvatar(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('No file provided');
-    return { url: `/uploads/avatars/${file.filename}` };
+
+    const uid = req[USER_KEY].uid;
+    const ext = path.extname(file.originalname) || '.jpg';
+    const filename = `${uid}_${Date.now()}${ext}`;
+    const key = `uploads/avatars/${filename}`;
+
+    await this.storage.put(key, file.buffer, { contentType: file.mimetype });
+
+    return { url: `/${key}` };
   }
 
   @Get('me/liked')

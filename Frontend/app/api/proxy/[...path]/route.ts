@@ -35,24 +35,32 @@ async function handler(
   const body =
     req.method === "GET" || req.method === "HEAD" ? undefined : req.body;
 
-  const upstream = await fetch(url, {
-    method: req.method,
-    headers,
-    body,
-    // @ts-expect-error Node 18+ fetch supports duplex
-    duplex: body ? "half" : undefined,
-  });
+  try {
+    const upstream = await fetch(url, {
+      method: req.method,
+      headers,
+      body,
+      // @ts-expect-error Node 18+ fetch supports duplex
+      duplex: body ? "half" : undefined,
+    });
 
-  const resHeaders = new Headers();
-  for (const [key, value] of upstream.headers.entries()) {
-    if (["transfer-encoding", "connection"].includes(key.toLowerCase())) continue;
-    resHeaders.set(key, value);
+    const resHeaders = new Headers();
+    for (const [key, value] of upstream.headers.entries()) {
+      if (["transfer-encoding", "connection"].includes(key.toLowerCase())) continue;
+      resHeaders.set(key, value);
+    }
+
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers: resHeaders,
+    });
+  } catch (err: any) {
+    console.error(`[ProxyError] Failed to fetch from backend: ${url}`, err);
+    return NextResponse.json(
+      { ok: false, error: "Backend unreachable", details: err.message },
+      { status: 502 },
+    );
   }
-
-  return new NextResponse(upstream.body, {
-    status: upstream.status,
-    headers: resHeaders,
-  });
 }
 
 export const GET = handler;

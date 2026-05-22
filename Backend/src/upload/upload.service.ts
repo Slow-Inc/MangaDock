@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -10,6 +11,7 @@ import * as crypto from 'crypto';
 import { SupabaseService } from '../supabase/supabase.service';
 import { VersionsService } from '../versions/versions.service';
 import type { ChapterVersion } from '../versions/versions.types';
+import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
@@ -32,6 +34,7 @@ export class UploadService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly versionsService: VersionsService,
+    @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
   ) {}
 
   private get db() {
@@ -39,7 +42,7 @@ export class UploadService {
   }
 
   private versionDir(versionId: string): string {
-    return path.join(process.cwd(), 'uploads', 'chapters', versionId);
+    return `uploads/chapters/${versionId}`;
   }
 
   async addPage(
@@ -49,18 +52,26 @@ export class UploadService {
     mimeType: string,
   ): Promise<{ pageUrl: string; pageIndex: number }> {
     if (!ALLOWED_MIME_TYPES.has(mimeType)) {
-      fs.unlinkSync(tempFilePath);
+      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
       throw new BadRequestException('Unsupported image format. Only JPEG, PNG, WebP and GIF are accepted.');
     }
 
     const ext = MIME_TO_EXT[mimeType];
     const filename = `${crypto.randomUUID()}${ext}`;
-    const dir = this.versionDir(versionId);
-    fs.mkdirSync(dir, { recursive: true });
-    const destPath = path.join(dir, filename);
-    fs.renameSync(tempFilePath, destPath);
+    const key = `${this.versionDir(versionId)}/${filename}`;
 
-    const pageUrl = `/uploads/chapters/${versionId}/${filename}`;
+    try {
+      const fileData = fs.readFileSync(tempFilePath);
+      await this.storage.put(key, fileData, { contentType: mimeType });
+      // Delete temp file after successful put
+      fs.unlinkSync(tempFilePath);
+    } catch (err) {
+      this.logger.error(`Failed to upload page to storage: ${String(err)}`);
+      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+      throw new Error('Failed to upload page to storage');
+    }
+
+    const pageUrl = `/${key}`;
 
     let pageIndex = -1;
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -76,15 +87,15 @@ export class UploadService {
         }>();
 
       if (readError) {
-        fs.unlinkSync(destPath);
+        await this.storage.delete(key);
         throw new Error(`Failed to read chapter version: ${readError.message}`);
       }
       if (!versionRow) {
-        fs.unlinkSync(destPath);
+        await this.storage.delete(key);
         throw new NotFoundException(`Chapter version ${versionId} not found`);
       }
       if (versionRow.translator_uid !== translatorUid) {
-        fs.unlinkSync(destPath);
+        await this.storage.delete(key);
         throw new BadRequestException('You do not own this chapter version');
       }
 
@@ -108,7 +119,7 @@ export class UploadService {
       const { data: updatedRows, error: updateError } = await query.select('version_id');
 
       if (updateError) {
-        fs.unlinkSync(destPath);
+        await this.storage.delete(key);
         throw new Error(`Failed to append page: ${updateError.message}`);
       }
 
@@ -118,7 +129,7 @@ export class UploadService {
       }
     }
 
-    fs.unlinkSync(destPath);
+    await this.storage.delete(key);
     throw new BadRequestException('Concurrent update conflict, please retry upload');
   }
 
@@ -162,10 +173,13 @@ export class UploadService {
     await this.versionsService.setPages(versionId, translatorUid, newPages);
 
     const filename = pageUrl.split('/').pop()!;
-    const filePath = path.join(this.versionDir(versionId), filename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    const key = `${this.versionDir(versionId)}/${filename}`;
+    try {
+      await this.storage.delete(key);
       this.logger.log(`Deleted page ${filename} from version ${versionId}`);
+    } catch (err) {
+      this.logger.warn(`Failed to delete file from storage: ${key}`);
     }
   }
 }
+
