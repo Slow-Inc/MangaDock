@@ -10,7 +10,7 @@ import { getHardwareId } from "../lib/fingerprint";
  * Also injects Hardware ID for Zero-Trust readiness.
  */
 export default function SupabaseGuard() {
-  const { toast } = useToast();
+  const { showToast } = useToast();
 
   useEffect(() => {
     // Intercept global fetch
@@ -41,10 +41,11 @@ export default function SupabaseGuard() {
           try {
             const data = await clonedResponse.json();
             if (data.code === 'SUPABASE_OFFLINE') {
-              toast.error(
-                "⚠️ ตรวจพบปัญหาการเชื่อมต่อฐานข้อมูล: โครงการ Supabase ของคุณอาจถูกหยุดชั่วคราว (Paused) กรุณาเปิดใช้งานที่ Supabase Dashboard",
-                { duration: 10000 }
-              );
+              showToast({
+                message: "⚠️ ตรวจพบปัญหาการเชื่อมต่อฐานข้อมูล: โครงการ Supabase ของคุณอาจถูกหยุดชั่วคราว (Paused) กรุณาเปิดใช้งานที่ Supabase Dashboard",
+                type: "error",
+                duration: 10000
+              });
             }
           } catch {
             // Not JSON or other error, ignore
@@ -59,10 +60,11 @@ export default function SupabaseGuard() {
           // Check if it's a Supabase-related URL
           const url = args[0]?.toString() || '';
           if (url.includes('supabase.co')) {
-             toast.error(
-                "❌ ไม่สามารถติดต่อฐานข้อมูล Supabase ได้โดยตรง: กรุณาตรวจสอบว่าโครงการไม่ได้ถูก Pause ไว้",
-                { duration: 10000 }
-              );
+             showToast({
+                message: "❌ ไม่สามารถติดต่อฐานข้อมูล Supabase ได้โดยตรง: กรุณาตรวจสอบว่าโครงการไม่ได้ถูก Pause ไว้",
+                type: "error",
+                duration: 10000
+              });
           }
         }
         throw error;
@@ -72,7 +74,7 @@ export default function SupabaseGuard() {
     return () => {
       window.fetch = originalFetch;
     };
-  }, [toast]);
+  }, [showToast]);
 
   return null; // This component doesn't render anything itself
 }

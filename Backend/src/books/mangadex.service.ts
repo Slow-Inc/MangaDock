@@ -307,7 +307,7 @@ export class MangaDexService {
     const cacheKey = `manga:detail:${mangaId}`;
     const cached = await this.cache.get<MangaDetail>(cacheKey);
     if (cached) {
-      const enhanced = this.enhanceMangaDetail(mangaId, cached.data);
+      const enhanced = await this.enhanceMangaDetail(mangaId, cached.data);
       if (this.imageCache.enabled) {
         this.patchMangaDetailCacheIfNeeded(cacheKey, cached.data, enhanced);
       }
@@ -335,7 +335,7 @@ export class MangaDexService {
 
     if (hasUsefulData) {
       await this.cache.set(cacheKey, detail, CACHE_TTL_MS);
-      const enhanced = this.enhanceMangaDetail(mangaId, detail);
+      const enhanced = await this.enhanceMangaDetail(mangaId, detail);
       return forceLocal ? this.applyForceLocalMangaDetail(enhanced) : enhanced;
     }
 
@@ -343,7 +343,7 @@ export class MangaDexService {
     const stale = this.cache.getStale<MangaDetail>(cacheKey);
     if (stale) {
       this.logger.log(`[MangaDex] Serving stale manga-detail cache (updatedAt=${stale.updatedAt})`);
-      const enhanced = this.enhanceMangaDetail(mangaId, stale.data);
+      const enhanced = await this.enhanceMangaDetail(mangaId, stale.data);
       return forceLocal ? this.applyForceLocalMangaDetail(enhanced) : enhanced;
     }
 

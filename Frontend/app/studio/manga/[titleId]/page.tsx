@@ -7,12 +7,12 @@ import Navbar from "../../../components/Navbar";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../contexts/ToastContext";
 import {
-  ChapterVersion,
   deleteVersion,
   getBookCoverUrl,
   getMyVersions,
   publishVersion,
 } from "../../../lib/studioApi";
+import type { ChapterVersion } from "../../../lib/types";
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   draft: { label: "ร่าง", color: "text-white/40 bg-white/10" },

@@ -17,17 +17,19 @@ export class StructuredLoggingInterceptor implements NestInterceptor {
     const req = context.switchToHttp().getRequest();
     const method = req.method;
     const url = req.url;
+    const ip = req.ip || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'] || 'unknown';
     const taskId = req.headers['x-task-id'] || (req as any).hardwareId || 'none';
 
     return next.handle().pipe(
       tap({
         next: () => {
           const duration = Date.now() - now;
-          this.log(method, url, duration, taskId, 'success');
+          this.log(method, url, duration, taskId, 'success', ip, userAgent);
         },
         error: (err) => {
           const duration = Date.now() - now;
-          this.log(method, url, duration, taskId, 'error', err.message);
+          this.log(method, url, duration, taskId, 'error', ip, userAgent, err.message);
         },
       }),
     );
@@ -39,6 +41,8 @@ export class StructuredLoggingInterceptor implements NestInterceptor {
     duration: number,
     taskId: string,
     status: string,
+    ip: string,
+    userAgent: string,
     errorMessage?: string,
   ) {
     // T4-STANDARD Pillar 6: Structured Logging
@@ -49,11 +53,14 @@ export class StructuredLoggingInterceptor implements NestInterceptor {
       event: `${method} ${url}`,
       duration_ms: duration,
       status: status,
+      client_info: {
+        ip,
+        user_agent: userAgent,
+      },
       ...(errorMessage && { error: errorMessage }),
     };
 
     // In a real T4 environment, this would be sent to a log aggregator.
-    // For now, we print it as a JSON string to stdout.
     console.log(JSON.stringify(logData));
   }
 }
