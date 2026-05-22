@@ -7,11 +7,10 @@ import Navbar from "../../components/Navbar";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import {
-  ChapterVersion,
   getBookCoverUrl,
   getMyVersions,
-  VersionStatus,
 } from "../../lib/studioApi";
+import type { ChapterVersion, VersionStatus } from "../../lib/types";
 import { getCached, setCache } from "../../lib/studioCache";
 import StudioNav from "../components/StudioNav";
 import { MetricCard, StudioAnnouncement, StudioSection } from "../components/StudioDashboardWidgets";

@@ -30,6 +30,11 @@ export type MangaChapter = {
   pageCount: number;
   readerAvailable?: boolean;
   isOfflineFallback?: boolean;
+  source?: "mangadex" | "user";
+  translatorName?: string | null;
+  priceCoins?: number;
+  versionId?: string;
+  backendAvailable?: boolean;
 };
 
 export type MangaChapterPages = {

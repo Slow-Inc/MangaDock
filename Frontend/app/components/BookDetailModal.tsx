@@ -15,45 +15,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { getWalletBalance, purchaseUnlock, getUnlocksForTitle, topupCoins } from "../lib/studioApi";
 import type { LandingBook, MangaCover, MangaDetail, MangaChapter } from "../lib/types";
 
-type MangaCover = {
-  volume: string | null;
-  url: string;
-  /** Local /img-cache/… path returned when backend IMAGE_CACHE_ENABLED=true */
-  localUrl?: string;
-};
-
-type MangaDetail = {
-  id: string;
-  authors: string[];
-  artists: string[];
-  covers: MangaCover[];
-  genres?: string[];
-  description?: string;
-};
-
-type MangaChapter = {
-  id: string;
-  chapterNumber: string | null;
-  title: string | null;
-  translatedLanguage: string;
-  uploadedAt: string;
-  pageCount: number;
-  /** forceLocal mode: true when this chapter has local cache for reader */
-  readerAvailable?: boolean;
-  /** True if returned from stale cache because the upstream API went offline */
-  isOfflineFallback?: boolean;
-  /** 'mangadex' (default) or 'user' for user-uploaded translations */
-  source?: "mangadex" | "user";
-  /** Translator name for user-uploaded versions */
-  translatorName?: string | null;
-  /** Coin price for user-uploaded versions (0 = free) */
-  priceCoins?: number;
-  /** The actual version ID (without ver: prefix) for unlock checks */
-  versionId?: string;
-  /** False when the version exists in DB but its uploaded files are missing on this backend. */
-  backendAvailable?: boolean;
-};
-
 type ActiveChapter = {
   id: string;
   chapterNumber: string | null;

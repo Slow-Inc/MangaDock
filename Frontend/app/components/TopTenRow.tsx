@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import TopTenCard from "./TopTenCard";
 import type { LandingBook } from "../lib/types";
 
-type TopTenRowProps = {
+type Props = {
   books: LandingBook[];
 };
 

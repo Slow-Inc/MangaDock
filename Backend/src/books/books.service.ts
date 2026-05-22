@@ -1262,7 +1262,7 @@ export class BooksService {
     const cached = await this.cache.get<LandingPayload>(cacheKey);
     if (cached) {
       this.logger.log(`Landing served from [${cached.source}] cache`);
-      const enhanced = this.enhanceLanding(cached.data);
+      const enhanced = await this.enhanceLanding(cached.data);
       if (this.imageCache.enabled) {
         this.patchLandingCacheIfNeeded(cacheKey, cached.data, enhanced);
       }
@@ -1296,7 +1296,7 @@ export class BooksService {
           fromStaleCache: true,
           staleUpdatedAt: stale.updatedAt,
         };
-        const enhanced = this.enhanceLanding(stalePayload);
+        const enhanced = await this.enhanceLanding(stalePayload);
         return forceLocal ? this.applyForceLocalLanding(enhanced) : enhanced;
       }
       this.logger.warn('No stale cache available — returning API offline payload');
@@ -1322,14 +1322,14 @@ export class BooksService {
           fromStaleCache: true,
           staleUpdatedAt: stale.updatedAt,
         };
-        const enhanced = this.enhanceLanding(stalePayload);
+        const enhanced = await this.enhanceLanding(stalePayload);
         return forceLocal ? this.applyForceLocalLanding(enhanced) : enhanced;
       }
       this.logger.warn('No stale cache available — returning API offline payload');
       return { hero: null, rows: [], updatedAt: new Date().toISOString(), apiOffline: true };
     }
 
-    const landingEnhanced = this.enhanceLanding(payload);
+    const landingEnhanced = await this.enhanceLanding(payload);
     return forceLocal ? this.applyForceLocalLanding(landingEnhanced) : landingEnhanced;
   }
 
