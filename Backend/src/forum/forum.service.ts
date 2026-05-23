@@ -198,6 +198,7 @@ export class ForumService {
         );
       }
       if (!parentComment) throw new NotFoundException('Parent comment not found');
+      // Supabase row keys mirror DB column names (snake_case).
       if (parentComment.post_id !== dto.postId) {
         throw new BadRequestException('Parent comment must belong to the same post');
       }
