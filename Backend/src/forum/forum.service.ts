@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { 
   ForumPost, 
@@ -192,7 +192,11 @@ export class ForumService {
         .eq('id', dto.parentId)
         .maybeSingle();
 
-      if (parentError) throw new Error(`Failed to validate parent comment: ${parentError.message}`);
+      if (parentError) {
+        throw new InternalServerErrorException(
+          `Failed to validate parent comment: ${parentError.message}`,
+        );
+      }
       if (!parentComment) throw new NotFoundException('Parent comment not found');
       if (parentComment.post_id !== dto.postId) {
         throw new BadRequestException('Parent comment must belong to the same post');
