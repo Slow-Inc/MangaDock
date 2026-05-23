@@ -16,6 +16,7 @@
 flowchart LR
   U[User Browser]
   FE[Frontend\nNext.js]
+  MA[Mobile App\nReact Native]
   SC[Supabase Auth/Client]
   BE[Backend\nNestJS]
   CA[Cache Layer\n2-Tier Cache]
@@ -25,8 +26,11 @@ flowchart LR
   GM[Gemini API\nand Translator Providers]
 
   U --> FE
+  U --> MA
   FE <--> BE
+  MA <--> BE
   FE <--> SC
+  MA <--> SC
   BE <--> CA
   BE <--> SS
   BE <--> EXT
@@ -40,7 +44,8 @@ flowchart LR
 
 1. Frontend (Next.js) ติดต่อกับ Backend (NestJS) เพื่อเรียกข้อมูลหนังสือ มังงะ ผู้ใช้ รายการโปรด และ flow การแปลภาพ
 2. Frontend ติดต่อกับ Supabase สำหรับ authentication และ real-time data ฝั่ง client
-3. Backend ติดต่อกับ 2-Layer Cache (Memory + Redis) เพื่อลดการเรียกข้อมูลซ้ำและเก็บผลลัพธ์ที่ใช้บ่อย พร้อมระบบ Graceful Shutdown
+3. Mobile App (React Native) ทำหน้าที่เป็น Shell ครอบ Web App และใช้ Native APIs สำหรับฟีเจอร์ระดับ OS เช่น Screen Capture และ Overlay
+4. Backend ติดต่อกับ 2-Layer Cache (Memory + Redis) เพื่อลดการเรียกข้อมูลซ้ำและเก็บผลลัพธ์ที่ใช้บ่อย พร้อมระบบ Graceful Shutdown
 4. Backend ติดต่อกับ Supabase (Service Role) สำหรับงานฝั่ง server เช่น การจัดการข้อมูลที่ซับซ้อนและการตรวจสอบสิทธิ์
 5. Backend ติดต่อกับ External APIs เช่น Google Books, MangaDex และบริการภายนอกอื่นตาม flow ของระบบ
 6. Backend ติดต่อกับ MIT ผ่าน HTTP แบบ Asynchronous (Fire-and-forget) เพื่อสั่งงานแปลภาพมังงะ
@@ -49,12 +54,13 @@ flowchart LR
 
 ## 4. Responsibility by Layer
 
-### Frontend
+### Frontend (Web & Mobile)
 
 - แสดงผลหน้า UI และจัดการ interaction ของผู้ใช้
+- **Web:** Next.js จัดการประสบการณ์บนเบราว์เซอร์
+- **Mobile:** React Native Shell ครอบ WebView และจัดการฟีเจอร์ระดับระบบปฏิบัติการ (OS-Level Integration)
 - เรียก backend APIs สำหรับ business flows หลัก
 - ใช้ Supabase สำหรับงาน authentication และจัดการ session ฝั่ง client
-- มีระบบ SupabaseGuard แจ้งเตือนเมื่อฐานข้อมูลไม่พร้อมใช้งาน
 
 ### Backend
 

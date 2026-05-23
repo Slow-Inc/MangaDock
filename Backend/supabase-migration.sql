@@ -154,6 +154,45 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- ─── 2.5 FORUM TABLES (Phase 2) ───────────────────────────────────────────
+
+-- forum_posts
+CREATE TABLE IF NOT EXISTS forum_posts (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  author_uid    UUID NOT NULL REFERENCES profiles(uid) ON DELETE CASCADE,
+  title         TEXT NOT NULL,
+  content       TEXT NOT NULL,
+  category      TEXT NOT NULL DEFAULT 'general', -- 'general', 'announcement', 'spoiler', 'manga_update'
+  target_manga_id TEXT, -- Optional link to a specific manga
+  upvotes       INTEGER NOT NULL DEFAULT 0,
+  downvotes     INTEGER NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- forum_comments (Nested support)
+CREATE TABLE IF NOT EXISTS forum_comments (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id       UUID NOT NULL REFERENCES forum_posts(id) ON DELETE CASCADE,
+  parent_id     UUID REFERENCES forum_comments(id) ON DELETE CASCADE,
+  author_uid    UUID NOT NULL REFERENCES profiles(uid) ON DELETE CASCADE,
+  content       TEXT NOT NULL,
+  upvotes       INTEGER NOT NULL DEFAULT 0,
+  downvotes     INTEGER NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- forum_votes (Idempotent voting)
+CREATE TABLE IF NOT EXISTS forum_votes (
+  uid           UUID NOT NULL REFERENCES profiles(uid) ON DELETE CASCADE,
+  target_type   TEXT NOT NULL CHECK (target_type IN ('post', 'comment')),
+  target_id     UUID NOT NULL,
+  vote_value    INTEGER NOT NULL CHECK (vote_value IN (1, -1)),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (uid, target_type, target_id)
+);
+
 -- ─── 3. CHECK CONSTRAINTS ────────────────────────────────────────────────────
 
 DO $$ BEGIN
