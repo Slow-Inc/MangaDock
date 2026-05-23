@@ -185,6 +185,20 @@ export class ForumService {
   }
 
   async createComment(uid: string, dto: CreateCommentDto): Promise<ForumComment> {
+    if (dto.parentId) {
+      const { data: parentComment, error: parentError } = await this.db
+        .from('forum_comments')
+        .select('id, post_id')
+        .eq('id', dto.parentId)
+        .maybeSingle();
+
+      if (parentError) throw new Error(`Failed to validate parent comment: ${parentError.message}`);
+      if (!parentComment) throw new NotFoundException('Parent comment not found');
+      if (parentComment.post_id !== dto.postId) {
+        throw new BadRequestException('Parent comment must belong to the same post');
+      }
+    }
+
     const { data, error } = await this.db
       .from('forum_comments')
       .insert({
