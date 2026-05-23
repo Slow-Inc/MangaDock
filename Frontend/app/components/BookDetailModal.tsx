@@ -13,6 +13,7 @@ import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { useAuth } from "../contexts/AuthContext";
 import { getWalletBalance, purchaseUnlock, getUnlocksForTitle, topupCoins } from "../lib/studioApi";
+import MangaDiscussion from "./MangaDiscussion";
 import type { LandingBook, MangaCover, MangaDetail, MangaChapter } from "../lib/types";
 
 type ActiveChapter = {
@@ -1059,6 +1060,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                 <p className="text-xs text-white/40">ไม่พบตอนที่แปลแล้ว</p>
               )}
             </div>
+          )}
+
+          {/* Manga-specific discussion threads (Phase 2 Community) */}
+          {isManga && (
+            <MangaDiscussion mangaId={book.id} title={book.title} />
           )}
         </div>
       </div>
