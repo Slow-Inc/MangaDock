@@ -1,10 +1,13 @@
 # Mobile Architecture and Integration
 
+> **Phase 3 — Future Scaling Goal**
+> Mobile App อยู่ในแผน Phase 3 และยังไม่ได้ integrate เข้า production pipeline ของ MangaDock โค้ด shell ใน `Mobile/` คือ proof-of-concept สำหรับวางโครงสร้างล่วงหน้า
+
 เอกสารฉบับนี้สรุปบทบาทของ Mobile Application ในระบบ MangaDock และแนวทางการเชื่อมต่อกับส่วนอื่น ๆ
 
 ## 1. Mobile Overview
 
-Mobile Application ของ MangaDock พัฒนาด้วย **React Native** โดยเน้นการเป็น **Native Shell** ที่ครอบ Web Application (Next.js) ไว้ภายใน WebView เพื่อใช้ประโยชน์จาก Responsive Design ที่ทำไว้แล้ว และเสริมความสามารถด้วยฟีเจอร์ที่เข้าถึงระบบปฏิบัติการ (OS-Level Integration)
+Mobile Application ของ MangaDock วางแผนพัฒนาด้วย **React Native** โดยเน้นการเป็น **Native Shell** ที่ครอบ Web Application (Next.js) ไว้ภายใน WebView เพื่อใช้ประโยชน์จาก Responsive Design ที่ทำไว้แล้ว และเสริมความสามารถด้วยฟีเจอร์ที่เข้าถึงระบบปฏิบัติการ (OS-Level Integration)
 
 ### 1.2 Tech Stack
 *   **Framework:** React Native 0.85+ (TypeScript)
@@ -42,7 +45,7 @@ User Mobile Device
 ### 4.2 Auth Bridge
 ใช้ระบบ Deep Linking (เช่น `mangadock://auth-callback`) เพื่อรับ Session Token จากเบราว์เซอร์กลับมายังแอปมือถือเมื่อผู้ใช้ทำการ Social Login สำเร็จ
 
-### 4.3 OS-Level Integration (Phase 2 Goal)
+### 4.3 OS-Level Integration (Phase 3 Goal)
 *   **Screen Capture:** ใช้ `MediaProjection` เพื่อดึงภาพหน้าจอขณะผู้ใช้ใช้งานแอปอื่น
 *   **Overlay:** ใช้ `WindowManager` เพื่อวาดกรอบคำแปลทับซ้อนหน้าจอเดิม
 

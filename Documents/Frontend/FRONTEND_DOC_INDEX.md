@@ -12,7 +12,7 @@
 
 ## Recommended Usage
 
-- ใช้ [../SYSTEM_ARCHITECTURE_OVERVIEW.md](../SYSTEM_ARCHITECTURE_OVERVIEW.md) เพื่อดูภาพรวมความสัมพันธ์ของ Frontend, Backend, MIT, Firebase และ external services
+- ใช้ [../SYSTEM_ARCHITECTURE_OVERVIEW.md](../SYSTEM_ARCHITECTURE_OVERVIEW.md) เพื่อดูภาพรวมความสัมพันธ์ของ Frontend, Backend, MIT, Supabase, Cloudflare Worker/R2 และ external services
 - ใช้ [Frontend README](../../Frontend/README.md) เป็นจุดเริ่มต้นสำหรับการติดตั้ง การตั้งค่า environment และการรันระบบ
 - ใช้ [FRONTEND_ARCHITECTURE_AND_RUNTIME.md](FRONTEND_ARCHITECTURE_AND_RUNTIME.md) เพื่อสรุปภาพรวมเชิงสถาปัตยกรรม เส้นทางข้อมูล และบทบาทของ frontend ในระบบ MangaDock
 

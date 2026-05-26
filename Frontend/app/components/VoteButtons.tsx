@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { vote } from "../lib/communityApi";
+import { useAuth } from "../contexts/AuthContext";
 
 interface VoteButtonsProps {
   targetType: 'post' | 'comment';
@@ -9,6 +10,7 @@ interface VoteButtonsProps {
   initialUpvotes: number;
   initialDownvotes: number;
   initialUserVote: number;
+  externalCounts?: { upvotes: number; downvotes: number };
 }
 
 export default function VoteButtons({
@@ -17,36 +19,71 @@ export default function VoteButtons({
   initialUpvotes,
   initialDownvotes,
   initialUserVote,
+  externalCounts,
 }: VoteButtonsProps) {
   const [upvotes, setUpvotes] = useState(initialUpvotes);
   const [downvotes, setDownvotes] = useState(initialDownvotes);
   const [userVote, setUserVote] = useState(initialUserVote);
   const [loading, setLoading] = useState(false);
 
+  // Sync SSE vote updates from other users (ignored while user is actively voting)
+  useEffect(() => {
+    if (!loading && externalCounts) {
+      setUpvotes(externalCounts.upvotes);
+      setDownvotes(externalCounts.downvotes);
+    }
+  }, [externalCounts, loading]);
+  const { user, showLoginPrompt } = useAuth();
+
   const handleVote = async (value: 1 | -1) => {
     if (loading) return;
-    setLoading(true);
 
+    if (!user) {
+      showLoginPrompt();
+      return;
+    }
+
+    // Snapshot for revert
+    const prevUpvotes = upvotes;
+    const prevDownvotes = downvotes;
+    const prevUserVote = userVote;
+    const isToggleOff = userVote === value;
+
+    // Apply optimistic delta immediately — no await
+    if (isToggleOff) {
+      if (value === 1) setUpvotes(v => v - 1);
+      else setDownvotes(v => v - 1);
+      setUserVote(0);
+    } else {
+      if (prevUserVote === 1) setUpvotes(v => v - 1);
+      if (prevUserVote === -1) setDownvotes(v => v - 1);
+      if (value === 1) setUpvotes(v => v + 1);
+      else setDownvotes(v => v + 1);
+      setUserVote(value);
+    }
+
+    setLoading(true);
     try {
       const result = await vote({ targetType, targetId, voteValue: value });
+      // Sync with authoritative server counts
       setUpvotes(result.upvotes);
       setDownvotes(result.downvotes);
-      
-      // If user clicks the same vote again, it toggles off (0), else sets to new value
-      setUserVote(prev => prev === value ? 0 : value);
-    } catch (err) {
-      console.error("Vote failed", err);
+    } catch {
+      // Revert to pre-click state
+      setUpvotes(prevUpvotes);
+      setDownvotes(prevDownvotes);
+      setUserVote(prevUserVote);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10">
+    <div className="flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10 smooth-hover">
       <button
         onClick={() => handleVote(1)}
         disabled={loading}
-        className={`p-1.5 rounded-full transition-colors ${
+        className={`p-1.5 rounded-full smooth-hover-fast ${
           userVote === 1 
             ? "text-orange-500 bg-orange-500/10" 
             : "text-white/60 hover:text-white hover:bg-white/10"
@@ -57,7 +94,7 @@ export default function VoteButtons({
         </svg>
       </button>
       
-      <span className={`text-xs font-bold min-w-[1.5rem] text-center ${
+      <span className={`text-xs font-bold min-w-[1.5rem] text-center smooth-hover-fast ${
         userVote === 1 ? "text-orange-500" : userVote === -1 ? "text-indigo-500" : "text-white/80"
       }`}>
         {upvotes - downvotes}
@@ -66,7 +103,7 @@ export default function VoteButtons({
       <button
         onClick={() => handleVote(-1)}
         disabled={loading}
-        className={`p-1.5 rounded-full transition-colors ${
+        className={`p-1.5 rounded-full smooth-hover-fast ${
           userVote === -1 
             ? "text-indigo-500 bg-indigo-500/10" 
             : "text-white/60 hover:text-white hover:bg-white/10"

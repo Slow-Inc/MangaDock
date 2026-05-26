@@ -100,11 +100,11 @@ export function getVersionStatusBreakdown(versions: ChapterVersion[]): Breakdown
   }, {});
 
   const result: BreakdownDatum[] = [
-    { label: "เผยแพร่", value: counts.published ?? 0, tone: "emerald" },
-    { label: "ร่าง", value: counts.draft ?? 0, tone: "slate" },
-    { label: "รอตรวจ", value: counts.pending_moderation ?? 0, tone: "amber" },
-    { label: "อนุมัติ", value: counts.approved ?? 0, tone: "sky" },
-    { label: "โดน moderator ลบ", value: counts.rejected ?? 0, tone: "rose" },
+    { label: "เผยแพร่แล้ว", value: counts.published ?? 0, tone: "emerald" },
+    { label: "แบบร่าง", value: counts.draft ?? 0, tone: "slate" },
+    { label: "รอตรวจสอบ", value: counts.pending_moderation ?? 0, tone: "amber" },
+    { label: "อนุมัติแล้ว", value: counts.approved ?? 0, tone: "sky" },
+    { label: "ไม่ผ่านการอนุมัติ", value: counts.rejected ?? 0, tone: "rose" },
   ];
   return result.filter((item) => item.value > 0);
 }

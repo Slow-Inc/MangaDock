@@ -7,6 +7,6 @@ import { ImageCacheService } from './image-cache.service';
 @Global()
 @Module({
   providers: [RedisService, JsonCacheService, CacheOrchestratorService, ImageCacheService],
-  exports: [CacheOrchestratorService, ImageCacheService],
+  exports: [CacheOrchestratorService, ImageCacheService, RedisService],
 })
 export class CacheModule {}

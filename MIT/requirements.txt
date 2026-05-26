@@ -23,7 +23,7 @@ transformers
 py3langid==0.2.2
 sentencepiece
 editdistance
-numpy==1.26.4
+numpy>=1.26.4
 tensorboardX
 websockets
 protobuf<6.0.0,>=3.20.2 # `google-genai` dependancy requirement
@@ -54,7 +54,7 @@ accelerate
 bitsandbytes
 uvicorn
 fastapi
-pydantic==2.5.0
+pydantic>=2.9.2
 python-multipart
 google-genai
 rich

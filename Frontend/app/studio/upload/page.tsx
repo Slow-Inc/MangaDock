@@ -610,38 +610,48 @@ function StudioUploadContent() {
         body: JSON.stringify({ description, priceCoins: Number(priceCoins) || 0 }),
       });
       if (!res.ok) {
-        showToast({ message: "บันทึกไม่สำเร็จ" });
+        showToast({ type: "error", message: "บันทึกไม่สำเร็จ" });
         return;
       }
-      showToast({ message: "บันทึกแล้ว" });
+      showToast({ type: "success", message: "บันทึกแล้ว" });
     } catch {
-      showToast({ message: "เกิดข้อผิดพลาด" });
+      showToast({ type: "error", message: "เกิดข้อผิดพลาด" });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDone = () => {
+  const handleDone = async () => {
     if (!titleId) {
-      showToast({ message: "กรุณาเลือกมังงะก่อน" });
+      showToast({ type: "warning", message: "กรุณาเลือกมังงะก่อน" });
       return;
     }
     if (!chapterNumber.trim()) {
-      showToast({ message: "กรุณากรอกหมายเลขตอน" });
+      showToast({ type: "warning", message: "กรุณากรอกหมายเลขตอน" });
       return;
     }
     if (!language) {
-      showToast({ message: "กรุณาเลือกภาษาที่แปล" });
+      showToast({ type: "warning", message: "กรุณาเลือกภาษาที่แปล" });
       return;
     }
     if (pages.length === 0) {
-      showToast({ message: "กรุณาอัปโหลดหน้ามังงะอย่างน้อย 1 หน้า" });
+      showToast({ type: "warning", message: "กรุณาอัปโหลดหน้ามังงะอย่างน้อย 1 หน้า" });
       return;
     }
     if (pages.some((p) => p.uploading)) {
-      showToast({ message: "กรุณารอให้การอัปโหลดเสร็จสิ้นก่อน" });
+      showToast({ type: "info", message: "กรุณารอให้การอัปโหลดเสร็จสิ้นก่อน" });
       return;
     }
+
+    // T4-STANDARD: Ensure metadata is saved before finishing (Readiness)
+    if (versionId) {
+      try {
+        await handleSaveMetadata();
+      } catch {
+        // Continue anyway if save fails, as the user might have already clicked save
+      }
+    }
+
     if (titleId) {
       router.push(`/studio/manga/${encodeURIComponent(titleId)}?titleName=${encodeURIComponent(titleName)}`);
     } else {

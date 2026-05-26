@@ -166,7 +166,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Toast container — always rendered for CSS transition */}
       <div
         aria-live="polite"
-        className={`fixed bottom-6 left-1/2 z-[9999] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 transition-all duration-300 ${
+        className={`fixed bottom-24 sm:bottom-10 left-1/2 z-[9999] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 transition-all duration-300 ${
           visible && toast ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"
         }`}
       >

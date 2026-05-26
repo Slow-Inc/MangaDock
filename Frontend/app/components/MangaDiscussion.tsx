@@ -7,7 +7,7 @@ import PostCard from "./PostCard";
 import { PostSkeleton } from "./ForumSkeleton";
 import type { ForumPost } from "../lib/types";
 
-export default function MangaDiscussion({ mangaId, title }: { mangaId: string, title: string }) {
+export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: string, title: string, cover?: string }) {
   const { user } = useAuth();
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,19 +33,53 @@ export default function MangaDiscussion({ mangaId, title }: { mangaId: string, t
 
   const handleQuickPost = async () => {
     if (!newPostContent.trim() || submitting) return;
+
+    const content = newPostContent;
+    const tempId = `temp-${Date.now()}`;
+    const tempPost: ForumPost = {
+      id: tempId,
+      title: `พูดคุยเกี่ยวกับเรื่อง ${title}`,
+      content,
+      category: 'general',
+      targetMangaId: mangaId,
+      targetMangaTitle: title,
+      targetMangaCover: cover ?? null,
+      imageUrls: [],
+      authorUid: user?.uid ?? '',
+      authorName: user?.displayName ?? null,
+      authorPhotoUrl: user?.photoURL ?? null,
+      authorRole: user?.role ?? 'user',
+      upvotes: 0,
+      downvotes: 0,
+      userVote: 0,
+      commentCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Optimistic: show post immediately, close form
+    setPosts(prev => [tempPost, ...prev]);
+    setNewPostContent("");
+    setIsPosting(false);
     setSubmitting(true);
+
     try {
-      await createPost({
-        title: `พูดคุยเกี่ยวกับเรื่อง ${title}`,
-        content: newPostContent,
+      const realPost = await createPost({
+        title: tempPost.title,
+        content,
         category: 'general',
-        targetMangaId: mangaId
+        targetMangaId: mangaId,
+        targetMangaTitle: title,
+        targetMangaCover: cover,
       });
-      setNewPostContent("");
-      setIsPosting(false);
-      fetchPosts();
+      // Replace temp with authoritative server post
+      setPosts(prev => prev.map(p => p.id === tempId ? realPost : p));
     } catch (err) {
       console.error(err);
+      // Revert: remove temp post, restore form
+      setPosts(prev => prev.filter(p => p.id !== tempId));
+      setNewPostContent(content);
+      setIsPosting(true);
     } finally {
       setSubmitting(false);
     }

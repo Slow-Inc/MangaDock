@@ -171,6 +171,7 @@
 ## Phase 7: Community Retention (Forum + Ecosystem)
 
 ### 7.1 Forum/Discussion
+- **PRD:** [PRD_COMMUNITY_FORUM.md](./PRD_COMMUNITY_FORUM.md)
 - กระดานคุยระดับ title/chapter/version
 - sticky posts สำหรับ translator notes/changelog
 
@@ -181,12 +182,18 @@
 
 ---
 
-## Backend Modules ที่ต้องเพิ่ม (ของใหม่ทั้งหมด)
-- `Backend/src/wallet/` (wallet, ledger, unlock)
+## Backend Modules
+
+### ✅ Implemented
+- `Backend/src/forum/` (threads, comments, image upload, voting)
+- `Backend/src/wallet/` (wallet balance, ledger)
+- `Backend/src/unlock/` (unlock economy, idempotent unlock flow)
+- `Backend/src/upload/` (StorageModule — DiskStorageProvider, injectable via `STORAGE_PROVIDER`)
+- `Backend/src/versions/` (chapter versions)
+
+### 🔭 Roadmap
 - `Backend/src/creator-economy/` (pricing, revenue share, payouts)
 - `Backend/src/content-origin/` (origin policy)
-- `Backend/src/versions/` (chapter versions)
-- `Backend/src/upload/` (upload workflow + moderation state)
 - `Backend/src/entitlements/` (plan/benefit resolver)
 - `Backend/src/payments/` (topup, webhook, reconciliation)
 - `Backend/src/payouts/` (withdrawal pipeline)
@@ -195,16 +202,19 @@
 - `Backend/src/trust/` (trust score + anti-abuse)
 - `Backend/src/legal/` (report, takedown, region block)
 - `Backend/src/text-removal/` (estimate + consume credits)
-- `Backend/src/forum/` (threads/comments/moderation)
 
-## Frontend Areas ที่ต้องเพิ่ม
-- `Frontend/app/studio/` (translator/creator upload studio)
-- `Frontend/app/wallet/` (balance, topup, history)
+## Frontend Areas
+
+### ✅ Implemented
+- `Frontend/app/studio/` (translator/creator upload studio — works, manga, wallet, upload pages)
+- `Frontend/app/community/` (community forum — posts, comments, voting, image upload)
+
+### 🔭 Roadmap
+- `Frontend/app/wallet/` (dedicated balance, topup, history page)
 - `Frontend/app/creator/` และ `Frontend/app/translator/` profile pages
 - `Frontend/app/chapter/[id]/versions` (เลือกเวอร์ชันแปล)
 - `Frontend/app/premium/` (subscription & benefits)
 - `Frontend/app/admin/` (moderation/legal/finance dashboards)
-- `Frontend/app/forum/` (community)
 - `Frontend/app/tools/text-removal/` (estimate + run)
 
 ## ไฟล์สำคัญที่ต้องแก้ (จากฐานเดิม)
@@ -217,22 +227,26 @@
 - `Frontend/app/components/AccountModal.tsx` (plan, wallet, creator tools, payout)
 - `Frontend/app/components/MangaReader.tsx` (version selector + unlock state + source label)
 
-## Firestore Collections (target model)
-- `users/{uid}`
-- `wallets/{uid}`
-- `walletTransactions/{txId}`
-- `subscriptions/{uid}`
-- `titles/{titleId}`
-- `chapters/{chapterId}`
-- `chapterVersions/{versionId}`
-- `unlocks/{uid}_{versionId}`
-- `reports/{reportId}`
-- `regionPolicies/{policyId}`
-- `ratings/{ratingId}`
-- `comments/{commentId}`
-- `trustEvents/{eventId}`
-- `leaderboards/{period}`
-- `bonusPayouts/{bonusId}`
+## Supabase Tables (Current + Target)
+
+### ✅ Current (Implemented)
+- `profiles`
+- `wallets`
+- `wallet_transactions`
+- `chapter_versions`
+- `unlocks`
+- `forum_posts` (รองรับ `image_urls TEXT[]`)
+- `forum_comments` (รองรับ `parent_id` self-referential FK สำหรับ nested threads)
+- `forum_votes`
+
+### 🔭 Target (Roadmap)
+- `subscriptions`
+- `reports`
+- `region_policies`
+- `ratings`
+- `trust_events`
+- `leaderboards`
+- `bonus_payouts`
 
 ## Dependencies (ลำดับการทำงาน)
 - Phase 0 ต้องมาก่อนทุกเฟส

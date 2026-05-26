@@ -92,7 +92,7 @@ async function flush() {
     "Content-Type": "application/json",
   };
 
-  // Compute diffs vs last known Firebase state
+  // Compute diffs vs last known database state
   const toAddFav: CachedBook[] = [];
   const toRemoveFav: string[] = [];
   const toAddLike: string[] = [];

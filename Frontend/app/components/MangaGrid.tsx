@@ -27,11 +27,18 @@ interface Props {
   books: GridBook[];
 }
 
+function cdnFallback(book: GridBook): string {
+  if (!book.thumbnail) return "";
+  return book.thumbnail.includes("mangadex.org")
+    ? `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`
+    : book.thumbnail;
+}
+
 function GridCard({ book }: { book: GridBook }) {
   const [showModal, setShowModal] = useState(false);
   const [showCover, setShowCover] = useState(false);
   const [showReader, setShowReader] = useState(false);
-  const thumb = resolvedThumbnail(book);
+  const [thumbSrc, setThumbSrc] = useState(() => resolvedThumbnail(book));
 
   // Same source as BookDetailModal — read from history directly, no extra props needed
   const historyEntry = getHistory().find((h) => h.id === book.id);
@@ -45,7 +52,7 @@ function GridCard({ book }: { book: GridBook }) {
         onClick={() => setShowModal(true)}
       >
         {/* Cover */}
-        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-white/10 bg-white/5 transition-all duration-300 group-hover:scale-[1.05] group-hover:border-white/25 group-hover:shadow-xl group-hover:shadow-black/50">
+        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-white/10 bg-white/5 smooth-hover group-hover:scale-[1.05] group-hover:border-white/25 group-hover:shadow-xl group-hover:shadow-black/50">
           {book.thumbnailCached === false ? (
             <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-white/5 text-white/20">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-7 w-7">
@@ -54,11 +61,12 @@ function GridCard({ book }: { book: GridBook }) {
             </div>
           ) : (
             <Image
-              src={thumb}
+              src={thumbSrc}
               alt={book.title}
               fill
               className="object-cover transition duration-300 group-hover:scale-105"
               sizes="(max-width: 640px) 45vw, (max-width: 1024px) 20vw, 14vw"
+              onError={() => setThumbSrc(cdnFallback(book))}
             />
           )}
           <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
@@ -108,7 +116,7 @@ function GridCard({ book }: { book: GridBook }) {
         <BookDetailModal book={book} onClose={() => setShowModal(false)} />
       )}
       {showCover && (
-        <CoverLightbox src={thumb} alt={book.title} onClose={() => setShowCover(false)} />
+        <CoverLightbox src={thumbSrc} alt={book.title} onClose={() => setShowCover(false)} />
       )}
       {showReader && lastChapterId && (
         <MangaReader

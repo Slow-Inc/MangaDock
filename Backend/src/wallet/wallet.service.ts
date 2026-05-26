@@ -122,7 +122,7 @@ export class WalletService {
       .insert({
         uid,
         type: 'purchase',
-        amount,
+        amount: -amount, // Use negative for deductions
         balance_after: newBalance,
         description,
         reference_id: referenceId ?? null,
@@ -143,6 +143,67 @@ export class WalletService {
 
     this.logger.log(`Spent ${amount} coins for user ${uid}, new balance: ${newBalance}`);
     return { balance: newBalance };
+  }
+
+  /**
+   * High-level purchase flow that splits revenue between Creator and Platform.
+   * Standard Split: 70% to Creator, 30% to Platform.
+   */
+  async processRevenueSplit(
+    userUid: string,
+    creatorUid: string,
+    amount: number,
+    description: string,
+    referenceId: string,
+  ) {
+    // 1. Deduct full amount from user
+    const { balance } = await this.spendCoins(userUid, amount, description, referenceId);
+
+    // 2. Calculate shares
+    const PLATFORM_FEE_PCT = 0.3; // 30%
+    const platformShare = Math.floor(amount * PLATFORM_FEE_PCT);
+    const creatorShare = amount - platformShare;
+
+    // 3. Add share to creator's wallet
+    if (creatorShare > 0) {
+      await this.addCoins(
+        creatorUid,
+        creatorShare,
+        'reward',
+        `ส่วนแบ่งรายได้: ${description}`,
+      );
+      this.logger.log(`Revenue Split: User ${userUid} paid ${amount}. Creator ${creatorUid} received ${creatorShare}. Platform took ${platformShare}.`);
+    }
+
+    return { balance, platformShare, creatorShare };
+  }
+
+  async getCreatorEarnings(uid: string): Promise<{
+    totalSales: number;
+    totalEarned: number;
+    titlesSold: number;
+    uniqueBuyers: number;
+  }> {
+    const { data, error } = await this.db
+      .from('translator_earnings')
+      .select('*')
+      .eq('translator_uid', uid)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to fetch creator earnings: ${error.message}`);
+    }
+
+    if (!data) {
+      return { totalSales: 0, totalEarned: 0, titlesSold: 0, uniqueBuyers: 0 };
+    }
+
+    return {
+      totalSales: data.total_sales,
+      totalEarned: data.total_earned,
+      titlesSold: data.titles_sold,
+      uniqueBuyers: data.unique_buyers,
+    };
   }
 
   async getTransactions(uid: string, limit = 50) {

@@ -70,10 +70,10 @@ export class UnlockService {
       return { alreadyUnlocked: true };
     }
 
-    // Fetch chapter version to get price
+    // Fetch chapter version to get price and creator
     const { data: version, error: versionError } = await this.db
       .from('chapter_versions')
-      .select('version_id, price_coins')
+      .select('version_id, price_coins, translator_uid, chapters!inner(manga!inner(title))')
       .eq('version_id', versionId)
       .maybeSingle();
 
@@ -85,13 +85,21 @@ export class UnlockService {
     }
 
     const priceCoins = version.price_coins ?? 0;
+    const creatorUid = version.translator_uid;
+    const mangaTitle = (version as any).chapters?.manga?.title || 'Unknown Manga';
     let newBalance: number | undefined;
 
     if (priceCoins > 0) {
-      const result = await this.walletService.spendCoins(
+      if (!creatorUid) {
+        throw new BadRequestException('Cannot purchase: Creator information is missing for this version.');
+      }
+
+      // Use the high-level revenue split logic
+      const result = await this.walletService.processRevenueSplit(
         uid,
+        creatorUid,
         priceCoins,
-        'ปลดล็อคตอน',
+        `ปลดล็อคตอน: ${mangaTitle}`,
         versionId,
       );
       newBalance = result.balance;

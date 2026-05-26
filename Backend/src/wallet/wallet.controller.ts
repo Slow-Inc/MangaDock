@@ -35,4 +35,10 @@ export class WalletController {
   async getTransactions(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
     return this.wallet.getTransactions(req[USER_KEY].uid);
   }
+
+  @Get('earnings')
+  @UseGuards(AuthGuard)
+  async getCreatorEarnings(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
+    return this.wallet.getCreatorEarnings(req[USER_KEY].uid);
+  }
 }

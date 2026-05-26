@@ -13,10 +13,12 @@ import {
   publishVersion,
 } from "../../../lib/studioApi";
 import type { ChapterVersion } from "../../../lib/types";
+import { StudioChaptersSkeleton } from "../../components/StudioSkeleton";
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  draft: { label: "ร่าง", color: "text-white/40 bg-white/10" },
+  draft: { label: "แบบร่าง", color: "text-white/40 bg-white/10" },
   published: { label: "เผยแพร่แล้ว", color: "text-green-300 bg-green-500/15" },
+  pending_moderation: { label: "รอตรวจสอบ", color: "text-amber-300 bg-amber-500/15" },
 };
 
 /** Single version row used inside a group */
@@ -154,7 +156,7 @@ function ChapterGroup({
             )}
             {statusCounts.draft > 0 && (
               <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/40">
-                ร่าง {statusCounts.draft}
+                แบบร่าง {statusCounts.draft}
               </span>
             )}
             {!hasMultiple && versions[0].priceCoins > 0 && (
@@ -438,9 +440,7 @@ export default function MangaDetailPage() {
 
         {/* Chapter list */}
         {loadingVersions && versions.length === 0 ? (
-          <div className="flex justify-center py-12">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-          </div>
+          <StudioChaptersSkeleton />
         ) : !loadingVersions && versions.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-white/15 py-16">
             <div className="text-3xl">📭</div>

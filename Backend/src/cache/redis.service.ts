@@ -5,7 +5,9 @@ import Redis from 'ioredis';
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private client: Redis | null = null;
+  private subscriber: Redis | null = null;
   private isConnected = false;
+  private readonly subscriptions = new Map<string, Set<(data: unknown) => void>>();
 
   onModuleInit() {
     this.connect();
@@ -87,7 +89,65 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client;
   }
 
+  // ─── Pub/Sub ──────────────────────────────────────────────────────────────────
+
+  private ensureSubscriber(): Redis | null {
+    if (!this.available || !this.client) return null;
+    if (!this.subscriber) {
+      this.subscriber = this.client.duplicate();
+      this.subscriber.on('message', (channel: string, message: string) => {
+        try {
+          const data = JSON.parse(message) as unknown;
+          this.subscriptions.get(channel)?.forEach(h => {
+            try { h(data); } catch {}
+          });
+        } catch {}
+      });
+      this.subscriber.on('error', (err: Error) => {
+        this.logger.warn(`Redis subscriber error: ${err.message}`);
+      });
+    }
+    return this.subscriber;
+  }
+
+  async publish(channel: string, data: unknown): Promise<void> {
+    if (!this.available) return;
+    try {
+      await this.client!.publish(channel, JSON.stringify(data));
+    } catch (err) {
+      this.logger.warn(`Redis publish failed on "${channel}": ${String(err)}`);
+    }
+  }
+
+  subscribe(channel: string, handler: (data: unknown) => void): () => void {
+    const sub = this.ensureSubscriber();
+    if (!sub) return () => {};
+
+    const existing = this.subscriptions.get(channel);
+    if (existing) {
+      existing.add(handler);
+    } else {
+      this.subscriptions.set(channel, new Set([handler]));
+      sub.subscribe(channel).catch(err =>
+        this.logger.warn(`Redis SUBSCRIBE "${channel}" failed: ${String(err)}`),
+      );
+    }
+
+    return () => {
+      const handlers = this.subscriptions.get(channel);
+      if (!handlers) return;
+      handlers.delete(handler);
+      if (handlers.size === 0) {
+        this.subscriptions.delete(channel);
+        sub.unsubscribe(channel).catch(() => {});
+      }
+    };
+  }
+
   async onModuleDestroy() {
+    if (this.subscriber) {
+      await this.subscriber.quit().catch(() => this.subscriber?.disconnect());
+    }
     if (this.client) {
       await this.client.quit().catch(() => this.client?.disconnect());
       this.logger.log('Redis connection closed gracefully');

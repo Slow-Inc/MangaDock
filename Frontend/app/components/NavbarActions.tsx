@@ -55,7 +55,7 @@ export default function NavbarActions() {
           <div ref={menuRef} className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
-              className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2 py-1 text-xs text-white/80 backdrop-blur-xl transition hover:bg-white/20 hover:text-white md:text-sm"
+              className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2 py-1 text-xs text-white/80 backdrop-blur-xl smooth-hover-fast hover:bg-white/20 hover:text-white md:text-sm"
             >
               {user.photoURL ? (
                 <div className="relative h-6.5 w-6.5 shrink-0 overflow-hidden rounded-full">
@@ -133,7 +133,7 @@ export default function NavbarActions() {
           /* ── Sign-in button ── */
           <button
             onClick={() => setIsLoginOpen(true)}
-            className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs text-white/80 backdrop-blur-xl transition hover:bg-white/20 hover:text-white sm:px-4 md:text-sm"
+            className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs text-white/80 backdrop-blur-xl smooth-hover-fast hover:bg-white/20 hover:text-white sm:px-4 md:text-sm"
           >
             เข้าสู่ระบบ
           </button>
