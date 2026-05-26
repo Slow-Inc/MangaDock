@@ -368,7 +368,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       setShowPhotoPicker(false);
     } catch (error: any) {
       const msg = error?.code === "storage/unauthorized"
-        ? "ไม่มีสิทธิ์อัพโหลด — ตรวจสอบ Firebase Storage Rules"
+        ? "ไม่มีสิทธิ์อัพโหลด — ตรวจสอบ MangaDock Storage Rules"
         : error?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่";
       setPhotoError(msg);
     } finally {
@@ -388,7 +388,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       setShowPhotoPicker(false);
     } catch (error: any) {
       const msg = error?.code === "storage/unauthorized"
-        ? "ไม่มีสิทธิ์อัพโหลด — ตรวจสอบ Firebase Storage Rules"
+        ? "ไม่มีสิทธิ์อัพโหลด — ตรวจสอบ MangaDock Storage Rules"
         : error?.message || "อัพโหลดไม่สำเร็จ กรุณาลองใหม่";
       setPhotoError(msg);
     } finally {
@@ -1368,7 +1368,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
     <div
       ref={overlayRef}
       onClick={(e) => { if (e.target === overlayRef.current) handleClose(); }}
-      className={`fixed inset-0 z-300 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
       style={{ display: isOpen || visible ? "flex" : "none" }}

@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import type Lenis from "lenis";
 import { createPortal } from "react-dom";
 import CoverLightbox from "./CoverLightbox";
 import GeminiBadge from "./GeminiBadge";
@@ -38,6 +39,50 @@ function isMangaDex(book: LandingBook) {
   return isUUID || book.thumbnail.includes("mangadex.org");
 }
 
+// Auto-scrolling title for mobile sticky header when text overflows.
+// Uses a CSS custom property (--marquee-overflow) set as inline style so the
+// keyframe can reference the real pixel distance without JS-driven animation.
+function MarqueeTitle({ title, active, className }: { title: string; active: boolean; className?: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [overflow, setOverflow] = useState(0);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const text = textRef.current;
+    if (!container || !text) return;
+    const measure = () => {
+      setOverflow(Math.max(0, text.scrollWidth - container.clientWidth));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [title]);
+
+  const shouldScroll = active && overflow > 0;
+  const duration = Math.max(5, overflow / 25);
+
+  return (
+    <div ref={containerRef} className={`min-w-0 flex-1 overflow-hidden${className ? ` ${className}` : ""}`}>
+      <span
+        ref={textRef}
+        className="inline-block whitespace-nowrap text-sm font-semibold tracking-[0.01em] text-white/98"
+        style={
+          shouldScroll
+            ? ({
+                '--marquee-overflow': `${overflow}px`,
+                animation: `marquee-title ${duration}s linear 1s infinite`,
+              } as React.CSSProperties)
+            : {}
+        }
+      >
+        {title}
+      </span>
+    </div>
+  );
+}
+
 export default function BookDetailModal({ book, onClose, scrollToChapters = false, highlightChapterId, asPage = false }: Props) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -66,7 +111,10 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const chaptersRef = useRef<HTMLDivElement>(null); // For scrolling to start
   const highlightChapterRef = useRef<HTMLButtonElement>(null);
   const modalScrollRef = useRef<HTMLDivElement>(null);
+  const modalContentRef = useRef<HTMLDivElement>(null);
   const chaptersListScrollRef = useRef<HTMLDivElement>(null);
+  const chaptersContentRef = useRef<HTMLDivElement>(null);
+  const chaptersLenisRef = useRef<Lenis | null>(null);
   const closingRef = useRef(false);
   const historyPushedRef = useRef(false);
   
@@ -84,9 +132,24 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [topupAmount, setTopupAmount] = useState(100);
   const [topupLoading, setTopupLoading] = useState(false);
 
-  // Apply custom local Lenis smooth scrolling
-  useLocalLenis(modalScrollRef, "vertical", !asPage && visible && activeChapter === null);
-  useLocalLenis(chaptersListScrollRef, "vertical", !asPage && visible && activeChapter === null && chapters.length > 0);
+  const lenisRef = useRef<any>(null);
+
+  // Main modal body smooth scroll
+  useLocalLenis(modalScrollRef, "vertical", !asPage && visible && activeChapter === null, lenisRef, modalContentRef);
+
+  // Inner chapters list smooth scroll (wrapper = max-h-72 viewport, content = growing inner div)
+  useLocalLenis(chaptersListScrollRef, "vertical", !asPage && visible && activeChapter === null && chapters.length > 0, chaptersLenisRef, chaptersContentRef);
+
+  // When inner chapters content grows (expand animation), tell Lenis the new scrollHeight.
+  // deps include chapters.length so this re-runs once the div is actually rendered.
+  // ResizeObserver then fires on every paint during the 300ms CSS grid-template-rows animation.
+  useEffect(() => {
+    const el = chaptersContentRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => chaptersLenisRef.current?.resize());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [chapters.length]);
 
   const updateCoverScroll = () => {
     const el = coverRowRef.current;
@@ -431,7 +494,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
           </button>
-          <span className={`flex-1 truncate text-sm font-semibold text-white transition-opacity duration-300 ${headerScrolled ? "opacity-100" : "opacity-0"}`}>{book.title}</span>
+          <MarqueeTitle
+            title={book.title}
+            active={headerScrolled}
+            className={`transition-opacity duration-300 ${headerScrolled ? "opacity-100" : "opacity-0"}`}
+          />
         </div>
       )}
 
@@ -457,9 +524,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   <path d="M19 12H5M12 5l-7 7 7 7" />
                 </svg>
               </button>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold tracking-[0.01em] text-white/98">{book.title}</p>
-              </div>
+              <MarqueeTitle title={book.title} active={headerScrolled} />
             </div>
           </div>
         )}
@@ -468,64 +533,66 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
           ref={modalScrollRef}
           className={asPage ? "w-full pb-[calc(var(--mobile-nav-height)+1.5rem)]" : "flex-1 min-h-0 overflow-y-auto custom-scrollbar"}
         >
-          {/* Close button - modal mode only */}
-          {!asPage && (
-            <button
-              onClick={handleClose}
-              title="ปิด"
-              className={`absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-[opacity,transform] duration-300 hover:bg-white/20 md:opacity-100 md:pointer-events-auto ${headerScrolled ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-          )}
+          <div ref={modalContentRef}>
+            {/* Drag handle — mobile only */}
+            {!asPage && (
+              <div className="flex justify-center pt-3 pb-0.5 md:hidden">
+                <div className="h-1 w-10 rounded-full bg-white/20" />
+              </div>
+            )}
 
-          {/* Hero — two-panel card layout, matching HeroCarousel style */}
-          <div className="relative w-full overflow-hidden">
-            {/* Blurred background */}
-            <div className="absolute inset-0 overflow-hidden">
-              <Image
-                src={displayThumbnail}
-                alt=""
-                fill
-                aria-hidden
-                sizes="768px"
-                className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
-              />
-            </div>
-            <div className="absolute inset-0 bg-linear-to-b from-[#141414]/60 via-transparent to-[#141414]" />
+            {/* Close button — modal mode, desktop only */}
+            {!asPage && (
+              <button
+                onClick={handleClose}
+                title="ปิด"
+                className={`absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-[opacity,transform] duration-300 hover:bg-white/20 md:opacity-100 md:pointer-events-auto ${headerScrolled ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"}`}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
 
-            {/* Two-panel card */}
-            <div className="relative z-10 flex gap-5 px-5 pb-6 pt-14">
-              {/* Portrait thumbnail */}
-              <div className="relative aspect-2/3 w-32 shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10 md:w-40">
+            {/* Hero */}
+            <div className="relative w-full overflow-hidden">
+              {/* Blurred background */}
+              <div className="absolute inset-0 overflow-hidden">
                 <Image
                   src={displayThumbnail}
-                  alt={book.title}
+                  alt=""
                   fill
-                  className="object-cover object-center"
-                  sizes="160px"
-                  priority
+                  aria-hidden
+                  sizes="768px"
+                  className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
                 />
               </div>
+              <div className="absolute inset-0 bg-linear-to-b from-[#141414]/60 via-transparent to-[#141414]" />
 
-              {/* Info panel */}
-              <div className="flex min-w-0 flex-1 flex-col justify-end gap-3">
+              {/* ── Mobile: stacked layout ─────────────────────────── */}
+              <div className="relative z-10 md:hidden flex flex-col items-center px-5 pb-6 pt-9">
+                {/* Cover */}
+                <div className="relative aspect-2/3 w-36 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10">
+                  <Image
+                    src={displayThumbnail}
+                    alt={book.title}
+                    fill
+                    className="object-cover object-center"
+                    sizes="144px"
+                    priority
+                  />
+                </div>
+
                 {/* Title */}
-                <div>
-                  <h2 className="text-xl font-black leading-tight text-white drop-shadow-lg md:text-2xl">
-                    {book.title}
-                  </h2>
+                <div className="mt-3 w-full text-center">
+                  <h2 className="text-xl font-black leading-tight text-white">{book.title}</h2>
                   {book.subtitle && (
-                    <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-white/60">
-                      {book.subtitle}
-                    </p>
+                    <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-white/60">{book.subtitle}</p>
                   )}
                 </div>
 
                 {/* Meta chips */}
-                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <div className="mt-2 flex flex-wrap justify-center items-center gap-1.5 text-xs">
                   {book.averageRating > 0 && (
                     <span className="flex items-center gap-1 font-semibold text-green-400">
                       <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3">
@@ -534,24 +601,18 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       {book.averageRating.toFixed(1)}
                     </span>
                   )}
-                  {book.publishedDate && (
-                    <span className="text-white/50">{book.publishedDate}</span>
-                  )}
+                  {book.publishedDate && <span className="text-white/50">{book.publishedDate}</span>}
                   {categories.slice(0, 3).map((cat) => (
-                    <span key={cat} className="rounded-full border border-white/20 px-2 py-0.5 text-white/70">
-                      {cat}
-                    </span>
+                    <span key={cat} className="rounded-full border border-white/20 px-2 py-0.5 text-white/70">{cat}</span>
                   ))}
                 </div>
 
-                {/* Actions */}
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Actions — mobile */}
+                <div className="mt-4 w-full space-y-2">
+                  {/* Primary CTA: อ่านตอนแรก — full width */}
                   {isManga ? (
                     !loadingChapters && chapters.length === 0 ? (
-                      <button
-                        disabled
-                        className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-white/20 px-5 py-2 text-sm font-bold text-white/40"
-                      >
+                      <button disabled className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-white/20 py-3 text-sm font-bold text-white/40">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
                           <path d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
                         </svg>
@@ -559,9 +620,14 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       </button>
                     ) : (
                       <button
-                        onClick={() => chaptersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                        disabled={loadingChapters}
-                        className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-white/85 disabled:opacity-50"
+                        onClick={() => {
+                          if (firstReadableChapter) {
+                            addToHistory({ ...book, lastChapterId: firstReadableChapter.id, lastChapterNumber: firstReadableChapter.chapterNumber });
+                            setActiveChapter({ id: firstReadableChapter.id, chapterNumber: firstReadableChapter.chapterNumber, title: firstReadableChapter.title });
+                          }
+                        }}
+                        disabled={!hasReadableChapter || loadingChapters}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-bold text-black transition active:bg-white/85 disabled:opacity-50"
                       >
                         {loadingChapters ? (
                           <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -572,70 +638,190 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                             <path d="M8 5v14l11-7z" />
                           </svg>
                         )}
-                        {loadingChapters ? "กำลังโหลด..." : "ดูตอนทั้งหมด"}
+                        {loadingChapters ? "กำลังโหลด..." : hasReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
                       </button>
                     )
                   ) : (
-                    <button className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-white/85">
+                    <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-bold text-black transition active:bg-white/85">
                       <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
                         <path d="M8 5v14l11-7z" />
                       </svg>
                       อ่านเลย
                     </button>
                   )}
-                  {isManga && (
-                    <button
-                      onClick={() => {
-                        if (firstReadableChapter) {
-                          addToHistory({ ...book, lastChapterId: firstReadableChapter.id, lastChapterNumber: firstReadableChapter.chapterNumber });
-                          setActiveChapter({ id: firstReadableChapter.id, chapterNumber: firstReadableChapter.chapterNumber, title: firstReadableChapter.title });
-                        }
-                      }}
-                      disabled={chapters.length === 0 || !hasReadableChapter}
-                      className="flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-40"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-                        <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                      </svg>
-                      {loadingChapters
-                        ? "กำลังโหลด..."
-                        : hasReadableChapter
-                          ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}`
-                          : "ไม่มีตอน"}
-                    </button>
-                  )}
-                  <button
-                    title={favorited ? "อยู่ในรายการแล้ว" : "เพิ่มในรายการ"}
-                    onClick={handleToggleFavorite}
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
-                      favorited ? "border-white bg-white text-black" : "border-white/40 text-white hover:border-white"
-                    }`}
-                  >
-                    {favorited ? (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
-                        <path d="M20 6L9 17l-5-5" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-                        <path d="M12 5v14M5 12h14" />
-                      </svg>
+
+                  {/* Secondary row: ดูตอนทั้งหมด + icon buttons */}
+                  <div className="flex gap-2">
+                    {isManga && (
+                      <button
+                        onClick={() => chaptersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                        disabled={loadingChapters || chapters.length === 0}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/25 py-2.5 text-xs font-semibold text-white/80 transition active:bg-white/8 disabled:opacity-40"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0">
+                          <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                        </svg>
+                        ดูตอนทั้งหมด
+                      </button>
                     )}
-                  </button>
-                  <button
-                    title={liked ? "เอาออก" : "ถูกใจ"}
-                    onClick={handleToggleLiked}
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
-                      liked ? "border-red-500 text-red-500" : "border-white/40 text-white hover:border-white"
-                    }`}
-                  >
-                    <svg viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                    </svg>
-                  </button>
+                    <button
+                      title={favorited ? "อยู่ในรายการแล้ว" : "เพิ่มในรายการ"}
+                      onClick={handleToggleFavorite}
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition ${
+                        favorited ? "border-white bg-white text-black" : "border-white/25 text-white/80"
+                      }`}
+                    >
+                      {favorited ? (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      title={liked ? "เอาออก" : "ถูกใจ"}
+                      onClick={handleToggleLiked}
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition ${
+                        liked ? "border-red-500 text-red-500" : "border-white/25 text-white/80"
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Desktop: two-panel layout ──────────────────────── */}
+              <div className="relative z-10 hidden md:flex gap-5 px-5 pb-6 pt-14">
+                {/* Portrait thumbnail */}
+                <div className="relative aspect-2/3 w-40 shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10">
+                  <Image
+                    src={displayThumbnail}
+                    alt={book.title}
+                    fill
+                    className="object-cover object-center"
+                    sizes="160px"
+                    priority
+                  />
+                </div>
+
+                {/* Info panel */}
+                <div className="flex min-w-0 flex-1 flex-col justify-end gap-3">
+                  <div>
+                    <h2 className="text-2xl font-black leading-tight text-white drop-shadow-lg">
+                      {book.title}
+                    </h2>
+                    {book.subtitle && (
+                      <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-white/60">
+                        {book.subtitle}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    {book.averageRating > 0 && (
+                      <span className="flex items-center gap-1 font-semibold text-green-400">
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                        {book.averageRating.toFixed(1)}
+                      </span>
+                    )}
+                    {book.publishedDate && <span className="text-white/50">{book.publishedDate}</span>}
+                    {categories.slice(0, 3).map((cat) => (
+                      <span key={cat} className="rounded-full border border-white/20 px-2 py-0.5 text-white/70">{cat}</span>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isManga ? (
+                      !loadingChapters && chapters.length === 0 ? (
+                        <button disabled className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-white/20 px-5 py-2 text-sm font-bold text-white/40">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                            <path d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                          ไม่มีตอนให้อ่าน
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => chaptersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                          disabled={loadingChapters}
+                          className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-white/85 disabled:opacity-50"
+                        >
+                          {loadingChapters ? (
+                            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          )}
+                          {loadingChapters ? "กำลังโหลด..." : "ดูตอนทั้งหมด"}
+                        </button>
+                      )
+                    ) : (
+                      <button className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-white/85">
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        อ่านเลย
+                      </button>
+                    )}
+                    {isManga && (
+                      <button
+                        onClick={() => {
+                          if (firstReadableChapter) {
+                            addToHistory({ ...book, lastChapterId: firstReadableChapter.id, lastChapterNumber: firstReadableChapter.chapterNumber });
+                            setActiveChapter({ id: firstReadableChapter.id, chapterNumber: firstReadableChapter.chapterNumber, title: firstReadableChapter.title });
+                          }
+                        }}
+                        disabled={chapters.length === 0 || !hasReadableChapter}
+                        className="flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-40"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                          <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                        {loadingChapters ? "กำลังโหลด..." : hasReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
+                      </button>
+                    )}
+                    <button
+                      title={favorited ? "อยู่ในรายการแล้ว" : "เพิ่มในรายการ"}
+                      onClick={handleToggleFavorite}
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+                        favorited ? "border-white bg-white text-black" : "border-white/40 text-white hover:border-white"
+                      }`}
+                    >
+                      {favorited ? (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      title={liked ? "เอาออก" : "ถูกใจ"}
+                      onClick={handleToggleLiked}
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+                        liked ? "border-red-500 text-red-500" : "border-white/40 text-white hover:border-white"
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
           {/* Description + side details */}
           <div className="flex gap-6 px-5 pb-2 pt-4">
@@ -658,9 +844,30 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   </button>
                 </div>
               )}
+
+              {/* Mobile-only metadata row */}
+              <div className="md:hidden pt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                {allAuthors.length > 0 && (
+                  <span className="text-white/40">
+                    ผู้แต่ง <span className="text-white/65">{allAuthors.slice(0, 2).join(", ")}</span>
+                  </span>
+                )}
+                {detail?.artists && detail.artists.length > 0 && (
+                  <span className="text-white/40">
+                    นักวาด <span className="text-white/65">{detail.artists.slice(0, 2).join(", ")}</span>
+                  </span>
+                )}
+                {detail?.covers && (() => {
+                  const vols = detail.covers.map((c) => parseFloat(c.volume ?? "")).filter((v) => !isNaN(v));
+                  const last = vols.length > 0 ? Math.max(...vols) : null;
+                  return last !== null ? (
+                    <span className="text-white/40">จบเล่ม <span className="text-white/65">{last}</span></span>
+                  ) : null;
+                })()}
+              </div>
             </div>
 
-            {/* Side details */}
+            {/* Side details — desktop only */}
             <div className="hidden w-40 shrink-0 space-y-3 text-xs md:block">
               {allAuthors.length > 0 && (
                 <div>
@@ -876,7 +1083,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   ))}
                 </div>
               ) : chapters.length > 0 ? (
-                <div ref={chaptersListScrollRef} className={`space-y-1.5 ${asPage ? "" : "max-h-72 overflow-y-auto custom-scrollbar"}`}>
+                <div ref={chaptersListScrollRef} className={asPage ? "" : "max-h-[50vh] md:max-h-80 overflow-y-auto custom-scrollbar"}>
+                  <div ref={chaptersContentRef} className="space-y-1.5">
                   {(() => {
                     const filtered = chapters.filter((ch) => langFilter === "all" || ch.translatedLanguage === langFilter);
 
@@ -1055,6 +1263,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       );
                     });
                   })()}
+                  </div>
                 </div>
               ) : (
                 <p className="text-xs text-white/40">ไม่พบตอนที่แปลแล้ว</p>
@@ -1064,10 +1273,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
           {/* Manga-specific discussion threads (Phase 2 Community) */}
           {isManga && (
-            <MangaDiscussion mangaId={book.id} title={book.title} />
+            <MangaDiscussion mangaId={book.id} title={book.title} cover={resolvedThumbnail(book)} />
           )}
         </div>
       </div>
+    </div>
 
       {/* Topup Modal */}
       {showTopup && (

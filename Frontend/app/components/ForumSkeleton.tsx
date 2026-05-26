@@ -3,7 +3,34 @@
 /**
  * Skeleton loading for forum posts.
  */
-export function PostSkeleton() {
+export function PostSkeleton({ viewMode = 'card' }: { viewMode?: 'card' | 'compact' }) {
+  if (viewMode === 'card') {
+    return (
+      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl overflow-hidden flex flex-col p-5 animate-pulse min-h-[260px]">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-white/10 shrink-0" />
+          <div className="space-y-2 flex-1">
+            <div className="w-24 h-3 rounded bg-white/15" />
+            <div className="w-16 h-2 rounded bg-white/10" />
+          </div>
+        </div>
+        <div className="flex-1 space-y-3">
+          <div className="w-3/4 h-5 rounded bg-white/15" />
+          <div className="w-full h-3 rounded bg-white/10" />
+          <div className="w-full h-3 rounded bg-white/10" />
+          <div className="w-1/2 h-3 rounded bg-white/10" />
+        </div>
+        <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+          <div className="flex gap-2">
+            <div className="w-8 h-8 rounded-full bg-white/10" />
+            <div className="w-8 h-8 rounded-full bg-white/10" />
+          </div>
+          <div className="w-24 h-8 rounded-lg bg-white/5" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden flex animate-pulse">
       <div className="hidden sm:flex flex-col items-center p-3 bg-white/2 border-r border-white/5 w-14 gap-2">
@@ -11,7 +38,7 @@ export function PostSkeleton() {
         <div className="w-4 h-4 rounded bg-white/10" />
         <div className="w-6 h-6 rounded-full bg-white/10" />
       </div>
-      <div className="flex-1 p-5 space-y-4">
+      <div className="flex-1 p-4 sm:p-5 space-y-4">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded-full bg-white/10" />
           <div className="w-24 h-3 rounded bg-white/10" />
@@ -21,7 +48,6 @@ export function PostSkeleton() {
           <div className="w-3/4 h-5 rounded bg-white/15" />
           <div className="w-full h-3 rounded bg-white/10" />
           <div className="w-full h-3 rounded bg-white/10" />
-          <div className="w-1/2 h-3 rounded bg-white/10" />
         </div>
         <div className="flex gap-4">
           <div className="w-24 h-8 rounded-lg bg-white/5" />

@@ -22,13 +22,13 @@
 - Node.js and bun for frontend and backend
 - Python environment for MIT service
 - Redis สำหรับ cache
-- Firebase project configuration
+- Supabase project configuration (URL + Service Role Key)
 - Environment variables สำหรับ service ภายนอก
 
 ## 3. Go Live Checklist
 
 1. ตรวจสอบ environment variables ครบถ้วน
-2. ตรวจสอบ backend เชื่อมต่อ Redis, Firebase และ external APIs ได้
+2. ตรวจสอบ backend เชื่อมต่อ Redis, Supabase และ external APIs ได้
 3. ตรวจสอบ MIT service พร้อมใช้งานที่ endpoint health
 4. ตรวจสอบ frontend เรียก backend ได้ถูกต้อง
 5. ตรวจสอบ flow สำคัญหลัง deploy เช่น login, search, open detail และ translate page

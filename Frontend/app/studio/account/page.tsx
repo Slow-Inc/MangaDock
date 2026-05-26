@@ -8,6 +8,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { getMyProfile, updateTranslatorProfile } from "../../lib/studioApi";
 import { getCached, setCache } from "../../lib/studioCache";
 import StudioNav from "../components/StudioNav";
+import { StudioAccountSkeleton } from "../components/StudioSkeleton";
 import { MetricCard, StudioAnnouncement, StudioSection } from "../components/StudioDashboardWidgets";
 import {
   StudioMobileHeader,
@@ -16,6 +17,7 @@ import {
   StudioMobileSection,
 } from "../components/StudioMobileShell";
 import { StudioSelect } from "../components/StudioSelect";
+import { CountrySelect } from "../components/CountrySelect";
 import { getAccountProfileCompleteness } from "../lib/dashboardAnalytics";
 import { useIsMobile } from "../../hooks/useIsMobile";
 
@@ -36,7 +38,7 @@ const LANGUAGE_OPTIONS = [
 ];
 
 type AccountMobileView = "menu" | "bio" | "languages" | "identity" | "guide";
-
+
 function LanguageSelect({
   value,
   onChange,
@@ -234,11 +236,7 @@ export default function StudioAccountPage() {
 
     const renderMobileContent = () => {
       if (loadingProfile) {
-        return (
-          <div className="flex items-center justify-center py-20">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-          </div>
-        );
+        return <StudioAccountSkeleton />;
       }
 
       if (mobileView === "menu") {
@@ -373,12 +371,10 @@ export default function StudioAccountPage() {
           <div className="space-y-4 px-4 py-4">
             <StudioMobileHeader title="ข้อมูลหลัก" subtitle="ตั้งประเทศและภาษาหลักของบัญชี" onBack={returnToMobileMenu} />
             <StudioMobileSection title="ประเทศ">
-              <input
-                type="text"
+              <CountrySelect
                 value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                placeholder="เช่น Thailand"
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-indigo-500"
+                onChange={setCountry}
+                placeholder="ค้นหาหรือเลือกประเทศ..."
               />
             </StudioMobileSection>
             <StudioMobileSection title="ภาษาหลัก">
@@ -443,9 +439,7 @@ export default function StudioAccountPage() {
           <StudioNav />
 
           {loadingProfile ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-            </div>
+            <StudioAccountSkeleton />
           ) : (
             <div className="space-y-6">
               <StudioSection title="สถานะบัญชี" subtitle="มุมมองเดียวกับหน้าข้อมูลนักเขียน แต่ผูกกับข้อมูล profile ของ MetaBooks">
@@ -531,12 +525,10 @@ export default function StudioAccountPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
                 <label className="mb-2 block text-sm font-semibold">ประเทศ</label>
-                <input
-                  type="text"
+                <CountrySelect
                   value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  placeholder="เช่น Thailand"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-indigo-500"
+                  onChange={setCountry}
+                  placeholder="ค้นหาหรือเลือกประเทศ..."
                 />
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/3 p-5">

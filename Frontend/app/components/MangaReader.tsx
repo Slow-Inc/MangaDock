@@ -7,6 +7,15 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { translateMangaChapterBatchPatches, translateMangaPagePatches, checkMitHealth, type PatchData } from "../lib/mangaTranslatePage";
 import { useLocalLenis } from "../hooks/useLocalLenis";
+import { getHardwareId } from "../lib/fingerprint";
+
+function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+  const hwid = getHardwareId();
+  return fetch(url, {
+    ...init,
+    headers: { 'x-hardware-id': hwid, ...(init?.headers as Record<string, string> | undefined) },
+  });
+}
 
 type ChapterPages = {
   pages: string[];
@@ -477,8 +486,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     if (!mangaId) return;
     // Fetch MangaDex chapters + user-uploaded versions and merge
     Promise.all([
-      fetch(`${API_BASE}/books/manga/${mangaId}/chapters`).then((r) => r.json()).catch(() => []),
-      fetch(`${API_BASE}/versions/title/${mangaId}`).then((r) => r.ok ? r.json() : []).catch(() => []),
+      apiFetch(`${API_BASE}/books/manga/${mangaId}/chapters`).then((r) => r.json()).catch(() => []),
+      apiFetch(`${API_BASE}/versions/title/${mangaId}`).then((r) => r.ok ? r.json() : []).catch(() => []),
     ]).then(([mangaDexChapters, userVersions]: [ChapterPageItem[], any[]]) => {
       const mdxList = Array.isArray(mangaDexChapters) ? mangaDexChapters : [];
       const userList: ChapterPageItem[] = (userVersions ?? [])
@@ -524,7 +533,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     const isUserVersion = chapterId.startsWith("ver:");
     if (isUserVersion) {
       const versionId = chapterId.slice(4);
-      fetch(`${API_BASE}/versions/${versionId}`)
+      apiFetch(`${API_BASE}/versions/${versionId}`)
         .then((r) => {
           if (!r.ok) throw new Error("not ok");
           return r.json();
@@ -551,7 +560,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       return () => { document.body.style.overflow = ""; };
     }
 
-    fetch(`${API_BASE}/books/chapters/${chapterId}/pages${localStorage.getItem("imgCacheForceLocal") === "1" ? "?forceLocal=true" : ""}`, {
+    apiFetch(`${API_BASE}/books/chapters/${chapterId}/pages${localStorage.getItem("imgCacheForceLocal") === "1" ? "?forceLocal=true" : ""}`, {
       headers: {
         'x-captcha-clearance': clearanceToken || '',
       }
@@ -979,7 +988,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               <Turnstile
                 siteKey={turnstileSiteKey}
                 onSuccess={(token) => {
-                  fetch(`${API_BASE}/books/verify-captcha`, {
+                  apiFetch(`${API_BASE}/books/verify-captcha`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ token })

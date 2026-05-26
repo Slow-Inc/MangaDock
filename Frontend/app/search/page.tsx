@@ -57,7 +57,7 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
   return (
     <>
       <div className="group flex flex-col gap-2 text-left cursor-pointer" onClick={onSelect}>
-        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-white/10 transition-all duration-300 group-hover:scale-[1.03] group-hover:border-white/30 group-hover:shadow-lg group-hover:shadow-black/50">
+        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-white/10 smooth-hover group-hover:scale-[1.03] group-hover:border-white/30 group-hover:shadow-lg group-hover:shadow-black/50">
           <Image
             src={thumb}
             alt={book.title}

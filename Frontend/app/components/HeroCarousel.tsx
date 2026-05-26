@@ -164,7 +164,16 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
   }, [total]);
 
   const book = books[idx];
-  const imgUrl = resolvedThumbnail(book);
+  const resolvedUrl = resolvedThumbnail(book);
+  const [imgUrl, setImgUrl] = useState(resolvedUrl);
+  useEffect(() => { setImgUrl(resolvedUrl); }, [resolvedUrl]);
+  const handleImgError = () => {
+    if (book.thumbnail) {
+      setImgUrl(book.thumbnail.includes("mangadex.org")
+        ? `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`
+        : book.thumbnail);
+    }
+  };
   const [titleMain, titleSub] = splitTitle(book);
 
   return (
@@ -189,6 +198,7 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
                 priority={idx === 0}
                 sizes="88vw"
                 className="object-cover object-center transition duration-300 group-active:scale-[0.985]"
+                onError={handleImgError}
               />
             )}
           </div>
@@ -233,6 +243,7 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
               sizes="100vw"
               aria-hidden
               className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
+              onError={handleImgError}
             />
           )}
         </div>
@@ -253,6 +264,7 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
                   priority={idx === 0}
                   sizes="320px"
                   className="object-cover object-center"
+                  onError={handleImgError}
                 />
               )}
             </div>

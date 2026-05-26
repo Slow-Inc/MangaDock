@@ -15,6 +15,7 @@ import {
 import type { ChapterVersion } from "../lib/types";
 import { getCached, setCache } from "../lib/studioCache";
 import StudioNav from "./components/StudioNav";
+import { StudioOverviewSkeleton } from "./components/StudioSkeleton";
 import {
   DonutChart,
   GroupedBarChart,
@@ -96,8 +97,7 @@ function RecentTransactionList({ transactions }: { transactions: WalletTransacti
 }
 
 export default function StudioOverviewPage() {
-  const router = useRouter();
-  const { user, loading, getIdToken } = useAuth();
+  const { getIdToken } = useAuth();
   const { showToast } = useToast();
   const isMobile = useIsMobile();
 
@@ -108,12 +108,7 @@ export default function StudioOverviewPage() {
   const [mobileView, setMobileView] = useState<OverviewMobileView>("menu");
   const hasFetched = useRef(false);
 
-  useEffect(() => {
-    if (!loading && !user) router.replace("/");
-  }, [loading, user, router]);
-
   const fetchAll = useCallback(async () => {
-    if (!user) return;
     try {
       const token = await getIdToken();
       if (!token) return;
@@ -134,14 +129,14 @@ export default function StudioOverviewPage() {
     } finally {
       setLoadingData(false);
     }
-  }, [user, getIdToken, showToast]);
+  }, [getIdToken, showToast]);
 
   useEffect(() => {
-    if (user && !hasFetched.current) {
+    if (!hasFetched.current) {
       hasFetched.current = true;
       fetchAll();
     }
-  }, [user, fetchAll]);
+  }, [fetchAll]);
 
   const overviewStats = useMemo(
     () => getOverviewStats(versions, transactions, balance),
@@ -158,14 +153,6 @@ export default function StudioOverviewPage() {
     () => last30Days.map((item) => ({ label: item.label, value: item.income })),
     [last30Days],
   );
-
-  if (loading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#141414]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-      </div>
-    );
-  }
 
   if (isMobile) {
     const renderMobileContent = () => {
@@ -379,9 +366,7 @@ export default function StudioOverviewPage() {
           <StudioNav />
 
           {loadingData ? (
-            <div className="flex justify-center py-16">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-            </div>
+            <StudioOverviewSkeleton />
           ) : (
             <div className="space-y-6">
               <StudioSection
@@ -391,7 +376,7 @@ export default function StudioOverviewPage() {
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="นับจาก title ที่เคยอัปโหลด" tone="indigo" />
                   <MetricCard label="จำนวนตอน" value={overviewStats.totalChapters} hint={`รวมทั้งหมด ${overviewStats.totalPages} หน้า`} tone="violet" />
-                  <MetricCard label="เผยแพร่แล้ว" value={overviewStats.published} hint={`รอตรวจ ${overviewStats.pending} | ร่าง ${overviewStats.draft}`} tone="emerald" />
+                  <MetricCard label="เผยแพร่แล้ว" value={overviewStats.published} hint={`รอตรวจสอบ ${overviewStats.pending} | แบบร่าง ${overviewStats.draft}`} tone="emerald" />
                   <MetricCard label="เหรียญคงเหลือ" value={formatCurrency(overviewStats.balance)} hint={`ใช้จ่ายสะสม ${formatCurrency(overviewStats.spendingTotal)}`} tone="amber" />
                 </div>
               </StudioSection>

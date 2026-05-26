@@ -1,69 +1,63 @@
-# MangaDock Phase 2: Mobile OS-Level Integration & Advanced Features
+# MangaDock — Granular Todo List (V5 Master)
 
-รายการงานสำหรับการพัฒนาแอปพลิเคชันมือถือ (Mobile App) และการขยายขีดความสามารถของระบบตามแผนงานระดับสูง
-
----
-
-## 📱 1. Mobile App Development (React Native Shell)
-
-- [ ] **[Mobile] Project Initialization:**
-    - [ ] ขึ้นโครงสร้างโปรเจกต์ React Native (TypeScript) ในโฟลเดอร์ `Mobile/`
-    - [ ] ติดตั้งและตั้งค่า `react-native-webview`
-    - [ ] *เป้าหมาย:* มีแอปที่สามารถเปิด Web App ของเราขึ้นมาแสดงผลได้
-
-- [ ] **[Mobile] Auth & Deep Linking:**
-    - [ ] ตั้งค่า URL Scheme สำหรับทำ Deep Linking (เช่น `mangadock://`)
-    - [ ] จัดการระบบ Authentication Bridge เพื่อส่ง Token จาก Browser เข้ามาในแอป
-    - [ ] *เป้าหมาย:* ผู้ใช้สามารถ Login ผ่านแอปได้อย่างไร้รอยต่อ
-
-- [ ] **[Mobile] Native Zero-Trust Integration:**
-    - [ ] ดึงรหัสอุปกรณ์ (Android ID / IDFV) จากฝั่ง Native
-    - [ ] ส่งค่า ID จริงแนบไปใน Header `x-hardware-id` ของทุก Request ใน WebView
-    - [ ] *เป้าหมาย:* ยกระดับความปลอดภัยจาก Fingerprint Stub เป็น Native Hardware ID
+## 🔹 Phase 0 - Phase 1: Core Foundation (COMPLETED ✅)
+- [X]  [Backend] Reverse Proxy Image Architecture
+- [X]  [Backend] OAuth 2.0 Integration (Google/Facebook)
+- [X]  [Backend] Email Verification & Reset Password Flow
+- [X]  [Backend] Profile Picture Integration (Local + Third-party)
+- [X]  [Backend] Advanced MIT Optimization (Region-Specific + Gemini 3)
+- [X]  [Backend] Overlap Detection Algorithm for Text Translation
+- [X]  [Backend] Intelligent Batching Fail-safe (L1 to L2 Redis)
+- [X]  [Frontend] Next.js On-the-fly Image Resizing
+- [X]  [Frontend] Responsive Mobile Native-like View
+- [X]  [Frontend] Reader Hardening (Continuous Image Fix + Scroll Fix)
 
 ---
 
-## 🚀 2. Advanced OS-Level Features (ไม้ตายเฟส 2)
-
-- [ ] **[Mobile] Screen Capture Pipeline:**
-    - [ ] เรียกใช้ **MediaProjection API** (Android) เพื่อขอสิทธิ์บันทึกภาพหน้าจอ
-    - [ ] เขียน Bridge เพื่อส่งสตรีมภาพหน้าจอไปประมวลผลที่ MIT Server
-    - [ ] *เป้าหมาย:* เตรียมความพร้อมสำหรับระบบแปลหน้าจอเรียลไทม์
-
-- [ ] **[Mobile] Real-time Translation Overlay:**
-    - [ ] พัฒนา **UI Overlay (WindowManager)** เพื่อวาดกรอบคำแปลทับซ้อนแอปอื่น
-    - [ ] ปรับจูนประสิทธิภาพ (Throttling) เพื่อไม่ให้กินแบตเตอรี่และ RAM เกินความจำเป็น
-    - [ ] *เป้าหมาย:* ฟีเจอร์แปลมังงะในแอปอื่นได้โดยไม่ต้องสลับหน้าจอ
-
----
-
-## 🏛️ 3. Community Forum (Reddit-like) - COMPLETED ✅
-
-- [x] **[Database] Forum Schema Migration:**
-    - [x] เพิ่มตาราง `forum_posts`, `forum_comments`, `forum_votes` ลงใน `supabase-migration.sql`
-    - [x] *สถานะ:* โค้ด Migration พร้อมแล้ว (ต้องการการรันบน Supabase Dashboard)
-
-- [x] **[Backend] Forum Orchestration:**
-    - [x] สร้าง `ForumModule` พร้อมระบบ Hot/New sorting และ Pagination
-    - [x] Implement Voting logic พร้อมป้องกันการปั๊มโหวต
-    - [x] *สถานะ:* API พร้อมใช้งาน
-
-- [x] **[Frontend] Community UI:**
-    - [x] **Navbar Integration:** เพิ่มลิงก์ "Community" ในแถบเมนูหลัก
-    - [x] สร้างหน้า `/community` และ `/community/p/[id]`
-    - [x] พัฒนา Components: `PostCard`, `CommentThread`, `VoteButtons`
-    - [x] *สถานะ:* UI พร้อมใช้งานและเชื่อมต่อกับ Backend แล้ว
+## 🟡 Phase 1.5: Stabilization & Creator Studio (COMPLETED / POLISHING ⏳)
+- [X]  [Database] Relational Migration to Supabase (Relational + RLS)
+- [X]  [Backend] Manga Upload System for Translators
+- [X]  [Frontend] Studio Dashboard & Stats
+- [X]  [Backend] Reddit-Style Forum Hub (Nested Threads + Voting)
+- [X]  [Real-time] SSE Redis Pub/Sub Bridge (Vote/Comment Sync)
+- [X]  [Frontend] LRU API Cache with SWR (500 entries limit)
+- [X]  [Backend] HWID Middleware Enforcement
+- [X]  [Backend] Wallet Ledger & Revenue Split (70/30)
+- [X]  [Backend] Creator Earnings API Endpoint
+- [X]  **[Technical Debt]** GoogleBooksService Removal (Completed)
+- [ ]  **[Backend]** Soft Deletion (`deleted_at`) in Forum Module
+- [ ]  **[Frontend]** Spoiler Blur / Click-to-reveal in Community
 
 ---
 
-## ✅ 4. Completed (เสร็จสิ้นแล้ว)
+## 🔵 Phase 2: Architectural Scaling & Cloud Readiness (PLANNED 🔭)
+- [ ]  **[Architecture]** L2-Centric Cache Refactor (Write-buffer logic)
+- [ ]  **[Architecture]** Redis Pub/Sub L1 Mirroring Sync Engine
+- [ ]  **[Architecture]** Workload-Aware Leader Election System
+- [ ]  **[Architecture]** Intelligent Write-behind Batching (Redis -> JSON -> DB)
+- [ ]  [Backend] Real-World Payment Gateway (QR/PromptPay)
+- [ ]  [Infrastructure] Cloudflare R2 Migration & Workers CDN Buffer
+- [ ]  [Infrastructure] MIT GPU Cloud Migration (On-Demand)
+- [ ]  [Security] 2FA & Device Session Pinning
 
-### Phase 1.5: System Optimization & Readiness
-- [x] **[Backend] Storage Adapter Pattern:** แยกตัวจัดการไฟล์ (put, get, delete) สลับไปใช้ R2 ได้ทันที
-- [x] **[Backend] Async MIT Pipeline:** เปลี่ยนการคุยกับ AI เป็น Asynchronous Webhook (T4-Standard)
-- [x] **[Backend] Structured Logging:** ปรับปรุง Log ทุก Request เป็น JSON Format
-- [x] **[Backend] Graceful Shutdown:** ระบบ Retry Sync Cache ก่อนปิดเครื่อง
-- [x] **[Frontend] Centralized Image Resolver:** รวมศูนย์ Logic การสร้าง URL รูปภาพ
-- [x] **[Frontend] Supabase Connectivity Guard:** แจ้งเตือน DB Offline ผ่าน Popup
-- [x] **[Unified] Shared Type Safety:** จัดระเบียบ Type Interfaces ข้ามฝั่ง FE/BE
-- [x] **[Documentation] Architecture Sync:** อัปเดต UML และเอกสารสถาปัตยกรรม 100%
+---
+
+## 📱 Phase 3: Hybrid Mobile Framework (NEXT STEP 🚀)
+- [ ]  [Mobile] React Native WebViewer Shell Initialization
+- [ ]  [Mobile] Strategic Code Sharing Layer (Shared Types/Logic)
+- [ ]  [Mobile] Native Authentication Bridge (Device Token Sync)
+- [ ]  [Mobile] Core OS Permission Handling (Storage/Network)
+
+---
+
+## 🚀 Phase 4: Native OS Power Features (R&D 🚧)
+- [ ]  [Mobile] Android MediaProjection Native Module (Screen Capture)
+- [ ]  [Mobile] WindowManager Overlay System (Floating Bubble)
+- [ ]  [Mobile] Native Background Stream Worker (MIT Integration)
+
+---
+
+## 🤝 Phase 5: Retention & Ecosystem (FUTURE 🏁)
+- [ ]  [Backend/Frontend] Social Graph Engine (Follow System)
+- [ ]  [Frontend] Personalized Reading Collections Sharing
+- [ ]  [Backend/Mobile] Push Notification Framework (OS-Level)

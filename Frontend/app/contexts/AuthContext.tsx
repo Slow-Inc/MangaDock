@@ -18,12 +18,13 @@ import {
 } from "../lib/emailValidation";
 import { setTokenSupplier, loadUserData, clearUserCache, flushNow } from "../lib/userCache";
 import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData } from "../lib/readingHistory";
+import { clearAllApiCache } from "../lib/apiCache";
 import { useToast } from "./ToastContext";
 
 const API_BASE = "/api/proxy";
 const DEFAULT_PUBLIC_SITE_URL = "http://localhost:4000";
 
-// ─── AppUser — Firebase-compatible interface for UI components ───────────────
+// ─── AppUser — Unified user interface for UI components ───────────────
 export interface AppUser {
   uid: string;
   id: string;
@@ -39,7 +40,7 @@ export interface AppUser {
   }>;
 }
 
-/** Map Supabase provider name → Firebase-style providerId used throughout the UI. */
+/** Map Supabase provider name → standard providerId used throughout the UI. */
 function mapProviderId(provider: string): string {
   if (provider === "google") return "google.com";
   if (provider === "facebook") return "facebook.com";
@@ -151,6 +152,8 @@ type AuthContextType = {
   deleteAccount: () => Promise<void>;
   /** Re-send the email verification link */
   resendVerificationEmail: () => Promise<void>;
+  /** Refresh the current session to update JWT claims (e.g. roles) */
+  refreshSession: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -181,6 +184,7 @@ export const AuthContext = createContext<AuthContextType>({
   reauthenticateUser: async () => {},
   deleteAccount: async () => {},
   resendVerificationEmail: async () => {},
+  refreshSession: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -266,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (lastUidRef.current && lastUidRef.current !== suUser.id) {
           clearUserCache();
           clearHistory();
+          clearAllApiCache();
         }
         lastUidRef.current = suUser.id;
 
@@ -293,6 +298,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastUidRef.current = null;
         clearUserCache();
         clearHistory();
+        clearAllApiCache();
       }
     });
 
@@ -489,6 +495,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
     clearHistory();
+    clearAllApiCache();
     await supabase.auth.signOut();
     setUser(null);
     showToast({ type: "success", message: "ออกจากระบบแล้ว", duration: 3000 });
@@ -672,6 +679,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
     clearHistory();
+    clearAllApiCache();
     await supabase.auth.signOut();
     setUser(null);
   };
@@ -681,6 +689,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.resend({ type: "signup", email: user.email });
     if (error) throw error;
     showToast({ type: "success", message: "ส่ง verification email ใหม่แล้ว กรุณาตรวจสอบ inbox", duration: 4000 });
+  };
+
+  const refreshSession = async (): Promise<void> => {
+    const { data: { session }, error } = await supabase.auth.refreshSession();
+    if (error) throw error;
+    if (session?.user) {
+      const appUser = adaptUser(session.user);
+      const token = session.access_token;
+      const profile = await fetchBackendProfile(token);
+      setUser({
+        ...appUser,
+        role: profile?.role ?? appUser.role,
+      });
+    }
   };
 
   const getPhotoHistory = async (): Promise<string[]> => {
@@ -751,6 +773,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       reauthenticateUser,
       deleteAccount,
       resendVerificationEmail,
+      refreshSession,
     }}>
       {children}
 

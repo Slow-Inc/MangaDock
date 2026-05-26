@@ -118,10 +118,22 @@ export default function Navbar() {
         }`}
       />
 
-      <div className="flex h-16 w-full items-center justify-between px-6 lg:px-10">
-        <div className="flex items-center gap-8">
+      <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-10">
+        <div className="flex items-center gap-3 sm:gap-8">
+          {pathname.startsWith("/community") && (
+            <button 
+              onClick={() => window.dispatchEvent(new Event('toggleMobileMenu'))}
+              className="lg:hidden p-2 -ml-1 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white transition-colors"
+              aria-label="Open Community Menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+              </svg>
+            </button>
+          )}
+
           <Link href="/">
-            <MangaDockLogo className="h-9" />
+            <MangaDockLogo className="h-8 sm:h-9" />
           </Link>
 
           <nav className="hidden items-center gap-1 text-sm md:flex">
@@ -136,7 +148,7 @@ export default function Navbar() {
                   key={item.label}
                   href={item.href}
                   onClick={(e) => handleNavClick(e, item)}
-                  className={`rounded-lg px-3 py-2 transition-colors duration-200 ${
+                  className={`rounded-lg px-3 py-2 smooth-hover-fast ${
                     isActive
                       ? "font-semibold text-white"
                       : "text-white/65 hover:text-white"
@@ -220,23 +232,47 @@ export default function Navbar() {
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-black md:hidden">
       {isStudioPath ? (
         <div className="flex h-16 items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
-            {STUDIO_TABS.map((tab) => {
-              const isActive = tab.key === activeStudioTab;
-              return (
-                <Link
-                  key={tab.key}
-                  href={tab.href}
-                  className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 text-[10px] transition-colors duration-200 ${
-                    isActive
-                      ? "text-white"
-                      : "text-white/45"
-                  }`}
-                >
-                  {tab.icon("h-5 w-5")}
-                  <span className="truncate">{tab.label}</span>
-                </Link>
-              );
-            })}
+          {STUDIO_TABS.slice(0, 2).map((tab) => {
+            const isActive = tab.key === activeStudioTab;
+            return (
+              <Link
+                key={tab.key}
+                href={tab.href}
+                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 text-[10px] transition-colors duration-200 ${
+                  isActive ? "text-white" : "text-white/45"
+                }`}
+              >
+                {tab.icon("h-5 w-5")}
+                <span className="truncate">{tab.label}</span>
+              </Link>
+            );
+          })}
+          <Link
+            href="/"
+            className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 text-[10px] text-indigo-400 transition-colors duration-200"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 shadow-[0_4px_14px_rgba(99,102,241,0.5)] active:scale-95 transition-transform duration-150">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-white">
+                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            </span>
+            <span className="truncate">หน้าหลัก</span>
+          </Link>
+          {STUDIO_TABS.slice(2).map((tab) => {
+            const isActive = tab.key === activeStudioTab;
+            return (
+              <Link
+                key={tab.key}
+                href={tab.href}
+                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 text-[10px] transition-colors duration-200 ${
+                  isActive ? "text-white" : "text-white/45"
+                }`}
+              >
+                {tab.icon("h-5 w-5")}
+                <span className="truncate">{tab.label}</span>
+              </Link>
+            );
+          })}
         </div>
       ) : (
         <>

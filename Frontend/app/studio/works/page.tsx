@@ -13,6 +13,7 @@ import {
 import type { ChapterVersion, VersionStatus } from "../../lib/types";
 import { getCached, setCache } from "../../lib/studioCache";
 import StudioNav from "../components/StudioNav";
+import { StudioWorksSkeleton } from "../components/StudioSkeleton";
 import { MetricCard, StudioAnnouncement, StudioSection } from "../components/StudioDashboardWidgets";
 import {
   StudioMobileHeader,
@@ -35,8 +36,8 @@ type WorksMobileView = "browse" | "filters";
 
 const STATUS_OPTIONS: { value: "" | VersionStatus; label: string }[] = [
   { value: "", label: "ทั้งหมด" },
-  { value: "published", label: "เผยแพร่" },
-  { value: "draft", label: "ฉบับร่าง" },
+  { value: "published", label: "เผยแพร่แล้ว" },
+  { value: "draft", label: "แบบร่าง" },
 ];
 
 // ── Sub-components ──────────────────────────────────────────────────────────
@@ -60,8 +61,8 @@ function StatusDots({ versions }: { versions: ChapterVersion[] }) {
   const counts = versions.reduce((acc, v) => { acc[v.status] = (acc[v.status] ?? 0) + 1; return acc; }, {} as Record<string, number>);
   return (
     <div className="flex flex-wrap gap-1.5">
-      {counts.published > 0 && <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-semibold text-green-300">เผยแพร่ {counts.published}</span>}
-      {counts.draft > 0 && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/40">ร่าง {counts.draft}</span>}
+      {counts.published > 0 && <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-semibold text-green-300">เผยแพร่แล้ว {counts.published}</span>}
+      {counts.draft > 0 && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/40">แบบร่าง {counts.draft}</span>}
     </div>
   );
 }
@@ -207,7 +208,7 @@ export default function WorksPage() {
   if (isMobile) {
     const renderMobileResults = () => {
       if (loadingVersions && mangaGroups.length === 0) {
-        return <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" /></div>;
+        return <StudioWorksSkeleton viewMode={viewMode} />;
       }
       if (!loadingVersions && mangaGroups.length === 0 && !hasFilters) return <EmptyState />;
       if (mangaGroups.length === 0) {
@@ -419,7 +420,7 @@ export default function WorksPage() {
           {/* ── Works list ── */}
           <div>
             {loadingVersions && mangaGroups.length === 0 ? (
-              <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" /></div>
+              <StudioWorksSkeleton viewMode={viewMode} />
             ) : !loadingVersions && mangaGroups.length === 0 && !hasFilters ? (
               <EmptyState />
             ) : mangaGroups.length === 0 ? (

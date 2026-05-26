@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
-import type { ForumPost, ForumComment, ForumCategory } from "./types";
+import type { ForumPost, ForumComment, ForumCategory, UserProfileResponse } from "./types";
+import { cacheOrFetch, cacheInvalidate, cacheClearByTag, TTL } from "./apiCache";
 
 const API_BASE = "/api/proxy";
 
@@ -21,28 +22,86 @@ export async function listPosts(options: {
   offset?: number;
   limit?: number;
 } = {}) {
-  const token = await getAuthToken();
-  const params = new URLSearchParams();
-  if (options.category) params.append('category', options.category);
-  if (options.mangaId) params.append('mangaId', options.mangaId);
-  if (options.sort) params.append('sort', options.sort);
-  if (options.offset) params.append('offset', options.offset.toString());
-  if (options.limit) params.append('limit', options.limit.toString());
+  const { category, mangaId, sort = 'hot', offset = 0, limit = 20 } = options;
+  const cacheKey = `posts:${category ?? ''}:${mangaId ?? ''}:${sort}:${offset}:${limit}`;
 
-  const res = await fetch(`${API_BASE}/forum/posts?${params.toString()}`, {
-    headers: authHeaders(token),
-  });
-  if (!res.ok) throw new Error("Failed to fetch posts");
-  return res.json() as Promise<{ items: ForumPost[]; total: number }>;
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const token = await getAuthToken();
+      const params = new URLSearchParams();
+      if (category) params.append('category', category);
+      if (mangaId) params.append('mangaId', mangaId);
+      params.append('sort', sort);
+      if (offset) params.append('offset', offset.toString());
+      if (limit !== 20) params.append('limit', limit.toString());
+      const res = await fetch(`${API_BASE}/forum/posts?${params.toString()}`, {
+        headers: authHeaders(token),
+      });
+      if (!res.ok) throw new Error("Failed to fetch posts");
+      return res.json() as Promise<{ items: ForumPost[]; total: number }>;
+    },
+    TTL.SHORT,
+    { staleAfter: 40_000, tags: ['forum_posts'] },
+  );
+}
+
+export interface TrendingManga {
+  mangaId: string;
+  mangaTitle: string;
+  mangaCover: string | null;
+  postCount: number;
+}
+
+export async function getTrendingManga(limit = 5) {
+  return cacheOrFetch(
+    `trending:${limit}`,
+    async () => {
+      const res = await fetch(`${API_BASE}/forum/trending-manga?limit=${limit}`);
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`Failed to fetch trending manga: ${res.status} ${errText}`);
+      }
+      return res.json() as Promise<TrendingManga[]>;
+    },
+    TTL.MEDIUM,
+    { staleAfter: 4 * 60_000, tags: ['trending'] },
+  );
 }
 
 export async function getPost(id: string) {
+  return cacheOrFetch(
+    `post:${id}`,
+    async () => {
+      const token = await getAuthToken();
+      const res = await fetch(`${API_BASE}/forum/posts/${id}`, {
+        headers: authHeaders(token),
+      });
+      if (!res.ok) throw new Error("Post not found");
+      return res.json() as Promise<ForumPost>;
+    },
+    TTL.SHORT,
+    { staleAfter: 40_000, tags: [`forum_post:${id}`] },
+  );
+}
+
+export async function uploadForumImage(file: File): Promise<{ imageUrl: string }> {
   const token = await getAuthToken();
-  const res = await fetch(`${API_BASE}/forum/posts/${id}`, {
-    headers: authHeaders(token),
+  if (!token) throw new Error("Unauthorized");
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`${API_BASE}/forum/upload-image`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
   });
-  if (!res.ok) throw new Error("Post not found");
-  return res.json() as Promise<ForumPost>;
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Upload failed: ${res.status} ${errText}`);
+  }
+  return res.json() as Promise<{ imageUrl: string }>;
 }
 
 export async function createPost(data: {
@@ -50,6 +109,9 @@ export async function createPost(data: {
   content: string;
   category: ForumCategory;
   targetMangaId?: string;
+  targetMangaTitle?: string;
+  targetMangaCover?: string;
+  imageUrls?: string[];
 }) {
   const token = await getAuthToken();
   if (!token) throw new Error("Unauthorized");
@@ -59,17 +121,29 @@ export async function createPost(data: {
     headers: authHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("Failed to create post");
-  return res.json() as Promise<ForumPost>;
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Failed to create post: ${res.status} ${errText}`);
+  }
+  const post = await res.json() as ForumPost;
+  cacheClearByTag('forum_posts');
+  return post;
 }
 
 export async function listComments(postId: string) {
-  const token = await getAuthToken();
-  const res = await fetch(`${API_BASE}/forum/posts/${postId}/comments`, {
-    headers: authHeaders(token),
-  });
-  if (!res.ok) throw new Error("Failed to fetch comments");
-  return res.json() as Promise<ForumComment[]>;
+  return cacheOrFetch(
+    `comments:${postId}`,
+    async () => {
+      const token = await getAuthToken();
+      const res = await fetch(`${API_BASE}/forum/posts/${postId}/comments`, {
+        headers: authHeaders(token),
+      });
+      if (!res.ok) throw new Error("Failed to fetch comments");
+      return res.json() as Promise<ForumComment[]>;
+    },
+    TTL.SHORT,
+    { staleAfter: 40_000, tags: [`forum_post:${postId}`] },
+  );
 }
 
 export async function createComment(data: {
@@ -86,6 +160,100 @@ export async function createComment(data: {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create comment");
+  return res.json() as Promise<ForumComment>;
+}
+
+export async function uploadProfileBanner(file: File): Promise<{ bannerUrl: string }> {
+  const token = await getAuthToken();
+  if (!token) throw new Error("Unauthorized");
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE}/forum/profile/banner`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Banner upload failed: ${res.status} ${errText}`);
+  }
+  return res.json() as Promise<{ bannerUrl: string }>;
+}
+
+export async function updateBannerPosition(position: number): Promise<{ bannerPosition: number }> {
+  const token = await getAuthToken();
+  if (!token) throw new Error("Unauthorized");
+
+  const res = await fetch(`${API_BASE}/forum/profile/banner-position`, {
+    method: "PATCH",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ position }),
+  });
+  if (!res.ok) throw new Error("Failed to update banner position");
+  return res.json() as Promise<{ bannerPosition: number }>;
+}
+
+export async function getProfile(uid: string): Promise<UserProfileResponse> {
+  const token = await getAuthToken();
+  const res = await fetch(`${API_BASE}/forum/profile/${uid}`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error("Profile not found");
+  return res.json() as Promise<UserProfileResponse>;
+}
+
+export async function deletePost(id: string): Promise<void> {
+  const token = await getAuthToken();
+  if (!token) throw new Error("Unauthorized");
+
+  const res = await fetch(`${API_BASE}/forum/posts/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error("Failed to delete post");
+  cacheInvalidate(`post:${id}`, `comments:${id}`);
+  cacheClearByTag('forum_posts');
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  const token = await getAuthToken();
+  if (!token) throw new Error("Unauthorized");
+
+  const res = await fetch(`${API_BASE}/forum/comments/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error("Failed to delete comment");
+}
+
+export async function updatePost(id: string, data: { title?: string; content?: string }) {
+  const token = await getAuthToken();
+  if (!token) throw new Error("Unauthorized");
+
+  const res = await fetch(`${API_BASE}/forum/posts/${id}`, {
+    method: "PATCH",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update post");
+  const post = await res.json() as ForumPost;
+  cacheInvalidate(`post:${id}`);
+  cacheClearByTag('forum_posts');
+  return post;
+}
+
+export async function updateComment(id: string, data: { content: string }) {
+  const token = await getAuthToken();
+  if (!token) throw new Error("Unauthorized");
+
+  const res = await fetch(`${API_BASE}/forum/comments/${id}`, {
+    method: "PATCH",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update comment");
   return res.json() as Promise<ForumComment>;
 }
 

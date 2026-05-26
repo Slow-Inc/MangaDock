@@ -154,7 +154,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- ─── 2.5 FORUM TABLES (Phase 2) ───────────────────────────────────────────
+-- ─── 2.5 FORUM TABLES (Phase 1.5) ──────────────────────────────────────────
 
 -- forum_posts
 CREATE TABLE IF NOT EXISTS forum_posts (
@@ -164,6 +164,8 @@ CREATE TABLE IF NOT EXISTS forum_posts (
   content       TEXT NOT NULL,
   category      TEXT NOT NULL DEFAULT 'general', -- 'general', 'announcement', 'spoiler', 'manga_update'
   target_manga_id TEXT, -- Optional link to a specific manga
+  target_manga_title TEXT, -- Cached title for display tags
+  target_manga_cover TEXT, -- Cached cover for display tags
   upvotes       INTEGER NOT NULL DEFAULT 0,
   downvotes     INTEGER NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -270,5 +272,49 @@ END $$;
 DROP TABLE IF EXISTS favorites;
 DROP TABLE IF EXISTS liked_items;
 DROP TABLE IF EXISTS reading_history;
+
+-- ─── 7. HOTFIXES / INCREMENTAL UPDATES ────────────────────────────────────────
+
+DO $$
+BEGIN
+  -- forum_posts: add target_manga_title
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='forum_posts' AND column_name='target_manga_title') THEN
+    ALTER TABLE forum_posts ADD COLUMN target_manga_title TEXT;
+  END IF;
+
+  -- forum_posts: add target_manga_cover
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='forum_posts' AND column_name='target_manga_cover') THEN
+    ALTER TABLE forum_posts ADD COLUMN target_manga_cover TEXT;
+  END IF;
+
+  -- forum_posts: add image_urls for post image attachments
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='forum_posts' AND column_name='image_urls') THEN
+    ALTER TABLE forum_posts ADD COLUMN image_urls TEXT[] DEFAULT '{}';
+  END IF;
+
+  -- profiles: add banner_url for custom profile banner image
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='banner_url') THEN
+    ALTER TABLE profiles ADD COLUMN banner_url TEXT;
+  END IF;
+
+  -- profiles: add banner_position (0-100 Y%) for drag-to-reposition
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='banner_position') THEN
+    ALTER TABLE profiles ADD COLUMN banner_position NUMERIC(5,2) DEFAULT 50;
+  END IF;
+
+  -- forum_posts: soft delete support
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='forum_posts' AND column_name='deleted_at') THEN
+    ALTER TABLE forum_posts ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
+  END IF;
+
+  -- forum_comments: soft delete support
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='forum_comments' AND column_name='deleted_at') THEN
+    ALTER TABLE forum_comments ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
+  END IF;
+END $$;
+
+-- Indexes for soft-delete queries (WHERE deleted_at IS NULL is the hot path)
+CREATE INDEX IF NOT EXISTS idx_forum_posts_deleted_at    ON forum_posts    (deleted_at) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_forum_comments_deleted_at ON forum_comments (deleted_at) WHERE deleted_at IS NULL;
 
 COMMIT;

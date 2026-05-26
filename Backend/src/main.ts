@@ -20,8 +20,8 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Serve cached images from .cache/images/ under /img-cache/
-  app.useStaticAssets(path.resolve(process.cwd(), '.cache', 'images'), {
+  // Serve cached images from img-cache/ under /img-cache/
+  app.useStaticAssets(path.resolve(process.cwd(), 'img-cache'), {
     prefix: '/img-cache/',
   });
 
