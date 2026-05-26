@@ -21,7 +21,7 @@ export default function CommentThread({
   onCommentAdded: (newComment: ForumComment) => void;
 }) {
   const { user, showLoginPrompt } = useAuth();
-  const [isReplying, setIsIsReplying] = useState(false);
+  const [isReplying, setIsReplying] = useState(false);
   const [replyContent, setReplyContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -73,7 +73,7 @@ export default function CommentThread({
     if (deletingComment) return;
     setDeletingComment(true);
     try {
-      await deleteComment(comment.id);
+      await deleteComment(comment.id, comment.postId);
       setIsDeleted(true);
     } catch {
       console.error("Failed to delete comment");
@@ -131,11 +131,12 @@ export default function CommentThread({
 
     onCommentAdded(tempReply);
     setReplyContent("");
-    setIsIsReplying(false);
+    setIsReplying(false);
     setSubmitting(true);
 
     try {
-      await createComment({ postId: comment.postId, parentId: comment.id, content });
+      const result = await createComment({ postId: comment.postId, parentId: comment.id, content });
+      onCommentAdded(result);
     } catch {
       console.error("Failed to post reply");
     } finally {
@@ -239,7 +240,7 @@ export default function CommentThread({
             />
 
             <button
-              onClick={() => user ? setIsIsReplying(!isReplying) : showLoginPrompt()}
+              onClick={() => user ? setIsReplying(!isReplying) : showLoginPrompt()}
               className="text-xs font-bold text-white/40 hover:text-white transition-colors"
             >
               ตอบกลับ
@@ -302,7 +303,7 @@ export default function CommentThread({
               />
               <div className="flex justify-end gap-2 mt-2">
                 <button
-                  onClick={() => setIsIsReplying(false)}
+                  onClick={() => setIsReplying(false)}
                   className="px-3 py-1.5 rounded-lg text-xs font-bold text-white/50 hover:bg-white/5 smooth-hover"
                 >
                   ยกเลิก

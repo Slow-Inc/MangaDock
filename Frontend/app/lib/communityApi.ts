@@ -160,7 +160,9 @@ export async function createComment(data: {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create comment");
-  return res.json() as Promise<ForumComment>;
+  const comment = await res.json() as ForumComment;
+  cacheInvalidate(`comments:${comment.postId}`);
+  return comment;
 }
 
 export async function uploadProfileBanner(file: File): Promise<{ bannerUrl: string }> {
@@ -217,7 +219,7 @@ export async function deletePost(id: string): Promise<void> {
   cacheClearByTag('forum_posts');
 }
 
-export async function deleteComment(id: string): Promise<void> {
+export async function deleteComment(id: string, postId?: string): Promise<void> {
   const token = await getAuthToken();
   if (!token) throw new Error("Unauthorized");
 
@@ -226,6 +228,7 @@ export async function deleteComment(id: string): Promise<void> {
     headers: authHeaders(token),
   });
   if (!res.ok) throw new Error("Failed to delete comment");
+  if (postId) cacheInvalidate(`comments:${postId}`);
 }
 
 export async function updatePost(id: string, data: { title?: string; content?: string }) {
@@ -254,7 +257,9 @@ export async function updateComment(id: string, data: { content: string }) {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update comment");
-  return res.json() as Promise<ForumComment>;
+  const comment = await res.json() as ForumComment;
+  cacheInvalidate(`comments:${comment.postId}`);
+  return comment;
 }
 
 export async function vote(data: {

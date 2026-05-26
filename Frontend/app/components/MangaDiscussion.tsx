@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { listPosts, createPost } from "../lib/communityApi";
 import { useAuth } from "../contexts/AuthContext";
 import PostCard from "./PostCard";
@@ -144,9 +145,12 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
 
       {posts.length > 0 && (
         <div className="mt-6 text-center">
-          <button className="text-[10px] font-black uppercase tracking-widest text-white/30 hover:text-white transition-colors">
+          <Link
+            href={`/community?mangaId=${mangaId}`}
+            className="text-[10px] font-black uppercase tracking-widest text-white/30 hover:text-white transition-colors"
+          >
             ดูการสนทนาทั้งหมด
-          </button>
+          </Link>
         </div>
       )}
     </section>
