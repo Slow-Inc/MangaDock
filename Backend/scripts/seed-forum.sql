@@ -1,5 +1,6 @@
--- MangaDock Forum Mockup Data (Corrected Seed Script)
--- Run this in Supabase SQL Editor to populate the community forum.
+-- ⚠️  DEV ONLY — DO NOT RUN IN PRODUCTION
+-- MangaDock Forum Mockup Data
+-- Run this in Supabase SQL Editor to populate the community forum for local development.
 
 -- 1. Create a dummy system/admin profile if it doesn't exist
 INSERT INTO profiles (uid, display_name, photo_url, role, bio)

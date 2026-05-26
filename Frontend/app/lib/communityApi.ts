@@ -161,7 +161,7 @@ export async function createComment(data: {
   });
   if (!res.ok) throw new Error("Failed to create comment");
   const comment = await res.json() as ForumComment;
-  cacheInvalidate(`comments:${comment.postId}`);
+  cacheInvalidate(`comments:${data.postId}`);
   return comment;
 }
 

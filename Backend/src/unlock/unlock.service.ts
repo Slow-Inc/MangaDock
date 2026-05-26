@@ -114,7 +114,15 @@ export class UnlockService {
         newBalance = result.balance;
       } catch (err) {
         // Payment failed after unlock was already granted — roll back unlock row
-        await this.db.from('unlocks').delete().match({ uid, version_id: versionId });
+        const { error: rollbackErr } = await this.db
+          .from('unlocks')
+          .delete()
+          .match({ uid, version_id: versionId });
+        if (rollbackErr) {
+          this.logger.error(
+            `Unlock rollback failed — uid=${uid} versionId=${versionId}: ${rollbackErr.message}`,
+          );
+        }
         throw err;
       }
     }

@@ -28,12 +28,15 @@ export default function VoteButtons({
 
   const { user, showLoginPrompt } = useAuth();
 
-  // Resync when the target changes (e.g. VoteButtons reused across different posts)
+  // Resync when the target changes (e.g. VoteButtons reused across different posts).
+  // Intentionally omits initialUpvotes/Downvotes from deps — those update via externalCounts,
+  // not by prop drilling, so including them here would overwrite in-progress optimistic state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setUpvotes(initialUpvotes);
     setDownvotes(initialDownvotes);
     setUserVote(initialUserVote);
-  }, [targetId, initialUpvotes, initialDownvotes, initialUserVote]);
+  }, [targetId]);
 
   // Sync SSE vote updates from other users (ignored while user is actively voting)
   useEffect(() => {

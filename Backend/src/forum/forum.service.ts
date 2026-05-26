@@ -67,8 +67,8 @@ export class ForumService {
     if (sort === 'new') {
       query = query.order('created_at', { ascending: false });
     } else {
-      // Hot: order by upvotes descending (simple popularity sort)
-      query = query.order('upvotes', { ascending: false });
+      // Hot: upvotes desc, recency as tiebreaker
+      query = query.order('upvotes', { ascending: false }).order('created_at', { ascending: false });
     }
 
     const { data, count, error } = await query.range(offset, offset + limit - 1);
