@@ -45,6 +45,7 @@ export function usePostStream({ postId, onEvent, enabled = true }: UsePostStream
     es.onerror = () => {
       es.close();
       esRef.current = null;
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
       const delay = Math.min(1_000 * 2 ** retriesRef.current, 30_000);
       retriesRef.current = Math.min(retriesRef.current + 1, 6);
       timerRef.current = setTimeout(connect, delay);
@@ -92,6 +93,8 @@ export function useFeedStream({ onNewPost, enabled = true }: UseFeedStreamOption
 
     es.onerror = () => {
       es.close();
+      esRef.current = null;
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
       const delay = Math.min(1_000 * 2 ** retriesRef.current, 30_000);
       retriesRef.current = Math.min(retriesRef.current + 1, 6);
       timerRef.current = setTimeout(connect, delay);

@@ -34,18 +34,25 @@ export class ForumEventsService implements OnModuleInit, OnModuleDestroy {
   private readonly postSubject = new Subject<ForumSSEEvent>();
   private readonly feedSubject = new Subject<FeedSSEEvent>();
   private readonly unsubscribeFns: Array<() => void> = [];
+  // Tag events published by this instance so the Redis subscriber can skip them
+  // (avoids double-delivery to local SSE clients when Redis is active)
+  private readonly instanceId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   constructor(private readonly redis: RedisService) {}
 
   onModuleInit() {
     const unsubPost = this.redis.subscribe(REDIS_POST_CHANNEL, (data: unknown) => {
       if (data && typeof data === 'object' && 'postId' in data) {
-        this.postSubject.next(data as ForumSSEEvent);
+        if ((data as Record<string, unknown>)['_src'] === this.instanceId) return;
+        const { _src: _, ...event } = data as Record<string, unknown>;
+        this.postSubject.next(event as ForumSSEEvent);
       }
     });
     const unsubFeed = this.redis.subscribe(REDIS_FEED_CHANNEL, (data: unknown) => {
       if (data && typeof data === 'object' && 'type' in data) {
-        this.feedSubject.next(data as FeedSSEEvent);
+        if ((data as Record<string, unknown>)['_src'] === this.instanceId) return;
+        const { _src: _, ...event } = data as Record<string, unknown>;
+        this.feedSubject.next(event as FeedSSEEvent);
       }
     });
     this.unsubscribeFns.push(unsubPost, unsubFeed);
@@ -59,18 +66,17 @@ export class ForumEventsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async broadcastPostEvent(event: ForumSSEEvent): Promise<void> {
+    // Always deliver to local SSE clients immediately (Redis may silently fail)
+    this.postSubject.next(event);
     if (this.redis.available) {
-      await this.redis.publish(REDIS_POST_CHANNEL, event);
-    } else {
-      this.postSubject.next(event);
+      await this.redis.publish(REDIS_POST_CHANNEL, { ...event, _src: this.instanceId });
     }
   }
 
   async broadcastFeedEvent(event: FeedSSEEvent): Promise<void> {
+    this.feedSubject.next(event);
     if (this.redis.available) {
-      await this.redis.publish(REDIS_FEED_CHANNEL, event);
-    } else {
-      this.feedSubject.next(event);
+      await this.redis.publish(REDIS_FEED_CHANNEL, { ...event, _src: this.instanceId });
     }
   }
 

@@ -166,9 +166,11 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
   const book = books[idx];
   const resolvedUrl = resolvedThumbnail(book);
   const [imgUrl, setImgUrl] = useState(resolvedUrl);
-  useEffect(() => { setImgUrl(resolvedUrl); }, [resolvedUrl]);
+  const [imgFellBack, setImgFellBack] = useState(false);
+  useEffect(() => { setImgUrl(resolvedUrl); setImgFellBack(false); }, [resolvedUrl]);
   const handleImgError = () => {
-    if (book.thumbnail) {
+    if (!imgFellBack && book.thumbnail) {
+      setImgFellBack(true);
       setImgUrl(book.thumbnail.includes("mangadex.org")
         ? `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`
         : book.thumbnail);

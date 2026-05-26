@@ -73,7 +73,7 @@ export class UnlockService {
     // Fetch chapter version to get price and creator
     const { data: version, error: versionError } = await this.db
       .from('chapter_versions')
-      .select('version_id, price_coins, translator_uid, chapters!inner(manga!inner(title))')
+      .select('version_id, price_coins, translator_uid, title_name')
       .eq('version_id', versionId)
       .maybeSingle();
 
@@ -86,7 +86,7 @@ export class UnlockService {
 
     const priceCoins = version.price_coins ?? 0;
     const creatorUid = version.translator_uid;
-    const mangaTitle = (version as any).chapters?.manga?.title || 'Unknown Manga';
+    const mangaTitle = version.title_name || 'Unknown Manga';
     let newBalance: number | undefined;
 
     if (priceCoins > 0) {
