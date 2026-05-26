@@ -81,15 +81,16 @@ describe('ForumController', () => {
   // ─── GET /forum/posts (public) ────────────────────────────────────────────
 
   describe('GET /forum/posts', () => {
-    it('should return a list of posts', async () => {
-      mockForumService.listPosts.mockResolvedValue([MOCK_POST]);
+    it('should return a list of posts with total count', async () => {
+      mockForumService.listPosts.mockResolvedValue({ items: [MOCK_POST], total: 1 });
       const res = await request(app.getHttpServer()).get('/forum/posts').expect(200);
-      expect(res.body).toHaveLength(1);
-      expect(res.body[0].id).toBe('p1');
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].id).toBe('p1');
+      expect(res.body.total).toBe(1);
     });
 
     it('should forward category, sort, limit, offset query params', async () => {
-      mockForumService.listPosts.mockResolvedValue([]);
+      mockForumService.listPosts.mockResolvedValue({ items: [], total: 0 });
       await request(app.getHttpServer())
         .get('/forum/posts?category=general&sort=new&limit=10&offset=20')
         .expect(200);
@@ -99,7 +100,7 @@ describe('ForumController', () => {
     });
 
     it('should default to sort=hot, limit=20, offset=0', async () => {
-      mockForumService.listPosts.mockResolvedValue([]);
+      mockForumService.listPosts.mockResolvedValue({ items: [], total: 0 });
       await request(app.getHttpServer()).get('/forum/posts').expect(200);
       expect(mockForumService.listPosts).toHaveBeenCalledWith(
         undefined, undefined, 'hot', 20, 0, TEST_USER.uid,
@@ -265,14 +266,14 @@ describe('ForumController', () => {
 
   describe('normal user flow', () => {
     it('browse posts, create post, add comment, upvote post', async () => {
-      mockForumService.listPosts.mockResolvedValue([]);
+      mockForumService.listPosts.mockResolvedValue({ items: [], total: 0 });
       mockForumService.createPost.mockResolvedValue(MOCK_POST);
       mockForumService.createComment.mockResolvedValue(MOCK_COMMENT);
       mockForumService.vote.mockResolvedValue({ upvotes: 1, downvotes: 0 });
 
       // 1. Browse public feed
       const feed = await request(app.getHttpServer()).get('/forum/posts').expect(200);
-      expect(Array.isArray(feed.body)).toBe(true);
+      expect(Array.isArray(feed.body.items)).toBe(true);
 
       // 2. Create a new post
       const post = await request(app.getHttpServer())
@@ -328,7 +329,7 @@ describe('ForumController', () => {
     });
 
     it('GET /forum/posts → 200 without token (public route)', async () => {
-      mockForumService.listPosts.mockResolvedValue([]);
+      mockForumService.listPosts.mockResolvedValue({ items: [], total: 0 });
       await request(unauthApp.getHttpServer()).get('/forum/posts').expect(200);
     });
 
