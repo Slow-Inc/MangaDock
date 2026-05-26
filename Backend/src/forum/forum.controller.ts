@@ -69,8 +69,8 @@ export class ForumController {
       category, 
       mangaId, 
       sort,
-      limit ? parseInt(limit) : 20, 
-      offset ? parseInt(offset) : 0,
+      limit ? (parseInt(limit, 10) || 20) : 20,
+      offset ? (parseInt(offset, 10) || 0) : 0,
       user?.uid
     );
   }

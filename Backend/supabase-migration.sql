@@ -317,4 +317,10 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_forum_posts_deleted_at    ON forum_posts    (deleted_at) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_forum_comments_deleted_at ON forum_comments (deleted_at) WHERE deleted_at IS NULL;
 
+-- Indexes for common filter + sort patterns
+CREATE INDEX IF NOT EXISTS idx_forum_posts_category_created_at ON forum_posts (category, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_forum_posts_manga_created_at    ON forum_posts (target_manga_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_forum_comments_post_created_at  ON forum_comments (post_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_forum_comments_parent_id        ON forum_comments (parent_id);
+
 COMMIT;

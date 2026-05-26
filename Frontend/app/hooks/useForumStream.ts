@@ -30,7 +30,7 @@ export function usePostStream({ postId, onEvent, enabled = true }: UsePostStream
 
   const connect = useCallback(() => {
     esRef.current?.close();
-    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4001";
     const es = new EventSource(`${base}/forum/posts/${postId}/stream`);
     esRef.current = es;
 
@@ -76,7 +76,7 @@ export function useFeedStream({ onNewPost, enabled = true }: UseFeedStreamOption
 
   const connect = useCallback(() => {
     esRef.current?.close();
-    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4001";
     const es = new EventSource(`${base}/forum/feed/stream`);
     esRef.current = es;
 

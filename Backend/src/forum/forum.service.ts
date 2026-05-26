@@ -66,7 +66,7 @@ export class ForumService {
     if (sort === 'new') {
       query = query.order('created_at', { ascending: false });
     } else {
-      // Simple 'hot' logic: upvotes - downvotes
+      // Hot: order by upvotes descending (simple popularity sort)
       query = query.order('upvotes', { ascending: false });
     }
 
@@ -664,19 +664,22 @@ export class ForumService {
     if (existingVote) {
       if (existingVote.vote_value === dto.voteValue) {
         // Remove vote if same value (toggle off)
-        await this.db.from('forum_votes').delete().match({ uid, target_type: dto.targetType, target_id: dto.targetId });
+        const { error } = await this.db.from('forum_votes').delete().match({ uid, target_type: dto.targetType, target_id: dto.targetId });
+        if (error) throw new InternalServerErrorException(`Vote delete failed: ${error.message}`);
       } else {
         // Change vote value
-        await this.db.from('forum_votes').update({ vote_value: dto.voteValue }).match({ uid, target_type: dto.targetType, target_id: dto.targetId });
+        const { error } = await this.db.from('forum_votes').update({ vote_value: dto.voteValue }).match({ uid, target_type: dto.targetType, target_id: dto.targetId });
+        if (error) throw new InternalServerErrorException(`Vote update failed: ${error.message}`);
       }
     } else {
       // New vote
-      await this.db.from('forum_votes').insert({
+      const { error } = await this.db.from('forum_votes').insert({
         uid,
         target_type: dto.targetType,
         target_id: dto.targetId,
         vote_value: dto.voteValue,
       });
+      if (error) throw new InternalServerErrorException(`Vote insert failed: ${error.message}`);
     }
 
     // 2. Recalculate upvotes/downvotes for the target
