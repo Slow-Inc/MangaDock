@@ -67,16 +67,24 @@ export class ForumEventsService implements OnModuleInit, OnModuleDestroy {
 
   async broadcastPostEvent(event: ForumSSEEvent): Promise<void> {
     // Always deliver to local SSE clients immediately (Redis may silently fail)
-    this.postSubject.next(event);
+    if (!this.postSubject.closed) this.postSubject.next(event);
     if (this.redis.available) {
-      await this.redis.publish(REDIS_POST_CHANNEL, { ...event, _src: this.instanceId });
+      try {
+        await this.redis.publish(REDIS_POST_CHANNEL, { ...event, _src: this.instanceId });
+      } catch (err) {
+        this.logger.warn(`Redis publish failed for post event: ${String(err)}`);
+      }
     }
   }
 
   async broadcastFeedEvent(event: FeedSSEEvent): Promise<void> {
-    this.feedSubject.next(event);
+    if (!this.feedSubject.closed) this.feedSubject.next(event);
     if (this.redis.available) {
-      await this.redis.publish(REDIS_FEED_CHANNEL, { ...event, _src: this.instanceId });
+      try {
+        await this.redis.publish(REDIS_FEED_CHANNEL, { ...event, _src: this.instanceId });
+      } catch (err) {
+        this.logger.warn(`Redis publish failed for feed event: ${String(err)}`);
+      }
     }
   }
 

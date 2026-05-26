@@ -87,35 +87,36 @@ export class UnlockService {
     const priceCoins = version.price_coins ?? 0;
     const creatorUid = version.translator_uid;
     const mangaTitle = version.title_name || 'Unknown Manga';
-    let newBalance: number | undefined;
-
-    if (priceCoins > 0) {
-      if (!creatorUid) {
-        throw new BadRequestException('Cannot purchase: Creator information is missing for this version.');
-      }
-
-      // Use the high-level revenue split logic
-      const result = await this.walletService.processRevenueSplit(
-        uid,
-        creatorUid,
-        priceCoins,
-        `ปลดล็อคตอน: ${mangaTitle}`,
-        versionId,
-      );
-      newBalance = result.balance;
+    if (priceCoins > 0 && !creatorUid) {
+      throw new BadRequestException('Cannot purchase: Creator information is missing for this version.');
     }
 
-    // Insert unlock record
+    // Insert unlock record FIRST so access is granted even if creator payment has issues
     const { error: unlockError } = await this.db
       .from('unlocks')
-      .insert({
-        uid,
-        version_id: versionId,
-        price_paid: priceCoins,
-      });
+      .insert({ uid, version_id: versionId, price_paid: priceCoins });
 
     if (unlockError) {
       throw new Error(`Failed to insert unlock record: ${unlockError.message}`);
+    }
+
+    let newBalance: number | undefined;
+
+    if (priceCoins > 0 && creatorUid) {
+      try {
+        const result = await this.walletService.processRevenueSplit(
+          uid,
+          creatorUid,
+          priceCoins,
+          `ปลดล็อคตอน: ${mangaTitle}`,
+          versionId,
+        );
+        newBalance = result.balance;
+      } catch (err) {
+        // Payment failed after unlock was already granted — roll back unlock row
+        await this.db.from('unlocks').delete().match({ uid, version_id: versionId });
+        throw err;
+      }
     }
 
     this.logger.log(`User ${uid} unlocked version ${versionId} for ${priceCoins} coins`);

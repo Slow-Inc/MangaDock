@@ -323,4 +323,109 @@ CREATE INDEX IF NOT EXISTS idx_forum_posts_manga_created_at    ON forum_posts (t
 CREATE INDEX IF NOT EXISTS idx_forum_comments_post_created_at  ON forum_comments (post_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_forum_comments_parent_id        ON forum_comments (parent_id);
 
+-- ─── 8. ATOMIC RPC FUNCTIONS ─────────────────────────────────────────────────
+
+-- Atomic add coins: increments balance and inserts transaction in one operation
+CREATE OR REPLACE FUNCTION add_coins_atomic(
+  p_uid        uuid,
+  p_amount     integer,
+  p_type       text,
+  p_description text DEFAULT NULL
+)
+RETURNS TABLE(balance integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_balance integer;
+BEGIN
+  INSERT INTO wallets (uid, balance)
+  VALUES (p_uid, 0)
+  ON CONFLICT (uid) DO NOTHING;
+
+  UPDATE wallets
+  SET balance = balance + p_amount,
+      updated_at = now()
+  WHERE uid = p_uid
+  RETURNING wallets.balance INTO v_balance;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description)
+  VALUES (p_uid, p_amount, p_type, v_balance, p_description);
+
+  RETURN QUERY SELECT v_balance;
+END;
+$$;
+
+-- Atomic spend coins: decrements balance only if sufficient, raises INSUFFICIENT_FUNDS otherwise
+CREATE OR REPLACE FUNCTION spend_coins_atomic(
+  p_uid          uuid,
+  p_amount       integer,
+  p_type         text,
+  p_description  text DEFAULT NULL,
+  p_reference_id text DEFAULT NULL
+)
+RETURNS TABLE(balance integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_balance integer;
+BEGIN
+  INSERT INTO wallets (uid, balance)
+  VALUES (p_uid, 0)
+  ON CONFLICT (uid) DO NOTHING;
+
+  UPDATE wallets
+  SET balance = balance - p_amount,
+      updated_at = now()
+  WHERE uid = p_uid
+    AND balance >= p_amount
+  RETURNING wallets.balance INTO v_balance;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'INSUFFICIENT_FUNDS';
+  END IF;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
+  VALUES (p_uid, -p_amount, p_type, v_balance, p_description, p_reference_id);
+
+  RETURN QUERY SELECT v_balance;
+END;
+$$;
+
+-- Atomic recalculate votes: counts forum_votes and writes totals to post/comment row
+CREATE OR REPLACE FUNCTION recalculate_votes_atomic(
+  p_target_type text,
+  p_target_id   uuid
+)
+RETURNS TABLE(upvotes bigint, downvotes bigint)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_upvotes   bigint;
+  v_downvotes bigint;
+BEGIN
+  SELECT
+    COUNT(*) FILTER (WHERE vote_value = 1),
+    COUNT(*) FILTER (WHERE vote_value = -1)
+  INTO v_upvotes, v_downvotes
+  FROM forum_votes
+  WHERE target_id = p_target_id
+    AND target_type = p_target_type;
+
+  IF p_target_type = 'post' THEN
+    UPDATE forum_posts
+    SET upvotes = v_upvotes, downvotes = v_downvotes
+    WHERE id = p_target_id;
+  ELSE
+    UPDATE forum_comments
+    SET upvotes = v_upvotes, downvotes = v_downvotes
+    WHERE id = p_target_id;
+  END IF;
+
+  RETURN QUERY SELECT v_upvotes, v_downvotes;
+END;
+$$;
+
 COMMIT;

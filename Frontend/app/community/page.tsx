@@ -82,6 +82,7 @@ function CommunityContent() {
   };
 
   const handleCreatePost = async () => {
+    if (!user) { showLoginPrompt(); return; }
     if (!newPost.title.trim() || !newPost.content.trim() || submitting) return;
 
     // Snapshot form state for potential revert
@@ -217,7 +218,7 @@ function CommunityContent() {
                 router.push(`/community?${params.toString()}`);
               }} className="hover:text-white transition-colors">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l18 18" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6L18 18" />
                 </svg>
               </button>
             </div>
@@ -231,7 +232,7 @@ function CommunityContent() {
                 router.push(`/community?${params.toString()}`);
               }} className="hover:text-white transition-colors">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l18 18" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6L18 18" />
                 </svg>
               </button>
             </div>
@@ -300,7 +301,7 @@ function CommunityContent() {
               <h2 className="text-xl font-bold text-white">สร้างโพสต์ใหม่</h2>
               <button onClick={() => { setShowCreateModal(false); setPostImages([]); }} className="text-white/40 hover:text-white">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6L18 18" />
                 </svg>
               </button>
             </header>

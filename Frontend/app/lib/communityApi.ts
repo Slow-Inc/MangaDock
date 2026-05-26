@@ -34,7 +34,7 @@ export async function listPosts(options: {
       if (mangaId) params.append('mangaId', mangaId);
       params.append('sort', sort);
       if (offset) params.append('offset', offset.toString());
-      if (limit !== 20) params.append('limit', limit.toString());
+      params.append('limit', limit.toString());
       const res = await fetch(`${API_BASE}/forum/posts?${params.toString()}`, {
         headers: authHeaders(token),
       });

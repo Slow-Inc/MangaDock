@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, InternalServerErrorException, Inject } from '@nestjs/common';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+import { fileTypeFromFile } from 'file-type';
 import { SupabaseService } from '../supabase/supabase.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 import { ForumEventsService } from './forum-events.service';
@@ -72,7 +73,7 @@ export class ForumService {
 
     const { data, count, error } = await query.range(offset, offset + limit - 1);
 
-    if (error) throw new Error(`Failed to list posts: ${error.message}`);
+    if (error) throw new InternalServerErrorException(`Failed to list posts: ${error.message}`);
 
     const userVotes = await this.getUserVotes(userUid, 'post', (data ?? []).map(p => p.id));
 
@@ -154,7 +155,7 @@ export class ForumService {
       .select('*, author:profiles(display_name, photo_url, role)')
       .single();
 
-    if (error) throw new Error(`Failed to create post: ${error.message}`);
+    if (error) throw new InternalServerErrorException(`Failed to create post: ${error.message}`);
 
     const post: ForumPost = {
       id: data.id,
@@ -339,7 +340,7 @@ export class ForumService {
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (error) throw new Error(`Failed to delete post: ${error.message}`);
+    if (error) throw new InternalServerErrorException(`Failed to delete post: ${error.message}`);
 
     this.forumEvents.broadcastPostEvent({ type: 'post_deleted', postId: id })
       .catch(err => this.logger.warn(`SSE broadcast failed: ${String(err)}`));
@@ -360,7 +361,7 @@ export class ForumService {
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (error) throw new Error(`Failed to delete comment: ${error.message}`);
+    if (error) throw new InternalServerErrorException(`Failed to delete comment: ${error.message}`);
 
     this.forumEvents.broadcastPostEvent({
       type: 'comment_deleted',
@@ -388,7 +389,7 @@ export class ForumService {
       .update(updates)
       .eq('id', id);
 
-    if (error) throw new Error(`Failed to update post: ${error.message}`);
+    if (error) throw new InternalServerErrorException(`Failed to update post: ${error.message}`);
     const updated = await this.getPost(id, uid);
 
     this.forumEvents.broadcastPostEvent({
@@ -419,7 +420,7 @@ export class ForumService {
       .select('*, author:profiles(display_name, photo_url, role)')
       .single();
 
-    if (error) throw new Error(`Failed to update comment: ${error.message}`);
+    if (error) throw new InternalServerErrorException(`Failed to update comment: ${error.message}`);
 
     return {
       id: data.id,
@@ -438,11 +439,14 @@ export class ForumService {
     };
   }
 
-  async uploadBanner(uid: string, tempFilePath: string, mimeType: string): Promise<{ bannerUrl: string }> {
-    if (!ALLOWED_IMAGE_MIME.has(mimeType)) {
+  async uploadBanner(uid: string, tempFilePath: string, _clientMime: string): Promise<{ bannerUrl: string }> {
+    // Validate by magic bytes, not the client-supplied Content-Type header
+    const detected = await fileTypeFromFile(tempFilePath);
+    if (!detected || !ALLOWED_IMAGE_MIME.has(detected.mime)) {
       if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
       throw new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed');
     }
+    const mimeType = detected.mime;
 
     const ext = MIME_TO_EXT[mimeType];
     const filename = `${crypto.randomUUID()}${ext}`;
@@ -455,7 +459,7 @@ export class ForumService {
     } catch (err) {
       this.logger.error(`Banner upload failed: ${String(err)}`);
       if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new Error('Failed to upload banner');
+      throw new InternalServerErrorException('Failed to upload banner');
     }
 
     const bannerUrl = `/${key}`;
@@ -465,7 +469,7 @@ export class ForumService {
       .update({ banner_url: bannerUrl })
       .eq('uid', uid);
 
-    if (error) throw new Error(`Failed to update profile banner: ${error.message}`);
+    if (error) throw new InternalServerErrorException(`Failed to update profile banner: ${error.message}`);
 
     return { bannerUrl };
   }
@@ -476,15 +480,18 @@ export class ForumService {
       .from('profiles')
       .update({ banner_position: clamped })
       .eq('uid', uid);
-    if (error) throw new Error(`Failed to update banner position: ${error.message}`);
+    if (error) throw new InternalServerErrorException(`Failed to update banner position: ${error.message}`);
     return { bannerPosition: clamped };
   }
 
-  async uploadImage(uid: string, tempFilePath: string, mimeType: string): Promise<{ imageUrl: string }> {
-    if (!ALLOWED_IMAGE_MIME.has(mimeType)) {
+  async uploadImage(uid: string, tempFilePath: string, _clientMime: string): Promise<{ imageUrl: string }> {
+    // Validate by magic bytes, not the client-supplied Content-Type header
+    const detected = await fileTypeFromFile(tempFilePath);
+    if (!detected || !ALLOWED_IMAGE_MIME.has(detected.mime)) {
       if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
       throw new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed');
     }
+    const mimeType = detected.mime;
 
     const ext = MIME_TO_EXT[mimeType];
     const filename = `${crypto.randomUUID()}${ext}`;
@@ -497,7 +504,7 @@ export class ForumService {
     } catch (err) {
       this.logger.error(`Forum image upload failed: ${String(err)}`);
       if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new Error('Failed to upload image');
+      throw new InternalServerErrorException('Failed to upload image');
     }
 
     return { imageUrl: `/${key}` };
@@ -512,9 +519,10 @@ export class ForumService {
       `)
       .eq('post_id', postId)
       .is('deleted_at', null)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .limit(500);
 
-    if (error) throw new Error(`Failed to list comments: ${error.message}`);
+    if (error) throw new InternalServerErrorException(`Failed to list comments: ${error.message}`);
 
     const userVotes = await this.getUserVotes(userUid, 'comment', (data ?? []).map(c => c.id));
 
@@ -593,7 +601,7 @@ export class ForumService {
         .sort((a, b) => b.postCount - a.postCount)
         .slice(0, limit);
     } catch (err) {
-      this.logger.error(`Unexpected error in getTrendingManga: ${err.message}`);
+      this.logger.error(`Unexpected error in getTrendingManga: ${String(err)}`);
       return [];
     }
   }
@@ -604,6 +612,7 @@ export class ForumService {
         .from('forum_comments')
         .select('id, post_id')
         .eq('id', dto.parentId)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (parentError) {
@@ -629,7 +638,7 @@ export class ForumService {
       .select('*, author:profiles(display_name, photo_url, role)')
       .single();
 
-    if (error) throw new Error(`Failed to create comment: ${error.message}`);
+    if (error) throw new InternalServerErrorException(`Failed to create comment: ${error.message}`);
 
     const comment: ForumComment = {
       ...data,
@@ -728,18 +737,17 @@ export class ForumService {
   }
 
   private async recalculateVotes(type: 'post' | 'comment', id: string) {
-    const { data: votes } = await this.db
-      .from('forum_votes')
-      .select('vote_value')
-      .eq('target_id', id)
-      .eq('target_type', type);
+    const { data, error } = await this.db.rpc('recalculate_votes_atomic', {
+      p_target_type: type,
+      p_target_id: id,
+    });
 
-    const upvotes = (votes ?? []).filter(v => v.vote_value === 1).length;
-    const downvotes = (votes ?? []).filter(v => v.vote_value === -1).length;
+    if (error) throw new InternalServerErrorException(`Failed to recalculate votes: ${error.message}`);
 
-    const table = type === 'post' ? 'forum_posts' : 'forum_comments';
-    await this.db.from(table).update({ upvotes, downvotes }).eq('id', id);
-
-    return { upvotes, downvotes };
+    const row = Array.isArray(data) ? data[0] : data;
+    return {
+      upvotes: Number(row?.upvotes ?? 0),
+      downvotes: Number(row?.downvotes ?? 0),
+    };
   }
 }
