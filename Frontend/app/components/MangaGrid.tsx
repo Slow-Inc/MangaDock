@@ -39,6 +39,7 @@ function GridCard({ book }: { book: GridBook }) {
   const [showCover, setShowCover] = useState(false);
   const [showReader, setShowReader] = useState(false);
   const [thumbSrc, setThumbSrc] = useState(() => resolvedThumbnail(book));
+  const [thumbFellBack, setThumbFellBack] = useState(false);
 
   // Same source as BookDetailModal — read from history directly, no extra props needed
   const historyEntry = getHistory().find((h) => h.id === book.id);
@@ -66,7 +67,7 @@ function GridCard({ book }: { book: GridBook }) {
               fill
               className="object-cover transition duration-300 group-hover:scale-105"
               sizes="(max-width: 640px) 45vw, (max-width: 1024px) 20vw, 14vw"
-              onError={() => setThumbSrc(cdnFallback(book))}
+              onError={() => { if (!thumbFellBack) { setThumbFellBack(true); setThumbSrc(cdnFallback(book)); } }}
             />
           )}
           <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />

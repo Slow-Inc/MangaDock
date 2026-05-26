@@ -29,7 +29,6 @@ function CommunityContent() {
   const [sort, setSort] = useState<'new' | 'hot'>('hot');
   const [viewMode, setViewMode] = useState<'card' | 'compact'>('card');
   
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPost, setNewPost] = useState({ title: "", content: "", category: "general" as ForumCategory });
   const [selectedManga, setSelectedManga] = useState<LandingBook | null>(null);
@@ -45,12 +44,6 @@ function CommunityContent() {
     setMangaId(searchParams.get('mangaId') || undefined);
     setCategory((searchParams.get('category') as ForumCategory) || undefined);
   }, [searchParams]);
-
-  useEffect(() => {
-    const handleToggle = () => setIsMobileMenuOpen(prev => !prev);
-    window.addEventListener('toggleMobileMenu', handleToggle);
-    return () => window.removeEventListener('toggleMobileMenu', handleToggle);
-  }, []);
 
   useEffect(() => {
     if (window.innerWidth < 768) setViewMode('compact');

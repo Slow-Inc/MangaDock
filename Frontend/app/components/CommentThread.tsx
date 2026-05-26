@@ -112,24 +112,6 @@ export default function CommentThread({
 
     const content = replyContent;
 
-    const tempReply: ForumComment = {
-      id: `temp-${Date.now()}`,
-      postId: comment.postId,
-      parentId: comment.id,
-      content,
-      authorUid: user?.uid ?? '',
-      authorName: user?.displayName ?? null,
-      authorPhotoUrl: user?.photoURL ?? null,
-      authorRole: user?.role ?? 'user',
-      upvotes: 0,
-      downvotes: 0,
-      userVote: 0,
-      replies: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    onCommentAdded(tempReply);
     setReplyContent("");
     setIsReplying(false);
     setSubmitting(true);
