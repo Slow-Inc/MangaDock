@@ -96,12 +96,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     if (!this.subscriber) {
       this.subscriber = this.client.duplicate();
       this.subscriber.on('message', (channel: string, message: string) => {
+        let data: unknown;
         try {
-          const data = JSON.parse(message) as unknown;
-          this.subscriptions.get(channel)?.forEach(h => {
-            try { h(data); } catch {}
-          });
-        } catch {}
+          data = JSON.parse(message);
+        } catch (err) {
+          this.logger.warn(`Redis message parse failed on "${channel}": ${String(err)}`);
+          return;
+        }
+        this.subscriptions.get(channel)?.forEach(h => {
+          try { h(data); } catch (err) {
+            this.logger.warn(`Redis subscriber handler error on "${channel}": ${String(err)}`);
+          }
+        });
       });
       this.subscriber.on('error', (err: Error) => {
         this.logger.warn(`Redis subscriber error: ${err.message}`);

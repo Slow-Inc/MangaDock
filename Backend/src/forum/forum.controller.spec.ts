@@ -1,4 +1,5 @@
-import { Test, type INestApplication } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
+import type { NestApplication } from '@nestjs/core';
 import request = require('supertest');
 import { UnauthorizedException } from '@nestjs/common';
 import { ForumController } from './forum.controller';
@@ -57,7 +58,7 @@ const mockAuthGuard = {
 };
 
 describe('ForumController', () => {
-  let app: INestApplication;
+  let app: NestApplication;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -299,7 +300,7 @@ describe('ForumController', () => {
   // ─── AuthGuard enforcement (POST routes) ─────────────────────────────────
 
   describe('AuthGuard enforcement', () => {
-    let unauthApp: INestApplication;
+    let unauthApp: NestApplication;
 
     beforeAll(async () => {
       const moduleRef = await Test.createTestingModule({
