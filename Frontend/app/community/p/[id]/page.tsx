@@ -76,6 +76,12 @@ export default function PostDetailPage() {
 
   const [voteCounts, setVoteCounts] = useState<Map<string, { upvotes: number; downvotes: number }>>(new Map());
   const [spoilerRevealed, setSpoilerRevealed] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   usePostStream({
     postId: id ?? "",
@@ -208,14 +214,14 @@ export default function PostDetailPage() {
     setNewComment("");
     try {
       const created = await createComment({ postId: post.id, content });
+      if (!mountedRef.current) return;
       setComments(prev => [...prev, created]);
       setPost(prev => prev ? { ...prev, commentCount: prev.commentCount + 1 } : prev);
-      fetchData(true);
     } catch (err) {
       console.error(err);
-      setNewComment(content);
+      if (mountedRef.current) setNewComment(content);
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) setSubmitting(false);
     }
   };
 
@@ -488,10 +494,12 @@ export default function PostDetailPage() {
                 post.imageUrls.length === 2 ? 'grid-cols-2' :
                 post.imageUrls.length >= 3 ? 'grid-cols-2' : 'grid-cols-1'
               } ${post.category === 'spoiler' && !spoilerRevealed ? 'blur-sm pointer-events-none' : ''}`}>
-                {post.imageUrls.map((url, i) => (
+                {post.imageUrls.map((url, i) => {
+                  const safeUrl = /^https?:\/\//i.test(url) ? url : '#';
+                  return (
                   <a
                     key={i}
-                    href={url}
+                    href={safeUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`relative block overflow-hidden bg-white/5 rounded-lg group ${
@@ -500,7 +508,7 @@ export default function PostDetailPage() {
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={url}
+                      src={safeUrl}
                       alt={`รูปที่ ${i + 1}`}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
@@ -510,7 +518,8 @@ export default function PostDetailPage() {
                       </svg>
                     </div>
                   </a>
-                ))}
+                  );
+                })}
               </div>
             )}
 

@@ -80,9 +80,11 @@ export function cacheInvalidate(...keys: string[]): void {
 }
 
 export function cacheClearByTag(tag: string): void {
+  const toDelete: string[] = [];
   for (const [key, entry] of store) {
-    if (entry.tags.includes(tag)) store.delete(key);
+    if (entry.tags.includes(tag)) toDelete.push(key);
   }
+  toDelete.forEach(k => store.delete(k));
 }
 
 // Clear everything — called on auth change to prevent cross-user bleed

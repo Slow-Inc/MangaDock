@@ -26,6 +26,15 @@ export default function VoteButtons({
   const [userVote, setUserVote] = useState(initialUserVote);
   const [loading, setLoading] = useState(false);
 
+  const { user, showLoginPrompt } = useAuth();
+
+  // Resync when the target changes (e.g. VoteButtons reused across different posts)
+  useEffect(() => {
+    setUpvotes(initialUpvotes);
+    setDownvotes(initialDownvotes);
+    setUserVote(initialUserVote);
+  }, [targetId, initialUpvotes, initialDownvotes, initialUserVote]);
+
   // Sync SSE vote updates from other users (ignored while user is actively voting)
   useEffect(() => {
     if (!loading && externalCounts) {
@@ -33,15 +42,13 @@ export default function VoteButtons({
       setDownvotes(externalCounts.downvotes);
     }
   }, [externalCounts, loading]);
-  const { user, showLoginPrompt } = useAuth();
 
   const handleVote = async (value: 1 | -1) => {
-    if (loading) return;
-
     if (!user) {
       showLoginPrompt();
       return;
     }
+    if (loading) return;
 
     // Snapshot for revert
     const prevUpvotes = upvotes;

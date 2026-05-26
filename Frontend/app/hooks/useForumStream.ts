@@ -30,8 +30,7 @@ export function usePostStream({ postId, onEvent, enabled = true }: UsePostStream
 
   const connect = useCallback(() => {
     esRef.current?.close();
-    const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4001";
-    const es = new EventSource(`${base}/forum/posts/${postId}/stream`);
+    const es = new EventSource(`/api/proxy/forum/posts/${postId}/stream`);
     esRef.current = es;
 
     es.onmessage = (e) => {
@@ -39,7 +38,9 @@ export function usePostStream({ postId, onEvent, enabled = true }: UsePostStream
         const data = JSON.parse(e.data) as ForumStreamEvent;
         if (data.type !== "heartbeat") onEventRef.current(data);
         retriesRef.current = 0;
-      } catch {}
+      } catch (err) {
+        console.warn("[usePostStream] Failed to parse SSE event:", err);
+      }
     };
 
     es.onerror = () => {
@@ -77,8 +78,7 @@ export function useFeedStream({ onNewPost, enabled = true }: UseFeedStreamOption
 
   const connect = useCallback(() => {
     esRef.current?.close();
-    const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4001";
-    const es = new EventSource(`${base}/forum/feed/stream`);
+    const es = new EventSource(`/api/proxy/forum/feed/stream`);
     esRef.current = es;
 
     es.onmessage = (e) => {
@@ -88,7 +88,9 @@ export function useFeedStream({ onNewPost, enabled = true }: UseFeedStreamOption
           onNewPostRef.current(data);
           retriesRef.current = 0;
         }
-      } catch {}
+      } catch (err) {
+        console.warn("[useFeedStream] Failed to parse SSE event:", err);
+      }
     };
 
     es.onerror = () => {
@@ -107,6 +109,7 @@ export function useFeedStream({ onNewPost, enabled = true }: UseFeedStreamOption
     return () => {
       timerRef.current && clearTimeout(timerRef.current);
       esRef.current?.close();
+      esRef.current = null;
     };
   }, [connect, enabled]);
 }

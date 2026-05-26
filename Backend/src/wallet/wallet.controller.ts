@@ -21,6 +21,7 @@ export class WalletController {
     return { balance };
   }
 
+  // DEV ONLY — no payment gateway yet; remove or gate behind NODE_ENV check before production
   @Post('topup')
   @UseGuards(AuthGuard)
   async topup(

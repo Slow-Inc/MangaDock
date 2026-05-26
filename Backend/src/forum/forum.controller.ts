@@ -19,11 +19,13 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as os from 'os';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 import { Observable, merge, interval } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ForumService } from './forum.service';
 import { ForumEventsService } from './forum-events.service';
-import { AuthGuard, USER_KEY, OptionalAuthGuard } from '../auth/auth.guard';
+import { AuthGuard, USER_KEY } from '../auth/auth.guard';
+import { OptionalAuthGuard } from '../auth/optional-auth.guard';
 import { type CreatePostDto, type CreateCommentDto, type UpdatePostDto, type UpdateCommentDto, type UpdateBannerPositionDto, type VoteDto, type ForumCategory } from './forum.types';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 
@@ -66,10 +68,10 @@ export class ForumController {
   ) {
     const user = req[USER_KEY] as SupabaseAuthUser | undefined;
     return this.forumService.listPosts(
-      category, 
-      mangaId, 
+      category,
+      mangaId,
       sort,
-      limit ? (parseInt(limit, 10) || 20) : 20,
+      Math.min(100, limit ? (parseInt(limit, 10) || 20) : 20),
       offset ? (parseInt(offset, 10) || 0) : 0,
       user?.uid
     );
@@ -95,7 +97,11 @@ export class ForumController {
   async uploadBanner(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file provided');
     const user = req[USER_KEY] as SupabaseAuthUser;
-    return this.forumService.uploadBanner(user.uid, file.path, file.mimetype);
+    try {
+      return await this.forumService.uploadBanner(user.uid, file.path, file.mimetype);
+    } finally {
+      fs.unlink(file.path, () => undefined);
+    }
   }
 
   @Patch('profile/banner-position')
@@ -114,7 +120,7 @@ export class ForumController {
 
   @Get('trending-manga')
   async getTrendingManga(@Query('limit') limit?: string) {
-    return this.forumService.getTrendingManga(limit ? parseInt(limit) : 5);
+    return this.forumService.getTrendingManga(Math.min(20, limit ? (parseInt(limit, 10) || 5) : 5));
   }
 
   @Get('posts/:id')
@@ -202,6 +208,10 @@ export class ForumController {
   async uploadImage(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file provided');
     const user = req[USER_KEY] as SupabaseAuthUser;
-    return this.forumService.uploadImage(user.uid, file.path, file.mimetype);
+    try {
+      return await this.forumService.uploadImage(user.uid, file.path, file.mimetype);
+    } finally {
+      fs.unlink(file.path, () => undefined);
+    }
   }
 }
