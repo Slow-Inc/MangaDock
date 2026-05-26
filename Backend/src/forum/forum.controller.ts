@@ -26,7 +26,8 @@ import { ForumService } from './forum.service';
 import { ForumEventsService } from './forum-events.service';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard';
-import { type CreatePostDto, type CreateCommentDto, type UpdatePostDto, type UpdateCommentDto, type UpdateBannerPositionDto, type VoteDto, type ForumCategory } from './forum.types';
+import { CreatePostDto, CreateCommentDto, UpdatePostDto, UpdateCommentDto, UpdateBannerPositionDto, VoteDto } from './forum.dto';
+import type { ForumCategory } from './forum.types';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);

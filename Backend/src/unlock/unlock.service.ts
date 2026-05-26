@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -29,7 +30,7 @@ export class UnlockService {
       .maybeSingle();
 
     if (error) {
-      throw new Error(`Failed to check unlock status: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to check unlock status: ${error.message}`);
     }
 
     return !!data;
@@ -45,7 +46,7 @@ export class UnlockService {
         .eq('chapter_versions.title_id', titleId);
 
       if (error) {
-        throw new Error(`Failed to fetch unlocked versions: ${error.message}`);
+        throw new InternalServerErrorException(`Failed to fetch unlocked versions: ${error.message}`);
       }
 
       return (data ?? []).map((row) => row.version_id);
@@ -57,7 +58,7 @@ export class UnlockService {
       .eq('uid', uid);
 
     if (error) {
-      throw new Error(`Failed to fetch unlocked versions: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to fetch unlocked versions: ${error.message}`);
     }
 
     return (data ?? []).map((row) => row.version_id);
@@ -78,7 +79,7 @@ export class UnlockService {
       .maybeSingle();
 
     if (versionError) {
-      throw new Error(`Failed to fetch chapter version: ${versionError.message}`);
+      throw new InternalServerErrorException(`Failed to fetch chapter version: ${versionError.message}`);
     }
     if (!version) {
       throw new NotFoundException(`Chapter version ${versionId} not found`);
@@ -97,7 +98,7 @@ export class UnlockService {
       .insert({ uid, version_id: versionId, price_paid: priceCoins });
 
     if (unlockError) {
-      throw new Error(`Failed to insert unlock record: ${unlockError.message}`);
+      throw new InternalServerErrorException(`Failed to insert unlock record: ${unlockError.message}`);
     }
 
     let newBalance: number | undefined;
