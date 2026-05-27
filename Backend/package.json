@@ -77,6 +77,9 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^file-type$": "<rootDir>/__mocks__/file-type.js"
+    },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
