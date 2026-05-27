@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import type { ChapterVersion } from "./types";
+import { cacheOrFetch, TTL } from "./apiCache";
 
 const API_BASE = "/api/proxy";
 
@@ -75,20 +76,27 @@ function authHeaders(token: string, extra?: HeadersInit): HeadersInit {
 }
 
 export async function searchBooks(query: string): Promise<{ items: StudioBook[]; total: number }> {
-  const qs = new URLSearchParams({ q: query, limit: "20", offset: "0" });
-  const data = await apiFetch<{ items: Array<{ id: string; title: string; subtitle: string; thumbnail?: string; authors?: string[] }>; total: number }>(
-    `/books/search?${qs.toString()}`,
+  return cacheOrFetch(
+    `search:${query}`,
+    async () => {
+      const qs = new URLSearchParams({ q: query, limit: "20", offset: "0" });
+      const data = await apiFetch<{ items: Array<{ id: string; title: string; subtitle: string; thumbnail?: string; authors?: string[] }>; total: number }>(
+        `/books/search?${qs.toString()}`,
+      );
+      return {
+        total: data.total ?? 0,
+        items: (data.items ?? []).map((b) => ({
+          id: b.id,
+          title: b.title ?? "",
+          subtitle: b.subtitle ?? "",
+          thumbnail: b.thumbnail,
+          authors: b.authors ?? [],
+        })),
+      };
+    },
+    TTL.MEDIUM,
+    { staleAfter: 4 * 60_000 },
   );
-  return {
-    total: data.total ?? 0,
-    items: (data.items ?? []).map((b) => ({
-      id: b.id,
-      title: b.title ?? "",
-      subtitle: b.subtitle ?? "",
-      thumbnail: b.thumbnail,
-      authors: b.authors ?? [],
-    })),
-  };
 }
 
 export function getBookCoverUrl(bookId: string): string {
@@ -209,6 +217,19 @@ export async function getWalletTransactions(token: string): Promise<WalletTransa
   });
 }
 
+export type CreatorEarnings = {
+  totalSales: number;
+  totalEarned: number;
+  titlesSold: number;
+  uniqueBuyers: number;
+};
+
+export async function getCreatorEarnings(token: string): Promise<CreatorEarnings> {
+  return apiFetch<CreatorEarnings>("/wallet/earnings", {
+    headers: authHeaders(token),
+  });
+}
+
 // ── Unlock API ──────────────────────────────────────────────────────────────
 
 export async function checkUnlock(token: string, versionId: string): Promise<{ unlocked: boolean }> {
@@ -266,6 +287,17 @@ export async function updateTranslatorProfile(
 ) {
   return apiFetch<{ message: string }>("/users/me/translator-profile", {
     method: "PATCH",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify(data),
+  });
+}
+
+export async function becomeTranslator(
+  token: string,
+  data: { bio?: string; translatorLanguages?: string[] } = {},
+) {
+  return apiFetch<{ ok: boolean }>("/users/me/become-translator", {
+    method: "POST",
     headers: authHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });

@@ -12,7 +12,7 @@
 
 ## Recommended Usage
 
-- ใช้ [../SYSTEM_ARCHITECTURE_OVERVIEW.md](../SYSTEM_ARCHITECTURE_OVERVIEW.md) เพื่อดูภาพรวมความสัมพันธ์ของ Frontend, Backend, MIT, Firebase, cache และ external APIs
+- ใช้ [../SYSTEM_ARCHITECTURE_OVERVIEW.md](../SYSTEM_ARCHITECTURE_OVERVIEW.md) เพื่อดูภาพรวมความสัมพันธ์ของ Frontend, Backend, MIT, Supabase, Cloudflare Worker/R2 และ external APIs
 - ใช้ [Backend README](../../Backend/README.md) เป็นจุดเริ่มต้นสำหรับการติดตั้ง การตั้งค่า environment และการรัน backend
 - ใช้ [BACKEND_SERVICE_OVERVIEW_AND_INTEGRATION.md](BACKEND_SERVICE_OVERVIEW_AND_INTEGRATION.md) เพื่อสรุปสถาปัตยกรรม โมดูลหลัก และการเชื่อมต่อกับ frontend และ MIT
 
@@ -21,5 +21,5 @@
 เอกสารในโฟลเดอร์นี้เน้นตอบคำถาม 3 เรื่องหลัก
 
 1. Backend ของ MangaDock ทำหน้าที่อะไร
-2. Backend เชื่อมต่อกับ frontend, Firebase และ MIT อย่างไร
+2. Backend เชื่อมต่อกับ frontend, Supabase และ MIT อย่างไร
 3. การรันและอ้างอิงเอกสารของ backend ควรเริ่มจากจุดใด

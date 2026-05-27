@@ -43,10 +43,15 @@ Frontend (Next.js)
 โมดูลหลักที่ใช้งานใน backend ได้แก่
 
 1. `books/` สำหรับข้อมูลหนังสือ มังงะ และ translation orchestration
-2. `users/` สำหรับ user-facing APIs และข้อมูลผู้ใช้
+2. `users/` สำหรับ user-facing APIs และข้อมูลผู้ใช้ รวมถึง avatar upload
 3. `cache/` สำหรับ 2-tier cache abstractions และ sync logic
-4. `supabase/` สำหรับ Supabase integration
+4. `supabase/` สำหรับ Supabase integration (PostgreSQL + RLS)
 5. `status/` สำหรับ health และ status endpoints
+6. `forum/` สำหรับ community forum — posts, nested comments, voting, image upload
+7. `wallet/` สำหรับ wallet balance และ ledger
+8. `unlock/` สำหรับ unlock economy (idempotent unlock flow)
+9. `upload/` (StorageModule `@Global`) สำหรับ file storage abstraction ผ่าน `STORAGE_PROVIDER` token
+10. `versions/` สำหรับ chapter versions (multi-translator support)
 
 README หลักของ backend อธิบายโครงสร้างโฟลเดอร์และวิธีรันระบบเพิ่มเติมไว้แล้วที่ [Backend README](../../Backend/README.md)
 

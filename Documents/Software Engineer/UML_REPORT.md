@@ -57,7 +57,6 @@ flowchart LR
   SupabaseService[SupabaseService\nservice]
   StorageProvider[StorageProvider\ninterface]
 
-  GoogleBooksAPI[(Google Books API\nexternal)]
   MangaDexAPI[(MangaDex API\nexternal)]
   GeminiAPI[(Gemini API\nexternal)]
   MITServer[(MIT Server\nFastAPI / Async)]
@@ -73,7 +72,6 @@ flowchart LR
   NestBackend --> UsersService
   NestBackend --> CacheOrchestrator
 
-  BooksService -->|Metadata| GoogleBooksAPI
   BooksService -->|Manga Content| MangaDexAPI
   BooksService -->|Translation| GeminiAPI
   BooksService -->|Async Tasks| MITServer

@@ -154,6 +154,47 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- ─── 2.5 FORUM TABLES (Phase 1.5) ──────────────────────────────────────────
+
+-- forum_posts
+CREATE TABLE IF NOT EXISTS forum_posts (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  author_uid    UUID NOT NULL REFERENCES profiles(uid) ON DELETE CASCADE,
+  title         TEXT NOT NULL,
+  content       TEXT NOT NULL,
+  category      TEXT NOT NULL DEFAULT 'general', -- 'general', 'announcement', 'spoiler', 'manga_update'
+  target_manga_id TEXT, -- Optional link to a specific manga
+  target_manga_title TEXT, -- Cached title for display tags
+  target_manga_cover TEXT, -- Cached cover for display tags
+  upvotes       INTEGER NOT NULL DEFAULT 0,
+  downvotes     INTEGER NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- forum_comments (Nested support)
+CREATE TABLE IF NOT EXISTS forum_comments (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id       UUID NOT NULL REFERENCES forum_posts(id) ON DELETE CASCADE,
+  parent_id     UUID REFERENCES forum_comments(id) ON DELETE CASCADE,
+  author_uid    UUID NOT NULL REFERENCES profiles(uid) ON DELETE CASCADE,
+  content       TEXT NOT NULL,
+  upvotes       INTEGER NOT NULL DEFAULT 0,
+  downvotes     INTEGER NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- forum_votes (Idempotent voting)
+CREATE TABLE IF NOT EXISTS forum_votes (
+  uid           UUID NOT NULL REFERENCES profiles(uid) ON DELETE CASCADE,
+  target_type   TEXT NOT NULL CHECK (target_type IN ('post', 'comment')),
+  target_id     UUID NOT NULL,
+  vote_value    INTEGER NOT NULL CHECK (vote_value IN (1, -1)),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (uid, target_type, target_id)
+);
+
 -- ─── 3. CHECK CONSTRAINTS ────────────────────────────────────────────────────
 
 DO $$ BEGIN
@@ -231,5 +272,160 @@ END $$;
 DROP TABLE IF EXISTS favorites;
 DROP TABLE IF EXISTS liked_items;
 DROP TABLE IF EXISTS reading_history;
+
+-- ─── 7. HOTFIXES / INCREMENTAL UPDATES ────────────────────────────────────────
+
+DO $$
+BEGIN
+  -- forum_posts: add target_manga_title
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='forum_posts' AND column_name='target_manga_title') THEN
+    ALTER TABLE forum_posts ADD COLUMN target_manga_title TEXT;
+  END IF;
+
+  -- forum_posts: add target_manga_cover
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='forum_posts' AND column_name='target_manga_cover') THEN
+    ALTER TABLE forum_posts ADD COLUMN target_manga_cover TEXT;
+  END IF;
+
+  -- forum_posts: add image_urls for post image attachments
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='forum_posts' AND column_name='image_urls') THEN
+    ALTER TABLE forum_posts ADD COLUMN image_urls TEXT[] DEFAULT '{}';
+  END IF;
+
+  -- profiles: add banner_url for custom profile banner image
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='banner_url') THEN
+    ALTER TABLE profiles ADD COLUMN banner_url TEXT;
+  END IF;
+
+  -- profiles: add banner_position (0-100 Y%) for drag-to-reposition
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='banner_position') THEN
+    ALTER TABLE profiles ADD COLUMN banner_position NUMERIC(5,2) DEFAULT 50;
+  END IF;
+
+  -- forum_posts: soft delete support
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='forum_posts' AND column_name='deleted_at') THEN
+    ALTER TABLE forum_posts ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
+  END IF;
+
+  -- forum_comments: soft delete support
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='forum_comments' AND column_name='deleted_at') THEN
+    ALTER TABLE forum_comments ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
+  END IF;
+END $$;
+
+-- Indexes for soft-delete queries (WHERE deleted_at IS NULL is the hot path)
+CREATE INDEX IF NOT EXISTS idx_forum_posts_deleted_at    ON forum_posts    (deleted_at) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_forum_comments_deleted_at ON forum_comments (deleted_at) WHERE deleted_at IS NULL;
+
+-- Indexes for common filter + sort patterns
+CREATE INDEX IF NOT EXISTS idx_forum_posts_category_created_at ON forum_posts (category, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_forum_posts_manga_created_at    ON forum_posts (target_manga_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_forum_comments_post_created_at  ON forum_comments (post_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_forum_comments_parent_id        ON forum_comments (parent_id);
+
+-- ─── 8. ATOMIC RPC FUNCTIONS ─────────────────────────────────────────────────
+
+-- Atomic add coins: increments balance and inserts transaction in one operation
+CREATE OR REPLACE FUNCTION add_coins_atomic(
+  p_uid        uuid,
+  p_amount     integer,
+  p_type       text,
+  p_description text DEFAULT NULL
+)
+RETURNS TABLE(balance integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_balance integer;
+BEGIN
+  INSERT INTO wallets (uid, balance)
+  VALUES (p_uid, 0)
+  ON CONFLICT (uid) DO NOTHING;
+
+  UPDATE wallets
+  SET balance = balance + p_amount,
+      updated_at = now()
+  WHERE uid = p_uid
+  RETURNING wallets.balance INTO v_balance;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description)
+  VALUES (p_uid, p_amount, p_type, v_balance, p_description);
+
+  RETURN QUERY SELECT v_balance;
+END;
+$$;
+
+-- Atomic spend coins: decrements balance only if sufficient, raises INSUFFICIENT_FUNDS otherwise
+CREATE OR REPLACE FUNCTION spend_coins_atomic(
+  p_uid          uuid,
+  p_amount       integer,
+  p_type         text,
+  p_description  text DEFAULT NULL,
+  p_reference_id text DEFAULT NULL
+)
+RETURNS TABLE(balance integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_balance integer;
+BEGIN
+  INSERT INTO wallets (uid, balance)
+  VALUES (p_uid, 0)
+  ON CONFLICT (uid) DO NOTHING;
+
+  UPDATE wallets
+  SET balance = balance - p_amount,
+      updated_at = now()
+  WHERE uid = p_uid
+    AND balance >= p_amount
+  RETURNING wallets.balance INTO v_balance;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'INSUFFICIENT_FUNDS';
+  END IF;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
+  VALUES (p_uid, -p_amount, p_type, v_balance, p_description, p_reference_id);
+
+  RETURN QUERY SELECT v_balance;
+END;
+$$;
+
+-- Atomic recalculate votes: counts forum_votes and writes totals to post/comment row
+CREATE OR REPLACE FUNCTION recalculate_votes_atomic(
+  p_target_type text,
+  p_target_id   uuid
+)
+RETURNS TABLE(upvotes bigint, downvotes bigint)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_upvotes   bigint;
+  v_downvotes bigint;
+BEGIN
+  SELECT
+    COUNT(*) FILTER (WHERE vote_value = 1),
+    COUNT(*) FILTER (WHERE vote_value = -1)
+  INTO v_upvotes, v_downvotes
+  FROM forum_votes
+  WHERE target_id = p_target_id
+    AND target_type = p_target_type;
+
+  IF p_target_type = 'post' THEN
+    UPDATE forum_posts
+    SET upvotes = v_upvotes, downvotes = v_downvotes
+    WHERE id = p_target_id;
+  ELSE
+    UPDATE forum_comments
+    SET upvotes = v_upvotes, downvotes = v_downvotes
+    WHERE id = p_target_id;
+  END IF;
+
+  RETURN QUERY SELECT v_upvotes, v_downvotes;
+END;
+$$;
 
 COMMIT;

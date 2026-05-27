@@ -14,6 +14,11 @@
 1. [Software Engineer/SE_PHASE_INDEX.md](Software%20Engineer/SE_PHASE_INDEX.md) สำหรับสารบัญเอกสารรายงานแยกตาม phase
 2. [Software Engineer/UML_REPORT.md](Software%20Engineer/UML_REPORT.md) สำหรับเอกสารแผนภาพ UML และ diagram ประกอบรายงาน
 
+## Product Requirements & Planning
+
+1. [Plan/Plan.md](Plan/Plan.md) สำหรับแผนงานและ Roadmap ฉบับละเอียด
+2. [Plan/PRD_COMMUNITY_FORUM.md](Plan/PRD_COMMUNITY_FORUM.md) สำหรับ PRD ของระบบ Community Forum (Phase 7.1)
+
 ## Folder Roles
 
 - [Frontend](Frontend): เอกสารระดับระบบของฝั่ง Frontend

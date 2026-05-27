@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -29,7 +30,7 @@ export class UnlockService {
       .maybeSingle();
 
     if (error) {
-      throw new Error(`Failed to check unlock status: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to check unlock status: ${error.message}`);
     }
 
     return !!data;
@@ -45,7 +46,7 @@ export class UnlockService {
         .eq('chapter_versions.title_id', titleId);
 
       if (error) {
-        throw new Error(`Failed to fetch unlocked versions: ${error.message}`);
+        throw new InternalServerErrorException(`Failed to fetch unlocked versions: ${error.message}`);
       }
 
       return (data ?? []).map((row) => row.version_id);
@@ -57,7 +58,7 @@ export class UnlockService {
       .eq('uid', uid);
 
     if (error) {
-      throw new Error(`Failed to fetch unlocked versions: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to fetch unlocked versions: ${error.message}`);
     }
 
     return (data ?? []).map((row) => row.version_id);
@@ -70,44 +71,61 @@ export class UnlockService {
       return { alreadyUnlocked: true };
     }
 
-    // Fetch chapter version to get price
+    // Fetch chapter version to get price and creator
     const { data: version, error: versionError } = await this.db
       .from('chapter_versions')
-      .select('version_id, price_coins')
+      .select('version_id, price_coins, translator_uid, title_name')
       .eq('version_id', versionId)
       .maybeSingle();
 
     if (versionError) {
-      throw new Error(`Failed to fetch chapter version: ${versionError.message}`);
+      throw new InternalServerErrorException(`Failed to fetch chapter version: ${versionError.message}`);
     }
     if (!version) {
       throw new NotFoundException(`Chapter version ${versionId} not found`);
     }
 
     const priceCoins = version.price_coins ?? 0;
-    let newBalance: number | undefined;
-
-    if (priceCoins > 0) {
-      const result = await this.walletService.spendCoins(
-        uid,
-        priceCoins,
-        'ปลดล็อคตอน',
-        versionId,
-      );
-      newBalance = result.balance;
+    const creatorUid = version.translator_uid;
+    const mangaTitle = version.title_name || 'Unknown Manga';
+    if (priceCoins > 0 && !creatorUid) {
+      throw new BadRequestException('Cannot purchase: Creator information is missing for this version.');
     }
 
-    // Insert unlock record
+    // Insert unlock record FIRST so access is granted even if creator payment has issues
     const { error: unlockError } = await this.db
       .from('unlocks')
-      .insert({
-        uid,
-        version_id: versionId,
-        price_paid: priceCoins,
-      });
+      .insert({ uid, version_id: versionId, price_paid: priceCoins });
 
     if (unlockError) {
-      throw new Error(`Failed to insert unlock record: ${unlockError.message}`);
+      throw new InternalServerErrorException(`Failed to insert unlock record: ${unlockError.message}`);
+    }
+
+    let newBalance: number | undefined;
+
+    if (priceCoins > 0 && creatorUid) {
+      try {
+        const result = await this.walletService.processRevenueSplit(
+          uid,
+          creatorUid,
+          priceCoins,
+          `ปลดล็อคตอน: ${mangaTitle}`,
+          versionId,
+        );
+        newBalance = result.balance;
+      } catch (err) {
+        // Payment failed after unlock was already granted — roll back unlock row
+        const { error: rollbackErr } = await this.db
+          .from('unlocks')
+          .delete()
+          .match({ uid, version_id: versionId });
+        if (rollbackErr) {
+          this.logger.error(
+            `Unlock rollback failed — uid=${uid} versionId=${versionId}: ${rollbackErr.message}`,
+          );
+        }
+        throw err;
+      }
     }
 
     this.logger.log(`User ${uid} unlocked version ${versionId} for ${priceCoins} coins`);

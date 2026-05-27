@@ -44,6 +44,8 @@ const nextConfig: NextConfig = {
     // All images are served through /api/proxy or /api/img-proxy (relative URLs on
     // the same server) so Next.js image optimizer can resize and convert to WebP/AVIF
     // without needing to know the original external hostname.
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     localPatterns: [
       { pathname: "/api/**" },
     ],
@@ -80,6 +82,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "scontent.fbcdn.net",
+      },
+      {
+        protocol: "https",
+        hostname: "api.dicebear.com",
       },
       // Local image cache + uploads served by the backend.
       {

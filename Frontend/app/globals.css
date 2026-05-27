@@ -14,6 +14,7 @@
 
 html {
   background: #08090d;
+  overflow-x: clip;
 }
 
 body {
@@ -21,7 +22,7 @@ body {
   background: #08090d;
   color: var(--foreground);
   font-family: var(--font-noto-sans-thai), sans-serif;
-  overflow-x: hidden;
+  overflow-x: clip;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
@@ -68,12 +69,14 @@ svg {
   max-width: 120rem;
 }
 
-.mobile-tabs-scroll {
+.mobile-tabs-scroll,
+.no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
-.mobile-tabs-scroll::-webkit-scrollbar {
+.mobile-tabs-scroll::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
@@ -123,6 +126,24 @@ svg {
 }
 .tab-fade-in {
   animation: tab-fade-in 0.2s ease-out both;
+}
+
+/* Profile reposition — content slides down when action bar opens */
+@keyframes profile-content-enter {
+  from { opacity: 0.75; transform: translateY(-12px); }
+  to   { opacity: 1;    transform: translateY(0); }
+}
+.profile-content-entering {
+  animation: profile-content-enter 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Profile reposition — content slides up when action bar closes */
+@keyframes profile-content-exit {
+  from { opacity: 0.75; transform: translateY(12px); }
+  to   { opacity: 1;    transform: translateY(0); }
+}
+.profile-content-exiting {
+  animation: profile-content-exit 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* New card slides in from left */
@@ -196,4 +217,42 @@ svg {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:active {
   background: rgba(99, 102, 241, 0.6);
+}
+
+/* Global Smooth Hover Standard — Phase 2 Optimization */
+.smooth-hover {
+  transition: 
+    color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.14s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.smooth-hover-fast {
+  transition:
+    color 0.08s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.08s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.08s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.1s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.08s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.08s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Marquee for long titles in mobile sticky header.
+   One-direction loop: pause at start → slide left → fade out → snap back invisible → fade in → repeat */
+@keyframes marquee-title {
+  0%   { transform: translateX(0); opacity: 1; }
+  /* pause at start so user can read from beginning */
+  14%  { transform: translateX(0); opacity: 1; animation-timing-function: ease-in-out; }
+  /* slide to end */
+  70%  { transform: translateX(calc(-1 * var(--marquee-overflow))); opacity: 1; }
+  /* brief pause then fade out */
+  78%  { transform: translateX(calc(-1 * var(--marquee-overflow))); opacity: 0; animation-timing-function: step-start; }
+  /* snap back to start while invisible */
+  79%  { transform: translateX(0); opacity: 0; animation-timing-function: ease-out; }
+  /* fade in at start */
+  93%  { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
 }

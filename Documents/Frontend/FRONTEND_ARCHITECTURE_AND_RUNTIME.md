@@ -46,6 +46,8 @@ Frontend ไม่เรียก MIT โดยตรงใน flow หลัก
 4. `app/api/` สำหรับ route handlers ที่ทำ proxy หรือช่วยงานฝั่ง server
 5. `app/lib/` สำหรับ utility integrations เช่น Supabase setup
 6. `app/hooks/` สำหรับ reusable client-side behavior
+7. `app/community/` สำหรับ Community Forum — Post Feed, Post Detail, Voting, Nested Comments, Image Upload
+8. `app/studio/` สำหรับ Creator/Translator Studio — Upload, Works Management, Manga Pages, Wallet
 
 ## 5. Runtime Configuration
 

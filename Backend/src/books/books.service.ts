@@ -6,7 +6,6 @@ import * as path from 'path';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
 import { ImageCacheService } from '../cache/image-cache.service';
 import { SupabaseService } from '../supabase/supabase.service';
-import { GoogleBooksService } from './google-books.service';
 import { MangaDexService } from './mangadex.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 import {
@@ -94,7 +93,6 @@ export class BooksService {
   private geminiModelsCatalogExpiresAt = 0;
 
   constructor(
-    private readonly googleBooks: GoogleBooksService,
     private readonly mangaDex: MangaDexService,
     private readonly cache: CacheOrchestratorService,
     private readonly imageCache: ImageCacheService,
@@ -182,10 +180,6 @@ export class BooksService {
       process.env.BACKEND_PUBLIC_ORIGIN ??
       `http://localhost:${process.env.PORT ?? 3001}`
     );
-  }
-
-  private getContentSource(): 'books' | 'manga' {
-    return (process.env.CONTENT_SOURCE ?? 'books').toLowerCase() === 'manga' ? 'manga' : 'books';
   }
 
   private normalizeGeminiModelName(model?: string | null): GeminiModel | null {
@@ -1257,8 +1251,7 @@ export class BooksService {
   }
 
   async getLandingBooks(forceLocal = false): Promise<LandingPayload> {
-    const contentSource = this.getContentSource();
-    const cacheKey = `${LANDING_CACHE_KEY}:${contentSource}`;
+    const cacheKey = LANDING_CACHE_KEY;
     const cached = await this.cache.get<LandingPayload>(cacheKey);
     if (cached) {
       this.logger.log(`Landing served from [${cached.source}] cache`);
@@ -1269,22 +1262,13 @@ export class BooksService {
       return forceLocal ? this.applyForceLocalLanding(enhanced) : enhanced;
     }
 
-    this.logger.log(
-      `Cache miss — fetching from ${contentSource === 'manga' ? 'MangaDex' : 'Google Books'} API`,
-    );
+    this.logger.log(`Cache miss — fetching from MangaDex API`);
 
     const rows: LandingRow[] = [];
     try {
-      if (contentSource === 'manga') {
-        for (const def of this.mangaDex.mangaRowDefs) {
-          const { items } = await this.mangaDex.fetchMangaForRow(def.order, def.limit ?? 10);
-          rows.push({ id: def.id, title: def.title, query: def.order, items });
-        }
-      } else {
-        for (const def of this.googleBooks.bookRowDefs) {
-          const { items } = await this.googleBooks.fetchBooksForQuery(def.query);
-          rows.push({ ...def, items });
-        }
+      for (const def of this.mangaDex.mangaRowDefs) {
+        const { items } = await this.mangaDex.fetchMangaForRow(def.order, def.limit ?? 10);
+        rows.push({ id: def.id, title: def.title, query: def.order, items });
       }
     } catch (err) {
       this.logger.warn(`API fetch error: ${String(err)} — attempting stale cache fallback`);
@@ -1334,8 +1318,7 @@ export class BooksService {
   }
 
   async searchBooks(query: string, lang?: string, limit = 100, offset = 0): Promise<{ items: LandingBook[]; total: number }> {
-    const contentSource = this.getContentSource();
-    const cacheKey = `${QUERY_CACHE_PREFIX}${contentSource}:${query
+    const cacheKey = `${QUERY_CACHE_PREFIX}${query
       .toLowerCase()
       .replace(/\s+/g, '_')}${lang ? `:${lang}` : ''}:${offset}:${limit}`;
 
@@ -1345,26 +1328,21 @@ export class BooksService {
       return cached.data;
     }
 
-    const result =
-      contentSource === 'manga'
-        ? await this.mangaDex.searchManga(query, lang, limit, offset)
-        : await this.googleBooks.fetchBooksForQuery(query, limit, offset);
+    const result = await this.mangaDex.searchManga(query, lang, limit, offset);
 
     // Enhance: also match user-uploaded alt names in chapter_versions
-    if (contentSource === 'manga') {
-      try {
-        const existingIds = new Set(result.items.map((b) => b.id));
-        const altMatches = await this.findTitleIdsByAltName(query);
-        const newIds = altMatches.filter((id) => !existingIds.has(id));
-        if (newIds.length > 0) {
-          const extra = await this.mangaDex.fetchMangaByIds(newIds);
-          result.items.push(...extra);
-          result.total += extra.length;
-          this.logger.log(`Alt-name search added ${extra.length} extra manga for "${query}"`);
-        }
-      } catch (err) {
-        this.logger.warn(`Alt-name lookup failed: ${String(err)}`);
+    try {
+      const existingIds = new Set(result.items.map((b) => b.id));
+      const altMatches = await this.findTitleIdsByAltName(query);
+      const newIds = altMatches.filter((id) => !existingIds.has(id));
+      if (newIds.length > 0) {
+        const extra = await this.mangaDex.fetchMangaByIds(newIds);
+        result.items.push(...extra);
+        result.total += extra.length;
+        this.logger.log(`Alt-name search added ${extra.length} extra manga for "${query}"`);
       }
+    } catch (err) {
+      this.logger.warn(`Alt-name lookup failed: ${String(err)}`);
     }
 
     if (result.items.length > 0) {

@@ -26,13 +26,11 @@ cp .env.example .env
 
 Sensitive values ที่ต้องกรอกเอง:
 - `GEMINI_API_KEY` — จาก Google AI Studio
-- `GOOGLE_BOOKS_API_KEY` — จาก Google Cloud Console
 - `SUPABASE_URL` — URL ของโปรเจกต์ Supabase
 - `SUPABASE_SERVICE_ROLE_KEY` — Service role key ของ Supabase (ใช้ฝั่ง backend เท่านั้น)
 
 ```env
 GEMINI_API_KEY=your-gemini-api-key
-GOOGLE_BOOKS_API_KEY=your-google-books-api-key
 
 PORT=4001
 FRONTEND_ORIGIN=http://localhost:4000

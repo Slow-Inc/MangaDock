@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -15,49 +16,16 @@ export class WalletService {
     return this.supabase.client;
   }
 
-  async getOrCreateWallet(uid: string) {
+  async getBalance(uid: string): Promise<number> {
+    // Upsert is handled inside the RPC; a plain SELECT suffices for read-only balance check
     const { data, error } = await this.db
       .from('wallets')
-      .select('*')
+      .select('balance')
       .eq('uid', uid)
       .maybeSingle();
 
-    if (error) {
-      throw new Error(`Failed to fetch wallet: ${error.message}`);
-    }
-
-    if (data) {
-      return {
-        uid: data.uid,
-        balance: data.balance,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
-    }
-
-    const now = new Date().toISOString();
-    const { data: created, error: insertError } = await this.db
-      .from('wallets')
-      .insert({ uid, balance: 0, created_at: now, updated_at: now })
-      .select('*')
-      .single();
-
-    if (insertError) {
-      throw new Error(`Failed to create wallet: ${insertError.message}`);
-    }
-
-    this.logger.log(`Created wallet for user ${uid}`);
-    return {
-      uid: created.uid,
-      balance: created.balance,
-      createdAt: created.created_at,
-      updatedAt: created.updated_at,
-    };
-  }
-
-  async getBalance(uid: string): Promise<number> {
-    const wallet = await this.getOrCreateWallet(uid);
-    return wallet.balance;
+    if (error) throw new InternalServerErrorException(`Failed to fetch wallet: ${error.message}`);
+    return data?.balance ?? 0;
   }
 
   async addCoins(
@@ -70,32 +38,16 @@ export class WalletService {
       throw new BadRequestException('Amount must be greater than 0');
     }
 
-    const wallet = await this.getOrCreateWallet(uid);
-    const newBalance = wallet.balance + amount;
+    const { data, error } = await this.db.rpc('add_coins_atomic', {
+      p_uid: uid,
+      p_amount: amount,
+      p_type: type,
+      p_description: description ?? null,
+    });
 
-    const { error: txError } = await this.db
-      .from('wallet_transactions')
-      .insert({
-        uid,
-        type,
-        amount,
-        balance_after: newBalance,
-        description: description ?? '',
-      });
+    if (error) throw new InternalServerErrorException(`Failed to add coins: ${error.message}`);
 
-    if (txError) {
-      throw new Error(`Failed to insert transaction: ${txError.message}`);
-    }
-
-    const { error: updateError } = await this.db
-      .from('wallets')
-      .update({ balance: newBalance, updated_at: new Date().toISOString() })
-      .eq('uid', uid);
-
-    if (updateError) {
-      throw new Error(`Failed to update wallet balance: ${updateError.message}`);
-    }
-
+    const newBalance: number = Array.isArray(data) ? data[0]?.balance : (data as any)?.balance;
     this.logger.log(`Added ${amount} coins (${type}) to user ${uid}, new balance: ${newBalance}`);
     return { balance: newBalance };
   }
@@ -110,39 +62,79 @@ export class WalletService {
       throw new BadRequestException('Amount must be greater than 0');
     }
 
-    const wallet = await this.getOrCreateWallet(uid);
-    if (wallet.balance < amount) {
-      throw new BadRequestException('Insufficient balance');
+    const { data, error } = await this.db.rpc('spend_coins_atomic', {
+      p_uid: uid,
+      p_amount: amount,
+      p_type: 'purchase',
+      p_description: description,
+      p_reference_id: referenceId ?? null,
+    });
+
+    if (error) {
+      if (error.message?.includes('INSUFFICIENT_FUNDS')) {
+        throw new BadRequestException('Insufficient balance');
+      }
+      throw new InternalServerErrorException(`Failed to spend coins: ${error.message}`);
     }
 
-    const newBalance = wallet.balance - amount;
-
-    const { error: txError } = await this.db
-      .from('wallet_transactions')
-      .insert({
-        uid,
-        type: 'purchase',
-        amount,
-        balance_after: newBalance,
-        description,
-        reference_id: referenceId ?? null,
-      });
-
-    if (txError) {
-      throw new Error(`Failed to insert transaction: ${txError.message}`);
-    }
-
-    const { error: updateError } = await this.db
-      .from('wallets')
-      .update({ balance: newBalance, updated_at: new Date().toISOString() })
-      .eq('uid', uid);
-
-    if (updateError) {
-      throw new Error(`Failed to update wallet balance: ${updateError.message}`);
-    }
-
+    const newBalance: number = Array.isArray(data) ? data[0]?.balance : (data as any)?.balance;
     this.logger.log(`Spent ${amount} coins for user ${uid}, new balance: ${newBalance}`);
     return { balance: newBalance };
+  }
+
+  /**
+   * High-level purchase flow that splits revenue between Creator and Platform.
+   * Standard Split: 70% to Creator, 30% to Platform.
+   */
+  async processRevenueSplit(
+    userUid: string,
+    creatorUid: string,
+    amount: number,
+    description: string,
+    referenceId: string,
+  ) {
+    const { balance } = await this.spendCoins(userUid, amount, description, referenceId);
+
+    const PLATFORM_FEE_PCT = 0.3;
+    const platformShare = Math.floor(amount * PLATFORM_FEE_PCT);
+    const creatorShare = amount - platformShare;
+
+    if (creatorShare > 0) {
+      await this.addCoins(
+        creatorUid,
+        creatorShare,
+        'reward',
+        `ส่วนแบ่งรายได้: ${description}`,
+      );
+      this.logger.log(
+        `Revenue Split: User ${userUid} paid ${amount}. Creator ${creatorUid} received ${creatorShare}. Platform took ${platformShare}.`,
+      );
+    }
+
+    return { balance, platformShare, creatorShare };
+  }
+
+  async getCreatorEarnings(uid: string): Promise<{
+    totalSales: number;
+    totalEarned: number;
+    titlesSold: number;
+    uniqueBuyers: number;
+  }> {
+    const { data, error } = await this.db
+      .from('translator_earnings')
+      .select('*')
+      .eq('translator_uid', uid)
+      .maybeSingle();
+
+    if (error) throw new InternalServerErrorException(`Failed to fetch creator earnings: ${error.message}`);
+    if (!data) return { totalSales: 0, totalEarned: 0, titlesSold: 0, uniqueBuyers: 0 };
+
+    return {
+      totalSales: data.total_sales,
+      totalEarned: data.total_earned,
+      titlesSold: data.titles_sold,
+      uniqueBuyers: data.unique_buyers,
+    };
   }
 
   async getTransactions(uid: string, limit = 50) {
@@ -153,9 +145,7 @@ export class WalletService {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (error) {
-      throw new Error(`Failed to fetch transactions: ${error.message}`);
-    }
+    if (error) throw new InternalServerErrorException(`Failed to fetch transactions: ${error.message}`);
 
     return (data ?? []).map((row) => ({
       id: row.id,
