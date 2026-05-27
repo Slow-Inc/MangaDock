@@ -1,24 +1,65 @@
 # MangaDock System Context
 
-## Cache Architecture (Phase 2)
+## Cache Architecture (Phase 2) — Implemented 2026-05-28
 
 ### L2-Centric Architecture
-โครงสร้างการจัดการสถานะที่ถือว่า **Redis (L2)** เป็น "แหล่งข้อมูลที่ถูกต้องที่สุด" (Source of Truth) ในระดับ Runtime ข้อมูลทุกอย่างที่เกิดขึ้นในระบบจะถูกบันทึกลง L2 ก่อนเป็นอันดับแรก
+Redis (L2) คือ Source of Truth ณ Runtime — ทุก `set()` เขียนลง Redis ก่อน L1 (JsonCache in-memory + disk) รับข้อมูลโดยตรงจาก `set()` เพื่อ in-process consistency
 
 ### L1 Read Mirror
-การสำรองข้อมูลในหน่วยความจำ (In-Memory) ของแต่ละ Application Node เพื่อความเร็วสูงสุด โดยจะซิงค์ข้อมูลกับ L2 ผ่านระบบ Redis Pub/Sub เมื่อมีการเปลี่ยนแปลง
+`JsonCacheService` เป็น in-memory + file-backed cache (`.cache/*.json`) ทำหน้าที่เป็น L1 fallback เมื่อ Redis ไม่พร้อม การ sync ข้าม node ยังไม่ implement — กำหนดไว้สำหรับ Phase 3 ผ่าน Redis Pub/Sub
 
-### Dynamic Batching Tiers
-กลยุทธ์การบันทึกข้อมูลจาก Redis ลงสู่ Local Storage (JSON) หรือ Database โดยมีความถี่แปรผันตาม **ความสำคัญ** และ **ความถี่ในการใช้งาน** ของข้อมูลนั้นๆ (เช่น ข้อมูล Wallet จะมี Tier ความถี่สูงสุด)
+### Write-behind Pattern
+```
+set(key, data)
+  → jsonCache.set(key, data)      // L1 sync (in-process)
+  → redis.set(key, entry, ttl)    // L2 write (source of truth)
+  → batchSync.markDirty(key)      // rpush cache:dirty
+```
+Leader node drain dirty queue ทุก 5s → `syncKey` → `jsonCache.syncEntry`
 
-### Redis Lock-based Election (Mutex)
-ระบบการคัดเลือกโหนดประมวลผลหลัก (Leader) โดยใช้คำสั่ง **SET NX PX** ใน Redis เพื่อให้แน่ใจว่าจะมีโหนดเดียวเท่านั้นที่ได้รับสิทธิ์ความเป็น Leader (Mutex) ในช่วงเวลาที่กำหนด วิธีนี้ช่วยป้องกันปัญหา Split-brain และแก้ปัญหา Leader Flapping ได้อย่างเด็ดขาด
+### Redis Lock-based Leader Election (Mutex)
+```
+Acquisition:  SET cache:leader {nodeId} NX PX 37500  → 'OK' = won
+Renewal:      SET cache:leader {nodeId} XX PX 37500  → 'OK' = held, null = lost
+Interval:     15s
+TTL:          37,500ms (2.5× interval — survives 1 missed renewal)
+```
+ป้องกัน split-brain: Redis เป็น single source of truth สำหรับ ownership ป้องกัน leader thrashing: lock holder ไม่สูญเสียตำแหน่งเพราะ CPU สูงจากการทำงาน
 
-### Node Heartbeat & Observability
-ข้อมูลสุขภาพของ Application Node (CPU, Memory, Supabase Latency) จะถูกส่งไปยัง Redis เพื่อจุดประสงค์ในการ **เฝ้าสังเกตการณ์ (Monitoring)** และแสดงผลบน Dashboard ในอนาคตเท่านั้น ไม่ถูกนำมาใช้เป็นปัจจัยในการตัดสินใจเลือก Leader
+### Node Heartbeat & Observability (MetricsService)
+```
+Fires:    immediately on onModuleInit() + every 10s
+Key:      cluster_metrics:{nodeId}  (TTL 30s, stale threshold 35s)
+Payload:  { nodeId, cpu, freeMem, latency, timestamp }
+Purpose:  Observability / future monitoring dashboard — NOT used for election
+```
 
-### Consolidated Batching (Write-behind)
-กระบวนการที่ Leader Node (ผู้ถือ Lock) รวบรวมข้อมูลที่มีการเปลี่ยนแปลง (Dirty Data) จาก Redis มาจัดกลุ่มเป็นก้อนเดียว ก่อนจะทำการอัปเดตลง Supabase ในครั้งเดียว เพื่อลด Database Overhead
+### Reliable Dirty Queue (BatchSyncWorker)
+```
+Write:    rpush cache:dirty {key}                       // markDirty()
+Consume:  rpoplpush cache:dirty cache:processing        // atomic move
+Ack:      lrem cache:processing 1 {key}                 // after sync success
+Recover:  lrange cache:processing → rpush cache:dirty   // on startup (crash recovery)
+Batch:    max 100 keys per 5s flush, leader-only
+```
+`cache:processing` ควร empty ตลอดในสภาวะปกติ — non-empty หลัง flush cycle = WARN signal
 
-### Dirty Key List / Queue
-บัญชีรายชื่อของข้อมูลใน Redis ที่มีการแก้ไขและยังไม่ได้ทำการบันทึกลงฐานข้อมูลหลัก (Supabase) ทำหน้าที่เป็นตัวเชื่อมระหว่างระบบ Cache และระบบ Persistence
+### Sync Target (Current — Scaffolding)
+`syncKey()` → `jsonCache.syncEntry()` อัปเดต L1 disk persistence เท่านั้น Supabase RPC handlers จะเพิ่มทีละ feature type (wallet, stats, etc.) ใน Phase 2 ถัดไป
+
+### Module Graph
+```
+AppModule
+  ├── CacheModule (@Global)
+  │     ├── imports: StatusModule
+  │     ├── RedisService (exported)
+  │     ├── JsonCacheService
+  │     ├── CacheOrchestratorService (exported)
+  │     ├── ImageCacheService (exported)
+  │     └── BatchSyncWorker
+  │           └── depends on: ElectionService (from StatusModule)
+  └── StatusModule
+        ├── MetricsService (exported) — heartbeat
+        ├── ElectionService (exported) — NX lock
+        └── StatusService — SSE health events
+```
