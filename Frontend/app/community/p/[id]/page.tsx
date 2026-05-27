@@ -494,7 +494,8 @@ export default function PostDetailPage() {
                 style={{ filter: post.category === 'spoiler' && !spoilerRevealed ? 'blur(4px)' : 'blur(0px)', transition: 'filter 0.5s ease' }}
               >
                 {post.imageUrls.map((url, i) => {
-                  const safeUrl = /^javascript:/i.test(url) ? '#' : url;
+                  const trimmed = url.trim();
+                  const safeUrl = /^\s*(javascript|data|vbscript|file):/i.test(trimmed) ? '#' : trimmed;
                   return (
                   <a
                     key={i}

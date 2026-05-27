@@ -9,11 +9,11 @@ import { listPosts, createPost } from "../../../lib/communityApi";
 import { useAuth } from "../../../contexts/AuthContext";
 import PostImageUploader from "../../../components/PostImageUploader";
 import { useLocalLenis } from "../../../hooks/useLocalLenis";
-import type { ForumPost, ForumCategory } from "../../../lib/types";
+import type { LandingBook, ForumPost, ForumCategory } from "../../../lib/types";
 
 export default function MangaCommunityPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
-  const { user } = useAuth();
+  const { user, showLoginPrompt } = useAuth();
 
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +30,18 @@ export default function MangaCommunityPage() {
   const modalScrollRef = useRef<HTMLDivElement>(null);
   useLocalLenis(modalScrollRef, "vertical", showCreateModal);
 
+  const fetchMangaMeta = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/proxy/books/${mangaId}`);
+      if (!res.ok) return;
+      const book: LandingBook = await res.json();
+      setMangaTitle((prev) => prev ?? book.title ?? null);
+      setMangaCover((prev) => prev ?? book.thumbnail ?? null);
+    } catch {
+      // non-critical, header just stays empty
+    }
+  }, [mangaId]);
+
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
@@ -39,13 +51,15 @@ export default function MangaCommunityPage() {
       if (infoPost) {
         setMangaTitle((prev) => prev ?? infoPost.targetMangaTitle);
         setMangaCover((prev) => prev ?? infoPost.targetMangaCover);
+      } else {
+        fetchMangaMeta();
       }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [mangaId, sort]);
+  }, [mangaId, sort, fetchMangaMeta]);
 
   useEffect(() => {
     fetchPosts();
@@ -157,7 +171,7 @@ export default function MangaCommunityPage() {
 
           <button
             onClick={() =>
-              user ? setShowCreateModal(true) : alert("กรุณาเข้าสู่ระบบก่อนโพสต์")
+              user ? setShowCreateModal(true) : showLoginPrompt()
             }
             className="hidden sm:block shrink-0 px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-xs hover:bg-indigo-500 shadow-xl shadow-indigo-500/20 smooth-hover active:scale-95"
           >
@@ -289,7 +303,7 @@ export default function MangaCommunityPage() {
 
       {/* FAB — Mobile Create Post */}
       <button
-        onClick={() => user ? setShowCreateModal(true) : alert("กรุณาเข้าสู่ระบบก่อนโพสต์")}
+        onClick={() => user ? setShowCreateModal(true) : showLoginPrompt()}
         className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-2xl shadow-indigo-500/40 sm:hidden active:scale-95 transition-transform"
         aria-label="สร้างโพสต์"
       >
