@@ -1,7 +1,7 @@
 import {
   IsArray,
   IsIn,
-  IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -98,7 +98,7 @@ export class VoteDto {
 }
 
 export class UpdateBannerPositionDto {
-  @IsInt()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(100)
   @Type(() => Number)

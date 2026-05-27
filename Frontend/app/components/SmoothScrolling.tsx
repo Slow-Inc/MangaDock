@@ -19,6 +19,10 @@ export default function SmoothScrolling({ children }: SmoothScrollingProps) {
   const pathname = usePathname();
 
   useEffect(() => {
+    lenisRef.current?.lenis?.scrollTo(0, { immediate: true });
+  }, [pathname]);
+
+  useEffect(() => {
     let resizeFrame = 0;
     let initialFrameA = 0;
     let initialFrameB = 0;
