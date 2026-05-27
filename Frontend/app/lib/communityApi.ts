@@ -191,7 +191,7 @@ export async function updateBannerPosition(position: number): Promise<{ bannerPo
   const res = await fetch(`${API_BASE}/forum/profile/banner-position`, {
     method: "PATCH",
     headers: authHeaders(token, { "Content-Type": "application/json" }),
-    body: JSON.stringify({ position }),
+    body: JSON.stringify({ position: Math.round(position * 100) / 100 }),
   });
   if (!res.ok) throw new Error("Failed to update banner position");
   return res.json() as Promise<{ bannerPosition: number }>;

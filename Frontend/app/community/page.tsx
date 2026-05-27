@@ -30,10 +30,21 @@ function CommunityContent() {
   const [viewMode, setViewMode] = useState<'card' | 'compact'>('card');
   
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [newPost, setNewPost] = useState({ title: "", content: "", category: "general" as ForumCategory });
   const [selectedManga, setSelectedManga] = useState<LandingBook | null>(null);
   const [postImages, setPostImages] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  const openModal = useCallback(() => {
+    setShowCreateModal(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => setIsModalVisible(true)));
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setIsModalVisible(false);
+    setTimeout(() => { setShowCreateModal(false); setPostImages([]); }, 220);
+  }, []);
 
   // Modal Smooth Scrolling
   const modalScrollRef = useRef<HTMLDivElement>(null);
@@ -112,13 +123,14 @@ function CommunityContent() {
       updatedAt: new Date().toISOString(),
     };
 
-    // Optimistic: close modal + prepend post immediately
+    // Optimistic: prepend post + close modal with animation
     setPosts(prev => [tempPost, ...prev]);
-    setShowCreateModal(false);
     setNewPost({ title: "", content: "", category: "general" });
     setSelectedManga(null);
     setPostImages([]);
     setSubmitting(true);
+    setIsModalVisible(false);
+    setTimeout(() => setShowCreateModal(false), 220);
 
     try {
       const realPost = await createPost({
@@ -138,6 +150,7 @@ function CommunityContent() {
       setSelectedManga(manga);
       setPostImages(images);
       setShowCreateModal(true);
+      requestAnimationFrame(() => requestAnimationFrame(() => setIsModalVisible(true)));
     } finally {
       setSubmitting(false);
     }
@@ -152,7 +165,7 @@ function CommunityContent() {
         </div>
         
         <button
-          onClick={() => user ? setShowCreateModal(true) : showLoginPrompt()}
+          onClick={() => user ? openModal() : showLoginPrompt()}
           className="hidden sm:block px-8 py-3 rounded-2xl bg-indigo-600 text-white font-black text-sm hover:bg-indigo-500 shadow-xl shadow-indigo-500/20 smooth-hover shrink-0 active:scale-95"
         >
           + สร้างโพสต์ใหม่
@@ -291,36 +304,53 @@ function CommunityContent() {
         )}
       </div>
 
-      {/* Create Post Modal */}
+      {/* Create Post Modal — bottom sheet on mobile, centered dialog on desktop */}
       {showCreateModal && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+        <div
+          className={`fixed inset-0 z-[100] flex items-end sm:items-center sm:p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${isModalVisible ? 'opacity-100' : 'opacity-0'}`}
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            <header className="p-6 border-b border-white/5 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">สร้างโพสต์ใหม่</h2>
-              <button onClick={() => { setShowCreateModal(false); setPostImages([]); }} className="text-white/40 hover:text-white">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className={`
+            w-full sm:max-w-2xl sm:mx-auto
+            bg-[#1a1a1a] border border-white/10 border-b-0 sm:border-b
+            rounded-t-[2rem] sm:rounded-3xl
+            shadow-2xl flex flex-col
+            h-[92dvh] sm:h-auto sm:max-h-[90vh]
+            transition-all duration-300 ease-out
+            ${isModalVisible
+              ? 'translate-y-0 sm:scale-100 sm:opacity-100'
+              : 'translate-y-full sm:translate-y-0 sm:scale-95 sm:opacity-0'}
+          `}>
+            {/* Drag handle — mobile only */}
+            <div className="flex justify-center pt-3 pb-1 sm:hidden shrink-0">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+
+            <header className="px-5 py-4 sm:p-6 border-b border-white/5 flex items-center justify-between shrink-0">
+              <h2 className="text-lg sm:text-xl font-bold text-white">สร้างโพสต์ใหม่</h2>
+              <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6L18 18" />
                 </svg>
               </button>
             </header>
-            
-            <div 
+
+            <div
               ref={modalScrollRef}
-              className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1"
+              className="p-5 sm:p-8 space-y-5 overflow-y-auto custom-scrollbar flex-1"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Category + Manga — stack on mobile */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-bold text-white/40 uppercase mb-2">หมวดหมู่</label>
+                  <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">หมวดหมู่</label>
                   <div className="flex flex-wrap gap-2">
                     {(['general', 'announcement', 'spoiler', 'manga_update'] as const).map((cat) => (
                       <button
                         key={cat}
                         onClick={() => setNewPost({ ...newPost, category: cat })}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold border smooth-hover ${
-                          newPost.category === cat 
-                            ? "bg-indigo-600 border-indigo-500 text-white" 
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
+                          newPost.category === cat
+                            ? "bg-indigo-600 border-indigo-500 text-white"
                             : "bg-white/5 text-white/40 border-white/5 hover:border-white/20"
                         }`}
                       >
@@ -330,48 +360,50 @@ function CommunityContent() {
                   </div>
                 </div>
 
-                <MangaSearchSelector 
-                  onSelect={setSelectedManga} 
-                  selectedManga={selectedManga} 
+                <MangaSearchSelector
+                  onSelect={setSelectedManga}
+                  selectedManga={selectedManga}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/40 uppercase mb-2">หัวข้อ</label>
+                <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">หัวข้อ</label>
                 <input
                   type="text"
                   value={newPost.title}
                   onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
                   placeholder="เขียนหัวข้อโพสต์ที่นี่..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-all"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/40 uppercase mb-2">เนื้อหา</label>
+                <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">เนื้อหา</label>
                 <textarea
                   value={newPost.content}
                   onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
                   placeholder="รายละเอียดสิ่งที่คุณต้องการจะพูดคุย..."
-                  rows={5}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-all resize-none"
+                  rows={4}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all resize-none"
                 />
               </div>
 
               <PostImageUploader images={postImages} onChange={setPostImages} />
             </div>
 
-            <footer className="p-6 bg-white/2 border-t border-white/5 flex justify-end gap-3">
+            <footer className="px-5 py-4 sm:p-6 bg-white/[0.02] border-t border-white/5 flex gap-3 shrink-0"
+              style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+            >
               <button
-                onClick={() => { setShowCreateModal(false); setPostImages([]); }}
-                className="px-6 py-2.5 rounded-xl text-sm font-bold text-white/50 hover:bg-white/5 transition-all"
+                onClick={closeModal}
+                className="flex-1 sm:flex-none px-5 py-3 rounded-xl text-sm font-bold text-white/50 bg-white/5 hover:bg-white/8 transition-all active:scale-95"
               >
                 ยกเลิก
               </button>
-              <button 
+              <button
                 onClick={handleCreatePost}
                 disabled={!newPost.title.trim() || !newPost.content.trim() || submitting}
-                className="px-8 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-sm hover:bg-indigo-500 shadow-lg shadow-indigo-500/20 disabled:opacity-50 transition-all"
+                className="flex-1 sm:flex-none px-8 py-3 rounded-xl bg-indigo-600 text-white font-black text-sm hover:bg-indigo-500 shadow-lg shadow-indigo-500/20 disabled:opacity-40 transition-all active:scale-95"
               >
                 {submitting ? "กำลังโพสต์..." : "โพสต์เลย"}
               </button>
@@ -382,7 +414,7 @@ function CommunityContent() {
 
       {/* FAB — Mobile Create Post */}
       <button
-        onClick={() => user ? setShowCreateModal(true) : showLoginPrompt()}
+        onClick={() => user ? openModal() : showLoginPrompt()}
         className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-2xl shadow-indigo-500/40 sm:hidden active:scale-95 transition-transform"
         aria-label="สร้างโพสต์"
       >

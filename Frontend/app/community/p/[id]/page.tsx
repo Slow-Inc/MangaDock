@@ -276,15 +276,6 @@ export default function PostDetailPage() {
             textClassName="text-sm font-semibold text-white"
             active={headerScrolled}
           />
-          {post.targetMangaTitle && (
-            <div className="mt-0.5">
-              <MarqueeText
-                text={post.targetMangaTitle}
-                textClassName="text-[10px] font-bold text-amber-500 uppercase tracking-widest leading-none"
-                active={headerScrolled}
-              />
-            </div>
-          )}
         </div>
       </div>
 
@@ -462,12 +453,17 @@ export default function PostDetailPage() {
                 </h1>
 
                 {/* Spoiler gate for post detail */}
-                {post.category === 'spoiler' && !spoilerRevealed ? (
+                {post.category === 'spoiler' ? (
                   <div className="relative mb-4 sm:mb-6">
-                    <div className="text-white/90 text-sm sm:text-base leading-relaxed whitespace-pre-wrap blur-sm select-none pointer-events-none line-clamp-4">
+                    <div
+                      className={`text-white/90 text-sm sm:text-base leading-relaxed whitespace-pre-wrap ${spoilerRevealed ? '' : 'select-none pointer-events-none line-clamp-4'}`}
+                      style={{ filter: spoilerRevealed ? 'blur(0px)' : 'blur(4px)', transition: 'filter 0.5s ease' }}
+                    >
                       {post.content}
                     </div>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/30 rounded-xl backdrop-blur-[2px]">
+                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/30 rounded-xl backdrop-blur-[2px] transition-opacity duration-500 ${
+                      spoilerRevealed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                    }`}>
                       <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                       </svg>
@@ -489,13 +485,16 @@ export default function PostDetailPage() {
             )}
 
             {post.imageUrls && post.imageUrls.length > 0 && (
-              <div className={`mb-8 rounded-xl overflow-hidden grid gap-1.5 ${
-                post.imageUrls.length === 1 ? 'grid-cols-1' :
-                post.imageUrls.length === 2 ? 'grid-cols-2' :
-                post.imageUrls.length >= 3 ? 'grid-cols-2' : 'grid-cols-1'
-              } ${post.category === 'spoiler' && !spoilerRevealed ? 'blur-sm pointer-events-none' : ''}`}>
+              <div
+                className={`mb-8 rounded-xl overflow-hidden grid gap-1.5 ${
+                  post.imageUrls.length === 1 ? 'grid-cols-1' :
+                  post.imageUrls.length === 2 ? 'grid-cols-2' :
+                  post.imageUrls.length >= 3 ? 'grid-cols-2' : 'grid-cols-1'
+                } ${post.category === 'spoiler' && !spoilerRevealed ? 'pointer-events-none' : ''}`}
+                style={{ filter: post.category === 'spoiler' && !spoilerRevealed ? 'blur(4px)' : 'blur(0px)', transition: 'filter 0.5s ease' }}
+              >
                 {post.imageUrls.map((url, i) => {
-                  const safeUrl = /^https?:\/\//i.test(url) ? url : '#';
+                  const safeUrl = /^javascript:/i.test(url) ? '#' : url;
                   return (
                   <a
                     key={i}
