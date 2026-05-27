@@ -136,25 +136,45 @@ describe('ElectionService — Redis NX Lock', () => {
     });
   });
 
-  describe('lock release on shutdown', () => {
-    it('releases lock via DEL when leader on onModuleDestroy', async () => {
-      const client = makeClient({ set: jest.fn().mockResolvedValue('OK') });
+  describe('lock release on shutdown (Lua CAS-delete)', () => {
+    it('releases lock via Lua eval when leader — only deletes if value still matches nodeId', async () => {
+      const client = makeClient({
+        set: jest.fn().mockResolvedValue('OK'),
+        eval: jest.fn().mockResolvedValue(1), // DELETE_SCRIPT returns 1 = deleted
+      });
       const svc = makeElection('node-1', client);
 
-      await svc.runElection(); // become leader
+      await svc.runElection(); // become leader via SET NX
       await svc.onModuleDestroy();
 
-      expect(client.del).toHaveBeenCalledWith('cache:leader');
+      expect(client.eval).toHaveBeenCalledWith(
+        expect.stringContaining('DEL'),
+        1,
+        'cache:leader',
+        'node-1',
+      );
     });
 
-    it('does not call DEL when not leader on onModuleDestroy', async () => {
+    it('does not call eval for delete when not leader on onModuleDestroy', async () => {
       const client = makeClient(); // never becomes leader
       const svc = makeElection('node-1', client);
 
       await svc.runElection(); // fails to acquire
       await svc.onModuleDestroy();
 
-      expect(client.del).not.toHaveBeenCalled();
+      expect(client.eval).not.toHaveBeenCalled();
+    });
+
+    it('handles the case where lock was already taken by another node (eval returns 0) without throwing', async () => {
+      const client = makeClient({
+        set: jest.fn().mockResolvedValue('OK'),
+        eval: jest.fn().mockResolvedValue(0), // CAS-delete fails — another node owns it
+      });
+      const svc = makeElection('node-1', client);
+
+      await svc.runElection(); // become leader
+      await expect(svc.onModuleDestroy()).resolves.not.toThrow();
+      expect(client.eval).toHaveBeenCalled();
     });
   });
 

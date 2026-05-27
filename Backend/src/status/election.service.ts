@@ -16,6 +16,17 @@ const RENEW_SCRIPT = `
   end
 `;
 
+// Atomic compare-and-delete: only DEL if we still own the lock.
+// Guards against the case where our TTL expired during a GC pause / process stall,
+// another node acquired the lock, and we then delete their lock on shutdown.
+const DELETE_SCRIPT = `
+  if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+  else
+    return 0
+  end
+`;
+
 @Injectable()
 export class ElectionService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ElectionService.name);
@@ -45,8 +56,13 @@ export class ElectionService implements OnModuleInit, OnModuleDestroy {
     const client = await this.redis.getClient();
     if (!client) return;
     try {
-      await (client as any).del(LEADER_KEY);
-      this.logger.log('Leader lock released on shutdown');
+      const nodeId = this.metrics.nodeId;
+      const deleted = await (client as any).eval(DELETE_SCRIPT, 1, LEADER_KEY, nodeId) as number;
+      if (deleted === 1) {
+        this.logger.log('Leader lock released on shutdown');
+      } else {
+        this.logger.warn('Leader lock already taken by another node — skipped DEL');
+      }
     } catch (err) {
       this.logger.warn(`Failed to release leader lock: ${String(err)}`);
     }

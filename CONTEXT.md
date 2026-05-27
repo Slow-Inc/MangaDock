@@ -58,27 +58,31 @@ DB  Supabase                      — long-term authoritative source
 `JsonCacheService` เก็บข้อมูลใน in-memory Map เท่านั้น — **ไม่มี disk I/O** เขียนพร้อม L2 บน `set()` เพื่อ in-process read consistency cross-node sync ยังไม่ implement (Phase 3 via Redis Pub/Sub)
 
 ### L3 — Per-node Backup
-`L3DiskService` รับผิดชอบ disk I/O ทั้งหมด (`write`, `readAll`) เขียนโดย `L3BatchWriter` periodic batch จาก L2 ตาม Flush Frequency ต่อ data type — ไม่เขียนใน `set()` path (Issues #13–15 🔵 Planned)
-
-**⚠️ Known bug (current code):** `JsonCacheService.set()` ยังเรียก `writeToDisk()` ทุก L1 update — จะแก้ใน Issue #13
+`L3DiskService` รับผิดชอบ disk I/O ทั้งหมด (`write`, `readAll`) เขียนโดย:
+- `L3BatchWriter` periodic batch จาก L2 ตาม Flush Frequency ต่อ data type (ทุก node)
+- `BatchSyncWorker.syncKey()` Leader re-sync ก่อน Supabase write (Leader เท่านั้น)
+ไม่เขียนใน `set()` path เด็ดขาด
 
 ### Write-behind Pattern
 ```
 set(key, data)
-  → jsonCache.set(key, data)      // L1 sync (in-process)
+  → jsonCache.set(key, data)      // L1 sync (in-process, in-memory only)
   → redis.set(key, entry, ttl)    // L2 write (source of truth)
   → batchSync.markDirty(key)      // rpush cache:dirty
+
+L3BatchWriter (all nodes):  L2 → L3DiskService.write()  per Flush Frequency
+BatchSyncWorker (Leader):   L2 → L3DiskService.write()  → (future) Supabase
 ```
-Leader node drain dirty queue ทุก 5s → `syncKey` → `jsonCache.syncEntry`
 
 ### Redis Lock-based Leader Election (Mutex)
 ```
-Acquisition:  SET cache:leader {nodeId} NX PX 37500  → 'OK' = won
-Renewal:      SET cache:leader {nodeId} XX PX 37500  → 'OK' = held, null = lost
+Acquisition:  SET cache:leader {nodeId} NX PX 37500          → 'OK' = won
+Renewal:      Lua CAS — GET; if match → SET NX PX 37500      → 'OK' = held, nil = lost
+Release:      Lua CAS — GET; if match → DEL                  → 1 = released, 0 = already taken
 Interval:     15s
 TTL:          37,500ms (2.5× interval — survives 1 missed renewal)
 ```
-ป้องกัน split-brain: Redis เป็น single source of truth สำหรับ ownership ป้องกัน leader thrashing: lock holder ไม่สูญเสียตำแหน่งเพราะ CPU สูงจากการทำงาน
+Renewal และ Release ใช้ Lua compare-and-swap เพื่อป้องกัน lock theft: node ที่ reconnect หลัง TTL หมดจะไม่ overwrite/delete lock ของ node ใหม่ที่ได้ lock ไปแล้ว
 
 ### Node Heartbeat & Observability (MetricsService)
 ```
@@ -98,8 +102,8 @@ Batch:    max 100 keys per 5s flush, leader-only
 ```
 `cache:processing` ควร empty ตลอดในสภาวะปกติ — non-empty หลัง flush cycle = WARN signal
 
-### Sync Target (Current — Scaffolding)
-`syncKey()` → `jsonCache.syncEntry()` อัปเดต L1 disk persistence เท่านั้น Supabase RPC handlers จะเพิ่มทีละ feature type (wallet, stats, etc.) ใน Phase 2 ถัดไป
+### Sync Target (Leader flush path)
+`syncKey()` → `L3DiskService.write(key, entry)` — Leader re-syncs L2→L3 เพื่อให้ L3 fresh ก่อน Supabase write Supabase RPC handlers จะเพิ่มทีละ feature type (wallet, stats, etc.) ใน Phase 2c
 
 ### Module Graph
 ```
@@ -107,13 +111,15 @@ AppModule
   ├── CacheModule (@Global)
   │     ├── imports: StatusModule
   │     ├── RedisService (exported)
-  │     ├── JsonCacheService
+  │     ├── L3DiskService
+  │     ├── L3BatchWriter          — periodic L2→L3, all nodes
+  │     ├── JsonCacheService       — L1 in-memory only
   │     ├── CacheOrchestratorService (exported)
   │     ├── ImageCacheService (exported)
-  │     └── BatchSyncWorker
+  │     └── BatchSyncWorker        — Leader dirty-queue drain → L3
   │           └── depends on: ElectionService (from StatusModule)
   └── StatusModule
         ├── MetricsService (exported) — heartbeat
-        ├── ElectionService (exported) — NX lock
+        ├── ElectionService (exported) — NX lock + Lua CAS
         └── StatusService — SSE health events
 ```

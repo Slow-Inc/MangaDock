@@ -25,18 +25,18 @@
 - [X]  [Backend] Wallet Ledger & Revenue Split (70/30)
 - [X]  [Backend] Creator Earnings API Endpoint
 - [X]  **[Technical Debt]** GoogleBooksService Removal (Completed)
-- [ ]  **[Backend]** Soft Deletion (`deleted_at`) in Forum Module
-- [ ]  **[Frontend]** Spoiler Blur / Click-to-reveal in Community
+- [X]  **[Backend]** Soft Deletion (`deleted_at`) in Forum Module
+- [X]  **[Frontend]** Spoiler Blur / Click-to-reveal in Community
 
 ---
 
-## 🔵 Phase 2: Architectural Scaling & Cloud Readiness (PLANNED 🔭)
-- [ ]  **[Architecture]** L2-Centric Cache Refactor (Write-buffer logic)
-- [ ]  **[Architecture]** Redis Pub/Sub L1 Mirroring Sync Engine
-- [ ]  **[Architecture]** Workload-Aware Leader Election System
-- [ ]  **[Architecture]** Intelligent Write-behind Batching (Redis -> JSON -> DB)
+## 🔵 Phase 2: Architectural Scaling & Cloud Readiness (STARTING 🚀)
+- [ ]  **[Architecture]** Multi-factor Metrics Collection (for Observability)
+- [ ]  **[Architecture]** Redis NX Lock-based Leader Election
+- [ ]  **[Architecture]** Reliable Write-behind Queue (`RPOPLPUSH`)
+- [ ]  **[Architecture]** Workload-Aware Batching & Supabase RPC Sync
 - [ ]  [Backend] Real-World Payment Gateway (QR/PromptPay)
-- [ ]  **[Backend]** Atomic Revenue Split — ย้าย `processRevenueSplit` (spendCoins + addCoins) เข้าไปเป็น Postgres function เดียว เพื่อป้องกัน user เสียเงินโดยไม่ได้รับสิทธิ์ถ้า creator payout ล้มเหลวกลางทาง (ดำเนินการพร้อมกับ Payment Gateway เพราะ flow จะเปลี่ยน)
+- [ ]  **[Backend]** Atomic Revenue Split (Postgres Function)
 - [ ]  [Infrastructure] Cloudflare R2 Migration & Workers CDN Buffer
 - [ ]  [Infrastructure] MIT GPU Cloud Migration (On-Demand)
 - [ ]  [Security] 2FA & Device Session Pinning
