@@ -55,6 +55,11 @@ flowchart LR
 *   **Shortest Workflow:** ใช้ React Native หุ้ม Web App พรีเมียม และแบ่งปัน Codebase (Shared Logic/Types) ร่วมกัน 
 *   **Native OS Bridge:** เชื่อมต่อ MediaProjection และ WindowManager API ผ่าน Native Modules
 
+### 2.6 Atomic Operations & Security Hardening (PR #8 Integration)
+*   **Database-Level Atomicity (RPCs):** ระบบการเงิน (Wallet Ledger) และระบบโหวตถูกย้ายตรรกะการคำนวณจากระดับ Application ไปยังระดับฐานข้อมูลโดยใช้ **PostgreSQL RPCs** (`add_coins_atomic`, `spend_coins_atomic`, `recalculate_votes_atomic`) เพื่อป้องกันปัญหา **TOCTOU (Time-of-Check to Time-of-Use)** และ Double-Spending อย่างเด็ดขาด 100%
+*   **Zero-Trust File Uploads:** ระบบตรวจสอบชนิดไฟล์รูปภาพเปลี่ยนจากการเชื่อถือ HTTP Headers สู่การตรวจสอบ **Magic Bytes** เชิงลึกผ่านไลบรารี `file-type` ป้องกันการโจมตีผ่านไฟล์ปลอมแปลง
+*   **XSS Sanitization:** ข้อมูล URL รูปภาพและเนื้อหาถูก Sanitize เพื่อสกัดกั้นการโจมตีแบบ Cross-Site Scripting (`javascript:` payloads) ในระดับ Frontend Component
+
 ## 3. Interaction Summary
 1. **Frontend:** จัดการ UI พรีเมียม และซิงค์ Session ผ่าน Auth Bridge
 2. **Backend:** Orchestration Layer ที่คุมกฎธุรกิจ, Cache Sync, และ Financial Ledger
