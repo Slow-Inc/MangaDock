@@ -46,11 +46,14 @@
 
 ### 🔵 Phase 2: Architectural Scaling & Cloud Readiness
 **สถานะ:** 🔵 In Progress (Cache Upgrade ✅ — ส่วนที่เหลือ Planned)
-1.  **Advanced 2-Layer Cache Orchestration (T4-Standard Architecture):** ✅ **Implemented** (Branch: `feat/2-layer-cache-upgrade`)
-    *   **L2-Centric Architecture:** Redis เป็น Source of Truth ณ Runtime, L1 (JsonCache) รับข้อมูลโดยตรงจาก `set()` เพื่อ in-process consistency
-    *   **Redis NX Lock Election:** ใช้ `SET cache:leader NX PX` เป็น Distributed Mutex แทน metric scoring ป้องกัน split-brain และ leader thrashing อย่างเด็ดขาด
-    *   **Node Observability:** MetricsService เก็บ CPU/Memory/Supabase Latency ใน `cluster_metrics:{nodeId}` สำหรับ monitoring dashboard — ไม่ใช้ตัดสิน leadership
-    *   **Reliable Write-behind Queue:** Leader Node ดึง Dirty Key ด้วย `RPOPLPUSH` (atomic) → sync → `LREM` ack; crash recovery ด้วย `LRANGE` บน startup; Pub/Sub cross-node L1 sync กำหนดใน Phase 3
+1.  **Advanced 3-Layer Cache Orchestration (T4-Standard Architecture):** 🔵 In Progress
+    *   **Truth Hierarchy (confirmed via architecture review):** L1 (in-memory latency) → L2 (Redis, runtime source of truth / horizontal scaling) → L3 (JSON disk, per-node backup + Leader buffer) → Supabase (long-term authority)
+    *   **L2-Centric Runtime:** Redis เป็น Source of Truth ณ Runtime; L1 (in-memory) รับข้อมูลจาก `set()` โดยตรงเพื่อ in-process consistency — **L1 = in-memory เท่านั้น ไม่รวม disk**
+    *   **L3 Batch Layer** (Issues #13–15 🔵 Planned): `L3DiskService` สำหรับ pure disk I/O; `L3BatchWriter` periodic L2→L3 batch บนทุก node ตาม Flush Frequency ต่อ data type; Leader re-sync L2→L3 ก่อน Supabase write; **แก้ไข bug: `JsonCacheService.set()` ปัจจุบันเขียน disk ทุก L1 update ซึ่งสร้าง I/O overhead มหาศาล**
+    *   **Redis NX Lock Election:** ✅ ใช้ `SET cache:leader NX PX` + Lua CAS renewal เป็น Distributed Mutex — ป้องกัน split-brain, leader thrashing, และ lock theft อย่างเด็ดขาด
+    *   **Node Observability:** ✅ MetricsService เก็บ CPU/Memory/Supabase Latency ใน `cluster_metrics:{nodeId}` สำหรับ monitoring dashboard — ไม่ใช้ตัดสิน leadership
+    *   **Reliable Write-behind Queue:** ✅ Leader Node ดึง Dirty Key ด้วย `RPOPLPUSH` (atomic) → L3 sync → `LREM` ack; crash recovery ด้วย `LRANGE` บน startup
+    *   **Recovery Hierarchy:** L1 in-memory → L3 disk vs Supabase timestamp (newer wins) → Supabase only (ถ้า L3 เสียหาย); implement พร้อม Supabase handler แรก
 2.  **Real-World Payment Gateway:** เปลี่ยนจาก Test Endpoint เป็นการเชื่อมต่อ Payment Provider จริง (QR/PromptPay) พร้อมระบบตรวจสอบ HMAC Webhook Validation
 3.  **Global Asset Distribution (Multi-layer Buffering):**
     *   **Cloudflare Worker Buffer:** ใช้ Worker เป็น Buffer ด่านหน้าก่อนถึง R2 เพื่อลด Request Rate และค่าใช้จ่าย (Cost) ให้ต่ำกว่าปกติมหาศาล

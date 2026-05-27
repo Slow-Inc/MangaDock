@@ -33,12 +33,24 @@ flowchart LR
 
 ## 2. Core Architectural Components (V5 Refinement)
 
-### 2.1 Advanced 2-Layer Cache (Phase 2 — Implemented)
-*   **L2-Centric Design:** Redis คือ Source of Truth ณ Runtime — ทุก `set()` เขียนลง Redis (L2) ก่อน; `JsonCacheService` (L1 in-memory + disk) รับข้อมูลจาก `set()` โดยตรงเพื่อ in-process consistency
-*   **Redis NX Lock Leader Election:** ใช้ `SET cache:leader {nodeId} NX PX 37500` เป็น Distributed Mutex แทน metric scoring — ป้องกัน split-brain และ leader thrashing อย่างเด็ดขาด ตัว holder ต่ออายุด้วย `SET XX PX` ทุก 15s
-*   **Reliable Write-behind Queue:** Leader Node ดึง dirty key ด้วย `RPOPLPUSH cache:dirty cache:processing` (atomic) → sync → `LREM` ack; startup ทำ crash recovery ด้วย `LRANGE cache:processing`
-*   **Node Observability:** `MetricsService` เก็บ CPU/Memory/Supabase latency ใน `cluster_metrics:{nodeId}` (TTL 30s) เพื่อ monitoring dashboard — ไม่ใช้ตัดสิน leadership
-*   **Cross-node L1 Sync:** Redis Pub/Sub สำหรับ sync L1 ข้ามโหนดยังไม่ implement — กำหนดไว้สำหรับ Phase 3
+### 2.1 Advanced 3-Layer Cache (Phase 2 — In Progress)
+
+**Truth Hierarchy:**
+```
+L1  in-memory (JsonCacheService)   — latency; lost on restart
+L2  Redis                          — source of truth at runtime; enables horizontal scaling
+L3  JSON disk (L3DiskService)      — per-node backup; Leader buffer before Supabase write
+DB  Supabase                       — long-term authoritative source
+```
+
+*   **L1 — In-process Latency:** `JsonCacheService` in-memory Map เท่านั้น ไม่มี disk I/O; เขียนพร้อม L2 บน `set()` เพื่อ in-process read consistency
+*   **L2 — Runtime Source of Truth:** Redis เป็น single source of truth ณ Runtime รองรับ Horizontal Scaling; ทุก `set()` เขียน L2 ก่อน
+*   **L3 — Per-node Backup & Leader Buffer:** `L3DiskService` (pure disk) เขียนโดย `L3BatchWriter` ที่รันบนทุก node ตาม Flush Frequency ต่อ data type; Leader ทำ L2→L3 re-sync ก่อน Supabase write (Issues #13–15 🔵 Planned)
+*   **Redis NX Lock Leader Election:** ✅ `SET cache:leader NX PX` acquisition + Lua CAS renewal + `DEL` on shutdown — ป้องกัน split-brain, leader thrashing, lock theft
+*   **Reliable Write-behind Queue:** ✅ `RPOPLPUSH` atomic move → L3 sync → `LREM` ack; crash recovery ด้วย `LRANGE` on startup
+*   **Node Observability:** ✅ `MetricsService` heartbeat → `cluster_metrics:{nodeId}` (TTL 30s) — monitoring เท่านั้น ไม่ใช้ตัดสิน leadership
+*   **Cross-node L1 Sync:** Redis Pub/Sub ยังไม่ implement — Phase 3
+*   **Recovery Hierarchy:** L1 memory → L3 disk vs Supabase timestamp (newer wins) → Supabase only; implement พร้อม Supabase handler แรก
 
 ### 2.2 Frontend Optimizations (L1 Client Cache & Real-time)
 *   **LRU API Cache (O(1) Complexity):** ระบบ In-memory Cache ใน Frontend (Next.js) ที่ใช้โครงสร้าง JavaScript `Map` ในการทำ Least Recently Used (LRU) กำหนดขีดจำกัดที่ 500 Entries เพื่อป้องกัน Memory Leak บน Browser
