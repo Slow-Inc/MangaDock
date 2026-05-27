@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Post,
   Req,
@@ -21,12 +22,16 @@ export class WalletController {
     return { balance };
   }
 
+  // DEV ONLY — no payment gateway yet; blocked in production until payment gateway is wired up per roadmap
   @Post('topup')
   @UseGuards(AuthGuard)
   async topup(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Body() body: { amount: number },
   ) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Direct topup is not available. Please use the payment gateway.');
+    }
     return this.wallet.addCoins(req[USER_KEY].uid, body.amount, 'topup', 'เติมเหรียญ (ทดสอบ)');
   }
 
@@ -34,5 +39,11 @@ export class WalletController {
   @UseGuards(AuthGuard)
   async getTransactions(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
     return this.wallet.getTransactions(req[USER_KEY].uid);
+  }
+
+  @Get('earnings')
+  @UseGuards(AuthGuard)
+  async getCreatorEarnings(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
+    return this.wallet.getCreatorEarnings(req[USER_KEY].uid);
   }
 }

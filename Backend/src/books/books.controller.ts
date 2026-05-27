@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpException, HttpStatus, NotFoundException, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, NotFoundException, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { BooksService } from './books.service';
 import { TurnstileGuard, generateClearanceToken } from '../auth/turnstile.guard';
@@ -8,15 +8,20 @@ export class BooksController {
   constructor(private readonly booksService: BooksService) {}
 
   @Post('verify-captcha')
-  async verifyCaptcha(@Body() body: { token: string }) {
+  async verifyCaptcha(@Req() req: any, @Body() body: { token: string }) {
     if (!body.token) {
       throw new HttpException('Token is required', HttpStatus.BAD_REQUEST);
     }
     const secretKey = process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA';
+    const hwid = req.headers['x-hardware-id'] as string;
+
+    if (!hwid) {
+      throw new HttpException('Hardware ID is required', HttpStatus.BAD_REQUEST);
+    }
     
     // Ignore verification if disabled
     if (process.env.TURNSTILE_ENABLED === 'false') {
-      return { clearanceToken: generateClearanceToken(secretKey) };
+      return { clearanceToken: generateClearanceToken(secretKey, hwid) };
     }
 
     const formData = new URLSearchParams();
@@ -31,7 +36,7 @@ export class BooksController {
       const outcome = await result.json();
 
       if (outcome.success) {
-        return { clearanceToken: generateClearanceToken(secretKey) };
+        return { clearanceToken: generateClearanceToken(secretKey, hwid) };
       }
       
       console.error('Turnstile verification failed:', outcome['error-codes']);

@@ -24,15 +24,11 @@ cp .env.example .env
 
 3. กรอกค่าที่จำเป็นใน `.env`
 
-Firebase Web App config (ดูจาก Firebase Console → Project Settings → Your apps → Web app):
+Supabase config (ดูจาก Supabase Dashboard → Project Settings → API):
 
 ```env
-NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-firebase-project-id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project-id.firebasestorage.app
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
-NEXT_PUBLIC_FIREBASE_APP_ID=your-firebase-app-id
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
 ตั้งค่า backend URL:
@@ -40,6 +36,14 @@ NEXT_PUBLIC_FIREBASE_APP_ID=your-firebase-app-id
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:4001
 INTERNAL_API_URL=http://localhost:4001
+```
+
+ค่าเสริมสำหรับ Cloudflare Worker/R2 และ Turnstile:
+
+```env
+NEXT_PUBLIC_CF_WORKER_URL=
+NEXT_PUBLIC_USE_CF_WORKER=false
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
 ```
 
 4. รัน Frontend
@@ -52,4 +56,4 @@ bun run dev
 
 ## Authentication
 
-Frontend ใช้ Firebase Client SDK สำหรับ authentication และส่ง Firebase ID token ไปยัง backend ที่แต่ละ request ผ่าน `Authorization: Bearer <token>` header
+Frontend ใช้ Supabase Client SDK สำหรับ authentication (Google OAuth) และส่ง Supabase session token ไปยัง backend ที่แต่ละ request ผ่าน `Authorization: Bearer <token>` header

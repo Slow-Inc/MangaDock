@@ -11,6 +11,7 @@ import { UploadModule } from './upload/upload.module';
 import { WalletModule } from './wallet/wallet.module';
 import { UnlockModule } from './unlock/unlock.module';
 import { HardwareIdMiddleware } from './common/middleware/hardware-id.middleware';
+import { ForumModule } from './forum/forum.module';
 
 import { validate } from './common/env.validation';
 
@@ -30,6 +31,7 @@ import { validate } from './common/env.validation';
     UploadModule,
     WalletModule,
     UnlockModule,
+    ForumModule,
   ],
 })
 export class AppModule implements NestModule {

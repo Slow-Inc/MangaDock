@@ -13,7 +13,7 @@ Phase 4 มีเป้าหมายเพื่อทำให้การพ
 เอกสารภายในถูกจัดทำขึ้นเพื่อให้สมาชิกในทีมเข้าใจภาพรวมของระบบและรายละเอียดเชิงเทคนิคได้ตรงกัน โดยเน้นให้เอกสารมีความกระชับ อัปเดตได้ง่าย และสอดคล้องกับโค้ดจริงมากที่สุด เอกสารในส่วนนี้ครอบคลุมหัวข้อสำคัญดังต่อไปนี้
 
 1. เอกสารภาพรวมสถาปัตยกรรมระบบ เพื่ออธิบายความสัมพันธ์ระหว่าง Frontend, Backend, Database, Cache และ External Services
-2. เอกสารโครงสร้างโมดูล เพื่อระบุหน้าที่ของแต่ละ module เช่น books, users, cache, firebase และ status
+2. เอกสารโครงสร้างโมดูล เพื่อระบุหน้าที่ของแต่ละ module เช่น books, users, cache, supabase และ status
 3. เอกสาร API และ data flow เพื่ออธิบาย request/response, endpoint สำคัญ, และลำดับการทำงานของระบบ
 4. เอกสารการติดตั้งและการรันระบบ เพื่อให้สมาชิกสามารถ setup project, environment variables, และ service ที่เกี่ยวข้องได้อย่างถูกต้อง
 5. เอกสารด้านการ deploy และ operation เพื่อใช้เป็นแนวทางในการรันระบบจริง, ตรวจสอบ health status, และจัดการ service ที่เชื่อมต่อภายนอก
@@ -35,7 +35,7 @@ Phase 4 มีเป้าหมายเพื่อทำให้การพ
 
 | ประเภทเอกสาร | วัตถุประสงค์ | ตัวอย่างเนื้อหา |
 |---|---|---|
-| Architecture Documentation | อธิบายภาพรวมระบบ | Frontend, Backend, Manga Translator, Firebase, Redis |
+| Architecture Documentation | อธิบายภาพรวมระบบ | Frontend, Backend, Manga Translator, Supabase, Redis |
 | Module Documentation | อธิบายหน้าที่ของแต่ละส่วน | Books Module, Users Module, Cache Module |
 | API Documentation | อธิบายการใช้งาน service | endpoint, parameters, response, error cases |
 | Setup Documentation | ใช้สำหรับติดตั้งและรันระบบ | environment variables, commands, dependencies |

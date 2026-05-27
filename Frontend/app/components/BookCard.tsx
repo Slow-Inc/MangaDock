@@ -16,7 +16,7 @@ export default function BookCard({ title, author, genre, rating, cover, slug }: 
     return (
         <Link href={`/book/${slug}`} className="block group">
             <div
-                className="book-card rounded-2xl overflow-hidden"
+                className="book-card rounded-2xl overflow-hidden smooth-hover"
                 style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
             >
                 {/* Cover */}

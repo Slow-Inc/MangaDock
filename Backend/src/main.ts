@@ -1,5 +1,6 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { ValidationPipe } from '@nestjs/common';
 import * as path from 'path';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -11,6 +12,7 @@ async function bootstrap() {
   const httpAdapterHost = app.get(HttpAdapterHost);
   app.useGlobalFilters(new AllExceptionsFilter(httpAdapterHost));
   app.useGlobalInterceptors(new StructuredLoggingInterceptor());
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   app.enableCors({
     origin: [
@@ -20,8 +22,8 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Serve cached images from .cache/images/ under /img-cache/
-  app.useStaticAssets(path.resolve(process.cwd(), '.cache', 'images'), {
+  // Serve cached images from img-cache/ under /img-cache/
+  app.useStaticAssets(path.resolve(process.cwd(), 'img-cache'), {
     prefix: '/img-cache/',
   });
 
