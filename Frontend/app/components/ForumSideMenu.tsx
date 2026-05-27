@@ -24,7 +24,7 @@ export default function ForumSideMenu({
 }: ForumSideMenuProps) {
   const [trending, setTrending] = useState<TrendingManga[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchBar] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<LandingBook[]>([]);
   const [searching, setSearching] = useState(false);
 
@@ -113,7 +113,7 @@ export default function ForumSideMenu({
         <input
           type="text"
           value={searchQuery}
-          onChange={(e) => setSearchBar(e.target.value)}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="ค้นหาชุมชนมังงะ..."
           className="relative w-full bg-white/3 border border-white/10 rounded-2xl px-4 py-3 pl-11 text-xs text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50 focus:bg-white/5 transition-all shadow-xl backdrop-blur-xl smooth-hover"
         />
@@ -137,7 +137,7 @@ export default function ForumSideMenu({
                     key={m.id}
                     onClick={() => {
                       onMangaSelect(m.id);
-                      setSearchBar("");
+                      setSearchQuery("");
                     }}
                     className="w-full flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/5 text-left transition-all group/item"
                   >

@@ -35,7 +35,7 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
   const checkFlip = useCallback(() => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const dropdownHeight = Math.min(320, 200); // Approximate based on max-h-60
+    const dropdownHeight = 320; // matches max-h-80
     const spaceBelow = window.innerHeight - rect.bottom;
     setDropUp(spaceBelow < dropdownHeight + 12);
   }, []);
