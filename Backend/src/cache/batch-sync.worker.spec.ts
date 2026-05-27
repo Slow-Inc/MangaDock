@@ -40,10 +40,11 @@ function makeWorker(
   processingQueue: string[] = [],
 ) {
   const redis = makeRedis(dirtyQueue, store, processingQueue);
+  const jc = makeJsonCache();
   return {
-    worker: new BatchSyncWorker(redis, makeElection(isLeader), makeJsonCache()),
+    worker: new BatchSyncWorker(redis, makeElection(isLeader), jc),
     redis,
-    jsonCache: makeJsonCache(),
+    jsonCache: jc,
   };
 }
 

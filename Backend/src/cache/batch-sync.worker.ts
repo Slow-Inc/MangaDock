@@ -60,12 +60,18 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     const client = await this.redis.getClient();
     if (!client) return;
 
-    const processed: string[] = [];
+    const seen = new Set<string>();
     for (let i = 0; i < MAX_BATCH_SIZE; i++) {
       const key: string | null = await (client as any).rpoplpush(DIRTY_QUEUE, PROCESSING_QUEUE);
       if (!key) break;
-      if (!processed.includes(key)) processed.push(key);
+      if (seen.has(key)) {
+        // Duplicate in queue — remove extra processing entry immediately to avoid orphan on crash
+        await client.lrem(PROCESSING_QUEUE, 1, key);
+        continue;
+      }
+      seen.add(key);
     }
+    const processed = [...seen];
     if (processed.length === 0) return;
 
     this.logger.log(`BatchSync: flushing ${processed.length} dirty key(s)`);
