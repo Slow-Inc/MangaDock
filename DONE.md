@@ -125,6 +125,62 @@
 
 ---
 
+## ✅ Phase 2b — Issue #13: L3DiskService Extraction (TDD, Branch: feat/2-layer-cache-upgrade)
+
+### Status: COMPLETE — 147 tests passing
+
+#### New Files
+- `Backend/src/cache/l3-disk.service.ts` — Deep module สำหรับ disk I/O ทั้งหมด: `write(key, entry)` (sanitize filename + embed original key) + `readAll(): Map` (skip corrupt, swallow errors); รับ cacheDir ผ่าน `@Optional() @Inject('L3_CACHE_DIR')` เพื่อ testability
+- `Backend/src/cache/l3-disk.service.spec.ts` — 5 tests: empty dir, round-trip, key sanitization, corrupt JSON skip, disk error swallow
+- `Backend/src/cache/json-cache.service.spec.ts` — 3 tests: `set()` ไม่เขียน disk, `syncEntry()` ไม่เขียน disk, `onModuleInit()` warm L1 จาก L3
+
+#### Modified Files
+- `Backend/src/cache/json-cache.service.ts` — **แก้ bug หลัก**: ลบ `writeToDisk()` ออก + `set()` / `syncEntry()` เป็น in-memory เท่านั้น + `onModuleInit()` ใช้ `l3.readAll()` แทน direct `fs.readdirSync`; constructor รับ `L3DiskService` ผ่าน DI
+- `Backend/src/cache/cache.module.ts` — เพิ่ม `L3DiskService` เป็น provider (ก่อน `JsonCacheService` เพราะ DI dependency)
+
+#### Key Fix (from grill session 2026-05-28)
+**Bug:** `JsonCacheService.set()` เรียก `writeToDisk()` ทุก L1 update — disk I/O overflow เพราะ L1 update บ่อยมาก
+**Fix:** L3 (disk) เขียนโดย `L3DiskService.write()` เท่านั้น ซึ่งจะถูกเรียกโดย `L3BatchWriter` (Issue #14) ตาม Flush Frequency ต่อ data type — ไม่เคยเขียนใน `set()` path
+
+#### Test Count: 147 passing (เพิ่มจาก 139 → 147)
+
+#### What Was NOT Changed
+- `CacheOrchestratorService` — interface `set()`/`syncEntry()` เหมือนเดิม
+- `BatchSyncWorker` — `syncEntry()` ยังทำงานปกติ (ตอนนี้ update L1 in-memory เท่านั้น — correct)
+- `batch-sync.worker.spec.ts` — mock `JsonCacheService` ไม่ได้รับผลกระทบ
+
+---
+
+## ✅ Phase 2b — Issues #14+#15: L3BatchWriter + Leader flush wire (TDD)
+
+### Status: COMPLETE — 155 tests passing
+
+#### New Files
+- `Backend/src/cache/l3-batch-writer.ts` — periodic L2→L3 batch บนทุก node; FLUSH_CONFIG: wallet: 2s, stats: 5s, default: 60s; fires immediate flush on startup; skips L2-missing keys; skips when Redis unavailable
+- `Backend/src/cache/l3-batch-writer.spec.ts` — 6 tests: startup flush, L2 miss skip, wallet 2s interval, manga only at 60s, destroy stops intervals, Redis unavailable
+
+#### Modified Files (#15)
+- `Backend/src/cache/batch-sync.worker.ts` — `syncKey()` ตอนนี้เรียก `l3.write(key, entry)` แทน `jsonCache.syncEntry()`; inject `L3DiskService` แทน `JsonCacheService`
+- `Backend/src/cache/batch-sync.worker.spec.ts` — อัปเดต mock ใช้ `L3DiskService`; assertions เปลี่ยนจาก `jsonCache.syncEntry` เป็น `l3.write`
+- `Backend/src/cache/cache.module.ts` — เพิ่ม `L3BatchWriter` provider
+
+#### Final Write-behind Architecture
+```
+set(key)  →  L1 in-memory  →  L2 Redis  →  markDirty
+
+L3BatchWriter (all nodes):   L2 → L3  (per Flush Frequency per type)
+BatchSyncWorker (Leader):    L2 → L3  (re-sync before future Supabase write)
+```
+
+#### Design Note (per grill)
+- `L3DiskService.write()` swallows disk errors — L3 = best-effort backup
+- Ack (lrem) always happens after write attempt; JSON parse fail = no ack (retry)
+- `L3BatchWriter` re-attempts on next cycle ถ้า disk ชั่วคราว unavailable
+
+#### Test Count: 155 passing (เพิ่มจาก 147 → 155)
+
+---
+
 ## 🛠️ V5 Final Hardening (Commit 69712f9)
 - **Error Handling:** เปลี่ยน `throw new Error()` เป็น `InternalServerErrorException` ทั้งหมดใน `UnlockService` เพื่อมาตรฐานความปลอดภัย
 - **Runtime Validation:** ติดตั้ง `forum.dto.ts` และเปิดใช้งาน `ValidationPipe` (class-validator) แบบ Global ใน `main.ts` ป้องกัน Payload ที่ผิดโครงสร้าง

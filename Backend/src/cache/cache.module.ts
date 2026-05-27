@@ -1,5 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { RedisService } from './redis.service';
+import { L3DiskService } from './l3-disk.service';
+import { L3BatchWriter } from './l3-batch-writer';
 import { JsonCacheService } from './json-cache.service';
 import { CacheOrchestratorService } from './cache-orchestrator.service';
 import { ImageCacheService } from './image-cache.service';
@@ -9,7 +11,15 @@ import { StatusModule } from '../status/status.module';
 @Global()
 @Module({
   imports: [StatusModule],
-  providers: [RedisService, JsonCacheService, CacheOrchestratorService, ImageCacheService, BatchSyncWorker],
+  providers: [
+    RedisService,
+    L3DiskService,
+    L3BatchWriter,
+    JsonCacheService,
+    CacheOrchestratorService,
+    ImageCacheService,
+    BatchSyncWorker,
+  ],
   exports: [CacheOrchestratorService, ImageCacheService, RedisService],
 })
 export class CacheModule {}

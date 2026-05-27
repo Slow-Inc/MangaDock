@@ -1,7 +1,8 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ElectionService } from '../status/election.service';
 import { RedisService } from './redis.service';
-import { JsonCacheService, CacheEntry } from './json-cache.service';
+import { L3DiskService } from './l3-disk.service';
+import type { CacheEntry } from './json-cache.service';
 
 export const DIRTY_QUEUE = 'cache:dirty';
 export const PROCESSING_QUEUE = 'cache:processing';
@@ -16,7 +17,7 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly redis: RedisService,
     private readonly election: ElectionService,
-    private readonly jsonCache: JsonCacheService,
+    private readonly l3: L3DiskService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -86,7 +87,7 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     if (!raw) return; // key expired in Redis — skip, don't ack
     try {
       const entry = JSON.parse(raw) as CacheEntry<unknown>;
-      this.jsonCache.syncEntry(key, entry);
+      this.l3.write(key, entry); // Leader re-sync L2 → L3; disk errors swallowed internally
       await client.lrem(PROCESSING_QUEUE, 1, key);
     } catch (err) {
       this.logger.warn(`BatchSync: failed to sync key=${key}: ${String(err)}`);
