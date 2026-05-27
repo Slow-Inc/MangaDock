@@ -4,6 +4,7 @@ import request = require('supertest');
 import { UnauthorizedException } from '@nestjs/common';
 import { ForumController } from './forum.controller';
 import { ForumService } from './forum.service';
+import { ForumEventsService } from './forum-events.service';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard';
 
@@ -50,6 +51,11 @@ const mockForumService = {
   uploadImage: jest.fn(),
 };
 
+const mockForumEventsService = {
+  getPostStream: jest.fn(),
+  getFeedStream: jest.fn(),
+};
+
 const mockAuthGuard = {
   canActivate: jest.fn().mockImplementation((ctx) => {
     ctx.switchToHttp().getRequest()[USER_KEY] = TEST_USER;
@@ -63,7 +69,10 @@ describe('ForumController', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ForumController],
-      providers: [{ provide: ForumService, useValue: mockForumService }],
+      providers: [
+        { provide: ForumService, useValue: mockForumService },
+        { provide: ForumEventsService, useValue: mockForumEventsService },
+      ],
     })
       .overrideGuard(AuthGuard)
       .useValue(mockAuthGuard)
@@ -306,7 +315,10 @@ describe('ForumController', () => {
     beforeAll(async () => {
       const moduleRef = await Test.createTestingModule({
         controllers: [ForumController],
-        providers: [{ provide: ForumService, useValue: mockForumService }],
+        providers: [
+          { provide: ForumService, useValue: mockForumService },
+          { provide: ForumEventsService, useValue: mockForumEventsService },
+        ],
       })
         .overrideGuard(AuthGuard)
         .useValue({ canActivate: () => { throw new UnauthorizedException(); } })

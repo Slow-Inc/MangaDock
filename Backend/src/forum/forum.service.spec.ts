@@ -1,10 +1,14 @@
 import { BadRequestException } from '@nestjs/common';
+import { fileTypeFromFile } from 'file-type';
 import { ForumService } from './forum.service';
+
+const mockFileType = fileTypeFromFile as jest.Mock;
 
 function buildMockChain(overrides: Record<string, jest.Mock> = {}) {
   const chain: Record<string, jest.Mock> = {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(),
     in: jest.fn().mockReturnThis(),
     not: jest.fn().mockReturnThis(),
     neq: jest.fn().mockReturnThis(),
@@ -23,6 +27,11 @@ function buildMockChain(overrides: Record<string, jest.Mock> = {}) {
   return chain;
 }
 
+const mockForumEvents = {
+  broadcastPostEvent: jest.fn().mockResolvedValue(undefined),
+  broadcastFeedEvent: jest.fn().mockResolvedValue(undefined),
+};
+
 function makeService(fromImpl: (table: string) => any, rpcImpl?: jest.Mock) {
   const supabaseService = {
     client: {
@@ -30,7 +39,7 @@ function makeService(fromImpl: (table: string) => any, rpcImpl?: jest.Mock) {
       rpc: rpcImpl ?? jest.fn().mockResolvedValue({ data: [{ upvotes: 0, downvotes: 0 }], error: null }),
     },
   } as any;
-  return new ForumService(supabaseService, {} as any, {} as any);
+  return new ForumService(supabaseService, {} as any, mockForumEvents as any);
 }
 
 // ── vote ──────────────────────────────────────────────────────────────────────
@@ -99,7 +108,7 @@ describe('ForumService.listComments — tree assembly', () => {
   it('nests child comments under their parent and returns only roots', async () => {
     const flatComments = [makeComment('c1', null), makeComment('c2', 'c1')];
     const chain = buildMockChain({
-      order: jest.fn().mockResolvedValue({ data: flatComments, error: null }),
+      limit: jest.fn().mockResolvedValue({ data: flatComments, error: null }),
     });
     const service = makeService(() => chain);
 
@@ -114,7 +123,7 @@ describe('ForumService.listComments — tree assembly', () => {
   it('returns all comments as roots when none have a parent', async () => {
     const flatComments = [makeComment('c1', null), makeComment('c2', null)];
     const chain = buildMockChain({
-      order: jest.fn().mockResolvedValue({ data: flatComments, error: null }),
+      limit: jest.fn().mockResolvedValue({ data: flatComments, error: null }),
     });
     const service = makeService(() => chain);
 
@@ -131,7 +140,7 @@ describe('ForumService.listComments — tree assembly', () => {
       makeComment('c3', 'c2'),
     ];
     const chain = buildMockChain({
-      order: jest.fn().mockResolvedValue({ data: flatComments, error: null }),
+      limit: jest.fn().mockResolvedValue({ data: flatComments, error: null }),
     });
     const service = makeService(() => chain);
 
@@ -143,7 +152,7 @@ describe('ForumService.listComments — tree assembly', () => {
 
   it('returns empty array when there are no comments', async () => {
     const chain = buildMockChain({
-      order: jest.fn().mockResolvedValue({ data: [], error: null }),
+      limit: jest.fn().mockResolvedValue({ data: [], error: null }),
     });
     const service = makeService(() => chain);
 
@@ -206,6 +215,8 @@ describe('ForumService.getTrendingManga', () => {
 });
 
 // ── uploadImage MIME guard ─────────────────────────────────────────────────────
+// The service validates by magic bytes (fileTypeFromFile), not the _clientMime param.
+// Tests must mock fileTypeFromFile to control what MIME the service sees.
 
 describe('ForumService.uploadImage — MIME validation', () => {
   const service = makeService(() => ({}));
@@ -215,8 +226,9 @@ describe('ForumService.uploadImage — MIME validation', () => {
     ['image/bmp'],
     ['application/pdf'],
     ['text/html'],
-  ])('rejects disallowed MIME type: %s', async (mime) => {
-    await expect(service.uploadImage('u1', '/tmp/nonexistent', mime))
+  ])('rejects disallowed MIME type detected by magic bytes: %s', async (mime) => {
+    mockFileType.mockResolvedValueOnce({ mime, ext: mime.split('/')[1] });
+    await expect(service.uploadImage('u1', '/tmp/nonexistent', 'ignored'))
       .rejects.toThrow(BadRequestException);
   });
 
@@ -225,9 +237,10 @@ describe('ForumService.uploadImage — MIME validation', () => {
     ['image/png'],
     ['image/webp'],
     ['image/gif'],
-  ])('accepts allowed MIME type without throwing MIME error: %s', async (mime) => {
-    // Storage will fail (no real file), but not with a BadRequestException
-    await expect(service.uploadImage('u1', '/tmp/nonexistent', mime))
+  ])('passes MIME check for allowed type: %s (storage will fail — not a MIME rejection)', async (mime) => {
+    mockFileType.mockResolvedValueOnce({ mime, ext: mime.split('/')[1] });
+    // BadRequestException should NOT be thrown — any other error (ENOENT) is acceptable
+    await expect(service.uploadImage('u1', '/tmp/nonexistent', 'ignored'))
       .rejects.not.toThrow(BadRequestException);
   });
 });

@@ -36,6 +36,7 @@
 - [ ]  **[Architecture]** Workload-Aware Leader Election System
 - [ ]  **[Architecture]** Intelligent Write-behind Batching (Redis -> JSON -> DB)
 - [ ]  [Backend] Real-World Payment Gateway (QR/PromptPay)
+- [ ]  **[Backend]** Atomic Revenue Split — ย้าย `processRevenueSplit` (spendCoins + addCoins) เข้าไปเป็น Postgres function เดียว เพื่อป้องกัน user เสียเงินโดยไม่ได้รับสิทธิ์ถ้า creator payout ล้มเหลวกลางทาง (ดำเนินการพร้อมกับ Payment Gateway เพราะ flow จะเปลี่ยน)
 - [ ]  [Infrastructure] Cloudflare R2 Migration & Workers CDN Buffer
 - [ ]  [Infrastructure] MIT GPU Cloud Migration (On-Demand)
 - [ ]  [Security] 2FA & Device Session Pinning
