@@ -1,9 +1,9 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
+import { BatchSyncWorker } from './batch-sync.worker';
 
 const DEFAULT_TTL_MS = 1000 * 60 * 20; // 20 minutes
-const DEFAULT_TTL_SEC = 60 * 20;
 
 @Injectable()
 export class CacheOrchestratorService implements OnApplicationShutdown {
@@ -12,6 +12,7 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
   constructor(
     private readonly redis: RedisService,
     private readonly jsonCache: JsonCacheService,
+    private readonly batchSync: BatchSyncWorker,
   ) {}
 
   /**
@@ -57,7 +58,7 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
   }
 
   /**
-   * Save data to both Redis and JSON cache.
+   * Write-behind: write to Redis (L2) immediately, sync L1 and persist asynchronously via BatchSyncWorker.
    */
   async set<T>(key: string, data: T, ttlMs = DEFAULT_TTL_MS): Promise<void> {
     const entry: CacheEntry<T> = {
@@ -66,10 +67,14 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
       ttlMs,
     };
 
+    // L1: write directly for in-process read consistency
     this.jsonCache.set(key, data, ttlMs);
 
+    // L2: write to Redis (source of truth at runtime)
     if (this.redis.available) {
       await this.redis.set(key, JSON.stringify(entry), Math.floor(ttlMs / 1000));
+      // Enqueue for leader-only batch persistence
+      await this.batchSync.markDirty(key);
     }
 
     this.logger.log(`Cache SET key=${key} ttl=${Math.floor(ttlMs / 1000)}s redis=${this.redis.available}`);
@@ -96,15 +101,13 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
     data: T,
     redisTtlMs: number = 1000 * 60 * 60 * 24, // 1 day default
   ): Promise<void> {
-    // JSON: permanent (ttlMs = -1)
     const jsonEntry: CacheEntry<T> = {
       data,
       updatedAt: new Date().toISOString(),
-      ttlMs: -1, // permanent
+      ttlMs: -1, // permanent in L1
     };
     this.jsonCache.set(key, data, -1);
 
-    // Redis: shorter TTL to save memory
     if (this.redis.available) {
       await this.redis.set(key, JSON.stringify(jsonEntry), Math.floor(redisTtlMs / 1000));
     }

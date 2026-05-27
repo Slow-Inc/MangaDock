@@ -33,6 +33,10 @@
 ### Package
 - `file-type` installed in Backend (`npm install file-type`)
 
+### Verified & Hardened (Pre-Phase 2 Audit)
+- **Soft Deletion:** Verified `deleted_at` implementation in `forum.service.ts` across 9 points (Update & Filter).
+- **Spoiler Blur:** Verified `spoiler` category integration in `PostCard`, `PostDetail`, and `Community` page with blur filters and click-to-reveal logic.
+
 ## What Was NOT Changed
 - Pre-existing spec errors in `hardware-id.middleware.spec.ts`, `unlock.controller.spec.ts`, `wallet.controller.spec.ts` (INestApplication import) — out of scope
 - Storage-before-DB order in uploadBanner/uploadImage — was already correct
@@ -41,6 +45,42 @@
 - `file-type` magic-byte validation: verify CJS interop on deployed Node version
 - `recalculate_votes_atomic` RPC: confirm `data[0]?.upvotes` always populated after UPDATE
 - `unlock.service.ts` rollback: best-effort delete — consider logging if rollback also fails
+
+---
+
+## ✅ Phase 1.5 Completion Verification (2026-05-27)
+
+### Phase 1.5 Status: COMPLETE
+
+#### Community Forum (PR #9 — merged 2026-05-27)
+- `Frontend/app/community/layout.tsx` — Shared layout + mobile drawer
+- `Frontend/app/community/trending/page.tsx` — Trending manga grid
+- `Frontend/app/community/manga/[mangaId]/page.tsx` — Manga community feed
+- `Frontend/app/community/profile/[uid]/page.tsx` — User profile page
+- `Frontend/app/components/ForumSideMenu.tsx` — Sidebar navigation
+- `Frontend/app/components/PostCard.tsx` — Reddit compact view + spoiler transitions
+- `Frontend/app/components/SmoothScrolling.tsx` — Scroll reset on pathname change
+- `Frontend/app/community/page.tsx` — Bottom sheet modal animation
+- `Frontend/app/community/p/[id]/page.tsx` — Sticky header, spoiler fade, XSS fix
+- `Frontend/app/lib/communityApi.ts` — Round position before send
+- `Backend/src/forum/forum.dto.ts` — @IsNumber replaces @IsInt
+
+#### Task A — Creator Earnings API + UI (pre-existing, verified complete)
+- `Backend/src/wallet/wallet.service.ts` — `getCreatorEarnings(uid)` queries `translator_earnings` VIEW; returns zero values when no row exists
+- `Backend/src/wallet/wallet.controller.ts` — `GET /wallet/earnings` with AuthGuard
+- `Frontend/app/lib/studioApi.ts` — `CreatorEarnings` type + `getCreatorEarnings(token)`
+- `Frontend/app/studio/wallet/page.tsx` — Earnings section visible only for translator/creator roles
+
+#### Task B — HWID Middleware Enforcement (pre-existing, verified active enforcer)
+- `Backend/src/common/middleware/hardware-id.middleware.ts` — Active enforcer: rejects 401 `{ statusCode: 401, message: 'Missing hardware ID' }` for protected routes; warns at logger level; whitelist covers auth/forum/wallet/public browse
+
+### What Was NOT Changed (Phase 1.5 close-out)
+- `supabase-migration.sql` — translator_earnings VIEW already existed, no migration needed
+- Any file in `Documents/`, `unlock.service.ts`, `books/*`
+
+### Notes for Gemini
+- Phase 1.5 is fully closed — all 4 pillars (Forum, HWID, Earnings, Zero-Trust) verified in codebase
+- Ready to begin Phase 2 planning (Architectural Scaling & Cloud Readiness)
 
 ---
 
