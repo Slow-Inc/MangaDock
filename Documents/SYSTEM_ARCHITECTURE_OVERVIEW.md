@@ -33,10 +33,12 @@ flowchart LR
 
 ## 2. Core Architectural Components (V5 Refinement)
 
-### 2.1 Advanced 2-Layer Cache (Phase 2 Upgrade)
-*   **L2-Centric Design:** Redis ทำหน้าที่เป็น Source of Truth และ Write-buffer หลัก เพื่อรองรับการขยายโหนด (Horizontal Scaling)
-*   **L1 Mirroring:** L1 (In-Memory) ทำหน้าที่เป็น Read Mirror ประสิทธิภาพสูง โดยซิงค์ข้อมูลผ่านระบบ **Redis Pub/Sub** แบบ Versioned Cooperative
-*   **Intelligent Batching:** ใช้ Leader Node ที่ว่างที่สุด (Workload-Aware) ดึงข้อมูลจาก L2 มาพักใน Local JSON ก่อนส่งขึ้น Supabase เพื่อลด DB Load
+### 2.1 Advanced 2-Layer Cache (Phase 2 — Implemented)
+*   **L2-Centric Design:** Redis คือ Source of Truth ณ Runtime — ทุก `set()` เขียนลง Redis (L2) ก่อน; `JsonCacheService` (L1 in-memory + disk) รับข้อมูลจาก `set()` โดยตรงเพื่อ in-process consistency
+*   **Redis NX Lock Leader Election:** ใช้ `SET cache:leader {nodeId} NX PX 37500` เป็น Distributed Mutex แทน metric scoring — ป้องกัน split-brain และ leader thrashing อย่างเด็ดขาด ตัว holder ต่ออายุด้วย `SET XX PX` ทุก 15s
+*   **Reliable Write-behind Queue:** Leader Node ดึง dirty key ด้วย `RPOPLPUSH cache:dirty cache:processing` (atomic) → sync → `LREM` ack; startup ทำ crash recovery ด้วย `LRANGE cache:processing`
+*   **Node Observability:** `MetricsService` เก็บ CPU/Memory/Supabase latency ใน `cluster_metrics:{nodeId}` (TTL 30s) เพื่อ monitoring dashboard — ไม่ใช้ตัดสิน leadership
+*   **Cross-node L1 Sync:** Redis Pub/Sub สำหรับ sync L1 ข้ามโหนดยังไม่ implement — กำหนดไว้สำหรับ Phase 3
 
 ### 2.2 Frontend Optimizations (L1 Client Cache & Real-time)
 *   **LRU API Cache (O(1) Complexity):** ระบบ In-memory Cache ใน Frontend (Next.js) ที่ใช้โครงสร้าง JavaScript `Map` ในการทำ Least Recently Used (LRU) กำหนดขีดจำกัดที่ 500 Entries เพื่อป้องกัน Memory Leak บน Browser

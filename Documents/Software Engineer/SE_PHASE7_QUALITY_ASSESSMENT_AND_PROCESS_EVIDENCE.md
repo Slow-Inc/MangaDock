@@ -34,7 +34,6 @@
 - การควบคุม version และ traceability ของงาน
 - การจัดทำเอกสาร requirement, design, test และ deployment
 - การบันทึก defect และการแก้ไขอย่างเป็นระบบ
-
 ### 4.2 OWASP-Oriented Evidence
 
 - การตรวจสอบ input validation
@@ -43,6 +42,17 @@
 - การควบคุม access ของ API และ service ภายใน
 - การจัดทำ checklist ความเสี่ยงเบื้องต้นด้าน security
 
+### 4.3 Defect Recording & Resolution Log (Process Quality Evidence)
+
+เพื่อให้สอดคล้องกับแนวคิด CMMI ด้านการบันทึกและแก้ไขข้อผิดพลาดอย่างเป็นระบบ โปรเจกต์ได้มีการจัดทำบันทึกรายการ Defect ที่สำคัญและการแก้ไข ดังตัวอย่างกรณีศึกษาด้านล่าง:
+
+| Defect ID | Description | Root Cause | Resolution | Impact |
+| :--- | :--- | :--- | :--- | :--- |
+| **DF-001** | ไม่สามารถบันทึกตำแหน่งแบนเนอร์ (Banner Position) ในหน้า Profile ได้ (Error 400) | **Type Mismatch:** Backend ใช้ `@IsInt()` บังคับเลขจำนวนเต็ม แต่ Frontend ส่งค่าทศนิยมจากการลากปรับตำแหน่ง (Drag-to-reposition) | 1. **Backend:** เปลี่ยน Validation เป็น `@IsNumber({ maxDecimalPlaces: 2 })`<br>2. **Frontend:** ใช้ `Math.round()` ก่อนส่งข้อมูลให้ตรงกับ DB Precision | ระบบทำงานได้ลื่นไหล รองรับการปรับตำแหน่งที่แม่นยำ และรักษามาตรฐาน Input Validation |
+| **DF-002** | `BatchSyncWorker.flush()` ไม่ตรวจสอบ leader status เมื่อถูกเรียกโดยตรง — non-leader node อาจดึง dirty queue ได้หากเรียก `flush()` ภายนอก interval | **Guard placement:** เงื่อนไข `if (!isLeader) return` อยู่แค่ใน interval callback ไม่ได้อยู่ใน body ของ `flush()` เอง | ย้าย `if (!this.election.isLeader) return;` เข้าไปเป็น statement แรกของ `flush()` — TDD cycle ที่ 2 (RED) ตรวจพบก่อน merge | ป้องกัน concurrent drain จาก non-leader nodes ในสภาวะ multi-process; queue integrity สมบูรณ์ |
+| **DF-003** | `BatchSyncWorker.onModuleInit()` ไม่รอ crash recovery เสร็จก่อนที่ interval จะเริ่ม — orphaned key อาจถูกประมวลผลซ้ำซ้อน | **Missing async:** `onModuleInit()` ประกาศเป็น `void` (sync) ทำให้ `recoverOrphans()` ซึ่งเป็น async ถูก fire-and-forget และ interval เริ่มทำงานก่อนที่ recovery จะเสร็จ | เปลี่ยน signature เป็น `async onModuleInit(): Promise<void>` และใช้ `await this.recoverOrphans()` — TDD cycle crash-recovery (RED) ตรวจพบ | รับประกันว่า orphaned key ถูก re-queue ทั้งหมดก่อนที่ flush cycle แรกจะทำงาน |
+
+## 5. Sample Result Summary
 หลักฐานเชิงกระบวนการในหัวข้อนี้สามารถผูกกับเอกสารระบบที่สร้างไว้แล้วได้โดยตรง เช่น เอกสาร setup และ runtime ของ Frontend, Backend และ MIT รวมถึง phase documentation ที่อธิบาย testing และ deployment
 
 ## 5. Sample Result Summary
