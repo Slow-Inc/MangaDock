@@ -41,3 +41,10 @@
 - `file-type` magic-byte validation: verify CJS interop on deployed Node version
 - `recalculate_votes_atomic` RPC: confirm `data[0]?.upvotes` always populated after UPDATE
 - `unlock.service.ts` rollback: best-effort delete — consider logging if rollback also fails
+
+---
+
+## 🛠️ V5 Final Hardening (Commit 69712f9)
+- **Error Handling:** เปลี่ยน `throw new Error()` เป็น `InternalServerErrorException` ทั้งหมดใน `UnlockService` เพื่อมาตรฐานความปลอดภัย
+- **Runtime Validation:** ติดตั้ง `forum.dto.ts` และเปิดใช้งาน `ValidationPipe` (class-validator) แบบ Global ใน `main.ts` ป้องกัน Payload ที่ผิดโครงสร้าง
+- **Test Integrity:** แก้ไข `forum.controller.spec.ts` ให้ Mock ข้อมูลตรงตาม Contract จริง `{ items, total }`
