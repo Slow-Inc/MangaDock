@@ -37,17 +37,23 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
   }
 
   async flush(prefix?: string): Promise<void> {
-    if (!this.redis.available) return;
-
-    const all = [...this.jsonCache.getAll().keys()];
-    const keys =
+    const all = this.jsonCache.getAll();
+    const matchesPrefix = (k: string) =>
       prefix === undefined
-        ? all
+        ? true
         : prefix === ''
-          ? all.filter((k) => !SPECIFIC_PREFIXES.some((p) => k.startsWith(p)))
-          : all.filter((k) => k.startsWith(prefix));
+          ? !SPECIFIC_PREFIXES.some((p) => k.startsWith(p))
+          : k.startsWith(prefix);
 
-    for (const key of keys) {
+    if (!this.redis.available) {
+      // L1→L3 direct path: Redis unavailable (e.g., provider destroyed before us on shutdown)
+      for (const [key, entry] of all) {
+        if (matchesPrefix(key)) this.l3.write(key, entry);
+      }
+      return;
+    }
+
+    for (const key of [...all.keys()].filter(matchesPrefix)) {
       const raw = await this.redis.get(key);
       if (!raw) continue; // expired in L2 — skip
       try {

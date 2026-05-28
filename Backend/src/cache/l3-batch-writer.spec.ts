@@ -128,17 +128,33 @@ describe('L3BatchWriter', () => {
     expect(l3.write).not.toHaveBeenCalled();
   });
 
-  // Cycle 6 — Redis unavailable: skip flush entirely
-  it('skips flush entirely when Redis is unavailable', async () => {
+  // Cycle 6 — Redis unavailable: L1→L3 direct fallback
+  it('writes L1 entries directly to L3 when Redis is unavailable — order-independent shutdown flush', async () => {
     const redis = { available: false, get: jest.fn() } as unknown as RedisService;
-    const jsonCache = makeJsonCache(['wallet:1']);
+    const entry = makeEntry('important');
+    const map = new Map([['manga:1', entry]]);
+    const jsonCache = { getAll: jest.fn().mockReturnValue(map) } as unknown as JsonCacheService;
     const l3 = makeL3();
     const writer = new L3BatchWriter(redis, jsonCache, l3);
 
-    await writer.onModuleInit();
-    writer.onModuleDestroy();
+    await writer.flush();
 
-    expect(redis.get).not.toHaveBeenCalled();
-    expect(l3.write).not.toHaveBeenCalled();
+    expect(redis.get).not.toHaveBeenCalled(); // L2 bypassed
+    expect(l3.write).toHaveBeenCalledWith('manga:1', entry);
+  });
+
+  it('L1→L3 fallback respects prefix filter when Redis is unavailable', async () => {
+    const redis = { available: false, get: jest.fn() } as unknown as RedisService;
+    const walletEntry = makeEntry('coins');
+    const mangaEntry = makeEntry('pages');
+    const map = new Map([['wallet:user:1', walletEntry], ['manga:1', mangaEntry]]);
+    const jsonCache = { getAll: jest.fn().mockReturnValue(map) } as unknown as JsonCacheService;
+    const l3 = makeL3();
+    const writer = new L3BatchWriter(redis, jsonCache, l3);
+
+    await writer.flush('wallet:');
+
+    expect(l3.write).toHaveBeenCalledWith('wallet:user:1', walletEntry);
+    expect(l3.write).not.toHaveBeenCalledWith('manga:1', expect.anything());
   });
 });
