@@ -86,7 +86,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getClient(): Promise<Redis | null> {
-    return this.client;
+    return this.available ? this.client : null;
   }
 
   // ─── Pub/Sub ──────────────────────────────────────────────────────────────────

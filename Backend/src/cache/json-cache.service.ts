@@ -37,17 +37,6 @@ export class JsonCacheService implements OnModuleInit {
     this.memoryStore.set(key, { key, data, updatedAt: new Date().toISOString(), ttlMs });
   }
 
-  syncEntry<T>(key: string, entry: CacheEntry<T>): void {
-    const existing = this.memoryStore.get(key);
-    if (
-      !existing ||
-      new Date(entry.updatedAt).getTime() > new Date(existing.updatedAt).getTime()
-    ) {
-      this.memoryStore.set(key, entry);
-      this.logger.log(`L1 synced newer data for key: ${key}`);
-    }
-  }
-
   getAll(): Map<string, CacheEntry<unknown>> {
     return this.memoryStore;
   }

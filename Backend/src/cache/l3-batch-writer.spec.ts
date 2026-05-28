@@ -100,15 +100,27 @@ describe('L3BatchWriter', () => {
     writer.onModuleDestroy();
   });
 
-  // Cycle 5 — onModuleDestroy stops all intervals
-  it('onModuleDestroy clears all intervals — no more flushes after destroy', async () => {
+  // Cycle 5 — onModuleDestroy flushes then stops all intervals
+  it('flushes L3 during onModuleDestroy — persists L2 data before timers clear', async () => {
+    const entry = makeEntry('shutdown-data');
+    const { writer, l3 } = makeWriter({ 'manga:1': JSON.stringify(entry) }, ['manga:1']);
+
+    await writer.onModuleInit();
+    l3.write.mockClear(); // clear startup flush
+
+    await writer.onModuleDestroy();
+
+    expect(l3.write).toHaveBeenCalledWith('manga:1', expect.objectContaining({ data: 'shutdown-data' }));
+  });
+
+  it('onModuleDestroy clears all intervals — no periodic flushes fire after destroy', async () => {
     jest.useFakeTimers();
     const entry = makeEntry(1);
     const { writer, l3 } = makeWriter({ 'wallet:x': JSON.stringify(entry) }, ['wallet:x']);
 
     await writer.onModuleInit();
-    writer.onModuleDestroy();
-    l3.write.mockClear();
+    await writer.onModuleDestroy(); // await so the final flush completes first
+    l3.write.mockClear();           // clear AFTER destroy — now check no more fire
 
     jest.advanceTimersByTime(60_000);
     await drainMicrotasks();

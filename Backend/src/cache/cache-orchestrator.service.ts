@@ -2,7 +2,6 @@ import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
 import { BatchSyncWorker } from './batch-sync.worker';
-import { L3BatchWriter } from './l3-batch-writer';
 
 const DEFAULT_TTL_MS = 1000 * 60 * 20; // 20 minutes
 
@@ -14,7 +13,6 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
     private readonly redis: RedisService,
     private readonly jsonCache: JsonCacheService,
     private readonly batchSync: BatchSyncWorker,
-    private readonly l3BatchWriter: L3BatchWriter,
   ) {}
 
   /**
@@ -120,9 +118,7 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
     );
   }
 
-  async onApplicationShutdown(signal?: string) {
-    this.logger.log(`Graceful shutdown (signal=${signal ?? 'none'}) — final L3 flush…`);
-    await this.l3BatchWriter.flush();
-    this.logger.log('L3 flush complete — ready to exit');
+  onApplicationShutdown(signal?: string) {
+    this.logger.log(`Graceful shutdown (signal=${signal ?? 'none'}) — L3 flush handled by L3BatchWriter.onModuleDestroy()`);
   }
 }

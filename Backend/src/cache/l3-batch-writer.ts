@@ -23,14 +23,15 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.flush(); // warm L3 with all L1 keys immediately on startup
+    await this.flush(); // sync L2→L3 for any keys Redis holds on startup; no-op if Redis is cold after a crash restart
     for (const { prefix, intervalMs } of FLUSH_CONFIG) {
       const timer = setInterval(() => void this.flush(prefix), intervalMs);
       this.timers.push(timer);
     }
   }
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
+    await this.flush(); // final flush while Redis is still live (runs before RedisService.onModuleDestroy)
     for (const timer of this.timers) clearInterval(timer);
     this.timers.length = 0;
   }

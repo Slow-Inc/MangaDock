@@ -27,15 +27,6 @@ describe('JsonCacheService — L1 in-memory only', () => {
     expect(fs.readdirSync(tmpDir)).toHaveLength(0);
   });
 
-  // Cycle 7 — syncEntry() is in-memory only
-  it('syncEntry() updates memory without writing to L3 disk', () => {
-    const entry = { data: 'hello', updatedAt: new Date().toISOString(), ttlMs: 60_000 };
-    jc.syncEntry('synckey', entry);
-
-    expect(jc.get('synckey')?.data).toBe('hello');
-    expect(fs.readdirSync(tmpDir)).toHaveLength(0);
-  });
-
   // Cycle 8 — onModuleInit() warms L1 from L3
   it('onModuleInit() loads entries written to L3 into L1 memory', () => {
     const entry = { key: 'disk:key', data: 'from disk', updatedAt: new Date().toISOString(), ttlMs: 60_000 };
