@@ -1,7 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { RedisService } from './redis.service';
-import { JsonCacheService } from './json-cache.service';
+import { JsonCacheService, CacheEntry } from './json-cache.service';
 import { BatchSyncWorker } from './batch-sync.worker';
+import { L3DiskService } from './l3-disk.service';
+import { ElectionService } from '../status/election.service';
 
 const SEVEN_DAYS_S = 7 * 24 * 60 * 60;
 
@@ -13,23 +15,32 @@ export class L2RecoveryService implements OnModuleInit {
     private readonly redis: RedisService,
     private readonly jsonCache: JsonCacheService,
     private readonly batchSync: BatchSyncWorker,
+    private readonly l3: L3DiskService,
+    private readonly election: ElectionService,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    this.redis.onReconnect(() => {
+    // Fires recover() the moment this node wins the election — works on cold boot and failover.
+    this.election.onBecomeLeader(() => {
       this.recover().catch(err => this.logger.warn(`L2 recovery failed: ${String(err)}`));
     });
-    if (this.redis.available) {
-      await this.recover();
-    }
+    // Fires recover() when Redis reconnects and we're already the leader (short outage where TTL didn't expire).
+    this.redis.onReconnect(() => {
+      if (!this.election.isLeader) return;
+      this.recover().catch(err => this.logger.warn(`L2 recovery failed: ${String(err)}`));
+    });
   }
 
   async recover(): Promise<{ synced: number; skipped: number }> {
-    const all = this.jsonCache.getAll();
+    const l1 = this.jsonCache.getAll();
+    const l3 = this.l3.readAll();
+
+    const allKeys = new Set([...l1.keys(), ...l3.keys()]);
     let synced = 0;
     let skipped = 0;
 
-    for (const [key, entry] of all) {
+    for (const key of allKeys) {
+      const entry = this.newerEntry(l1.get(key), l3.get(key));
       const expired = this.jsonCache.isExpired(entry);
       if (expired) {
         skipped++;
@@ -54,5 +65,11 @@ export class L2RecoveryService implements OnModuleInit {
     }
 
     return { synced, skipped };
+  }
+
+  private newerEntry(l1?: CacheEntry<unknown>, l3?: CacheEntry<unknown>): CacheEntry<unknown> {
+    if (!l1) return l3!;
+    if (!l3) return l1;
+    return new Date(l1.updatedAt) >= new Date(l3.updatedAt) ? l1 : l3;
   }
 }

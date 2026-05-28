@@ -117,12 +117,12 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
   });
 
-  describe('crash recovery — atomic Lua recovery on init', () => {
-    it('uses EVAL to atomically move orphans from processing to dirty queue', async () => {
+  describe('crash recovery — leader-only, on first flush as leader', () => {
+    it('calls EVAL to atomically move orphans from processing to dirty queue on first flush as leader', async () => {
       const redis = makeRedis([], {}, ['orphan-1', 'orphan-2']);
-      const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
+      const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
 
-      await worker.onModuleInit();
+      await (worker as any).flush();
 
       expect((redis as any)._client.eval).toHaveBeenCalledWith(
         expect.stringContaining('LRANGE'),
@@ -132,23 +132,56 @@ describe('BatchSyncWorker — Reliable Queue', () => {
       );
     });
 
-    it('does not call DEL or RPUSH directly during recovery — Lua handles it atomically', async () => {
-      const redis = makeRedis([], {}, ['orphan-1', 'orphan-2']);
+    it('does not call EVAL for orphan recovery on onModuleInit — recovery is leader-only at flush time', async () => {
+      const redis = makeRedis([], {}, ['orphan-1']);
       const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
 
       await worker.onModuleInit();
+
+      expect((redis as any)._client.eval).not.toHaveBeenCalled();
+    });
+
+    it('does not call EVAL for orphan recovery on a second consecutive flush as leader', async () => {
+      const redis = makeRedis([], {}, ['orphan-1']);
+      const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
+
+      await (worker as any).flush();
+      (redis as any)._client.eval.mockClear();
+      await (worker as any).flush();
+
+      expect((redis as any)._client.eval).not.toHaveBeenCalled();
+    });
+
+    it('does not call DEL or RPUSH directly during recovery — Lua handles it atomically', async () => {
+      const redis = makeRedis([], {}, ['orphan-1', 'orphan-2']);
+      const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
+
+      await (worker as any).flush();
 
       expect((redis as any)._client.del).not.toHaveBeenCalled();
       expect((redis as any)._client.rpush).not.toHaveBeenCalled();
     });
 
-    it('calls eval even when processing queue is empty — Lua returns 0 atomically', async () => {
-      const redis = makeRedis([], {}, []);
-      const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
+    it('runs orphan recovery again when node re-acquires leadership after losing it', async () => {
+      const redis = makeRedis([], {}, ['orphan-1']);
+      // First flush: isLeader=true → recovers; second flush: isLeader=false → resets; third: isLeader=true → recovers again
+      let leaderState = true;
+      const election = { get isLeader() { return leaderState; } } as unknown as ElectionService;
+      const worker = new BatchSyncWorker(redis, election, makeL3());
 
-      await worker.onModuleInit();
+      await (worker as any).flush(); // leader → recovers
+      (redis as any)._client.eval.mockClear();
+      leaderState = false;
+      await (worker as any).flush(); // non-leader → resets flag
+      leaderState = true;
+      await (worker as any).flush(); // leader again → recovers again
 
-      expect((redis as any)._client.eval).toHaveBeenCalledTimes(1);
+      expect((redis as any)._client.eval).toHaveBeenCalledWith(
+        expect.stringContaining('LRANGE'),
+        2,
+        PROCESSING_QUEUE,
+        DIRTY_QUEUE,
+      );
     });
   });
 
