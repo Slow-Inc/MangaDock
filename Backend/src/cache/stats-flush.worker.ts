@@ -29,7 +29,13 @@ export class StatsFlushWorker implements OnModuleInit, OnModuleDestroy {
 
   async flush(date = new Date().toISOString().slice(0, 10)): Promise<void> {
     if (!this.election.isLeader) return;
+    await this.flushDate(date);
+    // Drain yesterday's trailing window — views between the last pre-midnight tick and 23:59:59 UTC
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    if (yesterday !== date) await this.flushDate(yesterday);
+  }
 
+  private async flushDate(date: string): Promise<void> {
     const chapterIds = await this.redis.smembers(`stats:active:${date}`);
     if (chapterIds.length === 0) return;
 

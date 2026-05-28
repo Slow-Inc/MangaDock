@@ -93,6 +93,31 @@ describe('StatsFlushWorker', () => {
     await expect(worker.flush()).resolves.not.toThrow();
   });
 
+  // Cycle 6 — also drains yesterday's trailing window
+  it('flush() also processes yesterday\'s active set when called with no argument', async () => {
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const supabase = makeSupabase();
+    const redis = {
+      smembers: jest.fn().mockImplementation((key: string) =>
+        Promise.resolve(key === `stats:active:${yesterday}` ? ['ch:1'] : []),
+      ),
+      get: jest.fn().mockResolvedValue(null),
+      pfcount: jest.fn().mockResolvedValue(0),
+    };
+    const election = makeElection(true);
+    const worker = new StatsFlushWorker(
+      redis as unknown as RedisService,
+      election as unknown as ElectionService,
+      supabase as unknown as SupabaseService,
+    );
+
+    await worker.flush();
+
+    const queriedKeys = (redis.smembers as jest.Mock).mock.calls.map(([k]: [string]) => k);
+    expect(queriedKeys).toContain(`stats:active:${yesterday}`);
+    expect(supabase.client.from).toHaveBeenCalledWith('chapter_daily_stats');
+  });
+
   // Cycle 5 — onModuleDestroy stops interval
   it('onModuleDestroy clears the flush interval — no further flushes fire', async () => {
     jest.useFakeTimers();
