@@ -56,21 +56,30 @@ describe('StatsFlushWorker', () => {
     expect(redis.smembers).not.toHaveBeenCalled();
   });
 
-  // Cycle 2 — upsert per active chapter
-  it('flush() upserts one row per active chapter with views and unique readers', async () => {
+  // Cycle 2 — upsert per active chapter (today only, yesterday returns empty)
+  it('flush() upserts exactly one row per active chapter for today', async () => {
+    const today = new Date().toISOString().slice(0, 10);
     const supabase = makeSupabase();
-    const { worker } = makeWorker({
-      activeChapters: ['ch:1'],
-      viewCounts: { 'ch:1': 42 },
-      hllCounts: { 'ch:1': 7 },
-      supabase,
-    });
+    const redis = {
+      smembers: jest.fn().mockImplementation((key: string) =>
+        Promise.resolve(key === `stats:active:${today}` ? ['ch:1'] : []),
+      ),
+      get: jest.fn().mockResolvedValue('42'),
+      pfcount: jest.fn().mockResolvedValue(7),
+    };
+    const election = makeElection(true);
+    const worker = new StatsFlushWorker(
+      redis as unknown as RedisService,
+      election as unknown as ElectionService,
+      supabase as unknown as SupabaseService,
+    );
 
     await worker.flush();
 
     expect(supabase.client.from).toHaveBeenCalledWith('chapter_daily_stats');
-    const upsertCall = supabase.client.from().upsert.mock.calls[0][0];
-    expect(upsertCall).toMatchObject({ chapter_id: 'ch:1', views: 42, unique_readers: 7 });
+    const upsertFn = supabase.client.from('chapter_daily_stats').upsert as jest.Mock;
+    expect(upsertFn).toHaveBeenCalledTimes(1);
+    expect(upsertFn.mock.calls[0][0]).toMatchObject({ chapter_id: 'ch:1', views: 42, unique_readers: 7 });
   });
 
   // Cycle 3 — empty active set: no Supabase call
