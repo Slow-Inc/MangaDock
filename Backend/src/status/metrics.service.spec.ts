@@ -20,6 +20,33 @@ function makeService(redis: ReturnType<typeof makeRedis>): MetricsService {
   return svc;
 }
 
+const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+describe('MetricsService — nodeId (#42)', () => {
+  // Cycle 1 — nodeId embeds a UUID v4 segment for global uniqueness across containers
+  it('nodeId contains a UUID v4 segment after the PID', () => {
+    const redis = makeRedis();
+    const svc = new MetricsService(redis as unknown as RedisService);
+    // format: node-<pid>-<uuid-v4>  e.g. node-1234-550e8400-e29b-41d4-a716-446655440000
+    const uuidPart = svc.nodeId.replace(/^node-\d+-/, '');
+    expect(UUID_V4_RE.test(uuidPart)).toBe(true);
+  });
+
+  // Cycle 2 — prefix stays human-readable
+  it('nodeId starts with node-<pid>- so log lines remain identifiable', () => {
+    const redis = makeRedis();
+    const svc = new MetricsService(redis as unknown as RedisService);
+    expect(svc.nodeId).toMatch(new RegExp(`^node-${process.pid}-`));
+  });
+
+  // Cycle 3 — UUID guarantees uniqueness even when pid is identical (Docker containers)
+  it('two MetricsService instances have different nodeIds', () => {
+    const a = new MetricsService(makeRedis() as unknown as RedisService);
+    const b = new MetricsService(makeRedis() as unknown as RedisService);
+    expect(a.nodeId).not.toBe(b.nodeId);
+  });
+});
+
 describe('MetricsService', () => {
   afterEach(() => jest.restoreAllMocks());
 

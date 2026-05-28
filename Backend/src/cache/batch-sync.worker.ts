@@ -2,10 +2,12 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { ElectionService } from '../status/election.service';
 import { RedisService } from './redis.service';
 import { L3DiskService } from './l3-disk.service';
+import { SupabaseService } from '../supabase/supabase.service';
 import type { CacheEntry } from './json-cache.service';
 
 export const DIRTY_QUEUE = 'cache:dirty';
 export const PROCESSING_QUEUE = 'cache:processing';
+const CACHE_SYNC_RPC = 'upsert_cache_entry';
 const FLUSH_INTERVAL_MS = 5_000;
 const MAX_BATCH_SIZE = 100;
 
@@ -31,6 +33,7 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     private readonly redis: RedisService,
     private readonly election: ElectionService,
     private readonly l3: L3DiskService,
+    private readonly supabase: SupabaseService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -108,12 +111,25 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
       await client.lrem(PROCESSING_QUEUE, 1, key); // expired — ack to prevent permanent orphan
       return;
     }
+
+    let entry: CacheEntry<unknown>;
     try {
-      const entry = JSON.parse(raw) as CacheEntry<unknown>;
-      this.l3.write(key, entry); // Leader re-sync L2 → L3; disk errors swallowed internally
+      entry = JSON.parse(raw) as CacheEntry<unknown>;
+    } catch {
+      this.logger.warn(`BatchSync: corrupt Redis entry key=${key} — acking to prevent orphan`);
+      await client.lrem(PROCESSING_QUEUE, 1, key);
+      return;
+    }
+
+    this.l3.write(key, entry);
+
+    try {
+      const { error } = await this.supabase.client.rpc(CACHE_SYNC_RPC, { p_key: key, p_entry: entry }) as { error: Error | null };
+      if (error) throw error;
       await client.lrem(PROCESSING_QUEUE, 1, key);
     } catch (err) {
-      this.logger.warn(`BatchSync: failed to sync key=${key}: ${String(err)}`);
+      this.logger.warn(`BatchSync: Supabase RPC failed key=${key}: ${String(err)} — left in processing for retry`);
+      // Do NOT lrem — key stays in processing queue for next recovery cycle
     }
   }
 }
