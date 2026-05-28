@@ -1,11 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
-import { BatchSyncWorker } from './batch-sync.worker';
 import { L3DiskService } from './l3-disk.service';
 import { ElectionService } from '../status/election.service';
+import { DIRTY_QUEUE } from './batch-sync.worker';
 
 const SEVEN_DAYS_S = 7 * 24 * 60 * 60;
+const PIPELINE_CHUNK_SIZE = 500;
 
 @Injectable()
 export class L2RecoveryService implements OnModuleInit {
@@ -14,7 +15,6 @@ export class L2RecoveryService implements OnModuleInit {
   constructor(
     private readonly redis: RedisService,
     private readonly jsonCache: JsonCacheService,
-    private readonly batchSync: BatchSyncWorker,
     private readonly l3: L3DiskService,
     private readonly election: ElectionService,
   ) {}
@@ -34,29 +34,44 @@ export class L2RecoveryService implements OnModuleInit {
   async recover(): Promise<{ synced: number; skipped: number }> {
     const l1 = this.jsonCache.getAll();
     const l3 = this.l3.readAll();
-
     const allKeys = new Set([...l1.keys(), ...l3.keys()]);
-    let synced = 0;
+
+    if (allKeys.size === 0) return { synced: 0, skipped: 0 };
+
+    const client = await this.redis.getClient();
+    if (!client) return { synced: 0, skipped: 0 };
+
     let skipped = 0;
+
+    type Pending = { key: string; value: string; ttlSeconds: number };
+    const toSync: Pending[] = [];
 
     for (const key of allKeys) {
       const entry = this.newerEntry(l1.get(key), l3.get(key));
-      const expired = this.jsonCache.isExpired(entry);
-      if (expired) {
+      if (this.jsonCache.isExpired(entry)) {
         skipped++;
         continue;
       }
-
-      const ttl = entry.ttlMs <= 0
+      const ttlSeconds = entry.ttlMs <= 0
         ? SEVEN_DAYS_S
         : Math.max(Math.floor((entry.ttlMs - (Date.now() - new Date(entry.updatedAt).getTime())) / 1000), 1);
+      toSync.push({ key, value: JSON.stringify(entry), ttlSeconds });
+    }
 
+    let synced = 0;
+
+    for (let i = 0; i < toSync.length; i += PIPELINE_CHUNK_SIZE) {
+      const chunk = toSync.slice(i, i + PIPELINE_CHUNK_SIZE);
+      const pipeline = client.pipeline();
+      for (const { key, value, ttlSeconds } of chunk) {
+        pipeline.set(key, value, 'EX', ttlSeconds);
+        pipeline.rpush(DIRTY_QUEUE, key);
+      }
       try {
-        await this.redis.set(key, JSON.stringify(entry), ttl);
-        await this.batchSync.markDirty(key);
-        synced++;
+        await pipeline.exec();
+        synced += chunk.length;
       } catch (err) {
-        this.logger.warn(`L2 recovery: failed key=${key}: ${String(err)}`);
+        this.logger.warn(`L2 recovery: chunk [${i}–${i + chunk.length - 1}] failed: ${String(err)}`);
       }
     }
 
