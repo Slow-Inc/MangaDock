@@ -1,9 +1,9 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
+import { BatchSyncWorker } from './batch-sync.worker';
 
 const DEFAULT_TTL_MS = 1000 * 60 * 20; // 20 minutes
-const DEFAULT_TTL_SEC = 60 * 20;
 
 @Injectable()
 export class CacheOrchestratorService implements OnApplicationShutdown {
@@ -12,6 +12,7 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
   constructor(
     private readonly redis: RedisService,
     private readonly jsonCache: JsonCacheService,
+    private readonly batchSync: BatchSyncWorker,
   ) {}
 
   /**
@@ -57,7 +58,7 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
   }
 
   /**
-   * Save data to both Redis and JSON cache.
+   * Write-behind: write to Redis (L2) immediately, sync L1 and persist asynchronously via BatchSyncWorker.
    */
   async set<T>(key: string, data: T, ttlMs = DEFAULT_TTL_MS): Promise<void> {
     const entry: CacheEntry<T> = {
@@ -66,10 +67,14 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
       ttlMs,
     };
 
+    // L1: write directly for in-process read consistency
     this.jsonCache.set(key, data, ttlMs);
 
+    // L2: write to Redis (source of truth at runtime)
     if (this.redis.available) {
       await this.redis.set(key, JSON.stringify(entry), Math.floor(ttlMs / 1000));
+      // Enqueue for leader-only batch persistence
+      await this.batchSync.markDirty(key);
     }
 
     this.logger.log(`Cache SET key=${key} ttl=${Math.floor(ttlMs / 1000)}s redis=${this.redis.available}`);
@@ -96,17 +101,16 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
     data: T,
     redisTtlMs: number = 1000 * 60 * 60 * 24, // 1 day default
   ): Promise<void> {
-    // JSON: permanent (ttlMs = -1)
     const jsonEntry: CacheEntry<T> = {
       data,
       updatedAt: new Date().toISOString(),
-      ttlMs: -1, // permanent
+      ttlMs: -1, // permanent in L1
     };
     this.jsonCache.set(key, data, -1);
 
-    // Redis: shorter TTL to save memory
     if (this.redis.available) {
       await this.redis.set(key, JSON.stringify(jsonEntry), Math.floor(redisTtlMs / 1000));
+      await this.batchSync.markDirty(key);
     }
 
     this.logger.log(
@@ -114,86 +118,7 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
     );
   }
 
-  /**
-   * Graceful Shutdown: compare Redis ↔ JSON timestamp, sync newer to older.
-   */
-  async onApplicationShutdown(signal?: string) {
-    this.logger.log(`Graceful shutdown triggered (signal=${signal ?? 'none'}) — syncing caches…`);
-
-    const allJsonEntries = this.jsonCache.getAll();
-
-    for (const [key, jsonEntry] of allJsonEntries.entries()) {
-      if (!this.redis.available) break;
-
-      try {
-        const raw = await this.redis.get(key);
-        if (!raw) {
-          // Redis missing this key — write JSON data to Redis
-          const ttlRemaining = Math.floor(
-            (jsonEntry.ttlMs - (Date.now() - new Date(jsonEntry.updatedAt).getTime())) / 1000,
-          );
-          if (ttlRemaining > 0) {
-            await this.setWithRetry(key, JSON.stringify(jsonEntry), ttlRemaining);
-            this.logger.log(`Shutdown sync: wrote JSON→Redis for key=${key}`);
-          }
-          continue;
-        }
-
-        const redisEntry = JSON.parse(raw) as CacheEntry<unknown>;
-        const redisTime = new Date(redisEntry.updatedAt).getTime();
-        const jsonTime = new Date(jsonEntry.updatedAt).getTime();
-
-        if (redisTime > jsonTime) {
-          // Redis is newer → update JSON
-          this.jsonCache.syncEntry(key, redisEntry);
-          this.logger.log(`Shutdown sync: Redis→JSON (redis newer) key=${key}`);
-        } else if (jsonTime > redisTime) {
-          // JSON is newer → update Redis
-          const ttlSec = Math.floor(
-            (jsonEntry.ttlMs - (Date.now() - jsonTime)) / 1000,
-          );
-          if (ttlSec > 0) {
-            await this.setWithRetry(key, JSON.stringify(jsonEntry), ttlSec);
-            this.logger.log(`Shutdown sync: JSON→Redis (json newer) key=${key}`);
-          }
-        } else {
-          this.logger.debug(`Shutdown sync: in-sync key=${key}`);
-        }
-      } catch (err) {
-        this.logger.warn(`Shutdown sync error for key=${key}: ${String(err)}`);
-      }
-    }
-
-    this.logger.log('Cache sync complete — ready to exit');
-  }
-
-  private async sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  private async setWithRetry(
-    key: string,
-    value: string,
-    ttlSec: number,
-  ): Promise<void> {
-    const maxRetries = 3;
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        await this.redis.set(key, value, ttlSec);
-        return;
-      } catch (err) {
-        if (i === maxRetries - 1) {
-          this.logger.error(
-            `CRITICAL: Failed to sync key=${key} to Redis after ${maxRetries} attempts: ${String(err)}`,
-          );
-          return; // Don't throw to allow other keys to sync
-        }
-        const delay = Math.pow(2, i) * 500; // Exponential backoff
-        this.logger.warn(
-          `Shutdown sync retry ${i + 1}/${maxRetries} for key=${key} in ${delay}ms`,
-        );
-        await this.sleep(delay);
-      }
-    }
+  onApplicationShutdown(signal?: string) {
+    this.logger.log(`Graceful shutdown (signal=${signal ?? 'none'}) — L3 flush handled by L3BatchWriter.onModuleDestroy()`);
   }
 }
