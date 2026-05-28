@@ -8,6 +8,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private subscriber: Redis | null = null;
   private isConnected = false;
   private readonly subscriptions = new Map<string, Set<(data: unknown) => void>>();
+  private readonly reconnectCallbacks = new Set<() => void>();
+
+  onReconnect(cb: () => void): () => void {
+    this.reconnectCallbacks.add(cb);
+    return () => this.reconnectCallbacks.delete(cb);
+  }
 
   onModuleInit() {
     this.connect();
@@ -37,6 +43,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.client.on('connect', () => {
       this.isConnected = true;
       this.logger.log('Redis connected');
+      this.reconnectCallbacks.forEach(cb => {
+        try { cb(); } catch (err) {
+          this.logger.warn(`onReconnect callback error: ${String(err)}`);
+        }
+      });
     });
 
     this.client.on('error', (err: Error) => {
@@ -87,6 +98,61 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async getClient(): Promise<Redis | null> {
     return this.available ? this.client : null;
+  }
+
+  async incr(key: string): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return await this.client!.incr(key);
+    } catch {
+      this.isConnected = false;
+      return 0;
+    }
+  }
+
+  async pfadd(key: string, ...members: string[]): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return await (this.client as any).pfadd(key, ...members);
+    } catch {
+      return 0;
+    }
+  }
+
+  async pfcount(key: string): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return await (this.client as any).pfcount(key);
+    } catch {
+      return 0;
+    }
+  }
+
+  async sadd(key: string, ...members: string[]): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return await (this.client as any).sadd(key, ...members);
+    } catch {
+      return 0;
+    }
+  }
+
+  async smembers(key: string): Promise<string[]> {
+    if (!this.available) return [];
+    try {
+      return await (this.client as any).smembers(key);
+    } catch {
+      return [];
+    }
+  }
+
+  async expire(key: string, ttlSeconds: number): Promise<void> {
+    if (!this.available) return;
+    try {
+      await this.client!.expire(key, ttlSeconds);
+    } catch {
+      // best-effort
+    }
   }
 
   // ─── Pub/Sub ──────────────────────────────────────────────────────────────────
