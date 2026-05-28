@@ -2,6 +2,7 @@ import { CacheOrchestratorService } from './cache-orchestrator.service';
 import { RedisService } from './redis.service';
 import { JsonCacheService } from './json-cache.service';
 import { BatchSyncWorker } from './batch-sync.worker';
+import { L3DiskService } from './l3-disk.service';
 
 function makeRedis(available = true, store: Record<string, string> = {}): jest.Mocked<Pick<RedisService, 'available' | 'get' | 'set' | 'publish' | 'subscribe' | 'onReconnect'>> {
   return {
@@ -14,11 +15,12 @@ function makeRedis(available = true, store: Record<string, string> = {}): jest.M
   } as any;
 }
 
-function makeJsonCache(): jest.Mocked<Pick<JsonCacheService, 'get' | 'set' | 'delete' | 'getAll' | 'isExpired'>> {
+function makeJsonCache(): jest.Mocked<Pick<JsonCacheService, 'get' | 'set' | 'delete' | 'clear' | 'getAll' | 'isExpired'>> {
   return {
     get: jest.fn().mockReturnValue(null),
     set: jest.fn(),
     delete: jest.fn(),
+    clear: jest.fn(),
     getAll: jest.fn().mockReturnValue(new Map()),
     isExpired: jest.fn().mockReturnValue(false),
   } as any;
@@ -32,15 +34,23 @@ function makeMetrics(nodeId = 'test-node') {
   return { nodeId } as any;
 }
 
+function makeL3(): jest.Mocked<Pick<L3DiskService, 'appendDirtyFallback' | 'drainDirtyFallback'>> {
+  return {
+    appendDirtyFallback: jest.fn(),
+    drainDirtyFallback: jest.fn().mockReturnValue([]),
+  } as any;
+}
+
 function makeOrchestrator(overrides: {
-  redis?: any; jsonCache?: any; batchSync?: any; metrics?: any;
+  redis?: any; jsonCache?: any; batchSync?: any; metrics?: any; l3?: any;
 } = {}) {
   const redis = overrides.redis ?? makeRedis();
   const jsonCache = overrides.jsonCache ?? makeJsonCache();
   const batchSync = overrides.batchSync ?? makeBatchSync();
   const metrics = overrides.metrics ?? makeMetrics();
-  const svc = new CacheOrchestratorService(redis, jsonCache, batchSync, metrics);
-  return { svc, redis, jsonCache, batchSync, metrics };
+  const l3 = overrides.l3 ?? makeL3();
+  const svc = new CacheOrchestratorService(redis, jsonCache, batchSync, metrics, l3);
+  return { svc, redis, jsonCache, batchSync, metrics, l3 };
 }
 
 describe('CacheOrchestratorService — cross-node L1 invalidation (#37)', () => {
@@ -84,6 +94,30 @@ describe('CacheOrchestratorService — cross-node L1 invalidation (#37)', () => 
     capturedReconnectCb!();
 
     expect(redis.subscribe).toHaveBeenCalledTimes(2);
+  });
+
+  // Cycle 9 — clears L1 before re-subscribing on reconnect (invalidation gap fix #46)
+  it('onReconnect clears L1 (jsonCache.clear) before re-subscribing to invalidation channel', () => {
+    const callOrder: string[] = [];
+    let capturedReconnectCb: (() => void) | null = null;
+    const redis = makeRedis(false);
+    (redis.onReconnect as jest.Mock).mockImplementation((cb: () => void) => {
+      capturedReconnectCb = cb;
+      return () => {};
+    });
+    const jsonCache = makeJsonCache();
+    (jsonCache.clear as jest.Mock).mockImplementation(() => callOrder.push('clear'));
+    (redis.subscribe as jest.Mock).mockImplementation(() => callOrder.push('subscribe'));
+    const { svc } = makeOrchestrator({ redis, jsonCache });
+
+    svc.onModuleInit();
+    capturedReconnectCb!();
+
+    // clear must come before the reconnect subscribe call (index 1, not 0 which is init subscribe)
+    const clearIdx = callOrder.lastIndexOf('clear');
+    const subscribeIdx = callOrder.lastIndexOf('subscribe');
+    expect(jsonCache.clear).toHaveBeenCalledTimes(1);
+    expect(clearIdx).toBeLessThan(subscribeIdx);
   });
 
   // Cycle 3 — incoming invalidation from another node removes key from L1
@@ -186,6 +220,28 @@ describe('CacheOrchestratorService — setMangaCacheWithTiers', () => {
     await svc.setMangaCacheWithTiers('manga:123', { pages: [] });
 
     expect(batchSync.markDirty).not.toHaveBeenCalled();
+  });
+});
+
+describe('CacheOrchestratorService — dirty fallback (#48)', () => {
+  // Cycle F6 — appends to dirty fallback when Redis is unavailable
+  it('set() calls l3.appendDirtyFallback(key) when Redis is unavailable', async () => {
+    const l3 = makeL3();
+    const { svc } = makeOrchestrator({ redis: makeRedis(false), l3 });
+
+    await svc.set('manga:5', { pages: [] });
+
+    expect(l3.appendDirtyFallback).toHaveBeenCalledWith('manga:5');
+  });
+
+  // Cycle F7 — does NOT append fallback when Redis is available (BatchSyncWorker handles it)
+  it('set() does NOT call l3.appendDirtyFallback(key) when Redis is available', async () => {
+    const l3 = makeL3();
+    const { svc } = makeOrchestrator({ redis: makeRedis(true), l3 });
+
+    await svc.set('manga:5', { pages: [] });
+
+    expect(l3.appendDirtyFallback).not.toHaveBeenCalled();
   });
 });
 
