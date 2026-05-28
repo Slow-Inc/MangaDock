@@ -9,6 +9,18 @@ export const PROCESSING_QUEUE = 'cache:processing';
 const FLUSH_INTERVAL_MS = 5_000;
 const MAX_BATCH_SIZE = 100;
 
+// Atomic crash recovery: read orphans, clear processing queue, re-enqueue to dirty — all in one round-trip.
+// Guards against the DEL→RPUSH window where a crash would silently drop keys mid-recovery.
+const RECOVER_SCRIPT = `
+  local orphans = redis.call('LRANGE', KEYS[1], 0, -1)
+  if #orphans == 0 then return 0 end
+  redis.call('DEL', KEYS[1])
+  for _, key in ipairs(orphans) do
+    redis.call('RPUSH', KEYS[2], key)
+  end
+  return #orphans
+`;
+
 @Injectable()
 export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BatchSyncWorker.name);
@@ -46,12 +58,9 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     const client = await this.redis.getClient();
     if (!client) return;
     try {
-      const orphans: string[] = await (client as any).lrange(PROCESSING_QUEUE, 0, -1);
-      if (orphans.length === 0) return;
-      await (client as any).del(PROCESSING_QUEUE);
-      for (const key of orphans) {
-        await (client as any).rpush(DIRTY_QUEUE, key);
-        this.logger.warn(`Crash recovery: re-queued orphaned key=${key}`);
+      const count = await (client as any).eval(RECOVER_SCRIPT, 2, PROCESSING_QUEUE, DIRTY_QUEUE) as number;
+      if (count > 0) {
+        this.logger.warn(`Crash recovery: atomically re-queued ${count} orphaned key(s) → ${DIRTY_QUEUE}`);
       }
     } catch (err) {
       this.logger.warn(`Crash recovery failed: ${String(err)}`);

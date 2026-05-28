@@ -15,6 +15,7 @@ function makeClient(dirtyQueue: string[], store: Record<string, string> = {}, pr
     lrem: jest.fn().mockResolvedValue(1),
     lrange: jest.fn().mockResolvedValue(processingQueue),
     del: jest.fn().mockResolvedValue(1),
+    eval: jest.fn().mockResolvedValue(processingQueue.length),
   };
 }
 
@@ -116,42 +117,38 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
   });
 
-  describe('crash recovery — re-queues orphaned processing entries on init', () => {
-    it('moves entries from processing queue back to dirty queue on onModuleInit', async () => {
+  describe('crash recovery — atomic Lua recovery on init', () => {
+    it('uses EVAL to atomically move orphans from processing to dirty queue', async () => {
       const redis = makeRedis([], {}, ['orphan-1', 'orphan-2']);
       const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
 
       await worker.onModuleInit();
 
-      expect((redis as any)._client.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'orphan-1');
-      expect((redis as any)._client.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'orphan-2');
+      expect((redis as any)._client.eval).toHaveBeenCalledWith(
+        expect.stringContaining('LRANGE'),
+        2,
+        PROCESSING_QUEUE,
+        DIRTY_QUEUE,
+      );
     });
 
-    it('clears cache:processing with DEL before re-queuing orphans to cache:dirty', async () => {
+    it('does not call DEL or RPUSH directly during recovery — Lua handles it atomically', async () => {
       const redis = makeRedis([], {}, ['orphan-1', 'orphan-2']);
-      const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
-
-      await worker.onModuleInit();
-
-      expect((redis as any)._client.del).toHaveBeenCalledWith(PROCESSING_QUEUE);
-    });
-
-    it('does not call DEL when processing queue is empty', async () => {
-      const redis = makeRedis([], {}, []);
       const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
 
       await worker.onModuleInit();
 
       expect((redis as any)._client.del).not.toHaveBeenCalled();
+      expect((redis as any)._client.rpush).not.toHaveBeenCalled();
     });
 
-    it('does not call rpush when processing queue is empty', async () => {
+    it('calls eval even when processing queue is empty — Lua returns 0 atomically', async () => {
       const redis = makeRedis([], {}, []);
       const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
 
       await worker.onModuleInit();
 
-      expect((redis as any)._client.rpush).not.toHaveBeenCalled();
+      expect((redis as any)._client.eval).toHaveBeenCalledTimes(1);
     });
   });
 
