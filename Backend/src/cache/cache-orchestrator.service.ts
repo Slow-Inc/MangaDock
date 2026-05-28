@@ -138,7 +138,7 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
     if (this.redis.available) {
       await this.redis.set(key, JSON.stringify(jsonEntry), Math.floor(redisTtlMs / 1000));
       await this.redis.publish(INVALIDATE_CHANNEL, JSON.stringify({ key, nodeId: this.metrics.nodeId }));
-      await this.batchSync.markDirty(key);
+      // No markDirty — manga entries are permanent (ttlMs=-1); L3 is already the source of truth on disk.
     }
 
     this.logger.log(

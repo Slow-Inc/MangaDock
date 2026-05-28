@@ -20,13 +20,15 @@ export class L2RecoveryService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    // Fires recover() the moment this node wins the election — works on cold boot and failover.
+    this.election.onBecomeLeader(() => {
+      this.recover().catch(err => this.logger.warn(`L2 recovery failed: ${String(err)}`));
+    });
+    // Fires recover() when Redis reconnects and we're already the leader (short outage where TTL didn't expire).
     this.redis.onReconnect(() => {
       if (!this.election.isLeader) return;
       this.recover().catch(err => this.logger.warn(`L2 recovery failed: ${String(err)}`));
     });
-    if (this.redis.available && this.election.isLeader) {
-      await this.recover();
-    }
   }
 
   async recover(): Promise<{ synced: number; skipped: number }> {

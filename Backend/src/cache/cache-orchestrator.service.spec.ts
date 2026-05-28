@@ -172,12 +172,12 @@ describe('CacheOrchestratorService — L1-first read path (#36)', () => {
 });
 
 describe('CacheOrchestratorService — setMangaCacheWithTiers', () => {
-  it('calls markDirty() with the key after writing to L2', async () => {
+  it('does not call markDirty() — manga cache is permanent (ttlMs=-1), no dirty-queue entry needed', async () => {
     const { svc, batchSync } = makeOrchestrator({ redis: makeRedis(true) });
 
     await svc.setMangaCacheWithTiers('manga:123', { pages: [] });
 
-    expect(batchSync.markDirty).toHaveBeenCalledWith('manga:123');
+    expect(batchSync.markDirty).not.toHaveBeenCalled();
   });
 
   it('does not call markDirty() when Redis is unavailable', async () => {

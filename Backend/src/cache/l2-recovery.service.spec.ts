@@ -42,8 +42,8 @@ function makeL3(entries: Map<string, CacheEntry<unknown>> = new Map()): jest.Moc
   return { readAll: jest.fn().mockReturnValue(entries) } as any;
 }
 
-function makeElection(isLeader = true): jest.Mocked<Pick<ElectionService, 'isLeader'>> {
-  return { isLeader } as any;
+function makeElection(isLeader = true): jest.Mocked<Pick<ElectionService, 'isLeader' | 'onBecomeLeader'>> {
+  return { isLeader, onBecomeLeader: jest.fn() } as any;
 }
 
 function makeService(overrides: { redis?: any; jsonCache?: any; batchSync?: any; l3?: any; election?: any } = {}) {
@@ -155,12 +155,18 @@ describe('L2RecoveryService', () => {
     expect(redis.set).toHaveBeenCalledWith('key:perm', JSON.stringify(permanent), SEVEN_DAYS_S);
   });
 
-  // Cycle 8 — onModuleInit triggers immediate recovery when Redis is available
-  it('onModuleInit() calls recover() immediately when Redis is already available', async () => {
-    const { svc } = makeService({ redis: makeRedis(true) });
+  // Cycle 8 — onBecomeLeader callback triggers recover()
+  it('onModuleInit() registers onBecomeLeader; when the callback fires, recover() is called', async () => {
+    let capturedCb: (() => void) | null = null;
+    const election = makeElection(false);
+    (election.onBecomeLeader as jest.Mock).mockImplementation((cb: () => void) => {
+      capturedCb = cb;
+    });
+    const { svc } = makeService({ election });
     const spy = jest.spyOn(svc, 'recover').mockResolvedValue({ synced: 0, skipped: 0 });
 
     await svc.onModuleInit();
+    capturedCb!(); // simulate becoming leader
 
     expect(spy).toHaveBeenCalledTimes(1);
   });
@@ -233,15 +239,14 @@ describe('L2RecoveryService', () => {
     expect(redis.set).not.toHaveBeenCalled();
   });
 
-  // Cycle 16 — non-leader: onModuleInit does not call recover()
-  it('onModuleInit() does not call recover() when node is not the leader', async () => {
-    const { svc, redis } = makeService({ redis: makeRedis(true), election: makeElection(false) });
+  // Cycle 16 — onModuleInit never calls recover() directly (regardless of isLeader)
+  it('onModuleInit() does not call recover() directly — recovery is deferred to onBecomeLeader event', async () => {
+    const { svc } = makeService({ redis: makeRedis(true), election: makeElection(true) });
     const spy = jest.spyOn(svc, 'recover').mockResolvedValue({ synced: 0, skipped: 0 });
 
     await svc.onModuleInit();
 
     expect(spy).not.toHaveBeenCalled();
-    expect(redis.set).not.toHaveBeenCalled();
   });
 
   // Cycle 17 — non-leader: onReconnect does not trigger recover()

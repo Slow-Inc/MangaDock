@@ -25,6 +25,7 @@ const RECOVER_SCRIPT = `
 export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BatchSyncWorker.name);
   private timer: NodeJS.Timeout | null = null;
+  private lastFlushWasLeader = false;
 
   constructor(
     private readonly redis: RedisService,
@@ -33,7 +34,6 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.recoverOrphans();
     this.timer = setInterval(
       () => this.flush().catch(err => this.logger.warn(`Flush error: ${String(err)}`)),
       FLUSH_INTERVAL_MS,
@@ -68,9 +68,18 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async flush(): Promise<void> {
-    if (!this.election.isLeader) return;
+    if (!this.election.isLeader) {
+      this.lastFlushWasLeader = false;
+      return;
+    }
     const client = await this.redis.getClient();
     if (!client) return;
+
+    const justBecameLeader = !this.lastFlushWasLeader;
+    this.lastFlushWasLeader = true;
+    if (justBecameLeader) {
+      await this.recoverOrphans();
+    }
 
     const seen = new Set<string>();
     for (let i = 0; i < MAX_BATCH_SIZE; i++) {
