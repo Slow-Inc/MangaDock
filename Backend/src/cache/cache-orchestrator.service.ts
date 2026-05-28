@@ -21,13 +21,26 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
 
   onModuleInit(): void {
     const handler = (raw: unknown) => {
+      if (typeof raw !== 'string') {
+        this.logger.warn(`cache:invalidate: unexpected message type ${typeof raw}`);
+        return;
+      }
       try {
-        const { key, nodeId } = JSON.parse(raw as string) as { key: string; nodeId: string };
+        const parsed = JSON.parse(raw) as unknown;
+        if (
+          typeof parsed !== 'object' || parsed === null ||
+          typeof (parsed as Record<string, unknown>).key !== 'string' ||
+          typeof (parsed as Record<string, unknown>).nodeId !== 'string'
+        ) {
+          this.logger.warn(`cache:invalidate: malformed payload: ${raw}`);
+          return;
+        }
+        const { key, nodeId } = parsed as { key: string; nodeId: string };
         if (nodeId !== this.metrics.nodeId) {
           this.jsonCache.delete(key);
         }
       } catch {
-        this.logger.warn(`cache:invalidate message unparseable: ${String(raw)}`);
+        this.logger.warn(`cache:invalidate: JSON parse error: ${raw}`);
       }
     };
     this.redis.subscribe(INVALIDATE_CHANNEL, handler);

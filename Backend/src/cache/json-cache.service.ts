@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { LRUCache } from 'lru-cache';
 import { L3DiskService } from './l3-disk.service';
 
 export type CacheEntry<T> = {
@@ -8,10 +9,12 @@ export type CacheEntry<T> = {
   ttlMs: number;
 };
 
+const L1_MAX_ENTRIES = 10_000;
+
 @Injectable()
 export class JsonCacheService implements OnModuleInit {
   private readonly logger = new Logger(JsonCacheService.name);
-  private memoryStore = new Map<string, CacheEntry<unknown>>();
+  private readonly memoryStore = new LRUCache<string, CacheEntry<unknown>>({ max: L1_MAX_ENTRIES });
 
   constructor(private readonly l3: L3DiskService) {}
 
@@ -20,7 +23,7 @@ export class JsonCacheService implements OnModuleInit {
     for (const [key, entry] of entries) {
       this.memoryStore.set(key, entry);
     }
-    this.logger.log(`Loaded ${entries.size} entries from L3 disk into L1`);
+    this.logger.log(`Loaded ${entries.size} entries from L3 disk into L1 (max=${L1_MAX_ENTRIES})`);
   }
 
   get<T>(key: string): CacheEntry<T> | null {
@@ -42,6 +45,6 @@ export class JsonCacheService implements OnModuleInit {
   }
 
   getAll(): Map<string, CacheEntry<unknown>> {
-    return this.memoryStore;
+    return new Map(this.memoryStore.entries());
   }
 }
