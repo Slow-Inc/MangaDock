@@ -181,6 +181,56 @@ BatchSyncWorker (Leader):    L2 → L3  (re-sync before future Supabase write)
 
 ---
 
+## ✅ Phase 2c — Issues #18–#21: Dirty Queue Bug Fixes (TDD, Branch: feat/2-layer-cache-upgrade)
+
+### Status: COMPLETE — 161 tests passing (Commits: bba4a76, 6154a2d)
+
+#### Context
+PR #16 scrutiny (Issues #17 PRD) found 3 major bugs + 1 minor in the dirty-queue path. Broken into 4 issues (#18–#21) and fixed via TDD.
+
+#### Fixes
+
+**Issue #18 — Processing queue leak (bba4a76)**
+- `recoverOrphans()` previously called `lrange` → `del` → individual `rpush` per key
+- Missing: `del` was never called → orphans piled up in `cache:processing` across restarts
+- Fix: Added `del(PROCESSING_QUEUE)` before `rpush` loop
+- Tests: "clears cache:processing with DEL before re-queuing"; "does not call DEL when empty"
+
+**Issue #19 — Expired key orphan (bba4a76)**
+- `syncKey()` silently skipped when L2 key expired (`if (!raw) return;`)
+- Expired key stayed in `cache:processing` forever → permanent orphan after crash
+- Fix: `await client.lrem(PROCESSING_QUEUE, 1, key)` before early return
+- Tests: "calls lrem to ack even when key is expired in L2 — prevents permanent orphan"
+
+**Issue #20 — Shutdown durability (bba4a76)**
+- `onApplicationShutdown()` was syncing L1↔L2 timestamps — useless (in-memory data lost on exit)
+- Fix: replaced with `l3BatchWriter.flush()` — actually persists to disk before exit
+- `CacheOrchestratorService` now takes `L3BatchWriter` as 4th constructor param
+- `setMangaCacheWithTiers()` now calls `markDirty()` (was missing from write-behind path)
+- New spec: `cache-orchestrator.service.spec.ts` (4 tests)
+- Tests: "calls l3BatchWriter.flush() on graceful shutdown"; "does not call jsonCache.syncEntry() on shutdown"
+
+**Issue #21 — Non-atomic crash recovery (6154a2d)**
+- DEL → RPUSH sequence has a crash window where keys can be silently dropped
+- Fix: single `RECOVER_SCRIPT` Lua EVAL — LRANGE + DEL + RPUSH atomically in one round-trip
+- Follows RENEW_SCRIPT / DELETE_SCRIPT pattern from ElectionService
+- Logs count only (not per-key) since keys not iterable client-side after Lua exec
+- Tests: "uses EVAL to atomically move orphans"; "does not call DEL or RPUSH directly during recovery"
+
+#### Architecture Decisions
+- **Lua CAS pattern** for all atomic multi-step Redis operations: RENEW_SCRIPT (election renewal), DELETE_SCRIPT (lock release), RECOVER_SCRIPT (crash recovery)
+- **R2 for translated manga images**, Supabase for structured metadata → `setMangaCacheWithTiers()` now participates in write-behind (markDirty)
+- **L3BatchWriter.flush()** is the correct shutdown hook — L1 sync was a false guarantee
+
+#### Test Count: 161 passing (เพิ่มจาก 155 → 161, -1 test cleanup)
+
+#### Notes for Gemini
+- All 4 issues (#18–#21) closed; PR #16 branch (`feat/2-layer-cache-upgrade`) ready for final review and merge
+- `RECOVER_SCRIPT` Lua script named constant lives in `batch-sync.worker.ts` alongside the queues it uses
+- `cache-orchestrator.service.spec.ts` is a new file added alongside the orchestrator source
+
+---
+
 ## 🛠️ V5 Final Hardening (Commit 69712f9)
 - **Error Handling:** เปลี่ยน `throw new Error()` เป็น `InternalServerErrorException` ทั้งหมดใน `UnlockService` เพื่อมาตรฐานความปลอดภัย
 - **Runtime Validation:** ติดตั้ง `forum.dto.ts` และเปิดใช้งาน `ValidationPipe` (class-validator) แบบ Global ใน `main.ts` ป้องกัน Payload ที่ผิดโครงสร้าง
