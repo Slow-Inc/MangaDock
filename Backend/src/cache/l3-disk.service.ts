@@ -10,6 +10,11 @@ export class L3DiskService {
 
   constructor(@Optional() @Inject('L3_CACHE_DIR') cacheDir?: string) {
     this.cacheDir = cacheDir ?? path.resolve(process.cwd(), '.cache');
+    try {
+      fs.mkdirSync(this.cacheDir, { recursive: true });
+    } catch (err) {
+      this.logger.warn(`L3DiskService: could not create cache dir ${this.cacheDir}: ${String(err)}`);
+    }
   }
 
   readAll(): Map<string, CacheEntry<unknown>> {
@@ -36,9 +41,6 @@ export class L3DiskService {
 
   write<T>(key: string, entry: CacheEntry<T>): void {
     try {
-      if (!fs.existsSync(this.cacheDir)) {
-        fs.mkdirSync(this.cacheDir, { recursive: true });
-      }
       const safeFileName = key.replace(/[:\\/*?"<>|]/g, '_');
       const filePath = path.join(this.cacheDir, `${safeFileName}.json`);
       fs.writeFileSync(filePath, JSON.stringify({ ...entry, key }, null, 2), 'utf-8');

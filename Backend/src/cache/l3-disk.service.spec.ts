@@ -52,6 +52,16 @@ describe('L3DiskService', () => {
     expect(service.readAll().size).toBe(0);
   });
 
+  // Cycle 6 — Constructor ensures cacheDir
+  it('constructor ensures cacheDir exists — directory is ready before any write is called', () => {
+    const freshDir = path.join(tmpDir, 'auto-created');
+    expect(fs.existsSync(freshDir)).toBe(false); // dir does not exist yet
+
+    new L3DiskService(freshDir);
+
+    expect(fs.existsSync(freshDir)).toBe(true); // dir created at construction
+  });
+
   // Cycle 5 — Disk write error resilience
   it('write() swallows disk errors without throwing', () => {
     // Use a plain file as the cache dir — any write inside it will fail (ENOTDIR)

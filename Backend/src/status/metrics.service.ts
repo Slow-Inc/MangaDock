@@ -18,6 +18,7 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MetricsService.name);
   readonly nodeId = `node-${process.pid}`;
   private heartbeatTimer: NodeJS.Timeout | null = null;
+  private publishing = false;
 
   constructor(private readonly redis: RedisService) {}
 
@@ -34,15 +35,24 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async publishMetrics(): Promise<void> {
-    const metrics = await this.gatherMetrics();
-    await this.redis.set(
-      `cluster_metrics:${this.nodeId}`,
-      JSON.stringify(metrics),
-      METRICS_TTL_SEC,
-    );
-    this.logger.debug(
-      `Heartbeat cpu=${(metrics.cpu * 100).toFixed(1)}% freeMem=${(metrics.freeMem / 1e9).toFixed(2)}GB lat=${metrics.latency}ms`,
-    );
+    if (this.publishing) {
+      this.logger.debug('publishMetrics skipped — previous publish still in flight');
+      return;
+    }
+    this.publishing = true;
+    try {
+      const metrics = await this.gatherMetrics();
+      await this.redis.set(
+        `cluster_metrics:${this.nodeId}`,
+        JSON.stringify(metrics),
+        METRICS_TTL_SEC,
+      );
+      this.logger.debug(
+        `Heartbeat cpu=${(metrics.cpu * 100).toFixed(1)}% freeMem=${(metrics.freeMem / 1e9).toFixed(2)}GB lat=${metrics.latency}ms`,
+      );
+    } finally {
+      this.publishing = false;
+    }
   }
 
   async gatherMetrics(): Promise<NodeMetrics> {
