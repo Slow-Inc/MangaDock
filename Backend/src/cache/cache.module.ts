@@ -6,6 +6,9 @@ import { JsonCacheService } from './json-cache.service';
 import { CacheOrchestratorService } from './cache-orchestrator.service';
 import { ImageCacheService } from './image-cache.service';
 import { BatchSyncWorker } from './batch-sync.worker';
+import { StatsIncrementService } from './stats-increment.service';
+import { StatsFlushWorker } from './stats-flush.worker';
+import { L2RecoveryService } from './l2-recovery.service';
 import { StatusModule } from '../status/status.module';
 
 @Global()
@@ -19,7 +22,10 @@ import { StatusModule } from '../status/status.module';
     CacheOrchestratorService,
     ImageCacheService,
     BatchSyncWorker,
+    StatsIncrementService,
+    StatsFlushWorker,
+    L2RecoveryService,
   ],
-  exports: [CacheOrchestratorService, ImageCacheService, RedisService],
+  exports: [CacheOrchestratorService, ImageCacheService, RedisService, StatsIncrementService],
 })
 export class CacheModule {}
