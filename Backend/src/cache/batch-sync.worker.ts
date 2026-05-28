@@ -47,6 +47,8 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     if (!client) return;
     try {
       const orphans: string[] = await (client as any).lrange(PROCESSING_QUEUE, 0, -1);
+      if (orphans.length === 0) return;
+      await (client as any).del(PROCESSING_QUEUE);
       for (const key of orphans) {
         await (client as any).rpush(DIRTY_QUEUE, key);
         this.logger.warn(`Crash recovery: re-queued orphaned key=${key}`);
@@ -84,7 +86,10 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
 
   private async syncKey(key: string, client: any): Promise<void> {
     const raw = await this.redis.get(key);
-    if (!raw) return; // key expired in Redis — skip, don't ack
+    if (!raw) {
+      await client.lrem(PROCESSING_QUEUE, 1, key); // expired — ack to prevent permanent orphan
+      return;
+    }
     try {
       const entry = JSON.parse(raw) as CacheEntry<unknown>;
       this.l3.write(key, entry); // Leader re-sync L2 → L3; disk errors swallowed internally

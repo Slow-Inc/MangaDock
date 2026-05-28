@@ -14,6 +14,7 @@ function makeClient(dirtyQueue: string[], store: Record<string, string> = {}, pr
     rpush: jest.fn().mockResolvedValue(1),
     lrem: jest.fn().mockResolvedValue(1),
     lrange: jest.fn().mockResolvedValue(processingQueue),
+    del: jest.fn().mockResolvedValue(1),
   };
 }
 
@@ -105,13 +106,13 @@ describe('BatchSyncWorker — Reliable Queue', () => {
       expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
     });
 
-    it('does not call lrem when key is missing from L2 (skip)', async () => {
-      const redis = makeRedis(['ghost-key'], {}); // nothing in store
+    it('calls lrem to ack even when key is expired in L2 — prevents permanent orphan in cache:processing', async () => {
+      const redis = makeRedis(['ghost-key'], {}); // nothing in L2 store
       const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.lrem).not.toHaveBeenCalled();
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'ghost-key');
     });
   });
 
@@ -124,6 +125,24 @@ describe('BatchSyncWorker — Reliable Queue', () => {
 
       expect((redis as any)._client.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'orphan-1');
       expect((redis as any)._client.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'orphan-2');
+    });
+
+    it('clears cache:processing with DEL before re-queuing orphans to cache:dirty', async () => {
+      const redis = makeRedis([], {}, ['orphan-1', 'orphan-2']);
+      const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
+
+      await worker.onModuleInit();
+
+      expect((redis as any)._client.del).toHaveBeenCalledWith(PROCESSING_QUEUE);
+    });
+
+    it('does not call DEL when processing queue is empty', async () => {
+      const redis = makeRedis([], {}, []);
+      const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
+
+      await worker.onModuleInit();
+
+      expect((redis as any)._client.del).not.toHaveBeenCalled();
     });
 
     it('does not call rpush when processing queue is empty', async () => {
