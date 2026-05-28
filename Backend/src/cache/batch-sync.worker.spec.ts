@@ -2,6 +2,7 @@ import { BatchSyncWorker, DIRTY_QUEUE, PROCESSING_QUEUE } from './batch-sync.wor
 import { RedisService } from './redis.service';
 import { ElectionService } from '../status/election.service';
 import { L3DiskService } from './l3-disk.service';
+import { SupabaseService } from '../supabase/supabase.service';
 import { CacheEntry } from './json-cache.service';
 
 function makeEntry<T>(data: T): CacheEntry<T> {
@@ -36,18 +37,27 @@ function makeL3() {
   return { write: jest.fn() } as unknown as L3DiskService;
 }
 
+function makeSupabase(rpcError: Error | null = null): { client: { rpc: jest.Mock }; _rpc: jest.Mock } & SupabaseService {
+  const rpc = rpcError
+    ? jest.fn().mockResolvedValue({ data: null, error: rpcError })
+    : jest.fn().mockResolvedValue({ data: {}, error: null });
+  return { client: { rpc }, _rpc: rpc } as any;
+}
+
 function makeWorker(
   dirtyQueue: string[],
-  store: Record<string, string>,
-  isLeader: boolean,
+  store: Record<string, string> = {},
+  isLeader: boolean = true,
   processingQueue: string[] = [],
+  supabase: ReturnType<typeof makeSupabase> = makeSupabase(),
 ) {
   const redis = makeRedis(dirtyQueue, store, processingQueue);
   const l3 = makeL3();
   return {
-    worker: new BatchSyncWorker(redis, makeElection(isLeader), l3),
+    worker: new BatchSyncWorker(redis, makeElection(isLeader), l3, supabase as unknown as SupabaseService),
     redis,
     l3,
+    supabase,
   };
 }
 
@@ -55,8 +65,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
   describe('uses RPOPLPUSH instead of LPOP', () => {
     it('calls rpoplpush to atomically move key from dirty to processing queue', async () => {
       const entry = makeEntry('hello');
-      const redis = makeRedis(['key-1'], { 'key-1': JSON.stringify(entry) });
-      const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
+      const { worker, redis } = makeWorker(['key-1'], { 'key-1': JSON.stringify(entry) });
 
       await (worker as any).flush();
 
@@ -64,8 +73,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
 
     it('does not flush when not leader', async () => {
-      const redis = makeRedis(['key-1']);
-      const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
+      const { worker, redis } = makeWorker(['key-1'], {}, false);
 
       await (worker as any).flush();
 
@@ -76,9 +84,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
   describe('Leader re-syncs L2 → L3 via L3DiskService', () => {
     it('calls l3.write with entry from L2 after pulling key from dirty queue', async () => {
       const entry = makeEntry(42);
-      const redis = makeRedis(['key-a'], { 'key-a': JSON.stringify(entry) });
-      const l3 = makeL3();
-      const worker = new BatchSyncWorker(redis, makeElection(true), l3);
+      const { worker, l3 } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
 
       await (worker as any).flush();
 
@@ -86,9 +92,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
 
     it('does not call l3.write when key is missing from L2 (expired)', async () => {
-      const redis = makeRedis(['ghost-key'], {}); // nothing in store
-      const l3 = makeL3();
-      const worker = new BatchSyncWorker(redis, makeElection(true), l3);
+      const { worker, l3 } = makeWorker(['ghost-key'], {});
 
       await (worker as any).flush();
 
@@ -96,11 +100,56 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
   });
 
-  describe('acknowledges successful sync with LREM', () => {
-    it('calls lrem on processing queue after successful L3 write', async () => {
+  describe('Supabase RPC persistence (#43)', () => {
+    // Cycle S1 — RPC is called with key and parsed entry after L3 write
+    it('calls supabase.client.rpc with key and entry after writing to L3', async () => {
       const entry = makeEntry(42);
-      const redis = makeRedis(['key-a'], { 'key-a': JSON.stringify(entry) });
-      const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
+      const { worker, supabase } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
+
+      await (worker as any).flush();
+
+      expect(supabase._rpc).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ p_key: 'key-a' }),
+      );
+    });
+
+    // Cycle S2 — lrem NOT called when RPC returns an error object
+    it('does NOT call lrem when Supabase RPC returns an error — key stays in processing for retry', async () => {
+      const entry = makeEntry(42);
+      const supabase = makeSupabase(new Error('DB timeout'));
+      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase);
+
+      await (worker as any).flush();
+
+      expect((redis as any)._client.lrem).not.toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
+    });
+
+    // Cycle S3 — lrem called only after RPC succeeds
+    it('calls lrem on processing queue only after Supabase RPC succeeds', async () => {
+      const entry = makeEntry(42);
+      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
+
+      await (worker as any).flush();
+
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
+    });
+
+    // Cycle S4 — expired key: lrem without RPC (no data to sync)
+    it('calls lrem without calling RPC when key is expired in L2 — prevents permanent orphan', async () => {
+      const { worker, redis, supabase } = makeWorker(['ghost-key'], {});
+
+      await (worker as any).flush();
+
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'ghost-key');
+      expect(supabase._rpc).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('acknowledges successful sync with LREM', () => {
+    it('calls lrem on processing queue after successful L3 write and RPC', async () => {
+      const entry = makeEntry(42);
+      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
 
       await (worker as any).flush();
 
@@ -108,8 +157,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
 
     it('calls lrem to ack even when key is expired in L2 — prevents permanent orphan in cache:processing', async () => {
-      const redis = makeRedis(['ghost-key'], {}); // nothing in L2 store
-      const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
+      const { worker, redis } = makeWorker(['ghost-key'], {});
 
       await (worker as any).flush();
 
@@ -119,8 +167,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
 
   describe('crash recovery — leader-only, on first flush as leader', () => {
     it('calls EVAL to atomically move orphans from processing to dirty queue on first flush as leader', async () => {
-      const redis = makeRedis([], {}, ['orphan-1', 'orphan-2']);
-      const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
+      const { worker, redis } = makeWorker([], {}, true, ['orphan-1', 'orphan-2']);
 
       await (worker as any).flush();
 
@@ -133,8 +180,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
 
     it('does not call EVAL for orphan recovery on onModuleInit — recovery is leader-only at flush time', async () => {
-      const redis = makeRedis([], {}, ['orphan-1']);
-      const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
+      const { worker, redis } = makeWorker([], {}, false, ['orphan-1']);
 
       await worker.onModuleInit();
 
@@ -142,8 +188,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
 
     it('does not call EVAL for orphan recovery on a second consecutive flush as leader', async () => {
-      const redis = makeRedis([], {}, ['orphan-1']);
-      const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
+      const { worker, redis } = makeWorker([], {}, true, ['orphan-1']);
 
       await (worker as any).flush();
       (redis as any)._client.eval.mockClear();
@@ -153,8 +198,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
 
     it('does not call DEL or RPUSH directly during recovery — Lua handles it atomically', async () => {
-      const redis = makeRedis([], {}, ['orphan-1', 'orphan-2']);
-      const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
+      const { worker, redis } = makeWorker([], {}, true, ['orphan-1', 'orphan-2']);
 
       await (worker as any).flush();
 
@@ -163,11 +207,10 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
 
     it('runs orphan recovery again when node re-acquires leadership after losing it', async () => {
-      const redis = makeRedis([], {}, ['orphan-1']);
-      // First flush: isLeader=true → recovers; second flush: isLeader=false → resets; third: isLeader=true → recovers again
       let leaderState = true;
       const election = { get isLeader() { return leaderState; } } as unknown as ElectionService;
-      const worker = new BatchSyncWorker(redis, election, makeL3());
+      const redis = makeRedis([], {}, ['orphan-1']);
+      const worker = new BatchSyncWorker(redis, election, makeL3(), makeSupabase() as any);
 
       await (worker as any).flush(); // leader → recovers
       (redis as any)._client.eval.mockClear();
@@ -187,8 +230,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
 
   describe('markDirty', () => {
     it('pushes key to dirty queue via rpush', async () => {
-      const redis = makeRedis([]);
-      const worker = new BatchSyncWorker(redis, makeElection(false), makeL3());
+      const { worker, redis } = makeWorker([], {}, false);
 
       await worker.markDirty('some-key');
 
@@ -198,8 +240,7 @@ describe('BatchSyncWorker — Reliable Queue', () => {
 
   describe('corrupt Redis data', () => {
     it('skips corrupt entries without throwing', async () => {
-      const redis = makeRedis(['bad-key'], { 'bad-key': 'not-json{{{' });
-      const worker = new BatchSyncWorker(redis, makeElection(true), makeL3());
+      const { worker } = makeWorker(['bad-key'], { 'bad-key': 'not-json{{{' });
 
       await expect((worker as any).flush()).resolves.not.toThrow();
     });

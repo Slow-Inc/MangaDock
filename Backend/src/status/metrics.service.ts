@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import * as os from 'os';
+import { randomUUID } from 'crypto';
 import { RedisService } from '../cache/redis.service';
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
@@ -16,7 +17,7 @@ export interface NodeMetrics {
 @Injectable()
 export class MetricsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MetricsService.name);
-  readonly nodeId = `node-${process.pid}`;
+  readonly nodeId = `node-${process.pid}-${randomUUID()}`;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private publishing = false;
 
