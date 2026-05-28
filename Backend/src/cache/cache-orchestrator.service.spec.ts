@@ -28,33 +28,46 @@ function makeBatchSync(): jest.Mocked<Pick<BatchSyncWorker, 'markDirty'>> {
   return { markDirty: jest.fn().mockResolvedValue(undefined) } as any;
 }
 
+function makeMetrics(nodeId = 'test-node') {
+  return { nodeId } as any;
+}
+
 function makeOrchestrator(overrides: {
-  redis?: any; jsonCache?: any; batchSync?: any;
+  redis?: any; jsonCache?: any; batchSync?: any; metrics?: any;
 } = {}) {
   const redis = overrides.redis ?? makeRedis();
   const jsonCache = overrides.jsonCache ?? makeJsonCache();
   const batchSync = overrides.batchSync ?? makeBatchSync();
-  const svc = new CacheOrchestratorService(redis, jsonCache, batchSync);
-  return { svc, redis, jsonCache, batchSync };
+  const metrics = overrides.metrics ?? makeMetrics();
+  const svc = new CacheOrchestratorService(redis, jsonCache, batchSync, metrics);
+  return { svc, redis, jsonCache, batchSync, metrics };
 }
 
 describe('CacheOrchestratorService — cross-node L1 invalidation (#37)', () => {
-  // Cycle 1 — set() publishes key to cache:invalidate
-  it('set() publishes the key to cache:invalidate after writing to L2', async () => {
-    const { svc, redis } = makeOrchestrator({ redis: makeRedis(true) });
+  // Cycle 1 — set() publishes { key, nodeId } to cache:invalidate
+  it('set() publishes { key, nodeId } to cache:invalidate after writing to L2', async () => {
+    const metrics = makeMetrics('test-node');
+    const { svc, redis } = makeOrchestrator({ redis: makeRedis(true), metrics });
 
     await svc.set('manga:1', { pages: [] });
 
-    expect(redis.publish).toHaveBeenCalledWith('cache:invalidate', 'manga:1');
+    expect(redis.publish).toHaveBeenCalledWith(
+      'cache:invalidate',
+      JSON.stringify({ key: 'manga:1', nodeId: 'test-node' }),
+    );
   });
 
-  // Cycle 2 — setMangaCacheWithTiers() also publishes
-  it('setMangaCacheWithTiers() publishes the key to cache:invalidate after writing to L2', async () => {
-    const { svc, redis } = makeOrchestrator({ redis: makeRedis(true) });
+  // Cycle 2 — setMangaCacheWithTiers() also publishes { key, nodeId }
+  it('setMangaCacheWithTiers() publishes { key, nodeId } to cache:invalidate after writing to L2', async () => {
+    const metrics = makeMetrics('test-node');
+    const { svc, redis } = makeOrchestrator({ redis: makeRedis(true), metrics });
 
     await svc.setMangaCacheWithTiers('manga:2', { pages: [] });
 
-    expect(redis.publish).toHaveBeenCalledWith('cache:invalidate', 'manga:2');
+    expect(redis.publish).toHaveBeenCalledWith(
+      'cache:invalidate',
+      JSON.stringify({ key: 'manga:2', nodeId: 'test-node' }),
+    );
   });
 
   // Cycle 6 — re-subscribes on reconnect (guards against Redis unavailable at startup)
@@ -73,8 +86,8 @@ describe('CacheOrchestratorService — cross-node L1 invalidation (#37)', () => 
     expect(redis.subscribe).toHaveBeenCalledTimes(2);
   });
 
-  // Cycle 3 — incoming invalidation removes key from L1
-  it('onModuleInit() subscribes to cache:invalidate; received key is deleted from L1', () => {
+  // Cycle 3 — incoming invalidation from another node removes key from L1
+  it('onModuleInit() subscribes to cache:invalidate; message from another node deletes key from L1', () => {
     let capturedHandler: ((data: unknown) => void) | null = null;
     const redis = makeRedis(true);
     (redis.subscribe as jest.Mock).mockImplementation((_ch: string, handler: (data: unknown) => void) => {
@@ -82,10 +95,47 @@ describe('CacheOrchestratorService — cross-node L1 invalidation (#37)', () => 
       return () => {};
     });
     const jsonCache = makeJsonCache();
-    const { svc } = makeOrchestrator({ redis, jsonCache });
+    const metrics = makeMetrics('test-node');
+    const { svc } = makeOrchestrator({ redis, jsonCache, metrics });
 
     svc.onModuleInit();
-    capturedHandler!('manga:1');
+    capturedHandler!(JSON.stringify({ key: 'manga:1', nodeId: 'other-node' }));
+
+    expect(jsonCache.delete).toHaveBeenCalledWith('manga:1');
+  });
+
+  // Cycle 7 — self-invalidation: same nodeId → L1 delete is skipped
+  it('onModuleInit() handler does NOT delete from L1 when incoming nodeId matches own nodeId', () => {
+    let capturedHandler: ((data: unknown) => void) | null = null;
+    const redis = makeRedis(true);
+    (redis.subscribe as jest.Mock).mockImplementation((_ch: string, handler: (data: unknown) => void) => {
+      capturedHandler = handler;
+      return () => {};
+    });
+    const jsonCache = makeJsonCache();
+    const metrics = makeMetrics('test-node');
+    const { svc } = makeOrchestrator({ redis, jsonCache, metrics });
+
+    svc.onModuleInit();
+    capturedHandler!(JSON.stringify({ key: 'manga:1', nodeId: 'test-node' }));
+
+    expect(jsonCache.delete).not.toHaveBeenCalled();
+  });
+
+  // Cycle 8 — cross-node: different nodeId → L1 delete is applied
+  it('onModuleInit() handler deletes from L1 when incoming nodeId differs from own nodeId', () => {
+    let capturedHandler: ((data: unknown) => void) | null = null;
+    const redis = makeRedis(true);
+    (redis.subscribe as jest.Mock).mockImplementation((_ch: string, handler: (data: unknown) => void) => {
+      capturedHandler = handler;
+      return () => {};
+    });
+    const jsonCache = makeJsonCache();
+    const metrics = makeMetrics('test-node');
+    const { svc } = makeOrchestrator({ redis, jsonCache, metrics });
+
+    svc.onModuleInit();
+    capturedHandler!(JSON.stringify({ key: 'manga:1', nodeId: 'another-node' }));
 
     expect(jsonCache.delete).toHaveBeenCalledWith('manga:1');
   });

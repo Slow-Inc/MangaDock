@@ -3,6 +3,7 @@ import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
 import { BatchSyncWorker } from './batch-sync.worker';
 import { L3DiskService } from './l3-disk.service';
+import { ElectionService } from '../status/election.service';
 
 const SEVEN_DAYS_S = 7 * 24 * 60 * 60;
 
@@ -41,18 +42,24 @@ function makeL3(entries: Map<string, CacheEntry<unknown>> = new Map()): jest.Moc
   return { readAll: jest.fn().mockReturnValue(entries) } as any;
 }
 
-function makeService(overrides: { redis?: any; jsonCache?: any; batchSync?: any; l3?: any } = {}) {
+function makeElection(isLeader = true): jest.Mocked<Pick<ElectionService, 'isLeader'>> {
+  return { isLeader } as any;
+}
+
+function makeService(overrides: { redis?: any; jsonCache?: any; batchSync?: any; l3?: any; election?: any } = {}) {
   const redis = overrides.redis ?? makeRedis();
   const jsonCache = overrides.jsonCache ?? makeJsonCache();
   const batchSync = overrides.batchSync ?? makeBatchSync();
   const l3 = overrides.l3 ?? makeL3();
+  const election = overrides.election ?? makeElection();
   const svc = new L2RecoveryService(
     redis as unknown as RedisService,
     jsonCache as unknown as JsonCacheService,
     batchSync as unknown as BatchSyncWorker,
     l3 as unknown as L3DiskService,
+    election as unknown as ElectionService,
   );
-  return { svc, redis, jsonCache, batchSync, l3 };
+  return { svc, redis, jsonCache, batchSync, l3, election };
 }
 
 describe('L2RecoveryService', () => {
@@ -224,6 +231,34 @@ describe('L2RecoveryService', () => {
     await svc.recover();
 
     expect(redis.set).not.toHaveBeenCalled();
+  });
+
+  // Cycle 16 — non-leader: onModuleInit does not call recover()
+  it('onModuleInit() does not call recover() when node is not the leader', async () => {
+    const { svc, redis } = makeService({ redis: makeRedis(true), election: makeElection(false) });
+    const spy = jest.spyOn(svc, 'recover').mockResolvedValue({ synced: 0, skipped: 0 });
+
+    await svc.onModuleInit();
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(redis.set).not.toHaveBeenCalled();
+  });
+
+  // Cycle 17 — non-leader: onReconnect does not trigger recover()
+  it('onReconnect callback does not call recover() when node is not the leader', async () => {
+    let capturedCb: (() => void) | null = null;
+    const redis = makeRedis(false);
+    (redis.onReconnect as jest.Mock).mockImplementation((cb: () => void) => {
+      capturedCb = cb;
+      return () => {};
+    });
+    const { svc } = makeService({ redis, election: makeElection(false) });
+    const spy = jest.spyOn(svc, 'recover').mockResolvedValue({ synced: 0, skipped: 0 });
+
+    await svc.onModuleInit();
+    capturedCb!();
+
+    expect(spy).not.toHaveBeenCalled();
   });
 
   // Cycle 15 — equal timestamps: L1 wins (prefer in-memory over disk on tie)

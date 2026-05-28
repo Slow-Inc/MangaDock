@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs
 import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
 import { BatchSyncWorker } from './batch-sync.worker';
+import { MetricsService } from '../status/metrics.service';
 
 const DEFAULT_TTL_MS = 1000 * 60 * 20; // 20 minutes
 
@@ -15,10 +16,20 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
     private readonly redis: RedisService,
     private readonly jsonCache: JsonCacheService,
     private readonly batchSync: BatchSyncWorker,
+    private readonly metrics: MetricsService,
   ) {}
 
   onModuleInit(): void {
-    const handler = (key: unknown) => this.jsonCache.delete(key as string);
+    const handler = (raw: unknown) => {
+      try {
+        const { key, nodeId } = JSON.parse(raw as string) as { key: string; nodeId: string };
+        if (nodeId !== this.metrics.nodeId) {
+          this.jsonCache.delete(key);
+        }
+      } catch {
+        this.logger.warn(`cache:invalidate message unparseable: ${String(raw)}`);
+      }
+    };
     this.redis.subscribe(INVALIDATE_CHANNEL, handler);
     this.redis.onReconnect(() => this.redis.subscribe(INVALIDATE_CHANNEL, handler));
   }
@@ -76,7 +87,7 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
     // L2: write to Redis (source of truth at runtime)
     if (this.redis.available) {
       await this.redis.set(key, JSON.stringify(entry), Math.floor(ttlMs / 1000));
-      await this.redis.publish(INVALIDATE_CHANNEL, key);
+      await this.redis.publish(INVALIDATE_CHANNEL, JSON.stringify({ key, nodeId: this.metrics.nodeId }));
       await this.batchSync.markDirty(key);
     }
 
@@ -113,7 +124,7 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
 
     if (this.redis.available) {
       await this.redis.set(key, JSON.stringify(jsonEntry), Math.floor(redisTtlMs / 1000));
-      await this.redis.publish(INVALIDATE_CHANNEL, key);
+      await this.redis.publish(INVALIDATE_CHANNEL, JSON.stringify({ key, nodeId: this.metrics.nodeId }));
       await this.batchSync.markDirty(key);
     }
 

@@ -3,6 +3,7 @@ import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
 import { BatchSyncWorker } from './batch-sync.worker';
 import { L3DiskService } from './l3-disk.service';
+import { ElectionService } from '../status/election.service';
 
 const SEVEN_DAYS_S = 7 * 24 * 60 * 60;
 
@@ -15,13 +16,15 @@ export class L2RecoveryService implements OnModuleInit {
     private readonly jsonCache: JsonCacheService,
     private readonly batchSync: BatchSyncWorker,
     private readonly l3: L3DiskService,
+    private readonly election: ElectionService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     this.redis.onReconnect(() => {
+      if (!this.election.isLeader) return;
       this.recover().catch(err => this.logger.warn(`L2 recovery failed: ${String(err)}`));
     });
-    if (this.redis.available) {
+    if (this.redis.available && this.election.isLeader) {
       await this.recover();
     }
   }
