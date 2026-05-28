@@ -53,8 +53,11 @@ function makeJsonCache(entries: Map<string, CacheEntry<unknown>> = new Map()): j
   } as any;
 }
 
-function makeL3(entries: Map<string, CacheEntry<unknown>> = new Map()): jest.Mocked<Pick<L3DiskService, 'readAll'>> {
-  return { readAll: jest.fn().mockReturnValue(entries) } as any;
+function makeL3(entries: Map<string, CacheEntry<unknown>> = new Map(), fallbackKeys: string[] = []): jest.Mocked<Pick<L3DiskService, 'readAll' | 'drainDirtyFallback'>> {
+  return {
+    readAll: jest.fn().mockReturnValue(entries),
+    drainDirtyFallback: jest.fn().mockReturnValue(fallbackKeys),
+  } as any;
 }
 
 function makeElection(isLeader = true): jest.Mocked<Pick<ElectionService, 'isLeader' | 'onBecomeLeader'>> {
@@ -348,5 +351,46 @@ describe('L2RecoveryService', () => {
 
     expect(result).toEqual({ synced: 0, skipped: 0 });
     expect(redis._client.pipeline).not.toHaveBeenCalled();
+  });
+});
+
+describe('L2RecoveryService — dirty fallback drain (#48)', () => {
+  // Cycle F8 — drains fallback and re-queues keys to DIRTY_QUEUE via pipeline
+  it('recover() calls l3.drainDirtyFallback() and rpushes each returned key to DIRTY_QUEUE', async () => {
+    const { svc, redis } = makeService({
+      jsonCache: makeJsonCache(new Map()),
+      l3: makeL3(new Map(), ['fallback-key-1', 'fallback-key-2']),
+    });
+
+    await svc.recover();
+
+    const pipe = redis._client.created[0];
+    expect(pipe.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'fallback-key-1');
+    expect(pipe.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'fallback-key-2');
+  });
+
+  // Cycle F9 — no fallback keys: drainDirtyFallback still called (no-op)
+  it('recover() calls l3.drainDirtyFallback() even when L1 and L3 are empty', async () => {
+    const l3 = makeL3(new Map(), []);
+    const { svc } = makeService({ jsonCache: makeJsonCache(new Map()), l3 });
+
+    await svc.recover();
+
+    expect(l3.drainDirtyFallback).toHaveBeenCalled();
+  });
+
+  // Cycle F10 — fallback keys mixed with L1 keys: both are re-queued
+  it('recover() re-queues both L1 keys and fallback-only keys to DIRTY_QUEUE', async () => {
+    const entry = makeEntry();
+    const { svc, redis } = makeService({
+      jsonCache: makeJsonCache(new Map([['l1-key', entry]])),
+      l3: makeL3(new Map(), ['fallback-key']),
+    });
+
+    await svc.recover();
+
+    const pipe = redis._client.created[0];
+    expect(pipe.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'l1-key');
+    expect(pipe.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'fallback-key');
   });
 });

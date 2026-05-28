@@ -3,10 +3,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { CacheEntry } from './json-cache.service';
 
+const CONSECUTIVE_FAIL_THRESHOLD = 3;
+
 @Injectable()
 export class L3DiskService {
   private readonly logger = new Logger(L3DiskService.name);
   private readonly cacheDir: string;
+  private consecutiveWriteFailures = 0;
+  private criticalAlertFired = false;
 
   constructor(@Optional() @Inject('L3_CACHE_DIR') cacheDir?: string) {
     this.cacheDir = cacheDir ?? path.resolve(process.cwd(), '.cache');
@@ -43,9 +47,49 @@ export class L3DiskService {
     try {
       const safeFileName = key.replace(/[:\\/*?"<>|]/g, '_');
       const filePath = path.join(this.cacheDir, `${safeFileName}.json`);
-      fs.writeFileSync(filePath, JSON.stringify({ ...entry, key }, null, 2), 'utf-8');
+      this.writeFile(filePath, JSON.stringify({ ...entry, key }, null, 2));
+      this.consecutiveWriteFailures = 0;
+      this.criticalAlertFired = false;
     } catch (err) {
+      this.consecutiveWriteFailures++;
       this.logger.warn(`Failed to write L3 cache [${key}]: ${String(err)}`);
+      if (this.consecutiveWriteFailures >= CONSECUTIVE_FAIL_THRESHOLD && !this.criticalAlertFired) {
+        this.criticalAlertFired = true;
+        this.logger.error(
+          `CRITICAL: L3 disk write has failed ${this.consecutiveWriteFailures} consecutive times — possible disk full or permission error`,
+        );
+      }
     }
+  }
+
+  appendDirtyFallback(key: string): void {
+    const fallbackPath = path.join(this.cacheDir, 'dirty_fallback.json');
+    try {
+      let keys: string[] = [];
+      if (fs.existsSync(fallbackPath)) {
+        keys = JSON.parse(fs.readFileSync(fallbackPath, 'utf-8')) as string[];
+      }
+      keys.push(key);
+      fs.writeFileSync(fallbackPath, JSON.stringify(keys), 'utf-8');
+    } catch (err) {
+      this.logger.warn(`appendDirtyFallback: failed for key=${key}: ${String(err)}`);
+    }
+  }
+
+  drainDirtyFallback(): string[] {
+    const fallbackPath = path.join(this.cacheDir, 'dirty_fallback.json');
+    try {
+      if (!fs.existsSync(fallbackPath)) return [];
+      const keys = JSON.parse(fs.readFileSync(fallbackPath, 'utf-8')) as string[];
+      fs.unlinkSync(fallbackPath);
+      return Array.isArray(keys) ? keys : [];
+    } catch (err) {
+      this.logger.warn(`drainDirtyFallback: failed: ${String(err)}`);
+      return [];
+    }
+  }
+
+  protected writeFile(filePath: string, content: string): void {
+    fs.writeFileSync(filePath, content, 'utf-8');
   }
 }

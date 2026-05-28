@@ -3,6 +3,7 @@ import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
 import { BatchSyncWorker } from './batch-sync.worker';
 import { MetricsService } from '../status/metrics.service';
+import { L3DiskService } from './l3-disk.service';
 
 const DEFAULT_TTL_MS = 1000 * 60 * 20; // 20 minutes
 
@@ -17,6 +18,7 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
     private readonly jsonCache: JsonCacheService,
     private readonly batchSync: BatchSyncWorker,
     private readonly metrics: MetricsService,
+    private readonly l3: L3DiskService,
   ) {}
 
   onModuleInit(): void {
@@ -44,7 +46,10 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
       }
     };
     this.redis.subscribe(INVALIDATE_CHANNEL, handler);
-    this.redis.onReconnect(() => this.redis.subscribe(INVALIDATE_CHANNEL, handler));
+    this.redis.onReconnect(() => {
+      this.jsonCache.clear();
+      this.redis.subscribe(INVALIDATE_CHANNEL, handler);
+    });
   }
 
   /**
@@ -102,6 +107,8 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
       await this.redis.set(key, JSON.stringify(entry), Math.floor(ttlMs / 1000));
       await this.redis.publish(INVALIDATE_CHANNEL, JSON.stringify({ key, nodeId: this.metrics.nodeId }));
       await this.batchSync.markDirty(key);
+    } else {
+      this.l3.appendDirtyFallback(key);
     }
 
     this.logger.log(`Cache SET key=${key} ttl=${Math.floor(ttlMs / 1000)}s redis=${this.redis.available}`);

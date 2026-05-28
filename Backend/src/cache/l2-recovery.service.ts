@@ -34,9 +34,10 @@ export class L2RecoveryService implements OnModuleInit {
   async recover(): Promise<{ synced: number; skipped: number }> {
     const l1 = this.jsonCache.getAll();
     const l3 = this.l3.readAll();
+    const fallbackKeys = this.l3.drainDirtyFallback();
     const allKeys = new Set([...l1.keys(), ...l3.keys()]);
 
-    if (allKeys.size === 0) return { synced: 0, skipped: 0 };
+    if (allKeys.size === 0 && fallbackKeys.length === 0) return { synced: 0, skipped: 0 };
 
     const client = await this.redis.getClient();
     if (!client) return { synced: 0, skipped: 0 };
@@ -58,13 +59,23 @@ export class L2RecoveryService implements OnModuleInit {
       toSync.push({ key, value: JSON.stringify(entry), ttlSeconds });
     }
 
+    // Include fallback-only keys (modified while Redis was down, possibly evicted from L1)
+    const knownKeys = new Set(toSync.map(p => p.key));
+    for (const key of fallbackKeys) {
+      if (!knownKeys.has(key)) {
+        toSync.push({ key, value: '', ttlSeconds: 0 }); // value/ttl unused — only rpush matters
+      }
+    }
+
+    if (toSync.length === 0 && skipped === 0) return { synced: 0, skipped: 0 };
+
     let synced = 0;
 
     for (let i = 0; i < toSync.length; i += PIPELINE_CHUNK_SIZE) {
       const chunk = toSync.slice(i, i + PIPELINE_CHUNK_SIZE);
       const pipeline = client.pipeline();
       for (const { key, value, ttlSeconds } of chunk) {
-        pipeline.set(key, value, 'EX', ttlSeconds);
+        if (value) pipeline.set(key, value, 'EX', ttlSeconds);
         pipeline.rpush(DIRTY_QUEUE, key);
       }
       try {
