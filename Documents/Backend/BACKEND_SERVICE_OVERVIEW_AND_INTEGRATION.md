@@ -46,7 +46,7 @@ Frontend (Next.js)
 2. `users/` สำหรับ user-facing APIs และข้อมูลผู้ใช้ รวมถึง avatar upload
 3. `cache/` สำหรับ 2-tier cache abstractions และ sync logic
 4. `supabase/` สำหรับ Supabase integration (PostgreSQL + RLS)
-5. `status/` สำหรับ health และ status endpoints
+5. `status/` สำหรับ health และ status endpoints; `MetricsService` เก็บ node heartbeat (CPU/mem/latency → `cluster_metrics:{nodeId}`); `ElectionService` ทำ Redis NX Lock leader election — acquisition ด้วย `SET NX PX`, renewal และ release ด้วย Lua compare-and-swap (ป้องกัน lock theft) เพื่อกำหนด Leader Node สำหรับ write-behind queue
 6. `forum/` สำหรับ community forum — posts, nested comments, voting, image upload
 7. `wallet/` สำหรับ wallet balance และ ledger
 8. `unlock/` สำหรับ unlock economy (idempotent unlock flow)
