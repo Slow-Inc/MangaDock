@@ -72,7 +72,7 @@ describe('L3DiskService', () => {
   });
 });
 
-describe('L3DiskService — dirty fallback (#48)', () => {
+describe('L3DiskService — dirty fallback (#48 / #52)', () => {
   let tmpDir: string;
   let svc: L3DiskService;
 
@@ -85,24 +85,30 @@ describe('L3DiskService — dirty fallback (#48)', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  // Cycle F1 — appendDirtyFallback writes key to fallback file
-  it('appendDirtyFallback() persists a key to the fallback file on disk', () => {
+  // Cycle F1 — appendDirtyFallback persists a key (verifiable via drain)
+  it('appendDirtyFallback() persists a key — drainDirtyFallback() returns it', () => {
     svc.appendDirtyFallback('manga:1');
 
-    const fallbackPath = path.join(tmpDir, 'dirty_fallback.json');
-    const content = JSON.parse(fs.readFileSync(fallbackPath, 'utf-8')) as string[];
-    expect(content).toContain('manga:1');
+    expect(svc.drainDirtyFallback()).toContain('manga:1');
   });
 
-  // Cycle F2 — multiple appends accumulate in fallback file
+  // Cycle F2 — multiple appends accumulate without overwriting
   it('appendDirtyFallback() accumulates multiple keys without overwriting', () => {
     svc.appendDirtyFallback('key-1');
     svc.appendDirtyFallback('key-2');
     svc.appendDirtyFallback('key-3');
 
-    const fallbackPath = path.join(tmpDir, 'dirty_fallback.json');
-    const content = JSON.parse(fs.readFileSync(fallbackPath, 'utf-8')) as string[];
-    expect(content).toEqual(['key-1', 'key-2', 'key-3']);
+    expect(svc.drainDirtyFallback()).toEqual(['key-1', 'key-2', 'key-3']);
+  });
+
+  // Cycle F6 — file uses newline-delimited format (#52 crash-safety)
+  it('appendDirtyFallback() uses newline-delimited plain text format (not JSON array)', () => {
+    svc.appendDirtyFallback('key-a');
+    svc.appendDirtyFallback('key-b');
+
+    const fallbackPath = path.join(tmpDir, 'dirty_fallback.txt');
+    const raw = fs.readFileSync(fallbackPath, 'utf-8');
+    expect(raw).toBe('key-a\nkey-b\n');
   });
 
   // Cycle F3 — drainDirtyFallback returns all keys and deletes the file
@@ -113,22 +119,20 @@ describe('L3DiskService — dirty fallback (#48)', () => {
     const keys = svc.drainDirtyFallback();
 
     expect(keys).toEqual(['key-a', 'key-b']);
-    expect(fs.existsSync(path.join(tmpDir, 'dirty_fallback.json'))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, 'dirty_fallback.txt'))).toBe(false);
   });
 
   // Cycle F4 — drainDirtyFallback is idempotent when file does not exist
   it('drainDirtyFallback() returns empty array when no fallback file exists', () => {
-    const keys = svc.drainDirtyFallback();
-    expect(keys).toEqual([]);
+    expect(svc.drainDirtyFallback()).toEqual([]);
   });
 
-  // Cycle F5 — second drain after drain returns empty (file was deleted)
+  // Cycle F5 — second drain returns empty (file was deleted)
   it('drainDirtyFallback() returns empty array on subsequent call after drain', () => {
     svc.appendDirtyFallback('key-1');
     svc.drainDirtyFallback();
 
-    const keys = svc.drainDirtyFallback();
-    expect(keys).toEqual([]);
+    expect(svc.drainDirtyFallback()).toEqual([]);
   });
 });
 
