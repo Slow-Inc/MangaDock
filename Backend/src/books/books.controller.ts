@@ -1,11 +1,15 @@
 import { Body, Controller, Get, HttpException, HttpStatus, NotFoundException, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { BooksService } from './books.service';
+import { StatsIncrementService } from '../cache/stats-increment.service';
 import { TurnstileGuard, generateClearanceToken } from '../auth/turnstile.guard';
 
 @Controller('books')
 export class BooksController {
-  constructor(private readonly booksService: BooksService) {}
+  constructor(
+    private readonly booksService: BooksService,
+    private readonly statsIncrement: StatsIncrementService,
+  ) {}
 
   @Post('verify-captcha')
   async verifyCaptcha(@Req() req: any, @Body() body: { token: string }) {
@@ -118,10 +122,15 @@ export class BooksController {
   @Get('chapters/:chapterId/pages')
   async getMangaChapterPages(
     @Param('chapterId') chapterId: string,
+    @Query('mangaId') mangaId?: string,
+    @Req() req?: Request,
     @Query('forceLocal') forceLocal?: string,
   ) {
     const result = await this.booksService.getMangaChapterPages(chapterId, forceLocal === 'true');
     if (!result) throw new NotFoundException('Chapter pages not found');
+    const uid = (req?.headers?.['x-hardware-id'] as string) || 'anon';
+    const date = new Date().toISOString().slice(0, 10);
+    void this.statsIncrement.recordChapterView(chapterId, mangaId ?? '', uid, date);
     return result;
   }
 

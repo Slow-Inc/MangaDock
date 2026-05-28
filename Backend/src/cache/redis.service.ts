@@ -89,6 +89,61 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.available ? this.client : null;
   }
 
+  async incr(key: string): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return await this.client!.incr(key);
+    } catch {
+      this.isConnected = false;
+      return 0;
+    }
+  }
+
+  async pfadd(key: string, ...members: string[]): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return await (this.client as any).pfadd(key, ...members);
+    } catch {
+      return 0;
+    }
+  }
+
+  async pfcount(key: string): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return await (this.client as any).pfcount(key);
+    } catch {
+      return 0;
+    }
+  }
+
+  async sadd(key: string, ...members: string[]): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return await (this.client as any).sadd(key, ...members);
+    } catch {
+      return 0;
+    }
+  }
+
+  async smembers(key: string): Promise<string[]> {
+    if (!this.available) return [];
+    try {
+      return await (this.client as any).smembers(key);
+    } catch {
+      return [];
+    }
+  }
+
+  async expire(key: string, ttlSeconds: number): Promise<void> {
+    if (!this.available) return;
+    try {
+      await this.client!.expire(key, ttlSeconds);
+    } catch {
+      // best-effort
+    }
+  }
+
   // ─── Pub/Sub ──────────────────────────────────────────────────────────────────
 
   private ensureSubscriber(): Redis | null {
