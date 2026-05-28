@@ -32,6 +32,7 @@
     "class-validator": "^0.15.1",
     "file-type": "^21.3.0",
     "ioredis": "^5.10.0",
+    "lru-cache": "^11.5.1",
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",
     "passport-google-oauth20": "^2.0.0",

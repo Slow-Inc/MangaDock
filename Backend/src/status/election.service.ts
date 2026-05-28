@@ -32,6 +32,7 @@ export class ElectionService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ElectionService.name);
   private electionTimer: NodeJS.Timeout | null = null;
   private _isLeader = false;
+  private readonly becomeLeaderCallbacks: Array<() => void> = [];
 
   constructor(
     private readonly redis: RedisService,
@@ -40,6 +41,10 @@ export class ElectionService implements OnModuleInit, OnModuleDestroy {
 
   get isLeader(): boolean {
     return this._isLeader;
+  }
+
+  onBecomeLeader(cb: () => void): void {
+    this.becomeLeaderCallbacks.push(cb);
   }
 
   onModuleInit() {
@@ -91,6 +96,9 @@ export class ElectionService implements OnModuleInit, OnModuleDestroy {
 
     if (this._isLeader !== wasLeader) {
       this.logger.log(`Leadership ${this._isLeader ? 'acquired' : 'lost'} (nodeId=${nodeId})`);
+      if (this._isLeader) {
+        this.becomeLeaderCallbacks.forEach(cb => cb());
+      }
     }
   }
 }

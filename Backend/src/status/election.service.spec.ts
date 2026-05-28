@@ -178,6 +178,47 @@ describe('ElectionService — Redis NX Lock', () => {
     });
   });
 
+  describe('onBecomeLeader callback', () => {
+    it('fires registered callback exactly once when leadership is acquired', async () => {
+      const client = makeClient({ set: jest.fn().mockResolvedValue('OK') });
+      const svc = makeElection('node-1', client);
+      const cb = jest.fn();
+      svc.onBecomeLeader(cb);
+
+      await svc.runElection();
+
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fire callback when lock is not acquired', async () => {
+      const client = makeClient(); // set returns null
+      const svc = makeElection('node-1', client);
+      const cb = jest.fn();
+      svc.onBecomeLeader(cb);
+
+      await svc.runElection();
+
+      expect(cb).not.toHaveBeenCalled();
+    });
+
+    it('fires callback again when leadership is re-acquired after loss', async () => {
+      const setMock = jest.fn()
+        .mockResolvedValueOnce('OK')  // acquisition
+        .mockResolvedValueOnce('OK'); // re-acquisition
+      const evalMock = jest.fn().mockResolvedValue(null); // renewal always fails → loses
+      const client = makeClient({ set: setMock, eval: evalMock });
+      const svc = makeElection('node-1', client);
+      const cb = jest.fn();
+      svc.onBecomeLeader(cb);
+
+      await svc.runElection(); // acquires → cb fires (1)
+      await svc.runElection(); // renewal fails → loses
+      await svc.runElection(); // re-acquires → cb fires (2)
+
+      expect(cb).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('leadership change logging', () => {
     it('logs when leadership is acquired', async () => {
       const client = makeClient({ set: jest.fn().mockResolvedValue('OK') });
