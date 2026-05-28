@@ -1,12 +1,14 @@
-import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
 import { BatchSyncWorker } from './batch-sync.worker';
 
 const DEFAULT_TTL_MS = 1000 * 60 * 20; // 20 minutes
 
+const INVALIDATE_CHANNEL = 'cache:invalidate';
+
 @Injectable()
-export class CacheOrchestratorService implements OnApplicationShutdown {
+export class CacheOrchestratorService implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(CacheOrchestratorService.name);
 
   constructor(
@@ -15,43 +17,44 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
     private readonly batchSync: BatchSyncWorker,
   ) {}
 
+  onModuleInit(): void {
+    const handler = (key: unknown) => this.jsonCache.delete(key as string);
+    this.redis.subscribe(INVALIDATE_CHANNEL, handler);
+    this.redis.onReconnect(() => this.redis.subscribe(INVALIDATE_CHANNEL, handler));
+  }
+
   /**
-   * Get data from cache (Redis → JSON → API fallback).
+   * Get data from cache (L1 JSON → L2 Redis fallback).
    * Returns null if not found in any cache.
    */
   async get<T>(key: string): Promise<{ data: T; source: 'redis' | 'json' } | null> {
-    // 1. Try Redis first
+    // 1. Try L1 (JSON cache) first — fastest, in-process
+    const jsonEntry = this.jsonCache.get<T>(key);
+    if (jsonEntry) {
+      const expired = this.jsonCache.isExpired(jsonEntry);
+      if (!expired) {
+        this.logger.debug(`Cache HIT [json] key=${key}`);
+        return { data: jsonEntry.data, source: 'json' };
+      }
+      this.logger.debug(`Cache EXPIRED [json] key=${key}, will re-fetch`);
+    }
+
+    // 2. Try L2 (Redis) — source of truth; update L1 on hit
     if (this.redis.available) {
       const raw = await this.redis.get(key);
       if (raw) {
         try {
           const entry = JSON.parse(raw) as CacheEntry<T>;
           this.logger.debug(`Cache HIT [redis] key=${key}`);
+          const ttlRemainingMs = entry.ttlMs <= 0
+            ? entry.ttlMs
+            : entry.ttlMs - (Date.now() - new Date(entry.updatedAt).getTime());
+          this.jsonCache.set(key, entry.data, ttlRemainingMs);
           return { data: entry.data, source: 'redis' };
         } catch {
           this.logger.warn(`Redis entry corrupt for key=${key}, will re-fetch`);
         }
       }
-    }
-
-    // 2. Try JSON cache
-    const jsonEntry = this.jsonCache.get<T>(key);
-    if (jsonEntry) {
-      const expired = this.jsonCache.isExpired(jsonEntry);
-      if (!expired) {
-        this.logger.debug(`Cache HIT [json] key=${key}`);
-        // Warm Redis back up
-        if (this.redis.available) {
-          const ttlRemaining = Math.floor(
-            (jsonEntry.ttlMs - (Date.now() - new Date(jsonEntry.updatedAt).getTime())) / 1000,
-          );
-          if (ttlRemaining > 0) {
-            await this.redis.set(key, JSON.stringify(jsonEntry), ttlRemaining);
-          }
-        }
-        return { data: jsonEntry.data, source: 'json' };
-      }
-      this.logger.debug(`Cache EXPIRED [json] key=${key}, will re-fetch`);
     }
 
     return null;
@@ -73,7 +76,7 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
     // L2: write to Redis (source of truth at runtime)
     if (this.redis.available) {
       await this.redis.set(key, JSON.stringify(entry), Math.floor(ttlMs / 1000));
-      // Enqueue for leader-only batch persistence
+      await this.redis.publish(INVALIDATE_CHANNEL, key);
       await this.batchSync.markDirty(key);
     }
 
@@ -110,6 +113,7 @@ export class CacheOrchestratorService implements OnApplicationShutdown {
 
     if (this.redis.available) {
       await this.redis.set(key, JSON.stringify(jsonEntry), Math.floor(redisTtlMs / 1000));
+      await this.redis.publish(INVALIDATE_CHANNEL, key);
       await this.batchSync.markDirty(key);
     }
 

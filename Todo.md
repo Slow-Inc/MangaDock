@@ -30,11 +30,18 @@
 
 ---
 
-## 🔵 Phase 2: Architectural Scaling & Cloud Readiness (STARTING 🚀)
-- [ ]  **[Architecture]** Multi-factor Metrics Collection (for Observability)
-- [ ]  **[Architecture]** Redis NX Lock-based Leader Election
-- [ ]  **[Architecture]** Reliable Write-behind Queue (`RPOPLPUSH`)
-- [ ]  **[Architecture]** Workload-Aware Batching & Supabase RPC Sync
+## 🔵 Phase 2: Architectural Scaling & Cloud Readiness (IN PROGRESS 🔄)
+- [X]  **[Architecture]** Multi-factor Metrics Collection (MetricsService — CPU/mem/latency heartbeat, PRs #16+#34)
+- [X]  **[Architecture]** Redis NX Lock-based Leader Election (ElectionService NX mutex, PR #16)
+- [X]  **[Architecture]** Reliable Write-behind Queue — `RPOPLPUSH`+`LREM`+Lua EVAL atomic recovery (PR #16)
+- [X]  **[Architecture]** Workload-Aware Batching & Supabase Stats Flush (L3BatchWriter + StatsFlushWorker, PR #34)
+- [X]  **[Architecture]** Chapter-view Stats Pipeline — Redis → Supabase daily (PR #34)
+- [X]  **[Architecture]** L2 Recovery on reconnect (L2RecoveryService + onReconnect hook, PR #34)
+- [ ]  **[Architecture]** Cache Read Path — L1-first reads + on-L2-hit update L1 (ต้องทำคู่กับ Cross-node invalidation)
+- [ ]  **[Architecture]** Cross-node L1 Invalidation via Redis pub/sub `cache:invalidate` (ใหญ่ — ต้องการ grill)
+- [ ]  **[Architecture]** L2 Recovery Enhancement — compare L1 vs L3 timestamps, pick newest per key → L2
+- [ ]  **[Architecture]** Catastrophic Recovery — L1+L2 both fail: compare L3 vs Supabase → bootstrap L2 → L1 (ใหญ่ — ต้องการ grill)
+- [ ]  **[Frontend]** Pass `?mangaId=` param on chapter pages fetch (manga_id currently stored as `''` in chapter_daily_stats)
 - [ ]  [Backend] Real-World Payment Gateway (QR/PromptPay)
 - [ ]  **[Backend]** Atomic Revenue Split (Postgres Function)
 - [ ]  [Infrastructure] Cloudflare R2 Migration & Workers CDN Buffer

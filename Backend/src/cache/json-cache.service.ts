@@ -37,6 +37,10 @@ export class JsonCacheService implements OnModuleInit {
     this.memoryStore.set(key, { key, data, updatedAt: new Date().toISOString(), ttlMs });
   }
 
+  delete(key: string): void {
+    this.memoryStore.delete(key);
+  }
+
   getAll(): Map<string, CacheEntry<unknown>> {
     return this.memoryStore;
   }
