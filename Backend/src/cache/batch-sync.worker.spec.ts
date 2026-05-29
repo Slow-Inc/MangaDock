@@ -245,4 +245,35 @@ describe('BatchSyncWorker — Reliable Queue', () => {
       await expect((worker as any).flush()).resolves.not.toThrow();
     });
   });
+
+  describe('conditional upsert RPC params (#59)', () => {
+    // U1 — RPC called with p_data, p_updated_at, p_ttl_ms (not p_entry)
+    it('calls upsert_cache_entry with p_data, p_updated_at, and p_ttl_ms from the cache entry', async () => {
+      const entry = makeEntry({ title: 'One Piece' });
+      const { worker, supabase } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
+
+      await (worker as any).flush();
+
+      expect(supabase._rpc).toHaveBeenCalledWith(
+        'upsert_cache_entry',
+        expect.objectContaining({
+          p_key: 'key-a',
+          p_data: { title: 'One Piece' },
+          p_updated_at: entry.updatedAt,
+          p_ttl_ms: 60_000,
+        }),
+      );
+    });
+
+    // U2 — p_entry not passed (legacy param removed)
+    it('does not pass the legacy p_entry param to the RPC', async () => {
+      const entry = makeEntry({ title: 'Naruto' });
+      const { worker, supabase } = makeWorker(['key-b'], { 'key-b': JSON.stringify(entry) });
+
+      await (worker as any).flush();
+
+      const [, params] = supabase._rpc.mock.calls[0];
+      expect(params).not.toHaveProperty('p_entry');
+    });
+  });
 });
