@@ -9,3 +9,20 @@ Backend.rar
 Frontend.rar
 # Serena LSP (machine-specific)
 .serena/
+
+# VS Code (machine-specific)
+.vscode/
+
+# Mobile — Phase 3 (not started)
+Mobile/
+
+# Personal / academic docs
+Email.md
+ADVISOR_REQUEST.txt
+"Proposal SE.docx"
+
+# Runtime / temp
+Backend/img-cache/
+.claude/scheduled_tasks.lock
+Backend/issue_*.txt
+Backend/prd_*.txt
