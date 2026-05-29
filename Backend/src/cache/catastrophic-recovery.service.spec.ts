@@ -345,3 +345,78 @@ describe('CatastrophicRecoveryService — Supabase comparison (#58)', () => {
     expect((supabase as any)._in).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('CatastrophicRecoveryService — smart dirty queuing (#62)', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  function captureReconnect(redis: any): { getReconnectCb: () => ReconnectCb } {
+    let cb!: ReconnectCb;
+    (redis.onReconnect as jest.Mock).mockImplementation((fn: ReconnectCb) => { cb = fn; return () => {}; });
+    return { getReconnectCb: () => cb };
+  }
+
+  // D1 — Tracer bullet: Supabase winner → NO rpush to DIRTY_QUEUE
+  it('does NOT enqueue key to DIRTY_QUEUE when Supabase data wins — it is already in the DB', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const l3Entry = makeEntry({ updatedAt: '2026-01-01T00:00:00Z' });
+    const supabaseRow: SupabaseRow = {
+      key: 'key:1', data: {}, updated_at: '2026-06-01T00:00:00Z', ttl_ms: 60_000,
+    };
+    const redis = makeRedis(false);
+    const { getReconnectCb } = captureReconnect(redis);
+    const { svc } = makeService({
+      redis,
+      l3: makeL3(new Map([['key:1', l3Entry]])),
+      supabase: makeSupabase({ data: [supabaseRow], error: null }),
+    });
+
+    await svc.onModuleInit();
+    await getReconnectCb()();
+
+    const pipe = redis._client.created[0];
+    expect(pipe.rpush).not.toHaveBeenCalledWith(DIRTY_QUEUE, 'key:1');
+  });
+
+  // D2 — L3 winner → rpush to DIRTY_QUEUE (needs re-sync to Supabase)
+  it('enqueues key to DIRTY_QUEUE when L3 data wins — it must be synced to Supabase', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const l3Entry = makeEntry({ updatedAt: '2026-06-01T00:00:00Z' });
+    const supabaseRow: SupabaseRow = {
+      key: 'key:1', data: {}, updated_at: '2026-01-01T00:00:00Z', ttl_ms: 60_000,
+    };
+    const redis = makeRedis(false);
+    const { getReconnectCb } = captureReconnect(redis);
+    const { svc } = makeService({
+      redis,
+      l3: makeL3(new Map([['key:1', l3Entry]])),
+      supabase: makeSupabase({ data: [supabaseRow], error: null }),
+    });
+
+    await svc.onModuleInit();
+    await getReconnectCb()();
+
+    const pipe = redis._client.created[0];
+    expect(pipe.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'key:1');
+  });
+
+  // D3 — No Supabase match → L3 wins by default → rpush to DIRTY_QUEUE
+  it('enqueues key to DIRTY_QUEUE when no Supabase row exists for the key (L3 wins by default)', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const redis = makeRedis(false);
+    const { getReconnectCb } = captureReconnect(redis);
+    const { svc } = makeService({
+      redis,
+      l3: makeL3(new Map([['key:1', makeEntry()]])),
+      supabase: makeSupabase({ data: [], error: null }),
+    });
+
+    await svc.onModuleInit();
+    await getReconnectCb()();
+
+    const pipe = redis._client.created[0];
+    expect(pipe.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'key:1');
+  });
+});
