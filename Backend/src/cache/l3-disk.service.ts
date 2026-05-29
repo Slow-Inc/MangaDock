@@ -63,26 +63,21 @@ export class L3DiskService {
   }
 
   appendDirtyFallback(key: string): void {
-    const fallbackPath = path.join(this.cacheDir, 'dirty_fallback.json');
+    const fallbackPath = path.join(this.cacheDir, 'dirty_fallback.txt');
     try {
-      let keys: string[] = [];
-      if (fs.existsSync(fallbackPath)) {
-        keys = JSON.parse(fs.readFileSync(fallbackPath, 'utf-8')) as string[];
-      }
-      keys.push(key);
-      fs.writeFileSync(fallbackPath, JSON.stringify(keys), 'utf-8');
+      fs.appendFileSync(fallbackPath, key + '\n', 'utf-8');
     } catch (err) {
       this.logger.warn(`appendDirtyFallback: failed for key=${key}: ${String(err)}`);
     }
   }
 
   drainDirtyFallback(): string[] {
-    const fallbackPath = path.join(this.cacheDir, 'dirty_fallback.json');
+    const fallbackPath = path.join(this.cacheDir, 'dirty_fallback.txt');
     try {
       if (!fs.existsSync(fallbackPath)) return [];
-      const keys = JSON.parse(fs.readFileSync(fallbackPath, 'utf-8')) as string[];
+      const raw = fs.readFileSync(fallbackPath, 'utf-8');
       fs.unlinkSync(fallbackPath);
-      return Array.isArray(keys) ? keys : [];
+      return [...new Set(raw.split('\n').filter(k => k.length > 0))];
     } catch (err) {
       this.logger.warn(`drainDirtyFallback: failed: ${String(err)}`);
       return [];
