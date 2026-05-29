@@ -38,10 +38,12 @@ export class CatastrophicRecoveryService implements OnModuleInit {
     const winners = await this.buildWinnerBuffer(l3Entries);
     this.logger.log(`CatastrophicRecovery: buffered ${winners.size} winner key(s) for L2 push on reconnect`);
 
-    this.redis.onReconnect(() =>
-      this.pushToL2(winners).catch(err =>
-        this.logger.warn(`CatastrophicRecovery: reconnect push failed: ${String(err)}`),
-      ),
+    const unregister = this.redis.onReconnect(() =>
+      this.pushToL2(winners)
+        .then(() => unregister())
+        .catch(err =>
+          this.logger.warn(`CatastrophicRecovery: reconnect push failed: ${String(err)}`),
+        ),
     );
   }
 
