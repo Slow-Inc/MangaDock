@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-25T07:30:00Z",
+  "title": "Design System: MangaDock",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Indigo Action", "canonical": "oklch(62.14% 0.203 263.38)", "tonalRamp": ["#1e1b4b", "#312e81", "#3730a3", "#4338ca", "#4f46e5", "#6366f1", "#818cf8", "#a5b4fc"] },
+      "secondary": { "role": "secondary", "displayName": "Amber Manga", "canonical": "oklch(76.88% 0.175 74.34)", "tonalRamp": ["#451a03", "#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fcd34d"] }
+    },
+    "shadows": [
+      { "name": "tactical-glow", "value": "0 0 12px rgba(99, 102, 241, 0.4)", "purpose": "Active status or selected icon glow." }
+    ],
+    "motion": [
+      { "name": "smooth-hover", "value": "0.18s cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Standard interactive transitions." },
+      { "name": "smooth-hover-fast", "value": "0.08s cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Snappy feedback transitions." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action button with tactile feedback.",
+      "html": "<button class=\"ds-btn-primary\">TAKE ACTION</button>",
+      "css": ".ds-btn-primary { background: #6366f1; color: #fff; padding: 12px 24px; border-radius: 12px; font-weight: 900; border: none; font-size: 14px; transition: background 0.18s, transform 0.1s; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; } .ds-btn-primary:hover { background: #4f46e5; } .ds-btn-primary:active { transform: scale(0.95); }"
+    },
+    {
+      "name": "Liquid Glass Card",
+      "kind": "card",
+      "refersTo": "card-monolith",
+      "description": "Standard container for content with depth.",
+      "html": "<div class=\"ds-card-glass\"><h3 class=\"ds-title\">Monolith Header</h3><p class=\"ds-body\">Atmospheric content with glass depth.</p></div>",
+      "css": ".ds-card-glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 24px; color: #fff; } .ds-title { font-weight: 900; margin-bottom: 8px; font-size: 18px; } .ds-body { color: rgba(255, 255, 255, 0.5); font-size: 14px; line-height: 1.6; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Contextual Triad",
+    "overview": "MangaDock utilize a layered aesthetic philosophy that adapts to the user's current task: Cinematic Canvas for reading, Polished Monolith for interaction, and Tactical Terminal for status.",
+    "keyCharacteristics": ["Zero AI Slop", "Atmospheric Depth", "Native Fluidity"],
+    "dos": ["Do use backdrop-blur-md on all floating surfaces.", "Do use .smooth-hover (0.18s) for transitions."],
+    "donts": ["Don't use emojis for primary navigation.", "Don't use childish, oversaturated primary colors."]
+  }
+}
