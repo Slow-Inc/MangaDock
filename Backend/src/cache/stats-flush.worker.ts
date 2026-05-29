@@ -20,7 +20,7 @@ export class StatsFlushWorker implements OnModuleInit, OnModuleDestroy {
     this.timer = setInterval(
       () => this.flush().catch(err => this.logger.warn(`Stats flush error: ${String(err)}`)),
       FLUSH_INTERVAL_MS,
-    );
+    ).unref();
   }
 
   onModuleDestroy() {

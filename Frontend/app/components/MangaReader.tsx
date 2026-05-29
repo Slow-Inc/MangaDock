@@ -560,7 +560,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       return () => { document.body.style.overflow = ""; };
     }
 
-    apiFetch(`${API_BASE}/books/chapters/${chapterId}/pages${localStorage.getItem("imgCacheForceLocal") === "1" ? "?forceLocal=true" : ""}`, {
+    const _pageParams = new URLSearchParams();
+    if (localStorage.getItem("imgCacheForceLocal") === "1") _pageParams.set("forceLocal", "true");
+    if (mangaId) _pageParams.set("mangaId", mangaId);
+    const _pageQuery = _pageParams.size > 0 ? `?${_pageParams.toString()}` : "";
+    apiFetch(`${API_BASE}/books/chapters/${chapterId}/pages${_pageQuery}`, {
       headers: {
         'x-captcha-clearance': clearanceToken || '',
       }

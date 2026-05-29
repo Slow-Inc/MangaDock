@@ -84,6 +84,15 @@ export class L3DiskService {
     }
   }
 
+  keyCount(): number {
+    try {
+      if (!fs.existsSync(this.cacheDir)) return 0;
+      return fs.readdirSync(this.cacheDir).filter(f => f.endsWith('.json')).length;
+    } catch {
+      return 0;
+    }
+  }
+
   protected writeFile(filePath: string, content: string): void {
     fs.writeFileSync(filePath, content, 'utf-8');
   }
