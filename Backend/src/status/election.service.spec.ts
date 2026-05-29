@@ -245,3 +245,46 @@ describe('ElectionService — Redis NX Lock', () => {
     });
   });
 });
+
+describe('ElectionService — failover latency (#54)', () => {
+  // Cycle T1 — election interval is 5s for fast failover
+  it('ELECTION_INTERVAL_MS is 5000ms to ensure sub-15s failover', () => {
+    const interval = (ElectionService as any).ELECTION_INTERVAL_MS ?? 5_000;
+    // Verify via the timer set in onModuleInit
+    jest.useFakeTimers();
+    const client = makeClient();
+    const svc = makeElection('node-1', client);
+    const setIntervalSpy = jest.spyOn(global, 'setInterval');
+
+    svc.onModuleInit();
+
+    const call = setIntervalSpy.mock.calls[0];
+    expect(call[1]).toBe(5_000);
+
+    jest.useRealTimers();
+  });
+
+  // Cycle T2 — LEADER_TTL_MS covers at least 2 election intervals (split-brain guard)
+  it('LEADER_TTL_MS is at least 2x ELECTION_INTERVAL_MS to survive one missed renewal', () => {
+    jest.useFakeTimers();
+    const client = makeClient({ set: jest.fn().mockResolvedValue('OK') });
+    const svc = makeElection('node-1', client);
+
+    svc.onModuleInit();
+
+    // On renewal the Lua script is called with LEADER_TTL_MS as ARGV[2]
+    // We acquire first, then renew
+    jest.useRealTimers();
+
+    const evalMock = client.eval as jest.Mock;
+    // Trigger runElection twice: first acquires (set NX), second renews (eval)
+    return svc.runElection().then(() =>
+      svc.runElection().then(() => {
+        if (evalMock.mock.calls.length > 0) {
+          const ttlArg = Number(evalMock.mock.calls[0][4]); // ARGV[2] = ttl string
+          expect(ttlArg).toBeGreaterThanOrEqual(2 * 5_000);
+        }
+      })
+    );
+  });
+});

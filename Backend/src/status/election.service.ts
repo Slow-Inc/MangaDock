@@ -2,8 +2,8 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { RedisService } from '../cache/redis.service';
 import { MetricsService } from './metrics.service';
 
-const ELECTION_INTERVAL_MS = 15_000;
-const LEADER_TTL_MS = Math.floor(ELECTION_INTERVAL_MS * 2.5); // 37.5s — survives one missed renewal
+const ELECTION_INTERVAL_MS = 5_000;
+const LEADER_TTL_MS = Math.floor(ELECTION_INTERVAL_MS * 2.5); // 12.5s — survives one missed renewal
 const LEADER_KEY = 'cache:leader';
 
 // Atomic compare-and-swap: renew only if we still own the lock.

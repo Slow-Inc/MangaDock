@@ -38,3 +38,41 @@ describe('JsonCacheService — L1 in-memory only', () => {
     expect(freshJc.get('disk:key')?.data).toBe('from disk');
   });
 });
+
+describe('JsonCacheService — byte-size LRU eviction (#53)', () => {
+  let l3: L3DiskService;
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-size-'));
+    l3 = new L3DiskService(tmpDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // Cycle S1 — large entry is evicted when maxSize is exceeded
+  it('evicts an older large entry when total byte size exceeds maxSize', () => {
+    const jc = new JsonCacheService(l3);
+    // Fill with one large entry (~30MB) then add another to push over the 50MB limit
+    const big1 = 'x'.repeat(30 * 1024 * 1024); // ~30MB string
+    const big2 = 'y'.repeat(25 * 1024 * 1024); // ~25MB string
+    jc.set('large-1', big1, 60_000);
+    jc.set('large-2', big2, 60_000);
+
+    // large-1 should have been evicted (total would be ~55MB > 50MB)
+    expect(jc.get('large-1')).toBeNull();
+    expect(jc.get('large-2')).not.toBeNull();
+  });
+
+  // Cycle S2 — small entries are not evicted below maxSize
+  it('does not evict small entries when total size is well below maxSize', () => {
+    const jc = new JsonCacheService(l3);
+    jc.set('small-1', { v: 1 }, 60_000);
+    jc.set('small-2', { v: 2 }, 60_000);
+
+    expect(jc.get('small-1')).not.toBeNull();
+    expect(jc.get('small-2')).not.toBeNull();
+  });
+});

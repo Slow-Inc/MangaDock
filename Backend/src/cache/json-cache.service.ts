@@ -10,11 +10,16 @@ export type CacheEntry<T> = {
 };
 
 const L1_MAX_ENTRIES = 10_000;
+const L1_MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 @Injectable()
 export class JsonCacheService implements OnModuleInit {
   private readonly logger = new Logger(JsonCacheService.name);
-  private readonly memoryStore = new LRUCache<string, CacheEntry<unknown>>({ max: L1_MAX_ENTRIES });
+  private readonly memoryStore = new LRUCache<string, CacheEntry<unknown>>({
+    max: L1_MAX_ENTRIES,
+    maxSize: L1_MAX_SIZE_BYTES,
+    sizeCalculation: (value, key) => key.length + JSON.stringify(value.data).length,
+  });
 
   constructor(private readonly l3: L3DiskService) {}
 
