@@ -231,6 +231,106 @@ PR #16 scrutiny (Issues #17 PRD) found 3 major bugs + 1 minor in the dirty-queue
 
 ---
 
+## ✅ Phase 2.4–2.5 — Cache Hardening (2026-05-29, PRs #60 / #61 closed)
+
+### Status: COMPLETE — 277 tests passing
+
+---
+
+### Phase 2.4 — CatastrophicRecoveryService (#38)
+
+#### New Files
+- `Backend/src/cache/catastrophic-recovery.service.ts` — `OnModuleInit`: เมื่อ Redis ไม่ขึ้นตอน boot → อ่าน L3 → เปรียบเทียบ timestamp ต่อ key กับ Supabase (batch 100) → buffer winners → register reconnect callback (fire-once); `pushToL2()`: jitter 0–5s + pipeline chunk 500
+- `Backend/src/cache/catastrophic-recovery.service.spec.ts` — 18 tests: T1-T10 (core + fire-once), S1-S5 (Supabase comparison), D1-D3 (smart dirty queuing)
+
+#### Modified Files
+- `Backend/src/cache/batch-sync.worker.ts` — `syncKey()` RPC params เปลี่ยนจาก `{ p_key, p_entry }` → `{ p_key, p_data, p_updated_at, p_ttl_ms }` (conditional upsert)
+- `Backend/src/cache/batch-sync.worker.spec.ts` — เพิ่ม U1-U2: verify correct RPC param shape; `p_entry` absent
+- `Backend/src/cache/cache.module.ts` — register `CatastrophicRecoveryService`
+
+#### Key Architecture Decisions
+- **Smart Dirty Queuing:** `source: 'l3' | 'supabase'` tracking — skip RPUSH เมื่อ Supabase wins (data อยู่ DB แล้ว) → เฉพาะ L3 winners เท่านั้นที่ต้อง re-sync
+- **Fire-once callback:** `onReconnect()` return `unregister fn` → เรียกหลัง push สำเร็จครั้งแรก → ป้องกัน stale L3 data ทับ L2 บน reconnect ครั้งที่ 2+
+- **Thundering herd:** jitter `Math.random() * 5000ms` ก่อน pipeline push
+- **Supabase fallback:** ถ้า Supabase unavailable → ใช้ L3-only winners (log WARN)
+
+#### Scrutinize Finding Fixed (post-PR)
+- **Blocker:** `onReconnect` callback ไม่ unregister → push stale boot-time L3 data ทับค่าใหม่กว่าใน L2 บน reconnect ครั้งที่ 2
+- **Fix (commit bcfd68d):** `const unregister = this.redis.onReconnect(() => this.pushToL2(winners).then(() => unregister()).catch(...))`
+- **T10 test:** verify `unregister()` ถูก call exactly once หลัง push สำเร็จ
+
+---
+
+### Phase 2.4+ Round 1 — BatchSyncWorker Retry Budget + Dead-letter (#64–#66)
+
+#### Modified Files
+- `Backend/src/cache/batch-sync.worker.ts`
+  - Export: `MAX_RETRIES = 5`, `RETRY_COUNTS_KEY = 'cache:retry_counts'`, `DEAD_LETTER_SET = 'cache:dead_letter'`
+  - On RPC fail: `HINCRBY cache:retry_counts <key> 1`; if count >= MAX_RETRIES → `SADD cache:dead_letter <key>` + `LREM` + `logger.error`
+  - On RPC success: `HDEL cache:retry_counts <key>` ก่อน `LREM`
+  - On L2 expiry: `HDEL cache:retry_counts <key>` ป้องกัน stale counter สะสม
+- `Backend/src/cache/batch-sync.worker.spec.ts` — เพิ่ม 6 tests R1-R6
+
+#### Key Architecture Decision
+- Keys ที่ fail Supabase ซ้ำๆ วนลูป dirty→processing→dirty ไม่มีที่สิ้นสุด → ระบบ retry budget + dead-letter set ป้องกัน single bad key กิน flush budget ทั้งหมด
+- Dead-lettered keys inspectable ด้วย `SMEMBERS cache:dead_letter`; re-queue ด้วย `SMOVE cache:dead_letter cache:dirty <key>`
+
+---
+
+### Phase 2.4+ Round 2 — mangaId Propagation in Stats Pipeline
+
+#### Modified Files
+- `Frontend/app/components/MangaReader.tsx` — สร้าง URL ด้วย `URLSearchParams` รวม `?mangaId=` param เมื่อ prop มีค่า
+
+#### Context
+- `StatsIncrementService.recordChapterView()` ตั้ง `stats:chapter:{id}:manga:{date}` key ถูกต้องอยู่แล้ว
+- `BooksController.getMangaChapterPages()` รับ `@Query('mangaId')` อยู่แล้ว
+- ปัญหา: `MangaReader.tsx` ไม่ส่ง `?mangaId=` ทำให้ `manga_id` ใน `chapter_daily_stats` เป็น `''` เสมอ
+- ทุก component caller (`BookDetailModal`, `ContinueReadingRow`, `MangaGrid`, `BookRow`) ส่ง `mangaId={book.id}` ครบแล้ว
+
+---
+
+### Phase 2.4+ Round 3 — Timer Hygiene + Cache Health Endpoint (#67–#69)
+
+#### New Files
+- `Backend/src/cache/cache-health.service.ts` — `getHealth(): Promise<CacheHealthSnapshot>`: LLEN dirty/processing, SCARD dead_letter, L3 keyCount, isLeader; คืน 0 ทุกตัวเมื่อ Redis unavailable
+- `Backend/src/cache/cache-health.service.spec.ts` — 6 tests H1-H6
+
+#### Modified Files
+- `Backend/src/cache/batch-sync.worker.ts` — `.unref()` บน `setInterval` timer
+- `Backend/src/cache/stats-flush.worker.ts` — `.unref()` บน `setInterval` timer
+- `Backend/src/cache/redis.service.ts` — เพิ่ม `llen(key)` + `scard(key)` methods
+- `Backend/src/cache/l3-disk.service.ts` — เพิ่ม `keyCount()` → count `.json` files ไม่ parse JSON
+- `Backend/src/cache/cache.module.ts` — register + export `CacheHealthService`
+- `Backend/src/status/status.controller.ts` — `GET /status/cache` → `CacheHealthService.getHealth()`
+
+#### Key Architecture Decisions
+- **Timer `.unref()`:** ป้องกัน Jest process leak warning; production ไม่มีผลกระทบ
+- **`GET /status/cache`:** เปิดเหมือน `/status/stream` (ไม่มี auth guard) — ข้อมูลไม่ sensitive
+- **`CacheHealthService`:** deep module — dependency inject ได้, mock ได้ง่าย, interface ไม่เปลี่ยน
+
+---
+
+### Test Count: 277 passing (เพิ่มจาก 265 → 277)
+
+| Batch | Tests Added |
+|-------|------------|
+| T1-T10 (CatastrophicRecovery core + fire-once) | +10 |
+| S1-S5 (Supabase comparison) | +5 |
+| D1-D3 (smart dirty queuing) | +3 |
+| U1-U2 (RPC param shape) | +2 |
+| R1-R6 (retry budget + dead-letter) | +6 |
+| H1-H6 (cache health service) | +6 |
+
+### Notes for Gemini
+- PR #60 (feat/cache-phase-2-4) ปิดแล้ว — งานทั้งหมดรวมอยู่ใน PR ใหม่
+- `cache:dead_letter` Redis Set ควร empty เสมอในสภาวะปกติ; non-empty = signal ว่ามี key ที่ต้องตรวจสอบ Supabase schema/constraint
+- `GET /status/cache` endpoint: operator ใช้ตรวจสอบ queue depths; ไม่มี auth เหมือน `/status/stream`
+- `L3DiskService.keyCount()` นับแค่ไฟล์ ไม่ parse JSON — ถูกใช้เฉพาะ health snapshot, ไม่กระทบ critical path
+- `mangaId` ใน `chapter_daily_stats` จะมีค่าถูกต้องตั้งแต่ session นี้เป็นต้นไป; ข้อมูล historical ที่มี `''` ยังอยู่ใน DB แต่ไม่กระทบ future data
+
+---
+
 ## 🛠️ V5 Final Hardening (Commit 69712f9)
 - **Error Handling:** เปลี่ยน `throw new Error()` เป็น `InternalServerErrorException` ทั้งหมดใน `UnlockService` เพื่อมาตรฐานความปลอดภัย
 - **Runtime Validation:** ติดตั้ง `forum.dto.ts` และเปิดใช้งาน `ValidationPipe` (class-validator) แบบ Global ใน `main.ts` ป้องกัน Payload ที่ผิดโครงสร้าง

@@ -7,6 +7,9 @@ import type { CacheEntry } from './json-cache.service';
 
 export const DIRTY_QUEUE = 'cache:dirty';
 export const PROCESSING_QUEUE = 'cache:processing';
+export const RETRY_COUNTS_KEY = 'cache:retry_counts';
+export const DEAD_LETTER_SET = 'cache:dead_letter';
+export const MAX_RETRIES = 5;
 const CACHE_SYNC_RPC = 'upsert_cache_entry';
 const FLUSH_INTERVAL_MS = 5_000;
 const MAX_BATCH_SIZE = 100;
@@ -40,7 +43,7 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     this.timer = setInterval(
       () => this.flush().catch(err => this.logger.warn(`Flush error: ${String(err)}`)),
       FLUSH_INTERVAL_MS,
-    );
+    ).unref();
   }
 
   onModuleDestroy() {
@@ -109,6 +112,7 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     const raw = await this.redis.get(key);
     if (!raw) {
       await client.lrem(PROCESSING_QUEUE, 1, key); // expired — ack to prevent permanent orphan
+      await client.hdel(RETRY_COUNTS_KEY, key);    // cleanup stale retry counter
       return;
     }
 
@@ -124,12 +128,28 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     this.l3.write(key, entry);
 
     try {
-      const { error } = await this.supabase.client.rpc(CACHE_SYNC_RPC, { p_key: key, p_entry: entry }) as { error: Error | null };
+      const { error } = await this.supabase.client.rpc(CACHE_SYNC_RPC, {
+        p_key: key,
+        p_data: entry.data,
+        p_updated_at: entry.updatedAt,
+        p_ttl_ms: entry.ttlMs,
+      }) as { error: Error | null };
       if (error) throw error;
+      await client.hdel(RETRY_COUNTS_KEY, key); // reset consecutive-failure counter on success
       await client.lrem(PROCESSING_QUEUE, 1, key);
     } catch (err) {
-      this.logger.warn(`BatchSync: Supabase RPC failed key=${key}: ${String(err)} — left in processing for retry`);
-      // Do NOT lrem — key stays in processing queue for next recovery cycle
+      const retryCount = await client.hincrby(RETRY_COUNTS_KEY, key, 1) as number;
+      if (retryCount >= MAX_RETRIES) {
+        await client.sadd(DEAD_LETTER_SET, key);
+        await client.lrem(PROCESSING_QUEUE, 1, key);
+        this.logger.error(
+          `BatchSync: key=${key} dead-lettered after ${retryCount} consecutive failures — ${String(err)}`,
+        );
+      } else {
+        this.logger.warn(
+          `BatchSync: Supabase RPC failed key=${key} (attempt ${retryCount}/${MAX_RETRIES}): ${String(err)} — left in processing for retry`,
+        );
+      }
     }
   }
 }
