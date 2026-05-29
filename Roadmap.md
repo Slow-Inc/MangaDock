@@ -1,13 +1,19 @@
 # MangaDock — Consolidated Architecture & Implementation Roadmap (V5 Master)
 
+## Vision
+MangaDock is a premium, decentralized manga platform that bridges the gap between AI-driven translation (MIT) and human creativity. It features a robust marketplace for translators and creators, a high-performance reading experience, and a deep community ecosystem.
+
+---
+
 ## 🏛️ แกนหลักปรัชญาวิศวกรรมโครงการ (T4-STANDARD Pillars)
 1.  **Idempotent Pipelines:** ทุก Operation (Upload, Vote, Unlock) ต้อง Retry-safe ไม่เกิดข้อมูลซ้ำซ้อน แม้จะรันขนานกัน
 2.  **Webhook Integrity:** ทุกการสื่อสารภายนอก (MIT, Payments) ต้องมี HMAC Signature เพื่อป้องกันการปลอมแปลง
-3.  **2-Layer Cache (L1 In-Memory & L2 Redis):** ระบบ L1 (In-Memory Cache) และ L2 (Redis) เพื่อรองรับการทำ **Horizontal Scaling** ในอนาคตและมีความยืดหยุ่นสูง พร้อมระบบ Graceful Shutdown Sync ก่อนโปรเซสปิดตัว
+3.  **Multi-Layer Cache (L1 In-Memory / L2 Redis / L3 Disk):** Truth hierarchy L1→L2→L3→Supabase รองรับ Horizontal Scaling, Catastrophic Recovery, retry budget + dead-letter queue, cross-node invalidation via pub/sub พร้อม Graceful Shutdown Sync ก่อนโปรเซสปิดตัว
 4.  **Worker Memory Contract:** งานประมวลผลหนัก (AI) ต้องถูก Delegate ออกจาก Main Process เสมอ
 5.  **Zero-Trust Assets:** ปกป้องรูปภาพผ่าน Hardware ID และ 1-Hour Verification Window
 6.  **Observability:** บันทึกข้อมูลทุก Request เป็น Structured JSON รวม IP และ User-Agent เพื่อการทำ Audit Trail
 7.  **Premium Design:** บังคับใช้ Liquid Glass Aesthetics และ Zero-Emoji Policy ในระดับ System UI อย่างเคร่งครัด
+8.  **User-Centric UX & Empathy:** ทุก Interaction ต้องมี Instant Feedback (Optimistic UI), Skeleton Loading, และ Toast Notification ที่ชัดเจน — ออกแบบเพื่อผู้ใช้จริง ไม่ใช่เพื่อ Engineering Convenience
 
 ---
 
@@ -45,15 +51,15 @@
 7.  **✅ Technical Debt Cleanup (Completed):** ถอดถอน `GoogleBooksService` (Legacy) ออกทั้งหมด เพื่อใช้ MangaDex Service แบบ Dynamic 100% แล้ว และเตรียมเพิ่มระบบ Soft Deletion ใน Forum
 
 ### 🔵 Phase 2: Architectural Scaling & Cloud Readiness
-**สถานะ:** 🔵 In Progress (Cache Upgrade ✅ — ส่วนที่เหลือ Planned)
-1.  **Advanced 3-Layer Cache Orchestration (T4-Standard Architecture):** 🔵 In Progress
-    *   **Truth Hierarchy (confirmed via architecture review):** L1 (in-memory latency) → L2 (Redis, runtime source of truth / horizontal scaling) → L3 (JSON disk, per-node backup + Leader buffer) → Supabase (long-term authority)
-    *   **L2-Centric Runtime:** Redis เป็น Source of Truth ณ Runtime; L1 (in-memory) รับข้อมูลจาก `set()` โดยตรงเพื่อ in-process consistency — **L1 = in-memory เท่านั้น ไม่รวม disk**
-    *   **L3 Batch Layer** (Issues #13–15 🔵 Planned): `L3DiskService` สำหรับ pure disk I/O; `L3BatchWriter` periodic L2→L3 batch บนทุก node ตาม Flush Frequency ต่อ data type; Leader re-sync L2→L3 ก่อน Supabase write; **แก้ไข bug: `JsonCacheService.set()` ปัจจุบันเขียน disk ทุก L1 update ซึ่งสร้าง I/O overhead มหาศาล**
-    *   **Redis NX Lock Election:** ✅ ใช้ `SET cache:leader NX PX` + Lua CAS renewal เป็น Distributed Mutex — ป้องกัน split-brain, leader thrashing, และ lock theft อย่างเด็ดขาด
-    *   **Node Observability:** ✅ MetricsService เก็บ CPU/Memory/Supabase Latency ใน `cluster_metrics:{nodeId}` สำหรับ monitoring dashboard — ไม่ใช้ตัดสิน leadership
-    *   **Reliable Write-behind Queue:** ✅ Leader Node ดึง Dirty Key ด้วย `RPOPLPUSH` (atomic) → L3 sync → `LREM` ack; crash recovery ด้วย `LRANGE` บน startup
-    *   **Recovery Hierarchy:** L1 in-memory → L3 disk vs Supabase timestamp (newer wins) → Supabase only (ถ้า L3 เสียหาย); implement พร้อม Supabase handler แรก
+**สถานะ:** 🔵 In Progress (Cache Upgrade ✅ Complete — ส่วนที่เหลือ Planned)
+1.  **Multi-Layer Cache Orchestration (T4-Standard Architecture):** ✅ Complete (PRs #16/#34/#39/#49/#50/#55/#70/#71)
+    *   **Truth Hierarchy:** L1 (in-memory latency) → L2 (Redis, runtime source of truth) → L3 (JSON disk, per-node backup) → Supabase (long-term authority)
+    *   **Leader Election:** Redis NX Lock (`SET cache:leader NX PX`) + Lua CAS renewal — ป้องกัน split-brain, leader thrashing
+    *   **Write-behind Queue:** `RPOPLPUSH` (atomic) → L3 sync → `LREM` ack; retry budget (MAX_RETRIES=5) + dead-letter queue (`cache:dead_letter`)
+    *   **Catastrophic Recovery:** Boot with Redis down → อ่าน L3 → compare timestamp กับ Supabase → fire-once reconnect callback push L2
+    *   **Cross-node L1 Invalidation:** Redis pub/sub `cache:invalidate`
+    *   **Observability:** `GET /status/cache` → `{ dirtyQueueDepth, processingQueueDepth, deadLetterCount, l3KeyCount, isLeader }`
+    *   **279 tests passing**
 2.  **Real-World Payment Gateway:** เปลี่ยนจาก Test Endpoint เป็นการเชื่อมต่อ Payment Provider จริง (QR/PromptPay) พร้อมระบบตรวจสอบ HMAC Webhook Validation
 3.  **Global Asset Distribution (Multi-layer Buffering):**
     *   **Cloudflare Worker Buffer:** ใช้ Worker เป็น Buffer ด่านหน้าก่อนถึง R2 เพื่อลด Request Rate และค่าใช้จ่าย (Cost) ให้ต่ำกว่าปกติมหาศาล

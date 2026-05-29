@@ -112,7 +112,33 @@ Depth is conveyed through **Physical Transparency** and **Ambient Glow**.
 - **Top Bar:** Fixed height (64px), high-blur backdrop, z-index 50.
 - **Mobile Menu:** Right-aligned slide-over drawer with tactical navigation links.
 
-## 6. Do's and Don'ts
+## 6. Brand Identity
+
+### Brand Personality
+- **Sophisticated & Precise:** Like Apple, every gap and alignment is intentional.
+- **Immersive & Cinematic:** Like Netflix, the UI recedes to let the content shine.
+- **Tech-Forward:** Confident, high-performance, and reliable.
+
+### Anti-references
+- **Legacy Forums:** Avoid cluttered, dense, and "old-web" board designs.
+- **Childish Palettes:** No oversaturated, "toy-like" colors.
+- **AI Slop:** NO excessive emojis, generic gradients, or unpolished "generated" feels.
+- **Friction:** No complex workflows or deep nesting.
+
+### Core Design Principles
+- **Native-First Fluidity:** Every interaction must feel purpose-built and as smooth as a native OS app.
+- **High-Fidelity Minimalism:** Precision over decoration. Use "Liquid Glass" and blur for depth, not complexity.
+- **Content as the Hero:** The UI provides the frame; the manga and the community provide the life.
+- **Zero-Latency Feedback:** Instant responses (Optimistic UI) and clear, elegant loading states.
+
+### Accessibility
+- WCAG 2.1 Level AA.
+- Support for high-contrast reading and reduced motion preferences.
+- Inclusive typography optimized for multi-language manga text.
+
+---
+
+## 7. Do's and Don'ts
 
 ### Do:
 - **Do** use `backdrop-blur-md` on all floating surfaces.
