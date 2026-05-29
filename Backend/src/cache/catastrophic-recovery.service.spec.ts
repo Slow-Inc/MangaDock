@@ -223,6 +223,24 @@ describe('CatastrophicRecoveryService', () => {
 
     await expect(reconnectCb()).resolves.not.toThrow();
   });
+
+  // T10 — Fire-once: unregister is called after a successful push
+  it('unregisters the reconnect callback after the first successful push — prevents stale data overwrite on second reconnect', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const redis = makeRedis(false);
+    const unregister = jest.fn();
+    let reconnectCb!: ReconnectCb;
+    (redis.onReconnect as jest.Mock).mockImplementation((cb: ReconnectCb) => {
+      reconnectCb = cb;
+      return unregister;
+    });
+    const { svc } = makeService({ redis, l3: makeL3(new Map([['key:1', makeEntry()]])) });
+
+    await svc.onModuleInit();
+    await reconnectCb();
+
+    expect(unregister).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('CatastrophicRecoveryService — Supabase comparison (#58)', () => {
