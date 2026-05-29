@@ -137,6 +137,24 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async llen(key: string): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return await this.client!.llen(key);
+    } catch {
+      return 0;
+    }
+  }
+
+  async scard(key: string): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return await (this.client as any).scard(key);
+    } catch {
+      return 0;
+    }
+  }
+
   async smembers(key: string): Promise<string[]> {
     if (!this.available) return [];
     try {

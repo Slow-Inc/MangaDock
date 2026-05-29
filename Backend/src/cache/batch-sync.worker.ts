@@ -43,7 +43,7 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     this.timer = setInterval(
       () => this.flush().catch(err => this.logger.warn(`Flush error: ${String(err)}`)),
       FLUSH_INTERVAL_MS,
-    );
+    ).unref();
   }
 
   onModuleDestroy() {
