@@ -9,6 +9,7 @@ import { BatchSyncWorker } from './batch-sync.worker';
 import { StatsIncrementService } from './stats-increment.service';
 import { StatsFlushWorker } from './stats-flush.worker';
 import { L2RecoveryService } from './l2-recovery.service';
+import { CatastrophicRecoveryService } from './catastrophic-recovery.service';
 import { StatusModule } from '../status/status.module';
 
 @Global()
@@ -25,6 +26,7 @@ import { StatusModule } from '../status/status.module';
     StatsIncrementService,
     StatsFlushWorker,
     L2RecoveryService,
+    CatastrophicRecoveryService,
   ],
   exports: [CacheOrchestratorService, ImageCacheService, RedisService, StatsIncrementService],
 })
