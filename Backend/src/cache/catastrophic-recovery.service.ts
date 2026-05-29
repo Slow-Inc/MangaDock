@@ -11,6 +11,7 @@ const SEVEN_DAYS_S = 7 * 24 * 60 * 60;
 const MAX_JITTER_MS = 5_000;
 
 type CacheRow = { key: string; data: unknown; updated_at: string; ttl_ms: number };
+type WinnerEntry = { entry: CacheEntry<unknown>; source: 'l3' | 'supabase' };
 
 @Injectable()
 export class CatastrophicRecoveryService implements OnModuleInit {
@@ -46,8 +47,10 @@ export class CatastrophicRecoveryService implements OnModuleInit {
 
   private async buildWinnerBuffer(
     l3Entries: Map<string, CacheEntry<unknown>>,
-  ): Promise<Map<string, CacheEntry<unknown>>> {
-    const winners = new Map(l3Entries);
+  ): Promise<Map<string, WinnerEntry>> {
+    const winners = new Map<string, WinnerEntry>(
+      [...l3Entries.entries()].map(([key, entry]) => [key, { entry, source: 'l3' }]),
+    );
     const keys = [...l3Entries.keys()];
 
     try {
@@ -63,7 +66,10 @@ export class CatastrophicRecoveryService implements OnModuleInit {
         for (const row of data ?? []) {
           const l3Entry = l3Entries.get(row.key);
           if (l3Entry && new Date(row.updated_at) > new Date(l3Entry.updatedAt)) {
-            winners.set(row.key, { data: row.data, updatedAt: row.updated_at, ttlMs: row.ttl_ms });
+            winners.set(row.key, {
+              entry: { data: row.data, updatedAt: row.updated_at, ttlMs: row.ttl_ms },
+              source: 'supabase',
+            });
           }
         }
       }
@@ -76,7 +82,7 @@ export class CatastrophicRecoveryService implements OnModuleInit {
     return winners;
   }
 
-  private async pushToL2(entries: Map<string, CacheEntry<unknown>>): Promise<void> {
+  private async pushToL2(entries: Map<string, WinnerEntry>): Promise<void> {
     // Jitter: prevents thundering herd when all nodes reconnect simultaneously
     await new Promise<void>(resolve => setTimeout(resolve, Math.random() * MAX_JITTER_MS));
 
@@ -86,7 +92,7 @@ export class CatastrophicRecoveryService implements OnModuleInit {
       return;
     }
 
-    const toSync = [...entries.entries()].map(([key, entry]) => {
+    const toSync = [...entries.entries()].map(([key, { entry, source }]) => {
       const ttlSeconds =
         entry.ttlMs <= 0
           ? SEVEN_DAYS_S
@@ -94,16 +100,16 @@ export class CatastrophicRecoveryService implements OnModuleInit {
               Math.floor((entry.ttlMs - (Date.now() - new Date(entry.updatedAt).getTime())) / 1000),
               1,
             );
-      return { key, value: JSON.stringify(entry), ttlSeconds };
+      return { key, value: JSON.stringify(entry), ttlSeconds, source };
     });
 
     let pushed = 0;
     for (let i = 0; i < toSync.length; i += PIPELINE_CHUNK_SIZE) {
       const chunk = toSync.slice(i, i + PIPELINE_CHUNK_SIZE);
       const pipeline = (client as any).pipeline();
-      for (const { key, value, ttlSeconds } of chunk) {
+      for (const { key, value, ttlSeconds, source } of chunk) {
         pipeline.set(key, value, 'EX', ttlSeconds);
-        pipeline.rpush(DIRTY_QUEUE, key);
+        if (source === 'l3') pipeline.rpush(DIRTY_QUEUE, key); // Supabase winner: already in DB, skip re-sync
       }
       try {
         await pipeline.exec();
