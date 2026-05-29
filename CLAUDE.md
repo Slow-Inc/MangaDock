@@ -4,6 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Project Memory (Team Shared)
+
+Memory files live at `.claude/memory/` in this repo — committed so all team members and agents start with full context.
+
+**At the start of every session, read all files in `.claude/memory/` before doing anything else.**
+
+`MEMORY.md` is the index. Each linked file is a memory record (user, feedback, project, or reference type).
+
+If you write new memories during a session, update both `.claude/memory/` (for the team) and your local `~/.claude/projects/.../memory/` (for your own continuity).
+
+---
+
 ## Dual-AI Workflow (Project-Specific)
 
 You are the **Deep Reasoning Agent** in a Gemini + Claude system.
