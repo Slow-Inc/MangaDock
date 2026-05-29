@@ -10,6 +10,7 @@ import { StatsIncrementService } from './stats-increment.service';
 import { StatsFlushWorker } from './stats-flush.worker';
 import { L2RecoveryService } from './l2-recovery.service';
 import { CatastrophicRecoveryService } from './catastrophic-recovery.service';
+import { CacheHealthService } from './cache-health.service';
 import { StatusModule } from '../status/status.module';
 
 @Global()
@@ -27,7 +28,8 @@ import { StatusModule } from '../status/status.module';
     StatsFlushWorker,
     L2RecoveryService,
     CatastrophicRecoveryService,
+    CacheHealthService,
   ],
-  exports: [CacheOrchestratorService, ImageCacheService, RedisService, StatsIncrementService],
+  exports: [CacheOrchestratorService, ImageCacheService, RedisService, StatsIncrementService, CacheHealthService],
 })
 export class CacheModule {}
