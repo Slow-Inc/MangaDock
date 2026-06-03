@@ -44,6 +44,62 @@ _Avoid_: batch interval, sync rate, TTL
 
 ---
 
+## Translation System Architecture — 2026-06-04
+
+### Translation Paths
+
+**Text Translation (Dialogue):**
+Gemini API called directly from NestJS. Input: array of text lines. Output: translated lines. Cached permanently per line via SHA1 hash. User selects model from dropdown (persisted in localStorage).
+_Avoid_: OCR translation, image translation, MIT translation
+
+**Patch Translation (Image Overlay):**
+MIT Python server processes a manga page image and returns per-region translated PNG patches. Each patch has normalized coordinates (0–1 fractions of image dimensions). Overlaid client-side on the original image. Cached 7 days per page.
+_Avoid_: full-image translation, page replacement, rendered translation
+
+**Batch Translation:**
+Multiple pages sent to MIT in one request. Results stream back to frontend via SSE as each page completes. Architecture: fire-and-forget to MIT + webhook callback per page. See "Batch Job" below.
+_Avoid_: bulk translation, parallel translation, chapter translation
+
+### Glossary
+
+**Patch:**
+A translated text region returned as a PNG image with normalized bounding box (`xPct`, `yPct`, `wPct`, `hPct` — all 0–1 fractions of the original page dimensions). Rendered as an absolutely-positioned overlay on the original manga page image.
+_Avoid_: translated region, overlay image, text replacement
+
+**Batch Job:**
+A translation job for an entire chapter. MIT processes pages asynchronously and calls a webhook per page when done. The frontend connects via SSE and receives results as they arrive.
+_Avoid_: chapter job, bulk job, async job
+
+**Batch Job Registry (to be removed in Option A'):**
+Currently `activeBatchJobs: Map<string, BatchJobState>` in `BooksService`. Coordinates between the webhook handler and SSE listeners. Being replaced with Redis pub/sub.
+_Avoid_: job Map, job store, job cache
+
+**MIT (manga-image-translator):**
+The open-source Python AI server that handles OCR, text region detection, inpainting, and Gemini-based translation for manga page images. Runs as a separate process. Communicates with NestJS via HTTP (single-page) or HTTP + webhook callback (batch).
+_Avoid_: AI server, translation server, Python server
+
+**Startup Retry:**
+MIT loads ML models lazily on the first request. `translateMangaPagePatches` retries up to 30× with 5s delays (150s patience) for the main path; 3× for the fallback path (`_retryMissingPagesIndividually`).
+
+### Option A' — Redis Pub/Sub Batch Architecture (planned)
+
+Replaces `activeBatchJobs` Map with Redis pub/sub as coordination mechanism:
+```
+MIT → webhook → handleMitCallback
+  → cache.set(cacheKey, patches)          // persist result
+  → redis.publish("translate:{taskId}", pageIndex)  // notify SSE listeners
+
+SSE handler:
+  1. serve cached pages immediately
+  2. fire-and-forget batch to MIT
+  3. redis.subscribe("translate:{taskId}") → forward to client
+```
+
+Eliminates: job registry, race conditions, memory leaks, TOCTOU, 15-min timeout management.
+Preserves: fire-and-forget (T4-STANDARD Pillar 4), webhook pattern (Roadmap), reconnect-safety (cache).
+
+---
+
 ## Cache Architecture (Phase 2) — 2026-05-28
 
 ### Truth Hierarchy

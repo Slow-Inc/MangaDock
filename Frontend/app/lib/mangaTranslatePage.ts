@@ -11,32 +11,7 @@ import { toRelativeProxyUrl } from "./imgUrl";
  * @param pageUrl    Original (external) page image URL to translate
  * @returns Absolute URL to the translated PNG served from the backend
  */
-export async function translateMangaPage(
-  chapterId: string,
-  pageIndex: number,
-  pageUrl: string,
-  signal?: AbortSignal,
-): Promise<string> {
-  const res = await fetch(
-    `/api/proxy/books/chapters/${encodeURIComponent(chapterId)}/pages/${pageIndex}/translate`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pageUrl }),
-      signal,
-    },
-  );
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Manga page translation failed (${res.status}): ${text.slice(0, 200)}`,
-    );
-  }
-
-  const json = (await res.json()) as { translatedUrl: string; fromCache: boolean };
-  return toRelativeProxyUrl(json.translatedUrl);
-}
 
 /**
  * Checks whether the manga-image-translator microservice is reachable.

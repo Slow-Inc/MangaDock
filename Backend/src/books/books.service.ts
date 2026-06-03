@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createHash, randomBytes } from 'crypto';
 import * as fs from 'fs';
@@ -8,6 +8,7 @@ import { ImageCacheService } from '../cache/image-cache.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { MangaDexService } from './mangadex.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import { RedisService } from '../cache/redis.service';
 import {
   CACHE_TTL_MS,
   type LandingBook,
@@ -69,6 +70,8 @@ type BatchPageListener = (pageIndex: number, result: PageResult) => void;
 interface BatchJobState {
   /** Pages that have already been processed (cached + saved) */
   completedPages: Map<number, PageResult>;
+  /** Pages currently being processed — prevents duplicate concurrent webhooks */
+  processingPages: Set<number>;
   /** Active SSE listeners — removed on client disconnect */
   listeners: Set<BatchPageListener>;
   /** Resolves when ALL pages in the batch are done (or MIT closes) */
@@ -98,6 +101,7 @@ export class BooksService {
     private readonly imageCache: ImageCacheService,
     private readonly supabase: SupabaseService,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
+    @Optional() private readonly redis?: RedisService,
   ) {}
 
   /**
@@ -116,11 +120,12 @@ export class BooksService {
       return;
     }
 
-    // Idempotency: skip if already processed
-    if (job.completedPages.has(pageIndex)) {
+    // Idempotency: lock synchronously before any await to prevent concurrent duplicate webhooks
+    if (job.completedPages.has(pageIndex) || job.processingPages?.has(pageIndex)) {
       this.logger.debug(`[Webhook] Skipping duplicate callback for job=${jobKey} page=${pageIndex}`);
       return;
     }
+    job.processingPages?.add(pageIndex);
 
     const chapterId = jobKey.split(':')[0];
     const srcMIT = jobKey.split(':')[1];
@@ -134,20 +139,22 @@ export class BooksService {
       // Process patches (save to storage and cache)
       const patchDir = `uploads/patches/${chapterId}`;
 
+      const imgW = result.imgWidth > 0 ? result.imgWidth : 0;
+      const imgH = result.imgHeight > 0 ? result.imgHeight : 0;
       const patches: PatchEntry[] = [];
       for (const [i, p] of (result.patches || []).entries()) {
         const patchFilename = `${pageIndex}_${i}_${randomBytes(4).toString('hex')}.png`;
         const key = `${patchDir}/${patchFilename}`;
         const patchBuf = Buffer.from(p.img_b64, 'base64');
-        
+
         await this.storage.put(key, patchBuf, { contentType: 'image/png' });
 
         patches.push({
-          xPct: p.x,
-          yPct: p.y,
-          wPct: p.w,
-          hPct: p.h,
-          url: `/${key}`,
+          xPct: imgW > 0 ? p.x / imgW : 0,
+          yPct: imgH > 0 ? p.y / imgH : 0,
+          wPct: imgW > 0 ? p.w / imgW : 0,
+          hPct: imgH > 0 ? p.h / imgH : 0,
+          url: `${this.backendOrigin}/${key}`,
         });
       }
 
@@ -158,6 +165,8 @@ export class BooksService {
       pageResult = { patches };
     }
 
+    await this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...pageResult });
+    job.processingPages?.delete(pageIndex);
     // Notify listeners
     job.completedPages.set(pageIndex, pageResult);
     for (const listener of job.listeners) {
@@ -462,7 +471,7 @@ export class BooksService {
   async checkMitHealth(): Promise<{ available: boolean; url: string; message?: string }> {
     const baseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
     try {
-      const res = await fetch(`${baseUrl}/`, {
+      const res = await fetch(`${baseUrl}/ready`, {
         signal: AbortSignal.timeout(5_000),
       });
       return { available: res.ok, url: baseUrl };
@@ -472,128 +481,7 @@ export class BooksService {
     }
   }
 
-  async translateMangaPage(
-    chapterId: string,
-    pageIndex: number,
-    pageUrl: string,
-  ): Promise<{ translatedUrl: string; fromCache: boolean }> {
-    if (!chapterId || !pageUrl) {
-      throw new Error('chapterId and pageUrl are required');
-    }
-
-    const cacheKey = `translate:manga-page:v1:${chapterId}:${pageIndex}`;
-    const cached = await this.cache.get<{ translatedUrl: string }>(cacheKey);
-    if (cached?.data?.translatedUrl) {
-      return { translatedUrl: cached.data.translatedUrl, fromCache: true };
-    }
-
-    const mitUrl =
-      (process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003') +
-      '/translate/with-form/image';
-
-    // Fetch original manga page image
-    const imgRes = await fetch(pageUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
-        'Referer': 'https://mangadex.org/',
-      },
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!imgRes.ok) {
-      throw new Error(`Failed to fetch page image: HTTP ${imgRes.status}`);
-    }
-    const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
-
-    // POST to manga-image-translator API
-    const config = JSON.stringify({
-      translator: { translator: 'gemini', target_lang: 'THA' },
-      inpainter: { inpainter: 'lama_large' },
-      render: { direction: 'auto', rtl: false },
-    });
-
-    // MIT loads ML models lazily on the first request — this can take 60-180 s.
-    // 30 retries × 5 s = up to 150 s of patience before giving up.
-    const maxStartupRetries = 30;
-    const startupRetryDelayMs = 5_000;
-
-    let mitRes: Response | null = null;
-    let lastErrText = '';
-
-    for (let attempt = 0; attempt <= maxStartupRetries; attempt += 1) {
-      const form = new FormData();
-      form.append(
-        'image',
-        new Blob([imgBuffer], { type: 'image/jpeg' }),
-        'page.jpg',
-      );
-      form.append('config', config);
-
-      try {
-        mitRes = await fetch(mitUrl, {
-          method: 'POST',
-          body: form,
-          signal: AbortSignal.timeout(300_000), // 5 min — ML inference can be slow
-        });
-      } catch (err) {
-        const msg = String(err);
-        if (msg.includes('ECONNREFUSED') || msg.includes('fetch failed')) {
-          throw new Error(
-            `manga-image-translator service unavailable — make sure it is running (MANGA_TRANSLATOR_URL=${process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003'})`,
-          );
-        }
-        if (msg.includes('AbortError') || msg.includes('abort') || msg.includes('timed out')) {
-          throw new Error(
-            `manga-image-translator timed out after 5 minutes — the page may be too complex or the server is under load`,
-          );
-        }
-        throw err;
-      }
-
-      if (mitRes.ok) break;
-
-      const errText = await mitRes.text().catch(() => '');
-      lastErrText = errText;
-      // Treat ANY 500 during startup as transient: the worker subprocess may still be
-      // booting, loading ML models, or dealing with the 0.0.0.0 race condition.
-      // We log the exact MIT message so it shows up in the NestJS console.
-      this.logger.warn(`[MangaTranslate] MIT HTTP ${mitRes.status} body: ${errText.slice(0, 300)}`);
-      const startupNotReady = mitRes.status === 500;
-
-      if (!startupNotReady || attempt === maxStartupRetries) {
-        throw new Error(
-          `manga-image-translator error: HTTP ${mitRes.status} — ${errText.slice(0, 200)}`,
-        );
-      }
-
-      this.logger.warn(
-        `[MangaTranslate] MIT not ready (attempt ${attempt + 1}/${maxStartupRetries + 1}), retrying in ${startupRetryDelayMs / 1000}s — ${errText.slice(0, 120)}`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, startupRetryDelayMs));
-    }
-
-    if (!mitRes || !mitRes.ok) {
-      throw new Error(
-        `manga-image-translator error: startup retries exhausted — ${lastErrText.slice(0, 200)}`,
-      );
-    }
-
-    const translatedBuffer = Buffer.from(await mitRes.arrayBuffer());
-
-    // Save translated PNG to storage
-    const key = `uploads/translated/${chapterId}-p${pageIndex}.png`;
-    await this.storage.put(key, translatedBuffer, { contentType: 'image/png' });
-
-    const translatedUrl = `${this.backendOrigin}/${key}`;
-
-    // Cache permanently (TTL via setMangaCacheWithTiers uses manga tier = -1)
-    await this.cache.setMangaCacheWithTiers(cacheKey, { translatedUrl });
-
-    this.logger.log(
-      `[MangaTranslate] Translated chapter=${chapterId} page=${pageIndex} → ${key} (${translatedBuffer.length} bytes)`,
-    );
-
-    return { translatedUrl, fromCache: false };
-  }
+  
 
   async translateMangaPagePatches(
     chapterId: string,
@@ -601,6 +489,7 @@ export class BooksService {
     pageUrl: string,
     sourceLang?: string,
     targetLang?: string,
+    opts?: { maxStartupRetries?: number },
   ): Promise<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }> {
     if (!chapterId || !pageUrl) {
       throw new Error('chapterId and pageUrl are required');
@@ -642,7 +531,7 @@ export class BooksService {
       render: { direction: 'auto', rtl: isRtlLang(sourceLang ?? '') },
     });
 
-    const maxStartupRetries = 30;
+    const maxStartupRetries = opts?.maxStartupRetries ?? 30;
     const startupRetryDelayMs = 5_000;
 
     let mitRes: Response | null = null;
@@ -792,7 +681,31 @@ export class BooksService {
 
     // ── No active job: create one ──────────────────────────────────────────
 
-    // 1. Pre-check cache to avoid re-processing already-translated pages
+    // 1. Pre-check cache to avoid re-processing already-translated pages.
+    // Register a placeholder first so concurrent callers attach as latecomers
+    // instead of creating a second job (closes the TOCTOU window at cache.get).
+    const cancelController = new AbortController();
+    let resolve: () => void;
+    let reject: (err: any) => void;
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    const placeholderJob: BatchJobState = {
+      completedPages: new Map(),
+      processingPages: new Set(),
+      // When Redis is available, original caller receives via pub/sub subscription.
+      // Exclude it from job.listeners to prevent double-delivery from handleMitCallback fan-out.
+      // Latecomers still add themselves to job.listeners via the attach path.
+      listeners: new Set(this.redis ? [] : [listener]),
+      promise,
+      cancelController,
+      resolve: resolve!,
+      reject: reject!,
+      expectedCount: pages.length,
+    };
+    this.activeBatchJobs.set(jobKey, placeholderJob);
+
     const uncachedPages: Array<{ pageIndex: number; pageUrl: string }> = [];
     for (const p of pages) {
       const cacheKey = `translate:manga-patches:v3:${chapterId}:${p.pageIndex}:${srcMIT}:${tgtMIT}`;
@@ -807,27 +720,19 @@ export class BooksService {
 
     if (uncachedPages.length === 0) {
       this.logger.log(`[BatchRegistry] job=${jobKey} all ${pages.length} pages were cached — skipping MIT`);
+      placeholderJob.resolve?.();
       return;
     }
 
-    // 2. Create job state
-    const cancelController = new AbortController();
-    let resolve: () => void;
-    let reject: (err: any) => void;
-    const promise = new Promise<void>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
+    // 2. Finalize job state using the placeholder already in the registry
+    const job = placeholderJob;
+    job.expectedCount = uncachedPages.length;
 
-    const job: BatchJobState = {
-      completedPages: new Map(),
-      listeners: new Set([listener]),
-      promise,
-      cancelController,
-      resolve: resolve!,
-      reject: reject!,
-      expectedCount: uncachedPages.length,
-    };
+    // Subscribe to Redis channel so SSE listeners receive results via pub/sub (Option A')
+    const unsubscribeRedis = this.redis?.subscribe(`translate:${jobKey}`, (data: unknown) => {
+      const msg = data as { pageIndex: number; patches?: PatchEntry[]; error?: string };
+      listener(msg.pageIndex, { patches: msg.patches ?? [], ...(msg.error ? { error: msg.error } : {}) });
+    }) ?? (() => {});
 
     // 3. Inner notify: store result + fan-out to all listeners
     const notify = (pageIndex: number, result: PageResult) => {
@@ -850,31 +755,41 @@ export class BooksService {
       cancelController.signal,
       srcMIT,
       tgtMIT,
-      jobKey, // Pass jobKey as taskId
+      jobKey,
       sourceLang,
       targetLang,
     )
       .then(() => {
-        // If we are using the streaming response, it will finish here.
-        // But if we are using webhooks, the handleMitCallback will resolve it.
-        // For safety, we check if it's already resolved.
         if (job.completedPages.size >= job.expectedCount) {
           job.resolve?.();
         }
       })
       .catch((err) => {
         job.reject?.(err);
-      })
-      .finally(() => {
-        this.activeBatchJobs.delete(jobKey);
-        this.logger.log(`[BatchRegistry] job=${jobKey} completed & removed from registry`);
       });
 
-    this.activeBatchJobs.set(jobKey, job);
+    // Guarantee the promise is eventually settled so activeBatchJobs never leaks.
+    const timeoutHandle = setTimeout(
+      () => job.reject?.(new Error(`[BatchRegistry] job=${jobKey} timed out after 15 minutes`)),
+      15 * 60 * 1000,
+    );
+    job.cancelController.signal.addEventListener('abort', () => {
+      job.reject?.(new Error(`[BatchRegistry] job=${jobKey} cancelled`));
+    });
+
     this.logger.log(`[BatchRegistry] job=${jobKey} started (${uncachedPages.length} pages to process)`);
 
-    await promise;
-    job.listeners.delete(listener);
+    try {
+      await promise;
+    } finally {
+      clearTimeout(timeoutHandle);
+      unsubscribeRedis();
+      if (this.activeBatchJobs.get(jobKey) === job) {
+        this.activeBatchJobs.delete(jobKey);
+        this.logger.log(`[BatchRegistry] job=${jobKey} completed & removed from registry`);
+      }
+      job.listeners.delete(listener);
+    }
   }
 
   /**
@@ -1132,6 +1047,7 @@ export class BooksService {
     notify: (pageIndex: number, result: PageResult) => void,
     sourceLangIso?: string,
     targetLangIso?: string,
+    signal?: AbortSignal,
   ): Promise<void> {
     const missingPages = pages.filter((p) => !processedPageIndexes.has(p.pageIndex));
     if (missingPages.length > 0) {
@@ -1142,8 +1058,12 @@ export class BooksService {
     let failed = 0;
 
     for (const missing of missingPages) {
+      if (signal?.aborted) break;
       try {
-        const single = await this.translateMangaPagePatches(chapterId, missing.pageIndex, missing.pageUrl, sourceLangIso, targetLangIso);
+        const single = await this.translateMangaPagePatches(
+          chapterId, missing.pageIndex, missing.pageUrl, sourceLangIso, targetLangIso,
+          { maxStartupRetries: 3 },
+        );
         notify(missing.pageIndex, { patches: single.patches });
         recovered += 1;
       } catch (err) {

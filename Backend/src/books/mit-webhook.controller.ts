@@ -24,8 +24,10 @@ export class MitWebhookController {
 
       const hmac = crypto.createHmac('sha256', secret);
       const digest = hmac.update(JSON.stringify(body)).digest('hex');
+      const sigBuf = Buffer.from(signature, 'hex');
+      const digBuf = Buffer.from(digest, 'hex');
 
-      if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest))) {
+      if (sigBuf.length !== digBuf.length || !crypto.timingSafeEqual(sigBuf, digBuf)) {
         this.logger.error('Invalid HMAC signature');
         throw new HttpException('Invalid signature', HttpStatus.UNAUTHORIZED);
       }

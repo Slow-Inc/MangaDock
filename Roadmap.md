@@ -27,7 +27,7 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 3.  **Security Identity Verification:** พัฒนาระบบยืนยันตัวตนผ่าน Email โดยการส่ง Verification URL ไปยัง Email ที่สมัครเพื่อให้ผู้ใช้กดเพื่อยืนยันตัวตน และระบบ **Reset Password Flow** ที่สมบูรณ์ผ่าน Email เช่นกัน
 4.  **Advanced MIT Optimization & Parallel Engine:** 
     *   ปรับปรุง AI Pipeline ให้ Render เฉพาะส่วน Text (Region-Specific) ไม่ต้อง Render ทั้งหน้า เพื่อลด Workload, Bandwidth และเพิ่มความเร็วสูงสุด
-    *   **Queue Optimization (Fire and Forget):** ออกแบบระบบคิวงานแปลแบบ Non-blocking โดย Backend จะส่งงานแล้วปล่อยทันที (Fire and Forget) และรอรับผลผ่าน Webhook
+    *   **Queue Optimization (Fire and Forget) — ✅ Architecture decided (Option A'):** ออกแบบระบบคิวงานแปลแบบ Non-blocking โดย Backend จะส่งงานแล้วปล่อยทันที (Fire and Forget) และรอรับผลผ่าน Webhook — Implementation: MIT webhook → `cache.set` + `redis.publish` → SSE listener (แทน in-memory job registry เดิม ที่มี race condition 6 จุด)
     *   **Parallel Processing:** ปรับปรุงอัลกอริทึมให้สามารถประมวลผลงานแปลได้แบบขนาน (Parallel) พร้อมกันหลายหน้าหรือหลายงาน เพื่อเพิ่ม Throughput สูงสุด
     *   **Overlap Detection Algorithm:** ตรวจสอบความใกล้ชิดของ Text หากมี 2 ส่วนหรือมากกว่าอยู่ติดกันเกินไปจนเสี่ยงจะทับกันหลังแปล ให้ทำการรวมเป็น 1 ก้อนใหญ่ก่อนแปลเพื่อความสวยงามและถูกต้อง
     *   **Context Upgrade:** อัปเกรดท่อแปลภาษาเป็น **Gemini 3 Flash Lite** เพื่อความเข้าใจบริบทที่ลึกซึ้งกว่าเดิม

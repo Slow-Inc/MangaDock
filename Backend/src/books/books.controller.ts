@@ -158,26 +158,7 @@ export class BooksController {
     return this.booksService.checkMitHealth();
   }
 
-  @Post('chapters/:chapterId/pages/:pageIndex/translate')
-  async translateMangaPage(
-    @Param('chapterId') chapterId: string,
-    @Param('pageIndex') pageIndex: string,
-    @Body() body: { pageUrl?: string },
-  ) {
-    try {
-      return await this.booksService.translateMangaPage(
-        chapterId,
-        parseInt(pageIndex, 10),
-        body?.pageUrl ?? '',
-      );
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      throw new HttpException(
-        { statusCode: HttpStatus.INTERNAL_SERVER_ERROR, message },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
+  
 
   @Post('chapters/:chapterId/pages/:pageIndex/translate-patches')
   async translateMangaPagePatches(

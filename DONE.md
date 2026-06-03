@@ -331,6 +331,49 @@ PR #16 scrutiny (Issues #17 PRD) found 3 major bugs + 1 minor in the dirty-queue
 
 ---
 
+## ✅ Translation System Overhaul (2026-06-04, Session: Claude + Gemini multi-perspective)
+
+### Status: COMPLETE (backend) — Batch refactor (Option A') pending
+
+#### Bugs Fixed & Tested (issues #73–#78, all closed)
+- **#73** `startOrAttachBatchJob`: `.finally()` deleted job before webhooks arrived → replaced with `try/finally` + 15-min timeout + abort-signal listener
+- **#74** `handleMitCallback`: raw pixel coords stored as percentages → normalized with `imgWidth/imgHeight`; patch URL uses `backendOrigin`
+- **#75** HMAC mismatch (Python spaces vs JS compact) → `json.dumps(separators=(',',':'), ensure_ascii=False)`; NestJS length-checks before `timingSafeEqual`
+- **#76** Idempotency race in `handleMitCallback` → `processingPages: Set<number>` locks synchronously before any `await`
+- **#77** Latecomer listener added after replay loop → add before iterating `completedPages`
+- **#78** TOCTOU in `startOrAttachBatchJob` → register placeholder in `activeBatchJobs` before first `await cache.get()`
+
+#### Dead Code Removed (#81, closed)
+- `BooksService.translateMangaPage()` — full-image path (never called by frontend)
+- `BooksController POST /chapters/:id/pages/:idx/translate` — endpoint removed
+- `Frontend translateMangaPage()` — exported but never imported
+
+#### Other Fixes (#82–#84, closed)
+- **#82** `_retryMissingPagesIndividually` now accepts `AbortSignal`; passes `maxStartupRetries:3` to limit fallback wait from 150s → 15s per page
+- **#83** `checkMitHealth` calls `/ready` (not root `/`); MIT server gains `/ready` endpoint returning 503 until first worker registered
+- **#84** `fetchAvailableMangaModels()` fetches from `/api/proxy/books/models` with 5-min cache + hardcoded fallback
+
+#### New Issues Created
+- **#85** fix: `translateMangaEpisode` hardcodes Thai — add `targetLang` parameter
+- **#86** feat: expand target language options to all 17 MIT-supported languages
+- **#87** PRD: user-selectable Gemini model for MIT image translation
+
+#### Architecture Decision: Option A' (Redis pub/sub batch translation)
+After Gemini 10-perspective scrutiny + roadmap comparison:
+- Option A (in-memory job registry) — compliant but 6 bugs stem from Map-based state
+- Option B (sync NDJSON only) — simpler but violates Roadmap Fire-and-Forget + Pillar 4
+- Option C (sequential+cache) — violates Pillar 4 and Phase 2 GPU cloud requirement
+- **Option A' chosen**: replace `activeBatchJobs` Map with Redis pub/sub; `handleMitCallback` = `cache.set` + `redis.publish`; eliminates all 6 bug classes without losing fire-and-forget/webhook pattern
+
+#### Test Count: 299 passing (was 295)
+
+#### Notes for Gemini
+- `books-batch-webhook.spec.ts` (13 tests) + `books-retry.spec.ts` (2) + `books-health.spec.ts` (2) + `mit-webhook-hmac.spec.ts` (3) added
+- Option A' implementation issue pending — will replace `startOrAttachBatchJob` (~500 lines) with Redis pub/sub (~50 lines)
+- `processingPages: Set<number>` added to `BatchJobState` interface (temporary, removed with Option A')
+
+---
+
 ## 🛠️ V5 Final Hardening (Commit 69712f9)
 - **Error Handling:** เปลี่ยน `throw new Error()` เป็น `InternalServerErrorException` ทั้งหมดใน `UnlockService` เพื่อมาตรฐานความปลอดภัย
 - **Runtime Validation:** ติดตั้ง `forum.dto.ts` และเปิดใช้งาน `ValidationPipe` (class-validator) แบบ Global ใน `main.ts` ป้องกัน Payload ที่ผิดโครงสร้าง
