@@ -366,8 +366,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // The popup is same-origin and has already written the session to shared
+        // localStorage. Only call setSession() if the main window missed the
+        // storage event (e.g. browsers with per-window localStorage isolation).
         if (access_token && refresh_token) {
-          await supabase.auth.setSession({ access_token, refresh_token });
+          const { data: { session: existing } } = await supabase.auth.getSession();
+          if (!existing) {
+            await supabase.auth.setSession({ access_token, refresh_token });
+          }
         }
         resolve();
       };

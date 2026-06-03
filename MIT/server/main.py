@@ -75,6 +75,17 @@ async def health():
         "queue_size": len(task_queue.queue),
     }
 
+@app.get("/ready", tags=["api"], summary="Readiness check")
+async def ready():
+    """Returns 200 only when at least one worker is registered and ready to translate.
+    Returns 503 during model loading / startup. Use this instead of /health for
+    translation-readiness probes."""
+    from fastapi.responses import JSONResponse
+    worker_count = len(executor_instances.list)
+    if worker_count > 0:
+        return {"ready": True, "workers": worker_count}
+    return JSONResponse(status_code=503, content={"ready": False, "status": "starting"})
+
 @app.post("/register", response_description="no response", tags=["internal-api"])
 async def register_instance(instance: ExecutorInstance, req: Request, req_nonce: str = Header(alias="X-Nonce")):
     if req_nonce != nonce:
@@ -190,7 +201,7 @@ async def patches_form(req: Request, image: UploadFile = File(...), config: str 
 
 async def send_webhook(url: str, secret: str, payload: dict):
     """Sends a signed POST request to the callback URL."""
-    data = json.dumps(payload).encode("utf-8")
+    data = json.dumps(payload, separators=(',', ':'), ensure_ascii=False).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if secret:
         signature = hmac.new(secret.encode("utf-8"), data, hashlib.sha256).hexdigest()
