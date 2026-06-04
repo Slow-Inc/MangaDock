@@ -74,6 +74,9 @@ interface BatchJobState {
   processingPages: Set<number>;
   /** Active SSE listeners — removed on client disconnect */
   listeners: Set<BatchPageListener>;
+  /** Total active callers (Redis subscribers + job.listeners members). Used for
+   *  abort decision so the count is correct regardless of delivery path. */
+  activeCallerCount: number;
   /** Resolves when ALL pages in the batch are done (or MIT closes) */
   promise: Promise<void>;
   /** Abort this to stop MIT processing when the last listener disconnects */
@@ -169,7 +172,10 @@ export class BooksService {
       pageResult = { patches };
     }
 
-    await this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...pageResult });
+    const published = await this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...pageResult });
+    if (this.redis && published === false) {
+      this.logger.error(`[Webhook] Redis publish failed for job=${jobKey} page=${pageIndex} — SSE client may not receive this result`);
+    }
     job.processingPages?.delete(pageIndex);
     // Notify listeners
     job.completedPages.set(pageIndex, pageResult);
@@ -635,11 +641,10 @@ export class BooksService {
     const job = this.activeBatchJobs.get(jobKey);
     if (job) {
       job.listeners.delete(listener);
-      this.logger.log(`[BatchRegistry] job=${jobKey} − listener removed (${job.listeners.size} remaining)`);
-      // Hard-cancel: stop MIT the moment the last client disconnects.
-      // Already-cached pages stay in Redis so the next translate press resumes from where we left off.
-      if (job.listeners.size === 0) {
-        this.logger.log(`[BatchRegistry] job=${jobKey} last listener gone — cancelling MIT job`);
+      job.activeCallerCount = Math.max(0, job.activeCallerCount - 1);
+      this.logger.log(`[BatchRegistry] job=${jobKey} − listener removed (${job.activeCallerCount} active callers remaining)`);
+      if (job.activeCallerCount === 0) {
+        this.logger.log(`[BatchRegistry] job=${jobKey} last caller gone — cancelling MIT job`);
         job.cancelController.abort();
       }
     }
@@ -677,6 +682,7 @@ export class BooksService {
         listener(pageIndex, result);
       }
       existing.listeners.add(listener);
+      existing.activeCallerCount++;
       this.logger.log(`[BatchRegistry] job=${jobKey} attached to running job`);
       await existing.promise;
       existing.listeners.delete(listener);
@@ -702,6 +708,7 @@ export class BooksService {
       // Exclude it from job.listeners to prevent double-delivery from handleMitCallback fan-out.
       // Latecomers still add themselves to job.listeners via the attach path.
       listeners: new Set(this.redis ? [] : [listener]),
+      activeCallerCount: 1,
       promise,
       cancelController,
       resolve: resolve!,
