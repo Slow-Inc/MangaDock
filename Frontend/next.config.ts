@@ -26,7 +26,7 @@ function getLocalIPv4Addresses(): string[] {
 const nextConfig: NextConfig = {
   // Allow cross-origin HMR / hot-reload requests when accessing the dev server
   // from other devices on the local network (e.g. 192.168.x.x, 10.x.x.x, Radmin VPN).
-  allowedDevOrigins: getLocalIPv4Addresses(),
+  allowedDevOrigins: [...getLocalIPv4Addresses(), "10.0.2.2"],
   async rewrites() {
     const backendUrl = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
     return [

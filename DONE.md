@@ -412,3 +412,59 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 #### Notes for Gemini
 - `CLAUDE_BRIEF.md` is still stale for Phase 2 Cache Architecture. User explicitly authorized Phase 3 Mobile Shell work in parallel with Phase 2.
 - `npm install react-native-webview` reported `7 moderate severity vulnerabilities`; no audit fix applied because that can change dependency versions beyond issue #90 scope.
+
+---
+
+## Phase 3 Mobile Shell - Android Build Environment Follow-up
+
+### Status: COMPLETE - Android debug build verified
+
+#### Modified Files
+- `Mobile/package.json` / `Mobile/package-lock.json` - added `patch-package` postinstall support
+- `Mobile/patches/@react-native+gradle-plugin+0.85.3.patch` - patches `org.gradle.toolchains.foojay-resolver-convention` from `0.5.0` to `1.0.0` for Gradle 9 compatibility
+
+#### Local Environment
+- Android SDK configured via ignored `Mobile/android/local.properties`
+- Build command used Android Studio JBR: `JAVA_HOME=C:\Program Files\Android\Android Studio\jbr`
+
+#### Verification
+- `npm test -- --runInBand` in `Mobile/` - 2 suites, 3 tests passing
+- `npm run lint` in `Mobile/` - passing
+- `npx tsc --noEmit` in `Mobile/` - passing
+- `npm run postinstall` in `Mobile/` - `@react-native/gradle-plugin@0.85.3` patch applied
+- `.\gradlew.bat assembleDebug` in `Mobile/android` - `BUILD SUCCESSFUL in 8s`
+
+#### Notes
+- Original Gradle failure after Java became visible: `Class org.gradle.jvm.toolchain.JvmVendorSpec does not have member field 'org.gradle.jvm.toolchain.JvmVendorSpec IBM_SEMERU'`
+- Root cause: `@react-native/gradle-plugin@0.85.3` includes `foojay-resolver-convention 0.5.0`, incompatible with the generated `gradle-9.3.1-bin.zip` wrapper.
+- `npm install patch-package` still reported `7 moderate severity vulnerabilities`; no `npm audit fix` run.
+
+---
+
+## Phase 3 Mobile Shell - Android Emulator Smoke
+
+### Status: COMPLETE - shell launches and reaches Frontend dev server
+
+#### Modified Files
+- `Frontend/next.config.ts` - added `10.0.2.2` to `allowedDevOrigins` so Android emulator WebView can load Next dev assets/HMR from `http://10.0.2.2:4000`
+- `Frontend/package-lock.json` - updated by `npm install` to include existing `date-fns` dependency from `Frontend/package.json`
+
+#### Local Environment
+- Created Android AVD `MangaDock_API_36`
+- Installed SDK system image `system-images;android-36;google_apis;x86_64`
+- Created ignored `Frontend/.env` from `.env.example` smoke values
+- Started Frontend dev server at `http://localhost:4000`
+- Started Metro at `http://localhost:8081`
+
+#### Verification
+- `npx react-native run-android --no-packager --port 8081` in `Mobile/` - installed and launched `com.mobile/.MainActivity` on `emulator-5554`
+- `adb logcat` showed WebView loading from `http://10.0.2.2:4000/_next/...`
+- `adb logcat` showed `[HMR] connected` from `http://10.0.2.2:4000/_next/static/chunks/...`
+- `Invoke-WebRequest http://localhost:4000` - `StatusCode=200 Length=43732`
+- `npx eslint next.config.ts` in `Frontend/` - passing
+- `npm run lint` in `Mobile/` - passing
+
+#### Remaining Limits
+- Emulator screenshot still appears white because Frontend landing calls `/api/proxy/books/landing` and gets `502` while Backend is not running.
+- `npm run lint` in `Frontend/` still fails on existing repo-wide lint issues unrelated to `Frontend/next.config.ts`.
+- Full protected content flow remains out of issue #90 scope.
