@@ -147,7 +147,8 @@ export class BooksController {
       contextHint?: string;
       chapterId?: string;
       page?: number;
-      model?: 'gemini-2.5-flash' | 'gemini-2.5-flash-lite';
+      model?: string;
+      targetLang?: string;
     },
   ) {
     return this.booksService.translateMangaEpisode(body ?? {});

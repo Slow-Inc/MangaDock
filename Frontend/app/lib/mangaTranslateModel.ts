@@ -52,6 +52,7 @@ export async function translateMangaLines(payload: {
   chapterId?: string;
   page?: number;
   model?: string;
+  targetLang?: string;
 }) {
   const model = payload.model ?? getMangaTranslateModelFromStorage(await fetchAvailableMangaModels());
   const res = await fetch("/api/proxy/books/translate/manga", {

@@ -57,6 +57,18 @@ const MIT_LANG_MAP: Record<string, string> = {
 function mitLangCode(isoLang: string): string {
   return MIT_LANG_MAP[isoLang.toLowerCase()] ?? isoLang.toUpperCase();
 }
+
+const GEMINI_LANG_NAME: Record<string, string> = {
+  th: 'Thai', en: 'English', ja: 'Japanese', ko: 'Korean',
+  zh: 'Chinese (Simplified)', 'zh-hk': 'Chinese (Traditional)', 'zh-ro': 'Chinese (Romanized)',
+  fr: 'French', es: 'Spanish', de: 'German', ru: 'Russian',
+  pt: 'Portuguese', 'pt-br': 'Brazilian Portuguese', it: 'Italian',
+  vi: 'Vietnamese', id: 'Indonesian', ar: 'Arabic',
+};
+
+function geminiLangName(isoLang: string): string {
+  return GEMINI_LANG_NAME[isoLang.toLowerCase()] ?? isoLang;
+}
 /** RTL reading order — panels sort right→left for these original languages */
 function isRtlLang(isoLang: string): boolean {
   return ['ja', 'ko', 'zh', 'zh-hk', 'zh-ro'].includes(isoLang.toLowerCase());
@@ -335,6 +347,7 @@ export class BooksService {
     chapterId?: string;
     page?: number;
     model?: string;
+    targetLang?: string;
   }): Promise<{
     translatedLines: string[];
     translated: boolean;
@@ -372,10 +385,11 @@ export class BooksService {
       };
     }
 
+    const targetLang = (payload.targetLang ?? 'th').toLowerCase();
     const contextHint = (payload.contextHint ?? '').trim().slice(0, 280);
     const chapterTag = payload.chapterId ? `chapter:${payload.chapterId}` : 'chapter:unknown';
     const pageTag = Number.isFinite(payload.page) ? `page:${payload.page}` : 'page:unknown';
-    const cacheScope = `${chapterTag}|${pageTag}|ctx:${contextHint}`;
+    const cacheScope = `${chapterTag}|${pageTag}|lang:${targetLang}|ctx:${contextHint}`;
 
     const uniqueLineMap = new Map<string, number[]>();
     lines.forEach((line, idx) => {
@@ -407,7 +421,7 @@ export class BooksService {
     if (missingLines.length > 0) {
       const numberedLines = missingLines.map((line, idx) => `${idx + 1}. ${line}`).join('\n');
       const prompt = [
-        'Translate manga dialogue/narration to Thai with natural tone and context consistency.',
+        `Translate manga dialogue/narration to ${geminiLangName(targetLang)} with natural tone and context consistency.`,
         'Output ONLY valid JSON array of strings in the same order and same length as input.',
         'Do not include explanations, markdown, keys, or extra text.',
         contextHint ? `Context: ${contextHint}` : '',
