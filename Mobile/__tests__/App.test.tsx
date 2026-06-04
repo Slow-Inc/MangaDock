@@ -16,19 +16,13 @@ jest.mock(
     const {View} = require('react-native');
 
     return {
-      WebView: ({
-        source,
-        injectedJavaScriptBeforeContentLoaded,
-      }: {
+      WebView: (props: {
         source: {uri: string; headers?: Record<string, string>};
         injectedJavaScriptBeforeContentLoaded?: string;
       }) => (
         <View
           testID="mobile-shell-webview"
-          source={source}
-          injectedJavaScriptBeforeContentLoaded={
-            injectedJavaScriptBeforeContentLoaded
-          }
+          {...props}
         />
       ),
     };
@@ -68,4 +62,73 @@ test('renders the Frontend inside the Mobile Shell WebView with Mobile Shell hea
   expect(webview.props.injectedJavaScriptBeforeContentLoaded).toContain(
     '11111111-2222-4333-8444-555555555555',
   );
+});
+
+test('exposes beta diagnostics and logs WebView load events for QA', async () => {
+  const consoleLog = jest.spyOn(console, 'log').mockImplementation();
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  expect(
+    renderer!.root.findByProps({testID: 'mobile-diagnostics-button'}),
+  ).toBeTruthy();
+
+  const webview = renderer!.root.findByProps({
+    testID: 'mobile-shell-webview',
+  });
+
+  ReactTestRenderer.act(() => {
+    webview.props.onLoadStart({
+      nativeEvent: {url: 'https://hayateotsu.space/library'},
+    });
+  });
+
+  expect(consoleLog).toHaveBeenCalledWith(
+    expect.stringContaining('MangaDockMobile '),
+  );
+  expect(consoleLog).toHaveBeenCalledWith(
+    expect.stringContaining('"type":"webview_load_start"'),
+  );
+  expect(consoleLog).toHaveBeenCalledWith(
+    expect.stringContaining('"hardwareId":"11111111...5555"'),
+  );
+
+  consoleLog.mockRestore();
+});
+
+test('records bridged web JavaScript errors from the WebView', async () => {
+  const consoleLog = jest.spyOn(console, 'log').mockImplementation();
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const webview = renderer!.root.findByProps({
+    testID: 'mobile-shell-webview',
+  });
+
+  ReactTestRenderer.act(() => {
+    webview.props.onMessage({
+      nativeEvent: {
+        data: JSON.stringify({
+          source: 'mangadock-web',
+          type: 'console_error',
+          message: 'bad request {"status":500}',
+        }),
+      },
+    });
+  });
+
+  expect(consoleLog).toHaveBeenCalledWith(
+    expect.stringContaining('"type":"web_console_error"'),
+  );
+  expect(consoleLog).toHaveBeenCalledWith(
+    expect.stringContaining('bad request'),
+  );
+
+  consoleLog.mockRestore();
 });

@@ -34,4 +34,59 @@ describe('Mobile Shell WebView bridge', () => {
       'x-manga-dock-client': 'android-mobile-shell',
     });
   });
+
+  it('bridges web JavaScript errors to the Mobile Shell without posting non-error console logs', () => {
+    const postMessage = jest.fn();
+    const windowStub: {
+      localStorage: {setItem: jest.Mock};
+      fetch: jest.Mock;
+      ReactNativeWebView: {postMessage: jest.Mock};
+      console: {error: jest.Mock; log: jest.Mock};
+      onerror?: (
+        message: string,
+        filename: string,
+        lineNumber: number,
+        columnNumber: number,
+      ) => boolean;
+    } = {
+      localStorage: {
+        setItem: jest.fn(),
+      },
+      fetch: jest.fn(),
+      ReactNativeWebView: {
+        postMessage,
+      },
+      console: {
+        error: jest.fn(),
+        log: jest.fn(),
+      },
+    };
+
+    // eslint-disable-next-line no-new-func
+    Function(
+      'window',
+      `${createMobileShellInjectionScript(
+        '11111111-2222-4333-8444-555555555555',
+      )}`,
+    )(windowStub);
+
+    windowStub.onerror?.('boom', 'app.js', 10, 2);
+    windowStub.console.error('bad request', {status: 500});
+    windowStub.console.log('normal log');
+
+    expect(postMessage).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(postMessage.mock.calls[0][0])).toMatchObject({
+      source: 'mangadock-web',
+      type: 'js_error',
+      message: 'boom',
+      filename: 'app.js',
+      lineNumber: 10,
+      columnNumber: 2,
+    });
+    expect(JSON.parse(postMessage.mock.calls[1][0])).toMatchObject({
+      source: 'mangadock-web',
+      type: 'console_error',
+      message: 'bad request {"status":500}',
+    });
+  });
 });

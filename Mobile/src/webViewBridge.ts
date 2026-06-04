@@ -7,6 +7,68 @@ export function createMobileShellInjectionScript(hardwareId: string) {
   return `
     (function () {
       try {
+        var postDiagnosticsEvent = function (event) {
+          try {
+            if (!window.ReactNativeWebView || !window.ReactNativeWebView.postMessage) {
+              return;
+            }
+
+            window.ReactNativeWebView.postMessage(JSON.stringify(Object.assign({
+              source: 'mangadock-web'
+            }, event)));
+          } catch (error) {}
+        };
+        var stringifyDiagnosticPart = function (part) {
+          if (typeof part === 'string') {
+            return part;
+          }
+
+          try {
+            return JSON.stringify(part);
+          } catch (error) {
+            return String(part);
+          }
+        };
+        var previousOnError = window.onerror;
+        window.onerror = function (message, filename, lineNumber, columnNumber, error) {
+          postDiagnosticsEvent({
+            type: 'js_error',
+            message: stringifyDiagnosticPart(message),
+            filename: filename,
+            lineNumber: lineNumber,
+            columnNumber: columnNumber,
+            errorName: error && error.name ? error.name : undefined
+          });
+
+          if (typeof previousOnError === 'function') {
+            return previousOnError.apply(this, arguments);
+          }
+
+          return false;
+        };
+        var previousOnUnhandledRejection = window.onunhandledrejection;
+        window.onunhandledrejection = function (event) {
+          postDiagnosticsEvent({
+            type: 'unhandled_rejection',
+            message: stringifyDiagnosticPart(event && event.reason ? event.reason : event)
+          });
+
+          if (typeof previousOnUnhandledRejection === 'function') {
+            return previousOnUnhandledRejection.apply(this, arguments);
+          }
+        };
+        if (window.console && typeof window.console.error === 'function') {
+          var originalConsoleError = window.console.error;
+          window.console.error = function () {
+            var parts = Array.prototype.slice.call(arguments).map(stringifyDiagnosticPart);
+            postDiagnosticsEvent({
+              type: 'console_error',
+              message: parts.join(' ')
+            });
+
+            return originalConsoleError.apply(this, arguments);
+          };
+        }
         window.localStorage.setItem(${serializedHardwareIdKey}, ${serializedHardwareId});
         window.__MANGA_DOCK_CLIENT__ = 'android-mobile-shell';
         var originalFetch = window.fetch;

@@ -13,6 +13,8 @@ Android-first React Native CLI shell for MangaDock. The native layer is intentio
 - Injects `x-hardware-id` and `x-manga-dock-client` into the initial WebView request.
 - Seeds the same Mobile Hardware ID into the web app's `mangadock_device_id` localStorage key.
 - Wraps WebView `fetch` calls to attach Mobile Shell headers to MangaDock API requests.
+- Includes a beta diagnostics overlay and `MangaDockMobile` logcat events for QA triage.
+- Bridges web `window.onerror`, `window.onunhandledrejection`, and `console.error` events back into native diagnostics.
 - Does not include iOS artifacts.
 
 Follow-up issue ownership:
@@ -46,6 +48,7 @@ Mobile identity and header modules:
 ```text
 Mobile/src/mobileIdentity.ts
 Mobile/src/mobileHeaders.ts
+Mobile/src/mobileDiagnostics.ts
 Mobile/src/webViewBridge.ts
 ```
 
@@ -54,6 +57,7 @@ Tests:
 ```text
 Mobile/__tests__/mobileIdentity.test.ts
 Mobile/__tests__/mobileHeaders.test.ts
+Mobile/__tests__/mobileDiagnostics.test.ts
 Mobile/__tests__/webViewBridge.test.ts
 ```
 
@@ -194,8 +198,8 @@ Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.L
 Current QA beta version:
 
 ```text
-versionCode 2
-versionName 1.0.1-beta.1
+versionCode 3
+versionName 1.0.1-beta.2
 ```
 
 For initial QA, build a release APK that bundles JS:
@@ -237,6 +241,114 @@ C:\Users\Cable\AppData\Local\Android\Sdk\platform-tools\adb.exe shell am start -
 
 This beta APK is signed with the scaffold release signing config, which currently uses the debug keystore. It is suitable for direct QA install, not Play Store distribution.
 
+## QA Diagnostics
+
+Diagnostics are enabled in the beta build through:
+
+```text
+Mobile/src/config.ts
+```
+
+Current flags:
+
+```ts
+export const MOBILE_DIAGNOSTICS_ENABLED = true;
+export const MOBILE_BETA_VERSION_CODE = 3;
+export const MOBILE_BETA_VERSION_NAME = '1.0.1-beta.2';
+```
+
+The app shows a small `[diag]` button over the WebView. Tap it to open the diagnostics panel.
+
+The panel shows:
+
+- Current beta version.
+- Latest in-memory diagnostics events, capped at 20.
+- `Reload WebView`, which reloads only the WebView. It does not clear app data, cookies, cache, or login state.
+
+Native logcat output uses this prefix:
+
+```text
+MangaDockMobile
+```
+
+Capture diagnostics while reproducing a bug:
+
+```powershell
+C:\Users\Cable\AppData\Local\Android\Sdk\platform-tools\adb.exe logcat -c
+C:\Users\Cable\AppData\Local\Android\Sdk\platform-tools\adb.exe logcat | Select-String -Pattern 'MangaDockMobile|ReactNativeJS|chromium|ERR_|FATAL|Exception'
+```
+
+After reproducing, save the recent buffer:
+
+```powershell
+C:\Users\Cable\AppData\Local\Android\Sdk\platform-tools\adb.exe logcat -d -t 1000 | Select-String -Pattern 'MangaDockMobile|ReactNativeJS|chromium|ERR_|FATAL|Exception'
+```
+
+Diagnostics events mask the full Mobile Hardware ID. Example:
+
+```text
+"hardwareId":"11111111...5555"
+```
+
+Expected diagnostics event examples:
+
+```text
+webview_load_start
+webview_load_end
+webview_http_error
+webview_error
+web_console_error
+web_js_error
+web_unhandled_rejection
+webview_reload_requested
+```
+
+## QA Bug Report Template
+
+Use this template when reporting beta APK bugs:
+
+```text
+Title:
+
+APK:
+versionCode 3
+versionName 1.0.1-beta.2
+
+Device:
+Android version:
+Emulator or physical device:
+Network: Wi-Fi / mobile data / VPN / proxy:
+
+Account state:
+Logged in: yes/no
+QA account:
+
+Steps to reproduce:
+1.
+2.
+3.
+
+Expected result:
+
+Actual result:
+
+Frequency:
+Always / sometimes / once
+
+Diagnostics overlay:
+Last visible event:
+HTTP status code, if shown:
+Tapped Reload WebView: yes/no
+Result after Reload WebView:
+
+Logcat:
+Paste lines containing MangaDockMobile, ReactNativeJS, chromium, ERR_, FATAL, or Exception.
+
+Screenshots or screen recording:
+
+Notes:
+```
+
 ## Verification Checklist
 
 Before handing an APK to QA:
@@ -255,7 +367,12 @@ Mobile Hardware ID creates and persists an app-scoped UUID.
 Mobile Hardware ID reuses the persisted UUID on later calls.
 Mobile Header Injection prepares x-hardware-id and x-manga-dock-client.
 Mobile Shell WebView bridge seeds mangadock_device_id and injects Mobile Shell headers into protected fetches.
+Mobile diagnostics formats compact QA logs without exposing the full hardware ID.
+Mobile diagnostics keeps only the latest 20 diagnostics events in memory.
+Mobile Shell WebView bridge bridges web JavaScript errors to the Mobile Shell.
 App renders the WebView with Mobile Shell headers.
+App exposes beta diagnostics and logs WebView load events for QA.
+App records bridged web JavaScript errors from the WebView.
 ```
 
 Then:
@@ -269,6 +386,9 @@ Install the APK and verify:
 
 - App launches as `com.mobile/.MainActivity`.
 - WebView loads `https://hayateotsu.space`.
+- `[diag]` button appears over the WebView.
+- `[diag]` panel shows `1.0.1-beta.2 (3)`.
+- `Reload WebView` reloads the WebView without clearing app data.
 - WebView initial request includes `x-hardware-id`.
 - WebView initial request includes `x-manga-dock-client`.
 - WebView `fetch` requests to MangaDock API paths include `x-hardware-id`.
@@ -278,6 +398,7 @@ Install the APK and verify:
 - Login button opens web auth inside the WebView.
 - Bottom navigation renders.
 - No fatal errors appear in `adb logcat`.
+- `MangaDockMobile` diagnostics events appear in `adb logcat`.
 
 Useful smoke command:
 
