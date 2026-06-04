@@ -1,4 +1,5 @@
 import argparse
+import os
 import re
 from enum import Enum
 
@@ -216,9 +217,17 @@ class UpscaleConfig(BaseModel):
     upscale_ratio: Optional[int] = None
     """Image upscale ratio applied before detection. Can improve text detection."""
 
+def _default_translator() -> Translator:
+    key = os.environ.get('DEFAULT_TRANSLATOR', 'gemini')
+    try:
+        return Translator(key)
+    except ValueError:
+        return Translator.gemini
+
+
 class TranslatorConfig(BaseModel):
-    translator: Translator = Translator.sugoi
-    """Language translator to use"""
+    translator: Translator = _default_translator()
+    """Language translator to use. Controlled by DEFAULT_TRANSLATOR env var in MIT .env."""
     target_lang: str = 'ENG' #todo: validate VALID_LANGUAGES #todo: convert to enum
     """Destination language"""
     no_text_lang_skip: bool = False
