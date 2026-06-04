@@ -26,15 +26,15 @@ def build_load_kwargs(precision: str) -> dict:
     from transformers import BitsAndBytesConfig
 
     if precision == 'fp8':
-        return {'torch_dtype': torch.float8_e4m3fn}
+        return {'dtype': torch.float8_e4m3fn}
     if precision == 'fp16':
-        return {'torch_dtype': torch.float16}
+        return {'dtype': torch.float16}
     if precision == 'int8':
-        return {'torch_dtype': 'auto', 'quantization_config': BitsAndBytesConfig(load_in_8bit=True)}
+        return {'dtype': 'auto', 'quantization_config': BitsAndBytesConfig(load_in_8bit=True)}
     if precision == 'int4':
-        return {'torch_dtype': 'auto', 'quantization_config': BitsAndBytesConfig(load_in_4bit=True)}
+        return {'dtype': 'auto', 'quantization_config': BitsAndBytesConfig(load_in_4bit=True)}
     # bf16 (default) + unknown → bfloat16, no quantization
-    return {'torch_dtype': torch.bfloat16}
+    return {'dtype': torch.bfloat16}
 
 
 class Qwen3Translator(OfflineTranslator, ConfigGPT):

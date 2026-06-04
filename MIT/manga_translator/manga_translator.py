@@ -2141,13 +2141,23 @@ class MangaTranslator:
                     )
                     patch_ctx.img_rendered = patch_ctx.img_inpainted
 
-                # Offload PNG compression to thread pool to avoid blocking the event loop
+                # Offload PNG compression to thread pool to avoid blocking the event loop.
+                # compress_level=1 is ~10x faster than optimize=True with ~15% larger file —
+                # acceptable trade-off for interactive translation.
                 loop = asyncio.get_running_loop()
                 def _encode_png():
                     buf = io.BytesIO()
-                    Image.fromarray(patch_ctx.img_rendered).save(buf, format='PNG', optimize=True)
+                    Image.fromarray(patch_ctx.img_rendered).save(buf, format='PNG', compress_level=1)
                     return buf.getvalue()
-                png_bytes = await loop.run_in_executor(None, _encode_png)
+                logger.debug(f'[PatchTranslate] encoding PNG patch ({x2-x1}×{y2-y1} px)...')
+                try:
+                    png_bytes = await asyncio.wait_for(
+                        loop.run_in_executor(None, _encode_png), timeout=30.0
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f'[PatchTranslate] PNG encode timed out for group ({x1},{y1},{x2},{y2}) — skipping patch')
+                    return None
+                logger.debug(f'[PatchTranslate] PNG encode done ({len(png_bytes)//1024} KB)')
 
                 return {
                     'x': x1,

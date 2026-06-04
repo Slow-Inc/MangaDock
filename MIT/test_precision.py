@@ -77,19 +77,19 @@ class TestBuildLoadKwargs(unittest.TestCase):
     # P1 — fp8 → torch.float8_e4m3fn, no quantization_config
     def test_fp8_sets_float8_dtype(self):
         kwargs = build_load_kwargs('fp8')
-        self.assertEqual(kwargs['torch_dtype'], 'MOCK_FP8')
+        self.assertEqual(kwargs['dtype'], 'MOCK_FP8')
         self.assertNotIn('quantization_config', kwargs)
 
     # P2 — bf16 → torch.bfloat16, no quantization_config
     def test_bf16_sets_bfloat16_dtype(self):
         kwargs = build_load_kwargs('bf16')
-        self.assertEqual(kwargs['torch_dtype'], 'MOCK_BF16')
+        self.assertEqual(kwargs['dtype'], 'MOCK_BF16')
         self.assertNotIn('quantization_config', kwargs)
 
     # P3 — fp16 → torch.float16, no quantization_config
     def test_fp16_sets_float16_dtype(self):
         kwargs = build_load_kwargs('fp16')
-        self.assertEqual(kwargs['torch_dtype'], 'MOCK_FP16')
+        self.assertEqual(kwargs['dtype'], 'MOCK_FP16')
         self.assertNotIn('quantization_config', kwargs)
 
     # P4 — int8 → BitsAndBytesConfig(load_in_8bit=True)
@@ -109,7 +109,7 @@ class TestBuildLoadKwargs(unittest.TestCase):
     # P6 — unknown → fallback bf16, no crash
     def test_unknown_precision_falls_back_to_bf16(self):
         kwargs = build_load_kwargs('fp64_super_mode')
-        self.assertEqual(kwargs['torch_dtype'], 'MOCK_BF16')
+        self.assertEqual(kwargs['dtype'], 'MOCK_BF16')
         self.assertNotIn('quantization_config', kwargs)
 
 
