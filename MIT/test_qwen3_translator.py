@@ -68,7 +68,7 @@ class TestQwen3EnvVars(unittest.TestCase):
 
     def test_default_model_is_qwen3_4b(self):
         # _TRANSLATOR_MODEL default must match PRD spec
-        self.assertEqual(Qwen3Translator._TRANSLATOR_MODEL, 'Qwen/Qwen3-4B')
+        self.assertEqual(Qwen3Translator._TRANSLATOR_MODEL, 'Qwen/Qwen3.5-4B')
 
 
 # ── M2: _strip_think_tags ─────────────────────────────────────────────────
