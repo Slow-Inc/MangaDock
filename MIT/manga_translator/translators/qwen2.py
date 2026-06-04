@@ -40,13 +40,13 @@ class Qwen2Translator(OfflineTranslator, ConfigGPT):
         'IND': 'Indonesian'
     }
 
-    _TRANSLATOR_MODEL = "Qwen/Qwen2-1.5B-Instruct"
+    _TRANSLATOR_MODEL = os.environ.get('QWEN2_MODEL', 'Qwen/Qwen2-1.5B-Instruct')
     _MODEL_SUB_DIR = os.path.join(OfflineTranslator._MODEL_DIR, OfflineTranslator._MODEL_SUB_DIR, _TRANSLATOR_MODEL)
-    _IS_4_BIT = False
+    _IS_4_BIT = os.environ.get('QWEN2_4BIT', 'false').lower() in ('1', 'true', 'yes')
 
     def __init__(self):
         OfflineTranslator.__init__(self)
-        ConfigGPT.__init__(self, config_key='qwen2') 
+        ConfigGPT.__init__(self, config_key='qwen2')
 
     def parse_args(self, args: TranslatorConfig):
         self.config = args.chatgpt_config
@@ -58,15 +58,18 @@ class Qwen2Translator(OfflineTranslator, ConfigGPT):
             BitsAndBytesConfig
         )
         self.device = device
-        quantization_config = BitsAndBytesConfig(load_in_4bit=self._IS_4_BIT)
+        is_4bit = os.environ.get('QWEN2_4BIT', 'false').lower() in ('1', 'true', 'yes')
+        torch_dtype = os.environ.get('QWEN2_TORCH_DTYPE', 'auto')
+        quantization_config = BitsAndBytesConfig(load_in_4bit=is_4bit)
+        model_id = os.environ.get('QWEN2_MODEL', self._TRANSLATOR_MODEL)
         self.model = AutoModelForCausalLM.from_pretrained(
-            self._TRANSLATOR_MODEL,
-            torch_dtype="auto",
+            model_id,
+            torch_dtype=torch_dtype,
             quantization_config=quantization_config,
-            device_map="auto"
+            device_map='auto',
         )
         self.model.eval()
-        self.tokenizer = AutoTokenizer.from_pretrained(self._TRANSLATOR_MODEL)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
 
     async def _unload(self):
         del self.model
@@ -74,11 +77,11 @@ class Qwen2Translator(OfflineTranslator, ConfigGPT):
 
     async def _infer(self, from_lang: str, to_lang: str, queries: List[str]) -> List[str]:
         model_inputs = self.tokenize(queries, to_lang)
-        # Generate the translation
+        max_new_tokens = int(os.environ.get('QWEN2_MAX_NEW_TOKENS', '10240'))
         generated_ids = self.model.generate(
             model_inputs.input_ids,
             attention_mask=model_inputs.attention_mask,
-            max_new_tokens=10240
+            max_new_tokens=max_new_tokens,
         )
 
         # Extract the generated tokens
@@ -152,6 +155,6 @@ class Qwen2Translator(OfflineTranslator, ConfigGPT):
 
 
 class Qwen2BigTranslator(Qwen2Translator):
-    _TRANSLATOR_MODEL = "Qwen/Qwen2-7B-Instruct"
+    _TRANSLATOR_MODEL = os.environ.get('QWEN2_BIG_MODEL', 'Qwen/Qwen2-7B-Instruct')
     _MODEL_SUB_DIR = os.path.join(OfflineTranslator._MODEL_DIR, OfflineTranslator._MODEL_SUB_DIR, _TRANSLATOR_MODEL)
-    _IS_4_BIT = True
+    _IS_4_BIT = os.environ.get('QWEN2_BIG_4BIT', 'true').lower() in ('1', 'true', 'yes')
