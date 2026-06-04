@@ -441,6 +441,36 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 
 ---
 
+## Phase 3 Mobile Shell - Issues #91 and #92
+
+### Status: COMPLETE - Mobile Hardware ID, Mobile Header Injection, and protected flow smoke
+
+#### Modified Files
+- `Mobile/App.tsx` - waits for the persisted Mobile Hardware ID and passes Mobile Shell headers into the WebView
+- `Mobile/src/mobileIdentity.ts` - creates and persists app-scoped Mobile Hardware ID values
+- `Mobile/src/mobileHeaders.ts` - prepares `x-hardware-id` and `x-manga-dock-client`
+- `Mobile/src/webViewBridge.ts` - seeds `mangadock_device_id` and wraps WebView `fetch` calls for MangaDock API requests
+- `Mobile/package.json` / `Mobile/package-lock.json` - added `@react-native-async-storage/async-storage`
+- `Mobile/README.md` - documented Mobile Hardware ID, Mobile Header Injection, QA APK, and protected route smoke
+- `Mobile/__tests__/mobileIdentity.test.ts` - persistent ID behavior
+- `Mobile/__tests__/mobileHeaders.test.ts` - header contract behavior
+- `Mobile/__tests__/webViewBridge.test.ts` - WebView bridge protected fetch behavior
+- `Mobile/__tests__/App.test.tsx` - App WebView source headers and injected script behavior
+
+#### Verification
+- `npm test -- --runInBand` in `Mobile/` - 5 suites, 7 tests passing
+- `npm run lint` in `Mobile/` - passing
+- `npx tsc --noEmit` in `Mobile/` - passing
+- `Invoke-WebRequest -Uri 'https://hayateotsu.space/api/proxy/books/translate/mit-health' -Headers @{ 'x-hardware-id'='11111111-2222-4333-8444-555555555555'; 'x-manga-dock-client'='android-mobile-shell' } -UseBasicParsing -TimeoutSec 20` - `StatusCode=200`
+- `.\gradlew.bat assembleRelease` in `Mobile/android` - passing; `app-release.apk` produced at 57,808,364 bytes
+- QA APK refreshed at `Mobile/build/qa/mangadock-beta-release-prod-domain.apk`
+
+#### Notes
+- No Android ID, IDFV, native OAuth, deep link auth callback, native token storage, or token injection added.
+- Direct `https://api.hayateotsu.space/books/translate/mit-health` returned `StatusCode=502`, so the production smoke used the deployed Frontend proxy route.
+
+---
+
 ## Phase 3 Mobile Shell - Android Emulator Smoke
 
 ### Status: COMPLETE - shell launches and reaches Frontend dev server

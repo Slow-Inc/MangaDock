@@ -16,20 +16,38 @@ jest.mock(
     const {View} = require('react-native');
 
     return {
-      WebView: ({source}: {source: {uri: string}}) => (
-        <View testID="mobile-shell-webview" source={source} />
+      WebView: ({
+        source,
+        injectedJavaScriptBeforeContentLoaded,
+      }: {
+        source: {uri: string; headers?: Record<string, string>};
+        injectedJavaScriptBeforeContentLoaded?: string;
+      }) => (
+        <View
+          testID="mobile-shell-webview"
+          source={source}
+          injectedJavaScriptBeforeContentLoaded={
+            injectedJavaScriptBeforeContentLoaded
+          }
+        />
       ),
     };
   },
   {virtual: true},
 );
 
+jest.mock('../src/mobileIdentity', () => ({
+  getMobileHardwareId: jest
+    .fn()
+    .mockResolvedValue('11111111-2222-4333-8444-555555555555'),
+}));
+
 import App from '../App';
 
-test('renders the Frontend inside the Mobile Shell WebView', async () => {
+test('renders the Frontend inside the Mobile Shell WebView with Mobile Shell headers', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
 
-  await ReactTestRenderer.act(() => {
+  await ReactTestRenderer.act(async () => {
     renderer = ReactTestRenderer.create(<App />);
   });
 
@@ -37,5 +55,17 @@ test('renders the Frontend inside the Mobile Shell WebView', async () => {
     testID: 'mobile-shell-webview',
   });
 
-  expect(webview.props.source).toEqual({uri: 'https://hayateotsu.space'});
+  expect(webview.props.source).toEqual({
+    uri: 'https://hayateotsu.space',
+    headers: {
+      'x-hardware-id': '11111111-2222-4333-8444-555555555555',
+      'x-manga-dock-client': 'android-mobile-shell',
+    },
+  });
+  expect(webview.props.injectedJavaScriptBeforeContentLoaded).toContain(
+    'mangadock_device_id',
+  );
+  expect(webview.props.injectedJavaScriptBeforeContentLoaded).toContain(
+    '11111111-2222-4333-8444-555555555555',
+  );
 });

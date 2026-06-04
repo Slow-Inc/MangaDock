@@ -1,10 +1,14 @@
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import {useEffect, useState} from 'react';
+import {StatusBar, StyleSheet, useColorScheme, View} from 'react-native';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
-import { getMobileShellUrl } from './src/config';
+import {WebView} from 'react-native-webview';
+import {getMobileShellUrl} from './src/config';
+import {createMobileShellHeaders} from './src/mobileHeaders';
+import {getMobileHardwareId} from './src/mobileIdentity';
+import {createMobileShellInjectionScript} from './src/webViewBridge';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -19,6 +23,25 @@ function App() {
 
 function AppContent() {
   const safeAreaInsets = useSafeAreaInsets();
+  const [hardwareId, setHardwareId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getMobileHardwareId().then(nextHardwareId => {
+      if (isMounted) {
+        setHardwareId(nextHardwareId);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  if (!hardwareId) {
+    return <View testID="mobile-shell-loading" style={styles.container} />;
+  }
 
   return (
     <View
@@ -30,7 +53,15 @@ function AppContent() {
         },
       ]}
     >
-      <WebView source={{uri: getMobileShellUrl()}} />
+      <WebView
+        source={{
+          uri: getMobileShellUrl(),
+          headers: createMobileShellHeaders(hardwareId),
+        }}
+        injectedJavaScriptBeforeContentLoaded={createMobileShellInjectionScript(
+          hardwareId,
+        )}
+      />
     </View>
   );
 }
