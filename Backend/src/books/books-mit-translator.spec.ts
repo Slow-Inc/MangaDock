@@ -48,6 +48,9 @@ describe('BooksService — MIT_TRANSLATOR env var (#93)', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     delete process.env.MIT_TRANSLATOR;
+    delete process.env.MIT_TRANSLATOR_TYPE;
+    delete process.env.MIT_API_TRANSLATOR;
+    delete process.env.MIT_LOCAL_TRANSLATOR;
   });
 
   // Cycle B1 — default: no MIT_TRANSLATOR → sends 'gemini'
@@ -60,7 +63,7 @@ describe('BooksService — MIT_TRANSLATOR env var (#93)', () => {
     expect(getConfig()?.translator?.translator).toBe('gemini');
   });
 
-  // Cycle B2 — MIT_TRANSLATOR=qwen3 → sends 'qwen3'
+  // Cycle B2 — MIT_TRANSLATOR=qwen3 → sends 'qwen3' (backward compat)
   it('sends translator: qwen3 when MIT_TRANSLATOR=qwen3', async () => {
     process.env.MIT_TRANSLATOR = 'qwen3';
     const { service } = makeService();
@@ -69,5 +72,51 @@ describe('BooksService — MIT_TRANSLATOR env var (#93)', () => {
     await runBatch(service);
 
     expect(getConfig()?.translator?.translator).toBe('qwen3');
+  });
+
+  // Cycle B3 — MIT_TRANSLATOR_TYPE=local, no model set → default 'qwen3'
+  it('sends translator: qwen3 (default local) when MIT_TRANSLATOR_TYPE=local and no model specified', async () => {
+    process.env.MIT_TRANSLATOR_TYPE = 'local';
+    const { service } = makeService();
+    const { getConfig } = mockFetchCapturingMitConfig();
+
+    await runBatch(service);
+
+    expect(getConfig()?.translator?.translator).toBe('qwen3');
+  });
+
+  // Cycle B4 — MIT_TRANSLATOR_TYPE=local + MIT_LOCAL_TRANSLATOR=nllb → 'nllb'
+  it('sends translator: nllb when MIT_TRANSLATOR_TYPE=local and MIT_LOCAL_TRANSLATOR=nllb', async () => {
+    process.env.MIT_TRANSLATOR_TYPE = 'local';
+    process.env.MIT_LOCAL_TRANSLATOR = 'nllb';
+    const { service } = makeService();
+    const { getConfig } = mockFetchCapturingMitConfig();
+
+    await runBatch(service);
+
+    expect(getConfig()?.translator?.translator).toBe('nllb');
+  });
+
+  // Cycle B5 — MIT_TRANSLATOR_TYPE=api + MIT_API_TRANSLATOR=deepseek → 'deepseek'
+  it('sends translator: deepseek when MIT_TRANSLATOR_TYPE=api and MIT_API_TRANSLATOR=deepseek', async () => {
+    process.env.MIT_TRANSLATOR_TYPE = 'api';
+    process.env.MIT_API_TRANSLATOR = 'deepseek';
+    const { service } = makeService();
+    const { getConfig } = mockFetchCapturingMitConfig();
+
+    await runBatch(service);
+
+    expect(getConfig()?.translator?.translator).toBe('deepseek');
+  });
+
+  // Cycle B6 — MIT_TRANSLATOR_TYPE=api, no model set → default 'gemini'
+  it('sends translator: gemini (default api) when MIT_TRANSLATOR_TYPE=api and no model specified', async () => {
+    process.env.MIT_TRANSLATOR_TYPE = 'api';
+    const { service } = makeService();
+    const { getConfig } = mockFetchCapturingMitConfig();
+
+    await runBatch(service);
+
+    expect(getConfig()?.translator?.translator).toBe('gemini');
   });
 });

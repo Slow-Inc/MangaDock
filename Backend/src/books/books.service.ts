@@ -69,6 +69,21 @@ const GEMINI_LANG_NAME: Record<string, string> = {
 function geminiLangName(isoLang: string): string {
   return GEMINI_LANG_NAME[isoLang.toLowerCase()] ?? isoLang;
 }
+/**
+ * Resolve which MIT translator to use based on env config.
+ *
+ * Priority:
+ *   1. MIT_TRANSLATOR_TYPE=local  → MIT_LOCAL_TRANSLATOR  (default: 'qwen3')
+ *   2. MIT_TRANSLATOR_TYPE=api    → MIT_API_TRANSLATOR    (default: 'gemini')
+ *   3. No MIT_TRANSLATOR_TYPE     → MIT_TRANSLATOR        (default: 'gemini', backward compat)
+ */
+function resolveMitTranslator(): string {
+  const type = process.env.MIT_TRANSLATOR_TYPE;
+  if (type === 'local') return process.env.MIT_LOCAL_TRANSLATOR ?? 'qwen3';
+  if (type === 'api')   return process.env.MIT_API_TRANSLATOR  ?? 'gemini';
+  return process.env.MIT_TRANSLATOR ?? 'gemini';
+}
+
 /** RTL reading order — panels sort right→left for these original languages */
 function isRtlLang(isoLang: string): boolean {
   return ['ja', 'ko', 'zh', 'zh-hk', 'zh-ro'].includes(isoLang.toLowerCase());
@@ -547,7 +562,7 @@ export class BooksService {
 
     const config = JSON.stringify({
       translator: {
-        translator: process.env.MIT_TRANSLATOR ?? 'gemini',
+        translator: resolveMitTranslator(),
         target_lang: tgtMIT,
         ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
       },
@@ -863,7 +878,7 @@ export class BooksService {
     // ── 2. Build multipart form ───────────────────────────────────────────
     const mitConfig = JSON.stringify({
       translator: {
-        translator: process.env.MIT_TRANSLATOR ?? 'gemini',
+        translator: resolveMitTranslator(),
         target_lang: tgtMIT,
         ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
       },
