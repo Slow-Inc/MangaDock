@@ -191,6 +191,13 @@ Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.L
 
 ## QA Beta APK
 
+Current QA beta version:
+
+```text
+versionCode 2
+versionName 1.0.1-beta.1
+```
+
 For initial QA, build a release APK that bundles JS:
 
 ```powershell
