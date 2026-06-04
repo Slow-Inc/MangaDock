@@ -2,12 +2,62 @@
 
 ---
 
-## 🔖 Pending Issues (scrutinize findings — 2026-06-04, GitHub MCP no access, track manually)
+## 🔖 Pending Issues (GitHub MCP no access — publish manually when token updated)
 
 | # | Title | Priority |
 |---|---|---|
-| #89 | fix(books): notify() ต้อง publish ไป Redis ใน NDJSON sync path | 🔴 high |
-| #90 | fix(webhook): security hardening — raw HMAC, enforce secret, img_b64 bound | 🔴 high |
+| #89 | fix(books): notify() ต้อง publish ไป Redis ใน NDJSON sync path | ✅ done |
+| #90 | fix(webhook): security hardening — raw HMAC, enforce secret, img_b64 bound | ✅ done (S2+S3; S1 raw HMAC pending) |
+| #91 | fix(misc): listener tracking, observability, fetch short-circuit | ✅ done |
+| #92 | PRD: Qwen3 offline translator (see below) | 📋 PRD ready |
+
+---
+
+## 📋 PRD #92 — Qwen3 Offline Translator (2026-06-04)
+
+### Problem Statement
+
+ผู้ใช้ที่มี GPU (RTX 4070 Super 12GB) ต้องการรัน manga translation แบบ offline ไม่พึ่ง Gemini API แต่ MIT hardcode translator เป็น `gemini` และไม่มี Qwen3 translator class Qwen3 ยังมี thinking mode ที่ต้องปิดก่อนใช้งาน
+
+### Solution
+
+1. `MIT` — Qwen3Translator class ใหม่ที่ปิด thinking mode + config ผ่าน env vars
+2. `MIT config.py` — เพิ่ม `qwen3`, `qwen3_big` ใน Translator enum + OFFLINE_TRANSLATORS
+3. `Backend` — อ่าน `MIT_TRANSLATOR` env var แทน hardcode `gemini`
+
+### Env Vars (MIT)
+
+| Var | Default | Description |
+|---|---|---|
+| `QWEN3_MODEL` | `Qwen/Qwen3-4B-Instruct` | HuggingFace model ID |
+| `QWEN3_4BIT` | `false` | INT4 quantization |
+| `QWEN3_TORCH_DTYPE` | `auto` | auto/bfloat16/float16 |
+| `QWEN3_MAX_NEW_TOKENS` | `4096` | Max output tokens |
+| `QWEN3_BIG_MODEL` | `Qwen/Qwen3-8B-Instruct` | Model for qwen3_big key |
+| `QWEN3_BIG_4BIT` | `false` | INT4 for big model |
+
+**Backend:**
+```
+MIT_TRANSLATOR=gemini   # gemini | qwen3 | qwen3_big | nllb | sugoi
+```
+
+### Key Implementation Notes
+
+- `apply_chat_template(..., enable_thinking=False)` — requires transformers >= 4.51.0; strip `<think>.*</think>` as fallback
+- Qwen3-4B BF16 = ~8GB VRAM → fit ใน 12GB, ~4GB เหลือสำหรับ KV cache
+- Cold start บน SN850X NVMe (~7GB/s): ~1 วินาที หลัง download ครั้งแรก
+
+### Testing
+
+- MIT (Python unittest): thinking tag stripping, env var reading, response parsing
+- Backend (Jest): `MIT_TRANSLATOR` env → correct translator field ใน MIT config JSON; default = `gemini`
+- Prior art: `books-pubsub-batch.spec.ts` สำหรับ mock `_runMitBatch`
+
+### Out of Scope
+
+- Frontend translator selector UI
+- Qwen3 MoE 235B
+- Automatic VRAM detection/quantization selection
 | #91 | fix(misc): listener tracking log, observability, fetch short-circuit | 🟡 medium |
 
 ---
