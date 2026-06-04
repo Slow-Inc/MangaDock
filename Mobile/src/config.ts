@@ -1,4 +1,4 @@
-const DEFAULT_MOBILE_SHELL_URL = 'http://10.0.2.2:4000';
+const DEFAULT_MOBILE_SHELL_URL = 'https://hayateotsu.space';
 
 type MobileShellConfig = {
   frontendUrl?: string;

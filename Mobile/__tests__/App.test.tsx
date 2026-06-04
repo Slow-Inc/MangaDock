@@ -37,5 +37,5 @@ test('renders the Frontend inside the Mobile Shell WebView', async () => {
     testID: 'mobile-shell-webview',
   });
 
-  expect(webview.props.source).toEqual({uri: 'http://10.0.2.2:4000'});
+  expect(webview.props.source).toEqual({uri: 'https://hayateotsu.space'});
 });

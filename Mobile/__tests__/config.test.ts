@@ -1,8 +1,8 @@
 import {getMobileShellUrl} from '../src/config';
 
 describe('Mobile Shell config', () => {
-  it('uses the Android emulator Frontend URL by default', () => {
-    expect(getMobileShellUrl()).toBe('http://10.0.2.2:4000');
+  it('uses the production Frontend URL by default', () => {
+    expect(getMobileShellUrl()).toBe('https://hayateotsu.space');
   });
 
   it('uses an explicit Frontend URL override when provided', () => {
