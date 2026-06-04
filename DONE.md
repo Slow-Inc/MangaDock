@@ -1,5 +1,17 @@
 # DONE — Claude Code Review Fix Session (2026-05-27)
 
+---
+
+## 🔖 Pending Issues (scrutinize findings — 2026-06-04, GitHub MCP no access, track manually)
+
+| # | Title | Priority |
+|---|---|---|
+| #89 | fix(books): notify() ต้อง publish ไป Redis ใน NDJSON sync path | 🔴 high |
+| #90 | fix(webhook): security hardening — raw HMAC, enforce secret, img_b64 bound | 🔴 high |
+| #91 | fix(misc): listener tracking log, observability, fetch short-circuit | 🟡 medium |
+
+---
+
 ## Files Modified
 
 ### Frontend

@@ -143,6 +143,10 @@ export class BooksService {
       const imgH = result.imgHeight > 0 ? result.imgHeight : 0;
       const patches: PatchEntry[] = [];
       for (const [i, p] of (result.patches || []).entries()) {
+        if (p.img_b64.length > 5_000_000) {
+          this.logger.warn(`[Webhook] patch ${i} for job=${jobKey} page=${pageIndex} exceeds size limit — skipped`);
+          continue;
+        }
         const patchFilename = `${pageIndex}_${i}_${randomBytes(4).toString('hex')}.png`;
         const key = `${patchDir}/${patchFilename}`;
         const patchBuf = Buffer.from(p.img_b64, 'base64');
@@ -734,9 +738,10 @@ export class BooksService {
       listener(msg.pageIndex, { patches: msg.patches ?? [], ...(msg.error ? { error: msg.error } : {}) });
     }) ?? (() => {});
 
-    // 3. Inner notify: store result + fan-out to all listeners
+    // 3. Inner notify: store result + publish to Redis (for original caller) + fan-out (for latecomers)
     const notify = (pageIndex: number, result: PageResult) => {
       job.completedPages.set(pageIndex, result);
+      void this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...result });
       for (const l of job.listeners) {
         try {
           l(pageIndex, result);

@@ -14,30 +14,31 @@ export class MitWebhookController {
     @Body() body: any,
   ) {
     const secret = process.env.MIT_WEBHOOK_SECRET;
-    
-    // T4-STANDARD Pillar 2: HMAC Verification
-    if (secret) {
-      if (!signature) {
-        this.logger.error('Missing x-mit-signature header');
-        throw new HttpException('Missing signature', HttpStatus.UNAUTHORIZED);
-      }
 
-      const hmac = crypto.createHmac('sha256', secret);
-      const digest = hmac.update(JSON.stringify(body)).digest('hex');
-      const sigBuf = Buffer.from(signature, 'hex');
-      const digBuf = Buffer.from(digest, 'hex');
+    // T4-STANDARD Pillar 2: HMAC Verification — secret is required; no secret = reject
+    if (!secret) {
+      this.logger.error('MIT_WEBHOOK_SECRET is not set — rejecting webhook (configure the secret)');
+      throw new HttpException('Webhook not configured', HttpStatus.UNAUTHORIZED);
+    }
 
-      if (sigBuf.length !== digBuf.length || !crypto.timingSafeEqual(sigBuf, digBuf)) {
-        this.logger.error('Invalid HMAC signature');
-        throw new HttpException('Invalid signature', HttpStatus.UNAUTHORIZED);
-      }
-    } else {
-      this.logger.warn('MIT_WEBHOOK_SECRET not set — skipping signature verification (NOT RECOMMENDED FOR PRODUCTION)');
+    if (!signature) {
+      this.logger.error('Missing x-mit-signature header');
+      throw new HttpException('Missing signature', HttpStatus.UNAUTHORIZED);
+    }
+
+    const hmac = crypto.createHmac('sha256', secret);
+    const digest = hmac.update(JSON.stringify(body)).digest('hex');
+    const sigBuf = Buffer.from(signature, 'hex');
+    const digBuf = Buffer.from(digest, 'hex');
+
+    if (sigBuf.length !== digBuf.length || !crypto.timingSafeEqual(sigBuf, digBuf)) {
+      this.logger.error('Invalid HMAC signature');
+      throw new HttpException('Invalid signature', HttpStatus.UNAUTHORIZED);
     }
 
     // T4-STANDARD Pillar 2: Idempotent Webhook Processing
     const { taskId, pageIndex, result, error } = body;
-    
+
     if (!taskId) {
       throw new HttpException('Missing taskId in webhook body', HttpStatus.BAD_REQUEST);
     }

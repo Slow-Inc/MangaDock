@@ -1,5 +1,20 @@
 import { BooksService } from './books.service';
 
+function seedJob(service: BooksService, jobKey: string, overrides: Partial<any> = {}) {
+  const job = {
+    completedPages: new Map(),
+    processingPages: new Set<number>(),
+    listeners: new Set<any>(),
+    expectedCount: 1,
+    resolve: jest.fn(),
+    reject: jest.fn(),
+    cancelController: new AbortController(),
+    ...overrides,
+  };
+  (service as any).activeBatchJobs.set(jobKey, job);
+  return job;
+}
+
 function makeService() {
   const cache = {
     get: jest.fn().mockResolvedValue(null),
@@ -354,5 +369,43 @@ describe('BooksService — batch webhook pipeline', () => {
     expect(received).toContain(0);
 
     await jobPromise;
+  });
+
+  // Cycle — #90 S3: img_b64 size limit prevents OOM from oversized blob
+  it('skips patch and does not call storage.put when img_b64 exceeds size limit', async () => {
+    const { service, storage, cache } = makeService();
+    const jobKey = 'ch1:ANY:THA';
+    seedJob(service, jobKey);
+
+    const oversizedB64 = 'A'.repeat(5_000_001); // > 5 MB encoded
+    await service.handleMitCallback(
+      jobKey, 0,
+      { imgWidth: 800, imgHeight: 1200, patches: [{ x: 0, y: 0, w: 100, h: 100, img_b64: oversizedB64 }] },
+      undefined,
+    );
+
+    expect(storage.put).not.toHaveBeenCalled(); // oversized patch skipped
+  });
+
+  it('still processes remaining patches when one patch exceeds size limit', async () => {
+    const { service, storage, cache } = makeService();
+    const jobKey = 'ch1:ANY:THA';
+    seedJob(service, jobKey, { expectedCount: 1 });
+
+    const oversizedB64 = 'A'.repeat(5_000_001);
+    await service.handleMitCallback(
+      jobKey, 0,
+      {
+        imgWidth: 800,
+        imgHeight: 1200,
+        patches: [
+          { x: 0, y: 0, w: 100, h: 100, img_b64: oversizedB64 },  // skip
+          { x: 10, y: 10, w: 50, h: 50, img_b64: '' },             // keep
+        ],
+      },
+      undefined,
+    );
+
+    expect(storage.put).toHaveBeenCalledTimes(1); // only the valid patch
   });
 });
