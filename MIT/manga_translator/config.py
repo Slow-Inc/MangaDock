@@ -218,7 +218,13 @@ class UpscaleConfig(BaseModel):
     """Image upscale ratio applied before detection. Can improve text detection."""
 
 def _default_translator() -> Translator:
-    key = os.environ.get('DEFAULT_TRANSLATOR', 'gemini')
+    t_type = os.environ.get('TRANSLATOR_TYPE')
+    if t_type == 'local':
+        key = os.environ.get('DEFAULT_LOCAL_TRANSLATOR', 'qwen3')
+    elif t_type == 'api':
+        key = os.environ.get('DEFAULT_API_TRANSLATOR', 'gemini')
+    else:
+        key = os.environ.get('DEFAULT_TRANSLATOR', 'gemini')
     try:
         return Translator(key)
     except ValueError:
