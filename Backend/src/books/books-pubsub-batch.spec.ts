@@ -427,6 +427,120 @@ describe('BooksService — Redis pub/sub batch translation (#88)', () => {
   });
 });
 
+// ─── #91 C2: removeBatchListener abort uses activeCallerCount ────────────────
+
+describe('BooksService — removeBatchListener abort logic (#91-C2)', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('aborts job when original Redis caller disconnects (no latecomers)', async () => {
+    const redis = makeRedis();
+    const { service } = makeService(redis);
+
+    jest.spyOn(service as any, '_runMitBatch').mockResolvedValue(undefined);
+
+    const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
+    const listener = jest.fn();
+    // .catch swallows the expected abort rejection so it doesn't bleed into next test
+    const jobPromise = service.startOrAttachBatchJob('ch1', pages, listener as any).catch(() => {});
+    await new Promise(resolve => setImmediate(resolve));
+
+    service.removeBatchListener('ch1', undefined, undefined, listener);
+
+    const job = (service as any).activeBatchJobs.get('ch1:ANY:THA');
+    expect(job?.cancelController.signal.aborted).toBe(true);
+
+    await jobPromise; // cleanly drain the rejected promise
+  });
+
+  it('does NOT abort when original caller disconnects but latecomer is still active', async () => {
+    const redis = makeRedis();
+    const { service } = makeService(redis);
+
+    jest.spyOn(service as any, '_runMitBatch').mockResolvedValue(undefined);
+
+    const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
+    const originalListener = jest.fn();
+    const lateListener = jest.fn();
+
+    const origPromise = service.startOrAttachBatchJob('ch1', pages, originalListener as any).catch(() => {});
+    await new Promise(resolve => setImmediate(resolve));
+    const latePromise = service.startOrAttachBatchJob('ch1', pages, lateListener as any).catch(() => {});
+    await new Promise(resolve => setImmediate(resolve));
+
+    service.removeBatchListener('ch1', undefined, undefined, originalListener);
+
+    const job = (service as any).activeBatchJobs.get('ch1:ANY:THA');
+    expect(job?.cancelController.signal.aborted).toBe(false); // latecomer still active
+
+    // Cleanup: resolve job so no dangling promises
+    job?.resolve?.();
+    await Promise.all([origPromise, latePromise]);
+  });
+
+  it('aborts when latecomer also disconnects after original caller already left', async () => {
+    const redis = makeRedis();
+    const { service } = makeService(redis);
+
+    jest.spyOn(service as any, '_runMitBatch').mockResolvedValue(undefined);
+
+    const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
+    const originalListener = jest.fn();
+    const lateListener = jest.fn();
+
+    // .catch on both so aborted rejections don't bleed
+    const origPromise = service.startOrAttachBatchJob('ch1', pages, originalListener as any).catch(() => {});
+    await new Promise(resolve => setImmediate(resolve));
+    const latePromise = service.startOrAttachBatchJob('ch1', pages, lateListener as any).catch(() => {});
+    await new Promise(resolve => setImmediate(resolve));
+
+    service.removeBatchListener('ch1', undefined, undefined, originalListener);
+    service.removeBatchListener('ch1', undefined, undefined, lateListener);
+
+    const job = (service as any).activeBatchJobs.get('ch1:ANY:THA');
+    expect(job?.cancelController.signal.aborted).toBe(true);
+
+    await Promise.all([origPromise, latePromise]); // drain
+  });
+});
+
+// ─── #91 O1: ERROR log when redis.publish fails ──────────────────────────────
+
+describe('BooksService — Redis publish failure observability (#91-O1)', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('logs ERROR when redis.publish returns false (delivery failure) in handleMitCallback', async () => {
+    const redis = makeRedis({
+      publish: jest.fn().mockResolvedValue(false), // false = publish failed
+    });
+    const { service } = makeService(redis);
+    const loggerErrorSpy = jest.spyOn((service as any).logger, 'error');
+
+    const jobKey = 'ch1:ANY:THA';
+    seedJob(service, jobKey);
+
+    await service.handleMitCallback(jobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('publish failed'),
+    );
+  });
+
+  it('does not log ERROR when redis.publish returns true (success)', async () => {
+    const redis = makeRedis({
+      publish: jest.fn().mockResolvedValue(true),
+    });
+    const { service } = makeService(redis);
+    const loggerErrorSpy = jest.spyOn((service as any).logger, 'error');
+
+    const jobKey = 'ch1:ANY:THA';
+    seedJob(service, jobKey);
+
+    await service.handleMitCallback(jobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+
+    expect(loggerErrorSpy).not.toHaveBeenCalledWith(expect.stringContaining('publish failed'));
+  });
+});
+
 // ─── #89: notify() NDJSON path must also publish to Redis ────────────────────
 
 describe('BooksService — notify() NDJSON path publishes via Redis (#89)', () => {
