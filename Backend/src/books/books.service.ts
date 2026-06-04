@@ -547,7 +547,7 @@ export class BooksService {
 
     const config = JSON.stringify({
       translator: {
-        translator: 'gemini',
+        translator: process.env.MIT_TRANSLATOR ?? 'gemini',
         target_lang: tgtMIT,
         ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
       },
@@ -863,7 +863,7 @@ export class BooksService {
     // ── 2. Build multipart form ───────────────────────────────────────────
     const mitConfig = JSON.stringify({
       translator: {
-        translator: 'gemini',
+        translator: process.env.MIT_TRANSLATOR ?? 'gemini',
         target_lang: tgtMIT,
         ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
       },
