@@ -12,6 +12,31 @@ def _strip_think_tags(text: str) -> str:
     return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
 
 
+def build_load_kwargs(precision: str) -> dict:
+    """Map a precision string to AutoModelForCausalLM.from_pretrained keyword arguments.
+
+    fp8  → torch.float8_e4m3fn  (Ada Lovelace native, PyTorch >= 2.1)
+    bf16 → torch.bfloat16       (default)
+    fp16 → torch.float16
+    int8 → BitsAndBytesConfig(load_in_8bit=True)
+    int4 → BitsAndBytesConfig(load_in_4bit=True)
+    else → bf16 fallback
+    """
+    import torch
+    from transformers import BitsAndBytesConfig
+
+    if precision == 'fp8':
+        return {'torch_dtype': torch.float8_e4m3fn}
+    if precision == 'fp16':
+        return {'torch_dtype': torch.float16}
+    if precision == 'int8':
+        return {'torch_dtype': 'auto', 'quantization_config': BitsAndBytesConfig(load_in_8bit=True)}
+    if precision == 'int4':
+        return {'torch_dtype': 'auto', 'quantization_config': BitsAndBytesConfig(load_in_4bit=True)}
+    # bf16 (default) + unknown → bfloat16, no quantization
+    return {'torch_dtype': torch.bfloat16}
+
+
 class Qwen3Translator(OfflineTranslator, ConfigGPT):
     _LANGUAGE_CODE_MAP = {
         'CHS': 'Simplified Chinese',
@@ -43,7 +68,6 @@ class Qwen3Translator(OfflineTranslator, ConfigGPT):
 
     _TRANSLATOR_MODEL = os.environ.get('QWEN3_MODEL', 'Qwen/Qwen3-4B-Instruct')
     _MODEL_SUB_DIR = os.path.join(OfflineTranslator._MODEL_DIR, OfflineTranslator._MODEL_SUB_DIR, _TRANSLATOR_MODEL)
-    _IS_4_BIT = os.environ.get('QWEN3_4BIT', 'false').lower() in ('1', 'true', 'yes')
 
     def __init__(self):
         OfflineTranslator.__init__(self)
@@ -53,16 +77,13 @@ class Qwen3Translator(OfflineTranslator, ConfigGPT):
         self.config = args.chatgpt_config
 
     async def _load(self, from_lang: str, to_lang: str, device: str):
-        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+        from transformers import AutoModelForCausalLM, AutoTokenizer
         self.device = device
-        is_4bit = os.environ.get('QWEN3_4BIT', 'false').lower() in ('1', 'true', 'yes')
-        torch_dtype = os.environ.get('QWEN3_TORCH_DTYPE', 'auto')
         model_id = os.environ.get('QWEN3_MODEL', self._TRANSLATOR_MODEL)
-        quantization_config = BitsAndBytesConfig(load_in_4bit=is_4bit)
+        precision = os.environ.get('QWEN3_PRECISION', 'bf16')
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
-            torch_dtype=torch_dtype,
-            quantization_config=quantization_config,
+            **build_load_kwargs(precision),
             device_map='auto',
         )
         self.model.eval()
@@ -140,4 +161,16 @@ class Qwen3Translator(OfflineTranslator, ConfigGPT):
 class Qwen3BigTranslator(Qwen3Translator):
     _TRANSLATOR_MODEL = os.environ.get('QWEN3_BIG_MODEL', 'Qwen/Qwen3-8B-Instruct')
     _MODEL_SUB_DIR = os.path.join(OfflineTranslator._MODEL_DIR, OfflineTranslator._MODEL_SUB_DIR, _TRANSLATOR_MODEL)
-    _IS_4_BIT = os.environ.get('QWEN3_BIG_4BIT', 'false').lower() in ('1', 'true', 'yes')
+
+    async def _load(self, from_lang: str, to_lang: str, device: str):
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        self.device = device
+        model_id = os.environ.get('QWEN3_BIG_MODEL', self._TRANSLATOR_MODEL)
+        precision = os.environ.get('QWEN3_BIG_PRECISION', os.environ.get('QWEN3_PRECISION', 'bf16'))
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            **build_load_kwargs(precision),
+            device_map='auto',
+        )
+        self.model.eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
