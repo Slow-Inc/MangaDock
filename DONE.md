@@ -378,3 +378,37 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 - **Error Handling:** เปลี่ยน `throw new Error()` เป็น `InternalServerErrorException` ทั้งหมดใน `UnlockService` เพื่อมาตรฐานความปลอดภัย
 - **Runtime Validation:** ติดตั้ง `forum.dto.ts` และเปิดใช้งาน `ValidationPipe` (class-validator) แบบ Global ใน `main.ts` ป้องกัน Payload ที่ผิดโครงสร้าง
 - **Test Integrity:** แก้ไข `forum.controller.spec.ts` ให้ Mock ข้อมูลตรงตาม Contract จริง `{ items, total }`
+
+---
+
+## Phase 3 Mobile Shell — Issue #90 (Branch: feat/mobile-shell-phase3)
+
+### Status: IN PROGRESS — Android-first WebView scaffold implemented
+
+#### New Files
+- `Mobile/src/config.ts` — Mobile Shell URL config; default `http://10.0.2.2:4000`; explicit override supported for physical device/LAN scenarios
+- `Mobile/__tests__/config.test.ts` — TDD coverage for default URL and explicit override
+
+#### Modified Files
+- `.gitignore` — removed root `Mobile/` ignore rule now that Phase 3 has started; `Mobile/.gitignore` still ignores `node_modules/`, build outputs, and local native artifacts
+- `Mobile/App.tsx` — replaced React Native sample screen with `react-native-webview` shell pointed at `getMobileShellUrl()`
+- `Mobile/__tests__/App.test.tsx` — verifies `App` renders the Frontend URL inside the Mobile Shell WebView
+- `Mobile/package.json` / `Mobile/package-lock.json` — installed `react-native-webview`; removed unused sample screen package; removed `ios` script for Android-first scope
+- `Mobile/README.md` — replaced generated README with Android emulator and physical Android verification checklist
+
+#### What Was NOT Changed
+- No Mobile Hardware ID persistence
+- No `x-hardware-id` Mobile Header Injection
+- No protected content smoke test implementation
+- No iOS artifacts
+
+#### Verification
+- `npm test` in `Mobile/` — 2 suites, 3 tests passing
+- `npm run lint` in `Mobile/` — passing
+- `npx tsc --noEmit` in `Mobile/` — passing
+- `.\gradlew.bat assembleDebug` in `Mobile/android` — not run successfully because `ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.`
+- Android emulator/device smoke not run in this session
+
+#### Notes for Gemini
+- `CLAUDE_BRIEF.md` is still stale for Phase 2 Cache Architecture. User explicitly authorized Phase 3 Mobile Shell work in parallel with Phase 2.
+- `npm install react-native-webview` reported `7 moderate severity vulnerabilities`; no audit fix applied because that can change dependency versions beyond issue #90 scope.
