@@ -426,3 +426,148 @@ describe('BooksService — Redis pub/sub batch translation (#88)', () => {
     expect(listener).toHaveBeenCalledTimes(2); // all pages from cache
   });
 });
+
+// ─── #89: notify() NDJSON path must also publish to Redis ────────────────────
+
+describe('BooksService — notify() NDJSON path publishes via Redis (#89)', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  // Cycle 1 (RED) — notify callback publishes to Redis channel
+  it('publishes to Redis channel when notify() is called from _runMitBatch (NDJSON path)', async () => {
+    const redis = makeRedis();
+    const { service } = makeService(redis);
+
+    jest.spyOn(service as any, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+      const notify = args[2]; // (chapterId, pages, notify, signal, ...)
+      notify(0, { patches: [] });
+    });
+
+    const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
+    const jobPromise = service.startOrAttachBatchJob('ch1', pages, jest.fn() as any);
+    await new Promise(resolve => setImmediate(resolve));
+    const job = (service as any).activeBatchJobs.get('ch1:ANY:THA');
+    job?.resolve?.();
+    await jobPromise;
+
+    expect(redis.publish).toHaveBeenCalledWith(
+      'translate:ch1:ANY:THA',
+      expect.objectContaining({ pageIndex: 0 }),
+    );
+  });
+
+  // Cycle 2 (RED) — original caller receives result via Redis when notify() fires
+  it('original caller receives page via Redis subscription when NDJSON notify() fires', async () => {
+    let capturedSubHandler: ((data: unknown) => void) | null = null;
+    const redis = makeRedis({
+      subscribe: jest.fn().mockImplementation((_ch: string, handler: any) => {
+        capturedSubHandler = handler;
+        return () => {};
+      }),
+      publish: jest.fn().mockImplementation(async (_ch: string, data: unknown) => {
+        capturedSubHandler?.(data);
+      }),
+    });
+    const { service } = makeService(redis);
+
+    jest.spyOn(service as any, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+      const notify = args[2];
+      notify(0, { patches: [] });
+    });
+
+    const received: number[] = [];
+    await service.startOrAttachBatchJob(
+      'ch1',
+      [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }],
+      (pageIndex: number) => received.push(pageIndex) as any,
+    );
+
+    expect(received).toContain(0);
+  });
+
+  // Cycle 3 (RED) — exactly once despite publish + job.listeners both potentially firing
+  it('delivers page exactly once to original caller when notify() fires via NDJSON path', async () => {
+    let capturedSubHandler: ((data: unknown) => void) | null = null;
+    const redis = makeRedis({
+      subscribe: jest.fn().mockImplementation((_ch: string, handler: any) => {
+        capturedSubHandler = handler;
+        return () => {};
+      }),
+      publish: jest.fn().mockImplementation(async (_ch: string, data: unknown) => {
+        capturedSubHandler?.(data);
+      }),
+    });
+    const { service } = makeService(redis);
+
+    jest.spyOn(service as any, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+      const notify = args[2];
+      notify(0, { patches: [] });
+    });
+
+    const received: number[] = [];
+    await service.startOrAttachBatchJob(
+      'ch1',
+      [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }],
+      (pageIndex: number) => received.push(pageIndex) as any,
+    );
+
+    expect(received.filter(x => x === 0)).toHaveLength(1);
+  });
+
+  // Cycle 4 (RED) — error result from NDJSON notify() reaches original caller
+  it('forwards error result from notify() to original caller via Redis', async () => {
+    let capturedSubHandler: ((data: unknown) => void) | null = null;
+    const redis = makeRedis({
+      subscribe: jest.fn().mockImplementation((_ch: string, handler: any) => {
+        capturedSubHandler = handler;
+        return () => {};
+      }),
+      publish: jest.fn().mockImplementation(async (_ch: string, data: unknown) => {
+        capturedSubHandler?.(data);
+      }),
+    });
+    const { service } = makeService(redis);
+
+    jest.spyOn(service as any, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+      const notify = args[2];
+      notify(0, { patches: [], error: 'ocr failed' });
+    });
+
+    const received: Array<{ pageIndex: number; error?: string }> = [];
+    await service.startOrAttachBatchJob(
+      'ch1',
+      [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }],
+      (pageIndex: number, result: any) => received.push({ pageIndex, error: result.error }) as any,
+    );
+
+    expect(received[0]).toMatchObject({ pageIndex: 0, error: 'ocr failed' });
+  });
+
+  // Cycle 5 (RED) — latecomer still receives via job.listeners fan-out (not broken)
+  it('latecomer still receives page via job.listeners fan-out when notify() fires', async () => {
+    const redis = makeRedis();
+    const { service } = makeService(redis);
+
+    let capturedNotify: ((pageIndex: number, result: any) => void) | null = null;
+    jest.spyOn(service as any, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+      capturedNotify = args[2];
+    });
+
+    const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
+    service.startOrAttachBatchJob('ch1', pages, jest.fn() as any);
+    await new Promise(resolve => setImmediate(resolve));
+
+    const lateReceived: number[] = [];
+    const latePromise = service.startOrAttachBatchJob(
+      'ch1', pages, (idx: number) => lateReceived.push(idx) as any,
+    );
+    await new Promise(resolve => setImmediate(resolve));
+
+    capturedNotify?.(0, { patches: [] });
+
+    const job = (service as any).activeBatchJobs.get('ch1:ANY:THA');
+    job?.resolve?.();
+    await latePromise;
+
+    expect(lateReceived).toContain(0);
+  });
+});
