@@ -66,7 +66,7 @@ class Qwen3Translator(OfflineTranslator, ConfigGPT):
         'IND': 'Indonesian',
     }
 
-    _TRANSLATOR_MODEL = os.environ.get('QWEN3_MODEL', 'Qwen/Qwen3-4B-Instruct')
+    _TRANSLATOR_MODEL = os.environ.get('QWEN3_MODEL', 'Qwen/Qwen3-4B')
     _MODEL_SUB_DIR = os.path.join(OfflineTranslator._MODEL_DIR, OfflineTranslator._MODEL_SUB_DIR, _TRANSLATOR_MODEL)
 
     def __init__(self):
@@ -159,7 +159,7 @@ class Qwen3Translator(OfflineTranslator, ConfigGPT):
 
 
 class Qwen3BigTranslator(Qwen3Translator):
-    _TRANSLATOR_MODEL = os.environ.get('QWEN3_BIG_MODEL', 'Qwen/Qwen3-8B-Instruct')
+    _TRANSLATOR_MODEL = os.environ.get('QWEN3_BIG_MODEL', 'Qwen/Qwen3-8B')
     _MODEL_SUB_DIR = os.path.join(OfflineTranslator._MODEL_DIR, OfflineTranslator._MODEL_SUB_DIR, _TRANSLATOR_MODEL)
 
     async def _load(self, from_lang: str, to_lang: str, device: str):
