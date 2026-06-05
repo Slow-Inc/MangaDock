@@ -68,7 +68,7 @@ class TextBlock(object):
                  shadow_radius: float = 0.,
                  shadow_strength: float = 1.,
                  shadow_color: Tuple = (0, 0, 0),
-                 shadow_offset: List = [0, 0],
+                 shadow_offset: List = None,
                  prob: float = 1,
                  **kwargs) -> None:
         self.lines = np.array(lines, dtype=np.int32)
@@ -79,9 +79,9 @@ class TextBlock(object):
         self._direction = direction
 
         self.texts = texts if texts is not None else []
-        self.text = texts[0]
-        if self.text and len(texts) > 1:
-            for txt in texts[1:]:
+        self.text = self.texts[0] if self.texts else ""
+        if self.text and len(self.texts) > 1:
+            for txt in self.texts[1:]:
                 first_cjk = '\u3000' <= self.text[-1] <= '\u9fff'
                 second_cjk = txt and ('\u3000' <= txt[0] <= '\u9fff')
                 if first_cjk or second_cjk:
@@ -116,7 +116,7 @@ class TextBlock(object):
         self.shadow_radius = shadow_radius
         self.shadow_strength = shadow_strength
         self.shadow_color = shadow_color
-        self.shadow_offset = shadow_offset
+        self.shadow_offset = shadow_offset if shadow_offset is not None else [0, 0]
 
     @cached_property
     def xyxy(self):
