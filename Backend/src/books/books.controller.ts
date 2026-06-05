@@ -286,10 +286,20 @@ export class BooksController {
           'Referer': 'https://mangadex.org/',
         },
       });
+      // Cap proxied bodies (#139): manga pages are a few MB; without a bound a
+      // hostile/oversized upstream gets buffered into RAM in full.
+      const MAX_PROXY_BYTES = 15 * 1024 * 1024;
+      const declaredLength = Number(upstream.headers.get('content-length') ?? 0);
+      if (declaredLength > MAX_PROXY_BYTES) {
+        return res.status(413).send('Image too large');
+      }
       const contentType = upstream.headers.get('content-type') ?? 'image/jpeg';
+      const buf = await upstream.arrayBuffer();
+      if (buf.byteLength > MAX_PROXY_BYTES) {
+        return res.status(413).send('Image too large');
+      }
       res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=86400');
-      const buf = await upstream.arrayBuffer();
       return res.send(Buffer.from(buf));
     } catch {
       return res.status(502).send('Bad Gateway');
