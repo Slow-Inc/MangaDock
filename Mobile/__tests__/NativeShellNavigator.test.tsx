@@ -87,4 +87,82 @@ describe('Native Shell Router', () => {
       renderer!.root.findByProps({testID: 'native-shell-home-screen'}),
     ).toBeTruthy();
   });
+
+  it('launches MangaDock WebView from Native Shell Home', async () => {
+    let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <NativeShellNavigator initialRouteName="Home" />,
+      );
+    });
+
+    const openButton = renderer!.root.findByProps({
+      testID: 'native-home-open-mangadock-button',
+    });
+
+    await ReactTestRenderer.act(async () => {
+      openButton.props.onPress();
+    });
+
+    expect(
+      renderer!.root.findByProps({testID: 'mangadock-webview-screen'}),
+    ).toBeTruthy();
+    expect(
+      renderer!.root.findAll(node => node.children.includes('/')).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['native-home-search-button', '/search'],
+    ['native-home-library-button', '/mylist'],
+    ['native-home-studio-button', '/studio'],
+    ['native-home-community-button', '/community'],
+  ] as const)('launches %s to %s', async (buttonTestID, expectedPath) => {
+    let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <NativeShellNavigator initialRouteName="Home" />,
+      );
+    });
+
+    const button = renderer!.root.findByProps({testID: buttonTestID});
+
+    await ReactTestRenderer.act(async () => {
+      button.props.onPress();
+    });
+
+    expect(
+      renderer!.root.findAll(node => node.children.includes(expectedPath))
+        .length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('launches Continue reading with Last Known Reader Path', async () => {
+    let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <NativeShellNavigator
+          initialRouteName="Home"
+          lastKnownReaderPath="/book/demo/chapter/1"
+        />,
+      );
+    });
+
+    const button = renderer!.root.findByProps({
+      testID: 'native-home-continue-reading-button',
+    });
+
+    await ReactTestRenderer.act(async () => {
+      button.props.onPress();
+    });
+
+    expect(
+      renderer!.root.findAll(node =>
+        node.children.includes('/book/demo/chapter/1'),
+      ).length,
+    ).toBeGreaterThan(0);
+  });
 });

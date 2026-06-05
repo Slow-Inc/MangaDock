@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
+import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {
   Pressable,
   ScrollView,
@@ -28,7 +29,10 @@ import {
 } from './src/mobileDiagnostics';
 import {createMobileShellHeaders} from './src/mobileHeaders';
 import {getMobileHardwareId} from './src/mobileIdentity';
-import {NativeShellNavigator} from './src/navigation/NativeShellNavigator';
+import {
+  NativeShellNavigator,
+  type NativeShellStackParamList,
+} from './src/navigation/NativeShellNavigator';
 import {getNativeShellInitialRoute} from './src/onboarding/mobileOnboarding';
 import {createMobileShellInjectionScript} from './src/webViewBridge';
 
@@ -50,7 +54,11 @@ function App() {
   );
 }
 
-export function MobileShellWebViewScreen() {
+export function MobileShellWebViewScreen(
+  _props: Partial<
+    NativeStackScreenProps<NativeShellStackParamList, 'WebView'>
+  > = {},
+) {
   const safeAreaInsets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
   const [hardwareId, setHardwareId] = useState<string | null>(null);
