@@ -37,19 +37,16 @@ class Executors:
     def free_executors(self) -> int:
         return len([item for item in self.list if not item.busy])
 
-    async def _find_instance(self):
-        while True:
-            instance = next((x for x in self.list if x.busy == False), None)
-            if instance is not None:
-                return instance
-            #todo: cricial error: warn should never happen
-            await self.event.wait()
-
     async def find_executor(self) -> ExecutorInstance:
-        async with self.lock:  # Using async with for lock management
-            instance = await self._find_instance()
-            instance.busy = True
-            return instance
+        while True:
+            async with self.lock:
+                instance = next((x for x in self.list if not x.busy), None)
+                if instance is not None:
+                    instance.busy = True
+                    return instance
+            # Release lock before waiting — concurrent callers must not
+            # serialize on the lock while all executors are busy (#106).
+            await self.event.wait()
 
     async def free_executor(self, instance: ExecutorInstance):
         from server.myqueue import task_queue
