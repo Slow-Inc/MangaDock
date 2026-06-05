@@ -28,6 +28,7 @@ from .utils import (
     is_valuable_text,
     sort_regions,
 )
+from .utils.lang_ratio import target_script_ratio
 
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
@@ -3011,61 +3012,52 @@ class MangaTranslator:
 
     async def _check_target_language_ratio(self, text_regions: List, target_lang: str, min_ratio: float = 0.5) -> bool:
         """
-        检查翻译结果中目标语言的占比是否达到要求
-        使用py3langid进行语言检测
-        Check if the target language ratio meets the requirement by detecting the merged translation text
-        
+        检查翻译结果中目标语言文字的占比是否达到要求
+        Check whether enough of the merged translation is actually written in the
+        target language's script.
+
+        Uses a target-script character ratio (manga_translator.utils.lang_ratio)
+        instead of a single ``langid`` classification of the merged text: a few
+        deliberately-untranslated tokens (sound effects, scanlation credits) no
+        longer flip an otherwise-correct page to FAILED. See Issue #109.
+
+        The decision of *when* to run this check (how many regions warrant it)
+        belongs to the caller — this function is a pure verdict over whatever
+        regions it is given.
+
         Args:
             text_regions: 文本区域列表
             target_lang: 目标语言代码
-            min_ratio: 最小目标语言占比（此参数在新逻辑中不使用，保留为兼容性）
-            
+            min_ratio: 目标语言文字的最小占比（默认 0.5）
+
         Returns:
             bool: True表示通过检查，False表示未通过
         """
-        if not text_regions or len(text_regions) <= 10:
-            # 如果区域数量不超过10个，跳过此检查
+        if not text_regions:
             return True
-            
+
         # 合并所有翻译文本
         all_translations = []
         for region in text_regions:
             translation = getattr(region, 'translation', '')
             if translation and translation.strip():
                 all_translations.append(translation.strip())
-        
+
         if not all_translations:
             logger.debug('No valid translation texts for language ratio check')
             return True
-            
-        # 将所有翻译合并为一个文本进行检测
+
         merged_text = ''.join(all_translations)
-        
-        # logger.info(f'Target language check - Merged text preview (first 200 chars): "{merged_text[:200]}"')
-        # logger.info(f'Target language check - Total merged text length: {len(merged_text)} characters')
-        # logger.info(f'Target language check - Number of regions: {len(all_translations)}')
-        
-        # 使用py3langid进行语言检测
-        try:
-            detected_lang, confidence = langid.classify(merged_text)
-            detected_language = ISO_639_1_TO_VALID_LANGUAGES.get(detected_lang, 'UNKNOWN')
-            if detected_language != 'UNKNOWN':
-                detected_language = detected_language.upper()
-            
-            # logger.info(f'Target language check - py3langid result: "{detected_lang}" -> "{detected_language}" (confidence: {confidence:.3f})')
-        except Exception as e:
-            logger.debug(f'py3langid failed for merged text: {e}')
-            detected_language = 'UNKNOWN'
-            confidence = -9999
-        
-        # 检查检测出的语言是否为目标语言
-        is_target_lang = (detected_language == target_lang.upper())
-        
-        # logger.info(f'Target language check: Detected language "{detected_language}" using py3langid (confidence: {confidence:.3f})')
-        # logger.info(f'Target language check: Target is "{target_lang.upper()}"')
-        # logger.info(f'Target language check result: {"PASSED" if is_target_lang else "FAILED"}')
-        
-        return is_target_lang
+        ratio = target_script_ratio(merged_text, target_lang)
+        passed = ratio >= min_ratio
+
+        if not passed:
+            logger.warning(
+                f'Target language ratio check FAILED: only {ratio:.2f} of the '
+                f'translated text is in "{target_lang.upper()}" script '
+                f'(need >= {min_ratio:.2f})'
+            )
+        return passed
 
     async def _validate_translation(self, original_text: str, translation: str, target_lang: str, config, ctx: Context = None, silent: bool = False, page_lang_check_result: bool = None) -> bool:
         """
