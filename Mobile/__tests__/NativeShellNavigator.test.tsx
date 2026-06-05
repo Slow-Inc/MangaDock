@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
+import {createMobileDiagnosticsEvent} from '../src/mobileDiagnostics';
 import {NativeShellNavigator} from '../src/navigation/NativeShellNavigator';
 import {mobileTheme} from '../src/theme/mobileTheme';
 
@@ -164,5 +165,69 @@ describe('Native Shell Router', () => {
         node.children.includes('/book/demo/chapter/1'),
       ).length,
     ).toBeGreaterThan(0);
+  });
+
+  it('shows Native Diagnostics with masked identity, WebView health, and latest events', async () => {
+    const reloadWebView = jest.fn();
+    const diagnosticsEvents = Array.from({length: 25}, (_, index) =>
+      createMobileDiagnosticsEvent(
+        {
+          type: 'webview_load_end',
+          sequence: index + 1,
+          url: `https://hayateotsu.space/page-${String(index + 1).padStart(2, '0')}`,
+        },
+        () => `2026-06-05T00:00:${String(index).padStart(2, '0')}.000Z`,
+      ),
+    );
+    let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <NativeShellNavigator
+          diagnosticsEvents={diagnosticsEvents}
+          diagnosticsHardwareId="11111111-2222-4333-8444-555555555555"
+          endpointMode="Production"
+          initialRouteName="Diagnostics"
+          onReloadWebView={reloadWebView}
+          webViewHealth="Loaded"
+        />,
+      );
+    });
+
+    expect(
+      renderer!.root.findByProps({testID: 'native-diagnostics-screen'}),
+    ).toBeTruthy();
+    expect(renderer!.root.findAll(node => node.children.includes('1.0.1-beta.2')).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAll(node => node.children.includes('Production')).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAll(node => node.children.includes('Loaded')).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAll(node => node.children.includes('11111111...5555')).length).toBeGreaterThan(0);
+    expect(
+      renderer!.root.findAll(node =>
+        node.children.some(child => String(child).includes('page-25')),
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      renderer!.root.findAll(node =>
+        node.children.some(child => String(child).includes('page-01')),
+      ).length,
+    ).toBe(0);
+
+    await ReactTestRenderer.act(async () => {
+      renderer!.root
+        .findByProps({testID: 'native-diagnostics-reload-button'})
+        .props.onPress();
+    });
+    expect(reloadWebView).toHaveBeenCalledTimes(1);
+
+    await ReactTestRenderer.act(async () => {
+      renderer!.root
+        .findByProps({testID: 'native-diagnostics-clear-button'})
+        .props.onPress();
+    });
+    expect(
+      renderer!.root.findAll(node =>
+        node.children.some(child => String(child).includes('page-25')),
+      ).length,
+    ).toBe(0);
   });
 });

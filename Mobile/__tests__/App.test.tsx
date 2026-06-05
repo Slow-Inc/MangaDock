@@ -155,6 +155,32 @@ test('exposes beta diagnostics and logs WebView load events for QA', async () =>
   consoleLog.mockRestore();
 });
 
+test('opens Native Diagnostics from the beta WebView diagnostics shortcut', async () => {
+  const navigate = jest.fn();
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(
+      <MangaDockWebViewScreen navigation={{navigate} as never} />,
+    );
+  });
+
+  const diagnosticsButton = renderer!.root.findByProps({
+    testID: 'mobile-diagnostics-button',
+  });
+
+  await ReactTestRenderer.act(async () => {
+    diagnosticsButton.props.onPress();
+  });
+
+  expect(navigate).toHaveBeenCalledWith('Diagnostics');
+  expect(
+    renderer!.root.findAllByProps({
+      testID: 'mobile-diagnostics-reload-button',
+    }),
+  ).toHaveLength(0);
+});
+
 test('records bridged web JavaScript errors from the WebView', async () => {
   const consoleLog = jest.spyOn(console, 'log').mockImplementation();
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;

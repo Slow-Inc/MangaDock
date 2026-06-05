@@ -1,8 +1,20 @@
 import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {
+  createNativeStackNavigator,
+  type NativeStackScreenProps,
+} from '@react-navigation/native-stack';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {
+  MOBILE_BETA_VERSION_CODE,
+  MOBILE_BETA_VERSION_NAME,
+} from '../config';
+import {
+  appendMobileDiagnosticsEvent,
+  createMobileDiagnosticsEvent,
+  maskMobileHardwareId,
+  type MobileDiagnosticsEvent,
+} from '../mobileDiagnostics';
 import {mobileTheme} from '../theme/mobileTheme';
 import {
   createWebViewRouteLaunch,
@@ -26,8 +38,13 @@ export type NativeShellStackParamList = {
 };
 
 type NativeShellNavigatorProps = {
+  diagnosticsEvents?: MobileDiagnosticsEvent[];
+  diagnosticsHardwareId?: string;
+  endpointMode?: string;
   initialRouteName?: NativeShellRouteName;
   lastKnownReaderPath?: string;
+  onReloadWebView?: () => void;
+  webViewHealth?: string;
   WebViewComponent?: React.ComponentType<
     NativeStackScreenProps<NativeShellStackParamList, 'WebView'>
   >;
@@ -43,14 +60,7 @@ function PlaceholderScreen({
   testID: string;
 }) {
   return (
-    <View
-      style={{
-        ...styles.screen,
-        backgroundColor: mobileTheme.colors.background,
-        padding: mobileTheme.spacing.safeScreenPadding,
-      }}
-      testID={testID}
-    >
+    <View style={styles.screenThemed} testID={testID}>
       <Text style={styles.title}>{label}</Text>
     </View>
   );
@@ -60,14 +70,7 @@ function OnboardingScreen({
   navigation,
 }: NativeStackScreenProps<NativeShellStackParamList, 'Onboarding'>) {
   return (
-    <View
-      style={{
-        ...styles.screen,
-        backgroundColor: mobileTheme.colors.background,
-        padding: mobileTheme.spacing.safeScreenPadding,
-      }}
-      testID="native-onboarding-screen"
-    >
+    <View style={styles.screenThemed} testID="native-onboarding-screen">
       <Text style={styles.title}>Native Onboarding</Text>
       <Text style={styles.body}>
         MangaDock beta keeps web reading inside WebView and native controls in
@@ -87,67 +90,61 @@ function OnboardingScreen({
 
 function createHomeScreen(lastKnownReaderPath?: string) {
   function HomeScreen({
-  navigation,
+    navigation,
   }: NativeStackScreenProps<NativeShellStackParamList, 'Home'>) {
-  const launchWebView = (action: WebViewQuickAction) => {
-    const launch = createWebViewRouteLaunch(action);
+    const launchWebView = (action: WebViewQuickAction) => {
+      const launch = createWebViewRouteLaunch(action);
 
-    navigation.navigate(launch.screen, launch.params);
-  };
-  const continueReading = () => {
-    navigation.navigate('WebView', {
-      initialPath: getContinueReadingPath(lastKnownReaderPath),
-    });
-  };
+      navigation.navigate(launch.screen, launch.params);
+    };
+    const continueReading = () => {
+      navigation.navigate('WebView', {
+        initialPath: getContinueReadingPath(lastKnownReaderPath),
+      });
+    };
 
-  return (
-    <View
-      style={{
-        ...styles.screen,
-        backgroundColor: mobileTheme.colors.background,
-        padding: mobileTheme.spacing.safeScreenPadding,
-      }}
-      testID="native-shell-home-screen"
-    >
-      <Text style={styles.title}>Native Shell Home</Text>
-      <Text style={styles.body}>1.0.1-beta.2 · Production</Text>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => launchWebView('openMangaDock')}
-        style={styles.primaryButton}
-        testID="native-home-open-mangadock-button"
-      >
-        <Text style={styles.primaryButtonText}>Open MangaDock</Text>
-      </Pressable>
-      <View style={styles.quickActions}>
+    return (
+      <View style={styles.screenThemed} testID="native-shell-home-screen">
+        <Text style={styles.title}>Native Shell Home</Text>
+        <Text style={styles.body}>1.0.1-beta.2 · Production</Text>
         <Pressable
           accessibilityRole="button"
-          onPress={continueReading}
-          style={styles.secondaryButton}
-          testID="native-home-continue-reading-button"
+          onPress={() => launchWebView('openMangaDock')}
+          style={styles.primaryButton}
+          testID="native-home-open-mangadock-button"
         >
-          <Text style={styles.secondaryButtonText}>Continue reading</Text>
+          <Text style={styles.primaryButtonText}>Open MangaDock</Text>
         </Pressable>
-        {[
-          ['search', 'Search', 'native-home-search-button'],
-          ['library', 'Library', 'native-home-library-button'],
-          ['studio', 'Studio', 'native-home-studio-button'],
-          ['community', 'Community', 'native-home-community-button'],
-        ].map(([action, label, testID]) => (
+        <View style={styles.quickActions}>
           <Pressable
             accessibilityRole="button"
-            key={action}
-            onPress={() => launchWebView(action as WebViewQuickAction)}
+            onPress={continueReading}
             style={styles.secondaryButton}
-            testID={testID}
+            testID="native-home-continue-reading-button"
           >
-            <Text style={styles.secondaryButtonText}>{label}</Text>
+            <Text style={styles.secondaryButtonText}>Continue reading</Text>
           </Pressable>
-        ))}
+          {[
+            ['search', 'Search', 'native-home-search-button'],
+            ['library', 'Library', 'native-home-library-button'],
+            ['studio', 'Studio', 'native-home-studio-button'],
+            ['community', 'Community', 'native-home-community-button'],
+          ].map(([action, label, testID]) => (
+            <Pressable
+              accessibilityRole="button"
+              key={action}
+              onPress={() => launchWebView(action as WebViewQuickAction)}
+              style={styles.secondaryButton}
+              testID={testID}
+            >
+              <Text style={styles.secondaryButtonText}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
-    </View>
-  );
-}
+    );
+  }
+
   return HomeScreen;
 }
 
@@ -155,58 +152,147 @@ function PlaceholderWebViewScreen({
   route,
 }: NativeStackScreenProps<NativeShellStackParamList, 'WebView'>) {
   return (
-    <View
-      style={{
-        ...styles.screen,
-        backgroundColor: mobileTheme.colors.background,
-        padding: mobileTheme.spacing.safeScreenPadding,
-      }}
-      testID="mangadock-webview-screen"
-    >
+    <View style={styles.screenThemed} testID="mangadock-webview-screen">
       <Text style={styles.title}>MangaDock WebView Screen</Text>
       <Text style={styles.body}>{route.params?.initialPath ?? '/'}</Text>
     </View>
   );
 }
 
-function DiagnosticsScreen() {
-  return (
-    <PlaceholderScreen
-      label="Native Diagnostics"
-      testID="native-diagnostics-screen"
-    />
-  );
+function createDiagnosticsScreen({
+  diagnosticsEvents = [],
+  diagnosticsHardwareId,
+  endpointMode = 'Production',
+  onReloadWebView,
+  webViewHealth = 'Unknown',
+}: Pick<
+  NativeShellNavigatorProps,
+  | 'diagnosticsEvents'
+  | 'diagnosticsHardwareId'
+  | 'endpointMode'
+  | 'onReloadWebView'
+  | 'webViewHealth'
+>) {
+  function DiagnosticsScreen() {
+    const [events, setEvents] = React.useState(() =>
+      diagnosticsEvents.reduce(
+        (nextEvents, event) => appendMobileDiagnosticsEvent(nextEvents, event),
+        [] as MobileDiagnosticsEvent[],
+      ),
+    );
+    const reloadWebView = () => {
+      setEvents(currentEvents =>
+        appendMobileDiagnosticsEvent(
+          currentEvents,
+          createMobileDiagnosticsEvent({
+            hardwareId: diagnosticsHardwareId,
+            type: 'webview_reload_requested',
+          }),
+        ),
+      );
+      onReloadWebView?.();
+    };
+
+    return (
+      <View
+        style={[styles.screenThemed, styles.screenStretch]}
+        testID="native-diagnostics-screen"
+      >
+        <Text style={styles.title}>Native Diagnostics</Text>
+        <Text style={styles.body}>{MOBILE_BETA_VERSION_NAME}</Text>
+        <Text style={styles.body}>versionCode {MOBILE_BETA_VERSION_CODE}</Text>
+        <Text style={styles.body}>{endpointMode}</Text>
+        <Text style={styles.body}>{webViewHealth}</Text>
+        <Text style={styles.body}>
+          {maskMobileHardwareId(diagnosticsHardwareId) ?? 'unknown hardware ID'}
+        </Text>
+        <View style={styles.quickActions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={reloadWebView}
+            style={styles.primaryButton}
+            testID="native-diagnostics-reload-button"
+          >
+            <Text style={styles.primaryButtonText}>Reload WebView</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setEvents([])}
+            style={styles.secondaryButton}
+            testID="native-diagnostics-clear-button"
+          >
+            <Text style={styles.secondaryButtonText}>
+              Clear diagnostics events
+            </Text>
+          </Pressable>
+        </View>
+        <View style={styles.eventList}>
+          {events.map((event, index) => (
+            <Text
+              key={`${event.at}-${index}`}
+              style={styles.eventText}
+              testID="native-diagnostics-event"
+            >
+              {event.type}
+              {event.sequence ? ` #${event.sequence}` : ''}
+              {event.url ? ` ${event.url}` : ''}
+              {event.message ? ` ${event.message}` : ''}
+            </Text>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  return DiagnosticsScreen;
 }
 
 function SettingsScreen() {
-  return (
-    <PlaceholderScreen
-      label="Native Settings"
-      testID="native-settings-screen"
-    />
-  );
+  return <PlaceholderScreen label="Native Settings" testID="native-settings-screen" />;
 }
 
 export function NativeShellNavigator({
+  diagnosticsEvents,
+  diagnosticsHardwareId,
+  endpointMode,
   initialRouteName = 'WebView',
   lastKnownReaderPath,
+  onReloadWebView,
+  webViewHealth,
   WebViewComponent = PlaceholderWebViewScreen,
 }: NativeShellNavigatorProps) {
   const HomeComponent = React.useMemo(
     () => createHomeScreen(lastKnownReaderPath),
     [lastKnownReaderPath],
   );
+  const DiagnosticsComponent = React.useMemo(
+    () =>
+      createDiagnosticsScreen({
+        diagnosticsEvents,
+        diagnosticsHardwareId,
+        endpointMode,
+        onReloadWebView,
+        webViewHealth,
+      }),
+    [
+      diagnosticsEvents,
+      diagnosticsHardwareId,
+      endpointMode,
+      onReloadWebView,
+      webViewHealth,
+    ],
+  );
 
   return (
     <View style={styles.container} testID="native-shell-router">
       <NavigationContainer>
-      <Stack.Navigator initialRouteName={initialRouteName}>
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Home" component={HomeComponent} />
-        <Stack.Screen name="WebView" component={WebViewComponent} />
-        <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-      </Stack.Navigator>
+        <Stack.Navigator initialRouteName={initialRouteName}>
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="Home" component={HomeComponent} />
+          <Stack.Screen name="WebView" component={WebViewComponent} />
+          <Stack.Screen name="Diagnostics" component={DiagnosticsComponent} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+        </Stack.Navigator>
       </NavigationContainer>
     </View>
   );
@@ -216,15 +302,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  screen: {
+  screenThemed: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: mobileTheme.colors.background,
+    padding: mobileTheme.spacing.safeScreenPadding,
+  },
+  screenStretch: {
+    alignItems: 'stretch',
   },
   title: {
     color: mobileTheme.colors.foreground,
     fontSize: mobileTheme.typography.titleSize,
     fontWeight: '700',
+    textAlign: 'center',
   },
   body: {
     marginTop: mobileTheme.spacing.sm,
@@ -266,5 +358,13 @@ const styles = StyleSheet.create({
     color: mobileTheme.colors.foreground,
     fontSize: mobileTheme.typography.bodySize,
     fontWeight: '600',
+  },
+  eventList: {
+    gap: mobileTheme.spacing.xs,
+    marginTop: mobileTheme.spacing.md,
+  },
+  eventText: {
+    color: mobileTheme.colors.foregroundMuted,
+    fontSize: mobileTheme.typography.labelSize,
   },
 });

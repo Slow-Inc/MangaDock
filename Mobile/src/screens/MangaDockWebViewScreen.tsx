@@ -1,12 +1,10 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {WebView} from 'react-native-webview';
 import {
   getMobileShellUrl,
-  MOBILE_BETA_VERSION_CODE,
-  MOBILE_BETA_VERSION_NAME,
   MOBILE_DIAGNOSTICS_ENABLED,
 } from '../config';
 import {
@@ -28,10 +26,7 @@ export function MangaDockWebViewScreen(
   const safeAreaInsets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
   const [hardwareId, setHardwareId] = useState<string | null>(null);
-  const [diagnosticsEvents, setDiagnosticsEvents] = useState<
-    MobileDiagnosticsEvent[]
-  >([]);
-  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
+  const [, setDiagnosticsEvents] = useState<MobileDiagnosticsEvent[]>([]);
 
   const recordDiagnostics = useCallback(
     (input: {type: string; url?: string; statusCode?: number; message?: string}) => {
@@ -161,45 +156,12 @@ export function MangaDockWebViewScreen(
         <>
           <Pressable
             accessibilityRole="button"
-            onPress={() => setIsDiagnosticsOpen(isOpen => !isOpen)}
+            onPress={() => props.navigation?.navigate('Diagnostics')}
             style={styles.diagnosticsButton}
             testID="mobile-diagnostics-button"
           >
             <Text style={styles.diagnosticsButtonText}>[diag]</Text>
           </Pressable>
-          {isDiagnosticsOpen ? (
-            <View style={styles.diagnosticsPanel}>
-              <View style={styles.diagnosticsPanelHeader}>
-                <Text style={styles.diagnosticsTitle}>
-                  {MOBILE_BETA_VERSION_NAME} ({MOBILE_BETA_VERSION_CODE})
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    recordDiagnostics({type: 'webview_reload_requested'});
-                    webViewRef.current?.reload();
-                  }}
-                  style={styles.reloadButton}
-                  testID="mobile-diagnostics-reload-button"
-                >
-                  <Text style={styles.reloadButtonText}>Reload WebView</Text>
-                </Pressable>
-              </View>
-              <ScrollView style={styles.diagnosticsEvents}>
-                {diagnosticsEvents.map((event, index) => (
-                  <Text
-                    key={`${event.at}-${index}`}
-                    style={styles.diagnosticsEventText}
-                  >
-                    {event.type}
-                    {event.statusCode ? ` ${event.statusCode}` : ''}
-                    {event.url ? ` ${event.url}` : ''}
-                    {event.message ? ` ${event.message}` : ''}
-                  </Text>
-                ))}
-              </ScrollView>
-            </View>
-          ) : null}
         </>
       ) : null}
     </View>
@@ -222,46 +184,5 @@ const styles = StyleSheet.create({
   diagnosticsButtonText: {
     color: '#ffffff',
     fontSize: 12,
-  },
-  diagnosticsPanel: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 56,
-    maxHeight: 240,
-    padding: 10,
-    backgroundColor: 'rgba(16, 16, 16, 0.92)',
-    borderRadius: 6,
-  },
-  diagnosticsPanelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 8,
-  },
-  diagnosticsTitle: {
-    flex: 1,
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  reloadButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    backgroundColor: '#ffffff',
-    borderRadius: 4,
-  },
-  reloadButtonText: {
-    color: '#111111',
-    fontSize: 12,
-  },
-  diagnosticsEvents: {
-    maxHeight: 180,
-  },
-  diagnosticsEventText: {
-    color: '#d8d8d8',
-    fontSize: 11,
-    marginBottom: 4,
   },
 });
