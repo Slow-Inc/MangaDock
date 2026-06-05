@@ -44,26 +44,65 @@ export function getSelectedMangaImageTranslateModel(
 }
 
 // Module-level cache so Reader components share one fetch
-let _cachedModels: string[] | null = null;
+type ModelsInfo = { models: string[]; imageTranslator: string | null };
+let _cachedInfo: ModelsInfo | null = null;
 let _cacheExpiresAt = 0;
+let _inflight: Promise<ModelsInfo> | null = null;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 
-export async function fetchAvailableMangaModels(): Promise<string[]> {
-  if (_cachedModels && Date.now() < _cacheExpiresAt) return _cachedModels;
+async function fetchModelsInfo(): Promise<ModelsInfo> {
+  if (_cachedInfo && Date.now() < _cacheExpiresAt) return _cachedInfo;
+  // Concurrent callers (the Reader fires models + translator lookups together)
+  // share one request instead of racing duplicate fetches.
+  if (_inflight) return _inflight;
 
-  try {
-    const res = await fetch("/api/proxy/books/models", { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = (await res.json()) as { models?: string[] };
-    const models = Array.isArray(data.models) && data.models.length > 0
-      ? data.models
-      : [...MANGA_TRANSLATE_MODELS];
-    _cachedModels = models;
-    _cacheExpiresAt = Date.now() + CACHE_TTL_MS;
-    return models;
-  } catch {
-    return [...MANGA_TRANSLATE_MODELS];
-  }
+  _inflight = (async (): Promise<ModelsInfo> => {
+    try {
+      const res = await fetch("/api/proxy/books/models", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { models?: string[]; imageTranslator?: string | null };
+      const info: ModelsInfo = {
+        models: Array.isArray(data.models) && data.models.length > 0
+          ? data.models
+          : [...MANGA_TRANSLATE_MODELS],
+        imageTranslator: typeof data.imageTranslator === "string" ? data.imageTranslator : null,
+      };
+      _cachedInfo = info;
+      _cacheExpiresAt = Date.now() + CACHE_TTL_MS;
+      return info;
+    } catch {
+      // Not cached: a later call may succeed once the backend is reachable
+      return { models: [...MANGA_TRANSLATE_MODELS], imageTranslator: null };
+    } finally {
+      _inflight = null;
+    }
+  })();
+  return _inflight;
+}
+
+export async function fetchAvailableMangaModels(): Promise<string[]> {
+  return (await fetchModelsInfo()).models;
+}
+
+/** The translator MIT actually runs (from /books/models, #134) — null = unknown. */
+export async function fetchImageTranslator(): Promise<string | null> {
+  return (await fetchModelsInfo()).imageTranslator;
+}
+
+/** Gemini model selection only makes sense when MIT runs a Gemini-family
+ *  translator. null/unknown fails open (old backend, MIT down) so Gemini
+ *  deployments keep #87 behavior during MIT restarts. */
+export function isGeminiImageTranslator(translator: string | null): boolean {
+  return translator === null || translator.startsWith("gemini");
+}
+
+/** Single gating point for translate calls (PRD #131): the user's selected
+ *  image model, or undefined when the deployment's translator would ignore it —
+ *  a stale localStorage selection must not re-partition the patch cache. */
+export async function getEffectiveImageModel(): Promise<string | undefined> {
+  const info = await fetchModelsInfo();
+  if (!isGeminiImageTranslator(info.imageTranslator)) return undefined;
+  return getSelectedMangaImageTranslateModel(info.models);
 }
 
 export async function translateMangaLines(payload: {
