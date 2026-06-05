@@ -1,9 +1,20 @@
 import asyncio
 import pickle
 
-async def stream(messages):
+# Default timeout for the streaming consumer (seconds). A worker that dies or
+# stalls without emitting a terminal frame would otherwise hang the response
+# indefinitely (Issue #106).
+_STREAM_TIMEOUT = float(300)
+
+
+async def stream(messages, timeout: float = _STREAM_TIMEOUT):
     while True:
-        message = await messages.get()
+        try:
+            message = await asyncio.wait_for(messages.get(), timeout=timeout)
+        except asyncio.TimeoutError:
+            # Worker stalled — emit an error frame so the client gets a clean close.
+            yield b'\x02' + (0).to_bytes(4, 'big')
+            break
         yield message
         if message[0] == 0 or message[0] == 2:
             break

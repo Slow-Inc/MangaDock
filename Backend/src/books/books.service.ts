@@ -86,6 +86,8 @@ interface BatchJobState {
   processingPages: Set<number>;
   /** Active SSE listeners — removed on client disconnect */
   listeners: Set<BatchPageListener>;
+  /** Direct reference to the original SSE caller — guaranteed delivery regardless of Redis state */
+  originalListener?: BatchPageListener;
   /** Total active callers (Redis subscribers + job.listeners members). Used for
    *  abort decision so the count is correct regardless of delivery path. */
   activeCallerCount: number;
@@ -142,9 +144,8 @@ export class BooksService {
     }
     job.processingPages?.add(pageIndex);
 
-    const chapterId = jobKey.split(':')[0];
-    const srcMIT = jobKey.split(':')[1];
-    const tgtMIT = jobKey.split(':')[2];
+    // jobKey = chapterId:srcMIT:tgtMIT:model (model = 'default' when unset)
+    const [chapterId, srcMIT, tgtMIT, jobModel] = jobKey.split(':');
 
     let pageResult: PageResult;
 
@@ -177,8 +178,10 @@ export class BooksService {
         });
       }
 
-      // Cache the result
-      const cacheKey = `translate:manga-patches:v3:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}`;
+      // Cache the result — MUST be the same key the batch pre-check and the
+      // single-page endpoint read (patchCacheKey), or webhook results are never
+      // served from cache again (found live during the #87 v4 migration).
+      const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, jobModel);
       await this.cache.set(cacheKey, { patches }, 1000 * 60 * 60 * 24 * 7); // 7 days
 
       pageResult = { patches };
@@ -186,15 +189,17 @@ export class BooksService {
 
     const published = await this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...pageResult });
     if (this.redis && published === false) {
-      this.logger.error(`[Webhook] Redis publish failed for job=${jobKey} page=${pageIndex} — SSE client may not receive this result`);
+      this.logger.error(`[Webhook] Redis publish failed for job=${jobKey} page=${pageIndex}`);
     }
     job.processingPages?.delete(pageIndex);
-    // Notify listeners
     job.completedPages.set(pageIndex, pageResult);
-    for (const listener of job.listeners) {
+    // Direct delivery to original SSE caller (guaranteed regardless of Redis state)
+    try { job.originalListener?.(pageIndex, pageResult); } catch { /* caller may be gone */ }
+    // Fan-out to latecomers
+    for (const l of job.listeners) {
       try {
-        listener(pageIndex, pageResult);
-      } catch (err) {
+        l(pageIndex, pageResult);
+      } catch {
         // Listener might have disconnected
       }
     }
@@ -208,6 +213,17 @@ export class BooksService {
 
   private get backendOrigin(): string {
     return (
+      process.env.BACKEND_PUBLIC_ORIGIN ??
+      `http://localhost:${process.env.PORT ?? 3001}`
+    );
+  }
+
+  /** Origin used specifically for MIT webhook callbacks.
+   *  When MIT runs on the same machine as the backend, use localhost
+   *  instead of the public URL to avoid going through Cloudflare Tunnel. */
+  private get mitCallbackOrigin(): string {
+    return (
+      process.env.MIT_CALLBACK_ORIGIN ??
       process.env.BACKEND_PUBLIC_ORIGIN ??
       `http://localhost:${process.env.PORT ?? 3001}`
     );
@@ -339,6 +355,87 @@ export class BooksService {
   private shouldSendMitSourceLang(): boolean {
     const raw = (process.env.MIT_SEND_SOURCE_LANG ?? 'true').trim().toLowerCase();
     return !['false', '0', 'no', 'off'].includes(raw);
+  }
+
+  /** Resolve the MIT source/target language codes for a job. Single source of
+   *  truth so the cache key and the batch jobKey are always built identically —
+   *  a mismatch here silently breaks cancellation (the cancel path looks up a
+   *  jobKey that the start path never registered). */
+  private mitLangPair(sourceLang?: string, targetLang?: string): { srcMIT: string; tgtMIT: string } {
+    const srcMIT = this.shouldSendMitSourceLang() && sourceLang ? mitLangCode(sourceLang) : 'ANY';
+    const tgtMIT = mitLangCode(targetLang ?? 'th');
+    return { srcMIT, tgtMIT };
+  }
+
+  /** Sanitize a user-supplied Gemini model name for use in the MIT config and
+   *  cache/registry keys. Returns undefined for absent or unsafe values so the
+   *  pipeline falls back to MIT's default model (#87). */
+  private imageModelKey(imageModel?: string): string | undefined {
+    const normalized = this.normalizeGeminiModelName(imageModel);
+    return normalized && /^[\w.-]+$/.test(normalized) ? normalized : undefined;
+  }
+
+  /** Single source of truth for the per-page patch cache key. v4 adds the model
+   *  segment so different image-translation models never share cached patches
+   *  (#87); old v3 entries expire naturally via TTL. */
+  private patchCacheKey(
+    chapterId: string,
+    pageIndex: number,
+    srcMIT: string,
+    tgtMIT: string,
+    imageModel?: string,
+  ): string {
+    const model = this.imageModelKey(imageModel) ?? 'default';
+    return `translate:manga-patches:v4:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}:${model}`;
+  }
+
+  /** The registry key for a batch-translate job. MUST be built via mitLangPair
+   *  on every path (start, attach, remove) or cancellation breaks. Includes the
+   *  image model so two model selections for the same chapter never collide. */
+  private buildJobKey(chapterId: string, sourceLang?: string, targetLang?: string, imageModel?: string): string {
+    const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
+    return `${chapterId}:${srcMIT}:${tgtMIT}:${this.imageModelKey(imageModel) ?? 'default'}`;
+  }
+
+  /**
+   * Build the MIT pipeline config JSON. Single source of truth for the single-page
+   * and batch paths so the VRAM/perf knobs never drift between them.
+   *
+   * Detection/inpainting are the dominant VRAM + latency drivers (activation memory
+   * ∝ size²). MIT's bundled defaults are tuned for max quality (detection 2560,
+   * inpainting 2048) — heavier than typical manga pages need. We default them lower
+   * here and expose them as env so each deployment can match its GPU without a
+   * redeploy:
+   *   MIT_DETECTION_SIZE     (default 2048)   — text detection resolution
+   *   MIT_INPAINTING_SIZE    (default 1536)   — LaMa inpaint resolution
+   *   MIT_INPAINTER          (default lama_large)
+   *   MIT_INPAINTING_PRECISION (default bf16) — fp32 | fp16 | bf16 (LaMa is a CNN;
+   *                                             it has no int4/int8 path — that knob
+   *                                             only applies to the local LLM
+   *                                             translator via QWEN3_PRECISION).
+   */
+  private buildMitConfig(srcMIT: string, tgtMIT: string, sourceIso: string, imageModel?: string): string {
+    const intEnv = (name: string, fallback: number): number => {
+      const n = Number(process.env[name]);
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+    };
+    const model = this.imageModelKey(imageModel);
+    return JSON.stringify({
+      translator: {
+        target_lang: tgtMIT,
+        ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
+        // Per-request Gemini model override (#87); MIT falls back to its
+        // GEMINI_MODEL env when absent.
+        ...(model ? { model } : {}),
+      },
+      detector: { detection_size: intEnv('MIT_DETECTION_SIZE', 2048) },
+      inpainter: {
+        inpainter: process.env.MIT_INPAINTER ?? 'lama_large',
+        inpainting_size: intEnv('MIT_INPAINTING_SIZE', 1536),
+        inpainting_precision: process.env.MIT_INPAINTING_PRECISION ?? 'bf16',
+      },
+      render: { direction: 'auto', rtl: isRtlLang(sourceIso) },
+    });
   }
 
   async translateMangaEpisode(payload: {
@@ -513,16 +610,14 @@ export class BooksService {
     pageUrl: string,
     sourceLang?: string,
     targetLang?: string,
-    opts?: { maxStartupRetries?: number },
+    opts?: { maxStartupRetries?: number; imageModel?: string },
   ): Promise<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }> {
     if (!chapterId || !pageUrl) {
       throw new Error('chapterId and pageUrl are required');
     }
 
-    const sendSourceLang = this.shouldSendMitSourceLang();
-    const srcMIT = sendSourceLang && sourceLang ? mitLangCode(sourceLang) : 'ANY';
-    const tgtMIT = mitLangCode(targetLang ?? 'th');
-    const cacheKey = `translate:manga-patches:v3:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}`;
+    const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
+    const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, opts?.imageModel);
     const cached = await this.cache.get<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }>(cacheKey);
     if (cached?.data?.patches) {
       return cached.data;
@@ -545,15 +640,7 @@ export class BooksService {
     }
     const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-    const config = JSON.stringify({
-      translator: {
-        translator: 'gemini',
-        target_lang: tgtMIT,
-        ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
-      },
-      inpainter: { inpainter: 'lama_large' },
-      render: { direction: 'auto', rtl: isRtlLang(sourceLang ?? '') },
-    });
+    const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '', opts?.imageModel);
 
     const maxStartupRetries = opts?.maxStartupRetries ?? 30;
     const startupRetryDelayMs = 5_000;
@@ -650,8 +737,9 @@ export class BooksService {
     sourceLang: string | undefined,
     targetLang: string | undefined,
     listener: BatchPageListener,
+    imageModel?: string,
   ): void {
-    const jobKey = `${chapterId}:${sourceLang ? mitLangCode(sourceLang) : 'ANY'}:${mitLangCode(targetLang ?? 'th')}`;
+    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel);
     const job = this.activeBatchJobs.get(jobKey);
     if (job) {
       job.listeners.delete(listener);
@@ -660,6 +748,16 @@ export class BooksService {
       if (job.activeCallerCount === 0) {
         this.logger.log(`[BatchRegistry] job=${jobKey} last caller gone — cancelling MIT job`);
         job.cancelController.abort();
+        // Tell MIT to stop the in-flight background batch for this taskId so it
+        // doesn't keep burning GPU on a job nobody is listening to. Best-effort,
+        // fire-and-forget; MIT no-ops an unknown/finished taskId.
+        const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
+        void fetch(`${mitBaseUrl}/cancel/${encodeURIComponent(jobKey)}`, { method: 'POST' }).catch(
+          (err) =>
+            this.logger.debug(
+              `[BatchRegistry] MIT cancel request failed for job=${jobKey}: ${err instanceof Error ? err.message : String(err)}`,
+            ),
+        );
       }
     }
   }
@@ -681,11 +779,10 @@ export class BooksService {
     listener: BatchPageListener,
     sourceLang?: string,
     targetLang?: string,
+    imageModel?: string,
   ): Promise<void> {
-    const sendSourceLang = this.shouldSendMitSourceLang();
-    const srcMIT = sendSourceLang && sourceLang ? mitLangCode(sourceLang) : 'ANY';
-    const tgtMIT = mitLangCode(targetLang ?? 'th');
-    const jobKey = `${chapterId}:${srcMIT}:${tgtMIT}`;
+    const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
+    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel);
 
     const existing = this.activeBatchJobs.get(jobKey);
 
@@ -718,10 +815,10 @@ export class BooksService {
     const placeholderJob: BatchJobState = {
       completedPages: new Map(),
       processingPages: new Set(),
-      // When Redis is available, original caller receives via pub/sub subscription.
-      // Exclude it from job.listeners to prevent double-delivery from handleMitCallback fan-out.
-      // Latecomers still add themselves to job.listeners via the attach path.
-      listeners: new Set(this.redis ? [] : [listener]),
+      // Latecomers add themselves to job.listeners via the attach path.
+      // Original caller is always delivered directly via originalListener (no Redis dependency).
+      listeners: new Set(),
+      originalListener: listener,
       activeCallerCount: 1,
       promise,
       cancelController,
@@ -733,10 +830,10 @@ export class BooksService {
 
     const uncachedPages: Array<{ pageIndex: number; pageUrl: string }> = [];
     for (const p of pages) {
-      const cacheKey = `translate:manga-patches:v3:${chapterId}:${p.pageIndex}:${srcMIT}:${tgtMIT}`;
+      const cacheKey = this.patchCacheKey(chapterId, p.pageIndex, srcMIT, tgtMIT, imageModel);
       const cached = await this.cache.get<{ patches: PatchEntry[] }>(cacheKey);
       if (cached?.data?.patches) {
-        // Serve from cache immediately
+        // Serve from cache immediately — direct call, no Redis needed
         listener(p.pageIndex, { patches: cached.data.patches });
       } else {
         uncachedPages.push(p);
@@ -746,6 +843,13 @@ export class BooksService {
     if (uncachedPages.length === 0) {
       this.logger.log(`[BatchRegistry] job=${jobKey} all ${pages.length} pages were cached — skipping MIT`);
       placeholderJob.resolve?.();
+      // Remove the placeholder from the registry (mirrors the finally-cleanup of
+      // the MIT path). Leaving it behind poisons every later batch-translate for
+      // this jobKey: callers attach to the resolved job, replay an empty
+      // completedPages, and return with nothing (Issue #127).
+      if (this.activeBatchJobs.get(jobKey) === placeholderJob) {
+        this.activeBatchJobs.delete(jobKey);
+      }
       return;
     }
 
@@ -753,16 +857,18 @@ export class BooksService {
     const job = placeholderJob;
     job.expectedCount = uncachedPages.length;
 
-    // Subscribe to Redis channel so SSE listeners receive results via pub/sub (Option A')
-    const unsubscribeRedis = this.redis?.subscribe(`translate:${jobKey}`, (data: unknown) => {
-      const msg = data as { pageIndex: number; patches?: PatchEntry[]; error?: string };
-      listener(msg.pageIndex, { patches: msg.patches ?? [], ...(msg.error ? { error: msg.error } : {}) });
-    }) ?? (() => {});
+    // Redis pub/sub is used only for cross-instance fan-out (horizontal scale).
+    // Original caller on this instance is delivered directly via originalListener.
+    const unsubscribeRedis = (() => {}) as () => void;
 
-    // 3. Inner notify: store result + publish to Redis (for original caller) + fan-out (for latecomers)
+    // 3. Inner notify: direct delivery to original caller + Redis cross-instance fan-out + latecomers
     const notify = (pageIndex: number, result: PageResult) => {
       job.completedPages.set(pageIndex, result);
+      // Direct, synchronous delivery to original SSE caller — no Redis dependency
+      try { job.originalListener?.(pageIndex, result); } catch { /* listener may be gone */ }
+      // Cross-instance broadcast (for future multi-node setups)
       void this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...result });
+      // Fan-out to latecomers who attached to this job
       for (const l of job.listeners) {
         try {
           l(pageIndex, result);
@@ -784,6 +890,7 @@ export class BooksService {
       jobKey,
       sourceLang,
       targetLang,
+      imageModel,
     )
       .then(() => {
         if (job.completedPages.size >= job.expectedCount) {
@@ -810,11 +917,11 @@ export class BooksService {
     } finally {
       clearTimeout(timeoutHandle);
       unsubscribeRedis();
+      job.originalListener = undefined;
       if (this.activeBatchJobs.get(jobKey) === job) {
         this.activeBatchJobs.delete(jobKey);
         this.logger.log(`[BatchRegistry] job=${jobKey} completed & removed from registry`);
       }
-      job.listeners.delete(listener);
     }
   }
 
@@ -832,6 +939,7 @@ export class BooksService {
     taskId: string,
     sourceLangIso?: string,
     targetLangIso?: string,
+    imageModel?: string,
   ): Promise<void> {
     const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
     const mitUrl = `${mitBaseUrl}/translate/with-form/patches/batch`;
@@ -861,15 +969,7 @@ export class BooksService {
     }
 
     // ── 2. Build multipart form ───────────────────────────────────────────
-    const mitConfig = JSON.stringify({
-      translator: {
-        translator: 'gemini',
-        target_lang: tgtMIT,
-        ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
-      },
-      inpainter: { inpainter: 'lama_large' },
-      render: { direction: 'auto', rtl: isRtlLang(sourceLangIso ?? '') },
-    });
+    const mitConfig = this.buildMitConfig(srcMIT, tgtMIT, sourceLangIso ?? '', imageModel);
 
     const form = new FormData();
     for (const buf of imageBuffers) {
@@ -881,23 +981,27 @@ export class BooksService {
     // T4-STANDARD Pillar 2: Asynchronous Fire-and-forget preparation
     // Pass taskId and callbackUrl to MIT Server
     form.append('taskId', taskId);
-    form.append('callback_url', `${this.backendOrigin}/webhooks/mit/callback`);
+    form.append('callback_url', `${this.mitCallbackOrigin}/webhooks/mit/callback`);
     if (process.env.MIT_WEBHOOK_SECRET) {
       form.append('callback_secret', process.env.MIT_WEBHOOK_SECRET);
     }
 
-    // ── 3. POST to MIT (no timeout — may take many minutes for large chapters) ──
+    // ── 3. POST to MIT ────────────────────────────────────────────────────────
+    // Do NOT pass the cancel signal here — once MIT accepts the job it processes
+    // asynchronously and sends webhook callbacks even if the SSE caller disconnects.
+    // Passing the signal would kill the TCP connection to MIT mid-POST, causing
+    // MIT's BLAS/Fortran runtime to crash (forrtl error 200: window-CLOSE event).
+    if (signal.aborted) {
+      this.logger.log(`[BatchPatches] chapter=${chapterId} cancelled before MIT submit`);
+      return;
+    }
     let mitRes: Response;
     try {
-      mitRes = await fetch(mitUrl, { method: 'POST', body: form, signal });
+      mitRes = await fetch(mitUrl, { method: 'POST', body: form });
     } catch (err) {
-      if (signal.aborted) {
-        this.logger.log(`[BatchPatches] chapter=${chapterId} cancelled before MIT response`);
-        return;
-      }
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT batch fetch failed: ${msg}`);
-      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso);
+      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel);
       return;
     }
 
@@ -916,7 +1020,7 @@ export class BooksService {
     if (!mitRes.ok || !mitRes.body) {
       const errText = await mitRes.text().catch(() => '');
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT HTTP ${mitRes.status}: ${errText.slice(0, 200)}`);
-      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso);
+      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel);
       return;
     }
 
@@ -1012,6 +1116,7 @@ export class BooksService {
                     pageUrl,
                     undefined,
                     targetLangIso,
+                    { imageModel },
                   );
                   if (fallback.patches.length > 0) {
                     this.logger.log(
@@ -1028,7 +1133,7 @@ export class BooksService {
             }
 
             // Cache so single-page endpoint & future batch requests skip MIT
-            const cacheKey = `translate:manga-patches:v3:${chapterId}:${data.pageIndex}:${srcMIT}:${tgtMIT}`;
+            const cacheKey = this.patchCacheKey(chapterId, data.pageIndex, srcMIT, tgtMIT, imageModel);
             await this.cache.setMangaCacheWithTiers(cacheKey, { patches });
 
             this.logger.log(`[BatchPatches] chapter=${chapterId} page=${data.pageIndex} → ${patches.length} patches`);
@@ -1063,7 +1168,7 @@ export class BooksService {
     if (streamFailedError) {
       this.logger.warn(`[BatchPatches] chapter=${chapterId} continuing with per-page fallback after stream failure`);
     }
-    await this._retryMissingPagesIndividually(chapterId, pages, processedPageIndexes, notify, sourceLangIso, targetLangIso);
+    await this._retryMissingPagesIndividually(chapterId, pages, processedPageIndexes, notify, sourceLangIso, targetLangIso, imageModel);
   }
 
   private async _retryMissingPagesIndividually(
@@ -1073,6 +1178,7 @@ export class BooksService {
     notify: (pageIndex: number, result: PageResult) => void,
     sourceLangIso?: string,
     targetLangIso?: string,
+    imageModel?: string,
     signal?: AbortSignal,
   ): Promise<void> {
     const missingPages = pages.filter((p) => !processedPageIndexes.has(p.pageIndex));
@@ -1088,7 +1194,7 @@ export class BooksService {
       try {
         const single = await this.translateMangaPagePatches(
           chapterId, missing.pageIndex, missing.pageUrl, sourceLangIso, targetLangIso,
-          { maxStartupRetries: 3 },
+          { maxStartupRetries: 3, imageModel },
         );
         notify(missing.pageIndex, { patches: single.patches });
         recovered += 1;

@@ -36,7 +36,7 @@ describe('BooksService — retry fallback (#82)', () => {
     ];
 
     await (service as any)._retryMissingPagesIndividually(
-      'ch1', pages, new Set<number>(), notify, undefined, undefined, controller.signal,
+      'ch1', pages, new Set<number>(), notify, undefined, undefined, undefined, controller.signal,
     );
 
     expect(patchesSpy).not.toHaveBeenCalled();
@@ -58,7 +58,7 @@ describe('BooksService — retry fallback (#82)', () => {
 
     expect(patchesSpy).toHaveBeenCalledWith(
       'ch2', 0, 'http://example.com/0.jpg', undefined, undefined,
-      { maxStartupRetries: 3 },
+      { maxStartupRetries: 3, imageModel: undefined },
     );
   });
 });

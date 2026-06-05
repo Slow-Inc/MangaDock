@@ -27,9 +27,16 @@ if defined MIT_MODELS_TTL set "MIT_ARGS=%MIT_ARGS% --models-ttl %MIT_MODELS_TTL%
 if defined MIT_PRE_DICT set "MIT_ARGS=%MIT_ARGS% --pre-dict %MIT_PRE_DICT%"
 if defined MIT_POST_DICT set "MIT_ARGS=%MIT_ARGS% --post-dict %MIT_POST_DICT%"
 
+if not exist "logs" mkdir "logs"
+for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd"') do set LOGDATE=%%i
+set "LOGFILE=logs\server-%LOGDATE%.log"
+
 echo Starting MIT service with %PYTHON_CMD%
 echo Host=%MIT_HOST% Port=%MIT_PORT% GPU=%MIT_USE_GPU% StartInstance=%MIT_START_INSTANCE%
-"%PYTHON_CMD%" %MIT_ARGS%
+
+rem Tee all Python output (stdout + stderr) to log file.
+rem -u disables Python's output buffering so the tee gets data in real-time.
+"%PYTHON_CMD%" -u %MIT_ARGS% 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -FilePath '%LOGFILE%' -Append"
 
 popd
 endlocal

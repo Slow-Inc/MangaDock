@@ -371,8 +371,8 @@ class _CommonGPTTranslator_JSON:
             chatSample=self.translator.chat_sample.get(to_lang)
             if chatSample:
                 asJSON = [
-                    self.text2json(self.translator.chat_sample[0]).model_dump_json(),
-                    self.text2json(self.translator.chat_sample[1]).model_dump_json()
+                    self.text2json(chatSample[0]).model_dump_json(),
+                    self.text2json(chatSample[1]).model_dump_json()
                 ]
 
                 messages.append({'role': 'user', 'content': asJSON[0]})
@@ -432,7 +432,7 @@ class _CommonGPTTranslator_JSON:
             if not isinstance(translated_items, list):
                 raise ValueError("Invalid JSON structure: 'TextList' must be a list")
 
-            rangeOffset = min([val['ID'] for val in translated_items])
+            rangeOffset = min([val['ID'] for val in translated_items]) if translated_items else 0
             expected_max = (expected_count - 1) + rangeOffset
             
             # Process each translated item
@@ -456,7 +456,7 @@ class _CommonGPTTranslator_JSON:
 
         return translations
  
-    def text2json(text: str) -> TranslationList:
+    def text2json(self, text: str) -> TranslationList:
         """
         Convert text samples to TranslationList format.
         Assists with backwards compatiblity for `<|ID|>`-based samples.

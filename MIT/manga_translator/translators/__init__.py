@@ -21,6 +21,7 @@ from .none import NoneTranslator
 from .original import OriginalTranslator
 from .sakura import SakuraTranslator
 from .qwen2 import Qwen2Translator, Qwen2BigTranslator
+from .qwen3 import Qwen3Translator, Qwen3BigTranslator
 from .groq import GroqTranslator
 from .gemini import GeminiTranslator
 from .gemini_2stage import Gemini2StageTranslator
@@ -40,6 +41,8 @@ OFFLINE_TRANSLATORS = {
     Translator.mbart50: MBart50Translator,
     Translator.qwen2: Qwen2Translator,
     Translator.qwen2_big: Qwen2BigTranslator,
+    Translator.qwen3: Qwen3Translator,
+    Translator.qwen3_big: Qwen3BigTranslator,
 }
 
 GPT_TRANSLATORS = {

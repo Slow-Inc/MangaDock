@@ -1,5 +1,4 @@
 import asyncio
-import os
 from typing import List, Optional
 
 from PIL import Image
@@ -12,48 +11,15 @@ from server.sent_data_internal import NotifyType
 
 class QueueElement:
     req: Request
-    image: Image.Image | str
+    image: Image.Image
     config: Config
     task_type: str
 
     def __init__(self, req: Request, image: Image.Image, config: Config, length, task_type: str = "translate"):
         self.req = req
-        if length > 10:
-            #todo: store image in "upload-cache" folder
-            self.image = image
-        else:
-            self.image = image
+        self.image = image
         self.config = config
         self.task_type = task_type
-
-    def get_image(self)-> Image:
-        if isinstance(self.image, str):
-            return Image.open(self.image)
-        else:
-            return self.image
-
-    def __del__(self):
-        if isinstance(self.image, str):
-            os.remove(self.image)
-
-    async def is_client_disconnected(self) -> bool:
-        if await self.req.is_disconnected():
-            return True
-        return False
-
-
-class BatchQueueElement:
-    """Batch translation queue element"""
-    req: Request
-    images: List[Image.Image]
-    config: Config
-    batch_size: int
-
-    def __init__(self, req: Request, images: List[Image.Image], config: Config, batch_size: int):
-        self.req = req
-        self.images = images
-        self.config = config
-        self.batch_size = batch_size
 
     async def is_client_disconnected(self) -> bool:
         if await self.req.is_disconnected():
@@ -63,23 +29,24 @@ class BatchQueueElement:
 
 class TaskQueue:
     def __init__(self):
-        self.queue: List[QueueElement | BatchQueueElement] = []
+        self.queue: List[QueueElement] = []
         self.queue_event: asyncio.Event = asyncio.Event()
 
-    def add_task(self, task: QueueElement | BatchQueueElement):
+    def add_task(self, task: QueueElement):
         self.queue.append(task)
 
-    def get_pos(self, task: QueueElement | BatchQueueElement) -> Optional[int]:
+    def get_pos(self, task: QueueElement) -> Optional[int]:
         try:
             return self.queue.index(task)
         except ValueError:
             return None
+
     async def update_event(self):
         self.queue = [task for task in self.queue if not await task.is_client_disconnected()]
         self.queue_event.set()
         self.queue_event.clear()
 
-    async def remove(self, task: QueueElement | BatchQueueElement):
+    async def remove(self, task: QueueElement):
         self.queue.remove(task)
         await self.update_event()
 
@@ -88,13 +55,13 @@ class TaskQueue:
 
 task_queue = TaskQueue()
 
-async def wait_in_queue(task: QueueElement | BatchQueueElement, notify: NotifyType):
+async def wait_in_queue(task: QueueElement, notify: NotifyType):
     """Will get task position report it. If its in the range of translators then it will try to aquire an instance(blockig) and sent a task to it. when done the item will be removed from the queue and result will be returned"""
     while True:
         queue_pos = task_queue.get_pos(task)
         if queue_pos is None:
             if notify:
-                return
+                return None
             else:
                 raise HTTPException(500, detail="User is no longer connected")  # just for the logs
         if notify:
@@ -103,7 +70,7 @@ async def wait_in_queue(task: QueueElement | BatchQueueElement, notify: NotifyTy
             if await task.is_client_disconnected():
                 await task_queue.update_event()
                 if notify:
-                    return
+                    return None
                 else:
                     raise HTTPException(500, detail="User is no longer connected") #just for the logs
 
@@ -113,24 +80,16 @@ async def wait_in_queue(task: QueueElement | BatchQueueElement, notify: NotifyTy
                 notify(4, b"")
 
             try:
-                # Process batch translation task
-                if isinstance(task, BatchQueueElement):
-                    if notify:
-                        await instance.sent_batch_stream(task.images, task.config, task.batch_size, notify)
-                    else:
-                        result = await instance.sent_batch(task.images, task.config, task.batch_size)
+                if notify:
+                    await instance.sent_stream(task.image, task.config, notify)
                 else:
-                    # Process single translation task
-                    if notify:
-                        await instance.sent_stream(task.image, task.config, notify)
+                    if task.task_type == "translate_patches":
+                        result = await instance.sent_patches(task.image, task.config)
                     else:
-                        if task.task_type == "translate_patches":
-                            result = await instance.sent_patches(task.image, task.config)
-                        else:
-                            result = await instance.sent(task.image, task.config)
+                        result = await instance.sent(task.image, task.config)
 
                 if notify:
-                    return
+                    return None
                 else:
                     return result
 
@@ -143,7 +102,7 @@ async def wait_in_queue(task: QueueElement | BatchQueueElement, notify: NotifyTy
 
                 if notify:
                     notify(2, error_msg.encode('utf-8'))
-                    return
+                    return None
                 else:
                     raise HTTPException(500, detail=error_msg)
 

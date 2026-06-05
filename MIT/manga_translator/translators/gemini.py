@@ -100,6 +100,10 @@ class GeminiTranslator(CommonGPTTranslator):
         self.cached_content = None
         self.templateCache = None
 
+        # Per-request model override (#87): set in parse_args from the request
+        # config; None means "use the GEMINI_MODEL env default".
+        self._model_override = None
+
         # Dict for storing values to print to logger
         self.cachedVals={None}
 
@@ -129,14 +133,14 @@ class GeminiTranslator(CommonGPTTranslator):
         Start Section:
             Validate `GEMINI_MODEL` specification and determine supported capabilities.
         '''
-        model_names = [aModel.name.lstrip('models/') for aModel in model_list]
+        model_names = [aModel.name.removeprefix('models/') for aModel in model_list]
         if  f"{GEMINI_MODEL}" not in model_names:
             self.logger.error(f"Model: '{GEMINI_MODEL}' was not found in the model list.\n" +
                                 "Please ensure you set the key: GEMINI_MODEL to one of the following values:"
                             )
             self.logger.error('\n'.join(mName for mName in model_names))
 
-            raise
+            raise ValueError(f"GEMINI_MODEL '{GEMINI_MODEL}' is not in the available model list")
         
         # Use index of model name to get full model info
         model_info = model_list[model_names.index(GEMINI_MODEL)]
@@ -149,7 +153,7 @@ class GeminiTranslator(CommonGPTTranslator):
             Made into a function purely to help with code readability.
             """
             # List of models that support content caching:
-            canCacheModels=[m.name.lstrip('models/')
+            canCacheModels=[m.name.removeprefix('models/')
                             for m in model_list
                                 if 'createCachedContent' in m.supported_actions
                         ]
@@ -223,11 +227,16 @@ class GeminiTranslator(CommonGPTTranslator):
                   False otherwise.
         """
 
+        # A cached_content is bound to the model it was created with — a
+        # per-request override must bypass the template cache (#87).
+        if self._model_override and self._model_override != GEMINI_MODEL:
+            return False
+
         if self._canUseCache:
             try:
                 if self._needRecache:
                     self._createContext(to_lang=self.to_lang)
-                
+
                 return True
             
             except Exception as e:
@@ -243,12 +252,22 @@ class GeminiTranslator(CommonGPTTranslator):
 
     def parse_args(self, args: CommonGPTTranslator):
         super().parse_args(args)
-        
+
+        # Per-request model override (#87) sent by the Backend in the request
+        # config. Normalized like the catalog names; empty → env default.
+        raw = (getattr(args, 'model', None) or '').strip().removeprefix('models/')
+        self._model_override = raw or None
+
         # Initialize mode-specific components AFTER config is loaded
         if self.json_mode:
             self._init_json_mode()
         else:
             self._init_standard_mode()
+
+    def _model(self) -> str:
+        """Effective model for this request: the per-request override when set,
+        otherwise the GEMINI_MODEL env default."""
+        return self._model_override or GEMINI_MODEL
 
     def _init_json_mode(self):
         """Activate JSON-specific behavior"""
@@ -267,7 +286,7 @@ class GeminiTranslator(CommonGPTTranslator):
     def count_tokens(self, text: str) -> int:
         # Uses the synchronous call (`client`) instead of asynchronous (`client.aio`)
         #   for compatibility with `common_gpt` 's `assemble_prompt`
-        return self.client.models.count_tokens(model=GEMINI_MODEL, contents=text).total_tokens
+        return self.client.models.count_tokens(model=self._model(), contents=text).total_tokens
     
     def _createContext(self, to_lang: str): 
         chatSamples=None
@@ -324,10 +343,11 @@ class GeminiTranslator(CommonGPTTranslator):
             nonlocal MAX_SPLIT_ATTEMPTS
             split_prefix = ' (split)' if split_level > 0 else ''  
 
-            # Assemble prompt for the current batch  
+            # Assemble prompt for the current batch
             prompt, query_size = self._assemble_prompts(from_lang, to_lang, prompt_queries).__next__()
 
-            for attempt in range(RETRY_ATTEMPTS):  
+            server_error_attempt = 0
+            for attempt in range(RETRY_ATTEMPTS):
                 try:  
                     # Get the response (synchronously)
                     response = await self._request_translation(to_lang, prompt)  
@@ -464,7 +484,7 @@ class GeminiTranslator(CommonGPTTranslator):
                         )
 
         response = await self.client.aio.models.generate_content(
-                                                model=GEMINI_MODEL,
+                                                model=self._model(),
                                                 contents=messages,
                                                 config=types.GenerateContentConfig(
                                                             **config_kwargs
@@ -556,8 +576,8 @@ class _GeminiTranslator_json (_CommonGPTTranslator_JSON):
                     types.Content(role='model', parts=[types.Part.from_text(text=lang_JSON_samples[1].model_dump_json())]),
                 ]
 
-            loggerVals['Sample: User'] = lang_JSON_samples[0].model_dump_json(),
-            loggerVals['Sample: Model'] = lang_JSON_samples[1].model_dump_json()
+                loggerVals['Sample: User'] = lang_JSON_samples[0].model_dump_json()
+                loggerVals['Sample: Model'] = lang_JSON_samples[1].model_dump_json()
 
 
         messages.append(types.Content(role='user',  parts=[types.Part.from_text(text=prompt)]))
@@ -568,7 +588,7 @@ class _GeminiTranslator_json (_CommonGPTTranslator_JSON):
                             '\n------------'
                         )
         
-        response = await self.translator.client.aio.models.generate_content(model=GEMINI_MODEL,
+        response = await self.translator.client.aio.models.generate_content(model=self.translator._model(),
                                                                             contents=messages,
                                                                             config=types.GenerateContentConfig(
                                                                                 **config_kwargs
