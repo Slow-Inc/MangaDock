@@ -100,6 +100,10 @@ class GeminiTranslator(CommonGPTTranslator):
         self.cached_content = None
         self.templateCache = None
 
+        # Per-request model override (#87): set in parse_args from the request
+        # config; None means "use the GEMINI_MODEL env default".
+        self._model_override = None
+
         # Dict for storing values to print to logger
         self.cachedVals={None}
 
@@ -223,11 +227,16 @@ class GeminiTranslator(CommonGPTTranslator):
                   False otherwise.
         """
 
+        # A cached_content is bound to the model it was created with — a
+        # per-request override must bypass the template cache (#87).
+        if self._model_override and self._model_override != GEMINI_MODEL:
+            return False
+
         if self._canUseCache:
             try:
                 if self._needRecache:
                     self._createContext(to_lang=self.to_lang)
-                
+
                 return True
             
             except Exception as e:
@@ -243,12 +252,22 @@ class GeminiTranslator(CommonGPTTranslator):
 
     def parse_args(self, args: CommonGPTTranslator):
         super().parse_args(args)
-        
+
+        # Per-request model override (#87) sent by the Backend in the request
+        # config. Normalized like the catalog names; empty → env default.
+        raw = (getattr(args, 'model', None) or '').strip().removeprefix('models/')
+        self._model_override = raw or None
+
         # Initialize mode-specific components AFTER config is loaded
         if self.json_mode:
             self._init_json_mode()
         else:
             self._init_standard_mode()
+
+    def _model(self) -> str:
+        """Effective model for this request: the per-request override when set,
+        otherwise the GEMINI_MODEL env default."""
+        return self._model_override or GEMINI_MODEL
 
     def _init_json_mode(self):
         """Activate JSON-specific behavior"""
@@ -267,7 +286,7 @@ class GeminiTranslator(CommonGPTTranslator):
     def count_tokens(self, text: str) -> int:
         # Uses the synchronous call (`client`) instead of asynchronous (`client.aio`)
         #   for compatibility with `common_gpt` 's `assemble_prompt`
-        return self.client.models.count_tokens(model=GEMINI_MODEL, contents=text).total_tokens
+        return self.client.models.count_tokens(model=self._model(), contents=text).total_tokens
     
     def _createContext(self, to_lang: str): 
         chatSamples=None
@@ -465,7 +484,7 @@ class GeminiTranslator(CommonGPTTranslator):
                         )
 
         response = await self.client.aio.models.generate_content(
-                                                model=GEMINI_MODEL,
+                                                model=self._model(),
                                                 contents=messages,
                                                 config=types.GenerateContentConfig(
                                                             **config_kwargs
@@ -569,7 +588,7 @@ class _GeminiTranslator_json (_CommonGPTTranslator_JSON):
                             '\n------------'
                         )
         
-        response = await self.translator.client.aio.models.generate_content(model=GEMINI_MODEL,
+        response = await self.translator.client.aio.models.generate_content(model=self.translator._model(),
                                                                             contents=messages,
                                                                             config=types.GenerateContentConfig(
                                                                                 **config_kwargs

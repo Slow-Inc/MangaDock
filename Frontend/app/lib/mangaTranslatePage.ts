@@ -56,7 +56,7 @@ export async function translateMangaPagePatches(
   pageIndex: number,
   pageUrl: string,
   signal?: AbortSignal,
-  options?: { sourceLang?: string; targetLang?: string },
+  options?: { sourceLang?: string; targetLang?: string; imageModel?: string },
 ): Promise<PatchData[]> {
   const res = await fetch(
     `/api/proxy/books/chapters/${encodeURIComponent(chapterId)}/pages/${pageIndex}/translate-patches`,
@@ -67,6 +67,7 @@ export async function translateMangaPagePatches(
         pageUrl,
         sourceLang: options?.sourceLang,
         targetLang: options?.targetLang,
+        imageModel: options?.imageModel,
       }),
       signal,
     },
@@ -105,14 +106,19 @@ export async function translateMangaChapterBatchPatches(
   pages: Array<{ pageIndex: number; pageUrl: string }>,
   onPageDone: (pageIndex: number, patches: PatchData[]) => void,
   signal?: AbortSignal,
-  options?: { sourceLang?: string; targetLang?: string },
+  options?: { sourceLang?: string; targetLang?: string; imageModel?: string },
 ): Promise<void> {
   const res = await fetch(
     `/api/proxy/books/chapters/${encodeURIComponent(chapterId)}/batch-translate-patches`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pages, sourceLang: options?.sourceLang, targetLang: options?.targetLang }),
+      body: JSON.stringify({
+        pages,
+        sourceLang: options?.sourceLang,
+        targetLang: options?.targetLang,
+        imageModel: options?.imageModel,
+      }),
       signal,
     },
   );
