@@ -373,6 +373,43 @@ export class BooksService {
     return `${chapterId}:${srcMIT}:${tgtMIT}`;
   }
 
+  /**
+   * Build the MIT pipeline config JSON. Single source of truth for the single-page
+   * and batch paths so the VRAM/perf knobs never drift between them.
+   *
+   * Detection/inpainting are the dominant VRAM + latency drivers (activation memory
+   * ∝ size²). MIT's bundled defaults are tuned for max quality (detection 2560,
+   * inpainting 2048) — heavier than typical manga pages need. We default them lower
+   * here and expose them as env so each deployment can match its GPU without a
+   * redeploy:
+   *   MIT_DETECTION_SIZE     (default 2048)   — text detection resolution
+   *   MIT_INPAINTING_SIZE    (default 1536)   — LaMa inpaint resolution
+   *   MIT_INPAINTER          (default lama_large)
+   *   MIT_INPAINTING_PRECISION (default bf16) — fp32 | fp16 | bf16 (LaMa is a CNN;
+   *                                             it has no int4/int8 path — that knob
+   *                                             only applies to the local LLM
+   *                                             translator via QWEN3_PRECISION).
+   */
+  private buildMitConfig(srcMIT: string, tgtMIT: string, sourceIso: string): string {
+    const intEnv = (name: string, fallback: number): number => {
+      const n = Number(process.env[name]);
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+    };
+    return JSON.stringify({
+      translator: {
+        target_lang: tgtMIT,
+        ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
+      },
+      detector: { detection_size: intEnv('MIT_DETECTION_SIZE', 2048) },
+      inpainter: {
+        inpainter: process.env.MIT_INPAINTER ?? 'lama_large',
+        inpainting_size: intEnv('MIT_INPAINTING_SIZE', 1536),
+        inpainting_precision: process.env.MIT_INPAINTING_PRECISION ?? 'bf16',
+      },
+      render: { direction: 'auto', rtl: isRtlLang(sourceIso) },
+    });
+  }
+
   async translateMangaEpisode(payload: {
     lines?: string[];
     contextHint?: string;
@@ -575,14 +612,7 @@ export class BooksService {
     }
     const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-    const config = JSON.stringify({
-      translator: {
-        target_lang: tgtMIT,
-        ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
-      },
-      inpainter: { inpainter: 'lama_large' },
-      render: { direction: 'auto', rtl: isRtlLang(sourceLang ?? '') },
-    });
+    const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '');
 
     const maxStartupRetries = opts?.maxStartupRetries ?? 30;
     const startupRetryDelayMs = 5_000;
@@ -900,14 +930,7 @@ export class BooksService {
     }
 
     // ── 2. Build multipart form ───────────────────────────────────────────
-    const mitConfig = JSON.stringify({
-      translator: {
-        target_lang: tgtMIT,
-        ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
-      },
-      inpainter: { inpainter: 'lama_large' },
-      render: { direction: 'auto', rtl: isRtlLang(sourceLangIso ?? '') },
-    });
+    const mitConfig = this.buildMitConfig(srcMIT, tgtMIT, sourceLangIso ?? '');
 
     const form = new FormData();
     for (const buf of imageBuffers) {
