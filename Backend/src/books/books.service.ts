@@ -356,6 +356,23 @@ export class BooksService {
     return !['false', '0', 'no', 'off'].includes(raw);
   }
 
+  /** Resolve the MIT source/target language codes for a job. Single source of
+   *  truth so the cache key and the batch jobKey are always built identically —
+   *  a mismatch here silently breaks cancellation (the cancel path looks up a
+   *  jobKey that the start path never registered). */
+  private mitLangPair(sourceLang?: string, targetLang?: string): { srcMIT: string; tgtMIT: string } {
+    const srcMIT = this.shouldSendMitSourceLang() && sourceLang ? mitLangCode(sourceLang) : 'ANY';
+    const tgtMIT = mitLangCode(targetLang ?? 'th');
+    return { srcMIT, tgtMIT };
+  }
+
+  /** The registry key for a batch-translate job. MUST be built via mitLangPair
+   *  on every path (start, attach, remove) or cancellation breaks. */
+  private buildJobKey(chapterId: string, sourceLang?: string, targetLang?: string): string {
+    const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
+    return `${chapterId}:${srcMIT}:${tgtMIT}`;
+  }
+
   async translateMangaEpisode(payload: {
     lines?: string[];
     contextHint?: string;
@@ -534,9 +551,7 @@ export class BooksService {
       throw new Error('chapterId and pageUrl are required');
     }
 
-    const sendSourceLang = this.shouldSendMitSourceLang();
-    const srcMIT = sendSourceLang && sourceLang ? mitLangCode(sourceLang) : 'ANY';
-    const tgtMIT = mitLangCode(targetLang ?? 'th');
+    const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
     const cacheKey = `translate:manga-patches:v3:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}`;
     const cached = await this.cache.get<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }>(cacheKey);
     if (cached?.data?.patches) {
@@ -665,7 +680,7 @@ export class BooksService {
     targetLang: string | undefined,
     listener: BatchPageListener,
   ): void {
-    const jobKey = `${chapterId}:${sourceLang ? mitLangCode(sourceLang) : 'ANY'}:${mitLangCode(targetLang ?? 'th')}`;
+    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang);
     const job = this.activeBatchJobs.get(jobKey);
     if (job) {
       job.listeners.delete(listener);
@@ -706,10 +721,8 @@ export class BooksService {
     sourceLang?: string,
     targetLang?: string,
   ): Promise<void> {
-    const sendSourceLang = this.shouldSendMitSourceLang();
-    const srcMIT = sendSourceLang && sourceLang ? mitLangCode(sourceLang) : 'ANY';
-    const tgtMIT = mitLangCode(targetLang ?? 'th');
-    const jobKey = `${chapterId}:${srcMIT}:${tgtMIT}`;
+    const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
+    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang);
 
     const existing = this.activeBatchJobs.get(jobKey);
 

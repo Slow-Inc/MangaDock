@@ -40,6 +40,12 @@ async function handler(
       method: req.method,
       headers,
       body,
+      // Forward the client's abort to the backend. Without this, a browser
+      // that aborts a streaming request (e.g. cancelling a batch translate)
+      // leaves the upstream connection open, so the backend never fires its
+      // `res.on('close')` handler and never propagates the cancel downstream
+      // (the SSE job — and MIT's GPU work — keeps running). See #cancel-propagation.
+      signal: req.signal,
       // @ts-expect-error Node 18+ fetch supports duplex
       duplex: body ? "half" : undefined,
     });
