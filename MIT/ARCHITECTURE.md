@@ -159,8 +159,10 @@ layers, not here.
   (`MIT_START_INSTANCE=1`), so pages are processed **sequentially**.
 - `wait_in_queue()`: when the task's queue position is within the free-executor count, it acquires an
   executor, sends the work, frees the executor in `finally` (survives cancellation).
-- **Cancellation:** a queued task is dropped if `req.is_disconnected()`. This works for streaming requests
-  but **not** for the batch webhook background task, which uses a stub request — see Known Issue #101.
+- **Cancellation:** a queued task is dropped if `req.is_disconnected()` (streaming requests). The batch
+  webhook background task uses a stub request, so it instead polls a cancellation registry
+  (`server/cancellation.py`): the Backend calls `POST /cancel/{taskId}` when its last SSE listener leaves,
+  and the batch loop stops before the next page (Issue #101).
 - **Gotcha:** `find_executor()` holds an `asyncio.Lock` across an `await` (#106); translator instances are
   cached globally and mutated per-request (safe only because of the single-executor serialisation, #108).
 
@@ -280,7 +282,7 @@ From a full logic scrutiny (model internals excluded). Filed #100–#111.
 | # | Severity | Area | Status |
 |---|----------|------|--------|
 | #100 | Critical | Webhook had no retry → Patch Sets lost ("0/20") | **Done** (server/webhook.py) |
-| #101 | Critical | Batch cancellation not propagated → zombie GPU jobs | Open |
+| #101 | Critical | Batch cancellation not propagated → zombie GPU jobs | **Done** (`server/cancellation.py` + `/cancel`) |
 | #102 | Security | Path traversal in `/result(s)/...` | Open |
 | #103 | Security | Worker pickle-over-HTTP + binds 0.0.0.0 (RCE risk) | Open |
 | #104 | Major | Broken/stub batch endpoints | Open |

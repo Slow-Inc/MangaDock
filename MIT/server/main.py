@@ -25,6 +25,7 @@ from server.myqueue import task_queue
 from server.request_extraction import get_ctx, get_patch_ctx, while_streaming, TranslateRequest, BatchTranslateRequest, get_batch_ctx
 from server.to_json import to_translation, TranslationResponse
 from server.webhook import send_webhook
+from server.cancellation import is_cancelled, mark_cancelled, discard
 
 app = FastAPI(
     title="Manga Image Translator",
@@ -202,47 +203,72 @@ async def run_batch_with_callbacks(
     callback_url: str,
     callback_secret: str,
 ):
-    """Background task to process images and send webhooks."""
+    """Background task to process images and send webhooks.
+
+    Polls the cancellation registry between pages: a cancelled Batch Job stops
+    starting new pages, and a page that finished after the cancellation arrived
+    is not delivered. The taskId is discarded on exit so the registry stays small.
+    """
     # Dummy request mock for internal pipeline compatibility
     class DummyRequest:
         async def is_disconnected(self): return False
-    
+
     dummy_req = DummyRequest()
 
-    for img_bytes, page_idx in zip(images_data, index_list):
-        try:
-            # Re-parse config per page to avoid any state mutation
-            page_conf = Config.parse_raw(config_str)
-            patch_result = await get_patch_ctx(dummy_req, page_conf, img_bytes)
-            patches_out = []
-            for patch in patch_result.get("patches", []):
-                png_bytes = patch.get("img_png", b"")
-                patches_out.append({
-                    "x": patch.get("x", 0),
-                    "y": patch.get("y", 0),
-                    "w": patch.get("w", 0),
-                    "h": patch.get("h", 0),
-                    "img_b64": base64.b64encode(png_bytes).decode("utf-8"),
-                })
-            payload = {
-                "taskId": taskId,
-                "pageIndex": page_idx,
-                "imgWidth": patch_result.get("img_width", 0),
-                "imgHeight": patch_result.get("img_height", 0),
-                "patches": patches_out,
-                "error": None,
-            }
-        except Exception as exc:
-            payload = {
-                "taskId": taskId,
-                "pageIndex": page_idx,
-                "imgWidth": 0,
-                "imgHeight": 0,
-                "patches": [],
-                "error": str(exc),
-            }
-        
-        await send_webhook(callback_url, callback_secret, payload)
+    try:
+        for img_bytes, page_idx in zip(images_data, index_list):
+            # Stop before starting a new page if the Batch Job was cancelled.
+            if is_cancelled(taskId):
+                print(f"[batch] task {taskId} cancelled - stopping before page {page_idx}")
+                break
+            try:
+                # Re-parse config per page to avoid any state mutation
+                page_conf = Config.parse_raw(config_str)
+                patch_result = await get_patch_ctx(dummy_req, page_conf, img_bytes)
+                patches_out = []
+                for patch in patch_result.get("patches", []):
+                    png_bytes = patch.get("img_png", b"")
+                    patches_out.append({
+                        "x": patch.get("x", 0),
+                        "y": patch.get("y", 0),
+                        "w": patch.get("w", 0),
+                        "h": patch.get("h", 0),
+                        "img_b64": base64.b64encode(png_bytes).decode("utf-8"),
+                    })
+                payload = {
+                    "taskId": taskId,
+                    "pageIndex": page_idx,
+                    "imgWidth": patch_result.get("img_width", 0),
+                    "imgHeight": patch_result.get("img_height", 0),
+                    "patches": patches_out,
+                    "error": None,
+                }
+            except Exception as exc:
+                payload = {
+                    "taskId": taskId,
+                    "pageIndex": page_idx,
+                    "imgWidth": 0,
+                    "imgHeight": 0,
+                    "patches": [],
+                    "error": str(exc),
+                }
+
+            # If cancelled while this page was translating, drop its now-unwanted result.
+            if is_cancelled(taskId):
+                print(f"[batch] task {taskId} cancelled - dropping page {page_idx} result")
+                break
+            await send_webhook(callback_url, callback_secret, payload)
+    finally:
+        discard(taskId)
+
+@app.post("/cancel/{taskId}", tags=["api", "form"])
+async def cancel_batch(taskId: str):
+    """Signal that a running Batch Job should stop. Best-effort and idempotent:
+    a no-op for an unknown/finished taskId. The background batch loop stops before
+    its next page (and drops a page that finished after this arrived)."""
+    mark_cancelled(taskId)
+    return {"status": "cancelling", "taskId": taskId}
+
 
 @app.post("/translate/with-form/patches/batch", tags=["api", "form"])
 async def patches_batch_stream(

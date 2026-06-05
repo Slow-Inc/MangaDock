@@ -674,6 +674,16 @@ export class BooksService {
       if (job.activeCallerCount === 0) {
         this.logger.log(`[BatchRegistry] job=${jobKey} last caller gone — cancelling MIT job`);
         job.cancelController.abort();
+        // Tell MIT to stop the in-flight background batch for this taskId so it
+        // doesn't keep burning GPU on a job nobody is listening to. Best-effort,
+        // fire-and-forget; MIT no-ops an unknown/finished taskId.
+        const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
+        void fetch(`${mitBaseUrl}/cancel/${encodeURIComponent(jobKey)}`, { method: 'POST' }).catch(
+          (err) =>
+            this.logger.debug(
+              `[BatchRegistry] MIT cancel request failed for job=${jobKey}: ${err instanceof Error ? err.message : String(err)}`,
+            ),
+        );
       }
     }
   }
