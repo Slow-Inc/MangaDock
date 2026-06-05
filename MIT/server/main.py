@@ -22,7 +22,7 @@ from pathlib import Path
 from manga_translator import Config
 from server.instance import ExecutorInstance, executor_instances
 from server.myqueue import task_queue
-from server.request_extraction import get_ctx, get_patch_ctx, while_streaming, TranslateRequest, BatchTranslateRequest, get_batch_ctx
+from server.request_extraction import get_ctx, get_patch_ctx, while_streaming, TranslateRequest
 from server.to_json import to_translation, TranslationResponse
 from server.webhook import send_webhook
 from server.cancellation import is_cancelled, mark_cancelled, discard
@@ -426,41 +426,6 @@ async def get_result_by_folder(folder_name: str):
         headers={"Content-Disposition": f"inline; filename=final.png"}
     )
 
-@app.post("/translate/batch/json", response_model=list[TranslationResponse], tags=["api", "json", "batch"])
-async def batch_json(req: Request, data: BatchTranslateRequest):
-    """Batch translate images and return JSON format results"""
-    results = await get_batch_ctx(req, data.config, data.images, data.batch_size)
-    return [to_translation(ctx) for ctx in results]
-
-@app.post("/translate/batch/images", response_description="Zip file containing translated images", tags=["api", "batch"])
-async def batch_images(req: Request, data: BatchTranslateRequest):
-    """Batch translate images and return zip archive containing translated images"""
-    import zipfile
-    import tempfile
-    
-    results = await get_batch_ctx(req, data.config, data.images, data.batch_size)
-    
-    # Create temporary ZIP file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
-        with zipfile.ZipFile(tmp_file, 'w') as zip_file:
-            for i, ctx in enumerate(results):
-                if ctx.result:
-                    img_byte_arr = io.BytesIO()
-                    ctx.result.save(img_byte_arr, format="PNG")
-                    zip_file.writestr(f"translated_{i+1}.png", img_byte_arr.getvalue())
-        
-        # Return ZIP file
-        with open(tmp_file.name, 'rb') as f:
-            zip_data = f.read()
-        
-        # Clean up temporary file
-        os.unlink(tmp_file.name)
-        
-        return StreamingResponse(
-            io.BytesIO(zip_data),
-            media_type="application/zip",
-            headers={"Content-Disposition": "attachment; filename=translated_images.zip"}
-        )
 
 @app.get("/", response_class=HTMLResponse,tags=["ui"])
 async def index() -> HTMLResponse:
@@ -541,36 +506,6 @@ def prepare(args):
         shutil.rmtree(folder_name)
     os.makedirs(folder_name)
 
-@app.post("/simple_execute/translate_batch", tags=["internal-api"])
-async def simple_execute_batch(req: Request, data: BatchTranslateRequest):
-    """Internal batch translation execution endpoint"""
-    # Implementation for batch translation logic
-    # Currently returns empty results, actual implementation needs to call batch translator
-    from manga_translator import MangaTranslator
-    translator = MangaTranslator({'batch_size': data.batch_size})
-    
-    # Prepare image-config pairs
-    images_with_configs = [(img, data.config) for img in data.images]
-    
-    # Execute batch translation
-    results = await translator.translate_batch(images_with_configs, data.batch_size)
-    
-    return results
-
-@app.post("/execute/translate_batch", tags=["internal-api"])
-async def execute_batch_stream(req: Request, data: BatchTranslateRequest):
-    """Internal batch translation streaming execution endpoint"""
-    # Streaming batch translation implementation
-    from manga_translator import MangaTranslator
-    translator = MangaTranslator({'batch_size': data.batch_size})
-    
-    # Prepare image-config pairs
-    images_with_configs = [(img, data.config) for img in data.images]
-    
-    # Execute batch translation (streaming version requires more complex implementation)
-    results = await translator.translate_batch(images_with_configs, data.batch_size)
-    
-    return results
 
 @app.get("/results/list", tags=["api"])
 async def list_results():
@@ -654,7 +589,6 @@ if __name__ == '__main__':
     from args import parse_arguments
 
     args = parse_arguments()
-    args.start_instance = True
     proc = prepare(args)
     print("Nonce: "+nonce)
     try:
