@@ -80,14 +80,14 @@ async def ready():
     from fastapi.responses import JSONResponse
     worker_count = len(executor_instances.list)
     if worker_count > 0:
-        # Resolved default translator (env-driven, see config._default_translator) so
-        # consumers can discover the active translator family — e.g. the Reader hides
-        # the Gemini model selector on non-Gemini deployments (#132 / PRD #131).
-        from manga_translator.config import TranslatorConfig
+        # Resolved default translator (env-driven) so consumers can discover the
+        # active translator family — e.g. the Reader hides the Gemini model
+        # selector on non-Gemini deployments (#132 / PRD #131).
+        from manga_translator.config import _default_translator
         return {
             "ready": True,
             "workers": worker_count,
-            "translator": TranslatorConfig().translator.value,
+            "translator": _default_translator().value,
         }
     return JSONResponse(status_code=503, content={"ready": False, "status": "starting"})
 
