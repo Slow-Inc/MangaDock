@@ -366,11 +366,34 @@ export class BooksService {
     return { srcMIT, tgtMIT };
   }
 
+  /** Sanitize a user-supplied Gemini model name for use in the MIT config and
+   *  cache/registry keys. Returns undefined for absent or unsafe values so the
+   *  pipeline falls back to MIT's default model (#87). */
+  private imageModelKey(imageModel?: string): string | undefined {
+    const normalized = this.normalizeGeminiModelName(imageModel);
+    return normalized && /^[\w.-]+$/.test(normalized) ? normalized : undefined;
+  }
+
+  /** Single source of truth for the per-page patch cache key. v4 adds the model
+   *  segment so different image-translation models never share cached patches
+   *  (#87); old v3 entries expire naturally via TTL. */
+  private patchCacheKey(
+    chapterId: string,
+    pageIndex: number,
+    srcMIT: string,
+    tgtMIT: string,
+    imageModel?: string,
+  ): string {
+    const model = this.imageModelKey(imageModel) ?? 'default';
+    return `translate:manga-patches:v4:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}:${model}`;
+  }
+
   /** The registry key for a batch-translate job. MUST be built via mitLangPair
-   *  on every path (start, attach, remove) or cancellation breaks. */
-  private buildJobKey(chapterId: string, sourceLang?: string, targetLang?: string): string {
+   *  on every path (start, attach, remove) or cancellation breaks. Includes the
+   *  image model so two model selections for the same chapter never collide. */
+  private buildJobKey(chapterId: string, sourceLang?: string, targetLang?: string, imageModel?: string): string {
     const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
-    return `${chapterId}:${srcMIT}:${tgtMIT}`;
+    return `${chapterId}:${srcMIT}:${tgtMIT}:${this.imageModelKey(imageModel) ?? 'default'}`;
   }
 
   /**
@@ -390,15 +413,19 @@ export class BooksService {
    *                                             only applies to the local LLM
    *                                             translator via QWEN3_PRECISION).
    */
-  private buildMitConfig(srcMIT: string, tgtMIT: string, sourceIso: string): string {
+  private buildMitConfig(srcMIT: string, tgtMIT: string, sourceIso: string, imageModel?: string): string {
     const intEnv = (name: string, fallback: number): number => {
       const n = Number(process.env[name]);
       return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
     };
+    const model = this.imageModelKey(imageModel);
     return JSON.stringify({
       translator: {
         target_lang: tgtMIT,
         ...(srcMIT !== 'ANY' ? { source_lang: srcMIT, source_lang_only: true } : {}),
+        // Per-request Gemini model override (#87); MIT falls back to its
+        // GEMINI_MODEL env when absent.
+        ...(model ? { model } : {}),
       },
       detector: { detection_size: intEnv('MIT_DETECTION_SIZE', 2048) },
       inpainter: {
@@ -582,14 +609,14 @@ export class BooksService {
     pageUrl: string,
     sourceLang?: string,
     targetLang?: string,
-    opts?: { maxStartupRetries?: number },
+    opts?: { maxStartupRetries?: number; imageModel?: string },
   ): Promise<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }> {
     if (!chapterId || !pageUrl) {
       throw new Error('chapterId and pageUrl are required');
     }
 
     const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
-    const cacheKey = `translate:manga-patches:v3:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}`;
+    const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, opts?.imageModel);
     const cached = await this.cache.get<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }>(cacheKey);
     if (cached?.data?.patches) {
       return cached.data;
@@ -612,7 +639,7 @@ export class BooksService {
     }
     const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-    const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '');
+    const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '', opts?.imageModel);
 
     const maxStartupRetries = opts?.maxStartupRetries ?? 30;
     const startupRetryDelayMs = 5_000;
@@ -709,8 +736,9 @@ export class BooksService {
     sourceLang: string | undefined,
     targetLang: string | undefined,
     listener: BatchPageListener,
+    imageModel?: string,
   ): void {
-    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang);
+    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel);
     const job = this.activeBatchJobs.get(jobKey);
     if (job) {
       job.listeners.delete(listener);
@@ -750,9 +778,10 @@ export class BooksService {
     listener: BatchPageListener,
     sourceLang?: string,
     targetLang?: string,
+    imageModel?: string,
   ): Promise<void> {
     const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
-    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang);
+    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel);
 
     const existing = this.activeBatchJobs.get(jobKey);
 
@@ -800,7 +829,7 @@ export class BooksService {
 
     const uncachedPages: Array<{ pageIndex: number; pageUrl: string }> = [];
     for (const p of pages) {
-      const cacheKey = `translate:manga-patches:v3:${chapterId}:${p.pageIndex}:${srcMIT}:${tgtMIT}`;
+      const cacheKey = this.patchCacheKey(chapterId, p.pageIndex, srcMIT, tgtMIT, imageModel);
       const cached = await this.cache.get<{ patches: PatchEntry[] }>(cacheKey);
       if (cached?.data?.patches) {
         // Serve from cache immediately — direct call, no Redis needed
@@ -860,6 +889,7 @@ export class BooksService {
       jobKey,
       sourceLang,
       targetLang,
+      imageModel,
     )
       .then(() => {
         if (job.completedPages.size >= job.expectedCount) {
@@ -908,6 +938,7 @@ export class BooksService {
     taskId: string,
     sourceLangIso?: string,
     targetLangIso?: string,
+    imageModel?: string,
   ): Promise<void> {
     const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
     const mitUrl = `${mitBaseUrl}/translate/with-form/patches/batch`;
@@ -937,7 +968,7 @@ export class BooksService {
     }
 
     // ── 2. Build multipart form ───────────────────────────────────────────
-    const mitConfig = this.buildMitConfig(srcMIT, tgtMIT, sourceLangIso ?? '');
+    const mitConfig = this.buildMitConfig(srcMIT, tgtMIT, sourceLangIso ?? '', imageModel);
 
     const form = new FormData();
     for (const buf of imageBuffers) {
@@ -969,7 +1000,7 @@ export class BooksService {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT batch fetch failed: ${msg}`);
-      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso);
+      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel);
       return;
     }
 
@@ -988,7 +1019,7 @@ export class BooksService {
     if (!mitRes.ok || !mitRes.body) {
       const errText = await mitRes.text().catch(() => '');
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT HTTP ${mitRes.status}: ${errText.slice(0, 200)}`);
-      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso);
+      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel);
       return;
     }
 
@@ -1084,6 +1115,7 @@ export class BooksService {
                     pageUrl,
                     undefined,
                     targetLangIso,
+                    { imageModel },
                   );
                   if (fallback.patches.length > 0) {
                     this.logger.log(
@@ -1100,7 +1132,7 @@ export class BooksService {
             }
 
             // Cache so single-page endpoint & future batch requests skip MIT
-            const cacheKey = `translate:manga-patches:v3:${chapterId}:${data.pageIndex}:${srcMIT}:${tgtMIT}`;
+            const cacheKey = this.patchCacheKey(chapterId, data.pageIndex, srcMIT, tgtMIT, imageModel);
             await this.cache.setMangaCacheWithTiers(cacheKey, { patches });
 
             this.logger.log(`[BatchPatches] chapter=${chapterId} page=${data.pageIndex} → ${patches.length} patches`);
@@ -1135,7 +1167,7 @@ export class BooksService {
     if (streamFailedError) {
       this.logger.warn(`[BatchPatches] chapter=${chapterId} continuing with per-page fallback after stream failure`);
     }
-    await this._retryMissingPagesIndividually(chapterId, pages, processedPageIndexes, notify, sourceLangIso, targetLangIso);
+    await this._retryMissingPagesIndividually(chapterId, pages, processedPageIndexes, notify, sourceLangIso, targetLangIso, imageModel);
   }
 
   private async _retryMissingPagesIndividually(
@@ -1145,6 +1177,7 @@ export class BooksService {
     notify: (pageIndex: number, result: PageResult) => void,
     sourceLangIso?: string,
     targetLangIso?: string,
+    imageModel?: string,
     signal?: AbortSignal,
   ): Promise<void> {
     const missingPages = pages.filter((p) => !processedPageIndexes.has(p.pageIndex));
@@ -1160,7 +1193,7 @@ export class BooksService {
       try {
         const single = await this.translateMangaPagePatches(
           chapterId, missing.pageIndex, missing.pageUrl, sourceLangIso, targetLangIso,
-          { maxStartupRetries: 3 },
+          { maxStartupRetries: 3, imageModel },
         );
         notify(missing.pageIndex, { patches: single.patches });
         recovered += 1;

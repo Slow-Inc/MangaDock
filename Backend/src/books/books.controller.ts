@@ -165,7 +165,7 @@ export class BooksController {
   async translateMangaPagePatches(
     @Param('chapterId') chapterId: string,
     @Param('pageIndex') pageIndex: string,
-    @Body() body: { pageUrl?: string; sourceLang?: string; targetLang?: string },
+    @Body() body: { pageUrl?: string; sourceLang?: string; targetLang?: string; imageModel?: string },
   ) {
     try {
       return await this.booksService.translateMangaPagePatches(
@@ -174,6 +174,7 @@ export class BooksController {
         body?.pageUrl ?? '',
         body?.sourceLang,
         body?.targetLang,
+        { imageModel: body?.imageModel },
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -199,7 +200,7 @@ export class BooksController {
   @Post('chapters/:chapterId/batch-translate-patches')
   async batchTranslateMangaPatches(
     @Param('chapterId') chapterId: string,
-    @Body() body: { pages?: Array<{ pageIndex: number; pageUrl: string }>; sourceLang?: string; targetLang?: string },
+    @Body() body: { pages?: Array<{ pageIndex: number; pageUrl: string }>; sourceLang?: string; targetLang?: string; imageModel?: string },
     @Res() res: import('express').Response,
   ): Promise<void> {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -221,7 +222,7 @@ export class BooksController {
       if (!res.writableEnded) res.write(': ping\n\n');
     }, 15_000);
 
-    const { sourceLang, targetLang } = body ?? {};
+    const { sourceLang, targetLang, imageModel } = body ?? {};
 
     const listener = (pageIndex: number, result: { patches: unknown[]; error?: string }) => {
       if (!res.writableEnded) {
@@ -232,11 +233,11 @@ export class BooksController {
     // Remove listener on client disconnect — job continues in background
     res.on('close', () => {
       clearInterval(heartbeat);
-      this.booksService.removeBatchListener(chapterId, sourceLang, targetLang, listener);
+      this.booksService.removeBatchListener(chapterId, sourceLang, targetLang, listener, imageModel);
     });
 
     try {
-      await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang);
+      await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang, imageModel);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (!res.writableEnded) {

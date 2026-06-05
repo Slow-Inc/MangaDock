@@ -250,7 +250,10 @@ class TranslatorConfig(BaseModel):
     """Expected source language for region filtering, e.g. ENG, JPN."""
     source_lang_only: bool = False
     """If true, only translate regions whose source language matches source_lang."""
-    
+    model: Optional[str] = None
+    """Per-request model override for API-based translators (e.g. Gemini).
+    Falls back to the translator's env-configured default when absent (#87)."""
+
     # 译后检查配置项
     enable_post_translation_check: bool = True
     """Enable post-translation validation check"""

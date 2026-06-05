@@ -33,12 +33,18 @@ Sent as a `config` **form field** containing a JSON string, on every patch reque
   "translator": {
     "target_lang": "THA",
     "source_lang": "JPN",          // omitted when source is ANY
-    "source_lang_only": true        // omitted when source is ANY
+    "source_lang_only": true,      // omitted when source is ANY
+    "model": "gemini-2.5-pro"      // optional per-request Gemini model (#87);
+                                    // omitted → MIT's GEMINI_MODEL env default
   },
   "inpainter": { "inpainter": "lama_large" },
   "render":    { "direction": "auto", "rtl": false }
 }
 ```
+
+A per-request `model` bypasses Gemini context caching for that request (a cached template is bound to
+the model it was created with). The Backend partitions its patch cache and batch jobKey by model, so
+different model selections never share results.
 
 MIT parses this into its Pydantic `Config` (`manga_translator/config.py`). Unknown keys are ignored.
 

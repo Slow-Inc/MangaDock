@@ -23,6 +23,26 @@ export function getMangaTranslateModelFromStorage(
   return isMangaTranslateModel(value, availableModels) ? value : MANGA_TRANSLATE_MODELS[0];
 }
 
+// ─── Image translation (patch overlay) model selection (#87) ────────────────
+export const MANGA_IMAGE_TRANSLATE_MODEL_KEY = "mangaImageTranslateModel";
+
+/**
+ * The Gemini model the user selected for IMAGE translation, or undefined when
+ * no selection was made — undefined means "let the operator's env default win".
+ * Falls back to the shared text-translation selection so the existing model
+ * selector drives both text and image translation (PRD #87, user story 7).
+ */
+export function getSelectedMangaImageTranslateModel(
+  availableModels: string[] = [...MANGA_TRANSLATE_MODELS],
+): MangaTranslateModel | undefined {
+  if (typeof window === "undefined") return undefined;
+  const imageValue = localStorage.getItem(MANGA_IMAGE_TRANSLATE_MODEL_KEY);
+  if (isMangaTranslateModel(imageValue, availableModels)) return imageValue;
+  const textValue = localStorage.getItem(MANGA_TRANSLATE_MODEL_KEY);
+  if (isMangaTranslateModel(textValue, availableModels)) return textValue;
+  return undefined;
+}
+
 // Module-level cache so Reader components share one fetch
 let _cachedModels: string[] | null = null;
 let _cacheExpiresAt = 0;

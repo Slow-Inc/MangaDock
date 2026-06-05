@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { translateMangaChapterBatchPatches, translateMangaPagePatches, checkMitHealth, type PatchData } from "../lib/mangaTranslatePage";
+import { fetchAvailableMangaModels, getSelectedMangaImageTranslateModel } from "../lib/mangaTranslateModel";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { getHardwareId } from "../lib/fingerprint";
 
@@ -829,6 +830,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     }));
 
     const doneSet = new Set<number>(completedTranslatedPages);
+    // User-selected Gemini model for image translation (#87); undefined = server default
+    const imageModel = getSelectedMangaImageTranslateModel(await fetchAvailableMangaModels());
     try {
       await translateMangaChapterBatchPatches(
         chapterId,
@@ -843,7 +846,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           setTransProgress({ done: doneSet.size, total });
         },
         controller.signal,
-        { sourceLang: currentLang ?? undefined, targetLang },
+        { sourceLang: currentLang ?? undefined, targetLang, imageModel },
       );
     } catch (err) {
       if (!(err instanceof Error && err.name === "AbortError")) {
@@ -883,7 +886,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   setTransProgress({ done: doneSet.size, total });
                 },
                 controller.signal,
-                { sourceLang: currentLang ?? undefined, targetLang },
+                { sourceLang: currentLang ?? undefined, targetLang, imageModel },
               );
             } catch (retryErr) {
               if (retryErr instanceof Error && retryErr.name === "AbortError") break;
@@ -919,6 +922,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       const patches = await translateMangaPagePatches(chapterId, pageIndex, pageUrl, undefined, {
         sourceLang: currentLang ?? undefined,
         targetLang,
+        imageModel: getSelectedMangaImageTranslateModel(await fetchAvailableMangaModels()),
       });
       console.log(`[PageTranslate] Page ${pageIndex + 1} done — ${patches.length} patches:`, patches);
       if (patches.length > 0) {
