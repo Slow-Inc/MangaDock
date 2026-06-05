@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { translateMangaChapterBatchPatches, translateMangaPagePatches, checkMitHealth, type PatchData } from "../lib/mangaTranslatePage";
-import { fetchAvailableMangaModels, getSelectedMangaImageTranslateModel, MANGA_IMAGE_TRANSLATE_MODEL_KEY } from "../lib/mangaTranslateModel";
+import { fetchAvailableMangaModels, fetchImageTranslator, getEffectiveImageModel, isGeminiImageTranslator, MANGA_IMAGE_TRANSLATE_MODEL_KEY } from "../lib/mangaTranslateModel";
 import { useToast } from "../contexts/ToastContext";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { getHardwareId } from "../lib/fingerprint";
@@ -163,6 +163,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   // translate calls read it back via getSelectedMangaImageTranslateModel().
   const [imageModel, setImageModel] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  // Show Gemini model choices only when MIT runs a Gemini-family translator
+  // (#134, PRD #131). Defaults to visible (fail-open) until the flag arrives.
+  const [showModelSelector, setShowModelSelector] = useState(true);
 
   useEffect(() => {
     setImageModel(localStorage.getItem(MANGA_IMAGE_TRANSLATE_MODEL_KEY));
@@ -174,6 +177,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     let alive = true;
     void fetchAvailableMangaModels().then((models) => {
       if (alive) setAvailableModels(models);
+    });
+    void fetchImageTranslator().then((translator) => {
+      if (alive) setShowModelSelector(isGeminiImageTranslator(translator));
     });
     return () => { alive = false; };
   }, [translateMenuOpen, moreMenuOpen, availableModels.length]);
@@ -858,8 +864,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     }));
 
     const doneSet = new Set<number>(completedTranslatedPages);
-    // User-selected Gemini model for image translation (#87); undefined = server default
-    const imageModel = getSelectedMangaImageTranslateModel(await fetchAvailableMangaModels());
+    // User-selected Gemini model (#87), gated on the deployment's translator (#134);
+    // undefined = server default / non-Gemini deployment
+    const imageModel = await getEffectiveImageModel();
     try {
       await translateMangaChapterBatchPatches(
         chapterId,
@@ -957,7 +964,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       const patches = await translateMangaPagePatches(chapterId, pageIndex, pageUrl, undefined, {
         sourceLang: currentLang ?? undefined,
         targetLang,
-        imageModel: getSelectedMangaImageTranslateModel(await fetchAvailableMangaModels()),
+        imageModel: await getEffectiveImageModel(),
       });
       console.log(`[PageTranslate] Page ${pageIndex + 1} done — ${patches.length} patches:`, patches);
       if (patches.length > 0) {
@@ -1209,8 +1216,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       </div>
                     )}
 
-                    {/* Image-translation model selector (#87) */}
-                    {availableModels.length > 0 && (
+                    {/* Image-translation model selector (#87) — Gemini deployments only (#134) */}
+                    {showModelSelector && availableModels.length > 0 && (
                       <div className="mb-1">
                         <div className="mb-1.5 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-white/35">โมเดล AI</div>
                         <div className="flex flex-wrap gap-1 px-1 pb-1">
@@ -1439,8 +1446,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       </div>
                     )}
 
-                    {/* Image-translation model selector (#87) */}
-                    {availableModels.length > 0 && (
+                    {/* Image-translation model selector (#87) — Gemini deployments only (#134) */}
+                    {showModelSelector && availableModels.length > 0 && (
                       <div className="mb-2 flex flex-wrap gap-1">
                         <button
                           onClick={() => selectImageModel(null)}
