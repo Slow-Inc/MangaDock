@@ -5,7 +5,7 @@ import re
 from base64 import b64decode
 from typing import Union
 
-import requests
+import httpx
 from PIL import Image
 from fastapi import Request, HTTPException
 from pydantic import BaseModel
@@ -35,9 +35,11 @@ async def to_pil_image(image: Union[str, bytes]) -> Image.Image:
                 image = Image.open(io.BytesIO(image_data))
                 return image
             else:
-                response = requests.get(image)
-                image = Image.open(io.BytesIO(response.content))
-                return image
+                async with httpx.AsyncClient(timeout=30) as client:
+                    response = await client.get(image)
+                    response.raise_for_status()
+                    image = Image.open(io.BytesIO(response.content))
+                    return image
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
 
