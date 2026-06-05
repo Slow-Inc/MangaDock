@@ -207,7 +207,7 @@ Latest QA APK refresh:
 ```text
 Date: 2026-06-05
 Branch: feat/mobile-shell-phase3
-Commit: #121 beta APK refresh on feat/mobile-shell-phase3
+Source commit: 1c0dd2b docs: record beta apk checksum
 APK: Mobile/build/qa/mangadock-beta-release-prod-domain.apk
 Size: 67,447,494 bytes
 Package: com.mobile
@@ -226,7 +226,7 @@ package: name='com.mobile' versionCode='4' versionName='1.0.1-beta.3' platformBu
 Previous QA APK backup:
 
 ```text
-Mobile/build/qa/mangadock-beta-release-prod-domain.apk.bak-20260605-121035.apk
+Mobile/build/qa/mangadock-beta-release-prod-domain.apk.bak-20260605-162733.apk
 ```
 
 For initial QA, build a release APK that bundles JS:

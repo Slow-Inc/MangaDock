@@ -563,7 +563,8 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 - Version: `versionCode 4`, `versionName 1.0.1-beta.3`
 - Size: 67,447,494 bytes
 - SHA256: `7504D8C8BEBC25F002844DD5034AC7C75D790902108DE91B96B31B644A638EAF`
-- Previous backup: `Mobile/build/qa/mangadock-beta-release-prod-domain.apk.bak-20260605-121035.apk`
+- Source commit for latest refresh: `1c0dd2b docs: record beta apk checksum`
+- Previous backup: `Mobile/build/qa/mangadock-beta-release-prod-domain.apk.bak-20260605-162733.apk`
 
 #### Notes
 - QA APK is still signed with the scaffold release signing config using the debug keystore.
