@@ -86,6 +86,8 @@ interface BatchJobState {
   processingPages: Set<number>;
   /** Active SSE listeners — removed on client disconnect */
   listeners: Set<BatchPageListener>;
+  /** Direct reference to the original SSE caller — guaranteed delivery regardless of Redis state */
+  originalListener?: BatchPageListener;
   /** Total active callers (Redis subscribers + job.listeners members). Used for
    *  abort decision so the count is correct regardless of delivery path. */
   activeCallerCount: number;
@@ -186,15 +188,17 @@ export class BooksService {
 
     const published = await this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...pageResult });
     if (this.redis && published === false) {
-      this.logger.error(`[Webhook] Redis publish failed for job=${jobKey} page=${pageIndex} — SSE client may not receive this result`);
+      this.logger.error(`[Webhook] Redis publish failed for job=${jobKey} page=${pageIndex}`);
     }
     job.processingPages?.delete(pageIndex);
-    // Notify listeners
     job.completedPages.set(pageIndex, pageResult);
-    for (const listener of job.listeners) {
+    // Direct delivery to original SSE caller (guaranteed regardless of Redis state)
+    try { job.originalListener?.(pageIndex, pageResult); } catch { /* caller may be gone */ }
+    // Fan-out to latecomers
+    for (const l of job.listeners) {
       try {
-        listener(pageIndex, pageResult);
-      } catch (err) {
+        l(pageIndex, pageResult);
+      } catch {
         // Listener might have disconnected
       }
     }
@@ -208,6 +212,17 @@ export class BooksService {
 
   private get backendOrigin(): string {
     return (
+      process.env.BACKEND_PUBLIC_ORIGIN ??
+      `http://localhost:${process.env.PORT ?? 3001}`
+    );
+  }
+
+  /** Origin used specifically for MIT webhook callbacks.
+   *  When MIT runs on the same machine as the backend, use localhost
+   *  instead of the public URL to avoid going through Cloudflare Tunnel. */
+  private get mitCallbackOrigin(): string {
+    return (
+      process.env.MIT_CALLBACK_ORIGIN ??
       process.env.BACKEND_PUBLIC_ORIGIN ??
       `http://localhost:${process.env.PORT ?? 3001}`
     );
@@ -717,10 +732,10 @@ export class BooksService {
     const placeholderJob: BatchJobState = {
       completedPages: new Map(),
       processingPages: new Set(),
-      // When Redis is available, original caller receives via pub/sub subscription.
-      // Exclude it from job.listeners to prevent double-delivery from handleMitCallback fan-out.
-      // Latecomers still add themselves to job.listeners via the attach path.
-      listeners: new Set(this.redis ? [] : [listener]),
+      // Latecomers add themselves to job.listeners via the attach path.
+      // Original caller is always delivered directly via originalListener (no Redis dependency).
+      listeners: new Set(),
+      originalListener: listener,
       activeCallerCount: 1,
       promise,
       cancelController,
@@ -735,7 +750,7 @@ export class BooksService {
       const cacheKey = `translate:manga-patches:v3:${chapterId}:${p.pageIndex}:${srcMIT}:${tgtMIT}`;
       const cached = await this.cache.get<{ patches: PatchEntry[] }>(cacheKey);
       if (cached?.data?.patches) {
-        // Serve from cache immediately
+        // Serve from cache immediately — direct call, no Redis needed
         listener(p.pageIndex, { patches: cached.data.patches });
       } else {
         uncachedPages.push(p);
@@ -752,16 +767,18 @@ export class BooksService {
     const job = placeholderJob;
     job.expectedCount = uncachedPages.length;
 
-    // Subscribe to Redis channel so SSE listeners receive results via pub/sub (Option A')
-    const unsubscribeRedis = this.redis?.subscribe(`translate:${jobKey}`, (data: unknown) => {
-      const msg = data as { pageIndex: number; patches?: PatchEntry[]; error?: string };
-      listener(msg.pageIndex, { patches: msg.patches ?? [], ...(msg.error ? { error: msg.error } : {}) });
-    }) ?? (() => {});
+    // Redis pub/sub is used only for cross-instance fan-out (horizontal scale).
+    // Original caller on this instance is delivered directly via originalListener.
+    const unsubscribeRedis = (() => {}) as () => void;
 
-    // 3. Inner notify: store result + publish to Redis (for original caller) + fan-out (for latecomers)
+    // 3. Inner notify: direct delivery to original caller + Redis cross-instance fan-out + latecomers
     const notify = (pageIndex: number, result: PageResult) => {
       job.completedPages.set(pageIndex, result);
+      // Direct, synchronous delivery to original SSE caller — no Redis dependency
+      try { job.originalListener?.(pageIndex, result); } catch { /* listener may be gone */ }
+      // Cross-instance broadcast (for future multi-node setups)
       void this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...result });
+      // Fan-out to latecomers who attached to this job
       for (const l of job.listeners) {
         try {
           l(pageIndex, result);
@@ -809,11 +826,11 @@ export class BooksService {
     } finally {
       clearTimeout(timeoutHandle);
       unsubscribeRedis();
+      job.originalListener = undefined;
       if (this.activeBatchJobs.get(jobKey) === job) {
         this.activeBatchJobs.delete(jobKey);
         this.logger.log(`[BatchRegistry] job=${jobKey} completed & removed from registry`);
       }
-      job.listeners.delete(listener);
     }
   }
 
@@ -879,20 +896,24 @@ export class BooksService {
     // T4-STANDARD Pillar 2: Asynchronous Fire-and-forget preparation
     // Pass taskId and callbackUrl to MIT Server
     form.append('taskId', taskId);
-    form.append('callback_url', `${this.backendOrigin}/webhooks/mit/callback`);
+    form.append('callback_url', `${this.mitCallbackOrigin}/webhooks/mit/callback`);
     if (process.env.MIT_WEBHOOK_SECRET) {
       form.append('callback_secret', process.env.MIT_WEBHOOK_SECRET);
     }
 
-    // ── 3. POST to MIT (no timeout — may take many minutes for large chapters) ──
+    // ── 3. POST to MIT ────────────────────────────────────────────────────────
+    // Do NOT pass the cancel signal here — once MIT accepts the job it processes
+    // asynchronously and sends webhook callbacks even if the SSE caller disconnects.
+    // Passing the signal would kill the TCP connection to MIT mid-POST, causing
+    // MIT's BLAS/Fortran runtime to crash (forrtl error 200: window-CLOSE event).
+    if (signal.aborted) {
+      this.logger.log(`[BatchPatches] chapter=${chapterId} cancelled before MIT submit`);
+      return;
+    }
     let mitRes: Response;
     try {
-      mitRes = await fetch(mitUrl, { method: 'POST', body: form, signal });
+      mitRes = await fetch(mitUrl, { method: 'POST', body: form });
     } catch (err) {
-      if (signal.aborted) {
-        this.logger.log(`[BatchPatches] chapter=${chapterId} cancelled before MIT response`);
-        return;
-      }
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT batch fetch failed: ${msg}`);
       await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso);
