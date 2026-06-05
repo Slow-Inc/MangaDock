@@ -15,7 +15,7 @@ function makeService() {
     set: jest.fn().mockResolvedValue(undefined),
     setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
   };
-  const storage = { put: jest.fn().mockResolvedValue(undefined) };
+  const storage = { put: jest.fn().mockResolvedValue(undefined), list: jest.fn().mockResolvedValue([]), delete: jest.fn().mockResolvedValue(undefined) };
   const service = new BooksService(
     {} as any,
     cache as any,
@@ -100,5 +100,41 @@ describe('BooksService — per-request image translation model (#87)', () => {
     const expectedKey = (service as any).patchCacheKey('ch1', 0, srcMIT, tgtMIT, 'gemini-2.5-pro');
     const writtenKeys = cache.set.mock.calls.map((c: unknown[]) => c[0]);
     expect(writtenKeys).toContain(expectedKey);
+  });
+
+  // Copilot on PR #144 (a latent bug recorded in DONE.md since 2026-06-04):
+  // if persistence throws after processingPages.add, the page stayed locked
+  // forever — the idempotency check saw it as "still processing" on retry.
+  it('a storage failure never locks the page — retries stay possible', async () => {
+    const { service } = makeService();
+    const storage = {
+      put: jest.fn().mockRejectedValue(new Error('disk full')),
+      list: jest.fn().mockResolvedValue([]),
+      delete: jest.fn().mockResolvedValue(undefined),
+    };
+    (service as any).storage = storage;
+    (service as any).patchStore = new (require('./patch-store').PatchStore)(storage, () => 'http://b');
+
+    const jobKey = (service as any).buildJobKey('ch1', 'ja', 'th');
+    const job = {
+      completedPages: new Map(),
+      processingPages: new Set(),
+      listeners: new Set(),
+      activeCallerCount: 1,
+      expectedCount: 1,
+      resolve: jest.fn(),
+      reject: jest.fn(),
+      cancelController: new AbortController(),
+    };
+    (service as any).activeBatchJobs.set(jobKey, job);
+
+    await service.handleMitCallback(jobKey, 0, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [{ x: 1, y: 2, w: 3, h: 4, img_b64: Buffer.from('png').toString('base64') }],
+    });
+
+    expect(job.processingPages.has(0)).toBe(false); // unlocked
+    expect(job.completedPages.get(0)?.error).toBeTruthy(); // surfaced as a page error
   });
 });

@@ -286,11 +286,33 @@ export class BooksController {
           'Referer': 'https://mangadex.org/',
         },
       });
+      // Cap proxied bodies (#139): manga pages are a few MB. The body is read
+      // as a stream and the connection cancelled the moment the cap is crossed —
+      // a lying/missing Content-Length must not buffer unbounded bytes into RAM.
+      const MAX_PROXY_BYTES = 15 * 1024 * 1024;
+      const declaredLength = Number(upstream.headers.get('content-length') ?? 0);
+      if (declaredLength > MAX_PROXY_BYTES || !upstream.body) {
+        return res.status(declaredLength > MAX_PROXY_BYTES ? 413 : 502).send(
+          declaredLength > MAX_PROXY_BYTES ? 'Image too large' : 'Bad Gateway',
+        );
+      }
+      const reader = (upstream.body as unknown as ReadableStream<Uint8Array>).getReader();
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.byteLength;
+        if (received > MAX_PROXY_BYTES) {
+          reader.cancel().catch(() => {});
+          return res.status(413).send('Image too large');
+        }
+        chunks.push(value);
+      }
       const contentType = upstream.headers.get('content-type') ?? 'image/jpeg';
       res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=86400');
-      const buf = await upstream.arrayBuffer();
-      return res.send(Buffer.from(buf));
+      return res.send(Buffer.concat(chunks));
     } catch {
       return res.status(502).send('Bad Gateway');
     }

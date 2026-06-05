@@ -3,6 +3,21 @@ import { RedisService } from './redis.service';
 
 const SECONDS_IN_DAY = 86_400;
 
+/** All four stat writes + their TTLs in one atomic round-trip (#139) — the old
+ *  two-phase write left immortal keys when the process died between the write
+ *  and the EXPIRE batch. Same named-constant Lua pattern as ElectionService.
+ *  KEYS: views, hll, active, manga · ARGV: uid, chapterId, mangaId, ttlSec */
+const RECORD_VIEW_SCRIPT = `
+redis.call('INCR', KEYS[1])
+redis.call('PFADD', KEYS[2], ARGV[1])
+redis.call('SADD', KEYS[3], ARGV[2])
+redis.call('SET', KEYS[4], ARGV[3], 'EX', ARGV[4])
+redis.call('EXPIRE', KEYS[1], ARGV[4])
+redis.call('EXPIRE', KEYS[2], ARGV[4])
+redis.call('EXPIRE', KEYS[3], ARGV[4])
+return 1
+`;
+
 @Injectable()
 export class StatsIncrementService {
   private readonly logger = new Logger(StatsIncrementService.name);
@@ -19,20 +34,19 @@ export class StatsIncrementService {
     const ttl = this.secondsUntilEndOfDay(date);
 
     try {
-      // INCR/PFADD/SADD don't accept TTL — expire is best-effort in a second round-trip.
-      // If the process dies between these two awaits, keys persist until Redis restart.
-      await Promise.all([
-        this.redis.incr(viewsKey),
-        this.redis.pfadd(hllKey, uid),
-        this.redis.sadd(activeKey, chapterId),
-        this.redis.set(mangaKey, mangaId, ttl),
-      ]);
-
-      await Promise.all([
-        this.redis.expire(viewsKey, ttl),
-        this.redis.expire(hllKey, ttl),
-        this.redis.expire(activeKey, ttl),
-      ]);
+      const client = await this.redis.getClient();
+      await (client as any).eval(
+        RECORD_VIEW_SCRIPT,
+        4,
+        viewsKey,
+        hllKey,
+        activeKey,
+        mangaKey,
+        uid,
+        chapterId,
+        mangaId,
+        String(ttl),
+      );
     } catch (err) {
       this.logger.warn(`recordChapterView failed chapter=${chapterId}: ${String(err)}`);
     }
