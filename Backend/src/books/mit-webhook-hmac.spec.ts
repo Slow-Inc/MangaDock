@@ -48,6 +48,21 @@ describe('MitWebhookController — HMAC verification', () => {
     await expect(ctrl.handleCallback(signature, body)).resolves.toEqual({ ok: true });
   });
 
+  // #95 S1: HMAC must be verified over the raw request bytes, not a re-serialized body.
+  // MIT signs its exact serialized payload; re-stringifying the parsed object can differ
+  // byte-for-byte (e.g. Python json.dumps emits 1.0 where JSON.stringify emits 1).
+  it('accepts a signature computed over raw bytes that JSON.stringify would not reproduce', async () => {
+    const { ctrl } = makeController();
+    const raw = Buffer.from(
+      '{"taskId":"job5:ANY:THA","pageIndex":0,"imgWidth":1280.0,"imgHeight":1808.0,"patches":[],"error":null}',
+    );
+    const signature = crypto.createHmac('sha256', SECRET).update(raw).digest('hex');
+    const body = JSON.parse(raw.toString('utf8'));
+    const req = { rawBody: raw } as any;
+
+    await expect(ctrl.handleCallback(signature, body, req)).resolves.toEqual({ ok: true });
+  });
+
   // Cycle 17 — #90 S2: reject webhook when MIT_WEBHOOK_SECRET is not set
   it('returns 401 when MIT_WEBHOOK_SECRET is not configured', async () => {
     delete process.env.MIT_WEBHOOK_SECRET;

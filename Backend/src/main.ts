@@ -38,7 +38,17 @@ async function bootstrap() {
   setupFileLogging();
   // Disable built-in 100KB body-parser limit; MIT webhook bodies contain base64 PNG patches (~1-3MB).
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
-  app.use(json({ limit: '50mb' }));
+  // verify hook captures the raw request bytes so the MIT webhook controller can
+  // check the HMAC over exactly what MIT signed (#95 S1) — re-serializing the
+  // parsed body is not byte-stable across JSON implementations.
+  app.use(
+    json({
+      limit: '50mb',
+      verify: (req, _res, buf) => {
+        (req as { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.use(urlencoded({ extended: true, limit: '50mb' }));
   
   const httpAdapterHost = app.get(HttpAdapterHost);

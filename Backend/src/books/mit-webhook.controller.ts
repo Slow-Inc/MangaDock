@@ -1,4 +1,4 @@
-import { Body, Controller, Header, Headers, HttpException, HttpStatus, Logger, Post } from '@nestjs/common';
+import { Body, Controller, Header, Headers, HttpException, HttpStatus, Logger, Post, Req } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { BooksService } from './books.service';
 
@@ -12,6 +12,7 @@ export class MitWebhookController {
   async handleCallback(
     @Headers('x-mit-signature') signature: string,
     @Body() body: any,
+    @Req() req?: { rawBody?: Buffer },
   ) {
     const secret = process.env.MIT_WEBHOOK_SECRET;
 
@@ -24,8 +25,14 @@ export class MitWebhookController {
         throw new HttpException('Missing signature', HttpStatus.UNAUTHORIZED);
       }
 
+      // #95 S1: verify over the raw request bytes MIT actually signed. Re-serializing
+      // the parsed body can differ byte-for-byte (key order via middleware transforms,
+      // float formatting: Python json.dumps "1.0" vs JSON.stringify "1"). rawBody is
+      // captured by the json() verify hook in main.ts; the stringify fallback only
+      // covers callers without an Express request (e.g. direct unit invocation).
+      const data = req?.rawBody ?? Buffer.from(JSON.stringify(body), 'utf8');
       const hmac = crypto.createHmac('sha256', secret);
-      const digest = hmac.update(JSON.stringify(body)).digest('hex');
+      const digest = hmac.update(data).digest('hex');
       const sigBuf = Buffer.from(signature, 'hex');
       const digBuf = Buffer.from(digest, 'hex');
 
