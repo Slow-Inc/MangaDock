@@ -230,4 +230,98 @@ describe('Native Shell Router', () => {
       ).length,
     ).toBe(0);
   });
+
+  it('lets QA switch beta endpoint mode and reset to production from Native Settings', async () => {
+    const resetOnboarding = jest.fn();
+    let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <NativeShellNavigator
+          initialRouteName="Settings"
+          onResetOnboarding={resetOnboarding}
+        />,
+      );
+    });
+
+    expect(
+      renderer!.root.findByProps({testID: 'native-settings-screen'}),
+    ).toBeTruthy();
+    expect(renderer!.root.findAll(node => node.children.includes('1.0.1-beta.2')).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAll(node => node.children.includes('production')).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAll(node => node.children.includes('https://hayateotsu.space')).length).toBeGreaterThan(0);
+
+    await ReactTestRenderer.act(async () => {
+      renderer!.root
+        .findByProps({testID: 'native-settings-endpoint-local-button'})
+        .props.onPress();
+    });
+
+    expect(renderer!.root.findAll(node => node.children.includes('localEmulator')).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAll(node => node.children.includes('http://10.0.2.2:4000')).length).toBeGreaterThan(0);
+    expect(
+      renderer!.root.findAll(node =>
+        node.children.some(child =>
+          String(child).includes('non-production endpoint'),
+        ),
+      ).length,
+    ).toBeGreaterThan(0);
+
+    await ReactTestRenderer.act(async () => {
+      renderer!.root
+        .findByProps({testID: 'native-settings-reset-production-button'})
+        .props.onPress();
+    });
+
+    expect(renderer!.root.findAll(node => node.children.includes('production')).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAll(node => node.children.includes('https://hayateotsu.space')).length).toBeGreaterThan(0);
+
+    await ReactTestRenderer.act(async () => {
+      renderer!.root
+        .findByProps({testID: 'native-settings-view-onboarding-button'})
+        .props.onPress();
+    });
+
+    expect(
+      renderer!.root.findByProps({testID: 'native-onboarding-screen'}),
+    ).toBeTruthy();
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <NativeShellNavigator
+          initialRouteName="Settings"
+          onResetOnboarding={resetOnboarding}
+        />,
+      );
+    });
+
+    await ReactTestRenderer.act(async () => {
+      renderer!.root
+        .findByProps({testID: 'native-settings-reset-onboarding-button'})
+        .props.onPress();
+    });
+
+    expect(resetOnboarding).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks Native Settings endpoint controls outside beta builds', async () => {
+    let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <NativeShellNavigator
+          initialRouteName="Settings"
+          isBetaEndpointModeEnabled={false}
+        />,
+      );
+    });
+
+    expect(renderer!.root.findAll(node => node.children.includes('production')).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAll(node => node.children.includes('Endpoint locked to production')).length).toBeGreaterThan(0);
+    expect(
+      renderer!.root.findAllByProps({
+        testID: 'native-settings-endpoint-local-button',
+      }),
+    ).toHaveLength(0);
+  });
 });

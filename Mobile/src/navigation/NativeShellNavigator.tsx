@@ -15,6 +15,12 @@ import {
   maskMobileHardwareId,
   type MobileDiagnosticsEvent,
 } from '../mobileDiagnostics';
+import {getViewOnboardingRoute} from '../onboarding/mobileOnboarding';
+import {
+  createEndpointModeState,
+  getEndpointWarning,
+  resetEndpointModeToProduction,
+} from '../settings/mobileSettings';
 import {mobileTheme} from '../theme/mobileTheme';
 import {
   createWebViewRouteLaunch,
@@ -42,8 +48,10 @@ type NativeShellNavigatorProps = {
   diagnosticsHardwareId?: string;
   endpointMode?: string;
   initialRouteName?: NativeShellRouteName;
+  isBetaEndpointModeEnabled?: boolean;
   lastKnownReaderPath?: string;
   onReloadWebView?: () => void;
+  onResetOnboarding?: () => void;
   webViewHealth?: string;
   WebViewComponent?: React.ComponentType<
     NativeStackScreenProps<NativeShellStackParamList, 'WebView'>
@@ -51,20 +59,6 @@ type NativeShellNavigatorProps = {
 };
 
 const Stack = createNativeStackNavigator<NativeShellStackParamList>();
-
-function PlaceholderScreen({
-  label,
-  testID,
-}: {
-  label: string;
-  testID: string;
-}) {
-  return (
-    <View style={styles.screenThemed} testID={testID}>
-      <Text style={styles.title}>{label}</Text>
-    </View>
-  );
-}
 
 function OnboardingScreen({
   navigation,
@@ -247,8 +241,108 @@ function createDiagnosticsScreen({
   return DiagnosticsScreen;
 }
 
-function SettingsScreen() {
-  return <PlaceholderScreen label="Native Settings" testID="native-settings-screen" />;
+function createSettingsScreen({
+  isBetaEndpointModeEnabled = true,
+  onResetOnboarding,
+}: Pick<
+  NativeShellNavigatorProps,
+  'isBetaEndpointModeEnabled' | 'onResetOnboarding'
+>) {
+  function SettingsScreen({
+    navigation,
+  }: NativeStackScreenProps<NativeShellStackParamList, 'Settings'>) {
+    const [endpointState, setEndpointState] = React.useState(() =>
+      createEndpointModeState({
+        isBeta: isBetaEndpointModeEnabled,
+        mode: 'production',
+      }),
+    );
+    const warning = getEndpointWarning(endpointState);
+    const updateEndpointMode = (
+      mode: 'production' | 'localEmulator' | 'custom',
+    ) => {
+      setEndpointState(
+        createEndpointModeState({
+          customUrl: 'http://192.168.1.25:4000',
+          isBeta: isBetaEndpointModeEnabled,
+          mode,
+        }),
+      );
+    };
+
+    return (
+      <View
+        style={[styles.screenThemed, styles.screenStretch]}
+        testID="native-settings-screen"
+      >
+        <Text style={styles.title}>Native Settings</Text>
+        <Text style={styles.body}>{MOBILE_BETA_VERSION_NAME}</Text>
+        <Text style={styles.body}>versionCode {MOBILE_BETA_VERSION_CODE}</Text>
+        <Text style={styles.body}>{endpointState.mode}</Text>
+        <Text style={styles.body}>{endpointState.url}</Text>
+        {!endpointState.editable ? (
+          <Text style={styles.warningText}>Endpoint locked to production</Text>
+        ) : null}
+        {warning ? <Text style={styles.warningText}>{warning}</Text> : null}
+        {endpointState.editable ? (
+          <View style={styles.quickActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => updateEndpointMode('production')}
+              style={styles.secondaryButton}
+              testID="native-settings-endpoint-production-button"
+            >
+              <Text style={styles.secondaryButtonText}>Production endpoint</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => updateEndpointMode('localEmulator')}
+              style={styles.secondaryButton}
+              testID="native-settings-endpoint-local-button"
+            >
+              <Text style={styles.secondaryButtonText}>Local emulator endpoint</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => updateEndpointMode('custom')}
+              style={styles.secondaryButton}
+              testID="native-settings-endpoint-custom-button"
+            >
+              <Text style={styles.secondaryButtonText}>Custom LAN endpoint</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setEndpointState(resetEndpointModeToProduction())}
+              style={styles.primaryButton}
+              testID="native-settings-reset-production-button"
+            >
+              <Text style={styles.primaryButtonText}>Reset production endpoint</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        <View style={styles.quickActions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate(getViewOnboardingRoute())}
+            style={styles.secondaryButton}
+            testID="native-settings-view-onboarding-button"
+          >
+            <Text style={styles.secondaryButtonText}>View onboarding</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onResetOnboarding}
+            style={styles.secondaryButton}
+            testID="native-settings-reset-onboarding-button"
+          >
+            <Text style={styles.secondaryButtonText}>Reset onboarding</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return SettingsScreen;
 }
 
 export function NativeShellNavigator({
@@ -256,8 +350,10 @@ export function NativeShellNavigator({
   diagnosticsHardwareId,
   endpointMode,
   initialRouteName = 'WebView',
+  isBetaEndpointModeEnabled,
   lastKnownReaderPath,
   onReloadWebView,
+  onResetOnboarding,
   webViewHealth,
   WebViewComponent = PlaceholderWebViewScreen,
 }: NativeShellNavigatorProps) {
@@ -282,6 +378,14 @@ export function NativeShellNavigator({
       webViewHealth,
     ],
   );
+  const SettingsComponent = React.useMemo(
+    () =>
+      createSettingsScreen({
+        isBetaEndpointModeEnabled,
+        onResetOnboarding,
+      }),
+    [isBetaEndpointModeEnabled, onResetOnboarding],
+  );
 
   return (
     <View style={styles.container} testID="native-shell-router">
@@ -291,7 +395,7 @@ export function NativeShellNavigator({
           <Stack.Screen name="Home" component={HomeComponent} />
           <Stack.Screen name="WebView" component={WebViewComponent} />
           <Stack.Screen name="Diagnostics" component={DiagnosticsComponent} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Settings" component={SettingsComponent} />
         </Stack.Navigator>
       </NavigationContainer>
     </View>
@@ -366,5 +470,12 @@ const styles = StyleSheet.create({
   eventText: {
     color: mobileTheme.colors.foregroundMuted,
     fontSize: mobileTheme.typography.labelSize,
+  },
+  warningText: {
+    marginTop: mobileTheme.spacing.sm,
+    color: mobileTheme.colors.secondary,
+    fontSize: mobileTheme.typography.bodySize,
+    lineHeight: 20,
+    textAlign: 'center',
   },
 });
