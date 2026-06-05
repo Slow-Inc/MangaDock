@@ -4,6 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Engineering North Star (applies to every agent, every change)
+
+> **Simplest logic that works · easy to maintain · sustainable long-term · good performance.**
+
+Apply it concretely:
+
+- **Remove complexity rather than prop it up.** If a piece of code is fragile/over-built, prefer deleting it for a simpler equivalent over adding a dependency or layer to keep it alive. (e.g. the GPT few-shot lookup was simplified to a direct dict lookup, dropping the `langcodes`/`language_data` dependency entirely instead of installing it.)
+- **Pick the simplest construct that suffices.** Don't reach for heavier machinery than the problem needs (a `set` over an `asyncio.Event` when you only poll a flag; a function over a class for single-use logic).
+- **Extract for testability when it pays off.** Move logic into a small, dependency-light module so it can be unit-tested in isolation (e.g. `server/webhook.py` imports only httpx/json/hmac and tests in <1s, not the 22s ML stack).
+- **Surgical changes.** Touch only what the task requires; match surrounding style; remove only the orphans your own change creates.
+- **Performance counts too** — but don't trade clarity for micro-optimizations that don't matter. Optimize the hot path, keep the rest simple.
+
+When two designs are equally correct, choose the one a future maintainer (human or agent) will understand fastest and that has the fewest moving parts.
+
+---
+
 ## Project Memory (Team Shared)
 
 Memory files live at `.claude/memory/` in this repo — committed so all team members and agents start with full context.
