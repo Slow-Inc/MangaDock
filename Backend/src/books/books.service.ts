@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createHash, randomBytes } from 'crypto';
+import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
@@ -8,6 +8,7 @@ import { ImageCacheService } from '../cache/image-cache.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { MangaDexService } from './mangadex.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import { PatchStore } from './patch-store';
 import { RedisService } from '../cache/redis.service';
 import {
   CACHE_TTL_MS,
@@ -112,6 +113,9 @@ export class BooksService {
   private geminiModelsCatalog: GeminiModel[] | null = null;
   private geminiModelsCatalogExpiresAt = 0;
 
+  /** Single owner of Patch Set files (#137) — deterministic names, legacy sweep. */
+  private readonly patchStore: PatchStore;
+
   constructor(
     private readonly mangaDex: MangaDexService,
     private readonly cache: CacheOrchestratorService,
@@ -119,7 +123,19 @@ export class BooksService {
     private readonly supabase: SupabaseService,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
     @Optional() private readonly redis?: RedisService,
-  ) {}
+  ) {
+    this.patchStore = new PatchStore(this.storage, () => this.backendOrigin);
+  }
+
+  onModuleInit(): void {
+    // Clean the pre-#137 random-named patch backlog on boot, then daily.
+    this.patchStore.startSweeping(
+      (removed) => {
+        if (removed > 0) this.logger.log(`[PatchStore] swept ${removed} legacy patch files`);
+      },
+      (err) => this.logger.warn(`[PatchStore] sweep failed: ${String(err)}`),
+    );
+  }
 
   /**
    * Handle an asynchronous callback from the MIT Server.
@@ -149,34 +165,39 @@ export class BooksService {
 
     let pageResult: PageResult;
 
+    // Persistence failures must surface as a page error, never an exception:
+    // a throw here used to exit before processingPages.delete, permanently
+    // locking the page against retries (latent bug noted 2026-06-04, caught
+    // by review on PR #144).
+    try {
     if (error) {
       pageResult = { patches: [], error };
     } else {
-      // Process patches (save to storage and cache)
-      const patchDir = `uploads/patches/${chapterId}`;
-
       const imgW = result.imgWidth > 0 ? result.imgWidth : 0;
       const imgH = result.imgHeight > 0 ? result.imgHeight : 0;
-      const patches: PatchEntry[] = [];
+
+      // Enforce the per-patch size bound (#95 S3) before handing the accepted
+      // set to PatchStore, which owns naming/lifecycle (#137).
+      const accepted: Array<{ x: number; y: number; w: number; h: number; buf: Buffer }> = [];
       for (const [i, p] of (result.patches || []).entries()) {
         if (p.img_b64.length > 5_000_000) {
           this.logger.warn(`[Webhook] patch ${i} for job=${jobKey} page=${pageIndex} exceeds size limit — skipped`);
           continue;
         }
-        const patchFilename = `${pageIndex}_${i}_${randomBytes(4).toString('hex')}.png`;
-        const key = `${patchDir}/${patchFilename}`;
-        const patchBuf = Buffer.from(p.img_b64, 'base64');
-
-        await this.storage.put(key, patchBuf, { contentType: 'image/png' });
-
-        patches.push({
-          xPct: imgW > 0 ? p.x / imgW : 0,
-          yPct: imgH > 0 ? p.y / imgH : 0,
-          wPct: imgW > 0 ? p.w / imgW : 0,
-          hPct: imgH > 0 ? p.h / imgH : 0,
-          url: `${this.backendOrigin}/${key}`,
-        });
+        accepted.push({ x: p.x, y: p.y, w: p.w, h: p.h, buf: Buffer.from(p.img_b64, 'base64') });
       }
+
+      const urls = await this.patchStore.put(
+        { chapterId, pageIndex, srcMIT, tgtMIT, model: jobModel },
+        accepted.map((a) => a.buf),
+      );
+      const patches: PatchEntry[] = accepted.map((a, i) => ({
+        xPct: imgW > 0 ? a.x / imgW : 0,
+        yPct: imgH > 0 ? a.y / imgH : 0,
+        wPct: imgW > 0 ? a.w / imgW : 0,
+        hPct: imgH > 0 ? a.h / imgH : 0,
+        url: urls[i],
+      }));
 
       // Cache the result — MUST be the same key the batch pre-check and the
       // single-page endpoint read (patchCacheKey), or webhook results are never
@@ -185,6 +206,11 @@ export class BooksService {
       await this.cache.set(cacheKey, { patches }, 1000 * 60 * 60 * 24 * 7); // 7 days
 
       pageResult = { patches };
+    }
+    } catch (persistErr) {
+      const msg = persistErr instanceof Error ? persistErr.message : String(persistErr);
+      this.logger.error(`[Webhook] persistence failed job=${jobKey} page=${pageIndex}: ${msg}`);
+      pageResult = { patches: [], error: `persistence failed: ${msg}` };
     }
 
     const published = await this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...pageResult });
@@ -733,26 +759,19 @@ export class BooksService {
       patches: Array<{ x: number; y: number; w: number; h: number; img_b64: string }>;
     };
 
-    // Save each patch PNG to storage
+    // Persist the Patch Set via PatchStore (#137 — deterministic names, no orphans)
     const { img_width: imgW, img_height: imgH } = patchData;
-    const patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> = [];
-
-    for (let i = 0; i < patchData.patches.length; i += 1) {
-      const p = patchData.patches[i];
-      const pngBuf = Buffer.from(p.img_b64, 'base64');
-      const filename = `${chapterId}-${srcMIT}-${tgtMIT}-p${pageIndex}-r${i}.png`;
-      const key = `uploads/patches/${chapterId}/${filename}`;
-      
-      await this.storage.put(key, pngBuf, { contentType: 'image/png' });
-
-      patches.push({
-        xPct: imgW > 0 ? p.x / imgW : 0,
-        yPct: imgH > 0 ? p.y / imgH : 0,
-        wPct: imgW > 0 ? p.w / imgW : 0,
-        hPct: imgH > 0 ? p.h / imgH : 0,
-        url: `${this.backendOrigin}/${key}`,
-      });
-    }
+    const urls = await this.patchStore.put(
+      { chapterId, pageIndex, srcMIT, tgtMIT, model: this.imageModelKey(opts?.imageModel) },
+      patchData.patches.map((p) => Buffer.from(p.img_b64, 'base64')),
+    );
+    const patches = patchData.patches.map((p, i) => ({
+      xPct: imgW > 0 ? p.x / imgW : 0,
+      yPct: imgH > 0 ? p.y / imgH : 0,
+      wPct: imgW > 0 ? p.w / imgW : 0,
+      hPct: imgH > 0 ? p.h / imgH : 0,
+      url: urls[i],
+    }));
 
     const result = { patches };
     await this.cache.setMangaCacheWithTiers(cacheKey, result);
@@ -1124,24 +1143,17 @@ export class BooksService {
 
             const imgW = data.imgWidth;
             const imgH = data.imgHeight;
-            let patches: PatchEntry[] = [];
-
-            for (let i = 0; i < data.patches.length; i++) {
-              const p = data.patches[i];
-              const pngBuf = Buffer.from(p.img_b64, 'base64');
-              const filename = `${chapterId}-${srcMIT}-${tgtMIT}-p${data.pageIndex}-r${i}.png`;
-              const key = `uploads/patches/${chapterId}/${filename}`;
-
-              await this.storage.put(key, pngBuf, { contentType: 'image/png' });
-
-              patches.push({
-                xPct: imgW > 0 ? p.x / imgW : 0,
-                yPct: imgH > 0 ? p.y / imgH : 0,
-                wPct: imgW > 0 ? p.w / imgW : 0,
-                hPct: imgH > 0 ? p.h / imgH : 0,
-                url: `${this.backendOrigin}/${key}`,
-              });
-            }
+            const pageUrls = await this.patchStore.put(
+              { chapterId, pageIndex: data.pageIndex, srcMIT, tgtMIT, model: this.imageModelKey(imageModel) },
+              data.patches.map((p) => Buffer.from(p.img_b64, 'base64')),
+            );
+            let patches: PatchEntry[] = data.patches.map((p, i) => ({
+              xPct: imgW > 0 ? p.x / imgW : 0,
+              yPct: imgH > 0 ? p.y / imgH : 0,
+              wPct: imgW > 0 ? p.w / imgW : 0,
+              hPct: imgH > 0 ? p.h / imgH : 0,
+              url: pageUrls[i],
+            }));
 
             if (patches.length === 0 && srcMIT !== 'ANY') {
               const pageUrl = pageUrlByIndex.get(data.pageIndex);

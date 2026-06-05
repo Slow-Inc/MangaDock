@@ -2,6 +2,21 @@
 
 ---
 
+## ✅ LEAK SWEEP — #136 #137 #139 (+#138 falsified) — 2026-06-06, /improve-codebase-architecture → /to-issues → /tdd
+
+จากรายงาน architecture review (HTML ใน temp): candidates C1-C7 → issues #136-#143 (สองภาษาตาม convention ใหม่ใน `docs/agents/issue-tracker.md`)
+
+- **#136 MIT page-context**: `reset_page_context()` + เรียกต้น `translate_patches` — หยุด RAM โตไม่จำกัดบน worker singleton + บริบทรั่วข้าม job (`context_size=0` default → ไม่มี behavior change) · `test_page_context.py` (2) · seam จริง = #140 (HITL)
+- **#137 PatchStore**: module เดียวเป็นเจ้าของ `uploads/patches` — ชื่อ deterministic `{src}__{tgt}__{model}__p{N}__r{N}.png` (แปลซ้ำ=เขียนทับ) + ลบ stale regions เมื่อหน้าหดตัว + `sweepLegacy()` กวาด backlog ชื่อ random (boot+รายวัน `.unref`) · 3 call sites ใช้ PatchStore หมด (`uploads/patches` หายจาก books.service) · `patch-store.spec.ts` (5) ด้วย fake ที่เลียน **readdir semantics จริง**
+  - 🎯 **mock-drift จับได้จาก live verify**: fake แรกใช้ prefix-list แต่ `DiskStorageProvider.list` จริง = `readdirSync(dir)` (ระดับเดียว, basename) → sweep เงียบบนดิสก์จริง → แก้ทั้ง module+fake — บทเรียน: fake ต้อง mirror adapter จริง
+  - design note: sweep เป็น legacy-format cleanup (ไม่ใช่ age-based ตาม issue เดิม) เพราะ StorageProvider ไม่มี mtime — ของใหม่ bounded ด้วย overwrite จึงพอ
+- **#139 bundle**: stats `RECORD_VIEW_SCRIPT` Lua เดียว (atomic write+TTL — spec rewrite 4 tests) · ContinueReadingRow timer ref+cleanup (mountedRef ที่ agent อ้างไม่มีจริง) · log tee rollover ข้ามวัน (เจอกับตัวคืน e2e) · img-proxy cap 15MB
+- **#138 falsified ✓ ปิด not-planned**: EventSource อยู่ใน effect + cleanup ครบอยู่แล้ว — Explore agent อ่านพลาด, ผม file ก่อน verify (บทเรียนซ้ำ: verify ทุก finding ของ agent ก่อนใช้)
+- **Specs**: storage mock ทุก books spec เติม `list`/`delete` · ทั้งชุด 50/50 + build 0 + tsc 0
+- **HITL ค้าง**: #140 Translation Session · #141 MitClient+BatchJobRegistry · #143 NDJSON/fan-out ADR · #142 useChapterTranslation (AFK คิวหลัง)
+
+---
+
 ## ✅ PRD #131 → #132+#133+#134 IMPLEMENTED — translator-aware model selector (2026-06-05 ดึก, TDD + live verified)
 
 จาก #130 finding (Qwen deployment เห็น Gemini selector ที่กดแล้วไม่มีผล + เปลือง GPU ข้าม cache partition) — chain เต็ม: /to-prd → /to-issues (3 vertical slices) → /tdd → live verify บน branch `feat/translator-aware-model-selector`

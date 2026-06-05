@@ -269,6 +269,11 @@ export default function ContinueReadingRow() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
   const prevFirstIdRef = useRef<string | null>(null);
+  // Tracked so the new-card animation timer never fires setState after unmount (#139)
+  const newCardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (newCardTimerRef.current) clearTimeout(newCardTimerRef.current);
+  }, []);
 
   const refresh = () => {
     const next = getHistory();
@@ -288,8 +293,9 @@ export default function ContinueReadingRow() {
     // New card at front
     if (next.length > 0 && next[0].id !== prevFirstId) {
       setNewBookId(next[0].id);
-      // Clear after animation completes
-      setTimeout(() => setNewBookId(null), 600);
+      // Clear after animation completes — via ref so unmount cancels it
+      if (newCardTimerRef.current) clearTimeout(newCardTimerRef.current);
+      newCardTimerRef.current = setTimeout(() => setNewBookId(null), 600);
     }
 
     prevCountRef.current = next.length;
