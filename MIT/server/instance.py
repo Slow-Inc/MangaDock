@@ -24,15 +24,6 @@ class ExecutorInstance(BaseModel):
     async def sent_stream(self, image: Image, config: Config, sender: NotifyType):
         await fetch_data_stream("http://"+self.ip+":"+str(self.port)+"/execute/translate", image, config, sender)
 
-    async def sent_batch(self, images: List[Image.Image], config: Config, batch_size: int):
-        """发送批量翻译请求"""
-        return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate_batch", 
-                               {"images": images, "config": config, "batch_size": batch_size})
-
-    async def sent_batch_stream(self, images: List[Image.Image], config: Config, batch_size: int, sender: NotifyType):
-        """发送批量翻译流式请求"""
-        await fetch_data_stream("http://"+self.ip+":"+str(self.port)+"/execute/translate_batch",
-                               {"images": images, "config": config, "batch_size": batch_size}, config, sender)
 
 class Executors:
     def __init__(self):
@@ -46,19 +37,16 @@ class Executors:
     def free_executors(self) -> int:
         return len([item for item in self.list if not item.busy])
 
-    async def _find_instance(self):
-        while True:
-            instance = next((x for x in self.list if x.busy == False), None)
-            if instance is not None:
-                return instance
-            #todo: cricial error: warn should never happen
-            await self.event.wait()
-
     async def find_executor(self) -> ExecutorInstance:
-        async with self.lock:  # Using async with for lock management
-            instance = await self._find_instance()
-            instance.busy = True
-            return instance
+        while True:
+            async with self.lock:
+                instance = next((x for x in self.list if not x.busy), None)
+                if instance is not None:
+                    instance.busy = True
+                    return instance
+            # Release lock before waiting — concurrent callers must not
+            # serialize on the lock while all executors are busy (#106).
+            await self.event.wait()
 
     async def free_executor(self, instance: ExecutorInstance):
         from server.myqueue import task_queue

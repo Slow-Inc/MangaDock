@@ -42,7 +42,6 @@ class Qwen2Translator(OfflineTranslator, ConfigGPT):
 
     _TRANSLATOR_MODEL = os.environ.get('QWEN2_MODEL', 'Qwen/Qwen2-1.5B-Instruct')
     _MODEL_SUB_DIR = os.path.join(OfflineTranslator._MODEL_DIR, OfflineTranslator._MODEL_SUB_DIR, _TRANSLATOR_MODEL)
-    _IS_4_BIT = os.environ.get('QWEN2_4BIT', 'false').lower() in ('1', 'true', 'yes')
 
     def __init__(self):
         OfflineTranslator.__init__(self)
@@ -52,20 +51,14 @@ class Qwen2Translator(OfflineTranslator, ConfigGPT):
         self.config = args.chatgpt_config
 
     async def _load(self, from_lang: str, to_lang: str, device: str):
-        from transformers import (
-            AutoModelForCausalLM,
-            AutoTokenizer,
-            BitsAndBytesConfig
-        )
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from .qwen3 import build_load_kwargs
         self.device = device
-        is_4bit = os.environ.get('QWEN2_4BIT', 'false').lower() in ('1', 'true', 'yes')
-        torch_dtype = os.environ.get('QWEN2_TORCH_DTYPE', 'auto')
-        quantization_config = BitsAndBytesConfig(load_in_4bit=is_4bit)
         model_id = os.environ.get('QWEN2_MODEL', self._TRANSLATOR_MODEL)
+        precision = os.environ.get('QWEN2_PRECISION', 'bf16')
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
-            torch_dtype=torch_dtype,
-            quantization_config=quantization_config,
+            **build_load_kwargs(precision),
             device_map='auto',
         )
         self.model.eval()
@@ -157,4 +150,17 @@ class Qwen2Translator(OfflineTranslator, ConfigGPT):
 class Qwen2BigTranslator(Qwen2Translator):
     _TRANSLATOR_MODEL = os.environ.get('QWEN2_BIG_MODEL', 'Qwen/Qwen2-7B-Instruct')
     _MODEL_SUB_DIR = os.path.join(OfflineTranslator._MODEL_DIR, OfflineTranslator._MODEL_SUB_DIR, _TRANSLATOR_MODEL)
-    _IS_4_BIT = os.environ.get('QWEN2_BIG_4BIT', 'true').lower() in ('1', 'true', 'yes')
+
+    async def _load(self, from_lang: str, to_lang: str, device: str):
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from .qwen3 import build_load_kwargs
+        self.device = device
+        model_id = os.environ.get('QWEN2_BIG_MODEL', self._TRANSLATOR_MODEL)
+        precision = os.environ.get('QWEN2_BIG_PRECISION', os.environ.get('QWEN2_PRECISION', 'bf16'))
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            **build_load_kwargs(precision),
+            device_map='auto',
+        )
+        self.model.eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id)

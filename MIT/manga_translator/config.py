@@ -1,4 +1,5 @@
 import argparse
+import os
 import re
 from enum import Enum
 
@@ -134,6 +135,8 @@ class Translator(str, Enum):
     mbart50 = "mbart50"
     qwen2 = "qwen2"
     qwen2_big = "qwen2_big"
+    qwen3 = "qwen3"
+    qwen3_big = "qwen3_big"
 
     def __str__(self):
         return self.name
@@ -214,9 +217,24 @@ class UpscaleConfig(BaseModel):
     upscale_ratio: Optional[int] = None
     """Image upscale ratio applied before detection. Can improve text detection."""
 
+def _default_translator() -> Translator:
+    t_type = os.environ.get('TRANSLATOR_TYPE')
+    if t_type == 'local':
+        key = os.environ.get('DEFAULT_LOCAL_TRANSLATOR', 'qwen3')
+    elif t_type == 'api':
+        key = os.environ.get('DEFAULT_API_TRANSLATOR', 'gemini')
+    else:
+        key = os.environ.get('DEFAULT_TRANSLATOR', 'gemini')
+    try:
+        return Translator(key)
+    except ValueError:
+        return Translator.gemini
+
+
 class TranslatorConfig(BaseModel):
-    translator: Translator = Translator.sugoi
-    """Language translator to use"""
+    translator: Translator = Field(default_factory=_default_translator)
+    """Language translator to use. Controlled by DEFAULT_TRANSLATOR env var in MIT .env.
+    default_factory so the env is read per instance, not once at import time."""
     target_lang: str = 'ENG' #todo: validate VALID_LANGUAGES #todo: convert to enum
     """Destination language"""
     no_text_lang_skip: bool = False
@@ -233,7 +251,10 @@ class TranslatorConfig(BaseModel):
     """Expected source language for region filtering, e.g. ENG, JPN."""
     source_lang_only: bool = False
     """If true, only translate regions whose source language matches source_lang."""
-    
+    model: Optional[str] = None
+    """Per-request model override for API-based translators (e.g. Gemini).
+    Falls back to the translator's env-configured default when absent (#87)."""
+
     # 译后检查配置项
     enable_post_translation_check: bool = True
     """Enable post-translation validation check"""

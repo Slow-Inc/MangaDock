@@ -5,14 +5,14 @@ import re
 from base64 import b64decode
 from typing import Union
 
-import requests
+import httpx
 from PIL import Image
 from fastapi import Request, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 
 from manga_translator import Config
-from server.myqueue import task_queue, wait_in_queue, QueueElement, BatchQueueElement
+from server.myqueue import task_queue, wait_in_queue, QueueElement
 from server.streaming import notify, stream
 
 class TranslateRequest(BaseModel):
@@ -22,14 +22,6 @@ class TranslateRequest(BaseModel):
     config: Config = Config()
     """in case it is a multipart this needs to be a string(json.stringify)"""
 
-class BatchTranslateRequest(BaseModel):
-    """Batch translation request"""
-    images: list[bytes|str]
-    """List of images, can be URLs, base64 encoded strings, or binary data"""
-    config: Config = Config()
-    """Translation configuration"""
-    batch_size: int = 4
-    """Batch size, default is 4"""
 
 async def to_pil_image(image: Union[str, bytes]) -> Image.Image:
     try:
@@ -43,9 +35,11 @@ async def to_pil_image(image: Union[str, bytes]) -> Image.Image:
                 image = Image.open(io.BytesIO(image_data))
                 return image
             else:
-                response = requests.get(image)
-                image = Image.open(io.BytesIO(response.content))
-                return image
+                async with httpx.AsyncClient(timeout=30) as client:
+                    response = await client.get(image)
+                    response.raise_for_status()
+                    image = Image.open(io.BytesIO(response.content))
+                    return image
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -80,16 +74,3 @@ async def while_streaming(req: Request, transform, config: Config, image: bytes 
     asyncio.create_task(wait_in_queue(task, notify_internal))
     return streaming_response
 
-async def get_batch_ctx(req: Request, config: Config, images: list[str|bytes], batch_size: int = 4):
-    """Process batch translation request"""
-    # Convert images to PIL Image objects
-    pil_images = []
-    for img in images:
-        pil_img = await to_pil_image(img)
-        pil_images.append(pil_img)
-    
-    # Create batch task
-    batch_task = BatchQueueElement(req, pil_images, config, batch_size)
-    task_queue.add_task(batch_task)
-    
-    return await wait_in_queue(batch_task, None)

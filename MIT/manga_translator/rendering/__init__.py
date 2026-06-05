@@ -330,8 +330,8 @@ def render(
     #print(f"Target language: {region.target_lang}")      
     #print(f"Region horizontal: {region.horizontal}")  
     #print(f"Starting image adjustment: r_temp={r_temp}, r_orig={r_orig}, h={h}, w={w}")  
-    if region.horizontal:  
-        #print("Processing HORIZONTAL region")  
+    if render_horizontally:  # use effective direction, not raw detected orientation (#110 R-1)
+        #print("Processing HORIZONTAL region")
         
         if r_temp > r_orig:   
             #print(f"Case: r_temp({r_temp}) > r_orig({r_orig}) - Need vertical padding")  
@@ -402,6 +402,9 @@ def render(
     #src_pts[:, 1] = np.clip(np.round(src_pts[:, 1]), 0, enlarged_h * 2)
 
     M, _ = cv2.findHomography(src_points, dst_points, cv2.RANSAC, 5.0)
+    if M is None:  # degenerate/collinear dst_points (#110 R-2)
+        logger.debug('findHomography returned None (degenerate region), skipping warp')
+        return img
     rgba_region = cv2.warpPerspective(box, M, (img.shape[1], img.shape[0]), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
     x, y, w, h = cv2.boundingRect(dst_points.astype(np.int32))
     x0 = max(0, x)

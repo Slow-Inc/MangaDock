@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MIT — Architecture & Bug Report · MangaDock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #08090d;
+    --surface: #1a1a1a;
+    --surface-2: #131318;
+    --primary: #6366f1;
+    --primary-glow: rgba(99, 102, 241, 0.2);
+    --secondary: #f59e0b;
+    --secondary-glow: rgba(245, 158, 11, 0.2);
+    --fg: #f8f9fb;
+    --fg-muted: rgba(248, 249, 251, 0.45);
+    --fg-dim: rgba(248, 249, 251, 0.7);
+    --border: rgba(255, 255, 255, 0.1);
+    --border-soft: rgba(255, 255, 255, 0.06);
+    --crit: #f43f5e;
+    --crit-glow: rgba(244, 63, 94, 0.16);
+    --sec: var(--secondary);
+    --major: var(--primary);
+    --clean: #34d399;
+    --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+    --sans: 'Noto Sans Thai', -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(99,102,241,0.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 20%, rgba(245,158,11,0.06), transparent 55%),
+      var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 120px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── header ── */
+  header.hero {
+    padding: 72px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-size: 11px; font-weight: 900; letter-spacing: 0.28em;
+    text-transform: uppercase; color: var(--fg-muted); margin-bottom: 18px;
+  }
+  h1 {
+    font-size: clamp(34px, 6vw, 60px); font-weight: 900;
+    letter-spacing: -0.025em; line-height: 1.05;
+  }
+  h1 .accent { color: var(--primary); }
+  .hero p.sub {
+    margin-top: 18px; max-width: 70ch; color: var(--fg-dim); font-size: 16px;
+  }
+  .hero-meta {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px;
+  }
+  .chip {
+    font-size: 12px; font-weight: 600; padding: 7px 13px; border-radius: 9999px;
+    background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+    color: var(--fg-dim);
+  }
+  .chip b { color: var(--fg); font-weight: 700; }
+
+  /* ── nav toc ── */
+  nav.toc {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(14px);
+    background: rgba(8,9,13,0.78);
+    border-bottom: 1px solid var(--border-soft);
+    padding: 12px 0;
+  }
+  nav.toc .wrap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  nav.toc a {
+    font-size: 12.5px; font-weight: 600; color: var(--fg-muted);
+    text-decoration: none; padding: 6px 12px; border-radius: 9px;
+    transition: all 0.18s; border: 1px solid transparent;
+  }
+  nav.toc a:hover { color: var(--fg); background: rgba(255,255,255,0.05); border-color: var(--border); }
+
+  /* ── sections ── */
+  section { padding: 56px 0 8px; }
+  .sec-head { margin-bottom: 30px; }
+  .sec-num {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    color: var(--primary); letter-spacing: 0.1em;
+  }
+  h2 { font-size: clamp(24px, 4vw, 34px); font-weight: 800; letter-spacing: -0.02em; margin-top: 4px; }
+  .sec-head p { color: var(--fg-dim); margin-top: 10px; max-width: 76ch; }
+  h3 { font-size: 19px; font-weight: 700; margin: 34px 0 14px; letter-spacing: -0.01em; }
+  h4 { font-size: 15px; font-weight: 700; margin: 18px 0 8px; color: var(--fg); }
+  p.body { color: var(--fg-dim); margin: 10px 0; max-width: 78ch; }
+
+  /* ── liquid glass card ── */
+  .glass {
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    backdrop-filter: blur(8px);
+  }
+  .glass + .glass { margin-top: 16px; }
+
+  /* ── flow diagram ── */
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 22px 0; }
+  .node {
+    position: relative;
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; background: var(--surface-2);
+  }
+  .node .role {
+    font-size: 10.5px; font-weight: 900; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--fg-muted); margin-bottom: 5px;
+  }
+  .node .title { font-weight: 700; font-size: 15px; }
+  .node .desc { font-size: 13px; color: var(--fg-muted); margin-top: 4px; }
+  .node.f { border-color: rgba(99,102,241,0.4); box-shadow: 0 0 0 1px rgba(99,102,241,0.06) inset; }
+  .node.b { border-color: rgba(245,158,11,0.35); }
+  .node.m { border-color: rgba(52,211,153,0.32); }
+  .connector {
+    align-self: center; width: 2px; height: 26px;
+    background: linear-gradient(var(--border), var(--primary));
+    position: relative;
+  }
+  .connector::after {
+    content: ''; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%);
+    border: 5px solid transparent; border-top-color: var(--primary);
+  }
+  .connector .lbl {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    font-family: var(--mono); font-size: 11px; color: var(--fg-muted); white-space: nowrap;
+  }
+
+  /* horizontal pair */
+  .hpair { display: grid; grid-template-columns: 1fr; gap: 14px; margin: 20px 0; }
+  @media (min-width: 760px) { .hpair { grid-template-columns: 1fr 1fr; } }
+
+  /* numbered steps */
+  ol.steps { list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 10px; margin: 18px 0; }
+  ol.steps li {
+    counter-increment: s; position: relative; padding: 14px 16px 14px 56px;
+    border: 1px solid var(--border-soft); border-radius: 12px; background: rgba(255,255,255,0.02);
+  }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 600; font-size: 13px;
+    background: var(--primary-glow); color: var(--primary); border: 1px solid rgba(99,102,241,0.4);
+  }
+  ol.steps li b { color: var(--fg); }
+  ol.steps li .mono { font-family: var(--mono); font-size: 12.5px; color: var(--secondary); }
+
+  /* code block */
+  pre {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+    background: #0c0d12; border: 1px solid var(--border-soft); border-radius: 12px;
+    padding: 16px 18px; overflow-x: auto; margin: 12px 0; color: #d8dae5;
+  }
+  code.inl {
+    font-family: var(--mono); font-size: 0.88em; background: rgba(255,255,255,0.07);
+    padding: 1.5px 6px; border-radius: 6px; color: #cdd0e0;
+  }
+  .c-bad { color: var(--crit); }
+  .c-good { color: var(--clean); }
+  .c-com { color: var(--fg-muted); }
+  .c-key { color: var(--primary); }
+  .c-str { color: var(--secondary); }
+
+  /* ── severity legend ── */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 24px; }
+  .sev-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 600; padding: 7px 14px; border-radius: 9999px;
+    border: 1px solid var(--border); background: rgba(255,255,255,0.03);
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .dot.crit { background: var(--crit); box-shadow: 0 0 8px var(--crit); }
+  .dot.sec { background: var(--sec); box-shadow: 0 0 8px var(--sec); }
+  .dot.major { background: var(--major); box-shadow: 0 0 8px var(--major); }
+  .dot.clean { background: var(--clean); box-shadow: 0 0 8px var(--clean); }
+
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+  .filter-btn {
+    font-size: 12.5px; font-weight: 600; padding: 7px 14px; border-radius: 9999px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--fg-dim);
+    cursor: pointer; transition: all 0.16s; font-family: var(--sans);
+  }
+  .filter-btn:hover { color: var(--fg); }
+  .filter-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  /* ── bug card ── */
+  .bug {
+    border: 1px solid var(--border); border-radius: 16px; margin-bottom: 16px;
+    overflow: hidden; background: var(--surface-2);
+    border-left-width: 1px;
+  }
+  .bug .bug-top {
+    display: flex; align-items: flex-start; gap: 14px; padding: 18px 20px;
+    cursor: pointer; user-select: none;
+  }
+  .bug .idbadge {
+    font-family: var(--mono); font-weight: 600; font-size: 13px;
+    padding: 5px 10px; border-radius: 8px; flex-shrink: 0;
+    background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  }
+  .bug .bug-title { flex: 1; }
+  .bug .bug-title .t { font-weight: 700; font-size: 15.5px; line-height: 1.35; }
+  .bug .bug-title .loc { font-family: var(--mono); font-size: 11.5px; color: var(--fg-muted); margin-top: 4px; }
+  .sev-tag {
+    font-size: 10.5px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 7px; flex-shrink: 0; white-space: nowrap;
+  }
+  .sev-tag.crit { color: var(--crit); background: var(--crit-glow); border: 1px solid rgba(244,63,94,0.4); }
+  .sev-tag.sec { color: var(--sec); background: var(--secondary-glow); border: 1px solid rgba(245,158,11,0.4); }
+  .sev-tag.major { color: #a5b4fc; background: var(--primary-glow); border: 1px solid rgba(99,102,241,0.4); }
+  .sev-tag.clean { color: var(--clean); background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.35); }
+  .bug.crit { border-left: 3px solid var(--crit); }
+  .bug.sec { border-left: 3px solid var(--sec); }
+  .bug.major { border-left: 3px solid var(--major); }
+  .bug.clean { border-left: 3px solid var(--clean); }
+  .bug .bug-body {
+    padding: 0 20px 20px; display: none;
+    border-top: 1px solid var(--border-soft);
+  }
+  .bug.open .bug-body { display: block; }
+  .bug .bug-body .grid {
+    display: grid; gap: 14px; margin-top: 16px;
+  }
+  @media (min-width: 720px) { .bug .bug-body .grid { grid-template-columns: 1fr 1fr; } }
+  .panel { border: 1px solid var(--border-soft); border-radius: 11px; padding: 13px 15px; background: rgba(255,255,255,0.015); }
+  .panel .ph {
+    font-size: 10.5px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--fg-muted); margin-bottom: 7px;
+  }
+  .panel.impact { border-color: rgba(244,63,94,0.22); background: rgba(244,63,94,0.04); }
+  .panel.impact .ph { color: var(--crit); }
+  .panel p { font-size: 13.5px; color: var(--fg-dim); }
+  .expand-hint { font-size: 11px; color: var(--fg-muted); font-family: var(--mono); }
+
+  /* ── grill ── */
+  .qcard { border: 1px solid var(--border); border-radius: 16px; margin-bottom: 18px; background: var(--surface-2); overflow: hidden; }
+  .qcard .qhead { padding: 18px 22px; border-bottom: 1px solid var(--border-soft); }
+  .qcard .qnum { font-family: var(--mono); font-size: 12px; color: var(--secondary); font-weight: 600; }
+  .qcard .qtitle { font-weight: 700; font-size: 17px; margin-top: 5px; letter-spacing: -0.01em; }
+  .qcard .qctx { font-size: 13.5px; color: var(--fg-muted); margin-top: 8px; }
+  .choices { padding: 16px 22px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .choice {
+    display: flex; gap: 13px; align-items: flex-start; padding: 13px 15px;
+    border: 1px solid var(--border); border-radius: 12px; cursor: pointer;
+    transition: all 0.16s; background: rgba(255,255,255,0.015);
+  }
+  .choice:hover { border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.04); }
+  .choice .mark {
+    width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--fg-muted);
+    flex-shrink: 0; margin-top: 2px; position: relative; transition: all 0.16s;
+  }
+  .choice.sel .mark { border-color: var(--primary); }
+  .choice.sel .mark::after {
+    content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--primary);
+  }
+  .choice.sel { border-color: var(--primary); background: var(--primary-glow); }
+  .choice .ctext .cl { font-weight: 600; font-size: 14px; }
+  .choice .ctext .cd { font-size: 12.5px; color: var(--fg-muted); margin-top: 3px; }
+  .rec-badge {
+    display: inline-block; font-size: 9.5px; font-weight: 900; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 6px; margin-left: 8px;
+    background: rgba(52,211,153,0.14); color: var(--clean); border: 1px solid rgba(52,211,153,0.4);
+    vertical-align: middle;
+  }
+  .choice.rec { border-color: rgba(52,211,153,0.4); }
+
+  .callout {
+    border: 1px solid rgba(99,102,241,0.35); border-radius: 14px; padding: 16px 20px;
+    background: linear-gradient(180deg, rgba(99,102,241,0.08), rgba(99,102,241,0.02));
+    margin: 18px 0;
+  }
+  .callout .ch { font-weight: 700; font-size: 14px; color: #a5b4fc; margin-bottom: 6px; }
+  .callout p { font-size: 13.5px; color: var(--fg-dim); }
+
+  table.tbl { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13.5px; }
+  table.tbl th, table.tbl td { text-align: left; padding: 11px 13px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  table.tbl th { font-size: 10.5px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-muted); }
+  table.tbl td b { color: var(--fg); }
+  table.tbl tr:last-child td { border-bottom: none; }
+
+  footer { margin-top: 70px; padding-top: 28px; border-top: 1px solid var(--border); color: var(--fg-muted); font-size: 12.5px; }
+
+  .pill-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .mini { font-family: var(--mono); font-size: 11px; padding: 4px 9px; border-radius: 7px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-soft); color: var(--fg-dim); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">MangaDock · Manga Image Translator</div>
+    <h1>MIT <span class="accent">Architecture</span><br />&amp; Bug Report</h1>
+    <p class="sub">หลักการทำงานทั้งหมดของระบบแปลภาพ (MIT) แบบเห็นภาพ พร้อมรายงานบั๊กทุกจุดจากการ scrutinize และคำถามออกแบบ (grill) สำหรับการแก้ Issue #100 — webhook delivery resilience</p>
+    <div class="hero-meta">
+      <span class="chip">Scrutinized: <b>~46,000 LOC</b></span>
+      <span class="chip">Issues filed: <b>#100 – #111</b></span>
+      <span class="chip">Critical: <b>2</b></span>
+      <span class="chip">Security: <b>2</b></span>
+      <span class="chip">Scope: <b>logic only · model AI excluded</b></span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#overview">ภาพรวม</a>
+    <a href="#architecture">สถาปัตยกรรม</a>
+    <a href="#pipeline">Pipeline การแปล</a>
+    <a href="#webhook">Webhook Path</a>
+    <a href="#fixed">แก้ไปแล้ว</a>
+    <a href="#bugs">Bug Report</a>
+    <a href="#grill">Grill: #100</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ───────────── OVERVIEW ───────────── -->
+<section id="overview">
+  <div class="sec-head">
+    <div class="sec-num">00 — CONTEXT</div>
+    <h2>ภาพรวม</h2>
+    <p>MangaDock มี 3 services: <b>Frontend</b> (Next.js), <b>Backend</b> (NestJS) และ <b>MIT</b> (Python ML server) เอกสารนี้โฟกัสที่ <b>MIT</b> และเส้นทาง <b>Batch Translation</b> (แปลทั้งตอน) ซึ่งเป็นจุดที่เกิดอาการ “แปลเสร็จแต่หน้าจอขึ้น 0/20”</p>
+  </div>
+
+  <div class="hpair">
+    <div class="node f"><div class="role">Frontend · :4000</div><div class="title">Next.js 16 + React 19</div><div class="desc">UI, SSE consumer, วาด patch overlay บนรูปต้นฉบับ</div></div>
+    <div class="node b"><div class="role">Backend · :4001</div><div class="title">NestJS 11</div><div class="desc">Job registry, SSE, รับ webhook, cache, แปลข้อความ (Gemini)</div></div>
+  </div>
+  <div class="hpair" style="grid-template-columns:1fr;">
+    <div class="node m"><div class="role">MIT · :5003 / :5004</div><div class="title">Manga Image Translator (Python)</div><div class="desc">OCR → ตรวจจับข้อความ → แปล → inpaint → render เป็น PNG patch · <b>เป็นจุดที่บั๊กทั้งหมดในรายงานนี้อยู่</b></div></div>
+  </div>
+
+  <div class="callout">
+    <div class="ch">โดเมนภาษา (Ubiquitous Language)</div>
+    <p><b>Patch</b> = PNG ของข้อความที่แปลแล้ว 1 region (พิกัด % 0–1) · <b>Patch Set</b> = patch ทั้งหมดของ 1 หน้า · <b>Batch Job</b> = งานแปลทั้งตอน (key = <code class="inl">chapterId:srcMIT:tgtMIT</code>) · <b>MIT Webhook</b> = HTTP POST ที่ MIT ส่งผลแต่ละหน้ากลับ Backend</p>
+  </div>
+</section>
+
+<!-- ───────────── ARCHITECTURE ───────────── -->
+<section id="architecture">
+  <div class="sec-head">
+    <div class="sec-num">01 — ARCHITECTURE</div>
+    <h2>สถาปัตยกรรมภายใน MIT</h2>
+    <p>MIT รันเป็น <b>2 process</b> เพื่อแยกงาน ML ที่หนักออกจาก HTTP layer (T4-STANDARD Pillar 4: Worker Memory Contract)</p>
+  </div>
+
+  <div class="flow">
+    <div class="node b"><div class="role">Backend</div><div class="title">ส่ง page URLs ทั้งหมด + callback_url</div><div class="desc">POST /translate/with-form/patches/batch</div></div>
+    <div class="connector"><span class="lbl">HTTP (multipart)</span></div>
+    <div class="node m"><div class="role">MIT — Web Server · server/main.py · :5003</div><div class="title">คิวงาน + executor pool + ส่ง webhook</div><div class="desc">run_batch_with_callbacks() · send_webhook() · myqueue.py</div></div>
+    <div class="connector"><span class="lbl">pickle over HTTP (localhost)</span></div>
+    <div class="node m"><div class="role">MIT — Worker · mode/share.py · :5004</div><div class="title">โหลด ML models + แปลจริง</div><div class="desc">translate_patches() → คืน Patch Set (detect · ocr · translate · inpaint · render)</div></div>
+  </div>
+
+  <div class="glass">
+    <h4>ทำไมต้องแยก 2 process?</h4>
+    <p class="body">Web Server ต้องตอบ HTTP เร็วและรับงานขนานได้ ส่วน Worker ถือ ML models (GPU) ที่กิน RAM/VRAM มหาศาล การแยกทำให้ web layer ไม่ตายตาม worker และ restart worker ได้โดยไม่กระทบ HTTP — แต่การสื่อสารใช้ <code class="inl">pickle over HTTP</code> ซึ่งเป็นที่มาของบั๊กความปลอดภัย <b>#103</b></p>
+  </div>
+</section>
+
+<!-- ───────────── PIPELINE ───────────── -->
+<section id="pipeline">
+  <div class="sec-head">
+    <div class="sec-num">02 — TRANSLATION PIPELINE</div>
+    <h2>Pipeline การแปล 1 หน้า</h2>
+    <p>เมื่อ Worker รับรูป 1 หน้า มันวิ่งผ่าน stage ต่อไปนี้ใน <code class="inl">translate_patches()</code> แต่ละ stage มี try/except + <code class="inl">ignore_errors</code> กันล้ม</p>
+  </div>
+
+  <ol class="steps">
+    <li><b>Colorize / Upscale</b> <span class="c-com">(ข้ามถ้าไม่เปิด)</span> — เตรียมรูป</li>
+    <li><b>Detection</b> <span class="mono">_run_detection</span> — หา textline (กล่องข้อความ) + mask</li>
+    <li><b>OCR</b> <span class="mono">_run_ocr</span> — อ่านตัวอักษรในแต่ละกล่อง</li>
+    <li><b>Textline Merge</b> <span class="mono">textline_merge.dispatch</span> — รวมกล่องที่อยู่ใกล้กันเป็น region · <span class="c-bad">บั๊ก #111 (prob)</span></li>
+    <li><b>Text Translation</b> <span class="mono">_run_text_translation → dispatch → Gemini / Qwen3</span> · <span class="c-bad">บั๊ก #107 / #108</span></li>
+    <li><b>Post-translation Check</b> <span class="mono">_check_target_language_ratio</span> — ตรวจคุณภาพ · <span class="c-bad">บั๊ก #109</span></li>
+    <li><b>Per-region: Mask → Inpaint → Render</b> <span class="mono">rendering.dispatch</span> — ลบข้อความเดิม + วาดคำแปล · <span class="c-bad">บั๊ก #110</span></li>
+    <li><b>Encode PNG</b> — ได้ <b>Patch Set</b> คืนกลับ Web Server</li>
+  </ol>
+
+  <div class="callout">
+    <div class="ch">จุดสำคัญ</div>
+    <p>Pipeline แกนหลัก (translate_patches + patch helpers) เขียน<b>ดีและกันล้มครบ</b> — บั๊กส่วนใหญ่อยู่ที่ <b>translator layer</b> (Gemini/sample cache) และ <b>การส่งผลกลับ</b> (webhook) ไม่ใช่ตัว ML</p>
+  </div>
+</section>
+
+<!-- ───────────── WEBHOOK ───────────── -->
+<section id="webhook">
+  <div class="sec-head">
+    <div class="sec-num">03 — WEBHOOK DELIVERY</div>
+    <h2>เส้นทาง Webhook (โดเมนของ #100)</h2>
+    <p>หลังแปลเสร็จแต่ละหน้า MIT ต้องส่ง Patch Set กลับ Backend ผ่าน webhook — นี่คือจุดที่ Patch Set “หาย” จนเกิดอาการ 0/20</p>
+  </div>
+
+  <ol class="steps">
+    <li>Frontend กด “แปลทั้งตอน” → <span class="mono">POST /books/chapters/:id/batch-translate-patches</span> (เปิด SSE)</li>
+    <li>Backend register <b>Batch Job</b> → ส่ง page URLs + <span class="mono">callback_url</span> ไป MIT → MIT ตอบ <b>202</b> ทันที</li>
+    <li>MIT <span class="mono">run_batch_with_callbacks()</span> วน per page เบื้องหลัง: แปล → <span class="mono">send_webhook()</span></li>
+    <li>Backend <span class="mono">/webhooks/mit/callback</span> → เซฟ patch + cache + notify SSE → Frontend วาด overlay</li>
+  </ol>
+
+  <h3>โค้ดปัจจุบันของ <code class="inl">send_webhook()</code> — จุดที่ #100 จะแก้</h3>
+  <pre><span class="c-key">async def</span> send_webhook(url, secret, payload):
+    data = json.dumps(payload, ...).encode(<span class="c-str">"utf-8"</span>)
+    headers = {<span class="c-str">"Content-Type"</span>: <span class="c-str">"application/json"</span>}
+    <span class="c-key">if</span> secret:
+        headers[<span class="c-str">"x-mit-signature"</span>] = hmac_sign(secret, data)
+
+    <span class="c-key">async with</span> httpx.AsyncClient() <span class="c-key">as</span> client:
+        <span class="c-key">try</span>:
+            <span class="c-bad">await client.post(url, content=data, headers=headers, timeout=60.0)</span>  <span class="c-com"># ① ไม่เช็ค status</span>
+        <span class="c-key">except</span> Exception <span class="c-key">as</span> e:
+            <span class="c-bad">print(f"Webhook delivery failed to {url}: ...")</span>  <span class="c-com"># ② fail = print แล้วทิ้ง ไม่ retry</span></pre>
+
+  <div class="hpair">
+    <div class="panel impact"><div class="ph">① ไม่เช็ค HTTP status</div><p>Backend ตอบ 500 / 413 → MIT ถือว่า “สำเร็จ” เพราะ <code class="inl">post()</code> ไม่ throw บน non-2xx</p></div>
+    <div class="panel impact"><div class="ph">② fail = print ไม่ retry</div><p>network blip / backend restart / 5xx ชั่วคราว → Patch Set หายทันที ไม่มี retry, ไม่มี dead-letter</p></div>
+  </div>
+
+  <div class="callout">
+    <div class="ch">ทำไมถึงเป็น “0/20”</div>
+    <p>GPU แปลครบทุกหน้าจริง แต่ผลส่งไม่ถึง Backend → SSE ไม่มีข้อมูล → Frontend ค้างที่ 0/20 และ <b>ไม่มี reconciliation</b> ที่จะดึงหน้าที่หายกลับมา (ตาม CONTEXT.md) — <b>#100 retry คือแนวป้องกันเดียว</b></p>
+  </div>
+</section>
+
+<!-- ───────────── ALREADY FIXED ───────────── -->
+<section id="fixed">
+  <div class="sec-head">
+    <div class="sec-num">04 — ALREADY FIXED</div>
+    <h2>แก้ไปแล้วใน session นี้ (Backend / config)</h2>
+    <p>ก่อนจะ scrutinize เจอบั๊ก #100–#111 มีการแก้ root cause ชั้นแรกของอาการ 0/20 และ Cloudflare 524 ไปแล้ว — ทั้งหมด build ผ่าน (<code class="inl">nest build</code> EXIT 0)</p>
+  </div>
+  <table class="tbl">
+    <thead><tr><th>จุด</th><th>ปัญหา</th><th>การแก้</th></tr></thead>
+    <tbody>
+      <tr><td><b>MIT Callback Origin</b></td><td>callback_url ใช้ public Cloudflare URL ที่ MIT (localhost) reach ไม่ได้</td><td>เพิ่ม <code class="inl">MIT_CALLBACK_ORIGIN=http://localhost:4001</code></td></tr>
+      <tr><td><b>Webhook HMAC</b></td><td>controller reject ทุก webhook เมื่อ secret ไม่ได้ตั้ง</td><td>ทำ HMAC optional — ไม่มี secret = accept</td></tr>
+      <tr><td><b>MIT crash on cancel</b></td><td>ส่ง cancel signal เข้า fetch → kill TCP → MIT BLAS crash (forrtl 200)</td><td>ถอด signal + pre-check ก่อน submit</td></tr>
+      <tr><td><b>Payload too large</b></td><td>webhook body (base64 PNG ~1–3MB) เกิน body-parser 100KB → 413</td><td>ตั้ง <code class="inl">json({ limit: '50mb' })</code></td></tr>
+      <tr><td><b>Result wrapper mismatch</b></td><td>MIT ส่ง flat payload แต่ controller คาด <code class="inl">body.result</code> → <code class="inl">undefined.imgWidth</code> crash</td><td>controller อ่าน flat fields (anti-corruption layer)</td></tr>
+      <tr><td><b>Cloudflare 524</b></td><td>SSE ไม่มี byte ไหล ~100s → Cloudflare timeout</td><td>เพิ่ม initial byte + heartbeat <code class="inl">: ping</code> ทุก 15s</td></tr>
+    </tbody>
+  </table>
+  <p class="body"><b>หมายเหตุ:</b> การแก้เหล่านี้จำเป็นแต่<b>ไม่พอ</b> — ถ้า webhook fail ชั่วคราว Patch Set ก็ยังหายเพราะ <b>#100</b> (ไม่ retry)</p>
+</section>
+
+<!-- ───────────── BUGS ───────────── -->
+<section id="bugs">
+  <div class="sec-head">
+    <div class="sec-num">05 — BUG REPORT</div>
+    <h2>บั๊กที่เจอ (#100 – #111)</h2>
+    <p>จากการ scrutinize logic ทั้งหมด (ยกเว้น model AI) คลิกการ์ดเพื่อดูรายละเอียด · กรองตามความรุนแรงได้</p>
+  </div>
+
+  <div class="legend">
+    <span class="sev-pill"><span class="dot crit"></span> Critical — กระทบอาการจริง</span>
+    <span class="sev-pill"><span class="dot sec"></span> Security</span>
+    <span class="sev-pill"><span class="dot major"></span> Major — bug จริง</span>
+    <span class="sev-pill"><span class="dot clean"></span> Cleanup — dead code</span>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" data-f="all">ทั้งหมด (12)</button>
+    <button class="filter-btn" data-f="crit">Critical</button>
+    <button class="filter-btn" data-f="sec">Security</button>
+    <button class="filter-btn" data-f="major">Major</button>
+    <button class="filter-btn" data-f="clean">Cleanup</button>
+  </div>
+
+  <div id="buglist">
+
+    <!-- 100 -->
+    <article class="bug crit" data-sev="crit">
+      <div class="bug-top">
+        <span class="idbadge">#100</span>
+        <div class="bug-title">
+          <div class="t">send_webhook ไม่ retry และกลืน error → Patch Set หายถาวร</div>
+          <div class="loc">server/main.py · send_webhook()</div>
+        </div>
+        <span class="sev-tag crit">Critical</span>
+      </div>
+      <div class="bug-body">
+        <p class="body">webhook ยิงครั้งเดียว ไม่เช็ค status ถ้า fail แค่ <code class="inl">print</code> แล้วทิ้ง</p>
+        <div class="grid">
+          <div class="panel"><div class="ph">Root cause</div><p>non-2xx ไม่ throw + except แค่ print ไม่ retry ไม่มี dead-letter</p></div>
+          <div class="panel impact"><div class="ph">Impact</div><p><b>คือสาเหตุของ “0/20”</b> — GPU แปลครบ แต่ผลส่งไม่ถึง Backend หายถาวร (ไม่มี reconciliation)</p></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 101 -->
+    <article class="bug crit" data-sev="crit">
+      <div class="bug-top">
+        <span class="idbadge">#101</span>
+        <div class="bug-title">
+          <div class="t">ยกเลิก Batch ไม่ propagate ไป MIT → zombie job เผา GPU</div>
+          <div class="loc">server/main.py · run_batch_with_callbacks · DummyRequest.is_disconnected</div>
+        </div>
+        <span class="sev-tag crit">Critical</span>
+      </div>
+      <div class="bug-body">
+        <p class="body"><code class="inl">DummyRequest.is_disconnected()</code> return False เสมอ → MIT ไม่มีทางรู้ว่า user ยกเลิก</p>
+        <div class="grid">
+          <div class="panel"><div class="ph">Root cause</div><p>webhook path ใช้ stub request ที่บอกว่า “ยัง connect อยู่” ตลอด → ไม่ self-cancel</p></div>
+          <div class="panel impact"><div class="ph">Impact</div><p>ยกเลิกแล้ว MIT แปลต่อครบ 20 หน้า เผา GPU; retry chapter เดิม → 2 background task ชนกัน = ที่มาของ “cancel แล้วแย่ลง”</p></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 102 -->
+    <article class="bug sec" data-sev="sec">
+      <div class="bug-top">
+        <span class="idbadge">#102</span>
+        <div class="bug-title">
+          <div class="t">Path traversal + endpoint จัดการไฟล์ไม่มี auth</div>
+          <div class="loc">server/main.py · /result/{folder} · /results/{folder} · /results/clear</div>
+        </div>
+        <span class="sev-tag sec">Security</span>
+      </div>
+      <div class="bug-body">
+        <p class="body"><code class="inl">result_dir / folder_name</code> กับ <code class="inl">folder_name = "../.."</code> → หลุดออกนอก RESULT_ROOT</p>
+        <div class="grid">
+          <div class="panel"><div class="ph">Root cause</div><p>ไม่ validate folder name; endpoint เปิด unauthenticated บน 0.0.0.0</p></div>
+          <div class="panel impact"><div class="ph">Impact</div><p>อ่าน / ลบ directory นอก RESULT_ROOT ได้ (มี <code class="inl">shutil.rmtree</code>)</p></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 103 -->
+    <article class="bug sec" data-sev="sec">
+      <div class="bug-top">
+        <span class="idbadge">#103</span>
+        <div class="bug-title">
+          <div class="t">Worker รับ pickle ผ่าน HTTP + bind 0.0.0.0 → RCE risk</div>
+          <div class="loc">sent_data_internal.py · mode/share.py · start_translator_client_proc</div>
+        </div>
+        <span class="sev-tag sec">Security</span>
+      </div>
+      <div class="bug-body">
+        <p class="body"><code class="inl">pickle.loads</code> ของ request body จาก network = arbitrary code execution</p>
+        <div class="grid">
+          <div class="panel"><div class="ph">Root cause</div><p>worker ถูก spawn ด้วย <code class="inl">--host 0.0.0.0</code> → endpoint รับ pickle เข้าถึงได้จาก network</p></div>
+          <div class="panel impact"><div class="ph">Impact</div><p>RCE ถ้า port worker (5004) เปิด public · แก้: bind 127.0.0.1 เท่านั้น</p></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 104 -->
+    <article class="bug major" data-sev="major">
+      <div class="bug-top">
+        <span class="idbadge">#104</span>
+        <div class="bug-title">
+          <div class="t">Batch endpoints พังบน call (arity ผิด + stub)</div>
+          <div class="loc">server/instance.py · sent_batch · server/main.py · simple_execute_batch</div>
+        </div>
+        <span class="sev-tag major">Major</span>
+      </div>
+      <div class="bug-body">
+        <p class="body"><code class="inl">sent_batch</code> เรียก <code class="inl">fetch_data</code> ผิดจำนวน arg → TypeError; execute_batch เป็น stub คืน object ที่ serialize ไม่ได้</p>
+        <div class="grid">
+          <div class="panel"><div class="ph">Root cause</div><p>abandoned scaffolding — ไม่ใช่ production patch path</p></div>
+          <div class="panel"><div class="ph">Impact</div><p>endpoint crash ทุกครั้งที่ถูกเรียก · แนะนำลบหรือซ่อม</p></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 105 -->
+    <article class="bug clean" data-sev="clean">
+      <div class="bug-top">
+        <span class="idbadge">#105</span>
+        <div class="bug-title">
+          <div class="t">Dead code / redundant imports (+2 comments)</div>
+          <div class="loc">main.py · myqueue.py · translators/__init__ · common.py · config_gpt.py</div>
+        </div>
+        <span class="sev-tag clean">Cleanup</span>
+      </div>
+      <div class="bug-body">
+        <p class="body">รวม dead code ทั้งหมด ไม่กระทบ runtime</p>
+        <div class="pill-row">
+          <span class="mini">duplicate imports</span>
+          <span class="mini">String(e) JS leftover</span>
+          <span class="mini">start_instance=True override</span>
+          <span class="mini">no-op if length&gt;10</span>
+          <span class="mini">dead __del__</span>
+          <span class="mini">== 'cancel' (list)</span>
+          <span class="mini">dispatch dead langid</span>
+          <span class="mini">_load ประกาศซ้ำ</span>
+          <span class="mini">dead _json_sample local</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- 106 -->
+    <article class="bug major" data-sev="major">
+      <div class="bug-top">
+        <span class="idbadge">#106</span>
+        <div class="bug-title">
+          <div class="t">Event-loop blocking &amp; unbounded waits</div>
+          <div class="loc">instance.py · request_extraction.py · streaming.py (+ gemini_2stage.py)</div>
+        </div>
+        <span class="sev-tag major">Major</span>
+      </div>
+      <div class="bug-body">
+        <div class="grid">
+          <div class="panel"><div class="ph">3 จุด</div><p>① <code class="inl">find_executor</code> ถือ lock คร่อม await · ② <code class="inl">requests.get</code> sync ใน async (URL fetch) · ③ streaming <code class="inl">messages.get()</code> ไม่มี timeout</p></div>
+          <div class="panel impact"><div class="ph">Impact</div><p>blocking I/O หยุด event loop = stall ทุก request/webhook พร้อมกัน; gemini_2stage ใช้ sync OpenAI ก็เป็นแบบเดียวกัน</p></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 107 -->
+    <article class="bug major" data-sev="major">
+      <div class="bug-top">
+        <span class="idbadge">#107</span>
+        <div class="bug-title">
+          <div class="t">GeminiTranslator crash retry path เอง (UnboundLocalError) + 3 bug</div>
+          <div class="loc">translators/gemini.py · _translate · __init__</div>
+        </div>
+        <span class="sev-tag major">Major</span>
+      </div>
+      <div class="bug-body">
+        <p class="body"><b>Gemini = translator default ของ image translation!</b></p>
+        <div class="grid">
+          <div class="panel impact"><div class="ph">G1 (หลัก)</div><p><code class="inl">server_error_attempt += 1</code> โดยไม่ init → <code class="inl">UnboundLocalError</code> เวลา Gemini โยน APIError (ตอนที่ retry สำคัญสุด) — เป็นไฟล์<b>เดียว</b>ที่ตก init</p></div>
+          <div class="panel"><div class="ph">G2–G4</div><p>bare <code class="inl">raise</code> ไม่มี exception · <code class="inl">lstrip('models/')</code> ลบทีละตัวอักษร · JSON mode index sample นอก guard</p></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 108 -->
+    <article class="bug major" data-sev="major">
+      <div class="bug-top">
+        <span class="idbadge">#108</span>
+        <div class="bug-title">
+          <div class="t">GPT sample cache ค้างข้ามภาษา + JSON-mode helpers พัง</div>
+          <div class="loc">translators/config_gpt.py · _closest_sample_match · common_gpt.py</div>
+        </div>
+        <span class="sev-tag major">Major</span>
+      </div>
+      <div class="bug-body">
+        <div class="grid">
+          <div class="panel impact"><div class="ph">CG-1 (กระทบ production)</div><p><code class="inl">langSamples</code> cache ไม่ key ตามภาษา/ชนิด + translator ถูก cache global → แปล Thai แล้ว แปลภาษาอื่นได้ few-shot <b>Thai ค้าง</b> = คุณภาพตก (กระทบ 17-language)</p></div>
+          <div class="panel"><div class="ph">CG-2</div><p>JSON mode: <code class="inl">text2json</code> ขาด self · <code class="inl">chat_sample[0]</code> index dict ด้วย int · <code class="inl">min([])</code></p></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 109 -->
+    <article class="bug major" data-sev="major">
+      <div class="bug-top">
+        <span class="idbadge">#109</span>
+        <div class="bug-title">
+          <div class="t">Page-level language check reject งานแปลที่ถูกต้อง</div>
+          <div class="loc">manga_translator.py · _check_target_language_ratio</div>
+        </div>
+        <span class="sev-tag major">Major</span>
+      </div>
+      <div class="bug-body">
+        <div class="grid">
+          <div class="panel"><div class="ph">Root cause</div><p>ชื่อ “ratio” แต่ใช้ <code class="inl">langid.classify</code> บน merged text แล้ว reject <b>ทั้งหน้า</b> ถ้า detect ไม่ตรง · <code class="inl">min_ratio</code> เป็น dead param · threshold 5 vs 10 ไม่ตรงกัน</p></div>
+          <div class="panel impact"><div class="ph">Impact</div><p>หน้าที่มี SFX/credits ไม่แปล (เช่น “SETSU SCANS”) ปนอยู่ → langid เพี้ยน → reject งานดี + retry เปล่า</p></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 110 -->
+    <article class="bug major" data-sev="major">
+      <div class="bug-top">
+        <span class="idbadge">#110</span>
+        <div class="bug-title">
+          <div class="t">Rendering ใช้ orientation ดิบทำ padding ขณะวาดด้วย forced direction (+ homography ไม่ guard)</div>
+          <div class="loc">rendering/__init__.py · render() (+ utils/generic.py)</div>
+        </div>
+        <span class="sev-tag major">Major</span>
+      </div>
+      <div class="bug-body">
+        <div class="grid">
+          <div class="panel"><div class="ph">R-1</div><p>วาดด้วย <code class="inl">render_horizontally</code> (forced) แต่ padding ใช้ <code class="inl">region.horizontal</code> (raw) → เพี้ยนเมื่อ force direction (MangaDock ใช้ <code class="inl">auto</code> เลย dormant)</p></div>
+          <div class="panel"><div class="ph">R-2</div><p><code class="inl">findHomography</code> คืน None ได้ → <code class="inl">warpPerspective(None)</code> crash (rendering + generic.py ไม่ guard; textblock.py guard แล้ว)</p></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 111 -->
+    <article class="bug major" data-sev="major">
+      <div class="bug-top">
+        <span class="idbadge">#111</span>
+        <div class="bug-title">
+          <div class="t">Pipeline utils: prob หารผิด denominator + TextBlock defaults พัง</div>
+          <div class="loc">textline_merge/__init__.py · utils/textblock.py</div>
+        </div>
+        <span class="sev-tag major">Major</span>
+      </div>
+      <div class="bug-body">
+        <div class="grid">
+          <div class="panel"><div class="ph">U-1</div><p>สะสม logprob จาก <code class="inl">txtlns</code> (region) แต่หารด้วยพื้นที่ <code class="inl">textlines</code> (ทั้งหน้า) → <code class="inl">region.prob</code> เพี้ยน</p></div>
+          <div class="panel"><div class="ph">U-2 / U-3</div><p><code class="inl">texts[0]</code> ใช้ param แทน self.texts → default พัง · <code class="inl">shadow_offset=[0,0]</code> mutable default</p></div>
+        </div>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<!-- ───────────── GRILL ───────────── -->
+<section id="grill">
+  <div class="sec-head">
+    <div class="sec-num">06 — DESIGN GRILL</div>
+    <h2>Grill: ออกแบบการแก้ #100 (webhook retry)</h2>
+    <p>คำถามออกแบบที่ต้องตัดสินใจก่อน TDD — ไล่ลง design tree ทีละข้อ แต่ละข้อมี <b class="c-good">คำแนะนำของผม</b> highlighted คลิก choice เพื่อ mark ความคิดคุณ (ไม่ผูกพัน — ตอบจริงใน chat)</p>
+  </div>
+
+  <div class="callout">
+    <div class="ch">บริบทจาก Roadmap.md + CONTEXT.md (กำหนด recommendation)</div>
+    <p><b>Pillar 1 Idempotent:</b> Backend dedupe ด้วย pageIndex แล้ว → retry/re-send ปลอดภัย · <b>Pillar 3:</b> convention คือ retry budget <code class="inl">MAX_RETRIES=5</code> + dead-letter · <b>Pillar 6:</b> structured JSON log · <b>ไม่มี reconciliation</b> → #100 retry คือ defense เดียว</p>
+  </div>
+
+  <!-- Q1 -->
+  <div class="qcard">
+    <div class="qhead">
+      <div class="qnum">QUESTION 1 / 6 — Retryable failure classification</div>
+      <div class="qtitle">status ไหนควร retry?</div>
+      <div class="qctx">Acceptance criteria เดิมเขียนว่า retry “5xx/4xx” — แต่ 4xx ส่วนใหญ่ retry ไปก็ผลเดิม</div>
+    </div>
+    <div class="choices" data-q="q1">
+      <label class="choice rec">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">retry เฉพาะ transient (5xx + 429 + connection/timeout) · 4xx → dead-letter ทันที <span class="rec-badge">แนะนำ</span></span><span class="cd">413 / 401 เป็น deterministic — retry เปลือง; 500 retry ได้ (backend restart = transient จริง)</span></span>
+      </label>
+      <label class="choice">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">retry ทุก non-2xx (รวม 4xx) ตาม issue เดิม</span><span class="cd">ง่ายกว่า แต่เสียเวลา retry error ที่ไม่มีวันหาย</span></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Q2 -->
+  <div class="qcard">
+    <div class="qhead">
+      <div class="qnum">QUESTION 2 / 6 — Retry count + backoff</div>
+      <div class="qtitle">กี่ครั้ง และ backoff แบบไหน?</div>
+      <div class="qctx">โปรเจกต์มี convention <code class="inl">MAX_RETRIES=5</code> (cache write-behind)</div>
+    </div>
+    <div class="choices" data-q="q2">
+      <label class="choice rec">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">4 attempts รวม · exponential backoff (0.5s → 1s → 2s) · cap รวม ~5s <span class="rec-badge">แนะนำ</span></span><span class="cd">สมดุล: กัน transient blip ได้ แต่ไม่ดึง batch ให้ช้าเกิน (1 หน้าใช้เวลา GPU เป็นวินาทีอยู่แล้ว)</span></span>
+      </label>
+      <label class="choice">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">5 retries align กับ MAX_RETRIES=5 convention เป๊ะ</span><span class="cd">สม่ำเสมอกับ cache layer แต่ total time นานกว่า</span></span>
+      </label>
+      <label class="choice">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">3 retries · fixed delay 1s</span><span class="cd">ง่ายสุด แต่ไม่มี backoff (ไม่ผ่อน load ตอน backend overload)</span></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Q3 -->
+  <div class="qcard">
+    <div class="qhead">
+      <div class="qnum">QUESTION 3 / 6 — Per-attempt timeout</div>
+      <div class="qtitle">timeout ต่อครั้งเท่าไหร่?</div>
+      <div class="qctx">ปัจจุบัน <code class="inl">timeout=60.0</code> — ถ้า retry หลายครั้งจะรอนานมาก</div>
+    </div>
+    <div class="choices" data-q="q3">
+      <label class="choice rec">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">ลดเป็น 15–20s ต่อ attempt <span class="rec-badge">แนะนำ</span></span><span class="cd">webhook เป็น localhost call ที่ควรเร็ว; 60s × หลาย retry = ดึง batch ช้าเกินเหตุ</span></span>
+      </label>
+      <label class="choice">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">คง 60s เดิม</span><span class="cd">ปลอดภัยสุดถ้า backend ช้า แต่ retry chain ยาวมาก</span></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Q4 -->
+  <div class="qcard">
+    <div class="qhead">
+      <div class="qnum">QUESTION 4 / 6 — Blocking vs decoupled</div>
+      <div class="qtitle">retry ควร block หน้าถัดไปไหม?</div>
+      <div class="qctx">ปัจจุบัน loop <code class="inl">await send_webhook</code> แบบ sequential ต่อหน้า</div>
+    </div>
+    <div class="choices" data-q="q4">
+      <label class="choice rec">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">คง sequential await + cap total retry time (Simplicity First) <span class="rec-badge">แนะนำ</span></span><span class="cd">retry ใช้ ~5s ระหว่างหน้า ยอมรับได้ (GPU เป็น bottleneck อยู่แล้ว); ไม่เพิ่ม concurrency complexity</span></span>
+      </label>
+      <label class="choice">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">decouple — fire webhook เป็น background task ไม่ block หน้าถัดไป</span><span class="cd">throughput ดีกว่าเล็กน้อย แต่เพิ่ม concurrency + ordering concern (เกิน scope #100)</span></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Q5 -->
+  <div class="qcard">
+    <div class="qhead">
+      <div class="qnum">QUESTION 5 / 6 — Dead-letter mechanism</div>
+      <div class="qtitle">หมด retry แล้วทำอะไรกับ Patch Set ที่หาย?</div>
+      <div class="qctx">MIT ไม่มี Redis (dead-letter queue อยู่ฝั่ง Backend cache layer)</div>
+    </div>
+    <div class="choices" data-q="q5">
+      <label class="choice rec">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">log structured JSON (taskId + pageIndex + last status + error) <span class="rec-badge">แนะนำ</span></span><span class="cd">ตรง Pillar 6 (Observability); ทำให้ patch ที่หาย “มองเห็นได้” แทนหายเงียบ — scope ของ #100 พอดี</span></span>
+      </label>
+      <label class="choice">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">เพิ่ม persist payload ลงไฟล์/queue เพื่อ replay ภายหลัง</span><span class="cd">robust สุด แต่เป็น reconciliation layer ใหม่ — ใหญ่เกิน #100 (แยก issue)</span></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Q6 -->
+  <div class="qcard">
+    <div class="qhead">
+      <div class="qnum">QUESTION 6 / 6 — Configurability</div>
+      <div class="qtitle">retry bounds ผ่าน env var?</div>
+      <div class="qctx">#100 acceptance criteria ระบุ “configurable via env var with sensible defaults”</div>
+    </div>
+    <div class="choices" data-q="q6">
+      <label class="choice rec">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">เพิ่ม <code class="inl">MIT_WEBHOOK_MAX_RETRIES</code> + <code class="inl">MIT_WEBHOOK_RETRY_BACKOFF_MS</code> (มี default) <span class="rec-badge">แนะนำ</span></span><span class="cd">ตาม pattern env-driven ของโปรเจกต์ (เหมือน MIT_CALLBACK_ORIGIN, MIT_WEBHOOK_SECRET)</span></span>
+      </label>
+      <label class="choice">
+        <span class="mark"></span>
+        <span class="ctext"><span class="cl">hardcode constant พอ (ไม่ต้อง env)</span><span class="cd">ง่ายกว่า แต่ขัด acceptance criteria #100</span></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="ch">หลังตอบครบ → ขั้นต่อไป</div>
+    <p>สรุป design ที่ตกลง → เขียน <b>failing test</b> (TDD RED) สำหรับ send_webhook: mock httpx ให้คืน 500 แล้ว 200 → assert ว่า retry แล้วสำเร็จ + assert dead-letter log บน 4xx → จากนั้นเขียน implementation ให้ผ่าน (GREEN) · <b>คำถาม blocking:</b> MIT มี pytest setup สำหรับ server หรือยัง? (จะเช็คให้ก่อนเขียน test)</p>
+  </div>
+</section>
+
+<footer>
+  <div>MangaDock · MIT Architecture &amp; Bug Report · สร้างจากการ scrutinize logic ทั้งหมด (ยกเว้น model AI) · Issues #100–#111 บน <span class="mini">Slow-Inc/MangaDock</span></div>
+</footer>
+
+</main>
+
+<script>
+  // collapsible bug cards
+  document.querySelectorAll('.bug .bug-top').forEach(function (top) {
+    top.addEventListener('click', function () {
+      top.parentElement.classList.toggle('open');
+    });
+  });
+
+  // severity filter
+  var btns = document.querySelectorAll('.filter-btn');
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      btns.forEach(function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+      var f = b.getAttribute('data-f');
+      document.querySelectorAll('#buglist .bug').forEach(function (card) {
+        var show = (f === 'all') || (card.getAttribute('data-sev') === f);
+        card.style.display = show ? '' : 'none';
+      });
+    });
+  });
+
+  // grill choice selection (single-select per question group)
+  document.querySelectorAll('.choices').forEach(function (group) {
+    group.querySelectorAll('.choice').forEach(function (choice) {
+      choice.addEventListener('click', function () {
+        group.querySelectorAll('.choice').forEach(function (c) { c.classList.remove('sel'); });
+        choice.classList.add('sel');
+      });
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -1,10 +1,4 @@
 import base64
-import hmac
-import hashlib
-import httpx
-import hmac
-import hashlib
-import httpx
 import io
 import json
 import os
@@ -28,8 +22,11 @@ from pathlib import Path
 from manga_translator import Config
 from server.instance import ExecutorInstance, executor_instances
 from server.myqueue import task_queue
-from server.request_extraction import get_ctx, get_patch_ctx, while_streaming, TranslateRequest, BatchTranslateRequest, get_batch_ctx
+from server.request_extraction import get_ctx, get_patch_ctx, while_streaming, TranslateRequest
 from server.to_json import to_translation, TranslationResponse
+from server.batch_runner import run_batch_with_callbacks
+from server.cancellation import mark_cancelled
+from server.path_utils import safe_result_folder
 
 app = FastAPI(
     title="Manga Image Translator",
@@ -199,70 +196,14 @@ async def patches_form(req: Request, image: UploadFile = File(...), config: str 
         "patches": normalized_patches,
     }
 
-async def send_webhook(url: str, secret: str, payload: dict):
-    """Sends a signed POST request to the callback URL."""
-    data = json.dumps(payload, separators=(',', ':'), ensure_ascii=False).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
-    if secret:
-        signature = hmac.new(secret.encode("utf-8"), data, hashlib.sha256).hexdigest()
-        headers["x-mit-signature"] = signature
-    
-    async with httpx.AsyncClient() as client:
-        try:
-            await client.post(url, content=data, headers=headers, timeout=60.0)
-        except Exception as e:
-            # We use print as it's the current logging pattern in this file
-            print(f"Webhook delivery failed to {url}: {String(e) if 'String' in globals() else e}")
+@app.post("/cancel/{taskId}", tags=["api", "form"])
+async def cancel_batch(taskId: str):
+    """Signal that a running Batch Job should stop. Best-effort and idempotent:
+    a no-op for an unknown/finished taskId. The background batch loop stops before
+    its next page (and drops a page that finished after this arrived)."""
+    mark_cancelled(taskId)
+    return {"status": "cancelling", "taskId": taskId}
 
-async def run_batch_with_callbacks(
-    index_list: list[int],
-    images_data: list[bytes],
-    config_str: str,
-    taskId: str,
-    callback_url: str,
-    callback_secret: str,
-):
-    """Background task to process images and send webhooks."""
-    # Dummy request mock for internal pipeline compatibility
-    class DummyRequest:
-        async def is_disconnected(self): return False
-    
-    dummy_req = DummyRequest()
-
-    for img_bytes, page_idx in zip(images_data, index_list):
-        try:
-            # Re-parse config per page to avoid any state mutation
-            page_conf = Config.parse_raw(config_str)
-            patch_result = await get_patch_ctx(dummy_req, page_conf, img_bytes)
-            patches_out = []
-            for patch in patch_result.get("patches", []):
-                png_bytes = patch.get("img_png", b"")
-                patches_out.append({
-                    "x": patch.get("x", 0),
-                    "y": patch.get("y", 0),
-                    "w": patch.get("w", 0),
-                    "h": patch.get("h", 0),
-                    "img_b64": base64.b64encode(png_bytes).decode("utf-8"),
-                })
-            payload = {
-                "taskId": taskId,
-                "pageIndex": page_idx,
-                "imgWidth": patch_result.get("img_width", 0),
-                "imgHeight": patch_result.get("img_height", 0),
-                "patches": patches_out,
-                "error": None,
-            }
-        except Exception as exc:
-            payload = {
-                "taskId": taskId,
-                "pageIndex": page_idx,
-                "imgWidth": 0,
-                "imgHeight": 0,
-                "patches": [],
-                "error": str(exc),
-            }
-        
-        await send_webhook(callback_url, callback_secret, payload)
 
 @app.post("/translate/with-form/patches/batch", tags=["api", "form"])
 async def patches_batch_stream(
@@ -397,11 +338,11 @@ async def queue_size() -> int:
 @app.api_route("/result/{folder_name}/final.png", methods=["GET", "HEAD"], tags=["api", "file"])
 async def get_result_by_folder(folder_name: str):
     """根据文件夹名称获取翻译结果图片"""
-    result_dir = RESULT_ROOT
-    if not result_dir.exists():
-        raise HTTPException(404, detail="Result directory not found")
+    try:
+        folder_path = safe_result_folder(RESULT_ROOT, folder_name)
+    except ValueError:
+        raise HTTPException(400, detail="Invalid folder name")
 
-    folder_path = result_dir / folder_name
     if not folder_path.exists() or not folder_path.is_dir():
         raise HTTPException(404, detail=f"Folder {folder_name} not found")
 
@@ -419,41 +360,6 @@ async def get_result_by_folder(folder_name: str):
         headers={"Content-Disposition": f"inline; filename=final.png"}
     )
 
-@app.post("/translate/batch/json", response_model=list[TranslationResponse], tags=["api", "json", "batch"])
-async def batch_json(req: Request, data: BatchTranslateRequest):
-    """Batch translate images and return JSON format results"""
-    results = await get_batch_ctx(req, data.config, data.images, data.batch_size)
-    return [to_translation(ctx) for ctx in results]
-
-@app.post("/translate/batch/images", response_description="Zip file containing translated images", tags=["api", "batch"])
-async def batch_images(req: Request, data: BatchTranslateRequest):
-    """Batch translate images and return zip archive containing translated images"""
-    import zipfile
-    import tempfile
-    
-    results = await get_batch_ctx(req, data.config, data.images, data.batch_size)
-    
-    # Create temporary ZIP file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
-        with zipfile.ZipFile(tmp_file, 'w') as zip_file:
-            for i, ctx in enumerate(results):
-                if ctx.result:
-                    img_byte_arr = io.BytesIO()
-                    ctx.result.save(img_byte_arr, format="PNG")
-                    zip_file.writestr(f"translated_{i+1}.png", img_byte_arr.getvalue())
-        
-        # Return ZIP file
-        with open(tmp_file.name, 'rb') as f:
-            zip_data = f.read()
-        
-        # Clean up temporary file
-        os.unlink(tmp_file.name)
-        
-        return StreamingResponse(
-            io.BytesIO(zip_data),
-            media_type="application/zip",
-            headers={"Content-Disposition": "attachment; filename=translated_images.zip"}
-        )
 
 @app.get("/", response_class=HTMLResponse,tags=["ui"])
 async def index() -> HTMLResponse:
@@ -472,12 +378,19 @@ async def manual():
 def generate_nonce():
     return secrets.token_hex(16)
 
-def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+def _build_worker_cmd(params: Namespace, port: int, nonce: str) -> list:
+    """Build the subprocess argv for the worker process.
+
+    The worker always binds 127.0.0.1 (loopback) regardless of the front
+    server's public bind host. The worker receives pickle-deserialised payloads
+    from the web server; exposing it to the network would be arbitrary code
+    execution (Issue #103).
+    """
     cmds = [
         sys.executable,
         '-m', 'manga_translator',
         'shared',
-        '--host', host,
+        '--host', '127.0.0.1',
         '--port', str(port),
         '--nonce', nonce,
     ]
@@ -494,14 +407,16 @@ def start_translator_client_proc(host: str, port: int, nonce: str, params: Names
     if getattr(params, 'pre_dict', None):
         cmds.extend(['--pre-dict', params.pre_dict])
     if getattr(params, 'post_dict', None):
-        cmds.extend(['--post-dict', params.post_dict])       
+        cmds.extend(['--post-dict', params.post_dict])
+    return cmds
+
+
+def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+    cmds = _build_worker_cmd(params, port, nonce)
     base_path = os.path.dirname(os.path.abspath(__file__))
     parent = os.path.dirname(base_path)
     proc = subprocess.Popen(cmds, cwd=parent)
-    # Use 127.0.0.1 as the connect address regardless of the bind host (0.0.0.0)
-    # because 0.0.0.0 is a valid listen address but not a valid connection target.
-    connect_ip = '127.0.0.1' if host == '0.0.0.0' else host
-    executor_instances.register(ExecutorInstance(ip=connect_ip, port=port))
+    executor_instances.register(ExecutorInstance(ip='127.0.0.1', port=port))
 
     def handle_exit_signals(signal, frame):
         proc.terminate()
@@ -525,36 +440,6 @@ def prepare(args):
         shutil.rmtree(folder_name)
     os.makedirs(folder_name)
 
-@app.post("/simple_execute/translate_batch", tags=["internal-api"])
-async def simple_execute_batch(req: Request, data: BatchTranslateRequest):
-    """Internal batch translation execution endpoint"""
-    # Implementation for batch translation logic
-    # Currently returns empty results, actual implementation needs to call batch translator
-    from manga_translator import MangaTranslator
-    translator = MangaTranslator({'batch_size': data.batch_size})
-    
-    # Prepare image-config pairs
-    images_with_configs = [(img, data.config) for img in data.images]
-    
-    # Execute batch translation
-    results = await translator.translate_batch(images_with_configs, data.batch_size)
-    
-    return results
-
-@app.post("/execute/translate_batch", tags=["internal-api"])
-async def execute_batch_stream(req: Request, data: BatchTranslateRequest):
-    """Internal batch translation streaming execution endpoint"""
-    # Streaming batch translation implementation
-    from manga_translator import MangaTranslator
-    translator = MangaTranslator({'batch_size': data.batch_size})
-    
-    # Prepare image-config pairs
-    images_with_configs = [(img, data.config) for img in data.images]
-    
-    # Execute batch translation (streaming version requires more complex implementation)
-    results = await translator.translate_batch(images_with_configs, data.batch_size)
-    
-    return results
 
 @app.get("/results/list", tags=["api"])
 async def list_results():
@@ -577,7 +462,17 @@ async def list_results():
 
 @app.delete("/results/clear", tags=["api"])
 async def clear_results():
-    """Delete all result directories"""
+    """Delete all result directories.
+
+    Decision (#102): MIT is an internal service (Backend → MIT only). The
+    /results/clear endpoint has no path-traversal risk (it iterates RESULT_ROOT
+    directly) but is unauthenticated and bulk-destructive. It is disabled by
+    default via MIT_ENABLE_RESULT_CLEAR=0. Set MIT_ENABLE_RESULT_CLEAR=1 to
+    enable (e.g. for a standalone dev instance with the web UI).
+    """
+    if os.environ.get("MIT_ENABLE_RESULT_CLEAR", "0") != "1":
+        raise HTTPException(403, detail="Result clear is disabled on this instance")
+
     result_dir = RESULT_ROOT
     if not result_dir.exists():
         return {"message": "No results directory found"}
@@ -599,20 +494,23 @@ async def clear_results():
 @app.delete("/results/{folder_name}", tags=["api"])
 async def delete_result(folder_name: str):
     """Delete a specific result directory"""
-    result_dir = RESULT_ROOT
-    folder_path = result_dir / folder_name
-    
+    try:
+        folder_path = safe_result_folder(RESULT_ROOT, folder_name)
+    except ValueError:
+        raise HTTPException(400, detail="Invalid folder name")
+
     if not folder_path.exists():
         raise HTTPException(404, detail="Result directory not found")
-    
+
     try:
-        # Check if final.png exists in this directory
         final_png_path = folder_path / "final.png"
         if not final_png_path.exists():
             raise HTTPException(404, detail="Result file not found")
-        
+
         shutil.rmtree(folder_path)
         return {"message": f"Deleted result directory: {folder_name}"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, detail=f"Error deleting result: {str(e)}")
 
@@ -625,7 +523,6 @@ if __name__ == '__main__':
     from args import parse_arguments
 
     args = parse_arguments()
-    args.start_instance = True
     proc = prepare(args)
     print("Nonce: "+nonce)
     try:

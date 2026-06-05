@@ -165,7 +165,7 @@ export class BooksController {
   async translateMangaPagePatches(
     @Param('chapterId') chapterId: string,
     @Param('pageIndex') pageIndex: string,
-    @Body() body: { pageUrl?: string; sourceLang?: string; targetLang?: string },
+    @Body() body: { pageUrl?: string; sourceLang?: string; targetLang?: string; imageModel?: string },
   ) {
     try {
       return await this.booksService.translateMangaPagePatches(
@@ -174,6 +174,7 @@ export class BooksController {
         body?.pageUrl ?? '',
         body?.sourceLang,
         body?.targetLang,
+        { imageModel: body?.imageModel },
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -199,7 +200,7 @@ export class BooksController {
   @Post('chapters/:chapterId/batch-translate-patches')
   async batchTranslateMangaPatches(
     @Param('chapterId') chapterId: string,
-    @Body() body: { pages?: Array<{ pageIndex: number; pageUrl: string }>; sourceLang?: string; targetLang?: string },
+    @Body() body: { pages?: Array<{ pageIndex: number; pageUrl: string }>; sourceLang?: string; targetLang?: string; imageModel?: string },
     @Res() res: import('express').Response,
   ): Promise<void> {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -208,7 +209,20 @@ export class BooksController {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
-    const { sourceLang, targetLang } = body ?? {};
+    // Start the response body immediately with an SSE comment. This forces any
+    // intermediary proxy (Cloudflare Tunnel) into streaming mode so it does not
+    // apply a "time to first byte" timeout (HTTP 524) while MIT processes page 1.
+    res.write(': connected\n\n');
+
+    // Periodic heartbeat keeps the connection alive through long gaps between pages.
+    // A single complex page (or cold model load) can take >100s; Cloudflare idle-
+    // times-out at ~100s. SSE comment lines (leading ':') are ignored by the client
+    // reader, which only parses lines starting with "data: ".
+    const heartbeat = setInterval(() => {
+      if (!res.writableEnded) res.write(': ping\n\n');
+    }, 15_000);
+
+    const { sourceLang, targetLang, imageModel } = body ?? {};
 
     const listener = (pageIndex: number, result: { patches: unknown[]; error?: string }) => {
       if (!res.writableEnded) {
@@ -218,11 +232,12 @@ export class BooksController {
 
     // Remove listener on client disconnect — job continues in background
     res.on('close', () => {
-      this.booksService.removeBatchListener(chapterId, sourceLang, targetLang, listener);
+      clearInterval(heartbeat);
+      this.booksService.removeBatchListener(chapterId, sourceLang, targetLang, listener, imageModel);
     });
 
     try {
-      await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang);
+      await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang, imageModel);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (!res.writableEnded) {
@@ -230,6 +245,7 @@ export class BooksController {
       }
     }
 
+    clearInterval(heartbeat);
     if (!res.writableEnded) res.end();
   }
 
