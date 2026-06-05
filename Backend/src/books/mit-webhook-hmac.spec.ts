@@ -63,21 +63,40 @@ describe('MitWebhookController — HMAC verification', () => {
     await expect(ctrl.handleCallback(signature, body, req)).resolves.toEqual({ ok: true });
   });
 
-  // Cycle 17 — #90 S2: reject webhook when MIT_WEBHOOK_SECRET is not set
-  it('returns 401 when MIT_WEBHOOK_SECRET is not configured', async () => {
-    delete process.env.MIT_WEBHOOK_SECRET;
-    const { ctrl } = makeController();
-    const body = { taskId: 'job3:ANY:THA', pageIndex: 0, result: { patches: [] }, error: null };
+  // #95 S2 (resolved 2026-06-05): the secret is enforced only in production.
+  // Local dev runs MIT without a secret on purpose (decision 2026-06-04); a
+  // production deployment without MIT_WEBHOOK_SECRET is a misconfiguration and
+  // must not accept unauthenticated results.
+  describe('when MIT_WEBHOOK_SECRET is not configured', () => {
+    const prevNodeEnv = process.env.NODE_ENV;
+    afterEach(() => {
+      (process.env as any).NODE_ENV = prevNodeEnv;
+    });
 
-    await expect(ctrl.handleCallback('any-signature', body)).rejects.toMatchObject({ status: 401 });
-  });
+    it('returns 401 in production', async () => {
+      delete process.env.MIT_WEBHOOK_SECRET;
+      (process.env as any).NODE_ENV = 'production';
+      const { ctrl } = makeController();
+      const body = { taskId: 'job3:ANY:THA', pageIndex: 0, result: { patches: [] }, error: null };
 
-  // Cycle 18 — #90 S2: no secret + no signature still returns 401 (not 400)
-  it('returns 401 (not silent pass-through) when secret unset and signature missing', async () => {
-    delete process.env.MIT_WEBHOOK_SECRET;
-    const { ctrl } = makeController();
-    const body = { taskId: 'job3:ANY:THA', pageIndex: 0, result: { patches: [] }, error: null };
+      await expect(ctrl.handleCallback('any-signature', body)).rejects.toMatchObject({ status: 401 });
+    });
 
-    await expect(ctrl.handleCallback(undefined as any, body)).rejects.toMatchObject({ status: 401 });
+    it('returns 401 in production even when the signature header is missing', async () => {
+      delete process.env.MIT_WEBHOOK_SECRET;
+      (process.env as any).NODE_ENV = 'production';
+      const { ctrl } = makeController();
+      const body = { taskId: 'job3:ANY:THA', pageIndex: 0, result: { patches: [] }, error: null };
+
+      await expect(ctrl.handleCallback(undefined as any, body)).rejects.toMatchObject({ status: 401 });
+    });
+
+    it('accepts unauthenticated webhooks outside production (local dev without a secret)', async () => {
+      delete process.env.MIT_WEBHOOK_SECRET;
+      const { ctrl } = makeController();
+      const body = { taskId: 'job3:ANY:THA', pageIndex: 0, patches: [], error: null };
+
+      await expect(ctrl.handleCallback(undefined as any, body)).resolves.toEqual({ ok: true });
+    });
   });
 });

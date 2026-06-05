@@ -16,9 +16,16 @@ export class MitWebhookController {
   ) {
     const secret = process.env.MIT_WEBHOOK_SECRET;
 
-    // HMAC verification: only enforced when MIT_WEBHOOK_SECRET is configured.
-    // When no secret is set, MIT won't sign the callback — accept it unauthenticated.
-    // Production deployments should always set MIT_WEBHOOK_SECRET.
+    // HMAC policy (#95 S2, resolved 2026-06-05):
+    // - secret configured → verify every callback (over raw bytes, S1).
+    // - no secret in production → reject; an open results endpoint would let
+    //   anyone inject translations. Misconfiguration must fail loudly.
+    // - no secret outside production → accept unauthenticated (local dev runs
+    //   MIT without a secret on purpose — decision 2026-06-04).
+    if (!secret && process.env.NODE_ENV === 'production') {
+      this.logger.error('MIT_WEBHOOK_SECRET is not configured — rejecting webhook in production');
+      throw new HttpException('Webhook secret not configured', HttpStatus.UNAUTHORIZED);
+    }
     if (secret) {
       if (!signature) {
         this.logger.error('Missing x-mit-signature header');
