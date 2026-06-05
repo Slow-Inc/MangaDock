@@ -162,7 +162,9 @@ layers, not here.
 - **Cancellation:** a queued task is dropped if `req.is_disconnected()` (streaming requests). The batch
   webhook background task uses a stub request, so it instead polls a cancellation registry
   (`server/cancellation.py`): the Backend calls `POST /cancel/{taskId}` when its last SSE listener leaves,
-  and the batch loop stops before the next page (Issue #101).
+  and the batch loop (`server/batch_runner.py`) stops before the next page (Issue #101). taskIds are
+  deterministic per chapter+language pair, so each run **discards any stale cancel flag on start** — a
+  cancel that lands after a run already finished must not poison the next run of the same taskId (#128).
 - **Gotcha:** `find_executor()` holds an `asyncio.Lock` across an `await` (#106); translator instances are
   cached globally and mutated per-request (safe only because of the single-executor serialisation, #108).
 
