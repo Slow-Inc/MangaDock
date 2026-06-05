@@ -2026,6 +2026,18 @@ class MangaTranslator:
 
         return list(group_map.values())
 
+    def reset_page_context(self) -> None:
+        """Drop the cross-page translation context.
+
+        This instance is a process-lifetime singleton in the worker (#136): the
+        context lists grew with every page ever translated and let pages from
+        unrelated jobs bleed into context-aware prompts. Each request starts
+        clean; a per-Batch-Job context seam is tracked as the Translation
+        Session design (#140).
+        """
+        self.all_page_translations = []
+        self._original_page_texts = []
+
     async def translate_patches(self, image: Image.Image, config: Config) -> dict:
         """Translate image and return per-region rendered PNG patches.
 
@@ -2033,6 +2045,7 @@ class MangaTranslator:
         mask/inpaint/render per region crop to avoid full-page inpainting.
         Nearby regions are grouped into a single crop to avoid overlapping patches.
         """
+        self.reset_page_context()
         ctx = await self._translate_until_translation(image, config)
         img_h, img_w = ctx.img_rgb.shape[:2]
 
