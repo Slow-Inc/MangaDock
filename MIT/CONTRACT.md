@@ -1,0 +1,143 @@
+# MIT ↔ Backend — Wire Contract
+
+> The exact request/response/webhook shapes exchanged between the NestJS **Backend** and the **MIT** web
+> server. This boundary has already broken twice (payload-too-large; a `result`-wrapper mismatch). Treat this
+> file as the source of truth for the contract — when you change a shape on one side, update the other side
+> **and** this file in the same change.
+>
+> Authoritative code: MIT `server/main.py` (producer) · Backend `src/books/books.service.ts` +
+> `src/books/mit-webhook.controller.ts` (consumer).
+
+---
+
+## 0. ⚠️ Casing footgun — read this first
+
+Field names are **not consistent** across the two patch surfaces:
+
+| Surface | image dims keys | example |
+|---------|-----------------|---------|
+| **Single-page** response (`/translate/with-form/patches`) | **snake_case** | `img_width`, `img_height` |
+| **Batch** webhook / NDJSON payload | **camelCase** | `imgWidth`, `imgHeight` |
+
+Patch-item keys (`x`, `y`, `w`, `h`, `img_b64`) are the same on both. A consumer that assumes one casing on the
+other surface gets `undefined`/`0`. Do not "fix" one side casually — fix both sides + this doc together.
+
+---
+
+## 1. The `config` object (Backend → MIT)
+
+Sent as a `config` **form field** containing a JSON string, on every patch request. Shape the Backend builds:
+
+```json
+{
+  "translator": {
+    "target_lang": "THA",
+    "source_lang": "JPN",          // omitted when source is ANY
+    "source_lang_only": true        // omitted when source is ANY
+  },
+  "inpainter": { "inpainter": "lama_large" },
+  "render":    { "direction": "auto", "rtl": false }
+}
+```
+
+MIT parses this into its Pydantic `Config` (`manga_translator/config.py`). Unknown keys are ignored.
+
+---
+
+## 2. Single-page translation
+
+**Request** — `POST /translate/with-form/patches` (multipart/form-data)
+
+| field | type | notes |
+|-------|------|-------|
+| `image` | file | the page image |
+| `config` | string | JSON, see §1 |
+
+**Response** — `200 OK`, JSON (**snake_case**):
+
+```json
+{
+  "img_width": 1280,
+  "img_height": 1808,
+  "patches": [
+    { "x": 120, "y": 64, "w": 300, "h": 90, "img_b64": "<base64 PNG>" }
+  ]
+}
+```
+
+Coordinates are **pixels** relative to the source image. The Backend converts them to normalized fractions
+(`xPct = x / img_width`, etc.) before sending to the Frontend.
+
+---
+
+## 3. Batch translation
+
+**Request** — `POST /translate/with-form/patches/batch` (multipart/form-data)
+
+| field | type | notes |
+|-------|------|-------|
+| `images` | file[] | the pages |
+| `config` | string | JSON, see §1 |
+| `page_indices` | string | CSV of page indexes aligned to `images`, e.g. `0,1,2` |
+| `taskId` | string | the **Job Key** `chapterId:srcMIT:tgtMIT` |
+| `callback_url` | string | Backend webhook endpoint; **if present → webhook mode** |
+| `callback_secret` | string | HMAC secret (optional) |
+
+MIT chooses a mode by whether `callback_url` is set:
+
+### 3a. Webhook mode (production)
+
+- MIT immediately returns **`202 Accepted`**: `{ "status": "accepted", "taskId": "<taskId>" }`
+- Then, **per page**, MIT POSTs to `callback_url`:
+
+```json
+{
+  "taskId": "ch:ANY:THA",
+  "pageIndex": 0,
+  "imgWidth": 1280,
+  "imgHeight": 1808,
+  "patches": [ { "x": 120, "y": 64, "w": 300, "h": 90, "img_b64": "<base64 PNG>" } ],
+  "error": null
+}
+```
+
+- On a per-page failure: same envelope with `patches: []` and `error: "<message>"` (a string).
+- **Header** `x-mit-signature` = HMAC-SHA256 hex of the **raw JSON body**, present only when
+  `callback_secret` was provided.
+- Delivery is **retried** on transient failure (5xx / 429 / connection error) with backoff; non-retryable 4xx
+  and exhausted retries are dead-lettered (logged). See `server/webhook.py` + Issue #100.
+
+### 3b. NDJSON streaming mode (no `callback_url`)
+
+`200 OK`, `application/x-ndjson` — one JSON object per line, **same flat camelCase shape** as the webhook
+payload (minus `taskId`), terminated by a sentinel:
+
+```
+{"pageIndex":0,"imgWidth":1280,"imgHeight":1808,"patches":[...],"error":null}
+{"pageIndex":1,"imgWidth":1280,"imgHeight":1808,"patches":[...],"error":null}
+{"done":true}
+```
+
+---
+
+## 4. Invariants & limits
+
+- **Idempotency:** the Backend de-duplicates webhooks by `pageIndex`. Re-sending a webhook (e.g. after a lost
+  response) is safe — it will not double-apply. MIT relies on this when retrying.
+- **No reconciliation:** a permanently-undelivered page stays missing until the **whole batch** is
+  re-triggered. There is no single-page re-request path.
+- **Body size:** webhook bodies carry base64 PNGs and can be **1–3 MB+**. The Backend must accept large bodies
+  (currently `json({ limit: '50mb' })`). A `413` from the Backend is treated by MIT as non-retryable.
+- **Per-patch bound:** the Backend rejects any single `img_b64` over **5 MB** (Issue #95 S3).
+- **`error` is a string or `null`** — never an object.
+
+---
+
+## 5. Known contract hazards (open)
+
+- **HMAC over raw bytes (#95 S1):** MIT signs the exact serialized body
+  (`json.dumps(separators=(',',':'))`). The Backend currently verifies over a re-serialized parsed object,
+  which can differ byte-for-byte. Only matters when `MIT_WEBHOOK_SECRET` is set. Verify on **raw request
+  bytes** to be safe.
+- **Casing split (§0):** snake_case (single) vs camelCase (batch) — the most likely source of a silent
+  `undefined`/`0` on the consumer side.
