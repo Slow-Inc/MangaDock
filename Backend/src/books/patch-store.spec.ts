@@ -117,6 +117,33 @@ describe('PatchStore', () => {
     expect(storage.files.size).toBe(0);
   });
 
+  it('normalizes a trailing-slash origin (no double slash in urls)', async () => {
+    const storage = fakeStorage();
+    const store = new PatchStore(storage, () => 'https://api.example/');
+
+    const urls = await store.put(loc, [png('a')]);
+
+    expect(urls[0]).toBe('https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r0.png');
+  });
+
+  it('sweepLegacy keeps going when one delete fails (e.g. a stray directory)', async () => {
+    const { storage, store } = makeStore();
+    storage.files.set('uploads/patches/ch1/3_0_aaaa.png', png('legacy1'));
+    storage.files.set('uploads/patches/ch1/stray-dir', png('pretend-directory'));
+    storage.files.set('uploads/patches/ch1/3_1_bbbb.png', png('legacy2'));
+    const realDelete = storage.delete.bind(storage);
+    storage.delete = async (key: string) => {
+      if (key.endsWith('stray-dir')) throw new Error('EISDIR');
+      return realDelete(key);
+    };
+
+    const removed = await store.sweepLegacy();
+
+    expect(removed).toBe(2); // both real legacy files gone despite the throw
+    expect(storage.files.has('uploads/patches/ch1/3_0_aaaa.png')).toBe(false);
+    expect(storage.files.has('uploads/patches/ch1/3_1_bbbb.png')).toBe(false);
+  });
+
   it('sweepLegacy removes only legacy-format files, never PatchStore-named ones', async () => {
     const { storage, store } = makeStore();
     await store.put(loc, [png('a')]);
