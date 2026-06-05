@@ -536,3 +536,34 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 - Emulator screenshot still appears white because Frontend landing calls `/api/proxy/books/landing` and gets `502` while Backend is not running.
 - `npm run lint` in `Frontend/` still fails on existing repo-wide lint issues unrelated to `Frontend/next.config.ts`.
 - Full protected content flow remains out of issue #90 scope.
+
+---
+
+## Phase 3 Mobile Shell - Hybrid Beta APK Refresh (#121)
+
+### Status: COMPLETE - `1.0.1-beta.3` APK built for QA
+
+#### Modified Files
+- `Mobile/src/config.ts` - bumps beta metadata to `versionCode 4` / `versionName 1.0.1-beta.3`
+- `Mobile/android/app/build.gradle` - bumps APK metadata to `versionCode 4` / `versionName "1.0.1-beta.3"`
+- `Mobile/src/navigation/NativeShellNavigator.tsx` - uses beta version constants in the Native Shell Home
+- `Mobile/__tests__/NativeShellNavigator.test.tsx` - updates Native Shell version expectations
+- `Mobile/README.md` - updates QA APK metadata, diagnostics wording, QA template, and verification caveats
+
+#### Verification
+- `npm test -- --runInBand` in `Mobile/` - 11 suites, 42 tests passing
+- `npm run lint` in `Mobile/` - passing
+- `npx tsc --noEmit` in `Mobile/` - passing
+- `.\gradlew.bat assembleRelease` in `Mobile/android` - `BUILD SUCCESSFUL in 9m 6s`
+- `C:\Users\Cable\AppData\Local\Android\Sdk\build-tools\36.0.0\aapt.exe dump badging C:\Users\Cable\Documents\code\MangaDock\Mobile\build\qa\mangadock-beta-release-prod-domain.apk | Select-String -Pattern '^package:'` - `package: name='com.mobile' versionCode='4' versionName='1.0.1-beta.3' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'`
+- `C:\Users\Cable\AppData\Local\Android\Sdk\platform-tools\adb.exe devices` - no connected devices listed, so emulator install/launch smoke was skipped
+
+#### APK Artifact
+- Latest QA APK: `Mobile/build/qa/mangadock-beta-release-prod-domain.apk`
+- Version: `versionCode 4`, `versionName 1.0.1-beta.3`
+- Size: 67,447,494 bytes
+- Previous backup: `Mobile/build/qa/mangadock-beta-release-prod-domain.apk.bak-20260605-121035.apk`
+
+#### Notes
+- QA APK is still signed with the scaffold release signing config using the debug keystore.
+- Runtime endpoint defaults remain `https://hayateotsu.space` and production backend is reached through the web app at `https://api.hayateotsu.space`.

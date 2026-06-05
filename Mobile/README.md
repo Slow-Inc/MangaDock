@@ -198,8 +198,8 @@ Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.L
 Current QA beta version:
 
 ```text
-versionCode 3
-versionName 1.0.1-beta.2
+versionCode 4
+versionName 1.0.1-beta.3
 ```
 
 Latest QA APK refresh:
@@ -207,22 +207,22 @@ Latest QA APK refresh:
 ```text
 Date: 2026-06-05
 Branch: feat/mobile-shell-phase3
-Commit: e4dc928 feat: add mobile beta diagnostics
+Commit: #121 beta APK refresh on feat/mobile-shell-phase3
 APK: Mobile/build/qa/mangadock-beta-release-prod-domain.apk
-Size: 57,814,712 bytes
+Size: 67,447,494 bytes
 Package: com.mobile
 ```
 
 Verified APK metadata:
 
 ```text
-package: name='com.mobile' versionCode='3' versionName='1.0.1-beta.2' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36'
+package: name='com.mobile' versionCode='4' versionName='1.0.1-beta.3' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
 ```
 
 Previous QA APK backup:
 
 ```text
-Mobile/build/qa/mangadock-beta-release-prod-domain.apk.bak-20260604-193044.apk
+Mobile/build/qa/mangadock-beta-release-prod-domain.apk.bak-20260605-121035.apk
 ```
 
 For initial QA, build a release APK that bundles JS:
@@ -288,13 +288,13 @@ Current flags:
 
 ```ts
 export const MOBILE_DIAGNOSTICS_ENABLED = true;
-export const MOBILE_BETA_VERSION_CODE = 3;
-export const MOBILE_BETA_VERSION_NAME = '1.0.1-beta.2';
+export const MOBILE_BETA_VERSION_CODE = 4;
+export const MOBILE_BETA_VERSION_NAME = '1.0.1-beta.3';
 ```
 
-The app shows a small `[diag]` button over the WebView. Tap it to open the diagnostics panel.
+The app shows a small `[diag]` button over the WebView. Tap it to open the Native Diagnostics Screen.
 
-The panel shows:
+The screen shows:
 
 - Current beta version.
 - Latest in-memory diagnostics events, capped at 20.
@@ -346,8 +346,8 @@ Use this template when reporting beta APK bugs:
 Title:
 
 APK:
-versionCode 3
-versionName 1.0.1-beta.2
+versionCode 4
+versionName 1.0.1-beta.3
 
 Device:
 Android version:
@@ -422,8 +422,9 @@ Install the APK and verify:
 - App launches as `com.mobile/.MainActivity`.
 - WebView loads `https://hayateotsu.space`.
 - `[diag]` button appears over the WebView.
-- `[diag]` panel shows `1.0.1-beta.2 (3)`.
+- Native Diagnostics Screen shows `1.0.1-beta.3` and `versionCode 4`.
 - `Reload WebView` reloads the WebView without clearing app data.
+- Native Settings Screen can switch beta endpoint mode to production/local/custom and reset to production.
 - WebView initial request includes `x-hardware-id`.
 - WebView initial request includes `x-manga-dock-client`.
 - WebView `fetch` requests to MangaDock API paths include `x-hardware-id`.

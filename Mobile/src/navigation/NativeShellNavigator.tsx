@@ -100,7 +100,9 @@ function createHomeScreen(lastKnownReaderPath?: string) {
     return (
       <View style={styles.screenThemed} testID="native-shell-home-screen">
         <Text style={styles.title}>Native Shell Home</Text>
-        <Text style={styles.body}>1.0.1-beta.2 · Production</Text>
+        <Text style={styles.body}>
+          {MOBILE_BETA_VERSION_NAME} · Production
+        </Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => launchWebView('openMangaDock')}

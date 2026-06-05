@@ -197,7 +197,7 @@ describe('Native Shell Router', () => {
     expect(
       renderer!.root.findByProps({testID: 'native-diagnostics-screen'}),
     ).toBeTruthy();
-    expect(renderer!.root.findAll(node => node.children.includes('1.0.1-beta.2')).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAll(node => node.children.includes('1.0.1-beta.3')).length).toBeGreaterThan(0);
     expect(renderer!.root.findAll(node => node.children.includes('Production')).length).toBeGreaterThan(0);
     expect(renderer!.root.findAll(node => node.children.includes('Loaded')).length).toBeGreaterThan(0);
     expect(renderer!.root.findAll(node => node.children.includes('11111111...5555')).length).toBeGreaterThan(0);
@@ -247,7 +247,7 @@ describe('Native Shell Router', () => {
     expect(
       renderer!.root.findByProps({testID: 'native-settings-screen'}),
     ).toBeTruthy();
-    expect(renderer!.root.findAll(node => node.children.includes('1.0.1-beta.2')).length).toBeGreaterThan(0);
+    expect(renderer!.root.findAll(node => node.children.includes('1.0.1-beta.3')).length).toBeGreaterThan(0);
     expect(renderer!.root.findAll(node => node.children.includes('production')).length).toBeGreaterThan(0);
     expect(renderer!.root.findAll(node => node.children.includes('https://hayateotsu.space')).length).toBeGreaterThan(0);
 
