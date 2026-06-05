@@ -144,9 +144,8 @@ export class BooksService {
     }
     job.processingPages?.add(pageIndex);
 
-    const chapterId = jobKey.split(':')[0];
-    const srcMIT = jobKey.split(':')[1];
-    const tgtMIT = jobKey.split(':')[2];
+    // jobKey = chapterId:srcMIT:tgtMIT:model (model = 'default' when unset)
+    const [chapterId, srcMIT, tgtMIT, jobModel] = jobKey.split(':');
 
     let pageResult: PageResult;
 
@@ -179,8 +178,10 @@ export class BooksService {
         });
       }
 
-      // Cache the result
-      const cacheKey = `translate:manga-patches:v3:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}`;
+      // Cache the result — MUST be the same key the batch pre-check and the
+      // single-page endpoint read (patchCacheKey), or webhook results are never
+      // served from cache again (found live during the #87 v4 migration).
+      const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, jobModel);
       await this.cache.set(cacheKey, { patches }, 1000 * 60 * 60 * 24 * 7); // 7 days
 
       pageResult = { patches };

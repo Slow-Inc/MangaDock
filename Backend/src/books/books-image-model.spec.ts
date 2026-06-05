@@ -72,4 +72,33 @@ describe('BooksService — per-request image translation model (#87)', () => {
     const modelKey = (service as any).buildJobKey('ch1', 'ja', 'th', 'gemini-2.5-pro');
     expect(modelKey).not.toBe(defaultKey);
   });
+
+  // Found live (e2e 2026-06-05): the webhook path cached under the old v3 key
+  // while the batch pre-check reads v4 — webhook results were never served from
+  // cache again, so every re-translate hit MIT.
+  it('caches webhook results under the same key the batch pre-check reads', async () => {
+    const { service, cache } = makeService();
+    const jobKey = (service as any).buildJobKey('ch1', 'ja', 'th', 'gemini-2.5-pro');
+    (service as any).activeBatchJobs.set(jobKey, {
+      completedPages: new Map(),
+      processingPages: new Set(),
+      listeners: new Set(),
+      activeCallerCount: 1,
+      expectedCount: 1,
+      resolve: jest.fn(),
+      reject: jest.fn(),
+      cancelController: new AbortController(),
+    });
+
+    await service.handleMitCallback(jobKey, 0, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [{ x: 1, y: 2, w: 3, h: 4, img_b64: Buffer.from('png').toString('base64') }],
+    });
+
+    const { srcMIT, tgtMIT } = (service as any).mitLangPair('ja', 'th');
+    const expectedKey = (service as any).patchCacheKey('ch1', 0, srcMIT, tgtMIT, 'gemini-2.5-pro');
+    const writtenKeys = cache.set.mock.calls.map((c: unknown[]) => c[0]);
+    expect(writtenKeys).toContain(expectedKey);
+  });
 });
