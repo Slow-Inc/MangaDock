@@ -159,6 +159,13 @@ export class BooksController {
     return this.booksService.checkMitHealth();
   }
 
+  /** Gemini model catalog + the translator MIT actually runs (#133, PRD #131).
+   *  Unauthenticated, same posture as mit-health. */
+  @Get('models')
+  getModels() {
+    return this.booksService.getMangaModelsInfo();
+  }
+
   
 
   @Post('chapters/:chapterId/pages/:pageIndex/translate-patches')
