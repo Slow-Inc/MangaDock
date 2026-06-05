@@ -113,6 +113,12 @@ MIT chooses a mode by whether `callback_url` is set:
 - Delivery is **retried** on transient failure (5xx / 429 / connection error) with backoff; non-retryable 4xx
   and exhausted retries are dead-lettered (logged). See `server/webhook.py` + Issue #100.
 
+**Readiness** — `GET /ready` returns `{ "ready": true, "workers": N, "translator": "<id>" }` once a
+worker is registered (503 `{ "ready": false, "status": "starting" }` before that). `translator` is the resolved default
+translator id (e.g. `gemini`, `qwen3`) so consumers can discover the active translator family — the
+Backend forwards it via `GET /books/models` and the Reader hides the Gemini model selector on
+non-Gemini deployments (#132–#134, PRD #131).
+
 **Cancellation** — `POST /cancel/{taskId}` tells MIT to stop a running batch. The Backend calls it when its
 last SSE listener for the job leaves. Best-effort and idempotent: a no-op for an unknown/finished taskId. MIT
 stops before its next page and drops a page that finished after the cancel arrived. Because taskIds are

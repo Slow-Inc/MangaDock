@@ -2,6 +2,19 @@
 
 ---
 
+## ✅ PRD #131 → #132+#133+#134 IMPLEMENTED — translator-aware model selector (2026-06-05 ดึก, TDD + live verified)
+
+จาก #130 finding (Qwen deployment เห็น Gemini selector ที่กดแล้วไม่มีผล + เปลือง GPU ข้าม cache partition) — chain เต็ม: /to-prd → /to-issues (3 vertical slices) → /tdd → live verify บน branch `feat/translator-aware-model-selector`
+
+- **#132 MIT**: `/ready` → `{ready, workers, translator}` (ใช้ `TranslatorConfig()` ที่เพิ่งเป็น default_factory) · **discovery**: `GET /books/models` ที่ #87 อ้างว่ามี **ไม่เคยมีจริง** — Frontend ใช้ fallback hardcode มาตลอด · live: `curl /ready` → `"translator":"qwen3"` ✓
+- **#133 Backend**: `getImageTranslator()` (cache 60s, null เมื่อ down/503/no-field) + `getMangaModelsInfo()` + route `GET /books/models` ครั้งแรก · TDD `books-models.spec.ts` (6, RED→GREEN) · live: `{"models":[catalog จริง],"imageTranslator":"qwen3"}` ✓
+- **#134 Frontend**: `fetchImageTranslator`/`isGeminiImageTranslator` (null = fail-open) + deep module **`getEffectiveImageModel()`** เป็น gating จุดเดียวของทุก translate call (กัน stale localStorage ส่ง model บน non-Gemini) · เมนูทั้ง desktop+mobile gate ด้วย `showModelSelector` · live browser: เมนูเปิด แต่ **"โมเดล AI" หายไป** บนเครื่อง Qwen ✓ · tsc EXIT 0
+- Docs: `CONTRACT.md` เพิ่ม §Readiness
+
+**ตั้งใจไม่ทำ:** MIT-side rejection ของ model field (per #87 — เมินเงียบถูกแล้ว) · migrate cache partitions เก่า (TTL 7 วัน)
+
+---
+
 ## 🧪 LIVE E2E SESSION (2026-06-05 ค่ำ) — restart MIT + ทดสอบจริงผ่าน browser/API ก่อน merge
 
 **Setup:** restart MIT ด้วยโค้ดใหม่ (web+worker) · Playwright MCP browser (มีข้อจำกัด: HMR ws พังผ่าน docker → หน้า reload เป็นพัก ๆ + Turnstile widget โหลดไม่ได้ → ต้อง seed `cf_clearance_token` เอง) · ส่วน Backend↔MIT ทดสอบผ่าน HTTP/SSE ตรง (แม่นกว่า)
