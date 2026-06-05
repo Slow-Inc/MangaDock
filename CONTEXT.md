@@ -105,6 +105,70 @@ _Avoid_: cross-platform mobile app, iOS-ready app, native app
 The Mobile Shell practice of attaching native client headers such as `x-hardware-id` and `x-manga-dock-client` to WebView-originated requests so protected backend routes can apply Zero-Trust checks. It is not Supabase token injection or native authentication.
 _Avoid_: token injection, native auth, auth bridge
 
+**Hybrid Mobile Shell**:
+A React Native app that combines a Native App Surface for mobile-owned flows with a WebView Content Surface for the existing MangaDock web app. Native-owned flows include shell launch, onboarding, diagnostics, settings, OS permission prompts, and future native reader controls. WebView-owned flows keep the current MangaDock web experience for auth, library, reader content, community, studio, and translation UI. It is not a full native rewrite, native token storage, a mobile MIT client, or a screen translation app.
+_Avoid_: native rewrite, native app, mobile MIT client, screen translation app
+
+**Native App Surface**:
+The mobile-owned part of the Hybrid Mobile Shell. In the first hybrid milestone it covers Native Onboarding, Native Shell Home, Native Diagnostics, and Native Settings. It owns mobile app state, first-run orientation, app version visibility, endpoint mode, QA diagnostics, WebView reload controls, and OS permission prompts. It does not own manga reader rendering, Supabase Auth, community, studio, or translation workflows in the first milestone.
+_Avoid_: native reader, native auth, native manga app
+
+**WebView Content Surface**:
+The embedded MangaDock web app inside the Hybrid Mobile Shell. In the first hybrid milestone it remains responsible for reader content, Supabase Auth, library, community, studio, and translation UI. It receives mobile identity signals from the shell but does not become a native React Native implementation.
+_Avoid_: native content, duplicated frontend, rewritten reader
+
+**Native Shell Router**:
+The app-level navigation owner inside the Hybrid Mobile Shell. It routes between Native Onboarding, Native Shell Home, MangaDock WebView, Native Diagnostics, and Native Settings. The WebView Content Surface is one routed screen, not the owner of app-level navigation. Native overlays should stay limited to transient controls, not become the main navigation model.
+_Avoid_: WebView-owned navigation, overlay-first navigation, hidden native screens
+
+**Native Onboarding**:
+The first-run Native App Surface that orients users before they enter the MangaDock WebView. It should explain what the Mobile Shell does, confirm the production endpoint, surface diagnostics availability for beta builds, and then hand off to WebView Auth instead of collecting credentials natively.
+_Avoid_: native auth onboarding, marketing landing, duplicated account setup
+
+**Beta Session Onboarding**:
+The beta-only onboarding behavior where the Hybrid Mobile Shell shows Native Onboarding once per fresh app session so QA sees the current beta context and diagnostics guidance. Production builds should use first-run onboarding per install instead, with Settings offering View onboarding again and Reset onboarding controls.
+_Avoid_: production every-launch onboarding, blocking reader return flow, recurring marketing splash
+
+**Native Shell Home**:
+The native task launcher and app-status surface shown after Native Onboarding. It gives users a clear entry into MangaDock, shows app version, endpoint, diagnostics state, and provides native access to Diagnostics and Settings. It remains useful even when the WebView Content Surface cannot load.
+_Avoid_: marketing landing, duplicated manga feed, native auth form
+
+**MangaDock WebView Screen**:
+The Native Shell Router screen that hosts `react-native-webview` and loads the MangaDock web app. It owns WebView-specific behavior such as Mobile Header Injection, injected JavaScript bridge, WebView event logging, reload, and web error reporting. Reader content, WebView Auth, library, community, studio, and translation UI remain inside this screen through the embedded web app.
+_Avoid_: native reader screen, duplicated web routes, WebView-owned app router
+
+**Hybrid Entry Flow**:
+The first hybrid milestone entry flow is Native Onboarding to Native Shell Home to MangaDock WebView Screen. Native Onboarding orients the user, Native Shell Home exposes app-level controls, and MangaDock WebView Screen runs the existing MangaDock web experience.
+_Avoid_: onboarding directly into hidden settings, WebView-only startup, native-home bypass
+
+**WebView Route Launch**:
+The Native Shell Home practice of opening MangaDock WebView Screen with an intended web path such as `/`, `/search`, `/mylist`, `/studio`, or `/community`. Native quick actions launch routes but do not fetch or duplicate manga data. The MangaDock WebView Screen combines the configured frontend URL with the requested path.
+_Avoid_: native data feed, duplicated web routing, native manga fetch
+
+**Last Known Reader Path**:
+The most recent reader route observed from MangaDock WebView Screen navigation events. Native Shell Home may use it for Continue reading when available, otherwise it should fall back to `/mylist`. It is a navigation hint, not a native reading-history store.
+_Avoid_: native reading history, duplicated reader state, native library cache
+
+**Beta Endpoint Mode**:
+The beta-only Native Settings capability for choosing the WebView frontend endpoint: production `https://hayateotsu.space/`, local emulator `http://10.0.2.2:4000`, or a manual custom URL. Non-production endpoints must show a warning and offer Reset to production. Production builds should lock the production endpoint to avoid auth/session confusion across domains.
+_Avoid_: production endpoint editing, secret storage, token migration, hidden domain switching
+
+**Native Diagnostics**:
+The Native App Surface for QA and support diagnostics. It shows the latest 20 diagnostics events, app version, masked Mobile Hardware ID, endpoint mode, WebView health, Reload WebView, and Clear diagnostics events. It replaces large WebView diagnostics panels as the primary diagnostics UI.
+_Avoid_: WebView diagnostics panel as primary UI, persisted logs, full hardware ID display
+
+**Beta Diagnostics Shortcut**:
+The beta-only `[diag]` WebView overlay control. It should act only as a shortcut from MangaDock WebView Screen to Native Diagnostics. It should not render the full diagnostics panel over WebView, and production builds should not show it.
+_Avoid_: overlay-first diagnostics, production diag badge, large WebView overlay panel
+
+**Frontend Visual Source of Truth**:
+The existing `Frontend/` visual system is the design authority for Hybrid Mobile Shell native surfaces. Mobile native screens should preserve MangaDock's dark product UI, typography, spacing density, and interaction tone from the web mobile experience rather than inventing a separate native theme.
+_Avoid_: separate mobile brand, React Native template styling, new palette
+
+**Native Adaptation**:
+The process of translating MangaDock's `Frontend/` visual language into mobile-native screens that respect safe areas, touch targets, native navigation, OS permission flows, diagnostics, and settings. It adapts layout and controls for React Native without duplicating web feeds or rewriting WebView-owned workflows.
+_Avoid_: copied web layout, duplicated frontend, native rewrite
+
 ### Option A' — Redis Pub/Sub Batch Architecture (planned)
 
 Replaces `activeBatchJobs` Map with Redis pub/sub as coordination mechanism:

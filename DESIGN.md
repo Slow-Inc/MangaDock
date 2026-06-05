@@ -112,7 +112,32 @@ Depth is conveyed through **Physical Transparency** and **Ambient Glow**.
 - **Top Bar:** Fixed height (64px), high-blur backdrop, z-index 50.
 - **Mobile Menu:** Right-aligned slide-over drawer with tactical navigation links.
 
-## 6. Brand Identity
+## 6. Hybrid Mobile Native Surfaces
+
+Native screens in `Mobile/` must be a Native Adaptation of the existing `Frontend/` visual system. They should feel like MangaDock mobile surfaces, not React Native template screens.
+
+### Visual Source
+- Use `Frontend/` as the visual source of truth.
+- Preserve the dark product UI: `#08090d`, `#141414`, white/alpha text, indigo action, amber manga metadata.
+- Use Noto Sans Thai or the closest native/system equivalent.
+- Keep mobile density aligned with the current web mobile UI.
+- Do not introduce a separate mobile palette, marketing hero style, or decorative native theme.
+
+### Native Screen Roles
+- **OnboardingScreen:** compact beta/session orientation. It explains the shell, endpoint, and diagnostics. It is not a marketing landing page and does not collect auth credentials.
+- **HomeScreen:** task launcher plus app status. It exposes Open MangaDock, route quick actions, version, endpoint, diagnostics state, Diagnostics, and Settings.
+- **WebViewScreen:** content surface. It hosts MangaDock web, Mobile Header Injection, WebView bridge, reload, and WebView diagnostics events.
+- **DiagnosticsScreen:** dense QA tool UI. It shows recent events, masked Mobile Hardware ID, endpoint mode, app version, WebView health, Reload WebView, and Clear diagnostics events.
+- **SettingsScreen:** native list/control UI for endpoint mode, diagnostics controls, onboarding controls, app info, and carefully labeled destructive actions.
+
+### Interaction Rules
+- Use safe-area-aware layouts and Android touch targets.
+- Use native navigation for app-level movement; do not pile large panels over WebView.
+- Keep `[diag]` as a beta shortcut to DiagnosticsScreen only.
+- Production should hide QA-only controls unless explicitly enabled.
+- Motion should be short and state-driven; respect reduced motion.
+
+## 7. Brand Identity
 
 ### Brand Personality
 - **Sophisticated & Precise:** Like Apple, every gap and alignment is intentional.
@@ -138,7 +163,7 @@ Depth is conveyed through **Physical Transparency** and **Ambient Glow**.
 
 ---
 
-## 7. Do's and Don'ts
+## 8. Do's and Don'ts
 
 ### Do:
 - **Do** use `backdrop-blur-md` on all floating surfaces.
