@@ -352,6 +352,43 @@ export class BooksService {
     ]);
   }
 
+  /** Cache for getImageTranslator() — one MIT round-trip per minute at most. */
+  private imageTranslatorCache: { value: string | null; expiresAt: number } | null = null;
+
+  /** The translator family MIT actually runs (from /ready, #132) — e.g. 'qwen3'
+   *  or 'gemini'. null when MIT is down, not ready, or predates #132; consumers
+   *  treat null as "unknown" (Reader fails open — PRD #131). */
+  async getImageTranslator(): Promise<string | null> {
+    const now = Date.now();
+    if (this.imageTranslatorCache && now < this.imageTranslatorCache.expiresAt) {
+      return this.imageTranslatorCache.value;
+    }
+    let value: string | null = null;
+    try {
+      const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
+      const res = await fetch(`${mitBaseUrl}/ready`, { signal: AbortSignal.timeout(3_000) });
+      if (res.ok) {
+        const body = (await res.json()) as { translator?: unknown };
+        value = typeof body?.translator === 'string' && body.translator ? body.translator : null;
+      }
+    } catch {
+      /* MIT down — degrade to unknown */
+    }
+    this.imageTranslatorCache = { value, expiresAt: now + 60_000 };
+    return value;
+  }
+
+  /** Payload for GET /books/models (#133): the Gemini catalog the Reader can
+   *  offer, plus the translator MIT actually runs so the Reader knows whether
+   *  offering Gemini models makes sense at all. */
+  async getMangaModelsInfo(): Promise<{ models: GeminiModel[]; imageTranslator: string | null }> {
+    const [models, imageTranslator] = await Promise.all([
+      this.getMangaModels(),
+      this.getImageTranslator(),
+    ]);
+    return { models, imageTranslator };
+  }
+
   private shouldSendMitSourceLang(): boolean {
     const raw = (process.env.MIT_SEND_SOURCE_LANG ?? 'true').trim().toLowerCase();
     return !['false', '0', 'no', 'off'].includes(raw);
