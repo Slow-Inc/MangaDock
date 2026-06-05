@@ -165,6 +165,11 @@ export class BooksService {
 
     let pageResult: PageResult;
 
+    // Persistence failures must surface as a page error, never an exception:
+    // a throw here used to exit before processingPages.delete, permanently
+    // locking the page against retries (latent bug noted 2026-06-04, caught
+    // by review on PR #144).
+    try {
     if (error) {
       pageResult = { patches: [], error };
     } else {
@@ -201,6 +206,11 @@ export class BooksService {
       await this.cache.set(cacheKey, { patches }, 1000 * 60 * 60 * 24 * 7); // 7 days
 
       pageResult = { patches };
+    }
+    } catch (persistErr) {
+      const msg = persistErr instanceof Error ? persistErr.message : String(persistErr);
+      this.logger.error(`[Webhook] persistence failed job=${jobKey} page=${pageIndex}: ${msg}`);
+      pageResult = { patches: [], error: `persistence failed: ${msg}` };
     }
 
     const published = await this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...pageResult });

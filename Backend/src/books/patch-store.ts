@@ -69,12 +69,14 @@ export class PatchStore {
 
     const dir = this.chapterDir(loc.chapterId);
     const filePrefix = this.pageFilePrefix(loc);
+    // Normalize once per call: a trailing-slash origin must not produce `//`
+    const origin = this.origin().replace(/\/+$/, '');
     const urls: string[] = [];
 
     for (let i = 0; i < pngs.length; i += 1) {
       const key = `${dir}/${filePrefix}${i}.png`;
       await this.storage.put(key, pngs[i], { contentType: 'image/png' });
-      urls.push(`${this.origin()}/${key}`);
+      urls.push(`${origin}/${key}`);
     }
 
     const names = await this.storage.list(dir);
@@ -100,8 +102,14 @@ export class PatchStore {
       const names = await this.storage.list(dir);
       for (const name of names) {
         if (!OWNED_NAME.test(name)) {
-          await this.storage.delete(`${dir}/${name}`);
-          removed += 1;
+          // Best-effort per entry: readdir-based list() can surface stray
+          // directories, and one EISDIR must not abort the whole sweep.
+          try {
+            await this.storage.delete(`${dir}/${name}`);
+            removed += 1;
+          } catch {
+            /* skip undeletable entry, keep sweeping */
+          }
         }
       }
     }
