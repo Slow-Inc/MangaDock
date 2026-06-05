@@ -114,7 +114,7 @@ MIT chooses a mode by whether `callback_url` is set:
   and exhausted retries are dead-lettered (logged). See `server/webhook.py` + Issue #100.
 
 **Readiness** — `GET /ready` returns `{ "ready": true, "workers": N, "translator": "<id>" }` once a
-worker is registered (503 `{ "ready": false }` before that). `translator` is the resolved default
+worker is registered (503 `{ "ready": false, "status": "starting" }` before that). `translator` is the resolved default
 translator id (e.g. `gemini`, `qwen3`) so consumers can discover the active translator family — the
 Backend forwards it via `GET /books/models` and the Reader hides the Gemini model selector on
 non-Gemini deployments (#132–#134, PRD #131).

@@ -47,27 +47,37 @@ export function getSelectedMangaImageTranslateModel(
 type ModelsInfo = { models: string[]; imageTranslator: string | null };
 let _cachedInfo: ModelsInfo | null = null;
 let _cacheExpiresAt = 0;
+let _inflight: Promise<ModelsInfo> | null = null;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 
 async function fetchModelsInfo(): Promise<ModelsInfo> {
   if (_cachedInfo && Date.now() < _cacheExpiresAt) return _cachedInfo;
+  // Concurrent callers (the Reader fires models + translator lookups together)
+  // share one request instead of racing duplicate fetches.
+  if (_inflight) return _inflight;
 
-  try {
-    const res = await fetch("/api/proxy/books/models", { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = (await res.json()) as { models?: string[]; imageTranslator?: string | null };
-    const info: ModelsInfo = {
-      models: Array.isArray(data.models) && data.models.length > 0
-        ? data.models
-        : [...MANGA_TRANSLATE_MODELS],
-      imageTranslator: typeof data.imageTranslator === "string" ? data.imageTranslator : null,
-    };
-    _cachedInfo = info;
-    _cacheExpiresAt = Date.now() + CACHE_TTL_MS;
-    return info;
-  } catch {
-    return { models: [...MANGA_TRANSLATE_MODELS], imageTranslator: null };
-  }
+  _inflight = (async (): Promise<ModelsInfo> => {
+    try {
+      const res = await fetch("/api/proxy/books/models", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { models?: string[]; imageTranslator?: string | null };
+      const info: ModelsInfo = {
+        models: Array.isArray(data.models) && data.models.length > 0
+          ? data.models
+          : [...MANGA_TRANSLATE_MODELS],
+        imageTranslator: typeof data.imageTranslator === "string" ? data.imageTranslator : null,
+      };
+      _cachedInfo = info;
+      _cacheExpiresAt = Date.now() + CACHE_TTL_MS;
+      return info;
+    } catch {
+      // Not cached: a later call may succeed once the backend is reachable
+      return { models: [...MANGA_TRANSLATE_MODELS], imageTranslator: null };
+    } finally {
+      _inflight = null;
+    }
+  })();
+  return _inflight;
 }
 
 export async function fetchAvailableMangaModels(): Promise<string[]> {
