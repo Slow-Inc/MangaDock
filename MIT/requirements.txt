@@ -46,6 +46,7 @@ aioshutil
 aiofiles
 arabic-reshaper
 pyhyphen
+pythainlp  # Thai word segmentation for correct line-breaking (newmm engine, dict-based, no torch)
 langcodes
 manga-ocr
 langdetect
