@@ -87,6 +87,16 @@ scrutinize ทั้ง server/orchestration layer ของ MIT แล้วเ
 
 **สำหรับ Gemini re-review:** dead-letter ปัจจุบันเป็น log อย่างเดียว (ไม่ persist/replay) — ตาม scope #100; การ persist เพื่อ reconciliation เป็นงานแยก (เกิน #100) · ยังไม่ commit (รอ user สั่ง)
 
+## ✅ #107 IMPLEMENTED — GeminiTranslator error-handling (2026-06-05)
+
+- **G1** `server_error_attempt = 0` ก่อน retry loop (ตกหายไป — chatgpt/deepseek/sakura มีอยู่แล้ว) → APIError ไม่ crash UnboundLocalError แต่ retry ตามตั้งใจ
+- **G2** `raise` เปล่า → `raise ValueError(...)` (model misconfig ได้ error ชัด)
+- **G3** `.lstrip('models/')` → `.removeprefix('models/')` (lstrip ตัด char ในเซ็ต — `models/embedding`→`bedding`)
+- **G4** JSON-mode: ย้าย `loggerVals[...] = lang_JSON_samples[0]` เข้าใน `if` guard (กัน IndexError) + ลบ trailing-comma tuple
+- **Verify:** py_compile OK · G3 demo (`bedding-001` vs `embedding-001`) · 25 unit tests ยังเขียว · **ไม่เขียน gemini unit test** (สร้าง translator ต้อง network = disproportionate ต่อ mechanical fix ที่ตรงกับ 3 sibling translators)
+
+---
+
 ## ✅ #101 IMPLEMENTED — Batch cancellation propagation (2026-06-05, TDD, grilled)
 
 Design grill-locked (ทุกข้อยึดหลักการ simplest+sustainable+perf):
