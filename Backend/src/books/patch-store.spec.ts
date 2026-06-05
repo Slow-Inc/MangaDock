@@ -97,6 +97,26 @@ describe('PatchStore', () => {
     expect(storage.files.size).toBe(2);
   });
 
+  it('a model id containing underscores survives sweepLegacy (Copilot: data-loss class)', async () => {
+    const { storage, store } = makeStore();
+    // imageModelKey allows \w, so '_' is a legal model character
+    await store.put({ ...loc, model: 'my_custom_model' }, [png('a')]);
+
+    const removed = await store.sweepLegacy();
+
+    expect(removed).toBe(0);
+    expect(storage.files.size).toBe(1);
+  });
+
+  it('rejects path-traversal segments before touching storage', async () => {
+    const { storage, store } = makeStore();
+
+    await expect(store.put({ ...loc, chapterId: '../../etc' }, [png('a')])).rejects.toThrow();
+    await expect(store.put({ ...loc, srcMIT: 'a/b' }, [png('a')])).rejects.toThrow();
+    await expect(store.put({ ...loc, model: 'evil\\model' }, [png('a')])).rejects.toThrow();
+    expect(storage.files.size).toBe(0);
+  });
+
   it('sweepLegacy removes only legacy-format files, never PatchStore-named ones', async () => {
     const { storage, store } = makeStore();
     await store.put(loc, [png('a')]);
