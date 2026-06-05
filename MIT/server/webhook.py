@@ -27,6 +27,15 @@ def _sign(secret: str, data: bytes) -> str:
     return hmac.new(secret.encode("utf-8"), data, hashlib.sha256).hexdigest()
 
 
+def _int_env(name: str, default: int) -> int:
+    """Parse a non-negative int env var; empty/garbage values fall back to the
+    default instead of crashing the batch loop mid-delivery."""
+    try:
+        return max(0, int(os.environ.get(name, default)))
+    except (TypeError, ValueError):
+        return default
+
+
 def _is_retryable_status(status_code: int) -> bool:
     """Transient HTTP failures worth retrying: 5xx (server error / restart /
     overload) and 429 (rate limit). Other 4xx (e.g. 400, 401, 413) are
@@ -57,8 +66,8 @@ async def send_webhook(url: str, secret: str, payload: dict) -> None:
     if secret:
         headers["x-mit-signature"] = _sign(secret, data)
 
-    max_retries = int(os.environ.get("MIT_WEBHOOK_MAX_RETRIES", "3"))
-    backoff_ms = int(os.environ.get("MIT_WEBHOOK_RETRY_BACKOFF_MS", "500"))
+    max_retries = _int_env("MIT_WEBHOOK_MAX_RETRIES", 3)
+    backoff_ms = _int_env("MIT_WEBHOOK_RETRY_BACKOFF_MS", 500)
 
     last_reason = "unknown"
     async with httpx.AsyncClient() as client:

@@ -6,7 +6,7 @@ Covers:
   - find_executor() does not hold lock while waiting for a free executor
 """
 import asyncio
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
@@ -112,7 +112,7 @@ def test_to_pil_image_url_uses_async_http():
         async def run():
             return await re_mod.to_pil_image("http://example.com/img.png")
 
-        result = asyncio.run(run())
+        asyncio.run(run())
         assert mock_httpx.AsyncClient.called
         assert mock_client.get.called
 

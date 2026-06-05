@@ -3,9 +3,9 @@
 Verifies that the worker is always told to bind loopback regardless of what
 host the front server uses.
 """
-import sys
+
 from argparse import Namespace
-from unittest.mock import patch
+
 
 from server.main import _build_worker_cmd
 

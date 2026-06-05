@@ -160,3 +160,14 @@ def test_signs_when_secret_present(monkeypatch):
     client = _install(monkeypatch, [200])
     _run(webhook.send_webhook("http://x/cb", "topsecret", PAYLOAD))
     assert "x-mit-signature" in client.calls[0]["headers"]
+
+def test_malformed_retry_env_falls_back_to_defaults(monkeypatch):
+    """Empty/garbage env values must not crash the batch loop (Copilot review).
+
+    Defaults: max_retries=3 -> a permanent 500 is attempted 4 times.
+    """
+    monkeypatch.setenv("MIT_WEBHOOK_MAX_RETRIES", "")
+    monkeypatch.setenv("MIT_WEBHOOK_RETRY_BACKOFF_MS", "not-a-number")
+    client = _install(monkeypatch, [500, 500, 500, 500])
+    _run(webhook.send_webhook("http://x/cb", "", PAYLOAD))
+    assert len(client.calls) == 4
