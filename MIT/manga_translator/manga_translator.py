@@ -106,6 +106,12 @@ class MangaTranslator:
     result_sub_folder: str
     batch_size: int
 
+    # Minimum number of regions on a page before the page-level target-language
+    # check is worth running. Single-sourced so every page-level call site agrees
+    # (Issue #109). Below this, a few untranslated SFX/credits would dominate the
+    # ratio and reject an otherwise-fine page.
+    _PAGE_LANG_CHECK_MIN_REGIONS = 6
+
     def __init__(self, params: dict = None):
         self.pre_dict = params.get('pre_dict', None)
         self.post_dict = params.get('post_dict', None)
@@ -1249,7 +1255,7 @@ class MangaTranslator:
             
             # 页面级目标语言检查（使用过滤后的区域数量）
             page_lang_check_result = True
-            if ctx.text_regions and len(ctx.text_regions) > 5:
+            if ctx.text_regions and len(ctx.text_regions) >= self._PAGE_LANG_CHECK_MIN_REGIONS:
                 logger.info(f"Starting page-level target language check with {len(ctx.text_regions)} regions...")
                 page_lang_check_result = await self._check_target_language_ratio(
                     ctx.text_regions,
@@ -2450,7 +2456,8 @@ class MangaTranslator:
                     ctx.text_regions = await self._apply_post_translation_processing(ctx, config)
                 
                 # 单页目标语言检查（如果启用）
-                if config.translator.enable_post_translation_check and ctx.text_regions:
+                if (config.translator.enable_post_translation_check and ctx.text_regions
+                        and len(ctx.text_regions) >= self._PAGE_LANG_CHECK_MIN_REGIONS):
                     page_lang_check_result = await self._check_target_language_ratio(
                         ctx.text_regions,
                         config.translator.target_lang,
@@ -3074,7 +3081,7 @@ class MangaTranslator:
             return True
         
         # 1. 目标语言比例检查（页面级别）
-        if page_lang_check_result is None and ctx and ctx.text_regions and len(ctx.text_regions) > 10:
+        if page_lang_check_result is None and ctx and ctx.text_regions and len(ctx.text_regions) >= self._PAGE_LANG_CHECK_MIN_REGIONS:
             # 进行页面级目标语言检查
             page_lang_check_result = await self._check_target_language_ratio(
                 ctx.text_regions,
