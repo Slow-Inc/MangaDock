@@ -26,6 +26,7 @@ from server.request_extraction import get_ctx, get_patch_ctx, while_streaming, T
 from server.to_json import to_translation, TranslationResponse
 from server.webhook import send_webhook
 from server.cancellation import is_cancelled, mark_cancelled, discard
+from server.path_utils import safe_result_folder
 
 app = FastAPI(
     title="Manga Image Translator",
@@ -403,11 +404,11 @@ async def queue_size() -> int:
 @app.api_route("/result/{folder_name}/final.png", methods=["GET", "HEAD"], tags=["api", "file"])
 async def get_result_by_folder(folder_name: str):
     """根据文件夹名称获取翻译结果图片"""
-    result_dir = RESULT_ROOT
-    if not result_dir.exists():
-        raise HTTPException(404, detail="Result directory not found")
+    try:
+        folder_path = safe_result_folder(RESULT_ROOT, folder_name)
+    except ValueError:
+        raise HTTPException(400, detail="Invalid folder name")
 
-    folder_path = result_dir / folder_name
     if not folder_path.exists() or not folder_path.is_dir():
         raise HTTPException(404, detail=f"Folder {folder_name} not found")
 
@@ -583,7 +584,17 @@ async def list_results():
 
 @app.delete("/results/clear", tags=["api"])
 async def clear_results():
-    """Delete all result directories"""
+    """Delete all result directories.
+
+    Decision (#102): MIT is an internal service (Backend → MIT only). The
+    /results/clear endpoint has no path-traversal risk (it iterates RESULT_ROOT
+    directly) but is unauthenticated and bulk-destructive. It is disabled by
+    default via MIT_ENABLE_RESULT_CLEAR=0. Set MIT_ENABLE_RESULT_CLEAR=1 to
+    enable (e.g. for a standalone dev instance with the web UI).
+    """
+    if os.environ.get("MIT_ENABLE_RESULT_CLEAR", "0") != "1":
+        raise HTTPException(403, detail="Result clear is disabled on this instance")
+
     result_dir = RESULT_ROOT
     if not result_dir.exists():
         return {"message": "No results directory found"}
@@ -605,20 +616,23 @@ async def clear_results():
 @app.delete("/results/{folder_name}", tags=["api"])
 async def delete_result(folder_name: str):
     """Delete a specific result directory"""
-    result_dir = RESULT_ROOT
-    folder_path = result_dir / folder_name
-    
+    try:
+        folder_path = safe_result_folder(RESULT_ROOT, folder_name)
+    except ValueError:
+        raise HTTPException(400, detail="Invalid folder name")
+
     if not folder_path.exists():
         raise HTTPException(404, detail="Result directory not found")
-    
+
     try:
-        # Check if final.png exists in this directory
         final_png_path = folder_path / "final.png"
         if not final_png_path.exists():
             raise HTTPException(404, detail="Result file not found")
-        
+
         shutil.rmtree(folder_path)
         return {"message": f"Deleted result directory: {folder_name}"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, detail=f"Error deleting result: {str(e)}")
 
