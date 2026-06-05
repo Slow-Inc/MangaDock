@@ -1,10 +1,4 @@
 import base64
-import hmac
-import hashlib
-import httpx
-import hmac
-import hashlib
-import httpx
 import io
 import json
 import os
@@ -30,6 +24,7 @@ from server.instance import ExecutorInstance, executor_instances
 from server.myqueue import task_queue
 from server.request_extraction import get_ctx, get_patch_ctx, while_streaming, TranslateRequest, BatchTranslateRequest, get_batch_ctx
 from server.to_json import to_translation, TranslationResponse
+from server.webhook import send_webhook
 
 app = FastAPI(
     title="Manga Image Translator",
@@ -198,21 +193,6 @@ async def patches_form(req: Request, image: UploadFile = File(...), config: str 
         "img_height": patch_result.get("img_height", 0),
         "patches": normalized_patches,
     }
-
-async def send_webhook(url: str, secret: str, payload: dict):
-    """Sends a signed POST request to the callback URL."""
-    data = json.dumps(payload, separators=(',', ':'), ensure_ascii=False).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
-    if secret:
-        signature = hmac.new(secret.encode("utf-8"), data, hashlib.sha256).hexdigest()
-        headers["x-mit-signature"] = signature
-    
-    async with httpx.AsyncClient() as client:
-        try:
-            await client.post(url, content=data, headers=headers, timeout=60.0)
-        except Exception as e:
-            # We use print as it's the current logging pattern in this file
-            print(f"Webhook delivery failed to {url}: {String(e) if 'String' in globals() else e}")
 
 async def run_batch_with_callbacks(
     index_list: list[int],
