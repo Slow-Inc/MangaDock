@@ -23,6 +23,30 @@ except ImportError:
     _HAS_PYTHAINLP = False
 
 
+# Thai non-spacing marks that must never start a line: they attach to the
+# preceding base consonant (above/below vowels + tone marks). Splitting between
+# a base char and one of these orphans the mark and corrupts the rendered glyph.
+_THAI_COMBINING = frozenset(
+    [chr(0x0E31)]                              # MAI HAN-AKAT
+    + [chr(c) for c in range(0x0E34, 0x0E3B)]  # SARA I..U + PHINTHU
+    + [chr(c) for c in range(0x0E47, 0x0E4F)]  # MAITAIKHU..YAMAKKAN (incl. tone marks)
+)
+
+
+def _safe_char_split(s: str) -> List[str]:
+    """Split a string into renderable clusters, keeping Thai combining marks
+    attached to their preceding base character. Equivalent to list(s) for text
+    with no Thai marks. Used as the last-resort break unit so wrapping never
+    orphans a Thai mark even when a single token exceeds the line width."""
+    clusters: List[str] = []
+    for ch in s:
+        if ch in _THAI_COMBINING and clusters:
+            clusters[-1] += ch
+        else:
+            clusters.append(ch)
+    return clusters
+
+
 def _insert_thai_word_breaks(text: str) -> str:
     """If text contains Thai characters, segment it with pythainlp and
     insert zero-width spaces between tokens so calc_horizontal can wrap on
@@ -683,7 +707,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
             if len(word) <= 3:
                 new_syls = [word]
             else:
-                new_syls = list(word)
+                new_syls = _safe_char_split(word)
 
         # # Make sure no syllable goes over max_width
         # for syl in syllables[-1]:
@@ -696,7 +720,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
         for syl in new_syls:
             syl_width = get_string_width(font_size, syl)
             if syl_width > max_width:
-                normalized_syls.extend(list(syl))
+                normalized_syls.extend(_safe_char_split(syl))
             else:
                 normalized_syls.append(syl)
         syllables.append(normalized_syls)
