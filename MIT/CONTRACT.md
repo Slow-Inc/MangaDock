@@ -141,9 +141,9 @@ payload (minus `taskId`), terminated by a sentinel:
 
 ## 5. Known contract hazards (open)
 
-- **HMAC over raw bytes (#95 S1):** MIT signs the exact serialized body
-  (`json.dumps(separators=(',',':'))`). The Backend currently verifies over a re-serialized parsed object,
-  which can differ byte-for-byte. Only matters when `MIT_WEBHOOK_SECRET` is set. Verify on **raw request
-  bytes** to be safe.
 - **Casing split (§0):** snake_case (single) vs camelCase (batch) — the most likely source of a silent
   `undefined`/`0` on the consumer side.
+
+Resolved hazards: HMAC is now verified over the **raw request bytes** captured by the Backend's
+`json()` verify hook (#95 S1) — re-serializing the parsed body was not byte-stable
+(key-order transforms; Python `json.dumps` `1.0` vs `JSON.stringify` `1`).
