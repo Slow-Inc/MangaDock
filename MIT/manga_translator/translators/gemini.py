@@ -129,14 +129,14 @@ class GeminiTranslator(CommonGPTTranslator):
         Start Section:
             Validate `GEMINI_MODEL` specification and determine supported capabilities.
         '''
-        model_names = [aModel.name.lstrip('models/') for aModel in model_list]
+        model_names = [aModel.name.removeprefix('models/') for aModel in model_list]
         if  f"{GEMINI_MODEL}" not in model_names:
             self.logger.error(f"Model: '{GEMINI_MODEL}' was not found in the model list.\n" +
                                 "Please ensure you set the key: GEMINI_MODEL to one of the following values:"
                             )
             self.logger.error('\n'.join(mName for mName in model_names))
 
-            raise
+            raise ValueError(f"GEMINI_MODEL '{GEMINI_MODEL}' is not in the available model list")
         
         # Use index of model name to get full model info
         model_info = model_list[model_names.index(GEMINI_MODEL)]
@@ -149,7 +149,7 @@ class GeminiTranslator(CommonGPTTranslator):
             Made into a function purely to help with code readability.
             """
             # List of models that support content caching:
-            canCacheModels=[m.name.lstrip('models/')
+            canCacheModels=[m.name.removeprefix('models/')
                             for m in model_list
                                 if 'createCachedContent' in m.supported_actions
                         ]
@@ -324,10 +324,11 @@ class GeminiTranslator(CommonGPTTranslator):
             nonlocal MAX_SPLIT_ATTEMPTS
             split_prefix = ' (split)' if split_level > 0 else ''  
 
-            # Assemble prompt for the current batch  
+            # Assemble prompt for the current batch
             prompt, query_size = self._assemble_prompts(from_lang, to_lang, prompt_queries).__next__()
 
-            for attempt in range(RETRY_ATTEMPTS):  
+            server_error_attempt = 0
+            for attempt in range(RETRY_ATTEMPTS):
                 try:  
                     # Get the response (synchronously)
                     response = await self._request_translation(to_lang, prompt)  
@@ -556,8 +557,8 @@ class _GeminiTranslator_json (_CommonGPTTranslator_JSON):
                     types.Content(role='model', parts=[types.Part.from_text(text=lang_JSON_samples[1].model_dump_json())]),
                 ]
 
-            loggerVals['Sample: User'] = lang_JSON_samples[0].model_dump_json(),
-            loggerVals['Sample: Model'] = lang_JSON_samples[1].model_dump_json()
+                loggerVals['Sample: User'] = lang_JSON_samples[0].model_dump_json()
+                loggerVals['Sample: Model'] = lang_JSON_samples[1].model_dump_json()
 
 
         messages.append(types.Content(role='user',  parts=[types.Part.from_text(text=prompt)]))
