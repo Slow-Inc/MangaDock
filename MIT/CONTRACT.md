@@ -109,7 +109,9 @@ MIT chooses a mode by whether `callback_url` is set:
 
 **Cancellation** — `POST /cancel/{taskId}` tells MIT to stop a running batch. The Backend calls it when its
 last SSE listener for the job leaves. Best-effort and idempotent: a no-op for an unknown/finished taskId. MIT
-stops before its next page and drops a page that finished after the cancel arrived.
+stops before its next page and drops a page that finished after the cancel arrived. Because taskIds are
+deterministic (`chapterId:src:tgt`), a **new batch submission clears any stale cancel flag** for its taskId —
+a cancel that arrived after the previous run finished cannot poison the next run (#128).
 
 ### 3b. NDJSON streaming mode (no `callback_url`)
 
