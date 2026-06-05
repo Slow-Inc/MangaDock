@@ -211,7 +211,11 @@ Commit: #121 beta APK refresh on feat/mobile-shell-phase3
 APK: Mobile/build/qa/mangadock-beta-release-prod-domain.apk
 Size: 67,447,494 bytes
 Package: com.mobile
+SHA256: 7504D8C8BEBC25F002844DD5034AC7C75D790902108DE91B96B31B644A638EAF
 ```
+
+`Mobile/build/` is ignored by git, so this APK is a local QA artifact. Use the
+SHA256 above to confirm the file before sharing it with QA.
 
 Verified APK metadata:
 
