@@ -119,6 +119,10 @@ stops before its next page and drops a page that finished after the cancel arriv
 deterministic (`chapterId:src:tgt`), a **new batch submission clears any stale cancel flag** for its taskId —
 a cancel that arrived after the previous run finished cannot poison the next run (#128).
 
+Cancellation is **page-granular by design** (#129 ADR in `ARCHITECTURE.md` §6): a page already
+mid-inference finishes before the cancel takes effect (up to ~60–100 s), and the worker stays busy for
+that long — new requests queue behind it. Callers must not treat this window as "MIT is down".
+
 ### 3b. NDJSON streaming mode (no `callback_url`)
 
 `200 OK`, `application/x-ndjson` — one JSON object per line, **same flat camelCase shape** as the webhook

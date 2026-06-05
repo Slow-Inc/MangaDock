@@ -165,6 +165,14 @@ layers, not here.
   and the batch loop (`server/batch_runner.py`) stops before the next page (Issue #101). taskIds are
   deterministic per chapter+language pair, so each run **discards any stale cancel flag on start** — a
   cancel that lands after a run already finished must not poison the next run of the same taskId (#128).
+- **ADR — cancellation granularity (#129, decided 2026-06-05): page-boundary only, by design.**
+  An in-flight page cannot be interrupted: the worker is a separate process mid-inference, and killing
+  its connection has crashed the BLAS runtime before (`forrtl error 200`). Checkpointing cancellation
+  into the worker pipeline means plumbing taskIds across processes; a second worker doubles VRAM.
+  Accepted trade-off: cancel latency is **up to one page (~60–100 s)**, during which the single worker
+  is still busy and new requests (single-page or batch) queue behind it. The Frontend communicates this
+  on cancel ("หน้าที่กำลังประมวลผลอยู่จะหยุดเมื่อจบหน้านั้น"). Revisit only if multi-GPU or a worker
+  pool lands (then prefer a dedicated short-job worker over mid-page interruption).
 - **Gotcha:** `find_executor()` holds an `asyncio.Lock` across an `await` (#106); translator instances are
   cached globally and mutated per-request (safe only because of the single-executor serialisation, #108).
 
