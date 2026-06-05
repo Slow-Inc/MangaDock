@@ -49,9 +49,9 @@ MIT runs as **two processes** so heavy ML work is delegated out of the HTTP laye
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-- The web server spawns the worker in `start_translator_client_proc()` (server/main.py). The worker's
-  connect address is forced to `127.0.0.1`, but it currently **binds** on the web server's host
-  (`0.0.0.0` by default) — see Known Issue #103.
+- The web server spawns the worker in `start_translator_client_proc()` (server/main.py). The worker
+  always **binds `127.0.0.1`** (loopback) regardless of the front server's public bind host — the
+  worker's pickle-accepting endpoints must never be reachable from the network (#103, fixed).
 - Start everything with `run-server.bat` (Windows). Env knobs: `MIT_HOST`, `MIT_PORT` (5003),
   `MIT_USE_GPU`, `MIT_START_INSTANCE`.
 
@@ -242,7 +242,7 @@ Copy `.env.example` → `.env`. Key variables:
 > `MIT_WEBHOOK_SECRET` is a **Backend** variable; the secret reaches MIT as the `callback_secret` form field,
 > not via MIT's own env.
 
-**Security note (#103):** the worker accepts `pickle` over HTTP and is started on `MIT_HOST` (0.0.0.0).
+**Security note (#103, fixed):** the worker accepts `pickle` over HTTP. It is always started on `127.0.0.1` (loopback) regardless of `MIT_HOST` — never expose worker port externally.
 Treat its port as loopback-only and never expose it publicly.
 
 ---
@@ -284,7 +284,7 @@ From a full logic scrutiny (model internals excluded). Filed #100–#111.
 | #100 | Critical | Webhook had no retry → Patch Sets lost ("0/20") | **Done** (server/webhook.py) |
 | #101 | Critical | Batch cancellation not propagated → zombie GPU jobs | **Done** (`server/cancellation.py` + `/cancel`) |
 | #102 | Security | Path traversal in `/result(s)/...` | Open |
-| #103 | Security | Worker pickle-over-HTTP + binds 0.0.0.0 (RCE risk) | Open |
+| #103 | Security | Worker pickle-over-HTTP + binds 0.0.0.0 (RCE risk) | **Fixed** |
 | #104 | Major | Broken/stub batch endpoints | Open |
 | #105 | Cleanup | Dead code / duplicate imports | Open (partly cleaned with #100) |
 | #106 | Major | Event-loop blocking + unbounded waits | Open |

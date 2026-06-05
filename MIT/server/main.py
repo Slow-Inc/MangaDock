@@ -479,12 +479,19 @@ async def manual():
 def generate_nonce():
     return secrets.token_hex(16)
 
-def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+def _build_worker_cmd(params: Namespace, port: int, nonce: str) -> list:
+    """Build the subprocess argv for the worker process.
+
+    The worker always binds 127.0.0.1 (loopback) regardless of the front
+    server's public bind host. The worker receives pickle-deserialised payloads
+    from the web server; exposing it to the network would be arbitrary code
+    execution (Issue #103).
+    """
     cmds = [
         sys.executable,
         '-m', 'manga_translator',
         'shared',
-        '--host', host,
+        '--host', '127.0.0.1',
         '--port', str(port),
         '--nonce', nonce,
     ]
@@ -501,14 +508,16 @@ def start_translator_client_proc(host: str, port: int, nonce: str, params: Names
     if getattr(params, 'pre_dict', None):
         cmds.extend(['--pre-dict', params.pre_dict])
     if getattr(params, 'post_dict', None):
-        cmds.extend(['--post-dict', params.post_dict])       
+        cmds.extend(['--post-dict', params.post_dict])
+    return cmds
+
+
+def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+    cmds = _build_worker_cmd(params, port, nonce)
     base_path = os.path.dirname(os.path.abspath(__file__))
     parent = os.path.dirname(base_path)
     proc = subprocess.Popen(cmds, cwd=parent)
-    # Use 127.0.0.1 as the connect address regardless of the bind host (0.0.0.0)
-    # because 0.0.0.0 is a valid listen address but not a valid connection target.
-    connect_ip = '127.0.0.1' if host == '0.0.0.0' else host
-    executor_instances.register(ExecutorInstance(ip=connect_ip, port=port))
+    executor_instances.register(ExecutorInstance(ip='127.0.0.1', port=port))
 
     def handle_exit_signals(signal, frame):
         proc.terminate()
