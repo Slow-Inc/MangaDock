@@ -6,7 +6,8 @@ import { createPortal } from "react-dom";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { translateMangaChapterBatchPatches, translateMangaPagePatches, checkMitHealth, type PatchData } from "../lib/mangaTranslatePage";
-import { fetchAvailableMangaModels, getSelectedMangaImageTranslateModel } from "../lib/mangaTranslateModel";
+import { fetchAvailableMangaModels, getSelectedMangaImageTranslateModel, MANGA_IMAGE_TRANSLATE_MODEL_KEY } from "../lib/mangaTranslateModel";
+import { useToast } from "../contexts/ToastContext";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { getHardwareId } from "../lib/fingerprint";
 
@@ -155,6 +156,33 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [translateMenuOpen, setTranslateMenuOpen] = useState(false);
   const translateMenuRef = useRef<HTMLDivElement | null>(null);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const { showToast } = useToast();
+
+  // Image-translation Gemini model (#87). null = อัตโนมัติ — let the server's
+  // env default decide. Persisted under MANGA_IMAGE_TRANSLATE_MODEL_KEY; the
+  // translate calls read it back via getSelectedMangaImageTranslateModel().
+  const [imageModel, setImageModel] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+
+  useEffect(() => {
+    setImageModel(localStorage.getItem(MANGA_IMAGE_TRANSLATE_MODEL_KEY));
+  }, []);
+
+  // Fetch the model list lazily, the first time either translate menu opens
+  useEffect(() => {
+    if ((!translateMenuOpen && !moreMenuOpen) || availableModels.length > 0) return;
+    let alive = true;
+    void fetchAvailableMangaModels().then((models) => {
+      if (alive) setAvailableModels(models);
+    });
+    return () => { alive = false; };
+  }, [translateMenuOpen, moreMenuOpen, availableModels.length]);
+
+  const selectImageModel = (model: string | null) => {
+    setImageModel(model);
+    if (model) localStorage.setItem(MANGA_IMAGE_TRANSLATE_MODEL_KEY, model);
+    else localStorage.removeItem(MANGA_IMAGE_TRANSLATE_MODEL_KEY);
+  };
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
   const translateControllerRef = useRef<AbortController | null>(null);
   const [mitStatus, setMitStatus] = useState<"unknown" | "online" | "offline">("unknown");
@@ -907,6 +935,13 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     translateControllerRef.current?.abort();
     translateControllerRef.current = null;
     setTranslating(false);
+    // Cancellation is cooperative at page boundaries (ADR: MIT/ARCHITECTURE.md §6,
+    // #129) — the server stops before the next page; a page already mid-inference
+    // finishes (and its result is dropped). Tell the user the truth.
+    showToast({
+      message: "หยุดการแปลแล้ว — หน้าที่กำลังประมวลผลอยู่จะหยุดเมื่อจบหน้านั้น",
+      type: "info",
+    });
   };
 
   /** Translate only the current page — for debugging specific pages */
@@ -1174,6 +1209,38 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       </div>
                     )}
 
+                    {/* Image-translation model selector (#87) */}
+                    {availableModels.length > 0 && (
+                      <div className="mb-1">
+                        <div className="mb-1.5 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-white/35">โมเดล AI</div>
+                        <div className="flex flex-wrap gap-1 px-1 pb-1">
+                          <button
+                            onClick={() => selectImageModel(null)}
+                            className={`rounded-lg px-3 py-1.5 text-xs transition-colors duration-150 ${
+                              imageModel === null
+                                ? "bg-white/15 font-semibold text-white"
+                                : "text-white/60 hover:bg-white/10 hover:text-white"
+                            }`}
+                          >
+                            อัตโนมัติ
+                          </button>
+                          {availableModels.map((m) => (
+                            <button
+                              key={m}
+                              onClick={() => selectImageModel(m)}
+                              className={`rounded-lg px-3 py-1.5 text-xs transition-colors duration-150 ${
+                                imageModel === m
+                                  ? "bg-white/15 font-semibold text-white"
+                                  : "text-white/60 hover:bg-white/10 hover:text-white"
+                              }`}
+                            >
+                              {m.replace(/^gemini-/, "")}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="my-1 border-t border-white/10" />
 
                     {/* Single-page translate */}
@@ -1367,6 +1434,35 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                             }`}
                           >
                             {l.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Image-translation model selector (#87) */}
+                    {availableModels.length > 0 && (
+                      <div className="mb-2 flex flex-wrap gap-1">
+                        <button
+                          onClick={() => selectImageModel(null)}
+                          className={`rounded-lg px-3 py-1.5 text-xs transition ${
+                            imageModel === null
+                              ? "bg-white/15 font-semibold text-white"
+                              : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                          }`}
+                        >
+                          อัตโนมัติ
+                        </button>
+                        {availableModels.map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => selectImageModel(m)}
+                            className={`rounded-lg px-3 py-1.5 text-xs transition ${
+                              imageModel === m
+                                ? "bg-white/15 font-semibold text-white"
+                                : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                            }`}
+                          >
+                            {m.replace(/^gemini-/, "")}
                           </button>
                         ))}
                       </div>
