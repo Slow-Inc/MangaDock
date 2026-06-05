@@ -816,6 +816,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     const controller = new AbortController();
     translateControllerRef.current = controller;
     setTranslating(true);
+    setShowTranslation(true);
     setTransProgress({ done: completedTranslatedPages.size, total });
 
     // Build page list in priority order — visible page first for instant feedback

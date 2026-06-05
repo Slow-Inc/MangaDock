@@ -208,6 +208,19 @@ export class BooksController {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
+    // Start the response body immediately with an SSE comment. This forces any
+    // intermediary proxy (Cloudflare Tunnel) into streaming mode so it does not
+    // apply a "time to first byte" timeout (HTTP 524) while MIT processes page 1.
+    res.write(': connected\n\n');
+
+    // Periodic heartbeat keeps the connection alive through long gaps between pages.
+    // A single complex page (or cold model load) can take >100s; Cloudflare idle-
+    // times-out at ~100s. SSE comment lines (leading ':') are ignored by the client
+    // reader, which only parses lines starting with "data: ".
+    const heartbeat = setInterval(() => {
+      if (!res.writableEnded) res.write(': ping\n\n');
+    }, 15_000);
+
     const { sourceLang, targetLang } = body ?? {};
 
     const listener = (pageIndex: number, result: { patches: unknown[]; error?: string }) => {
@@ -218,6 +231,7 @@ export class BooksController {
 
     // Remove listener on client disconnect — job continues in background
     res.on('close', () => {
+      clearInterval(heartbeat);
       this.booksService.removeBatchListener(chapterId, sourceLang, targetLang, listener);
     });
 
@@ -230,6 +244,7 @@ export class BooksController {
       }
     }
 
+    clearInterval(heartbeat);
     if (!res.writableEnded) res.end();
   }
 

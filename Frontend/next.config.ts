@@ -8,6 +8,10 @@ import os from "os";
  * connection to fail — React Fast Refresh can't coordinate state updates and
  * falls back to a full page reload, losing all client-side state (modals,
  * reader, translation patches, etc.).
+ *
+ * For Cloudflare Tunnel access (e.g. hayateotsu.space) add the hostname to
+ * NEXT_DEV_EXTRA_ORIGINS in .env.local (comma-separated, no protocol):
+ *   NEXT_DEV_EXTRA_ORIGINS=hayateotsu.space
  */
 function getLocalIPv4Addresses(): string[] {
   const interfaces = os.networkInterfaces();
@@ -23,10 +27,16 @@ function getLocalIPv4Addresses(): string[] {
   return ips;
 }
 
+function getExtraDevOrigins(): string[] {
+  const raw = process.env.NEXT_DEV_EXTRA_ORIGINS ?? "";
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 const nextConfig: NextConfig = {
   // Allow cross-origin HMR / hot-reload requests when accessing the dev server
-  // from other devices on the local network (e.g. 192.168.x.x, 10.x.x.x, Radmin VPN).
-  allowedDevOrigins: getLocalIPv4Addresses(),
+  // from other devices on the local network (e.g. 192.168.x.x, 10.x.x.x, Radmin VPN)
+  // or via Cloudflare Tunnel (add hostname to NEXT_DEV_EXTRA_ORIGINS in .env.local).
+  allowedDevOrigins: [...getLocalIPv4Addresses(), ...getExtraDevOrigins()],
   async rewrites() {
     const backendUrl = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
     return [

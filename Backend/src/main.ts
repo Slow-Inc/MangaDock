@@ -1,13 +1,45 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
+import { json, urlencoded } from 'express';
+import * as fs from 'fs';
 import * as path from 'path';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { StructuredLoggingInterceptor } from './common/interceptors/structured-logging.interceptor';
 
+/**
+ * Tee every byte written to stdout/stderr into a daily rotating log file.
+ * Must be called before NestFactory.create so startup logs are captured.
+ */
+function setupFileLogging(): void {
+  const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const logsDir = path.resolve(process.cwd(), 'logs');
+  fs.mkdirSync(logsDir, { recursive: true });
+  const logPath = path.join(logsDir, `backend-${date}.log`);
+  const stream = fs.createWriteStream(logPath, { flags: 'a', encoding: 'utf8' });
+
+  // Write session separator so multiple restarts are distinguishable in the file
+  stream.write(`\n${'='.repeat(72)}\n[session start] ${new Date().toISOString()}\n${'='.repeat(72)}\n`);
+
+  const stripAnsi = (s: string) => s.replace(/\[[\d;]*[A-Za-z]/g, '');
+
+  for (const pipe of [process.stdout, process.stderr] as NodeJS.WriteStream[]) {
+    const orig = pipe.write.bind(pipe);
+    (pipe as any).write = (chunk: any, ...args: any[]): boolean => {
+      const text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+      stream.write(stripAnsi(text));
+      return orig(chunk, ...args);
+    };
+  }
+}
+
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  setupFileLogging();
+  // Disable built-in 100KB body-parser limit; MIT webhook bodies contain base64 PNG patches (~1-3MB).
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
   
   const httpAdapterHost = app.get(HttpAdapterHost);
   app.useGlobalFilters(new AllExceptionsFilter(httpAdapterHost));
