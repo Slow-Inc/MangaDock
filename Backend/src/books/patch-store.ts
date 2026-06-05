@@ -12,10 +12,22 @@ export interface PatchLocator {
 const ROOT = 'uploads/patches';
 
 /** Filenames PatchStore owns: `{src}__{tgt}__{model}__p{page}__r{region}.png`.
- *  `__` separators keep parsing unambiguous (model ids contain `-`). Anything
- *  in a chapter dir NOT matching this is a legacy orphan from the three old
- *  ad-hoc naming formulas and is removed by sweepLegacy(). */
-const OWNED_NAME = /^[^_]+(?:__[^_]+){2}__p\d+__r\d+\.png$/;
+ *  Ownership is detected by the `__p{N}__r{N}.png` tail — model ids may legally
+ *  contain `_` (imageModelKey allows \w), so segment-wise matching would
+ *  misclassify owned files as legacy and sweep them (data loss; caught in
+ *  review). None of the three legacy formulas ever produced this tail. */
+const OWNED_NAME = /__p\d+__r\d+\.png$/;
+
+/** Charset every key segment must satisfy — same alphabet as imageModelKey.
+ *  chapterId arrives from a URL param and segments become disk paths via the
+ *  DiskStorageProvider join, so `/`, `\` and `..` must never pass. */
+const SAFE_SEGMENT = /^[\w.-]+$/;
+
+function assertSafeSegment(value: string, what: string): void {
+  if (!SAFE_SEGMENT.test(value) || value.includes('..')) {
+    throw new Error(`PatchStore: unsafe ${what} segment: ${JSON.stringify(value)}`);
+  }
+}
 
 /**
  * The single owner of Patch Set files on storage (#137).
@@ -50,6 +62,11 @@ export class PatchStore {
    *  Stale region files beyond the new count (page shrank on re-translate) are
    *  removed so the page's footprint is always exactly its current regions. */
   async put(loc: PatchLocator, pngs: Buffer[]): Promise<string[]> {
+    assertSafeSegment(loc.chapterId, 'chapterId');
+    assertSafeSegment(loc.srcMIT, 'srcMIT');
+    assertSafeSegment(loc.tgtMIT, 'tgtMIT');
+    if (loc.model !== undefined) assertSafeSegment(loc.model, 'model');
+
     const dir = this.chapterDir(loc.chapterId);
     const filePrefix = this.pageFilePrefix(loc);
     const urls: string[] = [];
@@ -91,12 +108,14 @@ export class PatchStore {
     return removed;
   }
 
-  /** Sweep the legacy backlog now and once a day; timer never blocks exit. */
-  startSweeping(onSwept?: (removed: number) => void): void {
+  /** Sweep the legacy backlog now and once a day; timer never blocks exit.
+   *  Failures surface through onError — a silently dead sweeper would let the
+   *  legacy backlog grow again with no signal. */
+  startSweeping(onSwept?: (removed: number) => void, onError?: (err: unknown) => void): void {
     const run = () =>
       void this.sweepLegacy()
         .then((n) => onSwept?.(n))
-        .catch(() => {});
+        .catch((err) => onError?.(err));
     run();
     setInterval(run, 24 * 60 * 60 * 1000).unref();
   }

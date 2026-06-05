@@ -129,9 +129,12 @@ export class BooksService {
 
   onModuleInit(): void {
     // Clean the pre-#137 random-named patch backlog on boot, then daily.
-    this.patchStore.startSweeping((removed) => {
-      if (removed > 0) this.logger.log(`[PatchStore] swept ${removed} legacy patch files`);
-    });
+    this.patchStore.startSweeping(
+      (removed) => {
+        if (removed > 0) this.logger.log(`[PatchStore] swept ${removed} legacy patch files`);
+      },
+      (err) => this.logger.warn(`[PatchStore] sweep failed: ${String(err)}`),
+    );
   }
 
   /**
