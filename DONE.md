@@ -471,6 +471,44 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 
 ---
 
+## Phase 3 Mobile Shell - Diagnostics Beta APK
+
+### Status: COMPLETE - QA diagnostics and `1.0.1-beta.2` APK
+
+#### Modified Files
+- `Mobile/src/mobileDiagnostics.ts` - formats compact `MangaDockMobile` diagnostics events, masks full Mobile Hardware ID values, and keeps the latest 20 events in memory
+- `Mobile/App.tsx` - adds beta `[diag]` overlay, WebView load/error/http logging, `Reload WebView`, and bridged web error handling
+- `Mobile/src/webViewBridge.ts` - bridges `window.onerror`, `window.onunhandledrejection`, and `console.error` to the Mobile Shell
+- `Mobile/src/config.ts` - enables beta diagnostics and records `versionCode 3` / `versionName 1.0.1-beta.2`
+- `Mobile/android/app/build.gradle` - bumps APK metadata to `versionCode 3` / `versionName "1.0.1-beta.2"`
+- `Mobile/README.md` - documents QA diagnostics, logcat workflow, APK metadata, and QA bug report template
+- `Mobile/__tests__/mobileDiagnostics.test.ts` - diagnostics masking/history behavior
+- `Mobile/__tests__/webViewBridge.test.ts` - web JavaScript error bridge behavior
+- `Mobile/__tests__/App.test.tsx` - diagnostics UI, WebView event logging, and bridged web error behavior
+
+#### Verification
+- `npm test -- --runInBand` in `Mobile/` - 6 suites, 12 tests passing
+- `npm run lint` in `Mobile/` - passing
+- `npx tsc --noEmit` in `Mobile/` - passing
+- `.\gradlew.bat assembleRelease` in `Mobile/android` - `BUILD SUCCESSFUL`
+- `C:\Users\Cable\AppData\Local\Android\Sdk\build-tools\36.0.0\aapt.exe dump badging C:\Users\Cable\Documents\code\MangaDock\Mobile\build\qa\mangadock-beta-release-prod-domain.apk | Select-String -Pattern '^package:'` - `package: name='com.mobile' versionCode='3' versionName='1.0.1-beta.2'`
+- `C:\Users\Cable\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r C:\Users\Cable\Documents\code\MangaDock\Mobile\build\qa\mangadock-beta-release-prod-domain.apk` - `Success`
+- `C:\Users\Cable\AppData\Local\Android\Sdk\platform-tools\adb.exe shell am start -n com.mobile/.MainActivity` - `Starting: Intent { cmp=com.mobile/.MainActivity }`
+
+#### APK Artifact
+- Latest QA APK: `Mobile/build/qa/mangadock-beta-release-prod-domain.apk`
+- Version: `versionCode 3`, `versionName 1.0.1-beta.2`
+- Size: 57,814,712 bytes
+- Previous backup: `Mobile/build/qa/mangadock-beta-release-prod-domain.apk.bak-20260604-193044.apk`
+
+#### Notes
+- Commit pushed: `e4dc928 feat: add mobile beta diagnostics`
+- GitHub issue closed: `Slow-Inc/MangaDock#99`
+- Smoke launch emitted `MangaDockMobile` diagnostics logs.
+- During smoke, both `https://hayateotsu.space/` and `https://api.hayateotsu.space/` returned `502 Bad Gateway` from host checks as well as emulator WebView diagnostics, so this is documented as deployed domain availability outside the APK build.
+
+---
+
 ## Phase 3 Mobile Shell - Android Emulator Smoke
 
 ### Status: COMPLETE - shell launches and reaches Frontend dev server

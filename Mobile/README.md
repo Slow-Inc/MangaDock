@@ -202,6 +202,29 @@ versionCode 3
 versionName 1.0.1-beta.2
 ```
 
+Latest QA APK refresh:
+
+```text
+Date: 2026-06-05
+Branch: feat/mobile-shell-phase3
+Commit: e4dc928 feat: add mobile beta diagnostics
+APK: Mobile/build/qa/mangadock-beta-release-prod-domain.apk
+Size: 57,814,712 bytes
+Package: com.mobile
+```
+
+Verified APK metadata:
+
+```text
+package: name='com.mobile' versionCode='3' versionName='1.0.1-beta.2' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36'
+```
+
+Previous QA APK backup:
+
+```text
+Mobile/build/qa/mangadock-beta-release-prod-domain.apk.bak-20260604-193044.apk
+```
+
 For initial QA, build a release APK that bundles JS:
 
 ```powershell
@@ -240,6 +263,18 @@ C:\Users\Cable\AppData\Local\Android\Sdk\platform-tools\adb.exe shell am start -
 ```
 
 This beta APK is signed with the scaffold release signing config, which currently uses the debug keystore. It is suitable for direct QA install, not Play Store distribution.
+
+Runtime smoke note:
+
+```text
+adb install -r: Success
+adb shell am start -n com.mobile/.MainActivity: Success
+MangaDockMobile diagnostics logs: emitted
+https://hayateotsu.space/: 502 Bad Gateway during smoke
+https://api.hayateotsu.space/: 502 Bad Gateway during smoke
+```
+
+The `502 Bad Gateway` result was reproduced from the host machine as well as the emulator WebView, so it is treated as deployed domain availability outside the APK build itself.
 
 ## QA Diagnostics
 
