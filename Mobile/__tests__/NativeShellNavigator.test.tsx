@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import {NativeShellNavigator} from '../src/navigation/NativeShellNavigator';
+import {mobileTheme} from '../src/theme/mobileTheme';
 
 jest.mock('react-native-safe-area-context', () => {
   const ReactMock = require('react');
@@ -42,5 +43,26 @@ describe('Native Shell Router', () => {
     });
 
     expect(renderer!.root.findByProps({testID})).toBeTruthy();
+  });
+
+  it('uses the MangaDock native theme on placeholder screens', async () => {
+    let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <NativeShellNavigator initialRouteName="Home" />,
+      );
+    });
+
+    const screen = renderer!.root
+      .findAllByProps({testID: 'native-shell-home-screen'})
+      .find(node => node.props.style);
+
+    expect(screen?.props.style).toEqual(
+      expect.objectContaining({
+        backgroundColor: mobileTheme.colors.background,
+        padding: mobileTheme.spacing.safeScreenPadding,
+      }),
+    );
   });
 });

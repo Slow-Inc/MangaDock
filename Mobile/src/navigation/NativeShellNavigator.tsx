@@ -2,6 +2,7 @@ import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {StyleSheet, Text, View} from 'react-native';
+import {mobileTheme} from '../theme/mobileTheme';
 
 export type NativeShellRouteName =
   | 'Onboarding'
@@ -33,7 +34,14 @@ function PlaceholderScreen({
   testID: string;
 }) {
   return (
-    <View style={styles.screen} testID={testID}>
+    <View
+      style={{
+        ...styles.screen,
+        backgroundColor: mobileTheme.colors.background,
+        padding: mobileTheme.spacing.safeScreenPadding,
+      }}
+      testID={testID}
+    >
       <Text style={styles.title}>{label}</Text>
     </View>
   );
@@ -111,11 +119,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#08090d',
   },
   title: {
-    color: '#f8f9fb',
-    fontSize: 18,
+    color: mobileTheme.colors.foreground,
+    fontSize: mobileTheme.typography.titleSize,
     fontWeight: '700',
   },
 });
