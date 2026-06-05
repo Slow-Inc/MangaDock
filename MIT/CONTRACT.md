@@ -107,6 +107,10 @@ MIT chooses a mode by whether `callback_url` is set:
 - Delivery is **retried** on transient failure (5xx / 429 / connection error) with backoff; non-retryable 4xx
   and exhausted retries are dead-lettered (logged). See `server/webhook.py` + Issue #100.
 
+**Cancellation** — `POST /cancel/{taskId}` tells MIT to stop a running batch. The Backend calls it when its
+last SSE listener for the job leaves. Best-effort and idempotent: a no-op for an unknown/finished taskId. MIT
+stops before its next page and drops a page that finished after the cancel arrived.
+
 ### 3b. NDJSON streaming mode (no `callback_url`)
 
 `200 OK`, `application/x-ndjson` — one JSON object per line, **same flat camelCase shape** as the webhook
