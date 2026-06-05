@@ -54,21 +54,33 @@ jest.mock('../src/mobileIdentity', () => ({
     .mockResolvedValue('11111111-2222-4333-8444-555555555555'),
 }));
 
-import App from '../App';
+import App, {MobileShellWebViewScreen} from '../App';
 
-test('renders the Frontend inside the Mobile Shell WebView with Mobile Shell headers', async () => {
+test('starts beta sessions at Native Onboarding inside the Native Shell Router', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
 
   await ReactTestRenderer.act(async () => {
     renderer = ReactTestRenderer.create(<App />);
   });
 
-  const webview = renderer!.root.findByProps({
-    testID: 'mobile-shell-webview',
-  });
   expect(
     renderer!.root.findByProps({testID: 'native-shell-router'}),
   ).toBeTruthy();
+  expect(
+    renderer!.root.findByProps({testID: 'native-onboarding-screen'}),
+  ).toBeTruthy();
+});
+
+test('renders the Frontend inside the Mobile Shell WebView with Mobile Shell headers', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<MobileShellWebViewScreen />);
+  });
+
+  const webview = renderer!.root.findByProps({
+    testID: 'mobile-shell-webview',
+  });
 
   expect(webview.props.source).toEqual({
     uri: 'https://hayateotsu.space',
@@ -90,7 +102,7 @@ test('exposes beta diagnostics and logs WebView load events for QA', async () =>
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
 
   await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<App />);
+    renderer = ReactTestRenderer.create(<MobileShellWebViewScreen />);
   });
 
   expect(
@@ -125,7 +137,7 @@ test('records bridged web JavaScript errors from the WebView', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
 
   await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<App />);
+    renderer = ReactTestRenderer.create(<MobileShellWebViewScreen />);
   });
 
   const webview = renderer!.root.findByProps({

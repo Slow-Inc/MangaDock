@@ -15,6 +15,7 @@ import {
 import {WebView} from 'react-native-webview';
 import {
   getMobileShellUrl,
+  MOBILE_BETA_SESSION_ONBOARDING_ENABLED,
   MOBILE_BETA_VERSION_CODE,
   MOBILE_BETA_VERSION_NAME,
   MOBILE_DIAGNOSTICS_ENABLED,
@@ -28,6 +29,7 @@ import {
 import {createMobileShellHeaders} from './src/mobileHeaders';
 import {getMobileHardwareId} from './src/mobileIdentity';
 import {NativeShellNavigator} from './src/navigation/NativeShellNavigator';
+import {getNativeShellInitialRoute} from './src/onboarding/mobileOnboarding';
 import {createMobileShellInjectionScript} from './src/webViewBridge';
 
 function App() {
@@ -36,12 +38,19 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <NativeShellNavigator WebViewComponent={AppContent} />
+      <NativeShellNavigator
+        initialRouteName={getNativeShellInitialRoute({
+          isBeta: MOBILE_BETA_SESSION_ONBOARDING_ENABLED,
+          sessionCompleted: false,
+          persistedCompleted: false,
+        })}
+        WebViewComponent={MobileShellWebViewScreen}
+      />
     </SafeAreaProvider>
   );
 }
 
-function AppContent() {
+export function MobileShellWebViewScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
   const [hardwareId, setHardwareId] = useState<string | null>(null);

@@ -1,7 +1,8 @@
 import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {StyleSheet, Text, View} from 'react-native';
+import type {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {mobileTheme} from '../theme/mobileTheme';
 
 export type NativeShellRouteName =
@@ -47,12 +48,32 @@ function PlaceholderScreen({
   );
 }
 
-function OnboardingScreen() {
+function OnboardingScreen({
+  navigation,
+}: NativeStackScreenProps<NativeShellStackParamList, 'Onboarding'>) {
   return (
-    <PlaceholderScreen
-      label="Native Onboarding"
+    <View
+      style={{
+        ...styles.screen,
+        backgroundColor: mobileTheme.colors.background,
+        padding: mobileTheme.spacing.safeScreenPadding,
+      }}
       testID="native-onboarding-screen"
-    />
+    >
+      <Text style={styles.title}>Native Onboarding</Text>
+      <Text style={styles.body}>
+        MangaDock beta keeps web reading inside WebView and native controls in
+        the shell.
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => navigation.replace('Home')}
+        style={styles.primaryButton}
+        testID="native-onboarding-start-button"
+      >
+        <Text style={styles.primaryButtonText}>Start reading</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -123,6 +144,27 @@ const styles = StyleSheet.create({
   title: {
     color: mobileTheme.colors.foreground,
     fontSize: mobileTheme.typography.titleSize,
+    fontWeight: '700',
+  },
+  body: {
+    marginTop: mobileTheme.spacing.sm,
+    color: mobileTheme.colors.foregroundMuted,
+    fontSize: mobileTheme.typography.bodySize,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  primaryButton: {
+    minHeight: mobileTheme.touchTarget.minHeight,
+    marginTop: mobileTheme.spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: mobileTheme.radius.md,
+    backgroundColor: mobileTheme.colors.primary,
+    paddingHorizontal: mobileTheme.spacing.lg,
+  },
+  primaryButtonText: {
+    color: mobileTheme.colors.foreground,
+    fontSize: mobileTheme.typography.bodySize,
     fontWeight: '700',
   },
 });

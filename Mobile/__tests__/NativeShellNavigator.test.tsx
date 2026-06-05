@@ -65,4 +65,26 @@ describe('Native Shell Router', () => {
       }),
     );
   });
+
+  it('routes from Native Onboarding to Native Shell Home when onboarding is completed', async () => {
+    let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <NativeShellNavigator initialRouteName="Onboarding" />,
+      );
+    });
+
+    const startButton = renderer!.root.findByProps({
+      testID: 'native-onboarding-start-button',
+    });
+
+    await ReactTestRenderer.act(async () => {
+      startButton.props.onPress();
+    });
+
+    expect(
+      renderer!.root.findByProps({testID: 'native-shell-home-screen'}),
+    ).toBeTruthy();
+  });
 });
