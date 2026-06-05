@@ -54,7 +54,8 @@ jest.mock('../src/mobileIdentity', () => ({
     .mockResolvedValue('11111111-2222-4333-8444-555555555555'),
 }));
 
-import App, {MobileShellWebViewScreen} from '../App';
+import App from '../App';
+import {MangaDockWebViewScreen} from '../src/screens/MangaDockWebViewScreen';
 
 test('starts beta sessions at Native Onboarding inside the Native Shell Router', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
@@ -75,7 +76,7 @@ test('renders the Frontend inside the Mobile Shell WebView with Mobile Shell hea
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
 
   await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<MobileShellWebViewScreen />);
+    renderer = ReactTestRenderer.create(<MangaDockWebViewScreen />);
   });
 
   const webview = renderer!.root.findByProps({
@@ -97,12 +98,34 @@ test('renders the Frontend inside the Mobile Shell WebView with Mobile Shell hea
   );
 });
 
+test('renders a launched MangaDock web path inside the Mobile Shell WebView', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(
+      <MangaDockWebViewScreen
+        route={{
+          key: 'WebView',
+          name: 'WebView',
+          params: {initialPath: '/search'},
+        }}
+      />,
+    );
+  });
+
+  const webview = renderer!.root.findByProps({
+    testID: 'mobile-shell-webview',
+  });
+
+  expect(webview.props.source.uri).toBe('https://hayateotsu.space/search');
+});
+
 test('exposes beta diagnostics and logs WebView load events for QA', async () => {
   const consoleLog = jest.spyOn(console, 'log').mockImplementation();
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
 
   await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<MobileShellWebViewScreen />);
+    renderer = ReactTestRenderer.create(<MangaDockWebViewScreen />);
   });
 
   expect(
@@ -137,7 +160,7 @@ test('records bridged web JavaScript errors from the WebView', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
 
   await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<MobileShellWebViewScreen />);
+    renderer = ReactTestRenderer.create(<MangaDockWebViewScreen />);
   });
 
   const webview = renderer!.root.findByProps({
