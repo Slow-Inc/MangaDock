@@ -813,6 +813,13 @@ export class BooksService {
     if (uncachedPages.length === 0) {
       this.logger.log(`[BatchRegistry] job=${jobKey} all ${pages.length} pages were cached — skipping MIT`);
       placeholderJob.resolve?.();
+      // Remove the placeholder from the registry (mirrors the finally-cleanup of
+      // the MIT path). Leaving it behind poisons every later batch-translate for
+      // this jobKey: callers attach to the resolved job, replay an empty
+      // completedPages, and return with nothing (Issue #127).
+      if (this.activeBatchJobs.get(jobKey) === placeholderJob) {
+        this.activeBatchJobs.delete(jobKey);
+      }
       return;
     }
 
