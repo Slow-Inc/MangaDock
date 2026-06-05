@@ -1,7 +1,6 @@
 import re
 from typing import List, Dict
 from omegaconf import OmegaConf
-from langcodes import Language, closest_supported_match
 from .common import VALID_LANGUAGES
 from pydantic import BaseModel
 
@@ -188,7 +187,6 @@ class ConfigGPT:
         # This key is used to locate nested configuration entries
         self._CONFIG_KEY = config_key
         self.config = None
-        self.langSamples = None # Cache chat/json_samples[to_lang]
         self._json_sample = None
 
     def _config_get(self, key: str, default=None):
@@ -246,60 +244,28 @@ class ConfigGPT:
 
     def _closest_sample_match(self, all_samples: Dict, to_lang: str, max_distance=5) -> List:
         """
-        Use `langcodes` to find the `all_samples` entry with a key that is sufficiently similar to `to_lang`.
-        
-        Parameters
-        ----------
-        all_samples : Dict
-            A dictionary containing all available samples, keyed by language
-        to_lang : str
-            The target language code to find the closest match for.
-        max_distance : int (Defaults to 5)
-            How similar the match must be to `to_lang`.\n
-                                e.g. \n
-                                    'en-GB' vs 'en-US' -> distance=5 \n
-                                    'en-GB' vs 'en-AU' -> distance=3 \n
-                                    'pt-BR' vs 'pt-PT' -> distance=5 \n
-                                    'en-US' vs 'pt-PT' -> distance=1000 (Undefined)
-    
-        Returns:
-            list: A list of samples that best match the target language or an 
-                    empty list if no sufficient match is found.
+        Return the few-shot sample for `to_lang` from `all_samples`.
+
+        Samples are keyed by full language name (e.g. "Thai", "English"). A target
+        language *code* (e.g. "THA") is normalized to its name via
+        `_LANGUAGE_CODE_MAP`, then looked up directly (case-insensitively). Returns
+        an empty list when no sample exists.
+
+        Direct lookup is intentional: it needs no per-instance cache (so it cannot
+        go stale across languages or between chat/JSON sample sets) and no optional
+        `langcodes`/`language_data` dependency. `max_distance` is accepted for
+        backwards compatibility and ignored.
         """
-        if self.langSamples is not None:
-            return self.langSamples
-        
-        self.langSamples = []
-
-        try:
-            if to_lang in self._LANGUAGE_CODE_MAP:
-                to_lang = self._LANGUAGE_CODE_MAP[to_lang]
-
-            foundLang = closest_supported_match(
-                                Language.find(to_lang), 
-                                [
-                                    Language.find(sampleLang).to_tag() 
-                                    for sampleLang in list(all_samples.keys())
-                                ],
-                                max_distance=max_distance 
-                            )
-        except:
-            self.logger.error(f"Requested chat sample of unknown language: {to_lang}")
-            return self.langSamples
-        
-        # If a match is found: find, cache, and return the chat sample:
-        if foundLang:
-            for sampleLang, samples in all_samples.items():
-                if foundLang == Language.find(sampleLang).to_tag():
-                    self.langSamples = samples
-                    return self.langSamples
-
-        return self.langSamples
+        key = self._LANGUAGE_CODE_MAP.get(to_lang, to_lang)
+        samples = all_samples.get(key)
+        if samples is None:
+            lowered = {str(k).lower(): v for k, v in all_samples.items()}
+            samples = lowered.get(str(key).lower())
+        return samples if samples is not None else []
     
     def get_chat_sample(self, to_lang: str) -> List[str]:
         """
-        Use `langcodes` to search for the language labeling and return the chat sample.
-        If the language is not found, return an empty list.
+        Resolve `to_lang` to its chat few-shot sample, or an empty list if none.
         """
         
         return self._closest_sample_match(self.chat_sample, to_lang)
@@ -342,8 +308,7 @@ class ConfigGPT:
     
     def get_json_sample(self, to_lang: str) -> List[TranslationList]:
         """
-        Use `langcodes` to search for the language labeling and return the json sample.
-        If the language is not found, return an empty list.
+        Resolve `to_lang` to its JSON few-shot sample, or an empty list if none.
         """
 
         return self._closest_sample_match(self.json_sample, to_lang)
