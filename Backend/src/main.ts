@@ -22,7 +22,7 @@ function setupFileLogging(): void {
   // Write session separator so multiple restarts are distinguishable in the file
   stream.write(`\n${'='.repeat(72)}\n[session start] ${new Date().toISOString()}\n${'='.repeat(72)}\n`);
 
-  const stripAnsi = (s: string) => s.replace(/\[[\d;]*[A-Za-z]/g, '');
+  const stripAnsi = (s: string) => s.replace(/\x1b\[[\d;]*[A-Za-z]/g, '');
 
   for (const pipe of [process.stdout, process.stderr] as NodeJS.WriteStream[]) {
     const orig = pipe.write.bind(pipe);

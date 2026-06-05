@@ -232,8 +232,9 @@ def _default_translator() -> Translator:
 
 
 class TranslatorConfig(BaseModel):
-    translator: Translator = _default_translator()
-    """Language translator to use. Controlled by DEFAULT_TRANSLATOR env var in MIT .env."""
+    translator: Translator = Field(default_factory=_default_translator)
+    """Language translator to use. Controlled by DEFAULT_TRANSLATOR env var in MIT .env.
+    default_factory so the env is read per instance, not once at import time."""
     target_lang: str = 'ENG' #todo: validate VALID_LANGUAGES #todo: convert to enum
     """Destination language"""
     no_text_lang_skip: bool = False

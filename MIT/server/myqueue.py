@@ -61,7 +61,7 @@ async def wait_in_queue(task: QueueElement, notify: NotifyType):
         queue_pos = task_queue.get_pos(task)
         if queue_pos is None:
             if notify:
-                return
+                return None
             else:
                 raise HTTPException(500, detail="User is no longer connected")  # just for the logs
         if notify:
@@ -70,7 +70,7 @@ async def wait_in_queue(task: QueueElement, notify: NotifyType):
             if await task.is_client_disconnected():
                 await task_queue.update_event()
                 if notify:
-                    return
+                    return None
                 else:
                     raise HTTPException(500, detail="User is no longer connected") #just for the logs
 
@@ -89,7 +89,7 @@ async def wait_in_queue(task: QueueElement, notify: NotifyType):
                         result = await instance.sent(task.image, task.config)
 
                 if notify:
-                    return
+                    return None
                 else:
                     return result
 
@@ -102,7 +102,7 @@ async def wait_in_queue(task: QueueElement, notify: NotifyType):
 
                 if notify:
                     notify(2, error_msg.encode('utf-8'))
-                    return
+                    return None
                 else:
                     raise HTTPException(500, detail=error_msg)
 

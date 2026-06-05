@@ -7,7 +7,7 @@ These tests stay in pure-Python / cv2 territory — no ML models needed.
 """
 import cv2
 import numpy as np
-import pytest
+
 
 
 # ── R-2: None homography guard ───────────────────────────────────────────────
@@ -42,30 +42,11 @@ def test_none_homography_guard_in_render(monkeypatch):
     import manga_translator.rendering as rend_mod
     import cv2 as cv2_mod
 
-    original_findHomography = cv2_mod.findHomography
 
     def fake_homography(src, dst, *args, **kwargs):
         return None, None
 
     monkeypatch.setattr(cv2_mod, "findHomography", fake_homography)
-
-    # Minimal fake region — only the attributes render_region reads up to findHomography
-    class FakeRegion:
-        horizontal = True
-        font_size = 20
-        alignment = "left"
-        direction = "auto"
-        _direction = "auto"
-        target_lang = "ENG"
-        fg_r = fg_g = fg_b = 0
-        bg_r = bg_g = bg_b = 255
-        line_spacing = 1.0
-        translation = "hello"
-        texts = ["hello"]
-        text = "hello"
-
-        def get_translation_for_rendering(self):
-            return "hello"
 
     # The function we're testing is render_region (or equivalent), but it's
     # deeply coupled to text rendering (fonts, etc.). Instead, test the guard
