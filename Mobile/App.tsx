@@ -27,6 +27,7 @@ import {
 } from './src/mobileDiagnostics';
 import {createMobileShellHeaders} from './src/mobileHeaders';
 import {getMobileHardwareId} from './src/mobileIdentity';
+import {NativeShellNavigator} from './src/navigation/NativeShellNavigator';
 import {createMobileShellInjectionScript} from './src/webViewBridge';
 
 function App() {
@@ -35,7 +36,7 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <NativeShellNavigator WebViewComponent={AppContent} />
     </SafeAreaProvider>
   );
 }

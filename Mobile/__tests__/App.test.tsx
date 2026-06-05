@@ -5,10 +5,28 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
-jest.mock('react-native-safe-area-context', () => ({
-  SafeAreaProvider: ({children}: {children: React.ReactNode}) => children,
-  useSafeAreaInsets: () => ({top: 0, right: 0, bottom: 0, left: 0}),
-}));
+jest.mock('react-native-safe-area-context', () => {
+  const ReactMock = require('react');
+
+  return {
+    SafeAreaProvider: ({children}: {children: React.ReactNode}) => children,
+    SafeAreaView: ({children}: {children: React.ReactNode}) => children,
+    SafeAreaInsetsContext: ReactMock.createContext({
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    }),
+    SafeAreaFrameContext: ReactMock.createContext({
+      x: 0,
+      y: 0,
+      width: 390,
+      height: 844,
+    }),
+    useSafeAreaInsets: () => ({top: 0, right: 0, bottom: 0, left: 0}),
+    useSafeAreaFrame: () => ({x: 0, y: 0, width: 390, height: 844}),
+  };
+});
 
 jest.mock(
   'react-native-webview',
@@ -48,6 +66,9 @@ test('renders the Frontend inside the Mobile Shell WebView with Mobile Shell hea
   const webview = renderer!.root.findByProps({
     testID: 'mobile-shell-webview',
   });
+  expect(
+    renderer!.root.findByProps({testID: 'native-shell-router'}),
+  ).toBeTruthy();
 
   expect(webview.props.source).toEqual({
     uri: 'https://hayateotsu.space',
