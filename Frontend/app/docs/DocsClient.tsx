@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, ExternalLink, GitBranch, GitPullRequest, AlertCircle,
   FileText, Menu, X, CheckCircle2, Circle, GitMerge, XCircle,
@@ -97,15 +98,15 @@ function renderInline(text: string): React.ReactNode {
   const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
   return text.split(regex).map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**'))
-      return <strong key={i} className="font-semibold text-[#f8f9fb]">{part.slice(2, -2)}</strong>;
+      return <strong key={i} className="font-semibold text-[#1d1d1f]">{part.slice(2, -2)}</strong>;
     if (/^\*[^*].*\*$/.test(part) || /^\*.\*$/.test(part))
       return <em key={i}>{part.slice(1, -1)}</em>;
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2)
-      return <code key={i} className="px-1.5 py-0.5 rounded text-[0.85em] font-mono bg-white/[0.08] text-indigo-300 border border-white/[0.12]">{part.slice(1, -1)}</code>;
+      return <code key={i} className="px-1.5 py-0.5 rounded text-[0.85em] font-mono bg-[#f0f4ff] text-[#0071e3] border border-[#0071e3]/[0.15]">{part.slice(1, -1)}</code>;
     const lm = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (lm) {
       const ext = lm[2].startsWith('http');
-      return <a key={i} href={lm[2]} className="text-indigo-400 underline underline-offset-2 hover:text-indigo-300 transition-colors duration-150" target={ext ? '_blank' : undefined} rel={ext ? 'noreferrer' : undefined}>{lm[1]}</a>;
+      return <a key={i} href={lm[2]} className="text-[#0071e3] underline underline-offset-2 hover:text-[#0058b0] transition-colors duration-150" target={ext ? '_blank' : undefined} rel={ext ? 'noreferrer' : undefined}>{lm[1]}</a>;
     }
     return <React.Fragment key={i}>{part}</React.Fragment>;
   });
@@ -127,10 +128,10 @@ function MarkdownRenderer({ content }: { content: string }) {
       while (i < lines.length && !lines[i].startsWith('```')) { code.push(lines[i]); i++; }
       i++;
       nodes.push(
-        <div key={k++} className="my-5 rounded-xl overflow-hidden border border-white/[0.1] bg-[#0f1118]">
+        <div key={k++} className="my-5 rounded-xl overflow-hidden border border-black/[0.08] bg-[#0f1118]">
           {lang !== 'text' && (
-            <div className="px-4 py-2 border-b border-white/[0.08] bg-white/[0.02]">
-              <span className="text-[11px] font-mono text-white/30">{lang}</span>
+            <div className="px-4 py-2 border-b border-black/[0.08] bg-white/[0.02]">
+              <span className="text-[11px] font-mono text-[#86868b]">{lang}</span>
             </div>
           )}
           <pre className="p-4 overflow-x-auto text-[13px] font-mono text-[rgba(248,249,251,0.8)] leading-relaxed whitespace-pre">
@@ -148,16 +149,16 @@ function MarkdownRenderer({ content }: { content: string }) {
       const rows = tLines.filter(l => !l.match(/^\|[\s:|-]+\|/));
       if (rows.length === 0) continue;
       nodes.push(
-        <div key={k++} className="my-5 overflow-x-auto rounded-xl border border-white/[0.1]">
+        <div key={k++} className="my-5 overflow-x-auto rounded-xl border border-black/[0.08]">
           <table className="w-full text-sm border-collapse">
             <tbody>
               {rows.map((row, ri) => {
                 const cells = row.split('|').slice(1, -1);
                 const CellEl = ri === 0 ? 'th' : 'td';
                 return (
-                  <tr key={ri} className={ri % 2 === 1 ? 'bg-white/[0.02]' : ''}>
+                  <tr key={ri} className={ri % 2 === 1 ? 'bg-[#fafafa]' : ''}>
                     {cells.map((cell, ci) => (
-                      <CellEl key={ci} className={`px-4 py-2.5 text-left border-b border-white/[0.06] ${ri === 0 ? 'text-[11px] font-semibold text-white/70 bg-white/[0.04]' : 'text-[rgba(248,249,251,0.7)]'}`}>
+                      <CellEl key={ci} className={`px-4 py-2.5 text-left border-b border-black/[0.06] ${ri === 0 ? 'text-[11px] font-semibold text-[#6e6e73] bg-[#f5f5f7]' : 'text-[#374151]'}`}>
                         {renderInline(cell.trim())}
                       </CellEl>
                     ))}
@@ -176,10 +177,10 @@ function MarkdownRenderer({ content }: { content: string }) {
     if (hm) {
       const lvl = hm[1].length;
       const cls = [
-        'text-[28px] font-bold text-[#f8f9fb] mt-10 mb-4 tracking-tight leading-tight',
-        'text-[22px] font-semibold text-[#f8f9fb] mt-8 mb-3 tracking-tight',
-        'text-[17px] font-semibold text-[rgba(248,249,251,0.9)] mt-6 mb-2',
-        'text-[15px] font-medium text-[rgba(248,249,251,0.8)] mt-4 mb-1.5',
+        'text-[28px] font-bold text-[#1d1d1f] mt-10 mb-4 tracking-tight leading-tight',
+        'text-[22px] font-semibold text-[#1d1d1f] mt-8 mb-3 tracking-tight',
+        'text-[17px] font-semibold text-[#1d1d1f] mt-6 mb-2',
+        'text-[15px] font-medium text-[#1d1d1f] mt-4 mb-1.5',
       ][lvl - 1];
       const Tag = `h${lvl}` as 'h1' | 'h2' | 'h3' | 'h4';
       nodes.push(<Tag key={k++} className={cls}>{renderInline(hm[2])}</Tag>);
@@ -191,7 +192,7 @@ function MarkdownRenderer({ content }: { content: string }) {
       const ql: string[] = [];
       while (i < lines.length && lines[i].startsWith('> ')) { ql.push(lines[i].slice(2)); i++; }
       nodes.push(
-        <div key={k++} className="my-4 px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.1] italic text-[rgba(248,249,251,0.6)] leading-7">
+        <div key={k++} className="my-4 px-4 py-3 rounded-lg bg-[#f5f5f7] border border-black/[0.08] italic text-[#6e6e73] leading-7">
           {ql.map((l, li) => <p key={li}>{renderInline(l)}</p>)}
         </div>
       );
@@ -200,7 +201,7 @@ function MarkdownRenderer({ content }: { content: string }) {
 
     // HR
     if (['---', '***', '___'].includes(line.trim())) {
-      nodes.push(<hr key={k++} className="my-8 border-white/[0.1]" />);
+      nodes.push(<hr key={k++} className="my-8 border-black/[0.08]" />);
       i++; continue;
     }
 
@@ -214,8 +215,8 @@ function MarkdownRenderer({ content }: { content: string }) {
       nodes.push(
         <ul key={k++} className="my-3 space-y-2">
           {items.map((item, li) => (
-            <li key={li} className="flex gap-3 text-[rgba(248,249,251,0.7)] leading-7 text-[15px]">
-              <span className="mt-2.5 w-1.5 h-1.5 rounded-full bg-indigo-500/50 shrink-0" />
+            <li key={li} className="flex gap-3 text-[#374151] leading-7 text-[15px]">
+              <span className="mt-2.5 w-1.5 h-1.5 rounded-full bg-[#6e6e73] shrink-0" />
               <span>{renderInline(item)}</span>
             </li>
           ))}
@@ -234,8 +235,8 @@ function MarkdownRenderer({ content }: { content: string }) {
       nodes.push(
         <ol key={k++} className="my-3 space-y-2">
           {items.map((item, li) => (
-            <li key={li} className="flex gap-3 text-[rgba(248,249,251,0.7)] leading-7 text-[15px]">
-              <span className="text-[12px] font-mono text-indigo-400/50 shrink-0 mt-1 min-w-[20px] text-right">{li + 1}.</span>
+            <li key={li} className="flex gap-3 text-[#374151] leading-7 text-[15px]">
+              <span className="text-[12px] font-mono text-[#6e6e73] shrink-0 mt-1 min-w-[20px] text-right">{li + 1}.</span>
               <span>{renderInline(item)}</span>
             </li>
           ))}
@@ -265,7 +266,7 @@ function MarkdownRenderer({ content }: { content: string }) {
     }
     if (pl.length > 0) {
       nodes.push(
-        <p key={k++} className="my-3 text-[rgba(248,249,251,0.7)] leading-7 text-[15px]">{renderInline(pl.join(' '))}</p>
+        <p key={k++} className="my-3 text-[#374151] leading-7 text-[15px]">{renderInline(pl.join(' '))}</p>
       );
     }
   }
@@ -286,26 +287,26 @@ function LabelBadge({ label }: { label: GHLabel }) {
 }
 
 function IssueStateIcon({ state }: { state: string }) {
-  if (state === 'closed') return <CheckCircle2 size={14} className="text-white/40 shrink-0" />;
-  return <Circle size={14} className="text-green-400 shrink-0" />;
+  if (state === 'closed') return <CheckCircle2 size={14} className="text-black/30 shrink-0" />;
+  return <Circle size={14} className="text-green-600 shrink-0" />;
 }
 
 function PRStateIcon({ state, draft, merged }: { state: string; draft: boolean; merged: boolean }) {
-  if (merged || state === 'merged') return <GitMerge size={14} className="text-indigo-400 shrink-0" />;
-  if (state === 'closed') return <XCircle size={14} className="text-red-400 shrink-0" />;
-  if (draft) return <GitPullRequest size={14} className="text-white/30 shrink-0" />;
-  return <GitPullRequest size={14} className="text-green-400 shrink-0" />;
+  if (merged || state === 'merged') return <GitMerge size={14} className="text-[#0071e3] shrink-0" />;
+  if (state === 'closed') return <XCircle size={14} className="text-red-500 shrink-0" />;
+  if (draft) return <GitPullRequest size={14} className="text-black/30 shrink-0" />;
+  return <GitPullRequest size={14} className="text-green-600 shrink-0" />;
 }
 
 function StateBadge({ state, draft, merged }: { state: string; draft?: boolean; merged?: boolean }) {
-  if (merged) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-500/20 text-indigo-300">ผสานแล้ว</span>;
-  if (state === 'closed' && !merged) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/20 text-red-300">ปิดแล้ว</span>;
-  if (draft) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-white/10 text-white/40">ร่าง</span>;
-  return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-green-500/15 text-green-400">เปิดอยู่</span>;
+  if (merged) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#0071e3]/10 text-[#0071e3]">ผสานแล้ว</span>;
+  if (state === 'closed' && !merged) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-600">ปิดแล้ว</span>;
+  if (draft) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-black/[0.05] text-[#6e6e73]">ร่าง</span>;
+  return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-700">เปิดอยู่</span>;
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/[0.06] rounded ${className}`} />;
+  return <div className={`animate-pulse bg-black/[0.06] rounded ${className}`} />;
 }
 
 function LoadingSkeleton() {
@@ -334,7 +335,7 @@ function DocView({ file, mdFiles, onNavigate }: {
   const next = idx < mdFiles.length - 1 ? mdFiles[idx + 1] : null;
 
   if (!doc) return (
-    <div className="py-20 text-center text-white/30">
+    <div className="py-20 text-center text-[#6e6e73]">
       <AlertCircle size={32} className="mx-auto mb-4 opacity-30" />
       <p>ไม่พบเอกสาร</p>
     </div>
@@ -342,21 +343,21 @@ function DocView({ file, mdFiles, onNavigate }: {
 
   return (
     <div>
-      <div className="mb-8 pb-6 border-b border-white/[0.08]">
-        <div className="flex items-center gap-1.5 text-[12px] text-white/30 mb-4">
+      <div className="mb-8 pb-6 border-b border-black/[0.08]">
+        <div className="flex items-center gap-1.5 text-[12px] text-[#6e6e73] mb-4">
           <span>เอกสาร</span>
           <ChevronRight size={12} />
-          <span className="text-white/40">{doc.category}</span>
+          <span className="text-[#86868b]">{doc.category}</span>
           <ChevronRight size={12} />
-          <span className="text-indigo-400">{doc.name}</span>
+          <span className="text-[#0071e3]">{doc.name}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
-          <span className="text-[12px] font-mono text-white/20">{doc.relativePath}</span>
+          <span className="text-[12px] font-mono text-[#86868b]">{doc.relativePath}</span>
           <a
             href={`https://github.com/Slow-Inc/MangaDock/blob/main/${doc.relativePath}`}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1.5 text-[12px] text-white/30 hover:text-indigo-400 transition-colors"
+            className="flex items-center gap-1.5 text-[12px] text-[#6e6e73] hover:text-[#0071e3] transition-colors"
           >
             <ExternalLink size={12} />
             GitHub
@@ -366,29 +367,29 @@ function DocView({ file, mdFiles, onNavigate }: {
 
       <MarkdownRenderer content={doc.content} />
 
-      <div className="mt-16 pt-8 border-t border-white/[0.08] flex items-stretch gap-4">
+      <div className="mt-16 pt-8 border-t border-black/[0.08] flex items-stretch gap-4">
         {prev ? (
           <button
             onClick={() => onNavigate(prev.relativePath)}
-            className="flex-1 flex items-center gap-3 px-5 py-4 rounded-xl border border-white/[0.08] hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all text-left group"
+            className="flex-1 flex items-center gap-3 px-5 py-4 rounded-xl border border-black/[0.08] hover:border-[#0071e3]/30 hover:bg-[#0071e3]/[0.04] transition-all text-left group"
           >
-            <ChevronLeft size={16} className="text-white/30 group-hover:text-indigo-400 shrink-0 transition-colors" />
+            <ChevronLeft size={16} className="text-[#6e6e73] group-hover:text-[#0071e3] shrink-0 transition-colors" />
             <div>
-              <div className="text-[11px] text-white/30 mb-0.5">ก่อนหน้า</div>
-              <div className="text-[14px] font-medium text-white/70 group-hover:text-[#f8f9fb] transition-colors">{prev.name}</div>
+              <div className="text-[11px] text-[#86868b] mb-0.5">ก่อนหน้า</div>
+              <div className="text-[14px] font-medium text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors">{prev.name}</div>
             </div>
           </button>
         ) : <div className="flex-1" />}
         {next ? (
           <button
             onClick={() => onNavigate(next.relativePath)}
-            className="flex-1 flex items-center justify-end gap-3 px-5 py-4 rounded-xl border border-white/[0.08] hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all text-right group"
+            className="flex-1 flex items-center justify-end gap-3 px-5 py-4 rounded-xl border border-black/[0.08] hover:border-[#0071e3]/30 hover:bg-[#0071e3]/[0.04] transition-all text-right group"
           >
             <div>
-              <div className="text-[11px] text-white/30 mb-0.5">ถัดไป</div>
-              <div className="text-[14px] font-medium text-white/70 group-hover:text-[#f8f9fb] transition-colors">{next.name}</div>
+              <div className="text-[11px] text-[#86868b] mb-0.5">ถัดไป</div>
+              <div className="text-[14px] font-medium text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors">{next.name}</div>
             </div>
-            <ChevronRight size={16} className="text-white/30 group-hover:text-indigo-400 shrink-0 transition-colors" />
+            <ChevronRight size={16} className="text-[#6e6e73] group-hover:text-[#0071e3] shrink-0 transition-colors" />
           </button>
         ) : <div className="flex-1" />}
       </div>
@@ -429,20 +430,20 @@ function IssuesListView({ page, onIssue, onPage }: {
 
   return (
     <div>
-      <div className="mb-6 pb-6 border-b border-white/[0.08]">
-        <div className="flex items-center gap-1.5 text-[12px] text-white/30 mb-3">
+      <div className="mb-6 pb-6 border-b border-black/[0.08]">
+        <div className="flex items-center gap-1.5 text-[12px] text-[#6e6e73] mb-3">
           <span>GitHub</span>
           <ChevronRight size={12} />
-          <span className="text-indigo-400">Issues</span>
+          <span className="text-[#0071e3]">Issues</span>
         </div>
         <div className="flex items-center justify-between">
-          <h1 className="text-[22px] font-semibold text-[#f8f9fb]">รายการปัญหา</h1>
-          <div className="flex rounded-lg border border-white/[0.1] overflow-hidden">
+          <h1 className="text-[22px] font-semibold text-[#1d1d1f]">รายการปัญหา</h1>
+          <div className="flex rounded-lg border border-black/[0.08] overflow-hidden">
             {STATES.map(s => (
               <button
                 key={s.key}
                 onClick={() => { setActiveState(s.key); onPage(1); }}
-                className={`px-3 py-1.5 text-[12px] font-medium transition-colors ${activeState === s.key ? 'bg-indigo-600 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'}`}
+                className={`px-3 py-1.5 text-[12px] font-medium transition-colors ${activeState === s.key ? 'bg-[#0071e3] text-white' : 'text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/[0.04]'}`}
               >
                 {s.label}
               </button>
@@ -453,14 +454,14 @@ function IssuesListView({ page, onIssue, onPage }: {
 
       {loading && <LoadingSkeleton />}
       {error && (
-        <div className="py-8 text-center text-white/40 text-[14px]">
+        <div className="py-8 text-center text-[#6e6e73] text-[14px]">
           <AlertCircle size={24} className="mx-auto mb-3 opacity-40" />
           <p>ไม่สามารถโหลดข้อมูลได้: {error}</p>
-          <p className="text-[12px] mt-1 text-white/25">อาจถึงขีดจำกัด GitHub API หรือ repository เป็น private</p>
+          <p className="text-[12px] mt-1 text-[#86868b]">อาจถึงขีดจำกัด GitHub API หรือ repository เป็น private</p>
         </div>
       )}
       {!loading && !error && issues.length === 0 && (
-        <div className="py-12 text-center text-white/30 text-[14px]">ไม่มี issue ในสถานะนี้</div>
+        <div className="py-12 text-center text-[#6e6e73] text-[14px]">ไม่มี issue ในสถานะนี้</div>
       )}
 
       {!loading && !error && (
@@ -469,17 +470,17 @@ function IssuesListView({ page, onIssue, onPage }: {
             <button
               key={issue.number}
               onClick={() => onIssue(issue.number)}
-              className="w-full flex items-start gap-4 px-4 py-4 rounded-xl hover:bg-white/[0.04] transition-colors text-left group"
+              className="w-full flex items-start gap-4 px-4 py-4 rounded-xl hover:bg-black/[0.04] transition-colors text-left group"
             >
               <IssueStateIcon state={issue.state} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-start gap-2 flex-wrap">
-                  <span className="text-[15px] text-[rgba(248,249,251,0.85)] group-hover:text-[#f8f9fb] transition-colors font-medium leading-snug">
+                  <span className="text-[15px] text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors font-medium leading-snug">
                     {issue.title}
                   </span>
                   {issue.labels.map(l => <LabelBadge key={l.name} label={l} />)}
                 </div>
-                <div className="flex items-center gap-3 mt-1.5 text-[12px] text-white/30">
+                <div className="flex items-center gap-3 mt-1.5 text-[12px] text-[#6e6e73]">
                   <span>#{issue.number}</span>
                   <span>{relativeDate(issue.created_at)}</span>
                   <span>โดย {issue.user.login}</span>
@@ -491,26 +492,26 @@ function IssuesListView({ page, onIssue, onPage }: {
                   )}
                 </div>
               </div>
-              <ChevronRight size={14} className="text-white/20 group-hover:text-indigo-400 shrink-0 mt-0.5 transition-colors" />
+              <ChevronRight size={14} className="text-black/20 group-hover:text-[#0071e3] shrink-0 mt-0.5 transition-colors" />
             </button>
           ))}
         </div>
       )}
 
       {!loading && !error && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/[0.08]">
+        <div className="flex items-center justify-between mt-8 pt-6 border-t border-black/[0.08]">
           <button
             disabled={page <= 1}
             onClick={() => onPage(page - 1)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-white/40 hover:text-white/70 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.04] transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-[#6e6e73] hover:text-[#1d1d1f] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/[0.04] transition-all"
           >
             <ChevronLeft size={14} /> ก่อนหน้า
           </button>
-          <span className="text-[12px] text-white/30">หน้า {page}</span>
+          <span className="text-[12px] text-[#6e6e73]">หน้า {page}</span>
           <button
             disabled={issues.length < 20}
             onClick={() => onPage(page + 1)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-white/40 hover:text-white/70 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.04] transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-[#6e6e73] hover:text-[#1d1d1f] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/[0.04] transition-all"
           >
             ถัดไป <ChevronRight size={14} />
           </button>
@@ -543,14 +544,14 @@ function IssueDetailView({ number, onBack }: { number: number; onBack: () => voi
     <div>
       <button
         onClick={onBack}
-        className="flex items-center gap-1.5 text-[13px] text-white/40 hover:text-indigo-400 transition-colors mb-6"
+        className="flex items-center gap-1.5 text-[13px] text-[#6e6e73] hover:text-[#0071e3] transition-colors mb-6"
       >
         <ArrowLeft size={14} /> กลับไปรายการ
       </button>
 
       {loading && <LoadingSkeleton />}
       {error && (
-        <div className="py-8 text-center text-white/40 text-[14px]">
+        <div className="py-8 text-center text-[#6e6e73] text-[14px]">
           <AlertCircle size={24} className="mx-auto mb-3 opacity-40" />
           <p>โหลดไม่ได้: {error}</p>
         </div>
@@ -558,52 +559,52 @@ function IssueDetailView({ number, onBack }: { number: number; onBack: () => voi
 
       {!loading && !error && issue && (
         <>
-          <div className="mb-6 pb-6 border-b border-white/[0.08]">
-            <div className="flex items-center gap-1.5 text-[12px] text-white/30 mb-3">
+          <div className="mb-6 pb-6 border-b border-black/[0.08]">
+            <div className="flex items-center gap-1.5 text-[12px] text-[#6e6e73] mb-3">
               <span>GitHub</span>
               <ChevronRight size={12} />
-              <button onClick={onBack} className="hover:text-white/50 transition-colors">Issues</button>
+              <button onClick={onBack} className="hover:text-[#1d1d1f] transition-colors">Issues</button>
               <ChevronRight size={12} />
-              <span className="text-indigo-400">#{issue.number}</span>
+              <span className="text-[#0071e3]">#{issue.number}</span>
             </div>
-            <h1 className="text-[22px] font-semibold text-[#f8f9fb] mb-3 leading-snug">{issue.title}</h1>
+            <h1 className="text-[22px] font-semibold text-[#1d1d1f] mb-3 leading-snug">{issue.title}</h1>
             <div className="flex flex-wrap items-center gap-3">
               <StateBadge state={issue.state} />
               {issue.labels.map(l => <LabelBadge key={l.name} label={l} />)}
             </div>
-            <div className="mt-3 flex items-center gap-4 text-[12px] text-white/30">
+            <div className="mt-3 flex items-center gap-4 text-[12px] text-[#6e6e73]">
               <span className="flex items-center gap-1.5">
                 <img src={issue.user.avatar_url} alt="" className="w-4 h-4 rounded-full" />
                 {issue.user.login}
               </span>
               <span>เปิดเมื่อ {relativeDate(issue.created_at)}</span>
               <span>อัปเดต {relativeDate(issue.updated_at)}</span>
-              <a href={issue.html_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-indigo-400 transition-colors">
+              <a href={issue.html_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-[#0071e3] transition-colors">
                 <ExternalLink size={11} /> GitHub
               </a>
             </div>
           </div>
 
           {issue.body ? (
-            <div className="mb-8 pb-8 border-b border-white/[0.06]">
+            <div className="mb-8 pb-8 border-b border-black/[0.06]">
               <MarkdownRenderer content={issue.body} />
             </div>
           ) : (
-            <p className="text-white/25 italic text-[14px] mb-8">ไม่มีรายละเอียดเพิ่มเติม</p>
+            <p className="text-[#86868b] italic text-[14px] mb-8">ไม่มีรายละเอียดเพิ่มเติม</p>
           )}
 
           {comments.length > 0 && (
             <div>
-              <h2 className="text-[16px] font-semibold text-[rgba(248,249,251,0.8)] mb-4">
+              <h2 className="text-[16px] font-semibold text-[#1d1d1f] mb-4">
                 ความคิดเห็น ({comments.length})
               </h2>
               <div className="space-y-4">
                 {comments.map(c => (
-                  <div key={c.id} className="rounded-xl border border-white/[0.08] overflow-hidden">
-                    <div className="flex items-center gap-3 px-4 py-3 bg-white/[0.02] border-b border-white/[0.06]">
+                  <div key={c.id} className="rounded-xl border border-black/[0.08] overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-[#f5f5f7] border-b border-black/[0.06]">
                       <img src={c.user.avatar_url} alt="" className="w-5 h-5 rounded-full" />
-                      <span className="text-[13px] font-medium text-white/70">{c.user.login}</span>
-                      <span className="text-[12px] text-white/30 ml-auto">{relativeDate(c.created_at)}</span>
+                      <span className="text-[13px] font-medium text-[#1d1d1f]">{c.user.login}</span>
+                      <span className="text-[12px] text-[#6e6e73] ml-auto">{relativeDate(c.created_at)}</span>
                     </div>
                     <div className="px-4 py-4">
                       <MarkdownRenderer content={c.body} />
@@ -648,20 +649,20 @@ function PullsListView({ page, onPull, onPage }: {
 
   return (
     <div>
-      <div className="mb-6 pb-6 border-b border-white/[0.08]">
-        <div className="flex items-center gap-1.5 text-[12px] text-white/30 mb-3">
+      <div className="mb-6 pb-6 border-b border-black/[0.08]">
+        <div className="flex items-center gap-1.5 text-[12px] text-[#6e6e73] mb-3">
           <span>GitHub</span>
           <ChevronRight size={12} />
-          <span className="text-indigo-400">Pull Requests</span>
+          <span className="text-[#0071e3]">Pull Requests</span>
         </div>
         <div className="flex items-center justify-between">
-          <h1 className="text-[22px] font-semibold text-[#f8f9fb]">Pull Requests</h1>
-          <div className="flex rounded-lg border border-white/[0.1] overflow-hidden">
+          <h1 className="text-[22px] font-semibold text-[#1d1d1f]">Pull Requests</h1>
+          <div className="flex rounded-lg border border-black/[0.08] overflow-hidden">
             {STATES.map(s => (
               <button
                 key={s.key}
                 onClick={() => { setActiveState(s.key); onPage(1); }}
-                className={`px-3 py-1.5 text-[12px] font-medium transition-colors ${activeState === s.key ? 'bg-indigo-600 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'}`}
+                className={`px-3 py-1.5 text-[12px] font-medium transition-colors ${activeState === s.key ? 'bg-[#0071e3] text-white' : 'text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/[0.04]'}`}
               >
                 {s.label}
               </button>
@@ -672,13 +673,13 @@ function PullsListView({ page, onPull, onPage }: {
 
       {loading && <LoadingSkeleton />}
       {error && (
-        <div className="py-8 text-center text-white/40 text-[14px]">
+        <div className="py-8 text-center text-[#6e6e73] text-[14px]">
           <AlertCircle size={24} className="mx-auto mb-3 opacity-40" />
           <p>ไม่สามารถโหลดข้อมูลได้: {error}</p>
         </div>
       )}
       {!loading && !error && pulls.length === 0 && (
-        <div className="py-12 text-center text-white/30 text-[14px]">ไม่มี pull request ในสถานะนี้</div>
+        <div className="py-12 text-center text-[#6e6e73] text-[14px]">ไม่มี pull request ในสถานะนี้</div>
       )}
 
       {!loading && !error && (
@@ -687,44 +688,44 @@ function PullsListView({ page, onPull, onPage }: {
             <button
               key={pr.number}
               onClick={() => onPull(pr.number)}
-              className="w-full flex items-start gap-4 px-4 py-4 rounded-xl hover:bg-white/[0.04] transition-colors text-left group"
+              className="w-full flex items-start gap-4 px-4 py-4 rounded-xl hover:bg-black/[0.04] transition-colors text-left group"
             >
               <PRStateIcon state={pr.state} draft={pr.draft} merged={!!pr.merged_at} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-start gap-2 flex-wrap">
-                  <span className="text-[15px] text-[rgba(248,249,251,0.85)] group-hover:text-[#f8f9fb] transition-colors font-medium leading-snug">
+                  <span className="text-[15px] text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors font-medium leading-snug">
                     {pr.title}
                   </span>
-                  {pr.draft && <span className="px-1.5 py-0.5 rounded text-[11px] bg-white/[0.08] text-white/30">draft</span>}
+                  {pr.draft && <span className="px-1.5 py-0.5 rounded text-[11px] bg-black/[0.05] text-[#6e6e73]">draft</span>}
                   {pr.labels.map(l => <LabelBadge key={l.name} label={l} />)}
                 </div>
-                <div className="flex items-center gap-3 mt-1.5 text-[12px] text-white/30">
+                <div className="flex items-center gap-3 mt-1.5 text-[12px] text-[#6e6e73]">
                   <span>#{pr.number}</span>
                   <span className="font-mono text-[11px]">{pr.head.ref} → {pr.base.ref}</span>
                   <span>{relativeDate(pr.created_at)}</span>
                   <span>โดย {pr.user.login}</span>
                 </div>
               </div>
-              <ChevronRight size={14} className="text-white/20 group-hover:text-indigo-400 shrink-0 mt-0.5 transition-colors" />
+              <ChevronRight size={14} className="text-black/20 group-hover:text-[#0071e3] shrink-0 mt-0.5 transition-colors" />
             </button>
           ))}
         </div>
       )}
 
       {!loading && !error && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/[0.08]">
+        <div className="flex items-center justify-between mt-8 pt-6 border-t border-black/[0.08]">
           <button
             disabled={page <= 1}
             onClick={() => onPage(page - 1)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-white/40 hover:text-white/70 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.04] transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-[#6e6e73] hover:text-[#1d1d1f] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/[0.04] transition-all"
           >
             <ChevronLeft size={14} /> ก่อนหน้า
           </button>
-          <span className="text-[12px] text-white/30">หน้า {page}</span>
+          <span className="text-[12px] text-[#6e6e73]">หน้า {page}</span>
           <button
             disabled={pulls.length < 20}
             onClick={() => onPage(page + 1)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-white/40 hover:text-white/70 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/[0.04] transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-[#6e6e73] hover:text-[#1d1d1f] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/[0.04] transition-all"
           >
             ถัดไป <ChevronRight size={14} />
           </button>
@@ -753,14 +754,14 @@ function PullDetailView({ number, onBack }: { number: number; onBack: () => void
     <div>
       <button
         onClick={onBack}
-        className="flex items-center gap-1.5 text-[13px] text-white/40 hover:text-indigo-400 transition-colors mb-6"
+        className="flex items-center gap-1.5 text-[13px] text-[#6e6e73] hover:text-[#0071e3] transition-colors mb-6"
       >
         <ArrowLeft size={14} /> กลับไปรายการ
       </button>
 
       {loading && <LoadingSkeleton />}
       {error && (
-        <div className="py-8 text-center text-white/40 text-[14px]">
+        <div className="py-8 text-center text-[#6e6e73] text-[14px]">
           <AlertCircle size={24} className="mx-auto mb-3 opacity-40" />
           <p>โหลดไม่ได้: {error}</p>
         </div>
@@ -768,42 +769,42 @@ function PullDetailView({ number, onBack }: { number: number; onBack: () => void
 
       {!loading && !error && pr && (
         <>
-          <div className="mb-6 pb-6 border-b border-white/[0.08]">
-            <div className="flex items-center gap-1.5 text-[12px] text-white/30 mb-3">
+          <div className="mb-6 pb-6 border-b border-black/[0.08]">
+            <div className="flex items-center gap-1.5 text-[12px] text-[#6e6e73] mb-3">
               <span>GitHub</span>
               <ChevronRight size={12} />
-              <button onClick={onBack} className="hover:text-white/50 transition-colors">Pull Requests</button>
+              <button onClick={onBack} className="hover:text-[#1d1d1f] transition-colors">Pull Requests</button>
               <ChevronRight size={12} />
-              <span className="text-indigo-400">#{pr.number}</span>
+              <span className="text-[#0071e3]">#{pr.number}</span>
             </div>
-            <h1 className="text-[22px] font-semibold text-[#f8f9fb] mb-3 leading-snug">{pr.title}</h1>
+            <h1 className="text-[22px] font-semibold text-[#1d1d1f] mb-3 leading-snug">{pr.title}</h1>
             <div className="flex flex-wrap items-center gap-3">
               <StateBadge state={pr.state} draft={pr.draft} merged={!!pr.merged_at} />
               {pr.labels.map(l => <LabelBadge key={l.name} label={l} />)}
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-4 text-[12px] text-white/30">
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-[12px] text-[#6e6e73]">
               <span className="flex items-center gap-1.5">
                 <img src={pr.user.avatar_url} alt="" className="w-4 h-4 rounded-full" />
                 {pr.user.login}
               </span>
-              <span className="font-mono text-[11px] bg-white/[0.04] px-2 py-0.5 rounded">{pr.head.ref} → {pr.base.ref}</span>
+              <span className="font-mono text-[11px] bg-black/[0.04] px-2 py-0.5 rounded">{pr.head.ref} → {pr.base.ref}</span>
               <span>{relativeDate(pr.created_at)}</span>
               {pr.merged_at && <span>ผสานเมื่อ {relativeDate(pr.merged_at)}</span>}
             </div>
             {(pr.additions !== undefined || pr.changed_files !== undefined) && (
               <div className="mt-3 flex items-center gap-4 text-[12px]">
                 {pr.additions !== undefined && (
-                  <span className="text-green-400 font-mono">+{pr.additions}</span>
+                  <span className="text-green-600 font-mono">+{pr.additions}</span>
                 )}
                 {pr.deletions !== undefined && (
-                  <span className="text-red-400 font-mono">-{pr.deletions}</span>
+                  <span className="text-red-500 font-mono">-{pr.deletions}</span>
                 )}
                 {pr.changed_files !== undefined && (
-                  <span className="text-white/30">{pr.changed_files} ไฟล์ที่เปลี่ยนแปลง</span>
+                  <span className="text-[#6e6e73]">{pr.changed_files} ไฟล์ที่เปลี่ยนแปลง</span>
                 )}
               </div>
             )}
-            <a href={pr.html_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-white/30 hover:text-indigo-400 transition-colors">
+            <a href={pr.html_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-[#0071e3] hover:text-[#0058b0] transition-colors">
               <ExternalLink size={11} /> ดูใน GitHub
             </a>
           </div>
@@ -811,7 +812,7 @@ function PullDetailView({ number, onBack }: { number: number; onBack: () => void
           {pr.body ? (
             <MarkdownRenderer content={pr.body} />
           ) : (
-            <p className="text-white/25 italic text-[14px]">ไม่มีรายละเอียดเพิ่มเติม</p>
+            <p className="text-[#86868b] italic text-[14px]">ไม่มีรายละเอียดเพิ่มเติม</p>
           )}
         </>
       )}
@@ -835,18 +836,18 @@ function BranchesView() {
 
   return (
     <div>
-      <div className="mb-6 pb-6 border-b border-white/[0.08]">
-        <div className="flex items-center gap-1.5 text-[12px] text-white/30 mb-3">
+      <div className="mb-6 pb-6 border-b border-black/[0.08]">
+        <div className="flex items-center gap-1.5 text-[12px] text-[#6e6e73] mb-3">
           <span>GitHub</span>
           <ChevronRight size={12} />
-          <span className="text-indigo-400">สาขา</span>
+          <span className="text-[#0071e3]">สาขา</span>
         </div>
-        <h1 className="text-[22px] font-semibold text-[#f8f9fb]">สาขาทั้งหมด</h1>
+        <h1 className="text-[22px] font-semibold text-[#1d1d1f]">สาขาทั้งหมด</h1>
       </div>
 
       {loading && <LoadingSkeleton />}
       {error && (
-        <div className="py-8 text-center text-white/40 text-[14px]">
+        <div className="py-8 text-center text-[#6e6e73] text-[14px]">
           <AlertCircle size={24} className="mx-auto mb-3 opacity-40" />
           <p>โหลดไม่ได้: {error}</p>
         </div>
@@ -857,25 +858,25 @@ function BranchesView() {
           {branches.map(b => (
             <div
               key={b.name}
-              className="flex items-center gap-4 px-4 py-3.5 rounded-xl hover:bg-white/[0.03] transition-colors"
+              className="flex items-center gap-4 px-4 py-3.5 rounded-xl hover:bg-black/[0.03] transition-colors"
             >
-              <GitBranch size={14} className={b.name === 'main' ? 'text-indigo-400' : 'text-white/30'} />
+              <GitBranch size={14} className={b.name === 'main' ? 'text-[#0071e3]' : 'text-[#6e6e73]'} />
               <div className="flex-1 min-w-0">
-                <span className={`font-mono text-[13px] ${b.name === 'main' ? 'text-indigo-300' : 'text-[rgba(248,249,251,0.75)]'}`}>
+                <span className={`font-mono text-[13px] ${b.name === 'main' ? 'text-[#0071e3]' : 'text-[#1d1d1f]'}`}>
                   {b.name}
                 </span>
                 {b.protected && (
-                  <span className="ml-2 text-[11px] text-white/30 inline-flex items-center gap-1">
+                  <span className="ml-2 text-[11px] text-[#6e6e73] inline-flex items-center gap-1">
                     <Lock size={10} /> ป้องกัน
                   </span>
                 )}
               </div>
-              <span className="font-mono text-[11px] text-white/20">{b.commit.sha.slice(0, 7)}</span>
+              <span className="font-mono text-[11px] text-[#86868b]">{b.commit.sha.slice(0, 7)}</span>
               <a
                 href={`https://github.com/Slow-Inc/MangaDock/tree/${b.name}`}
                 target="_blank"
                 rel="noreferrer"
-                className="text-white/20 hover:text-indigo-400 transition-colors"
+                className="text-[#86868b] hover:text-[#0071e3] transition-colors"
               >
                 <ExternalLink size={12} />
               </a>
@@ -896,12 +897,12 @@ const DOC_CATEGORY_ICONS: Record<string, typeof FileText> = {
 };
 
 const OV_SECTIONS = [
-  { id: 'ov-hero',     label: 'ภาพรวม',      dot: 'bg-white/40' },
-  { id: 'ov-frontend', label: 'Frontend',     dot: 'bg-indigo-400' },
-  { id: 'ov-backend',  label: 'Backend',      dot: 'bg-amber-400' },
-  { id: 'ov-mit',      label: 'MIT',          dot: 'bg-emerald-400' },
-  { id: 'ov-supabase', label: 'Supabase',     dot: 'bg-sky-400' },
-  { id: 'ov-t4',       label: 'T4-STANDARD',  dot: 'bg-white/40' },
+  { id: 'ov-hero',     label: 'ภาพรวม',      dot: 'bg-[#6e6e73]' },
+  { id: 'ov-frontend', label: 'Frontend',     dot: 'bg-[#0071e3]' },
+  { id: 'ov-backend',  label: 'Backend',      dot: 'bg-amber-500' },
+  { id: 'ov-mit',      label: 'MIT',          dot: 'bg-emerald-500' },
+  { id: 'ov-supabase', label: 'Supabase',     dot: 'bg-sky-500' },
+  { id: 'ov-t4',       label: 'T4-STANDARD',  dot: 'bg-[#6e6e73]' },
 ] as const;
 
 function scrollToSection(id: string) {
@@ -969,7 +970,7 @@ function Sidebar({
   const activeFile = view.type === 'doc' ? view.file : null;
   const activeGH = view.type.startsWith('gh-') ? view.type : null;
 
-  function navItem(label: string, v: ViewState, icon: React.ReactNode) {
+  function navItem(label: string, v: ViewState, icon: React.ReactNode, prominent?: boolean) {
     const isActive = (() => {
       if (v.type === 'overview') return view.type === 'overview';
       if (v.type === 'techstack') return view.type === 'techstack';
@@ -979,14 +980,33 @@ function Sidebar({
       if (v.type === 'doc' && view.type === 'doc') return v.file === view.file;
       return false;
     })();
+
+    // Simulations (overview) gets special prominent treatment
+    if (prominent) {
+      return (
+        <button
+          key={label}
+          onClick={() => { navigate(v); close?.(); }}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors text-left ${
+            isActive
+              ? 'bg-[#0071e3] text-white shadow-sm'
+              : 'bg-[#0071e3]/[0.08] text-[#0071e3] hover:bg-[#0071e3]/[0.14]'
+          }`}
+        >
+          {icon}
+          <span className="truncate">{label}</span>
+        </button>
+      );
+    }
+
     return (
       <button
         key={label}
         onClick={() => { navigate(v); close?.(); }}
         className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors text-left ${
           isActive
-            ? 'bg-indigo-600/20 text-indigo-300'
-            : 'text-white/45 hover:text-white/75 hover:bg-white/[0.04]'
+            ? 'bg-white shadow-sm text-[#0071e3]'
+            : 'text-[#1d1d1f] hover:bg-black/[0.04]'
         }`}
       >
         {icon}
@@ -998,48 +1018,48 @@ function Sidebar({
   return (
     <nav className="h-full flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-5 pt-5 pb-4 border-b border-white/[0.07] shrink-0">
-        <Link href="/" className="flex items-center gap-2.5 text-white/60 hover:text-white/90 transition-colors mb-4">
+      <div className="px-5 pt-5 pb-4 border-b border-black/[0.08] shrink-0">
+        <Link href="/" className="flex items-center gap-2.5 text-[#6e6e73] hover:text-[#1d1d1f] transition-colors mb-4">
           <ArrowLeft size={14} />
           <span className="text-[13px]">กลับสู่แอป</span>
         </Link>
-        <p className="text-[16px] font-semibold text-[#f8f9fb]">เอกสาร & ประวัติ</p>
-        <p className="text-[12px] text-white/30 mt-0.5">MangaDock Engineering Hub</p>
+        <p className="text-[16px] font-semibold text-[#1d1d1f]">เอกสาร & ประวัติ</p>
+        <p className="text-[12px] text-[#6e6e73] mt-0.5">MangaDock Engineering Hub</p>
       </div>
 
       {/* Search */}
       <div className="px-4 py-3 shrink-0">
         <div className="relative">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#86868b]" />
           <input
             type="search"
             placeholder="ค้นหาเอกสาร..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white/70 placeholder:text-white/20 outline-none focus:border-indigo-500/40 focus:bg-white/[0.06] transition-all"
+            className="w-full pl-8 pr-3 py-2 rounded-lg bg-white border border-black/[0.12] text-[13px] text-[#1d1d1f] placeholder:text-[#86868b] outline-none focus:ring-1 focus:ring-[#0071e3]/30 focus:border-[#0071e3]/40 transition-all"
           />
         </div>
       </div>
 
       {/* Nav content */}
-      <div className="flex-1 overflow-y-auto px-3 pb-6 space-y-5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+      <div className="flex-1 overflow-y-auto px-3 pb-6 space-y-5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
 
         {/* Overview + Tech Stack */}
         <div className="pt-1 space-y-0.5">
-          {navItem('ภาพรวมระบบ', { type: 'overview' }, <LayoutDashboard size={13} className="shrink-0" />)}
+          {navItem('ภาพรวมระบบ', { type: 'overview' }, <LayoutDashboard size={13} className="shrink-0" />, true)}
           {view.type === 'overview' && (
-            <div className="ml-[22px] mt-0.5 pl-3 border-l border-white/[0.07] space-y-0.5">
+            <div className="ml-[22px] mt-0.5 pl-3 border-l border-black/[0.08] space-y-0.5">
               {OV_SECTIONS.map(s => (
                 <button
                   key={s.id}
                   onClick={() => { scrollToSection(s.id); close?.(); }}
                   className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] transition-colors text-left ${
                     activeSection === s.id
-                      ? 'text-white/80 bg-white/[0.05]'
-                      : 'text-white/35 hover:text-white/60'
+                      ? 'text-[#1d1d1f] bg-black/[0.04]'
+                      : 'text-[#6e6e73] hover:text-[#1d1d1f]'
                   }`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 transition-opacity ${s.dot} ${activeSection === s.id ? 'opacity-100' : 'opacity-30'}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 transition-opacity ${s.dot} ${activeSection === s.id ? 'opacity-100' : 'opacity-40'}`} />
                   {s.label}
                 </button>
               ))}
@@ -1053,7 +1073,7 @@ function Sidebar({
           const Icon = DOC_CATEGORY_ICONS[cat] ?? FileText;
           return (
             <div key={cat}>
-              <p className="flex items-center gap-2 px-3 mb-1.5 text-[11px] font-medium text-white/25">
+              <p className="flex items-center gap-2 px-3 mb-1.5 text-[11px] font-medium text-[#6e6e73] tracking-wide">
                 <Icon size={11} />
                 {cat}
               </p>
@@ -1066,7 +1086,7 @@ function Sidebar({
 
         {/* GitHub section */}
         <div>
-          <p className="flex items-center gap-2 px-3 mb-1.5 text-[11px] font-medium text-white/25">
+          <p className="flex items-center gap-2 px-3 mb-1.5 text-[11px] font-medium text-[#6e6e73] tracking-wide">
             <GitBranch size={11} />
             GitHub
           </p>
@@ -1080,12 +1100,12 @@ function Sidebar({
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-white/[0.06] shrink-0">
+      <div className="px-5 py-4 border-t border-black/[0.08] shrink-0">
         <a
           href="https://github.com/Slow-Inc/MangaDock"
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-2 text-[12px] text-white/25 hover:text-indigo-400 transition-colors"
+          className="flex items-center gap-2 text-[12px] text-[#6e6e73] hover:text-[#0071e3] transition-colors"
         >
           <ExternalLink size={12} />
           Slow-Inc/MangaDock
@@ -1096,6 +1116,15 @@ function Sidebar({
 }
 
 // ─── Main Component ─────────────────────────────────────────────────────────
+
+function viewKey(v: ViewState): string {
+  if (v.type === 'doc') return `doc:${v.file}`;
+  if (v.type === 'gh-issue') return `gh-issue:${v.number}`;
+  if (v.type === 'gh-pull') return `gh-pull:${v.number}`;
+  if (v.type === 'gh-issues') return `gh-issues`;
+  if (v.type === 'gh-pulls') return `gh-pulls`;
+  return v.type;
+}
 
 export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
   const [view, setView] = useState<ViewState>({ type: 'overview' });
@@ -1163,27 +1192,27 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
   }
 
   return (
-    <div className="h-screen bg-[#08090d] text-[#f8f9fb] flex flex-col overflow-hidden">
+    <div className="h-screen bg-white text-[#1d1d1f] flex flex-col overflow-hidden">
 
       {/* Mobile header */}
-      <header className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.07] bg-[#0a0b10] lg:hidden shrink-0">
+      <header className="flex items-center justify-between px-5 py-3.5 border-b border-black/[0.08] bg-[#f5f5f7] lg:hidden shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label={mobileOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
             aria-expanded={mobileOpen}
-            className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/[0.06] transition-all"
+            className="p-2 rounded-lg text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/[0.06] transition-all"
           >
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
-          <span className="text-[15px] font-semibold text-[#f8f9fb]">เอกสาร</span>
+          <span className="text-[15px] font-semibold text-[#1d1d1f]">เอกสาร</span>
         </div>
         <a
           href="https://github.com/Slow-Inc/MangaDock"
           target="_blank"
           rel="noreferrer"
           aria-label="เปิด GitHub repository"
-          className="p-2 rounded-lg text-white/30 hover:text-indigo-400 transition-colors"
+          className="p-2 rounded-lg text-[#6e6e73] hover:text-[#0071e3] transition-colors"
         >
           <ExternalLink size={16} />
         </a>
@@ -1192,7 +1221,7 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
       <div className="flex flex-1 overflow-hidden relative">
 
         {/* Sidebar — desktop */}
-        <aside className="hidden lg:flex w-[260px] shrink-0 flex-col border-r border-white/[0.07] bg-[#0a0b10]">
+        <aside className="hidden lg:flex w-[260px] shrink-0 flex-col border-r border-black/[0.08] bg-[#f5f5f7]">
           <Sidebar
             mdFiles={mdFiles}
             view={view}
@@ -1206,10 +1235,10 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
         {mobileOpen && (
           <>
             <div
-              className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+              className="fixed inset-0 bg-black/40 z-40 lg:hidden"
               onClick={() => setMobileOpen(false)}
             />
-            <aside className="fixed inset-y-0 left-0 w-[280px] z-50 bg-[#0a0b10] border-r border-white/[0.07] lg:hidden">
+            <aside className="fixed inset-y-0 left-0 w-[280px] z-50 bg-[#f5f5f7] border-r border-black/[0.08] lg:hidden">
               <Sidebar
                 mdFiles={mdFiles}
                 view={view}
@@ -1223,28 +1252,23 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
         )}
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+        <main className="flex-1 overflow-y-auto bg-white" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
           <div className="max-w-[760px] mx-auto px-6 md:px-12 py-10">
-            <div
-              key={view.type === 'doc' ? view.file : view.type}
-              style={{ animation: 'fadeIn 150ms ease' }}
-            >
-              {renderContent()}
-            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={viewKey(view)}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              >
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </main>
 
       </div>
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(4px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        }
-      `}</style>
     </div>
   );
 }

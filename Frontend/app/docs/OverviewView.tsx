@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Shared primitives ──────────────────────────────────────────────────────
 
@@ -50,8 +51,8 @@ function SectionTitle({ color, number, title, sub }: { color: Color; number: str
         <span className={`text-[13px] font-bold font-mono ${c.text}`}>{number}</span>
       </div>
       <div>
-        <h2 className={`text-[20px] font-semibold text-[#f8f9fb]`}>{title}</h2>
-        <p className="text-[13px] text-white/40 mt-0.5">{sub}</p>
+        <h2 className={`text-[20px] font-semibold text-[#1d1d1f]`}>{title}</h2>
+        <p className="text-[13px] text-[#6e6e73] mt-0.5">{sub}</p>
       </div>
     </div>
   );
@@ -241,7 +242,7 @@ const cacheScenarios: Record<CacheScenario, ScenarioDef> = {
 
 function TopLevelDiagram() {
   return (
-    <div className="my-8 p-6 rounded-2xl bg-[#0c0d12] border border-white/[0.08]">
+    <div className="my-8 p-6 rounded-2xl bg-[#1c1c1e] border border-white/[0.08]">
       <p className="text-[11px] font-mono text-white/25 mb-6">ภาพรวม Request Flow</p>
 
       {/* Main flow — overflow-x-auto to prevent wrapping */}
@@ -296,7 +297,7 @@ function TopLevelDiagram() {
 
 function FrontendDiagram() {
   return (
-    <div className="my-6 p-5 rounded-xl bg-[#0c0d12] border border-indigo-500/20">
+    <div className="my-6 p-5 rounded-xl bg-[#1c1c1e] border border-indigo-500/20">
       <p className="text-[11px] font-mono text-indigo-400/50 mb-5">Frontend Architecture</p>
       <div className="flex items-start gap-6 flex-wrap">
         {/* Left: flow */}
@@ -370,15 +371,15 @@ function BackendCacheDiagram() {
   ];
 
   return (
-    <div className="my-6 space-y-3">
-      {/* Scenario tabs — grouped by read / write */}
-      <div className="space-y-1.5">
+    <div className="my-6 rounded-2xl overflow-hidden border border-black/[0.07]">
+      {/* Scenario tabs — sit on dark header bar that bleeds into the simulator panel */}
+      <div className="bg-[#1c1c1e] px-6 pt-5 pb-4 space-y-2.5">
         {(['read', 'write', 'translate'] as const).map(group => {
           const ids = (Object.keys(cacheScenarios) as CacheScenario[]).filter(s => cacheScenarios[s].group === group);
           const groupLabel = group === 'read' ? 'Read' : group === 'write' ? 'Write' : 'Translate';
           return (
-            <div key={group} className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] font-mono text-white/20 shrink-0 w-14">
+            <div key={group} className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-mono text-white/30 shrink-0 w-14">
                 {groupLabel}
               </span>
               {ids.map(s => (
@@ -386,10 +387,10 @@ function BackendCacheDiagram() {
                   key={s}
                   onClick={() => switchScenario(s)}
                   aria-pressed={s === scenario}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all ${
+                  className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-all duration-200 ${
                     s === scenario
-                      ? 'bg-amber-500/15 border-amber-400/40 text-amber-200'
-                      : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60 hover:border-white/15'
+                      ? 'bg-white text-[#1d1d1f] shadow-sm'
+                      : 'text-white/45 hover:text-white/80 hover:bg-white/[0.08] border border-white/[0.08]'
                   }`}
                 >
                   {cacheScenarios[s].badge} {cacheScenarios[s].label}
@@ -400,8 +401,8 @@ function BackendCacheDiagram() {
         })}
       </div>
 
-      {/* Diagram area */}
-      <div className="p-5 rounded-xl bg-[#0c0d12] border border-amber-500/20 min-h-[120px]">
+      {/* Diagram area — no border-radius needed, parent handles the card */}
+      <div className="p-8 bg-[#1c1c1e] border-t border-white/[0.06] min-h-[120px]">
 
         {/* Read path scenarios (normal + l2down) */}
         {cur.read !== undefined && (
@@ -512,32 +513,41 @@ function BackendCacheDiagram() {
         )}
       </div>
 
-      {/* Step description + navigation */}
-      <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+      {/* Step description + navigation — part of the unified dark card */}
+      <div className="px-8 py-6 bg-[#1c1c1e] border-t border-white/[0.06]">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-white/75 mb-1">{cur.desc}</p>
-            <p className="text-[12px] text-white/45 leading-5">{cur.detail}</p>
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${scenario}-${step}`}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+              className="flex-1 min-w-0"
+            >
+              <p className="text-[17px] font-semibold text-white/85 mb-1.5">{cur.desc}</p>
+              <p className="text-[14px] text-white/50 leading-6">{cur.detail}</p>
+            </motion.div>
+          </AnimatePresence>
           <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
             <button onClick={prev} disabled={step === 0} aria-label="ขั้นตอนก่อนหน้า"
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-white/10 text-white/35 text-[16px] hover:text-white/60 hover:border-white/20 disabled:opacity-20 disabled:cursor-not-allowed transition-all">
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-[#1c1c1e] border border-white/10 text-white/50 text-[16px] hover:text-white/80 hover:border-white/25 disabled:opacity-20 disabled:cursor-not-allowed transition-all">
               ‹
             </button>
-            <span className="text-[11px] font-mono text-white/25 w-10 text-center" aria-live="polite">{step + 1} / {steps.length}</span>
+            <span className="text-[15px] font-semibold text-white/40 w-12 text-center" aria-live="polite">{step + 1} / {steps.length}</span>
             <button onClick={next} disabled={step === steps.length - 1} aria-label="ขั้นตอนถัดไป"
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-white/10 text-white/35 text-[16px] hover:text-white/60 hover:border-white/20 disabled:opacity-20 disabled:cursor-not-allowed transition-all">
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-[#1c1c1e] border border-white/10 text-white/50 text-[16px] hover:text-white/80 hover:border-white/25 disabled:opacity-20 disabled:cursor-not-allowed transition-all">
               ›
             </button>
           </div>
         </div>
         {/* Progress dots */}
-        <div className="flex gap-1.5 mt-3" role="group" aria-label="ขั้นตอน">
+        <div className="flex gap-1.5 mt-4" role="group" aria-label="ขั้นตอน">
           {steps.map((_, i) => (
             <button key={i} onClick={() => setStep(i)}
               aria-label={`ขั้นตอน ${i + 1}`}
               aria-current={i === step ? 'step' : undefined}
-              className={`relative h-[3px] rounded-full transition-all before:absolute before:inset-x-0 before:-inset-y-3 ${i === step ? 'w-5 bg-amber-400/50' : 'w-2 bg-white/10 hover:bg-white/20'}`} />
+              className={`relative h-[3px] rounded-full transition-all before:absolute before:inset-x-0 before:-inset-y-3 ${i === step ? 'w-5 bg-amber-400/60' : 'w-2 bg-white/15 hover:bg-white/25'}`} />
           ))}
         </div>
       </div>
@@ -549,7 +559,7 @@ function MITDiagram() {
   return (
     <div className="my-6 space-y-4">
       {/* Two-process model */}
-      <div className="p-5 rounded-xl bg-[#0c0d12] border border-emerald-500/20">
+      <div className="p-5 rounded-xl bg-[#1c1c1e] border border-emerald-500/20">
         <p className="text-[11px] font-mono text-emerald-400/50 mb-5">MIT — Two-Process Model (แยกกันทำงาน)</p>
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 p-4 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.05]">
@@ -584,7 +594,7 @@ function MITDiagram() {
       </div>
 
       {/* Pipeline */}
-      <div className="p-5 rounded-xl bg-[#0c0d12] border border-emerald-500/20">
+      <div className="p-5 rounded-xl bg-[#1c1c1e] border border-emerald-500/20">
         <p className="text-[11px] font-mono text-emerald-400/50 mb-5">MIT — Translation Pipeline (ขั้นตอนการแปล)</p>
         <div className="flex flex-col md:flex-row gap-4 items-start">
           {/* Flow */}
@@ -733,7 +743,7 @@ function QuantizationExplainer() {
 
 function SupabaseDiagram() {
   return (
-    <div className="my-6 p-5 rounded-xl bg-[#0c0d12] border border-sky-500/20">
+    <div className="my-6 p-5 rounded-xl bg-[#1c1c1e] border border-sky-500/20">
       <p className="text-[11px] font-mono text-sky-400/50 mb-5">Supabase — บทบาทในระบบ</p>
       <div className="grid md:grid-cols-2 gap-4">
         <div className="p-4 rounded-xl border border-sky-500/25 bg-sky-500/[0.05]">
@@ -782,9 +792,9 @@ export default function OverviewView() {
     <div className="max-w-[760px]">
       {/* Hero */}
       <div id="ov-hero" className="mb-10">
-        <p className="text-[12px] text-white/30 mb-3">เอกสาร &rsaquo; ภาพรวมระบบ</p>
-        <h1 className="text-[28px] font-bold text-[#f8f9fb] mb-3 tracking-tight leading-tight">ภาพรวมระบบ MangaDock</h1>
-        <p className="text-[15px] text-white/60 leading-7 max-w-[65ch]">
+        <p className="text-[12px] text-[#6e6e73] mb-3">เอกสาร &rsaquo; ภาพรวมระบบ</p>
+        <h1 className="text-[28px] font-bold text-[#1d1d1f] mb-3 tracking-tight leading-tight">ภาพรวมระบบ MangaDock</h1>
+        <p className="text-[15px] text-[#6e6e73] leading-7 max-w-[65ch]">
           MangaDock ประกอบด้วย 3 service หลักที่ทำงานร่วมกัน — Frontend รับ request จากผู้ใช้, Backend จัดการ logic และ cache, MIT ประมวลผล AI แปลภาพมังงะ โดยทั้งหมดใช้ Supabase เป็นฐานข้อมูลกลาง
         </p>
       </div>
@@ -792,12 +802,12 @@ export default function OverviewView() {
       {/* Top-level diagram */}
       <TopLevelDiagram />
 
-      <hr className="border-white/[0.07] my-10" />
+      <hr className="border-black/[0.08] my-10" />
 
       {/* ── Frontend ── */}
       <section id="ov-frontend" className="mb-12">
         <SectionTitle color="indigo" number="01" title="Frontend" sub="Next.js 16 + React 19 · port 4000" />
-        <p className="text-[15px] text-white/60 leading-7 mb-4">
+        <p className="text-[15px] text-[#6e6e73] leading-7 mb-4">
           Web app ที่ผู้ใช้เห็นโดยตรง ทุก API call ผ่าน proxy route ภายใน Next.js ก่อน ทำให้ token ไม่เดินทางข้าม network edge และสามารถเปลี่ยน backend URL ได้โดยไม่ต้อง redeploy frontend
         </p>
         <FrontendDiagram />
@@ -808,17 +818,17 @@ export default function OverviewView() {
         </div>
       </section>
 
-      <hr className="border-white/[0.07] my-10" />
+      <hr className="border-black/[0.08] my-10" />
 
       {/* ── Backend ── */}
       <section id="ov-backend" className="mb-12">
         <SectionTitle color="amber" number="02" title="Backend" sub="NestJS 11 · port 4001" />
-        <p className="text-[15px] text-white/60 leading-7 mb-4">
+        <p className="text-[15px] text-[#6e6e73] leading-7 mb-4">
           API server กลาง จัดการ logic ทั้งหมด ตั้งแต่ manga catalog, community forum, wallet ไปจนถึงการส่งงานแปลให้ MIT จุดเด่นที่สุดคือระบบ cache 3 ชั้นที่ออกแบบมาเพื่อ horizontal scaling
         </p>
 
         <div className="mb-5">
-          <p className="text-[14px] font-semibold text-white/70 mb-3">Modules หลัก</p>
+          <p className="text-[14px] font-semibold text-[#1d1d1f] mb-3">Modules หลัก</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {[
               { name: 'books', desc: 'manga catalog, chapter, pages' },
@@ -828,16 +838,16 @@ export default function OverviewView() {
               { name: 'unlock', desc: 'chapter unlock + HWID check' },
               { name: 'cache', desc: 'L1/L2/L3 orchestration, leader' },
             ].map(m => (
-              <div key={m.name} className="p-3 rounded-lg bg-amber-500/[0.05] border border-amber-500/20">
-                <div className="text-[13px] font-mono text-amber-300">{m.name}</div>
-                <div className="text-[11px] text-white/35 mt-0.5">{m.desc}</div>
+              <div key={m.name} className="p-3 rounded-lg bg-[#faf7f0] border border-amber-200">
+                <div className="text-[13px] font-mono text-amber-700 font-semibold">{m.name}</div>
+                <div className="text-[11px] text-[#6e6e73] mt-0.5">{m.desc}</div>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-[14px] font-semibold text-white/70 mb-3">ระบบ Cache (Multi-Layer)</p>
-        <p className="text-[13px] text-white/50 leading-6 mb-2">
+        <p className="text-[14px] font-semibold text-[#1d1d1f] mb-3">ระบบ Cache (Multi-Layer)</p>
+        <p className="text-[13px] text-[#6e6e73] leading-6 mb-2">
           แทนที่จะ query Supabase ทุกครั้ง Backend มีชั้น cache 3 ระดับ — ยิ่งชั้นสูง ยิ่งเร็ว ยิ่งชั้นต่ำ ยิ่งคงทน
         </p>
         <BackendCacheDiagram />
@@ -850,22 +860,22 @@ export default function OverviewView() {
         </div>
       </section>
 
-      <hr className="border-white/[0.07] my-10" />
+      <hr className="border-black/[0.08] my-10" />
 
       {/* ── MIT ── */}
       <section id="ov-mit" className="mb-12">
         <SectionTitle color="emerald" number="03" title="MIT — Manga Image Translator" sub="Python (FastAPI) · port 5003 + 5004" />
-        <p className="text-[15px] text-white/60 leading-7 mb-4">
+        <p className="text-[15px] text-[#6e6e73] leading-7 mb-4">
           Python ML service ที่แปลภาพมังงะ รับ page image แล้วส่งกลับ Patches (PNG เล็กๆ พร้อม coordinates) ซึ่ง Frontend นำไป overlay ทับ original image แทนที่จะส่งทั้งหน้าที่แปลแล้ว ช่วยลด bandwidth และ latency
         </p>
         <MITDiagram />
 
         <div className="mt-6">
-          <p className="text-[14px] font-semibold text-white/70 mb-2">Batch Translation Flow (แปลทั้ง Chapter)</p>
-          <p className="text-[13px] text-white/50 leading-6 mb-3">
+          <p className="text-[14px] font-semibold text-[#1d1d1f] mb-2">Batch Translation Flow (แปลทั้ง Chapter)</p>
+          <p className="text-[13px] text-[#6e6e73] leading-6 mb-3">
             เมื่อผู้ใช้สั่งแปลทั้ง chapter Backend ส่ง request แบบ fire-and-forget MIT แปลทีละหน้าและส่ง webhook callback กลับมาพร้อม HMAC signature ผู้ใช้รับผลผ่าน SSE แบบ real-time ทีละหน้า
           </p>
-          <div className="flex items-center gap-2 flex-wrap p-4 rounded-xl bg-[#0c0d12] border border-emerald-500/20">
+          <div className="flex items-center gap-2 flex-wrap p-4 rounded-xl bg-[#1c1c1e] border border-emerald-500/20">
             <Box label="Backend" sub="fire-and-forget" color="amber" size="sm" />
             <Arrow dir="right" label="POST batch" />
             <Box label="MIT Queue" color="emerald" size="sm" />
@@ -881,36 +891,36 @@ export default function OverviewView() {
         </div>
 
         <div className="mt-6">
-          <p className="text-[14px] font-semibold text-white/70 mb-2">Quantization — ปรับ VRAM vs คุณภาพ</p>
-          <p className="text-[13px] text-white/50 leading-5 mb-3">
+          <p className="text-[14px] font-semibold text-[#1d1d1f] mb-2">Quantization — ปรับ VRAM vs คุณภาพ</p>
+          <p className="text-[13px] text-[#6e6e73] leading-5 mb-3">
             โมเดล ML เก็บ weight ด้วยความละเอียดต่างกัน — ยิ่ง bit น้อย ยิ่งประหยัด VRAM และเร็วขึ้น แต่คุณภาพอาจลดลงเล็กน้อย
           </p>
           <QuantizationExplainer />
         </div>
 
         <div className="mt-6">
-          <p className="text-[14px] font-semibold text-white/70 mb-2">Environment Variables หลัก</p>
+          <p className="text-[14px] font-semibold text-[#1d1d1f] mb-2">Environment Variables หลัก</p>
           <MITConfigTable />
         </div>
       </section>
 
-      <hr className="border-white/[0.07] my-10" />
+      <hr className="border-black/[0.08] my-10" />
 
       {/* ── Supabase ── */}
       <section id="ov-supabase" className="mb-12">
         <SectionTitle color="sky" number="04" title="Supabase" sub="PostgreSQL + Auth-as-a-Service" />
-        <p className="text-[15px] text-white/60 leading-7 mb-4">
+        <p className="text-[15px] text-[#6e6e73] leading-7 mb-4">
           ทำหน้าที่ 2 อย่าง: เป็น Auth provider (JWT, OAuth) และ long-term database สำหรับข้อมูลถาวร ขณะที่ Redis เป็น source of truth ณ runtime Supabase คือที่ที่ข้อมูลอยู่จริงๆ ในระยะยาว
         </p>
         <SupabaseDiagram />
       </section>
 
-      <hr className="border-white/[0.07] my-10" />
+      <hr className="border-black/[0.08] my-10" />
 
       {/* Engineering principles */}
       <section id="ov-t4" className="mb-8">
-        <h2 className="text-[20px] font-semibold text-[#f8f9fb] mb-4">T4-STANDARD Pillars</h2>
-        <p className="text-[13px] text-white/50 mb-4 leading-6">หลักการวิศวกรรมที่ทีมยึดถือทุก feature</p>
+        <h2 className="text-[20px] font-semibold text-[#1d1d1f] mb-4">T4-STANDARD Pillars</h2>
+        <p className="text-[13px] text-[#6e6e73] mb-4 leading-6">หลักการวิศวกรรมที่ทีมยึดถือทุก feature</p>
         <div className="space-y-1">
           {[
             { n: '1', name: 'Idempotent Pipelines', desc: 'ทุก operation (Upload, Vote, Unlock) retry-safe ไม่ duplicate แม้รันซ้ำ' },
@@ -920,11 +930,11 @@ export default function OverviewView() {
             { n: '5', name: 'Zero-Trust Assets', desc: 'ทุก chapter image ต้องผ่าน HWID verification + 1-hour window' },
             { n: '6', name: 'Observability', desc: 'ทุก request log structured JSON รวม IP, User-Agent สำหรับ audit trail' },
           ].map(p => (
-            <div key={p.n} className="flex gap-4 py-3 border-b border-white/[0.06] last:border-0">
-              <span className="text-[12px] font-mono text-white/20 w-5 shrink-0 pt-0.5">{p.n}.</span>
+            <div key={p.n} className="flex gap-4 py-3 border-b border-black/[0.06] last:border-0">
+              <span className="text-[12px] font-mono text-[#86868b] w-5 shrink-0 pt-0.5">{p.n}.</span>
               <div>
-                <span className="text-[13px] font-medium text-white/75">{p.name}</span>
-                <span className="text-[13px] text-white/40 ml-2">— {p.desc}</span>
+                <span className="text-[13px] font-medium text-[#1d1d1f]">{p.name}</span>
+                <span className="text-[13px] text-[#6e6e73] ml-2">— {p.desc}</span>
               </div>
             </div>
           ))}
