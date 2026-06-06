@@ -183,6 +183,27 @@ describe('L3BatchWriter', () => {
     expect(l3.write).toHaveBeenLastCalledWith('wallet:1', expect.objectContaining({ data: 'coins=20' }));
   });
 
+  // Cycle 9 (#147, self-review) — high-water marks must not outlive their keys
+  it('prunes high-water marks for keys evicted from L1 — no unbounded growth', async () => {
+    const entry = makeEntry('x');
+    const store = { 'manga:1': JSON.stringify(entry) };
+    const map = new Map([['manga:1', entry]]);
+    const redis = {
+      available: true,
+      get: jest.fn(),
+      mget: jest.fn().mockImplementation((keys: string[]) => Promise.resolve(keys.map((k) => store[k as keyof typeof store] ?? null))),
+    } as unknown as RedisService;
+    const jsonCache = { getAll: jest.fn().mockReturnValue(map) } as unknown as JsonCacheService;
+    const writer = new L3BatchWriter(redis, jsonCache, makeL3());
+
+    await writer.flush();
+    expect((writer as any).lastWritten.size).toBe(1);
+
+    map.clear(); // key evicted from L1
+    await writer.flush();
+    expect((writer as any).lastWritten.size).toBe(0);
+  });
+
   it('L1→L3 fallback respects prefix filter when Redis is unavailable', async () => {
     const redis = { available: false, get: jest.fn() } as unknown as RedisService;
     const walletEntry = makeEntry('coins');

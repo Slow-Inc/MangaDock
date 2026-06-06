@@ -57,6 +57,12 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    // Prune high-water marks for keys evicted from L1 — without this the map
+    // grows forever under key churn (manga chapters rotate through the LRU).
+    for (const key of this.lastWritten.keys()) {
+      if (matchesPrefix(key) && !all.has(key)) this.lastWritten.delete(key);
+    }
+
     // One MGET round-trip instead of one GET per key (#147) — these timers
     // fire every 2s/5s/60s forever, so per-key RTTs were a standing tax.
     const keys = [...all.keys()].filter(matchesPrefix);
