@@ -34,6 +34,15 @@ type ChapterPageItem = {
   translatedLanguage: string;
 };
 
+/** Entry from GET /versions/title/:mangaId (user-uploaded chapter versions). */
+type UserVersionItem = {
+  versionId: string;
+  chapterNumber?: string | null;
+  chapterTitle?: string | null;
+  language?: string | null;
+  backendAvailable?: boolean;
+};
+
 type Props = {
   chapterId: string;
   chapterNumber: string | null;
@@ -49,20 +58,16 @@ const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
 
 export default function MangaReader({ chapterId: initialChapterId, chapterNumber: initialChapterNumber, chapterTitle: initialChapterTitle, mangaTitle, mangaId, onClose }: Props) {
-  // Cloudflare Turnstile state
-  const [turnstilePassed, setTurnstilePassed] = useState(false);
+  // Cloudflare Turnstile state. The clearance token is restored via a lazy
+  // initializer (not a mount effect): the component renders null until
+  // `mounted`, so there is no SSR/hydration-mismatch window, and a returning
+  // reader skips the Turnstile modal flash entirely.
+  const [clearanceToken, setClearanceToken] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : localStorage.getItem("cf_clearance_token"),
+  );
+  const [turnstilePassed, setTurnstilePassed] = useState(clearanceToken !== null);
   const [turnstileExiting, setTurnstileExiting] = useState(false);
-  const [clearanceToken, setClearanceToken] = useState<string | null>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
-
-  // Check valid clearance token on mount
-  useEffect(() => {
-    const savedToken = localStorage.getItem("cf_clearance_token");
-    if (savedToken) {
-      setClearanceToken(savedToken);
-      setTurnstilePassed(true);
-    }
-  }, []);
 
   // Current chapter state — can change via navigation
   const [currentChapterId, setCurrentChapterId] = useState(initialChapterId);
@@ -461,11 +466,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     Promise.all([
       apiFetch(`${API_BASE}/books/manga/${mangaId}/chapters`).then((r) => r.json()).catch(() => []),
       apiFetch(`${API_BASE}/versions/title/${mangaId}`).then((r) => r.ok ? r.json() : []).catch(() => []),
-    ]).then(([mangaDexChapters, userVersions]: [ChapterPageItem[], any[]]) => {
+    ]).then(([mangaDexChapters, userVersions]: [ChapterPageItem[], UserVersionItem[]]) => {
       const mdxList = Array.isArray(mangaDexChapters) ? mangaDexChapters : [];
       const userList: ChapterPageItem[] = (userVersions ?? [])
-        .filter((v: any) => v?.backendAvailable !== false)
-        .map((v: any) => ({
+        .filter((v) => v?.backendAvailable !== false)
+        .map((v) => ({
           id: `ver:${v.versionId}`,
           chapterNumber: v.chapterNumber || null,
           title: v.chapterTitle || null,
@@ -487,6 +492,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   };
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- mount flag + chapter-change
+       reset before fetching; resetting via a key-remount would also drop the
+       open/close fade animation and the portal mount gate. */
     setMounted(true);
     setPage(0);
     setData(null);
@@ -497,6 +505,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     if (contentReadyTimerRef.current) clearTimeout(contentReadyTimerRef.current);
     setZoom(1);
     resetPan();
+    /* eslint-enable react-hooks/set-state-in-effect */
     requestAnimationFrame(() => setVisible(true));
     document.body.style.overflow = "hidden";
 
@@ -576,6 +585,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
     return () => { document.body.style.overflow = ""; };
   }, [chapterId, turnstilePassed, clearanceToken]);
+  // Pan must reset on every page change; the page is set from many sites
+  // (buttons, keyboard, IntersectionObserver), so this effect is the choke point.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { resetPan(); }, [page]);
 
   // Sync continuousMode to ref so wheel handler can read it without re-binding
@@ -1459,7 +1471,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           )}
           {!loading && !error && data && pages.map((src, i) => {
             const pageIsPending = (translating && !completedTranslatedPages.has(i)) || translatingCurrentPageIndex === i;
-            const pageIsDone = completedTranslatedPages.has(i) && patchedPages.has(i);
             return (
               <div key={src} className="relative manga-continuous-img">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1687,7 +1698,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           {pages.map((_, i: number) => {
             const btnCurrentTranslating = translatingCurrentPageIndex === i;
             const btnQueued = translating && !completedTranslatedPages.has(i) && !btnCurrentTranslating;
-            const btnPending = btnQueued || btnCurrentTranslating;
             const btnDone = patchedPages.has(i);
             return (
               <button
