@@ -87,6 +87,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** One round-trip for many keys; null per missing key (MGET semantics). */
+  async mget(keys: string[]): Promise<(string | null)[]> {
+    if (keys.length === 0) return [];
+    if (!this.available) return keys.map(() => null);
+    try {
+      return await this.client!.mget(...keys);
+    } catch {
+      this.isConnected = false;
+      return keys.map(() => null);
+    }
+  }
+
   async keys(pattern: string): Promise<string[]> {
     if (!this.available) return [];
     try {

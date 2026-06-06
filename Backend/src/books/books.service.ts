@@ -562,17 +562,20 @@ export class BooksService {
     const translatedByUnique = new Map<string, string>();
     let fromCache = 0;
 
-    for (const line of uniqueLines) {
-      const hash = createHash('sha1').update(`${line}|${cacheScope}`).digest('hex').slice(0, 24);
-      for (const modelName of modelCandidates) {
-        const cacheKey = `translate:manga:v1:${modelName}:${hash}`;
-        const cached = await this.cache.get<{ text: string }>(cacheKey);
-        if (!cached?.data?.text) continue;
-        translatedByUnique.set(line, cached.data.text);
-        fromCache += 1;
-        break;
-      }
-    }
+    // Lines in parallel; model fallback order preserved within each line (#148)
+    await Promise.all(
+      uniqueLines.map(async (line) => {
+        const hash = createHash('sha1').update(`${line}|${cacheScope}`).digest('hex').slice(0, 24);
+        for (const modelName of modelCandidates) {
+          const cacheKey = `translate:manga:v1:${modelName}:${hash}`;
+          const cached = await this.cache.get<{ text: string }>(cacheKey);
+          if (!cached?.data?.text) continue;
+          translatedByUnique.set(line, cached.data.text);
+          fromCache += 1;
+          break;
+        }
+      }),
+    );
 
     const missingLines = uniqueLines.filter((line) => !translatedByUnique.has(line));
 
@@ -620,6 +623,7 @@ export class BooksService {
               .filter(Boolean);
           }
 
+          const cacheWrites: Promise<void>[] = [];
           for (let idx = 0; idx < missingLines.length; idx += 1) {
             const source = missingLines[idx];
             const translated = (parsed[idx] ?? source).trim() || source;
@@ -627,8 +631,9 @@ export class BooksService {
 
             const hash = createHash('sha1').update(`${source}|${cacheScope}`).digest('hex').slice(0, 24);
             const cacheKey = `translate:manga:v1:${modelName}:${hash}`;
-            await this.cache.setMangaCacheWithTiers(cacheKey, { text: translated });
+            cacheWrites.push(this.cache.setMangaCacheWithTiers(cacheKey, { text: translated }));
           }
+          await Promise.all(cacheWrites); // parallel writes (#148)
 
           usedModel = modelName;
           break;
@@ -884,17 +889,26 @@ export class BooksService {
     };
     this.activeBatchJobs.set(jobKey, placeholderJob);
 
+    // All page lookups in parallel (#148) — serial gets cost N cold-path RTTs
+    // before MIT even started. Replay stays in page order: results are
+    // consumed by index, not by resolution order.
+    const cachedResults = await Promise.all(
+      pages.map((p) =>
+        this.cache.get<{ patches: PatchEntry[] }>(
+          this.patchCacheKey(chapterId, p.pageIndex, srcMIT, tgtMIT, imageModel),
+        ),
+      ),
+    );
     const uncachedPages: Array<{ pageIndex: number; pageUrl: string }> = [];
-    for (const p of pages) {
-      const cacheKey = this.patchCacheKey(chapterId, p.pageIndex, srcMIT, tgtMIT, imageModel);
-      const cached = await this.cache.get<{ patches: PatchEntry[] }>(cacheKey);
+    pages.forEach((p, i) => {
+      const cached = cachedResults[i];
       if (cached?.data?.patches) {
         // Serve from cache immediately — direct call, no Redis needed
         listener(p.pageIndex, { patches: cached.data.patches });
       } else {
         uncachedPages.push(p);
       }
-    }
+    });
 
     if (uncachedPages.length === 0) {
       this.logger.log(`[BatchRegistry] job=${jobKey} all ${pages.length} pages were cached — skipping MIT`);

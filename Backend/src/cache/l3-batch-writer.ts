@@ -15,6 +15,10 @@ const SPECIFIC_PREFIXES = FLUSH_CONFIG.filter((c) => c.prefix !== '').map((c) =>
 export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(L3BatchWriter.name);
   private readonly timers: NodeJS.Timeout[] = [];
+  /** updatedAt last written to L3 per key — unchanged entries skip the disk
+   *  write (#147). Every set() stamps a fresh updatedAt, so equality means
+   *  "no write since the last flush". */
+  private readonly lastWritten = new Map<string, string>();
 
   constructor(
     private readonly redis: RedisService,
@@ -53,12 +57,26 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    for (const key of [...all.keys()].filter(matchesPrefix)) {
-      const raw = await this.redis.get(key);
+    // Prune high-water marks for keys evicted from L1 — without this the map
+    // grows forever under key churn (manga chapters rotate through the LRU).
+    for (const key of this.lastWritten.keys()) {
+      if (matchesPrefix(key) && !all.has(key)) this.lastWritten.delete(key);
+    }
+
+    // One MGET round-trip instead of one GET per key (#147) — these timers
+    // fire every 2s/5s/60s forever, so per-key RTTs were a standing tax.
+    const keys = [...all.keys()].filter(matchesPrefix);
+    if (keys.length === 0) return;
+    const raws = await this.redis.mget(keys);
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i];
+      const raw = raws[i];
       if (!raw) continue; // expired in L2 — skip
       try {
         const entry = JSON.parse(raw) as CacheEntry<unknown>;
+        if (this.lastWritten.get(key) === entry.updatedAt) continue; // unchanged since last flush
         this.l3.write(key, entry);
+        this.lastWritten.set(key, entry.updatedAt);
       } catch (err) {
         this.logger.warn(`L3BatchWriter: corrupt L2 data for key=${key}: ${String(err)}`);
       }

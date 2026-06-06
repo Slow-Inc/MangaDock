@@ -33,7 +33,10 @@ function makeService() {
 }
 
 describe('BooksService — batch webhook pipeline', () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.useRealTimers(); // a failing fake-timer test must not poison the rest
+    jest.restoreAllMocks();
+  });
 
   // Cycle 2 — #73: startOrAttachBatchJob promise does not resolve until all pages delivered
   it('startOrAttachBatchJob resolves only after handleMitCallback delivers all expected pages', async () => {
@@ -75,7 +78,9 @@ describe('BooksService — batch webhook pipeline', () => {
     const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
     const jobPromise = service.startOrAttachBatchJob('ch3', pages, jest.fn() as any);
 
-    await Promise.resolve(); // flush microtasks
+    // Drain microtasks until the job reaches steady state (the parallel
+    // cache pre-check (#148) takes a few ticks; setImmediate is faked here)
+    for (let i = 0; i < 20; i += 1) await Promise.resolve();
 
     jest.advanceTimersByTime(15 * 60 * 1000 + 1);
 
