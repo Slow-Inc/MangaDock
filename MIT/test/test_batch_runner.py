@@ -118,3 +118,27 @@ def test_taskid_is_discarded_after_the_run(monkeypatch):
 
     assert cancellation.is_cancelled(TASK) is False
     assert TASK not in cancellation._cancelled
+
+
+def test_webhook_payload_carries_the_page_text_layer(monkeypatch):
+    """#158: the batch loop sees what each finished page said — regions ride
+    the per-page webhook payload."""
+    payloads = []
+
+    async def translate(config_str, img_bytes, progress_meta=None):
+        return {
+            "img_width": 100,
+            "img_height": 200,
+            "patches": [],
+            "regions": [{"src": "Huh?", "dst": "หา?"}],
+        }
+
+    async def fake_send(url, secret, payload):
+        payloads.append(payload)
+
+    monkeypatch.setattr(batch_runner, "_translate_page", translate)
+    monkeypatch.setattr(batch_runner, "send_webhook", fake_send)
+    _run_batch(pages=(0,))
+
+    assert payloads[0]["regions"] == [{"src": "Huh?", "dst": "หา?"}]
+    assert payloads[0]["patches"] == []
