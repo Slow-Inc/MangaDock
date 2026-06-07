@@ -550,12 +550,30 @@ export class BooksService {
    *                                             it has no int4/int8 path — that knob
    *                                             only applies to the local LLM
    *                                             translator via QWEN3_PRECISION).
+   *
+   * #167 rescue knobs (all opt-in; unset = config identical to before):
+   *   MIT_OCR_PROB            — OCR confidence floor in (0,1]. The 48px OCR is
+   *                             underconfident on long thin lines and drops text
+   *                             it read almost correctly; 0.03 recovers the
+   *                             measured worst page (lowest real line = 0.035).
+   *   MIT_TEXT_THRESHOLD      — detector text threshold in (0,1]
+   *   MIT_DET_INVERT=1        — inverted detection pass (white-on-black text)
+   *   MIT_DET_GAMMA_CORRECT=1 — gamma correction before detection
    */
   private buildMitConfig(srcMIT: string, tgtMIT: string, sourceIso: string, imageModel?: string, seriesContext?: string): string {
     const intEnv = (name: string, fallback: number): number => {
       const n = Number(process.env[name]);
       return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
     };
+    // #167 rescue knobs — opt-in fractions in (0, 1]; absent/invalid env
+    // leaves the config byte-identical to today.
+    const fracEnv = (name: string): number | undefined => {
+      const n = Number(process.env[name]);
+      return Number.isFinite(n) && n > 0 && n <= 1 ? n : undefined;
+    };
+    const flagEnv = (name: string): boolean => process.env[name] === '1';
+    const ocrProb = fracEnv('MIT_OCR_PROB');
+    const textThreshold = fracEnv('MIT_TEXT_THRESHOLD');
     const model = this.imageModelKey(imageModel);
     return JSON.stringify({
       translator: {
@@ -569,7 +587,16 @@ export class BooksService {
         // prompt identical to the context-free behavior.
         ...(seriesContext ? { series_context: seriesContext } : {}),
       },
-      detector: { detection_size: intEnv('MIT_DETECTION_SIZE', 2048) },
+      detector: {
+        detection_size: intEnv('MIT_DETECTION_SIZE', 2048),
+        ...(textThreshold !== undefined ? { text_threshold: textThreshold } : {}),
+        ...(flagEnv('MIT_DET_INVERT') ? { det_invert: true } : {}),
+        ...(flagEnv('MIT_DET_GAMMA_CORRECT') ? { det_gamma_correct: true } : {}),
+      },
+      // OCR prob floor (#167): the 48px OCR is underconfident on long thin
+      // lines — at the default threshold it drops lines it read almost
+      // correctly, leaving the original text visible in the Reader.
+      ...(ocrProb !== undefined ? { ocr: { prob: ocrProb } } : {}),
       inpainter: {
         inpainter: process.env.MIT_INPAINTER ?? 'lama_large',
         inpainting_size: intEnv('MIT_INPAINTING_SIZE', 1536),
