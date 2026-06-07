@@ -26,6 +26,7 @@
 - **ส่งภาพทั้งหน้าเป็น context** ให้ LLM (เราส่งแต่ข้อความ)
 - **Page-number filtering** (กรองเลขหน้าออกก่อนแปลด้วย regex+OCR)
 - **Deterministic-only translation cache** (cache เฉพาะเมื่อ temp=0) + per-stage cache คีย์ด้วย content hash
+- **Rosetta เป็น translator self-host ทางเลือก** (ตรวจข้อมูลจริงจาก HF 2026-06-07): `YanoljaNEXT-Rosetta` = LLM เฉพาะทางการแปลล้วน (fine-tune จาก Gemma/gpt-oss) — รุ่น 4B/12B/20B รองรับ 11 ภาษา **ไม่มีไทย**; ตัวเดียวที่ relevant คือ **27B-2511** (GGUF, 32 ภาษา **รวมไทย**) มี glossary contract ในตัว (`- คำ -> คำแปล` บรรทัดละ entry + JSON in/out — format เดียวกับที่ MangaTranslator auto-detect) · **เสียบเข้า `custom_openai` ได้โดยไม่แก้โค้ด** (llama.cpp server) · **เหตุที่ยังไม่ทำ**: Q4 ~16GB เกิน VRAM 12GB ของเครื่อง dev (ต้อง offload → ช้า), text-only (ปิดทาง multimodal), และ qwen3.6-35b ผ่าน gateway ปัจจุบันใหญ่กว่า/คุณภาพน่าจะดีกว่า · **use case ที่คุ้ม**: deployment ที่อยากตัดค่า API เป็นศูนย์/ออฟไลน์ บนเครื่อง VRAM ≥16GB
 
 ---
 
@@ -103,3 +104,4 @@
 | Page-number filter | MIT patch path | regex + OCR check before translating tiny edge regions |
 | Deterministic-only result cache keyed by content hash | MIT server | complements Backend patch cache |
 | src==dst → skip render, keep original | `_process_group` | trivial |
+| **Rosetta as a self-host translator option** | deployment only — `custom_openai` via llama.cpp, zero code | HF-verified 2026-06-07: `YanoljaNEXT-Rosetta` = translation-only LLMs (Gemma/gpt-oss fine-tunes). 4B/12B/20B = 11 langs, **no Thai**; only **27B-2511** (GGUF) covers 32 langs **incl. Thai**. Native glossary contract (`- X -> Y` per line + JSON in/out — the format MangaTranslator auto-detects). Why parked: Q4 ≈16 GB exceeds the dev box's 12 GB VRAM (offload = slow), text-only (forecloses multimodal), and the current gateway model (qwen3.6-35b) is larger/likely better. Worth it for: zero-API-cost / offline deployments with ≥16 GB VRAM. |
