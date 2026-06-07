@@ -1,0 +1,220 @@
+# MIT — Pipeline Internals & Upstream Divergence
+
+> Companion to `ARCHITECTURE.md` (which maps the **server layer**: two-process model, queue,
+> batch/webhook). This file maps the inside of `manga_translator/` — the stage contracts a page
+> flows through — and the **exact delta between MangaDock's fork and upstream**
+> (`manga-image-translator`, legacy snapshot at `C:\Github\MetaBooks\MIT`, ~2026-03).
+> Model internals (network architectures, weights math) are intentionally out of scope: every
+> model is treated as a function with inputs and outputs.
+
+---
+
+## 1. The provenance rule (read this before editing anything)
+
+A full tree diff against the legacy snapshot (ignoring line endings) shows **~99% of
+`manga_translator/` is pristine upstream code**. MangaDock's entire delta is:
+
+- **13 modified + 2 new files** in `manga_translator/` (§5)
+- **5 modified + 5 new files** in `server/` (§5)
+
+**Rule:** before editing a file under `MIT/`, check §5.
+- File **listed** there → it carries MangaDock-specific behavior. Understand the listed intent
+  before touching; never "sync with upstream" blindly — you will revert a deliberate fix.
+- File **not listed** → vendor code we have never modified. Safe to treat as a black box; an
+  upstream upgrade may overwrite it wholesale.
+
+---
+
+## 2. The `Context` (ctx) lifecycle
+
+`Context` (`utils/generic.py`) is a loose attribute bag; missing attributes read as `None`.
+Stages communicate exclusively through it:
+
+| Attribute | Type | Written by | Meaning |
+|-----------|------|-----------|---------|
+| `input` | PIL.Image | `translate()` | Original input (may be RGBA/P) |
+| `img_rgb` | np.ndarray | load step | Working RGB image (after optional colorize/upscale) |
+| `img_alpha` | Image\|None | load step | Original alpha channel, recomposed at the end |
+| `textlines` | List[Quadrilateral] | detection → enriched by OCR → filtered by lang-skip | Raw detected lines (**reassigned 3×** — know which stage you're after) |
+| `mask_raw` | np.ndarray\|None | detection | Raw text mask (may be ~2× image size; rescaled later) |
+| `text_regions` | List[TextBlock] | textline_merge | Merged regions — the pipeline's main currency; `.translation` filled by translation stage |
+| `mask` | np.ndarray | mask_refinement | Final binary inpainting mask (built **after** translation, from surviving regions only) |
+| `img_inpainted` | np.ndarray | inpainting | Text erased |
+| `img_rendered` | np.ndarray | rendering | Translation drawn |
+| `result` | PIL.Image | dump | Final RGBA output |
+
+Early exits: no textlines after detection / after OCR / no regions after filtering → pipeline
+returns the (upscaled) original, untranslated. This is why an "empty" page is fast and silent.
+
+---
+
+## 3. Stage contracts — front half
+
+### 3.1 Detection (`detection/`)
+- **Contract:** RGB image + `detection_size` → (`textlines: List[Quadrilateral]`, `mask_raw`).
+- Dispatcher caches detector instances by key (`default` = DBNet, `ctd`, `craft`, `paddle`, `none`).
+- Pre-filters applied in order: rotate → border (min 400px) → invert → gamma; quads with
+  `area < 1` dropped; `det_auto_rotate` may re-run detection on the rotated image.
+- **Knobs:** `detection_size` (2560 default; MangaDock sends 2048 via Backend env
+  `MIT_DETECTION_SIZE`), `text_threshold` .5, `box_threshold` .7, `unclip_ratio` 2.3.
+- **Gotcha:** `mask_raw` can come back larger than the image (detector upsamples); downstream
+  crop code handles the size mismatch — keep it that way.
+
+### 3.2 OCR (`ocr/`)
+- **Contract:** image + textlines → same textlines with `.text` + per-line fg/bg colors.
+- Models: `48px` (default), `48px_ctc`, `32px`, `mocr`. Crops are perspective-transformed per
+  line before recognition.
+- Empty-text lines are dropped after OCR; `config.render.font_color_*` overrides the extracted
+  colors when set.
+- **Knobs:** `ocr`, `min_text_length`, `prob` (None → model default), `ignore_bubble` (applied
+  later, in mask refinement).
+
+### 3.3 Textline merge (`textline_merge/`)
+- **Contract:** textlines + image dims → `List[TextBlock]`.
+- Algorithm: NetworkX graph — edge when two quads "can merge" (hardcoded aspect/font/char-gap
+  tolerances) → connected components → `split_text_region()` re-splits suspicious components
+  (distance/angle/MST variance heuristics) → per-region: mean colors, majority direction
+  (`h`/`v`), centroid-sorted lines, area-weighted log-prob confidence.
+- After merge, `manga_translator.py` applies: lang-skip filter, bracket-balance cleanup,
+  `min_text_length` / `is_valuable_text` filters, same-as-target-language skip, then panel-aware
+  region sort (`force_simple_sort` falls back to plain top-to-bottom).
+- **Gotcha (#111, fixed in our fork):** the merged-prob denominator summed the wrong variable
+  upstream; our `textline_merge/__init__.py` carries the fix — do not revert from upstream.
+
+### 3.4 Translation stage
+Covered by `ARCHITECTURE.md` §7 (translator subsystem) and §7.1 (dormant page-context engine).
+Pipeline-side facts worth knowing:
+- `_run_text_translation` applies pre-dict → dispatch → post-dict, then **post-translation
+  checks**: per-region repetition/hallucination retry and the page-level target-script-ratio
+  check (`utils/lang_ratio.py`, ours — §5) gated by `_PAGE_LANG_CHECK_MIN_REGIONS = 6`.
+- `skip_lang` / `source_lang(+source_lang_only)` filters happen around translation using
+  `py3langid` detection on the **source** text.
+
+### 3.5 Mask refinement (`mask_refinement/`)
+- **Contract:** (surviving `text_regions`, `img_rgb`, `mask_raw`) → final binary `ctx.mask`.
+- Runs **after** translation on purpose: only regions that will actually be re-rendered get
+  erased.
+- Mechanics: connected components of the raw mask are assigned to textlines by overlap ratio
+  (distance fallback), then per-region dilation
+  (`dilate_size ≈ (text_size + mask_dilation_offset) * 0.3`, ellipse kernel) with optional CRF
+  refinement — **pydensecrf is optional in our fork** (§5): when absent, the raw mask is used.
+- `ignore_bubble` (1–50): filters non-bubble contours via `utils/bubble.py` heuristic.
+- **Knobs:** `mask_dilation_offset` (20), `kernel_size` (3, must stay odd).
+
+---
+
+## 4. Stage contracts — back half
+
+### 4.1 Inpainting (`inpainting/`)
+- **Contract:** (image crop, binary mask, `inpainting_size`, precision) → text-erased crop.
+- Registry: `lama_large` (MangaDock default via env `MIT_INPAINTER`), `lama_mpe`, `default`
+  (AOT), `sd`, `original` (debug: no erase), `none`.
+- **Gotchas:** mask must be strictly 0/255 — gray values bleed color. `inpainting_size` (we send
+  1536 via `MIT_INPAINTING_SIZE`) is the VRAM lever; too large = hard OOM, no graceful fallback.
+  Models are singleton-cached in VRAM until `unload()`.
+
+### 4.2 Rendering (`rendering/`)
+Three sub-steps inside `dispatch()`:
+1. **Region sizing** — `resize_regions_to_font_size()`: target font =
+   (`font_size_fixed` | detected + `font_size_offset`, floored by `font_size_minimum`); box
+   grows (≤ ~1.1×, more if line count overflows) when the translation is longer than the
+   original; final coords clamped to image bounds.
+2. **Glyph rendering** — `text_render.py` draws into an RGBA canvas:
+   `put_text_horizontal` / `put_text_vertical`; per-language line breaking — **Thai combining
+   marks are kept attached to their base character by `_safe_char_split()` (ours, §5)**;
+   hyphenation only for spaced Latin-ish languages (`no_hyphenation` disables).
+3. **Warp + composite** — `cv2.findHomography(src→dst)` then alpha-composite onto the inpainted
+   image. **Degenerate quads make `findHomography` return `None` — our fork guards this
+   (#110, §5); upstream crashes.** The same fix chooses the *effective* render direction
+   (`render_horizontally`) instead of the detected orientation.
+- Alternate renderers: `manga2eng`(+`pillow`) for English typesetting, `gimp`, `none`.
+
+### 4.3 The patch path (`translate_patches()` — MangaDock's production flow)
+- Front half runs **once per page** (`_translate_until_translation` + translation), then regions
+  are **proximity-grouped** (union-find on padded AABBs) so overlapping bubbles share one patch.
+- Per group, gated by `_PATCH_CONCURRENCY` (env, default 3) on the GPU-bound part:
+  crop (+40px pad, +80px render margin) → local-coords region copies → mask refinement →
+  inpaint, then **outside** the semaphore: render → PNG encode (thread pool,
+  `compress_level=1` + 30s timeout — ours, §5).
+- Returns `{img_width, img_height, patches:[{x,y,w,h,img_png}]}` — pixel coords; the Backend
+  converts to fractions.
+
+### 4.4 Upscaling / Colorization (rarely enabled)
+- `upscaling/` runs **before** detection (`esrgan`, `4xultrasharp`, ...; `revert_upscaling`
+  downsizes the result back). `colorization/` (`mc2`) colorizes B&W pages. Both off in
+  MangaDock's normal config.
+
+### 4.5 Modes (`mode/`)
+| Mode | Entry | Used by us | State |
+|------|-------|-----------|-------|
+| `share.py` | worker HTTP, pickled I/O | **yes — production worker** | global `_translator` singleton |
+| `local.py` | CLI folder mode | no (upstream CLI) | calls `translate_batch` — the path page-context was designed for (ARCHITECTURE §7.1) |
+| `ws.py` | websocket streaming | no | experimental |
+
+---
+
+## 5. MangaDock divergence from upstream (the full delta)
+
+### `manga_translator/` — modified (13)
+
+| File | What we changed | Why | Revert hazard |
+|------|----------------|-----|---------------|
+| `config.py` | Qwen3/Qwen3Big enum entries; env-driven `_default_translator()` (`TRANSLATOR_TYPE` → `DEFAULT_LOCAL/API_TRANSLATOR`); `TranslatorConfig.model` per-request override | #87, local LLM support | Default translator falls back to upstream's hardcoded choice; per-request Gemini model switching breaks |
+| `manga_translator.py` | `reset_page_context()` + call at `translate_patches` start; `_check_target_language_ratio` rewritten to script-ratio (`utils/lang_ratio.py`) with `_PAGE_LANG_CHECK_MIN_REGIONS=6`; PNG `compress_level=1` + 30s encode timeout | #136 (context bleed), #109 (false-fail lang check), streaming latency | Context bleeds across jobs again; pages with SFX/credits get falsely rejected; PNG encode can hang forever |
+| `mask_refinement/text_mask_utils.py` | pydensecrf import made optional (fallback: raw mask) | run without CRF dep | Import error on machines without pydensecrf |
+| `mode/share.py` | worker `GET /health` endpoint; injects `fonts/Prompt-Bold.ttf` for Thai rendering when no font specified (`:194`) | dead-worker detection (`/ready` probe, 2026-06-06 incident); Thai glyph support. Note: a 2026-06-07 investigation considered lighter weights for downscale halo, but Bold is the deliberate choice — the perceived "tone around patches" issue was the display-derivative mismatch (#156), not the font | `/ready` reports `workers_unreachable` forever; Thai falls back to a font without Thai glyphs |
+| `rendering/__init__.py` | use effective `render_horizontally`; guard `findHomography() is None` | #110 | Crash on degenerate region quads |
+| `rendering/text_render.py` | `_THAI_COMBINING` + `_safe_char_split()` in char-level wrapping | Thai tone marks orphaned on wrap | Corrupted Thai glyphs when lines break |
+| `textline_merge/__init__.py` | prob denominator typo fix (`textlines` → `txtlns`) | #111 | Wrong merged-region confidence |
+| `translators/__init__.py` | register qwen3/qwen3_big | local LLM | Qwen3 unselectable |
+| `translators/common_gpt.py` | few-shot sample variable typo fix; empty-list `min()` guard; `text2json` missing `self` | bug fixes | GPT few-shot silently broken; crashes on empty translations |
+| `translators/config_gpt.py` | `_closest_sample_match` rewritten as direct dict lookup — **dropped `langcodes`/`language_data` deps**; removed stale `self.langSamples` cache | #108 (cross-instance cache bleed) + dependency removal | Re-importing upstream reintroduces removed deps → ImportError |
+| `translators/gemini.py` | per-request `_model()` override + cache bypass when model ≠ env (#87); `removeprefix` over `lstrip`; error message fixes | #87 | Model picker in Reader silently ignored; stale Gemini context cache |
+| `translators/qwen2.py` | env-driven model/precision via shared `build_load_kwargs` from qwen3 | config parity | Hardcoded 4-bit returns |
+| `utils/textblock.py` | mutable-default `shadow_offset` fix; empty `texts` guard | bug fixes | Crash on empty region texts |
+
+### `manga_translator/` — new (3)
+- `translators/qwen3.py` — Qwen3 local translator; exports `build_load_kwargs()` (fp8/bf16/fp16/int8/int4) shared with qwen2.
+- `utils/lang_ratio.py` — character-script ratio check (#109); covers CJK/Thai/Arabic/Cyrillic/Latin ranges.
+- `utils/patch_png.py` — patch PNG encoding carrying the source page's ICC profile (#156,
+  2026-06-07): manga scans often embed a GRAY "Dot Gain 20%" profile; the browser
+  color-manages the page through it but renders an untagged patch as sRGB → every patch
+  rectangle showed ~10-16 gray levels darker midtones. A GRAY profile is only honored on a
+  grayscale image, so the patch saves as mode `L` in that case. `translate_patches` captures
+  `image.info['icc_profile']` and threads it to every patch encode. Guarded by
+  `test/test_patch_png.py` (fixture: `test/testdata/dotgain20.icc`).
+
+### `server/` — modified (5)
+
+| File | What we changed | Why |
+|------|----------------|-----|
+| `instance.py` | removed unused batch send methods; lock released before waiting in `find_executor`; `sent_patches` threads `progress_meta` to the worker | #106 contention; live progress UX |
+| `main.py` | `/ready` (probes worker `/health`); batch endpoint gained webhook fire-and-forget mode (202 + `run_batch_with_callbacks`); `/cancel/{taskId}`; `safe_result_folder` path guard; worker always binds 127.0.0.1; removed legacy batch endpoints | #100 #101 #102 #103 #106 + 2026-06-06 incident |
+| `myqueue.py` | single-image tasks only (no disk offload, no `BatchQueueElement`); `QueueElement.progress_meta` | batch moved to `batch_runner`; live progress UX |
+| `request_extraction.py` | `requests` → async `httpx`; dropped `BatchTranslateRequest`/`get_batch_ctx`; `get_patch_ctx` accepts `progress_meta` | async correctness; live progress UX |
+| `streaming.py` | 300s stream timeout + error frame on stall | #106 |
+
+### `server/` — new (5)
+`batch_runner.py` (#100 webhook batch loop) · `cancellation.py` (#101) · `path_utils.py` (#102) ·
+`readiness.py` (worker liveness, 2026-06-06 incident) · `webhook.py` (#100 signed delivery + retry + dead-letter; plus `send_progress`/`make_progress_hook` — fire-and-forget per-stage progress events the worker posts to the Backend so the Reader can show live pipeline stages; the worker attaches the hook per request in `mode/share.py`, and `batch_runner` passes `progress_meta` per page).
+
+---
+
+## 6. Consolidated foot-guns (things that look safe to change but are not)
+
+1. **Never re-sync a §5-listed file from upstream without re-applying our delta** — every entry
+   exists because something broke in production.
+2. `ctx.textlines` is reassigned three times; `ctx.mask` is `None` until mask refinement —
+  always guard.
+3. Mask values must be binary 0/255 before inpainting.
+4. `kernel_size` must stay odd (cv2 structuring element).
+5. `_PATCH_CONCURRENCY=0` deadlocks the patch loop; keep ≥1.
+6. PNG encode returns `None` on timeout — patch loop must (and does) tolerate a missing patch.
+7. The lang-ratio check is page-level and gated at ≥6 regions — lowering the gate re-introduces
+   #109 false failures on sparse pages.
+8. Worker must keep binding 127.0.0.1 — its pickle endpoint is remote code execution by design
+   (#103).
+9. Thai wrapping must go through `_safe_char_split()`; plain `list(word)` orphans combining
+   marks.
+10. `translate_patches` must keep calling `reset_page_context()` first (guarded by
+    `test/test_page_context.py`) until the #140 Translation Session lands.

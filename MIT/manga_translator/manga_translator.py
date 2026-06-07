@@ -29,6 +29,7 @@ from .utils import (
     sort_regions,
 )
 from .utils.lang_ratio import target_script_ratio
+from .utils.patch_png import encode_patch_png
 
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
@@ -2046,6 +2047,10 @@ class MangaTranslator:
         Nearby regions are grouped into a single crop to avoid overlapping patches.
         """
         self.reset_page_context()
+        # Carry the source page's ICC profile into every patch PNG — manga
+        # scans often embed non-sRGB profiles (e.g. "Dot Gain 20%"); an
+        # untagged patch renders darker than the color-managed page (#156).
+        source_icc = image.info.get('icc_profile')
         ctx = await self._translate_until_translation(image, config)
         img_h, img_w = ctx.img_rgb.shape[:2]
 
@@ -2166,9 +2171,7 @@ class MangaTranslator:
                 # acceptable trade-off for interactive translation.
                 loop = asyncio.get_running_loop()
                 def _encode_png():
-                    buf = io.BytesIO()
-                    Image.fromarray(patch_ctx.img_rendered).save(buf, format='PNG', compress_level=1)
-                    return buf.getvalue()
+                    return encode_patch_png(patch_ctx.img_rendered, icc_profile=source_icc)
                 logger.debug(f'[PatchTranslate] encoding PNG patch ({x2-x1}×{y2-y1} px)...')
                 try:
                     png_bytes = await asyncio.wait_for(

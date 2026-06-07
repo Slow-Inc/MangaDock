@@ -25,6 +25,7 @@ from server.myqueue import task_queue
 from server.request_extraction import get_ctx, get_patch_ctx, while_streaming, TranslateRequest
 from server.to_json import to_translation, TranslationResponse
 from server.batch_runner import run_batch_with_callbacks
+from server.readiness import count_alive
 from server.cancellation import mark_cancelled
 from server.path_utils import safe_result_folder
 
@@ -74,22 +75,31 @@ async def health():
 
 @app.get("/ready", tags=["api"], summary="Readiness check")
 async def ready():
-    """Returns 200 only when at least one worker is registered and ready to translate.
-    Returns 503 during model loading / startup. Use this instead of /health for
-    translation-readiness probes."""
+    """Returns 200 only when at least one worker is registered and reachable.
+    Returns 503 during model loading / startup ("starting") and when every
+    registered worker is dead ("workers_unreachable"). Use this instead of
+    /health for translation-readiness probes."""
     from fastapi.responses import JSONResponse
-    worker_count = len(executor_instances.list)
-    if worker_count > 0:
-        # Resolved default translator (env-driven) so consumers can discover the
-        # active translator family — e.g. the Reader hides the Gemini model
-        # selector on non-Gemini deployments (#132 / PRD #131).
-        from manga_translator.config import _default_translator
-        return {
-            "ready": True,
-            "workers": worker_count,
-            "translator": _default_translator().value,
-        }
-    return JSONResponse(status_code=503, content={"ready": False, "status": "starting"})
+    workers = list(executor_instances.list)
+    if not workers:
+        return JSONResponse(status_code=503, content={"ready": False, "status": "starting"})
+    # Probe each worker's /health — a worker that registered and later died
+    # (e.g. crashed while loading the translation model) stays registered
+    # forever; trusting registration alone reported ready=True during the
+    # 2026-06-06 dead-worker incident. Logic lives in server.readiness so it
+    # unit-tests without the ML stack (test/test_readiness.py).
+    alive = await count_alive(workers)
+    if alive == 0:
+        return JSONResponse(status_code=503, content={"ready": False, "status": "workers_unreachable"})
+    # Resolved default translator (env-driven) so consumers can discover the
+    # active translator family — e.g. the Reader hides the Gemini model
+    # selector on non-Gemini deployments (#132 / PRD #131).
+    from manga_translator.config import _default_translator
+    return {
+        "ready": True,
+        "workers": alive,
+        "translator": _default_translator().value,
+    }
 
 @app.post("/register", response_description="no response", tags=["internal-api"])
 async def register_instance(instance: ExecutorInstance, req: Request, req_nonce: str = Header(alias="X-Nonce")):

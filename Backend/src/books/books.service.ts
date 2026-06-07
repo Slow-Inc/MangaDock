@@ -9,6 +9,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { MangaDexService } from './mangadex.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 import { PatchStore } from './patch-store';
+import { loadPageBytes } from './page-source';
 import { RedisService } from '../cache/redis.service';
 import {
   CACHE_TTL_MS,
@@ -141,6 +142,32 @@ export class BooksService {
    * Handle an asynchronous callback from the MIT Server.
    * T4-STANDARD Pillar 2: Idempotent Webhook Processing.
    */
+  /**
+   * Forward a live MIT stage update to everyone watching this Batch Job.
+   * Informational only (UX): never recorded in completedPages, never resolves
+   * the job — a lost progress event costs nothing.
+   */
+  notifyBatchProgress(jobKey: string, pageIndex: number, stage: string): void {
+    const job = this.activeBatchJobs.get(jobKey);
+    if (!job) return;
+    const event = { patches: [], stage, progress: true } as PageResult & {
+      stage: string;
+      progress: true;
+    };
+    try {
+      job.originalListener?.(pageIndex, event);
+    } catch {
+      /* caller may be gone */
+    }
+    for (const l of job.listeners) {
+      try {
+        l(pageIndex, event);
+      } catch {
+        /* listener might have disconnected */
+      }
+    }
+  }
+
   async handleMitCallback(
     jobKey: string,
     pageIndex: number,
@@ -160,8 +187,9 @@ export class BooksService {
     }
     job.processingPages?.add(pageIndex);
 
-    // jobKey = chapterId:srcMIT:tgtMIT:model (model = 'default' when unset)
-    const [chapterId, srcMIT, tgtMIT, jobModel] = jobKey.split(':');
+    // jobKey = chapterId:srcMIT:tgtMIT:model:derivative (model = 'default'
+    // when unset; derivative = 'hd' | 'saver', #156)
+    const [chapterId, srcMIT, tgtMIT, jobModel, jobDerivative] = jobKey.split(':');
 
     let pageResult: PageResult;
 
@@ -202,7 +230,14 @@ export class BooksService {
       // Cache the result — MUST be the same key the batch pre-check and the
       // single-page endpoint read (patchCacheKey), or webhook results are never
       // served from cache again (found live during the #87 v4 migration).
-      const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, jobModel);
+      const cacheKey = this.patchCacheKey(
+        chapterId,
+        pageIndex,
+        srcMIT,
+        tgtMIT,
+        jobModel,
+        jobDerivative === 'saver' ? 'saver' : 'hd',
+      );
       await this.cache.set(cacheKey, { patches }, 1000 * 60 * 60 * 24 * 7); // 7 days
 
       pageResult = { patches };
@@ -232,7 +267,18 @@ export class BooksService {
 
     // Check if job is complete
     if (job.completedPages.size >= job.expectedCount) {
-      this.logger.log(`[Webhook] Job ${jobKey} fully completed via webhooks`);
+      // Report errored pages truthfully — an all-error batch used to log as
+      // "fully completed", hiding a dead MIT worker (2026-06-06 incident).
+      const errorPages = [...job.completedPages.values()].filter(
+        (r) => r.error,
+      );
+      if (errorPages.length > 0) {
+        this.logger.warn(
+          `[Webhook] Job ${jobKey} completed via webhooks with ${errorPages.length}/${job.expectedCount} page errors (first: ${errorPages[0].error})`,
+        );
+      } else {
+        this.logger.log(`[Webhook] Job ${jobKey} fully completed via webhooks`);
+      }
       job.resolve?.();
     }
   }
@@ -447,17 +493,26 @@ export class BooksService {
     srcMIT: string,
     tgtMIT: string,
     imageModel?: string,
+    derivative: 'hd' | 'saver' = 'hd',
   ): string {
     const model = this.imageModelKey(imageModel) ?? 'default';
-    return `translate:manga-patches:v4:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}:${model}`;
+    // v5: keyed by display derivative (#156) — patches generated from the HD
+    // image must never be served over the Data Saver view or vice versa.
+    return `translate:manga-patches:v5:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}:${model}:${derivative}`;
   }
 
   /** The registry key for a batch-translate job. MUST be built via mitLangPair
    *  on every path (start, attach, remove) or cancellation breaks. Includes the
    *  image model so two model selections for the same chapter never collide. */
-  private buildJobKey(chapterId: string, sourceLang?: string, targetLang?: string, imageModel?: string): string {
+  private buildJobKey(
+    chapterId: string,
+    sourceLang?: string,
+    targetLang?: string,
+    imageModel?: string,
+    derivative: 'hd' | 'saver' = 'hd',
+  ): string {
     const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
-    return `${chapterId}:${srcMIT}:${tgtMIT}:${this.imageModelKey(imageModel) ?? 'default'}`;
+    return `${chapterId}:${srcMIT}:${tgtMIT}:${this.imageModelKey(imageModel) ?? 'default'}:${derivative}`;
   }
 
   /**
@@ -673,14 +728,14 @@ export class BooksService {
     pageUrl: string,
     sourceLang?: string,
     targetLang?: string,
-    opts?: { maxStartupRetries?: number; imageModel?: string },
+    opts?: { maxStartupRetries?: number; imageModel?: string; derivative?: 'hd' | 'saver' },
   ): Promise<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }> {
     if (!chapterId || !pageUrl) {
       throw new Error('chapterId and pageUrl are required');
     }
 
     const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
-    const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, opts?.imageModel);
+    const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, opts?.imageModel, opts?.derivative ?? 'hd');
     const cached = await this.cache.get<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }>(cacheKey);
     if (cached?.data?.patches) {
       return cached.data;
@@ -690,18 +745,10 @@ export class BooksService {
       (process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003') +
       '/translate/with-form/patches';
 
-    // Fetch original manga page image
-    const imgRes = await fetch(pageUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
-        'Referer': 'https://mangadex.org/',
-      },
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!imgRes.ok) {
-      throw new Error(`Failed to fetch page image: HTTP ${imgRes.status}`);
-    }
-    const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+    // Load the source page — display-derivative aware (#156): /img-cache paths
+    // are read straight from disk so the patch is generated from byte-identical
+    // content to what the Reader displays; external URLs are fetched.
+    const imgBuffer = await loadPageBytes(pageUrl, { imgCacheRoot: 'img-cache' });
 
     const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '', opts?.imageModel);
 
@@ -713,7 +760,7 @@ export class BooksService {
 
     for (let attempt = 0; attempt <= maxStartupRetries; attempt += 1) {
       const form = new FormData();
-      form.append('image', new Blob([imgBuffer], { type: 'image/jpeg' }), 'page.jpg');
+      form.append('image', new Blob([new Uint8Array(imgBuffer)], { type: 'image/jpeg' }), 'page.jpg');
       form.append('config', config);
 
       try {
@@ -794,8 +841,9 @@ export class BooksService {
     targetLang: string | undefined,
     listener: BatchPageListener,
     imageModel?: string,
+    derivative: 'hd' | 'saver' = 'hd',
   ): void {
-    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel);
+    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel, derivative);
     const job = this.activeBatchJobs.get(jobKey);
     if (job) {
       job.listeners.delete(listener);
@@ -836,9 +884,10 @@ export class BooksService {
     sourceLang?: string,
     targetLang?: string,
     imageModel?: string,
+    derivative: 'hd' | 'saver' = 'hd',
   ): Promise<void> {
     const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
-    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel);
+    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel, derivative);
 
     const existing = this.activeBatchJobs.get(jobKey);
 
@@ -886,7 +935,7 @@ export class BooksService {
 
     const uncachedPages: Array<{ pageIndex: number; pageUrl: string }> = [];
     for (const p of pages) {
-      const cacheKey = this.patchCacheKey(chapterId, p.pageIndex, srcMIT, tgtMIT, imageModel);
+      const cacheKey = this.patchCacheKey(chapterId, p.pageIndex, srcMIT, tgtMIT, imageModel, derivative);
       const cached = await this.cache.get<{ patches: PatchEntry[] }>(cacheKey);
       if (cached?.data?.patches) {
         // Serve from cache immediately — direct call, no Redis needed
@@ -947,6 +996,7 @@ export class BooksService {
       sourceLang,
       targetLang,
       imageModel,
+      derivative,
     )
       .then(() => {
         if (job.completedPages.size >= job.expectedCount) {
@@ -996,6 +1046,7 @@ export class BooksService {
     sourceLangIso?: string,
     targetLangIso?: string,
     imageModel?: string,
+    derivative: 'hd' | 'saver' = 'hd',
   ): Promise<void> {
     const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
     const mitUrl = `${mitBaseUrl}/translate/with-form/patches/batch`;
@@ -1004,17 +1055,9 @@ export class BooksService {
     let imageBuffers: Buffer[];
     try {
       imageBuffers = await Promise.all(
-        pages.map(async ({ pageUrl }) => {
-          const imgRes = await fetch(pageUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
-              'Referer': 'https://mangadex.org/',
-            },
-            signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
-          });
-          if (!imgRes.ok) throw new Error(`Failed to fetch page image: HTTP ${imgRes.status}`);
-          return Buffer.from(await imgRes.arrayBuffer());
-        }),
+        // Display-derivative aware (#156): /img-cache paths read from disk,
+        // external URLs fetched (cancellable via the job signal).
+        pages.map(({ pageUrl }) => loadPageBytes(pageUrl, { imgCacheRoot: 'img-cache', signal })),
       );
     } catch (err) {
       if (signal.aborted) {
@@ -1057,7 +1100,7 @@ export class BooksService {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT batch fetch failed: ${msg}`);
-      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel);
+      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative);
       return;
     }
 
@@ -1076,7 +1119,7 @@ export class BooksService {
     if (!mitRes.ok || !mitRes.body) {
       const errText = await mitRes.text().catch(() => '');
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT HTTP ${mitRes.status}: ${errText.slice(0, 200)}`);
-      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel);
+      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative);
       return;
     }
 
@@ -1182,7 +1225,7 @@ export class BooksService {
             }
 
             // Cache so single-page endpoint & future batch requests skip MIT
-            const cacheKey = this.patchCacheKey(chapterId, data.pageIndex, srcMIT, tgtMIT, imageModel);
+            const cacheKey = this.patchCacheKey(chapterId, data.pageIndex, srcMIT, tgtMIT, imageModel, derivative);
             await this.cache.setMangaCacheWithTiers(cacheKey, { patches });
 
             this.logger.log(`[BatchPatches] chapter=${chapterId} page=${data.pageIndex} → ${patches.length} patches`);
@@ -1217,7 +1260,7 @@ export class BooksService {
     if (streamFailedError) {
       this.logger.warn(`[BatchPatches] chapter=${chapterId} continuing with per-page fallback after stream failure`);
     }
-    await this._retryMissingPagesIndividually(chapterId, pages, processedPageIndexes, notify, sourceLangIso, targetLangIso, imageModel);
+    await this._retryMissingPagesIndividually(chapterId, pages, processedPageIndexes, notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative);
   }
 
   private async _retryMissingPagesIndividually(
@@ -1229,6 +1272,7 @@ export class BooksService {
     targetLangIso?: string,
     imageModel?: string,
     signal?: AbortSignal,
+    derivative: 'hd' | 'saver' = 'hd',
   ): Promise<void> {
     const missingPages = pages.filter((p) => !processedPageIndexes.has(p.pageIndex));
     if (missingPages.length > 0) {
@@ -1243,7 +1287,7 @@ export class BooksService {
       try {
         const single = await this.translateMangaPagePatches(
           chapterId, missing.pageIndex, missing.pageUrl, sourceLangIso, targetLangIso,
-          { maxStartupRetries: 3, imageModel },
+          { maxStartupRetries: 3, imageModel, derivative },
         );
         notify(missing.pageIndex, { patches: single.patches });
         recovered += 1;

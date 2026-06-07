@@ -172,7 +172,7 @@ export class BooksController {
   async translateMangaPagePatches(
     @Param('chapterId') chapterId: string,
     @Param('pageIndex') pageIndex: string,
-    @Body() body: { pageUrl?: string; sourceLang?: string; targetLang?: string; imageModel?: string },
+    @Body() body: { pageUrl?: string; sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: 'hd' | 'saver' },
   ) {
     try {
       return await this.booksService.translateMangaPagePatches(
@@ -181,7 +181,7 @@ export class BooksController {
         body?.pageUrl ?? '',
         body?.sourceLang,
         body?.targetLang,
-        { imageModel: body?.imageModel },
+        { imageModel: body?.imageModel, derivative: body?.derivative === 'saver' ? 'saver' : 'hd' },
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -207,7 +207,7 @@ export class BooksController {
   @Post('chapters/:chapterId/batch-translate-patches')
   async batchTranslateMangaPatches(
     @Param('chapterId') chapterId: string,
-    @Body() body: { pages?: Array<{ pageIndex: number; pageUrl: string }>; sourceLang?: string; targetLang?: string; imageModel?: string },
+    @Body() body: { pages?: Array<{ pageIndex: number; pageUrl: string }>; sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: 'hd' | 'saver' },
     @Res() res: import('express').Response,
   ): Promise<void> {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -230,21 +230,30 @@ export class BooksController {
     }, 15_000);
 
     const { sourceLang, targetLang, imageModel } = body ?? {};
+    const derivative = body?.derivative === 'saver' ? 'saver' : 'hd';
 
-    const listener = (pageIndex: number, result: { patches: unknown[]; error?: string }) => {
-      if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ pageIndex, patches: result.patches, error: result.error ?? null })}\n\n`);
+    const listener = (
+      pageIndex: number,
+      result: { patches: unknown[]; error?: string; stage?: string; progress?: boolean },
+    ) => {
+      if (res.writableEnded) return;
+      if (result.progress) {
+        // Live MIT stage update — informational event, distinct shape from
+        // page completions so old clients (no `type` handling) skip it.
+        res.write(`data: ${JSON.stringify({ type: 'progress', pageIndex, stage: result.stage })}\n\n`);
+        return;
       }
+      res.write(`data: ${JSON.stringify({ pageIndex, patches: result.patches, error: result.error ?? null })}\n\n`);
     };
 
     // Remove listener on client disconnect — job continues in background
     res.on('close', () => {
       clearInterval(heartbeat);
-      this.booksService.removeBatchListener(chapterId, sourceLang, targetLang, listener, imageModel);
+      this.booksService.removeBatchListener(chapterId, sourceLang, targetLang, listener, imageModel, derivative);
     });
 
     try {
-      await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang, imageModel);
+      await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang, imageModel, derivative);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (!res.writableEnded) {
