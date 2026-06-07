@@ -56,7 +56,7 @@ export async function translateMangaPagePatches(
   pageIndex: number,
   pageUrl: string,
   signal?: AbortSignal,
-  options?: { sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: "hd" | "saver" },
+  options?: { sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: "hd" | "saver"; mangaId?: string },
 ): Promise<PatchData[]> {
   const res = await fetch(
     `/api/proxy/books/chapters/${encodeURIComponent(chapterId)}/pages/${pageIndex}/translate-patches`,
@@ -69,6 +69,8 @@ export async function translateMangaPagePatches(
         targetLang: options?.targetLang,
         imageModel: options?.imageModel,
         derivative: options?.derivative,
+        // Series context (#157): the Backend resolves catalog metadata itself.
+        mangaId: options?.mangaId,
       }),
       signal,
     },
@@ -107,7 +109,7 @@ export async function translateMangaChapterBatchPatches(
   pages: Array<{ pageIndex: number; pageUrl: string }>,
   onPageDone: (pageIndex: number, patches: PatchData[], error?: string) => void,
   signal?: AbortSignal,
-  options?: { sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: "hd" | "saver" },
+  options?: { sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: "hd" | "saver"; mangaId?: string },
   onPageProgress?: (pageIndex: number, stage: string) => void,
 ): Promise<void> {
   const res = await fetch(
@@ -121,6 +123,8 @@ export async function translateMangaChapterBatchPatches(
         targetLang: options?.targetLang,
         imageModel: options?.imageModel,
         derivative: options?.derivative,
+        // Series context (#157): the Backend resolves catalog metadata itself.
+        mangaId: options?.mangaId,
       }),
       signal,
     },

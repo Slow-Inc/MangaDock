@@ -7,7 +7,7 @@
  */
 import { afterEach, expect, test } from "bun:test";
 
-import { translateMangaChapterBatchPatches } from "./mangaTranslatePage";
+import { translateMangaChapterBatchPatches, translateMangaPagePatches } from "./mangaTranslatePage";
 
 const realFetch = globalThis.fetch;
 
@@ -100,4 +100,38 @@ test("non-OK batch response throws instead of resolving silently", async () => {
       () => {},
     ),
   ).rejects.toThrow("Batch translate failed (500)");
+});
+
+// ─── Series context (#157): mangaId rides the translate requests ─────────────
+
+test("batch request body carries mangaId when provided", async () => {
+  let sentBody: Record<string, unknown> = {};
+  globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+    sentBody = JSON.parse(String(init?.body));
+    return new Response("", { status: 200 });
+  }) as typeof fetch;
+
+  await translateMangaChapterBatchPatches(
+    "chapter-1",
+    [{ pageIndex: 0, pageUrl: "http://example.com/0.jpg" }],
+    () => {},
+    undefined,
+    { mangaId: "manga-123" },
+  );
+
+  expect(sentBody.mangaId).toBe("manga-123");
+});
+
+test("single-page request body carries mangaId when provided", async () => {
+  let sentBody: Record<string, unknown> = {};
+  globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+    sentBody = JSON.parse(String(init?.body));
+    return new Response(JSON.stringify({ patches: [] }), { status: 200 });
+  }) as typeof fetch;
+
+  await translateMangaPagePatches("chapter-1", 0, "http://example.com/0.jpg", undefined, {
+    mangaId: "manga-123",
+  });
+
+  expect(sentBody.mangaId).toBe("manga-123");
 });

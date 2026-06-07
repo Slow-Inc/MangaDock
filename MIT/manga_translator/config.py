@@ -254,6 +254,10 @@ class TranslatorConfig(BaseModel):
     model: Optional[str] = None
     """Per-request model override for API-based translators (e.g. Gemini).
     Falls back to the translator's env-configured default when absent (#87)."""
+    series_context: Optional[str] = None
+    """Backend-composed context about the series being translated (#157).
+    Exposed through chatgpt_config so every ConfigGPT-family translator
+    appends it to its system prompt. Absent → prompts identical to today."""
 
     # 译后检查配置项
     enable_post_translation_check: bool = True
@@ -289,6 +293,11 @@ class TranslatorConfig(BaseModel):
         if self.gpt_config is not None and self._gpt_config is None:
             #todo: load from already loaded file
             self._gpt_config = OmegaConf.load(self.gpt_config)
+        # Series context (#157) rides the same OmegaConf all ConfigGPT
+        # translators read via _config_get — one carriage point.
+        if self.series_context:
+            ctx = OmegaConf.create({'series_context': self.series_context})
+            return OmegaConf.merge(self._gpt_config, ctx) if self._gpt_config is not None else ctx
         return self._gpt_config
 
 

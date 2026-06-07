@@ -185,6 +185,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     currentPage: page,
     menusOpen: translateMenuOpen || moreMenuOpen,
     derivative,
+    // Series context (#157): the Backend resolves title/synopsis from the
+    // catalog so the translator knows which manga it is translating.
+    mangaId,
   });
 
   // Perceived-progress strings: ticking seconds + live MIT stage + honest ETA

@@ -10,6 +10,7 @@ import { MangaDexService } from './mangadex.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 import { PatchStore } from './patch-store';
 import { loadPageBytes } from './page-source';
+import { composeSeriesContext } from './series-context';
 import { RedisService } from '../cache/redis.service';
 import {
   CACHE_TTL_MS,
@@ -484,6 +485,21 @@ export class BooksService {
     return normalized && /^[\w.-]+$/.test(normalized) ? normalized : undefined;
   }
 
+  /** Series context (#157): resolve catalog metadata for the manga being
+   *  translated into the prompt-context string. Catalog failure or missing id
+   *  degrades to undefined — translate must never break because metadata is
+   *  unavailable (local-first rule). */
+  private async seriesContextFor(mangaId?: string): Promise<string | undefined> {
+    if (!mangaId) return undefined;
+    try {
+      const detail = await this.mangaDex.getMangaDetail(mangaId);
+      return composeSeriesContext(detail);
+    } catch (err) {
+      this.logger.warn(`[SeriesContext] catalog lookup failed manga=${mangaId}: ${String(err)}`);
+      return undefined;
+    }
+  }
+
   /** Single source of truth for the per-page patch cache key. v4 adds the model
    *  segment so different image-translation models never share cached patches
    *  (#87); old v3 entries expire naturally via TTL. */
@@ -496,9 +512,9 @@ export class BooksService {
     derivative: 'hd' | 'saver' = 'hd',
   ): string {
     const model = this.imageModelKey(imageModel) ?? 'default';
-    // v5: keyed by display derivative (#156) — patches generated from the HD
-    // image must never be served over the Data Saver view or vice versa.
-    return `translate:manga-patches:v5:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}:${model}:${derivative}`;
+    // v5: keyed by display derivative (#156). v6: series context (#157)
+    // changes translations — context-aware and context-free patches never mix.
+    return `translate:manga-patches:v6:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}:${model}:${derivative}`;
   }
 
   /** The registry key for a batch-translate job. MUST be built via mitLangPair
@@ -532,7 +548,7 @@ export class BooksService {
    *                                             only applies to the local LLM
    *                                             translator via QWEN3_PRECISION).
    */
-  private buildMitConfig(srcMIT: string, tgtMIT: string, sourceIso: string, imageModel?: string): string {
+  private buildMitConfig(srcMIT: string, tgtMIT: string, sourceIso: string, imageModel?: string, seriesContext?: string): string {
     const intEnv = (name: string, fallback: number): number => {
       const n = Number(process.env[name]);
       return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
@@ -545,6 +561,10 @@ export class BooksService {
         // Per-request Gemini model override (#87); MIT falls back to its
         // GEMINI_MODEL env when absent.
         ...(model ? { model } : {}),
+        // Series context (#157): MIT appends this to the translator system
+        // prompt so the model knows which manga it is translating. Absent →
+        // prompt identical to the context-free behavior.
+        ...(seriesContext ? { series_context: seriesContext } : {}),
       },
       detector: { detection_size: intEnv('MIT_DETECTION_SIZE', 2048) },
       inpainter: {
@@ -728,7 +748,7 @@ export class BooksService {
     pageUrl: string,
     sourceLang?: string,
     targetLang?: string,
-    opts?: { maxStartupRetries?: number; imageModel?: string; derivative?: 'hd' | 'saver' },
+    opts?: { maxStartupRetries?: number; imageModel?: string; derivative?: 'hd' | 'saver'; mangaId?: string },
   ): Promise<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }> {
     if (!chapterId || !pageUrl) {
       throw new Error('chapterId and pageUrl are required');
@@ -750,7 +770,7 @@ export class BooksService {
     // content to what the Reader displays; external URLs are fetched.
     const imgBuffer = await loadPageBytes(pageUrl, { imgCacheRoot: 'img-cache' });
 
-    const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '', opts?.imageModel);
+    const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '', opts?.imageModel, await this.seriesContextFor(opts?.mangaId));
 
     const maxStartupRetries = opts?.maxStartupRetries ?? 30;
     const startupRetryDelayMs = 5_000;
@@ -885,6 +905,7 @@ export class BooksService {
     targetLang?: string,
     imageModel?: string,
     derivative: 'hd' | 'saver' = 'hd',
+    mangaId?: string,
   ): Promise<void> {
     const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
     const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel, derivative);
@@ -997,6 +1018,7 @@ export class BooksService {
       targetLang,
       imageModel,
       derivative,
+      mangaId,
     )
       .then(() => {
         if (job.completedPages.size >= job.expectedCount) {
@@ -1047,6 +1069,7 @@ export class BooksService {
     targetLangIso?: string,
     imageModel?: string,
     derivative: 'hd' | 'saver' = 'hd',
+    mangaId?: string,
   ): Promise<void> {
     const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
     const mitUrl = `${mitBaseUrl}/translate/with-form/patches/batch`;
@@ -1068,7 +1091,7 @@ export class BooksService {
     }
 
     // ── 2. Build multipart form ───────────────────────────────────────────
-    const mitConfig = this.buildMitConfig(srcMIT, tgtMIT, sourceLangIso ?? '', imageModel);
+    const mitConfig = this.buildMitConfig(srcMIT, tgtMIT, sourceLangIso ?? '', imageModel, await this.seriesContextFor(mangaId));
 
     const form = new FormData();
     for (const buf of imageBuffers) {
@@ -1100,7 +1123,7 @@ export class BooksService {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT batch fetch failed: ${msg}`);
-      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative);
+      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative, mangaId);
       return;
     }
 
@@ -1119,7 +1142,7 @@ export class BooksService {
     if (!mitRes.ok || !mitRes.body) {
       const errText = await mitRes.text().catch(() => '');
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT HTTP ${mitRes.status}: ${errText.slice(0, 200)}`);
-      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative);
+      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative, mangaId);
       return;
     }
 
@@ -1260,7 +1283,7 @@ export class BooksService {
     if (streamFailedError) {
       this.logger.warn(`[BatchPatches] chapter=${chapterId} continuing with per-page fallback after stream failure`);
     }
-    await this._retryMissingPagesIndividually(chapterId, pages, processedPageIndexes, notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative);
+    await this._retryMissingPagesIndividually(chapterId, pages, processedPageIndexes, notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative, mangaId);
   }
 
   private async _retryMissingPagesIndividually(
@@ -1273,6 +1296,7 @@ export class BooksService {
     imageModel?: string,
     signal?: AbortSignal,
     derivative: 'hd' | 'saver' = 'hd',
+    mangaId?: string,
   ): Promise<void> {
     const missingPages = pages.filter((p) => !processedPageIndexes.has(p.pageIndex));
     if (missingPages.length > 0) {
@@ -1287,7 +1311,7 @@ export class BooksService {
       try {
         const single = await this.translateMangaPagePatches(
           chapterId, missing.pageIndex, missing.pageUrl, sourceLangIso, targetLangIso,
-          { maxStartupRetries: 3, imageModel, derivative },
+          { maxStartupRetries: 3, imageModel, derivative, mangaId },
         );
         notify(missing.pageIndex, { patches: single.patches });
         recovered += 1;
