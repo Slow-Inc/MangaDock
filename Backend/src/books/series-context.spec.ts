@@ -1,4 +1,5 @@
 import { BooksService } from './books.service';
+import { MangaDexService } from './mangadex.service';
 import { composeSeriesContext } from './series-context';
 
 /**
@@ -40,6 +41,50 @@ describe('composeSeriesContext', () => {
     const ctx = composeSeriesContext({ title: 'T', description: long })!;
     expect(ctx.length).toBeLessThanOrEqual(700);
     expect(ctx).not.toContain('\n\n'); // collapsed
+  });
+});
+
+/** The composer anchors on the series title, so the catalog detail must
+ *  actually carry one. Caught live (2026-06-07): getMangaDetail returned
+ *  {authors, artists, covers, genres, description} with NO title — the
+ *  composer degraded to undefined on every real manga and the context never
+ *  reached MIT, while the spec's hand-written {title, description} mock
+ *  stayed green. Mock-drift; this test pins the real seam. */
+describe('getMangaDetail — series title for the translate context', () => {
+  it('exposes the localized title from the MangaDex attributes', async () => {
+    const cache = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+      getStale: jest.fn().mockReturnValue(null),
+    };
+    const svc = new MangaDexService(cache as any, { enabled: false } as any, {} as any);
+
+    jest.spyOn(global, 'fetch').mockImplementation(async (url: any) => {
+      if (String(url).includes('/cover')) {
+        return { ok: true, json: async () => ({ data: [] }) } as any;
+      }
+      // /manga/{id} — the same payload fetchMangaAuthors already consumes
+      return {
+        ok: true,
+        json: async () => ({
+          data: {
+            id: 'manga-123',
+            attributes: {
+              title: { en: 'Mob Seka', ja: 'モブせか' },
+              description: { en: 'Otome game world.' },
+              tags: [],
+            },
+            relationships: [],
+          },
+        }),
+      } as any;
+    });
+
+    const detail = await svc.getMangaDetail('manga-123');
+    expect(detail.title).toBe('Mob Seka');
+    expect(composeSeriesContext(detail)).toContain('Mob Seka');
+
+    jest.restoreAllMocks();
   });
 });
 
