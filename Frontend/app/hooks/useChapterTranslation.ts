@@ -15,12 +15,11 @@ import {
   MANGA_IMAGE_TRANSLATE_MODEL_KEY,
 } from "../lib/mangaTranslateModel";
 import { useToast } from "../contexts/ToastContext";
+import { fallbackTarget } from "../lib/targetLangs";
 
-export const TARGET_LANG_OPTIONS: { code: string; label: string }[] = [
-  { code: "th", label: "→ TH" },
-  { code: "en", label: "→ EN" },
-  { code: "zh", label: "→ ZH" },
-];
+// Target options + source-guard live in lib/targetLangs (#163); re-exported
+// so existing consumers (MangaReader) keep their import path.
+export { TARGET_LANG_OPTIONS } from "../lib/targetLangs";
 
 type Options = {
   /** Chapter source language — null until the chapter list arrives. */
@@ -159,10 +158,7 @@ export function useChapterTranslation(
 
   // Never keep target language equal to current chapter/source language.
   useEffect(() => {
-    const source = (sourceLang ?? "").toLowerCase();
-    if (!source) return;
-    if (targetLang.toLowerCase() !== source) return;
-    const next = TARGET_LANG_OPTIONS.find((l) => l.code !== source)?.code;
+    const next = fallbackTarget(sourceLang, targetLang);
     if (next) setTargetLang(next);
   }, [sourceLang, targetLang]);
 
