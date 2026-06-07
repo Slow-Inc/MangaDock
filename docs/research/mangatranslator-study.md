@@ -26,7 +26,7 @@
 - **ส่งภาพทั้งหน้าเป็น context** ให้ LLM (เราส่งแต่ข้อความ)
 - **Page-number filtering** (กรองเลขหน้าออกก่อนแปลด้วย regex+OCR)
 - **Deterministic-only translation cache** (cache เฉพาะเมื่อ temp=0) + per-stage cache คีย์ด้วย content hash
-- **Rosetta เป็น translator self-host ทางเลือก** (ตรวจ HF 2026-06-07; แก้ไขรอบสองหลังไล่ดูทั้ง collection): `YanoljaNEXT-Rosetta` = LLM เฉพาะทางการแปลล้วน ออกเป็น generation — Sep'25 (4B/12B/20B, 11 ภาษา ไม่มีไทย) → **2510/2511 (32 ภาษา รวมไทย ทุกขนาด)** → **EEVE-Rosetta-7B-2602** (ก.พ. 2026 ใหม่สุด, base ByteDance Seed-X-PPO-7B, ไม่ประกาศชุดภาษาใน metadata — เช็คก่อนใช้) · **ตัวเรือธง = `Rosetta-4B-2511-GGUF` (105K downloads, มีไทย)** — Q8 ~4.3GB **ใส่เครื่อง dev 12GB ได้สบาย ทดลองได้ทันที** (ข้อสรุปเดิมที่ว่า "ต้อง 27B/16GB ถึงได้ไทย" ผิด) · glossary contract ในตัว (`- คำ -> คำแปล` + JSON in/out) · เสียบ `custom_openai` ผ่าน llama.cpp ศูนย์โค้ด · **คำถามเดียวที่เหลือ**: คุณภาพ 4B เฉพาะทาง vs qwen3.6-35b ผ่าน gateway — ต้องเทียบบนหน้าอ้างอิงจริง; text-only (ปิดทาง multimodal) ยังเป็นข้อจำกัด · **use case**: ตัดค่า API เป็นศูนย์/ออฟไลน์ ได้ตั้งแต่เครื่อง VRAM ~6GB ขึ้นไป
+- **Rosetta เป็น translator self-host ทางเลือก** (ตรวจ HF 2026-06-07 จากทั้ง 3 collection — ดูตาราง lineup เต็มในส่วนภาษาอังกฤษ §6): `YanoljaNEXT-Rosetta` = LLM เฉพาะทางการแปลล้วน มี **3 collection ใหญ่** — ดั้งเดิม Sep'25 (4B/12B/20B, 11 ภาษา **ไม่มีไทย**) → **2510** (4B/12B, 32 ภาษา **รวมไทย**) → **2511** (4B/27B, 32 ภาษา) + ตัวใหม่สุดนอก collection: **EEVE-Rosetta-7B-2602** (ก.พ. 2026, base Seed-X-PPO-7B, ไม่ประกาศชุดภาษา — เช็คก่อนใช้) แต่ละรุ่นมี variant ย่อย base/FP8/GGUF · **เรือธง = `4B-2511-GGUF`** (105K downloads, Q8 ~4.3GB) และ **`12B-2510-GGUF`** (Q4 ~7GB) — **ทั้งคู่ใส่เครื่อง dev 12GB ได้ ทดลองได้ทันที** · glossary contract ในตัว (`- คำ -> คำแปล` + JSON) · เสียบ `custom_openai` ผ่าน llama.cpp ศูนย์โค้ด · คำถามที่เหลือ: คุณภาพ vs qwen3.6-35b (ต้อง head-to-head) + text-only · use case: ตัดค่า API เป็นศูนย์/ออฟไลน์
 
 ---
 
@@ -104,4 +104,15 @@
 | Page-number filter | MIT patch path | regex + OCR check before translating tiny edge regions |
 | Deterministic-only result cache keyed by content hash | MIT server | complements Backend patch cache |
 | src==dst → skip render, keep original | `_process_group` | trivial |
-| **Rosetta as a self-host translator option** | deployment only — `custom_openai` via llama.cpp, zero code | HF-verified 2026-06-07 (corrected after sweeping the full collection): generations — Sep'25 4B/12B/20B (11 langs, no Thai) → **2510/2511 = 32 langs incl. Thai at every size** → newest **EEVE-Rosetta-7B-2602** (Feb 2026, base ByteDance Seed-X-PPO-7B, language set not declared in metadata — verify before use). **Flagship = `Rosetta-4B-2511-GGUF` (105K downloads, Thai included)** — Q8 ≈4.3 GB **fits the 12 GB dev box; testable today** (earlier "only 27B/16 GB has Thai" claim was wrong). Native glossary contract (`- X -> Y` + JSON in/out). Remaining open question: 4B-specialist quality vs the gateway's qwen3.6-35b — needs a head-to-head on the reference pages; text-only still forecloses multimodal. Use case: zero-API-cost/offline from ~6 GB VRAM up. |
+| **Rosetta as a self-host translator option** | deployment only — `custom_openai` via llama.cpp, zero code | HF-verified 2026-06-07 across all three collections — full lineup below. Native glossary contract (`- X -> Y` + JSON in/out — the format MangaTranslator auto-detects). Open question: specialist-4B/12B quality vs the gateway's qwen3.6-35b (needs a head-to-head on the reference pages); text-only forecloses multimodal. Use case: zero-API-cost/offline deployments. |
+
+### Rosetta lineup (yanolja on HF, three collections + one successor — verified 2026-06-07)
+
+| Collection / model | Sizes & variants | Languages | Fits 12 GB dev box? |
+|---|---|---|---|
+| `yanoljanext-rosetta` (Sep 2025, original) | 4B, 12B (Gemma-based, license gemma) · 20B (gpt-oss base, Apache-2.0) — base safetensors only | **11 langs — NO Thai** | irrelevant (no Thai) |
+| `yanoljanext-rosetta-2510` (Oct 2025) | 4B-2510 (+GGUF) · 12B-2510 (+GGUF, +FP8) | **32 langs incl. Thai** | **12B-2510-GGUF Q4 ≈7 GB ✓** — best quality-per-VRAM that fits |
+| `yanoljanext-rosetta-2511` (Nov 2025) | 4B-2511 (+FP8, +GGUF — **flagship, 105K downloads**) · 27B-2511 (+FP8, +GGUF) | **32 langs incl. Thai** | 4B Q8 ≈4.3 GB ✓ · 27B Q4 ≈16 GB ✗ (offload only) |
+| `EEVE-Rosetta-7B-2602` (Feb 2026, successor, outside the three collections) | 7B (8.3B params, +FP8) — base ByteDance Seed-X-PPO-7B, license openmdw-1.0 | **not declared in metadata — verify before use** | Q8 ≈8.8 GB ✓ (tight) |
+
+Note: 12B was not refreshed in 2511 and 20B never got a Thai-capable refresh — for Thai the candidates are 4B-2511, 12B-2510, 27B-2511, and (pending language verification) EEVE-7B-2602. |
