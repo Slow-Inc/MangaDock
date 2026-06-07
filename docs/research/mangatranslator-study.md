@@ -120,3 +120,20 @@
 Note: 12B was not refreshed in 2511 and 20B never got a Thai-capable refresh — for Thai the candidates are 4B-2511, 12B-2510, 27B-2511, and (pending language verification) EEVE-7B-2602.
 
 **Co-residency reality check (user-corrected 2026-06-07):** the "fits" column above is for the model *alone*. Running the translator NEXT TO the MIT stack (DBNet + 48px OCR + LaMa inpaint peaks + desktop ≈ 7.7 GB measured on the 12 GB box) is the real constraint — the team already lived this with Qwen3.5-4B local: FP8/Q8 (~4–5 GB incl. KV cache) pushes past 12 GB. Per the proven Qwen3.5 sizing guidance in `MIT/.env.example` (int4 quality loss is negligible on short manga sentences for a 4B instruct model), the production-viable options on this box are **4B-2511 Q4_K_M ≈2.5 GB** (≈10.2 GB total ✓) or CPU-only llama.cpp (zero VRAM, short bubbles tolerate it). **12B-2510 is out for co-residency here** — quality benchmarking can still use it with MIT idle. |
+
+#### Format choice: `-FP8` vs `-GGUF` vs bare (the suffix question, 2026-06-07)
+
+The three repos are the SAME model in different packaging — the suffix dictates the *runtime*, not the quality tier:
+
+| Repo | Format | Runtime | Why it matters here |
+|---|---|---|---|
+| bare (no suffix) | bf16 safetensors | `transformers` (PyTorch) | the canonical checkpoint; can be quantized AT LOAD time |
+| `-FP8` | pre-quantized FP8 checkpoint | **vLLM / TensorRT-LLM** serving | vLLM has no native Windows path (needs WSL — collides with our "shut WSL before MIT" memory) and pre-reserves a large VRAM block, killing co-residency |
+| `-GGUF` | llama.cpp container, many k-quants inside (Q8_0…IQ2) | **llama.cpp / Ollama / LM Studio** | native Windows binary, fine-grained VRAM control (`-ngl`, ctx), built-in OpenAI endpoint → `custom_openai` zero-code |
+
+**Important correction:** "FP8 on the 4070 Super" does NOT require the `-FP8` repo. Our Qwen3.5-4B already runs FP8 the *transformers* way — `qwen3.py` loads the **bare** checkpoint with `build_load_kwargs(precision)` and `QWEN3_PRECISION=fp8` quantizes at load (PyTorch ≥2.1 + Ada). So two real paths exist for Rosetta:
+
+1. **Offline-translator path (Qwen3.5-style):** add a `RosettaTranslator` that loads the **bare** repo with fp8 at load — native FP8 on Ada, no vLLM. Cost: a new translator (~the 5-step add discussed earlier + Rosetta's JSON/glossary contract). VRAM ~4 GB → same co-residency wall the user already hit with Qwen3.5 (would still drop to int4-class to fit beside MIT).
+2. **Gateway path (custom_openai):** llama.cpp + a GGUF k-quant → endpoint. Zero code, finest VRAM control, but uses llama.cpp's k-quants (Q5_K_M/IQ4_XS), not native FP8.
+
+**Verdict for THIS box (Windows, GPU shared with MIT):** GGUF — it reaches the same ~int4 VRAM footprint co-residency forces anyway, with zero new code. `-FP8`/transformers-fp8 only wins on a **dedicated Linux inference box (≥16 GB, no detector/inpainter sharing the card)**, where vLLM+FP8 on Ada pays off. The user's FP8 instinct is right about the *hardware*; the blocker is the *runtime + shared 12 GB*, not the precision. |
