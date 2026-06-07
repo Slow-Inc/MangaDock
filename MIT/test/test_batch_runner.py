@@ -24,7 +24,7 @@ def _clean_registry():
 
 
 def _stub_pipeline(monkeypatch, sent, translate=None):
-    async def default_translate(config_str, img_bytes):
+    async def default_translate(config_str, img_bytes, progress_meta=None):
         return {"img_width": 100, "img_height": 200, "patches": []}
 
     async def fake_send(url, secret, payload):
@@ -58,7 +58,7 @@ def test_cancel_during_a_page_still_drops_its_result(monkeypatch):
     drops that page's result and stops the run."""
     sent = []
 
-    async def translate_then_cancel(config_str, img_bytes):
+    async def translate_then_cancel(config_str, img_bytes, progress_meta=None):
         cancellation.mark_cancelled(TASK)  # user cancels mid-inference
         return {"img_width": 100, "img_height": 200, "patches": []}
 
@@ -78,7 +78,7 @@ def test_cancel_between_pages_stops_before_next_page(monkeypatch):
         sent.append(payload["pageIndex"])
         cancellation.mark_cancelled(TASK)  # cancel lands right after delivery
 
-    async def fake_translate(config_str, img_bytes):
+    async def fake_translate(config_str, img_bytes, progress_meta=None):
         return {"img_width": 100, "img_height": 200, "patches": []}
 
     monkeypatch.setattr(batch_runner, "_translate_page", fake_translate)
@@ -87,6 +87,26 @@ def test_cancel_between_pages_stops_before_next_page(monkeypatch):
     _run_batch(pages=(0, 1))
 
     assert sent == [0]
+
+
+def test_each_page_gets_progress_meta_for_live_stage_events(monkeypatch):
+    """The worker forwards live pipeline-stage events per page (UX) — the batch
+    loop must hand it the webhook target plus the page's identity."""
+    sent = []
+    metas = []
+
+    async def capture_translate(config_str, img_bytes, progress_meta=None):
+        metas.append(progress_meta)
+        return {"img_width": 100, "img_height": 200, "patches": []}
+
+    _stub_pipeline(monkeypatch, sent, translate=capture_translate)
+
+    _run_batch(pages=(0, 1))
+
+    assert metas == [
+        {"url": "http://backend/cb", "secret": "", "taskId": TASK, "pageIndex": 0},
+        {"url": "http://backend/cb", "secret": "", "taskId": TASK, "pageIndex": 1},
+    ]
 
 
 def test_taskid_is_discarded_after_the_run(monkeypatch):

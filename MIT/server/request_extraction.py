@@ -52,10 +52,10 @@ async def get_ctx(req: Request, config: Config, image: str|bytes):
 
     return await wait_in_queue(task, None)
 
-async def get_patch_ctx(req: Request, config: Config, image: str|bytes):
+async def get_patch_ctx(req: Request, config: Config, image: str|bytes, progress_meta: dict | None = None):
     image = await to_pil_image(image)
 
-    task = QueueElement(req, image, config, 0, task_type="translate_patches")
+    task = QueueElement(req, image, config, 0, task_type="translate_patches", progress_meta=progress_meta)
     task_queue.add_task(task)
 
     return await wait_in_queue(task, None)

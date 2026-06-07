@@ -56,7 +56,7 @@ export async function translateMangaPagePatches(
   pageIndex: number,
   pageUrl: string,
   signal?: AbortSignal,
-  options?: { sourceLang?: string; targetLang?: string; imageModel?: string },
+  options?: { sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: "hd" | "saver" },
 ): Promise<PatchData[]> {
   const res = await fetch(
     `/api/proxy/books/chapters/${encodeURIComponent(chapterId)}/pages/${pageIndex}/translate-patches`,
@@ -68,6 +68,7 @@ export async function translateMangaPagePatches(
         sourceLang: options?.sourceLang,
         targetLang: options?.targetLang,
         imageModel: options?.imageModel,
+        derivative: options?.derivative,
       }),
       signal,
     },
@@ -104,9 +105,10 @@ export async function translateMangaPagePatches(
 export async function translateMangaChapterBatchPatches(
   chapterId: string,
   pages: Array<{ pageIndex: number; pageUrl: string }>,
-  onPageDone: (pageIndex: number, patches: PatchData[]) => void,
+  onPageDone: (pageIndex: number, patches: PatchData[], error?: string) => void,
   signal?: AbortSignal,
-  options?: { sourceLang?: string; targetLang?: string; imageModel?: string },
+  options?: { sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: "hd" | "saver" },
+  onPageProgress?: (pageIndex: number, stage: string) => void,
 ): Promise<void> {
   const res = await fetch(
     `/api/proxy/books/chapters/${encodeURIComponent(chapterId)}/batch-translate-patches`,
@@ -118,6 +120,7 @@ export async function translateMangaChapterBatchPatches(
         sourceLang: options?.sourceLang,
         targetLang: options?.targetLang,
         imageModel: options?.imageModel,
+        derivative: options?.derivative,
       }),
       signal,
     },
@@ -154,17 +157,26 @@ export async function translateMangaChapterBatchPatches(
 
       try {
         const data = JSON.parse(jsonStr) as {
+          type?: string;
+          stage?: string;
           pageIndex: number;
           patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }>;
           error?: string | null;
         };
 
         if (typeof data.pageIndex !== "number" || data.pageIndex < 0) continue;
+
+        // Live MIT stage updates — informational only, never a completed page.
+        if (data.type === "progress") {
+          if (data.stage) onPageProgress?.(data.pageIndex, data.stage);
+          continue;
+        }
+
         if (!Array.isArray(data.patches)) continue;
 
         if (data.error) {
           console.warn(`[BatchTranslate] page ${data.pageIndex} error: ${data.error}`);
-          onPageDone(data.pageIndex, []);
+          onPageDone(data.pageIndex, [], data.error);
           continue;
         }
 

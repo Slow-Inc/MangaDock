@@ -408,4 +408,48 @@ describe('BooksService — batch webhook pipeline', () => {
 
     expect(storage.put).toHaveBeenCalledTimes(1); // only the valid patch
   });
+
+  // 2026-06-06 incident: an all-error batch (dead MIT worker) logged
+  // "fully completed via webhooks" — the completion summary must report page errors.
+  it('logs a truthful summary when the job completes with page errors', async () => {
+    const { service } = makeService();
+    const jobKey = 'ch-err:ANY:THA:default';
+    const job = seedJob(service, jobKey, { expectedCount: 2 });
+    const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+    const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => {});
+
+    await service.handleMitCallback(jobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+    await service.handleMitCallback(
+      jobKey, 1,
+      { imgWidth: 0, imgHeight: 0, patches: [] },
+      'Translation service is starting up, please wait a moment and try again.',
+    );
+
+    expect(job.resolve).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('1/2 page errors'));
+    expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining('fully completed'));
+  });
+
+  it('keeps the "fully completed" log when every page succeeds', async () => {
+    const { service } = makeService();
+    const jobKey = 'ch-ok:ANY:THA:default';
+    const job = seedJob(service, jobKey, { expectedCount: 1 });
+    const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+    const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => {});
+
+    await service.handleMitCallback(
+      jobKey,
+      0,
+      { imgWidth: 800, imgHeight: 1200, patches: [] },
+      undefined,
+    );
+
+    expect(job.resolve).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('fully completed'),
+    );
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('page errors'),
+    );
+  });
 });

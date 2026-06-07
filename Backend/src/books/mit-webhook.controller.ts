@@ -1,4 +1,13 @@
-import { Body, Controller, Headers, HttpException, HttpStatus, Logger, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  HttpException,
+  HttpStatus,
+  Logger,
+  Post,
+  Req,
+} from '@nestjs/common';
 import * as crypto from 'crypto';
 import { BooksService } from './books.service';
 
@@ -23,8 +32,13 @@ export class MitWebhookController {
     // - no secret outside production → accept unauthenticated (local dev runs
     //   MIT without a secret on purpose — decision 2026-06-04).
     if (!secret && process.env.NODE_ENV === 'production') {
-      this.logger.error('MIT_WEBHOOK_SECRET is not configured — rejecting webhook in production');
-      throw new HttpException('Webhook secret not configured', HttpStatus.UNAUTHORIZED);
+      this.logger.error(
+        'MIT_WEBHOOK_SECRET is not configured — rejecting webhook in production',
+      );
+      throw new HttpException(
+        'Webhook secret not configured',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
     if (secret) {
       if (!signature) {
@@ -43,7 +57,10 @@ export class MitWebhookController {
       const sigBuf = Buffer.from(signature, 'hex');
       const digBuf = Buffer.from(digest, 'hex');
 
-      if (sigBuf.length !== digBuf.length || !crypto.timingSafeEqual(sigBuf, digBuf)) {
+      if (
+        sigBuf.length !== digBuf.length ||
+        !crypto.timingSafeEqual(sigBuf, digBuf)
+      ) {
         this.logger.error('Invalid HMAC signature');
         throw new HttpException('Invalid signature', HttpStatus.UNAUTHORIZED);
       }
@@ -58,19 +75,40 @@ export class MitWebhookController {
     const { taskId, pageIndex, imgWidth, imgHeight, patches, error } = body;
 
     if (!taskId) {
-      throw new HttpException('Missing taskId in webhook body', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Missing taskId in webhook body',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
-    this.logger.log(`Received MIT webhook for task ${taskId} (page ${pageIndex})`);
+    // Live stage update (UX): {taskId, pageIndex, stage} with no patch data.
+    // Informational fire-and-forget — forwarded to batch listeners, never
+    // recorded as a completed page. Not logged: one event per stage per page.
+    if (typeof body.stage === 'string' && patches === undefined && !error) {
+      this.booksService.notifyBatchProgress(taskId, pageIndex, body.stage);
+      return { ok: true };
+    }
+
+    this.logger.log(
+      `Received MIT webhook for task ${taskId} (page ${pageIndex})`,
+    );
 
     const result = { imgWidth, imgHeight, patches };
 
     try {
-      await this.booksService.handleMitCallback(taskId, pageIndex, result, error);
+      await this.booksService.handleMitCallback(
+        taskId,
+        pageIndex,
+        result,
+        error,
+      );
       return { ok: true };
     } catch (err) {
       this.logger.error(`Failed to process MIT callback: ${String(err)}`);
-      throw new HttpException('Internal processing error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal processing error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

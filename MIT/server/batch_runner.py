@@ -12,7 +12,7 @@ from server.cancellation import is_cancelled, discard
 from server.webhook import send_webhook
 
 
-async def _translate_page(config_str: str, img_bytes: bytes) -> dict:
+async def _translate_page(config_str: str, img_bytes: bytes, progress_meta: dict | None = None) -> dict:
     """Run a single page through the translation pipeline.
 
     Heavy imports are deferred so importing this module stays fast for tests.
@@ -27,7 +27,7 @@ async def _translate_page(config_str: str, img_bytes: bytes) -> dict:
             return False
 
     page_conf = Config.parse_raw(config_str)
-    return await get_patch_ctx(DummyRequest(), page_conf, img_bytes)
+    return await get_patch_ctx(DummyRequest(), page_conf, img_bytes, progress_meta=progress_meta)
 
 
 async def run_batch_with_callbacks(
@@ -57,7 +57,15 @@ async def run_batch_with_callbacks(
                 print(f"[batch] task {taskId} cancelled - stopping before page {page_idx}")
                 break
             try:
-                patch_result = await _translate_page(config_str, img_bytes)
+                # The worker forwards live pipeline-stage events for this page
+                # straight to the Backend webhook (UX) — see server.webhook.
+                progress_meta = {
+                    "url": callback_url,
+                    "secret": callback_secret,
+                    "taskId": taskId,
+                    "pageIndex": page_idx,
+                }
+                patch_result = await _translate_page(config_str, img_bytes, progress_meta)
                 patches_out = []
                 for patch in patch_result.get("patches", []):
                     png_bytes = patch.get("img_png", b"")
