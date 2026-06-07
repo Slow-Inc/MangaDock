@@ -21,6 +21,10 @@ const ENV_KEYS = [
   'MIT_INPAINTING_SIZE',
   'MIT_INPAINTER',
   'MIT_INPAINTING_PRECISION',
+  'MIT_OCR_PROB',
+  'MIT_TEXT_THRESHOLD',
+  'MIT_DET_INVERT',
+  'MIT_DET_GAMMA_CORRECT',
 ];
 
 describe('BooksService.buildMitConfig', () => {
@@ -66,6 +70,37 @@ describe('BooksService.buildMitConfig', () => {
     const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
     expect(cfg.translator.source_lang).toBeUndefined();
     expect(cfg.translator.source_lang_only).toBeUndefined();
+  });
+
+  /** #167 rescue knobs — all opt-in; absent env leaves the config
+   *  byte-identical to today. MIT_OCR_PROB is the primary lever: the 48px
+   *  OCR drops long thin lines it read almost correctly (measured 8/8
+   *  detected but 5/8 kept on the reference page). */
+  it('exposes the OCR prob floor via MIT_OCR_PROB (#167)', () => {
+    process.env.MIT_OCR_PROB = '0.05';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.ocr).toEqual({ prob: 0.05 });
+  });
+
+  it('exposes detector rescue knobs via env (#167)', () => {
+    process.env.MIT_TEXT_THRESHOLD = '0.3';
+    process.env.MIT_DET_INVERT = '1';
+    process.env.MIT_DET_GAMMA_CORRECT = '1';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.detector.text_threshold).toBe(0.3);
+    expect(cfg.detector.det_invert).toBe(true);
+    expect(cfg.detector.det_gamma_correct).toBe(true);
+  });
+
+  it('omits all #167 knobs when env is unset or invalid — config unchanged', () => {
+    process.env.MIT_OCR_PROB = 'not-a-number';
+    process.env.MIT_TEXT_THRESHOLD = '5'; // out of (0,1] range
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.ocr).toBeUndefined();
+    expect(cfg.detector).toEqual({ detection_size: 2048 });
   });
 
   it('carries series_context to the translator when provided (#157)', () => {
