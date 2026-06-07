@@ -7,6 +7,7 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { useChapterTranslation, TARGET_LANG_OPTIONS } from "../hooks/useChapterTranslation";
 import { buildTranslationSources } from "../lib/translationSources";
+import { buildTranslateMenu } from "../lib/translateMenu";
 import { formatEta, stageLabel } from "../lib/translationStages";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { getHardwareId } from "../lib/fingerprint";
@@ -684,6 +685,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const hasAnyTranslation = translatedPages.size > 0 || patchedPages.size > 0 || completedTranslatedPages.size > 0;
   const hasFullTranslation = totalPages > 0 && completedTranslatedPages.size >= totalPages;
   const hasPartialTranslation = hasAnyTranslation && !hasFullTranslation;
+  // One model drives the desktop dropdown AND the mobile sheet (#162) — a
+  // fully-translated chapter offers a single view toggle, never dead
+  // translate buttons.
+  const translateMenu = buildTranslateMenu({
+    totalPages,
+    completedCount: completedTranslatedPages.size,
+    hasAnyTranslation,
+    showTranslation,
+  });
 
   // Keep last valid page count so counter can show it during chapter-change
   // fade-out — adjusted during render (React's "storing information from
@@ -1087,44 +1097,51 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
                     <div className="my-1 border-t border-white/10" />
 
-                    {/* Single-page translate */}
-                    <button
-                      onClick={() => { translateCurrentPage(); setTranslateMenuOpen(false); }}
-                      disabled={translatingCurrentPage}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-purple-300/90 transition-colors duration-150 hover:bg-white/10 hover:text-purple-200 disabled:opacity-50"
-                    >
-                      {translatingCurrentPage ? (
-                        <>
-                          <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" strokeOpacity="0.3" /><path d="M12 3a9 9 0 0 1 9 9" /></svg>
-                          กำลังแปลหน้า {(translatingCurrentPageIndex ?? page) + 1}...
-                        </>
-                      ) : (
-                        <>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 8h10M7 12h6" /></svg>
-                          แปลหน้านี้
-                        </>
-                      )}
-                    </button>
+                    {/* Translate actions — hidden once the chapter is fully
+                        translated (#162): a translate button that has nothing
+                        left to translate is a dead button. */}
+                    {translateMenu.showTranslateButtons && (
+                      <>
+                        {/* Single-page translate */}
+                        <button
+                          onClick={() => { translateCurrentPage(); setTranslateMenuOpen(false); }}
+                          disabled={translatingCurrentPage}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-purple-300/90 transition-colors duration-150 hover:bg-white/10 hover:text-purple-200 disabled:opacity-50"
+                        >
+                          {translatingCurrentPage ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" strokeOpacity="0.3" /><path d="M12 3a9 9 0 0 1 9 9" /></svg>
+                              กำลังแปลหน้า {(translatingCurrentPageIndex ?? page) + 1}...
+                            </>
+                          ) : (
+                            <>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 8h10M7 12h6" /></svg>
+                              แปลหน้านี้
+                            </>
+                          )}
+                        </button>
 
-                    {/* Batch translate */}
-                    <button
-                      onClick={() => { startTranslate(); setTranslateMenuOpen(false); }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M4 6h16M4 10h16M4 14h10M4 18h6" /></svg>
-                      แปลทั้งตอน
-                    </button>
+                        {/* Batch translate */}
+                        <button
+                          onClick={() => { startTranslate(); setTranslateMenuOpen(false); }}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M4 6h16M4 10h16M4 14h10M4 18h6" /></svg>
+                          แปลทั้งตอน
+                        </button>
+                      </>
+                    )}
 
                     {/* Show / hide translation toggle */}
-                    {hasAnyTranslation && (
+                    {translateMenu.viewToggleLabel && (
                       <>
-                        <div className="my-1 border-t border-white/10" />
+                        {translateMenu.showTranslateButtons && <div className="my-1 border-t border-white/10" />}
                         <button
                           onClick={() => { setShowTranslation((s) => !s); setTranslateMenuOpen(false); }}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition-colors duration-150 hover:bg-white/10 hover:text-white"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                          {showTranslation ? "ดูต้นฉบับ" : "ดูฉบับแปล"}
+                          {translateMenu.viewToggleLabel}
                         </button>
                       </>
                     )}
@@ -1312,8 +1329,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       </div>
                     )}
 
-                    {/* Translate actions */}
+                    {/* Translate actions — hidden when fully translated (#162) */}
                     <div className="space-y-1">
+                      {translateMenu.showTranslateButtons && (<>
                       <button
                         onClick={() => { translateCurrentPage(); setMoreMenuOpen(false); }}
                         disabled={translatingCurrentPage || translating}
@@ -1347,13 +1365,14 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                           </>
                         )}
                       </button>
-                      {hasAnyTranslation && (
+                      </>)}
+                      {translateMenu.viewToggleLabel && (
                         <button
                           onClick={() => { setShowTranslation((s) => !s); setMoreMenuOpen(false); }}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition hover:bg-white/10 hover:text-white"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                          {showTranslation ? "ดูต้นฉบับ" : "ดูฉบับแปล"}
+                          {translateMenu.viewToggleLabel}
                         </button>
                       )}
                     </div>
