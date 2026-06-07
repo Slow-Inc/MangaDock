@@ -320,11 +320,11 @@ export class MangaDexService {
     ]);
 
     const covers = coversData.status === 'fulfilled' ? coversData.value : [];
-    const { authors, artists, genres, description } = authorsData.status === 'fulfilled'
+    const { title, authors, artists, genres, description } = authorsData.status === 'fulfilled'
       ? authorsData.value
-      : { authors: [], artists: [], genres: [], description: '' };
+      : { title: '', authors: [], artists: [], genres: [], description: '' };
 
-    const detail: MangaDetail = { id: mangaId, authors, artists, covers, genres, description };
+    const detail: MangaDetail = { id: mangaId, ...(title ? { title } : {}), authors, artists, covers, genres, description };
 
     const hasUsefulData =
       detail.covers.length > 0 ||
@@ -513,7 +513,7 @@ export class MangaDexService {
     }
   }
 
-  private async fetchMangaAuthors(mangaId: string): Promise<{ authors: string[]; artists: string[]; genres: string[]; description: string }> {
+  private async fetchMangaAuthors(mangaId: string): Promise<{ title: string; authors: string[]; artists: string[]; genres: string[]; description: string }> {
     try {
       const params = new URLSearchParams();
       params.append('includes[]', 'author');
@@ -523,7 +523,7 @@ export class MangaDexService {
         headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
         cache: 'no-store',
       });
-      if (!res.ok) return { authors: [], artists: [], genres: [], description: '' };
+      if (!res.ok) return { title: '', authors: [], artists: [], genres: [], description: '' };
 
       const data = (await res.json()) as { data?: MangaDexManga };
       const rels = data.data?.relationships ?? [];
@@ -542,10 +542,12 @@ export class MangaDexService {
 
       const lang = this.getMangaLanguage();
       const description = this.pickLocalized(data.data?.attributes?.description, lang);
+      // Series title anchors the translator's series context (#157).
+      const title = this.pickLocalized(data.data?.attributes?.title, lang);
 
-      return { authors, artists, genres, description: description || '' };
+      return { title, authors, artists, genres, description: description || '' };
     } catch {
-      return { authors: [], artists: [], genres: [], description: '' };
+      return { title: '', authors: [], artists: [], genres: [], description: '' };
     }
   }
 
