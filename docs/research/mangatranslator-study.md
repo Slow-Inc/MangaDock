@@ -111,8 +111,10 @@
 | Collection / model | Sizes & variants | Languages | Fits 12 GB dev box? |
 |---|---|---|---|
 | `yanoljanext-rosetta` (Sep 2025, original) | 4B, 12B (Gemma-based, license gemma) · 20B (gpt-oss base, Apache-2.0) — base safetensors only | **11 langs — NO Thai** | irrelevant (no Thai) |
-| `yanoljanext-rosetta-2510` (Oct 2025) | 4B-2510 (+GGUF) · 12B-2510 (+GGUF, +FP8) | **32 langs incl. Thai** | **12B-2510-GGUF Q4 ≈7 GB ✓** — best quality-per-VRAM that fits |
-| `yanoljanext-rosetta-2511` (Nov 2025) | 4B-2511 (+FP8, +GGUF — **flagship, 105K downloads**) · 27B-2511 (+FP8, +GGUF) | **32 langs incl. Thai** | 4B Q8 ≈4.3 GB ✓ · 27B Q4 ≈16 GB ✗ (offload only) |
+| `yanoljanext-rosetta-2510` (Oct 2025) | 4B-2510 (+GGUF) · 12B-2510 (+GGUF, +FP8) | **32 langs incl. Thai** | **12B-2510-GGUF Q4 ≈7 GB** — benchmark-only here (co-residency note below) |
+| `yanoljanext-rosetta-2511` (Nov 2025) | 4B-2511 (+FP8, +GGUF — **flagship, 105K downloads**) · 27B-2511 (+FP8, +GGUF) | **32 langs incl. Thai** | 4B Q4 ≈2.5 GB ✓ · 27B Q4 ≈16 GB ✗ (offload only) |
+
+**2510 vs 2511** = monthly iterations of the same recipe (Gemma-3 `-pt` base, synthesized FineWeb Edu/FineWeb2 data, JSON-in/out + glossary-in-system-prompt usage) — only the training round and the size lineup differ (12B not refreshed in 2511; 27B added). Model-card benchmarks, CHrF++ WMT24++ EN→KO: **12B-2510 = 37.36 (beats GPT-4o 36.08)** · 4B-2511 = 35.64 · 4B-2510 = 35.09 · Gemini-2.5-Flash = 35.25 · plain Gemma-3-4b-it = 27.53 — specialization is worth ~8 points at 4B.
 | `EEVE-Rosetta-7B-2602` (Feb 2026, successor, outside the three collections) | 7B (8.3B params, +FP8) — base ByteDance Seed-X-PPO-7B, license openmdw-1.0 | **not declared in metadata — verify before use** | Q8 ≈8.8 GB ✓ (tight) |
 
 Note: 12B was not refreshed in 2511 and 20B never got a Thai-capable refresh — for Thai the candidates are 4B-2511, 12B-2510, 27B-2511, and (pending language verification) EEVE-7B-2602.
