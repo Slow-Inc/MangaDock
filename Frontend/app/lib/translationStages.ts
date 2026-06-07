@@ -35,3 +35,17 @@ export function formatEta(sec: number): string {
   if (sec < 60) return `~${sec} วิ`;
   return `~${Math.ceil(sec / 60)} นาที`;
 }
+
+/** Main line of the floating translation-status pill (#164). The pill is
+ *  view-mode agnostic — paged and continuous render the same status, so
+ *  switching modes never makes a running translation look idle. */
+export function pillMainText(
+  batchRunning: boolean,
+  done: number,
+  total: number,
+  currentPageNumber: number,
+): string {
+  return batchRunning
+    ? `แปลไปแล้ว ${done}/${total} หน้า`
+    : `กำลังแปลหน้า ${currentPageNumber}`;
+}
