@@ -25,6 +25,7 @@ from server.myqueue import task_queue
 from server.request_extraction import get_ctx, get_patch_ctx, while_streaming, TranslateRequest
 from server.to_json import to_translation, TranslationResponse
 from server.batch_runner import run_batch_with_callbacks
+from server.patch_payload import normalize_patch_result
 from server.readiness import count_alive
 from server.cancellation import mark_cancelled
 from server.path_utils import safe_result_folder
@@ -197,22 +198,8 @@ async def patches_form(req: Request, image: UploadFile = File(...), config: str 
     conf = Config.parse_raw(config)
     patch_result = await get_patch_ctx(req, conf, img_bytes)
 
-    normalized_patches = []
-    for patch in patch_result.get("patches", []):
-        png_bytes = patch.get("img_png", b"")
-        normalized_patches.append({
-            "x": patch.get("x", 0),
-            "y": patch.get("y", 0),
-            "w": patch.get("w", 0),
-            "h": patch.get("h", 0),
-            "img_b64": base64.b64encode(png_bytes).decode("utf-8"),
-        })
-
-    return {
-        "img_width": patch_result.get("img_width", 0),
-        "img_height": patch_result.get("img_height", 0),
-        "patches": normalized_patches,
-    }
+    # One normalize seam with the batch path (#158) — carries the text layer.
+    return normalize_patch_result(patch_result)
 
 @app.post("/cancel/{taskId}", tags=["api", "form"])
 async def cancel_batch(taskId: str):

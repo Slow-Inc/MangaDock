@@ -30,6 +30,7 @@ from .utils import (
 )
 from .utils.lang_ratio import target_script_ratio
 from .utils.patch_png import encode_patch_png
+from .text_layer import regions_payload
 
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
@@ -2055,7 +2056,7 @@ class MangaTranslator:
         img_h, img_w = ctx.img_rgb.shape[:2]
 
         if not ctx.text_regions:
-            return {'img_width': img_w, 'img_height': img_h, 'patches': []}
+            return {'img_width': img_w, 'img_height': img_h, 'patches': [], 'regions': []}
 
         await self._report_progress('translating')
         try:
@@ -2068,11 +2069,11 @@ class MangaTranslator:
 
         await self._report_progress('after-translating')
         if not ctx.text_regions or ctx.text_regions == 'cancel':
-            return {'img_width': img_w, 'img_height': img_h, 'patches': []}
+            return {'img_width': img_w, 'img_height': img_h, 'patches': [], 'regions': []}
 
         regions = self._filter_regions_by_source_lang(ctx.text_regions, config)
         if not regions:
-            return {'img_width': img_w, 'img_height': img_h, 'patches': []}
+            return {'img_width': img_w, 'img_height': img_h, 'patches': [], 'regions': []}
 
         await self._report_progress('mask-generation')
         await self._report_progress('inpainting')
@@ -2202,7 +2203,9 @@ class MangaTranslator:
                 patches.append(r)
 
         await self._report_progress('finished', True)
-        return {'img_width': img_w, 'img_height': img_h, 'patches': patches}
+        # Text layer (#158): what each rendered region said — the enabler for
+        # rolling context (#159) and translation memory (#160).
+        return {'img_width': img_w, 'img_height': img_h, 'patches': patches, 'regions': regions_payload(regions)}
 
     async def _batch_translate_contexts(self, contexts_with_configs: List[tuple], batch_size: int) -> List[tuple]:
         """

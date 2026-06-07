@@ -100,3 +100,44 @@ describe('MitWebhookController — HMAC verification', () => {
     });
   });
 });
+
+/** Text layer (#158): MIT's per-page payload now carries
+ *  `regions: [{src, dst}]`. The Backend accepts the field (persistence is a
+ *  later slice, #160) and payloads without it keep working. */
+describe('MitWebhookController — text layer payloads (#158)', () => {
+  afterEach(() => {
+    delete process.env.MIT_WEBHOOK_SECRET;
+    jest.restoreAllMocks();
+  });
+
+  it('accepts a payload carrying regions and still delivers the page result', async () => {
+    const booksService = { handleMitCallback: jest.fn().mockResolvedValue(undefined) } as any;
+    const ctrl = new MitWebhookController(booksService);
+    const body = {
+      taskId: 'job1:ANY:THA',
+      pageIndex: 0,
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [],
+      regions: [{ src: 'Huh?', dst: 'หา?' }],
+      error: null,
+    };
+
+    await expect(ctrl.handleCallback(undefined as any, body)).resolves.toEqual({ ok: true });
+    expect(booksService.handleMitCallback).toHaveBeenCalledWith(
+      'job1:ANY:THA',
+      0,
+      expect.objectContaining({ patches: [] }),
+      null,
+    );
+  });
+
+  it('still accepts the old payload shape without regions', async () => {
+    const booksService = { handleMitCallback: jest.fn().mockResolvedValue(undefined) } as any;
+    const ctrl = new MitWebhookController(booksService);
+    const body = { taskId: 'job1:ANY:THA', pageIndex: 1, imgWidth: 100, imgHeight: 200, patches: [], error: null };
+
+    await expect(ctrl.handleCallback(undefined as any, body)).resolves.toEqual({ ok: true });
+    expect(booksService.handleMitCallback).toHaveBeenCalled();
+  });
+});
