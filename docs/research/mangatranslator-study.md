@@ -115,4 +115,6 @@
 | `yanoljanext-rosetta-2511` (Nov 2025) | 4B-2511 (+FP8, +GGUF — **flagship, 105K downloads**) · 27B-2511 (+FP8, +GGUF) | **32 langs incl. Thai** | 4B Q8 ≈4.3 GB ✓ · 27B Q4 ≈16 GB ✗ (offload only) |
 | `EEVE-Rosetta-7B-2602` (Feb 2026, successor, outside the three collections) | 7B (8.3B params, +FP8) — base ByteDance Seed-X-PPO-7B, license openmdw-1.0 | **not declared in metadata — verify before use** | Q8 ≈8.8 GB ✓ (tight) |
 
-Note: 12B was not refreshed in 2511 and 20B never got a Thai-capable refresh — for Thai the candidates are 4B-2511, 12B-2510, 27B-2511, and (pending language verification) EEVE-7B-2602. |
+Note: 12B was not refreshed in 2511 and 20B never got a Thai-capable refresh — for Thai the candidates are 4B-2511, 12B-2510, 27B-2511, and (pending language verification) EEVE-7B-2602.
+
+**Co-residency reality check (user-corrected 2026-06-07):** the "fits" column above is for the model *alone*. Running the translator NEXT TO the MIT stack (DBNet + 48px OCR + LaMa inpaint peaks + desktop ≈ 7.7 GB measured on the 12 GB box) is the real constraint — the team already lived this with Qwen3.5-4B local: FP8/Q8 (~4–5 GB incl. KV cache) pushes past 12 GB. Per the proven Qwen3.5 sizing guidance in `MIT/.env.example` (int4 quality loss is negligible on short manga sentences for a 4B instruct model), the production-viable options on this box are **4B-2511 Q4_K_M ≈2.5 GB** (≈10.2 GB total ✓) or CPU-only llama.cpp (zero VRAM, short bubbles tolerate it). **12B-2510 is out for co-residency here** — quality benchmarking can still use it with MIT idle. |
