@@ -5,7 +5,7 @@
  */
 import { expect, test } from "bun:test";
 
-import { formatEta, stageLabel } from "./translationStages";
+import { formatEta, pillMainText, stageLabel } from "./translationStages";
 
 test("maps the patch-pipeline stages to ordered Thai labels", () => {
   expect(stageLabel("detection")).toEqual({ text: "ตรวจหาข้อความ", step: 1, total: 5 });
@@ -34,4 +34,11 @@ test("unknown or bookkeeping stages return null (UI falls back to generic text)"
   expect(stageLabel("running_pre_translation_hooks")).toBeNull();
   expect(stageLabel("definitely-not-a-stage")).toBeNull();
   expect(stageLabel(null)).toBeNull();
+});
+
+// ─── #164: the status pill is view-mode agnostic ─────────────────────────────
+
+test("pill text: batch run reports progress; single-page run names the page", () => {
+  expect(pillMainText(true, 4, 20, 7)).toBe("แปลไปแล้ว 4/20 หน้า");
+  expect(pillMainText(false, 0, 0, 7)).toBe("กำลังแปลหน้า 7");
 });

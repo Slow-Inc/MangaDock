@@ -8,7 +8,7 @@ import { addToHistory, getHistory } from "../lib/readingHistory";
 import { useChapterTranslation, TARGET_LANG_OPTIONS } from "../hooks/useChapterTranslation";
 import { buildTranslationSources } from "../lib/translationSources";
 import { buildTranslateMenu } from "../lib/translateMenu";
-import { formatEta, stageLabel } from "../lib/translationStages";
+import { formatEta, pillMainText, stageLabel } from "../lib/translationStages";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { getHardwareId } from "../lib/fingerprint";
 
@@ -1678,29 +1678,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                 </>
               )}
 
-              {/* Translation status pill — paged mode, floats at bottom of viewing area above the strip */}
-              {(translating || translatingCurrentPage) && (
-                <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
-                  <div className="flex flex-col items-center gap-1 rounded-2xl border border-blue-400/40 bg-black/85 px-4 py-2 shadow-xl shadow-black/60 backdrop-blur-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400/30 border-t-blue-400" />
-                      <span className="text-xs font-medium text-blue-300">
-                        {translating
-                          ? `แปลไปแล้ว ${transProgress.done}/${transProgress.total} หน้า`
-                          : `กำลังแปลหน้า ${(translatingCurrentPageIndex ?? page) + 1}`}
-                        {translateDetail ? ` · ${translateDetail}` : "..."}
-                      </span>
-                      {transProgress.failed > 0 && (
-                        <span className="text-xs font-medium text-red-400">ไม่สำเร็จ {transProgress.failed}</span>
-                      )}
-                    </div>
-                    {translateSubline && (
-                      <span className="text-[10px] text-white/40">{translateSubline}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-
               {page > 0 && (
                 <button onClick={() => setPage((p) => Math.max(p - 1, 0))} title="หน้าก่อน" className="absolute left-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-black/80">
                   <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" /></svg>
@@ -1743,6 +1720,30 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* Translation status pill — view-mode agnostic (#164): rendered above
+          BOTH the paged area and the continuous strip, so switching modes
+          never makes a running translation look idle. The continuous strip's
+          per-page badges scroll out of view; this pill never does. */}
+      {(translating || translatingCurrentPage) && (
+        <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 -translate-x-1/2">
+          <div className="flex flex-col items-center gap-1 rounded-2xl border border-blue-400/40 bg-black/85 px-4 py-2 shadow-xl shadow-black/60 backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400/30 border-t-blue-400" />
+              <span className="text-xs font-medium text-blue-300">
+                {pillMainText(translating, transProgress.done, transProgress.total, (translatingCurrentPageIndex ?? page) + 1)}
+                {translateDetail ? ` · ${translateDetail}` : "..."}
+              </span>
+              {transProgress.failed > 0 && (
+                <span className="text-xs font-medium text-red-400">ไม่สำเร็จ {transProgress.failed}</span>
+              )}
+            </div>
+            {translateSubline && (
+              <span className="text-[10px] text-white/40">{translateSubline}</span>
+            )}
+          </div>
         </div>
       )}
 
