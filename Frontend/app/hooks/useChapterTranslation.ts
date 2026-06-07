@@ -177,7 +177,13 @@ export function useChapterTranslation(
     const pendingIndices = Array.from({ length: total }, (_, i) => i).filter(
       (idx) => !completedTranslatedPages.has(idx),
     );
-    if (pendingIndices.length === 0) return;
+    if (pendingIndices.length === 0) {
+      // Everything is already translated — the user's intent is "show me the
+      // translation", not "make a network call" (#162). Without this flip the
+      // call is a silent no-op while the original view stays on.
+      setShowTranslation(true);
+      return;
+    }
 
     const controller = new AbortController();
     translateControllerRef.current = controller;
@@ -320,6 +326,12 @@ export function useChapterTranslation(
   const translateCurrentPage = async () => {
     if (translatingCurrentPage || translating) return;
     const pageIndex = currentPage;
+    // Patches already in memory → just show them; re-fetching would only hit
+    // the server cache and return the same data (#162).
+    if (patchedPages.has(pageIndex)) {
+      setShowTranslation(true);
+      return;
+    }
     const pageUrl = pages[pageIndex];
     if (!pageUrl) return;
     setTranslatingCurrentPage(true);
