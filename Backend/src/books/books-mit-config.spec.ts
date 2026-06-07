@@ -67,4 +67,20 @@ describe('BooksService.buildMitConfig', () => {
     expect(cfg.translator.source_lang).toBeUndefined();
     expect(cfg.translator.source_lang_only).toBeUndefined();
   });
+
+  it('carries series_context to the translator when provided (#157)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse(
+      (svc as any).buildMitConfig('ANY', 'THA', '', undefined, 'You are translating the manga series "Mob Seka".'),
+    );
+    expect(cfg.translator.series_context).toBe('You are translating the manga series "Mob Seka".');
+  });
+
+  it('produces a byte-identical config when series_context is absent (local-first rule)', () => {
+    const svc = makeService();
+    const withUndefined = (svc as any).buildMitConfig('JPN', 'THA', 'ja', undefined, undefined);
+    const legacyCall = (svc as any).buildMitConfig('JPN', 'THA', 'ja');
+    expect(withUndefined).toBe(legacyCall);
+    expect(withUndefined).not.toContain('series_context');
+  });
 });

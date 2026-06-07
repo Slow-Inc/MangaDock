@@ -33,6 +33,10 @@ type Options = {
    *  generated from the same derivative or their screentone tone visibly
    *  mismatches the page. Defaults to "hd". */
   derivative?: "hd" | "saver";
+  /** Catalog id of the manga being read (#157) — the Backend resolves
+   *  title/synopsis itself and feeds the translator its series context.
+   *  Absent → context-free translation, identical to today. */
+  mangaId?: string;
 };
 
 /**
@@ -50,7 +54,7 @@ type Options = {
 export function useChapterTranslation(
   chapterId: string,
   pages: string[],
-  { sourceLang, currentPage, menusOpen, derivative = "hd" }: Options,
+  { sourceLang, currentPage, menusOpen, derivative = "hd", mangaId }: Options,
 ) {
   const [translating, setTranslating] = useState(false);
   const [translatingCurrentPage, setTranslatingCurrentPage] = useState(false);
@@ -237,7 +241,7 @@ export function useChapterTranslation(
         batchPages,
         handlePageEvent,
         controller.signal,
-        { sourceLang: sourceLang ?? undefined, targetLang, imageModel, derivative },
+        { sourceLang: sourceLang ?? undefined, targetLang, imageModel, derivative, mangaId },
         handleProgressEvent,
       );
     } catch (err) {
@@ -270,7 +274,7 @@ export function useChapterTranslation(
                 retryBatchPages,
                 handlePageEvent,
                 controller.signal,
-                { sourceLang: sourceLang ?? undefined, targetLang, imageModel, derivative },
+                { sourceLang: sourceLang ?? undefined, targetLang, imageModel, derivative, mangaId },
                 handleProgressEvent,
               );
             } catch (retryErr) {

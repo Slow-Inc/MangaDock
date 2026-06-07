@@ -62,7 +62,9 @@ describe('BooksService — per-request image translation model (#87)', () => {
     const [keyWithModel] = cache.get.mock.calls[0];
     const [keyDefault] = cache.get.mock.calls[1];
     expect(keyWithModel).toContain(':gemini-2.5-pro');
-    expect(keyWithModel).toContain(':v5:');
+    // v6: series context changes translations (#157) — context-aware and
+    // context-free patches must never mix.
+    expect(keyWithModel).toContain(':v6:');
     expect(keyDefault).not.toBe(keyWithModel);
   });
 

@@ -172,7 +172,7 @@ export class BooksController {
   async translateMangaPagePatches(
     @Param('chapterId') chapterId: string,
     @Param('pageIndex') pageIndex: string,
-    @Body() body: { pageUrl?: string; sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: 'hd' | 'saver' },
+    @Body() body: { pageUrl?: string; sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: 'hd' | 'saver'; mangaId?: string },
   ) {
     try {
       return await this.booksService.translateMangaPagePatches(
@@ -181,7 +181,7 @@ export class BooksController {
         body?.pageUrl ?? '',
         body?.sourceLang,
         body?.targetLang,
-        { imageModel: body?.imageModel, derivative: body?.derivative === 'saver' ? 'saver' : 'hd' },
+        { imageModel: body?.imageModel, derivative: body?.derivative === 'saver' ? 'saver' : 'hd', mangaId: body?.mangaId },
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -207,7 +207,7 @@ export class BooksController {
   @Post('chapters/:chapterId/batch-translate-patches')
   async batchTranslateMangaPatches(
     @Param('chapterId') chapterId: string,
-    @Body() body: { pages?: Array<{ pageIndex: number; pageUrl: string }>; sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: 'hd' | 'saver' },
+    @Body() body: { pages?: Array<{ pageIndex: number; pageUrl: string }>; sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: 'hd' | 'saver'; mangaId?: string },
     @Res() res: import('express').Response,
   ): Promise<void> {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -253,7 +253,7 @@ export class BooksController {
     });
 
     try {
-      await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang, imageModel, derivative);
+      await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang, imageModel, derivative, body?.mangaId);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (!res.writableEnded) {
