@@ -19,6 +19,7 @@ import {
 import { setTokenSupplier, loadUserData, clearUserCache, flushNow } from "../lib/userCache";
 import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData } from "../lib/readingHistory";
 import { clearAllApiCache } from "../lib/apiCache";
+import { reloadPage, redirectToHome } from "../lib/browserActions";
 import { useToast } from "./ToastContext";
 
 const API_BASE = "/api/proxy";
@@ -404,6 +405,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
     await openOAuthPopup(data.url);
+    reloadPage();
   };
 
   const signInWithFacebook = async () => {
@@ -414,6 +416,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
     await openOAuthPopup(data.url);
+    reloadPage();
   };
 
   const signUpWithEmail = async (email: string, password: string, displayName: string) => {
@@ -478,6 +481,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       const name = data.user.user_metadata?.display_name ?? data.user.user_metadata?.full_name ?? data.user.email ?? "คุณ";
       showToast({ type: "success", message: `ยินดีต้อนรับกลับมา, ${name}!`, duration: 3000 });
+      reloadPage();
     }
   };
 
@@ -505,6 +509,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     showToast({ type: "success", message: "ออกจากระบบแล้ว", duration: 3000 });
+    reloadPage();
   };
 
   const updateUserProfile = async (displayName: string) => {
@@ -688,6 +693,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAllApiCache();
     await supabase.auth.signOut();
     setUser(null);
+    redirectToHome();
   };
 
   const resendVerificationEmail = async (): Promise<void> => {

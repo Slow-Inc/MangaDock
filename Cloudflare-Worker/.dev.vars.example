@@ -1,4 +1,5 @@
 BACKEND_SHARED_SECRET=840b672e8ed519158a62cbe9673ed7006890264ccfeac5b8a905c116d4cdce0b35455f0671cb4136f74b6cd52ce22f546eb25f7b51f73ff4e3886f5ac009534f
 MIT_PROCESS_URL=http://localhost:5003/translate/with-form/image
+MIT_PATCH_URL=http://localhost:5003/translate/with-form/patches
 MIT_API_KEY=optional-mit-api-key
 IMAGE_QUALITY_PROFILE=balanced

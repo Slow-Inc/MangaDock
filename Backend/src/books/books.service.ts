@@ -802,6 +802,52 @@ export class BooksService {
 
     const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '', opts?.imageModel, await this.seriesContextFor(opts?.mangaId));
 
+    // C-B: Route through Worker for R2-cached patch translation (#184)
+    const workerUrl = process.env.WORKER_URL?.trim();
+    const workerSecret = process.env.WORKER_SECRET?.trim();
+    if (workerUrl && workerSecret) {
+      const model = this.imageModelKey(opts?.imageModel) ?? 'default';
+      const chapterDir = `uploads/patches/${chapterId}`;
+      const filePrefix = `${srcMIT}__${tgtMIT}__${model}__p${pageIndex}__`;
+      const patchMetaKey = `${chapterDir}/${filePrefix}meta.json`;
+
+      const workerForm = new FormData();
+      workerForm.append('image', new Blob([new Uint8Array(imgBuffer)], { type: 'image/jpeg' }), 'page.jpg');
+      workerForm.append('config', config);
+      workerForm.append('patch_meta_key', patchMetaKey);
+
+      const workerRes = await fetch(`${workerUrl}/v1/translate-patches`, {
+        method: 'POST',
+        headers: { 'x-worker-secret': workerSecret },
+        body: workerForm,
+        signal: AbortSignal.timeout(300_000),
+      });
+
+      if (!workerRes.ok) {
+        const text = await workerRes.text().catch(() => '');
+        throw new Error(`Worker translate-patches error: HTTP ${workerRes.status} — ${text.slice(0, 200)}`);
+      }
+
+      const workerData = (await workerRes.json()) as {
+        patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; r2Key: string }>;
+      };
+      const origin = this.backendOrigin;
+      const patches = workerData.patches.map((p) => ({
+        xPct: p.xPct,
+        yPct: p.yPct,
+        wPct: p.wPct,
+        hPct: p.hPct,
+        url: `${origin}/r2-patches/${p.r2Key}`,
+      }));
+
+      const result = { patches };
+      await this.cache.setMangaCacheWithTiers(cacheKey, result);
+      this.logger.log(
+        `[MangaPatches] chapter=${chapterId} page=${pageIndex} → ${patches.length} patches (Worker)`,
+      );
+      return result;
+    }
+
     const maxStartupRetries = opts?.maxStartupRetries ?? 30;
     const startupRetryDelayMs = 5_000;
 

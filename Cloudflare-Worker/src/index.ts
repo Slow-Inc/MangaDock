@@ -13,6 +13,13 @@ interface R2PutResult {
   version?: string;
 }
 
+interface R2ListResult {
+  objects: Array<{ key: string }>;
+  delimitedPrefixes: string[];
+  truncated: boolean;
+  cursor?: string;
+}
+
 interface R2BucketLike {
   head: (key: string) => Promise<unknown | null>;
   get: (key: string) => Promise<R2StoredObject | null>;
@@ -25,12 +32,19 @@ interface R2BucketLike {
     },
   ) => Promise<R2PutResult>;
   delete: (key: string) => Promise<void>;
+  list: (options?: {
+    prefix?: string;
+    delimiter?: string;
+    limit?: number;
+    cursor?: string;
+  }) => Promise<R2ListResult>;
 }
 
 interface Env {
   MANGA_IMAGES: R2BucketLike;
   BACKEND_SHARED_SECRET: string;
   MIT_PROCESS_URL?: string;
+  MIT_PATCH_URL?: string;
   MIT_API_KEY?: string;
   IMAGE_QUALITY_PROFILE?: string;
 }
@@ -159,6 +173,13 @@ async function streamObject(object: R2StoredObject, key: string): Promise<Respon
   return new Response(object.body, { status: 200, headers });
 }
 
+function base64ToArrayBuffer(b64: string): ArrayBuffer {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
 async function handleExists(requestUrl: URL, env: Env): Promise<Response> {
   const key = getRequiredKey(requestUrl);
   if (!key) return badRequest("query parameter 'key' is required");
@@ -219,6 +240,22 @@ async function handlePutObject(request: Request, requestUrl: URL, env: Env): Pro
     etag: result.httpEtag,
     version: result.version,
   });
+}
+
+async function handleList(requestUrl: URL, env: Env): Promise<Response> {
+  const prefix = requestUrl.searchParams.get("prefix") ?? "";
+  const recursive = requestUrl.searchParams.get("recursive") === "true";
+  const normalizedPrefix = prefix && !prefix.endsWith("/") ? `${prefix}/` : prefix;
+
+  if (recursive) {
+    const result = await env.MANGA_IMAGES.list({ prefix: normalizedPrefix, limit: 1000 });
+    return json({ ok: true, keys: result.objects.map((o) => o.key) });
+  }
+
+  const result = await env.MANGA_IMAGES.list({ prefix: normalizedPrefix, delimiter: "/", limit: 1000 });
+  const files = result.objects.map((o) => o.key.slice(normalizedPrefix.length));
+  const dirs = (result.delimitedPrefixes ?? []).map((p) => p.slice(normalizedPrefix.length).replace(/\/$/, ""));
+  return json({ ok: true, keys: [...dirs, ...files].filter(Boolean) });
 }
 
 async function handleDeleteObject(requestUrl: URL, env: Env): Promise<Response> {
@@ -298,6 +335,95 @@ async function fetchProcessedImage(
   return new Response(outputBytes, { status: 200, headers });
 }
 
+async function handleTranslatePatches(request: Request, env: Env): Promise<Response> {
+  if (!env.MIT_PATCH_URL) {
+    return json({ ok: false, error: "MIT_PATCH_URL is not configured" }, 503);
+  }
+
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return badRequest("expected multipart/form-data body");
+  }
+
+  const patchMetaKey = formData.get("patch_meta_key");
+  const imageFile = formData.get("image");
+  const configStr = formData.get("config");
+
+  if (!patchMetaKey || typeof patchMetaKey !== "string") return badRequest("patch_meta_key is required");
+  if (!imageFile) return badRequest("image is required");
+  if (typeof configStr !== "string") return badRequest("config is required");
+
+  // R2 cache check — avoids calling MIT on re-translate of an already-stored page
+  const cached = await env.MANGA_IMAGES.get(patchMetaKey);
+  if (cached) {
+    const buf = await cached.arrayBuffer();
+    const meta = JSON.parse(new TextDecoder().decode(buf)) as {
+      patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; r2Key: string }>;
+    };
+    const headers = new Headers(JSON_HEADERS);
+    headers.set("x-cache-hit", "true");
+    return new Response(JSON.stringify({ ok: true, ...meta, cacheHit: true }), { status: 200, headers });
+  }
+
+  // Forward to MIT /translate/with-form/patches
+  const mitForm = new FormData();
+  mitForm.append("image", imageFile);
+  mitForm.append("config", configStr);
+
+  let mitRes: Response;
+  try {
+    mitRes = await fetch(env.MIT_PATCH_URL, {
+      method: "POST",
+      body: mitForm,
+      signal: AbortSignal.timeout(300_000),
+    });
+  } catch (err) {
+    return json({ ok: false, error: `MIT request failed: ${String(err)}` }, 502);
+  }
+
+  if (!mitRes.ok) {
+    const errText = await mitRes.text().catch(() => "");
+    return json({ ok: false, error: `MIT error: HTTP ${mitRes.status}`, detail: errText.slice(0, 300) }, 502);
+  }
+
+  const patchData = (await mitRes.json()) as {
+    img_width: number;
+    img_height: number;
+    patches: Array<{ x: number; y: number; w: number; h: number; img_b64: string }>;
+  };
+
+  const { img_width: imgW, img_height: imgH, patches: rawPatches } = patchData;
+  // Derive PNG key base: same dir as meta key, replace "meta.json" suffix with "r{i}.png"
+  const pngKeyBase = patchMetaKey.replace(/meta\.json$/, "r");
+
+  const patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; r2Key: string }> = [];
+  for (let i = 0; i < rawPatches.length; i++) {
+    const p = rawPatches[i];
+    const pngKey = `${pngKeyBase}${i}.png`;
+    await env.MANGA_IMAGES.put(pngKey, base64ToArrayBuffer(p.img_b64), {
+      httpMetadata: { contentType: "image/png", cacheControl: "public, max-age=31536000, immutable" },
+    });
+    patches.push({
+      xPct: imgW > 0 ? p.x / imgW : 0,
+      yPct: imgH > 0 ? p.y / imgH : 0,
+      wPct: imgW > 0 ? p.w / imgW : 0,
+      hPct: imgH > 0 ? p.h / imgH : 0,
+      r2Key: pngKey,
+    });
+  }
+
+  const meta = { patches };
+  await env.MANGA_IMAGES.put(patchMetaKey, new TextEncoder().encode(JSON.stringify(meta)).buffer, {
+    httpMetadata: { contentType: "application/json" },
+  });
+
+  const headers = new Headers(JSON_HEADERS);
+  headers.set("x-cache-hit", "false");
+  return new Response(JSON.stringify({ ok: true, ...meta, cacheHit: false }), { status: 200, headers });
+}
+
 async function handleTranslate(request: Request, env: Env): Promise<Response> {
   let payload: TranslateRequest;
   try {
@@ -354,6 +480,14 @@ export default {
 
     if (url.pathname === "/v1/object" && request.method === "DELETE") {
       return handleDeleteObject(url, env);
+    }
+
+    if (url.pathname === "/v1/list" && request.method === "GET") {
+      return handleList(url, env);
+    }
+
+    if (url.pathname === "/v1/translate-patches" && request.method === "POST") {
+      return handleTranslatePatches(request, env);
     }
 
     if (url.pathname === "/v1/translate" && request.method === "POST") {

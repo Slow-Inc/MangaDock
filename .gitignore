@@ -29,3 +29,5 @@ Backend/prd_*.txt
 
 # Local research clone (meangrinch/MangaTranslator) — studied, never committed
 /MangaTranslator
+
+.mcp.json

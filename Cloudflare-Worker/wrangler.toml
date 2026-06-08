@@ -7,4 +7,4 @@ enabled = true
 
 [[r2_buckets]]
 binding = "MANGA_IMAGES"
-bucket_name = "mangadock"
+bucket_name = "mangadock-assets"
