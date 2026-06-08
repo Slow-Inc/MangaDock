@@ -11,9 +11,10 @@ import MangaSearchSelector from "../components/MangaSearchSelector";
 import PostImageUploader from "../components/PostImageUploader";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { useFeedStream } from "../hooks/useForumStream";
+import { availableCategories, isRestrictedCategory } from "../lib/forumCategories";
 
 function CommunityContent() {
-  const { user, showLoginPrompt } = useAuth();
+  const { user, userRole, showLoginPrompt } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -26,7 +27,7 @@ function CommunityContent() {
   const [mangaId, setMangaId] = useState<string | undefined>(
     searchParams.get('mangaId') || undefined
   );
-  const [sort, setSort] = useState<'new' | 'hot'>('hot');
+  const [sort, setSort] = useState<'new' | 'hot'>('new');
   const [viewMode, setViewMode] = useState<'card' | 'compact'>('card');
   
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -45,6 +46,13 @@ function CommunityContent() {
     setIsModalVisible(false);
     setTimeout(() => { setShowCreateModal(false); setPostImages([]); }, 220);
   }, []);
+
+  // Reset to 'general' when role changes and current category becomes restricted
+  useEffect(() => {
+    if (isRestrictedCategory(newPost.category) && !availableCategories(userRole).includes(newPost.category)) {
+      setNewPost((prev) => ({ ...prev, category: "general" }));
+    }
+  }, [userRole, newPost.category]);
 
   // Modal Smooth Scrolling
   const modalScrollRef = useRef<HTMLDivElement>(null);
@@ -344,7 +352,7 @@ function CommunityContent() {
                 <div>
                   <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">หมวดหมู่</label>
                   <div className="flex flex-wrap gap-2">
-                    {(['general', 'announcement', 'spoiler', 'manga_update'] as const).map((cat) => (
+                    {availableCategories(userRole).map((cat) => (
                       <button
                         key={cat}
                         onClick={() => setNewPost({ ...newPost, category: cat })}
