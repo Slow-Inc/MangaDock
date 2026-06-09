@@ -1278,3 +1278,12 @@ Pulled `_check_target_language_ratio` (a pure verdict, Issue #109) into translat
 so it unit-tests with a stub (the real target_script_ratio passed in production). Async method delegates;
 byte-identical (verified vs pure fn). Tests: test_translation_checks.py 10 passed (5 repetition + 5 ratio).
 The validator seam now holds both post-translation checks; new validators attach here, not in the god object.
+
+## 2026-06-09 — #187 slice (c): extract duplicated punctuation correction off the god object
+The quote/bracket punctuation-correction logic (check_items + replace_items tables + a per-region
+mutation loop) was DUPLICATED inline in two places in MangaTranslator (translate + batch paths, ~150 lines
+total). Extracted verbatim to manga_translator/punctuation.py::correct_punctuation(source_text, translation)
+— pure string logic. Both call sites now delegate via `region.translation = correct_punctuation(region.text,
+region.translation)`; the data tables are gone from the god object. Byte-identical (6 golden characterization
+cases capturing the smart-quote->corner-bracket conversion, forced replacements, count-mismatch no-ops).
+Tests: test_punctuation.py 7 passed (6 behavioral + wiring inspection). Regression suite 36 passed.

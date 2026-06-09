@@ -14,6 +14,7 @@ import traceback
 import numpy as np
 from PIL import Image
 from typing import Optional, Any, List, Tuple
+from .punctuation import correct_punctuation
 import py3langid as langid
 
 from .config import Config, Colorizer, Detector, Translator, Renderer, Inpainter
@@ -1159,84 +1160,9 @@ class MangaTranslator:
                 region._direction = config.render.direction  
 
         # Punctuation correction logic. for translators often incorrectly change quotation marks from the source language to those commonly used in the target language.
-        check_items = [
-            # 圆括号处理
-            ["(", "（", "「", "【"],
-            ["（", "(", "「", "【"],
-            [")", "）", "」", "】"],
-            ["）", ")", "」", "】"],
-            
-            # 方括号处理
-            ["[", "［", "【", "「"],
-            ["［", "[", "【", "「"],
-            ["]", "］", "】", "」"],
-            ["］", "]", "】", "」"],
-            
-            # 引号处理
-            ["「", "“", "‘", "『", "【"],
-            ["」", "”", "’", "』", "】"],
-            ["『", "“", "‘", "「", "【"],
-            ["』", "”", "’", "」", "】"],
-            
-            # 新增【】处理
-            ["【", "(", "（", "「", "『", "["],
-            ["】", ")", "）", "」", "』", "]"],
-        ]
-
-        replace_items = [
-            ["「", "“"],
-            ["「", "‘"],
-            ["」", "”"],
-            ["」", "’"],
-            ["【", "["],  
-            ["】", "]"],  
-        ]
-
         for region in ctx.text_regions:
             if region.text and region.translation:
-                if '『' in region.text and '』' in region.text:
-                    quote_type = '『』'
-                elif '「' in region.text and '」' in region.text:
-                    quote_type = '「」'
-                elif '【' in region.text and '】' in region.text: 
-                    quote_type = '【】'
-                else:
-                    quote_type = None
-                
-                if quote_type:
-                    src_quote_count = region.text.count(quote_type[0])
-                    dst_dquote_count = region.translation.count('"')
-                    dst_fwquote_count = region.translation.count('＂')
-                    
-                    if (src_quote_count > 0 and
-                        (src_quote_count == dst_dquote_count or src_quote_count == dst_fwquote_count) and
-                        not region.translation.isascii()):
-                        
-                        if quote_type == '「」':
-                            region.translation = re.sub(r'"([^"]*)"', r'「\1」', region.translation)
-                        elif quote_type == '『』':
-                            region.translation = re.sub(r'"([^"]*)"', r'『\1』', region.translation)
-                        elif quote_type == '【】':  
-                            region.translation = re.sub(r'"([^"]*)"', r'【\1】', region.translation)
-
-                # === 优化后的数量判断逻辑 ===
-                # === Optimized quantity judgment logic ===
-                for v in check_items:
-                    num_src_std = region.text.count(v[0])
-                    num_src_var = sum(region.text.count(t) for t in v[1:])
-                    num_dst_std = region.translation.count(v[0])
-                    num_dst_var = sum(region.translation.count(t) for t in v[1:])
-                    
-                    if (num_src_std > 0 and
-                        num_src_std != num_src_var and
-                        num_src_std == num_dst_std + num_dst_var):
-                        for t in v[1:]:
-                            region.translation = region.translation.replace(t, v[0])
-
-                # 强制替换规则
-                # Forced replacement rules
-                for v in replace_items:
-                    region.translation = region.translation.replace(v[1], v[0])
+                region.translation = correct_punctuation(region.text, region.translation)
 
         # 注意：翻译结果的保存移动到了翻译流程的最后，确保保存的是最终结果而不是重试前的结果
 
@@ -2839,83 +2765,9 @@ class MangaTranslator:
         if not ctx.text_regions:
             return []
             
-        check_items = [
-            # 圆括号处理
-            ["(", "（", "「", "【"],
-            ["（", "(", "「", "【"],
-            [")", "）", "」", "】"],
-            ["）", ")", "」", "】"],
-            
-            # 方括号处理
-            ["[", "［", "【", "「"],
-            ["［", "[", "【", "「"],
-            ["]", "］", "】", "」"],
-            ["］", "]", "】", "」"],
-            
-            # 引号处理
-            ["「", "“", "‘", "『", "【"],
-            ["」", "”", "’", "』", "】"],
-            ["『", "“", "‘", "「", "【"],
-            ["』", "”", "’", "」", "】"],
-            
-            # 新增【】处理
-            ["【", "(", "（", "「", "『", "["],
-            ["】", ")", "）", "」", "』", "]"],
-        ]
-
-        replace_items = [
-            ["「", "“"],
-            ["「", "‘"],
-            ["」", "”"],
-            ["」", "’"],
-            ["【", "["],  
-            ["】", "]"],  
-        ]
-
         for region in ctx.text_regions:
             if region.text and region.translation:
-                # 引号处理逻辑
-                if '『' in region.text and '』' in region.text:
-                    quote_type = '『』'
-                elif '「' in region.text and '」' in region.text:
-                    quote_type = '「」'
-                elif '【' in region.text and '】' in region.text: 
-                    quote_type = '【】'
-                else:
-                    quote_type = None
-                
-                if quote_type:
-                    src_quote_count = region.text.count(quote_type[0])
-                    dst_dquote_count = region.translation.count('"')
-                    dst_fwquote_count = region.translation.count('＂')
-                    
-                    if (src_quote_count > 0 and
-                        (src_quote_count == dst_dquote_count or src_quote_count == dst_fwquote_count) and
-                        not region.translation.isascii()):
-                        
-                        if quote_type == '「」':
-                            region.translation = re.sub(r'"([^"]*)"', r'「\1」', region.translation)
-                        elif quote_type == '『』':
-                            region.translation = re.sub(r'"([^"]*)"', r'『\1』', region.translation)
-                        elif quote_type == '【】':  
-                            region.translation = re.sub(r'"([^"]*)"', r'【\1】', region.translation)
-
-                # 括号修正逻辑
-                for v in check_items:
-                    num_src_std = region.text.count(v[0])
-                    num_src_var = sum(region.text.count(t) for t in v[1:])
-                    num_dst_std = region.translation.count(v[0])
-                    num_dst_var = sum(region.translation.count(t) for t in v[1:])
-                    
-                    if (num_src_std > 0 and
-                        num_src_std != num_src_var and
-                        num_src_std == num_dst_std + num_dst_var):
-                        for t in v[1:]:
-                            region.translation = region.translation.replace(t, v[0])
-
-                # 强制替换规则
-                for v in replace_items:
-                    region.translation = region.translation.replace(v[1], v[0])
+                region.translation = correct_punctuation(region.text, region.translation)
 
         # 注意：翻译结果的保存移动到了translate方法的最后，确保保存的是最终结果
 
