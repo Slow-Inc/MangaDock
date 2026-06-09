@@ -14,6 +14,36 @@ us decompose the core without breaking it), not an end to chase exhaustively. Do
 slices forever — finish enough foundation to make the core safe, then decompose the core. See the
 `feedback_core_boundary` rule: **new features attach at a seam with tests, never grow the monolith.**
 
+## Reconciled plan (2026-06-09 deep analysis — supersedes the phase ordering below)
+
+A 6-agent deep read produced `docs/research/mit-core-decomposition-analysis.md` — the verified
+decomposition map (26 seams S1–S26, dependencies, per-seam test strategy, and 16 source-cited
+landmines). It reconciles this roadmap:
+
+- **Strategic spine holds**: anti-compounding, the four Iron Rules, `#188 before #187` *facade* work,
+  ship/validate between increments.
+- **Tactical correction**: `#187` and `#188` are **not** monolithic Phase-C items — they are ~16
+  independently-shippable seams, several already landed out of order and correctly (the validator checks
+  `translation_checks.py`, `punctuation.py`, and the `_greedy_pack` line-break seam #186 are all S-seams).
+  **Split them into seams and interleave the low-risk ones into Phase A**; start #188's tracker/unloader
+  (S3/S4) early; keep the high-risk facade (S17, S18, S22–S26) last.
+- **Highest-value/lowest-risk dedup the plan missed**: the **four-way post-translation duplication** —
+  `should_filter` is *verbatim*-identical at 1287-1314 ≡ 2372-2401 ≡ 2542-2571. It is **step 1**.
+- **Landmines to PRESERVE (not "fix") during extraction**, then fix separately behind an opt-in flag:
+  TTL key drift (`'colorizer'` never matches `case 'colorization'`, L1), divergent validation
+  (`min_ratio` 0.3 vs 0.5, region threshold 6 vs >10 — *load-bearing*, L6), singleton page-context bleed
+  (`reset_page_context` only from `translate_patches`, L9), `exit(-1)` in a stage (L2), cleanup-task leak (L14).
+
+**Corrected next 3 steps** (from the analysis):
+1. **S1 `filter_translated_regions(regions, config)`** — extract the verbatim 3-way `should_filter` block;
+   gate = all three inline copies + the new fn yield identical kept-set + identical `Filtered out`/`Reason` logs.
+2. **S2 `apply_translations` / `apply_original_as_translation`** — fold the 4 happy-path copies + casing;
+   gate = byte-identical region attributes incl. `zip`-truncation (L10) and upper/lower.
+3. **S3 `ModelUsageTracker`** *(starts #188 here, not Phase C)* — wrap `_model_usage_timestamps`; gate =
+   golden the exact `(tool, model)` key tuples (documents the L1 drift as a pinned invariant before S4).
+
+The phase tables below remain as the strategic reference; execution follows the seam order in the analysis doc.
+
 ## Iron rules (apply to every item)
 1. **Characterization net first.** For any core/shared module, capture golden behaviour across *all*
    imaginable scenarios before touching code, then prove byte-identical (`feedback_techdebt_all_scenarios`).
