@@ -1,15 +1,24 @@
 ---
 name: feedback-impact-report
-description: After significant work, record system-impacting changes AND tech debt into docs/reports/system-impact-report.md (report-level), in addition to the DONE.md dev log.
+description: Every change that affects the system goes into docs/reports/system-impact-report.md with the FULL field set (what/where, why, before→after, perf Δ, quality, validation, risk) so a whole-system report can be pulled from it. Plus the MIT tech-debt register.
 metadata:
   type: feedback
 ---
 
-Maintain a **report-level** record, not just the chronological dev log. After any significant batch of work, append to `docs/reports/system-impact-report.md`:
-- **Changes that affect the running system** — what changed, the system impact, the controlling knob/flag, test status. Flag opt-in vs default-changing behaviour.
-- **Tech debt** — issues filed (number, area, severity, status) and progress on in-flight refactors.
-- Key operational findings (gating, gotchas), known gaps vs the target, and the commit hashes.
+Maintain a **report-level** record the user can pull a whole-system report from — richer than the `DONE.md` dev log. After any significant batch, append to `docs/reports/system-impact-report.md`.
 
-**Why:** the user pulls status reports from this (2026-06-09 request: "บันทึกการแก้ไขต่างๆที่สำคัญ ส่งผลต่อระบบ รวมถึง tech dept ไว้ด้วยเพื่อนำไปทำ report"). `DONE.md` is a terse chronological dev log; this is the curated, stakeholder-readable summary.
+**Every system-affecting change must record ALL of these fields** (post-mortem-grade; write "not measured" / "N/A" honestly rather than guessing — never fabricate numbers):
+- **What & where** — the change + component / file:line / module.
+- **Why** — the problem or goal it serves.
+- **Before → After** — the concrete observable difference (state it both ways).
+- **Performance Δ** — quantified if measured (latency / VRAM / throughput / tokens); else "not measured".
+- **Quality** — correctness / render-fidelity / UX impact; how it compares to the target/reference.
+- **Validation** — how it was verified (unit tests, E2E, benchmark page, golden/characterization).
+- **Risk / rollback** — opt-in? byte-identical when off? controlling knob/flag; how to revert.
+- **Links** — issue #, commit hash.
 
-**How to apply:** keep entries terse + linkable (issue #, commit hash, file:line); one dated section per significant batch; tables for change/impact/test and the tech-debt register. This is in addition to — not a replacement for — `DONE.md` ([[feedback_md_history_log]]) and `MIT/PIPELINE.md §5`. Pairs with [[feedback-techdebt-all-scenarios]].
+Also keep a **tech-debt register** (issues filed: number/area/severity/status) and progress on in-flight refactors, plus key operational findings (gating, gotchas) and known gaps vs the target.
+
+**Why:** the user writes whole-system reports from this (2026-06-09: "เราต้องเขียน report ทั้งระบบ เช่น before vs after ตรงไหนแก้เพื่ออะไร ประสิทธิภาพเพิ่มขึ้นแค่ไหน คุณภาพเป็นยังไง"). A change logged without before→after / perf / quality / validation is incomplete for reporting.
+
+**How to apply:** terse + linkable; one dated section per batch; a per-change block or table carrying the fields above. In addition to — not instead of — `DONE.md` ([[feedback_md_history_log]]) + `MIT/PIPELINE.md §5`. Pairs with [[feedback-techdebt-all-scenarios]]. For a single fixed bug, a dedicated post-mortem (root cause / mechanism / fix / validation / how it slipped through) is the right artifact instead.
