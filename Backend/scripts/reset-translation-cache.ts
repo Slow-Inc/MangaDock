@@ -16,7 +16,6 @@ import * as path from 'path';
 import Redis from 'ioredis';
 
 import {
-  isTranslatedPatchCacheKey,
   resetTranslationCache,
   TRANSLATED_PATCH_PREFIX,
   type CacheResetPorts,

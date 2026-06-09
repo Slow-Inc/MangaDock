@@ -5,9 +5,6 @@ short last line. MangaTranslator (text_processing.py:489-579) uses a pragmatic
 Knuth-Plass DP that globally minimises total badness (slack^exponent) so lines are
 balanced. Pure arithmetic over a word-width callback — unit-tests with no PIL/fonts.
 """
-import re
-from pathlib import Path
-
 from manga_translator.line_break import find_optimal_line_breaks
 
 
