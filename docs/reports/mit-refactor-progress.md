@@ -2,7 +2,7 @@
 
 > **Single entry point** for the MIT tech-debt decomposition. If context was lost, READ THIS FIRST,
 > then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
-> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S4 done).
+> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S5 done).
 
 ## How to resume (read order)
 1. **This file** — current position + seam status table below.
@@ -49,8 +49,8 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | **S2** | `apply_translations` / `apply_original_as_translation` (fold 4 copies + casing) | pure | low | ✅ | `region_apply.py` (branch `refactor/mit-seam-s2-apply-translations`) |
 | **S3** | `ModelUsageTracker` (wrap `_model_usage_timestamps`; **#188 starts**) | stateful | low | ✅ | `model_usage_tracker.py` (branch `…-s3-model-usage-tracker`) |
 | **S4** | `ModelUnloader` (routing table; preserve L1) | stateful | med | ✅ | `model_unloader.py` (branch `…-s4-model-unloader`) |
-| **S5** | `memory_pressure_guard` (gc/empty_cache/psutil) | stateful | low | ▶️ next | — |
-| **S7** | `context_page_counts` (fold accounting) | pure | low | ⬜ | — |
+| **S5** | `memory_pressure_guard` (gc/empty_cache/psutil) | stateful | low | ✅ | `memory_guard.py` — `release_memory` only (psutil check single-use, left inline) |
+| **S7** | `context_page_counts` (fold accounting) | pure | low | ▶️ next | — |
 | **S8** | `PostDictionaryStage` (fold post-dict) | stateful | low | ⬜ | — |
 | **S6** | `build_prev_context` pure fn (per-mode index policy explicit) | pure | med | ⬜ | — |
 | **S9** | `NoneTranslator/GuardPolicy` (front-matter, L3/L12) | stateful | med | ⬜ | — |
