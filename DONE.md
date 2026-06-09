@@ -1214,3 +1214,10 @@ Pure, dependency-light (word-width callback). Tests: test_line_break.py 5 passed
 beats greedy short-last-line, empty, fits-one-line, overwide-lone-token no deadlock, hyphen penalty).
 NEXT (step 2, not done): wire into rendering/text_render.calc_horizontal behind a knob (replace the
 greedy word-packing loop ~774-845) + E2E — risky integration into the core wrapper, deserves a focused pass.
+
+## 2026-06-09 — #180 step 2 deferred → tech-debt issue #186
+Traced rendering/text_render.py::calc_horizontal for the Knuth-Plass wiring: ~270-line monolith
+(greedy pack + cross-line syllable hyphenation + single-char rebalance + assembly over shared mutable
+state, lines 664-934). Forcing the DP in = high regression risk. Per user, recorded as tech debt instead:
+filed #186 (refactor: extract pluggable LineBreaker seam, byte-identical greedy) + commented on #180
+that step 2 is blocked-by #186. Pure module (#180 step 1) stays committed & unused (byte-identical).
