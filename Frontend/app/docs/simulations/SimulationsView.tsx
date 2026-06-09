@@ -118,7 +118,6 @@ function MobileChipPicker({
   const [selectedDomainId, setSelectedDomainId] = useState(activeDomain?.id ?? ALL_DOMAINS[0].id);
 
   const currentDomain = ALL_DOMAINS.find(d => d.id === selectedDomainId) ?? ALL_DOMAINS[0];
-  const colors = DOMAIN_COLORS[currentDomain.color];
 
   return (
     <div className="md:hidden border-b border-black/[0.08]">

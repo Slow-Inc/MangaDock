@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LangContext, useLang, type Lang } from './lang-context';
 import {
   Search, ExternalLink, GitBranch, GitPullRequest, AlertCircle,
   FileText, Menu, X, CheckCircle2, Circle, GitMerge, XCircle,
   ChevronLeft, ChevronRight, MessageCircle, Lock, ArrowLeft,
-  Hash, Tag, Clock, Eye, Code2, BookOpen, Layers, Cpu, Server,
+  Tag, BookOpen, Layers, Cpu,
   LayoutDashboard, Zap,
 } from 'lucide-react';
 import OverviewView from './OverviewView';
@@ -319,7 +318,7 @@ function PRStateIcon({ state, draft, merged }: { state: string; draft: boolean; 
 function StateBadge({ state, draft, merged }: { state: string; draft?: boolean; merged?: boolean }) {
   const lang = useLang();
   if (merged) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#0071e3]/10 text-[#0071e3]">{lang === 'th' ? 'ผสานแล้ว' : 'Merged'}</span>;
-  if (state === 'closed' && !merged) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-600">{lang === 'th' ? 'ปิดแล้ว' : 'Closed'}</span>;
+  if (state === 'closed') return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-600">{lang === 'th' ? 'ปิดแล้ว' : 'Closed'}</span>;
   if (draft) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-black/[0.05] text-[#6e6e73]">{lang === 'th' ? 'ร่าง' : 'Draft'}</span>;
   return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-700">{lang === 'th' ? 'เปิดอยู่' : 'Open'}</span>;
 }
@@ -995,9 +994,6 @@ function Sidebar({
     }
     return result;
   }, [categories, search]);
-
-  const activeFile = view.type === 'doc' ? view.file : null;
-  const activeGH = view.type.startsWith('gh-') ? view.type : null;
 
   function navItem(label: string, v: ViewState, icon: React.ReactNode, prominent?: boolean) {
     const isActive = (() => {
