@@ -41,6 +41,7 @@ export default function SearchBar() {
       {/* Expanded search bar */}
       <form
         onSubmit={handleSubmit}
+        aria-hidden={!isOpen}
         className={`flex items-center overflow-hidden rounded-full border border-white/20 bg-black/75 backdrop-blur-xl transition-all duration-300 ${
           isOpen
             ? "fixed left-4 right-4 top-[calc(4.75rem+env(safe-area-inset-top))] z-[80] w-auto opacity-100 shadow-2xl md:static md:left-auto md:right-auto md:top-auto md:z-auto md:w-72 md:shadow-none"
@@ -53,6 +54,7 @@ export default function SearchBar() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="ค้นหาหนังสือ..."
+          tabIndex={isOpen ? 0 : -1}
           className="w-full bg-transparent px-4 py-2 text-sm text-white placeholder-white/40 outline-none"
         />
         {/* Clear button */}

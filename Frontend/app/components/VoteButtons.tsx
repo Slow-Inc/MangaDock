@@ -31,7 +31,6 @@ export default function VoteButtons({
   // Resync when the target changes (e.g. VoteButtons reused across different posts).
   // Intentionally omits initialUpvotes/Downvotes from deps — those update via externalCounts,
   // not by prop drilling, so including them here would overwrite in-progress optimistic state.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setUpvotes(initialUpvotes);
     setDownvotes(initialDownvotes);
@@ -93,19 +92,20 @@ export default function VoteButtons({
       <button
         onClick={() => handleVote(1)}
         disabled={loading}
-        className={`p-1.5 rounded-full smooth-hover-fast ${
-          userVote === 1 
-            ? "text-orange-500 bg-orange-500/10" 
+        aria-label="โหวตขึ้น"
+        className={`p-3 rounded-full smooth-hover-fast ${
+          userVote === 1
+            ? "text-amber-400 bg-amber-400/10"
             : "text-white/60 hover:text-white hover:bg-white/10"
         }`}
       >
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <svg aria-hidden="true" className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
         </svg>
       </button>
-      
+
       <span className={`text-xs font-bold min-w-[1.5rem] text-center smooth-hover-fast ${
-        userVote === 1 ? "text-orange-500" : userVote === -1 ? "text-indigo-500" : "text-white/80"
+        userVote === 1 ? "text-amber-400" : userVote === -1 ? "text-indigo-400" : "text-white/80"
       }`}>
         {upvotes - downvotes}
       </span>
@@ -113,13 +113,14 @@ export default function VoteButtons({
       <button
         onClick={() => handleVote(-1)}
         disabled={loading}
-        className={`p-1.5 rounded-full smooth-hover-fast ${
-          userVote === -1 
-            ? "text-indigo-500 bg-indigo-500/10" 
+        aria-label="โหวตลง"
+        className={`p-3 rounded-full smooth-hover-fast ${
+          userVote === -1
+            ? "text-indigo-400 bg-indigo-400/10"
             : "text-white/60 hover:text-white hover:bg-white/10"
         }`}
       >
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <svg aria-hidden="true" className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
         </svg>
       </button>

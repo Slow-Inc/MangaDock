@@ -20,9 +20,11 @@ export default function TopTenCard({ book, index }: Props) {
       <span className="pointer-events-none text-6xl font-black leading-none text-white/20 sm:text-7xl md:text-8xl">
         {index + 1}
       </span>
-      <div
+      <button
+        type="button"
         onClick={() => setShowModal(true)}
-        className={`relative cursor-pointer overflow-hidden rounded-xl border border-white/10 bg-white/10 md:backdrop-blur-xl transition-all duration-300 hover:border-white/30 hover:scale-105 ${
+        aria-label={`ดูรายละเอียด ${book.title}`}
+        className={`relative overflow-hidden rounded-xl border border-white/10 bg-white/10 md:backdrop-blur-xl transition-all duration-300 hover:border-white/30 hover:scale-105 focus-visible:scale-105 focus-visible:border-white/30 ${
           isLandscape ? "aspect-4/3 w-32 sm:w-40 md:w-48" : "h-32 w-24 sm:h-36 sm:w-28 md:h-40 md:w-28"
         }`}
       >
@@ -52,7 +54,7 @@ export default function TopTenCard({ book, index }: Props) {
           sizes="192px"
         />
         )}
-      </div>
+      </button>
 
       {showModal && (
         <BookDetailModal book={book} onClose={() => setShowModal(false)} />

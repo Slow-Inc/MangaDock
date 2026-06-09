@@ -1,6 +1,6 @@
 "use client";
 
-import { createVersion, type WalletTransaction } from "../../lib/studioApi";
+import type { WalletTransaction } from "../../lib/studioApi";
 import type { ChapterVersion } from "../../lib/types";
 
 export type ChartPoint = {
