@@ -19,6 +19,7 @@ from .region_apply import apply_original_as_translation, apply_render_casing, ap
 from .model_usage_tracker import ModelUsageTracker
 from .model_unloader import ModelUnloader
 from .memory_guard import release_memory
+from .context_counts import context_page_counts
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -1037,16 +1038,7 @@ class MangaTranslator:
         # 计算实际要使用的上下文页数和跳过的空页数
         # Calculate the actual number of context pages to use and empty pages to skip
         done_pages = self.all_page_translations
-        if self.context_size > 0 and done_pages:
-            pages_expected = min(self.context_size, len(done_pages))
-            non_empty_pages = [
-                page for page in done_pages
-                if any(sent.strip() for sent in page.values())
-            ]
-            pages_used = min(self.context_size, len(non_empty_pages))
-            skipped = pages_expected - pages_used
-        else:
-            pages_used = skipped = 0
+        pages_used, skipped = context_page_counts(self.context_size, done_pages)
 
         if self.context_size > 0:
             logger.info(f"Context-aware translation enabled with {self.context_size} pages of history")
@@ -2533,16 +2525,7 @@ class MangaTranslator:
             use_original_text = self.batch_concurrent and self.batch_size > 1
 
             done_pages = self.all_page_translations
-            if self.context_size > 0 and done_pages:
-                pages_expected = min(self.context_size, len(done_pages))
-                non_empty_pages = [
-                    page for page in done_pages
-                    if any(sent.strip() for sent in page.values())
-                ]
-                pages_used = min(self.context_size, len(non_empty_pages))
-                skipped = pages_expected - pages_used
-            else:
-                pages_used = skipped = 0
+            pages_used, skipped = context_page_counts(self.context_size, done_pages)
 
             if self.context_size > 0:
                 context_type = "original text" if use_original_text else "translation results"
