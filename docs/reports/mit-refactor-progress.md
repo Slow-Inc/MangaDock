@@ -2,7 +2,7 @@
 
 > **Single entry point** for the MIT tech-debt decomposition. If context was lost, READ THIS FIRST,
 > then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
-> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09.
+> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S2 done).
 
 ## How to resume (read order)
 1. **This file** — current position + seam status table below.
@@ -46,8 +46,8 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | #192a | `TranslatorChain` parse → `translator_chain.py` | pure | low | ✅ | `33cec29` |
 | #192b | remove dead `_batch_contexts/_configs` | — | low | ✅ | `eae3e02` |
 | **S1** | `filter_translated_regions` (3-way filter dedup) | pure | low | ✅ | `a71e4d2` |
-| **S2** | `apply_translations` / `apply_original_as_translation` (fold 4 copies + casing) | pure | low | ▶️ next | — |
-| **S3** | `ModelUsageTracker` (wrap `_model_usage_timestamps`; **#188 starts**) | stateful | low | ⬜ | — |
+| **S2** | `apply_translations` / `apply_original_as_translation` (fold 4 copies + casing) | pure | low | ✅ | `region_apply.py` (branch `refactor/mit-seam-s2-apply-translations`) |
+| **S3** | `ModelUsageTracker` (wrap `_model_usage_timestamps`; **#188 starts**) | stateful | low | ▶️ next | — |
 | **S4** | `ModelUnloader` (routing table; preserve L1) | stateful | med | ⬜ | S3 |
 | **S5** | `memory_pressure_guard` (gc/empty_cache/psutil) | stateful | low | ⬜ | — |
 | **S7** | `context_page_counts` (fold accounting) | pure | low | ⬜ | — |
@@ -76,8 +76,8 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | Issue | Title | Status |
 |---|---|---|
 | #186 | `calc_horizontal` → pluggable LineBreaker seam | seam extracted (`_greedy_pack`); #180 wiring pending |
-| #187 | MangaTranslator god object → stage orchestrators | in progress (S1 done; S2 next) |
-| #188 | model load/lifecycle + translator base abstractions | starts at S3 (interleaved early) |
+| #187 | MangaTranslator god object → stage orchestrators | in progress (S1+S2 done; S3 next) |
+| #188 | model load/lifecycle + translator base abstractions | starts at S3 (interleaved early) — ▶️ next |
 | #189 | glyph-render dedup (`put_char` h/v + stroke) | open (orthogonal, render) |
 | #190 | `resize_regions_to_font_size` + box-padding decompose | open (orthogonal, render) |
 | #191 | vendored LDM (~3000 LOC) + YOLOv5 trim | open — **investigate first**: is SD/LDM dead? |
