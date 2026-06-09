@@ -2,7 +2,9 @@
 
 > **Single entry point** for the MIT tech-debt decomposition. If context was lost, READ THIS FIRST,
 > then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
-> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S2–S11 merged via PR #195; S12 globals + S20 + S13 + S16 on a stack; AFK batch S19 next (last before core), then STOP before the high-risk core S15/S17/S18/S21–S26). Test baseline now 18 async-only failures (a stale uppercase-wiring test left by S2 was fixed in S13).
+> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S2–S11 merged via PR #195; **AFK batch done**: S12-globals + S20 + S13 + S16 + S19 on a stack (5 commits) — STOPPED before the high-risk core S15/S17/S18/S21–S26 per the dev's instruction. Test baseline 18 async-only failures (a stale uppercase-wiring test left by S2 was fixed in S13).
+>
+> **Remaining = the high-risk async-orchestration core** (needs E2E-per-step, not AFK): S15 stage-protocol (abstract groundwork), S17 TextTranslationDispatcher, S18 PostTranslationProcessor (pin L6/L8), S21 ModelLifecycle facade, S22 DispatchRegistry, S23 StageRunner, S24 PatchRenderer, S25 PipelineOrchestrator, S26 BatchModeOrchestrator (last). Plus S12 value-object (🔒 #192) and S14 VerboseDebugSink (🔒 S18).
 
 > **New latent bug found (preserve for now, fix later behind a flag):** `write_translations`
 > (was inline `--save-text`) opens the file with NO `encoding=`, so on a non-UTF-8 default
@@ -69,7 +71,7 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | **S21** | `ModelLifecycle` facade + preload (#188 facade) | async-orch | high | ⬜ | S20 |
 | **S17** | `TextTranslationDispatcher` (collapse duplicated switch) | async-orch | high | ⬜ | S6/S16,S11 |
 | **S18** | `PostTranslationProcessor` (unify 4 copies; pin L6/L8 as params) | async-orch | high | ⬜ | S1,S2,S8,S17 |
-| **S19** | `gather_per_context` (per-exception placeholder) | async-orch | med | ▶️ next (AFK, last before core) | S2 ✅ |
+| **S19** | `gather_per_context` (per-exception placeholder) | async-orch | med | ✅ | `gather_per_context.py` (gather + placeholder; last AFK seam) |
 | **S14** | `VerboseDebugSink` (cv2.imwrite/OCR-env/streaming) | stateful | med | ⬜ | S18 |
 | **S23** | `StageRunner` (uniform progress + try/except policy) | async-orch | high | ⬜ | S15,S11,S14 |
 | **S24** | `PatchRenderer` (extract `_process_group`; share.py:99 contract) | async-orch | med | ⬜ | S23 |
