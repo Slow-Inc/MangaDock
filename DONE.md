@@ -1249,3 +1249,11 @@ text_render._greedy_pack(words, word_widths, syllables, font_size, max_width, ws
 -> (line_words_list, line_width_list, hyphenation_idx_list). Steps 2-4 post-process its output unchanged.
 Byte-identical: 26 passed (characterization + guard + pure modules). This IS the #186 seam — #180 step 2
 now just adds a Knuth-Plass packer with the same signature + selects it behind a knob.
+
+## 2026-06-09 — #192 slice (a): extract TranslatorChain parsing (pure, tested)
+Pulled config.py's `# TODO: Refactor` TranslatorChain parse into manga_translator/translator_chain.py
+::parse_translator_chain(string, resolve_translator, valid_translators, valid_languages) — deps injected
+so it unit-tests with no translators/ML import. Wired TranslatorChain.__init__ to delegate; byte-identical
+(real-deps check: gemini:ENG → same chain/translators/langs/target_lang). Tests: test_translator_chain.py
+7 passed (single/multi/empty/unknown-name KeyError/disabled ValueError/unknown-lang ValueError + wiring).
+TODO marker resolved. Next #192 slices: dead fields, bare excepts, load_dotenv import side-effect.

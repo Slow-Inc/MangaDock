@@ -8,27 +8,19 @@ from typing import Optional, Any, Literal, List
 from omegaconf import OmegaConf
 from pydantic import BaseModel, Field
 
+from .translator_chain import parse_translator_chain
 
-# TODO: Refactor
+
 class TranslatorChain:
     def __init__(self, string: str):
         """
         Parses string in form 'trans1:lang1;trans2:lang2' into chains,
         which will be executed one after another when passed to the dispatch function.
         """
+        # #192: parsing extracted to the pure, unit-tested parse_translator_chain.
         from manga_translator.translators import TRANSLATORS, VALID_LANGUAGES
-        if not string:
-            raise Exception('Invalid translator chain')
-        self.chain = []
         self.target_lang = None
-        for g in string.split(';'):
-            trans, lang = g.split(':')
-            translator = Translator[trans]
-            if translator not in TRANSLATORS:
-                raise ValueError(f'Invalid choice: %s (choose from %s)' % (trans, ', '.join(map(repr, TRANSLATORS))))
-            if lang not in VALID_LANGUAGES:
-                raise ValueError(f'Invalid choice: %s (choose from %s)' % (lang, ', '.join(map(repr, VALID_LANGUAGES))))
-            self.chain.append((translator, lang))
+        self.chain = parse_translator_chain(string, lambda s: Translator[s], TRANSLATORS, VALID_LANGUAGES)
         self.translators, self.langs = list(zip(*self.chain))
 
     def has_offline(self) -> bool:
