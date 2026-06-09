@@ -1,0 +1,61 @@
+# MangaDock — System-Impact Change & Tech-Debt Report
+
+> Curated, report-level record of changes that **affect the running system** plus the **tech-debt
+> register**. Audience: team / stakeholders / status reports. The chronological dev log lives in
+> `DONE.md` (and `MIT/PIPELINE.md §5` for MIT internals); this file is the higher-level summary you
+> pull a report from. Append a dated section per significant batch; keep entries terse + linkable.
+
+---
+
+## 2026-06-09 — Render parity (MangaTranslator) + MIT tech-debt audit
+
+Branch: `feat/context-aware-translation`. All translation-render changes are **opt-in env knobs,
+byte-identical when unset** (no behaviour change unless explicitly enabled on the backend).
+
+### Shipped — translation render pipeline
+| Change | System impact | Knob | Tests |
+|---|---|---|---|
+| A · ALL-CAPS lettering | EN renders uppercase (manga convention) | `MIT_EN_UPPERCASE` | BE + MIT green |
+| B · EN font override | swap a heavier comic face for EN | `MIT_EN_FONT` | green |
+| C · Bubble-fill cap | text fills the balloon (raise the #175 0.5 cap) | `MIT_FONT_MAX_BOX_RATIO` | green |
+| #168 · SFX detection | detects + translates outside-bubble SFX via **AnimeText YOLO** (auto-download, gated repo) | `MIT_SFX_DETECTOR` | green; E2E `フッ→Hmph` |
+| #166/#170/#175/#179 | bubble area-fit, balloon seg, anti-overflow, safe-area narrow column | various | green |
+| #176/#181/#183 | EN comic font, 4× supersampling, dst-bounds clamp | various | green |
+| cache:reset tooling | clears the 3-layer translated-patch cache for debugging | `npm run cache:reset` | green |
+
+**Test totals:** MIT 42+ pure-module + Backend 66; render verified on the One Punch-Man benchmark page
+(`MIT/tools/ab_parity*.py`, `ab_sfx.py` → `*_montage.png`).
+
+### Key system findings (operational)
+- **Knob gating:** in-app render quality depends on the *full* MIT_* knob set on the backend;
+  `MIT_BUBBLE_AREA_FIT` gates the #166/#179 anti-overflow path. Missing it → legacy overflow render
+  (looked like a regression, was a config gap). See `.claude/memory/project_render_knob_gating.md`.
+- **AnimeText model is gated** (`deepghs/AnimeText_yolo`): auto-downloads via `HF_TOKEN` (MIT/.env,
+  loaded by `load_dotenv`); needed a one-click "Agree and access repository" on HF first.
+
+### Known gaps vs the MangaTranslator reference
+- Font weight still below CC Wild Words → needs a heavier font asset dropped in via `MIT_EN_FONT`.
+- Heavily-stylized SFX (`ぬ〜`) is **detected** but the 48px OCR can't read the hand-drawn glyph →
+  needs VLM-OCR (#172 upscale won't fix recognition). Detection path is ready.
+
+### Tech-debt register (MIT) — filed 2026-06-09, label `MIT`
+| Issue | Area | Sev | Status |
+|---|---|---|---|
+| #186 | `calc_horizontal` → pluggable LineBreaker seam | HIGH | **seam extracted** (in progress) |
+| #187 | `MangaTranslator` god object (~3,200 lines) → stage orchestrators + Context | HIGH | open |
+| #188 | model load/lifecycle + translator retry/config base abstractions (kill global `MODEL`) | HIGH | open |
+| #189 | glyph-render dedup (`put_char` h/v + stroke ~200 dup lines) | HIGH | open |
+| #190 | `resize_regions_to_font_size` + box-padding decomposition + constants | MED | open |
+| #191 | vendored LDM (~3000 LOC) + YOLOv5 trim (license + maintenance) | MED | open |
+| #192 | config centralize + cleanup (`load_dotenv` import side-effect, bare excepts, TranslatorChain TODO) | MED | open |
+| #193 | worker `--start-instance` lifecycle (5003/5004 orphan, PID, port collision) | MED | open |
+
+### Tech-debt progress
+- **#186:** built a 16-case characterization net (all language paths + rarely-hit branches), then
+  extracted `_split_words_and_widths`, `_split_into_syllables`, and the Step-1 greedy packer
+  `_greedy_pack(...)` — **byte-identical**. The pluggable line-break seam now exists → **#180 step 2**
+  (Knuth-Plass) is unblocked at the code level.
+
+### Commits
+`bc6902c` (render-parity + SFX) · `a9dd09b` (frontend/misc WIP) · `9739b9d` (Knuth-Plass pure module) ·
+`03bc6ae` (#180→#186 deferral note) · `fdfb297` · `15f132d` · `778d144` (#186 seam + net).
