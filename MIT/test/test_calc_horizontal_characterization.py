@@ -32,6 +32,25 @@ GOLDEN = [
      ['ทดสอบการตัด', 'บรรทัด', 'ภาษาไทยให้', 'พอดี']),
     ((36, "これはテストですよろしく", 180, 500, "ja_JP", True),
      ['これはテス', 'トですよろ', 'しく']),
+    # rarely-hit branches the seam extraction must preserve (per "test all scenarios" rule):
+    # height-overflow max_width expansion (small max_height)
+    ((40, "alpha beta gamma delta epsilon zeta eta theta iota", 150, 120, "en_US", True),
+     ['alpha beta gamma delta', 'epsilon zeta', 'eta theta iota']),
+    # max_width < 2*font_size clamp
+    ((40, "hello world wide", 30, 400, "en_US", True), ['hello', 'world', 'wide']),
+    # Step 2 backward hyphenation (lines > max_lines forces syllable moves)
+    ((40, "internationalization supercalifragilistic pneumonia", 220, 130, "en_US", True),
+     ['international', 'ization supe', 'rcalifragilistic', 'pneumonia']),
+    # leading / trailing / collapsed whitespace
+    ((40, "  spaced   out  ", 200, 400, "en_US", True), ['spaced out ']),
+    # mixed Latin + CJK in one string
+    ((40, "hello こんにちは world", 200, 400, "en_US", True), ['hello', 'こんにちは', 'world']),
+    # over-wide word char-split across many lines
+    ((40, "Pneumonoultramicroscopicsilicovolcanoconiosis", 120, 130, "en_US", True),
+     ['Pneumon', 'oultramicr', 'oscopicsil', 'icovolcan', 'oconiosis']),
+    # hyphenate disabled on an over-wide word
+    ((40, "Pneumonoultramicroscopicsilicovolcanoconiosis", 200, 400, "en_US", False),
+     ['Pneumono', 'ultramicros', 'copicsilico', 'volcanoco', 'niosis']),
 ]
 
 
