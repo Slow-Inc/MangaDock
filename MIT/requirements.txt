@@ -19,6 +19,7 @@ Pillow
 kornia
 backports.cached-property
 huggingface_hub
+ultralytics  # #170 bubble segmentation (YOLOv8-seg); AGPL-3.0
 transformers
 py3langid==0.2.2
 sentencepiece

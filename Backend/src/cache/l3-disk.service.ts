@@ -47,7 +47,9 @@ export class L3DiskService {
     try {
       const safeFileName = key.replace(/[:\\/*?"<>|]/g, '_');
       const filePath = path.join(this.cacheDir, `${safeFileName}.json`);
-      this.writeFile(filePath, JSON.stringify({ ...entry, key }, null, 2));
+      // Compact — these files are machine-read only; pretty-print cost ~25%
+      // extra bytes on every periodic flush (#147)
+      this.writeFile(filePath, JSON.stringify({ ...entry, key }));
       this.consecutiveWriteFailures = 0;
       this.criticalAlertFired = false;
     } catch (err) {

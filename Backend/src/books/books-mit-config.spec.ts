@@ -1,4 +1,19 @@
-import { BooksService } from './books.service';
+import { BooksService, parseJobKey } from './books.service';
+
+describe('parseJobKey', () => {
+  it('round-trips a plain chapterId', () => {
+    expect(parseJobKey('abc123:JPN:THA:default:hd')).toEqual({
+      chapterId: 'abc123', srcMIT: 'JPN', tgtMIT: 'THA', model: 'default', derivative: 'hd',
+    });
+  });
+
+  it('keeps the colon in a "ver:<uuid>" chapterId (right-split, #bug-hunt)', () => {
+    expect(parseJobKey('ver:752fc515-72ce-4890:ANY:ENG:gemini-2.5-pro:saver')).toEqual({
+      chapterId: 'ver:752fc515-72ce-4890',
+      srcMIT: 'ANY', tgtMIT: 'ENG', model: 'gemini-2.5-pro', derivative: 'saver',
+    });
+  });
+});
 
 /**
  * buildMitConfig is the single source of truth for the MIT pipeline config used
@@ -25,6 +40,16 @@ const ENV_KEYS = [
   'MIT_TEXT_THRESHOLD',
   'MIT_DET_INVERT',
   'MIT_DET_GAMMA_CORRECT',
+  'MIT_BUBBLE_SEG',
+  'MIT_FONT_SIZE_OFFSET',
+  'MIT_FONT_SIZE_MIN',
+  'MIT_BUBBLE_AREA_FIT',
+  'MIT_SFX_DETECTOR',
+  'MIT_EN_COMIC_FONT',
+  'MIT_SUPERSAMPLING',
+  'MIT_EN_UPPERCASE',
+  'MIT_FONT_MAX_BOX_RATIO',
+  'MIT_EN_FONT',
 ];
 
 describe('BooksService.buildMitConfig', () => {
@@ -101,6 +126,125 @@ describe('BooksService.buildMitConfig', () => {
     const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
     expect(cfg.ocr).toBeUndefined();
     expect(cfg.detector).toEqual({ detection_size: 2048 });
+  });
+
+  /** #170 bubble segmentation — opt-in; absent env leaves the config
+   *  byte-identical (guarded by the "#167 knobs unset" detector-shape test). */
+  it('enables bubble segmentation via MIT_BUBBLE_SEG (#170)', () => {
+    process.env.MIT_BUBBLE_SEG = '1';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.detector.det_bubble_seg).toBe(true);
+  });
+
+  it('omits det_bubble_seg unless MIT_BUBBLE_SEG is exactly "1" (#170)', () => {
+    process.env.MIT_BUBBLE_SEG = '0';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.detector.det_bubble_seg).toBeUndefined();
+  });
+
+  /** #166 font-size fidelity — the renderer's auto floor is (img.h+img.w)/200,
+   *  which in patch mode is computed from the tiny crop → uniformly small text.
+   *  Expose the existing MIT render knobs so an operator can raise the floor /
+   *  offset; absent env = render block unchanged. */
+  it('exposes render font-size knobs via env (#166)', () => {
+    process.env.MIT_FONT_SIZE_MIN = '24';
+    process.env.MIT_FONT_SIZE_OFFSET = '4';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.render.font_size_minimum).toBe(24);
+    expect(cfg.render.font_size_offset).toBe(4);
+  });
+
+  it('enables the comic EN font + supersampling via env (#176/#181)', () => {
+    process.env.MIT_EN_COMIC_FONT = '1';
+    process.env.MIT_SUPERSAMPLING = '4';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'ENG', ''));
+    expect(cfg.render.en_comic_font).toBe(true);
+    expect(cfg.render.supersampling).toBe(4);
+  });
+
+  it('omits en_comic_font + supersampling when env is unset — render unchanged (#176/#181)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'ENG', ''));
+    expect(cfg.render.en_comic_font).toBeUndefined();
+    expect(cfg.render.supersampling).toBeUndefined();
+  });
+
+  /** Render-parity gap A (MangaTranslator pipeline.py:1375 `text.upper()`): manga
+   *  lettering is ALL-CAPS. The MIT renderer already honors render.uppercase
+   *  (manga_translator.py:1125); expose it as an opt-in knob. */
+  it('enables ALL-CAPS lettering via MIT_EN_UPPERCASE (#parity-A)', () => {
+    process.env.MIT_EN_UPPERCASE = '1';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'ENG', ''));
+    expect(cfg.render.uppercase).toBe(true);
+  });
+
+  it('omits uppercase when MIT_EN_UPPERCASE is unset — render unchanged (#parity-A)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'ENG', ''));
+    expect(cfg.render.uppercase).toBeUndefined();
+  });
+
+  /** Render-parity gap C: raise the #175 font cap (0.5·balloon height) so text
+   *  fills the bubble like MangaTranslator. Fraction in (0,1]; absent → unchanged. */
+  it('raises the bubble-fit font cap via MIT_FONT_MAX_BOX_RATIO (#parity-C)', () => {
+    process.env.MIT_FONT_MAX_BOX_RATIO = '0.8';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'ENG', ''));
+    expect(cfg.render.font_max_box_ratio).toBe(0.8);
+  });
+
+  it('omits font_max_box_ratio when unset or out of (0,1] — render unchanged (#parity-C)', () => {
+    process.env.MIT_FONT_MAX_BOX_RATIO = '1.5'; // out of range
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'ENG', ''));
+    expect(cfg.render.font_max_box_ratio).toBeUndefined();
+  });
+
+  /** Render-parity gap B: override the EN face by filename (MangaTranslator BYO
+   *  font) for a heavier comic weight. Absent → unchanged. */
+  it('overrides the EN font via MIT_EN_FONT (#parity-B)', () => {
+    process.env.MIT_EN_FONT = 'anime_ace_3.ttf';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'ENG', ''));
+    expect(cfg.render.en_font).toBe('anime_ace_3.ttf');
+  });
+
+  it('omits en_font when MIT_EN_FONT is unset — render unchanged (#parity-B)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'ENG', ''));
+    expect(cfg.render.en_font).toBeUndefined();
+  });
+
+  it('omits render font-size knobs when unset — render block unchanged (#166)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.render.font_size_minimum).toBeUndefined();
+    expect(cfg.render.font_size_offset).toBeUndefined();
+  });
+
+  it('enables bubble area-fit font sizing via MIT_BUBBLE_AREA_FIT (#166)', () => {
+    process.env.MIT_BUBBLE_AREA_FIT = '1';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.render.bubble_area_fit).toBe(true);
+  });
+
+  it('omits bubble_area_fit unless MIT_BUBBLE_AREA_FIT is "1" (#166)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.render.bubble_area_fit).toBeUndefined();
+  });
+
+  it('enables the SFX detector via MIT_SFX_DETECTOR (#168)', () => {
+    process.env.MIT_SFX_DETECTOR = '1';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.detector.det_sfx).toBe(true);
   });
 
   it('carries series_context to the translator when provided (#157)', () => {

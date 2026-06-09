@@ -13,19 +13,17 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
   const [isOpen, setIsOpen] = useState(false);
   const [renderPanel, setRenderPanel] = useState(false);
   const [dropUp, setDropUp] = useState(false);
-  const [search, setSearch] = useState("");
+
+  const labelForValue = useCallback((v: string) => {
+    const current = COUNTRIES.find(c => c.label === v || c.code === v);
+    return current ? current.label : v;
+  }, []);
+
+  const [search, setSearch] = useState(() => labelForValue(value));
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
   const openFrameRef = useRef<number | null>(null);
-
-  // Initialize search with current label if found
-  useEffect(() => {
-    if (!isOpen) {
-      const current = COUNTRIES.find(c => c.label === value || c.code === value);
-      setSearch(current ? current.label : value);
-    }
-  }, [value, isOpen]);
 
   const filtered = COUNTRIES.filter(c => 
     c.label.toLowerCase().includes(search.toLowerCase()) || 
@@ -35,36 +33,39 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
   const checkFlip = useCallback(() => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const dropdownHeight = 320; // matches max-h-80
+    const dropdownHeight = 320;
     const spaceBelow = window.innerHeight - rect.bottom;
     setDropUp(spaceBelow < dropdownHeight + 12);
   }, []);
 
+  const openDropdown = useCallback(() => {
+    checkFlip();
+    setRenderPanel(true);
+    openFrameRef.current = window.requestAnimationFrame(() => {
+      setIsOpen(true);
+      openFrameRef.current = null;
+    });
+  }, [checkFlip]);
+
+  const closeDropdown = useCallback((label?: string) => {
+    setIsOpen(false);
+    setSearch(label ?? labelForValue(value));
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => {
+      setRenderPanel(false);
+      closeTimerRef.current = null;
+    }, 200);
+  }, [labelForValue, value]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        closeDropdown();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Sync renderPanel with isOpen for exit transitions — EXACT logic from StudioSelect
-  useEffect(() => {
-    if (isOpen) {
-      if (closeTimerRef.current) {
-        window.clearTimeout(closeTimerRef.current);
-        closeTimerRef.current = null;
-      }
-      setRenderPanel(true);
-    } else if (renderPanel) {
-      closeTimerRef.current = window.setTimeout(() => {
-        setRenderPanel(false);
-        closeTimerRef.current = null;
-      }, 200);
-    }
-  }, [isOpen, renderPanel]);
+  }, [closeDropdown]);
 
   useEffect(() => {
     return () => {
@@ -81,24 +82,10 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
-            if (!isOpen) {
-              checkFlip();
-              setRenderPanel(true);
-              openFrameRef.current = window.requestAnimationFrame(() => {
-                setIsOpen(true);
-                openFrameRef.current = null;
-              });
-            }
+            if (!isOpen) openDropdown();
           }}
           onFocus={() => {
-            if (!isOpen) {
-              checkFlip();
-              setRenderPanel(true);
-              openFrameRef.current = window.requestAnimationFrame(() => {
-                setIsOpen(true);
-                openFrameRef.current = null;
-              });
-            }
+            if (!isOpen) openDropdown();
           }}
           placeholder={placeholder}
           className={`w-full rounded-xl border px-3 py-2.5 text-sm transition-all duration-200 ${
@@ -137,8 +124,7 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
                     type="button"
                     onClick={() => {
                       onChange(country.label);
-                      setSearch(country.label);
-                      setIsOpen(false);
+                      closeDropdown(country.label);
                     }}
                     className={`flex w-full items-center justify-between px-4 py-3 text-sm transition hover:bg-white/10 ${
                       isSelected ? "text-indigo-400" : "text-white/70 hover:text-white"
@@ -155,12 +141,12 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
               })
             ) : (
               <div className="px-3 py-4 text-center text-xs text-white/30">
-                ไม่พบข้อมูลประเทศ "{search}"
-                <button 
+                ไม่พบข้อมูลประเทศ &ldquo;{search}&rdquo;
+                <button
                   type="button"
                   onClick={() => {
                     onChange(search);
-                    setIsOpen(false);
+                    closeDropdown(search);
                   }}
                   className="block mx-auto mt-2 text-indigo-400 font-bold hover:underline"
                 >

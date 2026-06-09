@@ -1,3 +1,4 @@
+<!-- lang:en -->
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -32,24 +33,18 @@ If you write new memories during a session, update both `.claude/memory/` (for t
 
 ---
 
-## Dual-AI Workflow (Project-Specific)
+## Dev Notifications (agent → developer)
 
-You are the **Deep Reasoning Agent** in a Gemini + Claude system.
+Ping the developer when a long task finishes or needs a decision, so they aren't tied to the terminal:
 
-| File | Created by | Read by |
-|------|-----------|---------|
-| `PLAN.md` | Gemini G-1 | You (reference only) |
-| `CLAUDE_BRIEF.md` | Gemini G-4 | You (primary input) |
-| `PR_REVIEW_GEMINI.md` | Gemini G-2 | You (C-3 security only) |
-| `DONE.md` | You | Gemini (next pass) |
+```bash
+pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
+```
 
-**Hard rules:**
-- Always read `CLAUDE_BRIEF.md` before touching any code
-- Never modify files outside the scope listed in the brief
-- If `CLAUDE_BRIEF.md` does not exist → stop and tell the user to run Gemini G-4 first
-- After every task, update `DONE.md` (files modified, what changed, what was intentionally left alone, anything for Gemini to re-review)
+`scripts/notify.ps1` emits a real Windows toast (WinRT via Windows PowerShell 5.1 → Action Center → forwarded to phone by Phone Link). The built-in `PushNotification` tool reports "sent" but does **not** surface a toast on this Win11 + VS Code setup, so prefer the script. Notify on: task/`/tdd` cycle complete, needing a confirm (before closing issues / merging), or AFK batch done — not on routine sub-progress.
 
 ---
+
 
 ## Repository Structure
 
@@ -69,6 +64,7 @@ MangaDock/
 bun dev          # Start dev server on port 4000 (0.0.0.0)
 bun build        # Production build
 bun lint         # ESLint
+bun test         # Unit tests (bun:test — *.test.ts, excluded from tsconfig)
 ```
 
 ### Backend (`Backend/`)
@@ -82,7 +78,13 @@ npm run test:e2e      # End-to-end tests
 
 # Run a single test file
 npx jest src/forum/forum.service.spec.ts --no-coverage
+
+# Debug: wipe translated-patch caches so MIT re-translates from scratch
+npm run cache:reset              # delete for real (Redis + L3 disk + uploads/patches)
+npm run cache:reset -- --dry-run # list what would be deleted, touch nothing
 ```
+
+`cache:reset` clears only the `translate:manga-patches:*` namespace (forum/search/mangadex/glossary survive). Selection logic is unit-tested in `src/cache/translation-cache-reset.ts`. Run it before every E2E translation test, then restart the backend to clear the in-memory L1.
 
 ---
 
@@ -140,3 +142,149 @@ const safe = /^\s*(javascript|data|vbscript|file):/i.test(url.trim()) ? '#' : ur
 **DTOs with floats**: Use `@IsNumber({ maxDecimalPlaces: 2 })` + `@Type(() => Number)` instead of `@IsInt()` when drag/calculation inputs can produce floating-point values.
 
 **Forum post images**: Stored as `image_urls TEXT[]` in Supabase `forum_posts` table. Apply schema changes via Supabase MCP `apply_migration` — the `supabase-migration.sql` file is reference-only.
+<!-- lang:end -->
+
+<!-- lang:th -->
+# CLAUDE.md — แนวทางสำหรับ Claude Code
+
+ไฟล์นี้ให้คำแนะนำแก่ Claude Code (claude.ai/code) เมื่อทำงานกับโค้ดใน repository นี้
+
+---
+
+## Engineering North Star (ใช้กับทุก agent ทุกการเปลี่ยนแปลง)
+
+> **Logic ที่เรียบง่ายที่สุดที่ทำงานได้ · ดูแลรักษาง่าย · ยั่งยืนระยะยาว · performance ดี**
+
+ใช้งานอย่างเป็นรูปธรรม:
+
+- **ลบความซับซ้อนแทนที่จะค้ำมันไว้** ถ้าโค้ดส่วนไหนเปราะหรือ over-built ควรลบแล้วแทนด้วยของที่เรียบง่ายกว่า ดีกว่าเพิ่ม dependency หรือ layer เพื่อให้ยังรันได้ (เช่น GPT few-shot lookup ถูก simplify เป็น dict lookup ตรงๆ ลบ dependency `langcodes`/`language_data` ทิ้งเลยแทนที่จะลง)
+- **เลือก construct ที่เรียบง่ายที่สุดที่เพียงพอ** อย่าใช้เครื่องมือหนักกว่าปัญหาต้องการ (`set` แทน `asyncio.Event` เมื่อแค่ poll flag; function แทน class สำหรับ logic ที่ใช้ครั้งเดียว)
+- **แยกออกมาเพื่อ testability เมื่อคุ้มค่า** ย้าย logic เข้า module เล็กที่มี dependency น้อยเพื่อ unit test แยกได้ (เช่น `server/webhook.py` import เฉพาะ httpx/json/hmac และ test ใน <1s ไม่ต้องลาก ML stack 22s)
+- **เปลี่ยนแบบ Surgical** แตะเฉพาะที่ task ต้องการ; ตามสไตล์โค้ดรอบข้าง; ลบเฉพาะ orphan ที่ change ของตัวเองสร้างขึ้น
+- **Performance สำคัญด้วย** — แต่อย่าแลกความชัดเจนเพื่อ micro-optimization ที่ไม่มีผล optimize hot path, ส่วนที่เหลือให้เรียบง่าย
+
+เมื่อ design สองอย่างถูกต้องเท่ากัน ให้เลือกอันที่ผู้ดูแลในอนาคต (มนุษย์หรือ agent) จะเข้าใจได้เร็วที่สุดและมี moving parts น้อยที่สุด
+
+---
+
+## Project Memory (ทีมใช้ร่วมกัน)
+
+ไฟล์ memory อยู่ที่ `.claude/memory/` ใน repo นี้ — commit ไว้เพื่อให้สมาชิกทีมและ agent ทุกคนเริ่มด้วย context ครบ
+
+**ต้องอ่านทุกไฟล์ใน `.claude/memory/` ก่อนทำอะไรทุกครั้งที่เริ่ม session**
+
+`MEMORY.md` คือ index; แต่ละไฟล์ที่ link ไปคือ memory record (ประเภท user, feedback, project หรือ reference)
+
+ถ้าเขียน memory ใหม่ระหว่าง session ให้อัปเดตทั้ง `.claude/memory/` (สำหรับทีม) และ `~/.claude/projects/.../memory/` ของตัวเอง (สำหรับความต่อเนื่องส่วนตัว)
+
+---
+
+## Dev Notifications (agent → developer)
+
+แจ้งเตือน developer เมื่อ task ยาวเสร็จหรือต้องตัดสินใจ จะได้ไม่ต้องเฝ้า terminal:
+
+```bash
+pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
+```
+
+`scripts/notify.ps1` ยิง Windows toast จริง (WinRT ผ่าน Windows PowerShell 5.1 → Action Center → Phone Link ส่งต่อเข้ามือถือ) tool `PushNotification` ในตัวขึ้น "sent" แต่ **ไม่เด้ง** บนเครื่อง Win11 + VS Code นี้ จึงใช้ script แทน ยิงเมื่อ: จบ task/รอบ `/tdd`, ต้อง confirm (ก่อนปิด issue / merge), หรือ AFK เสร็จ — ไม่ใช่ progress ย่อยๆ
+
+---
+
+## โครงสร้าง Repository
+
+```
+MangaDock/
+├── Frontend/     # Next.js 16 + React 19 (port 4000)
+├── Backend/      # NestJS 11 (port 3001 / 4001)
+└── MIT/          # Python ML inference server (image translation)
+```
+
+---
+
+## คำสั่ง
+
+### Frontend (`Frontend/`)
+```bash
+bun dev          # Start dev server บน port 4000 (0.0.0.0)
+bun build        # Production build
+bun lint         # ESLint
+bun test         # Unit tests (bun:test — *.test.ts ถูก exclude จาก tsconfig)
+```
+
+### Backend (`Backend/`)
+```bash
+npm run start:dev     # Watch mode dev server
+npm run build         # Compile
+npm run lint          # ESLint + Prettier fix
+npm test              # Jest unit tests
+npm run test:cov      # Coverage report
+npm run test:e2e      # End-to-end tests
+
+# รัน test file เดียว
+npx jest src/forum/forum.service.spec.ts --no-coverage
+
+# Debug: ล้าง translated-patch cache เพื่อให้ MIT แปลใหม่จากศูนย์
+npm run cache:reset              # ลบจริง (Redis + L3 disk + uploads/patches)
+npm run cache:reset -- --dry-run # ดูว่าจะลบอะไร ไม่แตะของจริง
+```
+
+`cache:reset` ลบเฉพาะ namespace `translate:manga-patches:*` (forum/search/mangadex/glossary รอด) logic การเลือกถูก unit-test ใน `src/cache/translation-cache-reset.ts` รันก่อน test การแปล E2E ทุกครั้ง แล้ว restart backend เพื่อล้าง L1 in-memory
+
+---
+
+## สถาปัตยกรรม
+
+### Request Flow
+API call จาก browser ทั้งหมดเป็น relative (`/api/proxy/...`) และผ่าน Next.js catch-all route handler ที่ `Frontend/app/api/proxy/[...path]/route.ts` ซึ่ง proxy ฝั่ง server ไปยัง NestJS backend ทำให้ auth token ไม่โผล่ที่ network edge และใช้งานได้จากทุก host/IP
+
+Static assets (`/uploads/*`, `/img-cache/*`) ถูก rewrite ไปยัง backend ผ่าน `next.config.ts`
+
+### Auth
+- **Provider**: Supabase Auth (Google OAuth, Facebook OAuth, email/password)
+- **Frontend**: `AuthContext.tsx` expose `AppUser` (map จาก Supabase user) และ `showLoginPrompt()` ต้องใช้ `showLoginPrompt()` เสมอสำหรับ unauthenticated UI flow — ห้ามใช้ `alert()`
+- **Backend**: `AuthGuard` validate Bearer JWT จาก Supabase `TurnstileGuard` gate auth endpoint `HardwareIdMiddleware` ต้องการ header `X-Hardware-Id` บน chapter/upload route (zero-trust asset protection)
+
+### Frontend Caching (`Frontend/app/lib/apiCache.ts`)
+In-memory LRU (500 entries) พร้อม stale-while-revalidate pattern ข้อมูล Forum ใช้ `TTL.SHORT` (60s), search `TTL.MEDIUM` (5 min), quasi-static `TTL.LONG` (30 min) Invalidate ด้วย key หรือ tag `clearAllApiCache()` เรียกเมื่อ auth state เปลี่ยนเพื่อป้องกัน cross-user bleed
+
+### Real-Time (SSE)
+`ForumEventsService` (backend) publish event ไปยัง RxJS Subjects + Redis pub/sub channels (`forum:events`, `forum:feed`) Frontend consume ผ่าน hook `useForumStream` / `useFeedStream` ที่เชื่อมต่อกับ `/api/proxy/forum/posts/:id/stream` SSE ใช้ exponential backoff retry
+
+### Smooth Scroll
+`SmoothScrolling.tsx` ครอบทั้ง app ด้วย Lenis `root` instance global มันเรียก `lenis.scrollTo(0, { immediate: true })` ทุกครั้งที่ `pathname` เปลี่ยนเพื่อป้องกัน scroll position carry-over ใน Next.js shared layouts sidebar community มี `ReactLenis` instance local ของตัวเอง (ไม่ใช่ `root`)
+
+### Community Forum Layout
+`app/community/layout.tsx` เป็น persistent shared layout (รอดจาก page navigation) Navigation state (category filter, active manga) อยู่ใน URL query params ไม่ใช่ component state — sidebar อ่าน `useSearchParams()` และ `usePathname()` เพื่อ sync ข้ามหน้า Mobile ใช้ drawer ที่ trigger ด้วย custom window event `toggleMobileMenu`
+
+### Backend Modules (`Backend/src/`)
+| Module | หน้าที่ |
+|--------|---------|
+| `books` | Manga catalog, chapter pages, Google Books integration |
+| `forum` | Posts, comments, votes, SSE streaming, trending, profiles |
+| `upload` | Image uploads — MIME validated ด้วย `file-type` (magic bytes ไม่ใช่ extension) |
+| `wallet` | Coin balance และ transactions |
+| `unlock` | Chapter unlock (ต้องการ HWID + wallet debit, atomic) |
+| `users` | Profile management |
+| `versions` | App version delivery |
+| `cache` | Redis service wrapper (`RedisService`) |
+| `supabase` | Global `SupabaseService` singleton |
+| `common/storage` | `StorageProvider` interface (local disk หรือ S3-compatible) |
+
+### Patterns สำคัญและข้อควรระวัง
+
+**Spoiler blur**: ใช้ inline `style={{ filter: 'blur(4px)', transition: 'filter 0.5s ease' }}` — ห้ามใช้ Tailwind `blur-sm`/`blur-0` Tailwind blur ใช้ CSS custom properties `--tw-blur` ที่ browser ไม่ transition ได้อย่างน่าเชื่อถือ
+
+**Image XSS**: ก่อนใช้ URL ที่ user ระบุใน `<img src>` หรือ `<a href>` ตรวจสอบ:
+```ts
+const safe = /^\s*(javascript|data|vbscript|file):/i.test(url.trim()) ? '#' : url.trim();
+```
+
+**`<img>` vs `<Image>`**: ใช้ Next.js `<Image>` สำหรับรูปที่รู้ขนาดและ domain อยู่ใน allow-list ของ `next.config.ts` ใช้ `<img>` เฉพาะรูปที่ขนาด dynamic ซึ่ง container จัดการ layout
+
+**Modal animation**: ใช้ double `requestAnimationFrame` สำหรับ enter (รอให้ DOM paint ก่อนเพิ่ม visible class), `setTimeout` สำหรับ exit (รอ CSS transition ก่อน unmount)
+
+**DTOs with floats**: ใช้ `@IsNumber({ maxDecimalPlaces: 2 })` + `@Type(() => Number)` แทน `@IsInt()` เมื่อ drag/calculation input อาจได้ค่า floating-point
+
+**Forum post images**: เก็บเป็น `image_urls TEXT[]` ใน Supabase table `forum_posts` ใช้ Supabase MCP `apply_migration` สำหรับ schema change — ไฟล์ `supabase-migration.sql` เป็นแค่ reference
+<!-- lang:end -->

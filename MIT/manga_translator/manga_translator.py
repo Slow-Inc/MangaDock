@@ -13,7 +13,9 @@ import sys
 import traceback
 import numpy as np
 from PIL import Image
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Tuple
+from .region_filter import filter_translated_regions
+from .punctuation import correct_punctuation
 import py3langid as langid
 
 from .config import Config, Colorizer, Detector, Translator, Renderer, Inpainter
@@ -131,9 +133,7 @@ class MangaTranslator:
         self._add_logger_hook()
 
         params = params or {}
-        
-        self._batch_contexts = []  # 存储批量处理的上下文
-        self._batch_configs = []   # 存储批量处理的配置
+
         self.disable_memory_optimization = params.get('disable_memory_optimization', False)
         # batch_concurrent 会在 parse_init_params 中验证并设置
         self.batch_concurrent = params.get('batch_concurrent', False)
@@ -700,8 +700,37 @@ class MangaTranslator:
                                         config.detector.box_threshold,
                                         config.detector.unclip_ratio, config.detector.det_invert, config.detector.det_gamma_correct, config.detector.det_rotate,
                                         config.detector.det_auto_rotate,
-                                        self.device, self.verbose)        
+                                        self.device, self.verbose)
+        # #168: optional SFX/outside-bubble second pass (AnimeText YOLO). Boxes the
+        # primary detector missed are appended as empty textlines for OCR to read.
+        if config.detector.det_sfx:
+            result = self._merge_sfx_detections(ctx, result)
         return result
+
+    @staticmethod
+    def _textline_aabb(q) -> Tuple[float, float, float, float]:
+        xs, ys = q.pts[:, 0], q.pts[:, 1]
+        return (float(xs.min()), float(ys.min()), float(xs.max()), float(ys.max()))
+
+    def _merge_sfx_detections(self, ctx, result):
+        """#168: run the AnimeText SFX detector as a second pass and merge the boxes
+        the primary detector missed (IoA-deduped) as empty textlines, so stylized
+        SFX flow through OCR → translate → render like any dialogue line."""
+        from .sfx_detector import detect_sfx_boxes
+        from .sfx_merge import dedup_sfx_boxes
+        from .utils.generic import Quadrilateral
+        textlines, mask_raw, mask = result
+        sfx_boxes = detect_sfx_boxes(ctx.img_rgb, device=str(self.device or 'cuda'))
+        if not sfx_boxes:
+            return result
+        existing = [self._textline_aabb(t) for t in textlines]
+        fresh = dedup_sfx_boxes(existing, sfx_boxes)
+        for (x1, y1, x2, y2) in fresh:
+            pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
+            textlines.append(Quadrilateral(pts, '', 1.0))
+        logger.info(f"[SFXDetect] {len(sfx_boxes)} boxes, +{len(fresh)} new textlines "
+                    f"(deduped {len(sfx_boxes) - len(fresh)})")
+        return (textlines, mask_raw, mask)
 
     async def _unload_model(self, tool: str, model: str):
         logger.info(f"Unloading {tool} model: {model}")
@@ -1132,84 +1161,9 @@ class MangaTranslator:
                 region._direction = config.render.direction  
 
         # Punctuation correction logic. for translators often incorrectly change quotation marks from the source language to those commonly used in the target language.
-        check_items = [
-            # 圆括号处理
-            ["(", "（", "「", "【"],
-            ["（", "(", "「", "【"],
-            [")", "）", "」", "】"],
-            ["）", ")", "」", "】"],
-            
-            # 方括号处理
-            ["[", "［", "【", "「"],
-            ["［", "[", "【", "「"],
-            ["]", "］", "】", "」"],
-            ["］", "]", "】", "」"],
-            
-            # 引号处理
-            ["「", "“", "‘", "『", "【"],
-            ["」", "”", "’", "』", "】"],
-            ["『", "“", "‘", "「", "【"],
-            ["』", "”", "’", "」", "】"],
-            
-            # 新增【】处理
-            ["【", "(", "（", "「", "『", "["],
-            ["】", ")", "）", "」", "』", "]"],
-        ]
-
-        replace_items = [
-            ["「", "“"],
-            ["「", "‘"],
-            ["」", "”"],
-            ["」", "’"],
-            ["【", "["],  
-            ["】", "]"],  
-        ]
-
         for region in ctx.text_regions:
             if region.text and region.translation:
-                if '『' in region.text and '』' in region.text:
-                    quote_type = '『』'
-                elif '「' in region.text and '」' in region.text:
-                    quote_type = '「」'
-                elif '【' in region.text and '】' in region.text: 
-                    quote_type = '【】'
-                else:
-                    quote_type = None
-                
-                if quote_type:
-                    src_quote_count = region.text.count(quote_type[0])
-                    dst_dquote_count = region.translation.count('"')
-                    dst_fwquote_count = region.translation.count('＂')
-                    
-                    if (src_quote_count > 0 and
-                        (src_quote_count == dst_dquote_count or src_quote_count == dst_fwquote_count) and
-                        not region.translation.isascii()):
-                        
-                        if quote_type == '「」':
-                            region.translation = re.sub(r'"([^"]*)"', r'「\1」', region.translation)
-                        elif quote_type == '『』':
-                            region.translation = re.sub(r'"([^"]*)"', r'『\1』', region.translation)
-                        elif quote_type == '【】':  
-                            region.translation = re.sub(r'"([^"]*)"', r'【\1】', region.translation)
-
-                # === 优化后的数量判断逻辑 ===
-                # === Optimized quantity judgment logic ===
-                for v in check_items:
-                    num_src_std = region.text.count(v[0])
-                    num_src_var = sum(region.text.count(t) for t in v[1:])
-                    num_dst_std = region.translation.count(v[0])
-                    num_dst_var = sum(region.translation.count(t) for t in v[1:])
-                    
-                    if (num_src_std > 0 and
-                        num_src_std != num_src_var and
-                        num_src_std == num_dst_std + num_dst_var):
-                        for t in v[1:]:
-                            region.translation = region.translation.replace(t, v[0])
-
-                # 强制替换规则
-                # Forced replacement rules
-                for v in replace_items:
-                    region.translation = region.translation.replace(v[1], v[0])
+                region.translation = correct_punctuation(region.text, region.translation)
 
         # 注意：翻译结果的保存移动到了翻译流程的最后，确保保存的是最终结果而不是重试前的结果
 
@@ -1332,33 +1286,7 @@ class MangaTranslator:
                 logger.warning("Some translation regions failed post-translation check.")
 
         # 过滤逻辑（简化版本，保留主要过滤条件）
-        new_text_regions = []
-        for region in ctx.text_regions:
-            should_filter = False
-            filter_reason = ""
-
-            if not region.translation.strip():
-                should_filter = True
-                filter_reason = "Translation contain blank areas"
-            elif config.translator.translator != Translator.none:
-                if region.translation.isnumeric():
-                    should_filter = True
-                    filter_reason = "Numeric translation"
-                elif config.filter_text and re.search(config.re_filter_text, region.translation):
-                    should_filter = True
-                    filter_reason = f"Matched filter text: {config.filter_text}"
-                elif not config.translator.translator == Translator.original:
-                    text_equal = region.text.lower().strip() == region.translation.lower().strip()
-                    if text_equal:
-                        should_filter = True
-                        filter_reason = "Translation identical to original"
-
-            if should_filter:
-                if region.translation.strip():
-                    logger.info(f'Filtered out: {region.translation}')
-                    logger.info(f'Reason: {filter_reason}')
-            else:
-                new_text_regions.append(region)
+        new_text_regions = filter_translated_regions(ctx.text_regions, config)
 
         return new_text_regions
 
@@ -1372,21 +1300,47 @@ class MangaTranslator:
         return await dispatch_inpainting(config.inpainter.inpainter, ctx.img_rgb, ctx.mask, config.inpainter, config.inpainter.inpainting_size, self.device,
                                          self.verbose)
 
+    def _render_font_path(self, config: Config, target_lang: str) -> str:
+        """#176: Latin/EN targets render in the bundled comic font when enabled;
+        everything else keeps the worker font (Prompt-Bold for Thai, CJK fallbacks).
+        Off (or font missing) → ``self.font_path`` (byte-identical).
+
+        Render-parity B: ``render.en_font`` overrides the EN face by filename so a
+        heavier comic font (e.g. a CC Wild Words-style face) can be dropped into
+        ``fonts/`` — MangaTranslator's BYO-font approach. Takes precedence over the
+        bundled comic font; missing file → falls through to the prior behavior."""
+        if target_lang in ('ENG',):
+            fonts_dir = os.path.join(os.path.dirname(__file__), '..', 'fonts')
+            if config.render.en_font:
+                override = os.path.normpath(os.path.join(fonts_dir, config.render.en_font))
+                if os.path.isfile(override):
+                    return override
+            if config.render.en_comic_font:
+                comic = os.path.normpath(os.path.join(fonts_dir, 'comic shanns 2.ttf'))
+                if os.path.isfile(comic):
+                    return comic
+        return self.font_path
+
     async def _run_text_rendering(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_timestamps[("rendering", config.render.renderer)] = current_time
+        font_path = self._render_font_path(
+            config, ctx.text_regions[0].target_lang if ctx.text_regions else '')
         if config.render.renderer == Renderer.none:
             output = ctx.img_inpainted
         # manga2eng currently only supports horizontal left to right rendering
         elif (config.render.renderer == Renderer.manga2Eng or config.render.renderer == Renderer.manga2EngPillow) and ctx.text_regions and LANGUAGE_ORIENTATION_PRESETS.get(ctx.text_regions[0].target_lang) == 'h':
             if config.render.renderer == Renderer.manga2EngPillow:
-                output = await dispatch_eng_render_pillow(ctx.img_inpainted, ctx.img_rgb, ctx.text_regions, self.font_path, config.render.line_spacing)
+                output = await dispatch_eng_render_pillow(ctx.img_inpainted, ctx.img_rgb, ctx.text_regions, font_path, config.render.line_spacing)
             else:
-                output = await dispatch_eng_render(ctx.img_inpainted, ctx.img_rgb, ctx.text_regions, self.font_path, config.render.line_spacing)
+                output = await dispatch_eng_render(ctx.img_inpainted, ctx.img_rgb, ctx.text_regions, font_path, config.render.line_spacing)
         else:
-            output = await dispatch_rendering(ctx.img_inpainted, ctx.text_regions, self.font_path, config.render.font_size,
+            output = await dispatch_rendering(ctx.img_inpainted, ctx.text_regions, font_path, config.render.font_size,
                                               config.render.font_size_offset,
-                                              config.render.font_size_minimum, not config.render.no_hyphenation, ctx.render_mask, config.render.line_spacing)
+                                              config.render.font_size_minimum, not config.render.no_hyphenation, ctx.render_mask, config.render.line_spacing,
+                                              bubble_fit=config.render.bubble_area_fit,
+                                              supersampling=config.render.supersampling,
+                                              font_max_box_ratio=config.render.font_max_box_ratio)
         return output
 
     def _result_path(self, path: str) -> str:
@@ -1886,6 +1840,18 @@ class MangaTranslator:
         local_region.lines[..., 1] -= y_offset
         local_region._bounding_rect = None
 
+        # #166: the balloon box (#170) is in page coords — shift it into the crop
+        # so area-driven sizing compares it against the local textline box.
+        bb = getattr(local_region, 'bubble_box', None)
+        if bb is not None:
+            local_region.bubble_box = (bb[0] - x_offset, bb[1] - y_offset,
+                                       bb[2] - x_offset, bb[3] - y_offset)
+        # #179: shift the balloon polygon into crop coords too (used to rasterize
+        # the interior mask for narrow-column wrapping).
+        poly = getattr(local_region, 'bubble_polygon', None)
+        if poly is not None:
+            local_region.bubble_polygon = [(px - x_offset, py - y_offset) for px, py in poly]
+
         for key in [
             'xyxy', 'xywh', 'center', 'unrotated_polygons', 'unrotated_min_rect',
             'min_rect', 'polygon_aspect_ratio', 'unrotated_size', 'aspect_ratio',
@@ -1976,57 +1942,55 @@ class MangaTranslator:
         cropped_mask[cropped_mask > 0] = 255
         return cropped_mask.astype(np.uint8)
 
-    def _group_nearby_regions(self, regions: List[Any], pad: int, img_w: int, img_h: int) -> List[List[Any]]:
-        """Group text regions whose padded bounding boxes overlap or touch.
+    def _tag_regions_with_bubbles(self, ctx, regions: List[Any]) -> None:
+        """#170: detect speech balloons and tag each region with the balloon
+        containing it (``region.bubble_idx`` + ``region.bubble_box``), so
+        grouping is balloon-aware and #166 can size text to the balloon.
 
-        Regions that would produce overlapping patches are merged into a single
-        group so they share one crop, preventing rendered text from stacking.
-        Uses a union-find approach: if two padded boxes intersect, they belong
-        to the same group.
+        Best-effort: any failure (or no balloons) leaves regions untagged and
+        the pipeline behaves exactly as if the stage were off.
         """
-        n = len(regions)
-        if n == 0:
+        from .bubble_detector import detect_bubbles
+        from .bubble_association import associate_regions_to_bubbles
+
+        polygons = detect_bubbles(ctx.img_rgb, device=str(self.device or 'cuda'))
+        if not polygons:
+            logger.info('[BubbleSeg] no balloons detected — proximity grouping')
+            return
+        boxes = [tuple(map(float, r.xyxy)) for r in regions]
+        assoc = associate_regions_to_bubbles(boxes, polygons)
+        tagged = 0
+        for r, idx in zip(regions, assoc):
+            r.bubble_idx = idx
+            if idx is not None:
+                poly = polygons[idx]
+                xs = [p[0] for p in poly]
+                ys = [p[1] for p in poly]
+                r.bubble_box = (min(xs), min(ys), max(xs), max(ys))
+                # #179: carry the balloon polygon so the renderer can wrap to the
+                # mask's true interior (narrow column), not the bounding box.
+                r.bubble_polygon = [(float(p[0]), float(p[1])) for p in poly]
+                tagged += 1
+        logger.info(f'[BubbleSeg] {len(polygons)} balloons, '
+                    f'{tagged}/{len(regions)} regions tagged')
+
+    def _group_nearby_regions(self, regions: List[Any], pad: int, img_w: int, img_h: int) -> List[List[Any]]:
+        """Group text regions that should share one render crop.
+
+        Delegates the union-find to the pure, unit-tested ``group_regions``
+        helper. When regions carry a ``bubble_idx`` (#170, stage on) grouping
+        becomes balloon-aware — adjacent caption boxes in different balloons no
+        longer collapse into one strip, and a multi-line balloon stays one
+        group. With no ``bubble_idx`` it is the legacy pure-proximity grouping.
+        """
+        from .bubble_association import group_regions
+
+        if not regions:
             return []
-
-        # Compute padded bboxes
-        boxes = []
-        for r in regions:
-            rx1, ry1, rx2, ry2 = map(int, r.xyxy)
-            boxes.append((
-                max(0, rx1 - pad),
-                max(0, ry1 - pad),
-                min(img_w, rx2 + pad),
-                min(img_h, ry2 + pad),
-            ))
-
-        parent = list(range(n))
-
-        def find(i: int) -> int:
-            while parent[i] != i:
-                parent[i] = parent[parent[i]]
-                i = parent[i]
-            return i
-
-        def union(i: int, j: int) -> None:
-            ri, rj = find(i), find(j)
-            if ri != rj:
-                parent[ri] = rj
-
-        for i in range(n):
-            ax1, ay1, ax2, ay2 = boxes[i]
-            for j in range(i + 1, n):
-                bx1, by1, bx2, by2 = boxes[j]
-                # Intersect if not separated on either axis
-                if ax2 > bx1 and bx2 > ax1 and ay2 > by1 and by2 > ay1:
-                    union(i, j)
-
-        # Build groups indexed by root
-        from collections import defaultdict
-        group_map: dict = defaultdict(list)
-        for i in range(n):
-            group_map[find(i)].append(regions[i])
-
-        return list(group_map.values())
+        boxes = [tuple(map(int, r.xyxy)) for r in regions]
+        bubble_idxs = [getattr(r, 'bubble_idx', None) for r in regions]
+        index_groups = group_regions(boxes, bubble_idxs, pad, img_w, img_h)
+        return [[regions[i] for i in group] for group in index_groups]
 
     def reset_page_context(self) -> None:
         """Drop the cross-page translation context.
@@ -2075,6 +2039,15 @@ class MangaTranslator:
         if not regions:
             return {'img_width': img_w, 'img_height': img_h, 'patches': [], 'regions': []}
 
+        # Bubble segmentation (#170): tag each region with its speech balloon so
+        # grouping stays within balloons (no cross-balloon clumps). Opt-in via
+        # detector.det_bubble_seg; untagged regions group by proximity as before.
+        if config.detector.det_bubble_seg:
+            try:
+                self._tag_regions_with_bubbles(ctx, regions)
+            except Exception:
+                logger.warning(f"[BubbleSeg] tagging failed:\n{traceback.format_exc()}")
+
         await self._report_progress('mask-generation')
         await self._report_progress('inpainting')
         await self._report_progress('rendering')
@@ -2109,6 +2082,18 @@ class MangaTranslator:
                 y1 = max(0, gy1 - render_extra)
                 x2 = min(img_w, gx2 + render_extra)
                 y2 = min(img_h, gy2 + render_extra)
+
+                # #166: grow the crop to cover any balloon in this group. The crop
+                # is sized to text-lines (+pad+render_extra); a balloon larger than
+                # its text-lines would overflow it, and the balloon-sized fitted
+                # text (set in the renderer) would render clipped at the patch edge.
+                if config.render.bubble_area_fit:
+                    from .bubble_association import union_box
+                    expanded = union_box(
+                        [(x1, y1, x2, y2)] + [getattr(r, 'bubble_box', None) for r in group],
+                        img_w, img_h)
+                    if expanded is not None:
+                        x1, y1, x2, y2 = expanded
 
                 if x2 <= x1 or y2 <= y1:
                     return None
@@ -2361,33 +2346,7 @@ class MangaTranslator:
                 # 过滤逻辑（简化版本，保留主要过滤条件）
                 for ctx, config in batch:
                     if ctx.text_regions:
-                        new_text_regions = []
-                        for region in ctx.text_regions:
-                            should_filter = False
-                            filter_reason = ""
-
-                            if not region.translation.strip():
-                                should_filter = True
-                                filter_reason = "Translation contain blank areas"
-                            elif config.translator.translator != Translator.none:
-                                if region.translation.isnumeric():
-                                    should_filter = True
-                                    filter_reason = "Numeric translation"
-                                elif config.filter_text and re.search(config.re_filter_text, region.translation):
-                                    should_filter = True
-                                    filter_reason = f"Matched filter text: {config.filter_text}"
-                                elif not config.translator.translator == Translator.original:
-                                    text_equal = region.text.lower().strip() == region.translation.lower().strip()
-                                    if text_equal:
-                                        should_filter = True
-                                        filter_reason = "Translation identical to original"
-
-                            if should_filter:
-                                if region.translation.strip():
-                                    logger.info(f'Filtered out: {region.translation}')
-                                    logger.info(f'Reason: {filter_reason}')
-                            else:
-                                new_text_regions.append(region)
+                        new_text_regions = filter_translated_regions(ctx.text_regions, config)
                         ctx.text_regions = new_text_regions
                         
                 results.extend(batch)
@@ -2531,33 +2490,7 @@ class MangaTranslator:
                 
                 # 过滤逻辑
                 if ctx.text_regions:
-                    new_text_regions = []
-                    for region in ctx.text_regions:
-                        should_filter = False
-                        filter_reason = ""
-
-                        if not region.translation.strip():
-                            should_filter = True
-                            filter_reason = "Translation contain blank areas"
-                        elif config.translator.translator != Translator.none:
-                            if region.translation.isnumeric():
-                                should_filter = True
-                                filter_reason = "Numeric translation"
-                            elif config.filter_text and re.search(config.re_filter_text, region.translation):
-                                should_filter = True
-                                filter_reason = f"Matched filter text: {config.filter_text}"
-                            elif not config.translator.translator == Translator.original:
-                                text_equal = region.text.lower().strip() == region.translation.lower().strip()
-                                if text_equal:
-                                    should_filter = True
-                                    filter_reason = "Translation identical to original"
-
-                        if should_filter:
-                            if region.translation.strip():
-                                logger.info(f'Filtered out: {region.translation}')
-                                logger.info(f'Reason: {filter_reason}')
-                        else:
-                            new_text_regions.append(region)
+                    new_text_regions = filter_translated_regions(ctx.text_regions, config)
                     ctx.text_regions = new_text_regions
                 
                 return ctx, config
@@ -2755,83 +2688,9 @@ class MangaTranslator:
         if not ctx.text_regions:
             return []
             
-        check_items = [
-            # 圆括号处理
-            ["(", "（", "「", "【"],
-            ["（", "(", "「", "【"],
-            [")", "）", "」", "】"],
-            ["）", ")", "」", "】"],
-            
-            # 方括号处理
-            ["[", "［", "【", "「"],
-            ["［", "[", "【", "「"],
-            ["]", "］", "】", "」"],
-            ["］", "]", "】", "」"],
-            
-            # 引号处理
-            ["「", "“", "‘", "『", "【"],
-            ["」", "”", "’", "』", "】"],
-            ["『", "“", "‘", "「", "【"],
-            ["』", "”", "’", "」", "】"],
-            
-            # 新增【】处理
-            ["【", "(", "（", "「", "『", "["],
-            ["】", ")", "）", "」", "』", "]"],
-        ]
-
-        replace_items = [
-            ["「", "“"],
-            ["「", "‘"],
-            ["」", "”"],
-            ["」", "’"],
-            ["【", "["],  
-            ["】", "]"],  
-        ]
-
         for region in ctx.text_regions:
             if region.text and region.translation:
-                # 引号处理逻辑
-                if '『' in region.text and '』' in region.text:
-                    quote_type = '『』'
-                elif '「' in region.text and '」' in region.text:
-                    quote_type = '「」'
-                elif '【' in region.text and '】' in region.text: 
-                    quote_type = '【】'
-                else:
-                    quote_type = None
-                
-                if quote_type:
-                    src_quote_count = region.text.count(quote_type[0])
-                    dst_dquote_count = region.translation.count('"')
-                    dst_fwquote_count = region.translation.count('＂')
-                    
-                    if (src_quote_count > 0 and
-                        (src_quote_count == dst_dquote_count or src_quote_count == dst_fwquote_count) and
-                        not region.translation.isascii()):
-                        
-                        if quote_type == '「」':
-                            region.translation = re.sub(r'"([^"]*)"', r'「\1」', region.translation)
-                        elif quote_type == '『』':
-                            region.translation = re.sub(r'"([^"]*)"', r'『\1』', region.translation)
-                        elif quote_type == '【】':  
-                            region.translation = re.sub(r'"([^"]*)"', r'【\1】', region.translation)
-
-                # 括号修正逻辑
-                for v in check_items:
-                    num_src_std = region.text.count(v[0])
-                    num_src_var = sum(region.text.count(t) for t in v[1:])
-                    num_dst_std = region.translation.count(v[0])
-                    num_dst_var = sum(region.translation.count(t) for t in v[1:])
-                    
-                    if (num_src_std > 0 and
-                        num_src_std != num_src_var and
-                        num_src_std == num_dst_std + num_dst_var):
-                        for t in v[1:]:
-                            region.translation = region.translation.replace(t, v[0])
-
-                # 强制替换规则
-                for v in replace_items:
-                    region.translation = region.translation.replace(v[1], v[0])
+                region.translation = correct_punctuation(region.text, region.translation)
 
         # 注意：翻译结果的保存移动到了translate方法的最后，确保保存的是最终结果
 
@@ -2985,105 +2844,16 @@ class MangaTranslator:
         检查文本是否包含重复内容（模型幻觉）
         Check if the text contains repetitive content (model hallucination)
         """
-        if not text or len(text.strip()) < threshold:
-            return False
-            
-        # 检查字符级重复
-        consecutive_count = 1
-        prev_char = None
-        
-        for char in text:
-            if char == prev_char:
-                consecutive_count += 1
-                if consecutive_count >= threshold:
-                    if not silent:
-                        logger.warning(f'Detected character repetition hallucination: "{text}" - repeated character: "{char}", consecutive count: {consecutive_count}')
-                    return True
-            else:
-                consecutive_count = 1
-            prev_char = char
-        
-        # 检查词语级重复（按字符分割中文，按空格分割其他语言）
-        segments = re.findall(r'[\u4e00-\u9fff]|\S+', text)
-        
-        if len(segments) >= threshold:
-            consecutive_segments = 1
-            prev_segment = None
-            
-            for segment in segments:
-                if segment == prev_segment:
-                    consecutive_segments += 1
-                    if consecutive_segments >= threshold:
-                        if not silent:
-                            logger.warning(f'Detected word repetition hallucination: "{text}" - repeated segment: "{segment}", consecutive count: {consecutive_segments}')
-                        return True
-                else:
-                    consecutive_segments = 1
-                prev_segment = segment
-        
-        # 检查短语级重复
-        words = text.split()
-        if len(words) >= threshold * 2:
-            for i in range(len(words) - threshold + 1):
-                phrase = ' '.join(words[i:i + threshold//2])
-                remaining_text = ' '.join(words[i + threshold//2:])
-                if phrase in remaining_text:
-                    phrase_count = text.count(phrase)
-                    if phrase_count >= 3:  # 降低短语重复检测阈值
-                        if not silent:
-                            logger.warning(f'Detected phrase repetition hallucination: "{text}" - repeated phrase: "{phrase}", occurrence count: {phrase_count}')
-                        return True
-                        
-        return False
+        # #187: logic extracted to the pure, unit-tested translation_checks module.
+        from .translation_checks import check_repetition_hallucination
+        return check_repetition_hallucination(text, threshold, silent)
 
     async def _check_target_language_ratio(self, text_regions: List, target_lang: str, min_ratio: float = 0.5) -> bool:
-        """
-        检查翻译结果中目标语言文字的占比是否达到要求
-        Check whether enough of the merged translation is actually written in the
-        target language's script.
-
-        Uses a target-script character ratio (manga_translator.utils.lang_ratio)
-        instead of a single ``langid`` classification of the merged text: a few
-        deliberately-untranslated tokens (sound effects, scanlation credits) no
-        longer flip an otherwise-correct page to FAILED. See Issue #109.
-
-        The decision of *when* to run this check (how many regions warrant it)
-        belongs to the caller — this function is a pure verdict over whatever
-        regions it is given.
-
-        Args:
-            text_regions: 文本区域列表
-            target_lang: 目标语言代码
-            min_ratio: 目标语言文字的最小占比（默认 0.5）
-
-        Returns:
-            bool: True表示通过检查，False表示未通过
-        """
-        if not text_regions:
-            return True
-
-        # 合并所有翻译文本
-        all_translations = []
-        for region in text_regions:
-            translation = getattr(region, 'translation', '')
-            if translation and translation.strip():
-                all_translations.append(translation.strip())
-
-        if not all_translations:
-            logger.debug('No valid translation texts for language ratio check')
-            return True
-
-        merged_text = ''.join(all_translations)
-        ratio = target_script_ratio(merged_text, target_lang)
-        passed = ratio >= min_ratio
-
-        if not passed:
-            logger.warning(
-                f'Target language ratio check FAILED: only {ratio:.2f} of the '
-                f'translated text is in "{target_lang.upper()}" script '
-                f'(need >= {min_ratio:.2f})'
-            )
-        return passed
+        """Pure verdict (Issue #109): is enough of the merged translation written in
+        target_lang's script? Logic extracted to the unit-tested
+        translation_checks.check_target_language_ratio (#187)."""
+        from .translation_checks import check_target_language_ratio
+        return check_target_language_ratio(text_regions, target_lang, target_script_ratio, min_ratio)
 
     async def _validate_translation(self, original_text: str, translation: str, target_lang: str, config, ctx: Context = None, silent: bool = False, page_lang_check_result: bool = None) -> bool:
         """

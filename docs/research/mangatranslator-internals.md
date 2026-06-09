@@ -4,6 +4,8 @@
 > สำรวจ 2026-06-08 จาก clone ที่ `/MangaTranslator` (gitignored, Apache-2.0). อ่านโค้ดจริงทุกบรรทัด 6 ระบบขนานกัน
 > เอกสารนี้คือ **companion เชิงลึก** ของ [`mangatranslator-study.md`](mangatranslator-study.md) (ตัวนั้นเป็น executive summary) — ตัวนี้เก็บ algorithm/constant/formula ระดับ reimplement ได้
 > รายละเอียด file:line ครบในส่วนภาษาอังกฤษด้านล่าง
+>
+> **รอบ 2 (2026-06-08):** อ่านซ้ำทั้ง 33K LOC ด้วย 5 agent ขนาน เจอเทคนิค/ค่าคงที่ที่รอบนี้พลาด → ดู [`mangatranslator-round2-deep.md`](mangatranslator-round2-deep.md) (สูตร binary-search ครบ, edge feathering, emphasis Giongo/Gitaigo, solid-bg flat-fill, min-128 upscale, determinism-gate cache, ฯลฯ)
 
 ## ภาพรวม pipeline เขา (เทียบของเรา)
 

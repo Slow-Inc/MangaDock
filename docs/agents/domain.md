@@ -1,3 +1,4 @@
+<!-- lang:en -->
 # Domain Docs
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
@@ -41,3 +42,50 @@ If the concept you need isn't in the glossary yet, that's a signal — either yo
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
 > _Contradicts ADR-0001 (L3 written by periodic batch only) — but worth reopening because…_
+<!-- lang:end -->
+
+<!-- lang:th -->
+# เอกสาร Domain
+
+วิธีที่ engineering skills ควรใช้เอกสาร domain ของ repo นี้เมื่อสำรวจ codebase
+
+## โครงสร้าง: Single-context
+
+นี่คือ repo แบบ single-context `CONTEXT.md` ไฟล์เดียวที่ root ครอบคลุมทุก sub-project (Frontend, Backend, MIT)
+
+```
+/
+├── CONTEXT.md          ← glossary domain สำหรับ codebase ทั้งหมด
+├── docs/adr/           ← Architectural Decision Records
+└── src/
+```
+
+## ก่อนสำรวจ ให้อ่านสิ่งเหล่านี้
+
+- **`CONTEXT.md`** ที่ root ของ repo — glossary domain ที่เป็น authoritative (L1/L2/L3 Cache, Dirty Key, Dirty Queue, Leader, Write-behind, Flush Frequency ฯลฯ)
+- **`docs/adr/`** — อ่าน ADR ที่เกี่ยวข้องกับพื้นที่ที่กำลังจะทำงานก่อนเสนอทางเลือกอื่น
+
+หากไฟล์เหล่านี้ไม่มีอยู่ **ดำเนินการต่อโดยไม่แจ้ง** ไม่ต้องบ่งชี้การขาดหายไป ไม่ต้องเสนอสร้างล่วงหน้า skill ผู้ผลิต (`/grill-with-docs`) จะสร้างแบบ lazy เมื่อ term หรือการตัดสินใจเกิดขึ้นจริง
+
+## ใช้คำศัพท์จาก glossary
+
+เมื่อผลลัพธ์ของคุณตั้งชื่อ concept ของ domain (ในชื่อ issue, ข้อเสนอ refactor, hypothesis, ชื่อ test) ใช้ term ตามที่กำหนดใน `CONTEXT.md` อย่าเปลี่ยนไปใช้คำพ้องความหมายที่ glossary ห้ามไว้โดยเฉพาะ
+
+รายการห้ามใช้ (จาก CONTEXT.md):
+- ใช้ **L1 Cache** ไม่ใช่ "local cache", "memory cache", หรือ "JSON cache"
+- ใช้ **L2 Cache** ไม่ใช่ "Redis cache", "distributed cache", หรือ "remote cache"
+- ใช้ **L3 Cache** ไม่ใช่ "JSON cache", "disk cache", "file cache", หรือ "L1 disk"
+- ใช้ **Dirty Key** ไม่ใช่ "stale key", "unsynced key", หรือ "pending key"
+- ใช้ **Dirty Queue** ไม่ใช่ "sync queue", "work queue", หรือ "flush queue"
+- ใช้ **Leader** ไม่ใช่ "master", "primary", หรือ "coordinator"
+- ใช้ **Write-behind** ไม่ใช่ "write-through", "async write", หรือ "lazy persist"
+- ใช้ **Flush Frequency** ไม่ใช่ "batch interval", "sync rate", หรือ "TTL"
+
+หาก concept ที่ต้องการยังไม่อยู่ใน glossary นั่นเป็นสัญญาณ — ไม่ว่าจะเป็นเพราะคุณกำลังสร้างภาษาที่ project ไม่ใช้ (ควรพิจารณาใหม่) หรือมีช่องว่างจริง (จดบันทึกไว้สำหรับ `/grill-with-docs`)
+
+## แจ้ง ADR conflicts
+
+หากผลลัพธ์ขัดแย้งกับ ADR ที่มีอยู่ ให้ระบุอย่างชัดเจนแทนที่จะ override แบบเงียบๆ:
+
+> _ขัดแย้งกับ ADR-0001 (L3 เขียนโดย periodic batch เท่านั้น) — แต่ควรพิจารณาใหม่เพราะ…_
+<!-- lang:end -->
