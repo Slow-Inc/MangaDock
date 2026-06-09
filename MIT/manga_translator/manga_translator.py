@@ -17,6 +17,7 @@ from typing import Optional, Any, List, Tuple
 from .region_filter import filter_translated_regions
 from .region_apply import apply_original_as_translation, apply_render_casing, apply_translations
 from .model_usage_tracker import ModelUsageTracker
+from .model_unloader import ModelUnloader
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -151,6 +152,18 @@ class MangaTranslator:
         torch.backends.cudnn.allow_tf32 = True
 
         self._model_usage_tracker = ModelUsageTracker()
+        self._model_unloader = ModelUnloader(
+            {
+                'colorization': unload_colorization,
+                'detection': unload_detection,
+                'inpainting': unload_inpainting,
+                'ocr': unload_ocr,
+                'upscaling': unload_upscaling,
+                'translation': unload_translation,
+            },
+            empty_cache=torch.cuda.empty_cache,
+            cuda_available=torch.cuda.is_available,
+        )
         self._detector_cleanup_task = None
         self.prep_manual = params.get('prep_manual', None)
         self.context_size = params.get('context_size', 0)
@@ -735,22 +748,7 @@ class MangaTranslator:
         return (textlines, mask_raw, mask)
 
     async def _unload_model(self, tool: str, model: str):
-        logger.info(f"Unloading {tool} model: {model}")
-        match tool:
-            case 'colorization':
-                await unload_colorization(model)
-            case 'detection':
-                await unload_detection(model)
-            case 'inpainting':
-                await unload_inpainting(model)
-            case 'ocr':
-                await unload_ocr(model)
-            case 'upscaling':
-                await unload_upscaling(model)
-            case 'translation':
-                await unload_translation(model)
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()  # empty CUDA cache
+        await self._model_unloader.unload(tool, model)
 
     # Background models cleanup job.
     async def _detector_cleanup_job(self):
