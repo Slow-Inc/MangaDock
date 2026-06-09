@@ -1688,3 +1688,20 @@ PR#196 (refactor/mit-seam-s21-model-lifecycle).
 Tests: test_model_lifecycle.py 4 passed + test_model_reaper ensure_started idempotent; full suite 258 passed
 (18 pre-existing async, 0 real). Remaining core = the hardest (S15/S17/S18/S22/S23/S24/S25/S26) — pausing to
 report before the L6/L8/L9-touching async-orchestration seams.
+
+## 2026-06-09 — #187 S17: TextTranslationDispatcher (collapse the duplicated chatgpt translator switch)
+The hardest seam. The duplicated ChatGPT/ChatGPT2Stage handling in _dispatch_with_context (single) +
+_batch_translate_texts (batch) → text_translation_dispatcher.{build_chatgpt_translator, dispatch_translate}.
+Split into TWO functions because construction order is load-bearing: OpenAITranslator.__init__ can warn about
+the glossary, and single constructs AFTER the context log while batch constructs BEFORE — so each caller calls
+build_chatgpt_translator at its own point (order preserved) and dispatch_translate does the order-invariant
+parse/set-context/log/translate. Divergences preserved & parameterised: result_path_callback (single = bound
+_result_path direct-set; batch = with_context swap closure), batch_contexts wiring (on_2stage_batch_setup,
+batch-only), and the context-computation placement (single unconditional incl. non-chatgpt log; batch only in
+its chatgpt branch — both kept at the call sites). Only reorder: parse_args now after the silent
+build_prev_context → identical observable log sequence. Stack on S21 (refactor/mit-seam-s17-text-translation-
+dispatcher). Pushed for rollback.
+Tests: test_text_translation_dispatcher.py 6 passed (build→openai/2stage, parse/set/translate w/wo ctx,
+2stage callback+batch-setup, chatgpt-skips-batch-setup, carry/skip logs) via fake translators + sys.modules
+stubs; full suite 264 passed (18 pre-existing async, 0 real). E2E PENDING — this high-risk seam wants a live
+translation pass (single + batch + concurrent + chatgpt_2stage) before merge.
