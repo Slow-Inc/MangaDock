@@ -701,40 +701,14 @@ def _split_into_syllables(words: List[str], font_size: int, max_width: int, lang
     return syllables
 
 
-def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, language: str = 'en_US', hyphenate: bool = True) -> Tuple[List[str], List[int]]:
-    """
-    Splits up a string of text into lines. Returns list of lines and their widths.
-    Will go over max_height if too much text is present.
-    """
-    # Pre-segment Thai text with zero-width spaces so wrapping can occur on
-    # word boundaries without adding visible spaces to final rendered output.
-    text = _insert_thai_word_breaks(text)
-    has_zwsp_breaks = _ZWSP in text
-    max_width = max(max_width, 2 * font_size)
-
-    whitespace_offset_x = 0 if has_zwsp_breaks else get_char_offset_x(font_size, ' ')
-    hyphen_offset_x = get_char_offset_x(font_size, '-')
-
-    # Split text into words and precalculate each word width (#186: helper)
-    words, word_widths = _split_words_and_widths(text, font_size)
-
-    # Try to increase width usage if a height overflow is unavoidable
-    while True:
-        max_lines = max_height // font_size + 1
-        expected_size = sum(word_widths) + max((len(word_widths) - 1) * whitespace_offset_x - (max_lines - 1) * hyphen_offset_x, 0)
-        max_size = max_width * max_lines
-        if max_size < expected_size:
-            multiplier = np.sqrt(expected_size / max_size)
-            max_width *= max(multiplier, 1.05)
-            max_height *= multiplier
-        else:
-            break
-
-    # Split words into syllables (#186: extracted to _split_into_syllables)
-    syllables = _split_into_syllables(words, font_size, max_width, language)
-    # Step 2/4 below still consult the hyphenator for backward-hyphenation decisions.
-    hyphenator = select_hyphenator(language)
-
+def _greedy_pack(words, word_widths, syllables, font_size, max_width,
+                 whitespace_offset_x, hyphen_offset_x):
+    """#186: greedy line packing — calc_horizontal's "Step 1". Packs words onto lines
+    up to ``max_width``; a single word wider than the column is char-split across
+    lines. Returns ``(line_words_list, line_width_list, hyphenation_idx_list)``:
+    per-line word-index lists, their pixel widths, and the syllable index where an
+    over-wide word was cut. This is the line-break strategy #186 will make swappable
+    (e.g. Knuth-Plass #180). Extracted verbatim from calc_horizontal — byte-identical."""
     line_words_list = []
     line_width_list = []
     hyphenation_idx_list = []
@@ -750,27 +724,6 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
         line_words = []
         line_width = 0
         hyphenation_idx = 0
-
-    def get_present_syllables_range(line_idx, word_pos):
-        while word_pos < 0:
-            word_pos += len(line_words_list[line_idx])
-        word_idx = line_words_list[line_idx][word_pos]
-        syl_start_idx = 0
-        syl_end_idx = len(syllables[word_idx])
-        if line_idx > 0 and word_pos == 0 and line_words_list[line_idx - 1][-1] == word_idx:
-            syl_start_idx = hyphenation_idx_list[line_idx - 1]
-        if line_idx < len(line_words_list) - 1 and word_pos == len(line_words_list[line_idx]) - 1 \
-            and line_words_list[line_idx + 1][0] == word_idx:
-            syl_end_idx = hyphenation_idx_list[line_idx]
-        return syl_start_idx, syl_end_idx
-
-    def get_present_syllables(line_idx, word_pos):
-        syl_start_idx, syl_end_idx = get_present_syllables_range(line_idx, word_pos)
-        return syllables[line_words_list[line_idx][word_pos]][syl_start_idx:syl_end_idx]
-
-
-    # Step 1:
-    # Arrange words without hyphenating unless necessary
 
     i = 0
     while True:
@@ -807,7 +760,68 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
             i += 1
         else:
             break_line()
+    return line_words_list, line_width_list, hyphenation_idx_list
 
+
+def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, language: str = 'en_US', hyphenate: bool = True) -> Tuple[List[str], List[int]]:
+    """
+    Splits up a string of text into lines. Returns list of lines and their widths.
+    Will go over max_height if too much text is present.
+    """
+    # Pre-segment Thai text with zero-width spaces so wrapping can occur on
+    # word boundaries without adding visible spaces to final rendered output.
+    text = _insert_thai_word_breaks(text)
+    has_zwsp_breaks = _ZWSP in text
+    max_width = max(max_width, 2 * font_size)
+
+    whitespace_offset_x = 0 if has_zwsp_breaks else get_char_offset_x(font_size, ' ')
+    hyphen_offset_x = get_char_offset_x(font_size, '-')
+
+    # Split text into words and precalculate each word width (#186: helper)
+    words, word_widths = _split_words_and_widths(text, font_size)
+
+    # Try to increase width usage if a height overflow is unavoidable
+    while True:
+        max_lines = max_height // font_size + 1
+        expected_size = sum(word_widths) + max((len(word_widths) - 1) * whitespace_offset_x - (max_lines - 1) * hyphen_offset_x, 0)
+        max_size = max_width * max_lines
+        if max_size < expected_size:
+            multiplier = np.sqrt(expected_size / max_size)
+            max_width *= max(multiplier, 1.05)
+            max_height *= multiplier
+        else:
+            break
+
+    # Split words into syllables (#186: extracted to _split_into_syllables)
+    syllables = _split_into_syllables(words, font_size, max_width, language)
+    # Step 2/4 below still consult the hyphenator for backward-hyphenation decisions.
+    hyphenator = select_hyphenator(language)
+
+    # Step 1: greedy line packing (#186: extracted to _greedy_pack — the swappable
+    # line-break strategy; Steps 2-4 below post-process its output).
+    line_words_list, line_width_list, hyphenation_idx_list = _greedy_pack(
+        words, word_widths, syllables, font_size, max_width,
+        whitespace_offset_x, hyphen_offset_x)
+
+    def get_present_syllables_range(line_idx, word_pos):
+        while word_pos < 0:
+            word_pos += len(line_words_list[line_idx])
+        word_idx = line_words_list[line_idx][word_pos]
+        syl_start_idx = 0
+        syl_end_idx = len(syllables[word_idx])
+        if line_idx > 0 and word_pos == 0 and line_words_list[line_idx - 1][-1] == word_idx:
+            syl_start_idx = hyphenation_idx_list[line_idx - 1]
+        if line_idx < len(line_words_list) - 1 and word_pos == len(line_words_list[line_idx]) - 1 \
+            and line_words_list[line_idx + 1][0] == word_idx:
+            syl_end_idx = hyphenation_idx_list[line_idx]
+        return syl_start_idx, syl_end_idx
+
+    def get_present_syllables(line_idx, word_pos):
+        syl_start_idx, syl_end_idx = get_present_syllables_range(line_idx, word_pos)
+        return syllables[line_words_list[line_idx][word_pos]][syl_start_idx:syl_end_idx]
+
+
+    # (Step 1 packing produced by _greedy_pack above.)
 
     # Step 2:
     # Compare two adjacent lines and try to hyphenate backwards
