@@ -1370,3 +1370,16 @@ under_memory_pressure() is deferred until a 2nd site appears — folding a singl
 without collapsing drift, against the North Star). Stacked on S4 (refactor/mit-seam-s5-memory-guard).
 Tests: test_memory_guard.py 2 passed (collect-then-empty when cuda available; collect-only when not); full
 suite 190 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — #187 S7: context_page_counts (fold the 2 context-carry accounting blocks)
+The (pages_used, skipped) accounting — "how many recent non-empty pages to carry, how many expected pages
+skipped for being empty" — was identical in single dispatch (_dispatch_with_context) and concurrent dispatch
+(_batch_translate_texts), each feeding the "Carrying N" / "Skipped N" log lines. Extracted to
+context_counts.context_page_counts(context_size, done_pages); both sites → one-line call so the two paths'
+logged numbers can't drift. Byte-identical: both counts capped at context_size, blank-page detection
+any(sent.strip() ...) preserved. Scope note: _build_prev_context recomputes its OWN non_empty_pages/pages_used
+to slice the context tail — that's the S6 seam, left untouched. Stacked on S5
+(refactor/mit-seam-s7-context-counts).
+Tests: test_context_counts.py 7 passed (context_size=0, no-pages, all-non-empty, blank-skipped, budget-caps-
+so-empty-not-skipped, budget-above-non-empty, page-empty-only-if-all-blank); full suite 197 passed (same 19
+pre-existing async failures); context regression (test_page_context/test_series_context) green.
