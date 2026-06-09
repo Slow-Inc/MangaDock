@@ -31,6 +31,7 @@ from .detection_postproc import merge_sfx_detections
 from .translation_memory import TranslationMemory
 from .gather_per_context import gather_per_context
 from .model_lifecycle import ModelLifecycle
+from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -871,47 +872,24 @@ class MangaTranslator:
         )
 
     async def _dispatch_with_context(self, config: Config, texts: list[str], ctx: Context):
-        # 计算实际要使用的上下文页数和跳过的空页数
-        # Calculate the actual number of context pages to use and empty pages to skip
+        # 计算实际要使用的上下文页数和跳过的空页数 / context page accounting
         done_pages = self._translation_memory.all_page_translations
         pages_used, skipped = context_page_counts(self.context_size, done_pages)
 
         if self.context_size > 0:
             logger.info(f"Context-aware translation enabled with {self.context_size} pages of history")
 
-        # 构建上下文字符串
-        # Build the context string
+        # 构建上下文字符串 / build the context string
         prev_ctx = self._build_prev_context()
 
-        # 如果是 ChatGPT 或 ChatGPT2Stage 翻译器，则专门处理上下文注入
-        # Special handling for ChatGPT and ChatGPT2Stage translators: inject context
+        # ChatGPT / ChatGPT2Stage：构造后注入上下文（单页模式 result_path 直接绑定，无 batch 接线）
         if config.translator.translator in [Translator.chatgpt, Translator.chatgpt_2stage]:
-            if config.translator.translator == Translator.chatgpt:
-                from .translators.chatgpt import OpenAITranslator
-                translator = OpenAITranslator()
-            else:  # chatgpt_2stage
-                from .translators.chatgpt_2stage import ChatGPT2StageTranslator
-                translator = ChatGPT2StageTranslator()
-                
-            translator.parse_args(config.translator)
-            translator.set_prev_context(prev_ctx)
-
-            if pages_used > 0:
-                context_count = prev_ctx.count("<|")
-                logger.info(f"Carrying {pages_used} pages of context, {context_count} sentences as translation reference")
-            if skipped > 0:
-                logger.warning(f"Skipped {skipped} pages with no sentences")
-                
-
-            
-            # ChatGPT2Stage 需要传递 ctx 参数，普通 ChatGPT 不需要
-            if config.translator.translator == Translator.chatgpt_2stage:
-                # 添加result_path_callback到Context，让translator可以保存bboxes_fixed.png
-                ctx.result_path_callback = self._result_path
-                return await translator._translate(ctx.from_lang, config.translator.target_lang, texts, ctx)
-            else:
-                return await translator._translate(ctx.from_lang, config.translator.target_lang, texts)
-
+            translator = build_chatgpt_translator(config.translator.translator)
+            return await dispatch_translate(
+                translator, texts, config, ctx, prev_ctx, pages_used, skipped,
+                result_path_callback=self._result_path,
+                on_2stage_batch_setup=None,
+            )
 
         return await dispatch_translation(
             config.translator.translator_gen,
@@ -2262,16 +2240,10 @@ class MangaTranslator:
         if config.translator.translator == Translator.none:
             return ["" for _ in texts]
 
-
-
         # 如果是ChatGPT翻译器（包括chatgpt和chatgpt_2stage），需要处理上下文
         if config.translator.translator in [Translator.chatgpt, Translator.chatgpt_2stage]:
-            if config.translator.translator == Translator.chatgpt:
-                from .translators.chatgpt import OpenAITranslator
-                translator = OpenAITranslator()
-            else:  # chatgpt_2stage
-                from .translators.chatgpt_2stage import ChatGPT2StageTranslator
-                translator = ChatGPT2StageTranslator()
+            # 先构造翻译器（构造顺序在 context 之前，需保留——构造函数可能 warn glossary）
+            translator = build_chatgpt_translator(config.translator.translator)
 
             # 确定是否使用并发模式和原文上下文
             use_original_text = self.batch_concurrent and self.batch_size > 1
@@ -2283,8 +2255,6 @@ class MangaTranslator:
                 context_type = "original text" if use_original_text else "translation results"
                 logger.info(f"Context-aware translation enabled with {self.context_size} pages of history using {context_type}")
 
-            translator.parse_args(config.translator)
-
             # 构建上下文 - 在并发模式下使用原文和页面索引
             prev_ctx = self._build_prev_context(
                 use_original_text=use_original_text,
@@ -2292,26 +2262,16 @@ class MangaTranslator:
                 batch_index=batch_index,
                 batch_original_texts=batch_original_texts
             )
-            translator.set_prev_context(prev_ctx)
 
-            if pages_used > 0:
-                context_count = prev_ctx.count("<|")
-                logger.info(f"Carrying {pages_used} pages of context, {context_count} sentences as translation reference")
-            if skipped > 0:
-                logger.warning(f"Skipped {skipped} pages with no sentences")
+            # 为当前图片创建专用的result_path_callback，避免并发时路径错位
+            current_image_context = getattr(ctx, 'image_context', None) or self._image_debug.current
 
-            # ChatGPT2Stage需要特殊处理
-            if config.translator.translator == Translator.chatgpt_2stage:
-                # 为当前图片创建专用的result_path_callback，避免并发时路径错位
-                current_image_context = getattr(ctx, 'image_context', None) or self._image_debug.current
+            def result_path_callback(path: str) -> str:
+                """为特定图片创建结果路径，使用保存的图片上下文"""
+                with self._image_debug.with_context(current_image_context):
+                    return self._result_path(path)
 
-                def result_path_callback(path: str) -> str:
-                    """为特定图片创建结果路径，使用保存的图片上下文"""
-                    with self._image_debug.with_context(current_image_context):
-                        return self._result_path(path)
-
-                ctx.result_path_callback = result_path_callback
-
+            def on_2stage_batch_setup(ctx):
                 # Check if batch processing is enabled and batch_contexts are provided
                 if batch_contexts and len(batch_contexts) > 1 and not self.batch_concurrent:
                     # Enable batch processing for chatgpt_2stage
@@ -2334,20 +2294,11 @@ class MangaTranslator:
 
                         batch_ctx.result_path_callback = create_result_path_callback(batch_image_context)
 
-                # ChatGPT2Stage需要传递ctx参数
-                return await translator._translate(
-                    ctx.from_lang,
-                    config.translator.target_lang,
-                    texts,
-                    ctx
-                )
-            else:
-                # 普通ChatGPT不需要ctx参数
-                return await translator._translate(
-                    ctx.from_lang,
-                    config.translator.target_lang,
-                    texts
-                )
+            return await dispatch_translate(
+                translator, texts, config, ctx, prev_ctx, pages_used, skipped,
+                result_path_callback=result_path_callback,
+                on_2stage_batch_setup=on_2stage_batch_setup,
+            )
 
         else:
             # 使用通用翻译调度器
