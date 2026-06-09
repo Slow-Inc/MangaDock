@@ -72,7 +72,7 @@ export class MitWebhookController {
     // _runMitBatch reads the same flat shape). Adapt it here into the structured `result`
     // object that handleMitCallback expects — this controller is the anti-corruption layer
     // between MIT's wire format and the service's domain shape.
-    const { taskId, pageIndex, imgWidth, imgHeight, patches, error } = body;
+    const { taskId, pageIndex, imgWidth, imgHeight, patches, regions, error } = body;
 
     if (!taskId) {
       throw new HttpException(
@@ -93,7 +93,8 @@ export class MitWebhookController {
       `Received MIT webhook for task ${taskId} (page ${pageIndex})`,
     );
 
-    const result = { imgWidth, imgHeight, patches };
+    // #160: forward the text layer (#158) so handleMitCallback can persist it.
+    const result = { imgWidth, imgHeight, patches, regions };
 
     try {
       await this.booksService.handleMitCallback(

@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import type Lenis from "lenis";
 import { createPortal } from "react-dom";
@@ -15,7 +14,7 @@ import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { useAuth } from "../contexts/AuthContext";
 import { getWalletBalance, purchaseUnlock, getUnlocksForTitle, topupCoins } from "../lib/studioApi";
 import MangaDiscussion from "./MangaDiscussion";
-import type { LandingBook, MangaCover, MangaDetail, MangaChapter } from "../lib/types";
+import type { LandingBook, MangaDetail, MangaChapter } from "../lib/types";
 
 type ActiveChapter = {
   id: string;
@@ -84,7 +83,6 @@ function MarqueeTitle({ title, active, className }: { title: string; active: boo
 }
 
 export default function BookDetailModal({ book, onClose, scrollToChapters = false, highlightChapterId, asPage = false }: Props) {
-  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const { favorited, liked, handleToggleFavorite, handleToggleLiked } = useBookActions(book);
@@ -104,7 +102,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
   const [translatingDesc, setTranslatingDesc] = useState(false);
   const [showOriginalDesc, setShowOriginalDesc] = useState(false);
-  const [forceLocalMode, setForceLocalMode] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
 
   const coverRowRef = useRef<HTMLDivElement>(null);
@@ -214,75 +211,68 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       setLoadingChapters(true);
 
       const forceLocal = localStorage.getItem("imgCacheForceLocal") === "1";
-      setForceLocalMode(forceLocal);
       const qs = forceLocal ? "?forceLocal=true" : "";
+
+      // Auto-translate description (#151): start immediately from the card's
+      // description — only wait for the detail fetch when the card had none.
+      const translateDesc = (text: string) => {
+        setTranslatingDesc(true);
+        fetch(`${API_BASE}/books/translate?text=${encodeURIComponent(text)}`)
+          .then((r) => r.json())
+          .then((trans: { translatedText: string; translated: boolean }) => {
+            if (trans.translated) setTranslatedDesc(trans.translatedText);
+            setTranslatingDesc(false);
+          })
+          .catch(() => setTranslatingDesc(false));
+      };
+      if (book.description) translateDesc(book.description);
 
       fetch(`${API_BASE}/books/manga/${book.id}${qs}`)
         .then((r) => r.json())
         .then((d: MangaDetail) => {
           setDetail(d);
           setLoadingDetail(false);
-          
-          // Auto-translate description if non-Thai (using detail.description if book.description is empty)
-          const descToTranslate = book.description || d.description;
-          if (descToTranslate) {
-            setTranslatingDesc(true);
-            fetch(`${API_BASE}/books/translate?text=${encodeURIComponent(descToTranslate)}`)
-              .then((r) => r.json())
-              .then((trans: { translatedText: string; translated: boolean }) => {
-                if (trans.translated) setTranslatedDesc(trans.translatedText);
-                setTranslatingDesc(false);
-              })
-              .catch(() => setTranslatingDesc(false));
-          }
+          if (!book.description && d.description) translateDesc(d.description);
         })
         .catch(() => setLoadingDetail(false));
 
-      fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`)
-        .then((r) => r.json())
-        .then((mangaDexChapters: MangaChapter[]) => {
+      // Chapters + user versions in parallel (#151) — independent requests
+      // that were a pure waterfall before (versions only merges at the end).
+      Promise.all([
+        fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => r.json()),
+        fetch(`${API_BASE}/versions/title/${book.id}`)
+          .then((r) => (r.ok ? r.json() : []))
+          .catch(() => []), // versions failure → MangaDex chapters only
+      ])
+        .then(([mangaDexChapters, versions]: [MangaChapter[], any[]]) => {
           // Tag MangaDex chapters with source
           const tagged = mangaDexChapters.map((ch) => ({ ...ch, source: "mangadex" as const }));
-
-          // Also fetch user-uploaded versions for this title
-          fetch(`${API_BASE}/versions/title/${book.id}`)
-            .then((r) => r.ok ? r.json() : [])
-            .then((versions: any[]) => {
-              const userChapters: MangaChapter[] = (versions ?? []).map((v: any) => ({
-                id: `ver:${v.versionId}`,
-                chapterNumber: v.chapterNumber || null,
-                title: v.chapterTitle || null,
-                translatedLanguage: v.language || "th",
-                uploadedAt: v.createdAt || "",
-                pageCount: v.pages?.length ?? 0,
-                readerAvailable: v.backendAvailable !== false,
-                source: "user" as const,
-                translatorName: v.translatorName ?? null,
-                priceCoins: v.priceCoins ?? 0,
-                versionId: v.versionId,
-                backendAvailable: v.backendAvailable !== false,
-              }));
-              // Merge: MangaDex first, then user-uploaded, sort by chapter number
-              const merged = [...tagged, ...userChapters].sort((a, b) => {
-                const numA = parseFloat(a.chapterNumber ?? "0") || 0;
-                const numB = parseFloat(b.chapterNumber ?? "0") || 0;
-                return numA - numB;
-              });
-              setChapters(merged);
-              setLoadingChapters(false);
-              if (effectiveHighlightId) {
-                const lang = merged.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
-                if (lang) setLangFilter(lang);
-              }
-            })
-            .catch(() => {
-              setChapters(tagged);
-              setLoadingChapters(false);
-              if (effectiveHighlightId) {
-                const lang = tagged.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
-                if (lang) setLangFilter(lang);
-              }
-            });
+          const userChapters: MangaChapter[] = (versions ?? []).map((v: any) => ({
+            id: `ver:${v.versionId}`,
+            chapterNumber: v.chapterNumber || null,
+            title: v.chapterTitle || null,
+            translatedLanguage: v.language || "th",
+            uploadedAt: v.createdAt || "",
+            pageCount: v.pages?.length ?? 0,
+            readerAvailable: v.backendAvailable !== false,
+            source: "user" as const,
+            translatorName: v.translatorName ?? null,
+            priceCoins: v.priceCoins ?? 0,
+            versionId: v.versionId,
+            backendAvailable: v.backendAvailable !== false,
+          }));
+          // Merge: MangaDex first, then user-uploaded, sort by chapter number
+          const merged = [...tagged, ...userChapters].sort((a, b) => {
+            const numA = parseFloat(a.chapterNumber ?? "0") || 0;
+            const numB = parseFloat(b.chapterNumber ?? "0") || 0;
+            return numA - numB;
+          });
+          setChapters(merged);
+          setLoadingChapters(false);
+          if (effectiveHighlightId) {
+            const lang = merged.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
+            if (lang) setLangFilter(lang);
+          }
         })
         .catch(() => setLoadingChapters(false));
     } else {
@@ -1214,7 +1204,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                           <button
                             onClick={() => setExpandedGroups((prev) => {
                               const next = new Set(prev);
-                              next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey);
+                              if (next.has(groupKey)) next.delete(groupKey); else next.add(groupKey);
                               return next;
                             })}
                             className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left transition ${

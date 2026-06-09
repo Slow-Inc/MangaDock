@@ -1,3 +1,4 @@
+<!-- lang:en -->
 # METABOOKS BACKEND ENGINEERING STANDARD (T4-STANDARD)
 You must strictly adhere to these backend engineering pillars 
 before writing, altering, or generating any server-side logic.
@@ -59,16 +60,9 @@ before writing, altering, or generating any server-side logic.
   `pydensecrf` and `pydantic-core` may fail to compile on Python 
   3.13 due to C API changes.
   - Mitigation: Always use a stable `venv` with Python 3.12.
-  - Patching: If `pydensecrf` is missing, ensure 
-    `manga_translator/mask_refinement/text_mask_utils.py` 
-    has the `try-except` fallback to avoid `ModuleNotFoundError`.
 - **Git Ignore & Rollback:** The `lib/` and `venv/` folders are 
   ignored by Git. A `git checkout` or rollback will NOT restore 
-  these. If `ModuleNotFoundError: No module named '...lib'` 
-  occurs, manually restore the `lib` folder or its stubs.
-- **Internal Path Handling:** Always ensure `sys.path` or 
-  `PYTHONPATH` includes the project root before importing 
-  `manga_translator`.
+  these.
 
 ## 8. UI/UX PRINCIPLES (META-DESIGN)
 - **Liquid Glass Sticky Navigation:** For pages with long content,
@@ -76,33 +70,14 @@ before writing, altering, or generating any server-side logic.
   accessibility.
 - **Visual Style:** Use "Liquid Glass" effect — semi-transparent 
   background (`bg-white/10` or `bg-black/20`), background blur 
-  (`backdrop-blur-md`), and rounded corners (`rounded-full` or 
-  `rounded-2xl`).
-- **Z-Index Management:** Sticky elements must use appropriate 
-  `z-index` (e.g., `z-40`) — above content, below global overlays.
-- **Robust Sidebar Layout:** Use multi-column Grid (`lg:grid-cols-12`)
-  or Flexbox with defined widths (`w-[320px]`). Never use simple 
-  percentage grids.
+  (`backdrop-blur-md`), and rounded corners.
 - **Premium Iconography:** NEVER use emojis for any UI element — 
-  in code or in the interface. Replace with high-fidelity SVG icons 
-  enhanced with Glow Effects and category-specific color palettes.
+  in code or in the interface. Replace with high-fidelity SVG icons.
 - **Smooth Interaction Standard:** All interactive elements must use 
-  `.smooth-hover` (0.18s) or `.smooth-hover-fast` (0.08s) with 
-  `cubic-bezier(0.4, 0, 0.2, 1)`.
-- **User-Centric Feedback & Empathy:** Every asynchronous operation 
-  (fetches, form submissions, AI translations) MUST have an immediate 
-  loading state (Skeleton or Spinner) and a clear success/error 
-  feedback (Toasts). Focus on reducing "Perceived Latency" by 
-  optimizing UI response time.
+  `.smooth-hover` (0.18s) or `.smooth-hover-fast` (0.08s).
 - **Optimistic UI Updates:** For instant-feel interactions (voting, 
   liking, bookmarking), the UI must reflect the new state IMMEDIATELY 
-  before the server response. Implement a robust rollback mechanism to 
-  revert the UI and notify the user if the backend call fails.
-- **Volatile Frontend Caching:** Reduce system load by implementing 
-  in-memory caching for API responses (e.g., Manga Detail, Trending). 
-  This cache should persist during client-side navigation but reset 
-  on a full website refresh to ensure data eventual consistency 
-  without over-complicating state management.
+  before the server response.
 
 ## 9. DEVELOPMENT WORKFLOW & OPERATIONAL RULES
 
@@ -114,20 +89,87 @@ before writing, altering, or generating any server-side logic.
 | MIT Server | `.\MIT\run-server.bat` |
 
 ### Mandatory Post-Edit Checklist
-After EVERY code change, you must perform these steps in order:
+After EVERY code change, perform these steps in order:
 
-1. **Update Documentation** — Sync all related documents and 
-   in-code comments to reflect the change. Never leave docs stale.
+1. **Update Documentation** — Sync all related documents to reflect the change.
+2. **Check Logs** — Verify logs from the affected service after every edit.
+3. **MIT Server Restart** — If any MIT Server file was modified, restart manually via `.\MIT\run-server.bat`. MIT has NO auto-restart mechanism.
+4. **No Emojis in Code** — Never use emojis anywhere in source code, comments, or log messages.
+<!-- lang:end -->
 
-2. **Check Logs** — Verify logs from the affected service after 
-   every edit. If any error or warning appears, fix it immediately 
-   before proceeding to the next task.
+<!-- lang:th -->
+# มาตรฐานวิศวกรรม Backend ของ METABOOKS (T4-STANDARD)
+คุณต้องยึดมั่นใน engineering pillar เหล่านี้อย่างเคร่งครัด
+ก่อนเขียน แก้ไข หรือสร้าง logic ฝั่ง server ใดๆ
 
-3. **MIT Server Restart** — If any MIT Server file was modified, 
-   manually restart via `.\MIT\run-server.bat`. MIT Server has 
-   NO auto-restart mechanism. Changes will not apply until 
-   manually restarted.
+## 1. IDEMPOTENT PIPELINES
+- งาน async ประมวลผลภาพทั้งหมดต้องเป็น idempotent
+- ตรวจสอบสถานะงานใน Redis/Supabase เสมอก่อนสร้างงาน MIT Server ใหม่ ป้องกัน AI compute ซ้ำซ้อนทุกกรณี
+- การเปลี่ยน task state ต้องเป็น atomic และเป็นไปตาม: `pending → processing → completed | failed`
+- ห้ามอัปเดต task state โดยไม่อ่าน current state ก่อน
 
-4. **No Emojis in Code** — Never use emojis anywhere in source 
-   code, comments, log messages, or variable names. Use descriptive 
-   text, SVG icons, or structured labels instead.
+## 2. WEBHOOK INTEGRITY (MIT Server Callbacks)
+- Webhook ขาเข้าจาก MIT Server ทั้งหมดต้อง verify ด้วย HMAC Signature ก่อนประมวลผล
+- Webhook handler ต้องเป็น idempotent — callback ซ้ำสำหรับ task_id เดียวกันต้องถูก ignore อย่างปลอดภัย
+- ถ้าไม่ได้รับ Webhook ภายใน TTL threshold ให้ mark task เป็น `failed` และส่งไป Dead Letter Queue (DLQ)
+- DLQ tasks ต้องทริกเกอร์ alert เมื่อ depth เกิน threshold
+
+## 3. 2-LAYER CACHE INTEGRITY
+- ลำดับชั้นเข้มงวด: L1 (In-Memory) → L2 (Redis) → Supabase
+- ทุก state mutation ต้องส่งต่อ L1 → L2 อย่างถูกต้อง
+- Graceful Shutdown: จับ `SIGTERM` และ `SIGINT`, flush data L1 volatile ทั้งหมดไปยัง Redis ก่อนปิด process ไม่มีข้อยกเว้น
+- Max retry สำหรับ Redis write ตอน shutdown: 3 ครั้งพร้อม exponential backoff ก่อน log critical error
+
+## 4. CLOUDFLARE WORKER MEMORY CONTRACT
+- ห้าม buffer รูปภาพทั้งหมดใน Worker memory เด็ดขาด
+- R2 upload ทั้งหมดต้องใช้ streaming `.put()` เท่านั้น
+- ทุกการเรียก `.put()` ต้องมี:
+  - `contentType`: MIME type ที่ถูกต้อง
+  - `cacheControl`: "public, max-age=31536000"
+- ต้องใช้ Multipart upload สำหรับไฟล์ > 100MB
+
+## 5. ZERO-TRUST ASSET PROTECTION
+- Reverse proxy endpoint ต้อง verify:
+  - Hardware Device Fingerprint (จาก Cloudflared Verify)
+  - header `Referer` กับ allowlist
+  - `User-Agent` กับ bot signature ที่รู้จัก
+- Direct R2 URL ต้องไม่เคยเปิดเผยให้ client
+- ต้องตรวจสอบสถานะ 1-Hour Verification Window ในทุก asset request
+
+## 6. OBSERVABILITY STANDARD
+- ทุก cross-service call ต้อง emit structured log:
+  `{ timestamp, service, task_id, event, duration_ms, status }`
+- Error ต้องมี context เสมอ:
+  `{ error_code, message, service_origin, task_id }`
+- ห้าม log raw image data หรือ user PII
+
+## 7. MIT SERVER TROUBLESHOOTING & RECOVERY
+- **Port Conflict (Errno 10048):** บน Windows ถ้า MIT ไม่สามารถ bind port 5003 ใช้ `netstat -ano | findstr :5003` เพื่อหา PID และ `taskkill /F /PID <PID>` ก่อน restart
+- **Missing Dependencies (Python 3.13+):** Package บางตัวเช่น `pydensecrf` และ `pydantic-core` อาจ compile ไม่ได้บน Python 3.13
+  - แนะนำ: ใช้ `venv` ที่เสถียรกับ Python 3.12 เสมอ
+- **Git Ignore & Rollback:** โฟลเดอร์ `lib/` และ `venv/` ถูก ignore โดย Git การ `git checkout` หรือ rollback จะไม่คืนค่าสิ่งเหล่านี้
+
+## 8. หลักการ UI/UX (META-DESIGN)
+- **Liquid Glass Sticky Navigation:** สำหรับหน้าที่มีเนื้อหายาว navigation element ต้องเป็น `sticky` หรือ `fixed`
+- **Visual Style:** ใช้ effect "Liquid Glass" — background โปร่งแสง (`bg-white/10` หรือ `bg-black/20`), blur พื้นหลัง (`backdrop-blur-md`) และมุมโค้ง
+- **Premium Iconography:** ห้ามใช้ emoji สำหรับ UI element ใดๆ — ในโค้ดหรือใน interface แทนด้วย SVG ความละเอียดสูง
+- **Smooth Interaction Standard:** ทุก interactive element ต้องใช้ `.smooth-hover` (0.18s) หรือ `.smooth-hover-fast` (0.08s)
+- **Optimistic UI Updates:** สำหรับ interaction ที่ต้องการความรู้สึก instant (โหวต, ถูกใจ, bookmark) UI ต้องสะท้อนสถานะใหม่ทันทีก่อนได้รับ response จาก server
+
+## 9. กระบวนการพัฒนาและกฎการดำเนินงาน
+
+### คำสั่งเริ่ม Service
+| Service | คำสั่ง |
+|---|---|
+| Backend (NestJS) | `bun run start:dev` |
+| Frontend (Next.js) | `bun run dev` |
+| MIT Server | `.\MIT\run-server.bat` |
+
+### Checklist บังคับหลังแก้ไข
+หลัง code change ทุกครั้ง ต้องทำตามลำดับดังนี้:
+
+1. **อัปเดตเอกสาร** — ซิงค์เอกสารทุกส่วนที่เกี่ยวข้องให้สะท้อนการเปลี่ยนแปลง
+2. **ตรวจ Log** — verify log จาก service ที่ได้รับผลกระทบหลังแก้ทุกครั้ง
+3. **Restart MIT Server** — ถ้าแก้ไขไฟล์ MIT ต้อง restart ด้วยตนเองผ่าน `.\MIT\run-server.bat` MIT ไม่มีกลไก auto-restart
+4. **ห้ามใช้ Emoji ในโค้ด** — ห้ามใช้ emoji ใน source code, comment หรือ log message ใดๆ
+<!-- lang:end -->

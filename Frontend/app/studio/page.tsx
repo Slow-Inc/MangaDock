@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
@@ -206,7 +205,11 @@ export default function StudioOverviewPage() {
             <StudioMobileSection title="ข้อมูลเชิงลึก" subtitle="แตะเพื่อเข้าไปดูรายละเอียดแต่ละกลุ่มข้อมูล">
               <div className="space-y-3">
                 <StudioMobileMenuCard
-                  icon={<span className="text-lg">📊</span>}
+                  icon={
+                    <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.5V21h4.5v-7.5H3zm6.75-6V21H14.25V7.5H9.75zM16.5 3V21H21V3h-4.5z" />
+                    </svg>
+                  }
                   title="ข้อมูลผลงาน"
                   description="ภาษา สถานะผลงาน และเรื่องที่มีจำนวนตอนมากที่สุด"
                   value={`${overviewStats.languages} ภาษา`}
@@ -214,7 +217,12 @@ export default function StudioOverviewPage() {
                   onClick={() => setMobileView("insights")}
                 />
                 <StudioMobileMenuCard
-                  icon={<span className="text-lg">🪙</span>}
+                  icon={
+                    <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-4-4a4 4 0 008 0m-8-4a4 4 0 008 0" />
+                      <circle cx="12" cy="12" r="9" strokeLinecap="round" />
+                    </svg>
+                  }
                   title="กระแสเหรียญ"
                   description="ดูรายรับรายจ่ายรายเดือน และแนวโน้มธุรกรรมล่าสุด"
                   value={formatCurrency(overviewStats.balance)}
@@ -222,7 +230,11 @@ export default function StudioOverviewPage() {
                   onClick={() => setMobileView("wallet")}
                 />
                 <StudioMobileMenuCard
-                  icon={<span className="text-lg">🧾</span>}
+                  icon={
+                    <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                  }
                   title="รายการล่าสุด"
                   description="สรุป transaction ล่าสุดและทางลัดไปหน้าจัดการที่เกี่ยวข้อง"
                   value={`${transactions.length} รายการ`}
