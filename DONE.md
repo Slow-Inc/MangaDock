@@ -1456,3 +1456,149 @@ the landmines-to-preserve quick-ref, the S1-S26 seam status table (done/next/blo
 #186-#193 issue status, and pending items (#180 wiring, glossary assembly). Added memory
 project_mit_refactor_resume pointing a fresh session at it. All canonical artifacts already committed
 (analysis, plan, dissection, port-plan, report). A reset context can now resume at S2 without re-exploring.
+
+## 2026-06-09 — #187 S2: fold the 4 translation→region assign copies + 3 original-as-translation copies
+Following the reconciled roadmap's corrected step 2. The happy-path "assign each translated sentence to its
+region + stamp target_lang/_alignment/_direction" loop was near-duplicated in four MangaTranslator paths
+(single / batch-memory-fallback / batch shared-index / concurrent), the render-casing logic appeared a fifth
+time in the retry path, and an error-fallback "use the source text as its own translation" loop in three
+more. Extracted to region_apply.{apply_translations, apply_render_casing, apply_original_as_translation};
+all 8 sites delegate (region.translation-assign loops 8→0). Byte-identical: preserves the L10 zip-truncation
+invariant (single/batch zip; concurrent's i<len guard yields the same kept-set so it collapses to the same
+zip), the single-path-only casing (apply_casing flag — batch/concurrent/memory-fallback never cased), and
+the batch shared-index by returning the consumed count so the caller advances text_idx itself. New branch
+off main (refactor/mit-seam-s2-apply-translations).
+Tests: test_region_apply.py 9 passed (assign+metadata, casing on/off, in-place re-case, L10 truncation,
+extra-dropped, shared-index threading, original-as-translation no-casing); region_filter 7 + translation-
+path regression 32 passed; full suite 177 passed (the 19 async-not-supported failures are pre-existing —
+verified identical on the stashed base).
+
+## 2026-06-09 — #187 S3 / #188 starts: ModelUsageTracker (wrap _model_usage_timestamps)
+First #188 seam (interleaved early per the reconciled roadmap). The model-usage TTL dict was stamped from 8
+inline _run_* sites (self._model_usage_timestamps[(tool, model)] = current_time) and swept in
+_detector_cleanup_job with a list(items()) loop + mid-iteration del. Extracted to
+model_usage_tracker.ModelUsageTracker — touch(tool, model, now) / expired(ttl, now) / forget(tool, model),
+clock injected so it tests in <1s with no ML stack. All 8 sites now call touch(...); the sweep is
+`for tool, model in tracker.expired(self.models_ttl, now): await _unload_model(...); tracker.forget(...)`.
+Byte-identical: keys NOT normalised so the L1 key-drift is pinned verbatim ('colorizer' never matching
+_unload_model's case 'colorization'; 'textline_merge'/'rendering' no-case) — golden'd before S4 freezes the
+unload routing; strict `> ttl`; insertion-order list(...) snapshot so mid-sweep forget is safe (L13). 0
+remaining _model_usage_timestamps refs. Stacked on the S2 branch (refactor/mit-seam-s3-model-usage-tracker).
+Tests: test_model_usage_tracker.py 7 passed (strict-> boundary, insertion order, forget, safe-forget-during-
+iteration, re-touch refresh); full suite 184 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — #187 S4 / #188: ModelUnloader (routing table replaces _unload_model match/case)
+The 6-arm `match tool:` in _unload_model became model_unloader.ModelUnloader — an injected
+{tool: async unload_fn} table + empty_cache/cuda_available hooks; _unload_model is now a one-line delegate
+(await self._model_unloader.unload(tool, model)). The ctor wires the table from the real unload_* imports
+(colorization/detection/inpainting/ocr/upscaling/translation) + torch.cuda.empty_cache/is_available. Routes
+injected → module pulls in no ML stack, tests via asyncio.run (pytest-asyncio not active here). Byte-identical:
+same log line, same fall-through-then-empty_cache order, and crucially the L1-drifted keys the tracker stamps
+('colorizer' vs the table's 'colorization', plus 'textline_merge'/'rendering') route to NOTHING — the same
+latent no-op the match/case had, now pinned by a test (3× empty_cache, 0 unloads) before the routing is
+frozen. Stacked on S3 (refactor/mit-seam-s4-model-unloader). S3+S4 together lift the model-lifecycle state
+(tracker + unloader) out of the god object — the #188 foundation; next #188 seam is S20 ModelReaper (the TTL
+loop) after S5.
+Tests: test_model_unloader.py 4 passed (known-tool route+cache, L1-drift no-op ×3, no-empty-cache-when-cuda-
+unavailable, per-tool routing); full suite 188 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — #187 S5: release_memory (fold the 4 verbatim gc.collect + empty_cache copies)
+The `gc.collect()` + `if torch.cuda.is_available(): torch.cuda.empty_cache()` cleanup was repeated verbatim in
+4 MangaTranslator spots (>85% pre-processing guard, MemoryError fallback, per-page individual cleanup,
+per-batch tail). Extracted to memory_guard.release_memory(cuda_available, empty_cache) — the two torch hooks
+injected so it unit-tests with no torch. All 4 sites → release_memory(torch.cuda.is_available,
+torch.cuda.empty_cache); 0 remaining gc.collect/import gc in the god object. Byte-identical (same
+collect-then-empty order, same cuda gating). Surgical-scope note: the psutil virtual_memory().percent > 85
+pressure check is single-use, so it was NOT extracted (nothing to de-duplicate; the analysis's
+under_memory_pressure() is deferred until a 2nd site appears — folding a single-use block would add a function
+without collapsing drift, against the North Star). Stacked on S4 (refactor/mit-seam-s5-memory-guard).
+Tests: test_memory_guard.py 2 passed (collect-then-empty when cuda available; collect-only when not); full
+suite 190 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — #187 S7: context_page_counts (fold the 2 context-carry accounting blocks)
+The (pages_used, skipped) accounting — "how many recent non-empty pages to carry, how many expected pages
+skipped for being empty" — was identical in single dispatch (_dispatch_with_context) and concurrent dispatch
+(_batch_translate_texts), each feeding the "Carrying N" / "Skipped N" log lines. Extracted to
+context_counts.context_page_counts(context_size, done_pages); both sites → one-line call so the two paths'
+logged numbers can't drift. Byte-identical: both counts capped at context_size, blank-page detection
+any(sent.strip() ...) preserved. Scope note: _build_prev_context recomputes its OWN non_empty_pages/pages_used
+to slice the context tail — that's the S6 seam, left untouched. Stacked on S5
+(refactor/mit-seam-s7-context-counts).
+Tests: test_context_counts.py 7 passed (context_size=0, no-pages, all-non-empty, blank-skipped, budget-caps-
+so-empty-not-skipped, budget-above-non-empty, page-empty-only-if-all-blank); full suite 197 passed (same 19
+pre-existing async failures); context regression (test_page_context/test_series_context) green.
+
+## 2026-06-09 — #187 S8: apply_post_dictionary (fold post-dict apply+log; move dict helpers to dictionary.py)
+The post-translation dictionary apply+log block was verbatim in single (_translate) and batch
+(_apply_post_translation_processing). Extracted to dictionary.apply_post_dictionary(text_regions,
+post_dict_path) — applies post-dict to each region.translation in place, collects "before => after" records,
+logs per-line + summary (or "No post-translation replacements made."), returns the list. The pure
+load_dictionary/apply_dictionary helpers were MOVED out of manga_translator.py into the same new dictionary.py
+(they only use os/re/logger, no MangaTranslator deps) so the stage tests with no ML stack; manga_translator
+re-imports all three, so `from .manga_translator import load_dictionary` still resolves and __main__.py is
+untouched (verified: load_dictionary.__module__ == manga_translator.dictionary). Byte-identical: same records,
+same logs, same `import regex as re` semantics. Completes the Phase-A low-risk cluster (S1-S5,S7,S8); S6
+build_prev_context (med-risk) is next. Stacked (refactor/mit-seam-s8-post-dictionary).
+Tests: test_dictionary.py 6 passed (replace, token-delete, summary+per-line logs, no-replacements message,
+empty-path no-op, moved-helper parse/apply); full suite 203 passed (same 19 pre-existing async failures).
+
+## 2026-06-09 — E2E smoke-validation of the S2-S8 stack (live pipeline, hayateotsu.space)
+User brought up MIT on the refactored working tree + ran a real translation (OPM benchmark page). Result: full
+pipeline ran end-to-end clean — translate → region-assign + uppercase casing (S2, visibly correct) → post-dict
+(S8) → model lifecycle (S3/S4/S5) → render; no crash, all bubbles populated & placed, hyphenated. Output is
+markedly better than the pre-render-parity "before" shot (no edge-clipping). Confirmed the refactor caused NO
+regression. The remaining gap to the MangaTranslator target (translation wording/naturalness, missing space
+after punctuation — present in the "before" shot too, ぬっ SFX→"LOOM" not rendered, minor fit) are pre-existing
+translation/SFX(#168)/line-break quality issues ORTHOGONAL to the byte-identical decomposition. Decision: finish
+the refactor workstream first (no PR / no quality work yet).
+
+## 2026-06-09 — #187 S6: build_prev_context (pure fn; per-mode index policy explicit)
+MangaTranslator._build_prev_context (the ~50-line per-mode context-string builder) extracted to pure
+prev_context.build_prev_context(all_page_translations, original_page_texts, context_size, *, use_original_text,
+current_page_index, batch_index, batch_original_texts); the method is now a thin delegate so its 2 call sites
+are untouched. Byte-identical: preserves the L7 available_pages.index(page) FIRST-MATCH (duplicate-content pages
+map to the earliest original), the pages_used==0 / not-available_pages empty short-circuits, and the concurrent
+`pass` (no append when not using original text). hasattr(self,'_original_page_texts') -> `is not None` (equiv —
+the attr is always init'd []). Process note: Serena replace_symbol_body mis-detected the method start line and
+produced a duplicate def + ate part of _dispatch_with_context; caught by grep, reverted file to S8 state, redid
+with an anchored regex. Stacked (refactor/mit-seam-s6-build-prev-context).
+Tests: test_prev_context.py 11 passed (numbered output, context_size<=0, no-pages, blank-skip+cap,
+current_page_index slice, use_original pull, L7 duplicate first-match, original-fallback, concurrent append vs
+pass); context regression (test_page_context/test_series_context) green; full suite 214 passed (same 19
+pre-existing async failures, no new breakage).
+## 2026-06-09 — #187 S9: none-translator front-matter guards (L12 + L3)
+Two landmine pieces of _run_text_translation's front-matter extracted to none_translator.py:
+apply_prep_manual_override(config, prep_manual) (L12 — prep_manual forces translator=none by mutating
+config.translator.translator in place; poisons a reused Config, preserved verbatim) and
+stamp_none_translations(text_regions, config) (L3 — blanks every region.translation + stamps metadata; caller
+returns ALL regions unfiltered vs the filtered normal path). Call-site order preserved EXACTLY (override →
+tracker.touch → if-none stamp + return ctx.text_regions) so touch still fires for the none path. Byte-identical.
+Stacked (refactor/mit-seam-s9-none-translator).
+Tests: test_none_translator.py 4 passed (prep_manual true/false, none-stamp metadata, empty-list no-op); full
+suite 218 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — #187 S10: translation side-channel I/O (load/save_text)
+The --load-text/--save-text JSON read/write in _run_text_translation extracted to
+translation_store.{read_translations, write_translations} (byte-identical: indent=4, ensure_ascii=False). The
+print(...) + bare exit(-1) (L2) and the input_files[0] filename derivation are LEFT INLINE (exit is a
+process-control landmine clearer when visible); no IndexError guard added (would change behaviour). Latent bug
+surfaced + preserved: the inline open(...,"w") had no encoding=, so on cp1252-default Windows ensure_ascii=False
+non-ASCII raises UnicodeEncodeError — candidate fix (encoding="utf-8") deferred to an opt-in change; logged in
+the progress doc. Stacked (refactor/mit-seam-s10-translation-store).
+Tests: test_translation_store.py 3 passed (round-trip, indent-4 array, non-ASCII unescaped ensure_ascii=False);
+full suite 221 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — #187 S11: ImageDebugContext (full class — debug-folder path lifecycle)
+The invasive one (user chose full extraction for long-term tech-debt reduction). Consolidated the scattered
+_current_image_context / _saved_image_contexts state + _set/_get/_save/_restore_image_context helpers +
+_result_path + the 2 manual save/restore swap closures into image_debug_context.ImageDebugContext
+(set/subfolder/save/restore/clear_saved/with_context/result_path). Approach: state+logic moved into the class;
+the 5 methods became THIN DELEGATES (so their ~call sites are unchanged); ~18 direct self._current_image_context
+reads -> self._image_debug.current (mechanical rename, dict shape preserved); the 2 swap closures
+(original=...; ...=X; try: result_path; finally: ...=original) -> `with self._image_debug.with_context(X):
+return self._result_path(path)`. Byte-identical: same subfolder format, same verbose/web/result_sub_folder path
+branches incl. the no-context default {ts}-unknown-1024-unknown-unknown, same makedirs, same getattr defaults.
+0 orphan refs; diff reviewed call-site-by-call-site. Stacked (refactor/mit-seam-s11-image-debug-context).
+Tests: test_image_debug_context.py 13 passed (subfolder, save/restore round-trip+miss, no-current save no-op,
+with_context swap + exception-restore, 5 result_path goldens, set with/without image + getattr defaults); full
+suite 234 passed (same 19 pre-existing async failures, no new breakage).

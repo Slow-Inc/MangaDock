@@ -2,7 +2,12 @@
 
 > **Single entry point** for the MIT tech-debt decomposition. If context was lost, READ THIS FIRST,
 > then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
-> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09.
+> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S11 done; S1-S11 complete, E2E-smoke-validated through S8).
+
+> **New latent bug found (preserve for now, fix later behind a flag):** `write_translations`
+> (was inline `--save-text`) opens the file with NO `encoding=`, so on a non-UTF-8 default
+> platform (Windows cp1252) `ensure_ascii=False` non-ASCII content raises `UnicodeEncodeError`.
+> Kept byte-identical in S10; candidate fix = add `encoding="utf-8"` (opt-in/standalone).
 
 ## How to resume (read order)
 1. **This file** — current position + seam status table below.
@@ -46,17 +51,17 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | #192a | `TranslatorChain` parse → `translator_chain.py` | pure | low | ✅ | `33cec29` |
 | #192b | remove dead `_batch_contexts/_configs` | — | low | ✅ | `eae3e02` |
 | **S1** | `filter_translated_regions` (3-way filter dedup) | pure | low | ✅ | `a71e4d2` |
-| **S2** | `apply_translations` / `apply_original_as_translation` (fold 4 copies + casing) | pure | low | ▶️ next | — |
-| **S3** | `ModelUsageTracker` (wrap `_model_usage_timestamps`; **#188 starts**) | stateful | low | ⬜ | — |
-| **S4** | `ModelUnloader` (routing table; preserve L1) | stateful | med | ⬜ | S3 |
-| **S5** | `memory_pressure_guard` (gc/empty_cache/psutil) | stateful | low | ⬜ | — |
-| **S7** | `context_page_counts` (fold accounting) | pure | low | ⬜ | — |
-| **S8** | `PostDictionaryStage` (fold post-dict) | stateful | low | ⬜ | — |
-| **S6** | `build_prev_context` pure fn (per-mode index policy explicit) | pure | med | ⬜ | — |
-| **S9** | `NoneTranslator/GuardPolicy` (front-matter, L3/L12) | stateful | med | ⬜ | — |
-| **S10** | `TranslationFileSideChannel` (load/save_text; L2 `exit(-1)`) | stateful | med | ⬜ | — |
-| **S11** | `ImageDebugContext` (result_path + MD5 swap) | stateful | med | ⬜ | — |
-| **S12** | `PipelineParams` + `apply_global_settings` (needs #192) | mixed | med | ⬜ | #192 |
+| **S2** | `apply_translations` / `apply_original_as_translation` (fold 4 copies + casing) | pure | low | ✅ | `region_apply.py` (branch `refactor/mit-seam-s2-apply-translations`) |
+| **S3** | `ModelUsageTracker` (wrap `_model_usage_timestamps`; **#188 starts**) | stateful | low | ✅ | `model_usage_tracker.py` (branch `…-s3-model-usage-tracker`) |
+| **S4** | `ModelUnloader` (routing table; preserve L1) | stateful | med | ✅ | `model_unloader.py` (branch `…-s4-model-unloader`) |
+| **S5** | `memory_pressure_guard` (gc/empty_cache/psutil) | stateful | low | ✅ | `memory_guard.py` — `release_memory` only (psutil check single-use, left inline) |
+| **S7** | `context_page_counts` (fold accounting) | pure | low | ✅ | `context_counts.py` (only the 2 log-accounting blocks; `_build_prev_context`'s own count is S6) |
+| **S8** | `PostDictionaryStage` (fold post-dict) | stateful | low | ✅ | `dictionary.py` (moved load/apply + new `apply_post_dictionary`; re-exported) |
+| **S6** | `build_prev_context` pure fn (per-mode index policy explicit) | pure | med | ✅ | `prev_context.py` (thin delegate; L7 first-match preserved) |
+| **S9** | `NoneTranslator/GuardPolicy` (front-matter, L3/L12) | stateful | med | ✅ | `none_translator.py` (prep-manual override L12 + none-stamp L3; order preserved) |
+| **S10** | `TranslationFileSideChannel` (load/save_text; L2 `exit(-1)`) | stateful | med | ✅ | `translation_store.py` (JSON I/O only; L2 exit + filename left inline) |
+| **S11** | `ImageDebugContext` (result_path + MD5 swap) | stateful | med | ✅ | `image_debug_context.py` (full class; helpers→delegates; swap closures→`with_context`) |
+| **S12** | `PipelineParams` + `apply_global_settings` (needs #192) | mixed | med | ▶️ next | #192 |
 | **S20** | `ModelReaper` (TTL loop; opt-in `.stop()`, L14) | async-orch | med | ⬜ | S3,S4 |
 | **S15** | Stage protocol over 8 `_run_*` (**#187 core begins**) | async-orch | low | ⬜ | S3 |
 | **S13** | `DetectionPostProcessor` (formalize `_merge_sfx_detections`) | stateful | low | ⬜ | S15 |
@@ -76,8 +81,8 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | Issue | Title | Status |
 |---|---|---|
 | #186 | `calc_horizontal` → pluggable LineBreaker seam | seam extracted (`_greedy_pack`); #180 wiring pending |
-| #187 | MangaTranslator god object → stage orchestrators | in progress (S1 done; S2 next) |
-| #188 | model load/lifecycle + translator base abstractions | starts at S3 (interleaved early) |
+| #187 | MangaTranslator god object → stage orchestrators | in progress (S1+S2 done) |
+| #188 | model load/lifecycle + translator base abstractions | started — S3 tracker + S4 unloader done; next #188 seam is S20 ModelReaper (after S5) |
 | #189 | glyph-render dedup (`put_char` h/v + stroke) | open (orthogonal, render) |
 | #190 | `resize_regions_to_font_size` + box-padding decompose | open (orthogonal, render) |
 | #191 | vendored LDM (~3000 LOC) + YOLOv5 trim | open — **investigate first**: is SD/LDM dead? |
