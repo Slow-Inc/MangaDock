@@ -15,3 +15,4 @@
 - [Project: AnimeText approved](project_animetext_approved.md) — user อนุมัติ download deepghs/AnimeText_yolo (#168 SFX) 2026-06-09; .pt gate ผ่านเฉพาะ model นี้
 - [Feedback: tech-debt ต้องคิด scenario ครบ](feedback_techdebt_all_scenarios.md) — refactor core/shared module ต้องสร้าง characterization net ครอบทุก scenario ก่อนแตะโค้ด (core error = กระทบทั้งระบบ)
 - [Feedback: impact report](feedback_impact_report.md) — ปิด issue/เปิด PR ต้องเขียน report เสมอ: bug→post-mortem-template, feature/refactor→full-field change record (before→after/perf/quality/validation) ลง docs/reports/system-impact-report.md
+- [Feedback: core boundary](feedback_core_boundary.md) — feature ใหม่เสียบที่ seam + มี test ห้ามโตเข้า core monolith/copy boilerplate; ไม่มี seam ต้องแตก seam ก่อน (กัน tech debt ทวีคูณแบบ LINE); priority debt = core decomposition #188→#187
