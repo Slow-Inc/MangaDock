@@ -21,4 +21,10 @@ Also keep a **tech-debt register** (issues filed: number/area/severity/status) a
 
 **Why:** the user writes whole-system reports from this (2026-06-09: "เราต้องเขียน report ทั้งระบบ เช่น before vs after ตรงไหนแก้เพื่ออะไร ประสิทธิภาพเพิ่มขึ้นแค่ไหน คุณภาพเป็นยังไง"). A change logged without before→after / perf / quality / validation is incomplete for reporting.
 
-**How to apply:** terse + linkable; one dated section per batch; a per-change block or table carrying the fields above. In addition to — not instead of — `DONE.md` ([[feedback_md_history_log]]) + `MIT/PIPELINE.md §5`. Pairs with [[feedback-techdebt-all-scenarios]]. For a single fixed bug, a dedicated post-mortem (root cause / mechanism / fix / validation / how it slipped through) is the right artifact instead.
+**How to apply:** terse + linkable; one dated section per batch; a per-change block or table carrying the fields above. In addition to — not instead of — `DONE.md` ([[feedback_md_history_log]]) + `MIT/PIPELINE.md §5`. Pairs with [[feedback-techdebt-all-scenarios]].
+
+**Trigger — closing an issue OR opening a PR: always write a report.** Pick the right artifact:
+- **Bug fix** → fill `docs/reports/post-mortem-template.md` (Summary / Symptom / Root cause / Why-it-produced-the-symptom / Fix / How-found / Why-it-slipped / Validation / Action-items). Refuse to draft until the four required inputs are met (reliable repro · root cause known · fix identified · fix validated). Post bilingual EN+TH on the issue/PR.
+- **Feature / refactor / tech-debt** → use the full-field change record above (what/where · why · before→after · perf Δ · quality · validation · risk).
+- Either way also drop the entry into `docs/reports/system-impact-report.md`, and **never close an issue or merge without the user's explicit confirmation** ([[feedback_self_review]]).
+- Skip the ceremony only for a trivial one-liner (the PR/commit message is the record).
