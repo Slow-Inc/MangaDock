@@ -77,3 +77,18 @@ byte-identical when unset** (no behaviour change unless explicitly enabled on th
 ### Commits
 `bc6902c` (render-parity + SFX) · `a9dd09b` (frontend/misc WIP) · `9739b9d` (Knuth-Plass pure module) ·
 `03bc6ae` (#180→#186 deferral note) · `fdfb297` · `15f132d` · `778d144` (#186 seam + net).
+
+---
+
+## 2026-06-09 (cont.) — Tech-debt remediation (foundation phase)
+
+Executing `docs/reports/tech-debt-remediation-plan.md` (foundation-first). Each refactor = characterization/
+unit net first, byte-identical, shipped + validated per increment.
+
+**#192 (a) · extract TranslatorChain parsing** — *What/where:* `config.py` parse → pure
+`translator_chain.parse_translator_chain` (deps injected). *Why:* resolve the `# TODO: Refactor`;
+make translator-chain parsing testable without the ML stack. *Before → After:* parse welded into the
+class (untestable without importing `translators`) → pure function with 7 unit tests + a 1-line delegation.
+*Perf Δ:* none. *Quality:* byte-identical (real-deps check `gemini:ENG` → identical chain/translators/langs/
+target_lang). *Validation:* `test_translator_chain.py` 7 passed + source-inspection wiring test. *Risk:*
+behaviour-preserving; revert = single commit. *Links:* #192.
