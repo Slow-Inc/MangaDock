@@ -1443,3 +1443,18 @@ non-ASCII raises UnicodeEncodeError — candidate fix (encoding="utf-8") deferre
 the progress doc. Stacked (refactor/mit-seam-s10-translation-store).
 Tests: test_translation_store.py 3 passed (round-trip, indent-4 array, non-ASCII unescaped ensure_ascii=False);
 full suite 221 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — #187 S11: ImageDebugContext (full class — debug-folder path lifecycle)
+The invasive one (user chose full extraction for long-term tech-debt reduction). Consolidated the scattered
+_current_image_context / _saved_image_contexts state + _set/_get/_save/_restore_image_context helpers +
+_result_path + the 2 manual save/restore swap closures into image_debug_context.ImageDebugContext
+(set/subfolder/save/restore/clear_saved/with_context/result_path). Approach: state+logic moved into the class;
+the 5 methods became THIN DELEGATES (so their ~call sites are unchanged); ~18 direct self._current_image_context
+reads -> self._image_debug.current (mechanical rename, dict shape preserved); the 2 swap closures
+(original=...; ...=X; try: result_path; finally: ...=original) -> `with self._image_debug.with_context(X):
+return self._result_path(path)`. Byte-identical: same subfolder format, same verbose/web/result_sub_folder path
+branches incl. the no-context default {ts}-unknown-1024-unknown-unknown, same makedirs, same getattr defaults.
+0 orphan refs; diff reviewed call-site-by-call-site. Stacked (refactor/mit-seam-s11-image-debug-context).
+Tests: test_image_debug_context.py 13 passed (subfolder, save/restore round-trip+miss, no-current save no-op,
+with_context swap + exception-restore, 5 result_path goldens, set with/without image + getattr defaults); full
+suite 234 passed (same 19 pre-existing async failures, no new breakage).

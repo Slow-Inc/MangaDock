@@ -24,6 +24,7 @@ from .dictionary import load_dictionary, apply_dictionary, apply_post_dictionary
 from .prev_context import build_prev_context
 from .none_translator import apply_prep_manual_override, stamp_none_translations
 from .translation_store import read_translations, write_translations
+from .image_debug_context import ImageDebugContext
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -146,8 +147,7 @@ class MangaTranslator:
         self._original_page_texts = []  # 存储原文页面数据，用于并发模式下的上下文
 
         # 调试图片管理相关属性
-        self._current_image_context = None  # 存储当前处理图片的上下文信息
-        self._saved_image_contexts = {}     # 存储批量处理中每个图片的上下文信息
+        self._image_debug = ImageDebugContext()  # 图片级调试上下文 / per-image debug context (S11)
         
         # 设置日志文件
         self._setup_log_file()
@@ -312,47 +312,17 @@ class MangaTranslator:
 
         
     def _set_image_context(self, config: Config, image=None):
-        """设置当前处理图片的上下文信息，用于生成调试图片子文件夹"""
-        from .utils.generic import get_image_md5
+        """Delegate to ImageDebugContext (#187 S11)."""
+        self._image_debug.set(config, image)
 
-        # 使用毫秒级时间戳确保唯一性
-        timestamp = str(int(time.time() * 1000))
-        detection_size = str(getattr(config.detector, 'detection_size', 1024))
-        target_lang = getattr(config.translator, 'target_lang', 'unknown')
-        translator = getattr(config.translator, 'translator', 'unknown')
-
-        # 计算图片MD5哈希值
-        if image is not None:
-            file_md5 = get_image_md5(image)
-        else:
-            file_md5 = "unknown"
-
-        # 生成子文件夹名：{timestamp}-{file_md5}-{detection_size}-{target_lang}-{translator}
-        subfolder_name = f"{timestamp}-{file_md5}-{detection_size}-{target_lang}-{translator}"
-
-        self._current_image_context = {
-            'subfolder': subfolder_name,
-            'file_md5': file_md5,
-            'config': config
-        }
-        
     def _get_image_subfolder(self) -> str:
-        """获取当前图片的调试子文件夹名"""
-        if self._current_image_context:
-            return self._current_image_context['subfolder']
-        return ''
-    
+        return self._image_debug.subfolder
+
     def _save_current_image_context(self, image_md5: str):
-        """保存当前图片上下文，用于批量处理中保持一致性"""
-        if self._current_image_context:
-            self._saved_image_contexts[image_md5] = self._current_image_context.copy()
+        self._image_debug.save(image_md5)
 
     def _restore_image_context(self, image_md5: str):
-        """恢复保存的图片上下文"""
-        if image_md5 in self._saved_image_contexts:
-            self._current_image_context = self._saved_image_contexts[image_md5].copy()
-            return True
-        return False
+        return self._image_debug.restore(image_md5)
 
     @property
     def using_gpu(self):
@@ -604,8 +574,8 @@ class MangaTranslator:
         await self._report_progress('rendering')
 
         # 在rendering状态后立即发送文件夹信息，用于前端精确检查final.png
-        if hasattr(self, '_progress_hooks') and self._current_image_context:
-            folder_name = self._current_image_context['subfolder']
+        if hasattr(self, '_progress_hooks') and self._image_debug.current:
+            folder_name = self._image_debug.current['subfolder']
             # 发送特殊格式的消息，前端可以解析
             await self._report_progress(f'rendering_folder:{folder_name}')
 
@@ -652,8 +622,8 @@ class MangaTranslator:
             cv2.imwrite(self._result_path('final.png'), final_img)
 
             # 通知前端文件已就绪
-            if hasattr(self, '_progress_hooks') and self._current_image_context:
-                folder_name = self._current_image_context['subfolder']
+            if hasattr(self, '_progress_hooks') and self._image_debug.current:
+                folder_name = self._image_debug.current['subfolder']
                 await self._report_progress(f'final_ready:{folder_name}')
 
             # 创建占位符结果并立即返回
@@ -1214,40 +1184,9 @@ class MangaTranslator:
         return output
 
     def _result_path(self, path: str) -> str:
-        """
-        Returns path to result folder where intermediate images are saved when using verbose flag
-        or web mode input/result images are cached.
-        """
-        # 只有在verbose模式下才使用图片级子文件夹
-        if self.verbose:
-            image_subfolder = self._get_image_subfolder()
-            if image_subfolder:
-                if self.result_sub_folder:
-                    result_path = os.path.join(BASE_PATH, 'result', self.result_sub_folder, image_subfolder, path)
-                else:
-                    result_path = os.path.join(BASE_PATH, 'result', image_subfolder, path)
-                # 确保目录存在
-                os.makedirs(os.path.dirname(result_path), exist_ok=True)
-                return result_path
-        
-        # 在server/web模式下（result_sub_folder为空）且为非verbose模式时
-        # 需要创建一个子文件夹来保存final.png
-        if not self.result_sub_folder:
-            if self._current_image_context:
-                # 直接使用已生成的子文件夹名
-                sub_folder = self._current_image_context['subfolder']
-            else:
-                # 没有上下文信息时使用默认值
-                timestamp = str(int(time.time() * 1000))
-                sub_folder = f"{timestamp}-unknown-1024-unknown-unknown"
-
-            result_path = os.path.join(BASE_PATH, 'result', sub_folder, path)
-        else:
-            result_path = os.path.join(BASE_PATH, 'result', self.result_sub_folder, path)
-        
-        # 确保目录存在
-        os.makedirs(os.path.dirname(result_path), exist_ok=True)
-        return result_path
+        """Path to the result folder for intermediate (verbose) or web-cached images
+        (#187 S11 — delegates to ImageDebugContext)."""
+        return self._image_debug.result_path(path, verbose=self.verbose, result_sub_folder=self.result_sub_folder)
 
     def add_progress_hook(self, ph):
         self._progress_hooks.append(ph)
@@ -1341,13 +1280,13 @@ class MangaTranslator:
                 # 为批量处理中的每张图片设置上下文
                 self._set_image_context(config, image)
                 # 保存图片上下文，确保后处理阶段使用相同的文件夹
-                if self._current_image_context:
-                    image_md5 = self._current_image_context['file_md5']
+                if self._image_debug.current:
+                    image_md5 = self._image_debug.current['file_md5']
                     self._save_current_image_context(image_md5)
                 ctx = await self._translate_until_translation(image, config)
                 # 保存图片上下文到Context对象中，用于后续批量处理
-                if self._current_image_context:
-                    ctx.image_context = self._current_image_context.copy()
+                if self._image_debug.current:
+                    ctx.image_context = self._image_debug.current.copy()
                 # 保存verbose标志到Context对象中
                 ctx.verbose = self.verbose
                 pre_translation_contexts.append((ctx, config))
@@ -1370,13 +1309,13 @@ class MangaTranslator:
                     # 重新设置图片上下文
                     self._set_image_context(recovery_config, image)
                     # 保存fallback图片上下文
-                    if self._current_image_context:
-                        image_md5 = self._current_image_context['file_md5']
+                    if self._image_debug.current:
+                        image_md5 = self._image_debug.current['file_md5']
                         self._save_current_image_context(image_md5)
                     ctx = await self._translate_until_translation(image, recovery_config)
                     # 保存图片上下文到Context对象中
-                    if self._current_image_context:
-                        ctx.image_context = self._current_image_context.copy()
+                    if self._image_debug.current:
+                        ctx.image_context = self._image_debug.current.copy()
                     # 保存verbose标志到Context对象中
                     ctx.verbose = self.verbose
                     pre_translation_contexts.append((ctx, recovery_config))
@@ -1474,7 +1413,7 @@ class MangaTranslator:
                 self._original_page_texts.append(page_original_texts)
 
         # 清理批量处理的图片上下文缓存
-        self._saved_image_contexts.clear()
+        self._image_debug.clear_saved()
         
         return results
 
@@ -1618,8 +1557,8 @@ class MangaTranslator:
             logger.info("No pre-translation replacements made.")
 
         # 保存当前图片上下文到ctx中，用于并发翻译时的路径管理
-        if self._current_image_context:
-            ctx.image_context = self._current_image_context.copy()
+        if self._image_debug.current:
+            ctx.image_context = self._image_debug.current.copy()
 
         return ctx
 
@@ -2437,16 +2376,12 @@ class MangaTranslator:
             # ChatGPT2Stage需要特殊处理
             if config.translator.translator == Translator.chatgpt_2stage:
                 # 为当前图片创建专用的result_path_callback，避免并发时路径错位
-                current_image_context = getattr(ctx, 'image_context', None) or self._current_image_context
+                current_image_context = getattr(ctx, 'image_context', None) or self._image_debug.current
 
                 def result_path_callback(path: str) -> str:
                     """为特定图片创建结果路径，使用保存的图片上下文"""
-                    original_context = self._current_image_context
-                    self._current_image_context = current_image_context
-                    try:
+                    with self._image_debug.with_context(current_image_context):
                         return self._result_path(path)
-                    finally:
-                        self._current_image_context = original_context
 
                 ctx.result_path_callback = result_path_callback
 
@@ -2461,17 +2396,13 @@ class MangaTranslator:
                         if hasattr(batch_ctx, 'image_context'):
                             batch_image_context = batch_ctx.image_context
                         else:
-                            batch_image_context = self._current_image_context
+                            batch_image_context = self._image_debug.current
 
                         def create_result_path_callback(image_context):
                             def result_path_callback(path: str) -> str:
                                 """为特定图片创建结果路径，使用保存的图片上下文"""
-                                original_context = self._current_image_context
-                                self._current_image_context = image_context
-                                try:
+                                with self._image_debug.with_context(image_context):
                                     return self._result_path(path)
-                                finally:
-                                    self._current_image_context = original_context
                             return result_path_callback
 
                         batch_ctx.result_path_callback = create_result_path_callback(batch_image_context)
@@ -2626,8 +2557,8 @@ class MangaTranslator:
         await self._report_progress('rendering')
 
         # 在rendering状态后立即发送文件夹信息，用于前端精确检查final.png
-        if hasattr(self, '_progress_hooks') and self._current_image_context:
-            folder_name = self._current_image_context['subfolder']
+        if hasattr(self, '_progress_hooks') and self._image_debug.current:
+            folder_name = self._image_debug.current['subfolder']
             # 发送特殊格式的消息，前端可以解析
             await self._report_progress(f'rendering_folder:{folder_name}')
 
