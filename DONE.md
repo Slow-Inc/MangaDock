@@ -821,6 +821,42 @@ MIT_TRANSLATOR=gemini   # gemini | qwen3 | qwen3_big | nllb | sugoi
 - `atomic_wallet_and_vote_rpcs` migration — `add_coins_atomic`, `spend_coins_atomic`, `recalculate_votes_atomic` created
 - `update_wallet_rpcs_with_balance_after` migration — Updated RPCs to include `balance_after` and `reference_id` in transaction insert
 
+---
+
+## ✅ Cloudflare Worker + R2 Integration — Phase A+B+C-B (2026-06-09)
+
+Branch: `feat/context-aware-translation`
+
+### Phase A — Worker deploy + secrets
+- `Cloudflare-Worker/wrangler.toml` — fix `bucket_name = "mangadock-assets"`, `name = "mangadock-worker"`
+- Worker deployed ที่ `https://mangadock-worker.akkanop2549.workers.dev`
+- Secrets set: `BACKEND_SHARED_SECRET`, `MIT_PROCESS_URL`, `IMAGE_QUALITY_PROFILE`
+- Endpoints verified: `/health`, `/v1/exists`, `/v1/object` (GET/PUT/DELETE), `/v1/translate`
+
+### Phase B — CloudflareR2StorageProvider + /v1/list
+- `Cloudflare-Worker/src/index.ts` — เพิ่ม `handleList()` + route `GET /v1/list` (prefix/recursive, delimiter="/" สำหรับ readdir semantics)
+- `Backend/src/common/env.validation.ts` — เพิ่ม `WORKER_URL`, `WORKER_SECRET` (optional)
+- `Backend/src/common/storage/cloudflare-r2.provider.ts` (ใหม่) — `CloudflareR2StorageProvider` implements `StorageProvider` (put/get/delete/deleteDir/exists/list → Worker API)
+- `Backend/src/common/storage/storage.module.ts` — factory switch: `WORKER_URL`+`WORKER_SECRET` set → R2 provider, otherwise disk
+- **key insight:** `DiskStorageProvider.list()` = `readdir` (basenames, 1 level) → Worker `handleList` ใช้ `delimiter="/"` เพื่อ mirror semantics เดียวกัน
+
+### Phase C-B — Worker translate-patches + Backend routing (#184 — closed)
+- `Cloudflare-Worker/src/index.ts` — เพิ่ม `MIT_PATCH_URL` ใน Env, `base64ToArrayBuffer()`, `handleTranslatePatches()` (R2 cache check → MIT → store PNGs + metadata JSON → return patches), route `POST /v1/translate-patches`
+- `Cloudflare-Worker/.dev.vars.example` — เพิ่ม `MIT_PATCH_URL`
+- `Backend/src/books/patches.controller.ts` (ใหม่) — `GET /r2-patches/*` → `storage.get(r2Key)` → stream PNG (เหตุผลที่ไม่ใช้ `/uploads/patches/`: `express.static` register ก่อน NestJS routes → controller ไม่ได้รับ request)
+- `Backend/src/books/books.module.ts` — register `PatchesController`
+- `Backend/src/books/books.service.ts` `translateMangaPagePatches()` — Worker branch: ถ้า `WORKER_URL`+`WORKER_SECRET` set → POST `/v1/translate-patches` → map `r2Key` → URL `{backendOrigin}/r2-patches/{r2Key}` → Redis cache; fallback = MIT direct (disk mode)
+- tsc EXIT 0 (Worker + Backend)
+
+**ยังไม่ทำ:** unit test Worker handler + integration test Backend→Worker path (track แยก)
+
+**Deploy checklist:**
+```
+cd Cloudflare-Worker && npx wrangler deploy
+npx wrangler secret put MIT_PATCH_URL   # http://26.17.141.205:5003/translate/with-form/patches
+# Backend .env: WORKER_URL + WORKER_SECRET
+```
+
 ### Package
 - `file-type` installed in Backend (`npm install file-type`)
 
@@ -1162,6 +1198,114 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 - `books-batch-webhook.spec.ts` (13 tests) + `books-retry.spec.ts` (2) + `books-health.spec.ts` (2) + `mit-webhook-hmac.spec.ts` (3) added
 - Option A' implementation issue pending — will replace `startOrAttachBatchJob` (~500 lines) with Redis pub/sub (~50 lines)
 - `processingPages: Set<number>` added to `BatchJobState` interface (temporary, removed with Option A')
+
+---
+
+## ✅ Cloudflare Worker + R2 Storage Integration (2026-06-09, Branch: feat/context-aware-translation)
+
+### Status: COMPLETE (Phase A + B) — Phase C pending design decision
+
+---
+
+### สิ่งที่ทำในเซสชันนี้
+
+#### 1. R2 Bucket + Worker ตรวจสอบและตั้งค่า
+
+- ตรวจพบ bucket จริงชื่อ `mangadock-assets` (ไม่ใช่ `mangadock` ที่ wrangler.toml เดิมระบุ)
+- ตรวจพบ Worker ที่มีอยู่ใน account: `jakethewitcher`, `mangadock-assets`, `tctps` — ไม่มี `mangadock-worker`
+- ตัดสินใจ deploy ในชื่อ `mangadock-worker` (Worker ใหม่) เพื่อแยกออกจาก placeholder
+- ตั้ง secrets ผ่าน `wrangler secret put` (3 ค่า: `BACKEND_SHARED_SECRET`, `MIT_PROCESS_URL`, `IMAGE_QUALITY_PROFILE`)
+- Worker ขึ้น production แล้วที่ `https://mangadock-worker.akkanop2549.workers.dev`
+- ทดสอบ endpoints ผ่านจาก local: `/health` ✓, `/v1/exists` ✓, `PUT /v1/object` → R2 ✓
+
+---
+
+#### 2. ไฟล์ที่แก้ไข
+
+| ไฟล์ | การเปลี่ยนแปลง |
+|------|----------------|
+| `Cloudflare-Worker/wrangler.toml` | `name = "mangadock-worker"`, `bucket_name = "mangadock-assets"` |
+| `Cloudflare-Worker/src/index.ts` | เพิ่ม `R2ListResult` interface, `handleList()` function, route `GET /v1/list` |
+| `Backend/src/common/env.validation.ts` | เพิ่ม `WORKER_URL` + `WORKER_SECRET` (optional) |
+| `Backend/src/common/storage/cloudflare-r2.provider.ts` | **ไฟล์ใหม่** — implements `StorageProvider` ผ่าน Worker API |
+| `Backend/src/common/storage/storage.module.ts` | factory: ใช้ R2 provider เมื่อ `WORKER_URL`+`WORKER_SECRET` set, fallback `DiskStorageProvider` |
+
+---
+
+#### 3. Worker endpoint ใหม่: `GET /v1/list`
+
+```
+GET /v1/list?prefix=<prefix>            → directory listing (immediate children)
+GET /v1/list?prefix=<prefix>&recursive=true  → all keys under prefix (สำหรับ deleteDir)
+```
+
+Response: `{ ok: true, keys: string[] }`
+
+- `recursive=false` (default): ใช้ R2 `delimiter="/"` — คืนชื่อไฟล์และ subdirectory ระดับแรก (เหมือน `readdir` ของ `DiskStorageProvider`)
+- `recursive=true`: คืน R2 keys ทั้งหมดที่ขึ้นต้นด้วย prefix — ใช้โดย `CloudflareR2StorageProvider.deleteDir()`
+
+---
+
+#### 4. CloudflareR2StorageProvider
+
+`Backend/src/common/storage/cloudflare-r2.provider.ts` — implements `StorageProvider` interface ครบทุก method:
+
+| method | Worker endpoint | หมายเหตุ |
+|--------|----------------|---------|
+| `put(key, data)` | `PUT /v1/object?key=` | รองรับ Buffer, string, Readable |
+| `get(key)` | `GET /v1/object?key=` | คืน Buffer |
+| `delete(key)` | `DELETE /v1/object?key=` | 404 = success (idempotent) |
+| `deleteDir(prefix)` | `GET /v1/list?recursive=true` + delete each | parallel delete |
+| `exists(key)` | `GET /v1/exists?key=` | |
+| `list(prefix)` | `GET /v1/list?prefix=` | คืน basenames เหมือน readdir |
+
+---
+
+#### 5. StorageModule — factory switching
+
+```typescript
+// ใช้ R2 เมื่อ WORKER_URL + WORKER_SECRET ตั้งค่าไว้
+// Fallback เป็น DiskStorageProvider เมื่อไม่มี env vars
+```
+
+ทุก consumer ของ `STORAGE_PROVIDER` (`BooksService`, `UploadService`, `PatchStore`) สลับไปใช้ R2 โดยอัตโนมัติ — ไม่ต้องแก้โค้ด caller
+
+---
+
+#### 6. ขั้นตอนที่ user ต้องทำเพิ่ม
+
+```bash
+# 1. เพิ่มใน Backend/.env
+WORKER_URL=https://mangadock-worker.akkanop2549.workers.dev
+WORKER_SECRET=<same value ที่ set ใน wrangler secret put>
+
+# 2. Deploy Worker ที่อัปเดต (เพิ่ม /v1/list endpoint)
+cd Cloudflare-Worker && npx wrangler deploy
+```
+
+---
+
+#### 7. Phase C — ยังไม่ implement (pending design decision)
+
+**ปัญหาที่พบ:** Worker `/v1/translate` ไม่ compatible กับ Backend translation flow ปัจจุบัน
+
+| | Worker `/v1/translate` | Backend (ปัจจุบัน) |
+|--|------------------------|-------------------|
+| MIT endpoint | `/translate/with-form/image` | `/translate/with-form/patches` |
+| Response | Full image binary (webp) | JSON patches `{xPct,yPct,wPct,hPct,url}` |
+| UX | Page ถูกแทนที่ทั้งหน้า | Overlay text bubbles บนหน้าเดิม |
+
+การ route translation ผ่าน Worker จะเปลี่ยน UX จาก "overlay patches" → "full image replacement" ซึ่งเป็น design decision ใหญ่ — รอ confirm ก่อน implement
+
+---
+
+#### ตั้งใจไม่แตะ
+
+- Forum, wallet, unlock, users modules — ไม่เกี่ยว
+- Frontend — URL shape เดิมทั้งหมด
+- MangaDex CDN URLs — คงเดิม
+- `ImageCacheService` (local thumbnail cache) — ยังใช้ disk ตามเดิม (scope แยก)
+- `MANGA_TRANSLATOR_URL` ใน Backend — MIT patch translation ยังทำงานผ่าน direct call เหมือนเดิม
 
 ---
 
