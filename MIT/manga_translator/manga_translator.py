@@ -131,9 +131,7 @@ class MangaTranslator:
         self._add_logger_hook()
 
         params = params or {}
-        
-        self._batch_contexts = []  # 存储批量处理的上下文
-        self._batch_configs = []   # 存储批量处理的配置
+
         self.disable_memory_optimization = params.get('disable_memory_optimization', False)
         # batch_concurrent 会在 parse_init_params 中验证并设置
         self.batch_concurrent = params.get('batch_concurrent', False)
