@@ -213,72 +213,66 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       const forceLocal = localStorage.getItem("imgCacheForceLocal") === "1";
       const qs = forceLocal ? "?forceLocal=true" : "";
 
+      // Auto-translate description (#151): start immediately from the card's
+      // description — only wait for the detail fetch when the card had none.
+      const translateDesc = (text: string) => {
+        setTranslatingDesc(true);
+        fetch(`${API_BASE}/books/translate?text=${encodeURIComponent(text)}`)
+          .then((r) => r.json())
+          .then((trans: { translatedText: string; translated: boolean }) => {
+            if (trans.translated) setTranslatedDesc(trans.translatedText);
+            setTranslatingDesc(false);
+          })
+          .catch(() => setTranslatingDesc(false));
+      };
+      if (book.description) translateDesc(book.description);
+
       fetch(`${API_BASE}/books/manga/${book.id}${qs}`)
         .then((r) => r.json())
         .then((d: MangaDetail) => {
           setDetail(d);
           setLoadingDetail(false);
-          
-          // Auto-translate description if non-Thai (using detail.description if book.description is empty)
-          const descToTranslate = book.description || d.description;
-          if (descToTranslate) {
-            setTranslatingDesc(true);
-            fetch(`${API_BASE}/books/translate?text=${encodeURIComponent(descToTranslate)}`)
-              .then((r) => r.json())
-              .then((trans: { translatedText: string; translated: boolean }) => {
-                if (trans.translated) setTranslatedDesc(trans.translatedText);
-                setTranslatingDesc(false);
-              })
-              .catch(() => setTranslatingDesc(false));
-          }
+          if (!book.description && d.description) translateDesc(d.description);
         })
         .catch(() => setLoadingDetail(false));
 
-      fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`)
-        .then((r) => r.json())
-        .then((mangaDexChapters: MangaChapter[]) => {
+      // Chapters + user versions in parallel (#151) — independent requests
+      // that were a pure waterfall before (versions only merges at the end).
+      Promise.all([
+        fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => r.json()),
+        fetch(`${API_BASE}/versions/title/${book.id}`)
+          .then((r) => (r.ok ? r.json() : []))
+          .catch(() => []), // versions failure → MangaDex chapters only
+      ])
+        .then(([mangaDexChapters, versions]: [MangaChapter[], any[]]) => {
           // Tag MangaDex chapters with source
           const tagged = mangaDexChapters.map((ch) => ({ ...ch, source: "mangadex" as const }));
-
-          // Also fetch user-uploaded versions for this title
-          fetch(`${API_BASE}/versions/title/${book.id}`)
-            .then((r) => r.ok ? r.json() : [])
-            .then((versions: any[]) => {
-              const userChapters: MangaChapter[] = (versions ?? []).map((v: any) => ({
-                id: `ver:${v.versionId}`,
-                chapterNumber: v.chapterNumber || null,
-                title: v.chapterTitle || null,
-                translatedLanguage: v.language || "th",
-                uploadedAt: v.createdAt || "",
-                pageCount: v.pages?.length ?? 0,
-                readerAvailable: v.backendAvailable !== false,
-                source: "user" as const,
-                translatorName: v.translatorName ?? null,
-                priceCoins: v.priceCoins ?? 0,
-                versionId: v.versionId,
-                backendAvailable: v.backendAvailable !== false,
-              }));
-              // Merge: MangaDex first, then user-uploaded, sort by chapter number
-              const merged = [...tagged, ...userChapters].sort((a, b) => {
-                const numA = parseFloat(a.chapterNumber ?? "0") || 0;
-                const numB = parseFloat(b.chapterNumber ?? "0") || 0;
-                return numA - numB;
-              });
-              setChapters(merged);
-              setLoadingChapters(false);
-              if (effectiveHighlightId) {
-                const lang = merged.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
-                if (lang) setLangFilter(lang);
-              }
-            })
-            .catch(() => {
-              setChapters(tagged);
-              setLoadingChapters(false);
-              if (effectiveHighlightId) {
-                const lang = tagged.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
-                if (lang) setLangFilter(lang);
-              }
-            });
+          const userChapters: MangaChapter[] = (versions ?? []).map((v: any) => ({
+            id: `ver:${v.versionId}`,
+            chapterNumber: v.chapterNumber || null,
+            title: v.chapterTitle || null,
+            translatedLanguage: v.language || "th",
+            uploadedAt: v.createdAt || "",
+            pageCount: v.pages?.length ?? 0,
+            readerAvailable: v.backendAvailable !== false,
+            source: "user" as const,
+            translatorName: v.translatorName ?? null,
+            priceCoins: v.priceCoins ?? 0,
+            versionId: v.versionId,
+            backendAvailable: v.backendAvailable !== false,
+          }));
+          // Merge: MangaDex first, then user-uploaded, sort by chapter number
+          const merged = [...tagged, ...userChapters].sort((a, b) => {
+            const numA = parseFloat(a.chapterNumber ?? "0") || 0;
+            const numB = parseFloat(b.chapterNumber ?? "0") || 0;
+            return numA - numB;
+          });
+          setChapters(merged);
+          setLoadingChapters(false);
+          if (effectiveHighlightId) {
+            const lang = merged.find((c) => c.id === effectiveHighlightId)?.translatedLanguage;
+            if (lang) setLangFilter(lang);
+          }
         })
         .catch(() => setLoadingChapters(false));
     } else {

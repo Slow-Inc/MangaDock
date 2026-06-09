@@ -45,6 +45,23 @@ describe('L3DiskService', () => {
     expect(service.readAll().get('wallet:user:456')?.data).toBe('coins');
   });
 
+  // Cycle 7 (#147) — compact on-disk format; legacy pretty files still readable
+  it('write() stores compact JSON (no pretty-print indentation)', () => {
+    service.write('manga:9', makeEntry({ a: 1, b: [1, 2] }));
+
+    const file = fs.readdirSync(tmpDir).find((f) => f.endsWith('.json'))!;
+    const raw = fs.readFileSync(path.join(tmpDir, file), 'utf-8');
+    expect(raw).not.toContain('\n'); // single-line compact output
+    expect(JSON.parse(raw).data).toEqual({ a: 1, b: [1, 2] });
+  });
+
+  it('readAll() still parses legacy pretty-printed files', () => {
+    const legacy = { ...makeEntry('old-style'), key: 'manga:legacy' };
+    fs.writeFileSync(path.join(tmpDir, 'manga_legacy.json'), JSON.stringify(legacy, null, 2), 'utf-8');
+
+    expect(service.readAll().get('manga:legacy')?.data).toBe('old-style');
+  });
+
   // Cycle 4 — Corrupt JSON resilience
   it('readAll() skips corrupt JSON files without throwing', () => {
     fs.writeFileSync(path.join(tmpDir, 'bad.json'), 'not-json{{{', 'utf-8');
