@@ -5,6 +5,15 @@
 > (`docs/research/` + the issues). Principle: **foundation → render → biggest-last, incremental,
 > ship/validate between steps — never big-bang.**
 
+## Why this order (anti-compounding)
+The thing that makes a codebase "become like LINE" is **features bolted onto the core until debt
+multiplies**. In MIT the core is the `MangaTranslator` orchestrator (#187) + the missing model/translator
+abstractions (#188) — that is where every new feature compounds. So **core decomposition (#188 → #187) is
+the objective**; the foundation + peripheral items are the *means* (the scaffolding + safety nets that let
+us decompose the core without breaking it), not an end to chase exhaustively. Don't nibble peripheral
+slices forever — finish enough foundation to make the core safe, then decompose the core. See the
+`feedback_core_boundary` rule: **new features attach at a seam with tests, never grow the monolith.**
+
 ## Iron rules (apply to every item)
 1. **Characterization net first.** For any core/shared module, capture golden behaviour across *all*
    imaginable scenarios before touching code, then prove byte-identical (`feedback_techdebt_all_scenarios`).
