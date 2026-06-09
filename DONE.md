@@ -1239,3 +1239,13 @@ TDD refactor-under-test on rendering/text_render.py::calc_horizontal (the #186 m
 Verified byte-identical: characterization + rendering_guard + pure-module suite all green (47 passed).
 NEXT on #186: broaden characterization cases (CJK/Thai/zwsp/empty), then extract the greedy packing
 (Step 1) into the pluggable LineBreaker seam so Knuth-Plass (#180) can slot in.
+
+## 2026-06-09 — #186 milestone: greedy line-break extracted into a swappable seam
+Applied the "test all scenarios first" rule (memory feedback_techdebt_all_scenarios): broadened the
+characterization net to 16 cases covering the rarely-hit branches (height-overflow max_width expansion,
+max_width<2*font clamp, Step 2 backward hyphenation, mixed EN+CJK, whitespace collapse, char-split,
+hyphenate on/off) BEFORE touching code. Then extracted calc_horizontal's Step-1 greedy packing into
+text_render._greedy_pack(words, word_widths, syllables, font_size, max_width, ws_off, hyphen_off)
+-> (line_words_list, line_width_list, hyphenation_idx_list). Steps 2-4 post-process its output unchanged.
+Byte-identical: 26 passed (characterization + guard + pure modules). This IS the #186 seam — #180 step 2
+now just adds a Knuth-Plass packer with the same signature + selects it behind a knob.
