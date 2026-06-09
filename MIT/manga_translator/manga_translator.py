@@ -18,6 +18,7 @@ from .region_filter import filter_translated_regions
 from .region_apply import apply_original_as_translation, apply_render_casing, apply_translations
 from .model_usage_tracker import ModelUsageTracker
 from .model_unloader import ModelUnloader
+from .memory_guard import release_memory
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -1452,10 +1453,7 @@ class MangaTranslator:
                     memory_percent = psutil.virtual_memory().percent
                     if memory_percent > 85:
                         logger.warning(f'High memory usage during pre-processing: {memory_percent:.1f}%')
-                        import gc
-                        gc.collect()
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
+                        release_memory(torch.cuda.is_available, torch.cuda.empty_cache)
                 except ImportError:
                     pass  # psutil 不可用时忽略
                 except Exception as e:
@@ -1489,10 +1487,7 @@ class MangaTranslator:
                     recovery_config = copy.deepcopy(config)
                     
                     # 强制清理
-                    import gc
-                    gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
+                    release_memory(torch.cuda.is_available, torch.cuda.empty_cache)
                     
                     # 重新设置图片上下文
                     self._set_image_context(recovery_config, image)
@@ -1558,10 +1553,7 @@ class MangaTranslator:
                     translated_contexts.append((ctx, config))
                     
                     # 每页翻译后都清理内存
-                    import gc
-                    gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
+                    release_memory(torch.cuda.is_available, torch.cuda.empty_cache)
                         
                 except Exception as individual_error:
                     logger.error(f'Individual page translation failed: {individual_error}')
@@ -2344,10 +2336,7 @@ class MangaTranslator:
                 results.extend(batch)
                 
             # 强制垃圾回收以释放内存
-            import gc
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            release_memory(torch.cuda.is_available, torch.cuda.empty_cache)
                 
         return results
 

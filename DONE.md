@@ -1357,3 +1357,16 @@ frozen. Stacked on S3 (refactor/mit-seam-s4-model-unloader). S3+S4 together lift
 loop) after S5.
 Tests: test_model_unloader.py 4 passed (known-tool route+cache, L1-drift no-op ×3, no-empty-cache-when-cuda-
 unavailable, per-tool routing); full suite 188 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — #187 S5: release_memory (fold the 4 verbatim gc.collect + empty_cache copies)
+The `gc.collect()` + `if torch.cuda.is_available(): torch.cuda.empty_cache()` cleanup was repeated verbatim in
+4 MangaTranslator spots (>85% pre-processing guard, MemoryError fallback, per-page individual cleanup,
+per-batch tail). Extracted to memory_guard.release_memory(cuda_available, empty_cache) — the two torch hooks
+injected so it unit-tests with no torch. All 4 sites → release_memory(torch.cuda.is_available,
+torch.cuda.empty_cache); 0 remaining gc.collect/import gc in the god object. Byte-identical (same
+collect-then-empty order, same cuda gating). Surgical-scope note: the psutil virtual_memory().percent > 85
+pressure check is single-use, so it was NOT extracted (nothing to de-duplicate; the analysis's
+under_memory_pressure() is deferred until a 2nd site appears — folding a single-use block would add a function
+without collapsing drift, against the North Star). Stacked on S4 (refactor/mit-seam-s5-memory-guard).
+Tests: test_memory_guard.py 2 passed (collect-then-empty when cuda available; collect-only when not); full
+suite 190 passed (same 19 pre-existing async failures, no new breakage).
