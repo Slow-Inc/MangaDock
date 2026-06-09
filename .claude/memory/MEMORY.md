@@ -14,3 +14,4 @@
 - [Project: Render knob gating](project_render_knob_gating.md) — in-app render ดีต่อเมื่อ backend ตั้ง MIT_* ครบ; MIT_BUBBLE_AREA_FIT gate #166/#179 (ไม่ตั้ง=legacy overflow); วิธี drive benchmark E2E ผ่าน MCP_DOCKER
 - [Project: AnimeText approved](project_animetext_approved.md) — user อนุมัติ download deepghs/AnimeText_yolo (#168 SFX) 2026-06-09; .pt gate ผ่านเฉพาะ model นี้
 - [Feedback: tech-debt ต้องคิด scenario ครบ](feedback_techdebt_all_scenarios.md) — refactor core/shared module ต้องสร้าง characterization net ครอบทุก scenario ก่อนแตะโค้ด (core error = กระทบทั้งระบบ)
+- [Feedback: impact report](feedback_impact_report.md) — งานสำคัญที่กระทบระบบ + tech debt ให้บันทึกลง docs/reports/system-impact-report.md (report-level) เพิ่มจาก DONE.md
