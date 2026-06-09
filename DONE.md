@@ -1657,3 +1657,21 @@ new memory location (it set the old attrs directly + reset now delegates). Stack
 Tests: test_translation_memory.py 4 passed (empty init, appendable, reset clears, reset-rebinds-not-clears);
 context regression (test_page_context/test_series_context) green; full suite 249 passed (18 pre-existing async
 failures, 0 real failures). Next AFK seam (last before core): S19 gather_per_context.
+
+## 2026-06-09 — #187 S19: gather_per_context (concurrent gather + per-exception placeholder)
+The concurrent driver's asyncio.gather(return_exceptions=True) + per-exception keep-original placeholder loop
+extracted to gather_per_context.gather_per_context(tasks, contexts_with_configs, ignore_errors); the inline
+~20-line block → one `final_results = await gather_per_context(...)` (bracketing Starting/Completed logs kept).
+Byte-identical: same return_exceptions=True, re-raise-unless-ignore_errors, apply_original_as_translation
+placeholder gated on ctx.text_regions, index alignment + logs. apply_original_as_translation still used at its
+other (batch error-fallback) sites — no orphan. Stack (refactor/mit-seam-s19-gather-per-context).
+Tests: test_gather_per_context.py 4 passed (all-succeed order, exception+ignore→placeholder index-aligned,
+exception+not-ignore→reraise-original, no-regions skips-apply); full suite 253 passed (18 pre-existing async).
+
+## 2026-06-09 — AFK decomposition batch done (S12-globals, S20, S13, S16, S19) — STOP before the core
+Per the dev's "do the normal seams AFK, stop at the hard ones": after PR #195 (S2–S11) merged, five more
+byte-identical seams landed on a stack — S12-globals (apply_global_settings), S20 (ModelReaper), S13
+(detection_postproc), S16 (TranslationMemory), S19 (gather_per_context). STOPPED before the high-risk
+async-orchestration core (S15 stage-protocol + S17/S18/S21/S22/S23/S24/S25/S26) which the analysis flags for
+E2E-per-step. Test baseline corrected to 18 async-only failures (a stale uppercase-wiring test from S2's casing
+move was fixed in S13). Full suite 253 passed, 0 real failures. Stack ready to PR.

@@ -29,6 +29,7 @@ from .pipeline_params import apply_global_settings
 from .model_reaper import ModelReaper
 from .detection_postproc import merge_sfx_detections
 from .translation_memory import TranslationMemory
+from .gather_per_context import gather_per_context
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -2255,27 +2256,7 @@ class MangaTranslator:
         
         logger.info(f'Starting concurrent translation of {len(tasks)} images...')
         
-        # 等待所有任务完成
-        try:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-        except Exception as e:
-            logger.error(f"Error in concurrent translation gather: {e}")
-            raise
-        
-        # 处理结果，检查是否有异常
-        final_results = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.error(f"Image {i+1} concurrent translation failed: {result}")
-                if not self.ignore_errors:
-                    raise result
-                # 创建失败的占位符
-                ctx, config = contexts_with_configs[i]
-                if ctx.text_regions:
-                    apply_original_as_translation(ctx.text_regions, config)
-                final_results.append((ctx, config))
-            else:
-                final_results.append(result)
+        final_results = await gather_per_context(tasks, contexts_with_configs, self.ignore_errors)
         
         logger.info(f'Concurrent translation completed: {len(final_results)} images processed')
         return final_results
