@@ -168,7 +168,6 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       onClose();
       resetTransientState();
     }, 300);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose, dismissToast, resetTransientState]);
 
   useEffect(() => {

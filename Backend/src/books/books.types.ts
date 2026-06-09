@@ -9,6 +9,10 @@ export type MangaCover = {
 
 export type MangaDetail = {
   id: string;
+  /** Localized series title from MangaDex attributes — anchors the
+   *  translator's series context (#157). Optional: detail entries cached
+   *  before this field existed lack it until their TTL expires. */
+  title?: string;
   authors: string[];
   artists: string[];
   covers: MangaCover[];

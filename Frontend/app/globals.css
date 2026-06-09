@@ -4,6 +4,19 @@
   --background: #08090d;
   --foreground: #f8f9fb;
   --mobile-nav-height: 4.25rem;
+
+  /* Surface depth scale */
+  --surface-base: #141414;
+  --surface-raised: #1a1a1a;
+  --surface-overlay: #151518;
+
+  /* Design token aliases (for legacy components) */
+  --bg-card: var(--surface-raised);
+  --border: rgba(255, 255, 255, 0.1);
+  --text-primary: #f8f9fb;
+  --text-secondary: rgba(248, 249, 251, 0.4);
+  --accent: #f59e0b;
+  --font-display: var(--font-noto-sans-thai);
 }
 
 @theme inline {
@@ -46,6 +59,13 @@ body::-webkit-scrollbar-thumb:hover {
 
 body::-webkit-scrollbar-thumb:active {
   background: rgba(99, 102, 241, 0.6);
+}
+
+/* Global focus ring — WCAG 2.1 SC 2.4.7 */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 img,
@@ -217,6 +237,11 @@ svg {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:active {
   background: rgba(99, 102, 241, 0.6);
+}
+
+/* Override focus ring to be invisible inside .no-focus-ring descendants */
+.no-focus-ring :focus-visible {
+  outline: none;
 }
 
 /* Global Smooth Hover Standard — Phase 2 Optimization */

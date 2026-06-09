@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import BookDetailModal from "../../components/BookDetailModal";
 import type { LandingBook } from "../../lib/types/manga";
@@ -8,21 +8,16 @@ import type { LandingBook } from "../../lib/types/manga";
 export default function BookDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [book, setBook] = useState<LandingBook | null>(null);
-  const [notFound, setNotFound] = useState(false);
-
-  useEffect(() => {
-    const stored = sessionStorage.getItem(`mb:book:${id}`);
-    if (!stored) {
-      setNotFound(true);
-      return;
-    }
+  const [book] = useState<LandingBook | null>(() => {
+    if (typeof window === "undefined") return null;
     try {
-      setBook(JSON.parse(stored) as LandingBook);
+      const stored = sessionStorage.getItem(`mb:book:${id}`);
+      return stored ? (JSON.parse(stored) as LandingBook) : null;
     } catch {
-      setNotFound(true);
+      return null;
     }
-  }, [id]);
+  });
+  const notFound = book === null;
 
   if (notFound) {
     return (
@@ -36,14 +31,6 @@ export default function BookDetailPage() {
             ← กลับ
           </button>
         </div>
-      </main>
-    );
-  }
-
-  if (!book) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#141414]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
       </main>
     );
   }

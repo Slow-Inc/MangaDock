@@ -26,3 +26,6 @@ Backend/img-cache/
 .claude/scheduled_tasks.lock
 Backend/issue_*.txt
 Backend/prd_*.txt
+
+# Local research clone (meangrinch/MangaTranslator) — studied, never committed
+/MangaTranslator

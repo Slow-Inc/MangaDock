@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import type Lenis from "lenis";
 import { createPortal } from "react-dom";
@@ -15,7 +14,7 @@ import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { useAuth } from "../contexts/AuthContext";
 import { getWalletBalance, purchaseUnlock, getUnlocksForTitle, topupCoins } from "../lib/studioApi";
 import MangaDiscussion from "./MangaDiscussion";
-import type { LandingBook, MangaCover, MangaDetail, MangaChapter } from "../lib/types";
+import type { LandingBook, MangaDetail, MangaChapter } from "../lib/types";
 
 type ActiveChapter = {
   id: string;
@@ -84,7 +83,6 @@ function MarqueeTitle({ title, active, className }: { title: string; active: boo
 }
 
 export default function BookDetailModal({ book, onClose, scrollToChapters = false, highlightChapterId, asPage = false }: Props) {
-  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const { favorited, liked, handleToggleFavorite, handleToggleLiked } = useBookActions(book);
@@ -104,7 +102,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
   const [translatingDesc, setTranslatingDesc] = useState(false);
   const [showOriginalDesc, setShowOriginalDesc] = useState(false);
-  const [forceLocalMode, setForceLocalMode] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
 
   const coverRowRef = useRef<HTMLDivElement>(null);
@@ -214,7 +211,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       setLoadingChapters(true);
 
       const forceLocal = localStorage.getItem("imgCacheForceLocal") === "1";
-      setForceLocalMode(forceLocal);
       const qs = forceLocal ? "?forceLocal=true" : "";
 
       // Auto-translate description (#151): start immediately from the card's
@@ -1208,7 +1204,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                           <button
                             onClick={() => setExpandedGroups((prev) => {
                               const next = new Set(prev);
-                              next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey);
+                              if (next.has(groupKey)) next.delete(groupKey); else next.add(groupKey);
                               return next;
                             })}
                             className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left transition ${

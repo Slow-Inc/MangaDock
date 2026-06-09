@@ -6,6 +6,9 @@ import { createPortal } from "react-dom";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { useChapterTranslation, TARGET_LANG_OPTIONS } from "../hooks/useChapterTranslation";
+import { buildTranslationSources } from "../lib/translationSources";
+import { buildTranslateMenu } from "../lib/translateMenu";
+import { formatEta, pillMainText, stageLabel } from "../lib/translationStages";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { getHardwareId } from "../lib/fingerprint";
 
@@ -147,6 +150,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
 
+  // Translate from the SAME derivative the Reader displays (#156) — a patch
+  // generated from a different encode of the page sits in a visibly
+  // different screentone tone than its surroundings.
+  const { sources: translationSources, derivative } = buildTranslationSources(data, useSaver);
+
   // All translate orchestration lives in the hook (#142); both the desktop
   // dropdown and the mobile sheet render from this single state bundle.
   const {
@@ -155,6 +163,10 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     translatingCurrentPage,
     translatingCurrentPageIndex,
     transProgress,
+    pageElapsedSec,
+    etaSec,
+    coldStart,
+    currentStage,
     translatedPages,
     patchedPages,
     completedTranslatedPages,
@@ -169,11 +181,30 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     startTranslate,
     cancelTranslate,
     translateCurrentPage,
-  } = useChapterTranslation(currentChapterId, data?.pages ?? [], {
+  } = useChapterTranslation(currentChapterId, translationSources, {
     sourceLang: currentLang,
     currentPage: page,
     menusOpen: translateMenuOpen || moreMenuOpen,
+    derivative,
+    // Series context (#157): the Backend resolves title/synopsis from the
+    // catalog so the translator knows which manga it is translating.
+    mangaId,
   });
+
+  // Perceived-progress strings: ticking seconds + live MIT stage + honest ETA
+  // keep the 20-60s per-page wait from reading as a frozen spinner.
+  const stageInfo = stageLabel(currentStage?.stage ?? null);
+  const translateDetail = [
+    pageElapsedSec > 0 ? `${pageElapsedSec} วิ` : null,
+    stageInfo ? `${stageInfo.text} (${stageInfo.step}/${stageInfo.total})` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const translateSubline = coldStart
+    ? "กำลังโหลดโมเดล AI — หน้าแรกมักใช้เวลา ~1 นาที"
+    : etaSec !== null
+      ? `เหลือ ${formatEta(etaSec)}`
+      : null;
   const [imgLoading, setImgLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -654,6 +685,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const hasAnyTranslation = translatedPages.size > 0 || patchedPages.size > 0 || completedTranslatedPages.size > 0;
   const hasFullTranslation = totalPages > 0 && completedTranslatedPages.size >= totalPages;
   const hasPartialTranslation = hasAnyTranslation && !hasFullTranslation;
+  // One model drives the desktop dropdown AND the mobile sheet (#162) — a
+  // fully-translated chapter offers a single view toggle, never dead
+  // translate buttons.
+  const translateMenu = buildTranslateMenu({
+    totalPages,
+    completedCount: completedTranslatedPages.size,
+    hasAnyTranslation,
+    showTranslation,
+  });
 
   // Keep last valid page count so counter can show it during chapter-change
   // fade-out — adjusted during render (React's "storing information from
@@ -966,7 +1006,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                     <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 shrink-0"><rect x="6" y="6" width="12" height="12" /></svg>
                   )}
                   {translating ? (
-                    `${transProgress.done}/${transProgress.total}`
+                    `${transProgress.done}/${transProgress.total}${transProgress.failed > 0 ? ` ✕${transProgress.failed}` : ""}`
                   ) : hasFullTranslation ? (
                     <>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3 w-3 shrink-0"><path d="M5 13l4 4L19 7" /></svg>
@@ -1057,44 +1097,51 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
                     <div className="my-1 border-t border-white/10" />
 
-                    {/* Single-page translate */}
-                    <button
-                      onClick={() => { translateCurrentPage(); setTranslateMenuOpen(false); }}
-                      disabled={translatingCurrentPage}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-purple-300/90 transition-colors duration-150 hover:bg-white/10 hover:text-purple-200 disabled:opacity-50"
-                    >
-                      {translatingCurrentPage ? (
-                        <>
-                          <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" strokeOpacity="0.3" /><path d="M12 3a9 9 0 0 1 9 9" /></svg>
-                          กำลังแปลหน้า {(translatingCurrentPageIndex ?? page) + 1}...
-                        </>
-                      ) : (
-                        <>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 8h10M7 12h6" /></svg>
-                          แปลหน้านี้
-                        </>
-                      )}
-                    </button>
+                    {/* Translate actions — hidden once the chapter is fully
+                        translated (#162): a translate button that has nothing
+                        left to translate is a dead button. */}
+                    {translateMenu.showTranslateButtons && (
+                      <>
+                        {/* Single-page translate */}
+                        <button
+                          onClick={() => { translateCurrentPage(); setTranslateMenuOpen(false); }}
+                          disabled={translatingCurrentPage}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-purple-300/90 transition-colors duration-150 hover:bg-white/10 hover:text-purple-200 disabled:opacity-50"
+                        >
+                          {translatingCurrentPage ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" strokeOpacity="0.3" /><path d="M12 3a9 9 0 0 1 9 9" /></svg>
+                              กำลังแปลหน้า {(translatingCurrentPageIndex ?? page) + 1}...
+                            </>
+                          ) : (
+                            <>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 8h10M7 12h6" /></svg>
+                              แปลหน้านี้
+                            </>
+                          )}
+                        </button>
 
-                    {/* Batch translate */}
-                    <button
-                      onClick={() => { startTranslate(); setTranslateMenuOpen(false); }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M4 6h16M4 10h16M4 14h10M4 18h6" /></svg>
-                      แปลทั้งตอน
-                    </button>
+                        {/* Batch translate */}
+                        <button
+                          onClick={() => { startTranslate(); setTranslateMenuOpen(false); }}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M4 6h16M4 10h16M4 14h10M4 18h6" /></svg>
+                          แปลทั้งตอน
+                        </button>
+                      </>
+                    )}
 
                     {/* Show / hide translation toggle */}
-                    {hasAnyTranslation && (
+                    {translateMenu.viewToggleLabel && (
                       <>
-                        <div className="my-1 border-t border-white/10" />
+                        {translateMenu.showTranslateButtons && <div className="my-1 border-t border-white/10" />}
                         <button
                           onClick={() => { setShowTranslation((s) => !s); setTranslateMenuOpen(false); }}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition-colors duration-150 hover:bg-white/10 hover:text-white"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                          {showTranslation ? "ดูต้นฉบับ" : "ดูฉบับแปล"}
+                          {translateMenu.viewToggleLabel}
                         </button>
                       </>
                     )}
@@ -1282,8 +1329,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       </div>
                     )}
 
-                    {/* Translate actions */}
+                    {/* Translate actions — hidden when fully translated (#162) */}
                     <div className="space-y-1">
+                      {translateMenu.showTranslateButtons && (<>
                       <button
                         onClick={() => { translateCurrentPage(); setMoreMenuOpen(false); }}
                         disabled={translatingCurrentPage || translating}
@@ -1308,7 +1356,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         {translating ? (
                           <>
                             <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0"><rect x="6" y="6" width="12" height="12" /></svg>
-                            หยุดแปล ({transProgress.done}/{transProgress.total})
+                            หยุดแปล ({transProgress.done}/{transProgress.total}{transProgress.failed > 0 ? ` ✕${transProgress.failed}` : ""})
                           </>
                         ) : (
                           <>
@@ -1317,13 +1365,14 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                           </>
                         )}
                       </button>
-                      {hasAnyTranslation && (
+                      </>)}
+                      {translateMenu.viewToggleLabel && (
                         <button
                           onClick={() => { setShowTranslation((s) => !s); setMoreMenuOpen(false); }}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition hover:bg-white/10 hover:text-white"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                          {showTranslation ? "ดูต้นฉบับ" : "ดูฉบับแปล"}
+                          {translateMenu.viewToggleLabel}
                         </button>
                       )}
                     </div>
@@ -1506,7 +1555,13 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   <div className="pointer-events-none absolute bottom-0 left-0 right-0 flex justify-center pb-2">
                     <div className="flex items-center gap-1.5 rounded-full border border-blue-400/30 bg-black/75 px-3 py-1 shadow-lg backdrop-blur-sm">
                       <div className="h-2.5 w-2.5 animate-spin rounded-full border border-blue-400/40 border-t-blue-400" />
-                      <span className="text-[10px] font-medium text-blue-300">กำลังแปลหน้า {i + 1}...</span>
+                      <span className="text-[10px] font-medium text-blue-300">
+                        {currentStage?.pageIndex === i || translatingCurrentPageIndex === i
+                          ? `กำลังแปลหน้า ${i + 1}${translateDetail ? ` · ${translateDetail}` : "..."}`
+                          : translating
+                            ? `อยู่ในคิวแปล...`
+                            : `กำลังแปลหน้า ${i + 1}...`}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -1623,28 +1678,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                 </>
               )}
 
-              {/* Translation status pill — paged mode, floats at bottom of viewing area above the strip */}
-              {(translating || translatingCurrentPage) && (
-                <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
-                  {(translating && !completedTranslatedPages.has(page)) || translatingCurrentPageIndex === page ? (
-                    <div className="flex items-center gap-2 rounded-full border border-blue-400/40 bg-black/85 px-4 py-2 shadow-xl shadow-black/60 backdrop-blur-sm">
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400/30 border-t-blue-400" />
-                      <span className="text-xs font-medium text-blue-300">กำลังแปลหน้า {page + 1}...</span>
-                    </div>
-                  ) : translatingCurrentPageIndex !== null ? (
-                    <div className="flex items-center gap-2 rounded-full border border-blue-400/40 bg-black/85 px-4 py-2 shadow-xl shadow-black/60 backdrop-blur-sm">
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400/30 border-t-blue-400" />
-                      <span className="text-xs font-medium text-blue-300">กำลังแปลหน้า {translatingCurrentPageIndex + 1}...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 rounded-full border border-white/20 bg-black/85 px-4 py-2 shadow-xl shadow-black/60 backdrop-blur-sm">
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
-                      <span className="text-xs font-medium text-white/60">แปลไปแล้ว {transProgress.done}/{transProgress.total} หน้า</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {page > 0 && (
                 <button onClick={() => setPage((p) => Math.max(p - 1, 0))} title="หน้าก่อน" className="absolute left-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-black/80">
                   <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" /></svg>
@@ -1687,6 +1720,30 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* Translation status pill — view-mode agnostic (#164): rendered above
+          BOTH the paged area and the continuous strip, so switching modes
+          never makes a running translation look idle. The continuous strip's
+          per-page badges scroll out of view; this pill never does. */}
+      {(translating || translatingCurrentPage) && (
+        <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 -translate-x-1/2">
+          <div className="flex flex-col items-center gap-1 rounded-2xl border border-blue-400/40 bg-black/85 px-4 py-2 shadow-xl shadow-black/60 backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400/30 border-t-blue-400" />
+              <span className="text-xs font-medium text-blue-300">
+                {pillMainText(translating, transProgress.done, transProgress.total, (translatingCurrentPageIndex ?? page) + 1)}
+                {translateDetail ? ` · ${translateDetail}` : "..."}
+              </span>
+              {transProgress.failed > 0 && (
+                <span className="text-xs font-medium text-red-400">ไม่สำเร็จ {transProgress.failed}</span>
+              )}
+            </div>
+            {translateSubline && (
+              <span className="text-[10px] text-white/40">{translateSubline}</span>
+            )}
+          </div>
         </div>
       )}
 

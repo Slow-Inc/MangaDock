@@ -9,6 +9,9 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { MangaDexService } from './mangadex.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 import { PatchStore } from './patch-store';
+import { TranslationMemoryRepository } from './translation-memory.repository';
+import { loadPageBytes } from './page-source';
+import { composeSeriesContext } from './series-context';
 import { RedisService } from '../cache/redis.service';
 import {
   CACHE_TTL_MS,
@@ -47,16 +50,33 @@ type GeminiModelListResponse = {
 };
 
 // ─── MIT language helpers ────────────────────────────────────────────────────
-/** Map MangaDex ISO language code → MIT target_lang / source_lang code */
-const MIT_LANG_MAP: Record<string, string> = {
+/** Map MangaDex ISO language code → MIT target_lang / source_lang code.
+ *  Every value must be a member of VALID_LANGUAGES in
+ *  MIT/manga_translator/translators/common.py — pinned by
+ *  mit-lang-map.spec.ts (#165: es/pt/vi had drifted to codes MIT rejects). */
+export const MIT_LANG_MAP: Record<string, string> = {
   en: 'ENG', ja: 'JPN', ko: 'KOR',
   zh: 'CHS', 'zh-hk': 'CHT', 'zh-ro': 'CHS',
-  fr: 'FRA', es: 'SPA', de: 'DEU', ru: 'RUS',
-  pt: 'POR', 'pt-br': 'POR', it: 'ITA', vi: 'VIE',
+  fr: 'FRA', es: 'ESP', de: 'DEU', ru: 'RUS',
+  pt: 'PTB', 'pt-br': 'PTB', it: 'ITA', vi: 'VIN',
   th: 'THA', id: 'IND', ar: 'ARA',
 };
-function mitLangCode(isoLang: string): string {
+export function mitLangCode(isoLang: string): string {
   return MIT_LANG_MAP[isoLang.toLowerCase()] ?? isoLang.toUpperCase();
+}
+
+/** Parse a batch jobKey `chapterId:srcMIT:tgtMIT:model:derivative`. Splits from
+ *  the RIGHT because a "ver:<uuid>" chapterId contains a colon — a left split
+ *  would mis-parse it (chapterId="ver"). The last 4 segments are colon-free. */
+export function parseJobKey(jobKey: string): {
+  chapterId: string; srcMIT: string; tgtMIT: string; model: string; derivative: string;
+} {
+  const parts = jobKey.split(':');
+  const derivative = parts.pop() ?? '';
+  const model = parts.pop() ?? '';
+  const tgtMIT = parts.pop() ?? '';
+  const srcMIT = parts.pop() ?? '';
+  return { chapterId: parts.join(':'), srcMIT, tgtMIT, model, derivative };
 }
 
 const GEMINI_LANG_NAME: Record<string, string> = {
@@ -115,6 +135,7 @@ export class BooksService {
 
   /** Single owner of Patch Set files (#137) — deterministic names, legacy sweep. */
   private readonly patchStore: PatchStore;
+  private readonly translationMemory: TranslationMemoryRepository;
 
   constructor(
     private readonly mangaDex: MangaDexService,
@@ -125,6 +146,9 @@ export class BooksService {
     @Optional() private readonly redis?: RedisService,
   ) {
     this.patchStore = new PatchStore(this.storage, () => this.backendOrigin);
+    // #160: translation memory rides the already-injected service-role client;
+    // best-effort, so a missing/broken Supabase never affects translation.
+    this.translationMemory = new TranslationMemoryRepository(this.supabase);
   }
 
   onModuleInit(): void {
@@ -141,6 +165,32 @@ export class BooksService {
    * Handle an asynchronous callback from the MIT Server.
    * T4-STANDARD Pillar 2: Idempotent Webhook Processing.
    */
+  /**
+   * Forward a live MIT stage update to everyone watching this Batch Job.
+   * Informational only (UX): never recorded in completedPages, never resolves
+   * the job — a lost progress event costs nothing.
+   */
+  notifyBatchProgress(jobKey: string, pageIndex: number, stage: string): void {
+    const job = this.activeBatchJobs.get(jobKey);
+    if (!job) return;
+    const event = { patches: [], stage, progress: true } as PageResult & {
+      stage: string;
+      progress: true;
+    };
+    try {
+      job.originalListener?.(pageIndex, event);
+    } catch {
+      /* caller may be gone */
+    }
+    for (const l of job.listeners) {
+      try {
+        l(pageIndex, event);
+      } catch {
+        /* listener might have disconnected */
+      }
+    }
+  }
+
   async handleMitCallback(
     jobKey: string,
     pageIndex: number,
@@ -160,8 +210,10 @@ export class BooksService {
     }
     job.processingPages?.add(pageIndex);
 
-    // jobKey = chapterId:srcMIT:tgtMIT:model (model = 'default' when unset)
-    const [chapterId, srcMIT, tgtMIT, jobModel] = jobKey.split(':');
+    // jobKey = chapterId:srcMIT:tgtMIT:model:derivative (model = 'default'
+    // when unset; derivative = 'hd' | 'saver', #156)
+    const { chapterId, srcMIT, tgtMIT, model: jobModel, derivative: jobDerivative } =
+      parseJobKey(jobKey);
 
     let pageResult: PageResult;
 
@@ -202,8 +254,24 @@ export class BooksService {
       // Cache the result — MUST be the same key the batch pre-check and the
       // single-page endpoint read (patchCacheKey), or webhook results are never
       // served from cache again (found live during the #87 v4 migration).
-      const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, jobModel);
+      const cacheKey = this.patchCacheKey(
+        chapterId,
+        pageIndex,
+        srcMIT,
+        tgtMIT,
+        jobModel,
+        jobDerivative === 'saver' ? 'saver' : 'hd',
+      );
       await this.cache.set(cacheKey, { patches }, 1000 * 60 * 60 * 24 * 7); // 7 days
+
+      // Translation memory (#160): persist this page's text layer (#158 regions).
+      // Fire-and-forget — the repository swallows its own errors, so persistence
+      // never adds latency to or fails page delivery (local-first).
+      if (Array.isArray(result.regions) && result.regions.length > 0) {
+        void this.translationMemory.savePageText(
+          chapterId, pageIndex, tgtMIT, result.regions, jobModel,
+        );
+      }
 
       pageResult = { patches };
     }
@@ -232,7 +300,18 @@ export class BooksService {
 
     // Check if job is complete
     if (job.completedPages.size >= job.expectedCount) {
-      this.logger.log(`[Webhook] Job ${jobKey} fully completed via webhooks`);
+      // Report errored pages truthfully — an all-error batch used to log as
+      // "fully completed", hiding a dead MIT worker (2026-06-06 incident).
+      const errorPages = [...job.completedPages.values()].filter(
+        (r) => r.error,
+      );
+      if (errorPages.length > 0) {
+        this.logger.warn(
+          `[Webhook] Job ${jobKey} completed via webhooks with ${errorPages.length}/${job.expectedCount} page errors (first: ${errorPages[0].error})`,
+        );
+      } else {
+        this.logger.log(`[Webhook] Job ${jobKey} fully completed via webhooks`);
+      }
       job.resolve?.();
     }
   }
@@ -438,6 +517,21 @@ export class BooksService {
     return normalized && /^[\w.-]+$/.test(normalized) ? normalized : undefined;
   }
 
+  /** Series context (#157): resolve catalog metadata for the manga being
+   *  translated into the prompt-context string. Catalog failure or missing id
+   *  degrades to undefined — translate must never break because metadata is
+   *  unavailable (local-first rule). */
+  private async seriesContextFor(mangaId?: string): Promise<string | undefined> {
+    if (!mangaId) return undefined;
+    try {
+      const detail = await this.mangaDex.getMangaDetail(mangaId);
+      return composeSeriesContext(detail);
+    } catch (err) {
+      this.logger.warn(`[SeriesContext] catalog lookup failed manga=${mangaId}: ${String(err)}`);
+      return undefined;
+    }
+  }
+
   /** Single source of truth for the per-page patch cache key. v4 adds the model
    *  segment so different image-translation models never share cached patches
    *  (#87); old v3 entries expire naturally via TTL. */
@@ -447,17 +541,26 @@ export class BooksService {
     srcMIT: string,
     tgtMIT: string,
     imageModel?: string,
+    derivative: 'hd' | 'saver' = 'hd',
   ): string {
     const model = this.imageModelKey(imageModel) ?? 'default';
-    return `translate:manga-patches:v4:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}:${model}`;
+    // v5: keyed by display derivative (#156). v6: series context (#157)
+    // changes translations — context-aware and context-free patches never mix.
+    return `translate:manga-patches:v6:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}:${model}:${derivative}`;
   }
 
   /** The registry key for a batch-translate job. MUST be built via mitLangPair
    *  on every path (start, attach, remove) or cancellation breaks. Includes the
    *  image model so two model selections for the same chapter never collide. */
-  private buildJobKey(chapterId: string, sourceLang?: string, targetLang?: string, imageModel?: string): string {
+  private buildJobKey(
+    chapterId: string,
+    sourceLang?: string,
+    targetLang?: string,
+    imageModel?: string,
+    derivative: 'hd' | 'saver' = 'hd',
+  ): string {
     const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
-    return `${chapterId}:${srcMIT}:${tgtMIT}:${this.imageModelKey(imageModel) ?? 'default'}`;
+    return `${chapterId}:${srcMIT}:${tgtMIT}:${this.imageModelKey(imageModel) ?? 'default'}:${derivative}`;
   }
 
   /**
@@ -476,12 +579,50 @@ export class BooksService {
    *                                             it has no int4/int8 path — that knob
    *                                             only applies to the local LLM
    *                                             translator via QWEN3_PRECISION).
+   *
+   * #167 rescue knobs (all opt-in; unset = config identical to before):
+   *   MIT_OCR_PROB            — OCR confidence floor in (0,1]. The 48px OCR is
+   *                             underconfident on long thin lines and drops text
+   *                             it read almost correctly; 0.03 recovers the
+   *                             measured worst page (lowest real line = 0.035).
+   *   MIT_TEXT_THRESHOLD      — detector text threshold in (0,1]
+   *   MIT_DET_INVERT=1        — inverted detection pass (white-on-black text)
+   *   MIT_DET_GAMMA_CORRECT=1 — gamma correction before detection
+   *
+   * #170 bubble segmentation (opt-in; unset = config identical to before):
+   *   MIT_BUBBLE_SEG=1        — run a speech-balloon YOLO alongside DBNet and
+   *                             tag each text-line region with its balloon mask
+   *                             (renderer area, mask-aware crop, OCR scoping).
    */
-  private buildMitConfig(srcMIT: string, tgtMIT: string, sourceIso: string, imageModel?: string): string {
+  private buildMitConfig(srcMIT: string, tgtMIT: string, sourceIso: string, imageModel?: string, seriesContext?: string): string {
     const intEnv = (name: string, fallback: number): number => {
       const n = Number(process.env[name]);
       return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
     };
+    // #167 rescue knobs — opt-in fractions in (0, 1]; absent/invalid env
+    // leaves the config byte-identical to today.
+    const fracEnv = (name: string): number | undefined => {
+      const n = Number(process.env[name]);
+      return Number.isFinite(n) && n > 0 && n <= 1 ? n : undefined;
+    };
+    const flagEnv = (name: string): boolean => process.env[name] === '1';
+    // #166 render knobs: offset may be negative; minimum is a positive px floor.
+    const signedIntEnv = (name: string): number | undefined => {
+      const raw = process.env[name];
+      if (raw === undefined) return undefined;
+      const n = Number(raw);
+      return Number.isInteger(n) ? n : undefined;
+    };
+    const posIntEnv = (name: string): number | undefined => {
+      const n = signedIntEnv(name);
+      return n !== undefined && n > 0 ? n : undefined;
+    };
+    const ocrProb = fracEnv('MIT_OCR_PROB');
+    const textThreshold = fracEnv('MIT_TEXT_THRESHOLD');
+    const fontSizeOffset = signedIntEnv('MIT_FONT_SIZE_OFFSET');
+    const fontSizeMin = posIntEnv('MIT_FONT_SIZE_MIN');
+    const supersampling = posIntEnv('MIT_SUPERSAMPLING');
+    const fontMaxBoxRatio = fracEnv('MIT_FONT_MAX_BOX_RATIO');
     const model = this.imageModelKey(imageModel);
     return JSON.stringify({
       translator: {
@@ -490,14 +631,60 @@ export class BooksService {
         // Per-request Gemini model override (#87); MIT falls back to its
         // GEMINI_MODEL env when absent.
         ...(model ? { model } : {}),
+        // Series context (#157): MIT appends this to the translator system
+        // prompt so the model knows which manga it is translating. Absent →
+        // prompt identical to the context-free behavior.
+        ...(seriesContext ? { series_context: seriesContext } : {}),
       },
-      detector: { detection_size: intEnv('MIT_DETECTION_SIZE', 2048) },
+      detector: {
+        detection_size: intEnv('MIT_DETECTION_SIZE', 2048),
+        ...(textThreshold !== undefined ? { text_threshold: textThreshold } : {}),
+        ...(flagEnv('MIT_DET_INVERT') ? { det_invert: true } : {}),
+        ...(flagEnv('MIT_DET_GAMMA_CORRECT') ? { det_gamma_correct: true } : {}),
+        // Bubble segmentation (#170): run a speech-balloon YOLO alongside DBNet
+        // and tag each text-line region with its balloon mask, so the renderer
+        // can size text to the balloon area. Absent → stage off, byte-identical.
+        ...(flagEnv('MIT_BUBBLE_SEG') ? { det_bubble_seg: true } : {}),
+        // SFX detector (#168): second YOLO pass for stylized katakana SFX that
+        // DBNet can't see. Absent → stage off, byte-identical.
+        ...(flagEnv('MIT_SFX_DETECTOR') ? { det_sfx: true } : {}),
+      },
+      // OCR prob floor (#167): the 48px OCR is underconfident on long thin
+      // lines — at the default threshold it drops lines it read almost
+      // correctly, leaving the original text visible in the Reader.
+      ...(ocrProb !== undefined ? { ocr: { prob: ocrProb } } : {}),
       inpainter: {
         inpainter: process.env.MIT_INPAINTER ?? 'lama_large',
         inpainting_size: intEnv('MIT_INPAINTING_SIZE', 1536),
         inpainting_precision: process.env.MIT_INPAINTING_PRECISION ?? 'bf16',
       },
-      render: { direction: 'auto', rtl: isRtlLang(sourceIso) },
+      render: {
+        direction: 'auto',
+        rtl: isRtlLang(sourceIso),
+        // Font-size fidelity (#166): the renderer's auto floor (img.h+img.w)/200
+        // is tiny in patch mode (computed from the crop). Absent → render
+        // identical to the auto behavior.
+        ...(fontSizeOffset !== undefined ? { font_size_offset: fontSizeOffset } : {}),
+        ...(fontSizeMin !== undefined ? { font_size_minimum: fontSizeMin } : {}),
+        // Bubble area-fit sizing (#166): size each region's font to its balloon
+        // area (#170 bubble_box) instead of the source textline column. Needs
+        // MIT_BUBBLE_SEG to supply the masks. Absent → byte-identical.
+        ...(flagEnv('MIT_BUBBLE_AREA_FIT') ? { bubble_area_fit: true } : {}),
+        // #176: render Latin/EN targets in the bundled comic font instead of the
+        // worker's Prompt-Bold (a Thai face). Absent → byte-identical.
+        ...(flagEnv('MIT_EN_COMIC_FONT') ? { en_comic_font: true } : {}),
+        // #181: text supersampling factor (render Nx then downscale). Absent → 1.
+        ...(supersampling !== undefined ? { supersampling } : {}),
+        // Render-parity A: ALL-CAPS lettering (MangaTranslator pipeline.py:1375).
+        // The MIT renderer already honors render.uppercase. Absent → byte-identical.
+        ...(flagEnv('MIT_EN_UPPERCASE') ? { uppercase: true } : {}),
+        // Render-parity C: raise the #175 bubble-fit font cap (0.5·balloon height)
+        // so text fills the balloon. Fraction in (0,1]. Absent → byte-identical.
+        ...(fontMaxBoxRatio !== undefined ? { font_max_box_ratio: fontMaxBoxRatio } : {}),
+        // Render-parity B: override the EN face by filename in fonts/ (operator-set,
+        // MangaTranslator BYO font). Absent → byte-identical.
+        ...(process.env.MIT_EN_FONT ? { en_font: process.env.MIT_EN_FONT } : {}),
+      },
     });
   }
 
@@ -678,14 +865,14 @@ export class BooksService {
     pageUrl: string,
     sourceLang?: string,
     targetLang?: string,
-    opts?: { maxStartupRetries?: number; imageModel?: string },
+    opts?: { maxStartupRetries?: number; imageModel?: string; derivative?: 'hd' | 'saver'; mangaId?: string },
   ): Promise<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }> {
     if (!chapterId || !pageUrl) {
       throw new Error('chapterId and pageUrl are required');
     }
 
     const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
-    const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, opts?.imageModel);
+    const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, opts?.imageModel, opts?.derivative ?? 'hd');
     const cached = await this.cache.get<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }>(cacheKey);
     if (cached?.data?.patches) {
       return cached.data;
@@ -695,20 +882,12 @@ export class BooksService {
       (process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003') +
       '/translate/with-form/patches';
 
-    // Fetch original manga page image
-    const imgRes = await fetch(pageUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
-        'Referer': 'https://mangadex.org/',
-      },
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!imgRes.ok) {
-      throw new Error(`Failed to fetch page image: HTTP ${imgRes.status}`);
-    }
-    const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+    // Load the source page — display-derivative aware (#156): /img-cache paths
+    // are read straight from disk so the patch is generated from byte-identical
+    // content to what the Reader displays; external URLs are fetched.
+    const imgBuffer = await loadPageBytes(pageUrl, { imgCacheRoot: 'img-cache', uploadsRoot: 'uploads' });
 
-    const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '', opts?.imageModel);
+    const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '', opts?.imageModel, await this.seriesContextFor(opts?.mangaId));
 
     const maxStartupRetries = opts?.maxStartupRetries ?? 30;
     const startupRetryDelayMs = 5_000;
@@ -718,7 +897,7 @@ export class BooksService {
 
     for (let attempt = 0; attempt <= maxStartupRetries; attempt += 1) {
       const form = new FormData();
-      form.append('image', new Blob([imgBuffer], { type: 'image/jpeg' }), 'page.jpg');
+      form.append('image', new Blob([new Uint8Array(imgBuffer)], { type: 'image/jpeg' }), 'page.jpg');
       form.append('config', config);
 
       try {
@@ -799,8 +978,9 @@ export class BooksService {
     targetLang: string | undefined,
     listener: BatchPageListener,
     imageModel?: string,
+    derivative: 'hd' | 'saver' = 'hd',
   ): void {
-    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel);
+    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel, derivative);
     const job = this.activeBatchJobs.get(jobKey);
     if (job) {
       job.listeners.delete(listener);
@@ -841,9 +1021,11 @@ export class BooksService {
     sourceLang?: string,
     targetLang?: string,
     imageModel?: string,
+    derivative: 'hd' | 'saver' = 'hd',
+    mangaId?: string,
   ): Promise<void> {
     const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
-    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel);
+    const jobKey = this.buildJobKey(chapterId, sourceLang, targetLang, imageModel, derivative);
 
     const existing = this.activeBatchJobs.get(jobKey);
 
@@ -895,7 +1077,7 @@ export class BooksService {
     const cachedResults = await Promise.all(
       pages.map((p) =>
         this.cache.get<{ patches: PatchEntry[] }>(
-          this.patchCacheKey(chapterId, p.pageIndex, srcMIT, tgtMIT, imageModel),
+          this.patchCacheKey(chapterId, p.pageIndex, srcMIT, tgtMIT, imageModel, derivative),
         ),
       ),
     );
@@ -961,6 +1143,8 @@ export class BooksService {
       sourceLang,
       targetLang,
       imageModel,
+      derivative,
+      mangaId,
     )
       .then(() => {
         if (job.completedPages.size >= job.expectedCount) {
@@ -1010,6 +1194,8 @@ export class BooksService {
     sourceLangIso?: string,
     targetLangIso?: string,
     imageModel?: string,
+    derivative: 'hd' | 'saver' = 'hd',
+    mangaId?: string,
   ): Promise<void> {
     const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
     const mitUrl = `${mitBaseUrl}/translate/with-form/patches/batch`;
@@ -1018,17 +1204,9 @@ export class BooksService {
     let imageBuffers: Buffer[];
     try {
       imageBuffers = await Promise.all(
-        pages.map(async ({ pageUrl }) => {
-          const imgRes = await fetch(pageUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
-              'Referer': 'https://mangadex.org/',
-            },
-            signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
-          });
-          if (!imgRes.ok) throw new Error(`Failed to fetch page image: HTTP ${imgRes.status}`);
-          return Buffer.from(await imgRes.arrayBuffer());
-        }),
+        // Display-derivative aware (#156): /img-cache paths read from disk,
+        // external URLs fetched (cancellable via the job signal).
+        pages.map(({ pageUrl }) => loadPageBytes(pageUrl, { imgCacheRoot: 'img-cache', uploadsRoot: 'uploads', signal })),
       );
     } catch (err) {
       if (signal.aborted) {
@@ -1039,7 +1217,7 @@ export class BooksService {
     }
 
     // ── 2. Build multipart form ───────────────────────────────────────────
-    const mitConfig = this.buildMitConfig(srcMIT, tgtMIT, sourceLangIso ?? '', imageModel);
+    const mitConfig = this.buildMitConfig(srcMIT, tgtMIT, sourceLangIso ?? '', imageModel, await this.seriesContextFor(mangaId));
 
     const form = new FormData();
     for (const buf of imageBuffers) {
@@ -1071,7 +1249,7 @@ export class BooksService {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT batch fetch failed: ${msg}`);
-      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel);
+      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative, mangaId);
       return;
     }
 
@@ -1090,7 +1268,7 @@ export class BooksService {
     if (!mitRes.ok || !mitRes.body) {
       const errText = await mitRes.text().catch(() => '');
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT HTTP ${mitRes.status}: ${errText.slice(0, 200)}`);
-      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel);
+      await this._retryMissingPagesIndividually(chapterId, pages, new Set<number>(), notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative, mangaId);
       return;
     }
 
@@ -1196,7 +1374,7 @@ export class BooksService {
             }
 
             // Cache so single-page endpoint & future batch requests skip MIT
-            const cacheKey = this.patchCacheKey(chapterId, data.pageIndex, srcMIT, tgtMIT, imageModel);
+            const cacheKey = this.patchCacheKey(chapterId, data.pageIndex, srcMIT, tgtMIT, imageModel, derivative);
             await this.cache.setMangaCacheWithTiers(cacheKey, { patches });
 
             this.logger.log(`[BatchPatches] chapter=${chapterId} page=${data.pageIndex} → ${patches.length} patches`);
@@ -1231,7 +1409,7 @@ export class BooksService {
     if (streamFailedError) {
       this.logger.warn(`[BatchPatches] chapter=${chapterId} continuing with per-page fallback after stream failure`);
     }
-    await this._retryMissingPagesIndividually(chapterId, pages, processedPageIndexes, notify, sourceLangIso, targetLangIso, imageModel);
+    await this._retryMissingPagesIndividually(chapterId, pages, processedPageIndexes, notify, sourceLangIso, targetLangIso, imageModel, undefined, derivative, mangaId);
   }
 
   private async _retryMissingPagesIndividually(
@@ -1243,6 +1421,8 @@ export class BooksService {
     targetLangIso?: string,
     imageModel?: string,
     signal?: AbortSignal,
+    derivative: 'hd' | 'saver' = 'hd',
+    mangaId?: string,
   ): Promise<void> {
     const missingPages = pages.filter((p) => !processedPageIndexes.has(p.pageIndex));
     if (missingPages.length > 0) {
@@ -1257,7 +1437,7 @@ export class BooksService {
       try {
         const single = await this.translateMangaPagePatches(
           chapterId, missing.pageIndex, missing.pageUrl, sourceLangIso, targetLangIso,
-          { maxStartupRetries: 3, imageModel },
+          { maxStartupRetries: 3, imageModel, derivative, mangaId },
         );
         notify(missing.pageIndex, { patches: single.patches });
         recovered += 1;

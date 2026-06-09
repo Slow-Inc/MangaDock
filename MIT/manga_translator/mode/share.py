@@ -37,6 +37,13 @@ _translator: MangaTranslator | None = None
 #  Internal endpoints consumed by the parent web-server
 # ────────────────────────────────────────────────────────
 
+@app.get("/health")
+async def health():
+    """Liveness probe used by the parent server's /ready — detects a worker
+    that registered and later died (e.g. crashed loading the translator)."""
+    return {"ok": True}
+
+
 @app.post("/simple_execute/translate")
 async def simple_execute_translate(request: Request):
     """Accept a pickled {image, config} payload, translate, return pickled Context."""
@@ -74,9 +81,19 @@ async def simple_execute_translate_patches(request: Request):
 
     image: Image.Image = data.get("image")
     config: Config = data.get("config", Config())
+    progress_meta = data.get("progress_meta")
 
     if image is None:
         raise HTTPException(422, detail="Missing 'image' in payload")
+
+    # Forward live pipeline-stage events to the Backend webhook (UX). The
+    # translator is a singleton serving one request at a time (parent gates via
+    # the busy flag), so a per-request hook is safe — removed in finally.
+    hook = None
+    if progress_meta:
+        from server.webhook import make_progress_hook
+        hook = make_progress_hook(progress_meta)
+        _translator.add_progress_hook(hook)
 
     try:
         patches = await _translator.translate_patches(image, config)
@@ -87,6 +104,9 @@ async def simple_execute_translate_patches(request: Request):
     except Exception as e:
         logger.error(f"Patch translation error: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=str(e))
+    finally:
+        if hook is not None and hook in _translator._progress_hooks:
+            _translator._progress_hooks.remove(hook)
 
 
 @app.post("/execute/translate")

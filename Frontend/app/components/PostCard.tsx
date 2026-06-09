@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+
 import Link from "next/link";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
@@ -11,17 +12,21 @@ import type { ForumPost } from "../lib/types";
 function MarqueeMangaTag({ title, maxWidth }: { title: string; maxWidth: number }) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
-  const [overflow, setOverflow] = useState(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
     const text = textRef.current;
     if (!container || !text) return;
     const gap = text.scrollWidth - container.clientWidth;
-    setOverflow(gap > 2 ? gap : 0);
+    const overflow = gap > 2 ? gap : 0;
+    if (overflow > 0) {
+      text.style.setProperty("--marquee-overflow", `${overflow}px`);
+      text.style.animation = `marquee-title ${Math.max(5, overflow / 22)}s linear infinite`;
+    } else {
+      text.style.removeProperty("--marquee-overflow");
+      text.style.animation = "";
+    }
   }, [title]);
-
-  const duration = Math.max(5, overflow / 22);
 
   return (
     <span
@@ -29,14 +34,7 @@ function MarqueeMangaTag({ title, maxWidth }: { title: string; maxWidth: number 
       className="overflow-hidden inline-block align-middle"
       style={{ maxWidth }}
     >
-      <span
-        ref={textRef}
-        className="inline-block whitespace-nowrap"
-        style={overflow > 0 ? ({
-          "--marquee-overflow": `${overflow}px`,
-          animation: `marquee-title ${duration}s linear infinite`,
-        } as React.CSSProperties) : undefined}
-      >
+      <span ref={textRef} className="inline-block whitespace-nowrap">
         {title}
       </span>
     </span>
@@ -54,7 +52,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
     const thumbUrl = hasImage ? post.imageUrls[0] : null;
 
     return (
-      <article className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden hover:border-white/20 smooth-hover flex group">
+      <article className="bg-[--surface-raised] border border-white/10 rounded-xl overflow-hidden hover:border-white/20 smooth-hover flex group">
 
         {/* Thumbnail — left side, only when images exist */}
         {hasImage && (
@@ -67,6 +65,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
             <img
               src={thumbUrl!}
               alt="thumbnail"
+              loading="lazy"
               className="w-full h-full object-cover"
             />
             {post.imageUrls.length > 1 && (
@@ -160,7 +159,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
 
   // ── NEW CARD LAYOUT (Almost square grid block, like Facebook post) ──
   return (
-    <article className="bg-[#1a1a1a] border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 smooth-hover flex flex-col group p-5 min-h-[260px] shadow-lg">
+    <article className="bg-[--surface-raised] border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 smooth-hover flex flex-col group p-5 min-h-[260px] shadow-lg">
       <header className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/5">
           {post.authorPhotoUrl && (
@@ -239,7 +238,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
                 } ${post.imageUrls.length === 3 && i === 0 ? 'col-span-2' : ''}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`รูปที่ ${i + 1}`} className="w-full h-full object-cover" />
+                <img src={url} alt={`รูปที่ ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
                 {i === 3 && post.imageUrls.length > 4 && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                     <span className="text-white font-black text-xl">+{post.imageUrls.length - 4}</span>
