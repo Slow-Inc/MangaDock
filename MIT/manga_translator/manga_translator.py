@@ -16,6 +16,7 @@ from PIL import Image
 from typing import Optional, Any, List, Tuple
 from .region_filter import filter_translated_regions
 from .region_apply import apply_original_as_translation, apply_render_casing, apply_translations
+from .model_usage_tracker import ModelUsageTracker
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -149,7 +150,7 @@ class MangaTranslator:
         # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
         torch.backends.cudnn.allow_tf32 = True
 
-        self._model_usage_timestamps = {}
+        self._model_usage_tracker = ModelUsageTracker()
         self._detector_cleanup_task = None
         self.prep_manual = params.get('prep_manual', None)
         self.context_size = params.get('context_size', 0)
@@ -678,7 +679,7 @@ class MangaTranslator:
 
     async def _run_colorizer(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("colorizer", config.colorizer.colorizer)] = current_time
+        self._model_usage_tracker.touch("colorizer", config.colorizer.colorizer, current_time)
         #todo: im pretty sure the ctx is never used. does it need to be passed in?
         return await dispatch_colorization(
             config.colorizer.colorizer,
@@ -691,12 +692,12 @@ class MangaTranslator:
 
     async def _run_upscaling(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("upscaling", config.upscale.upscaler)] = current_time
+        self._model_usage_tracker.touch("upscaling", config.upscale.upscaler, current_time)
         return (await dispatch_upscaling(config.upscale.upscaler, [ctx.img_colorized], config.upscale.upscale_ratio, self.device))[0]
 
     async def _run_detection(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("detection", config.detector.detector)] = current_time
+        self._model_usage_tracker.touch("detection", config.detector.detector, current_time)
         result = await dispatch_detection(config.detector.detector, ctx.img_rgb, config.detector.detection_size, config.detector.text_threshold,
                                         config.detector.box_threshold,
                                         config.detector.unclip_ratio, config.detector.det_invert, config.detector.det_gamma_correct, config.detector.det_rotate,
@@ -758,15 +759,14 @@ class MangaTranslator:
                 await asyncio.sleep(1)
                 continue
             now = time.time()
-            for (tool, model), last_used in list(self._model_usage_timestamps.items()):
-                if now - last_used > self.models_ttl:
-                    await self._unload_model(tool, model)
-                    del self._model_usage_timestamps[(tool, model)]
+            for tool, model in self._model_usage_tracker.expired(self.models_ttl, now):
+                await self._unload_model(tool, model)
+                self._model_usage_tracker.forget(tool, model)
             await asyncio.sleep(1)
 
     async def _run_ocr(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("ocr", config.ocr.ocr)] = current_time
+        self._model_usage_tracker.touch("ocr", config.ocr.ocr, current_time)
         
         # 为OCR创建子文件夹（只在verbose模式下）
         if self.verbose:
@@ -810,7 +810,7 @@ class MangaTranslator:
 
     async def _run_textline_merge(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("textline_merge", "textline_merge")] = current_time
+        self._model_usage_tracker.touch("textline_merge", "textline_merge", current_time)
         text_regions = await dispatch_textline_merge(ctx.textlines, ctx.img_rgb.shape[1], ctx.img_rgb.shape[0],
                                                      verbose=self.verbose)
         for region in text_regions:
@@ -1106,7 +1106,7 @@ class MangaTranslator:
             config.translator.translator = Translator.none
     
         current_time = time.time()
-        self._model_usage_timestamps[("translation", config.translator.translator)] = current_time
+        self._model_usage_tracker.touch("translation", config.translator.translator, current_time)
 
         # 为none翻译器添加特殊处理  
         # Add special handling for none translator  
@@ -1289,7 +1289,7 @@ class MangaTranslator:
 
     async def _run_inpainting(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("inpainting", config.inpainter.inpainter)] = current_time
+        self._model_usage_tracker.touch("inpainting", config.inpainter.inpainter, current_time)
         return await dispatch_inpainting(config.inpainter.inpainter, ctx.img_rgb, ctx.mask, config.inpainter, config.inpainter.inpainting_size, self.device,
                                          self.verbose)
 
@@ -1316,7 +1316,7 @@ class MangaTranslator:
 
     async def _run_text_rendering(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("rendering", config.render.renderer)] = current_time
+        self._model_usage_tracker.touch("rendering", config.render.renderer, current_time)
         font_path = self._render_font_path(
             config, ctx.text_regions[0].target_lang if ctx.text_regions else '')
         if config.render.renderer == Renderer.none:

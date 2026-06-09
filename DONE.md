@@ -1328,3 +1328,17 @@ Tests: test_region_apply.py 9 passed (assign+metadata, casing on/off, in-place r
 extra-dropped, shared-index threading, original-as-translation no-casing); region_filter 7 + translation-
 path regression 32 passed; full suite 177 passed (the 19 async-not-supported failures are pre-existing —
 verified identical on the stashed base).
+
+## 2026-06-09 — #187 S3 / #188 starts: ModelUsageTracker (wrap _model_usage_timestamps)
+First #188 seam (interleaved early per the reconciled roadmap). The model-usage TTL dict was stamped from 8
+inline _run_* sites (self._model_usage_timestamps[(tool, model)] = current_time) and swept in
+_detector_cleanup_job with a list(items()) loop + mid-iteration del. Extracted to
+model_usage_tracker.ModelUsageTracker — touch(tool, model, now) / expired(ttl, now) / forget(tool, model),
+clock injected so it tests in <1s with no ML stack. All 8 sites now call touch(...); the sweep is
+`for tool, model in tracker.expired(self.models_ttl, now): await _unload_model(...); tracker.forget(...)`.
+Byte-identical: keys NOT normalised so the L1 key-drift is pinned verbatim ('colorizer' never matching
+_unload_model's case 'colorization'; 'textline_merge'/'rendering' no-case) — golden'd before S4 freezes the
+unload routing; strict `> ttl`; insertion-order list(...) snapshot so mid-sweep forget is safe (L13). 0
+remaining _model_usage_timestamps refs. Stacked on the S2 branch (refactor/mit-seam-s3-model-usage-tracker).
+Tests: test_model_usage_tracker.py 7 passed (strict-> boundary, insertion order, forget, safe-forget-during-
+iteration, re-touch refresh); full suite 184 passed (same 19 pre-existing async failures, no new breakage).
