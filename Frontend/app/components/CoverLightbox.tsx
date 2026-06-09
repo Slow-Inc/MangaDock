@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 interface Props {
@@ -11,49 +11,33 @@ interface Props {
 
 export default function CoverLightbox({ src, alt, onClose }: Props) {
   const [visible, setVisible] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
+  const handleClose = useCallback(() => {
+    setVisible(false);
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    closeTimeoutRef.current = setTimeout(onClose, 300);
+  }, [onClose]);
 
+  useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", handleKey);
 
-    return () => {
-      window.removeEventListener("keydown", handleKey);
-      if (closeTimeoutRef.current) {
-        clearTimeout(closeTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-
-    let raf1 = 0;
+    // Double rAF: one committed paint with opacity-0 before entering
     let raf2 = 0;
-
-    // Ensure there is one committed paint with opacity-0 before transitioning in.
-    raf1 = requestAnimationFrame(() => {
+    const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => setVisible(true));
     });
 
     return () => {
+      window.removeEventListener("keydown", handleKey);
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     };
-  }, [mounted]);
-
-  const handleClose = () => {
-    setVisible(false);
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-    }
-    closeTimeoutRef.current = setTimeout(onClose, 300);
-  };
+  }, [handleClose]);
 
   const content = (
     <div
@@ -102,6 +86,6 @@ export default function CoverLightbox({ src, alt, onClose }: Props) {
     </div>
   );
 
-  if (!mounted) return null;
+  if (typeof document === "undefined") return null;
   return createPortal(content, document.body);
 }
