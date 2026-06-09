@@ -1631,3 +1631,16 @@ nothing calls it by default → the cleanup-task leak is preserved verbatim unti
 Tests: test_model_reaper.py 5 passed (unload→forget order, ttl==0 no-op + expired-not-queried, start creates
 task, stop cancels, stop-no-task no-op); full suite 242 passed (same 19 pre-existing async failures, no new
 breakage). Next: S15 Stage protocol (#187 core begins; deps S3 done).
+
+## 2026-06-09 — #187 S13 / #168: DetectionPostProcessor (move SFX second-pass merge off the god object)
+_merge_sfx_detections + _textline_aabb (the AnimeText SFX second-pass, gated by config.detector.det_sfx)
+extracted to detection_postproc.{merge_sfx_detections, textline_aabb}; _run_detection now calls
+merge_sfx_detections(ctx, result, self.device); the 2 methods + the now-unused Tuple import removed. Done
+without S15 (call-site gate unchanged). Byte-identical (same IoA dedup, empty-Quadrilateral append, [SFXDetect]
+log, str(device or 'cuda')). Stack (refactor/mit-seam-s13-detection-postproc).
+Stale-test fixes surfaced by the full-suite run (both are source-inspection wiring tests repointed to the new
+module locations): test_sfx_merge (merge body moved to detection_postproc.py) and — PRE-EXISTING since S2 merged
+— test_safe_area::test_en_uppercase_lettering_is_wired (S2 moved casing to region_apply.py but the test still
+grepped manga_translator.py). MIT test baseline is now 18 async-only failures (was 19; one was this stale test).
+Tests: test_detection_postproc.py 2 passed (AABB golden, no-SFX identity short-circuit); full suite 245 passed
+(18 pre-existing async failures, 0 real failures). Next AFK seam: S16 TranslationMemory.
