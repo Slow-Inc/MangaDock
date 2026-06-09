@@ -42,7 +42,7 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#141414]">
+    <div className="min-h-screen bg-[--surface-base]">
       <Navbar />
       
       {/* Mobile Drawer Overlay */}
@@ -53,15 +53,15 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
         onClick={() => setIsMobileMenuOpen(false)}
       >
         <div
-          className={`absolute top-0 left-0 w-[300px] h-full bg-[#151518] shadow-2xl border-r border-white/10 transition-transform duration-300 ease-out overflow-y-auto custom-scrollbar p-6 ${
+          className={`absolute top-0 left-0 w-[300px] h-full bg-[--surface-overlay] shadow-2xl border-r border-white/10 transition-transform duration-300 ease-out overflow-y-auto custom-scrollbar p-6 ${
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
             <h2 className="font-black text-white uppercase tracking-widest text-xs">Community</h2>
-            <button onClick={() => setIsMobileMenuOpen(false)} className="text-white/40 hover:text-white">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button onClick={() => setIsMobileMenuOpen(false)} aria-label="ปิดเมนู" className="text-white/40 hover:text-white">
+              <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
               </svg>
             </button>
@@ -110,7 +110,7 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
 export default function CommunityLayout({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={
-        <div className="min-h-screen bg-[#141414] flex items-center justify-center">
+        <div className="min-h-screen bg-[--surface-base] flex items-center justify-center">
             <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
         </div>
     }>

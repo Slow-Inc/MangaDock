@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+
 import type { StorageProvider } from '../common/storage/storage-provider.interface';
 
 export interface PatchLocator {
@@ -27,6 +29,15 @@ function assertSafeSegment(value: string, what: string): void {
   if (!SAFE_SEGMENT.test(value) || value.includes('..')) {
     throw new Error(`PatchStore: unsafe ${what} segment: ${JSON.stringify(value)}`);
   }
+}
+
+/** User-uploaded "version" chapters are addressed as `ver:<uuid>`. The `:` is a
+ *  valid id-scheme separator but not a valid path character, so map it to `_`
+ *  before the segment is used as a directory name. Only `:` is normalized —
+ *  every other unsafe char (`/`, `\`, `..`) still trips assertSafeSegment, so
+ *  the traversal guard is unchanged. */
+function toPathSegment(value: string): string {
+  return value.replace(/:/g, '_');
 }
 
 /**
@@ -62,12 +73,13 @@ export class PatchStore {
    *  Stale region files beyond the new count (page shrank on re-translate) are
    *  removed so the page's footprint is always exactly its current regions. */
   async put(loc: PatchLocator, pngs: Buffer[]): Promise<string[]> {
-    assertSafeSegment(loc.chapterId, 'chapterId');
+    const chapterId = toPathSegment(loc.chapterId);
+    assertSafeSegment(chapterId, 'chapterId');
     assertSafeSegment(loc.srcMIT, 'srcMIT');
     assertSafeSegment(loc.tgtMIT, 'tgtMIT');
     if (loc.model !== undefined) assertSafeSegment(loc.model, 'model');
 
-    const dir = this.chapterDir(loc.chapterId);
+    const dir = this.chapterDir(chapterId);
     const filePrefix = this.pageFilePrefix(loc);
     // Normalize once per call: a trailing-slash origin must not produce `//`
     const origin = this.origin().replace(/\/+$/, '');
@@ -76,7 +88,12 @@ export class PatchStore {
     for (let i = 0; i < pngs.length; i += 1) {
       const key = `${dir}/${filePrefix}${i}.png`;
       await this.storage.put(key, pngs[i], { contentType: 'image/png' });
-      urls.push(`${origin}/${key}`);
+      // Deterministic filenames mean a re-translate overwrites the PNG but keeps
+      // the URL — so clients keep serving the stale cached patch (max-age=14400)
+      // until it expires. A content-hash `?v=` makes the URL change iff the bytes
+      // change: identical re-translate stays cached, changed patch busts it.
+      const version = createHash('sha1').update(pngs[i]).digest('hex').slice(0, 12);
+      urls.push(`${origin}/${key}?v=${version}`);
     }
 
     const names = await this.storage.list(dir);

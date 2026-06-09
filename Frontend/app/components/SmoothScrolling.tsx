@@ -73,6 +73,12 @@ export default function SmoothScrolling({ children }: SmoothScrollingProps) {
     };
   }, [pathname]);
 
+  // Docs page uses h-screen with inner overflow-y-auto panels — Lenis root
+  // intercepts wheel events at the document level and prevents native scroll.
+  if (pathname.startsWith('/docs')) {
+    return <>{children}</>;
+  }
+
   return (
     <ReactLenis
       ref={lenisRef}

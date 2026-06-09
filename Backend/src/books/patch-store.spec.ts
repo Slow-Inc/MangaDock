@@ -60,11 +60,44 @@ describe('PatchStore', () => {
 
     const urls = await store.put(loc, [png('a'), png('b')]);
 
-    expect(urls).toEqual([
+    // path is the deterministic key; the ?v= content-version is asserted
+    // separately by the cache-bust test.
+    expect(urls.map((u) => u.split('?')[0])).toEqual([
       'https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r0.png',
       'https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r1.png',
     ]);
     expect(storage.files.size).toBe(2);
+  });
+
+  it('appends a content-version query param to each url (#cache-bust)', async () => {
+    const { store } = makeStore();
+
+    const urls = await store.put(loc, [png('a'), png('b')]);
+
+    // deterministic filename (cache-friendly) + a ?v= version so a re-translate
+    // that changes patch content forces clients off the stale cached PNG.
+    expect(urls[0]).toMatch(
+      /^https:\/\/api\.example\/uploads\/patches\/ch1\/ANY__THA__default__p3__r0\.png\?v=[0-9a-f]+$/,
+    );
+    expect(urls[1]).toMatch(/\?v=[0-9a-f]+$/);
+  });
+
+  it('keeps the same version when re-translated content is identical (cache stays warm)', async () => {
+    const { store } = makeStore();
+
+    const v1 = (await store.put(loc, [png('same')]))[0].split('?v=')[1];
+    const v2 = (await store.put(loc, [png('same')]))[0].split('?v=')[1];
+
+    expect(v1).toBe(v2);
+  });
+
+  it('changes the version when re-translated content differs (busts client cache)', async () => {
+    const { store } = makeStore();
+
+    const v1 = (await store.put(loc, [png('old')]))[0].split('?v=')[1];
+    const v2 = (await store.put(loc, [png('new')]))[0].split('?v=')[1];
+
+    expect(v1).not.toBe(v2);
   });
 
   it('re-translating overwrites in place — no new files appear', async () => {
@@ -108,6 +141,20 @@ describe('PatchStore', () => {
     expect(storage.files.size).toBe(1);
   });
 
+  it('stores a version chapterId (ver:<uuid>) by normalizing the colon to a safe segment', async () => {
+    const { storage, store } = makeStore();
+
+    const urls = await store.put(
+      { ...loc, chapterId: 'ver:752fc515-72ce-4890-9369-0337ea3a8224' },
+      [png('a')],
+    );
+
+    expect(urls[0].split('?')[0]).toBe(
+      'https://api.example/uploads/patches/ver_752fc515-72ce-4890-9369-0337ea3a8224/ANY__THA__default__p3__r0.png',
+    );
+    expect(storage.files.size).toBe(1);
+  });
+
   it('rejects path-traversal segments before touching storage', async () => {
     const { storage, store } = makeStore();
 
@@ -123,7 +170,7 @@ describe('PatchStore', () => {
 
     const urls = await store.put(loc, [png('a')]);
 
-    expect(urls[0]).toBe('https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r0.png');
+    expect(urls[0].split('?')[0]).toBe('https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r0.png');
   });
 
   it('sweepLegacy keeps going when one delete fails (e.g. a stray directory)', async () => {

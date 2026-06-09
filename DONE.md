@@ -1,3 +1,378 @@
+<!-- lang:en -->
+# DONE — Claude Code Session Log
+
+---
+
+## #179 narrow-column safe-area + adversarial bug hunt (2026-06-08, /tdd + Karpathy)
+
+**#179 (root-cause render parity):** new pure `MIT/manga_translator/safe_area.py` — `safe_area_box(mask)` = distance-transform safe-interior + pole-of-inaccessibility anchor (ported from MangaTranslator image_utils.py). Wired: `_tag_regions_with_bubbles` carries `bubble_polygon`; `_build_local_region` shifts it into crop coords; renderer `_bubble_interior_box` rasterizes the polygon → mask → `safe_area_box` and wraps to the **interior width** centered on the anchor (narrow column) instead of the bbox. Opt-in under `bubble_area_fit`; off → byte-identical. `test_safe_area.py` 5 green (incl conjoined-neck pole). **E2E (One Punch-Man JA→EN, ab_benchmark + MCP_DOCKER UI):** top-left narration now renders as a narrow column with hyphenated "some-where" — visibly closer to the reference (was a wide paragraph). UI path clean: zero 500/404 (only the pre-existing forum 404). `benchmark_compare_179.png`.
+
+**Adversarial bug hunt (12+ agent workflow, 25 candidates → 16 confirmed):** fixed the 4 that sit in the code being touched:
+- **[blocker] ZeroDivision** in `resize_regions_to_font_size` legacy single-axis expansion when `used_rows/used_cols == 0` → guarded `> 0`.
+- **[major] whitespace-only translation** entered bubble_fit (truthy but blank → large font for invisible text) → added `region.translation.strip()` guard.
+- **[major] empty `widths`** from calc_horizontal made `block_w=0` → every size "fits" → max font → measure now treats empty widths as no-fit (`inf`).
+- **[major] `union_box` float truncation** shrank the crop (int() truncates a float max inward, clipping the balloon) → floor mins / ceil maxes. (`test_union_box_does_not_shrink_on_float_coords`).
+- Logic tests: 41 green across safe_area/font_fit/bubble_association/render/thai (1 pre-existing async-plugin fail).
+
+**Confirmed bugs deferred (mapped / triaged, NOT yet fixed):** dst_points exceed image bounds (clipping commented out) → **#183**; vertical regions never fitted → **#182**; **Backend [major] batch `buildJobKey` breaks on a `ver:` chapterId** (colon splits the jobKey) — real, in the batch path, needs the same `:`→`_` normalization as PatchStore (not yet filed); patch cache-key `jobModel` divergence (needs verify); minor: fit_font_size margin≤0 guard, ver:/ver_ sanitize collision, control-char traversal, HMAC hex format, cache:reset Redis-misconfig silent pass. L1-not-cleared-by-cache:reset is already documented + the script now prints a restart reminder.
+PIPELINE.md §5 updated. Not committed.
+
+## Render Parity — PRD #178 + vertical-slice issues (2026-06-08, /to-prd + /to-issues)
+
+After the deep dissection, the user decided the direction (narrow-column + 4× supersampling + real vertical + SFX) and asked to break it into a PRD + issues. Filed:
+- **PRD #178** — "Render Parity with MangaTranslator" (bilingual, ready-for-agent): problem/solution, 26 user stories, deep-module plan (`safe_area`, `line_break`, `vertical_layout`, supersample seam, inpaint-fidelity helpers), testing decisions (pure modules + source-inspection wiring + byte-identical-when-off + benchmark E2E), VRAM framing (5–7/12GB now vs legacy 11.5GB SD/LDM, headroom for AnimeText + quantized diffusion opt-in). Parent of the render-quality issues; extends PRD #169.
+- **New vertical slices (all ready-for-agent, opt-in, byte-identical-off):** #179 mask-aware narrow-column wrap + safe-area centering (root cause) · #180 Knuth-Plass + kinsoku + hyphenation [blocked-by #179] · #181 4× supersampling · #182 real vertical layout + auto-orientation · #183 squeeze-on-collision + pre-warp bounds check.
+- **Existing children of #178:** #168 SFX, #171 emphasis, #172/#167 OCR, #173 feather, #174 flat-fill, #175 sizing, #176 font, #161 glossary.
+- **Deferred (in PRD, file when reached):** LAB luminance-match, translation determinism (temp 0.1 + gate), quantized diffusion inpainter (re-adopt legacy SD/LDM behind a flag).
+- No code changed. Next: /tdd the cheap visible wins (#175 cap, #181 supersampling, #179 narrow-column) and #168 SFX.
+
+## Research — translator deep dissection: MangaTranslator vs ours (2026-06-08, ultracode workflow)
+
+User asked to fully dissect MangaTranslator (techniques/models/methods), survey our MIT + Backend, analyze why ours is worse, and surface black boxes in both. Ran a 12-agent dissection workflow (9 per-stage dissectors reading both codebases + 3 synthesizers; 1.24M subagent tokens) + a gap-fill agent for detection. New canonical doc: **`docs/research/translator-deep-dissection.md`** (~70KB) — full pipeline dissection (detection/OCR/translation/cleaning-inpaint/layout/render/orchestration + complete ML model inventory), our MIT+Backend inventory, an 8-dimension "why ours is worse" table mapped to issues, and an honest black-box ledger (both codebases, tagged verify-by: read-code | run-experiment | ask-author).
+- **Headline (models/VRAM):** theirs = FLUX inpaint (8–15GB) + SAM2/SAM3 + AnimeText YOLO + 4× supersampling; ours = LaMa (~1–2GB) + DBNet + 48px CNN. They buy photoreal inpaint + crisp text + glossary/emphasis context at 8–15GB; we run at 1–2GB. Dev box has headroom (5–7/12GB used).
+- **Root-cause one-liner:** we adopted upstream's *correct* engine but ship it **untuned** — heuristic font-fit instead of safe-area + collision binary-search, no supersampling, greedy wrap instead of DP+kinsoku, LaMa without feathering/luminance-match, temp 0.5 without emphasis/glossary. **Most fixes are porting upstream's already-written logic into our patch path behind opt-in seams, not new research.**
+- **Why-worse ranked → issues:** seams #173 · font/supersampling #175+new · overflow/vertical #175+new · anchoring new · line-break/kinsoku new · SFX #168 · OCR upscale #172/#167 · translation tuning #171/#161/new.
+- Decided direction in memory `project_render_parity_direction` (narrow-column mask-aware wrap + 4× supersampling + real vertical Latin + SFX opt-in). Doc cross-links `mangatranslator-internals` + `round2-deep`. No code changed this round.
+
+## #175 bubble-fit anti-overflow sizing (2026-06-08, /tdd, /to-issues)
+
+User flagged (with screenshots) that #166's fitted text renders too big and clips at the balloon/panel edge. Filed #175 (sizing) + #176 (comic font) via /to-issues. Fixed #175's sizing:
+- **Pure** `fit_font_size` gained a `margin` param — fits to a fraction (0.92) of the box so glyph ascent/descent slack can't touch the edge (unit-tested; `margin=1.0` default keeps existing callers byte-identical).
+- **Renderer** `_bubble_fit_font_size`: real per-line height (`_LINE_HEIGHT=1.2`), `_FIT_MARGIN=0.92`, relative cap `_MAX_FONT_BOX_RATIO=0.5`. **Crucially**, calc_horizontal is now wrapped to the *margin'd* width too — without that the search floored at `low=8` (lines calc made for the full width always exceeded the margin'd fit-test). Did **not** copy MangaTranslator's flat `max=16` (would regress to tiny on our full-res pages).
+- **Diagnosis (mantra)**: instrumented `resize_regions_to_font_size` to a file (the `--start-instance` worker logs in a child process — also caught a real ops bug: killing only the :5003 listener orphans the :5004 instance, so code edits silently don't take effect; must kill both ports). Ground truth: bubble-fit regions sized 8–54; the `font=8` floor on the top-left narration box was the margin/calc-width mismatch (now fixed → 41); the bottom-right clip is a **LEGACY-path** region (`hasbub=False`, no fit-to-box) — out of #175's scope.
+- **E2E** (One Punch-Man JA→EN, `ab_benchmark.py`): top-left narration now fills its box (was tiny font 8), text fits within boxes, clipping largely gone. Visible jump toward the reference (~45% → ~60-65%). `benchmark_compare_175.png`.
+- Tests: `test_font_fit.py` + `test_bubble_association.py` 23 green; targeted render/thai sweep 35 green (1 pre-existing async-plugin fail). PIPELINE.md §5 updated. **#175 NOT closed — awaiting user confirm.**
+- **Remaining gap (new finding)**: non-bubble regions use the legacy path with no fit-to-box → they can still overflow (bottom-right). Plus SFX untranslated (#168) and typeface (#176). Candidate follow-up: extend fit-to-box to legacy regions or improve bubble coverage. Not committed.
+
+## MIT benchmark vs MangaTranslator + upload→translate fix (2026-06-08, /tdd)
+
+Stood up the full stack (frontend+backend+MIT worker+cloudflared tunnel) and drove the One Punch-Man "Benchmark Pipeline MIT" page (uploaded JA) through the UI via Playwright to compare against MangaTranslator's reference (`MIT/example_translation.jpg`). New `MIT/BENCHMARK.md` records the canonical test case + scorecard; throwaway harness `MIT/tools/ab_benchmark.py` translates it JA→EN directly through the worker and composites the patches.
+- **Result: ~40–50% of MangaTranslator on this page.** Translation text comparable; the gap is rendering+coverage: rectangular **narration boxes under-fill** (speech-bubble YOLO doesn't detect them → no `bubble_box` → #166 can't engage), **SFX untranslated** (ぬ→"LOOM"; #168 not built), **edge clipping** on the right column. #166 binary-search is correct but only lifts detected speech bubbles — this page is narration+SFX heavy, out of its scope.
+- **Bug #1 FIXED (TDD)** — `loadPageBytes` (`page-source.ts`) couldn't load an uploaded page: the Reader sends a relative `/api/proxy/uploads/...` URL → `fetch` "Failed to parse URL" → 500. Added `isLocalUploadPath` + disk read under the uploads root (handles `/uploads/` and `/api/proxy/uploads/` prefixes, same traversal guards as img-cache); `loadPageBytes` gained `uploadsRoot` opt, wired at both call sites. `page-source.spec` 12 green (+4). Rebuilt+restarted backend; the page now reaches the worker and renders.
+- **Bug #2 FIXED (/debug-mantra, TDD)** — after the worker succeeded, storing patches 500'd: `PatchStore: unsafe chapterId segment: "ver:752fc515-..."`. Uploaded "version" chapters carry a `ver:` prefix whose `:` failed PatchStore's `/^[\w.-]+$/` guard. Reproduced with a unit test (`put({chapterId:'ver:<uuid>'})` → throws), fixed by normalizing `:` → `_` in `PatchStore.put` before the guard (`toPathSegment`) so the dir is `ver_<uuid>`; `/`,`\`,`..` still throw (traversal contract preserved — that test stays green). `patch-store.spec` 13 green (+1). **Confirmed E2E via Playwright on `hayateotsu.space`: the uploaded chapter now translates fully — toolbar "✓ แปลแล้ว", EN patches overlay the page, zero 500s.** This was the real-world repro the unit test stood in for.
+- Stack left running (worker :5003, backend :4001 with #166 flags, frontend :4000, tunnel up). Not committed.
+
+## #166 — direct-worker E2E proof (2026-06-08)
+
+Tunnel (`hayateotsu.space`) was down (CF 530) so the Playwright path was blocked; proved the render change by driving the MIT worker directly instead (cleaner isolation of the change anyway). New throwaway diag `MIT/tools/ab_bubble_fit.py`: POSTs `tools/_bubble_proof/page01.jpg` to `:5003/translate/with-form/patches` with `bubble_area_fit` OFF vs ON (both `det_bubble_seg` on, `ocr.prob 0.03`), composites the returned patches onto the page → `before.png` / `after_fitoff.png` / `after_fiton.png`.
+- **Result:** translation works end-to-end (EN→TH via custom_openai gateway, 24 regions). The bottom-right speech balloon renders **large, clean, balloon-filling Thai** under ON vs tiny/untranslated under OFF — **no clipping, no overlap** → the binary-search fit + the two scrutinize fixes (union_box crop-expansion, sole-occupant gate) hold in a real render.
+- **Honest caveats:** (1) the runs differ in patch count (OFF 6 / ON 7) — `bubble_area_fit` ON legitimately changes the crop via `union_box`, so it's not a byte-isolated A/B; the bottom-right box was rescued only under ON. (2) Most **rectangular narration boxes still render small in both** — the `kitsumed/yolov8m_seg-speech-bubble` model targets rounded dialogue balloons, not narration boxes, so they get no `bubble_box` and fall to the legacy path. Covering narration boxes is out of #166's scope (needs a different detector / the OSB+panel path).
+- First attempt returned 0 patches: the diag set `source_lang_only=JPN` but page01 is an English scan → all 24 regions dropped by the lang filter; fixed by leaving source `ANY`. Worker left running on :5003. Not committed.
+
+## #166 binary-search — scrutinize fixes: clip + overlap (2026-06-08, /tdd)
+
+`/scrutinize` of the binary-search work surfaced two blockers in the patch-crop seam (both hit exactly the target "loose balloon" case, so they'd look *worse* than before under `MIT_BUBBLE_AREA_FIT=1`). Fixed via TDD before any E2E:
+- **Blocker 1 — clipping:** the crop is sized to text-lines (+pad+render_extra=120px); a balloon larger than that overflowed it, so the balloon-sized fitted text rendered cut off at the patch edge. Fix: new pure `bubble_association.union_box()` (clamped axis-aligned union) grows the crop to cover the group's balloons in `_process_group`, gated on `config.render.bubble_area_fit`. 3 tests.
+- **Blocker 2 — overlap:** a multi-region balloon (`_group_nearby_regions` keeps a multi-line balloon as one group) had every region fit to and render into the *same* full-balloon rect → stacking. Fix: new pure `bubble_association.balloon_occupancy()` counts regions per balloon box; the renderer fits a region only when `occupancy[i] == 1`, else it falls through to the legacy per-text-line path. 2 tests.
+- Verified: sole occupant still fits (font 120 into a 480×320 balloon); shared/None balloons gated out. Tests: `test_bubble_association.py` 15 green (+5), `test_font_fit.py` 6 green (wiring asserts both gates + union_box), targeted render/thai suite 33 green (1 pre-existing async-plugin fail). PIPELINE.md §5 updated. Verdict moved scrutinize → fix-then-ship done; **safe to E2E now.** Not committed.
+
+## #166 binary-search font sizing — the real fit (2026-06-08, /tdd)
+
+Replaces Step B's `sqrt(area-ratio)` heuristic (which near-no-op'd on dense boxes — the "ทำไมดูไม่ต่าง" feedback) with MangaTranslator's actual technique: binary-search the largest font whose wrapped text fits the balloon, measured by the renderer's own wrapper so the fit prediction matches the render.
+- **Pure** `font_fit.py` `fit_font_size(box_wh, measure, low, high)` — standard binary search over a `measure(size)->(block_w,block_h)` callback; fit-test = `block_w<=W ∧ block_h<=H`; floor-on-overflow. No PIL/ML imports. Removed the old `bubble_area_font_size` + its 6 area-ratio tests + the `_apply_bubble_area_fit` patch pre-step (dead once the renderer owns the fit). 5 search tests.
+- **Renderer** `rendering/__init__.py`: new `bubble_fit` path in `resize_regions_to_font_size` — for a horizontal region carrying a #170 `bubble_box`, `_bubble_fit_font_size()` fits via `calc_horizontal` and renders **into the balloon box** (dst_points = bubble rect), bypassing the length-ratio heuristic so the fitted size is never re-inflated past the balloon. Threaded `bubble_fit` through `dispatch`; `_run_text_rendering` passes `config.render.bubble_area_fit`. Off / no bubble_box → byte-identical legacy path.
+- **Proven** (real freetype wrapper, no GPU): same text in a 120×80 box → font 30; in a 480×320 box → font 120 (4× box ⇒ bigger font), dst = balloon dims. Direction correct, no squish-back.
+- Tests: `test_font_fit.py` 6 green (5 search + 1 source-inspection wiring); targeted render/bubble/thai suite 28 green (1 pre-existing async-plugin fail `test_default_renderer`, unrelated). PIPELINE.md §5 provenance updated (config/manga_translator/rendering/font_fit). **Issue #166 NOT closed — awaiting user confirm + full frontend E2E.** Not committed.
+
+## Dev tooling — `scripts/notify.ps1` Windows toast notifier (2026-06-08)
+
+User wants a ping when a long task finishes / needs a decision so they can step away from the terminal. Claude Code's built-in `PushNotification` reports "sent" but produces no OS toast on their Win11 + VS Code setup (verified: not DND, nothing in Action Center). Built a working path instead.
+- **Mechanism**: `scripts/notify.ps1 -Message "..."` (run by pwsh 7) shells out to **Windows PowerShell 5.1** and emits a **WinRT Toast** under the Windows PowerShell AppId → lands in Action Center → forwarded to the phone via Phone Link (user's phone is Phone-Link-paired). pwsh 7 can't load WinRT projections, hence the 5.1 hop; `powershell.exe` isn't on PATH in this env so the script uses the full `System32\WindowsPowerShell\v1.0` path; text is XML-escaped; `-File` runs fine under RemoteSigned (no `-ExecutionPolicy Bypass`, which the classifier denies).
+- **Confirmed live**: raw WinRT toast displayed on screen; built-in PushNotification + legacy NotifyIcon balloon did not.
+- Documented in CLAUDE.md (EN+TH, "Dev Notifications"); standing rule saved to memory `feedback_notify_on_done_or_question`. Not committed.
+
+## Debug tool — `cache:reset` wipes translated-patch caches (2026-06-08, /tdd)
+
+Re-translating during MIT debugging was defeated by every cache layer replaying the prior result; clearing them by hand (Redis pattern + `.cache` glob + `uploads/patches`) was error-prone — one wrong glob nukes `forum:*`/`search:*` (same data-loss class PatchStore's `OWNED_NAME` guards). Extracted the dangerous part into a unit-tested pure module.
+- **Pure module** `src/cache/translation-cache-reset.ts`: `isTranslatedPatchCacheKey()` (matches only `translate:manga-patches:` — sibling `translate:glossary:*` survives) + `resetTranslationCache(ports)` orchestrator over injected I/O ports (Redis / L3 disk / patch PNGs), best-effort per layer. 6 tests with in-memory fakes prove forum/search/mangadex/glossary keys are left intact and counts are accurate.
+- **CLI glue** `scripts/reset-translation-cache.ts` (`npm run cache:reset`, `-- --dry-run`): wires real ioredis (graceful skip when Redis down, mirrors RedisService fallback) + `fs` for `.cache/*.json` (selects by the entry's `key` field) and `uploads/patches/<chapterId>` trees. In-memory L1 dies with the backend → restart clears it.
+- **Verified on real data**: `.cache` held 463 json (219 patch + 244 other); dry-run then real run deleted exactly the 219, leaving 244 (463→244) — zero collateral. Full cache suite 137 green (14 suites). Not committed.
+
+## #166 font-size fidelity — Step A: render knobs (2026-06-08, /tdd, in progress)
+
+Leverage-order step 1 of #166 ("knobs"). The renderer's auto floor is `(img.h+img.w)/200` — in patch mode that's computed from the tiny crop, so text renders uniformly small. MIT's `render.font_size_offset`/`font_size_minimum` existed but the Backend never sent them.
+
+- **Backend** `buildMitConfig`: `MIT_FONT_SIZE_OFFSET` (signed int) + `MIT_FONT_SIZE_MIN` (positive px) → `render.{font_size_offset,font_size_minimum}`; absent → render block byte-identical. `signedIntEnv`/`posIntEnv` helpers. `books-mit-config.spec` 13 green (knob set + absent-unchanged).
+- **Frontend E2E** (build + restart with `MIT_FONT_SIZE_MIN=30`, cleared all 3 cache layers, re-translated Kouchuugun p1): text renders visibly larger and fills each caption box far better than the default auto-floor render — confirms mechanism #3 (knobs never tuned + crop-derived tiny floor). Screenshot in `_bubble_proof/`.
+- **Next (Step B, the core)**: drive size by *available area* (the `region.bubble_box` carried from #170) instead of the source textline column + the global floor — per-box auto-fit, not a blunt global minimum. Then Step C (patch-crop growth), Step D (display-text ≥2× median, ties to #168).
+- Dev env now also carries `MIT_FONT_SIZE_MIN=30`. Not committed/merged.
+
+### Step B — area-driven sizing (`MIT_BUBBLE_AREA_FIT`, /tdd)
+The automatic fix vs Step A's blunt global floor: size each region's font to its **balloon area** (#170 `bubble_box`) instead of the source textline column.
+- **Pure helper** `manga_translator/font_fit.py` `bubble_area_font_size()` — linear scale = `sqrt(bubble_area / (textline_area × share))`, clamped `[1, max_ratio=1.6]`, only grows, `share` = lines splitting one balloon (so a multi-line bubble doesn't overflow). 6 tests, no ML imports.
+- **Wiring**: `_build_local_region` shifts `bubble_box` into crop coords; `_process_group` calls `_apply_bubble_area_fit(local_regions)` when `config.render.bubble_area_fit`; it sets `region.font_size` (plain attr) — renderer (`rendering/__init__.py`) untouched. `RenderConfig.bubble_area_fit` (off=byte-identical); Backend `MIT_BUBBLE_AREA_FIT` knob (`books-mit-config` 15 green).
+- **Frontend E2E** (worker + backend restarted on Step B code, `MIT_BUBBLE_SEG=1 MIT_BUBBLE_AREA_FIT=1`, no font-min, cache cleared, Kouchuugun p1 re-translated; worker logged `7 balloons, 24/24 regions tagged`): per-box sizing — spacious boxes (e.g. "แล้ว…อะไรจะเลวร้ายไปกว่านี้ได้") render large/fill, dense boxes stay readable; no overflow, no uniform-tiny. Distinct from Step A's uniform global bump.
+- Tests: MIT 16 (font_fit 6 + bubble_association 10) + Backend 27 (mit-config 15 + patch-store 12) green. **Issue #166 NOT closed — awaiting user confirm.** Remaining: Step C (crop growth), Step D (display-text). Dev env now `MIT_BUBBLE_AREA_FIT=1` (font-min removed).
+
+---
+
+## MangaTranslator round-2 deep read — hidden techniques (2026-06-08, research)
+
+Re-swept the full `/MangaTranslator` clone (33K LOC, Apache-2.0) with 5 parallel Explore agents to find techniques the first study missed. New doc: `docs/research/mangatranslator-round2-deep.md` (cross-linked from `mangatranslator-internals.md`). Highest-value new findings:
+- **Full binary-search font-sizing constants** (low=8/high=16 dialogue, 10–64 OSB; fit-test = line_width≤W ∧ block_height≤H; collision = 4 corners inside mask; squeeze ×0.90 up to 3×; line-height from real Skia metrics; pole-of-inaccessibility anchor) → makes #166 implementable for real, not a weak heuristic.
+- **Mask edge feathering** (`ramp = 1 − d_out/blur_radius`, distance-transform alpha) → kills patch seams; applies to our LaMa patches (#156). New issue candidate.
+- **Emphasis contract** (`*italic*`/`**bold**`/`***bi***` + Giongo→onomatopoeia / Gitaigo→verb-no-period) → complete recipe for #171 P2, prompt-only.
+- **Solid-bg → flat-fill** (white/black border ratio ≥0.95 skips inpaint) → our white caption boxes qualify. New issue candidate.
+- **min-128px upscale before OCR** + numbered-parser `[Missing item N]` repair + SAM neighbour whiteout → #172.
+- **Event-based OCR chaining** for parallel batch = exactly our #159.
+- Quick wins: temp 0.1 all providers, ellipsis `…→...`, RTL no-reorder, determinism-gate cache + 2px bbox quantize.
+- Confirmed model repo ids (speech-bubble = `kitsumed/yolov8m_seg-speech-bubble` which we already adopted for #170; OSB = `deepghs/AnimeText_yolo` for #168).
+- Roadmap mapping updated in the round-2 doc. PRD #169 extended via comment (P4/P5 + grounds #166 with the full binary-search spec); **two new issues filed under #169: #173 (patch-seam edge feathering, P4) and #174 (solid-bg flat-fill fast-path, P5)** — bilingual, ready-for-agent.
+
+---
+
+## #160 — translation memory persistence (2026-06-08, /tdd, live-verified)
+
+PRD #155 P3. Translated text becomes durable memory in Supabase; the per-page webhook persists each page's #158 text layer.
+
+- **Migration** (Supabase MCP `apply_migration`, project `mangadock`): `manga_glossaries`, `chapter_page_texts`, `chapter_summaries` per the PRD schema; RLS enabled, **no policies** (server-only — service role bypasses RLS).
+- **Repository** `translation-memory.repository.ts` — best-effort (try/catch → boolean, never throws → translation never depends on it): `savePageText` (idempotent upsert on `(chapter,page,lang)`), `upsertGlossary` (a `source='auto'` write is **skipped when the stored row is `edited`** — curation protected; explicit `edited` always wins). 5 unit tests, mocked Supabase.
+- **Wiring**: constructed from the already-injected `SupabaseService` (no constructor/module change → zero spec breakage); `handleMitCallback` fire-and-forgets `savePageText` after caching (no added latency).
+- **BUG found by the live demo** (why real testing matters): the webhook controller's anti-corruption mapping `const result = { imgWidth, imgHeight, patches }` **dropped `regions`** → first demo left `chapter_page_texts` empty. The existing #158 test accepted the field but never asserted it was *forwarded*. Tightened that assertion (RED), then added `regions` to the destructure + result (GREEN). `mit-webhook-hmac.spec` 9 green.
+- **Live demo** (batch-translate Kouchuugun ch.1 via the frontend → webhooks → persist; queried Supabase): rows appear in `chapter_page_texts` — e.g. page 0 = 24 regions, `"COLONIAL PLANET VESTA…"` → `"ดาวเคราะห์อาณานิคมเวสตา…"`, with model/target_lang. Acceptance #4 met.
+- Read paths + summary/glossary generation are later slices (#161). Issue open, not committed.
+
+---
+
+## #168 — SFX detector: pure core + seam (2026-06-08, /tdd, AFK-gated)
+
+The deep testable module + env seam of #168, AFK-buildable without the model. The AnimeText-YOLO wrapper + pipeline second-pass + proof on the SFX pages are a **separate slice gated on** (a) model-download approval (deepghs/AnimeText_yolo `.pt`, security gate) and (b) the SFX reference pages p8/p13 (MangaDex 404'd them this session).
+
+- **Pure helper** `manga_translator/sfx_merge.py` `dedup_sfx_boxes()` — drops second-pass SFX boxes already covered (IoA ≥ 0.2 over the candidate area) by a DBNet textline, so dialogue isn't double-detected. 4 tests, no ML imports.
+- **Seam**: `DetectorConfig.det_sfx` (off=byte-identical); Backend `MIT_SFX_DETECTOR` knob (`books-mit-config` 16 green).
+- Not committed; issue open. Full completion needs the gated model + pages.
+
+---
+
+## #172 filed — OCR rescue ladder (PRD #169 P3) (2026-06-08)
+
+Closed the last gap in residual-original-text coverage. The three causes of original text leaking onto a translated page are now all tracked: stylized SFX never detected → #168; OCR detected-but-dropped → #167 (shipped); **OCR recovered-but-mangled → #172 (new)**. Umbrella goal = PRD #169 User Story 5 ("zero original-language leftovers"). #172 = env-gated 3-step ladder (floor #167 done → geometric pre-split of over-long textlines → vision re-read via the existing gateway, per-page fallback logging); step 3 coordinates with PRD #171 P1 (multimodal OCR) to share the vision-OCR seam. Bilingual, ready-for-agent.
+
+---
+
+## Patch URL cache-bust — versioned `?v=<contentHash>` (2026-06-08, /tdd)
+
+Fix for the stale-patch-cache bug found during #170 frontend E2E (deterministic patch filenames + `max-age=14400` → re-translating with changed geometry served stale PNGs up to 4 h; surfaced as garbled top caption boxes on Kouchuugun p1).
+
+- **Seam**: `PatchStore.put()` (`patch-store.ts`) already had both the PNG bytes and the URL builder — append `?v=` = `sha1(bytes).slice(0,12)`. Content-hash (not mtime) so an identical re-translate keeps the URL (cache stays warm) while changed bytes bust it. Disk filename unchanged; only the returned URL carries the version. `toRelativeProxyUrl` (frontend) already preserves the query string → no frontend change.
+- **TDD** `patch-store.spec.ts` (12 green): tracer = url has `?v=[0-9a-f]+`; same content → same version; different content → different version; updated 2 existing exact-url assertions to split off the query.
+- **Regression**: full `src/books` suite = 15 fails (the pre-existing pubsub-batch baseline, unchanged) + 118 pass — zero new failures.
+- **Live E2E** (rebuilt + restarted Backend, re-translated Kouchuugun p5 fresh): overlay urls now carry distinct hashes (`r0.png?v=41ee539faad3`, `r1.png?v=a3d68b56b02d`, …) — confirmed wired through to the browser `<img>` src.
+- **Gotcha confirmed**: the fix only helps translations made *after* deploy — pages cached pre-fix (L3 holds the non-versioned response) keep serving stale patches. Cleared all 3 cache layers (8 PNG + 3 L3 + L1 restart) + reloaded the browser (frontend `patchedPages` short-circuits "แปลหน้านี้" → no backend call), re-translated p1 fresh → all 7 overlays now `?v=`-versioned with correct natH (587/617, not stale 1492/1489); p1 renders cleanly. Lesson folded into `feedback_clear_cache_before_test` (clear L3 + reload after any deploy).
+- Not committed/merged (awaiting user).
+
+---
+
+## #170 bubble segmentation IMPLEMENTED — balloon-aware grouping fixes scattered clumps (2026-06-08, /tdd)
+
+P0 enabler of PRD #169. Additive scope (user-chosen): DBNet stays the text detector; a speech-balloon YOLO-seg enriches each region with its balloon. All behind `MIT_BUBBLE_SEG=1` — off = byte-identical.
+
+- **Proof first (measure, don't guess)**: `tools/diag_bubble_seg.py` loaded `kitsumed/yolov8m_seg-speech-bubble` on 5 real Kouchuugun pages → masks correct (7/6/8/10/8 balloons), **VRAM 8,598/12,282 = 70%** co-resident with the running worker (+663 MB), 30 ms/page. Gate passed before any pipeline code.
+- **Slice 1-3 `bubble_association.py`** (pure geom, no ML, 10 tests <1s): `associate_regions_to_bubbles()` (containment → smallest-area nested wins → IoA fallback ≥0.5) + `group_regions()` (balloon-aware union-find: different balloons never merge, same balloon always merges; all-None = legacy proximity).
+- **Slice 4 env knob**: Backend `buildMitConfig` `MIT_BUBBLE_SEG` → `detector.det_bubble_seg` (`books-mit-config.spec` 11 green); MIT `DetectorConfig.det_bubble_seg` + source-inspection wiring test.
+- **Slice 5 ML wrapper + integration**: `bubble_detector.py` lazy YOLO wrapper (best-effort → no balloons on failure); `translate_patches` tags regions when flag on; `_group_nearby_regions` **refactored to delegate** to the pure `group_regions` (extract-for-testability).
+- **E2E A/B verify** (worker restarted on new code, same page, flag-only diff): Kouchuugun p1 caption-box page **2→7 patches, aspect 0.30→0.73** — scattered clumps gone. OFF reproduced the exact `451×1489`/`649×1492` baseline → byte-identical.
+- **Frontend E2E** (Playwright via `hayateotsu.space` tunnel, Backend rebuilt + restarted with `MIT_BUBBLE_SEG=1` + `MIT_OCR_PROB=0.03`, Kouchuugun cache cleared 93 PNG + 38 L3): translated p1 → backend log `page=0 → 7 patches`, reader rendered all 7 per-balloon overlays (aspect 0.67–0.86); p4 → `page=3 → 3 patches` (wide banner 2.9 / square bubble 1.02 / tall caption 0.7) — each container its natural shape, no clumps. Remaining within-box gaps = #166 sizing, as scoped. Dev env left with the flag on (revert: restart Backend without `MIT_BUBBLE_SEG`).
+- **Stale-patch-cache bug found via original↔translated compare (NOT a #170 logic bug)**: user's p1 screenshot showed the top caption boxes squished/garbled. Measured: overlay `r0`/`r1` `naturalHeight` = 1492/1489 (old OFF strips, browser-cached under the same deterministic filename `p0__r0.png`) while the disk files were 587/617 (correct new bubble patches). Proof: re-fetched with `?bust=` → 587/617; busting the live overlay `src` rendered p1 correctly. Root cause = patch overlay `p.url` in `MangaReader.tsx` has **no cache-bust param** + `max-age=14400`, so re-translating with changed geometry serves stale patches up to 4 h. Real fix (separate scope) = version the patch URL (`?v=<mtime/hash>`). Methodology recorded in `frontend-testing` skill (original↔translated compare is mandatory; stale-cache diagnostic; search→modal→read playwright recipe).
+- **Scope boundary**: #170 delivers boundary + grouping (carries `region.bubble_box`); font-sizing to *fill* the balloon (remaining within-box gaps) is **#166**, now unblocked.
+- New dep `ultralytics` (AGPL-3.0, self-hosted) in `requirements.txt`. Provenance: `PIPELINE.md §5` (manga_translator new 3→5). Lesson re-applied from this series: I twice guessed the scattered-clump cause before; measured patch dims + viewed renders this time.
+- **Not committed/merged** (awaiting user). #170 has proof + E2E comments.
+
+---
+
+## LEAK SWEEP — #136 #137 #139 (+#138 falsified) — 2026-06-06
+
+From architecture review report: candidates C1-C7 → issues #136-#143 (bilingual per new convention in `docs/agents/issue-tracker.md`)
+
+- **#136 MIT page-context**: `reset_page_context()` + call at top of `translate_patches` — stops unbounded RAM growth on worker singleton + context leaking across jobs (`context_size=0` default → no behavior change) · `test_page_context.py` (2) · real seam = #140 (HITL)
+- **#137 PatchStore**: single module owns `uploads/patches` — deterministic name `{src}__{tgt}__{model}__p{N}__r{N}.png` (re-translate = overwrite) + delete stale regions when page shrinks + `sweepLegacy()` sweeps random-name backlog (boot + daily `.unref`) · 3 call sites use PatchStore (`uploads/patches` removed from books.service) · `patch-store.spec.ts` (5) with fake mirroring real readdir semantics
+  - **Mock-drift caught by live verify**: initial fake used prefix-list but `DiskStorageProvider.list` = `readdirSync(dir)` (one-level, basename) → sweep silently missed real disk → fixed both module+fake
+- **#139 bundle**: stats `RECORD_VIEW_SCRIPT` single Lua (atomic write+TTL — spec rewrite 4 tests) · ContinueReadingRow timer ref+cleanup · log tee rollover across midnight · img-proxy 15MB cap
+- **#138 falsified**: EventSource is inside effect + cleanup complete — Explore agent misread, verify before acting
+- **Specs**: storage mock in all books specs adds `list`/`delete` · full suite 50/50 + build 0 + tsc 0
+- **HITL pending**: #140 Translation Session · #141 MitClient+BatchJobRegistry · #143 NDJSON/fan-out ADR · #142 useChapterTranslation
+
+---
+
+## PRD #131 → #132+#133+#134 IMPLEMENTED — translator-aware model selector (2026-06-05 late)
+
+From #130 finding (Qwen deployment shows Gemini selector that does nothing + wastes GPU across cache partitions) — full chain: /to-prd → /to-issues (3 vertical slices) → /tdd → live verify on branch `feat/translator-aware-model-selector`
+
+- **#132 MIT**: `/ready` → `{ready, workers, translator}` · discovery: `GET /books/models` referenced in #87 **never existed** — Frontend used hardcoded fallback throughout · live: `curl /ready` → `"translator":"qwen3"` ✓
+- **#133 Backend**: `getImageTranslator()` (60s cache, null when down/503/no-field) + `getMangaModelsInfo()` + route `GET /books/models` for first time · TDD `books-models.spec.ts` (6, RED→GREEN) · live: `{"models":[real catalog],"imageTranslator":"qwen3"}` ✓
+- **#134 Frontend**: `fetchImageTranslator`/`isGeminiImageTranslator` (null = fail-open) + deep module **`getEffectiveImageModel()`** as single gate for all translate calls (blocks stale localStorage sending model on non-Gemini) · desktop+mobile menus gated by `showModelSelector` · live browser: menu opens but **"AI Model" hidden** on Qwen machine ✓ · tsc EXIT 0
+- Docs: `CONTRACT.md` adds §Readiness
+
+---
+
+## LIVE E2E SESSION (2026-06-05 evening) — restart MIT + browser/API verified before merge
+
+- ✅ Webhook path E2E with new code: run1 translated 4/4 complete
+- **Bug found+fixed by e2e**: `handleMitCallback` still writing cache **v3** while pre-check reads v4 → webhook results never served from cache → fix via `patchCacheKey` + model segment from jobKey (commit `103177a`, TDD RED→GREEN, 22 tests green) → **run4/run5 = 0s instant** ✓
+- ✅ **#127 live-proven**: repeated call after all-cached returns all 4 pages every time
+- ✅ **Cancel chain (#101/#123) live-proven**: curl abort 6s → Backend cancels MIT job → MIT drops page 0 result
+- ✅ **#128 live-proven**: planted stale cancel flag → new translation succeeded 2/2
+- ✅ **#87 UI seen in screenshot**: model menu shows from real `/books/models`
+- **New finding → #130**: machine uses `TRANSLATOR_TYPE=local` + `DEFAULT_LOCAL_TRANSLATOR=qwen3` → translates with Qwen3, not Gemini → model override correctly ignored per PRD scope, but UI selector silently misleads user
+
+---
+
+## #95 S2 + #87 UI + #129 RESOLVED (2026-06-05 second round)
+
+- **#95 S2**: enforce secret only in production (option c); `NODE_ENV=production` + no-secret → 401 · `mit-webhook-hmac.spec.ts` **green for first time (7)** → baseline down to 14 (pubsub only)
+- **#87 Reader model selector UI**: "AI Model" section in both desktop translate dropdown and mobile more-menu (chip pattern same as LANGS) — list from `fetchAvailableMangaModels()` + "Auto" button (= delete key → operator env wins)
+- **#129 Decision option (a)**: accept + document · ADR in `MIT/ARCHITECTURE.md` §6 — cancel = page-boundary by design · UX: toast in `cancelTranslate`
+
+---
+
+## #87 IMPLEMENTED — per-request Gemini model (2026-06-05, TDD)
+
+- **Slice A Backend**: `imageModelKey()` + `patchCacheKey()` — cache **v3→v4** with model segment; `buildMitConfig(..., imageModel?)` → `translator.model`; `buildJobKey` includes model (prevents cross-model collision)
+- **Slice B MIT**: `TranslatorConfig.model: Optional[str]` · `_model()` = override or `GEMINI_MODEL` · `useCache` returns False when override ≠ default
+- **Slice C Frontend**: `getSelectedMangaImageTranslateModel()` — new key `mangaImageTranslateModel`; UI pending
+
+---
+
+## #95 S1 IMPLEMENTED — webhook HMAC over raw request bytes (2026-06-05, TDD)
+
+- **Root cause**: Backend verified HMAC on `JSON.stringify(parsed body)` but MIT signs raw bytes (`json.dumps(separators=(',',':'), ensure_ascii=False)`) → byte-unstable (e.g. float `1280.0` → JS stringify becomes `1280`) → mismatch when `MIT_WEBHOOK_SECRET` set
+- **Fix**: `main.ts` json() `verify` hook saves `req.rawBody` · controller verifies on `req.rawBody`
+
+---
+
+## #127 + #128 IMPLEMENTED — cancel→re-translate poisoning (2026-06-05, TDD)
+
+- **#127 Backend: all-cached batch job leak** — `startOrAttachBatchJob` early-return when `uncachedPages.length === 0` without removing placeholder from registry → next request of same jobKey attaches to resolved job → returns immediately, doesn't serve cache, doesn't call MIT. Fix: remove jobKey from registry before early-return
+- **#128 MIT: stale cancel flag poisoning new batch of same taskId** — deterministic taskId + `/cancel` arriving after `discard()` in finally → taskId stays in `_cancelled` permanently → next run `is_cancelled` from first page → silent break, no webhook. Fix: `discard(taskId)` at run start — new submission supersedes stale cancel
+
+---
+
+## Cancel-propagation + Thai wrap + VRAM pass (2026-06-05)
+
+- **Cancel**: Frontend proxy not forwarding `req.signal` → browser abort didn't reach NestJS → `res.on('close')` didn't fire → MIT never cancelled. Fix: `signal: req.signal`
+- **Thai word wrap**: pythainlp not in requirements → `_HAS_PYTHAINLP=False` → ZWSP no-op → whole sentence treated as "1 word" → `calc_horizontal` fallback splits char by char. Fix: add `pythainlp` + `_safe_char_split` cluster-safe fallback. Test: `test/test_thai_wrap.py` (8)
+- **VRAM**: merge mitConfig to single `buildMitConfig()` · reduce defaults: detection 2560→2048, inpainting 2048→1536 · expose `MIT_DETECTION_SIZE/INPAINTING_SIZE/INPAINTER/INPAINTING_PRECISION`
+
+---
+
+## Batch Translation End-to-End Fix Session (2026-06-04)
+
+5 bugs found and fixed in sequence:
+
+| # | Root Cause | Fix |
+|---|---|---|
+| 1 | MIT Webhook sent to Backend Public Origin (Cloudflare) — MIT on localhost can't reach it | Add `MIT_CALLBACK_ORIGIN` env + `mitCallbackOrigin` getter |
+| 2 | Webhook controller rejected all requests when `MIT_WEBHOOK_SECRET` not set | Make HMAC optional — no secret → accept unauthenticated |
+| 3 | `signal` passed to MIT POST → user cancel → kills TCP mid-flight → MIT BLAS crash (`forrtl error 200`) | Remove `signal` from MIT POST + pre-check `signal.aborted` before submit |
+| 4a | MIT webhook body (base64 PNG ~1-3MB) exceeds body-parser default 100KB → `PayloadTooLargeError` | Set `json({ limit: '50mb' })` + `bodyParser: false` |
+| 4b | Contract mismatch: MIT sends flat payload but controller expected `body.result` → crash | Controller reads flat fields, assembles `result` object itself |
+| 5 | SSE endpoint no heartbeat → ~62s wait with no bytes → Cloudflare 524 | Add initial `: connected` byte + periodic `: ping` every 15s |
+
+---
+
+## MIT Scrutiny → Issues #100–#111 (2026-06-04 → 2026-06-05)
+
+Full end-to-end scan of MIT server and logic layer. All 12 issues fixed with TDD.
+
+| Issue | Severity | Fix Summary |
+|---|---|---|
+| #100 | Critical | `send_webhook` retry + dead-letter — extracted to `server/webhook.py`, 10 tests |
+| #101 | Critical | Batch cancellation propagation — `cancellation.py` module, `POST /cancel/{taskId}`, 6 tests |
+| #102 | Security | Path traversal in result file endpoints — `server/path_utils.py`, 7 tests |
+| #103 | Security | Worker bind 0.0.0.0 RCE risk — hardcode `--host 127.0.0.1`, 6 tests |
+| #104 | Major | Dead batch endpoints — removed `/translate/batch/json`, `/translate/batch/images` and related code |
+| #105 | Cleanup | Dead code removal — 152 lines net deleted |
+| #106 | Major | Async-correctness — streaming timeout, blocking HTTP → httpx, lock-across-await fix, 7 tests |
+| #107 | Bug | GeminiTranslator error handling — `server_error_attempt=0`, bare raise fix, lstrip→removeprefix, IndexError guard |
+| #108 | Major | GPT sample selection — replaced langcodes fuzzy-match with direct dict lookup, 4 tests |
+| #109 | Major | Target-language check — replaced langid with target-script char ratio, 6 tests |
+| #110 | Major | Rendering direction mismatch + None homography guard, 4 tests |
+| #111 | Major | Region utils — textline_merge prob denominator fix, TextBlock null guard, mutable default, 5 tests |
+
+**MIT unit suite final (2026-06-05): 49 tests passing** (up from 25 at session start)
+
+---
+
+## MIT Documentation (2026-06-05)
+- `MIT/ARCHITECTURE.md` — 12-section blueprint (2-process model, directory map, patch path, translator subsystem, webhook, known issues #100-#111)
+- `MIT/SETUP.md` — install/run/test runbook + real troubleshooting (forrtl 200, model load 150s, CUDA OOM, port conflicts)
+- `MIT/CONTRACT.md` — wire format MIT↔Backend; casing footgun (single=snake_case vs batch/webhook=camelCase) + HMAC raw-bytes hazard + size limits
+
+---
+
+## PRD #92 — Qwen3 Offline Translator (2026-06-04)
+
+Design for users with GPU (RTX 4070 Super 12GB) who want offline manga translation without Gemini API dependency.
+
+Solution: New `Qwen3Translator` class with thinking mode disabled + `MIT_TRANSLATOR` env var in Backend to select translator type. Qwen3-4B BF16 = ~8GB VRAM, fits in 12GB.
+
+---
+
+## Phase 1.5 Completion Verification (2026-05-27)
+
+All 4 pillars verified: Community Forum (PR #9 merged), HWID middleware enforcement, Creator Earnings API+UI, Zero-Trust Gate.
+
+---
+
+## Phase 2 — 2-Layer Cache Upgrade (Branch: feat/2-layer-cache-upgrade, Commit: ad72574)
+
+- **ElectionService** — Redis NX Lock, Lua CAS renewal, 15s interval, TTL=37.5s
+- **MetricsService** — CPU/mem/latency heartbeat every 10s
+- **BatchSyncWorker** — Reliable Queue: `RPOPLPUSH` + `LREM` ack + crash recovery + leader-only guard
+- **CacheOrchestratorService** — write-behind `set()`: L1 + L2 + `markDirty()`
+- **Test Count:** 134 passing (up from 117)
+
+---
+
+## Phase 2b — Issues #13–#15: L3 Batch Layer (2026-05-28)
+
+- **#13 L3DiskService** — extracted disk I/O from JsonCacheService; fixed bug: `set()` was calling `writeToDisk()` on every update — massive disk I/O overflow
+- **#14 L3BatchWriter** — periodic L2→L3 batch on all nodes: wallet 2s, stats 5s, default 60s
+- **#15 Leader flush wire** — `BatchSyncWorker.syncKey()` now calls `l3.write()` before future Supabase RPC
+- **Test Count:** 155 passing
+
+---
+
+## Phase 2c — Issues #18–#21: Dirty Queue Bug Fixes (2026-05-28)
+
+- **#18** Processing queue leak — missing `DEL` before re-queue in `recoverOrphans()`
+- **#19** Expired key orphan — `lrem` ack on early return prevents permanent orphan
+- **#20** Shutdown durability — `onApplicationShutdown()` now calls `l3BatchWriter.flush()` instead of useless L1↔L2 timestamp sync
+- **#21** Non-atomic crash recovery — replaced DEL→RPUSH sequence with single `RECOVER_SCRIPT` Lua EVAL
+- **Test Count:** 161 passing
+
+---
+
+## Phase 2.4–2.5 — Cache Hardening (2026-05-29)
+
+- **CatastrophicRecoveryService** — boot with Redis down → read L3 → compare timestamp with Supabase → buffer winners → fire-once reconnect callback; smart dirty queuing skips Supabase winners
+- **BatchSyncWorker Retry Budget** — `MAX_RETRIES=5`, `HINCRBY cache:retry_counts`, `SADD cache:dead_letter` on exhaustion
+- **CacheHealthService** — `GET /status/cache` → `{ dirtyQueueDepth, processingQueueDepth, deadLetterCount, l3KeyCount, isLeader }`
+- **Timer hygiene** — `.unref()` on all `setInterval` timers to prevent Jest process leak
+- **Test Count:** 277 passing
+
+---
+
+## Translation System Overhaul (2026-06-04)
+
+6 bugs fixed (#73–#78): `.finally()` job deletion race, raw pixel coords as percentages, HMAC mismatch, idempotency race, latecomer listener ordering, TOCTOU in job registration.
+
+Dead code removed (#81): `translateMangaPage()` full-image path, its controller endpoint, and frontend export.
+
+**Architecture Decision: Option A'** — Replace `activeBatchJobs` Map with Redis pub/sub; `handleMitCallback` = `cache.set` + `redis.publish`; eliminates all 6 bug classes.
+
+**Test Count:** 299 passing
+
+---
+
+## V5 Final Hardening (Commit 69712f9)
+
+- Error handling: all `throw new Error()` → `InternalServerErrorException` in UnlockService
+- Runtime validation: `ValidationPipe` (class-validator) enabled globally in `main.ts`
+- Test integrity: `forum.controller.spec.ts` mocks updated to match real contract `{ items, total }`
+<!-- lang:end -->
+
+<!-- lang:th -->
 # DONE — Claude Code Review Fix Session (2026-05-27)
 
 ---
@@ -115,7 +490,7 @@
 
 **ตั้งใจไม่แตะ:** #129 (page-granular cancel latency + single-worker starvation) เป็น HITL — รอเลือกแนวทาง (a) accept+doc / (b) checkpoint ใน pipeline / (c) worker ที่ 2 · pre-existing fails: Backend pubsub/hmac 16 ตัว, MIT upstream `test_translation*`/`test_textline_merge` (async-def, ไม่มี pytest-asyncio) — ยืนยันด้วย stash-run แล้วว่าไม่เกี่ยวกับ change นี้
 
-**สำหรับ Gemini re-review:** attach path ยังไม่ pre-check cache ให้ latecomer (ได้เฉพาะ `completedPages` replay) — พฤติกรรมเดิม ไม่ใช่ scope #127 · ยังไม่ commit (รอ user สั่ง)
+**Review notes:** attach path ยังไม่ pre-check cache ให้ latecomer (ได้เฉพาะ `completedPages` replay) — พฤติกรรมเดิม ไม่ใช่ scope #127 · ยังไม่ commit (รอ user สั่ง)
 
 ---
 
@@ -169,7 +544,7 @@ scrutinize ทั้ง server/orchestration layer ของ MIT แล้วเ
 | [#102](https://github.com/Slow-Inc/MangaDock/issues/102) | 🟠 security | path traversal + unauth บน `/result(s)/...` → read/delete นอก RESULT_ROOT |
 | [#103](https://github.com/Slow-Inc/MangaDock/issues/103) | 🟠 security | worker รับ pickle ผ่าน HTTP + bind 0.0.0.0 → RCE risk; ต้อง bind 127.0.0.1 |
 | [#104](https://github.com/Slow-Inc/MangaDock/issues/104) | 🟡 major | batch endpoints พัง (sent_batch arity + stub execute_batch) — dead/broken |
-| [#105](https://github.com/Slow-Inc/MangaDock/issues/105) | 🟢 cleanup | dead code: duplicate imports, `String(e)` JS leftover, `start_instance=True` override, no-op if/else, dead `__del__`, `==‘cancel’` |
+| [#105](https://github.com/Slow-Inc/MangaDock/issues/105) | 🟢 cleanup | dead code: duplicate imports, `String(e)` JS leftover, `start_instance=True` override, no-op if/else, dead `__del__`, `=='cancel'` |
 
 **เฟส 3 — สแกน logic layer เพิ่ม (ข้ามไฟล์ model AI):**
 - [#106](https://github.com/Slow-Inc/MangaDock/issues/106) 🟡 — event-loop blocking (`requests.get` ใน async), lock-across-await, streaming ไม่มี timeout
@@ -224,7 +599,7 @@ scrutinize ทั้ง server/orchestration layer ของ MIT แล้วเ
 
 **ติดตั้ง:** `pytest 9.0.3` ลงใน MIT `.venv` แล้ว
 
-**สำหรับ Gemini re-review:** dead-letter ปัจจุบันเป็น log อย่างเดียว (ไม่ persist/replay) — ตาม scope #100; การ persist เพื่อ reconciliation เป็นงานแยก (เกิน #100) · ยังไม่ commit (รอ user สั่ง)
+**Review notes:** dead-letter ปัจจุบันเป็น log อย่างเดียว (ไม่ persist/replay) — ตาม scope #100; การ persist เพื่อ reconciliation เป็นงานแยก (เกิน #100) · ยังไม่ commit (รอ user สั่ง)
 
 ## ✅ #107 IMPLEMENTED — GeminiTranslator error-handling (2026-06-05)
 
@@ -350,7 +725,7 @@ Design grill-locked (ทุกข้อยึดหลักการ simplest+s
 
 **ทดสอบ end-to-end:** ยังไม่ได้รัน — ต้อง **restart MIT** (run-server.bat) แล้วลองแปลทุกหน้าใหม่ Backend hot-reload เอง
 
-**สำหรับ Gemini re-review (ทิ้งไว้ตั้งใจ ไม่แก้ในรอบนี้):**
+**Review notes (ทิ้งไว้ตั้งใจ ไม่แก้ในรอบนี้):**
 - **#95 S1**: HMAC ยังคำนวณบน `JSON.stringify(body)` (parsed) ไม่ใช่ raw request bytes — MIT คำนวณบน `json.dumps(separators=(',',':'))` → ถ้าเปิด secret จะ mismatch ต้องเก็บ raw body buffer (เช่น `rawBody` express verify)
 - **Latent**: ใน `handleMitCallback` ถ้า throw หลัง `processingPages.add(pageIndex)` (เช่น storage fail) page จะ lock ถาวร retry ไม่ได้ — ควรห่อ try/finally เพื่อ delete จาก processingPages เมื่อ error
 
@@ -493,7 +868,7 @@ npx wrangler secret put MIT_PATCH_URL   # http://26.17.141.205:5003/translate/wi
 - Pre-existing spec errors in `hardware-id.middleware.spec.ts`, `unlock.controller.spec.ts`, `wallet.controller.spec.ts` (INestApplication import) — out of scope
 - Storage-before-DB order in uploadBanner/uploadImage — was already correct
 
-## Gemini Re-review Suggestions
+## Review Notes
 - `file-type` magic-byte validation: verify CJS interop on deployed Node version
 - `recalculate_votes_atomic` RPC: confirm `data[0]?.upvotes` always populated after UPDATE
 - `unlock.service.ts` rollback: best-effort delete — consider logging if rollback also fails
@@ -530,7 +905,7 @@ npx wrangler secret put MIT_PATCH_URL   # http://26.17.141.205:5003/translate/wi
 - `supabase-migration.sql` — translator_earnings VIEW already existed, no migration needed
 - Any file in `Documents/`, `unlock.service.ts`, `books/*`
 
-### Notes for Gemini
+### Notes
 - Phase 1.5 is fully closed — all 4 pillars (Forum, HWID, Earnings, Zero-Trust) verified in codebase
 - Ready to begin Phase 2 planning (Architectural Scaling & Cloud Readiness)
 
@@ -570,7 +945,7 @@ npx wrangler secret put MIT_PATCH_URL   # http://26.17.141.205:5003/translate/wi
 
 #### Test Count: 134 passing (เพิ่มจาก 117 → 134)
 
-#### Notes for Gemini
+#### Notes
 - Phase 2 Cache branch พร้อม review ก่อน merge — รอ PR
 - `cache:processing` list ควร empty ตลอดในสภาวะปกติ; non-empty หลัง flush cycle = WARN signal
 - Dirty queue consumer (syncKey → JsonCache) ยังเป็น scaffolding; Supabase RPC handlers จะเพิ่มทีละ feature ใน Phase 2 ถัดไป
@@ -676,7 +1051,7 @@ PR #16 scrutiny (Issues #17 PRD) found 3 major bugs + 1 minor in the dirty-queue
 
 #### Test Count: 161 passing (เพิ่มจาก 155 → 161, -1 test cleanup)
 
-#### Notes for Gemini
+#### Notes
 - All 4 issues (#18–#21) closed; PR #16 branch (`feat/2-layer-cache-upgrade`) ready for final review and merge
 - `RECOVER_SCRIPT` Lua script named constant lives in `batch-sync.worker.ts` alongside the queues it uses
 - `cache-orchestrator.service.spec.ts` is a new file added alongside the orchestrator source
@@ -774,7 +1149,7 @@ PR #16 scrutiny (Issues #17 PRD) found 3 major bugs + 1 minor in the dirty-queue
 | R1-R6 (retry budget + dead-letter) | +6 |
 | H1-H6 (cache health service) | +6 |
 
-### Notes for Gemini
+### Notes
 - PR #60 (feat/cache-phase-2-4) ปิดแล้ว — งานทั้งหมดรวมอยู่ใน PR ใหม่
 - `cache:dead_letter` Redis Set ควร empty เสมอในสภาวะปกติ; non-empty = signal ว่ามี key ที่ต้องตรวจสอบ Supabase schema/constraint
 - `GET /status/cache` endpoint: operator ใช้ตรวจสอบ queue depths; ไม่มี auth เหมือน `/status/stream`
@@ -783,7 +1158,7 @@ PR #16 scrutiny (Issues #17 PRD) found 3 major bugs + 1 minor in the dirty-queue
 
 ---
 
-## ✅ Translation System Overhaul (2026-06-04, Session: Claude + Gemini multi-perspective)
+## ✅ Translation System Overhaul (2026-06-04, Session: multi-perspective review)
 
 ### Status: COMPLETE (backend) — Batch refactor (Option A') pending
 
@@ -819,7 +1194,7 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 
 #### Test Count: 299 passing (was 295)
 
-#### Notes for Gemini
+#### Notes
 - `books-batch-webhook.spec.ts` (13 tests) + `books-retry.spec.ts` (2) + `books-health.spec.ts` (2) + `mit-webhook-hmac.spec.ts` (3) added
 - Option A' implementation issue pending — will replace `startOrAttachBatchJob` (~500 lines) with Redis pub/sub (~50 lines)
 - `processingPages: Set<number>` added to `BatchJobState` interface (temporary, removed with Option A')
@@ -938,3 +1313,146 @@ cd Cloudflare-Worker && npx wrangler deploy
 - **Error Handling:** เปลี่ยน `throw new Error()` เป็น `InternalServerErrorException` ทั้งหมดใน `UnlockService` เพื่อมาตรฐานความปลอดภัย
 - **Runtime Validation:** ติดตั้ง `forum.dto.ts` และเปิดใช้งาน `ValidationPipe` (class-validator) แบบ Global ใน `main.ts` ป้องกัน Payload ที่ผิดโครงสร้าง
 - **Test Integrity:** แก้ไข `forum.controller.spec.ts` ให้ Mock ข้อมูลตรงตาม Contract จริง `{ items, total }`
+<!-- lang:end -->
+
+## 2026-06-09 — Render-parity E2E proof (#176 + #181 + #179 + #166/#170)
+Full-stack restart (worker fresh = new code, backend `MIT_EN_COMIC_FONT=1 MIT_SUPERSAMPLING=4`,
+frontend, cloudflared tunnel), 3-layer cache cleared + backend L1 reset.
+`MIT/tools/ab_parity.py` → benchmark page JA→EN through worker with full parity render config.
+Result: 6/6 regions translated + rendered, BubbleSeg 5 balloons/3 tagged, 1 merged patch,
+comic font (`comic shanns 2.ttf`) confirmed loaded, 4× supersampling + safe-area narrow column active.
+Montage `MIT/tools/_bubble_proof/parity_montage.png` [original | ours | MangaTranslator-ref].
+Remaining gaps vs MangaTranslator: ALL-CAPS casing, SFX translate (#168, model dl), bolder weight.
+
+## 2026-06-09 — Render-parity port plan + #168 model approved
+Dug MangaTranslator (meangrinch) clone render path → `docs/research/render-parity-port-plan.md`.
+Corrections: ALL-CAPS is `pipeline.py:1375 text.upper()` (real code, not prompt); SFX uses
+`deepghs/AnimeText_yolo` (matches #168). User APPROVED downloading animetext_yolo (~400MB).
+Starting /tdd: A=ALL-CAPS knob → C=font fill (relax cap+squeeze) → B=heavier font → then #168 SFX+outline.
+
+## 2026-06-09 — /tdd render-parity slices A+B+C (opt-in knobs)
+A (ALL-CAPS): backend MIT_EN_UPPERCASE → render.uppercase (MIT already honored it, manga_translator.py:1125).
+C (bubble fill): new pure helper font_fit.font_high_cap + RenderConfig.font_max_box_ratio (default 0.5
+= byte-identical) threaded dispatch→resize→_bubble_fit_font_size; backend MIT_FONT_MAX_BOX_RATIO (frac).
+B (font weight): RenderConfig.en_font filename override in _render_font_path (BYO heavier face, MangaTranslator
+style); backend MIT_EN_FONT.
+Tests: MIT 36 passed (font_high_cap unit + wiring), Backend 26 passed (3 knob pairs); render import verified.
+E2E worker-direct `tools/ab_parity2.py` → `parity2_montage.png` [original|v2_comic|v2_aa3|MangaTranslator]:
+ALL-CAPS + fuller fill confirmed; weight still below MT (needs CC Wild Words via en_font). SFX = #168 next.
+
+## 2026-06-09 — #168 SFX detector wired (AnimeText YOLO) + E2E
+Model auto-downloads (gated deepghs/AnimeText_yolo, HF_TOKEN from MIT/.env via load_dotenv; cache warmed,
+119MB). New manga_translator/sfx_detector.py (mirrors bubble_detector.py #170): lazy hf_hub_download → YOLO
+→ boxes. Integrated in _run_detection (gated by det_sfx): AnimeText 2nd pass → dedup_sfx_boxes vs DBNet
+textlines → survivors appended as empty Quadrilateral textlines → OCR/translate/render.
+E2E `tools/ab_sfx.py` → `sfx_montage.png`: [SFXDetect] 8 boxes, +2 new textlines (deduped 6); region フッ→"Hmph"
+now appears (DBNet never found it). LIMITATION: heavily-stylized SFX ぬ〜 IS detected but 48px OCR can't read
+the hand-drawn katakana → empty → not translated (OCR gap #172/#167, not detection). MangaTranslator's "LOOM"
+needs better OCR. Gap F (dedicated SFX outline) deferred — uses default border for now.
+Tests: MIT 41 passed (sfx wiring), Backend 66 passed. All render-parity work (A/B/C/#168) opt-in, byte-identical off.
+
+## 2026-06-09 — #180 Knuth-Plass line-break (pure module, step 1)
+New manga_translator/line_break.py: find_optimal_line_breaks() — pragmatic Knuth-Plass DP
+(badness=slack^3, hyphen_penalty=1000) ported from MangaTranslator text_processing.py:489-579.
+Pure, dependency-light (word-width callback). Tests: test_line_break.py 5 passed (balanced break
+beats greedy short-last-line, empty, fits-one-line, overwide-lone-token no deadlock, hyphen penalty).
+NEXT (step 2, not done): wire into rendering/text_render.calc_horizontal behind a knob (replace the
+greedy word-packing loop ~774-845) + E2E — risky integration into the core wrapper, deserves a focused pass.
+
+## 2026-06-09 — #180 step 2 deferred → tech-debt issue #186
+Traced rendering/text_render.py::calc_horizontal for the Knuth-Plass wiring: ~270-line monolith
+(greedy pack + cross-line syllable hyphenation + single-char rebalance + assembly over shared mutable
+state, lines 664-934). Forcing the DP in = high regression risk. Per user, recorded as tech debt instead:
+filed #186 (refactor: extract pluggable LineBreaker seam, byte-identical greedy) + commented on #180
+that step 2 is blocked-by #186. Pure module (#180 step 1) stays committed & unused (byte-identical).
+
+## 2026-06-09 — MIT tech-debt audit → backlog issues #186–#193
+4-agent structural audit of MIT (orchestrator, rendering, detect/ocr/inpaint/translators, config/server/tests).
+Filed bilingual tech-debt issues (label MIT): #186 calc_horizontal line-break seam · #187 MangaTranslator god
+object · #188 model-lifecycle + translator base abstractions (kill global MODEL state) · #189 glyph-render
+dedup (put_char h/v + stroke) · #190 resize_regions + box-padding decomposition + constants · #191 vendored
+LDM/YOLOv5 trim (license+maint) · #192 config centralize + cleanup (load_dotenv import side-effect, bare
+excepts, TranslatorChain TODO) · #193 worker --start-instance lifecycle (5003/5004 orphan, PID, collision).
+
+## 2026-06-09 — #186 tech-debt: characterization net + first calc_horizontal extractions
+TDD refactor-under-test on rendering/text_render.py::calc_horizontal (the #186 monolith).
+- Added test/test_calc_horizontal_characterization.py: golden line-break output on 4 representative
+  strings (pinned to bundled Arial-Unicode font) = safety net for the whole #186 decomposition.
+- Extracted _split_words_and_widths + _split_into_syllables from calc_horizontal (verbatim, byte-identical).
+  Net caught a real leak (hyphenator used by Step 2/4) → restored in scope.
+Verified byte-identical: characterization + rendering_guard + pure-module suite all green (47 passed).
+NEXT on #186: broaden characterization cases (CJK/Thai/zwsp/empty), then extract the greedy packing
+(Step 1) into the pluggable LineBreaker seam so Knuth-Plass (#180) can slot in.
+
+## 2026-06-09 — #186 milestone: greedy line-break extracted into a swappable seam
+Applied the "test all scenarios first" rule (memory feedback_techdebt_all_scenarios): broadened the
+characterization net to 16 cases covering the rarely-hit branches (height-overflow max_width expansion,
+max_width<2*font clamp, Step 2 backward hyphenation, mixed EN+CJK, whitespace collapse, char-split,
+hyphenate on/off) BEFORE touching code. Then extracted calc_horizontal's Step-1 greedy packing into
+text_render._greedy_pack(words, word_widths, syllables, font_size, max_width, ws_off, hyphen_off)
+-> (line_words_list, line_width_list, hyphenation_idx_list). Steps 2-4 post-process its output unchanged.
+Byte-identical: 26 passed (characterization + guard + pure modules). This IS the #186 seam — #180 step 2
+now just adds a Knuth-Plass packer with the same signature + selects it behind a knob.
+
+## 2026-06-09 — #192 slice (a): extract TranslatorChain parsing (pure, tested)
+Pulled config.py's `# TODO: Refactor` TranslatorChain parse into manga_translator/translator_chain.py
+::parse_translator_chain(string, resolve_translator, valid_translators, valid_languages) — deps injected
+so it unit-tests with no translators/ML import. Wired TranslatorChain.__init__ to delegate; byte-identical
+(real-deps check: gemini:ENG → same chain/translators/langs/target_lang). Tests: test_translator_chain.py
+7 passed (single/multi/empty/unknown-name KeyError/disabled ValueError/unknown-lang ValueError + wiring).
+TODO marker resolved. Next #192 slices: dead fields, bare excepts, load_dotenv import side-effect.
+
+## 2026-06-09 — #192 slice (b1): remove dead vestigial fields
+Removed self._batch_contexts / self._batch_configs from MangaTranslator.__init__ (manga_translator.py:135-136)
+— assigned once, never read anywhere (grep-confirmed). Import OK; 19 tests green. Remaining #192:
+bare-except cleanup (20+ sites, per-site policy — its own slice), load_dotenv import side-effect (blast
+radius: worker HF_TOKEN auto-download + API keys — needs entry-point tracing, flagged before touching).
+
+## 2026-06-09 — #187 slice: extract pure validation check off the god object
+Pulled `_check_repetition_hallucination` (a pure verdict masquerading as an async method that awaited
+nothing) out of the 3,200-line MangaTranslator into manga_translator/translation_checks.py
+::check_repetition_hallucination — the seam where new post-translation validators attach (feedback_core_boundary)
+instead of growing the orchestrator. The async method now delegates; byte-identical (verified vs the pure fn on
+4 cases). Tests: test_translation_checks.py 5 passed (char/segment/phrase repetition, empty/short, threshold).
+God object shrank ~50 lines. Next: extract _check_target_language_ratio into the same seam.
+
+## 2026-06-09 — #187 slice (b): extract target-language-ratio check off the god object
+Pulled `_check_target_language_ratio` (a pure verdict, Issue #109) into translation_checks
+::check_target_language_ratio(text_regions, target_lang, script_ratio, min_ratio) — script_ratio injected
+so it unit-tests with a stub (the real target_script_ratio passed in production). Async method delegates;
+byte-identical (verified vs pure fn). Tests: test_translation_checks.py 10 passed (5 repetition + 5 ratio).
+The validator seam now holds both post-translation checks; new validators attach here, not in the god object.
+
+## 2026-06-09 — #187 slice (c): extract duplicated punctuation correction off the god object
+The quote/bracket punctuation-correction logic (check_items + replace_items tables + a per-region
+mutation loop) was DUPLICATED inline in two places in MangaTranslator (translate + batch paths, ~150 lines
+total). Extracted verbatim to manga_translator/punctuation.py::correct_punctuation(source_text, translation)
+— pure string logic. Both call sites now delegate via `region.translation = correct_punctuation(region.text,
+region.translation)`; the data tables are gone from the god object. Byte-identical (6 golden characterization
+cases capturing the smart-quote->corner-bracket conversion, forced replacements, count-mismatch no-ops).
+Tests: test_punctuation.py 7 passed (6 behavioral + wiring inspection). Regression suite 36 passed.
+
+## 2026-06-09 — MIT core deep analysis + roadmap reconciliation (answering "did you analyze deeply / follow the roadmap")
+Honest gaps: had only audited (file:line), not deep-analyzed the hard core; and had deviated from the
+foundation-first roadmap (jumped to #187 easy slices). Fixed via a 6-agent ultracode deep read →
+docs/research/mit-core-decomposition-analysis.md: 26 seams (S1-S26) with deps, test strategy, and 16
+source-cited landmines (TTL key drift L1, divergent min_ratio 0.3/0.5 + threshold 6/>10 L6, singleton
+page-context bleed L9, exit(-1) in a stage L2, cleanup-task leak L14). Reconciled the roadmap: #187/#188
+are ~16 interleavable seams (the already-done punctuation/validator/greedy-pack extractions ARE S-seams),
+not monolithic Phase-C. Corrected next 3 steps: S1 filter_translated_regions (verbatim 3-way dedup) → S2
+apply_translations → S3 ModelUsageTracker (#188 starts early). Landmines must be PRESERVED then fixed behind opt-in flags.
+
+## 2026-06-09 — #187 S1: collapse the verbatim 3-way post-translation region filter
+Following the reconciled roadmap's corrected step 1 (the highest-value/lowest-risk dedup the old plan
+missed). The should_filter block (drop blank/numeric/filter-matched/identical-to-source translations) was
+verbatim-identical in three MangaTranslator paths (single/batch/concurrent). Extracted to
+region_filter.filter_translated_regions(text_regions, config); all 3 sites now delegate (should_filter
+count: 3→0). Byte-identical incl. none (only-blank) + original (no identical-check) carve-outs.
+Tests: test_region_filter.py 7 passed (every branch + carve-outs); regression 35 passed.
+
+## 2026-06-09 — Persist all MIT exploration/analysis/plans (context-loss insurance)
+Created docs/reports/mit-refactor-progress.md — the SINGLE resume point: read-order index, governing rules,
+the landmines-to-preserve quick-ref, the S1-S26 seam status table (done/next/blocked + commit hashes), the
+#186-#193 issue status, and pending items (#180 wiring, glossary assembly). Added memory
+project_mit_refactor_resume pointing a fresh session at it. All canonical artifacts already committed
+(analysis, plan, dissection, port-plan, report). A reset context can now resume at S2 without re-exploring.

@@ -124,10 +124,13 @@ describe('MitWebhookController — text layer payloads (#158)', () => {
     };
 
     await expect(ctrl.handleCallback(undefined as any, body)).resolves.toEqual({ ok: true });
+    // #160: regions must be FORWARDED into the result, not just accepted —
+    // persistence reads result.regions. Dropping it silently disables the text
+    // layer (caught live: chapter_page_texts stayed empty).
     expect(booksService.handleMitCallback).toHaveBeenCalledWith(
       'job1:ANY:THA',
       0,
-      expect.objectContaining({ patches: [] }),
+      expect.objectContaining({ patches: [], regions: [{ src: 'Huh?', dst: 'หา?' }] }),
       null,
     );
   });
