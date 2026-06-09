@@ -42,6 +42,13 @@ class ModelReaper:
         self._task = asyncio.create_task(self._loop())
         return self._task
 
+    def ensure_started(self):
+        """Idempotent start: launch the polling task only if it isn't running yet, and
+        return it. Folds the call sites' ``if … is None: start()`` guard (L16)."""
+        if self._task is None:
+            self._task = asyncio.create_task(self._loop())
+        return self._task
+
     def stop(self) -> None:
         """Cancel the polling task — opt-in; only fixes the L14 leak when called."""
         if self._task is not None:

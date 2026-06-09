@@ -67,6 +67,20 @@ def test_stop_with_no_task_is_a_noop():
     ModelReaper(None, None, lambda: 0).stop()  # must not raise
 
 
+def test_ensure_started_is_idempotent():
+    async def run():
+        r = ModelReaper(_Tracker([]), _Unloader(), lambda: 0)
+        t1 = r.ensure_started()
+        t2 = r.ensure_started()
+        assert t1 is t2  # same task — not restarted on the second call
+        r.stop()
+        try:
+            await t1
+        except asyncio.CancelledError:
+            pass
+    asyncio.run(run())
+
+
 def test_start_creates_task_and_stop_cancels_it():
     async def run():
         r = ModelReaper(_Tracker([]), _Unloader(), lambda: 0)
