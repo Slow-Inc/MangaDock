@@ -15,6 +15,16 @@ import numpy as np
 from PIL import Image
 from typing import Optional, Any, List, Tuple
 from .region_filter import filter_translated_regions
+from .region_apply import apply_original_as_translation, apply_render_casing, apply_translations
+from .model_usage_tracker import ModelUsageTracker
+from .model_unloader import ModelUnloader
+from .memory_guard import release_memory
+from .context_counts import context_page_counts
+from .dictionary import load_dictionary, apply_dictionary, apply_post_dictionary
+from .prev_context import build_prev_context
+from .none_translator import apply_prep_manual_override, stamp_none_translations
+from .translation_store import read_translations, write_translations
+from .image_debug_context import ImageDebugContext
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -67,37 +77,6 @@ class TranslationInterrupt(Exception):
     """
     pass
 
-def load_dictionary(file_path):
-    dictionary = []
-    if file_path and os.path.exists(file_path):
-        with open(file_path, 'r', encoding='utf-8') as file:
-            for line_number, line in enumerate(file, start=1):
-                # Ignore empty lines and lines starting with '#' or '//'
-                if not line.strip() or line.strip().startswith('#') or line.strip().startswith('//'):
-                    continue
-                # Remove comment parts
-                line = line.split('#')[0].strip()
-                line = line.split('//')[0].strip()
-                parts = line.split()
-                if len(parts) == 1:
-                    # If there is only the left part, the right part defaults to an empty string, meaning delete the left part
-                    pattern = re.compile(parts[0])
-                    dictionary.append((pattern, '', line_number))
-                elif len(parts) == 2:
-                    # If both left and right parts are present, perform the replacement
-                    pattern = re.compile(parts[0])
-                    dictionary.append((pattern, parts[1], line_number))
-                else:
-                    logger.error(f'Invalid dictionary entry at line {line_number}: {line.strip()}')
-    return dictionary
-
-def apply_dictionary(text, dictionary):
-    for pattern, value, line_number in dictionary:
-        original_text = text  
-        text = pattern.sub(value, text)
-        if text != original_text:  
-            logger.info(f'Line {line_number}: Replaced "{original_text}" with "{text}" using pattern "{pattern.pattern}" and value "{value}"')
-    return text
 
 class MangaTranslator:
     verbose: bool
@@ -148,7 +127,19 @@ class MangaTranslator:
         # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
         torch.backends.cudnn.allow_tf32 = True
 
-        self._model_usage_timestamps = {}
+        self._model_usage_tracker = ModelUsageTracker()
+        self._model_unloader = ModelUnloader(
+            {
+                'colorization': unload_colorization,
+                'detection': unload_detection,
+                'inpainting': unload_inpainting,
+                'ocr': unload_ocr,
+                'upscaling': unload_upscaling,
+                'translation': unload_translation,
+            },
+            empty_cache=torch.cuda.empty_cache,
+            cuda_available=torch.cuda.is_available,
+        )
         self._detector_cleanup_task = None
         self.prep_manual = params.get('prep_manual', None)
         self.context_size = params.get('context_size', 0)
@@ -156,8 +147,7 @@ class MangaTranslator:
         self._original_page_texts = []  # 存储原文页面数据，用于并发模式下的上下文
 
         # 调试图片管理相关属性
-        self._current_image_context = None  # 存储当前处理图片的上下文信息
-        self._saved_image_contexts = {}     # 存储批量处理中每个图片的上下文信息
+        self._image_debug = ImageDebugContext()  # 图片级调试上下文 / per-image debug context (S11)
         
         # 设置日志文件
         self._setup_log_file()
@@ -322,47 +312,17 @@ class MangaTranslator:
 
         
     def _set_image_context(self, config: Config, image=None):
-        """设置当前处理图片的上下文信息，用于生成调试图片子文件夹"""
-        from .utils.generic import get_image_md5
+        """Delegate to ImageDebugContext (#187 S11)."""
+        self._image_debug.set(config, image)
 
-        # 使用毫秒级时间戳确保唯一性
-        timestamp = str(int(time.time() * 1000))
-        detection_size = str(getattr(config.detector, 'detection_size', 1024))
-        target_lang = getattr(config.translator, 'target_lang', 'unknown')
-        translator = getattr(config.translator, 'translator', 'unknown')
-
-        # 计算图片MD5哈希值
-        if image is not None:
-            file_md5 = get_image_md5(image)
-        else:
-            file_md5 = "unknown"
-
-        # 生成子文件夹名：{timestamp}-{file_md5}-{detection_size}-{target_lang}-{translator}
-        subfolder_name = f"{timestamp}-{file_md5}-{detection_size}-{target_lang}-{translator}"
-
-        self._current_image_context = {
-            'subfolder': subfolder_name,
-            'file_md5': file_md5,
-            'config': config
-        }
-        
     def _get_image_subfolder(self) -> str:
-        """获取当前图片的调试子文件夹名"""
-        if self._current_image_context:
-            return self._current_image_context['subfolder']
-        return ''
-    
+        return self._image_debug.subfolder
+
     def _save_current_image_context(self, image_md5: str):
-        """保存当前图片上下文，用于批量处理中保持一致性"""
-        if self._current_image_context:
-            self._saved_image_contexts[image_md5] = self._current_image_context.copy()
+        self._image_debug.save(image_md5)
 
     def _restore_image_context(self, image_md5: str):
-        """恢复保存的图片上下文"""
-        if image_md5 in self._saved_image_contexts:
-            self._current_image_context = self._saved_image_contexts[image_md5].copy()
-            return True
-        return False
+        return self._image_debug.restore(image_md5)
 
     @property
     def using_gpu(self):
@@ -614,8 +574,8 @@ class MangaTranslator:
         await self._report_progress('rendering')
 
         # 在rendering状态后立即发送文件夹信息，用于前端精确检查final.png
-        if hasattr(self, '_progress_hooks') and self._current_image_context:
-            folder_name = self._current_image_context['subfolder']
+        if hasattr(self, '_progress_hooks') and self._image_debug.current:
+            folder_name = self._image_debug.current['subfolder']
             # 发送特殊格式的消息，前端可以解析
             await self._report_progress(f'rendering_folder:{folder_name}')
 
@@ -662,8 +622,8 @@ class MangaTranslator:
             cv2.imwrite(self._result_path('final.png'), final_img)
 
             # 通知前端文件已就绪
-            if hasattr(self, '_progress_hooks') and self._current_image_context:
-                folder_name = self._current_image_context['subfolder']
+            if hasattr(self, '_progress_hooks') and self._image_debug.current:
+                folder_name = self._image_debug.current['subfolder']
                 await self._report_progress(f'final_ready:{folder_name}')
 
             # 创建占位符结果并立即返回
@@ -677,7 +637,7 @@ class MangaTranslator:
 
     async def _run_colorizer(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("colorizer", config.colorizer.colorizer)] = current_time
+        self._model_usage_tracker.touch("colorizer", config.colorizer.colorizer, current_time)
         #todo: im pretty sure the ctx is never used. does it need to be passed in?
         return await dispatch_colorization(
             config.colorizer.colorizer,
@@ -690,12 +650,12 @@ class MangaTranslator:
 
     async def _run_upscaling(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("upscaling", config.upscale.upscaler)] = current_time
+        self._model_usage_tracker.touch("upscaling", config.upscale.upscaler, current_time)
         return (await dispatch_upscaling(config.upscale.upscaler, [ctx.img_colorized], config.upscale.upscale_ratio, self.device))[0]
 
     async def _run_detection(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("detection", config.detector.detector)] = current_time
+        self._model_usage_tracker.touch("detection", config.detector.detector, current_time)
         result = await dispatch_detection(config.detector.detector, ctx.img_rgb, config.detector.detection_size, config.detector.text_threshold,
                                         config.detector.box_threshold,
                                         config.detector.unclip_ratio, config.detector.det_invert, config.detector.det_gamma_correct, config.detector.det_rotate,
@@ -733,22 +693,7 @@ class MangaTranslator:
         return (textlines, mask_raw, mask)
 
     async def _unload_model(self, tool: str, model: str):
-        logger.info(f"Unloading {tool} model: {model}")
-        match tool:
-            case 'colorization':
-                await unload_colorization(model)
-            case 'detection':
-                await unload_detection(model)
-            case 'inpainting':
-                await unload_inpainting(model)
-            case 'ocr':
-                await unload_ocr(model)
-            case 'upscaling':
-                await unload_upscaling(model)
-            case 'translation':
-                await unload_translation(model)
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()  # empty CUDA cache
+        await self._model_unloader.unload(tool, model)
 
     # Background models cleanup job.
     async def _detector_cleanup_job(self):
@@ -757,15 +702,14 @@ class MangaTranslator:
                 await asyncio.sleep(1)
                 continue
             now = time.time()
-            for (tool, model), last_used in list(self._model_usage_timestamps.items()):
-                if now - last_used > self.models_ttl:
-                    await self._unload_model(tool, model)
-                    del self._model_usage_timestamps[(tool, model)]
+            for tool, model in self._model_usage_tracker.expired(self.models_ttl, now):
+                await self._unload_model(tool, model)
+                self._model_usage_tracker.forget(tool, model)
             await asyncio.sleep(1)
 
     async def _run_ocr(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("ocr", config.ocr.ocr)] = current_time
+        self._model_usage_tracker.touch("ocr", config.ocr.ocr, current_time)
         
         # 为OCR创建子文件夹（只在verbose模式下）
         if self.verbose:
@@ -809,7 +753,7 @@ class MangaTranslator:
 
     async def _run_textline_merge(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("textline_merge", "textline_merge")] = current_time
+        self._model_usage_tracker.touch("textline_merge", "textline_merge", current_time)
         text_regions = await dispatch_textline_merge(ctx.textlines, ctx.img_rgb.shape[1], ctx.img_rgb.shape[0],
                                                      verbose=self.verbose)
         for region in text_regions:
@@ -957,96 +901,22 @@ class MangaTranslator:
         return text_regions
 
     def _build_prev_context(self, use_original_text=False, current_page_index=None, batch_index=None, batch_original_texts=None):
-        """
-        跳过句子数为0的页面，取最近 context_size 个非空页面，拼成：
-        <|1|>句子
-        <|2|>句子
-        ...
-        的格式；如果没有任何非空页面，返回空串。
-
-        Args:
-            use_original_text: 是否使用原文而不是译文作为上下文
-            current_page_index: 当前页面索引，用于确定上下文范围
-            batch_index: 当前页面在批次中的索引
-            batch_original_texts: 当前批次的原文数据
-        """
-        if self.context_size <= 0:
-            return ""
-
-        # 在并发模式下，需要特殊处理上下文范围
-        if batch_index is not None and batch_original_texts is not None:
-            # 并发模式：使用已完成的页面 + 当前批次中已处理的页面
-            available_pages = self.all_page_translations.copy()
-
-            # 添加当前批次中在当前页面之前的页面
-            for i in range(batch_index):
-                if i < len(batch_original_texts) and batch_original_texts[i]:
-                    # 在并发模式下，我们使用原文作为"已完成"的页面
-                    if use_original_text:
-                        available_pages.append(batch_original_texts[i])
-                    else:
-                        # 如果不使用原文，则跳过当前批次的页面（因为它们还没有翻译完成）
-                        pass
-        elif current_page_index is not None:
-            # 使用指定页面索引之前的页面作为上下文
-            available_pages = self.all_page_translations[:current_page_index] if self.all_page_translations else []
-        else:
-            # 使用所有已完成的页面
-            available_pages = self.all_page_translations or []
-
-        if not available_pages:
-            return ""
-
-        # 筛选出有句子的页面
-        non_empty_pages = [
-            page for page in available_pages
-            if any(sent.strip() for sent in page.values())
-        ]
-        # 实际要用的页数
-        pages_used = min(self.context_size, len(non_empty_pages))
-        if pages_used == 0:
-            return ""
-        tail = non_empty_pages[-pages_used:]
-
-        # 拼接 - 根据参数决定使用原文还是译文
-        lines = []
-        for page in tail:
-            for sent in page.values():
-                if sent.strip():
-                    lines.append(sent.strip())
-
-        # 如果使用原文，需要从原始数据中获取
-        if use_original_text and hasattr(self, '_original_page_texts'):
-            # 尝试获取对应的原文
-            original_lines = []
-            for i, page in enumerate(tail):
-                page_idx = available_pages.index(page)
-                if page_idx < len(self._original_page_texts):
-                    original_page = self._original_page_texts[page_idx]
-                    for sent in original_page.values():
-                        if sent.strip():
-                            original_lines.append(sent.strip())
-            if original_lines:
-                lines = original_lines
-
-        numbered = [f"<|{i+1}|>{s}" for i, s in enumerate(lines)]
-        context_type = "original text" if use_original_text else "translation results"
-        return f"Here are the previous {context_type} for reference:\n" + "\n".join(numbered)
+        """Thin delegate to the pure ``build_prev_context`` (#187 S6) — the per-mode
+        index policy now lives in a testable pure function; the two call sites are
+        unchanged."""
+        return build_prev_context(
+            self.all_page_translations, self._original_page_texts, self.context_size,
+            use_original_text=use_original_text,
+            current_page_index=current_page_index,
+            batch_index=batch_index,
+            batch_original_texts=batch_original_texts,
+        )
 
     async def _dispatch_with_context(self, config: Config, texts: list[str], ctx: Context):
         # 计算实际要使用的上下文页数和跳过的空页数
         # Calculate the actual number of context pages to use and empty pages to skip
         done_pages = self.all_page_translations
-        if self.context_size > 0 and done_pages:
-            pages_expected = min(self.context_size, len(done_pages))
-            non_empty_pages = [
-                page for page in done_pages
-                if any(sent.strip() for sent in page.values())
-            ]
-            pages_used = min(self.context_size, len(non_empty_pages))
-            skipped = pages_expected - pages_used
-        else:
-            pages_used = skipped = 0
+        pages_used, skipped = context_page_counts(self.context_size, done_pages)
 
         if self.context_size > 0:
             logger.info(f"Context-aware translation enabled with {self.context_size} pages of history")
@@ -1101,30 +971,22 @@ class MangaTranslator:
             
         # 如果设置了prep_manual则将translator设置为none，防止token浪费
         # Set translator to none to provent token waste if prep_manual is True  
-        if self.prep_manual:  
-            config.translator.translator = Translator.none
+        apply_prep_manual_override(config, self.prep_manual)
     
         current_time = time.time()
-        self._model_usage_timestamps[("translation", config.translator.translator)] = current_time
+        self._model_usage_tracker.touch("translation", config.translator.translator, current_time)
 
         # 为none翻译器添加特殊处理  
         # Add special handling for none translator  
-        if config.translator.translator == Translator.none:  
-            # 使用none翻译器时，为所有文本区域设置必要的属性  
-            # When using none translator, set necessary properties for all text regions  
-            for region in ctx.text_regions:  
-                region.translation = ""  # 空翻译将创建空白区域 / Empty translation will create blank areas  
-                region.target_lang = config.translator.target_lang  
-                region._alignment = config.render.alignment  
-                region._direction = config.render.direction    
+        if config.translator.translator == Translator.none:
+            stamp_none_translations(ctx.text_regions, config)
             return ctx.text_regions  
 
         # 以下翻译处理仅在非none翻译器或有none翻译器但没有prep_manual时执行  
         # Translation processing below only happens for non-none translator or none translator without prep_manual  
         if self.load_text:  
             input_filename = os.path.splitext(os.path.basename(self.input_files[0]))[0]  
-            with open(self._result_path(f"{input_filename}_translations.txt"), "r") as f:  
-                    translated_sentences = json.load(f)  
+            translated_sentences = read_translations(self._result_path(f"{input_filename}_translations.txt"))  
         else:  
             # 如果是none翻译器，不需要调用翻译服务，文本已经设置为空  
             # If using none translator, no need to call translation service, text is already set to empty  
@@ -1142,23 +1004,14 @@ class MangaTranslator:
             # Save translation if args.save_text is set and quit  
             if self.save_text:  
                 input_filename = os.path.splitext(os.path.basename(self.input_files[0]))[0]  
-                with open(self._result_path(f"{input_filename}_translations.txt"), "w") as f:  
-                    json.dump(translated_sentences, f, indent=4, ensure_ascii=False)  
+                write_translations(self._result_path(f"{input_filename}_translations.txt"), translated_sentences)  
                 print("Don't continue if --save-text is used")  
                 exit(-1)  
 
         # 如果不是none翻译器或者是none翻译器但没有prep_manual  
         # If not none translator or none translator without prep_manual  
-        if config.translator.translator != Translator.none or not self.prep_manual:  
-            for region, translation in zip(ctx.text_regions, translated_sentences):  
-                if config.render.uppercase:  
-                    translation = translation.upper()  
-                elif config.render.lowercase:  
-                    translation = translation.lower()  # 修正：应该是lower而不是upper  
-                region.translation = translation  
-                region.target_lang = config.translator.target_lang  
-                region._alignment = config.render.alignment  
-                region._direction = config.render.direction  
+        if config.translator.translator != Translator.none or not self.prep_manual:
+            apply_translations(ctx.text_regions, translated_sentences, config, apply_casing=True)
 
         # Punctuation correction logic. for translators often incorrectly change quotation marks from the source language to those commonly used in the target language.
         for region in ctx.text_regions:
@@ -1168,20 +1021,7 @@ class MangaTranslator:
         # 注意：翻译结果的保存移动到了翻译流程的最后，确保保存的是最终结果而不是重试前的结果
 
         # Apply post dictionary after translating
-        post_dict = load_dictionary(self.post_dict)
-        post_replacements = []  
-        for region in ctx.text_regions:  
-            original = region.translation  
-            region.translation = apply_dictionary(region.translation, post_dict)
-            if original != region.translation:  
-                post_replacements.append(f"{original} => {region.translation}")  
-
-        if post_replacements:  
-            logger.info("Post-translation replacements:")  
-            for replacement in post_replacements:  
-                logger.info(replacement)  
-        else:  
-            logger.info("No post-translation replacements made.")
+        apply_post_dictionary(ctx.text_regions, self.post_dict)
 
         # 译后检查和重试逻辑 - 第一阶段：单个region幻觉检测
         failed_regions = []
@@ -1296,7 +1136,7 @@ class MangaTranslator:
 
     async def _run_inpainting(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("inpainting", config.inpainter.inpainter)] = current_time
+        self._model_usage_tracker.touch("inpainting", config.inpainter.inpainter, current_time)
         return await dispatch_inpainting(config.inpainter.inpainter, ctx.img_rgb, ctx.mask, config.inpainter, config.inpainter.inpainting_size, self.device,
                                          self.verbose)
 
@@ -1323,7 +1163,7 @@ class MangaTranslator:
 
     async def _run_text_rendering(self, config: Config, ctx: Context):
         current_time = time.time()
-        self._model_usage_timestamps[("rendering", config.render.renderer)] = current_time
+        self._model_usage_tracker.touch("rendering", config.render.renderer, current_time)
         font_path = self._render_font_path(
             config, ctx.text_regions[0].target_lang if ctx.text_regions else '')
         if config.render.renderer == Renderer.none:
@@ -1344,40 +1184,9 @@ class MangaTranslator:
         return output
 
     def _result_path(self, path: str) -> str:
-        """
-        Returns path to result folder where intermediate images are saved when using verbose flag
-        or web mode input/result images are cached.
-        """
-        # 只有在verbose模式下才使用图片级子文件夹
-        if self.verbose:
-            image_subfolder = self._get_image_subfolder()
-            if image_subfolder:
-                if self.result_sub_folder:
-                    result_path = os.path.join(BASE_PATH, 'result', self.result_sub_folder, image_subfolder, path)
-                else:
-                    result_path = os.path.join(BASE_PATH, 'result', image_subfolder, path)
-                # 确保目录存在
-                os.makedirs(os.path.dirname(result_path), exist_ok=True)
-                return result_path
-        
-        # 在server/web模式下（result_sub_folder为空）且为非verbose模式时
-        # 需要创建一个子文件夹来保存final.png
-        if not self.result_sub_folder:
-            if self._current_image_context:
-                # 直接使用已生成的子文件夹名
-                sub_folder = self._current_image_context['subfolder']
-            else:
-                # 没有上下文信息时使用默认值
-                timestamp = str(int(time.time() * 1000))
-                sub_folder = f"{timestamp}-unknown-1024-unknown-unknown"
-
-            result_path = os.path.join(BASE_PATH, 'result', sub_folder, path)
-        else:
-            result_path = os.path.join(BASE_PATH, 'result', self.result_sub_folder, path)
-        
-        # 确保目录存在
-        os.makedirs(os.path.dirname(result_path), exist_ok=True)
-        return result_path
+        """Path to the result folder for intermediate (verbose) or web-cached images
+        (#187 S11 — delegates to ImageDebugContext)."""
+        return self._image_debug.result_path(path, verbose=self.verbose, result_sub_folder=self.result_sub_folder)
 
     def add_progress_hook(self, ph):
         self._progress_hooks.append(ph)
@@ -1461,10 +1270,7 @@ class MangaTranslator:
                     memory_percent = psutil.virtual_memory().percent
                     if memory_percent > 85:
                         logger.warning(f'High memory usage during pre-processing: {memory_percent:.1f}%')
-                        import gc
-                        gc.collect()
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
+                        release_memory(torch.cuda.is_available, torch.cuda.empty_cache)
                 except ImportError:
                     pass  # psutil 不可用时忽略
                 except Exception as e:
@@ -1474,13 +1280,13 @@ class MangaTranslator:
                 # 为批量处理中的每张图片设置上下文
                 self._set_image_context(config, image)
                 # 保存图片上下文，确保后处理阶段使用相同的文件夹
-                if self._current_image_context:
-                    image_md5 = self._current_image_context['file_md5']
+                if self._image_debug.current:
+                    image_md5 = self._image_debug.current['file_md5']
                     self._save_current_image_context(image_md5)
                 ctx = await self._translate_until_translation(image, config)
                 # 保存图片上下文到Context对象中，用于后续批量处理
-                if self._current_image_context:
-                    ctx.image_context = self._current_image_context.copy()
+                if self._image_debug.current:
+                    ctx.image_context = self._image_debug.current.copy()
                 # 保存verbose标志到Context对象中
                 ctx.verbose = self.verbose
                 pre_translation_contexts.append((ctx, config))
@@ -1498,21 +1304,18 @@ class MangaTranslator:
                     recovery_config = copy.deepcopy(config)
                     
                     # 强制清理
-                    import gc
-                    gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
+                    release_memory(torch.cuda.is_available, torch.cuda.empty_cache)
                     
                     # 重新设置图片上下文
                     self._set_image_context(recovery_config, image)
                     # 保存fallback图片上下文
-                    if self._current_image_context:
-                        image_md5 = self._current_image_context['file_md5']
+                    if self._image_debug.current:
+                        image_md5 = self._image_debug.current['file_md5']
                         self._save_current_image_context(image_md5)
                     ctx = await self._translate_until_translation(image, recovery_config)
                     # 保存图片上下文到Context对象中
-                    if self._current_image_context:
-                        ctx.image_context = self._current_image_context.copy()
+                    if self._image_debug.current:
+                        ctx.image_context = self._image_debug.current.copy()
                     # 保存verbose标志到Context对象中
                     ctx.verbose = self.verbose
                     pre_translation_contexts.append((ctx, recovery_config))
@@ -1563,18 +1366,11 @@ class MangaTranslator:
                         translated_texts = await self._batch_translate_texts([region.text for region in ctx.text_regions], config, ctx)
                         
                         # 将翻译结果应用到各个region
-                        for region, translation in zip(ctx.text_regions, translated_texts):
-                            region.translation = translation
-                            region.target_lang = config.translator.target_lang
-                            region._alignment = config.render.alignment
-                            region._direction = config.render.direction
+                        apply_translations(ctx.text_regions, translated_texts, config)
                     translated_contexts.append((ctx, config))
                     
                     # 每页翻译后都清理内存
-                    import gc
-                    gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
+                    release_memory(torch.cuda.is_available, torch.cuda.empty_cache)
                         
                 except Exception as individual_error:
                     logger.error(f'Individual page translation failed: {individual_error}')
@@ -1617,7 +1413,7 @@ class MangaTranslator:
                 self._original_page_texts.append(page_original_texts)
 
         # 清理批量处理的图片上下文缓存
-        self._saved_image_contexts.clear()
+        self._image_debug.clear_saved()
         
         return results
 
@@ -1761,8 +1557,8 @@ class MangaTranslator:
             logger.info("No pre-translation replacements made.")
 
         # 保存当前图片上下文到ctx中，用于并发翻译时的路径管理
-        if self._current_image_context:
-            ctx.image_context = self._current_image_context.copy()
+        if self._image_debug.current:
+            ctx.image_context = self._image_debug.current.copy()
 
         return ctx
 
@@ -2239,13 +2035,7 @@ class MangaTranslator:
                 for ctx_idx, (ctx, config) in enumerate(batch):
                     if not ctx.text_regions:  # 检查text_regions是否为None或空
                         continue
-                    for region_idx, region in enumerate(ctx.text_regions):
-                        if text_idx < len(translated_texts):
-                            region.translation = translated_texts[text_idx]
-                            region.target_lang = config.translator.target_lang
-                            region._alignment = config.render.alignment
-                            region._direction = config.render.direction
-                            text_idx += 1
+                    text_idx += apply_translations(ctx.text_regions, translated_texts[text_idx:], config)
                         
                 # 应用后处理逻辑（括号修正、过滤等）
                 for ctx, config in batch:
@@ -2359,18 +2149,11 @@ class MangaTranslator:
                 for ctx, config in batch:
                     if not ctx.text_regions:  # 检查text_regions是否为None或空
                         continue
-                    for region in ctx.text_regions:
-                        region.translation = region.text
-                        region.target_lang = config.translator.target_lang
-                        region._alignment = config.render.alignment
-                        region._direction = config.render.direction
+                    apply_original_as_translation(ctx.text_regions, config)
                 results.extend(batch)
                 
             # 强制垃圾回收以释放内存
-            import gc
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            release_memory(torch.cuda.is_available, torch.cuda.empty_cache)
                 
         return results
 
@@ -2422,12 +2205,7 @@ class MangaTranslator:
                 )
 
                 # 将翻译结果分配回各个region
-                for i, region in enumerate(ctx.text_regions):
-                    if i < len(translated_texts):
-                        region.translation = translated_texts[i]
-                        region.target_lang = config.translator.target_lang
-                        region._alignment = config.render.alignment
-                        region._direction = config.render.direction
+                apply_translations(ctx.text_regions, translated_texts, config)
                 
                 # 应用后处理逻辑（括号修正、过滤等）
                 if ctx.text_regions:
@@ -2501,11 +2279,7 @@ class MangaTranslator:
                     raise
                 # 错误时保持原文
                 if ctx.text_regions:
-                    for region in ctx.text_regions:
-                        region.translation = region.text
-                        region.target_lang = config.translator.target_lang
-                        region._alignment = config.render.alignment
-                        region._direction = config.render.direction
+                    apply_original_as_translation(ctx.text_regions, config)
                 return ctx, config
         
         # 创建并发任务，为每个任务添加页面索引和批次索引
@@ -2537,11 +2311,7 @@ class MangaTranslator:
                 # 创建失败的占位符
                 ctx, config = contexts_with_configs[i]
                 if ctx.text_regions:
-                    for region in ctx.text_regions:
-                        region.translation = region.text
-                        region.target_lang = config.translator.target_lang
-                        region._alignment = config.render.alignment
-                        region._direction = config.render.direction
+                    apply_original_as_translation(ctx.text_regions, config)
                 final_results.append((ctx, config))
             else:
                 final_results.append(result)
@@ -2580,16 +2350,7 @@ class MangaTranslator:
             use_original_text = self.batch_concurrent and self.batch_size > 1
 
             done_pages = self.all_page_translations
-            if self.context_size > 0 and done_pages:
-                pages_expected = min(self.context_size, len(done_pages))
-                non_empty_pages = [
-                    page for page in done_pages
-                    if any(sent.strip() for sent in page.values())
-                ]
-                pages_used = min(self.context_size, len(non_empty_pages))
-                skipped = pages_expected - pages_used
-            else:
-                pages_used = skipped = 0
+            pages_used, skipped = context_page_counts(self.context_size, done_pages)
 
             if self.context_size > 0:
                 context_type = "original text" if use_original_text else "translation results"
@@ -2615,16 +2376,12 @@ class MangaTranslator:
             # ChatGPT2Stage需要特殊处理
             if config.translator.translator == Translator.chatgpt_2stage:
                 # 为当前图片创建专用的result_path_callback，避免并发时路径错位
-                current_image_context = getattr(ctx, 'image_context', None) or self._current_image_context
+                current_image_context = getattr(ctx, 'image_context', None) or self._image_debug.current
 
                 def result_path_callback(path: str) -> str:
                     """为特定图片创建结果路径，使用保存的图片上下文"""
-                    original_context = self._current_image_context
-                    self._current_image_context = current_image_context
-                    try:
+                    with self._image_debug.with_context(current_image_context):
                         return self._result_path(path)
-                    finally:
-                        self._current_image_context = original_context
 
                 ctx.result_path_callback = result_path_callback
 
@@ -2639,17 +2396,13 @@ class MangaTranslator:
                         if hasattr(batch_ctx, 'image_context'):
                             batch_image_context = batch_ctx.image_context
                         else:
-                            batch_image_context = self._current_image_context
+                            batch_image_context = self._image_debug.current
 
                         def create_result_path_callback(image_context):
                             def result_path_callback(path: str) -> str:
                                 """为特定图片创建结果路径，使用保存的图片上下文"""
-                                original_context = self._current_image_context
-                                self._current_image_context = image_context
-                                try:
+                                with self._image_debug.with_context(image_context):
                                     return self._result_path(path)
-                                finally:
-                                    self._current_image_context = original_context
                             return result_path_callback
 
                         batch_ctx.result_path_callback = create_result_path_callback(batch_image_context)
@@ -2695,20 +2448,7 @@ class MangaTranslator:
         # 注意：翻译结果的保存移动到了translate方法的最后，确保保存的是最终结果
 
         # 应用后字典
-        post_dict = load_dictionary(self.post_dict)
-        post_replacements = []  
-        for region in ctx.text_regions:  
-            original = region.translation  
-            region.translation = apply_dictionary(region.translation, post_dict)
-            if original != region.translation:  
-                post_replacements.append(f"{original} => {region.translation}")  
-
-        if post_replacements:  
-            logger.info("Post-translation replacements:")  
-            for replacement in post_replacements:  
-                logger.info(replacement)  
-        else:  
-            logger.info("No post-translation replacements made.")
+        apply_post_dictionary(ctx.text_regions, self.post_dict)
 
         # 单个region幻觉检测
         failed_regions = []
@@ -2817,8 +2557,8 @@ class MangaTranslator:
         await self._report_progress('rendering')
 
         # 在rendering状态后立即发送文件夹信息，用于前端精确检查final.png
-        if hasattr(self, '_progress_hooks') and self._current_image_context:
-            folder_name = self._current_image_context['subfolder']
+        if hasattr(self, '_progress_hooks') and self._image_debug.current:
+            folder_name = self._image_debug.current['subfolder']
             # 发送特殊格式的消息，前端可以解析
             await self._report_progress(f'rendering_folder:{folder_name}')
 
@@ -2939,10 +2679,7 @@ class MangaTranslator:
                             region.translation = retranslated[0]
                             
                             # 应用格式化处理
-                            if config.render.uppercase:
-                                region.translation = region.translation.upper()
-                            elif config.render.lowercase:
-                                region.translation = region.translation.lower()
+                            apply_render_casing(region, config)
                                 
                             logger.info(f'Re-translation finished: "{region.text}" -> "{region.translation}"')
                         else:
