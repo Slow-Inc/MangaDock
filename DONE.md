@@ -1221,3 +1221,21 @@ Traced rendering/text_render.py::calc_horizontal for the Knuth-Plass wiring: ~27
 state, lines 664-934). Forcing the DP in = high regression risk. Per user, recorded as tech debt instead:
 filed #186 (refactor: extract pluggable LineBreaker seam, byte-identical greedy) + commented on #180
 that step 2 is blocked-by #186. Pure module (#180 step 1) stays committed & unused (byte-identical).
+
+## 2026-06-09 — MIT tech-debt audit → backlog issues #186–#193
+4-agent structural audit of MIT (orchestrator, rendering, detect/ocr/inpaint/translators, config/server/tests).
+Filed bilingual tech-debt issues (label MIT): #186 calc_horizontal line-break seam · #187 MangaTranslator god
+object · #188 model-lifecycle + translator base abstractions (kill global MODEL state) · #189 glyph-render
+dedup (put_char h/v + stroke) · #190 resize_regions + box-padding decomposition + constants · #191 vendored
+LDM/YOLOv5 trim (license+maint) · #192 config centralize + cleanup (load_dotenv import side-effect, bare
+excepts, TranslatorChain TODO) · #193 worker --start-instance lifecycle (5003/5004 orphan, PID, collision).
+
+## 2026-06-09 — #186 tech-debt: characterization net + first calc_horizontal extractions
+TDD refactor-under-test on rendering/text_render.py::calc_horizontal (the #186 monolith).
+- Added test/test_calc_horizontal_characterization.py: golden line-break output on 4 representative
+  strings (pinned to bundled Arial-Unicode font) = safety net for the whole #186 decomposition.
+- Extracted _split_words_and_widths + _split_into_syllables from calc_horizontal (verbatim, byte-identical).
+  Net caught a real leak (hyphenator used by Step 2/4) → restored in scope.
+Verified byte-identical: characterization + rendering_guard + pure-module suite all green (47 passed).
+NEXT on #186: broaden characterization cases (CJK/Thai/zwsp/empty), then extract the greedy packing
+(Step 1) into the pluggable LineBreaker seam so Knuth-Plass (#180) can slot in.
