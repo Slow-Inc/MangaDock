@@ -14,6 +14,7 @@ import traceback
 import numpy as np
 from PIL import Image
 from typing import Optional, Any, List, Tuple
+from .region_filter import filter_translated_regions
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -1285,33 +1286,7 @@ class MangaTranslator:
                 logger.warning("Some translation regions failed post-translation check.")
 
         # 过滤逻辑（简化版本，保留主要过滤条件）
-        new_text_regions = []
-        for region in ctx.text_regions:
-            should_filter = False
-            filter_reason = ""
-
-            if not region.translation.strip():
-                should_filter = True
-                filter_reason = "Translation contain blank areas"
-            elif config.translator.translator != Translator.none:
-                if region.translation.isnumeric():
-                    should_filter = True
-                    filter_reason = "Numeric translation"
-                elif config.filter_text and re.search(config.re_filter_text, region.translation):
-                    should_filter = True
-                    filter_reason = f"Matched filter text: {config.filter_text}"
-                elif not config.translator.translator == Translator.original:
-                    text_equal = region.text.lower().strip() == region.translation.lower().strip()
-                    if text_equal:
-                        should_filter = True
-                        filter_reason = "Translation identical to original"
-
-            if should_filter:
-                if region.translation.strip():
-                    logger.info(f'Filtered out: {region.translation}')
-                    logger.info(f'Reason: {filter_reason}')
-            else:
-                new_text_regions.append(region)
+        new_text_regions = filter_translated_regions(ctx.text_regions, config)
 
         return new_text_regions
 
@@ -2371,33 +2346,7 @@ class MangaTranslator:
                 # 过滤逻辑（简化版本，保留主要过滤条件）
                 for ctx, config in batch:
                     if ctx.text_regions:
-                        new_text_regions = []
-                        for region in ctx.text_regions:
-                            should_filter = False
-                            filter_reason = ""
-
-                            if not region.translation.strip():
-                                should_filter = True
-                                filter_reason = "Translation contain blank areas"
-                            elif config.translator.translator != Translator.none:
-                                if region.translation.isnumeric():
-                                    should_filter = True
-                                    filter_reason = "Numeric translation"
-                                elif config.filter_text and re.search(config.re_filter_text, region.translation):
-                                    should_filter = True
-                                    filter_reason = f"Matched filter text: {config.filter_text}"
-                                elif not config.translator.translator == Translator.original:
-                                    text_equal = region.text.lower().strip() == region.translation.lower().strip()
-                                    if text_equal:
-                                        should_filter = True
-                                        filter_reason = "Translation identical to original"
-
-                            if should_filter:
-                                if region.translation.strip():
-                                    logger.info(f'Filtered out: {region.translation}')
-                                    logger.info(f'Reason: {filter_reason}')
-                            else:
-                                new_text_regions.append(region)
+                        new_text_regions = filter_translated_regions(ctx.text_regions, config)
                         ctx.text_regions = new_text_regions
                         
                 results.extend(batch)
@@ -2541,33 +2490,7 @@ class MangaTranslator:
                 
                 # 过滤逻辑
                 if ctx.text_regions:
-                    new_text_regions = []
-                    for region in ctx.text_regions:
-                        should_filter = False
-                        filter_reason = ""
-
-                        if not region.translation.strip():
-                            should_filter = True
-                            filter_reason = "Translation contain blank areas"
-                        elif config.translator.translator != Translator.none:
-                            if region.translation.isnumeric():
-                                should_filter = True
-                                filter_reason = "Numeric translation"
-                            elif config.filter_text and re.search(config.re_filter_text, region.translation):
-                                should_filter = True
-                                filter_reason = f"Matched filter text: {config.filter_text}"
-                            elif not config.translator.translator == Translator.original:
-                                text_equal = region.text.lower().strip() == region.translation.lower().strip()
-                                if text_equal:
-                                    should_filter = True
-                                    filter_reason = "Translation identical to original"
-
-                        if should_filter:
-                            if region.translation.strip():
-                                logger.info(f'Filtered out: {region.translation}')
-                                logger.info(f'Reason: {filter_reason}')
-                        else:
-                            new_text_regions.append(region)
+                    new_text_regions = filter_translated_regions(ctx.text_regions, config)
                     ctx.text_regions = new_text_regions
                 
                 return ctx, config

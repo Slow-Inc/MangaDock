@@ -1297,3 +1297,11 @@ page-context bleed L9, exit(-1) in a stage L2, cleanup-task leak L14). Reconcile
 are ~16 interleavable seams (the already-done punctuation/validator/greedy-pack extractions ARE S-seams),
 not monolithic Phase-C. Corrected next 3 steps: S1 filter_translated_regions (verbatim 3-way dedup) → S2
 apply_translations → S3 ModelUsageTracker (#188 starts early). Landmines must be PRESERVED then fixed behind opt-in flags.
+
+## 2026-06-09 — #187 S1: collapse the verbatim 3-way post-translation region filter
+Following the reconciled roadmap's corrected step 1 (the highest-value/lowest-risk dedup the old plan
+missed). The should_filter block (drop blank/numeric/filter-matched/identical-to-source translations) was
+verbatim-identical in three MangaTranslator paths (single/batch/concurrent). Extracted to
+region_filter.filter_translated_regions(text_regions, config); all 3 sites now delegate (should_filter
+count: 3→0). Byte-identical incl. none (only-blank) + original (no identical-check) carve-outs.
+Tests: test_region_filter.py 7 passed (every branch + carve-outs); regression 35 passed.
