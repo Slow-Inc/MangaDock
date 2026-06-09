@@ -49,3 +49,14 @@ bun run start:dev
 ```
 
 API จะรันที่ http://localhost:4001
+
+## Debugging — ล้าง translated-patch cache
+
+ตอน debug ระบบแปล (MIT) cache ทุกชั้นจะ replay ผลเก่าแทนการแปลใหม่ ใช้คำสั่งนี้ล้างให้หมดในครั้งเดียว:
+
+```bash
+npm run cache:reset              # ลบจริง: Redis translate:manga-patches:* + L3 disk (.cache) + uploads/patches
+npm run cache:reset -- --dry-run # ดูว่าจะลบอะไรก่อน ไม่แตะของจริง
+```
+
+ลบเฉพาะ namespace `translate:manga-patches:*` เท่านั้น — cache ของ forum/search/mangadex/glossary ไม่โดนแตะ (logic การเลือกถูก unit-test ใน `src/cache/translation-cache-reset.ts`) หลังรันให้ restart backend เพื่อล้าง L1 in-memory ด้วย

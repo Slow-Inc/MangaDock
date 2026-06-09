@@ -53,6 +53,36 @@ describe('loadPageBytes', () => {
     );
   });
 
+  it.each([
+    '/uploads/chapters/ch1/p0.jpg',
+    '/api/proxy/uploads/chapters/ch1/p0.jpg', // the Reader's proxy-prefixed src
+  ])('reads an uploaded chapter page from the uploads root on disk: %s', async (url) => {
+    const dir = path.join(root, 'chapters', 'ch1');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'p0.jpg'), Buffer.from('upload-bytes'));
+
+    const buf = await loadPageBytes(url, {
+      imgCacheRoot: path.join(root, '_nope'),
+      uploadsRoot: root,
+    });
+
+    expect(buf.toString()).toBe('upload-bytes');
+  });
+
+  it.each([
+    '/uploads/../secrets.txt',
+    '/api/proxy/uploads/a/../../secrets.txt',
+    '/uploads/%2e%2e/secrets.txt',
+  ])('rejects an uploads path escaping the uploads root: %s', async (evil) => {
+    await fs
+      .writeFile(path.join(path.dirname(root), 'secrets.txt'), 'top secret')
+      .catch(() => {});
+
+    await expect(
+      loadPageBytes(evil, { imgCacheRoot: root, uploadsRoot: root }),
+    ).rejects.toThrow(/escapes|invalid/i);
+  });
+
   it('fetches an external URL and returns its bytes', async () => {
     const fetchImpl = jest.fn().mockResolvedValue({
       ok: true,
