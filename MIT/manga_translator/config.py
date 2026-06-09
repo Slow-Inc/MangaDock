@@ -165,6 +165,25 @@ class RenderConfig(BaseModel):
     """Offset font size by a given amount, positive number increase font size and vice versa"""
     font_size_minimum: int = -1
     """Minimum output font size. Default is image_sides_sum/200"""
+    bubble_area_fit: bool = False
+    """#166: size each region's font to its speech-balloon area (#170 bubble_box)
+    instead of the source textline column, so translated text fills the bubble.
+    Off → font sized as before (byte-identical)."""
+    en_comic_font: bool = False
+    """#176: render Latin/EN targets in the bundled comic font ('comic shanns 2')
+    instead of the worker's default (Prompt-Bold, a Thai face). Off → byte-identical."""
+    en_font: Optional[str] = None
+    """Render-parity B: filename (in fonts/) of a heavier EN face to use for Latin
+    targets, overriding en_comic_font (MangaTranslator's BYO-font approach). Missing
+    file or None → prior behavior (byte-identical)."""
+    supersampling: int = 1
+    """#181: render the text canvas at Nx then downscale for crisp glyphs and
+    controlled weight. 1 → byte-identical."""
+    font_max_box_ratio: float = 0.5
+    """Render-parity C: cap the #166 bubble-fit font at this fraction of the
+    balloon height. 0.5 (#175) keeps a short line from becoming a giant; raise it
+    (toward MangaTranslator's no-cap fill) to let text grow into the balloon.
+    0.5 → byte-identical."""
     direction: Direction = Direction.auto
     """Force text to be rendered horizontally/vertically/none"""
     uppercase: bool = False
@@ -317,6 +336,14 @@ class DetectorConfig(BaseModel):
     """Invert the image colors for detection. Might improve detection."""
     det_gamma_correct: bool = False
     """Applies gamma correction for detection. Might improve detection."""
+    det_bubble_seg: bool = False
+    """#170: run a speech-balloon segmentation YOLO alongside the text detector
+    and tag each text-line region with its balloon mask (renderer area,
+    mask-aware crop, OCR scoping). Off → pipeline byte-identical."""
+    det_sfx: bool = False
+    """#168: run a second SFX/display-text detector (AnimeText YOLO) after DBNet
+    and merge its boxes (IoA dedup) into the textline flow, so stylized katakana
+    sound effects DBNet can't see get translated. Off → pipeline byte-identical."""
     box_threshold: float = 0.7
     """Threshold for bbox generation"""
     unclip_ratio: float = 2.3

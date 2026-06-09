@@ -9,6 +9,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { MangaDexService } from './mangadex.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 import { PatchStore } from './patch-store';
+import { TranslationMemoryRepository } from './translation-memory.repository';
 import { loadPageBytes } from './page-source';
 import { composeSeriesContext } from './series-context';
 import { RedisService } from '../cache/redis.service';
@@ -62,6 +63,20 @@ export const MIT_LANG_MAP: Record<string, string> = {
 };
 export function mitLangCode(isoLang: string): string {
   return MIT_LANG_MAP[isoLang.toLowerCase()] ?? isoLang.toUpperCase();
+}
+
+/** Parse a batch jobKey `chapterId:srcMIT:tgtMIT:model:derivative`. Splits from
+ *  the RIGHT because a "ver:<uuid>" chapterId contains a colon — a left split
+ *  would mis-parse it (chapterId="ver"). The last 4 segments are colon-free. */
+export function parseJobKey(jobKey: string): {
+  chapterId: string; srcMIT: string; tgtMIT: string; model: string; derivative: string;
+} {
+  const parts = jobKey.split(':');
+  const derivative = parts.pop() ?? '';
+  const model = parts.pop() ?? '';
+  const tgtMIT = parts.pop() ?? '';
+  const srcMIT = parts.pop() ?? '';
+  return { chapterId: parts.join(':'), srcMIT, tgtMIT, model, derivative };
 }
 
 const GEMINI_LANG_NAME: Record<string, string> = {
@@ -120,6 +135,7 @@ export class BooksService {
 
   /** Single owner of Patch Set files (#137) — deterministic names, legacy sweep. */
   private readonly patchStore: PatchStore;
+  private readonly translationMemory: TranslationMemoryRepository;
 
   constructor(
     private readonly mangaDex: MangaDexService,
@@ -130,6 +146,9 @@ export class BooksService {
     @Optional() private readonly redis?: RedisService,
   ) {
     this.patchStore = new PatchStore(this.storage, () => this.backendOrigin);
+    // #160: translation memory rides the already-injected service-role client;
+    // best-effort, so a missing/broken Supabase never affects translation.
+    this.translationMemory = new TranslationMemoryRepository(this.supabase);
   }
 
   onModuleInit(): void {
@@ -193,7 +212,8 @@ export class BooksService {
 
     // jobKey = chapterId:srcMIT:tgtMIT:model:derivative (model = 'default'
     // when unset; derivative = 'hd' | 'saver', #156)
-    const [chapterId, srcMIT, tgtMIT, jobModel, jobDerivative] = jobKey.split(':');
+    const { chapterId, srcMIT, tgtMIT, model: jobModel, derivative: jobDerivative } =
+      parseJobKey(jobKey);
 
     let pageResult: PageResult;
 
@@ -243,6 +263,15 @@ export class BooksService {
         jobDerivative === 'saver' ? 'saver' : 'hd',
       );
       await this.cache.set(cacheKey, { patches }, 1000 * 60 * 60 * 24 * 7); // 7 days
+
+      // Translation memory (#160): persist this page's text layer (#158 regions).
+      // Fire-and-forget — the repository swallows its own errors, so persistence
+      // never adds latency to or fails page delivery (local-first).
+      if (Array.isArray(result.regions) && result.regions.length > 0) {
+        void this.translationMemory.savePageText(
+          chapterId, pageIndex, tgtMIT, result.regions, jobModel,
+        );
+      }
 
       pageResult = { patches };
     }
@@ -559,6 +588,11 @@ export class BooksService {
    *   MIT_TEXT_THRESHOLD      — detector text threshold in (0,1]
    *   MIT_DET_INVERT=1        — inverted detection pass (white-on-black text)
    *   MIT_DET_GAMMA_CORRECT=1 — gamma correction before detection
+   *
+   * #170 bubble segmentation (opt-in; unset = config identical to before):
+   *   MIT_BUBBLE_SEG=1        — run a speech-balloon YOLO alongside DBNet and
+   *                             tag each text-line region with its balloon mask
+   *                             (renderer area, mask-aware crop, OCR scoping).
    */
   private buildMitConfig(srcMIT: string, tgtMIT: string, sourceIso: string, imageModel?: string, seriesContext?: string): string {
     const intEnv = (name: string, fallback: number): number => {
@@ -572,8 +606,23 @@ export class BooksService {
       return Number.isFinite(n) && n > 0 && n <= 1 ? n : undefined;
     };
     const flagEnv = (name: string): boolean => process.env[name] === '1';
+    // #166 render knobs: offset may be negative; minimum is a positive px floor.
+    const signedIntEnv = (name: string): number | undefined => {
+      const raw = process.env[name];
+      if (raw === undefined) return undefined;
+      const n = Number(raw);
+      return Number.isInteger(n) ? n : undefined;
+    };
+    const posIntEnv = (name: string): number | undefined => {
+      const n = signedIntEnv(name);
+      return n !== undefined && n > 0 ? n : undefined;
+    };
     const ocrProb = fracEnv('MIT_OCR_PROB');
     const textThreshold = fracEnv('MIT_TEXT_THRESHOLD');
+    const fontSizeOffset = signedIntEnv('MIT_FONT_SIZE_OFFSET');
+    const fontSizeMin = posIntEnv('MIT_FONT_SIZE_MIN');
+    const supersampling = posIntEnv('MIT_SUPERSAMPLING');
+    const fontMaxBoxRatio = fracEnv('MIT_FONT_MAX_BOX_RATIO');
     const model = this.imageModelKey(imageModel);
     return JSON.stringify({
       translator: {
@@ -592,6 +641,13 @@ export class BooksService {
         ...(textThreshold !== undefined ? { text_threshold: textThreshold } : {}),
         ...(flagEnv('MIT_DET_INVERT') ? { det_invert: true } : {}),
         ...(flagEnv('MIT_DET_GAMMA_CORRECT') ? { det_gamma_correct: true } : {}),
+        // Bubble segmentation (#170): run a speech-balloon YOLO alongside DBNet
+        // and tag each text-line region with its balloon mask, so the renderer
+        // can size text to the balloon area. Absent → stage off, byte-identical.
+        ...(flagEnv('MIT_BUBBLE_SEG') ? { det_bubble_seg: true } : {}),
+        // SFX detector (#168): second YOLO pass for stylized katakana SFX that
+        // DBNet can't see. Absent → stage off, byte-identical.
+        ...(flagEnv('MIT_SFX_DETECTOR') ? { det_sfx: true } : {}),
       },
       // OCR prob floor (#167): the 48px OCR is underconfident on long thin
       // lines — at the default threshold it drops lines it read almost
@@ -602,7 +658,33 @@ export class BooksService {
         inpainting_size: intEnv('MIT_INPAINTING_SIZE', 1536),
         inpainting_precision: process.env.MIT_INPAINTING_PRECISION ?? 'bf16',
       },
-      render: { direction: 'auto', rtl: isRtlLang(sourceIso) },
+      render: {
+        direction: 'auto',
+        rtl: isRtlLang(sourceIso),
+        // Font-size fidelity (#166): the renderer's auto floor (img.h+img.w)/200
+        // is tiny in patch mode (computed from the crop). Absent → render
+        // identical to the auto behavior.
+        ...(fontSizeOffset !== undefined ? { font_size_offset: fontSizeOffset } : {}),
+        ...(fontSizeMin !== undefined ? { font_size_minimum: fontSizeMin } : {}),
+        // Bubble area-fit sizing (#166): size each region's font to its balloon
+        // area (#170 bubble_box) instead of the source textline column. Needs
+        // MIT_BUBBLE_SEG to supply the masks. Absent → byte-identical.
+        ...(flagEnv('MIT_BUBBLE_AREA_FIT') ? { bubble_area_fit: true } : {}),
+        // #176: render Latin/EN targets in the bundled comic font instead of the
+        // worker's Prompt-Bold (a Thai face). Absent → byte-identical.
+        ...(flagEnv('MIT_EN_COMIC_FONT') ? { en_comic_font: true } : {}),
+        // #181: text supersampling factor (render Nx then downscale). Absent → 1.
+        ...(supersampling !== undefined ? { supersampling } : {}),
+        // Render-parity A: ALL-CAPS lettering (MangaTranslator pipeline.py:1375).
+        // The MIT renderer already honors render.uppercase. Absent → byte-identical.
+        ...(flagEnv('MIT_EN_UPPERCASE') ? { uppercase: true } : {}),
+        // Render-parity C: raise the #175 bubble-fit font cap (0.5·balloon height)
+        // so text fills the balloon. Fraction in (0,1]. Absent → byte-identical.
+        ...(fontMaxBoxRatio !== undefined ? { font_max_box_ratio: fontMaxBoxRatio } : {}),
+        // Render-parity B: override the EN face by filename in fonts/ (operator-set,
+        // MangaTranslator BYO font). Absent → byte-identical.
+        ...(process.env.MIT_EN_FONT ? { en_font: process.env.MIT_EN_FONT } : {}),
+      },
     });
   }
 
@@ -798,7 +880,7 @@ export class BooksService {
     // Load the source page — display-derivative aware (#156): /img-cache paths
     // are read straight from disk so the patch is generated from byte-identical
     // content to what the Reader displays; external URLs are fetched.
-    const imgBuffer = await loadPageBytes(pageUrl, { imgCacheRoot: 'img-cache' });
+    const imgBuffer = await loadPageBytes(pageUrl, { imgCacheRoot: 'img-cache', uploadsRoot: 'uploads' });
 
     const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '', opts?.imageModel, await this.seriesContextFor(opts?.mangaId));
 
@@ -1110,7 +1192,7 @@ export class BooksService {
       imageBuffers = await Promise.all(
         // Display-derivative aware (#156): /img-cache paths read from disk,
         // external URLs fetched (cancellable via the job signal).
-        pages.map(({ pageUrl }) => loadPageBytes(pageUrl, { imgCacheRoot: 'img-cache', signal })),
+        pages.map(({ pageUrl }) => loadPageBytes(pageUrl, { imgCacheRoot: 'img-cache', uploadsRoot: 'uploads', signal })),
       );
     } catch (err) {
       if (signal.aborted) {
