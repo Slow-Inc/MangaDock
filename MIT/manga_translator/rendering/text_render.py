@@ -661,6 +661,46 @@ def get_char_offset_x(font_size: int, cdpt: str):
 def get_string_width(font_size: int, text: str):
     return sum([get_char_offset_x(font_size, c) for c in text])
 
+def _split_words_and_widths(text: str, font_size: int) -> Tuple[List[str], List[int]]:
+    """#186: split text on whitespace / zero-width-space and precompute each word's
+    pixel width. Extracted verbatim from ``calc_horizontal``."""
+    words = re.split(rf'[\s{_ZWSP}]+', text)
+    return words, [get_string_width(font_size, w) for w in words]
+
+
+def _split_into_syllables(words: List[str], font_size: int, max_width: int, language: str) -> List[List[str]]:
+    """#186: per-word syllable segmentation for the greedy horizontal wrap. Uses the
+    language hyphenator, falls back to a safe char-split for short/unhyphenatable
+    words, then further splits any syllable wider than ``max_width``. Extracted
+    verbatim from ``calc_horizontal`` (behaviour-preserving) so the wrap can later be
+    swapped for a pluggable strategy. Depends only on module-level font state."""
+    syllables = []
+    hyphenator = select_hyphenator(language)
+    for word in words:
+        new_syls = []
+        if hyphenator and len(word) <= 100:
+            try:
+                new_syls = hyphenator.syllables(word)
+            except Exception:
+                new_syls = []
+        if len(new_syls) == 0:
+            if len(word) <= 3:
+                new_syls = [word]
+            else:
+                new_syls = _safe_char_split(word)
+
+        # Split up syllables that are too large
+        normalized_syls = []
+        for syl in new_syls:
+            syl_width = get_string_width(font_size, syl)
+            if syl_width > max_width:
+                normalized_syls.extend(_safe_char_split(syl))
+            else:
+                normalized_syls.append(syl)
+        syllables.append(normalized_syls)
+    return syllables
+
+
 def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, language: str = 'en_US', hyphenate: bool = True) -> Tuple[List[str], List[int]]:
     """
     Splits up a string of text into lines. Returns list of lines and their widths.
@@ -675,11 +715,8 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     whitespace_offset_x = 0 if has_zwsp_breaks else get_char_offset_x(font_size, ' ')
     hyphen_offset_x = get_char_offset_x(font_size, '-')
 
-    # Split text into words and precalculate each word width
-    words = re.split(r'[\s\u200b]+', text)
-    word_widths = []
-    for i, word in enumerate(words):
-        word_widths.append(get_string_width(font_size, word))
+    # Split text into words and precalculate each word width (#186: helper)
+    words, word_widths = _split_words_and_widths(text, font_size)
 
     # Try to increase width usage if a height overflow is unavoidable
     while True:
@@ -693,37 +730,10 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
         else:
             break
 
-    # Split words into syllables
-    syllables = []
+    # Split words into syllables (#186: extracted to _split_into_syllables)
+    syllables = _split_into_syllables(words, font_size, max_width, language)
+    # Step 2/4 below still consult the hyphenator for backward-hyphenation decisions.
     hyphenator = select_hyphenator(language)
-    for i, word in enumerate(words):
-        new_syls = []
-        if hyphenator and len(word) <= 100:
-            try:
-                new_syls = hyphenator.syllables(word)
-            except Exception:
-                new_syls = []
-        if len(new_syls) == 0:
-            if len(word) <= 3:
-                new_syls = [word]
-            else:
-                new_syls = _safe_char_split(word)
-
-        # # Make sure no syllable goes over max_width
-        # for syl in syllables[-1]:
-        #     w = get_string_width(font_size, syl)
-        #     if w > max_width:
-        #         max_width = w
-
-        # Split up syllables that are too large
-        normalized_syls = []
-        for syl in new_syls:
-            syl_width = get_string_width(font_size, syl)
-            if syl_width > max_width:
-                normalized_syls.extend(_safe_char_split(syl))
-            else:
-                normalized_syls.append(syl)
-        syllables.append(normalized_syls)
 
     line_words_list = []
     line_width_list = []
