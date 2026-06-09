@@ -1206,3 +1206,11 @@ now appears (DBNet never found it). LIMITATION: heavily-stylized SFX ぬ〜 IS d
 the hand-drawn katakana → empty → not translated (OCR gap #172/#167, not detection). MangaTranslator's "LOOM"
 needs better OCR. Gap F (dedicated SFX outline) deferred — uses default border for now.
 Tests: MIT 41 passed (sfx wiring), Backend 66 passed. All render-parity work (A/B/C/#168) opt-in, byte-identical off.
+
+## 2026-06-09 — #180 Knuth-Plass line-break (pure module, step 1)
+New manga_translator/line_break.py: find_optimal_line_breaks() — pragmatic Knuth-Plass DP
+(badness=slack^3, hyphen_penalty=1000) ported from MangaTranslator text_processing.py:489-579.
+Pure, dependency-light (word-width callback). Tests: test_line_break.py 5 passed (balanced break
+beats greedy short-last-line, empty, fits-one-line, overwide-lone-token no deadlock, hyphen penalty).
+NEXT (step 2, not done): wire into rendering/text_render.calc_horizontal behind a knob (replace the
+greedy word-packing loop ~774-845) + E2E — risky integration into the core wrapper, deserves a focused pass.
