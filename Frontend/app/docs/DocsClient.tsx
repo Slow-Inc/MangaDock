@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LangContext, useLang, type Lang } from './lang-context';
 import {
   Search, ExternalLink, GitBranch, GitPullRequest, AlertCircle,
   FileText, Menu, X, CheckCircle2, Circle, GitMerge, XCircle,
   ChevronLeft, ChevronRight, MessageCircle, Lock, ArrowLeft,
-  Hash, Tag, Clock, Eye, Code2, BookOpen, Layers, Cpu, Server,
-  LayoutDashboard,
+  Tag, BookOpen, Layers, Cpu,
+  LayoutDashboard, Zap,
 } from 'lucide-react';
 import OverviewView from './OverviewView';
 import TechStackView from './TechStackView';
+import SimulationsView from './simulations/SimulationsView';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ export interface MdFile {
 type ViewState =
   | { type: 'overview' }
   | { type: 'techstack' }
+  | { type: 'simulations' }
   | { type: 'doc'; file: string }
   | { type: 'gh-issues'; state: 'open' | 'closed' | 'all'; page: number }
   | { type: 'gh-issue'; number: number }
@@ -112,8 +114,23 @@ function renderInline(text: string): React.ReactNode {
   });
 }
 
+function filterLangBlocks(raw: string, lang: Lang): string {
+  const out: string[] = [];
+  let active: Lang | 'all' = 'all';
+  for (const line of raw.split('\n')) {
+    const t = line.trim();
+    if (t === '<!-- lang:th -->') { active = 'th'; continue; }
+    if (t === '<!-- lang:en -->') { active = 'en'; continue; }
+    if (t === '<!-- lang:end -->') { active = 'all'; continue; }
+    if (active === 'all' || active === lang) out.push(line);
+  }
+  return out.join('\n');
+}
+
 function MarkdownRenderer({ content }: { content: string }) {
-  const lines = content.split('\n');
+  const lang = useLang();
+  const filtered = filterLangBlocks(content, lang);
+  const lines = filtered.split('\n');
   const nodes: React.ReactNode[] = [];
   let i = 0, k = 0;
 
@@ -299,10 +316,11 @@ function PRStateIcon({ state, draft, merged }: { state: string; draft: boolean; 
 }
 
 function StateBadge({ state, draft, merged }: { state: string; draft?: boolean; merged?: boolean }) {
-  if (merged) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#0071e3]/10 text-[#0071e3]">ผสานแล้ว</span>;
-  if (state === 'closed' && !merged) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-600">ปิดแล้ว</span>;
-  if (draft) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-black/[0.05] text-[#6e6e73]">ร่าง</span>;
-  return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-700">เปิดอยู่</span>;
+  const lang = useLang();
+  if (merged) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#0071e3]/10 text-[#0071e3]">{lang === 'th' ? 'ผสานแล้ว' : 'Merged'}</span>;
+  if (state === 'closed') return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-600">{lang === 'th' ? 'ปิดแล้ว' : 'Closed'}</span>;
+  if (draft) return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-black/[0.05] text-[#6e6e73]">{lang === 'th' ? 'ร่าง' : 'Draft'}</span>;
+  return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-700">{lang === 'th' ? 'เปิดอยู่' : 'Open'}</span>;
 }
 
 function Skeleton({ className }: { className?: string }) {
@@ -334,10 +352,12 @@ function DocView({ file, mdFiles, onNavigate }: {
   const prev = idx > 0 ? mdFiles[idx - 1] : null;
   const next = idx < mdFiles.length - 1 ? mdFiles[idx + 1] : null;
 
+  const lang = useLang();
+
   if (!doc) return (
     <div className="py-20 text-center text-[#6e6e73]">
       <AlertCircle size={32} className="mx-auto mb-4 opacity-30" />
-      <p>ไม่พบเอกสาร</p>
+      <p>{lang === 'th' ? 'ไม่พบเอกสาร' : 'Document not found'}</p>
     </div>
   );
 
@@ -345,7 +365,7 @@ function DocView({ file, mdFiles, onNavigate }: {
     <div>
       <div className="mb-8 pb-6 border-b border-black/[0.08]">
         <div className="flex items-center gap-1.5 text-[12px] text-[#6e6e73] mb-4">
-          <span>เอกสาร</span>
+          <span>{lang === 'th' ? 'เอกสาร' : 'Docs'}</span>
           <ChevronRight size={12} />
           <span className="text-[#86868b]">{doc.category}</span>
           <ChevronRight size={12} />
@@ -375,7 +395,7 @@ function DocView({ file, mdFiles, onNavigate }: {
           >
             <ChevronLeft size={16} className="text-[#6e6e73] group-hover:text-[#0071e3] shrink-0 transition-colors" />
             <div>
-              <div className="text-[11px] text-[#86868b] mb-0.5">ก่อนหน้า</div>
+              <div className="text-[11px] text-[#86868b] mb-0.5">{lang === 'th' ? 'ก่อนหน้า' : 'Previous'}</div>
               <div className="text-[14px] font-medium text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors">{prev.name}</div>
             </div>
           </button>
@@ -386,7 +406,7 @@ function DocView({ file, mdFiles, onNavigate }: {
             className="flex-1 flex items-center justify-end gap-3 px-5 py-4 rounded-xl border border-black/[0.08] hover:border-[#0071e3]/30 hover:bg-[#0071e3]/[0.04] transition-all text-right group"
           >
             <div>
-              <div className="text-[11px] text-[#86868b] mb-0.5">ถัดไป</div>
+              <div className="text-[11px] text-[#86868b] mb-0.5">{lang === 'th' ? 'ถัดไป' : 'Next'}</div>
               <div className="text-[14px] font-medium text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors">{next.name}</div>
             </div>
             <ChevronRight size={16} className="text-[#6e6e73] group-hover:text-[#0071e3] shrink-0 transition-colors" />
@@ -408,6 +428,7 @@ function IssuesListView({ page, onIssue, onPage }: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeState, setActiveState] = useState<'open' | 'closed' | 'all'>('open');
+  const lang = useLang();
 
   useEffect(() => {
     setLoading(true);
@@ -422,11 +443,11 @@ function IssuesListView({ page, onIssue, onPage }: {
       .finally(() => setLoading(false));
   }, [activeState, page]);
 
-  const STATES = [
-    { key: 'open', label: 'เปิดอยู่' },
-    { key: 'closed', label: 'ปิดแล้ว' },
-    { key: 'all', label: 'ทั้งหมด' },
-  ] as const;
+  const STATES: { key: 'open' | 'closed' | 'all'; label: string }[] = [
+    { key: 'open',   label: lang === 'th' ? 'เปิดอยู่' : 'Open' },
+    { key: 'closed', label: lang === 'th' ? 'ปิดแล้ว' : 'Closed' },
+    { key: 'all',    label: lang === 'th' ? 'ทั้งหมด' : 'All' },
+  ];
 
   return (
     <div>
@@ -437,7 +458,7 @@ function IssuesListView({ page, onIssue, onPage }: {
           <span className="text-[#0071e3]">Issues</span>
         </div>
         <div className="flex items-center justify-between">
-          <h1 className="text-[22px] font-semibold text-[#1d1d1f]">รายการปัญหา</h1>
+          <h1 className="text-[22px] font-semibold text-[#1d1d1f]">{lang === 'th' ? 'รายการปัญหา' : 'Issues'}</h1>
           <div className="flex rounded-lg border border-black/[0.08] overflow-hidden">
             {STATES.map(s => (
               <button
@@ -456,12 +477,12 @@ function IssuesListView({ page, onIssue, onPage }: {
       {error && (
         <div className="py-8 text-center text-[#6e6e73] text-[14px]">
           <AlertCircle size={24} className="mx-auto mb-3 opacity-40" />
-          <p>ไม่สามารถโหลดข้อมูลได้: {error}</p>
-          <p className="text-[12px] mt-1 text-[#86868b]">อาจถึงขีดจำกัด GitHub API หรือ repository เป็น private</p>
+          <p>{lang === 'th' ? `ไม่สามารถโหลดข้อมูลได้: ${error}` : `Failed to load: ${error}`}</p>
+          <p className="text-[12px] mt-1 text-[#86868b]">{lang === 'th' ? 'อาจถึงขีดจำกัด GitHub API หรือ repository เป็น private' : 'GitHub API rate limit reached, or repository is private.'}</p>
         </div>
       )}
       {!loading && !error && issues.length === 0 && (
-        <div className="py-12 text-center text-[#6e6e73] text-[14px]">ไม่มี issue ในสถานะนี้</div>
+        <div className="py-12 text-center text-[#6e6e73] text-[14px]">{lang === 'th' ? 'ไม่มี issue ในสถานะนี้' : 'No issues in this state.'}</div>
       )}
 
       {!loading && !error && (
@@ -483,7 +504,7 @@ function IssuesListView({ page, onIssue, onPage }: {
                 <div className="flex items-center gap-3 mt-1.5 text-[12px] text-[#6e6e73]">
                   <span>#{issue.number}</span>
                   <span>{relativeDate(issue.created_at)}</span>
-                  <span>โดย {issue.user.login}</span>
+                  <span>{lang === 'th' ? `โดย ${issue.user.login}` : `by ${issue.user.login}`}</span>
                   {issue.comments > 0 && (
                     <span className="flex items-center gap-1">
                       <MessageCircle size={11} />
@@ -505,15 +526,15 @@ function IssuesListView({ page, onIssue, onPage }: {
             onClick={() => onPage(page - 1)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-[#6e6e73] hover:text-[#1d1d1f] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/[0.04] transition-all"
           >
-            <ChevronLeft size={14} /> ก่อนหน้า
+            <ChevronLeft size={14} /> {lang === 'th' ? 'ก่อนหน้า' : 'Previous'}
           </button>
-          <span className="text-[12px] text-[#6e6e73]">หน้า {page}</span>
+          <span className="text-[12px] text-[#6e6e73]">{lang === 'th' ? `หน้า ${page}` : `Page ${page}`}</span>
           <button
             disabled={issues.length < 20}
             onClick={() => onPage(page + 1)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-[#6e6e73] hover:text-[#1d1d1f] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/[0.04] transition-all"
           >
-            ถัดไป <ChevronRight size={14} />
+            {lang === 'th' ? 'ถัดไป' : 'Next'} <ChevronRight size={14} />
           </button>
         </div>
       )}
@@ -528,6 +549,7 @@ function IssueDetailView({ number, onBack }: { number: number; onBack: () => voi
   const [comments, setComments] = useState<GHComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const lang = useLang();
 
   useEffect(() => {
     setLoading(true);
@@ -546,14 +568,14 @@ function IssueDetailView({ number, onBack }: { number: number; onBack: () => voi
         onClick={onBack}
         className="flex items-center gap-1.5 text-[13px] text-[#6e6e73] hover:text-[#0071e3] transition-colors mb-6"
       >
-        <ArrowLeft size={14} /> กลับไปรายการ
+        <ArrowLeft size={14} /> {lang === 'th' ? 'กลับไปรายการ' : 'Back to list'}
       </button>
 
       {loading && <LoadingSkeleton />}
       {error && (
         <div className="py-8 text-center text-[#6e6e73] text-[14px]">
           <AlertCircle size={24} className="mx-auto mb-3 opacity-40" />
-          <p>โหลดไม่ได้: {error}</p>
+          <p>{lang === 'th' ? `โหลดไม่ได้: ${error}` : `Failed to load: ${error}`}</p>
         </div>
       )}
 
@@ -577,8 +599,8 @@ function IssueDetailView({ number, onBack }: { number: number; onBack: () => voi
                 <img src={issue.user.avatar_url} alt="" className="w-4 h-4 rounded-full" />
                 {issue.user.login}
               </span>
-              <span>เปิดเมื่อ {relativeDate(issue.created_at)}</span>
-              <span>อัปเดต {relativeDate(issue.updated_at)}</span>
+              <span>{lang === 'th' ? `เปิดเมื่อ ${relativeDate(issue.created_at)}` : `Opened ${relativeDate(issue.created_at)}`}</span>
+              <span>{lang === 'th' ? `อัปเดต ${relativeDate(issue.updated_at)}` : `Updated ${relativeDate(issue.updated_at)}`}</span>
               <a href={issue.html_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-[#0071e3] transition-colors">
                 <ExternalLink size={11} /> GitHub
               </a>
@@ -590,13 +612,13 @@ function IssueDetailView({ number, onBack }: { number: number; onBack: () => voi
               <MarkdownRenderer content={issue.body} />
             </div>
           ) : (
-            <p className="text-[#86868b] italic text-[14px] mb-8">ไม่มีรายละเอียดเพิ่มเติม</p>
+            <p className="text-[#86868b] italic text-[14px] mb-8">{lang === 'th' ? 'ไม่มีรายละเอียดเพิ่มเติม' : 'No description provided.'}</p>
           )}
 
           {comments.length > 0 && (
             <div>
               <h2 className="text-[16px] font-semibold text-[#1d1d1f] mb-4">
-                ความคิดเห็น ({comments.length})
+                {lang === 'th' ? `ความคิดเห็น (${comments.length})` : `Comments (${comments.length})`}
               </h2>
               <div className="space-y-4">
                 {comments.map(c => (
@@ -631,6 +653,7 @@ function PullsListView({ page, onPull, onPage }: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeState, setActiveState] = useState<'open' | 'closed' | 'all'>('all');
+  const lang = useLang();
 
   useEffect(() => {
     setLoading(true);
@@ -641,11 +664,11 @@ function PullsListView({ page, onPull, onPage }: {
       .finally(() => setLoading(false));
   }, [activeState, page]);
 
-  const STATES = [
-    { key: 'open', label: 'เปิดอยู่' },
-    { key: 'closed', label: 'ปิดแล้ว' },
-    { key: 'all', label: 'ทั้งหมด' },
-  ] as const;
+  const STATES: { key: 'open' | 'closed' | 'all'; label: string }[] = [
+    { key: 'open',   label: lang === 'th' ? 'เปิดอยู่' : 'Open' },
+    { key: 'closed', label: lang === 'th' ? 'ปิดแล้ว' : 'Closed' },
+    { key: 'all',    label: lang === 'th' ? 'ทั้งหมด' : 'All' },
+  ];
 
   return (
     <div>
@@ -675,11 +698,11 @@ function PullsListView({ page, onPull, onPage }: {
       {error && (
         <div className="py-8 text-center text-[#6e6e73] text-[14px]">
           <AlertCircle size={24} className="mx-auto mb-3 opacity-40" />
-          <p>ไม่สามารถโหลดข้อมูลได้: {error}</p>
+          <p>{lang === 'th' ? `ไม่สามารถโหลดข้อมูลได้: ${error}` : `Failed to load: ${error}`}</p>
         </div>
       )}
       {!loading && !error && pulls.length === 0 && (
-        <div className="py-12 text-center text-[#6e6e73] text-[14px]">ไม่มี pull request ในสถานะนี้</div>
+        <div className="py-12 text-center text-[#6e6e73] text-[14px]">{lang === 'th' ? 'ไม่มี pull request ในสถานะนี้' : 'No pull requests in this state.'}</div>
       )}
 
       {!loading && !error && (
@@ -703,7 +726,7 @@ function PullsListView({ page, onPull, onPage }: {
                   <span>#{pr.number}</span>
                   <span className="font-mono text-[11px]">{pr.head.ref} → {pr.base.ref}</span>
                   <span>{relativeDate(pr.created_at)}</span>
-                  <span>โดย {pr.user.login}</span>
+                  <span>{lang === 'th' ? `โดย ${pr.user.login}` : `by ${pr.user.login}`}</span>
                 </div>
               </div>
               <ChevronRight size={14} className="text-black/20 group-hover:text-[#0071e3] shrink-0 mt-0.5 transition-colors" />
@@ -719,15 +742,15 @@ function PullsListView({ page, onPull, onPage }: {
             onClick={() => onPage(page - 1)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-[#6e6e73] hover:text-[#1d1d1f] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/[0.04] transition-all"
           >
-            <ChevronLeft size={14} /> ก่อนหน้า
+            <ChevronLeft size={14} /> {lang === 'th' ? 'ก่อนหน้า' : 'Previous'}
           </button>
-          <span className="text-[12px] text-[#6e6e73]">หน้า {page}</span>
+          <span className="text-[12px] text-[#6e6e73]">{lang === 'th' ? `หน้า ${page}` : `Page ${page}`}</span>
           <button
             disabled={pulls.length < 20}
             onClick={() => onPage(page + 1)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] text-[#6e6e73] hover:text-[#1d1d1f] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black/[0.04] transition-all"
           >
-            ถัดไป <ChevronRight size={14} />
+            {lang === 'th' ? 'ถัดไป' : 'Next'} <ChevronRight size={14} />
           </button>
         </div>
       )}
@@ -739,6 +762,7 @@ function PullsListView({ page, onPull, onPage }: {
 
 function PullDetailView({ number, onBack }: { number: number; onBack: () => void }) {
   const [pr, setPr] = useState<GHPull | null>(null);
+  const lang = useLang();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -756,14 +780,14 @@ function PullDetailView({ number, onBack }: { number: number; onBack: () => void
         onClick={onBack}
         className="flex items-center gap-1.5 text-[13px] text-[#6e6e73] hover:text-[#0071e3] transition-colors mb-6"
       >
-        <ArrowLeft size={14} /> กลับไปรายการ
+        <ArrowLeft size={14} /> {lang === 'th' ? 'กลับไปรายการ' : 'Back to list'}
       </button>
 
       {loading && <LoadingSkeleton />}
       {error && (
         <div className="py-8 text-center text-[#6e6e73] text-[14px]">
           <AlertCircle size={24} className="mx-auto mb-3 opacity-40" />
-          <p>โหลดไม่ได้: {error}</p>
+          <p>{lang === 'th' ? `โหลดไม่ได้: ${error}` : `Failed to load: ${error}`}</p>
         </div>
       )}
 
@@ -789,7 +813,7 @@ function PullDetailView({ number, onBack }: { number: number; onBack: () => void
               </span>
               <span className="font-mono text-[11px] bg-black/[0.04] px-2 py-0.5 rounded">{pr.head.ref} → {pr.base.ref}</span>
               <span>{relativeDate(pr.created_at)}</span>
-              {pr.merged_at && <span>ผสานเมื่อ {relativeDate(pr.merged_at)}</span>}
+              {pr.merged_at && <span>{lang === 'th' ? `ผสานเมื่อ ${relativeDate(pr.merged_at)}` : `Merged ${relativeDate(pr.merged_at)}`}</span>}
             </div>
             {(pr.additions !== undefined || pr.changed_files !== undefined) && (
               <div className="mt-3 flex items-center gap-4 text-[12px]">
@@ -800,19 +824,19 @@ function PullDetailView({ number, onBack }: { number: number; onBack: () => void
                   <span className="text-red-500 font-mono">-{pr.deletions}</span>
                 )}
                 {pr.changed_files !== undefined && (
-                  <span className="text-[#6e6e73]">{pr.changed_files} ไฟล์ที่เปลี่ยนแปลง</span>
+                  <span className="text-[#6e6e73]">{lang === 'th' ? `${pr.changed_files} ไฟล์ที่เปลี่ยนแปลง` : `${pr.changed_files} files changed`}</span>
                 )}
               </div>
             )}
             <a href={pr.html_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-[#0071e3] hover:text-[#0058b0] transition-colors">
-              <ExternalLink size={11} /> ดูใน GitHub
+              <ExternalLink size={11} /> {lang === 'th' ? 'ดูใน GitHub' : 'View on GitHub'}
             </a>
           </div>
 
           {pr.body ? (
             <MarkdownRenderer content={pr.body} />
           ) : (
-            <p className="text-[#86868b] italic text-[14px]">ไม่มีรายละเอียดเพิ่มเติม</p>
+            <p className="text-[#86868b] italic text-[14px]">{lang === 'th' ? 'ไม่มีรายละเอียดเพิ่มเติม' : 'No description provided.'}</p>
           )}
         </>
       )}
@@ -826,6 +850,7 @@ function BranchesView() {
   const [branches, setBranches] = useState<GHBranch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const lang = useLang();
 
   useEffect(() => {
     ghFetch<GHBranch[]>('branches')
@@ -840,16 +865,16 @@ function BranchesView() {
         <div className="flex items-center gap-1.5 text-[12px] text-[#6e6e73] mb-3">
           <span>GitHub</span>
           <ChevronRight size={12} />
-          <span className="text-[#0071e3]">สาขา</span>
+          <span className="text-[#0071e3]">{lang === 'th' ? 'สาขา' : 'Branches'}</span>
         </div>
-        <h1 className="text-[22px] font-semibold text-[#1d1d1f]">สาขาทั้งหมด</h1>
+        <h1 className="text-[22px] font-semibold text-[#1d1d1f]">{lang === 'th' ? 'สาขาทั้งหมด' : 'All Branches'}</h1>
       </div>
 
       {loading && <LoadingSkeleton />}
       {error && (
         <div className="py-8 text-center text-[#6e6e73] text-[14px]">
           <AlertCircle size={24} className="mx-auto mb-3 opacity-40" />
-          <p>โหลดไม่ได้: {error}</p>
+          <p>{lang === 'th' ? `โหลดไม่ได้: ${error}` : `Failed to load: ${error}`}</p>
         </div>
       )}
 
@@ -867,7 +892,7 @@ function BranchesView() {
                 </span>
                 {b.protected && (
                   <span className="ml-2 text-[11px] text-[#6e6e73] inline-flex items-center gap-1">
-                    <Lock size={10} /> ป้องกัน
+                    <Lock size={10} /> {lang === 'th' ? 'ป้องกัน' : 'protected'}
                   </span>
                 )}
               </div>
@@ -897,13 +922,13 @@ const DOC_CATEGORY_ICONS: Record<string, typeof FileText> = {
 };
 
 const OV_SECTIONS = [
-  { id: 'ov-hero',     label: 'ภาพรวม',      dot: 'bg-[#6e6e73]' },
-  { id: 'ov-frontend', label: 'Frontend',     dot: 'bg-[#0071e3]' },
-  { id: 'ov-backend',  label: 'Backend',      dot: 'bg-amber-500' },
-  { id: 'ov-mit',      label: 'MIT',          dot: 'bg-emerald-500' },
-  { id: 'ov-supabase', label: 'Supabase',     dot: 'bg-sky-500' },
-  { id: 'ov-t4',       label: 'T4-STANDARD',  dot: 'bg-[#6e6e73]' },
-] as const;
+  { id: 'ov-hero',     labelTH: 'ภาพรวม',     labelEN: 'Overview',    dot: 'bg-[#6e6e73]' },
+  { id: 'ov-frontend', labelTH: 'Frontend',    labelEN: 'Frontend',    dot: 'bg-[#0071e3]' },
+  { id: 'ov-backend',  labelTH: 'Backend',     labelEN: 'Backend',     dot: 'bg-amber-500' },
+  { id: 'ov-mit',      labelTH: 'MIT',         labelEN: 'MIT',         dot: 'bg-emerald-500' },
+  { id: 'ov-supabase', labelTH: 'Supabase',    labelEN: 'Supabase',    dot: 'bg-sky-500' },
+  { id: 'ov-t4',       labelTH: 'T4-STANDARD', labelEN: 'T4-STANDARD', dot: 'bg-[#6e6e73]' },
+];
 
 function scrollToSection(id: string) {
   const el = document.getElementById(id);
@@ -919,6 +944,7 @@ function Sidebar({
   search,
   setSearch,
   navigate,
+  setLang,
   close,
 }: {
   mdFiles: MdFile[];
@@ -926,8 +952,10 @@ function Sidebar({
   search: string;
   setSearch: (s: string) => void;
   navigate: (v: ViewState) => void;
+  setLang: (l: Lang) => void;
   close?: () => void;
 }) {
+  const lang = useLang();
   const [activeSection, setActiveSection] = useState('ov-hero');
 
   useEffect(() => {
@@ -967,13 +995,11 @@ function Sidebar({
     return result;
   }, [categories, search]);
 
-  const activeFile = view.type === 'doc' ? view.file : null;
-  const activeGH = view.type.startsWith('gh-') ? view.type : null;
-
   function navItem(label: string, v: ViewState, icon: React.ReactNode, prominent?: boolean) {
     const isActive = (() => {
       if (v.type === 'overview') return view.type === 'overview';
       if (v.type === 'techstack') return view.type === 'techstack';
+      if (v.type === 'simulations') return view.type === 'simulations';
       if (v.type === 'gh-issues') return view.type === 'gh-issues' || view.type === 'gh-issue';
       if (v.type === 'gh-pulls') return view.type === 'gh-pulls' || view.type === 'gh-pull';
       if (v.type === 'gh-branches') return view.type === 'gh-branches';
@@ -1019,12 +1045,26 @@ function Sidebar({
     <nav className="h-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-5 pb-4 border-b border-black/[0.08] shrink-0">
-        <Link href="/" className="flex items-center gap-2.5 text-[#6e6e73] hover:text-[#1d1d1f] transition-colors mb-4">
-          <ArrowLeft size={14} />
-          <span className="text-[13px]">กลับสู่แอป</span>
-        </Link>
-        <p className="text-[16px] font-semibold text-[#1d1d1f]">เอกสาร & ประวัติ</p>
-        <p className="text-[12px] text-[#6e6e73] mt-0.5">MangaDock Engineering Hub</p>
+        <div className="flex items-start justify-between gap-2 mb-0.5">
+          <p className="text-[16px] font-semibold text-[#1d1d1f] leading-snug">{lang === 'th' ? 'เอกสาร & ประวัติ' : 'Docs & History'}</p>
+          {/* Language toggle */}
+          <div className="flex items-center shrink-0 rounded-lg border border-black/[0.08] overflow-hidden mt-0.5">
+            {(['th', 'en'] as const).map(l => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                className={`px-2.5 py-1 text-[11px] font-mono font-semibold uppercase transition-colors ${
+                  lang === l
+                    ? 'bg-[#0071e3] text-white'
+                    : 'text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/[0.04]'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-[12px] text-[#6e6e73]">MangaDock Engineering Hub</p>
       </div>
 
       {/* Search */}
@@ -1033,7 +1073,8 @@ function Sidebar({
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#86868b]" />
           <input
             type="search"
-            placeholder="ค้นหาเอกสาร..."
+            placeholder={lang === 'th' ? 'ค้นหาเอกสาร...' : 'Search docs...'}
+            aria-label={lang === 'th' ? 'ค้นหาเอกสาร' : 'Search documentation'}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-8 pr-3 py-2 rounded-lg bg-white border border-black/[0.12] text-[13px] text-[#1d1d1f] placeholder:text-[#86868b] outline-none focus:ring-1 focus:ring-[#0071e3]/30 focus:border-[#0071e3]/40 transition-all"
@@ -1046,7 +1087,7 @@ function Sidebar({
 
         {/* Overview + Tech Stack */}
         <div className="pt-1 space-y-0.5">
-          {navItem('ภาพรวมระบบ', { type: 'overview' }, <LayoutDashboard size={13} className="shrink-0" />, true)}
+          {navItem(lang === 'th' ? 'ภาพรวมระบบ' : 'System Overview', { type: 'overview' }, <LayoutDashboard size={13} className="shrink-0" />, true)}
           {view.type === 'overview' && (
             <div className="ml-[22px] mt-0.5 pl-3 border-l border-black/[0.08] space-y-0.5">
               {OV_SECTIONS.map(s => (
@@ -1060,12 +1101,13 @@ function Sidebar({
                   }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 transition-opacity ${s.dot} ${activeSection === s.id ? 'opacity-100' : 'opacity-40'}`} />
-                  {s.label}
+                  {lang === 'th' ? s.labelTH : s.labelEN}
                 </button>
               ))}
             </div>
           )}
           {navItem('Tech Stack', { type: 'techstack' }, <Cpu size={13} className="shrink-0" />)}
+          {navItem('Simulations', { type: 'simulations' }, <Zap size={13} className="shrink-0" />)}
         </div>
 
         {/* Document sections */}
@@ -1093,7 +1135,7 @@ function Sidebar({
           <div className="space-y-0.5">
             {navItem('Issues', { type: 'gh-issues', state: 'open', page: 1 }, <AlertCircle size={13} className="shrink-0" />)}
             {navItem('Pull Requests', { type: 'gh-pulls', state: 'all', page: 1 }, <GitPullRequest size={13} className="shrink-0" />)}
-            {navItem('สาขา (Branches)', { type: 'gh-branches' }, <GitBranch size={13} className="shrink-0" />)}
+            {navItem(lang === 'th' ? 'สาขา (Branches)' : 'Branches', { type: 'gh-branches' }, <GitBranch size={13} className="shrink-0" />)}
           </div>
         </div>
 
@@ -1130,6 +1172,7 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
   const [view, setView] = useState<ViewState>({ type: 'overview' });
   const [search, setSearch] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [lang, setLang] = useState<Lang>('th');
 
   const navigate = useCallback((v: ViewState) => {
     setView(v);
@@ -1143,9 +1186,11 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
   function renderContent() {
     switch (view.type) {
       case 'overview':
-        return <OverviewView />;
+        return <OverviewView onOpenSimulations={() => navigate({ type: 'simulations' })} />;
       case 'techstack':
         return <TechStackView />;
+      case 'simulations':
+        return null;
       case 'doc':
         return (
           <DocView
@@ -1192,6 +1237,7 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
   }
 
   return (
+    <LangContext.Provider value={lang}>
     <div className="h-screen bg-white text-[#1d1d1f] flex flex-col overflow-hidden">
 
       {/* Mobile header */}
@@ -1199,13 +1245,13 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label={mobileOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
+            aria-label={mobileOpen ? (lang === 'th' ? 'ปิดเมนู' : 'Close menu') : (lang === 'th' ? 'เปิดเมนู' : 'Open menu')}
             aria-expanded={mobileOpen}
             className="p-2 rounded-lg text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/[0.06] transition-all"
           >
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
-          <span className="text-[15px] font-semibold text-[#1d1d1f]">เอกสาร</span>
+          <span className="text-[15px] font-semibold text-[#1d1d1f]">{lang === 'th' ? 'เอกสาร' : 'Docs'}</span>
         </div>
         <a
           href="https://github.com/Slow-Inc/MangaDock"
@@ -1228,6 +1274,7 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
             search={search}
             setSearch={setSearch}
             navigate={navigate}
+            setLang={setLang}
           />
         </aside>
 
@@ -1245,6 +1292,7 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
                 search={search}
                 setSearch={setSearch}
                 navigate={navigate}
+                setLang={setLang}
                 close={() => setMobileOpen(false)}
               />
             </aside>
@@ -1252,23 +1300,41 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
         )}
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto bg-white" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
-          <div className="max-w-[760px] mx-auto px-6 md:px-12 py-10">
+        {view.type === 'simulations' ? (
+          <main className="flex-1 overflow-hidden bg-white">
             <AnimatePresence mode="wait">
               <motion.div
-                key={viewKey(view)}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+                key="simulations"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+                className="h-full"
               >
-                {renderContent()}
+                <SimulationsView />
               </motion.div>
             </AnimatePresence>
-          </div>
-        </main>
+          </main>
+        ) : (
+          <main className="flex-1 overflow-y-auto bg-white" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+            <div className="max-w-[760px] mx-auto px-6 md:px-12 py-10">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={viewKey(view)}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+                >
+                  {renderContent()}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </main>
+        )}
 
       </div>
     </div>
+    </LangContext.Provider>
   );
 }

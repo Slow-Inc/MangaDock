@@ -206,9 +206,9 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
           </div>
           <div className="absolute inset-x-0 bottom-0 h-2/5 bg-linear-to-t from-black/90 via-black/50 to-transparent" />
           <div className={`absolute inset-x-0 bottom-0 p-5 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-            <h1 className="text-2xl font-black leading-tight text-white drop-shadow-lg">{titleMain}</h1>
+            <h1 className="text-2xl font-black leading-tight text-white text-balance drop-shadow-lg">{titleMain}</h1>
             {titleSub && (
-              <p className="mt-1 text-sm font-semibold uppercase tracking-wider text-white/80 drop-shadow-lg">
+              <p className="mt-1 text-sm font-semibold tracking-wide text-white/75 drop-shadow-lg">
                 {titleSub}
               </p>
             )}
@@ -274,12 +274,12 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
 
           {/* Info */}
           <div className={`flex min-w-0 flex-1 flex-col justify-center overflow-hidden py-4 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-            <p className="mb-3 text-xs font-semibold tracking-[0.32em] text-red-400">Top 10 หนังสือที่น่าอ่านวันนี้</p>
-            <h1 className="text-4xl font-black uppercase leading-tight text-white lg:text-5xl xl:text-6xl">
+            <p className="mb-3 text-xs font-semibold tracking-[0.32em] text-amber-400">Top 10 หนังสือที่น่าอ่านวันนี้</p>
+            <h1 className="text-4xl font-black uppercase leading-tight text-white text-balance lg:text-5xl xl:text-6xl">
               {titleMain}
             </h1>
             {titleSub && (
-              <p className="mt-2 text-lg font-semibold uppercase tracking-[0.16em] text-white/80 lg:text-xl">
+              <p className="mt-2 text-lg font-semibold tracking-[0.08em] text-white/70 lg:text-xl">
                 {titleSub}
               </p>
             )}

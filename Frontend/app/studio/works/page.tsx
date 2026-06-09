@@ -76,7 +76,8 @@ function CoverImage({ src, alt, className, fallbackClass, fallbackSize }: { src:
     img.src = src;
   }, [src]);
   if (failed) return <div className={`flex items-center justify-center ${fallbackClass}`}><span className={fallbackSize}>📖</span></div>;
-  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setFailed(true)} />;
 }
 
 function MangaListCard({ group }: { group: MangaGroup }) {
