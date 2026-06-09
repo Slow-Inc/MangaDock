@@ -252,14 +252,8 @@ function CoverImage({ src, alt, className }: {
     return <div className="flex h-full w-full items-center justify-center"><span className="text-2xl">📖</span></div>;
   }
 
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className={className}
-      onError={() => setFailed(true)}
-    />
-  );
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setFailed(true)} />;
 }
 
 export default function MangaDetailPage() {
@@ -323,7 +317,7 @@ export default function MangaDetailPage() {
       try {
         setAllVersions(JSON.parse(cached));
         setLoadingVersions(false);
-      } catch (e) {
+      } catch {
         setLoadingVersions(true);
       }
     } else {

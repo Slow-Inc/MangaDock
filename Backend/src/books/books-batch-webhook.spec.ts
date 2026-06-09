@@ -113,7 +113,7 @@ describe('BooksService — batch webhook pipeline', () => {
   // Cycle 5 — #74: coords are normalized by image dimensions
   it('normalizes patch coordinates to fractions using imgWidth and imgHeight', async () => {
     const { service, cache } = makeService();
-    const jobKey = 'ch5:ANY:THA';
+    const jobKey = 'ch5:ANY:THA:default:hd';
     (service as any).activeBatchJobs.set(jobKey, {
       completedPages: new Map(),
       processingPages: new Set(),
@@ -137,7 +137,7 @@ describe('BooksService — batch webhook pipeline', () => {
   // Cycle 6 — #74: imgWidth or imgHeight = 0 → no NaN
   it('clamps coordinates to 0 when imgWidth or imgHeight is 0', async () => {
     const { service, cache } = makeService();
-    const jobKey = 'ch6:ANY:THA';
+    const jobKey = 'ch6:ANY:THA:default:hd';
     (service as any).activeBatchJobs.set(jobKey, {
       completedPages: new Map(),
       processingPages: new Set(),
@@ -164,7 +164,7 @@ describe('BooksService — batch webhook pipeline', () => {
   // Cycle 7 — #74: patch URL includes backendOrigin
   it('builds patch URL with backendOrigin prefix', async () => {
     const { service, cache } = makeService();
-    const jobKey = 'ch7:ANY:THA';
+    const jobKey = 'ch7:ANY:THA:default:hd';
     (service as any).activeBatchJobs.set(jobKey, {
       completedPages: new Map(),
       processingPages: new Set(),
@@ -188,7 +188,7 @@ describe('BooksService — batch webhook pipeline', () => {
   // Cycle 8 — #76: duplicate concurrent webhooks → exactly one storage.put()
   it('processes a duplicate webhook for the same pageIndex exactly once', async () => {
     const { service, storage } = makeService();
-    const jobKey = 'ch8:ANY:THA';
+    const jobKey = 'ch8:ANY:THA:default:hd';
     const resolveFn = jest.fn();
     (service as any).activeBatchJobs.set(jobKey, {
       completedPages: new Map(),
@@ -213,7 +213,7 @@ describe('BooksService — batch webhook pipeline', () => {
   // Cycle 9 — #76: listener notified exactly once even with duplicate webhook
   it('notifies listener exactly once per pageIndex even with duplicate webhooks', async () => {
     const { service } = makeService();
-    const jobKey = 'ch9:ANY:THA';
+    const jobKey = 'ch9:ANY:THA:default:hd';
     const listener = jest.fn();
     (service as any).activeBatchJobs.set(jobKey, {
       completedPages: new Map(),
@@ -379,7 +379,7 @@ describe('BooksService — batch webhook pipeline', () => {
   // Cycle — #90 S3: img_b64 size limit prevents OOM from oversized blob
   it('skips patch and does not call storage.put when img_b64 exceeds size limit', async () => {
     const { service, storage, cache } = makeService();
-    const jobKey = 'ch1:ANY:THA';
+    const jobKey = 'ch1:ANY:THA:default:hd';
     seedJob(service, jobKey);
 
     const oversizedB64 = 'A'.repeat(5_000_001); // > 5 MB encoded
@@ -394,7 +394,7 @@ describe('BooksService — batch webhook pipeline', () => {
 
   it('still processes remaining patches when one patch exceeds size limit', async () => {
     const { service, storage, cache } = makeService();
-    const jobKey = 'ch1:ANY:THA';
+    const jobKey = 'ch1:ANY:THA:default:hd';
     seedJob(service, jobKey, { expectedCount: 1 });
 
     const oversizedB64 = 'A'.repeat(5_000_001);
@@ -412,5 +412,49 @@ describe('BooksService — batch webhook pipeline', () => {
     );
 
     expect(storage.put).toHaveBeenCalledTimes(1); // only the valid patch
+  });
+
+  // 2026-06-06 incident: an all-error batch (dead MIT worker) logged
+  // "fully completed via webhooks" — the completion summary must report page errors.
+  it('logs a truthful summary when the job completes with page errors', async () => {
+    const { service } = makeService();
+    const jobKey = 'ch-err:ANY:THA:default:hd';
+    const job = seedJob(service, jobKey, { expectedCount: 2 });
+    const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+    const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => {});
+
+    await service.handleMitCallback(jobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+    await service.handleMitCallback(
+      jobKey, 1,
+      { imgWidth: 0, imgHeight: 0, patches: [] },
+      'Translation service is starting up, please wait a moment and try again.',
+    );
+
+    expect(job.resolve).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('1/2 page errors'));
+    expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining('fully completed'));
+  });
+
+  it('keeps the "fully completed" log when every page succeeds', async () => {
+    const { service } = makeService();
+    const jobKey = 'ch-ok:ANY:THA:default:hd';
+    const job = seedJob(service, jobKey, { expectedCount: 1 });
+    const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+    const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => {});
+
+    await service.handleMitCallback(
+      jobKey,
+      0,
+      { imgWidth: 800, imgHeight: 1200, patches: [] },
+      undefined,
+    );
+
+    expect(job.resolve).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('fully completed'),
+    );
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('page errors'),
+    );
   });
 });

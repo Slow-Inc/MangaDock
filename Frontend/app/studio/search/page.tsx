@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
-import { searchBooks, StudioBook, getBookCoverUrl } from "../../lib/studioApi";
+import { searchBooks, StudioBook } from "../../lib/studioApi";
 import { resolvedThumbnail } from "../../lib/imgUrl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalLenis } from "../../hooks/useLocalLenis";
@@ -212,9 +212,11 @@ function SearchContent() {
               >
                 <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-xl bg-white/8 border border-white/8">
                   {book.thumbnail ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={resolvedThumbnail(book as any)}
                       alt={book.title}
+                      loading="lazy"
                       className="h-full w-full object-cover"
                     />
                   ) : (

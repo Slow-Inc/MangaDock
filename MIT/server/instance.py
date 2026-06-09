@@ -18,8 +18,8 @@ class ExecutorInstance(BaseModel):
     async def sent(self, image: Image, config: Config):
         return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate", image, config)
 
-    async def sent_patches(self, image: Image, config: Config):
-        return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate_patches", image, config)
+    async def sent_patches(self, image: Image, config: Config, progress_meta: dict | None = None):
+        return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate_patches", image, config, progress_meta=progress_meta)
 
     async def sent_stream(self, image: Image, config: Config, sender: NotifyType):
         await fetch_data_stream("http://"+self.ip+":"+str(self.port)+"/execute/translate", image, config, sender)

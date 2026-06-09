@@ -6,13 +6,12 @@ are unit-testable without importing the ML stack — same rationale as
 translation pipeline) sits behind ``_translate_page``, whose imports are
 deferred to call time.
 """
-import base64
-
 from server.cancellation import is_cancelled, discard
+from server.patch_payload import normalize_patch_result
 from server.webhook import send_webhook
 
 
-async def _translate_page(config_str: str, img_bytes: bytes) -> dict:
+async def _translate_page(config_str: str, img_bytes: bytes, progress_meta: dict | None = None) -> dict:
     """Run a single page through the translation pipeline.
 
     Heavy imports are deferred so importing this module stays fast for tests.
@@ -27,7 +26,7 @@ async def _translate_page(config_str: str, img_bytes: bytes) -> dict:
             return False
 
     page_conf = Config.parse_raw(config_str)
-    return await get_patch_ctx(DummyRequest(), page_conf, img_bytes)
+    return await get_patch_ctx(DummyRequest(), page_conf, img_bytes, progress_meta=progress_meta)
 
 
 async def run_batch_with_callbacks(
@@ -57,23 +56,25 @@ async def run_batch_with_callbacks(
                 print(f"[batch] task {taskId} cancelled - stopping before page {page_idx}")
                 break
             try:
-                patch_result = await _translate_page(config_str, img_bytes)
-                patches_out = []
-                for patch in patch_result.get("patches", []):
-                    png_bytes = patch.get("img_png", b"")
-                    patches_out.append({
-                        "x": patch.get("x", 0),
-                        "y": patch.get("y", 0),
-                        "w": patch.get("w", 0),
-                        "h": patch.get("h", 0),
-                        "img_b64": base64.b64encode(png_bytes).decode("utf-8"),
-                    })
+                # The worker forwards live pipeline-stage events for this page
+                # straight to the Backend webhook (UX) — see server.webhook.
+                progress_meta = {
+                    "url": callback_url,
+                    "secret": callback_secret,
+                    "taskId": taskId,
+                    "pageIndex": page_idx,
+                }
+                patch_result = await _translate_page(config_str, img_bytes, progress_meta)
+                normalized = normalize_patch_result(patch_result)
                 payload = {
                     "taskId": taskId,
                     "pageIndex": page_idx,
-                    "imgWidth": patch_result.get("img_width", 0),
-                    "imgHeight": patch_result.get("img_height", 0),
-                    "patches": patches_out,
+                    "imgWidth": normalized["img_width"],
+                    "imgHeight": normalized["img_height"],
+                    "patches": normalized["patches"],
+                    # Text layer (#158): what this page said — the enabler for
+                    # rolling context (#159) and translation memory (#160).
+                    "regions": normalized["regions"],
                     "error": None,
                 }
             except Exception as exc:

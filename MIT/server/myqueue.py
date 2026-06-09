@@ -15,11 +15,14 @@ class QueueElement:
     config: Config
     task_type: str
 
-    def __init__(self, req: Request, image: Image.Image, config: Config, length, task_type: str = "translate"):
+    def __init__(self, req: Request, image: Image.Image, config: Config, length, task_type: str = "translate", progress_meta: dict | None = None):
         self.req = req
         self.image = image
         self.config = config
         self.task_type = task_type
+        # Optional {url, secret, taskId, pageIndex} — the worker forwards live
+        # pipeline-stage events to this webhook while translating (UX).
+        self.progress_meta = progress_meta
 
     async def is_client_disconnected(self) -> bool:
         if await self.req.is_disconnected():
@@ -84,7 +87,7 @@ async def wait_in_queue(task: QueueElement, notify: NotifyType):
                     await instance.sent_stream(task.image, task.config, notify)
                 else:
                     if task.task_type == "translate_patches":
-                        result = await instance.sent_patches(task.image, task.config)
+                        result = await instance.sent_patches(task.image, task.config, task.progress_meta)
                     else:
                         result = await instance.sent(task.image, task.config)
 

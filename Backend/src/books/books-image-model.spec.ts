@@ -62,7 +62,9 @@ describe('BooksService — per-request image translation model (#87)', () => {
     const [keyWithModel] = cache.get.mock.calls[0];
     const [keyDefault] = cache.get.mock.calls[1];
     expect(keyWithModel).toContain(':gemini-2.5-pro');
-    expect(keyWithModel).toContain(':v4:');
+    // v6: series context changes translations (#157) — context-aware and
+    // context-free patches must never mix.
+    expect(keyWithModel).toContain(':v6:');
     expect(keyDefault).not.toBe(keyWithModel);
   });
 
@@ -71,6 +73,49 @@ describe('BooksService — per-request image translation model (#87)', () => {
     const defaultKey = (service as any).buildJobKey('ch1', 'ja', 'th');
     const modelKey = (service as any).buildJobKey('ch1', 'ja', 'th', 'gemini-2.5-pro');
     expect(modelKey).not.toBe(defaultKey);
+  });
+
+  // #156: patches generated from one display derivative (HD vs Data Saver)
+  // must never be served over the other — keys partition by derivative.
+  it('partitions jobKey and patch cache key by derivative, defaulting to hd', () => {
+    const { service } = makeService();
+    const hdJob = (service as any).buildJobKey('ch1', 'ja', 'th');
+    const saverJob = (service as any).buildJobKey('ch1', 'ja', 'th', undefined, 'saver');
+    expect(saverJob).not.toBe(hdJob);
+
+    const hdKey = (service as any).patchCacheKey('ch1', 0, 'JPN', 'THA', undefined, 'hd');
+    const defaultKey = (service as any).patchCacheKey('ch1', 0, 'JPN', 'THA');
+    const saverKey = (service as any).patchCacheKey('ch1', 0, 'JPN', 'THA', undefined, 'saver');
+    expect(defaultKey).toBe(hdKey);
+    expect(saverKey).not.toBe(hdKey);
+  });
+
+  // Same consistency trap as the v3/v4 incident above, for the derivative
+  // segment: the webhook path re-derives the cache key from the jobKey.
+  it('caches webhook results for a saver job under the saver cache key', async () => {
+    const { service, cache } = makeService();
+    const jobKey = (service as any).buildJobKey('ch1', 'ja', 'th', undefined, 'saver');
+    (service as any).activeBatchJobs.set(jobKey, {
+      completedPages: new Map(),
+      processingPages: new Set(),
+      listeners: new Set(),
+      activeCallerCount: 1,
+      expectedCount: 1,
+      resolve: jest.fn(),
+      reject: jest.fn(),
+      cancelController: new AbortController(),
+    });
+
+    await service.handleMitCallback(jobKey, 0, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [{ x: 1, y: 2, w: 3, h: 4, img_b64: Buffer.from('png').toString('base64') }],
+    });
+
+    const { srcMIT, tgtMIT } = (service as any).mitLangPair('ja', 'th');
+    const expectedKey = (service as any).patchCacheKey('ch1', 0, srcMIT, tgtMIT, undefined, 'saver');
+    const writtenKeys = cache.set.mock.calls.map((c: unknown[]) => c[0]);
+    expect(writtenKeys).toContain(expectedKey);
   });
 
   // Found live (e2e 2026-06-05): the webhook path cached under the old v3 key

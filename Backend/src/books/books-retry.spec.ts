@@ -58,7 +58,7 @@ describe('BooksService — retry fallback (#82)', () => {
 
     expect(patchesSpy).toHaveBeenCalledWith(
       'ch2', 0, 'http://example.com/0.jpg', undefined, undefined,
-      { maxStartupRetries: 3, imageModel: undefined },
+      { maxStartupRetries: 3, imageModel: undefined, derivative: 'hd' },
     );
   });
 });

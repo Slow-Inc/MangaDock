@@ -20,8 +20,10 @@ async def fetch_data_stream(url, image: Image, config: Config, sender: NotifyTyp
             else:
                 raise HTTPException(response.status, detail=await response.text())
 
-async def fetch_data(url, image: Image, config: Config, headers: Mapping[str, str] = {}):
+async def fetch_data(url, image: Image, config: Config, headers: Mapping[str, str] = {}, progress_meta: dict | None = None):
     attributes = {"image": image, "config": config}
+    if progress_meta:
+        attributes["progress_meta"] = progress_meta
     data = pickle.dumps(attributes)
 
     async with aiohttp.ClientSession() as session:

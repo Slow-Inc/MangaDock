@@ -8,6 +8,9 @@ from tqdm import tqdm
 
 # from .ballon_extractor import extract_ballon_region
 from . import text_render
+from ..font_fit import fit_font_size, font_high_cap
+from ..bubble_association import balloon_occupancy
+from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
 from ..utils import (
@@ -45,7 +48,67 @@ def count_text_length(text: str) -> float:
             length += 1.0
     return length
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int):  
+# #175 sizing safety: text was rendering too big and clipping at the balloon
+# edge. _LINE_HEIGHT approximates real per-line height (ascent+descent ≈ 1.2×
+# font) so the vertical fit isn't under-estimated; _FIT_MARGIN fits to 92% of the
+# box so rounding/glyph slack can't touch the edge; _MAX_FONT_BOX_RATIO caps the
+# font at half the box height so a short line in a big balloon isn't a giant.
+_LINE_HEIGHT = 1.2
+_FIT_MARGIN = 0.92
+_MAX_FONT_BOX_RATIO = 0.5
+
+
+def _bubble_fit_font_size(region, bubble_wh, max_box_ratio: float = _MAX_FONT_BOX_RATIO) -> int:
+    """#166/#175: largest font whose wrapped translation fits the balloon box,
+    measured with the renderer's own wrapper so the prediction matches the actual
+    render — with a real line-height estimate, a fit margin, and a relative cap so
+    the text fills the balloon without overflowing it. Render-parity C: a higher
+    ``max_box_ratio`` lets short lines fill a tall balloon (MangaTranslator has no
+    cap); the default reproduces the #175 0.5 cap byte-for-byte."""
+    w_box, h_box = bubble_wh
+    lang = getattr(region, 'target_lang', 'en_US')
+    text = region.translation
+
+    # Wrap to the *margin'd* width so the lines calc_horizontal produces are
+    # never wider than the fit-test (which compares against w_box * margin) —
+    # otherwise every size fails the margin check and the search floors at `low`
+    # (#175 self-bug).
+    mw, mh = int(w_box * _FIT_MARGIN), int(h_box * _FIT_MARGIN)
+
+    def measure(size):
+        lines, widths = text_render.calc_horizontal(
+            size, text, max_width=mw, max_height=mh, language=lang)
+        # Empty widths means nothing measurable wrapped — treat as "does not fit"
+        # so the search floors at `low` instead of picking the max font (#bug-hunt).
+        block_w = max(widths) if widths else float('inf')
+        block_h = len(lines) * size * _LINE_HEIGHT
+        return block_w, block_h
+
+    high = font_high_cap(h_box, max_box_ratio, floor=8)
+    return fit_font_size((w_box, h_box), measure, low=8, high=high, margin=_FIT_MARGIN)
+
+
+def _bubble_interior_box(region, bubble_box, crop_shape):
+    """#179: the safe-interior box + anchor for narrow-column wrapping.
+
+    When the balloon polygon is carried (#170 → crop coords), rasterize it and
+    measure the distance-transform safe interior so English wraps to the bubble's
+    true (narrow) shape, not its bounding box. Falls back to the centered bounding
+    box when no polygon is present (== pre-#179 behaviour)."""
+    bx1, by1, bx2, by2 = bubble_box
+    poly = getattr(region, 'bubble_polygon', None)
+    if poly:
+        h, w = crop_shape[:2]
+        mask = np.zeros((h, w), dtype=np.uint8)
+        pts = np.array([[int(round(px)), int(round(py))] for px, py in poly], dtype=np.int32)
+        cv2.fillPoly(mask, [pts], 1)
+        iw, ih, anchor = safe_area_box(mask)
+        if iw > 1 and ih > 1:
+            return iw, ih, anchor
+    return int(bx2 - bx1), int(by2 - by1), ((bx1 + bx2) / 2.0, (by1 + by2) / 2.0)
+
+
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -66,11 +129,36 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
     # logger.debug(f'font_size_minimum {font_size_minimum}')  
     font_size_minimum = max(1, font_size_minimum)  
 
-    dst_points_list = []  
-    for region in text_regions: 
-    
+    # #166: a fitted region is rendered into its *whole* balloon, so only the
+    # sole occupant of a balloon may be fitted — two regions sharing one balloon
+    # would otherwise stack on the same rect.
+    occupancy = (balloon_occupancy([getattr(r, 'bubble_box', None) for r in text_regions])
+                 if bubble_fit else None)
+
+    dst_points_list = []
+    for i, region in enumerate(text_regions):
+
+        # #166 binary-search fit: when this region is the sole occupant of a known
+        # balloon, size the font to fill the balloon box and render into that box.
+        # This is the final word — it bypasses the length-ratio heuristic below so
+        # the fitted size is never re-inflated past the balloon it was just fit to.
+        # Only for horizontal targets (the wrapper measures horizontally); vertical,
+        # balloon-less, and balloon-sharing regions fall through to legacy unchanged.
+        bubble_box = getattr(region, 'bubble_box', None) if bubble_fit else None
+        if (bubble_box is not None and region.horizontal and occupancy[i] == 1
+                and region.translation and region.translation.strip()):
+            # #179: wrap to the balloon's safe *interior* (narrow column) centered
+            # on the safe anchor, not the full bounding box.
+            fit_w, fit_h, (acx, acy) = _bubble_interior_box(region, bubble_box, img.shape)
+            region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), font_max_box_ratio)
+            hw, hh = fit_w / 2.0, fit_h / 2.0
+            dst_points_list.append(
+                np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
+                           [acx + hw, acy + hh], [acx - hw, acy + hh]]], dtype=np.int64))
+            continue
+
         # Store and validate original font size
-        original_region_font_size = region.font_size  
+        original_region_font_size = region.font_size
         if original_region_font_size <= 0:  
             # logger.warning(f"Invalid original font size ({original_region_font_size}) for text '{region.translation}'. Using default value {font_size_minimum}.")  
             original_region_font_size = font_size_minimum
@@ -102,9 +190,9 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 language=getattr(region, "target_lang", "en_US")
             )
             needed_rows = len(line_text_list)
-            # logger.debug(f"Needed rows: {needed_rows}")                
+            # logger.debug(f"Needed rows: {needed_rows}")
 
-            if needed_rows > used_rows:
+            if needed_rows > used_rows and used_rows > 0:  # used_rows>0 guards /0 on empty texts
                 scale_x = ((needed_rows - used_rows) / used_rows) * 1 + 1
                 try:  
                     poly = Polygon(region.unrotated_min_rect[0])
@@ -136,8 +224,8 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 max_height=region.unrotated_size[1],
             )
             needed_cols = len(line_text_list)
-            # logger.debug(f"Needed columns: {needed_cols}") 
-            if needed_cols > used_cols:
+            # logger.debug(f"Needed columns: {needed_cols}")
+            if needed_cols > used_cols and used_cols > 0:  # used_cols>0 guards /0 on empty texts
                 scale_x = ((needed_cols - used_cols) / used_cols) * 1 + 1
                 try:  
                     poly = Polygon(region.unrotated_min_rect[0])
@@ -226,8 +314,17 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             else:
                 dst_points = region.min_rect
 
+        # #183: when render parity is on, clamp the legacy dst to image bounds so
+        # text may exceed the detection box but never render off the page (the
+        # commented-out clip let off-canvas text be silently dropped, #bug-hunt).
+        # bubble_fit off → unchanged (byte-identical).
+        if bubble_fit and isinstance(dst_points, np.ndarray):
+            dst_points = np.clip(
+                dst_points, np.array([0, 0]),
+                np.array([img.shape[1] - 1, img.shape[0] - 1]))
+
         # Store results and update font size
-        dst_points_list.append(dst_points)  
+        dst_points_list.append(dst_points)
         region.font_size = int(target_font_size)
 
     return dst_points_list
@@ -242,14 +339,17 @@ async def dispatch(
     hyphenate: bool = True,
     render_mask: np.ndarray = None,
     line_spacing: int = None,
-    disable_font_border: bool = False
+    disable_font_border: bool = False,
+    bubble_fit: bool = False,
+    supersampling: int = 1,
+    font_max_box_ratio: float = _MAX_FONT_BOX_RATIO
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
     # Resize regions that are too small
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio)
 
     # TODO: Maybe remove intersections
 
@@ -258,7 +358,7 @@ async def dispatch(
         if render_mask is not None:
             # set render_mask to 1 for the region that is inside dst_points
             cv2.fillConvexPoly(render_mask, dst_points.astype(np.int32), 1)
-        img = render(img, region, dst_points, hyphenate, line_spacing, disable_font_border)
+        img = render(img, region, dst_points, hyphenate, line_spacing, disable_font_border, supersampling)
     return img
 
 def render(
@@ -267,8 +367,12 @@ def render(
     dst_points,
     hyphenate,
     line_spacing,
-    disable_font_border
+    disable_font_border,
+    supersampling: int = 1
 ):
+    # #181: render the text canvas at `ss`× then downscale → crisp glyphs +
+    # controlled weight (ss=1 → byte-identical).
+    ss = max(1, int(supersampling))
     fg, bg = region.get_font_colors()
     fg, bg = fg_bg_compare(fg, bg)
 
@@ -296,10 +400,10 @@ def render(
 
     if render_horizontally:
         temp_box = text_render.put_text_horizontal(
-            region.font_size,
+            region.font_size * ss,
             region.get_translation_for_rendering(),
-            round(norm_h[0]),
-            round(norm_v[0]),
+            round(norm_h[0] * ss),
+            round(norm_v[0] * ss),
             region.alignment,
             region.direction == 'hl',
             fg,
@@ -310,13 +414,19 @@ def render(
         )
     else:
         temp_box = text_render.put_text_vertical(
-            region.font_size,
+            region.font_size * ss,
             region.get_translation_for_rendering(),
-            round(norm_v[0]),
+            round(norm_v[0] * ss),
             region.alignment,
             fg,
             bg,
             line_spacing,
+        )
+    if ss > 1:
+        temp_box = cv2.resize(
+            temp_box,
+            (max(1, temp_box.shape[1] // ss), max(1, temp_box.shape[0] // ss)),
+            interpolation=cv2.INTER_AREA,
         )
     h, w, _ = temp_box.shape
     r_temp = w / h

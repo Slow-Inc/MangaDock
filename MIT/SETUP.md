@@ -42,6 +42,13 @@ Fill in at least:
 
 See `.env.example` for every knob (webhook retry, precision, concurrency).
 
+> **Host memory requirement (local translator):** loading Qwen3.5 needs enough
+> Windows *commit memory* (RAM + pagefile) headroom — keep **≥ 15 GB free**
+> (`Get-CimInstance Win32_OperatingSystem` → `FreeVirtualMemory`). If commit
+> runs out the worker dies mid-load with `OSError 1455 (paging file too small)`
+> and `/ready` answers 503 `workers_unreachable`; close memory-heavy apps
+> (WSL: `wsl --shutdown`) or lower `QWEN3_PRECISION` and restart.
+
 ---
 
 ## 4. Run

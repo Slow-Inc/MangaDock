@@ -4,8 +4,11 @@
 > This document is the map for the ~46,000-LOC codebase: read it before touching MIT so you (human or agent)
 > understand the structure and the request flow without spelunking. Pair it with the root
 > `UBIQUITOUS_LANGUAGE.md`, `CONTEXT.md`, and `Roadmap.md`.
+> For the inside of `manga_translator/` — per-stage pipeline contracts (detect → OCR → merge →
+> translate → inpaint → render) and the exact file-level divergence from upstream — see
+> **`PIPELINE.md`**. Check its §5 provenance table before editing any MIT file.
 
-**Last updated:** 2026-06-05 · **Scope:** server + orchestration + translator subsystem (model internals summarised, not detailed)
+**Last updated:** 2026-06-06 · **Scope:** server + orchestration + translator subsystem (model internals summarised, not detailed)
 
 ---
 
@@ -200,6 +203,42 @@ translators.dispatch(chain, queries, translator_config)   # translators/__init__
   cleans output, merges back. `OfflineTranslator` adds model `load`/`unload`.
 - **Samples** live in `config_gpt.py::_CHAT_SAMPLE` / `_JSON_SAMPLE` (includes Thai). Qwen3 indexes
   `chat_sample[to_lang]` directly; Gemini goes through `_closest_sample_match` (langcodes) — **cache bug #108**.
+
+### 7.1 Context-aware translation (page context) — present but dormant
+
+Upstream ships a rolling-context engine: `MangaTranslator.all_page_translations` accumulates every
+translated page and `_build_prev_context()` (manga_translator.py) renders the last `context_size`
+non-empty pages as a numbered reference block for the prompt. In MangaDock it is effectively OFF,
+for three stacked reasons:
+
+1. **`context_size` defaults to 0** — nothing is injected unless a request opts in.
+2. **Context is wiped per request** (#136): the worker's `MangaTranslator` is a process-lifetime
+   singleton while pages arrive as *independent* pickled requests with no job identity
+   (`sent_patches(image, config)` — no taskId crosses the worker boundary). Accumulating state
+   therefore meant unbounded RAM growth and pages from unrelated jobs/users bleeding into prompts,
+   so `translate_patches` now calls `reset_page_context()` first (guarded by
+   `test/test_page_context.py`). Upstream never hit this: it was built as a single-user CLI that
+   processes one chapter per process, not a multi-tenant server.
+3. **Injection is wired only for `chatgpt` / `chatgpt_2stage`** (`_dispatch_with_context`):
+   MangaDock's actual translators (Gemini, Qwen3) never receive `prev_ctx` even when
+   `context_size > 0`.
+
+The execution path context was *designed for* still exists but is never called:
+`MangaTranslator.translate_batch` + `_concurrent_translate_contexts` translate many pages in one
+call, accumulating context internally (concurrent mode even feeds the *original text* of
+not-yet-translated batch pages as forward context — the proven recipe if forward context is ever
+wanted). MangaDock's `batch_runner` bypasses it with per-page `translate_patches` calls to keep
+per-page webhooks/cancellation (the web-server batch endpoints are broken stubs, #104). The
+injection seam upstream uses is `translator.set_prev_context(prev_ctx)` with the numbered `<|n|>`
+block — reuse it rather than inventing a new prompt format.
+
+The real fix is the **Translation Session** design (#140, open): a per-Batch-Job session owning
+page context, the translator singleton reduced to a stateless engine — context must ride the
+pickle boundary (e.g. a session id inside `config`) because the web server, not the worker, knows
+the taskId. A related quality lever that needs **no** session: GPT-family translators already read
+`chat_system_template` overrides from the per-request `chatgpt_config`
+(`config_gpt.py::_config_get`), so series-level context (title / synopsis / glossary) can be
+injected per request today via the Backend's `buildMitConfig`.
 
 ---
 

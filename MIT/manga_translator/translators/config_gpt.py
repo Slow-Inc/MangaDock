@@ -2,6 +2,7 @@ import re
 from typing import List, Dict
 from omegaconf import OmegaConf
 from .common import VALID_LANGUAGES
+from ..series_context import append_series_context
 from pydantic import BaseModel
 
 # Define the schema for the response
@@ -217,7 +218,13 @@ class ConfigGPT:
 
     @property
     def chat_system_template(self) -> str:
-        return self._config_get('chat_system_template', self._CHAT_SYSTEM_TEMPLATE)
+        # Series context (#157): one append seam for every GPT-family
+        # translator (Qwen3, Gemini, ChatGPT, DeepSeek). Absent → template
+        # returned byte-identical.
+        return append_series_context(
+            self._config_get('chat_system_template', self._CHAT_SYSTEM_TEMPLATE),
+            self._config_get('series_context'),
+        )
 
     @property
     def chat_sample(self) -> Dict[str, List[str]]:

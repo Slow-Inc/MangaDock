@@ -88,3 +88,43 @@ async def send_webhook(url: str, secret: str, payload: dict) -> None:
                 await asyncio.sleep((backoff_ms / 1000.0) * (2 ** attempt))
 
     _dead_letter(payload, f"exhausted {max_retries + 1} attempts; last={last_reason}")
+
+
+# ── Live progress events (UX) ────────────────────────────────────────────────
+# Per-stage updates so the Reader can show what the 20-60s per-page wait is
+# actually doing. Informational fire-and-forget: one attempt, short timeout,
+# never raises — unlike Patch Sets, a lost progress event costs nothing.
+
+_PROGRESS_TIMEOUT_S = 2.0
+
+# Pipeline stages worth showing to a user; bookkeeping states are filtered out.
+_PROGRESS_STAGES = {
+    'detection', 'ocr', 'textline_merge', 'translating',
+    'mask-generation', 'inpainting', 'rendering',
+}
+
+
+async def send_progress(url: str, secret: str, payload: dict) -> None:
+    """POST a signed progress event. Single attempt; all failures swallowed."""
+    data = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if secret:
+        headers["x-mit-signature"] = _sign(secret, data)
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(url, content=data, headers=headers, timeout=_PROGRESS_TIMEOUT_S)
+    except Exception:
+        pass  # informational only — never disturb the translation pipeline
+
+
+def make_progress_hook(meta: dict):
+    """Build a MangaTranslator progress hook that forwards user-facing pipeline
+    stages to the Backend webhook. `meta` = {url, secret, taskId, pageIndex}."""
+    async def hook(state, finished=False):
+        if state in _PROGRESS_STAGES:
+            await send_progress(meta["url"], meta["secret"], {
+                "taskId": meta["taskId"],
+                "pageIndex": meta["pageIndex"],
+                "stage": state,
+            })
+    return hook
