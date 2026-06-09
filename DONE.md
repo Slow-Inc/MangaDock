@@ -1644,3 +1644,16 @@ module locations): test_sfx_merge (merge body moved to detection_postproc.py) an
 grepped manga_translator.py). MIT test baseline is now 18 async-only failures (was 19; one was this stale test).
 Tests: test_detection_postproc.py 2 passed (AABB golden, no-SFX identity short-circuit); full suite 245 passed
 (18 pre-existing async failures, 0 real failures). Next AFK seam: S16 TranslationMemory.
+
+## 2026-06-09 — #187 S16: TranslationMemory (name the cross-page bleed boundary)
+The two cross-page lists (all_page_translations + _original_page_texts) + reset_page_context extracted to
+translation_memory.TranslationMemory (all_page_translations, original_page_texts, reset()). self._translation_
+memory holds them; ~16 direct refs renamed mechanically (lists stay plain lists → append/len/index/slice
+identical); reset_page_context delegates to .reset(). Makes the #136/#140 worker-singleton bleed boundary an
+explicit object (L9). Byte-identical: append sites still caller-driven (L7 asymmetry), reset still only from
+translate_patches (L9), reset rebinds not .clear() verbatim. Updated test_page_context's _bare_translator to the
+new memory location (it set the old attrs directly + reset now delegates). Stack
+(refactor/mit-seam-s16-translation-memory).
+Tests: test_translation_memory.py 4 passed (empty init, appendable, reset clears, reset-rebinds-not-clears);
+context regression (test_page_context/test_series_context) green; full suite 249 passed (18 pre-existing async
+failures, 0 real failures). Next AFK seam (last before core): S19 gather_per_context.

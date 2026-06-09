@@ -28,6 +28,7 @@ from .image_debug_context import ImageDebugContext
 from .pipeline_params import apply_global_settings
 from .model_reaper import ModelReaper
 from .detection_postproc import merge_sfx_detections
+from .translation_memory import TranslationMemory
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -142,8 +143,7 @@ class MangaTranslator:
         self._detector_cleanup_task = None
         self.prep_manual = params.get('prep_manual', None)
         self.context_size = params.get('context_size', 0)
-        self.all_page_translations = []
-        self._original_page_texts = []  # 存储原文页面数据，用于并发模式下的上下文
+        self._translation_memory = TranslationMemory()  # 跨页翻译记忆 / cross-page memory (S16, #136/#140)
 
         # 调试图片管理相关属性
         self._image_debug = ImageDebugContext()  # 图片级调试上下文 / per-image debug context (S11)
@@ -388,12 +388,12 @@ class MangaTranslator:
             # 汇总本页翻译，供下一页做上文
             page_translations = {r.text_raw if hasattr(r, "text_raw") else r.text: r.translation
                                  for r in ctx.text_regions}
-            self.all_page_translations.append(page_translations)
+            self._translation_memory.all_page_translations.append(page_translations)
 
             # 同时保存原文用于并发模式的上下文
             page_original_texts = {i: (r.text_raw if hasattr(r, "text_raw") else r.text)
                                   for i, r in enumerate(ctx.text_regions)}
-            self._original_page_texts.append(page_original_texts)
+            self._translation_memory.original_page_texts.append(page_original_texts)
 
         return ctx
 
@@ -867,7 +867,7 @@ class MangaTranslator:
         index policy now lives in a testable pure function; the two call sites are
         unchanged."""
         return build_prev_context(
-            self.all_page_translations, self._original_page_texts, self.context_size,
+            self._translation_memory.all_page_translations, self._translation_memory.original_page_texts, self.context_size,
             use_original_text=use_original_text,
             current_page_index=current_page_index,
             batch_index=batch_index,
@@ -877,7 +877,7 @@ class MangaTranslator:
     async def _dispatch_with_context(self, config: Config, texts: list[str], ctx: Context):
         # 计算实际要使用的上下文页数和跳过的空页数
         # Calculate the actual number of context pages to use and empty pages to skip
-        done_pages = self.all_page_translations
+        done_pages = self._translation_memory.all_page_translations
         pages_used, skipped = context_page_counts(self.context_size, done_pages)
 
         if self.context_size > 0:
@@ -1367,12 +1367,12 @@ class MangaTranslator:
                 # 汇总本页翻译，供下一页做上文
                 page_translations = {r.text_raw if hasattr(r, "text_raw") else r.text: r.translation
                                      for r in ctx.text_regions}
-                self.all_page_translations.append(page_translations)
+                self._translation_memory.all_page_translations.append(page_translations)
 
                 # 同时保存原文用于并发模式的上下文
                 page_original_texts = {i: (r.text_raw if hasattr(r, "text_raw") else r.text)
                                       for i, r in enumerate(ctx.text_regions)}
-                self._original_page_texts.append(page_original_texts)
+                self._translation_memory.original_page_texts.append(page_original_texts)
 
         # 清理批量处理的图片上下文缓存
         self._image_debug.clear_saved()
@@ -1759,8 +1759,7 @@ class MangaTranslator:
         clean; a per-Batch-Job context seam is tracked as the Translation
         Session design (#140).
         """
-        self.all_page_translations = []
-        self._original_page_texts = []
+        self._translation_memory.reset()
 
     async def translate_patches(self, image: Image.Image, config: Config) -> dict:
         """Translate image and return per-region rendered PNG patches.
@@ -2136,10 +2135,10 @@ class MangaTranslator:
                     batch_original_texts.append(page_texts)
 
                     # 确保 _original_page_texts 有足够的长度
-                    while len(self._original_page_texts) <= len(self.all_page_translations) + i:
-                        self._original_page_texts.append({})
+                    while len(self._translation_memory.original_page_texts) <= len(self._translation_memory.all_page_translations) + i:
+                        self._translation_memory.original_page_texts.append({})
 
-                    self._original_page_texts[len(self.all_page_translations) + i] = page_texts
+                    self._translation_memory.original_page_texts[len(self._translation_memory.all_page_translations) + i] = page_texts
                 else:
                     batch_original_texts.append({})
 
@@ -2248,7 +2247,7 @@ class MangaTranslator:
         tasks = []
         for i, ctx_config_pair in enumerate(contexts_with_configs):
             # 计算当前页面在整个翻译序列中的索引
-            page_index = len(self.all_page_translations) + i
+            page_index = len(self._translation_memory.all_page_translations) + i
             batch_index = i  # 在当前批次中的索引
             ctx_config_pair_with_index = (*ctx_config_pair, page_index, batch_index)
             task = asyncio.create_task(translate_single_context(ctx_config_pair_with_index))
@@ -2311,7 +2310,7 @@ class MangaTranslator:
             # 确定是否使用并发模式和原文上下文
             use_original_text = self.batch_concurrent and self.batch_size > 1
 
-            done_pages = self.all_page_translations
+            done_pages = self._translation_memory.all_page_translations
             pages_used, skipped = context_page_counts(self.context_size, done_pages)
 
             if self.context_size > 0:
