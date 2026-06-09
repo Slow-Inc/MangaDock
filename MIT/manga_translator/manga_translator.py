@@ -26,6 +26,7 @@ from .none_translator import apply_prep_manual_override, stamp_none_translations
 from .translation_store import read_translations, write_translations
 from .image_debug_context import ImageDebugContext
 from .pipeline_params import apply_global_settings
+from .model_reaper import ModelReaper
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -136,6 +137,7 @@ class MangaTranslator:
             empty_cache=torch.cuda.empty_cache,
             cuda_available=torch.cuda.is_available,
         )
+        self._model_reaper = ModelReaper(self._model_usage_tracker, self._model_unloader, lambda: self.models_ttl)
         self._detector_cleanup_task = None
         self.prep_manual = params.get('prep_manual', None)
         self.context_size = params.get('context_size', 0)
@@ -397,7 +399,7 @@ class MangaTranslator:
     async def _translate(self, config: Config, ctx: Context) -> Context:
         # Start the background cleanup job once if not already started.
         if self._detector_cleanup_task is None:
-            self._detector_cleanup_task = asyncio.create_task(self._detector_cleanup_job())
+            self._detector_cleanup_task = self._model_reaper.start()
         # -- Colorization
         if config.colorizer.colorizer != Colorizer.none:
             await self._report_progress('colorizing')
@@ -689,17 +691,6 @@ class MangaTranslator:
     async def _unload_model(self, tool: str, model: str):
         await self._model_unloader.unload(tool, model)
 
-    # Background models cleanup job.
-    async def _detector_cleanup_job(self):
-        while True:
-            if self.models_ttl == 0:
-                await asyncio.sleep(1)
-                continue
-            now = time.time()
-            for tool, model in self._model_usage_tracker.expired(self.models_ttl, now):
-                await self._unload_model(tool, model)
-                self._model_usage_tracker.forget(tool, model)
-            await asyncio.sleep(1)
 
     async def _run_ocr(self, config: Config, ctx: Context):
         current_time = time.time()
@@ -1447,7 +1438,7 @@ class MangaTranslator:
 
         # Start the background cleanup job once if not already started.
         if self._detector_cleanup_task is None:
-            self._detector_cleanup_task = asyncio.create_task(self._detector_cleanup_job())
+            self._detector_cleanup_task = self._model_reaper.start()
 
         # -- Colorization
         if config.colorizer.colorizer != Colorizer.none:
