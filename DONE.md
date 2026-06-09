@@ -1618,3 +1618,16 @@ raise + ordering — the analysis gates it on config-centralisation). Branch ref
 Tests: test_pipeline_params.py 3 passed (model_dir override / absent-or-empty no-op / TF32 flags); full suite
 237 passed (same 19 pre-existing async failures, no new breakage). Next actionable seam: S20 ModelReaper (deps
 S3+S4 done).
+
+## 2026-06-09 — #187 S20 / #188: ModelReaper (TTL loop off the god object)
+_detector_cleanup_job (the background model-TTL polling loop) extracted to
+model_reaper.ModelReaper(tracker, unloader, get_ttl): _loop polls the testable reap_once(now) once/sec; the 2
+task-creation sites now call self._model_reaper.start() behind their existing `is None` guard; the method is
+gone. Wraps the S3 tracker + S4 unloader (both on main). Byte-identical: ttl==0 short-circuit preserved,
+list(...) snapshot (L13) intact via tracker.expired, unload-before-forget order kept; reaper calls
+unloader.unload directly (== the old _unload_model delegate). L14 fix is OPT-IN: stop() cancels the task but
+nothing calls it by default → the cleanup-task leak is preserved verbatim until a caller opts in. Stacked on S12
+(refactor/mit-seam-s20-model-reaper).
+Tests: test_model_reaper.py 5 passed (unload→forget order, ttl==0 no-op + expired-not-queried, start creates
+task, stop cancels, stop-no-task no-op); full suite 242 passed (same 19 pre-existing async failures, no new
+breakage). Next: S15 Stage protocol (#187 core begins; deps S3 done).
