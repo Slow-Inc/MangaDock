@@ -1305,3 +1305,10 @@ verbatim-identical in three MangaTranslator paths (single/batch/concurrent). Ext
 region_filter.filter_translated_regions(text_regions, config); all 3 sites now delegate (should_filter
 count: 3→0). Byte-identical incl. none (only-blank) + original (no identical-check) carve-outs.
 Tests: test_region_filter.py 7 passed (every branch + carve-outs); regression 35 passed.
+
+## 2026-06-09 — Persist all MIT exploration/analysis/plans (context-loss insurance)
+Created docs/reports/mit-refactor-progress.md — the SINGLE resume point: read-order index, governing rules,
+the landmines-to-preserve quick-ref, the S1-S26 seam status table (done/next/blocked + commit hashes), the
+#186-#193 issue status, and pending items (#180 wiring, glossary assembly). Added memory
+project_mit_refactor_resume pointing a fresh session at it. All canonical artifacts already committed
+(analysis, plan, dissection, port-plan, report). A reset context can now resume at S2 without re-exploring.
