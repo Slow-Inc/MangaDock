@@ -22,6 +22,7 @@ from .memory_guard import release_memory
 from .context_counts import context_page_counts
 from .dictionary import load_dictionary, apply_dictionary, apply_post_dictionary
 from .prev_context import build_prev_context
+from .none_translator import apply_prep_manual_override, stamp_none_translations
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -999,22 +1000,15 @@ class MangaTranslator:
             
         # 如果设置了prep_manual则将translator设置为none，防止token浪费
         # Set translator to none to provent token waste if prep_manual is True  
-        if self.prep_manual:  
-            config.translator.translator = Translator.none
+        apply_prep_manual_override(config, self.prep_manual)
     
         current_time = time.time()
         self._model_usage_tracker.touch("translation", config.translator.translator, current_time)
 
         # 为none翻译器添加特殊处理  
         # Add special handling for none translator  
-        if config.translator.translator == Translator.none:  
-            # 使用none翻译器时，为所有文本区域设置必要的属性  
-            # When using none translator, set necessary properties for all text regions  
-            for region in ctx.text_regions:  
-                region.translation = ""  # 空翻译将创建空白区域 / Empty translation will create blank areas  
-                region.target_lang = config.translator.target_lang  
-                region._alignment = config.render.alignment  
-                region._direction = config.render.direction    
+        if config.translator.translator == Translator.none:
+            stamp_none_translations(ctx.text_regions, config)
             return ctx.text_regions  
 
         # 以下翻译处理仅在非none翻译器或有none翻译器但没有prep_manual时执行  
