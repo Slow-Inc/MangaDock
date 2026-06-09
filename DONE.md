@@ -1271,3 +1271,10 @@ nothing) out of the 3,200-line MangaTranslator into manga_translator/translation
 instead of growing the orchestrator. The async method now delegates; byte-identical (verified vs the pure fn on
 4 cases). Tests: test_translation_checks.py 5 passed (char/segment/phrase repetition, empty/short, threshold).
 God object shrank ~50 lines. Next: extract _check_target_language_ratio into the same seam.
+
+## 2026-06-09 — #187 slice (b): extract target-language-ratio check off the god object
+Pulled `_check_target_language_ratio` (a pure verdict, Issue #109) into translation_checks
+::check_target_language_ratio(text_regions, target_lang, script_ratio, min_ratio) — script_ratio injected
+so it unit-tests with a stub (the real target_script_ratio passed in production). Async method delegates;
+byte-identical (verified vs pure fn). Tests: test_translation_checks.py 10 passed (5 repetition + 5 ratio).
+The validator seam now holds both post-translation checks; new validators attach here, not in the god object.

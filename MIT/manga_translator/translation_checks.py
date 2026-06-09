@@ -8,8 +8,42 @@ verbatim from the originals so behaviour is byte-identical.
 """
 import logging
 import re
+from typing import Callable, List
 
 logger = logging.getLogger('manga_translator')
+
+
+def check_target_language_ratio(text_regions: List, target_lang: str,
+                                script_ratio: Callable[[str, str], float],
+                                min_ratio: float = 0.5) -> bool:
+    """True if enough of the merged translation is written in ``target_lang``'s
+    script. ``script_ratio(text, lang) -> float`` is injected (the real
+    ``target_script_ratio`` in production, a stub in tests) so this stays a pure
+    verdict over whatever regions it is given (Issue #109)."""
+    if not text_regions:
+        return True
+
+    all_translations = []
+    for region in text_regions:
+        translation = getattr(region, 'translation', '')
+        if translation and translation.strip():
+            all_translations.append(translation.strip())
+
+    if not all_translations:
+        logger.debug('No valid translation texts for language ratio check')
+        return True
+
+    merged_text = ''.join(all_translations)
+    ratio = script_ratio(merged_text, target_lang)
+    passed = ratio >= min_ratio
+
+    if not passed:
+        logger.warning(
+            f'Target language ratio check FAILED: only {ratio:.2f} of the '
+            f'translated text is in "{target_lang.upper()}" script '
+            f'(need >= {min_ratio:.2f})'
+        )
+    return passed
 
 
 def check_repetition_hallucination(text: str, threshold: int = 5, silent: bool = False) -> bool:
