@@ -1257,3 +1257,9 @@ so it unit-tests with no translators/ML import. Wired TranslatorChain.__init__ t
 (real-deps check: gemini:ENG → same chain/translators/langs/target_lang). Tests: test_translator_chain.py
 7 passed (single/multi/empty/unknown-name KeyError/disabled ValueError/unknown-lang ValueError + wiring).
 TODO marker resolved. Next #192 slices: dead fields, bare excepts, load_dotenv import side-effect.
+
+## 2026-06-09 — #192 slice (b1): remove dead vestigial fields
+Removed self._batch_contexts / self._batch_configs from MangaTranslator.__init__ (manga_translator.py:135-136)
+— assigned once, never read anywhere (grep-confirmed). Import OK; 19 tests green. Remaining #192:
+bare-except cleanup (20+ sites, per-site policy — its own slice), load_dotenv import side-effect (blast
+radius: worker HF_TOKEN auto-download + API keys — needs entry-point tracing, flagged before touching).
