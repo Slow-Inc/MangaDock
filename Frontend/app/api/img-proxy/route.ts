@@ -26,9 +26,12 @@ export async function GET(req: NextRequest) {
     );
 
     const contentType = upstream.headers.get("content-type") ?? "image/jpeg";
-    const buf = await upstream.arrayBuffer();
 
-    return new NextResponse(buf, {
+    // Stream pass-through (#150): buffering via arrayBuffer() delayed the
+    // first byte until the LAST byte arrived from the backend and held the
+    // whole image (~2-3MB) in memory per concurrent request. Streaming lets
+    // the browser paint progressively from the first chunk.
+    return new NextResponse(upstream.body, {
       status: upstream.status,
       headers: {
         "Content-Type": contentType,

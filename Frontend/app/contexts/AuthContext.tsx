@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   ReactNode,
@@ -749,37 +750,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userRole = user?.role ?? null;
   const isTranslator = userRole === "translator" || userRole === "creator" || userRole === "admin";
 
+  // Memoized provider value (#152): without this, any provider state change
+  // (including loginOpen open/close) re-rendered every useAuth() consumer.
+  // Deps rule: every state an exposed function reads via closure must be a
+  // dep, or the memoized closure goes stale. Audited 2026-06-06: the
+  // functions read ONLY `user` (loading/loginOpen are never read, only set;
+  // setters and the supabase client are stable). userRole/isTranslator
+  // derive from user.
+  const value = useMemo(() => ({
+    user,
+    userRole,
+    isTranslator,
+    loading,
+    signInWithGoogle,
+    signUpWithEmail,
+    signInWithEmail,
+    sendPasswordReset,
+    signOut,
+    getIdToken,
+    showLoginPrompt,
+    openLoginModal,
+    updateUserProfile,
+    updateUserPassword,
+    linkGoogleAccount,
+    unlinkAccount,
+    signInWithFacebook,
+    linkFacebookAccount,
+    addEmailPassword,
+    uploadProfilePhoto,
+    updateUserPhotoURL,
+    getPhotoHistory,
+    savePhotoHistory,
+    switchToConflictingAccount,
+    reauthenticateUser,
+    deleteAccount,
+    resendVerificationEmail,
+    refreshSession,
+    // Functions are recreated every render; capturing them once per
+    // [user, loading] is the point of the memo (audit above: `user` only).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [user, loading]);
+
   return (
-    <AuthContext.Provider value={{
-      user,
-      userRole,
-      isTranslator,
-      loading,
-      signInWithGoogle,
-      signUpWithEmail,
-      signInWithEmail,
-      sendPasswordReset,
-      signOut,
-      getIdToken,
-      showLoginPrompt,
-      openLoginModal,
-      updateUserProfile,
-      updateUserPassword,
-      linkGoogleAccount,
-      unlinkAccount,
-      signInWithFacebook,
-      linkFacebookAccount,
-      addEmailPassword,
-      uploadProfilePhoto,
-      updateUserPhotoURL,
-      getPhotoHistory,
-      savePhotoHistory,
-      switchToConflictingAccount,
-      reauthenticateUser,
-      deleteAccount,
-      resendVerificationEmail,
-      refreshSession,
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
 
       {/* Login modal triggered by showLoginPrompt */}

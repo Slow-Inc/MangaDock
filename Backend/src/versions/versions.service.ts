@@ -57,20 +57,28 @@ export class VersionsService {
     const pages = row.pages ?? [];
     if (pages.length === 0) return true;
 
+    const expectedPrefix = `/uploads/chapters/${row.version_id}/`;
+    // Collect the local filenames first — non-local URLs (future R2/worker
+    // flow) are treated as available here.
+    const localNames: string[] = [];
     for (const pageUrl of pages) {
       if (!pageUrl || typeof pageUrl !== 'string') return false;
-      const expectedPrefix = `/uploads/chapters/${row.version_id}/`;
-
-      // Non-local URLs (future R2/worker flow) are treated as available here.
       if (!pageUrl.startsWith(expectedPrefix)) continue;
-
       const filename = pageUrl.split('/').pop();
       if (!filename) return false;
-      const key = `${this.versionDir(row.version_id)}/${filename}`;
-      const exists = await this.storage.exists(key);
-      if (!exists) return false;
+      localNames.push(filename);
     }
-    return true;
+    if (localNames.length === 0) return true;
+
+    // One readdir per version instead of one stat per page (#149) — every
+    // list endpoint maps every row, so per-page round-trips multiply fast
+    // (and would be ~100ms each on the planned R2 adapter).
+    try {
+      const present = new Set(await this.storage.list(this.versionDir(row.version_id)));
+      return localNames.every((name) => present.has(name));
+    } catch {
+      return false; // directory missing on this node
+    }
   }
 
   private async mapRow(row: ChapterVersionRow): Promise<ChapterVersion> {
