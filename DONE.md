@@ -1383,3 +1383,17 @@ to slice the context tail — that's the S6 seam, left untouched. Stacked on S5
 Tests: test_context_counts.py 7 passed (context_size=0, no-pages, all-non-empty, blank-skipped, budget-caps-
 so-empty-not-skipped, budget-above-non-empty, page-empty-only-if-all-blank); full suite 197 passed (same 19
 pre-existing async failures); context regression (test_page_context/test_series_context) green.
+
+## 2026-06-09 — #187 S8: apply_post_dictionary (fold post-dict apply+log; move dict helpers to dictionary.py)
+The post-translation dictionary apply+log block was verbatim in single (_translate) and batch
+(_apply_post_translation_processing). Extracted to dictionary.apply_post_dictionary(text_regions,
+post_dict_path) — applies post-dict to each region.translation in place, collects "before => after" records,
+logs per-line + summary (or "No post-translation replacements made."), returns the list. The pure
+load_dictionary/apply_dictionary helpers were MOVED out of manga_translator.py into the same new dictionary.py
+(they only use os/re/logger, no MangaTranslator deps) so the stage tests with no ML stack; manga_translator
+re-imports all three, so `from .manga_translator import load_dictionary` still resolves and __main__.py is
+untouched (verified: load_dictionary.__module__ == manga_translator.dictionary). Byte-identical: same records,
+same logs, same `import regex as re` semantics. Completes the Phase-A low-risk cluster (S1-S5,S7,S8); S6
+build_prev_context (med-risk) is next. Stacked (refactor/mit-seam-s8-post-dictionary).
+Tests: test_dictionary.py 6 passed (replace, token-delete, summary+per-line logs, no-replacements message,
+empty-path no-op, moved-helper parse/apply); full suite 203 passed (same 19 pre-existing async failures).

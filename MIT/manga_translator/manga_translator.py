@@ -20,6 +20,7 @@ from .model_usage_tracker import ModelUsageTracker
 from .model_unloader import ModelUnloader
 from .memory_guard import release_memory
 from .context_counts import context_page_counts
+from .dictionary import load_dictionary, apply_dictionary, apply_post_dictionary
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -72,37 +73,6 @@ class TranslationInterrupt(Exception):
     """
     pass
 
-def load_dictionary(file_path):
-    dictionary = []
-    if file_path and os.path.exists(file_path):
-        with open(file_path, 'r', encoding='utf-8') as file:
-            for line_number, line in enumerate(file, start=1):
-                # Ignore empty lines and lines starting with '#' or '//'
-                if not line.strip() or line.strip().startswith('#') or line.strip().startswith('//'):
-                    continue
-                # Remove comment parts
-                line = line.split('#')[0].strip()
-                line = line.split('//')[0].strip()
-                parts = line.split()
-                if len(parts) == 1:
-                    # If there is only the left part, the right part defaults to an empty string, meaning delete the left part
-                    pattern = re.compile(parts[0])
-                    dictionary.append((pattern, '', line_number))
-                elif len(parts) == 2:
-                    # If both left and right parts are present, perform the replacement
-                    pattern = re.compile(parts[0])
-                    dictionary.append((pattern, parts[1], line_number))
-                else:
-                    logger.error(f'Invalid dictionary entry at line {line_number}: {line.strip()}')
-    return dictionary
-
-def apply_dictionary(text, dictionary):
-    for pattern, value, line_number in dictionary:
-        original_text = text  
-        text = pattern.sub(value, text)
-        if text != original_text:  
-            logger.info(f'Line {line_number}: Replaced "{original_text}" with "{text}" using pattern "{pattern.pattern}" and value "{value}"')
-    return text
 
 class MangaTranslator:
     verbose: bool
@@ -1152,20 +1122,7 @@ class MangaTranslator:
         # 注意：翻译结果的保存移动到了翻译流程的最后，确保保存的是最终结果而不是重试前的结果
 
         # Apply post dictionary after translating
-        post_dict = load_dictionary(self.post_dict)
-        post_replacements = []  
-        for region in ctx.text_regions:  
-            original = region.translation  
-            region.translation = apply_dictionary(region.translation, post_dict)
-            if original != region.translation:  
-                post_replacements.append(f"{original} => {region.translation}")  
-
-        if post_replacements:  
-            logger.info("Post-translation replacements:")  
-            for replacement in post_replacements:  
-                logger.info(replacement)  
-        else:  
-            logger.info("No post-translation replacements made.")
+        apply_post_dictionary(ctx.text_regions, self.post_dict)
 
         # 译后检查和重试逻辑 - 第一阶段：单个region幻觉检测
         failed_regions = []
@@ -2631,20 +2588,7 @@ class MangaTranslator:
         # 注意：翻译结果的保存移动到了translate方法的最后，确保保存的是最终结果
 
         # 应用后字典
-        post_dict = load_dictionary(self.post_dict)
-        post_replacements = []  
-        for region in ctx.text_regions:  
-            original = region.translation  
-            region.translation = apply_dictionary(region.translation, post_dict)
-            if original != region.translation:  
-                post_replacements.append(f"{original} => {region.translation}")  
-
-        if post_replacements:  
-            logger.info("Post-translation replacements:")  
-            for replacement in post_replacements:  
-                logger.info(replacement)  
-        else:  
-            logger.info("No post-translation replacements made.")
+        apply_post_dictionary(ctx.text_regions, self.post_dict)
 
         # 单个region幻觉检测
         failed_regions = []

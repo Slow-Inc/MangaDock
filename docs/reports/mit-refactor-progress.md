@@ -2,7 +2,7 @@
 
 > **Single entry point** for the MIT tech-debt decomposition. If context was lost, READ THIS FIRST,
 > then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
-> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S7 done).
+> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S8 done; Phase-A low-risk cluster S1-S5,S7,S8 complete).
 
 ## How to resume (read order)
 1. **This file** — current position + seam status table below.
@@ -51,8 +51,8 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | **S4** | `ModelUnloader` (routing table; preserve L1) | stateful | med | ✅ | `model_unloader.py` (branch `…-s4-model-unloader`) |
 | **S5** | `memory_pressure_guard` (gc/empty_cache/psutil) | stateful | low | ✅ | `memory_guard.py` — `release_memory` only (psutil check single-use, left inline) |
 | **S7** | `context_page_counts` (fold accounting) | pure | low | ✅ | `context_counts.py` (only the 2 log-accounting blocks; `_build_prev_context`'s own count is S6) |
-| **S8** | `PostDictionaryStage` (fold post-dict) | stateful | low | ▶️ next | — |
-| **S6** | `build_prev_context` pure fn (per-mode index policy explicit) | pure | med | ⬜ | — |
+| **S8** | `PostDictionaryStage` (fold post-dict) | stateful | low | ✅ | `dictionary.py` (moved load/apply + new `apply_post_dictionary`; re-exported) |
+| **S6** | `build_prev_context` pure fn (per-mode index policy explicit) | pure | med | ▶️ next | — |
 | **S9** | `NoneTranslator/GuardPolicy` (front-matter, L3/L12) | stateful | med | ⬜ | — |
 | **S10** | `TranslationFileSideChannel` (load/save_text; L2 `exit(-1)`) | stateful | med | ⬜ | — |
 | **S11** | `ImageDebugContext` (result_path + MD5 swap) | stateful | med | ⬜ | — |
