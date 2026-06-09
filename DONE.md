@@ -1342,3 +1342,18 @@ unload routing; strict `> ttl`; insertion-order list(...) snapshot so mid-sweep 
 remaining _model_usage_timestamps refs. Stacked on the S2 branch (refactor/mit-seam-s3-model-usage-tracker).
 Tests: test_model_usage_tracker.py 7 passed (strict-> boundary, insertion order, forget, safe-forget-during-
 iteration, re-touch refresh); full suite 184 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — #187 S4 / #188: ModelUnloader (routing table replaces _unload_model match/case)
+The 6-arm `match tool:` in _unload_model became model_unloader.ModelUnloader — an injected
+{tool: async unload_fn} table + empty_cache/cuda_available hooks; _unload_model is now a one-line delegate
+(await self._model_unloader.unload(tool, model)). The ctor wires the table from the real unload_* imports
+(colorization/detection/inpainting/ocr/upscaling/translation) + torch.cuda.empty_cache/is_available. Routes
+injected → module pulls in no ML stack, tests via asyncio.run (pytest-asyncio not active here). Byte-identical:
+same log line, same fall-through-then-empty_cache order, and crucially the L1-drifted keys the tracker stamps
+('colorizer' vs the table's 'colorization', plus 'textline_merge'/'rendering') route to NOTHING — the same
+latent no-op the match/case had, now pinned by a test (3× empty_cache, 0 unloads) before the routing is
+frozen. Stacked on S3 (refactor/mit-seam-s4-model-unloader). S3+S4 together lift the model-lifecycle state
+(tracker + unloader) out of the god object — the #188 foundation; next #188 seam is S20 ModelReaper (the TTL
+loop) after S5.
+Tests: test_model_unloader.py 4 passed (known-tool route+cache, L1-drift no-op ×3, no-empty-cache-when-cuda-
+unavailable, per-tool routing); full suite 188 passed (same 19 pre-existing async failures, no new breakage).

@@ -2,7 +2,7 @@
 
 > **Single entry point** for the MIT tech-debt decomposition. If context was lost, READ THIS FIRST,
 > then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
-> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S3 done).
+> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S4 done).
 
 ## How to resume (read order)
 1. **This file** — current position + seam status table below.
@@ -48,8 +48,8 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | **S1** | `filter_translated_regions` (3-way filter dedup) | pure | low | ✅ | `a71e4d2` |
 | **S2** | `apply_translations` / `apply_original_as_translation` (fold 4 copies + casing) | pure | low | ✅ | `region_apply.py` (branch `refactor/mit-seam-s2-apply-translations`) |
 | **S3** | `ModelUsageTracker` (wrap `_model_usage_timestamps`; **#188 starts**) | stateful | low | ✅ | `model_usage_tracker.py` (branch `…-s3-model-usage-tracker`) |
-| **S4** | `ModelUnloader` (routing table; preserve L1) | stateful | med | ▶️ next | S3 |
-| **S5** | `memory_pressure_guard` (gc/empty_cache/psutil) | stateful | low | ⬜ | — |
+| **S4** | `ModelUnloader` (routing table; preserve L1) | stateful | med | ✅ | `model_unloader.py` (branch `…-s4-model-unloader`) |
+| **S5** | `memory_pressure_guard` (gc/empty_cache/psutil) | stateful | low | ▶️ next | — |
 | **S7** | `context_page_counts` (fold accounting) | pure | low | ⬜ | — |
 | **S8** | `PostDictionaryStage` (fold post-dict) | stateful | low | ⬜ | — |
 | **S6** | `build_prev_context` pure fn (per-mode index policy explicit) | pure | med | ⬜ | — |
@@ -77,7 +77,7 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 |---|---|---|
 | #186 | `calc_horizontal` → pluggable LineBreaker seam | seam extracted (`_greedy_pack`); #180 wiring pending |
 | #187 | MangaTranslator god object → stage orchestrators | in progress (S1+S2 done) |
-| #188 | model load/lifecycle + translator base abstractions | started — S3 ModelUsageTracker done; S4 ModelUnloader ▶️ next |
+| #188 | model load/lifecycle + translator base abstractions | started — S3 tracker + S4 unloader done; next #188 seam is S20 ModelReaper (after S5) |
 | #189 | glyph-render dedup (`put_char` h/v + stroke) | open (orthogonal, render) |
 | #190 | `resize_regions_to_font_size` + box-padding decompose | open (orthogonal, render) |
 | #191 | vendored LDM (~3000 LOC) + YOLOv5 trim | open — **investigate first**: is SD/LDM dead? |
