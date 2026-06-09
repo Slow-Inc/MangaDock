@@ -9,21 +9,20 @@ non-verbose web-mode default subfolder and the `makedirs(dirname)` side effect.
 import os
 
 import manga_translator.image_debug_context as idc
-from manga_translator.image_debug_context import ImageDebugContext
 
 
 def test_subfolder_empty_when_no_current():
-    assert ImageDebugContext().subfolder == ''
+    assert idc.ImageDebugContext().subfolder == ''
 
 
 def test_subfolder_returns_current_subfolder():
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     c.current = {'subfolder': 'SF', 'file_md5': 'm', 'config': None}
     assert c.subfolder == 'SF'
 
 
 def test_save_and_restore_round_trip():
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     c.current = {'subfolder': 'A', 'file_md5': 'md5a', 'config': None}
     c.save('md5a')
     c.current = {'subfolder': 'B', 'file_md5': 'md5b', 'config': None}
@@ -34,13 +33,13 @@ def test_save_and_restore_round_trip():
 
 
 def test_save_is_a_noop_when_no_current():
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     c.save('x')  # current is None -> nothing saved
     assert c.restore('x') is False
 
 
 def test_with_context_swaps_then_restores():
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     original = {'subfolder': 'orig', 'file_md5': 'o', 'config': None}
     c.current = original
     swapped = {'subfolder': 'swap', 'file_md5': 's', 'config': None}
@@ -50,7 +49,7 @@ def test_with_context_swaps_then_restores():
 
 
 def test_with_context_restores_on_exception():
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     original = {'subfolder': 'orig'}
     c.current = original
     try:
@@ -67,7 +66,7 @@ def _no_makedirs(monkeypatch):
 
 def test_result_path_verbose_with_subfolder_no_result_sub(monkeypatch):
     _no_makedirs(monkeypatch)
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     c.current = {'subfolder': 'SF'}
     out = c.result_path('mask.png', verbose=True, result_sub_folder='')
     assert out == os.path.join(idc.BASE_PATH, 'result', 'SF', 'mask.png')
@@ -75,7 +74,7 @@ def test_result_path_verbose_with_subfolder_no_result_sub(monkeypatch):
 
 def test_result_path_verbose_with_subfolder_and_result_sub(monkeypatch):
     _no_makedirs(monkeypatch)
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     c.current = {'subfolder': 'SF'}
     out = c.result_path('mask.png', verbose=True, result_sub_folder='job1')
     assert out == os.path.join(idc.BASE_PATH, 'result', 'job1', 'SF', 'mask.png')
@@ -83,7 +82,7 @@ def test_result_path_verbose_with_subfolder_and_result_sub(monkeypatch):
 
 def test_result_path_web_mode_uses_current_subfolder(monkeypatch):
     _no_makedirs(monkeypatch)
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     c.current = {'subfolder': 'SF'}
     # verbose False, no result_sub_folder -> web mode, uses current subfolder
     out = c.result_path('final.png', verbose=False, result_sub_folder='')
@@ -92,7 +91,7 @@ def test_result_path_web_mode_uses_current_subfolder(monkeypatch):
 
 def test_result_path_web_mode_no_current_uses_default_unknown(monkeypatch):
     _no_makedirs(monkeypatch)
-    c = ImageDebugContext()  # current None
+    c = idc.ImageDebugContext()  # current None
     out = c.result_path('final.png', verbose=False, result_sub_folder='')
     # default subfolder is "{timestamp}-unknown-1024-unknown-unknown"
     parts = out.split(os.sep)
@@ -102,14 +101,14 @@ def test_result_path_web_mode_no_current_uses_default_unknown(monkeypatch):
 
 def test_result_path_with_result_sub_folder_set(monkeypatch):
     _no_makedirs(monkeypatch)
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     out = c.result_path('final.png', verbose=False, result_sub_folder='job1')
     assert out == os.path.join(idc.BASE_PATH, 'result', 'job1', 'final.png')
 
 
 def test_set_builds_subfolder_from_config_and_md5(monkeypatch):
     monkeypatch.setattr(idc, 'get_image_md5', lambda img: 'MD5X')
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     config = type('C', (), {})()
     config.detector = type('D', (), {'detection_size': 1536})()
     config.translator = type('T', (), {'target_lang': 'ENG', 'translator': 'gpt'})()
@@ -121,7 +120,7 @@ def test_set_builds_subfolder_from_config_and_md5(monkeypatch):
 
 
 def test_set_without_image_uses_unknown_md5(monkeypatch):
-    c = ImageDebugContext()
+    c = idc.ImageDebugContext()
     config = type('C', (), {})()
     config.detector = type('D', (), {})()  # no detection_size -> default 1024
     config.translator = type('T', (), {})()  # no target/translator -> 'unknown'
