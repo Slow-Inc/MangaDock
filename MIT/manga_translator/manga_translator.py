@@ -3074,53 +3074,11 @@ class MangaTranslator:
         return check_repetition_hallucination(text, threshold, silent)
 
     async def _check_target_language_ratio(self, text_regions: List, target_lang: str, min_ratio: float = 0.5) -> bool:
-        """
-        检查翻译结果中目标语言文字的占比是否达到要求
-        Check whether enough of the merged translation is actually written in the
-        target language's script.
-
-        Uses a target-script character ratio (manga_translator.utils.lang_ratio)
-        instead of a single ``langid`` classification of the merged text: a few
-        deliberately-untranslated tokens (sound effects, scanlation credits) no
-        longer flip an otherwise-correct page to FAILED. See Issue #109.
-
-        The decision of *when* to run this check (how many regions warrant it)
-        belongs to the caller — this function is a pure verdict over whatever
-        regions it is given.
-
-        Args:
-            text_regions: 文本区域列表
-            target_lang: 目标语言代码
-            min_ratio: 目标语言文字的最小占比（默认 0.5）
-
-        Returns:
-            bool: True表示通过检查，False表示未通过
-        """
-        if not text_regions:
-            return True
-
-        # 合并所有翻译文本
-        all_translations = []
-        for region in text_regions:
-            translation = getattr(region, 'translation', '')
-            if translation and translation.strip():
-                all_translations.append(translation.strip())
-
-        if not all_translations:
-            logger.debug('No valid translation texts for language ratio check')
-            return True
-
-        merged_text = ''.join(all_translations)
-        ratio = target_script_ratio(merged_text, target_lang)
-        passed = ratio >= min_ratio
-
-        if not passed:
-            logger.warning(
-                f'Target language ratio check FAILED: only {ratio:.2f} of the '
-                f'translated text is in "{target_lang.upper()}" script '
-                f'(need >= {min_ratio:.2f})'
-            )
-        return passed
+        """Pure verdict (Issue #109): is enough of the merged translation written in
+        target_lang's script? Logic extracted to the unit-tested
+        translation_checks.check_target_language_ratio (#187)."""
+        from .translation_checks import check_target_language_ratio
+        return check_target_language_ratio(text_regions, target_lang, target_script_ratio, min_ratio)
 
     async def _validate_translation(self, original_text: str, translation: str, target_lang: str, config, ctx: Context = None, silent: bool = False, page_lang_check_result: bool = None) -> bool:
         """
