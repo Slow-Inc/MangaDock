@@ -68,7 +68,7 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | **S15** | Stage protocol over 8 `_run_*` (**#187 core begins**) | async-orch | low | 🛑 core (stop-before) | S3 ✅ |
 | **S13** | `DetectionPostProcessor` (formalize `_merge_sfx_detections`) | stateful | low | ✅ | `detection_postproc.py` (`merge_sfx_detections`+`textline_aabb`; done w/o S15) |
 | **S16** | `TranslationMemory` (the two lists + bleed boundary, L9) | stateful | med | ✅ | `translation_memory.py` (2 lists + `reset()`; 16 sites renamed; append/reset asymmetry preserved) |
-| **S21** | `ModelLifecycle` facade + preload (#188 facade) | async-orch | high | ⬜ | S20 |
+| **S21** | `ModelLifecycle` facade + preload (#188 facade) | async-orch | high | ✅ | `model_lifecycle.py` (preload fold ×2 + `ensure_running`/`reaper.ensure_started` fold ×2; wraps reaper — tracker/unloader left direct) |
 | **S17** | `TextTranslationDispatcher` (collapse duplicated switch) | async-orch | high | ⬜ | S6/S16,S11 |
 | **S18** | `PostTranslationProcessor` (unify 4 copies; pin L6/L8 as params) | async-orch | high | ⬜ | S1,S2,S8,S17 |
 | **S19** | `gather_per_context` (per-exception placeholder) | async-orch | med | ✅ | `gather_per_context.py` (gather + placeholder; last AFK seam) |

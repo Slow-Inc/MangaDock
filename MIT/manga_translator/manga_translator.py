@@ -30,6 +30,7 @@ from .model_reaper import ModelReaper
 from .detection_postproc import merge_sfx_detections
 from .translation_memory import TranslationMemory
 from .gather_per_context import gather_per_context
+from .model_lifecycle import ModelLifecycle
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -141,7 +142,11 @@ class MangaTranslator:
             cuda_available=torch.cuda.is_available,
         )
         self._model_reaper = ModelReaper(self._model_usage_tracker, self._model_unloader, lambda: self.models_ttl)
-        self._detector_cleanup_task = None
+        self._model_lifecycle = ModelLifecycle(self._model_reaper, {
+            'upscaling': prepare_upscaling, 'detection': prepare_detection,
+            'ocr': prepare_ocr, 'inpainting': prepare_inpainting,
+            'translation': prepare_translation, 'colorization': prepare_colorization,
+        })
         self.prep_manual = params.get('prep_manual', None)
         self.context_size = params.get('context_size', 0)
         self._translation_memory = TranslationMemory()  # 跨页翻译记忆 / cross-page memory (S16, #136/#140)
@@ -369,16 +374,7 @@ class MangaTranslator:
                 logger.debug(f"Exception details: {traceback.format_exc()}")
 
         # preload and download models (not strictly necessary, remove to lazy load)
-        if ( self.models_ttl == 0 ):
-            logger.info('Loading models')
-            if config.upscale.upscale_ratio:
-                await prepare_upscaling(config.upscale.upscaler)
-            await prepare_detection(config.detector.detector)
-            await prepare_ocr(config.ocr.ocr, self.device)
-            await prepare_inpainting(config.inpainter.inpainter, self.device)
-            await prepare_translation(config.translator.translator_gen)
-            if config.colorizer.colorizer != Colorizer.none:
-                await prepare_colorization(config.colorizer.colorizer)
+        await self._model_lifecycle.preload(config, self.device, self.models_ttl)
 
         # translate
         ctx = await self._translate(config, ctx)
@@ -400,8 +396,7 @@ class MangaTranslator:
 
     async def _translate(self, config: Config, ctx: Context) -> Context:
         # Start the background cleanup job once if not already started.
-        if self._detector_cleanup_task is None:
-            self._detector_cleanup_task = self._model_reaper.start()
+        self._model_lifecycle.ensure_running()
         # -- Colorization
         if config.colorizer.colorizer != Colorizer.none:
             await self._report_progress('colorizing')
@@ -1403,20 +1398,10 @@ class MangaTranslator:
                 logger.debug(f"Exception details: {traceback.format_exc()}")
 
         # preload and download models (not strictly necessary, remove to lazy load)
-        if ( self.models_ttl == 0 ):
-            logger.info('Loading models')
-            if config.upscale.upscale_ratio:
-                await prepare_upscaling(config.upscale.upscaler)
-            await prepare_detection(config.detector.detector)
-            await prepare_ocr(config.ocr.ocr, self.device)
-            await prepare_inpainting(config.inpainter.inpainter, self.device)
-            await prepare_translation(config.translator.translator_gen)
-            if config.colorizer.colorizer != Colorizer.none:
-                await prepare_colorization(config.colorizer.colorizer)
+        await self._model_lifecycle.preload(config, self.device, self.models_ttl)
 
         # Start the background cleanup job once if not already started.
-        if self._detector_cleanup_task is None:
-            self._detector_cleanup_task = self._model_reaper.start()
+        self._model_lifecycle.ensure_running()
 
         # -- Colorization
         if config.colorizer.colorizer != Colorizer.none:

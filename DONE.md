@@ -1675,3 +1675,16 @@ byte-identical seams landed on a stack — S12-globals (apply_global_settings), 
 async-orchestration core (S15 stage-protocol + S17/S18/S21/S22/S23/S24/S25/S26) which the analysis flags for
 E2E-per-step. Test baseline corrected to 18 async-only failures (a stale uppercase-wiring test from S2's casing
 move was fixed in S13). Full suite 253 passed, 0 real failures. Stack ready to PR.
+
+## 2026-06-09 — #187 S21 / #188: ModelLifecycle facade (first core seam; preload + ensure_running fold)
+After pushing a rollback point (main + PR #196) the dev said continue, so started the core. S21: the duplicated
+eager-preload block (×2, gated models_ttl==0) + the duplicated cleanup-task guard (×2) → model_lifecycle.
+ModelLifecycle(reaper, prepare_fns) with preload(config, device, models_ttl) + ensure_running(); the guard's
+idempotency moved into ModelReaper.ensure_started(). self._detector_cleanup_task removed (the reaper owns its
+task; 0 refs left). Facade wraps the reaper; tracker(S3)+unloader(S4) stay direct (used by _run_* touch + reaper)
+— absorbing them is high-churn/low-value, deferred. Byte-identical (same preload order, upscale_ratio/Colorizer.
+none conditions, device threading, models_ttl==0 gate; prepare_* injected as a table → ML-free tests). Stack on
+PR#196 (refactor/mit-seam-s21-model-lifecycle).
+Tests: test_model_lifecycle.py 4 passed + test_model_reaper ensure_started idempotent; full suite 258 passed
+(18 pre-existing async, 0 real). Remaining core = the hardest (S15/S17/S18/S22/S23/S24/S25/S26) — pausing to
+report before the L6/L8/L9-touching async-orchestration seams.
