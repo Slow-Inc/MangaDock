@@ -1602,3 +1602,19 @@ branches incl. the no-context default {ts}-unknown-1024-unknown-unknown, same ma
 Tests: test_image_debug_context.py 13 passed (subfolder, save/restore round-trip+miss, no-current save no-op,
 with_context swap + exception-restore, 5 result_path goldens, set with/without image + getattr defaults); full
 suite 234 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — PR #195 merged + #187 S12 (globals half): apply_global_settings
+PR #195 (seams S2–S11, 10 byte-identical extractions) addressed the github-code-quality finding (dual-import
+style in test_image_debug_context → single `idc.` form) and was **merged to main** (merge `88a01eb`). Resolved a
+merge collision in Backend/.env.example by keeping main's canonical Cloudflare Worker config (akkanop-x domain).
+
+Then S12 (globals half): the process-global construction side effects — conditional ModelWrapper._MODEL_DIR
+override (was in parse_init_params) + the two torch.backends.*.allow_tf32=True flags (were in __init__) →
+pipeline_params.apply_global_settings(params), called once after parse_init_params. Removed the now-unused
+ModelWrapper import (0 refs left). Byte-identical: nothing reads _MODEL_DIR between its old (mid-parse) and new
+(post-parse) position, models load lazily at translate time, TF32 flags + relative order preserved. The
+PipelineParams value object for the ~20 parsed fields is DEFERRED until #192 (entangled with device/using_gpu/
+raise + ordering — the analysis gates it on config-centralisation). Branch refactor/mit-seam-s12-pipeline-params.
+Tests: test_pipeline_params.py 3 passed (model_dir override / absent-or-empty no-op / TF32 flags); full suite
+237 passed (same 19 pre-existing async failures, no new breakage). Next actionable seam: S20 ModelReaper (deps
+S3+S4 done).

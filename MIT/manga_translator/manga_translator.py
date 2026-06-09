@@ -25,6 +25,7 @@ from .prev_context import build_prev_context
 from .none_translator import apply_prep_manual_override, stamp_none_translations
 from .translation_store import read_translations, write_translations
 from .image_debug_context import ImageDebugContext
+from .pipeline_params import apply_global_settings
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -32,7 +33,6 @@ from .config import Config, Colorizer, Detector, Translator, Renderer, Inpainter
 from .utils import (
     BASE_PATH,
     LANGUAGE_ORIENTATION_PRESETS,
-    ModelWrapper,
     Context,
     load_image,
     dump_image,
@@ -120,12 +120,8 @@ class MangaTranslator:
         self.parse_init_params(params)
         self.result_sub_folder = ''
 
-        # The flag below controls whether to allow TF32 on matmul. This flag defaults to False
-        # in PyTorch 1.12 and later.
-        torch.backends.cuda.matmul.allow_tf32 = True
-
-        # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
-        torch.backends.cudnn.allow_tf32 = True
+        # Process-global construction settings (model dir override + TF32 flags) — S12
+        apply_global_settings(params)
 
         self._model_usage_tracker = ModelUsageTracker()
         self._model_unloader = ModelUnloader(
@@ -296,8 +292,6 @@ class MangaTranslator:
             raise Exception(
                 'CUDA or Metal compatible device could not be found in torch whilst --use-gpu args was set.\n'
                 'Is the correct pytorch version installed? (See https://pytorch.org/)')
-        if params.get('model_dir'):
-            ModelWrapper._MODEL_DIR = params.get('model_dir')
         #todo: fix why is kernel size loaded in the constructor
         self.kernel_size=int(params.get('kernel_size'))
         # Set input files
