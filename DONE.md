@@ -1422,3 +1422,13 @@ Tests: test_prev_context.py 11 passed (numbered output, context_size<=0, no-page
 current_page_index slice, use_original pull, L7 duplicate first-match, original-fallback, concurrent append vs
 pass); context regression (test_page_context/test_series_context) green; full suite 214 passed (same 19
 pre-existing async failures, no new breakage).
+## 2026-06-09 — #187 S9: none-translator front-matter guards (L12 + L3)
+Two landmine pieces of _run_text_translation's front-matter extracted to none_translator.py:
+apply_prep_manual_override(config, prep_manual) (L12 — prep_manual forces translator=none by mutating
+config.translator.translator in place; poisons a reused Config, preserved verbatim) and
+stamp_none_translations(text_regions, config) (L3 — blanks every region.translation + stamps metadata; caller
+returns ALL regions unfiltered vs the filtered normal path). Call-site order preserved EXACTLY (override →
+tracker.touch → if-none stamp + return ctx.text_regions) so touch still fires for the none path. Byte-identical.
+Stacked (refactor/mit-seam-s9-none-translator).
+Tests: test_none_translator.py 4 passed (prep_manual true/false, none-stamp metadata, empty-list no-op); full
+suite 218 passed (same 19 pre-existing async failures, no new breakage).

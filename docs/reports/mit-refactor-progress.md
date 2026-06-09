@@ -2,7 +2,7 @@
 
 > **Single entry point** for the MIT tech-debt decomposition. If context was lost, READ THIS FIRST,
 > then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
-> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S6 done; S1-S8 complete, E2E-smoke-validated on the live pipeline).
+> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S9 done; S1-S9 complete, E2E-smoke-validated through S8).
 
 ## How to resume (read order)
 1. **This file** — current position + seam status table below.
@@ -53,8 +53,8 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | **S7** | `context_page_counts` (fold accounting) | pure | low | ✅ | `context_counts.py` (only the 2 log-accounting blocks; `_build_prev_context`'s own count is S6) |
 | **S8** | `PostDictionaryStage` (fold post-dict) | stateful | low | ✅ | `dictionary.py` (moved load/apply + new `apply_post_dictionary`; re-exported) |
 | **S6** | `build_prev_context` pure fn (per-mode index policy explicit) | pure | med | ✅ | `prev_context.py` (thin delegate; L7 first-match preserved) |
-| **S9** | `NoneTranslator/GuardPolicy` (front-matter, L3/L12) | stateful | med | ▶️ next | — |
-| **S10** | `TranslationFileSideChannel` (load/save_text; L2 `exit(-1)`) | stateful | med | ⬜ | — |
+| **S9** | `NoneTranslator/GuardPolicy` (front-matter, L3/L12) | stateful | med | ✅ | `none_translator.py` (prep-manual override L12 + none-stamp L3; order preserved) |
+| **S10** | `TranslationFileSideChannel` (load/save_text; L2 `exit(-1)`) | stateful | med | ▶️ next | — |
 | **S11** | `ImageDebugContext` (result_path + MD5 swap) | stateful | med | ⬜ | — |
 | **S12** | `PipelineParams` + `apply_global_settings` (needs #192) | mixed | med | ⬜ | #192 |
 | **S20** | `ModelReaper` (TTL loop; opt-in `.stop()`, L14) | async-orch | med | ⬜ | S3,S4 |
