@@ -1287,3 +1287,13 @@ total). Extracted verbatim to manga_translator/punctuation.py::correct_punctuati
 region.translation)`; the data tables are gone from the god object. Byte-identical (6 golden characterization
 cases capturing the smart-quote->corner-bracket conversion, forced replacements, count-mismatch no-ops).
 Tests: test_punctuation.py 7 passed (6 behavioral + wiring inspection). Regression suite 36 passed.
+
+## 2026-06-09 — MIT core deep analysis + roadmap reconciliation (answering "did you analyze deeply / follow the roadmap")
+Honest gaps: had only audited (file:line), not deep-analyzed the hard core; and had deviated from the
+foundation-first roadmap (jumped to #187 easy slices). Fixed via a 6-agent ultracode deep read →
+docs/research/mit-core-decomposition-analysis.md: 26 seams (S1-S26) with deps, test strategy, and 16
+source-cited landmines (TTL key drift L1, divergent min_ratio 0.3/0.5 + threshold 6/>10 L6, singleton
+page-context bleed L9, exit(-1) in a stage L2, cleanup-task leak L14). Reconciled the roadmap: #187/#188
+are ~16 interleavable seams (the already-done punctuation/validator/greedy-pack extractions ARE S-seams),
+not monolithic Phase-C. Corrected next 3 steps: S1 filter_translated_regions (verbatim 3-way dedup) → S2
+apply_translations → S3 ModelUsageTracker (#188 starts early). Landmines must be PRESERVED then fixed behind opt-in flags.
