@@ -10,6 +10,24 @@ import importlib.util
 import pathlib
 
 # ── Mock heavy dependencies before any MIT import ─────────────────────────
+# The stubs below let qwen3.py import without torch/omegaconf/the real package.
+# They are installed ONLY long enough to load the module under test, then the
+# original sys.modules entries are restored (see the restore block after
+# `_load_qwen3`). Leaving them in place shadowed the real `omegaconf` /
+# `manga_translator` for every test module collected afterwards, breaking any
+# later test that imports them for real (detection_postproc, series_context,
+# mit_config) when the full suite runs.
+
+_STUBBED_NAMES = (
+    'omegaconf',
+    'manga_translator',
+    'manga_translator.config',
+    'manga_translator.translators',
+    'manga_translator.translators.common',
+    'manga_translator.translators.config_gpt',
+    'manga_translator.translators.qwen3',
+)
+_SAVED_MODULES = {name: sys.modules.get(name) for name in _STUBBED_NAMES}
 
 def _stub(name):
     mod = types.ModuleType(name)
@@ -54,6 +72,16 @@ def _load_qwen3():
 _mod = _load_qwen3()
 Qwen3Translator = _mod.Qwen3Translator
 _strip_think_tags = _mod._strip_think_tags
+
+# Restore the real sys.modules entries now that qwen3 is fully loaded — it keeps
+# its own references to the (stubbed) deps, and the tests below only touch
+# `Qwen3Translator` / `_strip_think_tags`, so later test modules see the real
+# omegaconf / manga_translator instead of our empty stubs.
+for _name, _orig in _SAVED_MODULES.items():
+    if _orig is None:
+        sys.modules.pop(_name, None)
+    else:
+        sys.modules[_name] = _orig
 
 
 # ── M1: env var defaults ───────────────────────────────────────────────────
