@@ -15,6 +15,7 @@ import numpy as np
 from PIL import Image
 from typing import Optional, Any, List, Tuple
 from .region_filter import filter_translated_regions
+from .region_apply import apply_original_as_translation, apply_render_casing, apply_translations
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -1149,16 +1150,8 @@ class MangaTranslator:
 
         # 如果不是none翻译器或者是none翻译器但没有prep_manual  
         # If not none translator or none translator without prep_manual  
-        if config.translator.translator != Translator.none or not self.prep_manual:  
-            for region, translation in zip(ctx.text_regions, translated_sentences):  
-                if config.render.uppercase:  
-                    translation = translation.upper()  
-                elif config.render.lowercase:  
-                    translation = translation.lower()  # 修正：应该是lower而不是upper  
-                region.translation = translation  
-                region.target_lang = config.translator.target_lang  
-                region._alignment = config.render.alignment  
-                region._direction = config.render.direction  
+        if config.translator.translator != Translator.none or not self.prep_manual:
+            apply_translations(ctx.text_regions, translated_sentences, config, apply_casing=True)
 
         # Punctuation correction logic. for translators often incorrectly change quotation marks from the source language to those commonly used in the target language.
         for region in ctx.text_regions:
@@ -1563,11 +1556,7 @@ class MangaTranslator:
                         translated_texts = await self._batch_translate_texts([region.text for region in ctx.text_regions], config, ctx)
                         
                         # 将翻译结果应用到各个region
-                        for region, translation in zip(ctx.text_regions, translated_texts):
-                            region.translation = translation
-                            region.target_lang = config.translator.target_lang
-                            region._alignment = config.render.alignment
-                            region._direction = config.render.direction
+                        apply_translations(ctx.text_regions, translated_texts, config)
                     translated_contexts.append((ctx, config))
                     
                     # 每页翻译后都清理内存
@@ -2239,13 +2228,7 @@ class MangaTranslator:
                 for ctx_idx, (ctx, config) in enumerate(batch):
                     if not ctx.text_regions:  # 检查text_regions是否为None或空
                         continue
-                    for region_idx, region in enumerate(ctx.text_regions):
-                        if text_idx < len(translated_texts):
-                            region.translation = translated_texts[text_idx]
-                            region.target_lang = config.translator.target_lang
-                            region._alignment = config.render.alignment
-                            region._direction = config.render.direction
-                            text_idx += 1
+                    text_idx += apply_translations(ctx.text_regions, translated_texts[text_idx:], config)
                         
                 # 应用后处理逻辑（括号修正、过滤等）
                 for ctx, config in batch:
@@ -2359,11 +2342,7 @@ class MangaTranslator:
                 for ctx, config in batch:
                     if not ctx.text_regions:  # 检查text_regions是否为None或空
                         continue
-                    for region in ctx.text_regions:
-                        region.translation = region.text
-                        region.target_lang = config.translator.target_lang
-                        region._alignment = config.render.alignment
-                        region._direction = config.render.direction
+                    apply_original_as_translation(ctx.text_regions, config)
                 results.extend(batch)
                 
             # 强制垃圾回收以释放内存
@@ -2422,12 +2401,7 @@ class MangaTranslator:
                 )
 
                 # 将翻译结果分配回各个region
-                for i, region in enumerate(ctx.text_regions):
-                    if i < len(translated_texts):
-                        region.translation = translated_texts[i]
-                        region.target_lang = config.translator.target_lang
-                        region._alignment = config.render.alignment
-                        region._direction = config.render.direction
+                apply_translations(ctx.text_regions, translated_texts, config)
                 
                 # 应用后处理逻辑（括号修正、过滤等）
                 if ctx.text_regions:
@@ -2501,11 +2475,7 @@ class MangaTranslator:
                     raise
                 # 错误时保持原文
                 if ctx.text_regions:
-                    for region in ctx.text_regions:
-                        region.translation = region.text
-                        region.target_lang = config.translator.target_lang
-                        region._alignment = config.render.alignment
-                        region._direction = config.render.direction
+                    apply_original_as_translation(ctx.text_regions, config)
                 return ctx, config
         
         # 创建并发任务，为每个任务添加页面索引和批次索引
@@ -2537,11 +2507,7 @@ class MangaTranslator:
                 # 创建失败的占位符
                 ctx, config = contexts_with_configs[i]
                 if ctx.text_regions:
-                    for region in ctx.text_regions:
-                        region.translation = region.text
-                        region.target_lang = config.translator.target_lang
-                        region._alignment = config.render.alignment
-                        region._direction = config.render.direction
+                    apply_original_as_translation(ctx.text_regions, config)
                 final_results.append((ctx, config))
             else:
                 final_results.append(result)
@@ -2939,10 +2905,7 @@ class MangaTranslator:
                             region.translation = retranslated[0]
                             
                             # 应用格式化处理
-                            if config.render.uppercase:
-                                region.translation = region.translation.upper()
-                            elif config.render.lowercase:
-                                region.translation = region.translation.lower()
+                            apply_render_casing(region, config)
                                 
                             logger.info(f'Re-translation finished: "{region.text}" -> "{region.translation}"')
                         else:

@@ -1312,3 +1312,19 @@ the landmines-to-preserve quick-ref, the S1-S26 seam status table (done/next/blo
 #186-#193 issue status, and pending items (#180 wiring, glossary assembly). Added memory
 project_mit_refactor_resume pointing a fresh session at it. All canonical artifacts already committed
 (analysis, plan, dissection, port-plan, report). A reset context can now resume at S2 without re-exploring.
+
+## 2026-06-09 — #187 S2: fold the 4 translation→region assign copies + 3 original-as-translation copies
+Following the reconciled roadmap's corrected step 2. The happy-path "assign each translated sentence to its
+region + stamp target_lang/_alignment/_direction" loop was near-duplicated in four MangaTranslator paths
+(single / batch-memory-fallback / batch shared-index / concurrent), the render-casing logic appeared a fifth
+time in the retry path, and an error-fallback "use the source text as its own translation" loop in three
+more. Extracted to region_apply.{apply_translations, apply_render_casing, apply_original_as_translation};
+all 8 sites delegate (region.translation-assign loops 8→0). Byte-identical: preserves the L10 zip-truncation
+invariant (single/batch zip; concurrent's i<len guard yields the same kept-set so it collapses to the same
+zip), the single-path-only casing (apply_casing flag — batch/concurrent/memory-fallback never cased), and
+the batch shared-index by returning the consumed count so the caller advances text_idx itself. New branch
+off main (refactor/mit-seam-s2-apply-translations).
+Tests: test_region_apply.py 9 passed (assign+metadata, casing on/off, in-place re-case, L10 truncation,
+extra-dropped, shared-index threading, original-as-translation no-casing); region_filter 7 + translation-
+path regression 32 passed; full suite 177 passed (the 19 async-not-supported failures are pre-existing —
+verified identical on the stashed base).
