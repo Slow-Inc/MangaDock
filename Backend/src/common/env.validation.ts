@@ -37,6 +37,14 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   MIT_WEBHOOK_SECRET: string;
+
+  @IsString()
+  @IsOptional()
+  WORKER_URL: string;
+
+  @IsString()
+  @IsOptional()
+  WORKER_SECRET: string;
 }
 
 export function validate(config: Record<string, any>) {

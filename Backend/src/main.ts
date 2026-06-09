@@ -83,11 +83,8 @@ async function bootstrap() {
   app.useStaticAssets(path.resolve(process.cwd(), 'img-cache'), {
     prefix: '/img-cache/',
   });
-
-  // Serve translated patch overlays from uploads/ under /uploads/
-  app.useStaticAssets(path.resolve(process.cwd(), 'uploads'), {
-    prefix: '/uploads/',
-  });
+  // /uploads/** is served by UploadsController (StorageModule) so it works
+  // with both disk and R2 storage — no express.static needed here.
 
   // Enable graceful shutdown hooks (T4-STANDARD Pillar 3)
   app.enableShutdownHooks();
