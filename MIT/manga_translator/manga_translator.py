@@ -23,6 +23,7 @@ from .context_counts import context_page_counts
 from .dictionary import load_dictionary, apply_dictionary, apply_post_dictionary
 from .prev_context import build_prev_context
 from .none_translator import apply_prep_manual_override, stamp_none_translations
+from .translation_store import read_translations, write_translations
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -1015,8 +1016,7 @@ class MangaTranslator:
         # Translation processing below only happens for non-none translator or none translator without prep_manual  
         if self.load_text:  
             input_filename = os.path.splitext(os.path.basename(self.input_files[0]))[0]  
-            with open(self._result_path(f"{input_filename}_translations.txt"), "r") as f:  
-                    translated_sentences = json.load(f)  
+            translated_sentences = read_translations(self._result_path(f"{input_filename}_translations.txt"))  
         else:  
             # 如果是none翻译器，不需要调用翻译服务，文本已经设置为空  
             # If using none translator, no need to call translation service, text is already set to empty  
@@ -1034,8 +1034,7 @@ class MangaTranslator:
             # Save translation if args.save_text is set and quit  
             if self.save_text:  
                 input_filename = os.path.splitext(os.path.basename(self.input_files[0]))[0]  
-                with open(self._result_path(f"{input_filename}_translations.txt"), "w") as f:  
-                    json.dump(translated_sentences, f, indent=4, ensure_ascii=False)  
+                write_translations(self._result_path(f"{input_filename}_translations.txt"), translated_sentences)  
                 print("Don't continue if --save-text is used")  
                 exit(-1)  
 

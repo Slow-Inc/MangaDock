@@ -2,7 +2,12 @@
 
 > **Single entry point** for the MIT tech-debt decomposition. If context was lost, READ THIS FIRST,
 > then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
-> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S9 done; S1-S9 complete, E2E-smoke-validated through S8).
+> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S10 done; S1-S10 complete, E2E-smoke-validated through S8).
+
+> **New latent bug found (preserve for now, fix later behind a flag):** `write_translations`
+> (was inline `--save-text`) opens the file with NO `encoding=`, so on a non-UTF-8 default
+> platform (Windows cp1252) `ensure_ascii=False` non-ASCII content raises `UnicodeEncodeError`.
+> Kept byte-identical in S10; candidate fix = add `encoding="utf-8"` (opt-in/standalone).
 
 ## How to resume (read order)
 1. **This file** — current position + seam status table below.
@@ -54,8 +59,8 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | **S8** | `PostDictionaryStage` (fold post-dict) | stateful | low | ✅ | `dictionary.py` (moved load/apply + new `apply_post_dictionary`; re-exported) |
 | **S6** | `build_prev_context` pure fn (per-mode index policy explicit) | pure | med | ✅ | `prev_context.py` (thin delegate; L7 first-match preserved) |
 | **S9** | `NoneTranslator/GuardPolicy` (front-matter, L3/L12) | stateful | med | ✅ | `none_translator.py` (prep-manual override L12 + none-stamp L3; order preserved) |
-| **S10** | `TranslationFileSideChannel` (load/save_text; L2 `exit(-1)`) | stateful | med | ▶️ next | — |
-| **S11** | `ImageDebugContext` (result_path + MD5 swap) | stateful | med | ⬜ | — |
+| **S10** | `TranslationFileSideChannel` (load/save_text; L2 `exit(-1)`) | stateful | med | ✅ | `translation_store.py` (JSON I/O only; L2 exit + filename left inline) |
+| **S11** | `ImageDebugContext` (result_path + MD5 swap) | stateful | med | ▶️ next | — |
 | **S12** | `PipelineParams` + `apply_global_settings` (needs #192) | mixed | med | ⬜ | #192 |
 | **S20** | `ModelReaper` (TTL loop; opt-in `.stop()`, L14) | async-orch | med | ⬜ | S3,S4 |
 | **S15** | Stage protocol over 8 `_run_*` (**#187 core begins**) | async-orch | low | ⬜ | S3 |
