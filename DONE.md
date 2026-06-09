@@ -1263,3 +1263,11 @@ Removed self._batch_contexts / self._batch_configs from MangaTranslator.__init__
 — assigned once, never read anywhere (grep-confirmed). Import OK; 19 tests green. Remaining #192:
 bare-except cleanup (20+ sites, per-site policy — its own slice), load_dotenv import side-effect (blast
 radius: worker HF_TOKEN auto-download + API keys — needs entry-point tracing, flagged before touching).
+
+## 2026-06-09 — #187 slice: extract pure validation check off the god object
+Pulled `_check_repetition_hallucination` (a pure verdict masquerading as an async method that awaited
+nothing) out of the 3,200-line MangaTranslator into manga_translator/translation_checks.py
+::check_repetition_hallucination — the seam where new post-translation validators attach (feedback_core_boundary)
+instead of growing the orchestrator. The async method now delegates; byte-identical (verified vs the pure fn on
+4 cases). Tests: test_translation_checks.py 5 passed (char/segment/phrase repetition, empty/short, threshold).
+God object shrank ~50 lines. Next: extract _check_target_language_ratio into the same seam.

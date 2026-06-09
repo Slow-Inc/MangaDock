@@ -3069,56 +3069,9 @@ class MangaTranslator:
         检查文本是否包含重复内容（模型幻觉）
         Check if the text contains repetitive content (model hallucination)
         """
-        if not text or len(text.strip()) < threshold:
-            return False
-            
-        # 检查字符级重复
-        consecutive_count = 1
-        prev_char = None
-        
-        for char in text:
-            if char == prev_char:
-                consecutive_count += 1
-                if consecutive_count >= threshold:
-                    if not silent:
-                        logger.warning(f'Detected character repetition hallucination: "{text}" - repeated character: "{char}", consecutive count: {consecutive_count}')
-                    return True
-            else:
-                consecutive_count = 1
-            prev_char = char
-        
-        # 检查词语级重复（按字符分割中文，按空格分割其他语言）
-        segments = re.findall(r'[\u4e00-\u9fff]|\S+', text)
-        
-        if len(segments) >= threshold:
-            consecutive_segments = 1
-            prev_segment = None
-            
-            for segment in segments:
-                if segment == prev_segment:
-                    consecutive_segments += 1
-                    if consecutive_segments >= threshold:
-                        if not silent:
-                            logger.warning(f'Detected word repetition hallucination: "{text}" - repeated segment: "{segment}", consecutive count: {consecutive_segments}')
-                        return True
-                else:
-                    consecutive_segments = 1
-                prev_segment = segment
-        
-        # 检查短语级重复
-        words = text.split()
-        if len(words) >= threshold * 2:
-            for i in range(len(words) - threshold + 1):
-                phrase = ' '.join(words[i:i + threshold//2])
-                remaining_text = ' '.join(words[i + threshold//2:])
-                if phrase in remaining_text:
-                    phrase_count = text.count(phrase)
-                    if phrase_count >= 3:  # 降低短语重复检测阈值
-                        if not silent:
-                            logger.warning(f'Detected phrase repetition hallucination: "{text}" - repeated phrase: "{phrase}", occurrence count: {phrase_count}')
-                        return True
-                        
-        return False
+        # #187: logic extracted to the pure, unit-tested translation_checks module.
+        from .translation_checks import check_repetition_hallucination
+        return check_repetition_hallucination(text, threshold, silent)
 
     async def _check_target_language_ratio(self, text_regions: List, target_lang: str, min_ratio: float = 0.5) -> bool:
         """
