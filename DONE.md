@@ -1432,3 +1432,14 @@ tracker.touch → if-none stamp + return ctx.text_regions) so touch still fires 
 Stacked (refactor/mit-seam-s9-none-translator).
 Tests: test_none_translator.py 4 passed (prep_manual true/false, none-stamp metadata, empty-list no-op); full
 suite 218 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — #187 S10: translation side-channel I/O (load/save_text)
+The --load-text/--save-text JSON read/write in _run_text_translation extracted to
+translation_store.{read_translations, write_translations} (byte-identical: indent=4, ensure_ascii=False). The
+print(...) + bare exit(-1) (L2) and the input_files[0] filename derivation are LEFT INLINE (exit is a
+process-control landmine clearer when visible); no IndexError guard added (would change behaviour). Latent bug
+surfaced + preserved: the inline open(...,"w") had no encoding=, so on cp1252-default Windows ensure_ascii=False
+non-ASCII raises UnicodeEncodeError — candidate fix (encoding="utf-8") deferred to an opt-in change; logged in
+the progress doc. Stacked (refactor/mit-seam-s10-translation-store).
+Tests: test_translation_store.py 3 passed (round-trip, indent-4 array, non-ASCII unescaped ensure_ascii=False);
+full suite 221 passed (same 19 pre-existing async failures, no new breakage).
