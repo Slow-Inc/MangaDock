@@ -13,7 +13,7 @@ import sys
 import traceback
 import numpy as np
 from PIL import Image
-from typing import Optional, Any, List, Tuple
+from typing import Optional, Any, List
 from .region_filter import filter_translated_regions
 from .region_apply import apply_original_as_translation, apply_render_casing, apply_translations
 from .model_usage_tracker import ModelUsageTracker
@@ -27,6 +27,7 @@ from .translation_store import read_translations, write_translations
 from .image_debug_context import ImageDebugContext
 from .pipeline_params import apply_global_settings
 from .model_reaper import ModelReaper
+from .detection_postproc import merge_sfx_detections
 from .punctuation import correct_punctuation
 import py3langid as langid
 
@@ -660,33 +661,9 @@ class MangaTranslator:
         # #168: optional SFX/outside-bubble second pass (AnimeText YOLO). Boxes the
         # primary detector missed are appended as empty textlines for OCR to read.
         if config.detector.det_sfx:
-            result = self._merge_sfx_detections(ctx, result)
+            result = merge_sfx_detections(ctx, result, self.device)
         return result
 
-    @staticmethod
-    def _textline_aabb(q) -> Tuple[float, float, float, float]:
-        xs, ys = q.pts[:, 0], q.pts[:, 1]
-        return (float(xs.min()), float(ys.min()), float(xs.max()), float(ys.max()))
-
-    def _merge_sfx_detections(self, ctx, result):
-        """#168: run the AnimeText SFX detector as a second pass and merge the boxes
-        the primary detector missed (IoA-deduped) as empty textlines, so stylized
-        SFX flow through OCR → translate → render like any dialogue line."""
-        from .sfx_detector import detect_sfx_boxes
-        from .sfx_merge import dedup_sfx_boxes
-        from .utils.generic import Quadrilateral
-        textlines, mask_raw, mask = result
-        sfx_boxes = detect_sfx_boxes(ctx.img_rgb, device=str(self.device or 'cuda'))
-        if not sfx_boxes:
-            return result
-        existing = [self._textline_aabb(t) for t in textlines]
-        fresh = dedup_sfx_boxes(existing, sfx_boxes)
-        for (x1, y1, x2, y2) in fresh:
-            pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
-            textlines.append(Quadrilateral(pts, '', 1.0))
-        logger.info(f"[SFXDetect] {len(sfx_boxes)} boxes, +{len(fresh)} new textlines "
-                    f"(deduped {len(sfx_boxes) - len(fresh)})")
-        return (textlines, mask_raw, mask)
 
     async def _unload_model(self, tool: str, model: str):
         await self._model_unloader.unload(tool, model)

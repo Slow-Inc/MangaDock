@@ -48,9 +48,13 @@ def test_en_uppercase_lettering_is_wired():
     MIT pipeline still uppercases region.translation when render.uppercase is set
     (manga_translator.py — mirrors MangaTranslator pipeline.py:1375 `text.upper()`)."""
     base = Path(__file__).parent.parent / 'manga_translator'
+    # #187 seam S2 moved the casing out of manga_translator.py into region_apply.py
+    # (apply_render_casing); manga_translator triggers it via apply_casing=True.
     mt = (base / 'manga_translator.py').read_text(encoding='utf-8')
-    assert re.search(r'if\s+config\.render\.uppercase\s*:', mt)
-    assert '.upper()' in mt
+    assert 'apply_casing=True' in mt                               # single-page path wires it
+    ra = (base / 'region_apply.py').read_text(encoding='utf-8')
+    assert re.search(r'if\s+config\.render\.uppercase\s*:', ra)
+    assert '.upper()' in ra
     cfg = (base / 'config.py').read_text(encoding='utf-8')
     assert re.search(r'uppercase:\s*bool\s*=\s*False', cfg)        # opt-in default
 

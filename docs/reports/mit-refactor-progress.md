@@ -2,7 +2,7 @@
 
 > **Single entry point** for the MIT tech-debt decomposition. If context was lost, READ THIS FIRST,
 > then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
-> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S2–S11 merged via PR #195; S12 globals + S20 ModelReaper done on a stack; S15 next).
+> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-09 (S2–S11 merged via PR #195; S12 globals + S20 + S13 on a stack; AFK batch S16/S19 next, STOP before the high-risk core S15/S17/S18/S21–S26). Test baseline now 18 async-only failures (a stale uppercase-wiring test left by S2 was fixed in S13).
 
 > **New latent bug found (preserve for now, fix later behind a flag):** `write_translations`
 > (was inline `--save-text`) opens the file with NO `encoding=`, so on a non-UTF-8 default
@@ -63,9 +63,9 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | **S11** | `ImageDebugContext` (result_path + MD5 swap) | stateful | med | ✅ | `image_debug_context.py` (full class; helpers→delegates; swap closures→`with_context`) |
 | **S12** | `PipelineParams` + `apply_global_settings` (needs #192) | mixed | med | ◐ globals ✅ · value-obj 🔒#192 | `pipeline_params.py` — `apply_global_settings` (`_MODEL_DIR`+TF32) done; `PipelineParams` value-object deferred (entangled w/ device/using_gpu/raise — do after #192) |
 | **S20** | `ModelReaper` (TTL loop; opt-in `.stop()`, L14) | async-orch | med | ✅ | `model_reaper.py` (stack; `reap_once`/`start`/`stop`; L13/L14/ttl==0 preserved) |
-| **S15** | Stage protocol over 8 `_run_*` (**#187 core begins**) | async-orch | low | ▶️ next | S3 ✅ |
-| **S13** | `DetectionPostProcessor` (formalize `_merge_sfx_detections`) | stateful | low | ⬜ | S15 |
-| **S16** | `TranslationMemory` (the two lists + bleed boundary, L9) | stateful | med | ⬜ | S6 |
+| **S15** | Stage protocol over 8 `_run_*` (**#187 core begins**) | async-orch | low | 🛑 core (stop-before) | S3 ✅ |
+| **S13** | `DetectionPostProcessor` (formalize `_merge_sfx_detections`) | stateful | low | ✅ | `detection_postproc.py` (`merge_sfx_detections`+`textline_aabb`; done w/o S15) |
+| **S16** | `TranslationMemory` (the two lists + bleed boundary, L9) | stateful | med | ▶️ next (AFK) | S6 ✅ |
 | **S21** | `ModelLifecycle` facade + preload (#188 facade) | async-orch | high | ⬜ | S20 |
 | **S17** | `TextTranslationDispatcher` (collapse duplicated switch) | async-orch | high | ⬜ | S6/S16,S11 |
 | **S18** | `PostTranslationProcessor` (unify 4 copies; pin L6/L8 as params) | async-orch | high | ⬜ | S1,S2,S8,S17 |
