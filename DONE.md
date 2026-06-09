@@ -1397,3 +1397,28 @@ same logs, same `import regex as re` semantics. Completes the Phase-A low-risk c
 build_prev_context (med-risk) is next. Stacked (refactor/mit-seam-s8-post-dictionary).
 Tests: test_dictionary.py 6 passed (replace, token-delete, summary+per-line logs, no-replacements message,
 empty-path no-op, moved-helper parse/apply); full suite 203 passed (same 19 pre-existing async failures).
+
+## 2026-06-09 — E2E smoke-validation of the S2-S8 stack (live pipeline, hayateotsu.space)
+User brought up MIT on the refactored working tree + ran a real translation (OPM benchmark page). Result: full
+pipeline ran end-to-end clean — translate → region-assign + uppercase casing (S2, visibly correct) → post-dict
+(S8) → model lifecycle (S3/S4/S5) → render; no crash, all bubbles populated & placed, hyphenated. Output is
+markedly better than the pre-render-parity "before" shot (no edge-clipping). Confirmed the refactor caused NO
+regression. The remaining gap to the MangaTranslator target (translation wording/naturalness, missing space
+after punctuation — present in the "before" shot too, ぬっ SFX→"LOOM" not rendered, minor fit) are pre-existing
+translation/SFX(#168)/line-break quality issues ORTHOGONAL to the byte-identical decomposition. Decision: finish
+the refactor workstream first (no PR / no quality work yet).
+
+## 2026-06-09 — #187 S6: build_prev_context (pure fn; per-mode index policy explicit)
+MangaTranslator._build_prev_context (the ~50-line per-mode context-string builder) extracted to pure
+prev_context.build_prev_context(all_page_translations, original_page_texts, context_size, *, use_original_text,
+current_page_index, batch_index, batch_original_texts); the method is now a thin delegate so its 2 call sites
+are untouched. Byte-identical: preserves the L7 available_pages.index(page) FIRST-MATCH (duplicate-content pages
+map to the earliest original), the pages_used==0 / not-available_pages empty short-circuits, and the concurrent
+`pass` (no append when not using original text). hasattr(self,'_original_page_texts') -> `is not None` (equiv —
+the attr is always init'd []). Process note: Serena replace_symbol_body mis-detected the method start line and
+produced a duplicate def + ate part of _dispatch_with_context; caught by grep, reverted file to S8 state, redid
+with an anchored regex. Stacked (refactor/mit-seam-s6-build-prev-context).
+Tests: test_prev_context.py 11 passed (numbered output, context_size<=0, no-pages, blank-skip+cap,
+current_page_index slice, use_original pull, L7 duplicate first-match, original-fallback, concurrent append vs
+pass); context regression (test_page_context/test_series_context) green; full suite 214 passed (same 19
+pre-existing async failures, no new breakage).
