@@ -23,6 +23,15 @@ GOLDEN = [
      ['What should', 'we do? We', 'can still hide', 'somewhere']),
     ((40, "THIS BRAT DOESNT REALIZE WHAT HE DID YET", 240, 500, "en_US", True),
      ['THIS BRAT', 'DOESNT', 'REALIZE', 'WHAT HE', 'DID YET']),
+    # edge: empty, single short word, char-split of an over-wide hyphenated word
+    ((40, "", 200, 400, "en_US", True), []),
+    ((40, "ok", 200, 400, "en_US", True), ['ok']),
+    ((40, "well-known co-op", 150, 400, "en_US", True), ['well-kno', 'wn co-op']),
+    # Thai (pythainlp word-break + zero-width-space path) and CJK
+    ((36, "ทดสอบการตัดบรรทัดภาษาไทยให้พอดี", 200, 500, "th_TH", True),
+     ['ทดสอบการตัด', 'บรรทัด', 'ภาษาไทยให้', 'พอดี']),
+    ((36, "これはテストですよろしく", 180, 500, "ja_JP", True),
+     ['これはテス', 'トですよろ', 'しく']),
 ]
 
 
