@@ -11,10 +11,13 @@
 
 ## 1. The provenance rule (read this before editing anything)
 
-A full tree diff against the legacy snapshot (ignoring line endings) shows **~99% of
-`manga_translator/` is pristine upstream code**. MangaDock's entire delta is:
+A full tree diff against the legacy snapshot (ignoring line endings) shows the bulk of
+`manga_translator/` is still pristine upstream **stage logic**, but `manga_translator.py`
+itself is now a thin driver: the #187/#188 decomposition carved its god-object internals into
+many small **byte-identical** modules that delegate back. MangaDock's entire delta is:
 
-- **13 modified + 7 new files** in `manga_translator/` (§5)
+- **13 modified + 11 new (features) files** in `manga_translator/` (§5)
+- **~22 new (#187/#188 decomposition) files** in `manga_translator/` (§5 decomposition subsection)
 - **5 modified + 5 new files** in `server/` (§5)
 
 **Rule:** before editing a file under `MIT/`, check §5.
@@ -173,7 +176,7 @@ Three sub-steps inside `dispatch()`:
 | `translators/qwen2.py` | env-driven model/precision via shared `build_load_kwargs` from qwen3 | config parity | Hardcoded 4-bit returns |
 | `utils/textblock.py` | mutable-default `shadow_offset` fix; empty `texts` guard | bug fixes | Crash on empty region texts |
 
-### `manga_translator/` — new (7)
+### `manga_translator/` — new (features, 11)
 - `sfx_merge.py` (#168) — pure geometry, no ML imports: `dedup_sfx_boxes()` drops second-pass SFX-detector boxes already covered (IoA ≥ 0.2 over the candidate's area) by a DBNet textline, so dialogue isn't double-detected. `test/test_sfx_merge.py`. (The AnimeText-YOLO wrapper + pipeline second-pass + proof are a separate slice — gated on model-download approval + the SFX reference pages.)
 - `bubble_association.py` (#170, +#166) — pure geometry, no ML imports: `associate_regions_to_bubbles()` tags each text-line region with the balloon mask containing its centroid (smallest-area nested wins; IoA fallback) and `group_regions()` does balloon-aware union-find grouping (different balloons never merge; same balloon always does). #166 adds `balloon_occupancy()` (how many regions share each balloon box — gates the renderer so only a sole occupant is fitted, else co-occupants would stack on one rect) and `union_box()` (clamped axis-aligned union — grows the patch crop to cover a balloon larger than its text-lines; floors mins / ceils maxes so float balloon coords never shrink the box, #bug-hunt). Unit-tested in <1s (`test/test_bubble_association.py`).
 - `font_fit.py` (#166, +#175) — pure arithmetic, no ML imports: `fit_font_size(box_wh, measure, low, high, margin=1.0)` binary-searches the largest font whose wrapped block fits the balloon box, via a caller-supplied `measure(size)->(w,h)` callback (the renderer passes one built on `calc_horizontal`; tests pass stubs). #175 adds `margin` — fit to a fraction of the box (e.g. 0.92) so glyph slack can't clip. Drives the `bubble_fit` path in `rendering/__init__.py` when `render.bubble_area_fit`. Replaced the earlier `sqrt(area-ratio)` heuristic, which near-no-op'd on dense boxes. `test/test_font_fit.py`.
@@ -188,6 +191,51 @@ Three sub-steps inside `dispatch()`:
   grayscale image, so the patch saves as mode `L` in that case. `translate_patches` captures
   `image.info['icc_profile']` and threads it to every patch encode. Guarded by
   `test/test_patch_png.py` (fixture: `test/testdata/dotgain20.icc`).
+- `series_context.py` (#157) — builds the per-series context string (manga title/synopsis) the
+  GPT-family translators prepend so the model knows which work it is translating.
+- `text_layer.py` (#158) — `regions_payload` builder: serialises translated regions into the
+  patch path's HTTP text-layer contract (`share.py:99`).
+- `sfx_detector.py` (#168) — AnimeText-YOLO SFX-detector wrapper (second detection pass);
+  best-effort, gated by `config.detector.det_sfx`; pairs with `sfx_merge.py`'s dedup.
+
+### `manga_translator/` — new: #187/#188 god-object decomposition (~22, byte-identical extractions)
+
+These modules were carved out of `manga_translator.py` (the ~3000-line god object) by the
+tech-debt decomposition (#187 stage orchestrators, #188 model lifecycle). Each is a
+**byte-identical** extraction proven by characterization tests; `manga_translator.py` now
+**delegates** to them. **Revert hazard (uniform):** re-syncing `manga_translator.py` from
+upstream drops the delegation imports → `ImportError`, and re-importing upstream deletes the
+module → the extracted logic *and its preserved landmines* vanish. Per-seam interface + the 16
+preserved landmines: `docs/research/mit-core-decomposition-analysis.md`; status + landmine list:
+`docs/reports/mit-refactor-progress.md`.
+
+Pure / value (no ML imports, unit-tested in <1s):
+- `region_filter.py` (S1) — `filter_translated_regions` (3-way filter dedup).
+- `region_apply.py` (S2) — `apply_translations` (zip-truncation **L10**), `apply_render_casing`, `apply_original_as_translation`.
+- `prev_context.py` (S6) — `build_prev_context` (per-mode index policy; **L7** first-match).
+- `context_counts.py` (S7) — `context_page_counts` log accounting.
+- `dictionary.py` (S8) — `load_dictionary` / `apply_dictionary` / `apply_post_dictionary` (re-exported for `__main__`).
+- `punctuation.py` — `correct_punctuation` (source-style quote/bracket restore).
+- `translation_checks.py` — `check_repetition_hallucination` + `check_target_language_ratio` (#109).
+- `translator_chain.py` (#192a) — `TranslatorChain` parse. · `line_break.py` (#180) — Knuth-Plass packer (wire pending).
+
+Stateful / async-orchestration (self-bound deps passed as callbacks; characterized via `asyncio.run`):
+- `model_usage_tracker.py` (S3) — `ModelUsageTracker` TTL timestamps (**L1** key-drift preserved).
+- `model_unloader.py` (S4) — `ModelUnloader` routing table (**L1** unknown-key no-op).
+- `memory_guard.py` (S5) — `release_memory` (gc + `empty_cache`).
+- `model_reaper.py` (S20) — `ModelReaper` TTL loop (opt-in `.stop()`, **L13/L14**).
+- `model_lifecycle.py` (S21) — `ModelLifecycle` facade (preload ×2 fold + `ensure_running`, **L16**).
+- `none_translator.py` (S9) — `apply_prep_manual_override` (**L12**) + `stamp_none_translations` (**L3**).
+- `translation_store.py` (S10) — `read`/`write_translations` (**L2** `exit(-1)` + the cp1252 latent encode bug preserved).
+- `image_debug_context.py` (S11) — `ImageDebugContext` (result_path + MD5 swap closures → `with_context`).
+- `pipeline_params.py` (S12) — `apply_global_settings` (`_MODEL_DIR` + TF32); value-object deferred (#192).
+- `detection_postproc.py` (S13) — `merge_sfx_detections` + `textline_aabb` (#168 second pass).
+- `translation_memory.py` (S16) — `TranslationMemory` (two cross-page lists + `reset`; **L9** bleed boundary explicit).
+- `gather_per_context.py` (S19) — `gather_per_context` (per-exception keep-original placeholder).
+- `text_translation_dispatcher.py` (S17) — `build_chatgpt_translator` + `dispatch_translate` (construction-order split; result_path direct/swap preserved).
+- `post_translation.py` (S18) — `apply_post_translation_processing` (punct + post-dict + phase-1 repetition retry) **+** the three phase-2 retry loops `single_` / `concurrent_` / `batch_lang_check_retry`. The loops are **NOT unified**: their `min_ratio` (0.5/0.3), region thresholds (≥6 / >10) and collect/reassign strategies (pad+enumerate / filter+text_idx / cross-context region_mapping) are load-bearing (**L6/L8**) and pinned as per-scope params. The single driver's own phase-1 variant stays inline (different logging/error-handling — a flagged change for later).
+- `stages.py` (S15) — the six leaf stage adapters (`run_colorizer`/`run_upscaling`/`run_detection`/`run_mask_refinement`/`run_inpainting`/`run_text_rendering`): the `read ctx-subset → dispatch_* → return value` core of the `_run_*` methods, so the many-arg `dispatch_*` calls (detection = 12 positional) are unit-testable by stubbing. The driver keeps each stage's `time.time()`+`touch()` instrumentation and delegates. **L15** (`**ctx` splat into `dispatch_colorization`) and **L5** (always-None `render_mask`) preserved. Groundwork for the StageRunner (S23).
+- `debug_sink.py` (S14) — the verbose debug-image save bodies (`input`/`mask_raw`/`bboxes_unfiltered`/`bboxes`/`inpainted`/`final`.png; verbose guard stays at call sites), the inpaint-preview pair (`save_inpaint_preview` **unguarded** single-driver vs `save_inpaint_preview_guarded` batch — divergence pinned as two functions; preview render passed in as a callback, no ML imports) and the `ocr_debug_dir_env` context manager (`MANGA_OCR_RESULT_DIR` set/restore + 3-branch ocrs/ dir). Leaves exactly **one** `cv2.imwrite` in the god object: the **L11** streaming-placeholder branch (flow control, `_is_streaming_mode` set nowhere in-repo).
 
 ### `server/` — modified (5)
 

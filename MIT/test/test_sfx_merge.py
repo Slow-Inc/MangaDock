@@ -21,11 +21,15 @@ def test_sfx_detector_second_pass_is_wired():
     det = (base / 'sfx_detector.py').read_text(encoding='utf-8')
     assert 'deepghs/AnimeText_yolo' in det and 'yolo12x_animetext/model.pt' in det
     assert 'def detect_sfx_boxes' in det and 'res.boxes.xyxy' in det
-    mt = (base / 'manga_translator.py').read_text(encoding='utf-8')
-    assert re.search(r'if\s+config\.detector\.det_sfx\s*:', mt)  # gated, opt-in
-    assert '_merge_sfx_detections' in mt
-    assert 'detect_sfx_boxes' in mt and 'dedup_sfx_boxes' in mt
-    assert 'Quadrilateral' in mt                                  # boxes → textlines
+    # #187 S15 moved the detection adapter (the det_sfx gate + merge call) into stages.py
+    stg = (base / 'stages.py').read_text(encoding='utf-8')
+    assert re.search(r'if\s+config\.detector\.det_sfx\s*:', stg)  # gated, opt-in (call site)
+    assert 'merge_sfx_detections' in stg                          # delegates to the module
+    # the merge logic itself lives in detection_postproc.py (#187 seam S13)
+    dpp = (base / 'detection_postproc.py').read_text(encoding='utf-8')
+    assert 'def merge_sfx_detections' in dpp
+    assert 'detect_sfx_boxes' in dpp and 'dedup_sfx_boxes' in dpp
+    assert 'Quadrilateral' in dpp                                 # boxes → textlines
     cfg = (base / 'config.py').read_text(encoding='utf-8')
     assert re.search(r'det_sfx:\s*bool\s*=\s*False', cfg)         # opt-in default
 

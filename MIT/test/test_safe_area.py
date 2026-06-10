@@ -23,8 +23,10 @@ def test_safe_area_is_wired_for_narrow_column_render():
     assert 'safe_area_box' in rnd
     assert '_bubble_interior_box' in rnd
     mt = (base / 'manga_translator.py').read_text(encoding='utf-8')
-    assert 'bubble_polygon' in mt   # carried in tagging + shifted in _build_local_region
-    assert len(re.findall(r'bubble_polygon', mt)) >= 2
+    assert 'bubble_polygon' in mt   # carried in tagging (_tag_regions_with_bubbles)
+    # #187 S24a moved _build_local_region's crop-coord shift into patch_geometry.py
+    pg = (base / 'patch_geometry.py').read_text(encoding='utf-8')
+    assert len(re.findall(r'bubble_polygon', pg)) >= 2   # getattr + shifted reassignment
 
 
 def test_render_parity_knobs_are_wired():
@@ -34,10 +36,12 @@ def test_render_parity_knobs_are_wired():
     assert re.search(r'en_comic_font:\s*bool\s*=\s*False', cfg)   # #176 opt-in
     assert re.search(r'supersampling:\s*int\s*=\s*1', cfg)        # #181 default off
     mt = (base / 'manga_translator.py').read_text(encoding='utf-8')
-    assert '_render_font_path' in mt and 'comic shanns' in mt     # #176
+    assert '_render_font_path' in mt and 'comic shanns' in mt     # #176 (font path stays in the driver)
     assert 'config.render.en_font' in mt                          # parity-B EN font override
     assert re.search(r'en_font:\s*Optional\[str\]\s*=\s*None', cfg)  # parity-B opt-in
-    assert 'supersampling=config.render.supersampling' in mt      # #181 threaded
+    # #187 S15 moved the renderer dispatch (carrying the #181 supersampling kwarg) into stages.py
+    stg = (base / 'stages.py').read_text(encoding='utf-8')
+    assert 'supersampling=config.render.supersampling' in stg     # #181 threaded
     rnd = (base / 'rendering' / '__init__.py').read_text(encoding='utf-8')
     assert 'supersampling' in rnd and 'INTER_AREA' in rnd         # #181 downscale seam
     assert 'np.clip(' in rnd                                      # #183 bounds clamp
@@ -48,9 +52,13 @@ def test_en_uppercase_lettering_is_wired():
     MIT pipeline still uppercases region.translation when render.uppercase is set
     (manga_translator.py — mirrors MangaTranslator pipeline.py:1375 `text.upper()`)."""
     base = Path(__file__).parent.parent / 'manga_translator'
+    # #187 seam S2 moved the casing out of manga_translator.py into region_apply.py
+    # (apply_render_casing); manga_translator triggers it via apply_casing=True.
     mt = (base / 'manga_translator.py').read_text(encoding='utf-8')
-    assert re.search(r'if\s+config\.render\.uppercase\s*:', mt)
-    assert '.upper()' in mt
+    assert 'apply_casing=True' in mt                               # single-page path wires it
+    ra = (base / 'region_apply.py').read_text(encoding='utf-8')
+    assert re.search(r'if\s+config\.render\.uppercase\s*:', ra)
+    assert '.upper()' in ra
     cfg = (base / 'config.py').read_text(encoding='utf-8')
     assert re.search(r'uppercase:\s*bool\s*=\s*False', cfg)        # opt-in default
 

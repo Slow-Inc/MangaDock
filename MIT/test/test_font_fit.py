@@ -88,6 +88,8 @@ def test_binary_search_fit_is_wired_into_the_renderer():
     assert 'font_max_box_ratio' in rnd
     assert re.search(r'font_max_box_ratio:\s*float\s*=\s*0\.5', cfg)  # opt-in default
 
-    mt = (base / 'manga_translator.py').read_text(encoding='utf-8')
-    assert 'config.render.bubble_area_fit' in mt  # render flag drives the renderer fit
-    assert 'union_box' in mt                       # crop grows to cover the balloon
+    # #187 S24b moved the patch-path balloon-grow (the bubble_area_fit gate +
+    # union_box crop expansion) out of translate_patches into patch_renderer.py.
+    pr = (base / 'patch_renderer.py').read_text(encoding='utf-8')
+    assert 'config.render.bubble_area_fit' in pr  # render flag drives the patch crop-grow
+    assert 'union_box' in pr                       # crop grows to cover the balloon
