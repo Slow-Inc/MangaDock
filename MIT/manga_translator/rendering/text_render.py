@@ -299,9 +299,15 @@ class Glyph:
         self.metrics.horiAdvance = glyph.metrics.horiAdvance
         self.metrics.vertAdvance = glyph.metrics.vertAdvance
 
-@functools.lru_cache(maxsize = 1024, typed = True)
-def get_char_glyph(cdpt: str, font_size: int, direction: int) -> Glyph:
-    global FONT_SELECTION
+def _select_face_for_char(cdpt: str, font_size: int, direction: int) -> freetype.Face:
+    """Pick the first FONT_SELECTION face that has a glyph for ``cdpt`` (falling
+    back to the last face when none cover it), size it for the given direction
+    (0 = horizontal, 1 = vertical), and return it.
+
+    Shared fallback loop for get_char_glyph / get_char_border, which previously
+    carried byte-identical copies differing only in the subsequent load_char
+    flags and the value they extract.
+    """
     for i, face in enumerate(FONT_SELECTION):
         if face.get_char_index(cdpt) == 0 and i != len(FONT_SELECTION) - 1:
             continue
@@ -309,22 +315,20 @@ def get_char_glyph(cdpt: str, font_size: int, direction: int) -> Glyph:
             face.set_pixel_sizes(0, font_size)
         elif direction == 1:
             face.set_pixel_sizes(font_size, 0)
-        face.load_char(cdpt)
-        return Glyph(face.glyph)
+        return face
+
+
+@functools.lru_cache(maxsize = 1024, typed = True)
+def get_char_glyph(cdpt: str, font_size: int, direction: int) -> Glyph:
+    face = _select_face_for_char(cdpt, font_size, direction)
+    face.load_char(cdpt)
+    return Glyph(face.glyph)
 
 #@functools.lru_cache(maxsize = 1024, typed = True)
 def get_char_border(cdpt: str, font_size: int, direction: int):
-    global FONT_SELECTION
-    for i, face in enumerate(FONT_SELECTION):
-        if face.get_char_index(cdpt) == 0 and i != len(FONT_SELECTION) - 1:
-            continue
-        if direction == 0:
-            face.set_pixel_sizes(0, font_size)
-        elif direction == 1:
-            face.set_pixel_sizes(font_size, 0)
-        face.load_char(cdpt, freetype.FT_LOAD_DEFAULT | freetype.FT_LOAD_NO_BITMAP)
-        slot_border = face.glyph
-        return slot_border.get_glyph()
+    face = _select_face_for_char(cdpt, font_size, direction)
+    face.load_char(cdpt, freetype.FT_LOAD_DEFAULT | freetype.FT_LOAD_NO_BITMAP)
+    return face.glyph.get_glyph()
 
 # def get_char_kerning(cdpt, prev, font_size: int, direction: int):
 #     global FONT_SELECTION
