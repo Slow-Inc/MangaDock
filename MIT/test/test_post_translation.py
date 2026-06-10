@@ -174,3 +174,57 @@ def test_concurrent_retry_filters_empty_and_reassigns_by_text_idx():
     assert regions[0].translation == 'A'         # reassigned
     assert regions[1].translation == 'keep_empty'  # empty region untouched
     assert regions[2].translation == 'C'
+
+
+# ============================================================================
+# single_page_lang_check_retry — single driver, min_ratio 0.5, threshold 6,
+# pad-with-empty + enumerate reassign (the divergence vs concurrent), plus the
+# skip-log and unified success/failure message the concurrent path lacks.
+# ============================================================================
+
+def _run_single(regions, config, ctx, *, min_regions, min_ratio, check_ratio, batch_translate):
+    return asyncio.run(pt.single_page_lang_check_retry(
+        regions, config, ctx, min_regions=min_regions, min_ratio=min_ratio,
+        check_ratio=check_ratio, batch_translate=batch_translate))
+
+
+def test_single_noop_when_check_disabled():
+    async def check_ratio(*a, **k):
+        raise AssertionError('check_ratio called while disabled')
+    _run_single([_region('a', 'b')], _ccfg(enable_check=False), object(),
+                min_regions=6, min_ratio=0.5, check_ratio=check_ratio, batch_translate=_boom)
+
+
+def test_single_below_threshold_skips_check_but_reports_success(caplog):
+    import logging
+    regions = [_region(f'r{i}', f't{i}') for i in range(5)]  # 5 < 6
+    async def check_ratio(*a, **k):
+        raise AssertionError('check_ratio must not run below threshold')
+    with caplog.at_level(logging.INFO, logger='manga_translator'):
+        _run_single(regions, _ccfg(), object(),
+                    min_regions=6, min_ratio=0.5, check_ratio=check_ratio, batch_translate=_boom)
+    msgs = [r.message for r in caplog.records]
+    assert any('Skipping page-level target language check: only 5 regions' in m for m in msgs)
+    assert 'All translation regions passed post-translation check.' in msgs
+
+
+def test_single_retry_pads_empty_and_reassigns_by_enumerate():
+    # pad-with-empty: empty-text region contributes "" to the request and its
+    # enumerate index still lines up; reassign skips falsy new translations.
+    regions = [_region('a', 'old_a'), _region('', 'keep'), _region('c', 'old_c'),
+               _region('d', 'old_d'), _region('e', 'old_e'), _region('f', 'old_f')]
+    results = iter([False, True])
+    async def check_ratio(rs, target, min_ratio):
+        assert min_ratio == 0.5
+        return next(results)
+    captured = {}
+    async def batch_translate(texts, config, ctx):
+        captured['texts'] = list(texts)
+        # index 1 (the padded "") returns falsy → must be skipped on reassign
+        return ['A', '', 'C', 'D', 'E', 'F']
+    _run_single(regions, _ccfg(max_retry=3), object(),
+                min_regions=6, min_ratio=0.5, check_ratio=check_ratio, batch_translate=batch_translate)
+    assert captured['texts'] == ['a', '', 'c', 'd', 'e', 'f']  # padded, index-aligned
+    assert regions[0].translation == 'A'
+    assert regions[1].translation == 'keep'   # falsy new[1] → original kept
+    assert regions[2].translation == 'C'
