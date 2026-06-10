@@ -3,6 +3,20 @@
 
 ---
 
+## S23→S26a god-object tail — 5 byte-identical seams + batched E2E (2026-06-10, /tdd, xhigh)
+
+Pushed the high-risk async-orchestration tail of #187 in one session, one commit per seam, each byte-identical (`git diff -w` = zero semantic change on kept lines) and unit-tested. **Driver `manga_translator.py` 2235 → 1934 lines** (this session; **3040 → 1934 = −36%** since the decomposition began). Suite went 18 async-only baseline + **323 passed** (+16 new cases).
+
+- **S23 StageRunner** (`f1ce7a3`) — `stage_runner.run_stage(name, fn, fallback, *, report_progress, ignore_errors, logger)` + thin `_run_stage`. Folded the identical report-progress → try → `ignore_errors` (re-raise | fallback) + `"Error during {name}"` log block that repeated **14×** (8 in `_translate`, 5 in `_translate_until_translation`, leaving 1). **Rendering kept inline** — it reports `'rendering'` then a conditional `'rendering_folder:'` BEFORE running, and `_run_stage` couples report+run, so folding would double-report + reorder. `logger` injected so `set_main_logger` swaps are honoured. 5 cases.
+- **S24a patch_geometry** (`2eac7dd`) — three `self`-free numpy/cv2 helpers (`build_local_region` coord-shift+cache-clear, `create_text_only_mask` fillPoly+adaptive dilate, `crop_mask_for_patch` same-size/scaled crop+binarize) → `patch_geometry.py`, thin delegates. 8 golden-numpy cases.
+- **S24b PatchRenderer** (`8fa69d3`) — the ~90-line `_process_group` closure (crop→mask→inpaint→render→PNG, GPU semaphore, 30s `wait_for`) → `PatchRenderer.process_group`; body kept verbatim via local-aliasing, only the 6 helper calls rewritten. `{x,y,w,h,img_png}` HTTP contract (pickled at share.py:99) + every fallback preserved. Removed the now-orphan `encode_patch_png` import. 3 stub-orchestration cases.
+- **S25 PipelineOrchestrator** (`dfa0eb1`) — `_run_until_translation_stages(ctx,config)->(ctx,finished)` folds the ~80-line colorize→pre-dict block shared by both drivers (the dup S23 deliberately left). early-exit returns `(revert,True)` ⇒ caller `if finished: return ctx` = byte-identical. **L4 dead `'cancel'` branches preserved** (dead-code removal is a separate opt-in fix). 3 cases.
+- **S26a batch_orchestration** (`70792af`) — `placeholder_context` (dedup 2 failure-branch sites) + `build_page_translation_record` (the L7 `{raw:translation}`+`{idx:raw}` records appended to TranslationMemory). The MemoryError pre-process ladder (**S26b**) stays in the driver for a focused pass. 3 golden cases.
+
+Two stale source-inspection wiring tests re-pointed across the new module boundaries (`test_safe_area` bubble_polygon → patch_geometry, `test_font_fit` bubble_area_fit+union_box → patch_renderer) — same maintenance S15 did for stages.py.
+
+**E2E (batched — one MIT restart for all five seams).** MIT stopped (released ~7.7GB → commit-free 9.8→17.5GB, clearing the OSError-1455 risk) and restarted on the new code (`/ready` 200, fresh PIDs); `cache:reset` + fresh backend L1; translated Kouchuugun ch1 p0 EN→TH through the **production tunnel** while logged in. Result: **2 patches, pixel-exact `649×1492` + `451×1489` = byte-identical to the pre-refactor baseline**; the page rendered correct Thai with narrow-column wrapping (#179) intact. The translate_patches path (touched by S24/S25/S26a) is the most-exercised hot path, so this is the strongest byte-identity confirmation. Remaining tail: **S26b** MemoryError ladder, **S22** DispatchRegistry (#188), S12 value-object (🔒 #192).
+
 ## HOTFIX (critical): per-chapter Cloudflare Worker /v1/list cost-bleed (2026-06-10, /debug-mantra + /tdd)
 
 `MangaDexService.attachLocalStatus` fired one R2 `/v1/list` per chapter (`Promise.all(chapters.map(hasChapterCache))`) on EVERY chapter-list load — including the Redis cache-hit path — ungated by `forceLocal`. An N-chapter manga cost N Class-A list ops per load × every re-fetch (home grid re-fetches ~11/min; 507 chapter-list reqs/46min observed) → tens of thousands of worker list ops/session, unbounded. The R2 provider logs no outbound calls, so it was invisible in our logs (seen only on the Worker side).
