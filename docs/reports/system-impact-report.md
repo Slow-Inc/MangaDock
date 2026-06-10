@@ -15,6 +15,46 @@
 
 ---
 
+## 2026-06-10 — MIT god-object decomposition stack (S13–S18) + test-pollution fix + E2E
+
+Branch: `refactor/mit-seam-s17-text-translation-dispatcher` (stacks S13/S16/S17/S19/S21/S18 on the
+landed S1–S12 work). Every seam is a **byte-identical** extraction behind characterization tests —
+**zero runtime behaviour change**; the value is tech-debt: the ~3000-line `manga_translator.py` god
+object shedding internals into small, unit-tested modules. Per-seam detail: `MIT/PIPELINE.md §5`
+(decomposition subsection), `docs/reports/mit-refactor-progress.md`, `DONE.md`.
+
+### Shipped — decomposition seams (byte-identical, no behaviour change)
+| Seam | Extracted to | System impact | Validation |
+|---|---|---|---|
+| S13 DetectionPostProcessor | `detection_postproc.py` | none (byte-identical) | unit + suite |
+| S16 TranslationMemory | `translation_memory.py` | none | unit + suite |
+| S17 TextTranslationDispatcher | `text_translation_dispatcher.py` | none | unit + E2E |
+| S19 gather_per_context | `gather_per_context.py` | none | asyncio unit |
+| S21 ModelLifecycle facade | `model_lifecycle.py` | none | unit + E2E |
+| S18 PostTranslationProcessor | `post_translation.py` (4 fns) | none | unit + E2E |
+
+### Before → After (headline, full fields)
+
+**S18 · post-translation processing relocated (NOT unified)** — *What/where:* the punct+post-dict+phase-1 helper and the three phase-2 page-level lang-check retry loops carved out of `manga_translator.py`'s single/concurrent/batch drivers into `post_translation.py` (4 functions; drivers delegate). *Why:* the four "copies" were buried + untestable, and the documented "unify 4 copies" premise was unsafe — close reading showed the retry loops are structurally divergent (`min_ratio` 0.5/0.3, threshold ≥6/>10, pad+enumerate vs filter+text_idx vs cross-context region_mapping) and load-bearing (L6/L8); unifying would change output, so they're pinned as per-scope params. *Before → After:* ~290 lines of duplicated-but-divergent orchestration inline in the god object → 4 named, unit-tested functions; divergence now explicit + documented. *Perf Δ:* none (same code path). *Quality:* byte-identical output; future unify-decision is now visible. *Validation:* 13 characterization cases + full suite (18 async-only baseline, **295 passed**) + E2E (below). *Risk:* byte-identical; revert = 4 commits (S18a–d). *Links:* `a5f7585`,`fd628bc`,`9458dfd`,`a5cde22`; #187.
+
+**Test-suite pollution fix (pre-existing)** — *What/where:* `MIT/test_precision.py` + `MIT/test_qwen3_translator.py` stub `omegaconf`/`manga_translator` into `sys.modules` at import time and never restore. *Why:* during a full `pytest` run those stubs (installed at collection) shadow the real modules for every later test → 8 spurious failures (`test_detection_postproc`, `test_series_context`, `test_mit_config`) that all pass in isolation. Pre-existing — both files sit on `main`, untouched by the refactor. *Before → After:* full suite **26 failed → 18** (the unchanged async-only baseline), 295 passed. *Perf Δ:* N/A. *Quality:* suite signal trustworthy in a single run (was masking real failures). *Validation:* full suite + qwen3/precision own tests 12/12 green. *Risk:* test-only; save-then-restore `sys.modules`. *Links:* `0db9479`.
+
+### Validation — E2E (production tunnel, mandatory original↔translated)
+Through `https://hayateotsu.space/` (cloudflared tunnel, per the `frontend-testing` skill — never
+localhost). Test page: **Kouchuugun Shikan Boukensha ni Naru** ch1 "Emergency Landing" page 0
+(EN→TH, custom_openai / 9arm). Ran **twice**: after S17/S21, then again after restarting MIT on the
+S18 code with the 3-layer cache cleared. **Both runs identical:** `page=0 → 2 patches`, geometry
+**649×1492 + 451×1489**, POST `translate-patches` 201/success (~35 s), Thai text correctly
+positioned, art/layout/panels unchanged — byte-identical to the documented bubble-seg-off baseline.
+No 500s; only the standard `/pages` 401→200 HWID auth handshake. Screenshots `e2e-s17-p1-*.png`,
+`e2e-s18-p1-translated.png`.
+
+### Risk / rollback
+Whole stack byte-identical + characterization-covered; branch pushed (`aa918cb..834a522`) for
+rollback. PR to `main` pending user confirm.
+
+---
+
 ## 2026-06-09 — Render parity (MangaTranslator) + MIT tech-debt audit
 
 Branch: `feat/context-aware-translation`. All translation-render changes are **opt-in env knobs,
