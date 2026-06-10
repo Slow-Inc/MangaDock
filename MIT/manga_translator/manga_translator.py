@@ -38,6 +38,8 @@ from .debug_sink import (
     save_mask_raw,
     save_bboxes_unfiltered,
     save_bboxes,
+    save_inpaint_preview,
+    save_inpaint_preview_guarded,
     save_inpainted,
     save_final,
 )
@@ -536,10 +538,11 @@ class MangaTranslator:
                 ctx.mask = ctx.mask_raw if ctx.mask_raw is not None else np.zeros_like(ctx.img_rgb, dtype=np.uint8)[:,:,0] # Fallback to raw mask or empty mask
 
         if self.verbose and ctx.mask is not None:
-            inpaint_input_img = await dispatch_inpainting(Inpainter.none, ctx.img_rgb, ctx.mask, config.inpainter,config.inpainter.inpainting_size,
-                                                          self.device, self.verbose)
-            cv2.imwrite(self._result_path('inpaint_input.png'), cv2.cvtColor(inpaint_input_img, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(self._result_path('mask_final.png'), ctx.mask)
+            # #187 S14: unguarded variant — body in debug_sink (the batch driver's is guarded)
+            await save_inpaint_preview(
+                ctx.mask, self._result_path,
+                lambda: dispatch_inpainting(Inpainter.none, ctx.img_rgb, ctx.mask, config.inpainter,config.inpainter.inpainting_size,
+                                            self.device, self.verbose))
 
         # -- Inpainting
         await self._report_progress('inpainting')
@@ -2114,24 +2117,11 @@ class MangaTranslator:
                 ctx.mask = ctx.mask_raw if ctx.mask_raw is not None else np.zeros_like(ctx.img_rgb, dtype=np.uint8)[:,:,0]
 
         if self.verbose and ctx.mask is not None:
-            try:
-                inpaint_input_img = await dispatch_inpainting(Inpainter.none, ctx.img_rgb, ctx.mask, config.inpainter,config.inpainter.inpainting_size,
-                                                              self.device, self.verbose)
-                
-                # 保存inpaint_input.png
-                inpaint_input_path = self._result_path('inpaint_input.png')
-                success1 = cv2.imwrite(inpaint_input_path, cv2.cvtColor(inpaint_input_img, cv2.COLOR_RGB2BGR))
-                if not success1:
-                    logger.warning(f"Failed to save debug image: {inpaint_input_path}")
-                
-                # 保存mask_final.png
-                mask_final_path = self._result_path('mask_final.png')
-                success2 = cv2.imwrite(mask_final_path, ctx.mask)
-                if not success2:
-                    logger.warning(f"Failed to save debug image: {mask_final_path}")
-            except Exception as e:
-                logger.error(f"Error saving debug images (inpaint_input.png, mask_final.png): {e}")
-                logger.debug(f"Exception details: {traceback.format_exc()}")
+            # #187 S14: guarded variant — body in debug_sink (the single driver's is unguarded)
+            await save_inpaint_preview_guarded(
+                ctx.mask, self._result_path,
+                lambda: dispatch_inpainting(Inpainter.none, ctx.img_rgb, ctx.mask, config.inpainter,config.inpainter.inpainting_size,
+                                            self.device, self.verbose))
 
         # -- Inpainting
         await self._report_progress('inpainting')

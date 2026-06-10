@@ -74,6 +74,39 @@ def save_inpainted(img_inpainted, result_path):
         logger.debug(f"Exception details: {traceback.format_exc()}")
 
 
+async def save_inpaint_preview(mask, result_path, make_preview):
+    """UNGUARDED (single driver): render the Inpainter.none preview via the
+    caller's `make_preview` and write inpaint_input.png + mask_final.png bare —
+    an exception propagates. The guarded batch variant is a separate function;
+    the divergence is load-bearing (analysis §3, S14)."""
+    inpaint_input_img = await make_preview()
+    cv2.imwrite(result_path('inpaint_input.png'), cv2.cvtColor(inpaint_input_img, cv2.COLOR_RGB2BGR))
+    cv2.imwrite(result_path('mask_final.png'), mask)
+
+
+async def save_inpaint_preview_guarded(mask, result_path, make_preview):
+    """GUARDED (batch back-half driver): same two writes, but the whole block —
+    including the preview render — sits in try/except with per-file success
+    checks."""
+    try:
+        inpaint_input_img = await make_preview()
+
+        # 保存inpaint_input.png
+        inpaint_input_path = result_path('inpaint_input.png')
+        success1 = cv2.imwrite(inpaint_input_path, cv2.cvtColor(inpaint_input_img, cv2.COLOR_RGB2BGR))
+        if not success1:
+            logger.warning(f"Failed to save debug image: {inpaint_input_path}")
+
+        # 保存mask_final.png
+        mask_final_path = result_path('mask_final.png')
+        success2 = cv2.imwrite(mask_final_path, mask)
+        if not success2:
+            logger.warning(f"Failed to save debug image: {mask_final_path}")
+    except Exception as e:
+        logger.error(f"Error saving debug images (inpaint_input.png, mask_final.png): {e}")
+        logger.debug(f"Exception details: {traceback.format_exc()}")
+
+
 def save_final(result, result_path):
     """在verbose模式下保存final.png到调试文件夹 (guarded; `_revert_upscale`)."""
     try:
