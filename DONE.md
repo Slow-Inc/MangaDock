@@ -3,6 +3,15 @@
 
 ---
 
+## S14 VerboseDebugSink — fold the scattered verbose debug saves (2026-06-10, /tdd)
+
+New module `MIT/manga_translator/debug_sink.py` + `test_debug_sink.py` (15 characterization cases), three byte-identical increments, one commit each:
+- **S14a** the six save bodies — `input.png`/`mask_raw.png`/`bboxes_unfiltered.png`/`bboxes.png` (duplicated verbatim in the single + patch drivers), `inpainted.png` (single + batch back-half), `final.png` (`_revert_upscale`). Verbose guard stays at each call site; each save now exists once. Guarded-vs-unguarded split pinned as-is (input/inpainted/final = try/except + success-check warning; mask_raw/bboxes* = bare, exceptions propagate).
+- **S14b** the inpaint-preview pair — `save_inpaint_preview` (single driver, **unguarded**) vs `save_inpaint_preview_guarded` (batch back-half, whole block incl. preview render guarded with per-file success checks). The divergence is load-bearing (analysis S14) → pinned as two functions, not a flag; the `dispatch_inpainting(Inpainter.none, ...)` render stays at the call site as a `make_preview` callback so debug_sink has no ML imports.
+- **S14c** `ocr_debug_dir_env` context manager — `_run_ocr`'s `MANGA_OCR_RESULT_DIR` dance (verbose → 3-branch dir construction + makedirs → set env for `dispatch_ocr` → always restore in finally). `get_image_subfolder` passed as a callable, only consulted when verbose. Tested with real makedirs against tmp_path + restore-on-raise.
+
+Result: `manga_translator.py` is down to a **single `cv2.imwrite`** — the streaming-placeholder branch (L11 `_is_streaming_mode`, set nowhere in-repo), which is flow control and stays inline. Suite: 18 async-only baseline, **310 passed**. **E2E re-validated** (MIT restarted on S14 code, cache cleared): Kouchuugun ch1 p0 → 2 patches **649×1492 + 451×1489** — third identical run; `ocr_debug_dir_env` sits on every translation's hot path and behaves byte-identically. Unblocks S23 StageRunner (needs S15 next).
+
 ## S18 PostTranslationProcessor — relocate (not unify) 4 copies (2026-06-10, /tdd)
 
 The documented S18 premise was "unify 4 copies of post-translation processing". Close reading showed the four are **not** a clean byte-identical dedup: the genuinely-identical part (`filter_translated_regions`) was already extracted in S1, and the three phase-2 retry loops are **structurally divergent and load-bearing** (L6/L8) — single uses min_ratio 0.5 / threshold ≥6 / pad-with-empty + enumerate; concurrent uses 0.3 / ≥6 / filter + text_idx; batch uses 0.5 / >10 / cross-context region_mapping, plus divergent log strings. Forcing them into one function needs per-scope collect/reassign/log callbacks — that *adds* complexity to prop up a merge, against the North Star. The user steered "reduce long-term debt", so the chosen interpretation is **relocate + make testable + pin the divergence as explicit params**, not unify.

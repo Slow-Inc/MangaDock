@@ -4,7 +4,7 @@
 > then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
 > landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-10. **S1–S12 on `main` (PR #195).** On the `refactor/mit-seam-s17…` stack (pushed, PR-to-main pending): **S20 + S13 + S16 + S19 + S21 + S17 + S18** — the high-risk async-orchestration core through S18 now landed, each E2E-validated where it touches output (S17/S21/S18 via the production tunnel: Kouchuugun p0 = 2 patches 649×1492+451×1489, byte-identical). A pre-existing `sys.modules` test-pollution bug (test_precision/test_qwen3_translator) was fixed so the **full** suite is a reliable 18 async-only baseline (was masking 8 failures); current totals **18 baseline + 295 passed**.
 >
-> **Remaining = the high-risk async-orchestration core (tail):** S15 stage-protocol (abstract groundwork), S22 DispatchRegistry, S23 StageRunner, S24 PatchRenderer, S25 PipelineOrchestrator, S26 BatchModeOrchestrator (last). Plus S12 value-object (🔒 #192) and **S14 VerboseDebugSink (now UNBLOCKED — S18 landed)**. Each needs E2E-per-step, not AFK.
+> **Remaining = the high-risk async-orchestration core (tail):** S15 stage-protocol (abstract groundwork, ▶️ next), S22 DispatchRegistry, S23 StageRunner (unblocked by S15 once landed — S11/S14 ✅), S24 PatchRenderer, S25 PipelineOrchestrator, S26 BatchModeOrchestrator (last). Plus S12 value-object (🔒 #192). S14 landed 2026-06-10 (debug_sink, E2E'd). Each needs E2E-per-step, not AFK.
 
 > **New latent bug found (preserve for now, fix later behind a flag):** `write_translations`
 > (was inline `--save-text`) opens the file with NO `encoding=`, so on a non-UTF-8 default
@@ -72,7 +72,7 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | **S17** | `TextTranslationDispatcher` (collapse duplicated switch) | async-orch | high | ✅ (unit + E2E 2026-06-10) | `text_translation_dispatcher.py` (`build_chatgpt_translator` + `dispatch_translate`; construction-order + result_path direct/swap + batch_contexts preserved). E2E: Kouchuugun ch1 p1 EN→TH via tunnel, 2 patches 649×1492+451×1489 = baseline exact |
 | **S18** | `PostTranslationProcessor` (relocate 4 copies; pin L6/L8 as params) | async-orch | high | ✅ (unit; E2E 2026-06-10) | `post_translation.py` — S18a helper (punct+post-dict+phase1) + S18b/c/d the 3 phase-2 retry loops. **NOT unified**: min_ratio 0.5/0.3, threshold ≥6/>10, collect/reassign (pad+enumerate / filter+text_idx / region_mapping) are load-bearing (L6/L8) → kept as per-scope params. 13 characterization cases |
 | **S19** | `gather_per_context` (per-exception placeholder) | async-orch | med | ✅ | `gather_per_context.py` (gather + placeholder; last AFK seam) |
-| **S14** | `VerboseDebugSink` (cv2.imwrite/OCR-env/streaming) | stateful | med | ▶️ next (unblocked) | S18 ✅ |
+| **S14** | `VerboseDebugSink` (cv2.imwrite/OCR-env/streaming) | stateful | med | ✅ (unit + E2E 2026-06-10) | `debug_sink.py` — S14a six save bodies (guarded/unguarded split pinned) + S14b inpaint-preview pair (unguarded vs guarded = 2 fns) + S14c `ocr_debug_dir_env` ctx-manager. god object down to 1 `cv2.imwrite` (L11 streaming branch, flow control, inline). 15 cases |
 | **S23** | `StageRunner` (uniform progress + try/except policy) | async-orch | high | ⬜ | S15,S11,S14 |
 | **S24** | `PatchRenderer` (extract `_process_group`; share.py:99 contract) | async-orch | med | ⬜ | S23 |
 | **S22** | `DispatchRegistry` (onto existing `ModelWrapper`; #188 downstream) | stateful | high | ⬜ | S4 |

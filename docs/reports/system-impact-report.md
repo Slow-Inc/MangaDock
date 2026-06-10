@@ -32,6 +32,7 @@ object shedding internals into small, unit-tested modules. Per-seam detail: `MIT
 | S19 gather_per_context | `gather_per_context.py` | none | asyncio unit |
 | S21 ModelLifecycle facade | `model_lifecycle.py` | none | unit + E2E |
 | S18 PostTranslationProcessor | `post_translation.py` (4 fns) | none | unit + E2E |
+| S14 VerboseDebugSink | `debug_sink.py` (9 fns/ctx-mgr) | none | unit + E2E |
 
 ### Before → After (headline, full fields)
 
@@ -42,8 +43,8 @@ object shedding internals into small, unit-tested modules. Per-seam detail: `MIT
 ### Validation — E2E (production tunnel, mandatory original↔translated)
 Through `https://hayateotsu.space/` (cloudflared tunnel, per the `frontend-testing` skill — never
 localhost). Test page: **Kouchuugun Shikan Boukensha ni Naru** ch1 "Emergency Landing" page 0
-(EN→TH, custom_openai / 9arm). Ran **twice**: after S17/S21, then again after restarting MIT on the
-S18 code with the 3-layer cache cleared. **Both runs identical:** `page=0 → 2 patches`, geometry
+(EN→TH, custom_openai / 9arm). Ran **three times**: after S17/S21, after restarting MIT on the
+S18 code, and after restarting on the S14 code — each with the 3-layer cache cleared. **All runs identical:** `page=0 → 2 patches`, geometry
 **649×1492 + 451×1489**, POST `translate-patches` 201/success (~35 s), Thai text correctly
 positioned, art/layout/panels unchanged — byte-identical to the documented bubble-seg-off baseline.
 No 500s; only the standard `/pages` 401→200 HWID auth handshake. Screenshots `e2e-s17-p1-*.png`,
