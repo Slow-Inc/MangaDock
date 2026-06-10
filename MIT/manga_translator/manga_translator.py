@@ -33,7 +33,11 @@ from .gather_per_context import gather_per_context
 from .model_lifecycle import ModelLifecycle
 from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
-from .post_translation import apply_post_translation_processing, concurrent_page_lang_check_retry
+from .post_translation import (
+    apply_post_translation_processing,
+    concurrent_page_lang_check_retry,
+    single_page_lang_check_retry,
+)
 import py3langid as langid
 
 from .config import Config, Colorizer, Detector, Translator, Renderer, Inpainter
@@ -983,84 +987,13 @@ class MangaTranslator:
                     await self._retry_translation_with_validation(region, config, ctx)
                 logger.info("Repetition check retry finished.")
 
-        # 译后检查和重试逻辑 - 第二阶段：页面级目标语言检查（使用过滤后的区域）
-        if config.translator.enable_post_translation_check:
-            
-            # 页面级目标语言检查（使用过滤后的区域数量）
-            page_lang_check_result = True
-            if ctx.text_regions and len(ctx.text_regions) >= self._PAGE_LANG_CHECK_MIN_REGIONS:
-                logger.info(f"Starting page-level target language check with {len(ctx.text_regions)} regions...")
-                page_lang_check_result = await self._check_target_language_ratio(
-                    ctx.text_regions,
-                    config.translator.target_lang,
-                    min_ratio=0.5
-                )
-                
-                if not page_lang_check_result:
-                    logger.warning("Page-level target language ratio check failed")
-                    
-                    # 第二阶段：整个批次重新翻译逻辑
-                    max_batch_retry = config.translator.post_check_max_retry_attempts
-                    batch_retry_count = 0
-                    
-                    while batch_retry_count < max_batch_retry and not page_lang_check_result:
-                        batch_retry_count += 1
-                        logger.warning(f"Starting batch retry {batch_retry_count}/{max_batch_retry} for page-level target language check...")
-                        
-                        # 重新翻译所有区域
-                        original_texts = []
-                        for region in ctx.text_regions:
-                            if hasattr(region, 'text') and region.text:
-                                original_texts.append(region.text)
-                            else:
-                                original_texts.append("")
-                        
-                        if original_texts:
-                            try:
-                                # 重新批量翻译
-                                logger.info(f"Retrying translation for {len(original_texts)} regions...")
-                                new_translations = await self._batch_translate_texts(original_texts, config, ctx)
-                                
-                                # 更新翻译结果到regions
-                                for i, region in enumerate(ctx.text_regions):
-                                    if i < len(new_translations) and new_translations[i]:
-                                        old_translation = region.translation
-                                        region.translation = new_translations[i]
-                                        logger.debug(f"Region {i+1} translation updated: '{old_translation}' -> '{new_translations[i]}'")
-                                    
-                                # 重新检查目标语言比例
-                                logger.info(f"Re-checking page-level target language ratio after batch retry {batch_retry_count}...")
-                                page_lang_check_result = await self._check_target_language_ratio(
-                                    ctx.text_regions,
-                                    config.translator.target_lang,
-                                    min_ratio=0.5
-                                )
-                                
-                                if page_lang_check_result:
-                                    logger.info(f"Page-level target language check passed")
-                                    break
-                                else:
-                                    logger.warning(f"Page-level target language check still failed")
-                                    
-                            except Exception as e:
-                                logger.error(f"Error during batch retry {batch_retry_count}: {e}")
-                                break
-                        else:
-                            logger.warning("No text found for batch retry")
-                            break
-                    
-                    if not page_lang_check_result:
-                        logger.error(f"Page-level target language check failed after all {max_batch_retry} batch retries")
-                else:
-                    logger.info("Page-level target language ratio check passed")
-            else:
-                logger.info(f"Skipping page-level target language check: only {len(ctx.text_regions)} regions (threshold: 5)")
-            
-            # 统一的成功信息
-            if page_lang_check_result:
-                logger.info("All translation regions passed post-translation check.")
-            else:
-                logger.warning("Some translation regions failed post-translation check.")
+        # 译后检查和重试逻辑 - 第二阶段 — #187 S18: body in post_translation.single_page_lang_check_retry
+        await single_page_lang_check_retry(
+            ctx.text_regions, config, ctx,
+            min_regions=self._PAGE_LANG_CHECK_MIN_REGIONS, min_ratio=0.5,
+            check_ratio=self._check_target_language_ratio,
+            batch_translate=self._batch_translate_texts,
+        )
 
         # 过滤逻辑（简化版本，保留主要过滤条件）
         new_text_regions = filter_translated_regions(ctx.text_regions, config)
