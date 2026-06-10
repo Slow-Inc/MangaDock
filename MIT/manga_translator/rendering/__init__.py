@@ -108,6 +108,34 @@ def _bubble_interior_box(region, bubble_box, crop_shape):
     return int(bx2 - bx1), int(by2 - by1), ((bx1 + bx2) / 2.0, (by1 + by2) / 2.0)
 
 
+def _expand_single_axis(region, needed_count: int, used_count: int, horizontal_axis: bool):
+    """If the wrapped translation needs more lines than the detection box has,
+    scale the region's unrotated min-rect along the text's wrap axis to make
+    room and return the rotated int64 dst_points; else None.
+
+    Shared by the horizontal (rows → x-axis) and vertical (cols → y-axis)
+    expansion, which previously carried byte-identical scale/rotate/except blocks
+    differing only in the line-count source and which axis is scaled. The caller
+    passes horizontal_axis explicitly (not inferred from region.horizontal) so
+    the original two-independent-`if` behaviour is preserved exactly.
+    """
+    if not (needed_count > used_count and used_count > 0):
+        return None
+    scale_x = ((needed_count - used_count) / used_count) * 1 + 1
+    xfact, yfact = (scale_x, 1.0) if horizontal_axis else (1.0, scale_x)
+    try:
+        poly = Polygon(region.unrotated_min_rect[0])
+        minx, miny, maxx, maxy = poly.bounds
+        poly = affinity.scale(poly, xfact=xfact, yfact=yfact, origin=(minx, miny))
+        pts = np.array(poly.exterior.coords[:4])
+        dst_points = rotate_polygons(
+            region.center, pts.reshape(1, -1), -region.angle, to_int=False
+        ).reshape(-1, 4, 2)
+        return dst_points.astype(np.int64)
+    except Exception:
+        return None
+
+
 def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO):
     """
     Adjust text region size to accommodate font size and translated text length.
@@ -178,10 +206,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         single_axis_expanded = False
         dst_points = None
         
-        if region.horizontal: 
-            used_rows = len(region.texts)
-            # logger.debug(f"Horizontal text - used rows: {used_rows}")
-            
+        if region.horizontal:
             line_text_list, _ = text_render.calc_horizontal(
                 region.font_size,
                 region.translation,
@@ -189,63 +214,21 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 max_height=region.unrotated_size[1],
                 language=getattr(region, "target_lang", "en_US")
             )
-            needed_rows = len(line_text_list)
-            # logger.debug(f"Needed rows: {needed_rows}")
+            expanded = _expand_single_axis(region, len(line_text_list), len(region.texts), True)
+            if expanded is not None:
+                dst_points = expanded
+                single_axis_expanded = True
 
-            if needed_rows > used_rows and used_rows > 0:  # used_rows>0 guards /0 on empty texts
-                scale_x = ((needed_rows - used_rows) / used_rows) * 1 + 1
-                try:  
-                    poly = Polygon(region.unrotated_min_rect[0])
-                    minx, miny, maxx, maxy = poly.bounds
-                    poly = affinity.scale(poly, xfact=scale_x, yfact=1.0, origin=(minx, miny))        
-                
-                    pts = np.array(poly.exterior.coords[:4])  
-                    dst_points = rotate_polygons(  
-                        region.center, pts.reshape(1, -1), -region.angle,  
-                        to_int=False  
-                    ).reshape(-1, 4, 2)  
-                    # 移除边界限制，允许文本超出检测框边界
-                    # dst_points[..., 0] = dst_points[..., 0].clip(0, img.shape[1] - 1)  
-                    # dst_points[..., 1] = dst_points[..., 1].clip(0, img.shape[0] - 1)  
-                    dst_points = dst_points.astype(np.int64)
-                    single_axis_expanded = True
-                    # logger.debug(f"Successfully expanded horizontal text width: xfact={scale_x:.2f}")  
-                except Exception as e:  
-                    # logger.error(f"Failed to expand horizontal text: {e}")  
-                    pass
-                    
         if region.vertical:
-            used_cols = len(region.texts)
-            # logger.debug(f"Vertical text - used columns: {used_cols}")
-            
             line_text_list, _ = text_render.calc_vertical(
-                region.font_size, 
-                region.translation, 
+                region.font_size,
+                region.translation,
                 max_height=region.unrotated_size[1],
             )
-            needed_cols = len(line_text_list)
-            # logger.debug(f"Needed columns: {needed_cols}")
-            if needed_cols > used_cols and used_cols > 0:  # used_cols>0 guards /0 on empty texts
-                scale_x = ((needed_cols - used_cols) / used_cols) * 1 + 1
-                try:  
-                    poly = Polygon(region.unrotated_min_rect[0])
-                    minx, miny, maxx, maxy = poly.bounds
-                    poly = affinity.scale(poly, xfact=1.0, yfact=scale_x, origin=(minx, miny))                    
-                    
-                    pts = np.array(poly.exterior.coords[:4])  
-                    dst_points = rotate_polygons(  
-                        region.center, pts.reshape(1, -1), -region.angle,  
-                        to_int=False  
-                    ).reshape(-1, 4, 2)  
-                    # 移除边界限制，允许文本超出检测框边界
-                    # dst_points[..., 0] = dst_points[..., 0].clip(0, img.shape[1] - 1)  
-                    # dst_points[..., 1] = dst_points[..., 1].clip(0, img.shape[0] - 1)  
-                    dst_points = dst_points.astype(np.int64)
-                    single_axis_expanded = True
-                    # logger.debug(f"Successfully expanded vertical text width: xfact={scale_x:.2f}")  
-                except Exception as e:  
-                    # logger.error(f"Failed to expand vertical text: {e}")  
-                    pass
+            expanded = _expand_single_axis(region, len(line_text_list), len(region.texts), False)
+            if expanded is not None:
+                dst_points = expanded
+                single_axis_expanded = True
 
         # If single-axis expansion failed, use general scaling
         if not single_axis_expanded:
