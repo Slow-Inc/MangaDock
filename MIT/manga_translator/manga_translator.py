@@ -412,9 +412,15 @@ class MangaTranslator:
 
         return ctx
 
-    async def _translate(self, config: Config, ctx: Context) -> Context:
-        # Start the background cleanup job once if not already started.
-        self._model_lifecycle.ensure_running()
+    async def _run_until_translation_stages(self, ctx: Context, config: Config):
+        """Run the shared colorize→upscale→detect→ocr→textline_merge→pre-dict block
+        (#187 S25). Returns ``(ctx, finished)``: ``finished=True`` means an
+        early-exit fired (no regions / no text) and ``ctx`` is already the final
+        reverted result; ``finished=False`` means continue to translation. Both
+        ``_translate`` and ``_translate_until_translation`` drive this identical
+        sequence — the divergence lives only in their prefix (preload /
+        save_input_png) and suffix (continue-to-translation vs save image_context).
+        """
         # -- Colorization
         if config.colorizer.colorizer != Colorizer.none:
             ctx.img_colorized = await self._run_stage(
@@ -450,7 +456,7 @@ class MangaTranslator:
             await self._report_progress('skip-no-regions', True)
             # If no text was found result is intermediate image product
             ctx.result = ctx.upscaled
-            return await self._revert_upscale(config, ctx)
+            return await self._revert_upscale(config, ctx), True
 
         if self.verbose:
             save_bboxes_unfiltered(ctx.img_rgb, ctx.textlines, self._result_path)
@@ -465,7 +471,7 @@ class MangaTranslator:
             await self._report_progress('skip-no-text', True)
             # If no text was found result is intermediate image product
             ctx.result = ctx.upscaled
-            return await self._revert_upscale(config, ctx)
+            return await self._revert_upscale(config, ctx), True
 
         # -- Textline merge
         ctx.text_regions = await self._run_stage(
@@ -491,6 +497,16 @@ class MangaTranslator:
                 logger.info(replacement)
         else:
             logger.info("No pre-translation replacements made.")
+
+        return ctx, False
+
+    async def _translate(self, config: Config, ctx: Context) -> Context:
+        # Start the background cleanup job once if not already started.
+        self._model_lifecycle.ensure_running()
+
+        ctx, finished = await self._run_until_translation_stages(ctx, config)
+        if finished:
+            return ctx
 
         # -- Translation
         ctx.text_regions = await self._run_stage(
@@ -1213,78 +1229,9 @@ class MangaTranslator:
         # Start the background cleanup job once if not already started.
         self._model_lifecycle.ensure_running()
 
-        # -- Colorization
-        if config.colorizer.colorizer != Colorizer.none:
-            ctx.img_colorized = await self._run_stage(
-                'colorizing',
-                lambda: self._run_colorizer(config, ctx),
-                lambda: ctx.input)
-        else:
-            ctx.img_colorized = ctx.input
-
-        # -- Upscaling
-        if config.upscale.upscale_ratio:
-            ctx.upscaled = await self._run_stage(
-                'upscaling',
-                lambda: self._run_upscaling(config, ctx),
-                lambda: ctx.img_colorized)
-        else:
-            ctx.upscaled = ctx.img_colorized
-
-        ctx.img_rgb, ctx.img_alpha = load_image(ctx.upscaled)
-
-        # -- Detection
-        ctx.textlines, ctx.mask_raw, ctx.mask = await self._run_stage(
-            'detection',
-            lambda: self._run_detection(config, ctx),
-            lambda: ([], None, None))
-
-        if self.verbose and ctx.mask_raw is not None:
-            save_mask_raw(ctx.mask_raw, self._result_path)
-
-        if not ctx.textlines:
-            await self._report_progress('skip-no-regions', True)
-            ctx.result = ctx.upscaled
-            return await self._revert_upscale(config, ctx)
-
-        if self.verbose:
-            save_bboxes_unfiltered(ctx.img_rgb, ctx.textlines, self._result_path)
-
-        # -- OCR
-        ctx.textlines = await self._run_stage(
-            'ocr',
-            lambda: self._run_ocr(config, ctx),
-            lambda: [])
-
-        if not ctx.textlines:
-            await self._report_progress('skip-no-text', True)
-            ctx.result = ctx.upscaled
-            return await self._revert_upscale(config, ctx)
-
-        # -- Textline merge
-        ctx.text_regions = await self._run_stage(
-            'textline_merge',
-            lambda: self._run_textline_merge(config, ctx),
-            lambda: [])
-
-        if self.verbose and ctx.text_regions:
-            save_bboxes(ctx.img_rgb, ctx.text_regions, config, self._result_path)
-
-        # Apply pre-dictionary after textline merge
-        pre_dict = load_dictionary(self.pre_dict)
-        pre_replacements = []
-        for region in ctx.text_regions:
-            original = region.text
-            region.text = apply_dictionary(region.text, pre_dict)
-            if original != region.text:
-                pre_replacements.append(f"{original} => {region.text}")
-
-        if pre_replacements:
-            logger.info("Pre-translation replacements:")
-            for replacement in pre_replacements:
-                logger.info(replacement)
-        else:
-            logger.info("No pre-translation replacements made.")
+        ctx, finished = await self._run_until_translation_stages(ctx, config)
+        if finished:
+            return ctx
 
         # 保存当前图片上下文到ctx中，用于并发翻译时的路径管理
         if self._image_debug.current:
