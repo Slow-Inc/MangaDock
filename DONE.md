@@ -3,6 +3,18 @@
 
 ---
 
+## S18 PostTranslationProcessor — relocate (not unify) 4 copies (2026-06-10, /tdd)
+
+The documented S18 premise was "unify 4 copies of post-translation processing". Close reading showed the four are **not** a clean byte-identical dedup: the genuinely-identical part (`filter_translated_regions`) was already extracted in S1, and the three phase-2 retry loops are **structurally divergent and load-bearing** (L6/L8) — single uses min_ratio 0.5 / threshold ≥6 / pad-with-empty + enumerate; concurrent uses 0.3 / ≥6 / filter + text_idx; batch uses 0.5 / >10 / cross-context region_mapping, plus divergent log strings. Forcing them into one function needs per-scope collect/reassign/log callbacks — that *adds* complexity to prop up a merge, against the North Star. The user steered "reduce long-term debt", so the chosen interpretation is **relocate + make testable + pin the divergence as explicit params**, not unify.
+
+New module `MIT/manga_translator/post_translation.py` + `test_post_translation.py` (13 characterization cases), four byte-identical increments, one commit each:
+- **S18a** `apply_post_translation_processing` — punct + post-dict + phase-1 repetition retry (the helper batch/concurrent share); two self-bound async steps become callbacks. Updated the punctuation wiring test for the move (1 inline call in the god object + 1 in the module).
+- **S18b** `concurrent_page_lang_check_retry` — concurrent phase-2 (0.3 / ≥6, filter + text_idx).
+- **S18c** `single_page_lang_check_retry` — single phase-2 (0.5 / ≥6, pad + enumerate, skip-log + unified success/failure message).
+- **S18d** `batch_lang_check_retry` — batch phase-2 (0.5 / >10, cross-context region_mapping).
+
+Each driver now delegates; L6 thresholds/ratios and the L8 index-dropping re-translate are preserved verbatim. Suite throughout: 18 async-only baseline, **295 passed**. The single driver's own phase-1 variant (side-effect retry, no per-region try/except, different logging) is documented and left inline — unifying it with the helper would change logging/error behaviour, a flagged change for later.
+
 ## E2E validation — S17/S21 refactor stack via production tunnel (2026-06-10)
 
 Brought up the full stack (Redis → cache:reset → MIT 5003 `--use-gpu --start-instance` → Backend 4001 → Frontend 4000 → cloudflared tunnel) and ran the mandatory original↔translated comparison through **`https://hayateotsu.space/`** (never localhost — per `frontend-testing` skill). Test page: **Kouchuugun Shikan Boukensha ni Naru** ch1 "Emergency Landing" page 1 (EN→TH, custom_openai/9arm).

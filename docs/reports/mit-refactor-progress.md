@@ -70,7 +70,7 @@ Legend: ✅ done · ▶️ next · ⬜ todo · 🔒 blocked-by. Full interface/t
 | **S16** | `TranslationMemory` (the two lists + bleed boundary, L9) | stateful | med | ✅ | `translation_memory.py` (2 lists + `reset()`; 16 sites renamed; append/reset asymmetry preserved) |
 | **S21** | `ModelLifecycle` facade + preload (#188 facade) | async-orch | high | ✅ | `model_lifecycle.py` (preload fold ×2 + `ensure_running`/`reaper.ensure_started` fold ×2; wraps reaper — tracker/unloader left direct) |
 | **S17** | `TextTranslationDispatcher` (collapse duplicated switch) | async-orch | high | ✅ (unit + E2E 2026-06-10) | `text_translation_dispatcher.py` (`build_chatgpt_translator` + `dispatch_translate`; construction-order + result_path direct/swap + batch_contexts preserved). E2E: Kouchuugun ch1 p1 EN→TH via tunnel, 2 patches 649×1492+451×1489 = baseline exact |
-| **S18** | `PostTranslationProcessor` (unify 4 copies; pin L6/L8 as params) | async-orch | high | ⬜ | S1,S2,S8,S17 |
+| **S18** | `PostTranslationProcessor` (relocate 4 copies; pin L6/L8 as params) | async-orch | high | ✅ (unit; E2E 2026-06-10) | `post_translation.py` — S18a helper (punct+post-dict+phase1) + S18b/c/d the 3 phase-2 retry loops. **NOT unified**: min_ratio 0.5/0.3, threshold ≥6/>10, collect/reassign (pad+enumerate / filter+text_idx / region_mapping) are load-bearing (L6/L8) → kept as per-scope params. 13 characterization cases |
 | **S19** | `gather_per_context` (per-exception placeholder) | async-orch | med | ✅ | `gather_per_context.py` (gather + placeholder; last AFK seam) |
 | **S14** | `VerboseDebugSink` (cv2.imwrite/OCR-env/streaming) | stateful | med | ⬜ | S18 |
 | **S23** | `StageRunner` (uniform progress + try/except policy) | async-orch | high | ⬜ | S15,S11,S14 |
