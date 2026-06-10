@@ -3,6 +3,12 @@
 
 ---
 
+## HOTFIX (critical): per-chapter Cloudflare Worker /v1/list cost-bleed (2026-06-10, /debug-mantra + /tdd)
+
+`MangaDexService.attachLocalStatus` fired one R2 `/v1/list` per chapter (`Promise.all(chapters.map(hasChapterCache))`) on EVERY chapter-list load — including the Redis cache-hit path — ungated by `forceLocal`. An N-chapter manga cost N Class-A list ops per load × every re-fetch (home grid re-fetches ~11/min; 507 chapter-list reqs/46min observed) → tens of thousands of worker list ops/session, unbounded. The R2 provider logs no outbound calls, so it was invisible in our logs (seen only on the Worker side).
+
+**Fix:** gate the fan-out — compute `readerAvailable` only when `imageCache.enabled && (forceLocal || isOfflineFallback)`; thread `forceLocal` into all 4 attachLocalStatus call sites. Mirrors the frontend's own consumption (`HeroDetailButton.tsx:33`, `BookDetailModal chapterNeedsBackup === isOfflineFallback`) → **default browsing = 0 worker calls, offline/forceLocal flows unchanged, zero UI regression.** TDD: `mangadex-reader-available.spec.ts` 3 cases RED→GREEN (default=0, forceLocal=N, disabled=0). Shipped to `main` via PR #197 (squash `01affd5`). Post-mortem + backlog follow-ups in `docs/reports/system-impact-report.md`.
+
 ## S15 Stage protocol — extract the 6 leaf stage adapters into stages.py (2026-06-10, /tdd)
 
 New module `MIT/manga_translator/stages.py` + `test_stages.py` (9 golden cases), one commit. Moved the `read ctx-subset → dispatch_* → return value` core of six `_run_*` adapters byte-for-byte: `run_colorizer` (preserves the **L15** `**ctx` splat), `run_upscaling` (`[0]` unwrap), `run_detection` (12 positional args + the #168 `det_sfx` second pass), `run_mask_refinement`, `run_inpainting`, `run_text_rendering` (3-way renderer branch + the #181 supersampling kwargs; **L5** always-None `render_mask` preserved). Each driver `_run_*` keeps its `time.time()` + `_model_usage_tracker.touch(...)` instrumentation (the S3 concern) and delegates — so the error-prone many-arg dispatch calls are now independently testable by stubbing `dispatch_*` + snapshotting positional args, exactly the documented S15 test strategy.
