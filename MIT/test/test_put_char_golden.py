@@ -71,3 +71,21 @@ def test_put_char_byte_identical():
         if key == 'advances':
             continue
         assert np.array_equal(rendered[key], golden[key]), f'pixel drift in {key}'
+
+
+def test_paste_bitmap_offsets_source_when_clipped_off_top_left():
+    """_paste_bitmap (now shared by all four put_char paste sites) offsets the
+    SOURCE slice when the placement runs off the top/left edge, instead of
+    pasting the source from its own (0,0). This is the corrected vertical-stroke
+    clipping (#189 S2): the old put_char_vertical border paste clamped pen_border
+    to >=0 and sliced bitmap_border[0:...], misaligning a stroke clipped at the
+    edge. Unreachable on padded render canvases (hence golden stays byte-identical),
+    pinned here so the four-site unification to correct clipping stays intentional.
+    """
+    canvas = np.zeros((10, 10), dtype=np.uint8)
+    # 4x4 bitmap, a distinct value per row so a misaligned paste is detectable.
+    bmp = np.array([[1, 1, 1, 1], [2, 2, 2, 2], [3, 3, 3, 3], [4, 4, 4, 4]], dtype=np.uint8)
+    # place at (-2, -2): only the bottom-right 2x2 (src rows/cols 2..3) lands at canvas[0:2, 0:2].
+    tr._paste_bitmap(canvas, bmp, -2, -2, np.maximum)
+    assert canvas[0:2, 0:2].tolist() == [[3, 3], [4, 4]]   # src rows 2,3 — offset, not rows 0,1
+    assert int(canvas[2:, :].sum()) == 0 and int(canvas[:, 2:].sum()) == 0
