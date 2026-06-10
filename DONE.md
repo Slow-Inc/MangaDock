@@ -3,6 +3,14 @@
 
 ---
 
+## S15 Stage protocol — extract the 6 leaf stage adapters into stages.py (2026-06-10, /tdd)
+
+New module `MIT/manga_translator/stages.py` + `test_stages.py` (9 golden cases), one commit. Moved the `read ctx-subset → dispatch_* → return value` core of six `_run_*` adapters byte-for-byte: `run_colorizer` (preserves the **L15** `**ctx` splat), `run_upscaling` (`[0]` unwrap), `run_detection` (12 positional args + the #168 `det_sfx` second pass), `run_mask_refinement`, `run_inpainting`, `run_text_rendering` (3-way renderer branch + the #181 supersampling kwargs; **L5** always-None `render_mask` preserved). Each driver `_run_*` keeps its `time.time()` + `_model_usage_tracker.touch(...)` instrumentation (the S3 concern) and delegates — so the error-prone many-arg dispatch calls are now independently testable by stubbing `dispatch_*` + snapshotting positional args, exactly the documented S15 test strategy.
+
+The heavier `_run_ocr` / `_run_textline_merge` / `_run_text_translation` adapters keep their extra logic inline (they already delegate to `debug_sink` / `text_translation_dispatcher`); only the leaf dispatches moved. Updated two stale source-inspection wiring tests (`test_safe_area` #181 supersampling, `test_sfx_merge` #168 det_sfx) to point at `stages.py` after the move. This is the groundwork the **StageRunner (S23)** drives as a uniform list — S23 is now unblocked (S15/S11/S14 all ✅).
+
+Suite: 18 async-only baseline, **319 passed**. **E2E run #4** (MIT restarted on S15 code, cache cleared): Kouchuugun ch1 p0 → 2 patches **649×1492 + 451×1489**, status success, **0 console errors** — identical to runs #1–3. S15 sits on every translation's detection→inpainting→rendering hot path, so this is the strongest byte-identity confirmation yet.
+
 ## S14 VerboseDebugSink — fold the scattered verbose debug saves (2026-06-10, /tdd)
 
 New module `MIT/manga_translator/debug_sink.py` + `test_debug_sink.py` (15 characterization cases), three byte-identical increments, one commit each:
