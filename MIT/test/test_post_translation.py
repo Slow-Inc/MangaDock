@@ -228,3 +228,69 @@ def test_single_retry_pads_empty_and_reassigns_by_enumerate():
     assert regions[0].translation == 'A'
     assert regions[1].translation == 'keep'   # falsy new[1] → original kept
     assert regions[2].translation == 'C'
+
+
+# ============================================================================
+# batch_lang_check_retry — cross-context, min_ratio 0.5, threshold >10,
+# region_mapping reassign across the whole batch (the divergence vs single/
+# concurrent which work on one ctx). Skip-log literal says "threshold: 10".
+# ============================================================================
+
+def _batch_ctx(regions):
+    return SimpleNamespace(text_regions=regions)
+
+
+def _make_batch(n_ctx, per_ctx, config):
+    batch = []
+    for c in range(n_ctx):
+        regions = [_region(f'c{c}r{r}', f'old_c{c}r{r}') for r in range(per_ctx)]
+        batch.append((_batch_ctx(regions), config))
+    return batch
+
+
+def _run_batch(batch, *, threshold, min_ratio, check_ratio, batch_translate):
+    return asyncio.run(pt.batch_lang_check_retry(
+        batch, threshold=threshold, min_ratio=min_ratio,
+        check_ratio=check_ratio, batch_translate=batch_translate))
+
+
+def test_batch_noop_when_empty_or_disabled():
+    async def check_ratio(*a, **k):
+        raise AssertionError('check_ratio called')
+    _run_batch([], threshold=10, min_ratio=0.5, check_ratio=check_ratio, batch_translate=_boom)
+    batch = _make_batch(2, 6, _ccfg(enable_check=False))
+    _run_batch(batch, threshold=10, min_ratio=0.5, check_ratio=check_ratio, batch_translate=_boom)
+
+
+def test_batch_below_threshold_skips_and_reports_success(caplog):
+    import logging
+    batch = _make_batch(2, 5, _ccfg())  # 10 regions, not > 10
+    async def check_ratio(*a, **k):
+        raise AssertionError('check_ratio must not run at exactly 10 regions')
+    with caplog.at_level(logging.INFO, logger='manga_translator'):
+        _run_batch(batch, threshold=10, min_ratio=0.5, check_ratio=check_ratio, batch_translate=_boom)
+    msgs = [r.message for r in caplog.records]
+    assert any('Skipping batch-level target language check: only 10 regions (threshold: 10)' in m for m in msgs)
+    assert 'All translation regions passed post-translation check.' in msgs
+
+
+def test_batch_retry_reassigns_across_contexts_via_region_mapping():
+    cfg = _ccfg(max_retry=3)
+    batch = _make_batch(2, 6, cfg)  # 12 regions across 2 ctxs → > 10
+    results = iter([False, True])
+    async def check_ratio(rs, target, min_ratio):
+        assert min_ratio == 0.5
+        return next(results)
+    captured = {}
+    async def batch_translate(texts, config, ctx):
+        captured['texts'] = list(texts)
+        captured['ctx_is_first'] = ctx is batch[0][0]   # L8: re-translate uses batch[0][0]
+        return [t.upper() for t in texts]
+    _run_batch(batch, threshold=10, min_ratio=0.5, check_ratio=check_ratio, batch_translate=batch_translate)
+    # all 12 region texts collected in ctx-then-region order (original lowercase text)
+    assert captured['texts'][0] == 'c0r0' and captured['texts'][-1] == 'c1r5'
+    assert len(captured['texts']) == 12
+    assert captured['ctx_is_first'] is True
+    # reassigned across both contexts via region_mapping
+    assert batch[0][0].text_regions[0].translation == 'C0R0'
+    assert batch[1][0].text_regions[5].translation == 'C1R5'
