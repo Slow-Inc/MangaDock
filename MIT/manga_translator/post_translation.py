@@ -254,3 +254,114 @@ async def single_page_lang_check_retry(
         logger.info("All translation regions passed post-translation check.")
     else:
         logger.warning("Some translation regions failed post-translation check.")
+
+
+async def batch_lang_check_retry(
+    batch: List,
+    *,
+    threshold: int,
+    min_ratio: float,
+    check_ratio: Callable[..., Awaitable[bool]],
+    batch_translate: Callable[..., Awaitable[List]],
+) -> None:
+    """Non-concurrent batch driver's batch-level target-language check + retry.
+
+    Lifted byte-for-byte from `_translate_batch`. Operates across the whole
+    `batch` (a list of `(ctx, config)` tuples): collects every page's regions,
+    checks once with min_ratio (0.5), and on failure re-translates **all** batch
+    regions via a `region_mapping` (ctx_idx, region) reassign — the divergence
+    from the single/concurrent single-ctx drivers. The region threshold is
+    strict `> threshold` (10); the re-translate uses `batch[0][0]` and drops
+    page/batch index (L8). The skip-log literal still reads "threshold: 10".
+    Mutates each ctx's regions in place."""
+    # 批次级别的目标语言检查
+    if not (batch and batch[0][1].translator.enable_post_translation_check):
+        return
+    # 收集批次内所有页面的filtered regions
+    all_batch_regions = []
+    for ctx, config in batch:
+        if ctx.text_regions:
+            all_batch_regions.extend(ctx.text_regions)
+
+    # 进行批次级别的目标语言检查
+    batch_lang_check_result = True
+    if all_batch_regions and len(all_batch_regions) > threshold:
+        sample_config = batch[0][1]
+        logger.info(f"Starting batch-level target language check with {len(all_batch_regions)} regions...")
+        batch_lang_check_result = await check_ratio(
+            all_batch_regions,
+            sample_config.translator.target_lang,
+            min_ratio
+        )
+
+        if not batch_lang_check_result:
+            logger.warning("Batch-level target language ratio check failed")
+
+            # 批次重新翻译逻辑
+            max_batch_retry = sample_config.translator.post_check_max_retry_attempts
+            batch_retry_count = 0
+
+            while batch_retry_count < max_batch_retry and not batch_lang_check_result:
+                batch_retry_count += 1
+                logger.warning(f"Starting batch retry {batch_retry_count}/{max_batch_retry}")
+
+                # 重新翻译批次内所有区域
+                all_original_texts = []
+                region_mapping = []  # 记录每个text属于哪个ctx
+
+                for ctx_idx, (ctx, config) in enumerate(batch):
+                    if ctx.text_regions:
+                        for region in ctx.text_regions:
+                            if hasattr(region, 'text') and region.text:
+                                all_original_texts.append(region.text)
+                                region_mapping.append((ctx_idx, region))
+
+                if all_original_texts:
+                    try:
+                        # 重新批量翻译
+                        logger.info(f"Retrying translation for {len(all_original_texts)} regions...")
+                        new_translations = await batch_translate(all_original_texts, sample_config, batch[0][0])
+
+                        # 更新翻译结果到各个region
+                        for i, (ctx_idx, region) in enumerate(region_mapping):
+                            if i < len(new_translations) and new_translations[i]:
+                                old_translation = region.translation
+                                region.translation = new_translations[i]
+                                logger.debug(f"Region {i+1} translation updated: '{old_translation}' -> '{new_translations[i]}'")
+
+                        # 重新收集所有regions并检查目标语言比例
+                        all_batch_regions = []
+                        for ctx, config in batch:
+                            if ctx.text_regions:
+                                all_batch_regions.extend(ctx.text_regions)
+
+                        logger.info(f"Re-checking batch-level target language ratio after batch retry {batch_retry_count}...")
+                        batch_lang_check_result = await check_ratio(
+                            all_batch_regions,
+                            sample_config.translator.target_lang,
+                            min_ratio
+                        )
+
+                        if batch_lang_check_result:
+                            logger.info(f"Batch-level target language check passed")
+                            break
+                        else:
+                            logger.warning(f"Batch-level target language check still failed")
+
+                    except Exception as e:
+                        logger.error(f"Error during batch retry {batch_retry_count}: {e}")
+                        break
+                else:
+                    logger.warning("No text found for batch retry")
+                    break
+
+            if not batch_lang_check_result:
+                logger.error(f"Batch-level target language check failed after all {max_batch_retry} batch retries")
+    else:
+        logger.info(f"Skipping batch-level target language check: only {len(all_batch_regions)} regions (threshold: 10)")
+
+    # 统一的成功信息
+    if batch_lang_check_result:
+        logger.info("All translation regions passed post-translation check.")
+    else:
+        logger.warning("Some translation regions failed post-translation check.")
