@@ -141,8 +141,6 @@ class CRAFTDetector(OfflineDetector):
         if device == 'cuda' or device == 'mps':
             self.model = self.model.to(self.device)
             self.model_refiner = self.model_refiner.to(self.device)
-        global MODEL
-        MODEL = self.model
 
     async def _unload(self):
         del self.model

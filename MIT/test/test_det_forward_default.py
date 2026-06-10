@@ -7,10 +7,11 @@ concurrency hazard if two detectors load. This pins the forward's transform
 `mask`) with the model passed as an explicit argument, so the global can go.
 Uses real torch with a fake net.
 """
-import numpy as np
-import torch
+import importlib
 
-import manga_translator.detection.default as dd
+import numpy as np
+import pytest
+import torch
 
 
 class FakeNet:
@@ -24,11 +25,17 @@ class FakeNet:
         return torch.zeros((n, 1, 4, 4)), torch.ones((n, 1, 4, 4))
 
 
-def test_forward_threads_model_and_preserves_transform():
+# default + dbnet_convnext both carry the (now model-threaded) det_batch_forward_default
+@pytest.mark.parametrize('module', [
+    'manga_translator.detection.default',
+    'manga_translator.detection.dbnet_convnext',
+])
+def test_forward_threads_model_and_preserves_transform(module):
+    forward = importlib.import_module(module).det_batch_forward_default
     net = FakeNet()
     batch = np.zeros((1, 8, 8, 3), dtype=np.uint8)        # n h w c, all 0
 
-    db, mask = dd.det_batch_forward_default(batch, 'cpu', net)
+    db, mask = forward(batch, 'cpu', net)
 
     # the net got a normalized, channel-first, float32 tensor — no global needed
     assert net.received is not None
