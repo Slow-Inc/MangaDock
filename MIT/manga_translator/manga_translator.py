@@ -33,6 +33,7 @@ from .gather_per_context import gather_per_context
 from .model_lifecycle import ModelLifecycle
 from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
+from .stage_runner import run_stage
 from .stages import (
     run_colorizer,
     run_upscaling,
@@ -415,15 +416,10 @@ class MangaTranslator:
         self._model_lifecycle.ensure_running()
         # -- Colorization
         if config.colorizer.colorizer != Colorizer.none:
-            await self._report_progress('colorizing')
-            try:
-                ctx.img_colorized = await self._run_colorizer(config, ctx)
-            except Exception as e:  
-                logger.error(f"Error during colorizing:\n{traceback.format_exc()}")  
-                if not self.ignore_errors:  
-                    raise  
-                ctx.img_colorized = ctx.input  # Fallback to input image if colorization fails
-
+            ctx.img_colorized = await self._run_stage(
+                'colorizing',
+                lambda: self._run_colorizer(config, ctx),
+                lambda: ctx.input)  # Fallback to input image if colorization fails
         else:
             ctx.img_colorized = ctx.input
 
@@ -431,30 +427,20 @@ class MangaTranslator:
         # The default text detector doesn't work very well on smaller images, might want to
         # consider adding automatic upscaling on certain kinds of small images.
         if config.upscale.upscale_ratio:
-            await self._report_progress('upscaling')
-            try:
-                ctx.upscaled = await self._run_upscaling(config, ctx)
-            except Exception as e:  
-                logger.error(f"Error during upscaling:\n{traceback.format_exc()}")  
-                if not self.ignore_errors:  
-                    raise  
-                ctx.upscaled = ctx.img_colorized # Fallback to colorized (or input) image if upscaling fails
+            ctx.upscaled = await self._run_stage(
+                'upscaling',
+                lambda: self._run_upscaling(config, ctx),
+                lambda: ctx.img_colorized)  # Fallback to colorized (or input) image if upscaling fails
         else:
             ctx.upscaled = ctx.img_colorized
 
         ctx.img_rgb, ctx.img_alpha = load_image(ctx.upscaled)
 
         # -- Detection
-        await self._report_progress('detection')
-        try:
-            ctx.textlines, ctx.mask_raw, ctx.mask = await self._run_detection(config, ctx)
-        except Exception as e:  
-            logger.error(f"Error during detection:\n{traceback.format_exc()}")  
-            if not self.ignore_errors:  
-                raise 
-            ctx.textlines = [] 
-            ctx.mask_raw = None
-            ctx.mask = None
+        ctx.textlines, ctx.mask_raw, ctx.mask = await self._run_stage(
+            'detection',
+            lambda: self._run_detection(config, ctx),
+            lambda: ([], None, None))
 
         if self.verbose and ctx.mask_raw is not None:
             save_mask_raw(ctx.mask_raw, self._result_path)
@@ -469,14 +455,10 @@ class MangaTranslator:
             save_bboxes_unfiltered(ctx.img_rgb, ctx.textlines, self._result_path)
 
         # -- OCR
-        await self._report_progress('ocr')
-        try:
-            ctx.textlines = await self._run_ocr(config, ctx)
-        except Exception as e:  
-            logger.error(f"Error during ocr:\n{traceback.format_exc()}")  
-            if not self.ignore_errors:  
-                raise 
-            ctx.textlines = [] # Fallback to empty textlines if OCR fails
+        ctx.textlines = await self._run_stage(
+            'ocr',
+            lambda: self._run_ocr(config, ctx),
+            lambda: [])  # Fallback to empty textlines if OCR fails
 
         if not ctx.textlines:
             await self._report_progress('skip-no-text', True)
@@ -485,14 +467,10 @@ class MangaTranslator:
             return await self._revert_upscale(config, ctx)
 
         # -- Textline merge
-        await self._report_progress('textline_merge')
-        try:
-            ctx.text_regions = await self._run_textline_merge(config, ctx)
-        except Exception as e:  
-            logger.error(f"Error during textline_merge:\n{traceback.format_exc()}")  
-            if not self.ignore_errors:  
-                raise 
-            ctx.text_regions = [] # Fallback to empty text_regions if textline merge fails
+        ctx.text_regions = await self._run_stage(
+            'textline_merge',
+            lambda: self._run_textline_merge(config, ctx),
+            lambda: [])  # Fallback to empty text_regions if textline merge fails
 
         if self.verbose and ctx.text_regions:
             save_bboxes(ctx.img_rgb, ctx.text_regions, config, self._result_path)
@@ -501,7 +479,7 @@ class MangaTranslator:
         pre_dict = load_dictionary(self.pre_dict)
         pre_replacements = []
         for region in ctx.text_regions:
-            original = region.text  
+            original = region.text
             region.text = apply_dictionary(region.text, pre_dict)
             if original != region.text:
                 pre_replacements.append(f"{original} => {region.text}")
@@ -512,16 +490,12 @@ class MangaTranslator:
                 logger.info(replacement)
         else:
             logger.info("No pre-translation replacements made.")
-            
+
         # -- Translation
-        await self._report_progress('translating')
-        try:
-            ctx.text_regions = await self._run_text_translation(config, ctx)
-        except Exception as e:  
-            logger.error(f"Error during translating:\n{traceback.format_exc()}")  
-            if not self.ignore_errors:  
-                raise 
-            ctx.text_regions = [] # Fallback to empty text_regions if translation fails
+        ctx.text_regions = await self._run_stage(
+            'translating',
+            lambda: self._run_text_translation(config, ctx),
+            lambda: [])  # Fallback to empty text_regions if translation fails
 
         await self._report_progress('after-translating')
 
@@ -537,14 +511,10 @@ class MangaTranslator:
         # -- Mask refinement
         # (Delayed to take advantage of the region filtering done after ocr and translation)
         if ctx.mask is None:
-            await self._report_progress('mask-generation')
-            try:
-                ctx.mask = await self._run_mask_refinement(config, ctx)
-            except Exception as e:  
-                logger.error(f"Error during mask-generation:\n{traceback.format_exc()}")  
-                if not self.ignore_errors:  
-                    raise 
-                ctx.mask = ctx.mask_raw if ctx.mask_raw is not None else np.zeros_like(ctx.img_rgb, dtype=np.uint8)[:,:,0] # Fallback to raw mask or empty mask
+            ctx.mask = await self._run_stage(
+                'mask-generation',
+                lambda: self._run_mask_refinement(config, ctx),
+                lambda: ctx.mask_raw if ctx.mask_raw is not None else np.zeros_like(ctx.img_rgb, dtype=np.uint8)[:,:,0])  # Fallback to raw mask or empty mask
 
         if self.verbose and ctx.mask is not None:
             # #187 S14: unguarded variant — body in debug_sink (the batch driver's is guarded)
@@ -554,20 +524,18 @@ class MangaTranslator:
                                             self.device, self.verbose))
 
         # -- Inpainting
-        await self._report_progress('inpainting')
-        try:
-            ctx.img_inpainted = await self._run_inpainting(config, ctx)
-        except Exception as e:  
-            logger.error(f"Error during inpainting:\n{traceback.format_exc()}")  
-            if not self.ignore_errors:  
-                raise
-            else:
-                ctx.img_inpainted = ctx.img_rgb
+        ctx.img_inpainted = await self._run_stage(
+            'inpainting',
+            lambda: self._run_inpainting(config, ctx),
+            lambda: ctx.img_rgb)
         ctx.gimp_mask = np.dstack((cv2.cvtColor(ctx.img_inpainted, cv2.COLOR_RGB2BGR), ctx.mask))
 
         if self.verbose:
             save_inpainted(ctx.img_inpainted, self._result_path)
         # -- Rendering
+        # #187 S23: kept inline — 'rendering' is reported, then the conditional
+        # 'rendering_folder:' message, BEFORE the stage runs; _run_stage couples
+        # report+run so folding it would double-report 'rendering' and reorder.
         await self._report_progress('rendering')
 
         # 在rendering状态后立即发送文件夹信息，用于前端精确检查final.png
@@ -993,6 +961,17 @@ class MangaTranslator:
         for ph in self._progress_hooks:
             await ph(state, finished)
 
+    async def _run_stage(self, name, fn, fallback):
+        # #187 S23: thin bind of the uniform stage policy (progress + try/except
+        # ignore_errors + "Error during {name}" log). `logger` is the live
+        # module global so set_main_logger swaps are honoured at call time.
+        return await run_stage(
+            name, fn, fallback,
+            report_progress=self._report_progress,
+            ignore_errors=self.ignore_errors,
+            logger=logger,
+        )
+
     def _add_logger_hook(self):
         # TODO: Pass ctx to logger hook
         LOG_MESSAGES = {
@@ -1222,7 +1201,7 @@ class MangaTranslator:
         ctx = Context()
         ctx.input = image
         ctx.result = None
-        
+
         # 保存原始输入图片用于调试 — #187 S14: body in debug_sink
         if self.verbose:
             save_input_png(image, self._result_path)
@@ -1235,43 +1214,29 @@ class MangaTranslator:
 
         # -- Colorization
         if config.colorizer.colorizer != Colorizer.none:
-            await self._report_progress('colorizing')
-            try:
-                ctx.img_colorized = await self._run_colorizer(config, ctx)
-            except Exception as e:  
-                logger.error(f"Error during colorizing:\n{traceback.format_exc()}")  
-                if not self.ignore_errors:  
-                    raise  
-                ctx.img_colorized = ctx.input
+            ctx.img_colorized = await self._run_stage(
+                'colorizing',
+                lambda: self._run_colorizer(config, ctx),
+                lambda: ctx.input)
         else:
             ctx.img_colorized = ctx.input
 
         # -- Upscaling
         if config.upscale.upscale_ratio:
-            await self._report_progress('upscaling')
-            try:
-                ctx.upscaled = await self._run_upscaling(config, ctx)
-            except Exception as e:  
-                logger.error(f"Error during upscaling:\n{traceback.format_exc()}")  
-                if not self.ignore_errors:  
-                    raise  
-                ctx.upscaled = ctx.img_colorized
+            ctx.upscaled = await self._run_stage(
+                'upscaling',
+                lambda: self._run_upscaling(config, ctx),
+                lambda: ctx.img_colorized)
         else:
             ctx.upscaled = ctx.img_colorized
 
         ctx.img_rgb, ctx.img_alpha = load_image(ctx.upscaled)
 
         # -- Detection
-        await self._report_progress('detection')
-        try:
-            ctx.textlines, ctx.mask_raw, ctx.mask = await self._run_detection(config, ctx)
-        except Exception as e:  
-            logger.error(f"Error during detection:\n{traceback.format_exc()}")  
-            if not self.ignore_errors:  
-                raise 
-            ctx.textlines = [] 
-            ctx.mask_raw = None
-            ctx.mask = None
+        ctx.textlines, ctx.mask_raw, ctx.mask = await self._run_stage(
+            'detection',
+            lambda: self._run_detection(config, ctx),
+            lambda: ([], None, None))
 
         if self.verbose and ctx.mask_raw is not None:
             save_mask_raw(ctx.mask_raw, self._result_path)
@@ -1285,14 +1250,10 @@ class MangaTranslator:
             save_bboxes_unfiltered(ctx.img_rgb, ctx.textlines, self._result_path)
 
         # -- OCR
-        await self._report_progress('ocr')
-        try:
-            ctx.textlines = await self._run_ocr(config, ctx)
-        except Exception as e:  
-            logger.error(f"Error during ocr:\n{traceback.format_exc()}")  
-            if not self.ignore_errors:  
-                raise 
-            ctx.textlines = []
+        ctx.textlines = await self._run_stage(
+            'ocr',
+            lambda: self._run_ocr(config, ctx),
+            lambda: [])
 
         if not ctx.textlines:
             await self._report_progress('skip-no-text', True)
@@ -1300,14 +1261,10 @@ class MangaTranslator:
             return await self._revert_upscale(config, ctx)
 
         # -- Textline merge
-        await self._report_progress('textline_merge')
-        try:
-            ctx.text_regions = await self._run_textline_merge(config, ctx)
-        except Exception as e:  
-            logger.error(f"Error during textline_merge:\n{traceback.format_exc()}")  
-            if not self.ignore_errors:  
-                raise 
-            ctx.text_regions = []
+        ctx.text_regions = await self._run_stage(
+            'textline_merge',
+            lambda: self._run_textline_merge(config, ctx),
+            lambda: [])
 
         if self.verbose and ctx.text_regions:
             save_bboxes(ctx.img_rgb, ctx.text_regions, config, self._result_path)
@@ -1316,7 +1273,7 @@ class MangaTranslator:
         pre_dict = load_dictionary(self.pre_dict)
         pre_replacements = []
         for region in ctx.text_regions:
-            original = region.text  
+            original = region.text
             region.text = apply_dictionary(region.text, pre_dict)
             if original != region.text:
                 pre_replacements.append(f"{original} => {region.text}")
