@@ -152,3 +152,52 @@ def test_save_final_guarded_and_grayscale_path(monkeypatch, caplog):
     with caplog.at_level(logging.WARNING, logger='manga_translator'):
         ds.save_final(_rgb(), _result_path)
     assert any('Failed to save debug image: RP/final.png' in r.message for r in caplog.records)
+
+
+# ============================================================================
+# save_inpaint_preview / save_inpaint_preview_guarded — the load-bearing
+# divergence: the single driver writes bare (exceptions propagate), the batch
+# back-half wraps everything (incl. the preview render) in try/except with
+# per-file success checks. Pinned as TWO functions, not a flag.
+# `make_preview` is the caller's `dispatch_inpainting(Inpainter.none, ...)`.
+# ============================================================================
+import asyncio
+
+
+def test_inpaint_preview_unguarded_writes_both_and_propagates(monkeypatch):
+    calls = _capture_imwrite(monkeypatch)
+    mask = np.full((4, 5), 255, dtype=np.uint8)
+
+    async def make_preview():
+        return _rgb()
+    asyncio.run(ds.save_inpaint_preview(mask, _result_path, make_preview))
+    assert [c[0] for c in calls] == ['RP/inpaint_input.png', 'RP/mask_final.png']
+    assert calls[0][1][0, 0, 2] == 200          # preview BGR-converted
+    assert np.array_equal(calls[1][1], mask)    # mask written raw
+
+    async def boom():
+        raise RuntimeError('inpaint preview failed')
+    with pytest.raises(RuntimeError):           # unguarded — propagates
+        asyncio.run(ds.save_inpaint_preview(mask, _result_path, boom))
+
+
+def test_inpaint_preview_guarded_swallows_and_warns(monkeypatch, caplog):
+    mask = np.full((4, 5), 255, dtype=np.uint8)
+
+    # per-file success check → warning for each failed write
+    calls = _capture_imwrite(monkeypatch, ret=False)
+    async def make_preview():
+        return _rgb()
+    with caplog.at_level(logging.WARNING, logger='manga_translator'):
+        asyncio.run(ds.save_inpaint_preview_guarded(mask, _result_path, make_preview))
+    msgs = [r.message for r in caplog.records]
+    assert any('Failed to save debug image: RP/inpaint_input.png' in m for m in msgs)
+    assert any('Failed to save debug image: RP/mask_final.png' in m for m in msgs)
+
+    # a preview failure is swallowed (the whole block is guarded)
+    async def boom():
+        raise RuntimeError('x')
+    with caplog.at_level(logging.ERROR, logger='manga_translator'):
+        asyncio.run(ds.save_inpaint_preview_guarded(mask, _result_path, boom))  # no raise
+    assert any('Error saving debug images (inpaint_input.png, mask_final.png)' in r.message
+               for r in caplog.records)
