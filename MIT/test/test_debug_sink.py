@@ -201,3 +201,56 @@ def test_inpaint_preview_guarded_swallows_and_warns(monkeypatch, caplog):
         asyncio.run(ds.save_inpaint_preview_guarded(mask, _result_path, boom))  # no raise
     assert any('Error saving debug images (inpaint_input.png, mask_final.png)' in r.message
                for r in caplog.records)
+
+
+# ============================================================================
+# ocr_debug_dir_env — the OCR result-dir + MANGA_OCR_RESULT_DIR env dance from
+# `_run_ocr`: verbose builds (and creates) the per-image ocrs/ dir via one of
+# three branches, sets the env var for dispatch_ocr, and always restores it.
+# ============================================================================
+import os
+
+ENV = 'MANGA_OCR_RESULT_DIR'
+
+
+@pytest.fixture(autouse=False)
+def _clean_env(monkeypatch):
+    monkeypatch.delenv(ENV, raising=False)
+
+
+def test_ocr_env_verbose_off_touches_nothing(_clean_env, tmp_path):
+    def never():
+        raise AssertionError('get_image_subfolder must not be called when not verbose')
+    with ds.ocr_debug_dir_env(False, never, 'sub', str(tmp_path)):
+        assert ENV not in os.environ
+    assert ENV not in os.environ
+
+
+def test_ocr_env_subfolder_with_result_sub_folder(_clean_env, tmp_path):
+    expected = os.path.join(str(tmp_path), 'result', 'job7', 'img-abc', 'ocrs')
+    with ds.ocr_debug_dir_env(True, lambda: 'img-abc', 'job7', str(tmp_path)):
+        assert os.environ[ENV] == expected
+        assert os.path.isdir(expected)          # makedirs happened
+    assert ENV not in os.environ                # previously absent → deleted
+
+
+def test_ocr_env_subfolder_without_result_sub_folder(_clean_env, tmp_path):
+    expected = os.path.join(str(tmp_path), 'result', 'img-abc', 'ocrs')
+    with ds.ocr_debug_dir_env(True, lambda: 'img-abc', '', str(tmp_path)):
+        assert os.environ[ENV] == expected
+
+
+def test_ocr_env_no_subfolder_falls_back_to_result_sub_folder(_clean_env, tmp_path):
+    expected = os.path.join(str(tmp_path), 'result', 'job7', 'ocrs')
+    with ds.ocr_debug_dir_env(True, lambda: None, 'job7', str(tmp_path)):
+        assert os.environ[ENV] == expected
+        assert os.path.isdir(expected)
+
+
+def test_ocr_env_restores_previous_value_even_on_raise(monkeypatch, tmp_path):
+    monkeypatch.setenv(ENV, 'OLD_DIR')
+    with pytest.raises(RuntimeError):
+        with ds.ocr_debug_dir_env(True, lambda: 'img-abc', 'job7', str(tmp_path)):
+            assert os.environ[ENV] != 'OLD_DIR'
+            raise RuntimeError('ocr failed')
+    assert os.environ[ENV] == 'OLD_DIR'         # restored in finally
