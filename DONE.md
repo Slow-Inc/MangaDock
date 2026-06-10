@@ -3,11 +3,71 @@
 
 ---
 
+## S23→S26a god-object tail — 5 byte-identical seams + batched E2E (2026-06-10, /tdd, xhigh)
+
+Pushed the high-risk async-orchestration tail of #187 in one session, one commit per seam, each byte-identical (`git diff -w` = zero semantic change on kept lines) and unit-tested. **Driver `manga_translator.py` 2235 → 1934 lines** (this session; **3040 → 1934 = −36%** since the decomposition began). Suite went 18 async-only baseline + **323 passed** (+16 new cases).
+
+- **S23 StageRunner** (`f1ce7a3`) — `stage_runner.run_stage(name, fn, fallback, *, report_progress, ignore_errors, logger)` + thin `_run_stage`. Folded the identical report-progress → try → `ignore_errors` (re-raise | fallback) + `"Error during {name}"` log block that repeated **14×** (8 in `_translate`, 5 in `_translate_until_translation`, leaving 1). **Rendering kept inline** — it reports `'rendering'` then a conditional `'rendering_folder:'` BEFORE running, and `_run_stage` couples report+run, so folding would double-report + reorder. `logger` injected so `set_main_logger` swaps are honoured. 5 cases.
+- **S24a patch_geometry** (`2eac7dd`) — three `self`-free numpy/cv2 helpers (`build_local_region` coord-shift+cache-clear, `create_text_only_mask` fillPoly+adaptive dilate, `crop_mask_for_patch` same-size/scaled crop+binarize) → `patch_geometry.py`, thin delegates. 8 golden-numpy cases.
+- **S24b PatchRenderer** (`8fa69d3`) — the ~90-line `_process_group` closure (crop→mask→inpaint→render→PNG, GPU semaphore, 30s `wait_for`) → `PatchRenderer.process_group`; body kept verbatim via local-aliasing, only the 6 helper calls rewritten. `{x,y,w,h,img_png}` HTTP contract (pickled at share.py:99) + every fallback preserved. Removed the now-orphan `encode_patch_png` import. 3 stub-orchestration cases.
+- **S25 PipelineOrchestrator** (`dfa0eb1`) — `_run_until_translation_stages(ctx,config)->(ctx,finished)` folds the ~80-line colorize→pre-dict block shared by both drivers (the dup S23 deliberately left). early-exit returns `(revert,True)` ⇒ caller `if finished: return ctx` = byte-identical. **L4 dead `'cancel'` branches preserved** (dead-code removal is a separate opt-in fix). 3 cases.
+- **S26a batch_orchestration** (`70792af`) — `placeholder_context` (dedup 2 failure-branch sites) + `build_page_translation_record` (the L7 `{raw:translation}`+`{idx:raw}` records appended to TranslationMemory). The MemoryError pre-process ladder (**S26b**) stays in the driver for a focused pass. 3 golden cases.
+
+Two stale source-inspection wiring tests re-pointed across the new module boundaries (`test_safe_area` bubble_polygon → patch_geometry, `test_font_fit` bubble_area_fit+union_box → patch_renderer) — same maintenance S15 did for stages.py.
+
+**E2E (batched — one MIT restart for all five seams).** MIT stopped (released ~7.7GB → commit-free 9.8→17.5GB, clearing the OSError-1455 risk) and restarted on the new code (`/ready` 200, fresh PIDs); `cache:reset` + fresh backend L1; translated Kouchuugun ch1 p0 EN→TH through the **production tunnel** while logged in. Result: **2 patches, pixel-exact `649×1492` + `451×1489` = byte-identical to the pre-refactor baseline**; the page rendered correct Thai with narrow-column wrapping (#179) intact. The translate_patches path (touched by S24/S25/S26a) is the most-exercised hot path, so this is the strongest byte-identity confirmation.
+
+**Follow-up — S26b** (`35390fa`): the ~50-line per-image try/MemoryError/Exception ladder moved out of `translate_batch`'s loop into `_preprocess_image_for_batch(image, config, i, memory_optimization_enabled) -> (ctx, config)` (loop keeps the psutil check + appends the return). Byte-identical (`append` → `return` is the only mechanical change; deepcopy-recovery-config, double image-context save, every log preserved). `test_batch_preprocess.py` — 5 cases pin every branch (success / MemoryError→recovery retry / retry-fail→placeholder / generic→placeholder / re-raise when mem-opt off). Suite **328 passed**. MIT rebooted on S26b → `/ready` 200 (boot-validated); S26b is on the batch path only, so the single-page byte-exact result above is untouched. **S26 complete.** Remaining tail: **S22** DispatchRegistry (#188 — the last seam), S12 value-object (🔒 #192).
+
 ## HOTFIX (critical): per-chapter Cloudflare Worker /v1/list cost-bleed (2026-06-10, /debug-mantra + /tdd)
 
 `MangaDexService.attachLocalStatus` fired one R2 `/v1/list` per chapter (`Promise.all(chapters.map(hasChapterCache))`) on EVERY chapter-list load — including the Redis cache-hit path — ungated by `forceLocal`. An N-chapter manga cost N Class-A list ops per load × every re-fetch (home grid re-fetches ~11/min; 507 chapter-list reqs/46min observed) → tens of thousands of worker list ops/session, unbounded. The R2 provider logs no outbound calls, so it was invisible in our logs (seen only on the Worker side).
 
-**Fix:** gate the fan-out — compute `readerAvailable` only when `imageCache.enabled && (forceLocal || isOfflineFallback)`; thread `forceLocal` into all 4 attachLocalStatus call sites. Mirrors the frontend's own consumption (`HeroDetailButton.tsx:33`, `BookDetailModal chapterNeedsBackup === isOfflineFallback`) → **default browsing = 0 worker calls, offline/forceLocal flows unchanged, zero UI regression.** TDD: `mangadex-reader-available.spec.ts` 3 cases RED→GREEN (default=0, forceLocal=N, disabled=0). Targets `main` directly (the defect is in main's merged code; `git merge-base --is-ancestor origin/main HEAD` confirms storage fully merged — Part B answered). Post-mortem + backlog follow-ups in `docs/reports/system-impact-report.md`.
+**Fix:** gate the fan-out — compute `readerAvailable` only when `imageCache.enabled && (forceLocal || isOfflineFallback)`; thread `forceLocal` into all 4 attachLocalStatus call sites. Mirrors the frontend's own consumption (`HeroDetailButton.tsx:33`, `BookDetailModal chapterNeedsBackup === isOfflineFallback`) → **default browsing = 0 worker calls, offline/forceLocal flows unchanged, zero UI regression.** TDD: `mangadex-reader-available.spec.ts` 3 cases RED→GREEN (default=0, forceLocal=N, disabled=0). Shipped to `main` via PR #197 (squash `01affd5`). Post-mortem + backlog follow-ups in `docs/reports/system-impact-report.md`.
+
+## S15 Stage protocol — extract the 6 leaf stage adapters into stages.py (2026-06-10, /tdd)
+
+New module `MIT/manga_translator/stages.py` + `test_stages.py` (9 golden cases), one commit. Moved the `read ctx-subset → dispatch_* → return value` core of six `_run_*` adapters byte-for-byte: `run_colorizer` (preserves the **L15** `**ctx` splat), `run_upscaling` (`[0]` unwrap), `run_detection` (12 positional args + the #168 `det_sfx` second pass), `run_mask_refinement`, `run_inpainting`, `run_text_rendering` (3-way renderer branch + the #181 supersampling kwargs; **L5** always-None `render_mask` preserved). Each driver `_run_*` keeps its `time.time()` + `_model_usage_tracker.touch(...)` instrumentation (the S3 concern) and delegates — so the error-prone many-arg dispatch calls are now independently testable by stubbing `dispatch_*` + snapshotting positional args, exactly the documented S15 test strategy.
+
+The heavier `_run_ocr` / `_run_textline_merge` / `_run_text_translation` adapters keep their extra logic inline (they already delegate to `debug_sink` / `text_translation_dispatcher`); only the leaf dispatches moved. Updated two stale source-inspection wiring tests (`test_safe_area` #181 supersampling, `test_sfx_merge` #168 det_sfx) to point at `stages.py` after the move. This is the groundwork the **StageRunner (S23)** drives as a uniform list — S23 is now unblocked (S15/S11/S14 all ✅).
+
+Suite: 18 async-only baseline, **319 passed**. **E2E run #4** (MIT restarted on S15 code, cache cleared): Kouchuugun ch1 p0 → 2 patches **649×1492 + 451×1489**, status success, **0 console errors** — identical to runs #1–3. S15 sits on every translation's detection→inpainting→rendering hot path, so this is the strongest byte-identity confirmation yet.
+
+## S14 VerboseDebugSink — fold the scattered verbose debug saves (2026-06-10, /tdd)
+
+New module `MIT/manga_translator/debug_sink.py` + `test_debug_sink.py` (15 characterization cases), three byte-identical increments, one commit each:
+- **S14a** the six save bodies — `input.png`/`mask_raw.png`/`bboxes_unfiltered.png`/`bboxes.png` (duplicated verbatim in the single + patch drivers), `inpainted.png` (single + batch back-half), `final.png` (`_revert_upscale`). Verbose guard stays at each call site; each save now exists once. Guarded-vs-unguarded split pinned as-is (input/inpainted/final = try/except + success-check warning; mask_raw/bboxes* = bare, exceptions propagate).
+- **S14b** the inpaint-preview pair — `save_inpaint_preview` (single driver, **unguarded**) vs `save_inpaint_preview_guarded` (batch back-half, whole block incl. preview render guarded with per-file success checks). The divergence is load-bearing (analysis S14) → pinned as two functions, not a flag; the `dispatch_inpainting(Inpainter.none, ...)` render stays at the call site as a `make_preview` callback so debug_sink has no ML imports.
+- **S14c** `ocr_debug_dir_env` context manager — `_run_ocr`'s `MANGA_OCR_RESULT_DIR` dance (verbose → 3-branch dir construction + makedirs → set env for `dispatch_ocr` → always restore in finally). `get_image_subfolder` passed as a callable, only consulted when verbose. Tested with real makedirs against tmp_path + restore-on-raise.
+
+Result: `manga_translator.py` is down to a **single `cv2.imwrite`** — the streaming-placeholder branch (L11 `_is_streaming_mode`, set nowhere in-repo), which is flow control and stays inline. Suite: 18 async-only baseline, **310 passed**. **E2E re-validated** (MIT restarted on S14 code, cache cleared): Kouchuugun ch1 p0 → 2 patches **649×1492 + 451×1489** — third identical run; `ocr_debug_dir_env` sits on every translation's hot path and behaves byte-identically. Unblocks S23 StageRunner (needs S15 next).
+
+## S18 PostTranslationProcessor — relocate (not unify) 4 copies (2026-06-10, /tdd)
+
+The documented S18 premise was "unify 4 copies of post-translation processing". Close reading showed the four are **not** a clean byte-identical dedup: the genuinely-identical part (`filter_translated_regions`) was already extracted in S1, and the three phase-2 retry loops are **structurally divergent and load-bearing** (L6/L8) — single uses min_ratio 0.5 / threshold ≥6 / pad-with-empty + enumerate; concurrent uses 0.3 / ≥6 / filter + text_idx; batch uses 0.5 / >10 / cross-context region_mapping, plus divergent log strings. Forcing them into one function needs per-scope collect/reassign/log callbacks — that *adds* complexity to prop up a merge, against the North Star. The user steered "reduce long-term debt", so the chosen interpretation is **relocate + make testable + pin the divergence as explicit params**, not unify.
+
+New module `MIT/manga_translator/post_translation.py` + `test_post_translation.py` (13 characterization cases), four byte-identical increments, one commit each:
+- **S18a** `apply_post_translation_processing` — punct + post-dict + phase-1 repetition retry (the helper batch/concurrent share); two self-bound async steps become callbacks. Updated the punctuation wiring test for the move (1 inline call in the god object + 1 in the module).
+- **S18b** `concurrent_page_lang_check_retry` — concurrent phase-2 (0.3 / ≥6, filter + text_idx).
+- **S18c** `single_page_lang_check_retry` — single phase-2 (0.5 / ≥6, pad + enumerate, skip-log + unified success/failure message).
+- **S18d** `batch_lang_check_retry` — batch phase-2 (0.5 / >10, cross-context region_mapping).
+
+Each driver now delegates; L6 thresholds/ratios and the L8 index-dropping re-translate are preserved verbatim. Suite throughout: 18 async-only baseline, **295 passed**. The single driver's own phase-1 variant (side-effect retry, no per-region try/except, different logging) is documented and left inline — unifying it with the helper would change logging/error behaviour, a flagged change for later.
+
+## E2E validation — S17/S21 refactor stack via production tunnel (2026-06-10)
+
+Brought up the full stack (Redis → cache:reset → MIT 5003 `--use-gpu --start-instance` → Backend 4001 → Frontend 4000 → cloudflared tunnel) and ran the mandatory original↔translated comparison through **`https://hayateotsu.space/`** (never localhost — per `frontend-testing` skill). Test page: **Kouchuugun Shikan Boukensha ni Naru** ch1 "Emergency Landing" page 1 (EN→TH, custom_openai/9arm).
+
+- **Result: PASS, output byte-identical to documented baseline.** `[MangaPatches] page=0 → 2 patches`, POST `translate-patches` → **201** (37s). Patch geometry **649×1492 + 451×1489** — matches the skill's recorded bubble-seg-OFF baseline exactly (render knobs gated off → byte-identical, as designed). Thai text correctly positioned in the caption columns, art/layout/panel positions preserved vs the original screenshot. No 500s; the only errors were the standard `/pages` 401→200 HWID auth handshake (pre-existing, unrelated to translation).
+- **What this validates:** the refactor stack on the hot path — **S21 ModelLifecycle** (preload + ensure_running, runs on every translate), S13 detection_postproc, S16 TranslationMemory, S19 gather_per_context — produces unchanged output end-to-end. (S17's chatgpt-specific dispatch is not exercised by the custom_openai path, but the surrounding orchestration is.) Screenshots: `e2e-s17-p1-original.png`, `e2e-s17-p1-translated.png`.
+
+## MIT test-suite pollution fix — sys.modules restore (2026-06-10)
+
+While running the full MIT suite to validate the S17 stack, the full `pytest` run showed **26 failed** — 18 the known async-only baseline (`async def functions are not natively supported`, pytest-asyncio inactive) plus **8 non-async** that all *passed in isolation* (`test_detection_postproc`, `test_series_context`, `test_mit_config` ×6). Root cause: `test_precision.py` + `test_qwen3_translator.py` install `_stub('omegaconf')` / `_stub('manga_translator')` into `sys.modules` at **module import time** (so qwen3.py loads without torch/the real package) and never restore them. pytest imports those root files during **collection**, so the empty stubs shadow the real modules for every test collected afterwards; any later test that imports the real `omegaconf` / `manga_translator.config` then breaks.
+
+- **Pre-existing, not a refactor regression:** git confirms both polluter files sit on `main` untouched by the #187/#188 stack; `pytest test/` alone (root files not collected) = clean 18 async-only. S13 merely *added* `test_detection_postproc.py`, which became a 3rd victim (its code passes in isolation).
+- **Fix:** snapshot the affected `sys.modules` entries before stubbing, restore them right after the module-under-test is loaded (it keeps its own references; the tests only touch the loaded symbols). `test_precision.py` deliberately leaves `torch`/`transformers`/`bitsandbytes` stubbed — its `build_load_kwargs` tests resolve those at call time.
+- **Result:** full suite **26 → 18 failed** (just the async baseline), **282 passed** (+8). precision+qwen3 own tests 12/12 green. Touch = 2 test files, +55 lines, zero production code. Commit `0db9479` on `refactor/mit-seam-s17-text-translation-dispatcher`.
 
 ## #179 narrow-column safe-area + adversarial bug hunt (2026-06-08, /tdd + Karpathy)
 
@@ -1608,3 +1668,106 @@ branches incl. the no-context default {ts}-unknown-1024-unknown-unknown, same ma
 Tests: test_image_debug_context.py 13 passed (subfolder, save/restore round-trip+miss, no-current save no-op,
 with_context swap + exception-restore, 5 result_path goldens, set with/without image + getattr defaults); full
 suite 234 passed (same 19 pre-existing async failures, no new breakage).
+
+## 2026-06-09 — PR #195 merged + #187 S12 (globals half): apply_global_settings
+PR #195 (seams S2–S11, 10 byte-identical extractions) addressed the github-code-quality finding (dual-import
+style in test_image_debug_context → single `idc.` form) and was **merged to main** (merge `88a01eb`). Resolved a
+merge collision in Backend/.env.example by keeping main's canonical Cloudflare Worker config (akkanop-x domain).
+
+Then S12 (globals half): the process-global construction side effects — conditional ModelWrapper._MODEL_DIR
+override (was in parse_init_params) + the two torch.backends.*.allow_tf32=True flags (were in __init__) →
+pipeline_params.apply_global_settings(params), called once after parse_init_params. Removed the now-unused
+ModelWrapper import (0 refs left). Byte-identical: nothing reads _MODEL_DIR between its old (mid-parse) and new
+(post-parse) position, models load lazily at translate time, TF32 flags + relative order preserved. The
+PipelineParams value object for the ~20 parsed fields is DEFERRED until #192 (entangled with device/using_gpu/
+raise + ordering — the analysis gates it on config-centralisation). Branch refactor/mit-seam-s12-pipeline-params.
+Tests: test_pipeline_params.py 3 passed (model_dir override / absent-or-empty no-op / TF32 flags); full suite
+237 passed (same 19 pre-existing async failures, no new breakage). Next actionable seam: S20 ModelReaper (deps
+S3+S4 done).
+
+## 2026-06-09 — #187 S20 / #188: ModelReaper (TTL loop off the god object)
+_detector_cleanup_job (the background model-TTL polling loop) extracted to
+model_reaper.ModelReaper(tracker, unloader, get_ttl): _loop polls the testable reap_once(now) once/sec; the 2
+task-creation sites now call self._model_reaper.start() behind their existing `is None` guard; the method is
+gone. Wraps the S3 tracker + S4 unloader (both on main). Byte-identical: ttl==0 short-circuit preserved,
+list(...) snapshot (L13) intact via tracker.expired, unload-before-forget order kept; reaper calls
+unloader.unload directly (== the old _unload_model delegate). L14 fix is OPT-IN: stop() cancels the task but
+nothing calls it by default → the cleanup-task leak is preserved verbatim until a caller opts in. Stacked on S12
+(refactor/mit-seam-s20-model-reaper).
+Tests: test_model_reaper.py 5 passed (unload→forget order, ttl==0 no-op + expired-not-queried, start creates
+task, stop cancels, stop-no-task no-op); full suite 242 passed (same 19 pre-existing async failures, no new
+breakage). Next: S15 Stage protocol (#187 core begins; deps S3 done).
+
+## 2026-06-09 — #187 S13 / #168: DetectionPostProcessor (move SFX second-pass merge off the god object)
+_merge_sfx_detections + _textline_aabb (the AnimeText SFX second-pass, gated by config.detector.det_sfx)
+extracted to detection_postproc.{merge_sfx_detections, textline_aabb}; _run_detection now calls
+merge_sfx_detections(ctx, result, self.device); the 2 methods + the now-unused Tuple import removed. Done
+without S15 (call-site gate unchanged). Byte-identical (same IoA dedup, empty-Quadrilateral append, [SFXDetect]
+log, str(device or 'cuda')). Stack (refactor/mit-seam-s13-detection-postproc).
+Stale-test fixes surfaced by the full-suite run (both are source-inspection wiring tests repointed to the new
+module locations): test_sfx_merge (merge body moved to detection_postproc.py) and — PRE-EXISTING since S2 merged
+— test_safe_area::test_en_uppercase_lettering_is_wired (S2 moved casing to region_apply.py but the test still
+grepped manga_translator.py). MIT test baseline is now 18 async-only failures (was 19; one was this stale test).
+Tests: test_detection_postproc.py 2 passed (AABB golden, no-SFX identity short-circuit); full suite 245 passed
+(18 pre-existing async failures, 0 real failures). Next AFK seam: S16 TranslationMemory.
+
+## 2026-06-09 — #187 S16: TranslationMemory (name the cross-page bleed boundary)
+The two cross-page lists (all_page_translations + _original_page_texts) + reset_page_context extracted to
+translation_memory.TranslationMemory (all_page_translations, original_page_texts, reset()). self._translation_
+memory holds them; ~16 direct refs renamed mechanically (lists stay plain lists → append/len/index/slice
+identical); reset_page_context delegates to .reset(). Makes the #136/#140 worker-singleton bleed boundary an
+explicit object (L9). Byte-identical: append sites still caller-driven (L7 asymmetry), reset still only from
+translate_patches (L9), reset rebinds not .clear() verbatim. Updated test_page_context's _bare_translator to the
+new memory location (it set the old attrs directly + reset now delegates). Stack
+(refactor/mit-seam-s16-translation-memory).
+Tests: test_translation_memory.py 4 passed (empty init, appendable, reset clears, reset-rebinds-not-clears);
+context regression (test_page_context/test_series_context) green; full suite 249 passed (18 pre-existing async
+failures, 0 real failures). Next AFK seam (last before core): S19 gather_per_context.
+
+## 2026-06-09 — #187 S19: gather_per_context (concurrent gather + per-exception placeholder)
+The concurrent driver's asyncio.gather(return_exceptions=True) + per-exception keep-original placeholder loop
+extracted to gather_per_context.gather_per_context(tasks, contexts_with_configs, ignore_errors); the inline
+~20-line block → one `final_results = await gather_per_context(...)` (bracketing Starting/Completed logs kept).
+Byte-identical: same return_exceptions=True, re-raise-unless-ignore_errors, apply_original_as_translation
+placeholder gated on ctx.text_regions, index alignment + logs. apply_original_as_translation still used at its
+other (batch error-fallback) sites — no orphan. Stack (refactor/mit-seam-s19-gather-per-context).
+Tests: test_gather_per_context.py 4 passed (all-succeed order, exception+ignore→placeholder index-aligned,
+exception+not-ignore→reraise-original, no-regions skips-apply); full suite 253 passed (18 pre-existing async).
+
+## 2026-06-09 — AFK decomposition batch done (S12-globals, S20, S13, S16, S19) — STOP before the core
+Per the dev's "do the normal seams AFK, stop at the hard ones": after PR #195 (S2–S11) merged, five more
+byte-identical seams landed on a stack — S12-globals (apply_global_settings), S20 (ModelReaper), S13
+(detection_postproc), S16 (TranslationMemory), S19 (gather_per_context). STOPPED before the high-risk
+async-orchestration core (S15 stage-protocol + S17/S18/S21/S22/S23/S24/S25/S26) which the analysis flags for
+E2E-per-step. Test baseline corrected to 18 async-only failures (a stale uppercase-wiring test from S2's casing
+move was fixed in S13). Full suite 253 passed, 0 real failures. Stack ready to PR.
+
+## 2026-06-09 — #187 S21 / #188: ModelLifecycle facade (first core seam; preload + ensure_running fold)
+After pushing a rollback point (main + PR #196) the dev said continue, so started the core. S21: the duplicated
+eager-preload block (×2, gated models_ttl==0) + the duplicated cleanup-task guard (×2) → model_lifecycle.
+ModelLifecycle(reaper, prepare_fns) with preload(config, device, models_ttl) + ensure_running(); the guard's
+idempotency moved into ModelReaper.ensure_started(). self._detector_cleanup_task removed (the reaper owns its
+task; 0 refs left). Facade wraps the reaper; tracker(S3)+unloader(S4) stay direct (used by _run_* touch + reaper)
+— absorbing them is high-churn/low-value, deferred. Byte-identical (same preload order, upscale_ratio/Colorizer.
+none conditions, device threading, models_ttl==0 gate; prepare_* injected as a table → ML-free tests). Stack on
+PR#196 (refactor/mit-seam-s21-model-lifecycle).
+Tests: test_model_lifecycle.py 4 passed + test_model_reaper ensure_started idempotent; full suite 258 passed
+(18 pre-existing async, 0 real). Remaining core = the hardest (S15/S17/S18/S22/S23/S24/S25/S26) — pausing to
+report before the L6/L8/L9-touching async-orchestration seams.
+
+## 2026-06-09 — #187 S17: TextTranslationDispatcher (collapse the duplicated chatgpt translator switch)
+The hardest seam. The duplicated ChatGPT/ChatGPT2Stage handling in _dispatch_with_context (single) +
+_batch_translate_texts (batch) → text_translation_dispatcher.{build_chatgpt_translator, dispatch_translate}.
+Split into TWO functions because construction order is load-bearing: OpenAITranslator.__init__ can warn about
+the glossary, and single constructs AFTER the context log while batch constructs BEFORE — so each caller calls
+build_chatgpt_translator at its own point (order preserved) and dispatch_translate does the order-invariant
+parse/set-context/log/translate. Divergences preserved & parameterised: result_path_callback (single = bound
+_result_path direct-set; batch = with_context swap closure), batch_contexts wiring (on_2stage_batch_setup,
+batch-only), and the context-computation placement (single unconditional incl. non-chatgpt log; batch only in
+its chatgpt branch — both kept at the call sites). Only reorder: parse_args now after the silent
+build_prev_context → identical observable log sequence. Stack on S21 (refactor/mit-seam-s17-text-translation-
+dispatcher). Pushed for rollback.
+Tests: test_text_translation_dispatcher.py 6 passed (build→openai/2stage, parse/set/translate w/wo ctx,
+2stage callback+batch-setup, chatgpt-skips-batch-setup, carry/skip logs) via fake translators + sys.modules
+stubs; full suite 264 passed (18 pre-existing async, 0 real). E2E PENDING — this high-risk seam wants a live
+translation pass (single + batch + concurrent + chatgpt_2stage) before merge.

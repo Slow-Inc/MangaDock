@@ -12,17 +12,20 @@ from manga_translator.manga_translator import MangaTranslator
 
 
 def _bare_translator() -> MangaTranslator:
+    # #187 S16 moved the two cross-page lists into TranslationMemory
+    from manga_translator.translation_memory import TranslationMemory
     t = MangaTranslator.__new__(MangaTranslator)
-    t.all_page_translations = [{"page": "stale"}]
-    t._original_page_texts = [{"page": "stale"}]
+    t._translation_memory = TranslationMemory()
+    t._translation_memory.all_page_translations = [{"page": "stale"}]
+    t._translation_memory.original_page_texts = [{"page": "stale"}]
     return t
 
 
 def test_reset_page_context_empties_both_lists():
     t = _bare_translator()
     t.reset_page_context()
-    assert t.all_page_translations == []
-    assert t._original_page_texts == []
+    assert t._translation_memory.all_page_translations == []
+    assert t._translation_memory.original_page_texts == []
 
 
 def test_translate_patches_resets_context_first():

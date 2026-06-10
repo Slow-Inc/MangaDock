@@ -33,10 +33,18 @@ def test_fullwidth_double_quote_count_mismatch_leaves_text_untouched():
 
 
 def test_is_wired_into_the_translator():
-    """Source-inspection (no ML import): both former inline copies now delegate."""
+    """Source-inspection (no ML import): both former inline copies now delegate.
+
+    #187 S18 moved the helper-path copy into post_translation.py, so the single
+    driver keeps one inline call in manga_translator.py and the other lives in
+    the extracted module — two call sites total, byte-identical behaviour."""
     import re
     from pathlib import Path
-    mt = (Path(__file__).parent.parent / 'manga_translator' / 'manga_translator.py').read_text(encoding='utf-8')
+    root = Path(__file__).parent.parent / 'manga_translator'
+    mt = (root / 'manga_translator.py').read_text(encoding='utf-8')
+    pt = (root / 'post_translation.py').read_text(encoding='utf-8')
+    pattern = r'correct_punctuation\(region\.text, region\.translation\)'
     assert 'from .punctuation import correct_punctuation' in mt
-    assert len(re.findall(r'correct_punctuation\(region\.text, region\.translation\)', mt)) == 2
+    assert len(re.findall(pattern, mt)) == 1          # single driver, still inline
+    assert len(re.findall(pattern, pt)) == 1          # helper copy now in the module
     assert 'check_items = [' not in mt  # the duplicated data tables are gone

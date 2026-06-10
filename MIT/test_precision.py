@@ -7,6 +7,24 @@ import types
 import unittest
 from unittest.mock import MagicMock
 
+# These module-level stubs let qwen3.py load without torch/transformers/the real
+# MIT package. Only the package/omegaconf stubs are restored after the module is
+# loaded (see the restore block after `_load(...qwen3...)`); they are needed just
+# to *import* qwen3, but leaving them shadowed the real omegaconf / manga_translator
+# for every test collected afterwards (detection_postproc, series_context,
+# mit_config). The torch/transformers/bitsandbytes stubs stay in place — the tests
+# below resolve them at call time and need the mocks.
+_RESTORED_NAMES = (
+    'omegaconf',
+    'manga_translator',
+    'manga_translator.config',
+    'manga_translator.translators',
+    'manga_translator.translators.common',
+    'manga_translator.translators.config_gpt',
+    'manga_translator.translators.qwen3',
+)
+_SAVED_MODULES = {name: sys.modules.get(name) for name in _RESTORED_NAMES}
+
 # ── Mock torch before any import ──────────────────────────────────────────
 _torch = types.ModuleType('torch')
 _torch.float8_e4m3fn = 'MOCK_FP8'
@@ -70,6 +88,15 @@ _qwen3 = _load(
     _HERE / 'manga_translator' / 'translators' / 'qwen3.py',
 )
 build_load_kwargs = _qwen3.build_load_kwargs
+
+# Restore the real sys.modules entries — qwen3 keeps its own references to the
+# stubbed deps and the tests below only call build_load_kwargs, so later test
+# modules see the real torch / omegaconf / manga_translator.
+for _name, _orig in _SAVED_MODULES.items():
+    if _orig is None:
+        sys.modules.pop(_name, None)
+    else:
+        sys.modules[_name] = _orig
 
 
 class TestBuildLoadKwargs(unittest.TestCase):

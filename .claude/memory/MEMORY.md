@@ -17,3 +17,5 @@
 - [Feedback: impact report](feedback_impact_report.md) — ปิด issue/เปิด PR ต้องเขียน report เสมอ: bug→post-mortem-template, feature/refactor→full-field change record (before→after/perf/quality/validation) ลง docs/reports/system-impact-report.md
 - [Feedback: core boundary](feedback_core_boundary.md) — feature ใหม่เสียบที่ seam + มี test ห้ามโตเข้า core monolith/copy boilerplate; ไม่มี seam ต้องแตก seam ก่อน (กัน tech debt ทวีคูณแบบ LINE); priority debt = core decomposition #188→#187
 - [Project: MIT refactor resume](project_mit_refactor_resume.md) — RESUME POINT เดียวของ decomposition #187/#188 = docs/reports/mit-refactor-progress.md (seam S1-S26 status + landmines); อ่านก่อนทำต่อ ไม่ต้องสำรวจใหม่
+- [Feedback: decomposition method + ผลที่วัดได้](feedback_decomposition_method.md) — ทำไม decomposition ใช้ byte-identical/characterization-first/1-seam-1-commit + วัดได้: god object 3040→2235 (−26.5%), 21 module, test +77%, E2E เหมือน 4 รอบ; ทำต่อแบบนี้
+- [Reference: Frontend UI Libraries](reference_frontend_ui_libraries.md) — shadcn (UI primitives/Radix) vs React Bits (WebGL/GLSL effects); MCP setup และ pattern การใช้คู่กัน
