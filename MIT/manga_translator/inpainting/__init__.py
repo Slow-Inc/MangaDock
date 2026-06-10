@@ -9,6 +9,7 @@ from .inpainting_sd import StableDiffusionInpainter
 from .none import NoneInpainter
 from .original import OriginalInpainter
 from ..config import Inpainter, InpainterConfig
+from ..dispatch_registry import DispatchRegistry
 
 INPAINTERS = {
     Inpainter.default: AotInpainter,
@@ -18,15 +19,10 @@ INPAINTERS = {
     Inpainter.none: NoneInpainter,
     Inpainter.original: OriginalInpainter,
 }
-inpainter_cache = {}
+_registry = DispatchRegistry(INPAINTERS, 'inpainter')
 
 def get_inpainter(key: Inpainter, *args, **kwargs) -> CommonInpainter:
-    if key not in INPAINTERS:
-        raise ValueError(f'Could not find inpainter for: "{key}". Choose from the following: %s' % ','.join(INPAINTERS))
-    if not inpainter_cache.get(key):
-        inpainter = INPAINTERS[key]
-        inpainter_cache[key] = inpainter(*args, **kwargs)
-    return inpainter_cache[key]
+    return _registry.get(key, *args, **kwargs)
 
 async def prepare(inpainter_key: Inpainter, device: str = 'cpu'):
     inpainter = get_inpainter(inpainter_key)
@@ -41,5 +37,4 @@ async def dispatch(inpainter_key: Inpainter, image: np.ndarray, mask: np.ndarray
     config = config or InpainterConfig()
     return await inpainter.inpaint(image, mask, config, inpainting_size, verbose)
 
-async def unload(inpainter_key: Inpainter):
-    inpainter_cache.pop(inpainter_key, None)
+unload = _registry.unload

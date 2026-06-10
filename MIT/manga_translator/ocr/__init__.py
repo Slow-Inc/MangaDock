@@ -7,6 +7,7 @@ from .model_48px_ctc import Model48pxCTCOCR
 from .model_manga_ocr import ModelMangaOCR
 from ..config import Ocr, OcrConfig
 from ..utils import Quadrilateral
+from ..dispatch_registry import DispatchRegistry
 
 OCRS = {
     Ocr.ocr32px: Model32pxOCR,
@@ -14,15 +15,10 @@ OCRS = {
     Ocr.ocr48px_ctc: Model48pxCTCOCR,
     Ocr.mocr: ModelMangaOCR,
 }
-ocr_cache = {}
+_registry = DispatchRegistry(OCRS, 'OCR')
 
 def get_ocr(key: Ocr, *args, **kwargs) -> CommonOCR:
-    if key not in OCRS:
-        raise ValueError(f'Could not find OCR for: "{key}". Choose from the following: %s' % ','.join(OCRS))
-    if not ocr_cache.get(key):
-        ocr = OCRS[key]
-        ocr_cache[key] = ocr(*args, **kwargs)
-    return ocr_cache[key]
+    return _registry.get(key, *args, **kwargs)
 
 async def prepare(ocr_key: Ocr, device: str = 'cpu'):
     ocr = get_ocr(ocr_key)
@@ -37,5 +33,4 @@ async def dispatch(ocr_key: Ocr, image: np.ndarray, regions: List[Quadrilateral]
     config = config or OcrConfig()
     return await ocr.recognize(image, regions, config, verbose)
 
-async def unload(ocr_key: Ocr):
-    ocr_cache.pop(ocr_key, None)
+unload = _registry.unload
