@@ -34,6 +34,7 @@ from .model_lifecycle import ModelLifecycle
 from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
 from .debug_sink import (
+    ocr_debug_dir_env,
     save_input_png,
     save_mask_raw,
     save_bboxes_unfiltered,
@@ -654,35 +655,9 @@ class MangaTranslator:
         current_time = time.time()
         self._model_usage_tracker.touch("ocr", config.ocr.ocr, current_time)
         
-        # 为OCR创建子文件夹（只在verbose模式下）
-        if self.verbose:
-            image_subfolder = self._get_image_subfolder()
-            if image_subfolder:
-                if self.result_sub_folder:
-                    ocr_result_dir = os.path.join(BASE_PATH, 'result', self.result_sub_folder, image_subfolder, 'ocrs')
-                else:
-                    ocr_result_dir = os.path.join(BASE_PATH, 'result', image_subfolder, 'ocrs')
-                os.makedirs(ocr_result_dir, exist_ok=True)
-            else:
-                ocr_result_dir = os.path.join(BASE_PATH, 'result', self.result_sub_folder, 'ocrs')
-                os.makedirs(ocr_result_dir, exist_ok=True)
-        else:
-            # 非verbose模式下使用临时目录或不创建OCR结果目录
-            ocr_result_dir = None
-        
-        # 临时设置环境变量供OCR模块使用
-        old_ocr_dir = os.environ.get('MANGA_OCR_RESULT_DIR', None)
-        if ocr_result_dir:
-            os.environ['MANGA_OCR_RESULT_DIR'] = ocr_result_dir
-        
-        try:
+        # OCR debug-dir + MANGA_OCR_RESULT_DIR env dance — #187 S14: body in debug_sink
+        with ocr_debug_dir_env(self.verbose, self._get_image_subfolder, self.result_sub_folder, BASE_PATH):
             textlines = await dispatch_ocr(config.ocr.ocr, ctx.img_rgb, ctx.textlines, config.ocr, self.device, self.verbose)
-        finally:
-            # 恢复环境变量
-            if old_ocr_dir is not None:
-                os.environ['MANGA_OCR_RESULT_DIR'] = old_ocr_dir
-            elif 'MANGA_OCR_RESULT_DIR' in os.environ:
-                del os.environ['MANGA_OCR_RESULT_DIR']
 
         new_textlines = []
         for textline in textlines:

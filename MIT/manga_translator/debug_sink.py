@@ -15,7 +15,9 @@ verbose/result_sub_folder directory logic + makedirs). The streaming-placeholder
 branch in `_revert_upscale` (L11) is flow control, not a debug save — it stays
 in the driver.
 """
+import contextlib
 import logging
+import os
 import traceback
 
 import cv2
@@ -24,6 +26,44 @@ import numpy as np
 from .utils import visualize_textblocks
 
 logger = logging.getLogger('manga_translator')
+
+
+@contextlib.contextmanager
+def ocr_debug_dir_env(verbose, get_image_subfolder, result_sub_folder, base_path):
+    """The `_run_ocr` debug-dir + env dance: when verbose, build (and create)
+    the per-image `ocrs/` result dir via one of three branches, expose it to
+    the OCR module through MANGA_OCR_RESULT_DIR for the duration of the body,
+    and always restore the variable afterwards. `get_image_subfolder` is the
+    caller's bound `_get_image_subfolder` — only consulted when verbose."""
+    # 为OCR创建子文件夹（只在verbose模式下）
+    if verbose:
+        image_subfolder = get_image_subfolder()
+        if image_subfolder:
+            if result_sub_folder:
+                ocr_result_dir = os.path.join(base_path, 'result', result_sub_folder, image_subfolder, 'ocrs')
+            else:
+                ocr_result_dir = os.path.join(base_path, 'result', image_subfolder, 'ocrs')
+            os.makedirs(ocr_result_dir, exist_ok=True)
+        else:
+            ocr_result_dir = os.path.join(base_path, 'result', result_sub_folder, 'ocrs')
+            os.makedirs(ocr_result_dir, exist_ok=True)
+    else:
+        # 非verbose模式下使用临时目录或不创建OCR结果目录
+        ocr_result_dir = None
+
+    # 临时设置环境变量供OCR模块使用
+    old_ocr_dir = os.environ.get('MANGA_OCR_RESULT_DIR', None)
+    if ocr_result_dir:
+        os.environ['MANGA_OCR_RESULT_DIR'] = ocr_result_dir
+
+    try:
+        yield ocr_result_dir
+    finally:
+        # 恢复环境变量
+        if old_ocr_dir is not None:
+            os.environ['MANGA_OCR_RESULT_DIR'] = old_ocr_dir
+        elif 'MANGA_OCR_RESULT_DIR' in os.environ:
+            del os.environ['MANGA_OCR_RESULT_DIR']
 
 
 def save_input_png(image, result_path):
