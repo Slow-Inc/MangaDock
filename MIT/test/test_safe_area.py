@@ -23,8 +23,10 @@ def test_safe_area_is_wired_for_narrow_column_render():
     assert 'safe_area_box' in rnd
     assert '_bubble_interior_box' in rnd
     mt = (base / 'manga_translator.py').read_text(encoding='utf-8')
-    assert 'bubble_polygon' in mt   # carried in tagging + shifted in _build_local_region
-    assert len(re.findall(r'bubble_polygon', mt)) >= 2
+    assert 'bubble_polygon' in mt   # carried in tagging (_tag_regions_with_bubbles)
+    # #187 S24a moved _build_local_region's crop-coord shift into patch_geometry.py
+    pg = (base / 'patch_geometry.py').read_text(encoding='utf-8')
+    assert len(re.findall(r'bubble_polygon', pg)) >= 2   # getattr + shifted reassignment
 
 
 def test_render_parity_knobs_are_wired():
