@@ -1022,6 +1022,66 @@ class MangaTranslator:
 
         self.add_progress_hook(ph)
 
+    async def _preprocess_image_for_batch(self, image, config, i, memory_optimization_enabled):
+        """Pre-process one batch image through `_translate_until_translation`, with
+        the MemoryError fallback ladder (#187 S26b). Returns the ``(ctx, config)``
+        pair the caller appends to ``pre_translation_contexts``: on success the
+        real ctx + original config; on MemoryError a ``release_memory`` +
+        deepcopy-config retry (or re-raise when memory optimization is off); on
+        retry failure or any other error a placeholder Context + the original
+        config. The per-image psutil check stays in the driver loop.
+        """
+        try:
+            # 为批量处理中的每张图片设置上下文
+            self._set_image_context(config, image)
+            # 保存图片上下文，确保后处理阶段使用相同的文件夹
+            if self._image_debug.current:
+                image_md5 = self._image_debug.current['file_md5']
+                self._save_current_image_context(image_md5)
+            ctx = await self._translate_until_translation(image, config)
+            # 保存图片上下文到Context对象中，用于后续批量处理
+            if self._image_debug.current:
+                ctx.image_context = self._image_debug.current.copy()
+            # 保存verbose标志到Context对象中
+            ctx.verbose = self.verbose
+            logger.debug(f'Image {i+1} pre-processing successful')
+            return (ctx, config)
+        except MemoryError as e:
+            logger.error(f'Memory error in pre-processing image {i+1}: {e}')
+            if not memory_optimization_enabled:
+                logger.error('Consider enabling memory optimization')
+                raise
+
+            # 尝试降级处理
+            try:
+                logger.warning(f'Image {i+1} attempting fallback processing...')
+                import copy
+                recovery_config = copy.deepcopy(config)
+
+                # 强制清理
+                release_memory(torch.cuda.is_available, torch.cuda.empty_cache)
+
+                # 重新设置图片上下文
+                self._set_image_context(recovery_config, image)
+                # 保存fallback图片上下文
+                if self._image_debug.current:
+                    image_md5 = self._image_debug.current['file_md5']
+                    self._save_current_image_context(image_md5)
+                ctx = await self._translate_until_translation(image, recovery_config)
+                # 保存图片上下文到Context对象中
+                if self._image_debug.current:
+                    ctx.image_context = self._image_debug.current.copy()
+                # 保存verbose标志到Context对象中
+                ctx.verbose = self.verbose
+                logger.info(f'Image {i+1} fallback processing successful')
+                return (ctx, recovery_config)
+            except Exception as retry_error:
+                logger.error(f'Image {i+1} fallback processing also failed: {retry_error}')
+                return (placeholder_context(image), config)
+        except Exception as e:
+            logger.error(f'Image {i+1} pre-processing error: {e}')
+            return (placeholder_context(image), config)
+
     async def translate_batch(self, images_with_configs: List[tuple], batch_size: int = None, image_names: List[str] = None) -> List[Context]:
         """
         批量翻译多张图片，在翻译阶段进行批量处理以提高效率
@@ -1071,56 +1131,8 @@ class MangaTranslator:
                 except Exception as e:
                     logger.debug(f'Memory check failed: {e}')
                 
-            try:
-                # 为批量处理中的每张图片设置上下文
-                self._set_image_context(config, image)
-                # 保存图片上下文，确保后处理阶段使用相同的文件夹
-                if self._image_debug.current:
-                    image_md5 = self._image_debug.current['file_md5']
-                    self._save_current_image_context(image_md5)
-                ctx = await self._translate_until_translation(image, config)
-                # 保存图片上下文到Context对象中，用于后续批量处理
-                if self._image_debug.current:
-                    ctx.image_context = self._image_debug.current.copy()
-                # 保存verbose标志到Context对象中
-                ctx.verbose = self.verbose
-                pre_translation_contexts.append((ctx, config))
-                logger.debug(f'Image {i+1} pre-processing successful')
-            except MemoryError as e:
-                logger.error(f'Memory error in pre-processing image {i+1}: {e}')
-                if not memory_optimization_enabled:
-                    logger.error('Consider enabling memory optimization')
-                    raise
-                    
-                # 尝试降级处理
-                try:
-                    logger.warning(f'Image {i+1} attempting fallback processing...')
-                    import copy
-                    recovery_config = copy.deepcopy(config)
-                    
-                    # 强制清理
-                    release_memory(torch.cuda.is_available, torch.cuda.empty_cache)
-                    
-                    # 重新设置图片上下文
-                    self._set_image_context(recovery_config, image)
-                    # 保存fallback图片上下文
-                    if self._image_debug.current:
-                        image_md5 = self._image_debug.current['file_md5']
-                        self._save_current_image_context(image_md5)
-                    ctx = await self._translate_until_translation(image, recovery_config)
-                    # 保存图片上下文到Context对象中
-                    if self._image_debug.current:
-                        ctx.image_context = self._image_debug.current.copy()
-                    # 保存verbose标志到Context对象中
-                    ctx.verbose = self.verbose
-                    pre_translation_contexts.append((ctx, recovery_config))
-                    logger.info(f'Image {i+1} fallback processing successful')
-                except Exception as retry_error:
-                    logger.error(f'Image {i+1} fallback processing also failed: {retry_error}')
-                    pre_translation_contexts.append((placeholder_context(image), config))
-            except Exception as e:
-                logger.error(f'Image {i+1} pre-processing error: {e}')
-                pre_translation_contexts.append((placeholder_context(image), config))
+            pre_translation_contexts.append(
+                await self._preprocess_image_for_batch(image, config, i, memory_optimization_enabled))
         
         if not pre_translation_contexts:
             logger.warning('No images pre-processed successfully')
