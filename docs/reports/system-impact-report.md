@@ -15,6 +15,22 @@
 
 ---
 
+## 2026-06-10 — HOTFIX (critical): per-chapter Cloudflare Worker `/v1/list` cost-bleed
+
+**Severity:** critical (unbounded Cloudflare R2 Class-A op spend) · **Branch:** `hotfix/r2-list-amplification` → `main` (PR #197, squash `01affd5`).
+
+*Post-mortem (bug):*
+- **Symptom.** The Cloudflare Worker (`mangadock-worker.akkanop2549.workers.dev`) was receiving a flood of `GET /v1/list?prefix=img-cache/_chapters/chapters/<chapterId>/`. Our backend log showed **507 `GET /books/manga/<id>/chapters` requests in 46 min** (~11/min, across the home-grid manga) — and the R2 provider does not log its outbound calls, so the spend was invisible on our side.
+- **Root cause.** `MangaDexService.attachLocalStatus` (mangadex.service.ts) did `Promise.all(chapters.map(ch => imageCache.hasChapterCache('_chapters', ch.id)))` — **one R2 `/v1/list` per chapter** — and it ran on **every** chapter-list load, *including the Redis cache-HIT path* (line 99) and the fresh/stale paths (162/166/172). It was **not gated by `forceLocal`** (only `imageCache.enabled`, which is true on the R2 dev/prod config). So an **N-chapter manga cost N Class-A list ops per load**, multiplied by every (re)fetch (the home grid re-fetches per card, frontend uses raw `fetch()` bypassing the apiCache). Example: a 83-chapter manga × ~50 re-fetches ≈ 4,800 list ops; whole grid ≈ tens of thousands per session. **Unbounded** — grows with chapter count × open count.
+- **Why it was safe to gate.** `readerAvailable` is consumed by the UI **only** when `forceLocal` (offline toggle) or `isOfflineFallback` (stale cache while MangaDex is down) is set — `HeroDetailButton.tsx:33` (`if (forceLocal || ch.isOfflineFallback) … else pageCount>0`) and `BookDetailModal` (`chapterNeedsBackup === ch.isOfflineFallback`). The frontend only sends `?forceLocal=true` when the toggle is on. So computing `readerAvailable` during default browsing was pure waste.
+- **Fix (before → after).** Gate the fan-out: `attachLocalStatus(chapters, isOfflineFallback, forceLocal)` now computes `readerAvailable` (the per-chapter `/v1/list`) **only when `imageCache.enabled && (forceLocal || isOfflineFallback)`**; otherwise returns `readerAvailable:false` with **zero** worker calls. `forceLocal` is threaded into all 4 call sites. *Before:* every chapter-list load = N `/v1/list`. *After:* default browsing = **0**; offline/forceLocal flows unchanged (still compute it, exactly as the UI needs). **Mirrors the frontend's own consumption condition → zero UI regression.**
+- **Validation.** `mangadex-reader-available.spec.ts` (3 cases, RED→GREEN): default browsing fires 0 `hasChapterCache`; `forceLocal=true` fires exactly N; disabled fires 0. Typecheck clean for `mangadex.service.ts` (the unrelated `.spec.ts` TS errors are pre-existing).
+- **Part B (asked alongside):** main's Cloudflare R2/Worker storage **is fully merged** into the working branch (`git merge-base --is-ancestor origin/main HEAD` true; zero diff over `common/storage`). The bug is a pre-existing **design defect in the merged code**, not a merge gap — which is why this hotfix targets `main` directly.
+- **Risk / rollback:** Low — one method + 4 call sites; behaviour preserved for the only paths that read `readerAvailable`; revert = single commit.
+- **Follow-ups (backlog, not in this hotfix):** route the frontend chapter-list fetch through `apiCache` (kill the ~11/min re-fetch); Redis-cache the `readerAvailable` set; in-flight dedup on `storage.list`; `CloudflareR2Provider.list` outbound logging + failure backoff; the flat `_chapters` namespace → per-manga (enables N→1 list).
+
+---
+
 ## 2026-06-10 — MIT god-object decomposition stack (S13–S18) + test-pollution fix + E2E
 
 Branch: `refactor/mit-seam-s17-text-translation-dispatcher` (stacks S13/S16/S17/S19/S21/S18 on the
