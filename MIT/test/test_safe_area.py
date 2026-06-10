@@ -34,10 +34,12 @@ def test_render_parity_knobs_are_wired():
     assert re.search(r'en_comic_font:\s*bool\s*=\s*False', cfg)   # #176 opt-in
     assert re.search(r'supersampling:\s*int\s*=\s*1', cfg)        # #181 default off
     mt = (base / 'manga_translator.py').read_text(encoding='utf-8')
-    assert '_render_font_path' in mt and 'comic shanns' in mt     # #176
+    assert '_render_font_path' in mt and 'comic shanns' in mt     # #176 (font path stays in the driver)
     assert 'config.render.en_font' in mt                          # parity-B EN font override
     assert re.search(r'en_font:\s*Optional\[str\]\s*=\s*None', cfg)  # parity-B opt-in
-    assert 'supersampling=config.render.supersampling' in mt      # #181 threaded
+    # #187 S15 moved the renderer dispatch (carrying the #181 supersampling kwarg) into stages.py
+    stg = (base / 'stages.py').read_text(encoding='utf-8')
+    assert 'supersampling=config.render.supersampling' in stg     # #181 threaded
     rnd = (base / 'rendering' / '__init__.py').read_text(encoding='utf-8')
     assert 'supersampling' in rnd and 'INTER_AREA' in rnd         # #181 downscale seam
     assert 'np.clip(' in rnd                                      # #183 bounds clamp
