@@ -96,7 +96,7 @@ export class MangaDexService {
     const cacheKey = `manga:chapters:v3:${mangaId}`;
     const cached = await this.cache.get<MangaChapter[]>(cacheKey);
     if (cached) {
-      return await this.attachLocalStatus(cached.data, false);
+      return await this.attachLocalStatus(cached.data, false, forceLocal);
     }
 
     const lang = this.getMangaLanguage();
@@ -159,17 +159,17 @@ export class MangaDexService {
         const stale = this.cache.getStale<MangaChapter[]>(cacheKey);
         if (stale) {
           this.logger.log(`[MangaDex] Serving stale chapters cache (updatedAt=${stale.updatedAt})`);
-          return this.attachLocalStatus(stale.data, true);
+          return this.attachLocalStatus(stale.data, true, forceLocal);
         }
       }
 
-      return this.attachLocalStatus(chapters, false);
+      return this.attachLocalStatus(chapters, false, forceLocal);
     } catch (err) {
       this.logger.error(`[MangaDex] Chapters fetch error: ${String(err)}`);
       const stale = this.cache.getStale<MangaChapter[]>(cacheKey);
       if (stale) {
         this.logger.log(`[MangaDex] Serving stale chapters cache (updatedAt=${stale.updatedAt})`);
-        return this.attachLocalStatus(stale.data, true);
+        return this.attachLocalStatus(stale.data, true, forceLocal);
       }
       return [];
     }
@@ -632,8 +632,14 @@ export class MangaDexService {
 
   // ─── Image cache enhancement ─────────────────────────────────────────────────
 
-  private async attachLocalStatus(chapters: MangaChapter[], isOfflineFallback = false): Promise<MangaChapter[]> {
-    if (!this.imageCache.enabled) {
+  private async attachLocalStatus(chapters: MangaChapter[], isOfflineFallback = false, forceLocal = false): Promise<MangaChapter[]> {
+    // readerAvailable is only consumed by the UI under forceLocal (offline toggle) or
+    // isOfflineFallback (stale cache served while MangaDex is down) — see
+    // HeroDetailButton.tsx:33 and BookDetailModal's chapterNeedsBackup === isOfflineFallback.
+    // Computing it otherwise fires one Cloudflare Worker GET /v1/list per chapter, so an
+    // N-chapter manga cost N Class-A R2 list ops on EVERY chapter-list load (incl. cache
+    // hits). Skip the fan-out unless the result will actually be read.
+    if (!this.imageCache.enabled || (!forceLocal && !isOfflineFallback)) {
       return chapters.map((ch) => ({ ...ch, readerAvailable: false, isOfflineFallback }));
     }
 
