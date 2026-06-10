@@ -33,6 +33,7 @@ from .gather_per_context import gather_per_context
 from .model_lifecycle import ModelLifecycle
 from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
+from .post_translation import apply_post_translation_processing
 import py3langid as langid
 
 from .config import Config, Colorizer, Detector, Translator, Renderer, Inpainter
@@ -2312,55 +2313,17 @@ class MangaTranslator:
             )
             
     async def _apply_post_translation_processing(self, ctx: Context, config: Config) -> List:
-        """
-        应用翻译后处理逻辑（括号修正、过滤等）
-        """
-        # 检查text_regions是否为None或空
-        if not ctx.text_regions:
-            return []
-            
-        for region in ctx.text_regions:
-            if region.text and region.translation:
-                region.translation = correct_punctuation(region.text, region.translation)
+        """应用翻译后处理逻辑（括号修正、后字典、phase-1 幻觉重试）。
 
-        # 注意：翻译结果的保存移动到了translate方法的最后，确保保存的是最终结果
-
-        # 应用后字典
-        apply_post_dictionary(ctx.text_regions, self.post_dict)
-
-        # 单个region幻觉检测
-        failed_regions = []
-        if config.translator.enable_post_translation_check:
-            logger.info("Starting post-translation check...")
-            
-            # 单个region级别的幻觉检测
-            for region in ctx.text_regions:
-                if region.translation and region.translation.strip():
-                    # 只检查重复内容幻觉
-                    if await self._check_repetition_hallucination(
-                        region.translation, 
-                        config.translator.post_check_repetition_threshold,
-                        silent=False
-                    ):
-                        failed_regions.append(region)
-            
-            # 对失败的区域进行重试
-            if failed_regions:
-                logger.warning(f"Found {len(failed_regions)} regions that failed repetition check, starting retry...")
-                for region in failed_regions:
-                    try:
-                        logger.info(f"Retrying translation for region with text: '{region.text}'")
-                        new_translation = await self._retry_translation_with_validation(region, config, ctx)
-                        if new_translation:
-                            old_translation = region.translation
-                            region.translation = new_translation
-                            logger.info(f"Region retry successful: '{old_translation}' -> '{new_translation}'")
-                        else:
-                            logger.warning(f"Region retry failed, keeping original: '{region.translation}'")
-                    except Exception as e:
-                        logger.error(f"Error during region retry: {e}")
-
-        return ctx.text_regions
+        #187 S18: body extracted byte-for-byte into
+        post_translation.apply_post_translation_processing; the two self-bound
+        async steps are passed as callbacks. The per-scope page-level ratio
+        check + retry loops stay in the drivers (L6/L8 divergence preserved)."""
+        return await apply_post_translation_processing(
+            ctx.text_regions, config, self.post_dict,
+            check_repetition=self._check_repetition_hallucination,
+            retry_region=lambda region, cfg: self._retry_translation_with_validation(region, cfg, ctx),
+        )
 
     async def _complete_translation_pipeline(self, ctx: Context, config: Config) -> Context:
         """
