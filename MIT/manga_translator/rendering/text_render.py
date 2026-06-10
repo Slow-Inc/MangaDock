@@ -383,6 +383,28 @@ def calc_vertical(font_size: int, text: str, max_height: int):
     # box_calc_y = max(line_height_list)
     return line_text_list, line_height_list
 
+def _render_glyph_stroke(cdpt: str, font_size: int, direction: int) -> Optional[np.ndarray]:
+    """Render the stroked (border) glyph for ``cdpt`` as a uint8 bitmap, or
+    ``None`` if the stroke bitmap is empty/invalid.
+
+    Shared by put_char_horizontal/put_char_vertical: the freetype stroker setup
+    (radius = 64·max(int(0.07·font_size), 1), round join + round cap) and the
+    bitmap validity check were byte-identical copies in both; ``direction``
+    selects the horizontal (0) / vertical (1) face orientation.
+    """
+    glyph_border = get_char_border(cdpt, font_size, direction)
+    stroker = freetype.Stroker()
+    stroke_radius = 64 * max(int(0.07 * font_size), 1)  # 1/64 px units
+    stroker.set(stroke_radius, freetype.FT_STROKER_LINEJOIN_ROUND, freetype.FT_STROKER_LINECAP_ROUND, 0)
+    glyph_border.stroke(stroker, destroy=True)
+    blyph = glyph_border.to_bitmap(freetype.FT_RENDER_MODE_NORMAL, freetype.Vector(0, 0), True)
+    bitmap_b = blyph.bitmap
+    rows, width = bitmap_b.rows, bitmap_b.width
+    if rows * width > 0 and len(bitmap_b.buffer) == rows * width:
+        return np.array(bitmap_b.buffer, dtype=np.uint8).reshape((rows, width))
+    return None
+
+
 def put_char_vertical(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_text: np.ndarray, canvas_border: np.ndarray, border_size: int):  
     """  
     在画布上垂直放置一个字符，并可选地添加描边效果。  
@@ -495,33 +517,9 @@ def put_char_vertical(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_
             
     # --- 处理描边 / Process border ---  
     if border_size > 0:  
-        # 获取字符描边  
-        # Get character border  
-        glyph_border = get_char_border(cdpt, font_size, 1)  
-        stroker = freetype.Stroker()  
-        
-        # 设置描边半径和样式  
-        # Set stroke radius and style  
-        stroke_radius = 64 * max(int(0.07 * font_size), 1)  # 基于字体大小的比例值 / Proportional value based on font size  
-        stroker.set(stroke_radius, freetype.FT_STROKER_LINEJOIN_ROUND, freetype.FT_STROKER_LINECAP_ROUND, 0)  
-        
-        # 应用描边效果  
-        # Apply stroke effect  
-        glyph_border.stroke(stroker, destroy=True)  
-        
-        # 渲染描边字形到位图  
-        # Render stroked glyph to bitmap  
-        blyph = glyph_border.to_bitmap(freetype.FT_RENDER_MODE_NORMAL, freetype.Vector(0, 0), True)  
-        bitmap_b = blyph.bitmap  # 这是描边后的 bitmap 对象 / This is the bitmap object after stroking  
-
-        # --- 获取描边位图信息 / Get border bitmap information ---  
-        border_bitmap_rows = bitmap_b.rows  
-        border_bitmap_width = bitmap_b.width  
-
-        if border_bitmap_rows * border_bitmap_width > 0 and len(bitmap_b.buffer) == border_bitmap_rows * border_bitmap_width:  
-            # 将描边位图缓冲区转换为NumPy数组  
-            # Convert border bitmap buffer to NumPy array  
-            bitmap_border = np.array(bitmap_b.buffer, dtype=np.uint8).reshape((border_bitmap_rows, border_bitmap_width))  
+        bitmap_border = _render_glyph_stroke(cdpt, font_size, 1)
+        if bitmap_border is not None:
+            border_bitmap_rows, border_bitmap_width = bitmap_border.shape
 
             # --- 计算描边位图放置位置，使其中心与原始字符位图中心对齐 ---  
             # --- Calculate border bitmap placement position to align its center with the original character bitmap center ---  
@@ -1068,38 +1066,9 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
     # --- Handle stroke rendering (if border_size > 0) ---
     # 处理描边渲染 (如果 border_size > 0)
     if border_size > 0:
-        # Get glyph outline for stroke 获取用于描边的字形轮廓
-        glyph_border = get_char_border(cdpt, font_size, 0)  # Same horizontal orientation 同样水平方向
-        
-        # Configure stroker 配置描边器
-        stroker = freetype.Stroker()
-        stroke_radius = 64 * max(int(0.07 * font_size), 1)  # In 1/64 pixel units 单位: 1/64 像素
-        stroker.set(stroke_radius, 
-                   freetype.FT_STROKER_LINEJOIN_ROUND,  # Round joins 圆角连接
-                   freetype.FT_STROKER_LINECAP_ROUND,   # Round line caps 圆头线帽
-                   0)
-        
-        # Apply stroke 应用描边
-        glyph_border.stroke(stroker, destroy=True)
-        
-        # Render stroked glyph to bitmap 将描边后的字形渲染到位图
-        blyph = glyph_border.to_bitmap(freetype.FT_RENDER_MODE_NORMAL, 
-                                      freetype.Vector(0, 0), True)
-        bitmap_b = blyph.bitmap  # Stroked bitmap 描边后的位图
-
-        # --- Process stroke bitmap ---
-        border_bitmap_rows = bitmap_b.rows
-        border_bitmap_width = bitmap_b.width
-
-        # Only proceed if stroke bitmap is valid
-        # 仅在描边位图有效时继续
-        if (border_bitmap_rows * border_bitmap_width > 0 and 
-            len(bitmap_b.buffer) == border_bitmap_rows * border_bitmap_width):
-            
-            # Convert stroke bitmap to numpy array
-            # 将描边位图缓冲区转为 numpy 数组
-            bitmap_border = np.array(bitmap_b.buffer, dtype=np.uint8
-                                   ).reshape((border_bitmap_rows, border_bitmap_width))
+        bitmap_border = _render_glyph_stroke(cdpt, font_size, 0)
+        if bitmap_border is not None:
+            border_bitmap_rows, border_bitmap_width = bitmap_border.shape
 
             # --- Calculate stroke placement (center alignment logic) ---
             # 原始字符位图的尺寸
