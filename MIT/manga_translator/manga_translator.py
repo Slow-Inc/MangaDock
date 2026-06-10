@@ -33,7 +33,7 @@ from .gather_per_context import gather_per_context
 from .model_lifecycle import ModelLifecycle
 from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
-from .post_translation import apply_post_translation_processing
+from .post_translation import apply_post_translation_processing, concurrent_page_lang_check_retry
 import py3langid as langid
 
 from .config import Config, Colorizer, Detector, Translator, Renderer, Inpainter
@@ -2137,60 +2137,13 @@ class MangaTranslator:
                 if ctx.text_regions:
                     ctx.text_regions = await self._apply_post_translation_processing(ctx, config)
                 
-                # 单页目标语言检查（如果启用）
-                if (config.translator.enable_post_translation_check and ctx.text_regions
-                        and len(ctx.text_regions) >= self._PAGE_LANG_CHECK_MIN_REGIONS):
-                    page_lang_check_result = await self._check_target_language_ratio(
-                        ctx.text_regions,
-                        config.translator.target_lang,
-                        min_ratio=0.3  # 对单页使用更宽松的阈值
-                    )
-                    
-                    if not page_lang_check_result:
-                        logger.warning(f"Page-level target language check failed for single image")
-                        
-                        # 单页重试逻辑
-                        max_retry = config.translator.post_check_max_retry_attempts
-                        retry_count = 0
-                        
-                        while retry_count < max_retry and not page_lang_check_result:
-                            retry_count += 1
-                            logger.info(f"Retrying single image translation {retry_count}/{max_retry}")
-                            
-                            # 重新翻译
-                            original_texts = [region.text for region in ctx.text_regions if hasattr(region, 'text') and region.text]
-                            if original_texts:
-                                try:
-                                    new_translations = await self._batch_translate_texts(original_texts, config, ctx)
-                                    
-                                    # 更新翻译结果
-                                    text_idx = 0
-                                    for region in ctx.text_regions:
-                                        if hasattr(region, 'text') and region.text and text_idx < len(new_translations):
-                                            old_translation = region.translation
-                                            region.translation = new_translations[text_idx]
-                                            logger.debug(f"Region translation updated: '{old_translation}' -> '{new_translations[text_idx]}'")
-                                            text_idx += 1
-                                    
-                                    # 重新检查
-                                    page_lang_check_result = await self._check_target_language_ratio(
-                                        ctx.text_regions,
-                                        config.translator.target_lang,
-                                        min_ratio=0.3
-                                    )
-                                    
-                                    if page_lang_check_result:
-                                        logger.info(f"Single image target language check passed after retry {retry_count}")
-                                        break
-                                        
-                                except Exception as e:
-                                    logger.error(f"Error during single image retry {retry_count}: {e}")
-                                    break
-                            else:
-                                break
-                        
-                        if not page_lang_check_result:
-                            logger.warning(f"Single image target language check failed after all {max_retry} retries")
+                # 单页目标语言检查（如果启用）— #187 S18: body in post_translation.concurrent_page_lang_check_retry
+                await concurrent_page_lang_check_retry(
+                    ctx.text_regions, config, ctx,
+                    min_regions=self._PAGE_LANG_CHECK_MIN_REGIONS, min_ratio=0.3,
+                    check_ratio=self._check_target_language_ratio,
+                    batch_translate=self._batch_translate_texts,
+                )
                 
                 # 过滤逻辑
                 if ctx.text_regions:
