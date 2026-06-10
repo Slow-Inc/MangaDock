@@ -35,6 +35,23 @@ object shedding internals into small, unit-tested modules. Per-seam detail: `MIT
 | S14 VerboseDebugSink | `debug_sink.py` (9 fns/ctx-mgr) | none | unit + E2E |
 | S15 Stage adapters | `stages.py` (6 leaf fns) | none | unit + E2E |
 
+### Tech-debt outcome (measured) + why this approach
+
+**Measured benefit (pre-decomposition `73251c5` → HEAD):**
+| Metric | Before | Now | Δ |
+|---|---|---|---|
+| `manga_translator.py` (the god object) | **3040 lines** | **2235 lines** | **−805 (−26.5%)** — trajectory 3040 → 2700 (S1–S12 on main) → 2235 |
+| Dependency-light, unit-tested modules carved out | 0 | **21** | region_filter/apply, model_usage_tracker/unloader/reaper/lifecycle, memory_guard, prev_context, context_counts, dictionary, none_translator, translation_store, image_debug_context, pipeline_params, detection_postproc, translation_memory, gather_per_context, text_translation_dispatcher, post_translation, debug_sink, stages |
+| MIT test cases | 180 | **319** | **+139 (+77%)** characterization net |
+| Behaviour change | — | **none** | 4 consecutive byte-identical E2E runs (2 patches, 649×1492+451×1489) |
+
+**Why byte-identical, characterization-first, one seam per commit** (not a big-bang rewrite):
+- **The god object is the hottest path in the product** — every translated page flows through it. A silent behaviour change there breaks translation system-wide and is hard to detect. So each seam ships a *characterization net first* (locks current behaviour), then a *verbatim* extraction proven against that net — refactor without re-deciding behaviour.
+- **Small, revertable increments** — one commit per seam means each is independently reviewable and rollback = a single revert. Blast radius is one seam, not the whole driver. (12 commits on this branch, each green + E2E'd where it touches output.)
+- **Landmines preserved verbatim, fixed later behind opt-in flags** — divergent thresholds (L6 0.5/0.3, ≥6/>10), `**ctx` splat (L15), `exit(-1)` (L2), cp1252 encode bug, etc. are *kept*, not "tidied". This separates "move code" (safe) from "change behaviour" (flagged, opt-in) so neither hides in the other.
+- **Don't force-unify load-bearing duplication** (the S18 finding) — when "4 copies" turn out to be structurally divergent on purpose, relocate + pin the divergence as explicit params rather than merging (which would change output). Adding callback complexity to prop up a false merge violates the North Star.
+- **Testability is the durable win, not just line count** — the leaf logic (e.g. a 12-arg `dispatch_detection` call) was previously only reachable through a full `MangaTranslator` instance + the 22s ML stack; the extracted adapters unit-test in <1s by stubbing. That is what makes the next seams (and future features) safe to touch.
+
 ### Before → After (headline, full fields)
 
 **S18 · post-translation processing relocated (NOT unified)** — *What/where:* the punct+post-dict+phase-1 helper and the three phase-2 page-level lang-check retry loops carved out of `manga_translator.py`'s single/concurrent/batch drivers into `post_translation.py` (4 functions; drivers delegate). *Why:* the four "copies" were buried + untestable, and the documented "unify 4 copies" premise was unsafe — close reading showed the retry loops are structurally divergent (`min_ratio` 0.5/0.3, threshold ≥6/>10, pad+enumerate vs filter+text_idx vs cross-context region_mapping) and load-bearing (L6/L8); unifying would change output, so they're pinned as per-scope params. *Before → After:* ~290 lines of duplicated-but-divergent orchestration inline in the god object → 4 named, unit-tested functions; divergence now explicit + documented. *Perf Δ:* none (same code path). *Quality:* byte-identical output; future unify-decision is now visible. *Validation:* 13 characterization cases + full suite (18 async-only baseline, **295 passed**) + E2E (below). *Risk:* byte-identical; revert = 4 commits (S18a–d). *Links:* `a5f7585`,`fd628bc`,`9458dfd`,`a5cde22`; #187.
