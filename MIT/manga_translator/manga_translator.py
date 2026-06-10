@@ -33,6 +33,14 @@ from .gather_per_context import gather_per_context
 from .model_lifecycle import ModelLifecycle
 from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
+from .debug_sink import (
+    save_input_png,
+    save_mask_raw,
+    save_bboxes_unfiltered,
+    save_bboxes,
+    save_inpainted,
+    save_final,
+)
 from .post_translation import (
     apply_post_translation_processing,
     concurrent_page_lang_check_retry,
@@ -366,19 +374,9 @@ class MangaTranslator:
         # 在web模式下总是保存，不仅仅是verbose模式
         ctx.debug_folder = self._get_image_subfolder()
         
-        # 保存原始输入图片用于调试
+        # 保存原始输入图片用于调试 — #187 S14: body in debug_sink
         if self.verbose:
-            try:
-                input_img = np.array(image)
-                if len(input_img.shape) == 3:  # 彩色图片，转换BGR顺序
-                    input_img = cv2.cvtColor(input_img, cv2.COLOR_RGB2BGR)
-                result_path = self._result_path('input.png')
-                success = cv2.imwrite(result_path, input_img)
-                if not success:
-                    logger.warning(f"Failed to save debug image: {result_path}")
-            except Exception as e:
-                logger.error(f"Error saving input.png debug image: {e}")
-                logger.debug(f"Exception details: {traceback.format_exc()}")
+            save_input_png(image, self._result_path)
 
         # preload and download models (not strictly necessary, remove to lazy load)
         await self._model_lifecycle.preload(config, self.device, self.models_ttl)
@@ -448,7 +446,7 @@ class MangaTranslator:
             ctx.mask = None
 
         if self.verbose and ctx.mask_raw is not None:
-            cv2.imwrite(self._result_path('mask_raw.png'), ctx.mask_raw)
+            save_mask_raw(ctx.mask_raw, self._result_path)
 
         if not ctx.textlines:
             await self._report_progress('skip-no-regions', True)
@@ -457,10 +455,7 @@ class MangaTranslator:
             return await self._revert_upscale(config, ctx)
 
         if self.verbose:
-            img_bbox_raw = np.copy(ctx.img_rgb)
-            for txtln in ctx.textlines:
-                cv2.polylines(img_bbox_raw, [txtln.pts], True, color=(255, 0, 0), thickness=2)
-            cv2.imwrite(self._result_path('bboxes_unfiltered.png'), cv2.cvtColor(img_bbox_raw, cv2.COLOR_RGB2BGR))
+            save_bboxes_unfiltered(ctx.img_rgb, ctx.textlines, self._result_path)
 
         # -- OCR
         await self._report_progress('ocr')
@@ -489,10 +484,7 @@ class MangaTranslator:
             ctx.text_regions = [] # Fallback to empty text_regions if textline merge fails
 
         if self.verbose and ctx.text_regions:
-            show_panels = not config.force_simple_sort  # 当不使用简单排序时显示panel
-            bboxes = visualize_textblocks(cv2.cvtColor(ctx.img_rgb, cv2.COLOR_BGR2RGB), ctx.text_regions, 
-                                        show_panels=show_panels, img_rgb=ctx.img_rgb, right_to_left=config.render.rtl)
-            cv2.imwrite(self._result_path('bboxes.png'), bboxes)
+            save_bboxes(ctx.img_rgb, ctx.text_regions, config, self._result_path)
 
         # Apply pre-dictionary after textline merge
         pre_dict = load_dictionary(self.pre_dict)
@@ -562,14 +554,7 @@ class MangaTranslator:
         ctx.gimp_mask = np.dstack((cv2.cvtColor(ctx.img_inpainted, cv2.COLOR_RGB2BGR), ctx.mask))
 
         if self.verbose:
-            try:
-                inpainted_path = self._result_path('inpainted.png')
-                success = cv2.imwrite(inpainted_path, cv2.cvtColor(ctx.img_inpainted, cv2.COLOR_RGB2BGR))
-                if not success:
-                    logger.warning(f"Failed to save debug image: {inpainted_path}")
-            except Exception as e:
-                logger.error(f"Error saving inpainted.png debug image: {e}")
-                logger.debug(f"Exception details: {traceback.format_exc()}")
+            save_inpainted(ctx.img_inpainted, self._result_path)
         # -- Rendering
         await self._report_progress('rendering')
 
@@ -599,19 +584,9 @@ class MangaTranslator:
             await self._report_progress('downscaling')
             ctx.result = ctx.result.resize(ctx.input.size)
 
-        # 在verbose模式下保存final.png到调试文件夹
+        # 在verbose模式下保存final.png到调试文件夹 — #187 S14: body in debug_sink
         if ctx.result and self.verbose:
-            try:
-                final_img = np.array(ctx.result)
-                if len(final_img.shape) == 3:  # 彩色图片，转换BGR顺序
-                    final_img = cv2.cvtColor(final_img, cv2.COLOR_RGB2BGR)
-                final_path = self._result_path('final.png')
-                success = cv2.imwrite(final_path, final_img)
-                if not success:
-                    logger.warning(f"Failed to save debug image: {final_path}")
-            except Exception as e:
-                logger.error(f"Error saving final.png debug image: {e}")
-                logger.debug(f"Exception details: {traceback.format_exc()}")
+            save_final(ctx.result, self._result_path)
 
         # Web流式模式优化：保存final.png并使用占位符
         if ctx.result and not self.result_sub_folder and hasattr(self, '_is_streaming_mode') and self._is_streaming_mode:
@@ -1296,19 +1271,9 @@ class MangaTranslator:
         ctx.input = image
         ctx.result = None
         
-        # 保存原始输入图片用于调试
+        # 保存原始输入图片用于调试 — #187 S14: body in debug_sink
         if self.verbose:
-            try:
-                input_img = np.array(image)
-                if len(input_img.shape) == 3:  # 彩色图片，转换BGR顺序
-                    input_img = cv2.cvtColor(input_img, cv2.COLOR_RGB2BGR)
-                result_path = self._result_path('input.png')
-                success = cv2.imwrite(result_path, input_img)
-                if not success:
-                    logger.warning(f"Failed to save debug image: {result_path}")
-            except Exception as e:
-                logger.error(f"Error saving input.png debug image: {e}")
-                logger.debug(f"Exception details: {traceback.format_exc()}")
+            save_input_png(image, self._result_path)
 
         # preload and download models (not strictly necessary, remove to lazy load)
         await self._model_lifecycle.preload(config, self.device, self.models_ttl)
@@ -1357,7 +1322,7 @@ class MangaTranslator:
             ctx.mask = None
 
         if self.verbose and ctx.mask_raw is not None:
-            cv2.imwrite(self._result_path('mask_raw.png'), ctx.mask_raw)
+            save_mask_raw(ctx.mask_raw, self._result_path)
 
         if not ctx.textlines:
             await self._report_progress('skip-no-regions', True)
@@ -1365,10 +1330,7 @@ class MangaTranslator:
             return await self._revert_upscale(config, ctx)
 
         if self.verbose:
-            img_bbox_raw = np.copy(ctx.img_rgb)
-            for txtln in ctx.textlines:
-                cv2.polylines(img_bbox_raw, [txtln.pts], True, color=(255, 0, 0), thickness=2)
-            cv2.imwrite(self._result_path('bboxes_unfiltered.png'), cv2.cvtColor(img_bbox_raw, cv2.COLOR_RGB2BGR))
+            save_bboxes_unfiltered(ctx.img_rgb, ctx.textlines, self._result_path)
 
         # -- OCR
         await self._report_progress('ocr')
@@ -1396,10 +1358,7 @@ class MangaTranslator:
             ctx.text_regions = []
 
         if self.verbose and ctx.text_regions:
-            show_panels = not config.force_simple_sort  # 当不使用简单排序时显示panel
-            bboxes = visualize_textblocks(cv2.cvtColor(ctx.img_rgb, cv2.COLOR_BGR2RGB), ctx.text_regions, 
-                                        show_panels=show_panels, img_rgb=ctx.img_rgb, right_to_left=config.render.rtl)
-            cv2.imwrite(self._result_path('bboxes.png'), bboxes)
+            save_bboxes(ctx.img_rgb, ctx.text_regions, config, self._result_path)
 
         # Apply pre-dictionary after textline merge
         pre_dict = load_dictionary(self.pre_dict)
@@ -2188,14 +2147,7 @@ class MangaTranslator:
         ctx.gimp_mask = np.dstack((cv2.cvtColor(ctx.img_inpainted, cv2.COLOR_RGB2BGR), ctx.mask))
 
         if self.verbose:
-            try:
-                inpainted_path = self._result_path('inpainted.png')
-                success = cv2.imwrite(inpainted_path, cv2.cvtColor(ctx.img_inpainted, cv2.COLOR_RGB2BGR))
-                if not success:
-                    logger.warning(f"Failed to save debug image: {inpainted_path}")
-            except Exception as e:
-                logger.error(f"Error saving inpainted.png debug image: {e}")
-                logger.debug(f"Exception details: {traceback.format_exc()}")
+            save_inpainted(ctx.img_inpainted, self._result_path)
 
         # -- Rendering
         await self._report_progress('rendering')
