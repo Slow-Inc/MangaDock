@@ -344,6 +344,31 @@ async def dispatch(
         img = render(img, region, dst_points, hyphenate, line_spacing, disable_font_border, supersampling)
     return img
 
+def _pad_box(temp_box, pad_height: bool, ext: int, offset: int):
+    """Place temp_box inside a zero-padded RGBA box to reach the target aspect
+    ratio. ext < 0 means no padding is possible → return temp_box.copy().
+    pad_height selects the padded axis: True pads rows (height) by 2*ext and
+    places temp_box at [offset:offset+h, :]; False pads columns (width) and
+    places it at [:, offset:offset+w].
+
+    Shared by render()'s four h/v ratio-padding branches, which differ only in
+    axis, the per-branch ext formula, and the offset — horizontal text centres
+    on the padded axis, vertical text top-/left-aligns (per #110). Those
+    divergent choices stay explicit at the call sites; only the
+    zero-box/place/copy boilerplate is folded here.
+    """
+    h, w = temp_box.shape[:2]
+    if ext < 0:
+        return temp_box.copy()
+    if pad_height:
+        box = np.zeros((h + ext * 2, w, 4), dtype=np.uint8)
+        box[offset:offset + h, 0:w] = temp_box
+    else:
+        box = np.zeros((h, w + ext * 2, 4), dtype=np.uint8)
+        box[0:h, offset:offset + w] = temp_box
+    return box
+
+
 def render(
     img,
     region: TextBlock,
@@ -414,81 +439,23 @@ def render(
     h, w, _ = temp_box.shape
     r_temp = w / h
 
-    # Extend temporary box so that it has same ratio as original
-    box = None  
-    #print("\n" + "="*50)  
-    #print(f"Processing text: \"{region.get_translation_for_rendering()}\"")  
-    #print(f"Text direction: {'Horizontal' if region.horizontal else 'Vertical'}")  
-    #print(f"Font size: {region.font_size}, Alignment: {region.alignment}")  
-    #print(f"Target language: {region.target_lang}")      
-    #print(f"Region horizontal: {region.horizontal}")  
-    #print(f"Starting image adjustment: r_temp={r_temp}, r_orig={r_orig}, h={h}, w={w}")  
-    if render_horizontally:  # use effective direction, not raw detected orientation (#110 R-1)
-        #print("Processing HORIZONTAL region")
-        
-        if r_temp > r_orig:   
-            #print(f"Case: r_temp({r_temp}) > r_orig({r_orig}) - Need vertical padding")  
-            h_ext = int((w / r_orig - h) // 2) if r_orig > 0 else 0  
-            #print(f"Calculated h_ext = {h_ext}")  
-            
-            if h_ext >= 0:  
-                #print(f"Creating new box with dimensions: {h + h_ext * 2}x{w}")  
-                box = np.zeros((h + h_ext * 2, w, 4), dtype=np.uint8)  
-                #print(f"Placing temp_box at position [h_ext:h_ext+h, :w] = [{h_ext}:{h_ext+h}, 0:{w}]")  
-                # Columns fully filled, rows centered
-                box[h_ext:h_ext+h, 0:w] = temp_box  
-            else:  
-                #print("h_ext < 0, using original temp_box")  
-                box = temp_box.copy()  
-        else:   
-            #print(f"Case: r_temp({r_temp}) <= r_orig({r_orig}) - Need horizontal padding")  
-            w_ext = int((h * r_orig - w) // 2)  
-            #print(f"Calculated w_ext = {w_ext}")  
-            
-            if w_ext >= 0:  
-                #print(f"Creating new box with dimensions: {h}x{w + w_ext * 2}")  
-                box = np.zeros((h, w + w_ext * 2, 4), dtype=np.uint8)  
-                #print(f"Placing temp_box at position [:, :w] = [0:{h}, 0:{w}]")  
-         
-                # The line is full, and there should be no empty columns on the left side of the text. Otherwise, when multiple text boxes are aligned on the left, the translated text cannot be aligned. Common scenarios: borderless comics, comic postscript.  
-                # When there are bubbles on the current page, it can be changed to center: box[0:h, w_ext:w_ext+w] = temp_box, requiring more accurate bubble detection. But not changing it doesn't have much impact.
-                box[0:h, 0:w] = temp_box  
-            else:  
-                #print("w_ext < 0, using original temp_box")  
-                box = temp_box.copy()  
-    else:  
-        #print("Processing VERTICAL region")  
-        
-        if r_temp > r_orig:   
-            #print(f"Case: r_temp({r_temp}) > r_orig({r_orig}) - Need vertical padding")  
-            h_ext = int(w / (2 * r_orig) - h / 2) if r_orig > 0 else 0   
-            #print(f"Calculated h_ext = {h_ext}")  
-            
-            if h_ext >= 0:   
-                #print(f"Creating new box with dimensions: {h + h_ext * 2}x{w}")  
-                box = np.zeros((h + h_ext * 2, w, 4), dtype=np.uint8)  
-                #print(f"Placing temp_box at position [0:h, 0:w] = [0:{h}, 0:{w}]")  
-                # The rows are full, and there should be no empty lines above the text; otherwise, when multiple text boxes have their top edges aligned, the text cannot be aligned. Common scenario: borderless comics, CG. 
-                # When there are bubbles on the current page, it can be changed to center: box[h_ext:h_ext+h, 0:w] = temp_box, requiring more accurate bubble detection.
-                box[0:h, 0:w] = temp_box  
-            else:   
-                #print("h_ext < 0, using original temp_box")  
-                box = temp_box.copy()   
-        else:   
-            #print(f"Case: r_temp({r_temp}) <= r_orig({r_orig}) - Need horizontal padding")  
-            w_ext = int((h * r_orig - w) / 2)  
-            #print(f"Calculated w_ext = {w_ext}")  
-            
-            if w_ext >= 0:  
-                #print(f"Creating new box with dimensions: {h}x{w + w_ext * 2}")  
-                box = np.zeros((h, w + w_ext * 2, 4), dtype=np.uint8)  
-                #print(f"Placing temp_box at position [0:h, w_ext:w_ext+w] = [0:{h}, {w_ext}:{w_ext+w}]") 
-                # Rows are fully filled, columns are centered
-                box[0:h, w_ext:w_ext+w] = temp_box  
-            else:   
-                #print("w_ext < 0, using original temp_box")  
-                box = temp_box.copy()   
-    #print(f"Final box dimensions: {box.shape if box is not None else 'None'}")  
+    # Extend temporary box to the original aspect ratio (#110 R-1: use the
+    # effective render direction, not the raw detected orientation). Each branch
+    # picks its own ext formula + placement offset (h centres, v top-/left-aligns).
+    if render_horizontally:
+        if r_temp > r_orig:
+            h_ext = int((w / r_orig - h) // 2) if r_orig > 0 else 0
+            box = _pad_box(temp_box, True, h_ext, h_ext)
+        else:
+            w_ext = int((h * r_orig - w) // 2)
+            box = _pad_box(temp_box, False, w_ext, 0)
+    else:
+        if r_temp > r_orig:
+            h_ext = int(w / (2 * r_orig) - h / 2) if r_orig > 0 else 0
+            box = _pad_box(temp_box, True, h_ext, 0)
+        else:
+            w_ext = int((h * r_orig - w) / 2)
+            box = _pad_box(temp_box, False, w_ext, w_ext)
 
     src_points = np.array([[0, 0], [box.shape[1], 0], [box.shape[1], box.shape[0]], [0, box.shape[0]]]).astype(np.float32)
     #src_pts[:, 0] = np.clip(np.round(src_pts[:, 0]), 0, enlarged_w * 2)
