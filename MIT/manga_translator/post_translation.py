@@ -81,3 +81,77 @@ async def apply_post_translation_processing(
                     logger.error(f"Error during region retry: {e}")
 
     return text_regions
+
+
+async def concurrent_page_lang_check_retry(
+    text_regions: List,
+    config,
+    ctx,
+    *,
+    min_regions: int,
+    min_ratio: float,
+    check_ratio: Callable[..., Awaitable[bool]],
+    batch_translate: Callable[..., Awaitable[List]],
+) -> None:
+    """Concurrent driver's phase-2 page-level target-language check + retry.
+
+    Lifted byte-for-byte from the per-image concurrent path. min_ratio (0.3) and
+    min_regions (>=6) are L6 parameters; the retry **filters** empty-text regions
+    and reassigns via a running `text_idx` (the divergence from the single
+    driver's pad-with-empty + enumerate). The retry re-translate drops page/batch
+    index (L8). Mutates `text_regions` in place."""
+    # 单页目标语言检查（如果启用）
+    if not (config.translator.enable_post_translation_check and text_regions
+            and len(text_regions) >= min_regions):
+        return
+    page_lang_check_result = await check_ratio(
+        text_regions,
+        config.translator.target_lang,
+        min_ratio  # 对单页使用更宽松的阈值
+    )
+
+    if not page_lang_check_result:
+        logger.warning(f"Page-level target language check failed for single image")
+
+        # 单页重试逻辑
+        max_retry = config.translator.post_check_max_retry_attempts
+        retry_count = 0
+
+        while retry_count < max_retry and not page_lang_check_result:
+            retry_count += 1
+            logger.info(f"Retrying single image translation {retry_count}/{max_retry}")
+
+            # 重新翻译
+            original_texts = [region.text for region in text_regions if hasattr(region, 'text') and region.text]
+            if original_texts:
+                try:
+                    new_translations = await batch_translate(original_texts, config, ctx)
+
+                    # 更新翻译结果
+                    text_idx = 0
+                    for region in text_regions:
+                        if hasattr(region, 'text') and region.text and text_idx < len(new_translations):
+                            old_translation = region.translation
+                            region.translation = new_translations[text_idx]
+                            logger.debug(f"Region translation updated: '{old_translation}' -> '{new_translations[text_idx]}'")
+                            text_idx += 1
+
+                    # 重新检查
+                    page_lang_check_result = await check_ratio(
+                        text_regions,
+                        config.translator.target_lang,
+                        min_ratio
+                    )
+
+                    if page_lang_check_result:
+                        logger.info(f"Single image target language check passed after retry {retry_count}")
+                        break
+
+                except Exception as e:
+                    logger.error(f"Error during single image retry {retry_count}: {e}")
+                    break
+            else:
+                break
+
+        if not page_lang_check_result:
+            logger.warning(f"Single image target language check failed after all {max_retry} retries")

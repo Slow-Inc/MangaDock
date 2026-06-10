@@ -110,3 +110,67 @@ def test_retry_falsy_return_keeps_original_and_exception_is_swallowed(monkeypatc
          check_repetition=check, retry_region=retry)
     assert regions[0].translation == 'bad1'   # falsy return → unchanged
     assert regions[1].translation == 'bad2'   # exception swallowed → unchanged
+
+
+# ============================================================================
+# concurrent_page_lang_check_retry — single-context, min_ratio 0.3, threshold 6,
+# filter-empty + text_idx reassign (the divergence vs the single driver's
+# pad-with-empty + enumerate). L6/L8 pinned as params.
+# ============================================================================
+
+def _ccfg(*, enable_check=True, target='THA', max_retry=2):
+    return SimpleNamespace(translator=SimpleNamespace(
+        enable_post_translation_check=enable_check,
+        target_lang=target,
+        post_check_max_retry_attempts=max_retry,
+    ))
+
+
+def _run_concurrent(regions, config, ctx, *, min_regions, min_ratio, check_ratio, batch_translate):
+    return asyncio.run(pt.concurrent_page_lang_check_retry(
+        regions, config, ctx, min_regions=min_regions, min_ratio=min_ratio,
+        check_ratio=check_ratio, batch_translate=batch_translate))
+
+
+def test_concurrent_noop_when_check_disabled_or_below_threshold():
+    regions = [_region(f'r{i}', f't{i}') for i in range(6)]
+    async def check_ratio(*a, **k):
+        raise AssertionError('check_ratio called while disabled/below-threshold')
+    # disabled
+    _run_concurrent(regions, _ccfg(enable_check=False), object(),
+                    min_regions=6, min_ratio=0.3, check_ratio=check_ratio, batch_translate=_boom)
+    # below threshold (5 < 6)
+    _run_concurrent(regions[:5], _ccfg(enable_check=True), object(),
+                    min_regions=6, min_ratio=0.3, check_ratio=check_ratio, batch_translate=_boom)
+
+
+def test_concurrent_pass_first_time_no_retry():
+    regions = [_region(f'r{i}', f't{i}') for i in range(6)]
+    seen = []
+    async def check_ratio(rs, target, min_ratio):
+        seen.append((target, min_ratio))
+        return True
+    _run_concurrent(regions, _ccfg(), object(),
+                    min_regions=6, min_ratio=0.3, check_ratio=check_ratio, batch_translate=_boom)
+    assert seen == [('THA', 0.3)]   # checked once with 0.3, never retried
+
+
+def test_concurrent_retry_filters_empty_and_reassigns_by_text_idx():
+    # mix of empty-text regions; the filter+text_idx path must only consume one
+    # new translation per non-empty region, in order, skipping the empty one.
+    regions = [_region('a', 'old_a'), _region('', 'keep_empty'), _region('c', 'old_c'),
+               _region('d', 'old_d'), _region('e', 'old_e'), _region('f', 'old_f')]
+    results = iter([False, True])   # fail, then pass after one retry
+    async def check_ratio(rs, target, min_ratio):
+        return next(results)
+    captured = {}
+    async def batch_translate(texts, config, ctx):
+        captured['texts'] = list(texts)
+        return [t.upper() for t in texts]
+    _run_concurrent(regions, _ccfg(max_retry=3), object(),
+                    min_regions=6, min_ratio=0.3, check_ratio=check_ratio, batch_translate=batch_translate)
+    # empty region filtered out of the re-translate request
+    assert captured['texts'] == ['a', 'c', 'd', 'e', 'f']
+    assert regions[0].translation == 'A'         # reassigned
+    assert regions[1].translation == 'keep_empty'  # empty region untouched
+    assert regions[2].translation == 'C'
