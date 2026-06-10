@@ -36,6 +36,7 @@ from .punctuation import correct_punctuation
 from .stage_runner import run_stage
 from .patch_geometry import build_local_region, create_text_only_mask, crop_mask_for_patch
 from .patch_renderer import PatchRenderer
+from .batch_orchestration import placeholder_context, build_page_translation_record
 from .stages import (
     run_colorizer,
     run_upscaling,
@@ -1116,18 +1117,10 @@ class MangaTranslator:
                     logger.info(f'Image {i+1} fallback processing successful')
                 except Exception as retry_error:
                     logger.error(f'Image {i+1} fallback processing also failed: {retry_error}')
-                    # 创建空context作为占位符
-                    ctx = Context()
-                    ctx.input = image
-                    ctx.text_regions = []  # 确保text_regions被初始化为空列表
-                    pre_translation_contexts.append((ctx, config))
+                    pre_translation_contexts.append((placeholder_context(image), config))
             except Exception as e:
                 logger.error(f'Image {i+1} pre-processing error: {e}')
-                # 创建空context作为占位符
-                ctx = Context()
-                ctx.input = image
-                ctx.text_regions = []  # 确保text_regions被初始化为空列表
-                pre_translation_contexts.append((ctx, config))
+                pre_translation_contexts.append((placeholder_context(image), config))
         
         if not pre_translation_contexts:
             logger.warning('No images pre-processed successfully')
@@ -1196,14 +1189,9 @@ class MangaTranslator:
         # 批处理完成后，保存所有页面的最终翻译结果
         for ctx in results:
             if ctx.text_regions:
-                # 汇总本页翻译，供下一页做上文
-                page_translations = {r.text_raw if hasattr(r, "text_raw") else r.text: r.translation
-                                     for r in ctx.text_regions}
+                # 汇总本页翻译，供下一页做上文（同时保存原文用于并发模式的上下文）
+                page_translations, page_original_texts = build_page_translation_record(ctx.text_regions)
                 self._translation_memory.all_page_translations.append(page_translations)
-
-                # 同时保存原文用于并发模式的上下文
-                page_original_texts = {i: (r.text_raw if hasattr(r, "text_raw") else r.text)
-                                      for i, r in enumerate(ctx.text_regions)}
                 self._translation_memory.original_page_texts.append(page_original_texts)
 
         # 清理批量处理的图片上下文缓存
