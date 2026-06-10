@@ -33,6 +33,14 @@ from .gather_per_context import gather_per_context
 from .model_lifecycle import ModelLifecycle
 from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
+from .stages import (
+    run_colorizer,
+    run_upscaling,
+    run_detection,
+    run_mask_refinement,
+    run_inpainting,
+    run_text_rendering,
+)
 from .debug_sink import (
     ocr_debug_dir_env,
     save_input_png,
@@ -617,34 +625,17 @@ class MangaTranslator:
     async def _run_colorizer(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("colorizer", config.colorizer.colorizer, current_time)
-        #todo: im pretty sure the ctx is never used. does it need to be passed in?
-        return await dispatch_colorization(
-            config.colorizer.colorizer,
-            colorization_size=config.colorizer.colorization_size,
-            denoise_sigma=config.colorizer.denoise_sigma,
-            device=self.device,
-            image=ctx.input,
-            **ctx
-        )
+        return await run_colorizer(config, ctx, self.device)
 
     async def _run_upscaling(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("upscaling", config.upscale.upscaler, current_time)
-        return (await dispatch_upscaling(config.upscale.upscaler, [ctx.img_colorized], config.upscale.upscale_ratio, self.device))[0]
+        return await run_upscaling(config, ctx, self.device)
 
     async def _run_detection(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("detection", config.detector.detector, current_time)
-        result = await dispatch_detection(config.detector.detector, ctx.img_rgb, config.detector.detection_size, config.detector.text_threshold,
-                                        config.detector.box_threshold,
-                                        config.detector.unclip_ratio, config.detector.det_invert, config.detector.det_gamma_correct, config.detector.det_rotate,
-                                        config.detector.det_auto_rotate,
-                                        self.device, self.verbose)
-        # #168: optional SFX/outside-bubble second pass (AnimeText YOLO). Boxes the
-        # primary detector missed are appended as empty textlines for OCR to read.
-        if config.detector.det_sfx:
-            result = merge_sfx_detections(ctx, result, self.device)
-        return result
+        return await run_detection(config, ctx, self.device, self.verbose)
 
 
     async def _unload_model(self, tool: str, model: str):
@@ -955,14 +946,12 @@ class MangaTranslator:
         return new_text_regions
 
     async def _run_mask_refinement(self, config: Config, ctx: Context):
-        return await dispatch_mask_refinement(ctx.text_regions, ctx.img_rgb, ctx.mask_raw, 'fit_text',
-                                              config.mask_dilation_offset, config.ocr.ignore_bubble, self.verbose,self.kernel_size)
+        return await run_mask_refinement(config, ctx, self.verbose, self.kernel_size)
 
     async def _run_inpainting(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("inpainting", config.inpainter.inpainter, current_time)
-        return await dispatch_inpainting(config.inpainter.inpainter, ctx.img_rgb, ctx.mask, config.inpainter, config.inpainter.inpainting_size, self.device,
-                                         self.verbose)
+        return await run_inpainting(config, ctx, self.device, self.verbose)
 
     def _render_font_path(self, config: Config, target_lang: str) -> str:
         """#176: Latin/EN targets render in the bundled comic font when enabled;
@@ -990,22 +979,7 @@ class MangaTranslator:
         self._model_usage_tracker.touch("rendering", config.render.renderer, current_time)
         font_path = self._render_font_path(
             config, ctx.text_regions[0].target_lang if ctx.text_regions else '')
-        if config.render.renderer == Renderer.none:
-            output = ctx.img_inpainted
-        # manga2eng currently only supports horizontal left to right rendering
-        elif (config.render.renderer == Renderer.manga2Eng or config.render.renderer == Renderer.manga2EngPillow) and ctx.text_regions and LANGUAGE_ORIENTATION_PRESETS.get(ctx.text_regions[0].target_lang) == 'h':
-            if config.render.renderer == Renderer.manga2EngPillow:
-                output = await dispatch_eng_render_pillow(ctx.img_inpainted, ctx.img_rgb, ctx.text_regions, font_path, config.render.line_spacing)
-            else:
-                output = await dispatch_eng_render(ctx.img_inpainted, ctx.img_rgb, ctx.text_regions, font_path, config.render.line_spacing)
-        else:
-            output = await dispatch_rendering(ctx.img_inpainted, ctx.text_regions, font_path, config.render.font_size,
-                                              config.render.font_size_offset,
-                                              config.render.font_size_minimum, not config.render.no_hyphenation, ctx.render_mask, config.render.line_spacing,
-                                              bubble_fit=config.render.bubble_area_fit,
-                                              supersampling=config.render.supersampling,
-                                              font_max_box_ratio=config.render.font_max_box_ratio)
-        return output
+        return await run_text_rendering(config, ctx, font_path)
 
     def _result_path(self, path: str) -> str:
         """Path to the result folder for intermediate (verbose) or web-cached images
