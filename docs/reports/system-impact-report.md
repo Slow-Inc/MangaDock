@@ -215,3 +215,72 @@ After PR #195 (S2–S11) merged, an AFK batch landed five more byte-identical se
 **#187 S21 / #188 · ModelLifecycle facade** — *What/where:* the duplicated eager-preload block (×2, gated `models_ttl==0`) and the duplicated cleanup-task guard (×2) → `model_lifecycle.ModelLifecycle(reaper, prepare_fns)` with `preload(config, device, models_ttl)` + `ensure_running()`; the guard's idempotency moved into `ModelReaper.ensure_started()`. *Why:* the #188 lifecycle capstone — fold the construction-time preload + the start-once guard onto the S20 reaper; `self._detector_cleanup_task` is gone (the reaper owns its task). *Before → After:* 2× ~9-line preload + 2× `if self._detector_cleanup_task is None: …start()` → `await self._model_lifecycle.preload(...)` + `self._model_lifecycle.ensure_running()`. *Scope:* the facade wraps the **reaper**; the tracker (S3) + unloader (S4) stay direct (used by the `_run_*` touch sites and the reaper) — absorbing them is high-churn/low-value, deferred. *Perf Δ:* none. *Quality:* byte-identical — same preload order, same `upscale_ratio`/`Colorizer.none` conditions, same `device` threading, same `models_ttl==0` gate, idempotent start preserved (L16). prepare_* injected as a table → tests with no ML. *Validation:* test_model_lifecycle.py 4 passed (ttl-skip, full order+device, upscale/colorizer conditions, ensure_running delegates) + test_model_reaper ensure_started idempotent; full suite 258 passed / 18 pre-existing async. *Risk:* behaviour-preserving. *Links:* #187 (seam S21), #188, L16.
 
 **#187 S17 / #188 · TextTranslationDispatcher** — *What/where:* the duplicated ChatGPT/ChatGPT2Stage translator handling in `_dispatch_with_context` (single) and `_batch_translate_texts` (batch) → `text_translation_dispatcher.{build_chatgpt_translator, dispatch_translate}`. *Why:* the highest-risk dedup — the two copies share the construction switch + parse/set-context + carry/skip logs + the 2stage-vs-chatgpt dispatch, but diverge in load-bearing ways. *Before → After:* ~40 + ~70-line near-duplicate switches → a 2-line construct + a `dispatch_translate(...)` call at each site. **Two functions on purpose:** `OpenAITranslator.__init__` can emit a glossary warning, and single constructs the translator *after* the context log while batch constructs it *before* — so each caller calls `build_chatgpt_translator` at its own point (order preserved) and `dispatch_translate` does the order-invariant rest. *Divergences preserved (parameterised):* chatgpt_2stage `result_path_callback` = bound `_result_path` (single) vs the `with_context` swap closure (batch); the `batch_contexts` multi-image wiring via `on_2stage_batch_setup` (batch-only); and the **context-computation placement** (single computes/logs it unconditionally incl. non-chatgpt, batch only inside its chatgpt branch — both left at the call sites, not moved into the dispatcher). *Perf Δ:* none. *Quality:* byte-identical (the only reorder — `parse_args` now after the silent `build_prev_context` — produces an identical observable log sequence). *Validation:* test_text_translation_dispatcher.py 6 passed (build→openai/2stage, parse/set/translate w/wo ctx, 2stage callback+batch-setup, chatgpt-skips-batch-setup, carry/skip logs) via fake translators + `sys.modules` stubs + `asyncio.run`; full suite 264 passed / 18 pre-existing async. **E2E pending** (the high-risk seams want a live-pipeline pass before merge). *Risk:* behaviour-preserving by construction + unit-characterised; E2E recommended. *Links:* #187 (seam S17).
+
+---
+
+## 2026-06-11 — #189 + #190 render dedup (glyph + resize/render geometry) · PR #215
+
+Two sibling MIT render tech-debt issues, **6 byte-identical seams** (one commit each), each pinned by a golden-pixel characterization test written **before** the edit. Branch `refactor/mit-189-190-render-dedup`. Reported with the full 18-section feature/refactor template ([[feedback-impact-report]]).
+
+**1. What changed.** #189 (`rendering/text_render.py`): the two ~200-line near-duplicate glyph fns `put_char_horizontal`/`put_char_vertical` collapsed onto 3 shared direction-parameterised helpers — `_render_glyph_stroke` (the freetype stroker block + validity check), `_paste_bitmap` (the 4 clip/slice/blend paste sites → 1), `_select_face_for_char` (the font-fallback loop). #190 (`rendering/__init__.py`): `_expand_single_axis` (the 2 single-axis expansion blocks → 1), `_pad_box` (render()'s 4 ratio-padding branches' boilerplate → 1 primitive), named length-ratio constants + deleted the ~14-line dead commented `elif`.
+
+**2. Results.** Render code **−198 net lines** (−375 / +177 across the 2 files). 4 paste copies → 1; 2 glyph twins → shared helpers; 4 padding branches → 1 primitive; 2 font-loop copies → 1. Byte-identical on every changed path (2 deterministic goldens green through all 6 seams). Full suite **331 passed / 18 pre-existing async / 0 new failures**. Live E2E passed.
+
+**3. Expected performance gain %.** **0% runtime — byte-identical, maintainability-only.** The render hot path runs the same operations in the same order; goldens prove identical pixels. No latency/VRAM/throughput change (not a perf optimisation). The gain is maintenance/DX velocity, not CPU.
+
+**4. Benefits.** Single source of truth for glyph stroke/paste/font-fallback + box-padding; future render fixes land in 1 place, not 2–4; smaller divergence surface (the copies had already drifted into a latent bug); a reusable golden harness now guards render pixels; fixed a latent vertical-stroke edge-clip misalignment as a free byproduct.
+
+**5. Purpose.** Remove the largest remaining near-duplicate blocks on the render hot path to cut maintenance cost + bug surface (engineering north star: simplest logic that works · maintainable · sustainable long-term).
+
+**6. Why we changed it + architectural impact.** Two ~200-line copies of glyph logic inevitably drift — they already had: the vertical-*stroke* paste clamped `pen_border≥0` and sliced `bitmap_border[0:]`, misaligning a stroke clipped off the top/left edge, a bug absent from the 3 sibling paste sites. Architecturally render moves from 2 monolithic twins + inline branch soup to small single-purpose unit-testable helpers behind a golden net — "relocate the shared mechanism, keep divergent policy explicit at the call site."
+
+**7. Problems before the refactor.** ~200-line near-duplicate `put_char_h/v`; 4 copies of clip/slice/blend paste; 4 near-identical h/v padding branches; copy-pasted fallback loop in `get_char_glyph`/`get_char_border`; scattered magic numbers (0.3/0.4/1.1); ~80+ lines of dead commented debug; a latent v-stroke clip bug born of the divergence; and **no golden/characterization net on render at all**.
+
+**8. Goals.** Byte-identical dedup; golden-guarded before each edit; one commit per seam; zero behaviour change on any real page; load-bearing divergence relocated, not unified.
+
+**9. Architecture Before.**
+```
+put_char_horizontal (~200 LOC) ─┐ stroker block (copy A) · char paste (copy A) · stroke paste (copy A)
+put_char_vertical   (~200 LOC) ─┘ stroker block (copy B) · char paste (copy B) · stroke paste (copy B, buggy clip)
+get_char_glyph / get_char_border  ── fallback loop (copy ×2)
+resize_regions_to_font_size       ── h-expansion block ‖ v-expansion block (twins) + ~80 dead lines
+render()                          ── 4 ratio-padding branches (zero-box/place/copy ×4)
+constants                          ── 0.3 / 0.4 / 1.1 inline magic numbers
+[no render characterization tests]
+```
+**10. Architecture After.**
+```
+_render_glyph_stroke(cdpt,size,dir) ─┐
+_paste_bitmap(canvas,bmp,x,y,blend) ─┼─ put_char_horizontal / put_char_vertical (thin)
+_select_face_for_char(cdpt,size,dir)─┘
+_expand_single_axis(region,need,used,h_axis) ─ resize_regions_to_font_size (thin orchestrator)
+_pad_box(temp_box,pad_height,ext,offset)     ─ render() (4 branches → 4 one-liners + 1 primitive)
+_LEN_RATIO_FONT_GAIN / _FONT_SIZE_SCALE_GAIN / _MAX_BBOX_SCALE (named constants)
+test/test_put_char_golden.py + test/test_render_golden.py (deterministic golden net)
+```
+**11. Refactor list.**
+| Seam | Commit | Helper |
+|------|--------|--------|
+| #189 S1 | `b320ff5` | `_render_glyph_stroke` |
+| #189 S2 | `84417d8` | `_paste_bitmap` (+ v-stroke clip fix) |
+| #189 S3 | `7641474` | `_select_face_for_char` |
+| #190 S1 | `00bc673` | `_expand_single_axis` |
+| #190 S2 | `94795c0` | `_pad_box` |
+| #190 S3 | `e92df75` | named constants + dead-elif removal |
+| docs | `ddc8566` | DONE.md + PIPELINE.md §5 |
+
+**12. Metrics.** −198 net render LOC (−375 / +177); 4→1 paste sites; 2 glyph fns deduped; 4→1 padding branches; 2→1 font loop; +2 golden test files (9 glyph cases × 2 dirs × border on/off × 2 sizes + 3 dispatch regions); 331 unit pass / 0 new fail; live E2E 74 s (1200×1705 page, GPU); golden runtime ~12–20 s.
+
+**13. Technical Debt Removed.** 4 paste copies, 2 glyph twins, 2 font-loop copies, 4 padding-branch copies, ~80+ dead debug lines, scattered magic numbers, the latent v-stroke clip bug, and the render-test blind spot (zero characterization coverage before this).
+
+**14. Risk Reduction.** Divergence-bug surface eliminated where it had already produced one bug; the golden net catches any future pixel drift in put_char_*/dispatch in ~15 s; byte-identical guarantee ⇒ zero render-quality regression risk from this change.
+
+**15. Developer Experience Impact.** A render fix now edits 1 helper, not 2–4 hand-synced copies; each helper is unit-testable in isolation; the golden gives fast byte-identical feedback locally (no full GPU E2E needed to catch a pixel regression).
+
+**16. Future Opportunities.** Deferred (flagged): #189 FontStack cache-key fix (a *behaviour* change — alters output on mid-page font switch); #190 RenderTuning dataclass threaded through `dispatch()` (runtime-config machinery not yet needed); an exhaustive scrub of the remaining inline dead-debug comments.
+
+**17. Lessons Learned.** "Relocate, don't unify" load-bearing divergence — the v-border clip, the h/v padding placements, and the both-axes overwrite order were preserved explicitly, not forced into one formula that would shift edge pixels. Golden-pixel characterization is the right guard for pixel-critical refactors. Operational: MIT must launch on `MIT/.venv` (cu121 CUDA torch), not the Store python (cpu) — `--use-gpu` + cpu-torch hangs the worker at `/ready` 503 (poll `/ready`, not `/health`). See [[project-mit-launch-env]].
+
+**18. KPI.** Byte-identical 100% (6/6 golden-passing seams) · regressions 0 (331 pass) · LOC −198 render · dedup 4→1 paste / 2→shared glyph / 4→1 padding · E2E pass (clean Thai render, original↔translated parity) · deferred items 2 (both flagged).
+
+*Validation:* golden-pixel unit (put_char h/v + dispatch h/v, deterministic) + full suite + live direct-MIT E2E (`POST /translate/with-form/image`, Kouchuugun source, 74 s, clean render). *Risk/rollback:* byte-identical; revert = drop the branch (no flag needed). *Links:* #189, #190, PR #215.

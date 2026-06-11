@@ -1771,3 +1771,33 @@ Tests: test_text_translation_dispatcher.py 6 passed (build→openai/2stage, pars
 2stage callback+batch-setup, chatgpt-skips-batch-setup, carry/skip logs) via fake translators + sys.modules
 stubs; full suite 264 passed (18 pre-existing async, 0 real). E2E PENDING — this high-risk seam wants a live
 translation pass (single + batch + concurrent + chatgpt_2stage) before merge.
+
+## 2026-06-10 — #189 + #190 render dedup (6 byte-identical seams, golden-pixel guarded)
+After the #187/#188 decomposition merged (PR #203), took the two sibling render-dedup issues at xhigh. All
+six seams are byte-identical, each pinned by a golden-pixel characterization test before the edit.
+Branch `refactor/mit-189-190-render-dedup` off main.
+#189 (`rendering/text_render.py`): the two ~200-line near-duplicate glyph functions `put_char_horizontal`/
+`put_char_vertical` collapsed onto shared direction-parameterised helpers —
+  S1 `_render_glyph_stroke(cdpt, font_size, direction)` (the freetype stroker block + validity check, identical);
+  S2 `_paste_bitmap(canvas, bitmap, x, y, blend)` (the 4 clip/slice/blend paste sites -> 1; `blend=np.maximum`
+     for the char paste so Thai combining marks accumulate, `cv2.add` for stroke). 3 of 4 sites already used
+     correct edge clipping; the vertical *stroke* paste clamped pen_border>=0 and sliced bitmap[0:...], misaligning
+     a stroke clipped off the top/left edge — a latent bug, dead on padded render canvases. Unified to correct
+     clipping, pinned by an explicit edge test;
+  S3 `_select_face_for_char(cdpt, font_size, direction)` (the font-fallback loop shared by get_char_glyph/border).
+  Deferred + flagged: the issue's FontStack cache-key fix is a behaviour change (alters output when the font
+  switches mid-page), kept out of the byte-identical pass.
+#190 (`rendering/__init__.py`): S1 `_expand_single_axis(region, needed, used, horizontal_axis)` folds the two
+  byte-identical single-axis expansion blocks (rows->x / cols->y); the orchestrator keeps both independent `if`
+  blocks so the both-directions-true overwrite order is preserved, passing the axis explicitly. S2 `_pad_box(
+  temp_box, pad_height, ext, offset)` collapses render()'s four ratio-padding branches' zero-box/place/copy
+  boilerplate while each branch keeps its own divergent ext-formula + offset inline (h centres / v top-/left-
+  aligns per #110 — NOT unified, which would shift edge pixels). S3 named the length-ratio tuning factors as
+  module constants (`_LEN_RATIO_FONT_GAIN` 0.3, `_FONT_SIZE_SCALE_GAIN` 0.4, `_MAX_BBOX_SCALE` 1.1) + deleted
+  the ~14-line dead commented "translation shorter" elif. Deferred + flagged: threading a RenderTuning
+  dataclass through dispatch() (machinery for runtime config we don't have).
+Guards (new): `test/test_put_char_golden.py` (golden over Latin/CJK/Thai-base/Thai-combining/CJK-punct/space x
+both directions x border on/off x 2 sizes) + `test/test_render_golden.py` (deterministic golden on dispatch()
+output over h-expansion + v-expansion + legacy length-ratio regions, bubble_fit off). Goldens committed under
+`test/golden/` (test/testdata is gitignored). All 6 seams kept both goldens green; full suite 331 passed
+(18 pre-existing async, 0 real). E2E PENDING — batched tunnel pass after #190 per the dev's call.
