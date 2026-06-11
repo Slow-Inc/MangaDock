@@ -284,3 +284,69 @@ test/test_put_char_golden.py + test/test_render_golden.py (deterministic golden 
 **18. KPI.** Byte-identical 100% (6/6 golden-passing seams) · regressions 0 (331 pass) · LOC −198 render · dedup 4→1 paste / 2→shared glyph / 4→1 padding · E2E pass (clean Thai render, original↔translated parity) · deferred items 2 (both flagged).
 
 *Validation:* golden-pixel unit (put_char h/v + dispatch h/v, deterministic) + full suite + live direct-MIT E2E (`POST /translate/with-form/image`, Kouchuugun source, 74 s, clean render). *Risk/rollback:* byte-identical; revert = drop the branch (no flag needed). *Links:* #189, #190, PR #215.
+
+## 2026-06-11 — #186 LineBreaker seam (finish) + Knuth-Plass wired (unblocks #180)
+
+Finished the pluggable line-break seam in `calc_horizontal`. Prior sessions had extracted the tokenizers + greedy Step 1 (`_greedy_pack`) under a 15-case characterization net; this session formalised the seam and wired the Knuth-Plass strategy. Branch `refactor/mit-186-linebreaker-seam`, 3 commits. Reported with the full 18-section template ([[feedback-impact-report]]).
+
+**1. What changed.** `rendering/text_render.py`: added a `LineBreaker` Protocol + `GreedyLineBreaker` (delegates to the existing `_greedy_pack`) + `KnuthPlassLineBreaker` (adapts the pure `line_break.find_optimal_line_breaks` to the seam). `calc_horizontal` gained an optional `line_breaker=` param (defaults to greedy) and now packs Step 1 via `breaker.pack(...)`; its greedy-only Step 2 (backward syllable hyphenation) is gated on `breaker.greedy_postprocess`. New `test/test_line_breaker.py`.
+
+**2. Results.** The line-break strategy is now swappable without touching tokenization or Step 4 assembly. Greedy stays the default ⇒ production render **byte-identical** (characterization net + line-break + thai-wrap + font-fit: **23 passed**). The Knuth-Plass strategy is selectable and balances lines (`test_line_breaker.py`: **4 passed**) — on the demo sentence greedy leaves a lone `today` (min 97, spread 117), KP pulls `dog` down (min 137, spread 57). #180 step 2 is now unblocked.
+
+**3. Expected performance gain %.** **Default path: 0% runtime — byte-identical** (greedy unchanged; goldens prove identical line breaking). The KP path is **opt-in and quality-only** (balanced lines, not speed): its DP is O(n²) over a region's *words* (tens, not thousands) — negligible vs OCR/inpaint/translate. No latency/VRAM claim until #180 step 2 measures it under E2E.
+
+**4. Benefits.** Knuth-Plass (built in #180 step 1, dormant since) is finally reachable behind a clean seam; line-break policy lives behind one interface (greedy vs holistic) instead of being hard-wired into a 270-line monolith; both strategies are unit-testable in isolation (no PIL); #180 step 2 collapses from "untangle the monolith" to "select a strategy + E2E."
+
+**5. Purpose.** Pay down the tech debt that blocked #180 step 2: `calc_horizontal` interleaved four concerns over shared mutable state, so dropping in a global DP conflicted with the greedy-assuming post-processing. Expose the strategy as a seam so the algorithm swap is a one-liner, per the north star (simplest logic that works · maintainable · sustainable).
+
+**6. Why we changed it + architectural impact.** Forcing Knuth-Plass into the greedy monolith was flagged high-risk on a core, widely-used wrapper (3 production callers). Architecturally, Step 1 moves from a hard-wired greedy block to a **strategy seam**: tokenization (shared) → `LineBreaker.pack` (swappable) → Steps 2-4 (greedy post-process gated by `greedy_postprocess`; assembly shared). "Relocate the shared mechanism, keep divergent policy explicit" — the greedy-specific re-balancing is gated off for holistic strategies rather than deleted.
+
+**7. Problems before the refactor.** `calc_horizontal` Step 1 was hard-wired greedy; the pure Knuth-Plass module (`line_break.py`, #180 step 1) existed but was **unwired** (#180 step 2 blocked); Steps 2-4 assumed the greedy structure + per-line `hyphenation_idx`, so any alternate strategy conflicted with them; no way to A/B a line-break algorithm.
+
+**8. Goals.** Greedy path byte-identical (golden-guarded); `LineBreaker` interface unit-tested in isolation (no PIL) for both strategies; Knuth-Plass wired as a selectable strategy; greedy stays default so the live render is unchanged; #180 step 2 reduced to a strategy selection behind `render.bubble_area_fit`.
+
+**9. Architecture Before.**
+```
+calc_horizontal
+ ├─ tokenize (_split_words_and_widths / _split_into_syllables)   [extracted earlier]
+ ├─ Step 1: _greedy_pack(...)                                    [hard-wired greedy]
+ ├─ Step 2: backward hyphenation  ┐
+ ├─ Step 3: single-char rebalance ├─ assume greedy structure + hyphenation_idx
+ └─ Step 4: assembly              ┘
+line_break.find_optimal_line_breaks  ── pure Knuth-Plass DP, UNWIRED (#180 blocked)
+```
+**10. Architecture After.**
+```
+LineBreaker (Protocol): pack(...) -> (line_words, line_widths, hyphenation_idx); greedy_postprocess
+ ├─ GreedyLineBreaker      (greedy_postprocess=True)  -> _greedy_pack         [default = byte-identical]
+ └─ KnuthPlassLineBreaker  (greedy_postprocess=False) -> find_optimal_line_breaks  [opt-in, balanced]
+calc_horizontal(..., line_breaker=None)
+ ├─ tokenize (shared)
+ ├─ Step 1: breaker.pack(...)                         [swappable seam]
+ ├─ Step 2: gated on breaker.greedy_postprocess       [greedy-only]
+ ├─ Step 3: greedy rebalance (natural no-op for KP — never shares a word across lines)
+ └─ Step 4: assembly (shared)
+test/test_line_breaker.py — both strategies in isolation (no PIL) + real-font selectable proof
+```
+**11. Refactor list.**
+| Seam | Commit | Change |
+|------|--------|--------|
+| #186 C1 | `09e8c8c` | `LineBreaker` Protocol + `GreedyLineBreaker`; `calc_horizontal` `line_breaker=` param + Step 2 gate (byte-identical) |
+| #186 C2 | `426f4a2` | `KnuthPlassLineBreaker` adapter + `test/test_line_breaker.py` (no-PIL isolation + real-font selectable) |
+| #186 C3 | docs | PIPELINE.md §5 + DONE.md + this report |
+
+**12. Metrics.** `text_render.py` +46 LOC (seam: Protocol + 2 breakers) over the already-extracted `_greedy_pack`; +68 LOC test (`test_line_breaker.py`, 4 tests). Default-path tests: 23 passed (15-case char net + 5 line-break + thai-wrap + font-fit) ⇒ byte-identical. New breaker tests: 4 passed. 3 production callers unaffected (all pass ≤6 args; new param inert). KP balance on demo sentence: min 97→137, spread 117→57.
+
+**13. Technical Debt Removed.** The #180-blocking entanglement of Step 1 with the greedy-assuming Steps 2-4; the dead-on-arrival unwired Knuth-Plass module; the hard-wired single-strategy line-break; the absence of isolated (no-PIL) line-break unit coverage for an alternate strategy.
+
+**14. Risk Reduction.** Default greedy is byte-identical (15-case golden net green) ⇒ zero render regression risk from this change. The KP strategy is opt-in (default off), so it cannot affect the live render until #180 step 2 deliberately selects it behind `render.bubble_area_fit` + E2E. Both strategies are unit-pinned in isolation, so a future edit that breaks either fails fast (~12 s, no GPU).
+
+**15. Developer Experience Impact.** Swapping the line-break algorithm is now `calc_horizontal(..., line_breaker=KnuthPlassLineBreaker())` instead of surgery on a 270-line monolith; line-break logic is testable without fonts/PIL via a stubbed width fn; #180 step 2 is a small, low-risk follow-up.
+
+**16. Future Opportunities.** #180 step 2: select `KnuthPlassLineBreaker` behind `render.bubble_area_fit` (or a dedicated knob) + production E2E + tuning of `badness_exponent`/`hyphen_penalty`. Give KP word-level over-wide handling (currently a lone over-wide word overflows; syllable splitting stays the greedy path's job) and empty-text parity. Potentially make Step 3 explicitly strategy-gated (today it's a proven no-op for KP).
+
+**17. Lessons Learned.** A seam is the cheap way to defuse a high-risk wiring: rather than force Knuth-Plass into greedy-assuming code, gate the greedy-specific post-process behind a strategy flag and keep assembly shared. "Relocate, don't unify" again — Step 2 is gated off for holistic strategies, not deleted. Unit-testing the interface with a stubbed width fn keeps the proof fast and PIL-free while a single real-font test pins the end-to-end selectable behaviour.
+
+**18. KPI.** Default byte-identical 100% (23/23 default-path tests) · regressions 0 · new isolated coverage +4 tests (both strategies, no PIL) · #180 step 2 unblocked · KP line-width spread −51% on the demo (117→57) · deferred items: #180 step-2 selection + KP over-wide/empty parity (flagged).
+
+*Validation:* characterization net (greedy byte-identical) + `test_line_breaker.py` (both strategies isolated + real-font selectable). Live E2E deferred to the verify step / #180 step 2 (default path is byte-identical so the live render is unchanged). *Risk/rollback:* default byte-identical, KP opt-in/off; revert = drop the branch. *Links:* #186, #180, #178.
