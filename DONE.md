@@ -1840,3 +1840,26 @@ off main, 3 commits:
 Design: greedy stays the default so the live render is byte-identical; #180 step 2 now collapses to selecting
 `KnuthPlassLineBreaker` behind `render.bubble_area_fit` + E2E. Over-wide-word syllable splitting + empty-text
 degenerate handling stay the greedy path's job (documented on the KP class) — KP refinement is #180's scope.
+
+## 2026-06-11 — #193 harden --start-instance worker lifecycle (port-collision + orphan cleanup)
+The front server (`--port P`) launches the worker subprocess on `P+1`; the inline launch had no port-collision
+check, no orphan cleanup, and its SIGINT/SIGTERM handlers are silently overridden by uvicorn (so Ctrl+C left the
+worker orphaned on 5004 serving old code — the restart pain hit repeatedly during render-parity dev + this
+session). Branch `refactor/mit-193-worker-lifecycle` off main.
+- New `server/worker_lifecycle.py` (pure stdlib, unit-tested without spawning a worker): `port_is_free` (plain
+  bind, no SO_REUSEADDR so a live listener reads as taken), `ensure_worker_port_free` (raises a clear
+  RuntimeError naming both ports + "free BOTH"), `terminate_process` (terminate → wait(timeout) → kill
+  escalation; idempotent on None / already-exited).
+- `server/main.py`: `start_translator_client_proc` now pre-checks the worker port (fail loud, not hang), prints
+  front+worker PIDs, registers `atexit.register(terminate_process, proc)` as the reliable cleanup backstop
+  (uvicorn clobbers the signal handlers), and the signal handler + `__main__` (now `try/finally`) both route
+  through `terminate_process`. Behaviour change (NOT byte-identical): happy path preserved, cleanup hardened,
+  collisions fail loud.
+- `test/test_worker_lifecycle.py` (8): port free/taken, ensure raises with both ports + BOTH, terminate
+  live / kill-on-timeout / noop-already-dead / noop-None.
+- `MIT/README.md`: "Worker lifecycle (two-port model)" — restart kills BOTH ports (PowerShell one-liner),
+  graceful vs force-kill, the port-busy message meaning, poll `/ready` not `/health`.
+Validation: 8 unit pass; full suite 350 pass / 18 pre-existing async / 0 new fail; **live collision test in the
+real entrypoint** — starting front 5003 while the running MIT's worker held 5004 raised the RuntimeError
+immediately, before any ML load (no "MIT worker started"/"Nonce" printed). Aligns with the project_mit_launch_env
+restart recipe.
