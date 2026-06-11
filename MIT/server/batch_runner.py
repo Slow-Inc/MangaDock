@@ -17,7 +17,7 @@ async def _translate_page(config_str: str, img_bytes: bytes, progress_meta: dict
     Heavy imports are deferred so importing this module stays fast for tests.
     The config is re-parsed per page to avoid any state mutation across pages.
     """
-    from manga_translator import Config
+    from manga_translator.config import parse_and_validate_config
     from server.request_extraction import get_patch_ctx
 
     # Dummy request mock for internal pipeline compatibility
@@ -25,7 +25,7 @@ async def _translate_page(config_str: str, img_bytes: bytes, progress_meta: dict
         async def is_disconnected(self):
             return False
 
-    page_conf = Config.parse_raw(config_str)
+    page_conf = parse_and_validate_config(config_str)
     return await get_patch_ctx(DummyRequest(), page_conf, img_bytes, progress_meta=progress_meta)
 
 

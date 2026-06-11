@@ -217,7 +217,7 @@ Pure / value (no ML imports, unit-tested in <1s):
 - `dictionary.py` (S8) — `load_dictionary` / `apply_dictionary` / `apply_post_dictionary` (re-exported for `__main__`).
 - `punctuation.py` — `correct_punctuation` (source-style quote/bracket restore).
 - `translation_checks.py` — `check_repetition_hallucination` + `check_target_language_ratio` (#109).
-- `translator_chain.py` (#192a) — `TranslatorChain` parse. · `line_break.py` (#180) — Knuth-Plass packer, now wired behind the **#186 `LineBreaker` seam** (`KnuthPlassLineBreaker`, opt-in; #180 step 2 = select it behind `render.bubble_area_fit` + E2E).
+- `translator_chain.py` (#192a) — `TranslatorChain` parse. · `config.py::parse_and_validate_config` (#192) — the single config parse/validate seam (Pydantic-v2 `model_validate_json`) every endpoint shares, replacing 11× scattered `Config.parse_raw` (load_dotenv extraction deferred: import-order risk > ROI; the remaining bare-excepts are intentional broad catches, not debt). · `line_break.py` (#180) — Knuth-Plass packer, now wired behind the **#186 `LineBreaker` seam** (`KnuthPlassLineBreaker`, opt-in; #180 step 2 = select it behind `render.bubble_area_fit` + E2E).
 
 Stateful / async-orchestration (self-bound deps passed as callbacks; characterized via `asyncio.run`):
 - `model_usage_tracker.py` (S3) — `ModelUsageTracker` TTL timestamps (**L1** key-drift preserved).

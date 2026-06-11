@@ -6,7 +6,7 @@ request; absent means "use the GEMINI_MODEL env default".
 """
 import json
 
-from manga_translator.config import Config
+from manga_translator.config import parse_and_validate_config
 
 BACKEND_CONFIG = {
     "translator": {"target_lang": "THA", "model": "gemini-2.5-pro"},
@@ -16,11 +16,11 @@ BACKEND_CONFIG = {
 
 
 def test_translator_model_is_parsed_from_request_config():
-    conf = Config.parse_raw(json.dumps(BACKEND_CONFIG))
+    conf = parse_and_validate_config(json.dumps(BACKEND_CONFIG))
     assert conf.translator.model == "gemini-2.5-pro"
 
 
 def test_translator_model_defaults_to_none_when_absent():
     payload = {"translator": {"target_lang": "THA"}}
-    conf = Config.parse_raw(json.dumps(payload))
+    conf = parse_and_validate_config(json.dumps(payload))
     assert conf.translator.model is None

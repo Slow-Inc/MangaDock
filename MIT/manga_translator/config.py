@@ -401,3 +401,16 @@ class Config(BaseModel):
         if self._filter_text is None:
             self._filter_text = re.compile(self.filter_text)
         return self._filter_text
+
+
+def parse_and_validate_config(config: str) -> Config:
+    """Single parse + validate entry point for the raw JSON config string every
+    server endpoint (and the batch runner) receives (#192).
+
+    Centralises parsing so validation / error policy lives in one place instead of
+    a dozen scattered ``Config.parse_raw`` calls, and uses Pydantic v2
+    ``model_validate_json`` (``parse_raw`` is deprecated and dropped in Pydantic
+    v3). For a valid config the resulting ``Config`` is identical to the old
+    ``parse_raw`` path; invalid input still raises ``pydantic.ValidationError``.
+    """
+    return Config.model_validate_json(config)
