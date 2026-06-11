@@ -77,7 +77,6 @@ class InpaintPrecision(str, Enum):
 class Detector(str, Enum):
     default = "default"
     dbconvnext = "dbconvnext"
-    ctd = "ctd"
     craft = "craft"
     paddle = "paddle"
     none = "none"
@@ -86,7 +85,6 @@ class Inpainter(str, Enum):
     default = "default"
     lama_large = "lama_large"
     lama_mpe = "lama_mpe"
-    sd = "sd"
     none = "none"
     original = "original"
 

@@ -55,7 +55,7 @@ returns the (upscaled) original, untranslated. This is why an "empty" page is fa
 
 ### 3.1 Detection (`detection/`)
 - **Contract:** RGB image + `detection_size` → (`textlines: List[Quadrilateral]`, `mask_raw`).
-- Dispatcher caches detector instances by key (`default` = DBNet, `ctd`, `craft`, `paddle`, `none`).
+- Dispatcher caches detector instances by key (`default` = DBNet, `dbconvnext`, `craft`, `paddle`, `none`; the vendored `ctd`/YOLOv5 was removed in #191).
 - Pre-filters applied in order: rotate → border (min 400px) → invert → gamma; quads with
   `area < 1` dropped; `det_auto_rotate` may re-run detection on the rotated image.
 - **Knobs:** `detection_size` (2560 default; MangaDock sends 2048 via Backend env
@@ -252,6 +252,11 @@ Stateful / async-orchestration (self-bound deps passed as callbacks; characteriz
 `batch_runner.py` (#100 webhook batch loop) · `cancellation.py` (#101) · `path_utils.py` (#102) ·
 `readiness.py` (worker liveness, 2026-06-06 incident) · `webhook.py` (#100 signed delivery + retry + dead-letter; plus `send_progress`/`make_progress_hook` — fire-and-forget per-stage progress events the worker posts to the Backend so the Reader can show live pipeline stages; the worker attaches the hook per request in `mode/share.py`, and `batch_runner` passes `progress_meta` per page). ·
 `worker_lifecycle.py` (#193 — `port_is_free` / `ensure_worker_port_free` / `terminate_process`; the two-port `--start-instance` lifecycle guards: startup worker-port collision check (fail loud, not hang) + graceful terminate→kill orphan cleanup. Pure stdlib, unit-tested without spawning a worker. **Revert hazard:** drop it and a killed front orphans the worker on `P+1` again, and a busy worker port hangs the front silently).
+
+### Removed — #191 (vendored upstream baggage, ~14.4k LOC)
+- **SD/LDM inpainter** — deleted `inpainting/ldm/**` (vendored CompVis LDM ~11.7k LOC), `guided_ldm_inpainting.py`, `inpainting_sd.py`, `sd_hack.py`, `booru_tagger.py` (SD-prompt-only), the 2 `guided_ldm_inpaint*_v15.yaml`; dropped `Inpainter.sd` (enum + `INPAINTERS`), the `<option value="sd">` web-UI entry, and `open_clip_torch` (SD-exclusive dep). `lama_large` is the production inpainter; the roadmap (MangaTranslator) uses Flux via `diffusers`, not the vendored LDM.
+- **ctd / vendored YOLOv5** — deleted `detection/ctd.py` + `detection/ctd_utils/**` (~2.3k LOC incl. GPL YOLOv5); dropped `Detector.ctd` (enum + `DETECTORS`). `default`(DBNet)/`dbconvnext` are the production detectors; the roadmap uses ultralytics YOLOv8+ (already partly in via #168/#170).
+- Byte-identical for the production path (Backend sends `lama_large` + default/dbnet; `Inpainter.sd`/`Detector.ctd` were never sent). `test/test_registry_trim.py` pins the trim. **Revert hazard:** re-syncing inpainting/detection `__init__` from upstream reintroduces the deleted keys → `ImportError` on the now-absent modules.
 
 ---
 

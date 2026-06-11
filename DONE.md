@@ -1885,3 +1885,22 @@ Audited the remaining #192 work; only one piece was both safe and valuable, the 
 Branch `refactor/mit-192-config-parse-seam` off main. Validation: 5 config tests pass; full suite **353 / 18
 pre-existing async / 0 new fail**. #192 advanced (single-parse-path + TODO/dead-field criteria met via this +
 #192a/#192b); `load_dotenv` is the one documented remaining item.
+
+## 2026-06-11 — #191 remove vendored SD/LDM inpainter + ctd/YOLOv5 detector (~14.4k LOC)
+Investigated first (the issue's "decision" criterion), then the dev approved removal **conditional on not blocking the
+MangaTranslator roadmap** — verified it doesn't: MangaTranslator uses Flux via `diffusers>=0.37` + ultralytics
+YOLOv8/v11/v12, so our vendored CompVis-LDM + GPL-YOLOv5 are exactly the old baggage that roadmap replaces (removal
+is roadmap-aligned, and we already pull `kitsumed/yolov8m_seg-speech-bubble` via #168/#170). Branch
+`refactor/mit-191-drop-vendored-ldm-yolov5` off main.
+- **SD/LDM** (deleted, ~11.7k LOC): `inpainting/ldm/**`, `guided_ldm_inpainting.py`, `inpainting_sd.py`, `sd_hack.py`,
+  `booru_tagger.py` (SD-prompt-only, imported only by inpainting_sd), the 2 `guided_ldm_inpaint*_v15.yaml`. Rewired:
+  dropped `Inpainter.sd` (config enum + `INPAINTERS`), `from .inpainting_sd import StableDiffusionInpainter`, the
+  `<option value="sd">` in server/index.html, and `open_clip_torch` from requirements (SD-exclusive; kept
+  kornia/einops/omegaconf/transformers — used elsewhere).
+- **ctd/YOLOv5** (deleted, ~2.3k LOC incl. GPL): `detection/ctd.py`, `detection/ctd_utils/**` (confirmed ctd-exclusive —
+  no other detector imports it). Rewired: dropped `Detector.ctd` (enum + `DETECTORS`) + the ctd import.
+- Left `inpainting_attn.py` (dead but NOT ldm/sd — out of #191 scope, surgical).
+Byte-identical for production (Backend sends `lama_large` + default/dbnet; `sd`/`ctd` never sent; Backend has zero
+sd/ctd refs). Import smoke: registries build clean, no dangling imports — Inpainter `[default,lama_large,lama_mpe,none,
+original]`, Detector `[default,dbconvnext,craft,paddle,none]`. `test/test_registry_trim.py` (4) pins the trim. Full
+suite **357 / 18 pre-existing async / 0 new fail**. 56 files, **−14,405 LOC**.
