@@ -6,7 +6,7 @@ import freetype
 import functools
 import logging
 from pathlib import Path
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Protocol
 from hyphen import Hyphenator
 from hyphen.dictools import LANGUAGES as HYPHENATOR_LANGUAGES
 from langcodes import standardize_tag
@@ -731,7 +731,44 @@ def _greedy_pack(words, word_widths, syllables, font_size, max_width,
     return line_words_list, line_width_list, hyphenation_idx_list
 
 
-def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, language: str = 'en_US', hyphenate: bool = True) -> Tuple[List[str], List[int]]:
+class LineBreaker(Protocol):
+    """#186: the pluggable line-break strategy seam.
+
+    A LineBreaker turns the tokenized ``words`` (plus their precomputed pixel
+    ``word_widths`` and per-word ``syllables``) into per-line word-index
+    groupings — the exact ``(line_words_list, line_width_list,
+    hyphenation_idx_list)`` shape ``calc_horizontal`` Steps 2-4 consume. This lets
+    the greedy packer be swapped for a holistic strategy (Knuth-Plass, #180)
+    without touching tokenization or assembly.
+
+    ``greedy_postprocess`` tells ``calc_horizontal`` whether to run its
+    greedy-specific Step 2 (backward syllable hyphenation across line boundaries).
+    The greedy packer relies on it; a holistic strategy already balances its lines
+    and must not have that layout re-greedified, so it sets this ``False``.
+    """
+
+    greedy_postprocess: bool
+
+    def pack(self, words: List[str], word_widths: List[int], syllables: List[List[str]],
+             font_size: int, max_width: int, whitespace_offset_x: int,
+             hyphen_offset_x: int) -> Tuple[List[List[int]], List[int], List[int]]:
+        ...
+
+
+class GreedyLineBreaker:
+    """#186: default strategy — ``calc_horizontal``'s original greedy packing
+    (Step 1), kept byte-identical by delegating straight to :func:`_greedy_pack`.
+    Steps 2-4 post-process its output, so ``greedy_postprocess`` is ``True``."""
+
+    greedy_postprocess = True
+
+    def pack(self, words, word_widths, syllables, font_size, max_width,
+             whitespace_offset_x, hyphen_offset_x):
+        return _greedy_pack(words, word_widths, syllables, font_size, max_width,
+                            whitespace_offset_x, hyphen_offset_x)
+
+
+def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, language: str = 'en_US', hyphenate: bool = True, line_breaker: Optional[LineBreaker] = None) -> Tuple[List[str], List[int]]:
     """
     Splits up a string of text into lines. Returns list of lines and their widths.
     Will go over max_height if too much text is present.
@@ -765,9 +802,12 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     # Step 2/4 below still consult the hyphenator for backward-hyphenation decisions.
     hyphenator = select_hyphenator(language)
 
-    # Step 1: greedy line packing (#186: extracted to _greedy_pack — the swappable
-    # line-break strategy; Steps 2-4 below post-process its output).
-    line_words_list, line_width_list, hyphenation_idx_list = _greedy_pack(
+    # Step 1: line packing via the pluggable LineBreaker seam (#186). Default is
+    # GreedyLineBreaker — byte-identical to the original greedy Step 1; #180 step 2
+    # selects KnuthPlassLineBreaker behind render.bubble_area_fit. Steps 2-4 below
+    # post-process greedy output; a holistic strategy opts out via greedy_postprocess.
+    breaker = line_breaker if line_breaker is not None else GreedyLineBreaker()
+    line_words_list, line_width_list, hyphenation_idx_list = breaker.pack(
         words, word_widths, syllables, font_size, max_width,
         whitespace_offset_x, hyphen_offset_x)
 
@@ -795,7 +835,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     # Compare two adjacent lines and try to hyphenate backwards
 
     # Avoid hyphenation if max_lines isn't fully used
-    if hyphenate and len(line_words_list) > max_lines:
+    if breaker.greedy_postprocess and hyphenate and len(line_words_list) > max_lines:
         line_idx = 0
         while line_idx < len(line_words_list) - 1:
             line_words1 = line_words_list[line_idx]
