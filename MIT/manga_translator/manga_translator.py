@@ -25,7 +25,7 @@ from .prev_context import build_prev_context
 from .none_translator import apply_prep_manual_override, stamp_none_translations
 from .translation_store import read_translations, write_translations
 from .image_debug_context import ImageDebugContext
-from .pipeline_params import apply_global_settings
+from .pipeline_params import apply_global_settings, PipelineParams
 from .model_reaper import ModelReaper
 from .detection_postproc import merge_sfx_detections
 from .translation_memory import TranslationMemory
@@ -306,38 +306,22 @@ class MangaTranslator:
             print(f"Failed to setup log file: {e}")
 
     def parse_init_params(self, params: dict):
-        self.verbose = params.get('verbose', False)
-        self.use_mtpe = params.get('use_mtpe', False)
-        self.font_path = params.get('font_path', None)
-        self.models_ttl = params.get('models_ttl', 0)
-        self.batch_size = params.get('batch_size', 1)  # 添加批量大小参数
-        
-        # 验证batch_concurrent参数
-        if self.batch_concurrent and self.batch_size < 2:
-            logger.warning('--batch-concurrent requires --batch-size to be at least 2. When batch_size is 1, concurrent mode has no effect.')
-            logger.info('Suggestion: Use --batch-size 2 (or higher) with --batch-concurrent, or remove --batch-concurrent flag.')
-            # 自动禁用并发模式
-            self.batch_concurrent = False
-            
-        self.ignore_errors = params.get('ignore_errors', False)
-        # check mps for apple silicon or cuda for nvidia
-        device = 'mps' if torch.backends.mps.is_available() else 'cuda'
-        self.device = device if params.get('use_gpu', False) else 'cpu'
-        self._gpu_limited_memory = params.get('use_gpu_limited', False)
-        if self._gpu_limited_memory and not self.using_gpu:
-            self.device = device
-        if self.using_gpu and ( not torch.cuda.is_available() and not torch.backends.mps.is_available()):
-            raise Exception(
-                'CUDA or Metal compatible device could not be found in torch whilst --use-gpu args was set.\n'
-                'Is the correct pytorch version installed? (See https://pytorch.org/)')
-        #todo: fix why is kernel size loaded in the constructor
-        self.kernel_size=int(params.get('kernel_size'))
-        # Set input files
-        self.input_files = params.get('input', [])
-        # Set save_text
-        self.save_text = params.get('save_text', False)
-        # Set load_text
-        self.load_text = params.get('load_text', False)
+        # #187 S12: the field parsing + device/using_gpu/raise logic + batch_concurrent
+        # auto-disable now live in the PipelineParams value object (byte-identical).
+        pp = PipelineParams.from_params(params, self.batch_concurrent)
+        self.verbose = pp.verbose
+        self.use_mtpe = pp.use_mtpe
+        self.font_path = pp.font_path
+        self.models_ttl = pp.models_ttl
+        self.batch_size = pp.batch_size
+        self.batch_concurrent = pp.batch_concurrent
+        self.ignore_errors = pp.ignore_errors
+        self.device = pp.device
+        self._gpu_limited_memory = pp.gpu_limited_memory
+        self.kernel_size = pp.kernel_size
+        self.input_files = pp.input_files
+        self.save_text = pp.save_text
+        self.load_text = pp.load_text
         
         # batch_concurrent 已在初始化时设置并验证
         

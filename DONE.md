@@ -1904,3 +1904,24 @@ Byte-identical for production (Backend sends `lama_large` + default/dbnet; `sd`/
 sd/ctd refs). Import smoke: registries build clean, no dangling imports — Inpainter `[default,lama_large,lama_mpe,none,
 original]`, Detector `[default,dbconvnext,craft,paddle,none]`. `test/test_registry_trim.py` (4) pins the trim. Full
 suite **357 / 18 pre-existing async / 0 new fail**. 56 files, **−14,405 LOC**.
+
+## 2026-06-11 — #187 S12 PipelineParams value-object (the LAST god-object seam → #187 CLOSED)
+Finishes the MIT god-object decomposition (#187): all S1-S26 seams now landed. S12 was deferred as "entangled
+w/ device/using_gpu/raise — do after #192"; #192 closed, and on analysis the entanglement is a self-contained
+method, so the extraction is byte-identical. Branch `refactor/mit-187-s12-pipeline-params` off main.
+- `manga_translator/pipeline_params.py`: added `PipelineParams` dataclass (13 fields + `using_gpu` property) +
+  `from_params(params, batch_concurrent)` classmethod — the verbatim extraction of `parse_init_params`'s field
+  parsing, the device computation (`use_gpu`→device, gpu-limited promotion, `using_gpu` checks), the
+  cuda/mps-availability raise, and the `batch_concurrent` auto-disable. Foot-guns kept verbatim: `kernel_size`
+  has no default (`int(None)` raises if absent); the raise leaves an unusable half-built object either way
+  (so moving the raise into `from_params` is byte-identical at the behaviour level). A `_is_gpu(device)` helper
+  mirrors `MangaTranslator.using_gpu`.
+- `manga_translator/manga_translator.py`: `parse_init_params` now delegates to `PipelineParams.from_params(
+  params, self.batch_concurrent)` and assigns `self.X = pp.X` (13 fields). `MangaTranslator.using_gpu` property
+  unchanged (still reads `self.device`).
+- `test/test_pipeline_params.py`: +8 characterization cases (torch GPU availability monkeypatched) — cpu/cuda/mps
+  device, gpu-limited promotion, raise-when-no-device, batch_concurrent auto-disable/keep, field passthrough.
+TDD red→green: 8 new tests RED (AttributeError) → implement → GREEN. Validation: `test_pipeline_params.py` 11
+pass (3 globals + 8 value-object); full suite **365 / 18 pre-existing async / 0 new fail**. One cosmetic delta:
+the batch_concurrent warning now logs under the `pipeline_params` logger name (same message/level/effect).
+**#187 CLOSED → MIT tech-debt category 6/6 complete** (#186/#187/#188/#191/#192/#193).

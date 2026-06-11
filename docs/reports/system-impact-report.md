@@ -597,3 +597,66 @@ roadmap: Flux/diffusers + ultralytics YOLO (replacements, added fresh when neede
 **18. KPI.** −14,405 LOC (largest batch cleanup) · 1 GPL dep removed · 0 regressions (357 pass) · production byte-identical (zero Backend refs + smoke) · roadmap-aligned (Flux/diffusers + ultralytics replace the removed) · trim pinned (4 tests).
 
 *Validation:* import smoke (registries build, no dangling imports) + `test_registry_trim` (4) + full suite (357 / 0 new fail) + roadmap check (MangaTranslator uses diffusers/Flux + ultralytics, not the vendored LDM/YOLOv5). *Risk/rollback:* byte-identical production; revert = restore the branch (large diff, but git-clean). *Links:* #191, roadmap `C:\Github\MangaDock\MangaTranslator`.
+
+## 2026-06-11 — #187 S12 PipelineParams value-object (last god-object seam → #187 CLOSED)
+
+The final seam of the MIT god-object decomposition: extract `parse_init_params`' field/device/raise logic into a `PipelineParams` value-object, closing #187 (all S1-S26 landed) and the MIT tech-debt category (6/6). Byte-identical, TDD red→green. Full 18-section template ([[feedback-impact-report]]).
+
+**1. What changed.** `pipeline_params.py` gained a `PipelineParams` dataclass (13 fields + `using_gpu` property) + `from_params(params, batch_concurrent)` — the verbatim extraction of the constructor's parsing (device computation, gpu-limited promotion, cuda/mps-availability raise, `batch_concurrent` auto-disable, field parsing). `manga_translator.py`'s `parse_init_params` now delegates to it and assigns `self.X = pp.X`. New: 8 characterization tests (torch availability mocked).
+
+**2. Results.** The constructor's ~35-line parsing block is now a testable value-object; `parse_init_params` is a thin assignment list. Byte-identical (the logic is a verbatim move). TDD: 8 tests RED → GREEN. `test_pipeline_params.py` 11 pass; full suite **365 / 18 pre-existing async / 0 new fail**. **#187 closed → MIT tech-debt category 6/6.**
+
+**3. Expected performance gain %.** **0% runtime — byte-identical.** Same parsing, same device logic, same raise; only the carriage moved. No latency/VRAM change.
+
+**4. Benefits.** The device/`using_gpu`/gpu-limited/raise logic — previously only reachable by constructing a full `MangaTranslator` — is now unit-testable in isolation with mocked torch availability (8 cases pin every branch); the constructor is thinner; #187 is finally complete (the decomposition's last seam).
+
+**5. Purpose.** Close out #187: the last piece of breaking up the ~3000-line god object. S12 was deferred until #192 centralised config; with #192 done and the entanglement analysed as a self-contained method, the extraction is now safe.
+
+**6. Why we changed it + architectural impact.** Param-parsing buried in a constructor (with a process-raising side effect + a property read mid-parse) is untestable without heavy construction. Architecturally the parsing becomes a value-object (`PipelineParams.from_params`) the constructor reads — the same "extract a pure-ish unit, delegate from the driver" pattern as the other 25 seams. `MangaTranslator.using_gpu` stays (reads `self.device`); `_is_gpu` mirrors it inside the value-object.
+
+**7. Problems before the refactor.** ~35 lines of parsing inline in `__init__`/`parse_init_params`; device/`using_gpu`/gpu-limited/raise logic order-sensitive and only testable via full construction; the `batch_concurrent` validation read+mutated `self`; flagged "entangled" and deferred.
+
+**8. Goals.** Byte-identical extraction; value-object unit-testable without constructing `MangaTranslator`; preserve the device logic, the raise, the batch_concurrent auto-disable, and the constructor foot-guns (`kernel_size` no-default); full suite green; close #187.
+
+**9. Architecture Before.**
+```
+MangaTranslator.parse_init_params(params):
+   self.verbose/use_mtpe/font_path/models_ttl/batch_size = params.get(...)
+   if self.batch_concurrent and self.batch_size < 2: warn + self.batch_concurrent = False
+   self.device = ... (use_gpu? mps/cuda : cpu); gpu-limited promotion; raise if no cuda/mps
+   self.kernel_size/input_files/save_text/load_text = params.get(...)
+   # only testable by constructing the whole god object
+```
+**10. Architecture After.**
+```
+pipeline_params.py:
+   _is_gpu(device)                         # body of MangaTranslator.using_gpu
+   @dataclass PipelineParams(13 fields; using_gpu property)
+       from_params(params, batch_concurrent) -> PipelineParams   # the verbatim parse logic
+MangaTranslator.parse_init_params(params):
+   pp = PipelineParams.from_params(params, self.batch_concurrent); self.X = pp.X  (×13)
+test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing globals cases
+```
+**11. Refactor list.**
+| Piece | Where | Change |
+|-------|-------|--------|
+| value-object | `pipeline_params.py` | `PipelineParams` dataclass + `from_params` + `_is_gpu` |
+| delegate | `manga_translator.py` | `parse_init_params` → `from_params` + 13 assignments + import |
+| tests | `test_pipeline_params.py` | +8 characterization cases |
+| docs | progress tracker / PIPELINE §5 / DONE.md / this report | S12 ✅, #187 DONE |
+
+**12. Metrics.** `pipeline_params.py` +~60 LOC (value-object); `manga_translator.py` ~−20 inline parsing → thin delegation; +8 tests. Suite 357 → **365** / 0 new fail. #187: 26/26 seams done.
+
+**13. Technical Debt Removed.** The last inline parsing block of the god object; an untestable-without-construction device/raise path; the read+mutate-`self` batch_concurrent validation; the "S12 deferred" item on the resume tracker.
+
+**14. Risk Reduction.** The device/gpu-limited/raise logic is now pinned by 8 unit cases (mocked availability) instead of being exercised only incidentally during construction; byte-identical ⇒ no behaviour regression (full suite constructs `MangaTranslator` and stays green).
+
+**15. Developer Experience Impact.** Device-selection logic is editable + testable in one small module without spinning up the translator; the constructor reads as a field list; the decomposition tracker now shows #187 complete (no open seam to resume).
+
+**16. Future Opportunities.** The inline `#todo: fix why is kernel size loaded in the constructor` is now isolated in `from_params` (easy to address later); `kernel_size`'s no-default foot-gun could get a default; `parse_init_params` could eventually be inlined into `__init__` since it's now trivial. All optional.
+
+**17. Lessons Learned.** A "deferred — entangled" seam is often tractable once you read the actual entanglement: here the device/`using_gpu`/raise coupling was a self-contained method, and moving the raise into the value-object is byte-identical because a raising constructor yields an unusable object either way. Mock torch availability to make device-branch logic deterministic + fast to test. Keep foot-guns verbatim in a byte-identical pass (the `kernel_size` no-default).
+
+**18. KPI.** #187 CLOSED (26/26 seams) · MIT tech-debt category **6/6** · byte-identical (verbatim move + suite green) · 0 regressions (365 pass) · +8 isolated tests for previously-construction-only logic · 1 cosmetic delta (logger name, documented).
+
+*Validation:* TDD red→green; `test_pipeline_params.py` 11 pass (3 globals + 8 value-object) + full suite (365 / 0 new fail). *Risk/rollback:* byte-identical; revert = drop the branch. *Cosmetic delta:* the batch_concurrent warning logs under the `pipeline_params` logger name (same message/level/effect). *Links:* #187, #188, resume `docs/reports/mit-refactor-progress.md`.

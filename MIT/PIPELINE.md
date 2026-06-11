@@ -229,7 +229,7 @@ Stateful / async-orchestration (self-bound deps passed as callbacks; characteriz
 - `none_translator.py` (S9) — `apply_prep_manual_override` (**L12**) + `stamp_none_translations` (**L3**).
 - `translation_store.py` (S10) — `read`/`write_translations` (**L2** `exit(-1)` + the cp1252 latent encode bug preserved).
 - `image_debug_context.py` (S11) — `ImageDebugContext` (result_path + MD5 swap closures → `with_context`).
-- `pipeline_params.py` (S12) — `apply_global_settings` (`_MODEL_DIR` + TF32); value-object deferred (#192).
+- `pipeline_params.py` (S12) — `apply_global_settings` (`_MODEL_DIR` + TF32) **+ `PipelineParams.from_params` value-object** (device/`using_gpu`/gpu-limited/cuda-raise + `batch_concurrent` auto-disable + field parsing; byte-identical, `parse_init_params` delegates). **Closes #187** (the last of the S1-S26 seams).
 - `detection_postproc.py` (S13) — `merge_sfx_detections` + `textline_aabb` (#168 second pass).
 - `translation_memory.py` (S16) — `TranslationMemory` (two cross-page lists + `reset`; **L9** bleed boundary explicit).
 - `gather_per_context.py` (S19) — `gather_per_context` (per-exception keep-original placeholder).
