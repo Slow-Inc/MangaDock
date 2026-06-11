@@ -28,6 +28,7 @@ from .gemini_2stage import Gemini2StageTranslator
 from .custom_openai import CustomOpenAiTranslator
 from ..config import Translator, TranslatorConfig, TranslatorChain
 from ..utils import Context
+from ..dispatch_registry import DispatchRegistry
 
 OFFLINE_TRANSLATORS = {
     Translator.offline: SelectiveOfflineTranslator,
@@ -69,15 +70,10 @@ TRANSLATORS = {
     **GPT_TRANSLATORS,
     **OFFLINE_TRANSLATORS,
 }
-translator_cache = {}
+_registry = DispatchRegistry(TRANSLATORS, 'translator')
 
 def get_translator(key: Translator, *args, **kwargs) -> CommonTranslator:
-    if key not in TRANSLATORS:
-        raise ValueError(f'Could not find translator for: "{key}". Choose from the following: %s' % ','.join(TRANSLATORS))
-    if not translator_cache.get(key):
-        translator = TRANSLATORS[key]
-        translator_cache[key] = translator(*args, **kwargs)
-    return translator_cache[key]
+    return _registry.get(key, *args, **kwargs)
 
 prepare_selective_translator(get_translator)
 
@@ -193,5 +189,4 @@ LANGDETECT_MAP = {
     'tl': 'FIL'
 }
 
-async def unload(key: Translator):
-    translator_cache.pop(key, None)
+unload = _registry.unload

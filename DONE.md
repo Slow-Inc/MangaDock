@@ -3,6 +3,19 @@
 
 ---
 
+## Lane A — S22 DispatchRegistry + #188 global-MODEL removal + full-stack E2E (2026-06-10, /tdd, high)
+
+After PR #203 merged, started the MIT tech-debt backlog (Lane A). Four byte-identical commits, then a from-scratch full-stack E2E.
+
+- **S22a** (`bd788b5`) — the detector/ocr/inpainter/upscaler/colorizer `__init__` modules each repeated the identical `get_X` (lazy cache) + `unload` (pop) + cache-dict trio; folded into `dispatch_registry.py` `DispatchRegistry(registry, kind)`. Each module wires `get_X` = thin typed wrapper over `_registry.get` + `unload = _registry.unload`; `prepare`/`dispatch` stay per-module (divergent bodies — different methods/args, upscaling's ratio==1 early-return). `if not cache.get` quirk + `','.join` ValueError preserved. 5 unit cases.
+- **S22b** (`cc8785d`) — `translators/__init__.py` carried the same trio; wired it too. The divergent inline `await translator.unload(device)` (translator-INSTANCE unload) in `dispatch` and `prepare_selective_translator(get_translator)` untouched. Completes S22 — all 6 dispatch modules on one registry.
+- **#188 global MODEL** (`f5d60bc` default, `859506d` dbnet+craft) — `det_batch_forward_default` reached the loaded net via a module-global `MODEL` (set in `_load`, read in the forward) = concurrency hazard (two detectors clobber the global). Threaded the model explicitly: `det_batch_forward_default(batch, device, model)`, `_load` drops the global, `_infer` passes `self.model` via a closure into `det_rearrange_forward` + the fallback call (default + dbnet, byte-identical bodies). craft.py's global was pure **dead code** (its `_infer` calls `self.model(x)` directly, never reads the global) — deleted. `test_det_forward_default.py` (torch + fake net) parametrized over default + dbnet. **No module-level global MODEL remains in detection** — #188's "no global MODEL; concurrent loads safe" met for all three.
+- **#188 shared-utils**: found **already done** — `det_rearrange_forward` is single-source in `utils/generic.py`; `merge_bboxes` single-source in `model_manga_ocr.py` (model_48px has no merge). No work.
+
+Suite: 18 async-only baseline + **335 passed** (+10 across the batch).
+
+**Full-stack E2E (started the whole system from scratch — it was all down + Docker daemon off).** Launched Docker Desktop → Redis (compose) + MIT (`--use-gpu --start-instance`) + Backend (`dist/src/main`) + Frontend (`bun dev`) + cloudflared tunnel; `cache:reset` + fresh L1; translated Kouchuugun ch1 p0 EN→TH through the **production tunnel** while logged in. Result: **2 patches `649×1492` + `451×1489` = pixel-exact to baseline**, page rendered correct Thai. S22 + global-MODEL sit on the detection/dispatch hot path of every translation, so this is a strong byte-identity confirmation. Remaining Lane A is the harder long-tail (render dedup #189/#190, behavior changes #192/#193/#186, #188 BaseGPTTranslator=xhigh, #191 product decision).
+
 ## S23→S26a god-object tail — 5 byte-identical seams + batched E2E (2026-06-10, /tdd, xhigh)
 
 Pushed the high-risk async-orchestration tail of #187 in one session, one commit per seam, each byte-identical (`git diff -w` = zero semantic change on kept lines) and unit-tested. **Driver `manga_translator.py` 2235 → 1934 lines** (this session; **3040 → 1934 = −36%** since the decomposition began). Suite went 18 async-only baseline + **323 passed** (+16 new cases).
