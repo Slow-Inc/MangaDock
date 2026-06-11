@@ -225,6 +225,7 @@ Stateful / async-orchestration (self-bound deps passed as callbacks; characteriz
 - `memory_guard.py` (S5) — `release_memory` (gc + `empty_cache`).
 - `model_reaper.py` (S20) — `ModelReaper` TTL loop (opt-in `.stop()`, **L13/L14**).
 - `model_lifecycle.py` (S21) — `ModelLifecycle` facade (preload ×2 fold + `ensure_running`, **L16**).
+- `dispatch_registry.py` (S22) — `DispatchRegistry(registry, kind)` folds the byte-identical get/cache/unload trio across all **6** dispatch modules (detector/ocr/inpainter/upscaler/colorizer/translators); each wires `get_X = reg.get` / `unload = reg.unload` and keeps its own divergent `prepare`/`dispatch`. **#188 global `MODEL` killed** in detection — `det_batch_forward_default(batch, device, model)` threads the net explicitly, `craft`'s dead global deleted (no module-level `MODEL` left). `if not cache.get` re-create quirk + `','.join` ValueError message preserved. Closes the #188 model-lifecycle half (translator `BaseGPTTranslator` half still open).
 - `none_translator.py` (S9) — `apply_prep_manual_override` (**L12**) + `stamp_none_translations` (**L3**).
 - `translation_store.py` (S10) — `read`/`write_translations` (**L2** `exit(-1)` + the cp1252 latent encode bug preserved).
 - `image_debug_context.py` (S11) — `ImageDebugContext` (result_path + MD5 swap closures → `with_context`).
