@@ -12,6 +12,7 @@ from hyphen.dictools import LANGUAGES as HYPHENATOR_LANGUAGES
 from langcodes import standardize_tag
 
 from ..utils import BASE_PATH, is_punctuation
+from ..line_break import find_optimal_line_breaks
 
 # ── Thai word segmentation (optional) ────────────────────────────────────────
 _THAI_RE = re.compile(r'[\u0E00-\u0E7F]')
@@ -766,6 +767,57 @@ class GreedyLineBreaker:
              whitespace_offset_x, hyphen_offset_x):
         return _greedy_pack(words, word_widths, syllables, font_size, max_width,
                             whitespace_offset_x, hyphen_offset_x)
+
+
+class KnuthPlassLineBreaker:
+    """#186 / #180: holistic strategy — wraps the pure Knuth-Plass DP
+    (:func:`manga_translator.line_break.find_optimal_line_breaks`) behind the
+    LineBreaker seam.
+
+    Groups whole words to globally minimise total badness (``slack ** exponent``),
+    so lines come out balanced instead of greedily overflowing into an ugly short
+    last line. It works at word granularity: it never splits a word across lines,
+    hence emits no mid-word hyphenation (``hyphenation_idx_list`` all 0) and needs
+    no greedy post-process (``greedy_postprocess = False``). A single word wider
+    than the column is placed on its own line (the DP never deadlocks); the
+    syllable-level splitting of over-wide words stays the greedy path's job.
+
+    Opt-in: ``calc_horizontal`` defaults to :class:`GreedyLineBreaker`, so the
+    production render stays byte-identical until #180 step 2 selects this behind
+    ``render.bubble_area_fit``.
+    """
+
+    greedy_postprocess = False
+
+    def __init__(self, badness_exponent: float = 3.0, hyphen_penalty: float = 1000.0):
+        self._badness_exponent = badness_exponent
+        self._hyphen_penalty = hyphen_penalty
+
+    def pack(self, words, word_widths, syllables, font_size, max_width,
+             whitespace_offset_x, hyphen_offset_x):
+        lines = find_optimal_line_breaks(
+            words,
+            max_width=float(max_width),
+            word_width=lambda tok: float(get_string_width(font_size, tok)),
+            space_width=float(whitespace_offset_x),
+            badness_exponent=self._badness_exponent,
+            hyphen_penalty=self._hyphen_penalty,
+        )
+        # find_optimal_line_breaks partitions the word *sequence* contiguously, so
+        # recover per-line word indices by walking the line lengths.
+        line_words_list: List[List[int]] = []
+        line_width_list: List[int] = []
+        idx = 0
+        for line in lines:
+            indices = list(range(idx, idx + len(line)))
+            idx += len(line)
+            width = sum(word_widths[k] for k in indices)
+            if len(indices) > 1:
+                width += (len(indices) - 1) * whitespace_offset_x
+            line_words_list.append(indices)
+            line_width_list.append(width)
+        hyphenation_idx_list = [0] * len(line_words_list)
+        return line_words_list, line_width_list, hyphenation_idx_list
 
 
 def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, language: str = 'en_US', hyphenate: bool = True, line_breaker: Optional[LineBreaker] = None) -> Tuple[List[str], List[int]]:
