@@ -537,3 +537,63 @@ bare-excepts: UNCHANGED (intentional broad catches; documented)
 **18. KPI.** Single config-parse seam (11→1) · deprecated `parse_raw` removed (v3-ready) · byte-identical (==legacy test) · 0 regressions (353 pass) · 2 flagged items audited + documented as deliberate non-changes (load_dotenv risk, intentional excepts) · #192 criteria met except the documented load_dotenv deferral.
 
 *Validation:* `test_config_parse` (3, incl. ==legacy) + `test_image_model_config` (2, rewired) + full suite (353 / 0 new fail). *Risk/rollback:* behaviour-preserving for valid configs; revert = drop the branch. *Links:* #192 (advanced; load_dotenv deferred).
+
+## 2026-06-11 — #191 remove vendored SD/LDM inpainter + ctd/YOLOv5 detector (~14.4k LOC)
+
+The largest single cleanup of the tech-debt batch: delete two unused, unmaintained vendored upstream subsystems. Gated on a roadmap check (the dev's condition) before any deletion. Full 18-section template ([[feedback-impact-report]]).
+
+**1. What changed.** Deleted the SD/LDM inpainter (`inpainting/ldm/**` ~11.7k LOC + `guided_ldm_inpainting.py` / `inpainting_sd.py` / `sd_hack.py` / `booru_tagger.py` + 2 SD yaml configs) and the ComicTextDetector + vendored YOLOv5 (`detection/ctd.py` + `detection/ctd_utils/**` ~2.3k LOC, GPL). Rewired the enums (`Inpainter.sd`, `Detector.ctd`), the `INPAINTERS`/`DETECTORS` registries, the imports, the `<option value="sd">` web-UI entry, and dropped the SD-exclusive `open_clip_torch` dep. New `test/test_registry_trim.py`.
+
+**2. Results.** **−14,405 LOC** across 56 files. Production path untouched (Backend sends `lama_large` + default/dbnet; `sd`/`ctd` were never sent and Backend has zero refs). Registries build clean with no dangling imports (verified by smoke). Full suite **357 / 18 pre-existing async / 0 new failures**.
+
+**3. Expected performance gain %.** **No runtime change** (the removed code was never on the production path). The win is **maintenance + supply-chain**: ~14.4k LOC of vendored ML code (the largest CUDA/torch-upgrade liability in MIT) and a **GPL** dependency (YOLOv5) are gone — smaller clone, faster CI checkout, no GPL-compatibility question, no manual diffing on torch upgrades.
+
+**4. Benefits.** Removes the single biggest vendored-code maintenance burden; resolves the YOLOv5 GPL license concern; shrinks the import/attack surface; aligns the codebase with the chosen roadmap (Flux-via-diffusers + ultralytics-YOLO) by clearing the superseded baggage first; the trim is pinned so it can't silently regress on an upstream re-sync.
+
+**5. Purpose.** Pay down the vendored-code debt the issue flags: ~14k LOC of CompVis-LDM + GPL-YOLOv5 carried from upstream, unused by MangaDock (lama_large + DBNet), with stale deps and license ambiguity.
+
+**6. Why we changed it + architectural impact.** Vendored ML subsystems rot (manual CUDA/torch diffs, no upstream fix flow) and the YOLOv5 GPL is a real license-compat risk. Architecturally the inpainter/detector dispatch shrinks to the maintained set; the seam (DispatchRegistry from S22) made the removal a registry-entry + enum delete, not surgery. Roadmap-aligned: MangaTranslator (our reference) uses Flux/diffusers + ultralytics, so this clears the old path the new one replaces.
+
+**7. Problems before the refactor.** ~11.7k LOC vendored CompVis LDM + ~2.3k LOC vendored YOLOv5 (GPL); both selectable but unused in production; stale deps (`open_clip_torch`); CUDA/torch upgrades required hand-diffing the vendored code; a GPL-vs-project-license question left open.
+
+**8. Goals.** Remove both subsystems without touching the production path; verify the removal doesn't block the MangaTranslator roadmap (the dev's explicit condition); keep the remaining inpainters/detectors intact; pin the trim with a test; byte-identical production render.
+
+**9. Architecture Before.**
+```
+INPAINTERS: default(aot) · lama_large · lama_mpe · sd(StableDiffusion→guided_ldm→ldm/** ~11.7k) · none · original
+DETECTORS:  default(DBNet) · dbconvnext · ctd(ComicText→ctd_utils/** incl. GPL yolov5 ~2.3k) · craft · paddle · none
+deps: ... open_clip_torch (SD-only) ...
+```
+**10. Architecture After.**
+```
+INPAINTERS: default(aot) · lama_large · lama_mpe · none · original          [sd + ldm/** gone]
+DETECTORS:  default(DBNet) · dbconvnext · craft · paddle · none             [ctd + ctd_utils/** gone]
+deps: open_clip_torch removed (kornia/einops/omegaconf/transformers kept — used elsewhere)
+test/test_registry_trim.py pins: sd/ctd absent, production set intact
+roadmap: Flux/diffusers + ultralytics YOLO (replacements, added fresh when needed)
+```
+**11. Refactor list.**
+| Piece | Change |
+|-------|--------|
+| SD files | delete ldm/** + guided_ldm + inpainting_sd + sd_hack + booru_tagger + 2 yaml |
+| SD wiring | drop `Inpainter.sd` (enum + INPAINTERS) + import + web-UI option + `open_clip_torch` dep |
+| ctd files | delete ctd.py + ctd_utils/** (incl. GPL yolov5) |
+| ctd wiring | drop `Detector.ctd` (enum + DETECTORS) + import |
+| docs | PIPELINE.md §3.1 + §5 + mit-hidden-capabilities + DONE.md + this report |
+| test | test_registry_trim.py (4) |
+
+**12. Metrics.** −14,405 LOC / 56 files; 2 enum members + 2 registry entries + 2 imports + 1 web-UI option + 1 dep removed; +4 pinning tests. Suite 357 (353 → +4) / 0 new fail. 1 GPL dependency eliminated.
+
+**13. Technical Debt Removed.** ~11.7k LOC vendored CompVis LDM; ~2.3k LOC vendored YOLOv5 (GPL); the `open_clip_torch` SD-only dep; the CUDA/torch hand-diff burden on the vendored ML; the unresolved GPL-license question; two selectable-but-unused pipeline options.
+
+**14. Risk Reduction.** Eliminates a GPL-compatibility liability and the largest vendored-ML maintenance surface. Production is byte-identical (removed code never on the Backend path; verified zero Backend refs + import smoke). The trim is pinned, so an upstream re-sync that reintroduces sd/ctd fails the test instead of silently dragging the baggage back.
+
+**15. Developer Experience Impact.** Smaller repo + clone + CI checkout; torch/CUDA upgrades no longer require diffing vendored LDM; no GPL question hanging over the detector; the inpainter/detector option lists are now exactly what's actually supported.
+
+**16. Future Opportunities.** Add Flux inpainting via `diffusers` + ultralytics-YOLO detection fresh (the roadmap path) if/when wanted — cleanly, not on top of the old vendored code. Optionally delete the now-dead, unrelated `inpainting_attn.py` (left out of #191 scope). Audit other vendored dirs for similar trims.
+
+**17. Lessons Learned.** Gate a big irreversible-feeling deletion on the actual roadmap, not assumption: checking MangaTranslator's `requirements.txt` (diffusers + ultralytics) turned "might we need SD/ctd later?" into a definite "the roadmap replaces them." Verify exclusivity before deleting shared-looking dirs (confirmed `ctd_utils` is ctd-only, `booru_tagger` is SD-only, `open_clip_torch` is SD-only) and keep deps that are used elsewhere (kornia/einops). The S22 DispatchRegistry seam made a 14k-LOC removal a few enum/registry edits.
+
+**18. KPI.** −14,405 LOC (largest batch cleanup) · 1 GPL dep removed · 0 regressions (357 pass) · production byte-identical (zero Backend refs + smoke) · roadmap-aligned (Flux/diffusers + ultralytics replace the removed) · trim pinned (4 tests).
+
+*Validation:* import smoke (registries build, no dangling imports) + `test_registry_trim` (4) + full suite (357 / 0 new fail) + roadmap check (MangaTranslator uses diffusers/Flux + ultralytics, not the vendored LDM/YOLOv5). *Risk/rollback:* byte-identical production; revert = restore the branch (large diff, but git-clean). *Links:* #191, roadmap `C:\Github\MangaDock\MangaTranslator`.

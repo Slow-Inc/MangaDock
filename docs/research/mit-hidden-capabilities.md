@@ -69,7 +69,7 @@ The discovered feature = **FreeType stroker** text border: radius `64 * max(int(
 
 | Knob | Default | Why it matters |
 |---|---|---|
-| `detector.detector` | default(DBNet-r34) | alternatives: `dbconvnext`, `ctd` (comic text detector!), `craft`, `paddle` — ctd is manga-specific and untested by us; relevant to #168 comparisons |
+| `detector.detector` | default(DBNet-r34) | alternatives: `dbconvnext`, `craft`, `paddle` — the vendored `ctd` (ComicTextDetector) + YOLOv5 were removed in #191 (GPL + unused; the roadmap uses ultralytics YOLO instead) |
 | `detector.box_threshold` / `unclip_ratio` | 0.7 / 2.3 | bbox formation tightness/expansion |
 | `detector.det_rotate` / `det_auto_rotate` | False | rotated/vertical text assist — could matter for the ゴゴゴ class (#168) before YOLO work |
 | `ocr.ocr` | 48px | alternatives `32px`, `48px_ctc`, `mocr` (manga-ocr, JP-only) |
