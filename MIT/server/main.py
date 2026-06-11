@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-from manga_translator import Config
+from manga_translator.config import parse_and_validate_config
 from server.instance import ExecutorInstance, executor_instances
 from server.myqueue import task_queue
 from server.request_extraction import get_ctx, get_patch_ctx, while_streaming, TranslateRequest
@@ -164,21 +164,21 @@ async def stream_image(req: Request, data: TranslateRequest) -> StreamingRespons
 @app.post("/translate/with-form/json", response_model=TranslationResponse, tags=["api", "form"],response_description="json strucure inspired by the ichigo translator extension")
 async def json_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
     img = await image.read()
-    conf = Config.parse_raw(config)
+    conf = parse_and_validate_config(config)
     ctx = await get_ctx(req, conf, img)
     return to_translation(ctx)
 
 @app.post("/translate/with-form/bytes", response_class=StreamingResponse, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
 async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
     img = await image.read()
-    conf = Config.parse_raw(config)
+    conf = parse_and_validate_config(config)
     ctx = await get_ctx(req, conf, img)
     return StreamingResponse(content=to_translation(ctx).to_bytes())
 
 @app.post("/translate/with-form/image", response_description="the result image", tags=["api", "form"],response_class=StreamingResponse)
 async def image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
     img = await image.read()
-    conf = Config.parse_raw(config)
+    conf = parse_and_validate_config(config)
     ctx = await get_ctx(req, conf, img)
     img_byte_arr = io.BytesIO()
     ctx.result.save(img_byte_arr, format="PNG")
@@ -197,7 +197,7 @@ async def patches_form(req: Request, image: UploadFile = File(...), config: str 
     import base64
 
     img_bytes = await image.read()
-    conf = Config.parse_raw(config)
+    conf = parse_and_validate_config(config)
     patch_result = await get_patch_ctx(req, conf, img_bytes)
 
     # One normalize seam with the batch path (#158) — carries the text layer.
@@ -231,7 +231,7 @@ async def patches_batch_stream(
     Webhook payload:
       {"taskId": taskId, "pageIndex": N, "imgWidth": W, "imgHeight": H, "patches": [...], "error": null}
     """
-    conf = Config.parse_raw(config)
+    conf = parse_and_validate_config(config)
     index_list: list[int]
     if page_indices.strip():
         index_list = [int(x) for x in page_indices.split(",") if x.strip()]
@@ -265,7 +265,7 @@ async def patches_batch_stream(
             img_bytes = await image_file.read()
             try:
                 # Re-parse config per page to avoid any state mutation
-                page_conf = Config.parse_raw(config)
+                page_conf = parse_and_validate_config(config)
                 patch_result = await get_patch_ctx(req, page_conf, img_bytes)
                 patches_out = []
                 for patch in patch_result.get("patches", []):
@@ -306,7 +306,7 @@ async def patches_batch_stream(
 @app.post("/translate/with-form/json/stream", response_class=StreamingResponse, tags=["api", "form"], response_description="A stream over elements with strucure(1byte status, 4 byte size, n byte data) status code are 0,1,2,3,4 0 is result data, 1 is progress report, 2 is error, 3 is waiting queue position, 4 is waiting for translator instance")
 async def stream_json_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
     img = await image.read()
-    conf = Config.parse_raw(config)
+    conf = parse_and_validate_config(config)
     # 标记这是Web前端调用，用于占位符优化
     conf._is_web_frontend = True
     return await while_streaming(req, transform_to_json, conf, img)
@@ -316,14 +316,14 @@ async def stream_json_form(req: Request, image: UploadFile = File(...), config: 
 @app.post("/translate/with-form/bytes/stream", response_class=StreamingResponse,tags=["api", "form"], response_description="A stream over elements with strucure(1byte status, 4 byte size, n byte data) status code are 0,1,2,3,4 0 is result data, 1 is progress report, 2 is error, 3 is waiting queue position, 4 is waiting for translator instance")
 async def stream_bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"))-> StreamingResponse:
     img = await image.read()
-    conf = Config.parse_raw(config)
+    conf = parse_and_validate_config(config)
     return await while_streaming(req, transform_to_bytes, conf, img)
 
 @app.post("/translate/with-form/image/stream", response_class=StreamingResponse, tags=["api", "form"], response_description="Standard streaming endpoint - returns complete image data. Suitable for API calls and scripts.")
 async def stream_image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
     """通用流式端点：返回完整图片数据，适用于API调用和comicread脚本"""
     img = await image.read()
-    conf = Config.parse_raw(config)
+    conf = parse_and_validate_config(config)
     # 标记为通用模式，不使用占位符优化
     conf._web_frontend_optimized = False
     return await while_streaming(req, transform_to_image, conf, img)
@@ -332,7 +332,7 @@ async def stream_image_form(req: Request, image: UploadFile = File(...), config:
 async def stream_image_form_web(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
     """Web前端专用端点：使用占位符优化，提供极速体验"""
     img = await image.read()
-    conf = Config.parse_raw(config)
+    conf = parse_and_validate_config(config)
     # 标记为Web前端优化模式，使用占位符优化
     conf._web_frontend_optimized = True
     return await while_streaming(req, transform_to_image, conf, img)
