@@ -12,7 +12,7 @@ Standing policy for the tech-debt batch (and similar agent-owned PRs), set by th
 **How to apply (per PR):**
 1. Open the PR (bilingual EN+TH full Thai, 18-section impact report, self-review note).
 2. Wait for CodeQL green + confirm 0 new test failures.
-3. **Run `/scrutinize` to review the diff.** Address anything it surfaces (fix + re-test, or justify).
+3. **Run `/scrutinize` to review the diff.** Address anything it surfaces (fix + re-test, or justify). **Post the `/scrutinize` findings on the PR bilingually (EN + full Thai)**, like the rest of the PR body — never English-only (dev rule 2026-06-11).
 4. If clean → squash-merge → sync main → delete branch → notify the dev.
 5. Never merge if `/scrutinize` finds a real blocker; surface it instead.
 
