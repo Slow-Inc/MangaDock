@@ -9,6 +9,7 @@ import subprocess
 import sys
 from argparse import Namespace
 import asyncio
+import atexit
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -28,6 +29,7 @@ from server.batch_runner import run_batch_with_callbacks
 from server.patch_payload import normalize_patch_result
 from server.readiness import count_alive
 from server.cancellation import mark_cancelled
+from server.worker_lifecycle import ensure_worker_port_free, terminate_process
 from server.path_utils import safe_result_folder
 
 app = FastAPI(
@@ -417,14 +419,26 @@ def _build_worker_cmd(params: Namespace, port: int, nonce: str) -> list:
 
 
 def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+    # Fail loudly if the worker port is taken (usually an orphaned worker) instead
+    # of letting the subprocess fail to bind and the front hang on /register (#193).
+    ensure_worker_port_free('127.0.0.1', port, params.port)
+
     cmds = _build_worker_cmd(params, port, nonce)
     base_path = os.path.dirname(os.path.abspath(__file__))
     parent = os.path.dirname(base_path)
     proc = subprocess.Popen(cmds, cwd=parent)
+    print(f"MIT worker started: pid={proc.pid} on 127.0.0.1:{port} "
+          f"(front pid={os.getpid()} on {host}:{params.port})")
     executor_instances.register(ExecutorInstance(ip='127.0.0.1', port=port))
 
-    def handle_exit_signals(signal, frame):
-        proc.terminate()
+    # Clean up the worker on every exit path. uvicorn installs its own SIGINT/
+    # SIGTERM handlers when it runs, overriding the ones below, so the signal path
+    # alone leaks the worker on Ctrl+C — atexit (plus the __main__ finally) is the
+    # reliable backstop. terminate_process is idempotent, so the overlap is safe.
+    atexit.register(terminate_process, proc)
+
+    def handle_exit_signals(signum, frame):
+        terminate_process(proc)
         sys.exit(0)
 
     signal.signal(signal.SIGINT, handle_exit_signals)
@@ -532,6 +546,5 @@ if __name__ == '__main__':
     print("Nonce: "+nonce)
     try:
         uvicorn.run(app, host=args.host, port=args.port)
-    except Exception:
-        if proc:
-            proc.terminate()
+    finally:
+        terminate_process(proc)

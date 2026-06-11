@@ -413,3 +413,67 @@ test_dispatch_registry.py (5) + test_det_forward_default.py (2)
 **18. KPI.** Byte-identical 100% (units + prior E2E byte-exact) · regressions 0 (342 pass) · dispatch boilerplate 6→1 · detection globals removed 3→0 · new coverage +7 cases · #188 model-lifecycle half complete (S3/S4/S20/S21/S22) · remaining: S12 (🔒#192) + BaseGPTTranslator.
 
 *Validation:* `test_dispatch_registry` + `test_det_forward_default` + full suite (342 pass / 0 new fail on rebased main) + prior full-stack production-tunnel E2E (byte-exact patches). *Risk/rollback:* byte-identical; revert = drop the branch. *Links:* #188, #187, resume `docs/reports/mit-refactor-progress.md`.
+
+## 2026-06-11 — #193 harden --start-instance worker lifecycle (port-collision + orphan cleanup)
+
+Operational reliability fix for the two-port `--start-instance` model. Unlike the byte-identical refactors above this is a **behaviour change** (it adds a startup guard that can fail loudly and hardens shutdown), so it's scoped tightly: the happy path is preserved, only the failure/shutdown paths change. Full 18-section template ([[feedback-impact-report]]).
+
+**1. What changed.** New `server/worker_lifecycle.py` (pure stdlib): `port_is_free(host, port)` (plain bind), `ensure_worker_port_free(worker_host, worker_port, front_port)` (raises a clear RuntimeError naming both ports + "free BOTH"), `terminate_process(proc, timeout)` (terminate → wait → kill escalation; idempotent on None/exited). `server/main.py`: `start_translator_client_proc` pre-checks the worker port, prints front+worker PIDs, and registers `atexit.register(terminate_process, proc)`; the signal handler and `__main__` (now `try/finally`) route through `terminate_process`. New `test/test_worker_lifecycle.py` (8) + a `MIT/README.md` "Worker lifecycle" section.
+
+**2. Results.** A stale/orphaned worker on `P+1` is now **reported loudly at startup** instead of hanging the front forever on a `/register` that never comes; a graceful stop (Ctrl+C / SIGTERM) reliably terminates the worker via the atexit backstop (uvicorn overrides our signal handlers, so atexit is what actually fires). 8 unit pass; full suite **350 / 18 pre-existing async / 0 new fail**. Live entrypoint test: front 5003 while the running worker held 5004 raised the RuntimeError immediately, **before any ML load**.
+
+**3. Expected performance gain %.** **No runtime perf change** on the happy path (same launch). The win is **operational**: it removes the repeated "kill front → orphan on 5004 → restart serves old code / hangs" cycle — minutes saved per dev/restart, and a class of "why is it serving stale code" confusion eliminated. Not measurable as CPU/latency.
+
+**4. Benefits.** Restarts are deterministic (port-busy is reported, not silently hung); the worker can't outlive a graceful front stop; front+worker PIDs are logged for manual cleanup; the lifecycle logic is unit-tested without spawning a real worker; README documents the two-port model so the next operator doesn't relearn it.
+
+**5. Purpose.** Kill the operational debt the issue calls out: the inline launch had no port-collision check, no PID tracking, and no orphan cleanup, and uvicorn silently overrode the only shutdown handler — so every MIT restart risked an orphan serving old code (hit repeatedly during render-parity dev, and again this session when a Store-python worker lingered).
+
+**6. Why we changed it + architectural impact.** The launch was inline in `start_translator_client_proc` with a single signal handler that uvicorn clobbers. Architecturally the lifecycle moves into a small, pure, tested `worker_lifecycle` module, and shutdown is now defence-in-depth (signal handler + atexit + `__main__` finally, all idempotent) rather than a single fragile handler. Startup gains a fail-fast precondition.
+
+**7. Problems before the refactor.** No worker-port collision check → the subprocess fails to bind and the front hangs forever on `/register`; uvicorn overrides the SIGINT/SIGTERM handlers → Ctrl+C leaks the worker; `__main__` only cleaned up `except Exception` (not on normal shutdown); no PID logging; the two-port restart procedure was undocumented (tribal knowledge in a memory file).
+
+**8. Goals.** Detect a busy worker port at startup and report it (not hang); reliably stop the worker on a graceful front stop; track/log the worker PID; document the two-port lifecycle + restart; keep the happy-path launch unchanged; make the logic unit-testable without spawning a worker.
+
+**9. Architecture Before.**
+```
+start_translator_client_proc(host, port, nonce, params):
+    Popen(worker on port)          # no port-free check -> silent bind failure / hang
+    register(...)
+    signal SIGINT/SIGTERM -> proc.terminate()   # OVERRIDDEN by uvicorn at run() -> leaks on Ctrl+C
+__main__: try: uvicorn.run() except Exception: proc.terminate()   # not on normal exit
+```
+**10. Architecture After.**
+```
+worker_lifecycle.py: port_is_free / ensure_worker_port_free (raise, name both ports) / terminate_process (term->kill, idempotent)
+start_translator_client_proc:
+    ensure_worker_port_free('127.0.0.1', port, params.port)   # fail loud, not hang
+    Popen(worker); print front+worker PIDs; register(...)
+    atexit.register(terminate_process, proc)                  # reliable backstop (survives uvicorn)
+    signal SIGINT/SIGTERM -> terminate_process(proc)
+__main__: try: uvicorn.run() finally: terminate_process(proc)
+README: "Worker lifecycle (two-port model)" — restart kills BOTH ports
+```
+**11. Refactor list.**
+| Piece | Where | Change |
+|-------|-------|--------|
+| port check | `worker_lifecycle.port_is_free` / `ensure_worker_port_free` | startup fail-fast on a busy worker port |
+| cleanup | `worker_lifecycle.terminate_process` | terminate→kill escalation, idempotent |
+| wiring | `server/main.py` | pre-check + PID log + atexit + signal + `__main__` finally |
+| tests | `test/test_worker_lifecycle.py` | 8 cases, no worker spawned |
+| docs | `MIT/README.md` | two-port lifecycle + restart steps |
+
+**12. Metrics.** +1 module (`worker_lifecycle.py`, ~60 LOC) + 8 tests; `server/main.py` ~+15/−5 (port-check, PID print, atexit, finally); README +1 section. Suite 350 pass (342 → +8) / 0 new fail. Live collision test: fail-fast before ML load.
+
+**13. Technical Debt Removed.** No-collision-check launch (hang-forever failure mode); uvicorn-clobbered single shutdown handler (worker leak on Ctrl+C); `except Exception`-only cleanup; undocumented two-port restart; untestable inline lifecycle.
+
+**14. Risk Reduction.** Eliminates the orphaned-worker-serves-old-code class of bug at the source (loud collision report + reliable graceful cleanup). Residual: **force-kill (SIGKILL / `Stop-Process -Force`) cannot be caught** — documented in the README (restart must free BOTH ports), the honest limit of any in-process cleanup.
+
+**15. Developer Experience Impact.** A restart that hits a stale worker now prints exactly what's wrong and how to fix it (free both ports) instead of hanging; front+worker PIDs are logged; the README section replaces tribal knowledge. The lifecycle is unit-testable, so future changes are guarded.
+
+**16. Future Opportunities.** A `--stop` / pidfile-based single-command supervisor (the issue's optional "single stop cleans both"); parent-death detection so a force-killed front still reaps the worker (Windows job objects / POSIX `prctl(PR_SET_PDEATHSIG)`); auto-reclaim a stale worker on startup instead of erroring. All deferred (current scope = report + graceful cleanup, the high-value 80%).
+
+**17. Lessons Learned.** uvicorn installs its own signal handlers at `run()`, so any handler registered before it is silently overridden — `atexit` (plus a `finally`) is the reliable cleanup hook, not `signal`. A fail-fast precondition with a message that names the fix ("free BOTH ports") beats a silent hang. Extracting the lifecycle into a pure stdlib module made it unit-testable without spawning a worker (fast, deterministic). ASCII-only operator messages avoid Windows-console mojibake.
+
+**18. KPI.** Hang-on-collision eliminated (fail-fast, message names both ports + the fix) · graceful-stop orphan eliminated (atexit backstop) · +8 unit cases (no worker spawned) · 0 regressions (350 pass) · two-port restart documented · residual force-kill limit documented. Behaviour change (not byte-identical): happy path preserved.
+
+*Validation:* `test_worker_lifecycle` (8) + full suite (350 pass / 0 new fail) + live entrypoint collision test (raised before ML load). *Risk/rollback:* behaviour change on failure/shutdown paths only; revert = drop the branch. *Links:* #193.
