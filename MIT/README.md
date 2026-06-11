@@ -69,6 +69,29 @@ run-server.bat
 python server/main.py --host 0.0.0.0 --port 5003 --use-gpu --start-instance
 ```
 
+### Worker lifecycle (โมเดลสองพอร์ต) — #193
+
+`--start-instance` รันสองโปรเซส: **front server** บน `--port` (เช่น 5003) และ **worker** บน `port+1` (5004) front รับ HTTP แล้ว dispatch งานให้ worker (worker bind `127.0.0.1` เท่านั้นด้วยเหตุผลความปลอดภัย #103)
+
+**Restart ต้องปิดทั้งสองพอร์ต** — kill แค่ front (5003) จะทิ้ง worker (5004) ค้าง (orphan) ที่ยังเสิร์ฟโค้ดเก่าต่อ:
+
+```powershell
+# Windows: ปิดทั้ง front + worker
+Get-NetTCPConnection -LocalPort 5003,5004 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+```
+
+front จะ cleanup worker ให้เองเมื่อปิดแบบ **graceful** (Ctrl+C / SIGTERM — ผ่าน `atexit` + signal handler + `__main__` finally) แต่ **force-kill (`-Force` / SIGKILL) จับไม่ได้** จึงต้องปิดทั้งสองพอร์ตเองในกรณีนั้น
+
+ถ้าพอร์ต worker (5004) ถูกใช้อยู่แล้วตอนสตาร์ท front จะ **fail ทันทีพร้อมข้อความชัดเจน** (เดิมจะค้างรอ `/register` ที่ไม่มีวันมา):
+
+```
+RuntimeError: MIT worker port 5004 is already in use - ... a restart must free BOTH ...
+```
+
+แปลว่ามี worker เก่า orphan ค้างอยู่ — ปิดมันก่อน (คำสั่งด้านบน) แล้วสตาร์ทใหม่ ตอน front สตาร์ทจะ print PID ของทั้ง front + worker ไว้ให้ตามเก็บได้
+
+> เช็คความพร้อมด้วย `http://127.0.0.1:5003/ready` (worker พร้อมจริง) ไม่ใช่ `/health` (แค่ front ขึ้น)
+
 ### Docker
 
 ```bash

@@ -243,14 +243,15 @@ Stateful / async-orchestration (self-bound deps passed as callbacks; characteriz
 | File | What we changed | Why |
 |------|----------------|-----|
 | `instance.py` | removed unused batch send methods; lock released before waiting in `find_executor`; `sent_patches` threads `progress_meta` to the worker | #106 contention; live progress UX |
-| `main.py` | `/ready` (probes worker `/health`); batch endpoint gained webhook fire-and-forget mode (202 + `run_batch_with_callbacks`); `/cancel/{taskId}`; `safe_result_folder` path guard; worker always binds 127.0.0.1; removed legacy batch endpoints | #100 #101 #102 #103 #106 + 2026-06-06 incident |
+| `main.py` | `/ready` (probes worker `/health`); batch endpoint gained webhook fire-and-forget mode (202 + `run_batch_with_callbacks`); `/cancel/{taskId}`; `safe_result_folder` path guard; worker always binds 127.0.0.1; removed legacy batch endpoints; **#193** `--start-instance` worker lifecycle — startup port-collision pre-check (fail loud, not hang) + `atexit` & `__main__` finally orphan cleanup (uvicorn overrides our signal handlers) + front/worker PID logging, delegating to `worker_lifecycle.py` | #100 #101 #102 #103 #106 + 2026-06-06 incident + #193 |
 | `myqueue.py` | single-image tasks only (no disk offload, no `BatchQueueElement`); `QueueElement.progress_meta` | batch moved to `batch_runner`; live progress UX |
 | `request_extraction.py` | `requests` → async `httpx`; dropped `BatchTranslateRequest`/`get_batch_ctx`; `get_patch_ctx` accepts `progress_meta` | async correctness; live progress UX |
 | `streaming.py` | 300s stream timeout + error frame on stall | #106 |
 
-### `server/` — new (5)
+### `server/` — new (6)
 `batch_runner.py` (#100 webhook batch loop) · `cancellation.py` (#101) · `path_utils.py` (#102) ·
-`readiness.py` (worker liveness, 2026-06-06 incident) · `webhook.py` (#100 signed delivery + retry + dead-letter; plus `send_progress`/`make_progress_hook` — fire-and-forget per-stage progress events the worker posts to the Backend so the Reader can show live pipeline stages; the worker attaches the hook per request in `mode/share.py`, and `batch_runner` passes `progress_meta` per page).
+`readiness.py` (worker liveness, 2026-06-06 incident) · `webhook.py` (#100 signed delivery + retry + dead-letter; plus `send_progress`/`make_progress_hook` — fire-and-forget per-stage progress events the worker posts to the Backend so the Reader can show live pipeline stages; the worker attaches the hook per request in `mode/share.py`, and `batch_runner` passes `progress_meta` per page). ·
+`worker_lifecycle.py` (#193 — `port_is_free` / `ensure_worker_port_free` / `terminate_process`; the two-port `--start-instance` lifecycle guards: startup worker-port collision check (fail loud, not hang) + graceful terminate→kill orphan cleanup. Pure stdlib, unit-tested without spawning a worker. **Revert hazard:** drop it and a killed front orphans the worker on `P+1` again, and a busy worker port hangs the front silently).
 
 ---
 
