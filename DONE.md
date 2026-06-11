@@ -1801,3 +1801,29 @@ both directions x border on/off x 2 sizes) + `test/test_render_golden.py` (deter
 output over h-expansion + v-expansion + legacy length-ratio regions, bubble_fit off). Goldens committed under
 `test/golden/` (test/testdata is gitignored). All 6 seams kept both goldens green; full suite 331 passed
 (18 pre-existing async, 0 real). E2E PENDING — batched tunnel pass after #190 per the dev's call.
+[Update: #189+#190 shipped as squash PR #215 (cf22c62); live direct-MIT E2E passed 74s, clean Thai render.]
+
+## 2026-06-11 — #186 LineBreaker seam (finish) + Knuth-Plass wired (unblocks #180)
+Continuation at xhigh after #189/#190 merged (PR #215). Prior sessions had already extracted
+`calc_horizontal`'s tokenizers (`_split_words_and_widths`, `_split_into_syllables`) and the greedy Step 1
+(`_greedy_pack`) under a committed 15-case characterization net (`test/test_calc_horizontal_characterization.py`,
+EN/TH/CJK/edge/Step-2/over-wide). This session finished the seam. Branch `refactor/mit-186-linebreaker-seam`
+off main, 3 commits:
+  C1 (byte-identical) — formalised the seam: `LineBreaker` Protocol + `GreedyLineBreaker` (delegates to
+     `_greedy_pack`) in `text_render.py`; `calc_horizontal` gained `line_breaker=None` (defaults to greedy) and
+     calls `breaker.pack(...)`; Step 2 (backward syllable hyphenation) now gated on `breaker.greedy_postprocess`
+     (True for greedy => unchanged). 3 production callers all pass <=6 args, so the new 7th param is inert.
+     Characterization net + line-break + thai-wrap + font-fit: 23 passed => production render byte-identical.
+  C2 (opt-in feature) — `KnuthPlassLineBreaker` bridges the pure `line_break.find_optimal_line_breaks` (#180
+     step 1) into the seam: groups whole words to minimise total badness (balanced lines, no lone short last
+     word); word-granularity so no mid-word hyphenation (`hyphenation_idx_list` all 0) and `greedy_postprocess=
+     False` so its layout is never re-greedified. `test/test_line_breaker.py` (4): both strategies in isolation
+     with a stubbed width fn (no PIL) — greedy overflow `[[0,1],[2]]` vs KP balance `[[0],[1,2]]` — plus a
+     real-font `calc_horizontal` test proving KP is selectable and tightens the spread (demo sentence
+     'the quick brown fox jumps over the lazy dog today': greedy leaves lone 'today' min97/spread117; KP pulls
+     'dog' down => min137/spread57).
+  C3 — PIPELINE.md §5 (text_render row + the `line_break.py` "wire pending" -> "wired behind #186 seam"),
+     DONE.md, impact report.
+Design: greedy stays the default so the live render is byte-identical; #180 step 2 now collapses to selecting
+`KnuthPlassLineBreaker` behind `render.bubble_area_fit` + E2E. Over-wide-word syllable splitting + empty-text
+degenerate handling stay the greedy path's job (documented on the KP class) — KP refinement is #180's scope.
