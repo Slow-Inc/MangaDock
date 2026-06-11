@@ -103,3 +103,24 @@ def test_all_fields_passthrough(monkeypatch):
     assert params.verbose is True and params.use_mtpe is True and params.font_path == '/f.ttf'
     assert params.models_ttl == 30 and params.ignore_errors is True
     assert params.input_files == ['a.png'] and params.save_text is True and params.load_text is True
+
+
+def test_parse_init_params_delegation_assigns_fields(monkeypatch):
+    """End-to-end delegation: MangaTranslator.parse_init_params reads
+    self.batch_concurrent, calls PipelineParams.from_params, and assigns every
+    field back to self. Exercised WITHOUT constructing the god object — a
+    SimpleNamespace stands in for self (the method touches only
+    self.batch_concurrent + the 13 written fields), so the __init__ side effects
+    (the builtins.print redirect) never run. Closes the seam between the value
+    object and the constructor."""
+    from types import SimpleNamespace
+    from manga_translator.manga_translator import MangaTranslator
+    _gpu(monkeypatch, cuda=True, mps=False)
+    obj = SimpleNamespace(batch_concurrent=True)
+    MangaTranslator.parse_init_params(
+        obj, {'kernel_size': 7, 'use_gpu': True, 'verbose': True, 'batch_size': 1})
+    assert obj.device == 'cuda'            # use_gpu -> device assigned from value object
+    assert obj.kernel_size == 7
+    assert obj.verbose is True
+    assert obj.batch_size == 1
+    assert obj.batch_concurrent is False   # auto-disabled (batch_size 1) flows through delegation
