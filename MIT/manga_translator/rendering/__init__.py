@@ -57,6 +57,14 @@ _LINE_HEIGHT = 1.2
 _FIT_MARGIN = 0.92
 _MAX_FONT_BOX_RATIO = 0.5
 
+# #175/#181/#183 length-ratio sizing: when the translation is longer than the
+# source, grow font + bounding box proportionally. _LEN_RATIO_FONT_GAIN is the
+# font/box growth per unit of length increase, _FONT_SIZE_SCALE_GAIN the box
+# growth per unit of font-size delta, _MAX_BBOX_SCALE the final scale clamp.
+_LEN_RATIO_FONT_GAIN = 0.3
+_FONT_SIZE_SCALE_GAIN = 0.4
+_MAX_BBOX_SCALE = 1.1
+
 
 def _bubble_fit_font_size(region, bubble_wh, max_box_ratio: float = _MAX_FONT_BOX_RATIO) -> int:
     """#166/#175: largest font whose wrapped translation fits the balloon box,
@@ -106,6 +114,34 @@ def _bubble_interior_box(region, bubble_box, crop_shape):
         if iw > 1 and ih > 1:
             return iw, ih, anchor
     return int(bx2 - bx1), int(by2 - by1), ((bx1 + bx2) / 2.0, (by1 + by2) / 2.0)
+
+
+def _expand_single_axis(region, needed_count: int, used_count: int, horizontal_axis: bool):
+    """If the wrapped translation needs more lines than the detection box has,
+    scale the region's unrotated min-rect along the text's wrap axis to make
+    room and return the rotated int64 dst_points; else None.
+
+    Shared by the horizontal (rows → x-axis) and vertical (cols → y-axis)
+    expansion, which previously carried byte-identical scale/rotate/except blocks
+    differing only in the line-count source and which axis is scaled. The caller
+    passes horizontal_axis explicitly (not inferred from region.horizontal) so
+    the original two-independent-`if` behaviour is preserved exactly.
+    """
+    if not (needed_count > used_count and used_count > 0):
+        return None
+    scale_x = ((needed_count - used_count) / used_count) * 1 + 1
+    xfact, yfact = (scale_x, 1.0) if horizontal_axis else (1.0, scale_x)
+    try:
+        poly = Polygon(region.unrotated_min_rect[0])
+        minx, miny, maxx, maxy = poly.bounds
+        poly = affinity.scale(poly, xfact=xfact, yfact=yfact, origin=(minx, miny))
+        pts = np.array(poly.exterior.coords[:4])
+        dst_points = rotate_polygons(
+            region.center, pts.reshape(1, -1), -region.angle, to_int=False
+        ).reshape(-1, 4, 2)
+        return dst_points.astype(np.int64)
+    except Exception:
+        return None
 
 
 def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO):
@@ -178,10 +214,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         single_axis_expanded = False
         dst_points = None
         
-        if region.horizontal: 
-            used_rows = len(region.texts)
-            # logger.debug(f"Horizontal text - used rows: {used_rows}")
-            
+        if region.horizontal:
             line_text_list, _ = text_render.calc_horizontal(
                 region.font_size,
                 region.translation,
@@ -189,63 +222,21 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 max_height=region.unrotated_size[1],
                 language=getattr(region, "target_lang", "en_US")
             )
-            needed_rows = len(line_text_list)
-            # logger.debug(f"Needed rows: {needed_rows}")
+            expanded = _expand_single_axis(region, len(line_text_list), len(region.texts), True)
+            if expanded is not None:
+                dst_points = expanded
+                single_axis_expanded = True
 
-            if needed_rows > used_rows and used_rows > 0:  # used_rows>0 guards /0 on empty texts
-                scale_x = ((needed_rows - used_rows) / used_rows) * 1 + 1
-                try:  
-                    poly = Polygon(region.unrotated_min_rect[0])
-                    minx, miny, maxx, maxy = poly.bounds
-                    poly = affinity.scale(poly, xfact=scale_x, yfact=1.0, origin=(minx, miny))        
-                
-                    pts = np.array(poly.exterior.coords[:4])  
-                    dst_points = rotate_polygons(  
-                        region.center, pts.reshape(1, -1), -region.angle,  
-                        to_int=False  
-                    ).reshape(-1, 4, 2)  
-                    # 移除边界限制，允许文本超出检测框边界
-                    # dst_points[..., 0] = dst_points[..., 0].clip(0, img.shape[1] - 1)  
-                    # dst_points[..., 1] = dst_points[..., 1].clip(0, img.shape[0] - 1)  
-                    dst_points = dst_points.astype(np.int64)
-                    single_axis_expanded = True
-                    # logger.debug(f"Successfully expanded horizontal text width: xfact={scale_x:.2f}")  
-                except Exception as e:  
-                    # logger.error(f"Failed to expand horizontal text: {e}")  
-                    pass
-                    
         if region.vertical:
-            used_cols = len(region.texts)
-            # logger.debug(f"Vertical text - used columns: {used_cols}")
-            
             line_text_list, _ = text_render.calc_vertical(
-                region.font_size, 
-                region.translation, 
+                region.font_size,
+                region.translation,
                 max_height=region.unrotated_size[1],
             )
-            needed_cols = len(line_text_list)
-            # logger.debug(f"Needed columns: {needed_cols}")
-            if needed_cols > used_cols and used_cols > 0:  # used_cols>0 guards /0 on empty texts
-                scale_x = ((needed_cols - used_cols) / used_cols) * 1 + 1
-                try:  
-                    poly = Polygon(region.unrotated_min_rect[0])
-                    minx, miny, maxx, maxy = poly.bounds
-                    poly = affinity.scale(poly, xfact=1.0, yfact=scale_x, origin=(minx, miny))                    
-                    
-                    pts = np.array(poly.exterior.coords[:4])  
-                    dst_points = rotate_polygons(  
-                        region.center, pts.reshape(1, -1), -region.angle,  
-                        to_int=False  
-                    ).reshape(-1, 4, 2)  
-                    # 移除边界限制，允许文本超出检测框边界
-                    # dst_points[..., 0] = dst_points[..., 0].clip(0, img.shape[1] - 1)  
-                    # dst_points[..., 1] = dst_points[..., 1].clip(0, img.shape[0] - 1)  
-                    dst_points = dst_points.astype(np.int64)
-                    single_axis_expanded = True
-                    # logger.debug(f"Successfully expanded vertical text width: xfact={scale_x:.2f}")  
-                except Exception as e:  
-                    # logger.error(f"Failed to expand vertical text: {e}")  
-                    pass
+            expanded = _expand_single_axis(region, len(line_text_list), len(region.texts), False)
+            if expanded is not None:
+                dst_points = expanded
+                single_axis_expanded = True
 
         # If single-axis expansion failed, use general scaling
         if not single_axis_expanded:
@@ -255,41 +246,20 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             char_count_trans = count_text_length(region.translation.strip())     
             length_ratio = 1.0
 
-            if char_count_orig > 0 and char_count_trans > char_count_orig:  
+            if char_count_orig > 0 and char_count_trans > char_count_orig:
                 increase_percentage = (char_count_trans - char_count_orig) / char_count_orig
-                font_increase_ratio = 1 + (increase_percentage * 0.3)
+                font_increase_ratio = 1 + (increase_percentage * _LEN_RATIO_FONT_GAIN)
                 font_increase_ratio = min(1.5, max(1.0, font_increase_ratio))
-                # logger.debug(f"Translation is {increase_percentage:.2%} longer, font increase ratio: {font_increase_ratio:.2f}")
                 target_font_size = int(target_font_size * font_increase_ratio)
-                # logger.debug(f"Adjusted target font size: {target_font_size}")
-                # Need greater bounding box scaling to accommodate larger font size and longer text
-                target_scale = max(1, min(1 + increase_percentage * 0.3, 2))  # Possibly max(1, min(1 + (font_increase_ratio-1), 2))
-                # logger.debug(f"Translation is longer than original and font increased, need larger bounding box scaling. Target scale factor: {target_scale:.2f}")
-            # Short text box expansion is quite aggressive, in many cases short text boxes don't need expansion
-            # elif char_count_orig > 0 and char_count_trans < char_count_orig:
-            #     # Translation is shorter, increase font proportionally
-            #     decrease_percentage = (char_count_orig - char_count_trans) / char_count_orig
-            #     # Font increase ratio equals text reduction ratio
-            #     font_increase_ratio = 1 + decrease_percentage
-            #     # Limit font increase ratio to reasonable range, e.g., between 1.0 and 1.5
-            #     font_increase_ratio = min(1.5, max(1.0, font_increase_ratio))
-            #     logger.debug(f"Translation is {decrease_percentage:.2%} shorter than original, font increase ratio: {font_increase_ratio:.2f}")
-            #     # Update target font size
-            #     target_font_size = int(target_font_size * font_increase_ratio)
-            #     logger.debug(f"Adjusted target font size: {target_font_size}")
-            #     target_scale = 1.0  # No additional bounding box scaling needed
-            #     logger.debug(f"Translation is shorter than original, no bounding box scaling applied, only font increase. Target scale factor: {target_scale:.2f}")            
-            else:  
-                target_scale = 1              
-                # logger.debug(f"No length ratio scaling applied. Target scale factor: {target_scale:.2f}")   
+                # Need greater bounding box scaling for the larger font + longer text
+                target_scale = max(1, min(1 + increase_percentage * _LEN_RATIO_FONT_GAIN, 2))
+            else:
+                target_scale = 1
 
             # Calculate final scaling factor
-            font_size_scale = (((target_font_size - original_region_font_size) / original_region_font_size) * 0.4 + 1) if original_region_font_size > 0 else 1.0  
-            # logger.debug(f"Font size ratio: ({target_font_size} / {original_region_font_size})")  
+            font_size_scale = (((target_font_size - original_region_font_size) / original_region_font_size) * _FONT_SIZE_SCALE_GAIN + 1) if original_region_font_size > 0 else 1.0
             final_scale = max(font_size_scale, target_scale)
-            final_scale = max(1, min(final_scale, 1.1))  
-            
-            # logger.debug(f"Final scaling factor: {final_scale:.2f}")  
+            final_scale = max(1, min(final_scale, _MAX_BBOX_SCALE))
 
             # Scale bounding box if needed
             if final_scale > 1.001:  
@@ -361,6 +331,31 @@ async def dispatch(
         img = render(img, region, dst_points, hyphenate, line_spacing, disable_font_border, supersampling)
     return img
 
+def _pad_box(temp_box, pad_height: bool, ext: int, offset: int):
+    """Place temp_box inside a zero-padded RGBA box to reach the target aspect
+    ratio. ext < 0 means no padding is possible → return temp_box.copy().
+    pad_height selects the padded axis: True pads rows (height) by 2*ext and
+    places temp_box at [offset:offset+h, :]; False pads columns (width) and
+    places it at [:, offset:offset+w].
+
+    Shared by render()'s four h/v ratio-padding branches, which differ only in
+    axis, the per-branch ext formula, and the offset — horizontal text centres
+    on the padded axis, vertical text top-/left-aligns (per #110). Those
+    divergent choices stay explicit at the call sites; only the
+    zero-box/place/copy boilerplate is folded here.
+    """
+    h, w = temp_box.shape[:2]
+    if ext < 0:
+        return temp_box.copy()
+    if pad_height:
+        box = np.zeros((h + ext * 2, w, 4), dtype=np.uint8)
+        box[offset:offset + h, 0:w] = temp_box
+    else:
+        box = np.zeros((h, w + ext * 2, 4), dtype=np.uint8)
+        box[0:h, offset:offset + w] = temp_box
+    return box
+
+
 def render(
     img,
     region: TextBlock,
@@ -431,81 +426,23 @@ def render(
     h, w, _ = temp_box.shape
     r_temp = w / h
 
-    # Extend temporary box so that it has same ratio as original
-    box = None  
-    #print("\n" + "="*50)  
-    #print(f"Processing text: \"{region.get_translation_for_rendering()}\"")  
-    #print(f"Text direction: {'Horizontal' if region.horizontal else 'Vertical'}")  
-    #print(f"Font size: {region.font_size}, Alignment: {region.alignment}")  
-    #print(f"Target language: {region.target_lang}")      
-    #print(f"Region horizontal: {region.horizontal}")  
-    #print(f"Starting image adjustment: r_temp={r_temp}, r_orig={r_orig}, h={h}, w={w}")  
-    if render_horizontally:  # use effective direction, not raw detected orientation (#110 R-1)
-        #print("Processing HORIZONTAL region")
-        
-        if r_temp > r_orig:   
-            #print(f"Case: r_temp({r_temp}) > r_orig({r_orig}) - Need vertical padding")  
-            h_ext = int((w / r_orig - h) // 2) if r_orig > 0 else 0  
-            #print(f"Calculated h_ext = {h_ext}")  
-            
-            if h_ext >= 0:  
-                #print(f"Creating new box with dimensions: {h + h_ext * 2}x{w}")  
-                box = np.zeros((h + h_ext * 2, w, 4), dtype=np.uint8)  
-                #print(f"Placing temp_box at position [h_ext:h_ext+h, :w] = [{h_ext}:{h_ext+h}, 0:{w}]")  
-                # Columns fully filled, rows centered
-                box[h_ext:h_ext+h, 0:w] = temp_box  
-            else:  
-                #print("h_ext < 0, using original temp_box")  
-                box = temp_box.copy()  
-        else:   
-            #print(f"Case: r_temp({r_temp}) <= r_orig({r_orig}) - Need horizontal padding")  
-            w_ext = int((h * r_orig - w) // 2)  
-            #print(f"Calculated w_ext = {w_ext}")  
-            
-            if w_ext >= 0:  
-                #print(f"Creating new box with dimensions: {h}x{w + w_ext * 2}")  
-                box = np.zeros((h, w + w_ext * 2, 4), dtype=np.uint8)  
-                #print(f"Placing temp_box at position [:, :w] = [0:{h}, 0:{w}]")  
-         
-                # The line is full, and there should be no empty columns on the left side of the text. Otherwise, when multiple text boxes are aligned on the left, the translated text cannot be aligned. Common scenarios: borderless comics, comic postscript.  
-                # When there are bubbles on the current page, it can be changed to center: box[0:h, w_ext:w_ext+w] = temp_box, requiring more accurate bubble detection. But not changing it doesn't have much impact.
-                box[0:h, 0:w] = temp_box  
-            else:  
-                #print("w_ext < 0, using original temp_box")  
-                box = temp_box.copy()  
-    else:  
-        #print("Processing VERTICAL region")  
-        
-        if r_temp > r_orig:   
-            #print(f"Case: r_temp({r_temp}) > r_orig({r_orig}) - Need vertical padding")  
-            h_ext = int(w / (2 * r_orig) - h / 2) if r_orig > 0 else 0   
-            #print(f"Calculated h_ext = {h_ext}")  
-            
-            if h_ext >= 0:   
-                #print(f"Creating new box with dimensions: {h + h_ext * 2}x{w}")  
-                box = np.zeros((h + h_ext * 2, w, 4), dtype=np.uint8)  
-                #print(f"Placing temp_box at position [0:h, 0:w] = [0:{h}, 0:{w}]")  
-                # The rows are full, and there should be no empty lines above the text; otherwise, when multiple text boxes have their top edges aligned, the text cannot be aligned. Common scenario: borderless comics, CG. 
-                # When there are bubbles on the current page, it can be changed to center: box[h_ext:h_ext+h, 0:w] = temp_box, requiring more accurate bubble detection.
-                box[0:h, 0:w] = temp_box  
-            else:   
-                #print("h_ext < 0, using original temp_box")  
-                box = temp_box.copy()   
-        else:   
-            #print(f"Case: r_temp({r_temp}) <= r_orig({r_orig}) - Need horizontal padding")  
-            w_ext = int((h * r_orig - w) / 2)  
-            #print(f"Calculated w_ext = {w_ext}")  
-            
-            if w_ext >= 0:  
-                #print(f"Creating new box with dimensions: {h}x{w + w_ext * 2}")  
-                box = np.zeros((h, w + w_ext * 2, 4), dtype=np.uint8)  
-                #print(f"Placing temp_box at position [0:h, w_ext:w_ext+w] = [0:{h}, {w_ext}:{w_ext+w}]") 
-                # Rows are fully filled, columns are centered
-                box[0:h, w_ext:w_ext+w] = temp_box  
-            else:   
-                #print("w_ext < 0, using original temp_box")  
-                box = temp_box.copy()   
-    #print(f"Final box dimensions: {box.shape if box is not None else 'None'}")  
+    # Extend temporary box to the original aspect ratio (#110 R-1: use the
+    # effective render direction, not the raw detected orientation). Each branch
+    # picks its own ext formula + placement offset (h centres, v top-/left-aligns).
+    if render_horizontally:
+        if r_temp > r_orig:
+            h_ext = int((w / r_orig - h) // 2) if r_orig > 0 else 0
+            box = _pad_box(temp_box, True, h_ext, h_ext)
+        else:
+            w_ext = int((h * r_orig - w) // 2)
+            box = _pad_box(temp_box, False, w_ext, 0)
+    else:
+        if r_temp > r_orig:
+            h_ext = int(w / (2 * r_orig) - h / 2) if r_orig > 0 else 0
+            box = _pad_box(temp_box, True, h_ext, 0)
+        else:
+            w_ext = int((h * r_orig - w) / 2)
+            box = _pad_box(temp_box, False, w_ext, w_ext)
 
     src_points = np.array([[0, 0], [box.shape[1], 0], [box.shape[1], box.shape[0]], [0, box.shape[0]]]).astype(np.float32)
     #src_pts[:, 0] = np.clip(np.round(src_pts[:, 0]), 0, enlarged_w * 2)

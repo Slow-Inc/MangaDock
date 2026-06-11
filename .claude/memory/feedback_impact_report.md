@@ -17,6 +17,26 @@ Maintain a **report-level** record the user can pull a whole-system report from 
 - **Risk / rollback** — opt-in? byte-identical when off? controlling knob/flag; how to revert.
 - **Links** — issue #, commit hash.
 
+**Feature / refactor / tech-debt PR — the canonical 18-section template (required, 2026-06-11).** When writing a PR write-up AND the `system-impact-report.md` entry for a feature/refactor, cover ALL of these (use the headings; write "N/A" / "byte-identical 0%" honestly, never fabricate):
+1. **What changed** (แก้ไขอะไรไปบ้าง)
+2. **Results / outcome** (ได้ผลลัพธ์ยังไง)
+3. **Expected performance gain %** (คาดว่า performance ดีขึ้นกี่% — for a byte-identical refactor state "0% runtime, maintainability-only"; never invent a number)
+4. **Benefits** (ข้อดี)
+5. **Purpose — what the refactor is for** (ทำเพื่ออะไร)
+6. **Why we changed it + architectural impact** (ทำไมเปลี่ยน + ผลกระทบเชิงสถาปัตยกรรม)
+7. **Problems before the refactor** (ก่อน refactor มีปัญหาอะไร)
+8. **Goals** (เป้าหมาย)
+9. **Architecture Before**
+10. **Architecture After**
+11. **Refactor list** (รายการ refactor — seam/commit table)
+12. **Metrics** (LOC Δ, dedup ratio, test counts, timings)
+13. **Technical Debt Removed**
+14. **Risk Reduction**
+15. **Developer Experience Impact**
+16. **Future Opportunities**
+17. **Lessons Learned**
+18. **KPI**
+
 Also keep a **tech-debt register** (issues filed: number/area/severity/status) and progress on in-flight refactors, plus key operational findings (gating, gotchas) and known gaps vs the target.
 
 **Why:** the user writes whole-system reports from this (2026-06-09: "เราต้องเขียน report ทั้งระบบ เช่น before vs after ตรงไหนแก้เพื่ออะไร ประสิทธิภาพเพิ่มขึ้นแค่ไหน คุณภาพเป็นยังไง"). A change logged without before→after / perf / quality / validation is incomplete for reporting.

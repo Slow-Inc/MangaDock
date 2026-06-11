@@ -299,9 +299,15 @@ class Glyph:
         self.metrics.horiAdvance = glyph.metrics.horiAdvance
         self.metrics.vertAdvance = glyph.metrics.vertAdvance
 
-@functools.lru_cache(maxsize = 1024, typed = True)
-def get_char_glyph(cdpt: str, font_size: int, direction: int) -> Glyph:
-    global FONT_SELECTION
+def _select_face_for_char(cdpt: str, font_size: int, direction: int) -> freetype.Face:
+    """Pick the first FONT_SELECTION face that has a glyph for ``cdpt`` (falling
+    back to the last face when none cover it), size it for the given direction
+    (0 = horizontal, 1 = vertical), and return it.
+
+    Shared fallback loop for get_char_glyph / get_char_border, which previously
+    carried byte-identical copies differing only in the subsequent load_char
+    flags and the value they extract.
+    """
     for i, face in enumerate(FONT_SELECTION):
         if face.get_char_index(cdpt) == 0 and i != len(FONT_SELECTION) - 1:
             continue
@@ -309,22 +315,20 @@ def get_char_glyph(cdpt: str, font_size: int, direction: int) -> Glyph:
             face.set_pixel_sizes(0, font_size)
         elif direction == 1:
             face.set_pixel_sizes(font_size, 0)
-        face.load_char(cdpt)
-        return Glyph(face.glyph)
+        return face
+
+
+@functools.lru_cache(maxsize = 1024, typed = True)
+def get_char_glyph(cdpt: str, font_size: int, direction: int) -> Glyph:
+    face = _select_face_for_char(cdpt, font_size, direction)
+    face.load_char(cdpt)
+    return Glyph(face.glyph)
 
 #@functools.lru_cache(maxsize = 1024, typed = True)
 def get_char_border(cdpt: str, font_size: int, direction: int):
-    global FONT_SELECTION
-    for i, face in enumerate(FONT_SELECTION):
-        if face.get_char_index(cdpt) == 0 and i != len(FONT_SELECTION) - 1:
-            continue
-        if direction == 0:
-            face.set_pixel_sizes(0, font_size)
-        elif direction == 1:
-            face.set_pixel_sizes(font_size, 0)
-        face.load_char(cdpt, freetype.FT_LOAD_DEFAULT | freetype.FT_LOAD_NO_BITMAP)
-        slot_border = face.glyph
-        return slot_border.get_glyph()
+    face = _select_face_for_char(cdpt, font_size, direction)
+    face.load_char(cdpt, freetype.FT_LOAD_DEFAULT | freetype.FT_LOAD_NO_BITMAP)
+    return face.glyph.get_glyph()
 
 # def get_char_kerning(cdpt, prev, font_size: int, direction: int):
 #     global FONT_SELECTION
@@ -382,6 +386,55 @@ def calc_vertical(font_size: int, text: str, max_height: int):
     # box_calc_x = sum(line_width_list) + (len(line_width_list) - 1) * spacing_x
     # box_calc_y = max(line_height_list)
     return line_text_list, line_height_list
+
+def _render_glyph_stroke(cdpt: str, font_size: int, direction: int) -> Optional[np.ndarray]:
+    """Render the stroked (border) glyph for ``cdpt`` as a uint8 bitmap, or
+    ``None`` if the stroke bitmap is empty/invalid.
+
+    Shared by put_char_horizontal/put_char_vertical: the freetype stroker setup
+    (radius = 64·max(int(0.07·font_size), 1), round join + round cap) and the
+    bitmap validity check were byte-identical copies in both; ``direction``
+    selects the horizontal (0) / vertical (1) face orientation.
+    """
+    glyph_border = get_char_border(cdpt, font_size, direction)
+    stroker = freetype.Stroker()
+    stroke_radius = 64 * max(int(0.07 * font_size), 1)  # 1/64 px units
+    stroker.set(stroke_radius, freetype.FT_STROKER_LINEJOIN_ROUND, freetype.FT_STROKER_LINECAP_ROUND, 0)
+    glyph_border.stroke(stroker, destroy=True)
+    blyph = glyph_border.to_bitmap(freetype.FT_RENDER_MODE_NORMAL, freetype.Vector(0, 0), True)
+    bitmap_b = blyph.bitmap
+    rows, width = bitmap_b.rows, bitmap_b.width
+    if rows * width > 0 and len(bitmap_b.buffer) == rows * width:
+        return np.array(bitmap_b.buffer, dtype=np.uint8).reshape((rows, width))
+    return None
+
+
+def _paste_bitmap(canvas: np.ndarray, bitmap: np.ndarray, place_x: int, place_y: int, blend) -> None:
+    """Blend a glyph/stroke bitmap onto ``canvas`` with its top-left at
+    (place_x, place_y), clipping to the canvas bounds and skipping the matching
+    source rows/cols when the placement runs off the top/left edge.
+
+    Shared by the four paste sites in put_char_horizontal/vertical: the char
+    paste passes ``blend=np.maximum`` (so combining marks accumulate instead of
+    overwriting the base glyph), the stroke paste passes ``blend=cv2.add``.
+    Replaces four near-identical clip+slice+blend copies; the vertical stroke
+    paste previously clamped the source origin to (0,0) instead of offsetting
+    the source slice, so a stroke clipped off the top/left edge was misaligned
+    (a latent bug, unreachable on padded render canvases) — this unification
+    gives all four sites the same correct clipping.
+    """
+    rows, width = bitmap.shape
+    y_start = max(0, place_y)
+    x_start = max(0, place_x)
+    y_end = min(canvas.shape[0], place_y + rows)
+    x_end = min(canvas.shape[1], place_x + width)
+    if y_start >= y_end or x_start >= x_end:
+        return
+    src = bitmap[y_start - place_y : y_end - place_y, x_start - place_x : x_end - place_x]
+    target = canvas[y_start:y_end, x_start:x_end]
+    if src.size > 0 and src.shape == target.shape:
+        canvas[y_start:y_end, x_start:x_end] = blend(target, src)
+
 
 def put_char_vertical(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_text: np.ndarray, canvas_border: np.ndarray, border_size: int):  
     """  
@@ -463,65 +516,13 @@ def put_char_vertical(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_
     char_place_x = pen[0] + (slot.metrics.vertBearingX >> 6)  
     char_place_y = pen[1] + (slot.metrics.vertBearingY >> 6)   
 
-    # 在 canvas_text 上放置原始字符  
-    # Place the original character on canvas_text  
-    # 确保索引不为负  
-    # Ensure indices are not negative  
-    paste_y_start = max(0, char_place_y)  
-    paste_x_start = max(0, char_place_x)  
-    paste_y_end = min(canvas_text.shape[0], char_place_y + char_bitmap_rows)  
-    paste_x_end = min(canvas_text.shape[1], char_place_x + char_bitmap_width)  
+    _paste_bitmap(canvas_text, bitmap_char, char_place_x, char_place_y, np.maximum)
 
-    # 检查切片是否有效（宽度和高度都大于0）  
-    # 字符完全在画布上方或下方时， paste_y_start 等于 paste_y_end ，切片 paste_y_start:paste_y_end 会产生高度为0的区域
-    # 简单处理，有概率漏字
-    # Check if the slice is valid (width and height both greater than 0)
-    # When a character is completely above or below the canvas, paste_y_start equals paste_y_end, and the slice paste_y_start:paste_y_end will produce a region with height 0.
-    # Simple handling, there's a probability of missing characters 
-    if paste_y_start >= paste_y_end or paste_x_start >= paste_x_end:  
-        logger.warning(f"Char '{cdpt}' is completely outside the canvas or on the boundary, skipped. Position: x={char_place_x}, y={char_place_y}, Canvas size: {canvas_text.shape}")      
-    else: 
-    # 确保切片源和目标尺寸匹配  
-    # Ensure slice source and target dimensions match  
-        bitmap_char_slice = bitmap_char[paste_y_start-char_place_y : paste_y_end-char_place_y,   
-                                        paste_x_start-char_place_x : paste_x_end-char_place_x]  
-        if bitmap_char_slice.size > 0:
-            # Use np.maximum to accumulate glyphs so combining characters (e.g.
-            # Thai sara-am ำ) do not erase the underlying consonant pixels.
-            canvas_text[paste_y_start:paste_y_end, paste_x_start:paste_x_end] = np.maximum(
-                canvas_text[paste_y_start:paste_y_end, paste_x_start:paste_x_end],
-                bitmap_char_slice,
-            )
-            
     # --- 处理描边 / Process border ---  
     if border_size > 0:  
-        # 获取字符描边  
-        # Get character border  
-        glyph_border = get_char_border(cdpt, font_size, 1)  
-        stroker = freetype.Stroker()  
-        
-        # 设置描边半径和样式  
-        # Set stroke radius and style  
-        stroke_radius = 64 * max(int(0.07 * font_size), 1)  # 基于字体大小的比例值 / Proportional value based on font size  
-        stroker.set(stroke_radius, freetype.FT_STROKER_LINEJOIN_ROUND, freetype.FT_STROKER_LINECAP_ROUND, 0)  
-        
-        # 应用描边效果  
-        # Apply stroke effect  
-        glyph_border.stroke(stroker, destroy=True)  
-        
-        # 渲染描边字形到位图  
-        # Render stroked glyph to bitmap  
-        blyph = glyph_border.to_bitmap(freetype.FT_RENDER_MODE_NORMAL, freetype.Vector(0, 0), True)  
-        bitmap_b = blyph.bitmap  # 这是描边后的 bitmap 对象 / This is the bitmap object after stroking  
-
-        # --- 获取描边位图信息 / Get border bitmap information ---  
-        border_bitmap_rows = bitmap_b.rows  
-        border_bitmap_width = bitmap_b.width  
-
-        if border_bitmap_rows * border_bitmap_width > 0 and len(bitmap_b.buffer) == border_bitmap_rows * border_bitmap_width:  
-            # 将描边位图缓冲区转换为NumPy数组  
-            # Convert border bitmap buffer to NumPy array  
-            bitmap_border = np.array(bitmap_b.buffer, dtype=np.uint8).reshape((border_bitmap_rows, border_bitmap_width))  
+        bitmap_border = _render_glyph_stroke(cdpt, font_size, 1)
+        if bitmap_border is not None:
+            border_bitmap_rows, border_bitmap_width = bitmap_border.shape
 
             # --- 计算描边位图放置位置，使其中心与原始字符位图中心对齐 ---  
             # --- Calculate border bitmap placement position to align its center with the original character bitmap center ---  
@@ -551,40 +552,7 @@ def put_char_vertical(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_
             pen_border_x = int(round(pen_border_x_float))  
             pen_border_y = int(round(pen_border_y_float))  
 
-            # 最终的 pen_border，确保不小于 0  
-            # Final pen_border, ensure not less than 0  
-            pen_border = (max(0, pen_border_x), max(0, pen_border_y))  
-
-            # --- 在 canvas_border 上放置描边位图 / Place border bitmap on canvas_border ---  
-            # 确保索引不为负，且在画布范围内  
-            # Ensure indices are not negative and within canvas range  
-            paste_border_y_start = pen_border[1]  
-            paste_border_x_start = pen_border[0]  
-            paste_border_y_end = min(canvas_border.shape[0], pen_border[1] + border_bitmap_rows)  
-            paste_border_x_end = min(canvas_border.shape[1], pen_border[0] + border_bitmap_width)  
-
-            # 检查切片是否有效（宽度和高度都大于0）
-            if paste_border_y_start >= paste_border_y_end or paste_border_x_start >= paste_border_x_end:  
-                logger.warning(f"The border of char '{cdpt}' is completely outside the canvas or on the boundary, skipped. Position: x={pen_border[0]}, y={pen_border[1]}, Canvas size: {canvas_border.shape}")  
-            else:        
-                # 确保切片源和目标尺寸匹配  
-                # Ensure slice source and target dimensions match  
-                bitmap_border_slice = bitmap_border[0 : paste_border_y_end-paste_border_y_start,   
-                                                    0 : paste_border_x_end-paste_border_x_start]  
-                if bitmap_border_slice.size > 0:
-                    # 使用 cv2.add 叠加描边  
-                    # Use cv2.add to overlay border  
-                    target_slice = canvas_border[paste_border_y_start:paste_border_y_end,   
-                                                 paste_border_x_start:paste_border_x_end]  
-                    # 确保形状匹配后再添加  
-                    # Ensure shapes match before adding  
-                    if target_slice.shape == bitmap_border_slice.shape:  
-                        canvas_border[paste_border_y_start:paste_border_y_end,   
-                                      paste_border_x_start:paste_border_x_end] = cv2.add(target_slice, bitmap_border_slice)  
-                    else:  
-                        # 处理形状不匹配的情况  
-                        # Handle shape mismatch if necessary  
-                        logger.warning(f"Shape mismatch: target={target_slice.shape}, source={bitmap_border_slice.shape}")  
+            _paste_bitmap(canvas_border, bitmap_border, pen_border_x, pen_border_y, cv2.add)
 
     # 返回垂直步进值  
     # Return vertical advance value  
@@ -1033,73 +1001,14 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
     char_place_y = pen[1] - slot.bitmap_top
 
     # --- Paste character to canvas_text ---
-    # Ensure paste area is within canvas and indices non-negative
-    # 确保粘贴范围在画布内且索引非负
-    paste_y_start = max(0, char_place_y)
-    paste_x_start = max(0, char_place_x)
-    paste_y_end = min(canvas_text.shape[0], char_place_y + bitmap.rows)
-    paste_x_end = min(canvas_text.shape[1], char_place_x + bitmap.width)
-
-    # Calculate source bitmap slicing area
-    # 计算源位图需要切片的区域
-    bitmap_slice_y_start = paste_y_start - char_place_y
-    bitmap_slice_x_start = paste_x_start - char_place_x
-    bitmap_slice_y_end = bitmap_slice_y_start + (paste_y_end - paste_y_start)
-    bitmap_slice_x_end = bitmap_slice_x_start + (paste_x_end - paste_x_start)
-
-    # Extract slice from source bitmap
-    # 从源位图中提取切片
-    bitmap_char_slice = bitmap_char[bitmap_slice_y_start:bitmap_slice_y_end, 
-                                   bitmap_slice_x_start:bitmap_slice_x_end]
-
-    # Paste if slice is valid and shapes match
-    # 检查切片是否有效且形状匹配，然后粘贴
-    if (bitmap_char_slice.size > 0 and 
-        bitmap_char_slice.shape == (paste_y_end - paste_y_start, 
-                                   paste_x_end - paste_x_start)):
-        # Use np.maximum to accumulate glyphs so combining characters (e.g.
-        # Thai sara-am ำ) do not erase the underlying consonant pixels.
-        canvas_text[paste_y_start:paste_y_end,
-                    paste_x_start:paste_x_end] = np.maximum(
-            canvas_text[paste_y_start:paste_y_end, paste_x_start:paste_x_end],
-            bitmap_char_slice,
-        )
+    _paste_bitmap(canvas_text, bitmap_char, char_place_x, char_place_y, np.maximum)
 
     # --- Handle stroke rendering (if border_size > 0) ---
     # 处理描边渲染 (如果 border_size > 0)
     if border_size > 0:
-        # Get glyph outline for stroke 获取用于描边的字形轮廓
-        glyph_border = get_char_border(cdpt, font_size, 0)  # Same horizontal orientation 同样水平方向
-        
-        # Configure stroker 配置描边器
-        stroker = freetype.Stroker()
-        stroke_radius = 64 * max(int(0.07 * font_size), 1)  # In 1/64 pixel units 单位: 1/64 像素
-        stroker.set(stroke_radius, 
-                   freetype.FT_STROKER_LINEJOIN_ROUND,  # Round joins 圆角连接
-                   freetype.FT_STROKER_LINECAP_ROUND,   # Round line caps 圆头线帽
-                   0)
-        
-        # Apply stroke 应用描边
-        glyph_border.stroke(stroker, destroy=True)
-        
-        # Render stroked glyph to bitmap 将描边后的字形渲染到位图
-        blyph = glyph_border.to_bitmap(freetype.FT_RENDER_MODE_NORMAL, 
-                                      freetype.Vector(0, 0), True)
-        bitmap_b = blyph.bitmap  # Stroked bitmap 描边后的位图
-
-        # --- Process stroke bitmap ---
-        border_bitmap_rows = bitmap_b.rows
-        border_bitmap_width = bitmap_b.width
-
-        # Only proceed if stroke bitmap is valid
-        # 仅在描边位图有效时继续
-        if (border_bitmap_rows * border_bitmap_width > 0 and 
-            len(bitmap_b.buffer) == border_bitmap_rows * border_bitmap_width):
-            
-            # Convert stroke bitmap to numpy array
-            # 将描边位图缓冲区转为 numpy 数组
-            bitmap_border = np.array(bitmap_b.buffer, dtype=np.uint8
-                                   ).reshape((border_bitmap_rows, border_bitmap_width))
+        bitmap_border = _render_glyph_stroke(cdpt, font_size, 0)
+        if bitmap_border is not None:
+            border_bitmap_rows, border_bitmap_width = bitmap_border.shape
 
             # --- Calculate stroke placement (center alignment logic) ---
             # 原始字符位图的尺寸
@@ -1134,51 +1043,7 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
             pen_border_y = int(round(pen_border_y_float))
 
             # --- Paste stroke to canvas_border ---
-            # Ensure paste area is within canvas
-            # 确保粘贴范围在画布内且索引非负
-            paste_border_y_start = max(0, pen_border_y)
-            paste_border_x_start = max(0, pen_border_x)
-            paste_border_y_end = min(canvas_border.shape[0], pen_border_y + border_bitmap_rows)
-            paste_border_x_end = min(canvas_border.shape[1], pen_border_x + border_bitmap_width)
-
-            # Calculate source stroke bitmap slicing area
-            # 计算源描边位图需要切片的区域
-            border_slice_y_start = paste_border_y_start - pen_border_y
-            border_slice_x_start = paste_border_x_start - pen_border_x
-            border_slice_y_end = border_slice_y_start + (paste_border_y_end - paste_border_y_start)
-            border_slice_x_end = border_slice_x_start + (paste_border_x_end - paste_border_x_start)
-
-            # Extract slice from stroke bitmap
-            # 从源描边位图中提取切片
-            bitmap_border_slice = bitmap_border[
-                border_slice_y_start:border_slice_y_end,
-                border_slice_x_start:border_slice_x_end
-            ]
-
-            # Check slice validity before pasting
-            # 检查切片是否有效且形状匹配
-            if (bitmap_border_slice.size > 0 and 
-                bitmap_border_slice.shape == (paste_border_y_end - paste_border_y_start,
-                                            paste_border_x_end - paste_border_x_start)):
-                
-                # Get target canvas area
-                # 获取目标画布上的对应区域
-                target_slice = canvas_border[
-                    paste_border_y_start:paste_border_y_end,
-                    paste_border_x_start:paste_border_x_end
-                ]
-                
-                # Ensure shape consistency
-                # 确保形状一致（切片逻辑正确的话应该是一致的）
-                if target_slice.shape == bitmap_border_slice.shape:
-                    # Blend stroke using cv2.add or np.maximum
-                    # 使用 cv2.add 可以平滑合并重叠的描边部分
-                    canvas_border[paste_border_y_start:paste_border_y_end,
-                                paste_border_x_start:paste_border_x_end] = cv2.add(
-                        target_slice, bitmap_border_slice)
-                else:
-                    print(f"[Error] Shape mismatch during border paste: "
-                         f"target={target_slice.shape}, source={bitmap_border_slice.shape}")
+            _paste_bitmap(canvas_border, bitmap_border, pen_border_x, pen_border_y, cv2.add)
 
     return char_offset_x  # Return horizontal advance 返回水平步进距离
 
