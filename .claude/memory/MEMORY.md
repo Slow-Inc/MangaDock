@@ -19,4 +19,6 @@
 - [Project: MIT refactor resume](project_mit_refactor_resume.md) — RESUME POINT เดียวของ decomposition #187/#188 = docs/reports/mit-refactor-progress.md (seam S1-S26 status + landmines); อ่านก่อนทำต่อ ไม่ต้องสำรวจใหม่
 - [Project: MIT launch env](project_mit_launch_env.md) — รัน MIT ต้องใช้ MIT/.venv (cu121 CUDA) ไม่ใช่ Store python (cpu) ไม่งั้น worker ค้าง /ready 503; poll /ready ไม่ใช่ /health; direct render E2E ผ่าน POST /translate/with-form/image เลี่ยง auth
 - [Feedback: decomposition method + ผลที่วัดได้](feedback_decomposition_method.md) — ทำไม decomposition ใช้ byte-identical/characterization-first/1-seam-1-commit + วัดได้: god object 3040→2235 (−26.5%), 21 module, test +77%, E2E เหมือน 4 รอบ; ทำต่อแบบนี้
+- [Feedback: issue ownership scope](feedback_issue_ownership_scope.md) — ทำเฉพาะ issues ที่เราเปิด (author xenodeve) หรือ tag ready-for-agent; ของ akkanop-x (#205/206/207/210/212/177, R2 #214) และ Mobile (CableMoMo2027) = log ของเขา อย่า implement
+- [Feedback: review+merge policy](feedback_review_merge_policy.md) — auto-merge PR เมื่อ CodeQL เขียว + 0 new fail แต่ **ต้อง review ด้วย skill /scrutinize ก่อน merge เสมอ**
 - [Reference: Frontend UI Libraries](reference_frontend_ui_libraries.md) — shadcn (UI primitives/Radix) vs React Bits (WebGL/GLSL effects); MCP setup และ pattern การใช้คู่กัน

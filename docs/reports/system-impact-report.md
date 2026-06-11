@@ -477,3 +477,63 @@ README: "Worker lifecycle (two-port model)" — restart kills BOTH ports
 **18. KPI.** Hang-on-collision eliminated (fail-fast, message names both ports + the fix) · graceful-stop orphan eliminated (atexit backstop) · +8 unit cases (no worker spawned) · 0 regressions (350 pass) · two-port restart documented · residual force-kill limit documented. Behaviour change (not byte-identical): happy path preserved.
 
 *Validation:* `test_worker_lifecycle` (8) + full suite (350 pass / 0 new fail) + live entrypoint collision test (raised before ML load). *Risk/rollback:* behaviour change on failure/shutdown paths only; revert = drop the branch. *Links:* #193.
+
+## 2026-06-11 — #192 config-parse seam (parse_and_validate_config) + scope decision
+
+The valuable, safe slice of the remaining #192 config-hygiene work: one shared config-parse seam + a Pydantic-v2 migration. The audit's most useful output was deciding what NOT to do (load_dotenv, bare-excepts) — surfaced first below. Full 18-section template ([[feedback-impact-report]]).
+
+**1. What changed.** Added `parse_and_validate_config(config: str) -> Config` to `config.py` (uses `Config.model_validate_json`); rewired the 11 scattered `Config.parse_raw` call sites (server/main.py ×10 + batch_runner.py ×1) + 2 tests to it; dropped the now-unused `Config` import from main.py; new `test/test_config_parse.py` (3). **Deliberately did NOT** change `load_dotenv` (deferred) or the bare-excepts (intentional).
+
+**2. Results.** One parse/validate entry point for every endpoint instead of 11 copies; `parse_raw` (deprecated, removed in Pydantic v3) → `model_validate_json` everywhere (the ~13 deprecation warnings on parse go away). Byte-identical for valid configs: `test_config_parse` pins `parse_and_validate_config(j) == Config.parse_raw(j)`. Full suite **353 / 18 pre-existing async / 0 new fail**.
+
+**3. Expected performance gain %.** **0% runtime.** Same parse, called through one function; the v2 method produces the identical Config. Value is maintainability (single validation point) + v3-readiness, not speed.
+
+**4. Benefits.** Validation/error policy for the config now has one home (future tightening lands once, not 11×); the deprecation is gone (v3-ready); the seam is unit-pinned including an equality check against the legacy path; the audit documented two non-changes so they aren't re-opened.
+
+**5. Purpose.** Satisfy the #192 "one config parse/validate path shared by all endpoints" criterion without churning the risky/low-ROI parts the issue also listed — pay down the real debt, leave the correct-as-is code alone (north star).
+
+**6. Why we changed it + architectural impact.** 11 identical `Config.parse_raw` calls is a copy-paste seam with no single place to add validation or migrate the API. The seam centralises it. Architecturally minor (one function + call-site rewire), but it's the carriage point a future config-validation policy or error-shaping would attach to.
+
+**7. Problems before the refactor.** 11 duplicated parse calls; the deprecated `parse_raw` API across all of them (v3 breakage waiting); no single validation seam; (per the issue) load_dotenv import side-effect + bare-excepts — **audited and found load_dotenv high-risk/low-ROI and the bare-excepts intentional**, so left as documented known-state.
+
+**8. Goals.** One shared parse seam; migrate off deprecated `parse_raw`; prove byte-identical for valid configs; don't touch correct-but-flagged code (bare-excepts) or take import-order risk for low ROI (load_dotenv); keep the suite green.
+
+**9. Architecture Before.**
+```
+server/main.py:    Config.parse_raw(config)   ×10   (deprecated API, no shared seam)
+server/batch_runner.py: Config.parse_raw(config_str)
+test_image_model_config.py: Config.parse_raw(...) ×2
+manga_translator/__init__.py:5  load_dotenv()        # import side-effect (flagged)
+manga_translator.py:  7× bare except Exception        # flagged — but all intentional
+```
+**10. Architecture After.**
+```
+config.py:  parse_and_validate_config(config) -> Config   # one seam, model_validate_json (v2)
+ └─ server/main.py ×10 · batch_runner.py · test_image_model_config.py  all call it
+test_config_parse.py: representative-config · ==legacy-parse_raw · invalid-raises
+load_dotenv: UNCHANGED (import-order risk > ROI; documented)
+bare-excepts: UNCHANGED (intentional broad catches; documented)
+```
+**11. Refactor list.**
+| Piece | Where | Change |
+|-------|-------|--------|
+| seam | `config.py` `parse_and_validate_config` | one parse+validate fn, `model_validate_json` |
+| rewire | server/main.py ×10, batch_runner.py ×1 | call the seam; drop unused `Config` import |
+| tests | test_config_parse.py (new) + test_image_model_config.py | seam == legacy parse_raw; invalid raises |
+| audit | DONE.md / this report | load_dotenv deferred; bare-excepts intentional (documented) |
+
+**12. Metrics.** +1 fn (~10 LOC) + 3 tests; 11 call sites + 2 tests rewired; 1 unused import removed; ~13 parse deprecation warnings eliminated. Suite 353 (350 → +3) / 0 new fail.
+
+**13. Technical Debt Removed.** 11 duplicated parse calls → 1 seam; deprecated `parse_raw` API (v3 breakage) eliminated; the "no single config-parse path" gap closed; the audit converted two vague "todo: refactor" flags into a documented decision.
+
+**14. Risk Reduction.** v3 won't break config parsing (off the deprecated API); a future config-validation change can't drift across 11 sites. The migration is pinned byte-identical (== legacy). Deliberately avoided the two risk sources the issue flagged (import-order via load_dotenv; semantic drift via narrowing intentional excepts).
+
+**15. Developer Experience Impact.** A config-validation tweak is one edit at the seam; the parse path is greppable (`parse_and_validate_config`) instead of 11 `parse_raw`; no more deprecation-warning noise in test output.
+
+**16. Future Opportunities.** `load_dotenv` → explicit `initialize()` (needs every entrypoint audited for import-time env reads — high-risk, only if a real test-determinism problem appears). Validate `target_lang` against `VALID_LANGUAGES` / convert to enum (the inline config.py todos). S12 `PipelineParams` value-object (#187). All deferred by design.
+
+**17. Lessons Learned.** The highest-value review output can be "don't do this": the bare-excepts read as debt in the issue but are load-bearing broad catches (log-never-crash / best-effort / ignore_errors) — narrowing them is negative-value, so the right move is to document them as intentional. Pin an API migration with an equality test against the old path (`new(j) == old(j)`) so "behaviour-preserving" is proven, not asserted.
+
+**18. KPI.** Single config-parse seam (11→1) · deprecated `parse_raw` removed (v3-ready) · byte-identical (==legacy test) · 0 regressions (353 pass) · 2 flagged items audited + documented as deliberate non-changes (load_dotenv risk, intentional excepts) · #192 criteria met except the documented load_dotenv deferral.
+
+*Validation:* `test_config_parse` (3, incl. ==legacy) + `test_image_model_config` (2, rewired) + full suite (353 / 0 new fail). *Risk/rollback:* behaviour-preserving for valid configs; revert = drop the branch. *Links:* #192 (advanced; load_dotenv deferred).

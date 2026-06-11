@@ -1863,3 +1863,25 @@ Validation: 8 unit pass; full suite 350 pass / 18 pre-existing async / 0 new fai
 real entrypoint** — starting front 5003 while the running MIT's worker held 5004 raised the RuntimeError
 immediately, before any ML load (no "MIT worker started"/"Nonce" printed). Aligns with the project_mit_launch_env
 restart recipe.
+
+## 2026-06-11 — #192 config-parse seam (parse_and_validate_config) + scope decision
+Audited the remaining #192 work; only one piece was both safe and valuable, the rest is intentional or risky:
+- **DONE:** extracted `parse_and_validate_config(config: str) -> Config` — the single parse+validate seam every
+  endpoint shares, replacing the 11 scattered `Config.parse_raw` calls (server/main.py ×10 + batch_runner.py ×1)
+  and migrating to Pydantic-v2 `model_validate_json` (`parse_raw` is deprecated, dropped in v3). Byte-identical
+  for valid configs — `test/test_config_parse.py` pins `parse_and_validate_config(j) == Config.parse_raw(j)` (3
+  cases: representative Backend config, identical-to-legacy, invalid-raises). Dropped the now-unused `Config`
+  import from main.py; 11 call sites + 2 existing tests rewired.
+- **DEFERRED (documented, NOT done):** `load_dotenv()` import side-effect (`manga_translator/__init__.py:5`) —
+  moving it out of import is genuine import-order risk (submodules may read env at import) for low ROI (the test
+  suite is already deterministic); the resume doc had already deferred it. Kept as-is.
+- **NOT debt (investigated):** the 7 remaining bare `except Exception:` in manga_translator.py are all
+  intentional broad catches — logging-never-crashes (×3), best-effort lang-detect fallback (×2), the
+  `ignore_errors` policy (translate patch mode), best-effort bubble-seg tagging. Narrowing them changes
+  semantics for negative value → documented, not changed. The env-lazy-read criterion is already met
+  (`TranslatorConfig.translator` uses `default_factory`, read per-instance not at import — config.py:248).
+- **S12** `PipelineParams` value-object stays separate (a god-object extraction, #187 territory; the risky #192
+  bits that entangle it weren't done).
+Branch `refactor/mit-192-config-parse-seam` off main. Validation: 5 config tests pass; full suite **353 / 18
+pre-existing async / 0 new fail**. #192 advanced (single-parse-path + TODO/dead-field criteria met via this +
+#192a/#192b); `load_dotenv` is the one documented remaining item.
