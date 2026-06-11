@@ -2,7 +2,6 @@ import numpy as np
 
 from .default import DefaultDetector
 from .dbnet_convnext import DBConvNextDetector
-from .ctd import ComicTextDetector
 from .craft import CRAFTDetector
 from .paddle_rust import PaddleDetector
 from .none import NoneDetector
@@ -13,7 +12,6 @@ from ..dispatch_registry import DispatchRegistry
 DETECTORS = {
     Detector.default: DefaultDetector,
     Detector.dbconvnext: DBConvNextDetector,
-    Detector.ctd: ComicTextDetector,
     Detector.craft: CRAFTDetector,
     Detector.paddle: PaddleDetector,
     Detector.none: NoneDetector,
