@@ -8,6 +8,7 @@ from .paddle_rust import PaddleDetector
 from .none import NoneDetector
 from .common import CommonDetector, OfflineDetector
 from ..config import Detector
+from ..dispatch_registry import DispatchRegistry
 
 DETECTORS = {
     Detector.default: DefaultDetector,
@@ -17,15 +18,10 @@ DETECTORS = {
     Detector.paddle: PaddleDetector,
     Detector.none: NoneDetector,
 }
-detector_cache = {}
+_registry = DispatchRegistry(DETECTORS, 'detector')
 
 def get_detector(key: Detector, *args, **kwargs) -> CommonDetector:
-    if key not in DETECTORS:
-        raise ValueError(f'Could not find detector for: "{key}". Choose from the following: %s' % ','.join(DETECTORS))
-    if not detector_cache.get(key):
-        detector = DETECTORS[key]
-        detector_cache[key] = detector(*args, **kwargs)
-    return detector_cache[key]
+    return _registry.get(key, *args, **kwargs)
 
 async def prepare(detector_key: Detector):
     detector = get_detector(detector_key)
@@ -39,5 +35,4 @@ async def dispatch(detector_key: Detector, image: np.ndarray, detect_size: int, 
         await detector.load(device)
     return await detector.detect(image, detect_size, text_threshold, box_threshold, unclip_ratio, invert, gamma_correct, rotate, auto_rotate, verbose)
 
-async def unload(detector_key: Detector):
-    detector_cache.pop(detector_key, None)
+unload = _registry.unload

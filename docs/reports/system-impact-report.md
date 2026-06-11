@@ -350,3 +350,66 @@ test/test_line_breaker.py — both strategies in isolation (no PIL) + real-font 
 **18. KPI.** Default byte-identical 100% (23/23 default-path tests) · regressions 0 · new isolated coverage +4 tests (both strategies, no PIL) · #180 step 2 unblocked · KP line-width spread −51% on the demo (117→57) · deferred items: #180 step-2 selection + KP over-wide/empty parity (flagged).
 
 *Validation:* characterization net (greedy byte-identical) + `test_line_breaker.py` (both strategies isolated + real-font selectable). Live E2E deferred to the verify step / #180 step 2 (default path is byte-identical so the live render is unchanged). *Risk/rollback:* default byte-identical, KP opt-in/off; revert = drop the branch. *Links:* #186, #180, #178.
+
+## 2026-06-11 — #188 S22 DispatchRegistry + kill global MODEL in detection (last #188 model-lifecycle seam)
+
+Landed the final model-lifecycle seam of the #187/#188 god-object decomposition: collapse the duplicated dispatch get/cache/unload trio into one `DispatchRegistry`, and thread the detector net explicitly to delete the module-global `MODEL`. Code was complete on `refactor/mit-188-dispatch-registry-global-model`; this rebased it onto current main (clean — disjoint from the #215/#216 render work) and verified. Full 18-section template ([[feedback-impact-report]]).
+
+**1. What changed.** (a) `dispatch_registry.py` — a 33-line `DispatchRegistry(registry, kind)` with `get`/`unload`, folding the byte-identical `get_X` (lazy cache) + `unload` (pop) + cache-dict trio that the **6** dispatch `__init__` modules (detector/ocr/inpainter/upscaler/colorizer/translators) each copy-pasted. Each module now wires `get_X = registry.get` / `unload = registry.unload` and keeps its own divergent `prepare`/`dispatch`. (b) Detection: `det_batch_forward_default(batch, device, model)` takes the net explicitly; `_load` drops the module-global `MODEL`, `_infer` threads `self.model`; `craft.py`'s global was dead code (deleted). New `test_dispatch_registry.py` (5) + `test_det_forward_default.py` (2, default + dbnet).
+
+**2. Results.** Dispatch boilerplate folded 6→1; no `MODEL` global left in detection (concurrent detector loads can't clobber). Byte-identical: the `if not cache.get` re-create quirk and the `','.join` ValueError message are preserved verbatim. Rebased onto main: **342 passed / 18 pre-existing async / 0 new failures** (335 main + 7 S22). Prior full-stack E2E (production tunnel, Kouchuugun ch1 p0 EN→TH) returned **2 patches 649×1492 + 451×1489 = pixel-exact to baseline**.
+
+**3. Expected performance gain %.** **0% runtime — byte-identical.** The registry does the same lazy-instantiate/cache/pop the inline code did; goldens/units prove identical behaviour. The global-`MODEL` removal is a **correctness/concurrency** change (removes a latent two-detector clobber), not a perf change — no latency/VRAM delta.
+
+**4. Benefits.** One source of truth for dispatch caching (a cache/unload fix lands once, not 6×); detection is concurrency-safe (no shared mutable global on the forward hot path); the registry + threaded-model are unit-pinned; finishes the model-lifecycle half of #188 so the only remaining #187/#188 work is S12 (🔒 #192) + the translator base-abstraction half.
+
+**5. Purpose.** Close out the model load/lifecycle decomposition (#188): kill per-impl boilerplate and the global model state the issue calls out, so model dispatch is one tested seam rather than 6 hand-synced copies + a concurrency landmine.
+
+**6. Why we changed it + architectural impact.** Six copies of the get/cache/unload trio drift independently, and a module-global `MODEL` on the detection forward path is unsafe the moment two detectors load. Architecturally, model dispatch moves from "copy-pasted trio per module + global net" to "one `DispatchRegistry` owning lifecycle, model passed explicitly" — the per-module `prepare`/`dispatch` stay (load-bearing divergence: different methods/args/early-returns), relocated-not-unified.
+
+**7. Problems before the refactor.** 6× duplicated `get_X`/`unload`/cache dict; a module-global `MODEL` in `detection/default.py` + `dbnet_convnext.py` (read in the batch-forward) = concurrency hazard; a dead global in `craft.py`; no isolated test on dispatch caching or the detector forward transform.
+
+**8. Goals.** Fold the dispatch trio byte-identical; remove the detection global without changing the forward's numerics; unit-pin both; keep each module's divergent prepare/dispatch; land on current main with 0 new failures.
+
+**9. Architecture Before.**
+```
+detection/__init__.py   ── get_detector / unload / DETECTORS cache  ┐
+ocr/__init__.py         ── get_ocr / unload / OCRS cache            │  6x copy-pasted
+inpainting/__init__.py  ── get_inpainter / unload / cache           ├─ get/cache/unload trio
+upscaling, colorization ── ...                                      │
+translators/__init__.py ── get_translator / unload / cache          ┘
+detection/default.py + dbnet_convnext.py ── global MODEL set in _load, read in det_batch_forward_default (hazard)
+detection/craft.py      ── dead global MODEL
+```
+**10. Architecture After.**
+```
+dispatch_registry.py: DispatchRegistry(registry, kind).get(key,*a,**kw) / async unload(key)
+ ├─ detection/ocr/inpainting/upscaling/colorization/translators: get_X = reg.get ; unload = reg.unload
+ └─ each keeps its own prepare/dispatch (divergent — untouched)
+det_batch_forward_default(batch, device, model)  ── model threaded explicitly; NO global MODEL anywhere in detection
+test_dispatch_registry.py (5) + test_det_forward_default.py (2)
+```
+**11. Refactor list.**
+| Seam | Commit (pre-rebase) | Change |
+|------|---------------------|--------|
+| S22a | `bd788b5` | `DispatchRegistry` + wire detector/ocr/inpainter/upscaler/colorizer |
+| S22b | `cc8785d` | fold `translators/__init__.py` onto the registry |
+| #188 global | `f5d60bc` | thread model in `detection/default.py` (kill global) |
+| #188 global | `859506d` | finish in `dbnet_convnext` + delete `craft` dead global |
+| docs | `dc04369` | DONE.md Lane A + full-stack E2E record |
+
+**12. Metrics.** 13 files, +201 / −72; dispatch trio 6→1 (`dispatch_registry.py` 33 LOC); global `MODEL` removed from 3 detection files; +2 test files / 7 cases. Suite 342 pass (was 335 on main) / 0 new fail. Prior E2E byte-exact (2 patches).
+
+**13. Technical Debt Removed.** 6 copies of the dispatch get/cache/unload trio; the detection global-`MODEL` concurrency hazard (2 files) + 1 dead global; the test blind spot on dispatch caching + detector forward numerics.
+
+**14. Risk Reduction.** Concurrency hazard on the detection hot path eliminated (no shared mutable global); dispatch behaviour pinned by 5 cases (lazy-once, arg-forwarding, exact ValueError, unload-reinstantiate, unknown-key no-op) and the forward transform by 2 (NHWC→NCHW + sigmoid, real torch). Byte-identical ⇒ no translation-quality regression (E2E byte-exact).
+
+**15. Developer Experience Impact.** A dispatch cache/unload change is now one edit in `DispatchRegistry`, not 6 hand-synced copies; the detector forward is testable with a fake net (no model download); the resume tracker now shows the #188 model-lifecycle half complete.
+
+**16. Future Opportunities.** Remaining #187/#188: **S12** `PipelineParams` value-object (🔒 #192) and the **translator base-abstraction half** of #188 (`BaseGPTTranslator`, xhigh). `prepare`/`dispatch` could later share more if their divergence is ever paid down (currently load-bearing, left explicit).
+
+**17. Lessons Learned.** Fold the mechanism, keep policy per-module: the get/cache/unload trio is identical (→ registry) but `prepare`/`dispatch` genuinely diverge (→ stay inline). Killing a global is safest when the replacement is threaded explicitly and pinned by a transform test. A code-complete branch that fell behind main lands cleanly when the two streams are disjoint (render vs dispatch) — rebase + full-suite is enough proof.
+
+**18. KPI.** Byte-identical 100% (units + prior E2E byte-exact) · regressions 0 (342 pass) · dispatch boilerplate 6→1 · detection globals removed 3→0 · new coverage +7 cases · #188 model-lifecycle half complete (S3/S4/S20/S21/S22) · remaining: S12 (🔒#192) + BaseGPTTranslator.
+
+*Validation:* `test_dispatch_registry` + `test_det_forward_default` + full suite (342 pass / 0 new fail on rebased main) + prior full-stack production-tunnel E2E (byte-exact patches). *Risk/rollback:* byte-identical; revert = drop the branch. *Links:* #188, #187, resume `docs/reports/mit-refactor-progress.md`.

@@ -6,21 +6,17 @@ from .waifu2x import Waifu2xUpscaler
 from .esrgan import ESRGANUpscaler
 from .esrgan_pytorch import ESRGANUpscalerPytorch
 from ..config import Upscaler
+from ..dispatch_registry import DispatchRegistry
 
 UPSCALERS = {
     Upscaler.waifu2x: Waifu2xUpscaler,
     Upscaler.esrgan: ESRGANUpscaler,
     Upscaler.upscler4xultrasharp: ESRGANUpscalerPytorch,
 }
-upscaler_cache = {}
+_registry = DispatchRegistry(UPSCALERS, 'upscaler')
 
 def get_upscaler(key: Upscaler, *args, **kwargs) -> CommonUpscaler:
-    if key not in UPSCALERS:
-        raise ValueError(f'Could not find upscaler for: "{key}". Choose from the following: %s' % ','.join(UPSCALERS))
-    if not upscaler_cache.get(key):
-        upscaler = UPSCALERS[key]
-        upscaler_cache[key] = upscaler(*args, **kwargs)
-    return upscaler_cache[key]
+    return _registry.get(key, *args, **kwargs)
 
 async def prepare(upscaler_key: Upscaler):
     upscaler = get_upscaler(upscaler_key)
@@ -35,5 +31,4 @@ async def dispatch(upscaler_key: Upscaler, image_batch: List[Image.Image], upsca
         await upscaler.load(device)
     return await upscaler.upscale(image_batch, upscale_ratio)
 
-async def unload(upscaler_key: Upscaler):
-    upscaler_cache.pop(upscaler_key, None)
+unload = _registry.unload

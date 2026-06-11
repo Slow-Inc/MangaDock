@@ -495,15 +495,13 @@ from .default_utils import imgproc, dbnet_utils, craft_utils
 from .common import OfflineDetector
 from ..utils import TextBlock, Quadrilateral, det_rearrange_forward
 
-MODEL = None
-def det_batch_forward_default(batch: np.ndarray, device: str):
-    global MODEL
+def det_batch_forward_default(batch: np.ndarray, device: str, model):
     if isinstance(batch, list):
         batch = np.array(batch)
     batch = einops.rearrange(batch.astype(np.float32) / 127.5 - 1.0, 'n h w c -> n c h w')
     batch = torch.from_numpy(batch).to(device)
     with torch.no_grad():
-        db, mask = MODEL(batch)
+        db, mask = model(batch)
         db = db.sigmoid().cpu().numpy()
         mask = mask.cpu().numpy()
     return db, mask
@@ -532,8 +530,6 @@ class DBConvNextDetector(OfflineDetector):
         self.device = device
         if device == 'cuda' or device == 'mps':
             self.model = self.model.to(self.device)
-        global MODEL
-        MODEL = self.model
 
     async def _unload(self):
         del self.model
@@ -542,14 +538,14 @@ class DBConvNextDetector(OfflineDetector):
                      unclip_ratio: float, verbose: bool = False):
 
         # TODO: Move det_rearrange_forward to common.py and refactor
-        db, mask = det_rearrange_forward(image, det_batch_forward_default, detect_size, 4, device=self.device, verbose=verbose)
+        db, mask = det_rearrange_forward(image, lambda b, d: det_batch_forward_default(b, d, self.model), detect_size, 4, device=self.device, verbose=verbose)
 
         if db is None:
             # rearrangement is not required, fallback to default forward
             img_resized, target_ratio, _, pad_w, pad_h = imgproc.resize_aspect_ratio(cv2.bilateralFilter(image, 17, 80, 80), detect_size, cv2.INTER_LINEAR, mag_ratio = 1)
             img_resized_h, img_resized_w = img_resized.shape[:2]
             ratio_h = ratio_w = 1 / target_ratio
-            db, mask = det_batch_forward_default([img_resized], self.device)
+            db, mask = det_batch_forward_default([img_resized], self.device, self.model)
         else:
             img_resized_h, img_resized_w = image.shape[:2]
             ratio_w = ratio_h = 1
