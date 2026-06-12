@@ -141,6 +141,7 @@ export class BooksController {
     return this.booksService.translateDescription(text ?? '');
   }
 
+  @UseGuards(TurnstileGuard)
   @Post('translate/manga')
   translateMangaEpisode(
     @Body()
@@ -170,6 +171,7 @@ export class BooksController {
 
   
 
+  @UseGuards(TurnstileGuard)
   @Post('chapters/:chapterId/pages/:pageIndex/translate-patches')
   async translateMangaPagePatches(
     @Param('chapterId') chapterId: string,
@@ -209,6 +211,7 @@ export class BooksController {
    * background and caches each page result. A reconnecting client attaches to the
    * running job and receives already-completed pages immediately.
    */
+  @UseGuards(TurnstileGuard)
   @Post('chapters/:chapterId/batch-translate-patches')
   async batchTranslateMangaPatches(
     @Param('chapterId') chapterId: string,

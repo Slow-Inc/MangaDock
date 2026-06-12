@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useToast } from "../contexts/ToastContext";
 import { getHardwareId } from "../lib/fingerprint";
+import { isApiRequest, withZeroTrustHeaders } from "../lib/zeroTrustHeaders";
 
 /**
  * Monitors global fetch calls or specific backend error states to show a persistent
@@ -16,20 +17,14 @@ export default function SupabaseGuard() {
     // Intercept global fetch
     const originalFetch = window.fetch;
     window.fetch = async (...args) => {
-      // T4-STANDARD Pillar 5: Zero-Trust Asset Protection (Stub)
-      // Automatically add Hardware ID to headers if it's an API request
+      // T4-STANDARD Pillar 5: Zero-Trust Asset Protection
+      // Attach the device Hardware ID and (when present) the HWID-bound captcha
+      // clearance token (#227) so every captcha-guarded endpoint reuses the same
+      // token the reader already obtained from /books/verify-captcha.
       const url = args[0]?.toString() || '';
-      const isApiRequest = url.startsWith('/') || url.includes('localhost') || url.includes('supabase.co');
-      
-      if (isApiRequest) {
-        const hwId = getHardwareId();
-        let options = (args[1] as RequestInit) || {};
-        const headers = new Headers(options.headers || {});
-        if (!headers.has('x-hardware-id')) {
-          headers.set('x-hardware-id', hwId);
-        }
-        options.headers = headers;
-        args[1] = options;
+      if (isApiRequest(url)) {
+        const clearance = localStorage.getItem('cf_clearance_token');
+        args[1] = withZeroTrustHeaders(args[1] as RequestInit, getHardwareId(), clearance);
       }
 
       try {
