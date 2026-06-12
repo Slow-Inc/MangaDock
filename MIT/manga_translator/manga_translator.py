@@ -755,7 +755,32 @@ class MangaTranslator:
             if len(region.text) < config.ocr.min_text_length \
                     or not is_valuable_text(region.text) \
                     or (not config.translator.no_text_lang_skip and langcodes.tag_distance(region.source_lang, config.translator.target_lang) == 0):
-                if region.text.strip():
+                # #168/#172: before dropping a large region the 48px OCR couldn't read
+                # (stylized SFX like ぬ), try a vision-LLM rescue — localize the crop to
+                # an English onomatopoeia via the custom_openai/9arm vision gateway.
+                rescued = ''
+                if config.ocr.vlm_rescue:
+                    x1, y1, x2, y2 = (int(v) for v in region.xyxy)
+                    if (x2 - x1) * (y2 - y1) >= 3600 and min(x2 - x1, y2 - y1) >= 24:
+                        from .ocr_vlm import vlm_localize_sfx
+                        from .translators.keys import (CUSTOM_OPENAI_API_BASE,
+                                                       CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
+                        crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
+                        if crop.size:
+                            rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
+                                                       api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL)
+                if rescued:
+                    logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
+                    # The rescue already produced the FINAL target-language (English)
+                    # SFX. Setting region.text to it makes source_lang auto-derive as
+                    # the target, so the translate stage skips it; pre-setting
+                    # region.translation means the skip leaves a non-blank translation
+                    # (otherwise filter_translated_regions would drop it) and it renders.
+                    region.text = rescued
+                    region.translation = rescued
+                    region.sfx_rescued = True  # restore_sfx_translations re-applies this after translate
+                    new_text_regions.append(region)
+                elif region.text.strip():
                     logger.info(f'Filtered out: {region.text}')
                     if len(region.text) < config.ocr.min_text_length:
                         logger.info('Reason: Text length is less than the minimum required length.')
@@ -868,6 +893,10 @@ class MangaTranslator:
         # If not none translator or none translator without prep_manual  
         if config.translator.translator != Translator.none or not self.prep_manual:
             apply_translations(ctx.text_regions, translated_sentences, config, apply_casing=True)
+            # #168/#172: the translator blanks already-English SFX the rescue produced;
+            # restore them so filter_translated_regions keeps the localized SFX.
+            from .ocr_vlm import restore_sfx_translations
+            restore_sfx_translations(ctx.text_regions)
 
         # Punctuation correction logic. for translators often incorrectly change quotation marks from the source language to those commonly used in the target language.
         for region in ctx.text_regions:

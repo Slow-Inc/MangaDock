@@ -2165,3 +2165,27 @@ archive rather than risk a bad SHA-pin on the effectively-frozen upstream). TDD:
 `test/test_text_mask_utils.py` (monkeypatch `PYDENSECRF_AVAILABLE=False` → raw passthrough + warns exactly once over
 two calls; no ML). No E2E — dormant in dev, zero render change (the warn branch never fires when the dep is present).
 Provenance in PIPELINE.md §5.
+
+## 2026-06-13 — #168 vision-OCR SFX rescue render-path FIXED (ぬ→SQUELCH) — benchmark SFX gap closed
+The parked render-path bug is **solved**. The vision-OCR rescue (`ocr_vlm.py` + the `_run_textline_merge` wire) had
+localized the big ぬ to an English SFX, but the rescued region was **dropped before render** — the prior session
+chased it via worker-HTTP and never pinpointed it. **Root cause (found via the code, not worker-HTTP per the memory
+rule):** `filter_translated_regions` (`region_filter.py`) drops a region when `region.text == region.translation`
+("Translation identical to original"). The rescue sets **both** `text` and `translation` to the same English SFX
+("SQUELCH"), so it tripped that check and was filtered out — the prior fix only handled the *blank* check, not the
+*identical* check. **Fix:** exempt `sfx_rescued` regions from the filter (keep them when their translation is
+non-blank) — one guard at the top of the loop. The rescued region already carries detection `lines`, so once it
+survives, `create_text_only_mask` masks it and the original ぬ art is inpainted out (no extra mask wiring needed).
+TDD: 2 tests in `test_region_filter` (rescued text==translation survives; blank-rescued still dropped) — RED on the
+identical-survives case → GREEN. Full MIT suite **394 pass / 18 pre-existing async / 0 new**.
+
+### ✅ E2E — direct render through the live #168 worker (det_sfx + ocr.vlm_rescue, production config)
+`MIT/_e2e_168_sfx.png`: the big ぬ now **renders as a large "SQUELCH"** in place, and **the original ぬ art is erased**
+(inpainted) — exactly the MangaTranslator-target treatment of the SFX (theirs reads "LOOM"; ours "SQUELCH" — a
+different vision model reading the same glyph, functionally equivalent). Worker log confirms the full path:
+`[OcrVLM] rescued SFX region "X" -> "SQUELCH"` → translator keeps `SQUELCH` → survives the filter → rendered + erased.
+**This closes the last visible benchmark gap** (the cluster #247-#251 already matched inpaint cleanliness / seam /
+fit). In-app Reader re-translate was blocked by the frontend's cached-translation state (multi-layer cache; the app
+offered "ดูฉบับแปล" of the stale pre-#168 translation rather than re-running) — the full Reader/tunnel path itself
+was validated for the cluster (#249), and the direct render here is conclusive (same MIT worker, production config).
+`.env` enabled `MIT_SFX_DETECTOR=1` + `MIT_OCR_VLM_RESCUE=1`. Provenance in PIPELINE.md §5.

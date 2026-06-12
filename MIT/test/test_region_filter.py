@@ -59,3 +59,18 @@ def test_none_translator_only_filters_blanks():
 def test_original_translator_keeps_identical_text():
     r = _r('Hello', 'hello')
     assert filter_translated_regions([r], _cfg(translator=Translator.original)) == [r]
+
+
+def test_sfx_rescued_region_survives_the_identical_filter():
+    """#168: a vision-OCR-rescued SFX carries text == translation (both the English
+    onomatopoeia), which would trip the 'identical to source' drop. Rescued regions
+    with a non-blank translation are kept so the localized SFX renders + its mask
+    inpaints the original art."""
+    r = SimpleNamespace(text='LOOM', translation='LOOM', sfx_rescued=True)
+    assert filter_translated_regions([r], _cfg()) == [r]
+
+
+def test_sfx_rescued_region_with_blank_translation_is_still_filtered():
+    """A rescued region that ended up blank has nothing to render → still dropped."""
+    r = SimpleNamespace(text='LOOM', translation='   ', sfx_rescued=True)
+    assert filter_translated_regions([r], _cfg()) == []

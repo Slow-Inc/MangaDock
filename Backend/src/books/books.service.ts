@@ -657,7 +657,16 @@ export class BooksService {
       // OCR prob floor (#167): the 48px OCR is underconfident on long thin
       // lines — at the default threshold it drops lines it read almost
       // correctly, leaving the original text visible in the Reader.
-      ...(ocrProb !== undefined ? { ocr: { prob: ocrProb } } : {}),
+      // vlm_rescue (#168/#172): large regions the 48px drops (stylized SFX) get
+      // re-read by the custom_openai/9arm vision gateway. Absent → byte-identical.
+      ...(ocrProb !== undefined || flagEnv('MIT_OCR_VLM_RESCUE')
+        ? {
+            ocr: {
+              ...(ocrProb !== undefined ? { prob: ocrProb } : {}),
+              ...(flagEnv('MIT_OCR_VLM_RESCUE') ? { vlm_rescue: true } : {}),
+            },
+          }
+        : {}),
       inpainter: {
         inpainter: process.env.MIT_INPAINTER ?? 'lama_large',
         // #247: match MIT's tuned Config default (2048). 1536 downscaled pages
