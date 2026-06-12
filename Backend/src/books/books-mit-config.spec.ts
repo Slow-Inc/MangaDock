@@ -50,6 +50,7 @@ const ENV_KEYS = [
   'MIT_EN_UPPERCASE',
   'MIT_FONT_MAX_BOX_RATIO',
   'MIT_EN_FONT',
+  'MIT_PATCH_FEATHER',
 ];
 
 describe('BooksService.buildMitConfig', () => {
@@ -221,6 +222,20 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'ENG', ''));
     expect(cfg.render.en_font).toBeUndefined();
+  });
+
+  it('enables patch-seam feathering via MIT_PATCH_FEATHER (#173)', () => {
+    process.env.MIT_PATCH_FEATHER = '16';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.render.patch_feather_radius).toBe(16);
+  });
+
+  it('omits patch_feather_radius when unset or invalid — patches byte-identical (#173)', () => {
+    process.env.MIT_PATCH_FEATHER = '0'; // posIntEnv rejects 0/negatives
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.render.patch_feather_radius).toBeUndefined();
   });
 
   it('omits render font-size knobs when unset — render block unchanged (#166)', () => {
