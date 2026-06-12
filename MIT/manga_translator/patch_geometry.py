@@ -157,6 +157,18 @@ def union_refined_with_fallback(refined_mask: np.ndarray, text_only_mask: np.nda
     return out
 
 
+def page_scaled_font_min(img_h: int, img_w: int, existing: int) -> int:
+    """Page-scaled render font floor for patch mode (#250).
+
+    The renderer's auto floor is ``(h+w)/200`` computed on the small patch crop →
+    ~3-4px, unreadably small on the fallback render path (vertical / occupancy>1 /
+    no-balloon / SFX). Derive it from the full PAGE instead, and keep any explicit
+    override that is already larger.
+    """
+    page_min = round((img_h + img_w) / 200)
+    return max(int(existing), page_min)
+
+
 def expand_inpaint_crop(x1: int, y1: int, x2: int, y2: int,
                         img_h: int, img_w: int, pad: int):
     """Expand a render-rect crop by `pad` px on each side for inpainting (#249).

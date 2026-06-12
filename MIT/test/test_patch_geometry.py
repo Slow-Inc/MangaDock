@@ -134,6 +134,17 @@ def test_union_keeps_tight_refined_and_drops_the_text_only_halo():
     assert int((out > 0).sum()) == 16                        # exactly the 4x4 refined blob, no halo
 
 
+def test_page_scaled_font_min_uses_page_dims_over_crop_floor():
+    """#250: the render font floor must come from the full PAGE (h+w)/200, not the
+    small patch crop (which yields an unreadable ~3-4px on the fallback path)."""
+    assert pg.page_scaled_font_min(2000, 1400, -1) == 17     # round((2000+1400)/200)
+
+
+def test_page_scaled_font_min_keeps_a_larger_explicit_override():
+    """An explicit override already above the page floor is preserved."""
+    assert pg.page_scaled_font_min(2000, 1400, 30) == 30
+
+
 def test_feather_alpha_interior_opaque_edge_fades_to_zero():
     """#173: distance-transform alpha ramp — content stays opaque, the patch fades
     to transparent over `radius` px outside the content so the rectangular seam
