@@ -568,12 +568,12 @@ export class BooksService {
    * and batch paths so the VRAM/perf knobs never drift between them.
    *
    * Detection/inpainting are the dominant VRAM + latency drivers (activation memory
-   * ∝ size²). MIT's bundled defaults are tuned for max quality (detection 2560,
-   * inpainting 2048) — heavier than typical manga pages need. We default them lower
-   * here and expose them as env so each deployment can match its GPU without a
-   * redeploy:
-   *   MIT_DETECTION_SIZE     (default 2048)   — text detection resolution
-   *   MIT_INPAINTING_SIZE    (default 1536)   — LaMa inpaint resolution
+   * ∝ size²). The defaults match MIT's own tuned Config values (detection 2560,
+   * inpainting 2048) — #247: shipping them lower silently dropped small/faint text
+   * and blurred the erased plate. They stay env-overridable so a VRAM-tight host can
+   * drop them without a redeploy (it IS a quality cut — raise where the GPU allows):
+   *   MIT_DETECTION_SIZE     (default 2560)   — text detection resolution
+   *   MIT_INPAINTING_SIZE    (default 2048)   — LaMa inpaint resolution
    *   MIT_INPAINTER          (default lama_large)
    *   MIT_INPAINTING_PRECISION (default bf16) — fp32 | fp16 | bf16 (LaMa is a CNN;
    *                                             it has no int4/int8 path — that knob
@@ -637,7 +637,10 @@ export class BooksService {
         ...(seriesContext ? { series_context: seriesContext } : {}),
       },
       detector: {
-        detection_size: intEnv('MIT_DETECTION_SIZE', 2048),
+        // #247: match MIT's own tuned Config default (2560). 2048 silently
+        // dropped small/faint glyphs below DBNet's threshold (~36% fewer px),
+        // leaving original text untranslated. Env still drops it for tight VRAM.
+        detection_size: intEnv('MIT_DETECTION_SIZE', 2560),
         ...(textThreshold !== undefined ? { text_threshold: textThreshold } : {}),
         ...(flagEnv('MIT_DET_INVERT') ? { det_invert: true } : {}),
         ...(flagEnv('MIT_DET_GAMMA_CORRECT') ? { det_gamma_correct: true } : {}),
@@ -655,7 +658,10 @@ export class BooksService {
       ...(ocrProb !== undefined ? { ocr: { prob: ocrProb } } : {}),
       inpainter: {
         inpainter: process.env.MIT_INPAINTER ?? 'lama_large',
-        inpainting_size: intEnv('MIT_INPAINTING_SIZE', 1536),
+        // #247: match MIT's tuned Config default (2048). 1536 downscaled pages
+        // before the LaMa erase then upscaled back → blurrier plate / screentone
+        // smear. Env still drops it for tight VRAM (it IS a quality cut).
+        inpainting_size: intEnv('MIT_INPAINTING_SIZE', 2048),
         inpainting_precision: process.env.MIT_INPAINTING_PRECISION ?? 'bf16',
       },
       render: {
