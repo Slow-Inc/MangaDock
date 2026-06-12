@@ -162,7 +162,7 @@ Three sub-steps inside `dispatch()`:
 
 | File | What we changed | Why | Revert hazard |
 |------|----------------|-----|---------------|
-| `config.py` | Qwen3/Qwen3Big enum entries; env-driven `_default_translator()` (`TRANSLATOR_TYPE` → `DEFAULT_LOCAL/API_TRANSLATOR`); `TranslatorConfig.model` per-request override; `TranslatorConfig.series_context` (#157); `DetectorConfig.det_bubble_seg` (#170); `RenderConfig.bubble_area_fit` (#166); `DetectorConfig.det_sfx` (#168); `RenderConfig.patch_feather_radius` (#173); `InpainterConfig.inpaint_context_pad` (#249) | #87, local LLM support, #157, #170, #166, #168, #173, #249 | Default translator falls back to upstream's hardcoded choice; per-request Gemini model switching breaks; series context / bubble-seg / area-fit flag unparseable |
+| `config.py` | Qwen3/Qwen3Big enum entries; env-driven `_default_translator()` (`TRANSLATOR_TYPE` → `DEFAULT_LOCAL/API_TRANSLATOR`); `TranslatorConfig.model` per-request override; `TranslatorConfig.series_context` (#157); `DetectorConfig.det_bubble_seg` (#170); `RenderConfig.bubble_area_fit` (#166); `DetectorConfig.det_sfx` (#168); `RenderConfig.patch_feather_radius` (#173); `InpainterConfig.inpaint_context_pad` (#249); `OcrConfig.vlm_rescue` (#168) | #87, local LLM support, #157, #170, #166, #168, #173, #249 | Default translator falls back to upstream's hardcoded choice; per-request Gemini model switching breaks; series context / bubble-seg / area-fit flag unparseable |
 | `manga_translator.py` | `reset_page_context()` + call at `translate_patches` start; `_check_target_language_ratio` rewritten to script-ratio (`utils/lang_ratio.py`) with `_PAGE_LANG_CHECK_MIN_REGIONS=6`; PNG `compress_level=1` + 30s encode timeout; `translate_patches` text layer (`regions_payload`, #158); **bubble-seg tagging + balloon-aware `_group_nearby_regions` (delegates to `bubble_association.group_regions`) when `det_bubble_seg` (#170); `_build_local_region` bubble_box **and bubble_polygon** (#179) shift into crop coords + grows the patch crop to cover balloons via `union_box` + threads `render.bubble_area_fit` into `dispatch_rendering` as `bubble_fit` for binary-search font sizing (#166)** | #136 (context bleed), #109 (false-fail lang check), streaming latency, #158, #170, #166 | Context bleeds across jobs again; pages with SFX/credits get falsely rejected; PNG encode can hang forever; scattered-clump grouping returns; bubble text renders at the tiny crop-derived floor |
 | `mask_refinement/text_mask_utils.py` | pydensecrf import made optional (fallback: raw mask); **#251** warns once when the CRF fallback fires (no longer silent) so a worker image missing the dep is visible | run without CRF dep; surface a missing-dep deploy | Import error on machines without pydensecrf; silent text-residue degradation returns |
 | `mode/share.py` | worker `GET /health` endpoint; injects `fonts/Prompt-Bold.ttf` for Thai rendering when no font specified (`:194`) | dead-worker detection (`/ready` probe, 2026-06-06 incident); Thai glyph support. Note: a 2026-06-07 investigation considered lighter weights for downscale halo, but Bold is the deliberate choice — the perceived "tone around patches" issue was the display-derivative mismatch (#156), not the font | `/ready` reports `workers_unreachable` forever; Thai falls back to a font without Thai glyphs |
@@ -199,6 +199,13 @@ Three sub-steps inside `dispatch()`:
   patch path's HTTP text-layer contract (`share.py:99`).
 - `sfx_detector.py` (#168) — AnimeText-YOLO SFX-detector wrapper (second detection pass);
   best-effort, gated by `config.detector.det_sfx`; pairs with `sfx_merge.py`'s dedup.
+- `ocr_vlm.py` (#168/#172) — vision-OCR SFX rescue (no ML import — httpx to the OpenAI-compatible
+  vision gateway, custom_openai/9arm): `vlm_localize_sfx(crop, ...)` posts a big-SFX crop the 48px
+  line-OCR dropped (stylized ぬ) and returns a sanitized UPPERCASE English onomatopoeia; gated by
+  `config.ocr.vlm_rescue`. Wired in `_run_textline_merge` (rescue branch sets `region.translation`
+  + `sfx_rescued=True`); `restore_sfx_translations` re-applies after `apply_translations`, and
+  `region_filter` (S1) exempts `sfx_rescued` so it survives to render. The rescued region's detection
+  `lines` drive `create_text_only_mask` → the original SFX art is inpainted out. `test/test_ocr_vlm.py`.
 
 ### `manga_translator/` — new: #187/#188 god-object decomposition (~22, byte-identical extractions)
 
@@ -212,7 +219,7 @@ preserved landmines: `docs/research/mit-core-decomposition-analysis.md`; status 
 `docs/reports/mit-refactor-progress.md`.
 
 Pure / value (no ML imports, unit-tested in <1s):
-- `region_filter.py` (S1) — `filter_translated_regions` (3-way filter dedup).
+- `region_filter.py` (S1) — `filter_translated_regions` (3-way filter dedup). **#168:** exempts `sfx_rescued` regions from the drop (a vision-OCR-rescued SFX has `text == translation`, which would trip the identical-to-source check) so the localized SFX survives to render + inpaint.
 - `region_apply.py` (S2) — `apply_translations` (zip-truncation **L10**), `apply_render_casing`, `apply_original_as_translation`.
 - `prev_context.py` (S6) — `build_prev_context` (per-mode index policy; **L7** first-match).
 - `context_counts.py` (S7) — `context_page_counts` log accounting.

@@ -376,6 +376,10 @@ class OcrConfig(BaseModel):
     """The threshold for ignoring text in non bubble areas, with valid values ranging from 1 to 50, does not ignore others. Recommendation 5 to 10. If it is too low, normal bubble areas may be ignored, and if it is too large, non bubble areas may be considered normal bubbles"""
     prob: float | None = None
     """Minimum probability of a text region to be considered valid. If None, uses the model default."""
+    vlm_rescue: bool = False
+    """#168/#172: when the 48px line-OCR drops a large region (stylized SFX like ぬ),
+    send its crop to the OpenAI-compatible vision gateway (custom_openai / 9arm) to
+    localize it into an English onomatopoeia instead of losing it. Off → byte-identical."""
 
 class Config(BaseModel):
     # General
