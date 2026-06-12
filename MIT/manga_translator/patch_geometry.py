@@ -157,6 +157,24 @@ def union_refined_with_fallback(refined_mask: np.ndarray, text_only_mask: np.nda
     return out
 
 
+def expand_inpaint_crop(x1: int, y1: int, x2: int, y2: int,
+                        img_h: int, img_w: int, pad: int):
+    """Expand a render-rect crop by `pad` px on each side for inpainting (#249).
+
+    The patch path renders a tight crop, but LaMa's FFC global branch reconstructs
+    by mixing global context — a tight crop starves it of clean background. This
+    returns a larger inpaint crop ``(ix1, iy1, ix2, iy2)`` (the render rect grown by
+    `pad`, clamped to the image) plus the offset ``(ox, oy)`` of the render rect
+    inside that larger crop, so the caller can slice the inpaint result back to the
+    render rect after running LaMa on the wider receptive field. Pure integer math.
+    """
+    ix1 = max(0, x1 - pad)
+    iy1 = max(0, y1 - pad)
+    ix2 = min(img_w, x2 + pad)
+    iy2 = min(img_h, y2 + pad)
+    return ix1, iy1, ix2, iy2, x1 - ix1, y1 - iy1
+
+
 def feather_alpha(content_mask: np.ndarray, radius: int) -> np.ndarray:
     """Distance-transform alpha ramp for blending a patch into the page (#173).
 

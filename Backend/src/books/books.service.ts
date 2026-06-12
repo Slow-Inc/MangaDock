@@ -624,6 +624,7 @@ export class BooksService {
     const supersampling = posIntEnv('MIT_SUPERSAMPLING');
     const fontMaxBoxRatio = fracEnv('MIT_FONT_MAX_BOX_RATIO');
     const patchFeather = posIntEnv('MIT_PATCH_FEATHER');
+    const inpaintContextPad = posIntEnv('MIT_INPAINT_CONTEXT_PAD');
     const model = this.imageModelKey(imageModel);
     return JSON.stringify({
       translator: {
@@ -664,6 +665,9 @@ export class BooksService {
         // smear. Env still drops it for tight VRAM (it IS a quality cut).
         inpainting_size: intEnv('MIT_INPAINTING_SIZE', 2048),
         inpainting_precision: process.env.MIT_INPAINTING_PRECISION ?? 'bf16',
+        // #249: inpaint a crop expanded by N px (patch path) so LaMa sees real
+        // background instead of a starved tight crop. Absent → tight, byte-identical.
+        ...(inpaintContextPad !== undefined ? { inpaint_context_pad: inpaintContextPad } : {}),
       },
       render: {
         direction: 'auto',

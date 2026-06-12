@@ -148,6 +148,23 @@ def test_feather_alpha_interior_opaque_edge_fades_to_zero():
     assert 0 < a[10, 20] < 255                       # within the band → partial blend
 
 
+def test_expand_inpaint_crop_interior_pads_all_sides():
+    """#249: a render rect well inside the page expands by `pad` on every side; the
+    returned (ox, oy) is where the render rect sits inside the larger inpaint crop."""
+    ix1, iy1, ix2, iy2, ox, oy = pg.expand_inpaint_crop(300, 320, 400, 420, 1000, 1000, pad=256)
+    assert (ix1, iy1, ix2, iy2) == (44, 64, 656, 676)
+    assert (ox, oy) == (256, 256)
+
+
+def test_expand_inpaint_crop_clamps_at_image_edges():
+    """Near an edge the crop clamps to the image and (ox, oy) shrinks to the
+    available margin, so the slice-back still lands on the render rect."""
+    ix1, iy1, ix2, iy2, ox, oy = pg.expand_inpaint_crop(10, 30, 200, 250, 1000, 1000, pad=256)
+    assert (ix1, iy1) == (0, 0)
+    assert (ix2, iy2) == (456, 506)
+    assert (ox, oy) == (10, 30)
+
+
 def test_feather_alpha_radius_zero_is_hard_alpha():
     """radius 0 → no ramp: opaque exactly on content, transparent elsewhere (the
     byte-identical hard-alpha fallback)."""
