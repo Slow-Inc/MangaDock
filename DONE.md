@@ -2152,3 +2152,16 @@ pre-existing async / 0 new**.
 fills its box better than the #249 baseline; inpaint still clean; no regression (ぬ still JP = #168). Used the fast
 direct-render path for this subtle font-floor refinement — the **full Reader/tunnel E2E was validated for the cluster
 (#249)** and is reserved for #168 (the high-visual-impact ぬ→LOOM change). Provenance in PIPELINE.md §5.
+
+## 2026-06-13 — #251 harden pydensecrf fallback (warn-once + build-critical flag)
+Latent inpaint defect #6 (`docs/research/inpaint-cleanliness-vs-upstream.md`): `refine_mask` returns the **raw
+(un-CRF'd) mask** if `pydensecrf` import fails (`text_mask_utils.py:68-78`) → mask doesn't tighten to glyph strokes →
+faint leftover text residue. **DORMANT in dev** (pydensecrf 1.0 IS installed) but a worker image missing the dep
+would degrade text removal **silently**. Fix: **warn once** (module `_warned_no_crf` flag + `logging.getLogger`) when
+the fallback fires, so a missing-dep deploy is visible instead of silent; raw-mask passthrough unchanged when the dep
+is present (dev path byte-identical). Flagged `pydensecrf` build-critical in `requirements.txt` (already installed by
+the Dockerfile's `pip install -r requirements.txt:19`, so it ships in the worker image — kept the working master
+archive rather than risk a bad SHA-pin on the effectively-frozen upstream). TDD: 1 test in new
+`test/test_text_mask_utils.py` (monkeypatch `PYDENSECRF_AVAILABLE=False` → raw passthrough + warns exactly once over
+two calls; no ML). No E2E — dormant in dev, zero render change (the warn branch never fires when the dep is present).
+Provenance in PIPELINE.md §5.
