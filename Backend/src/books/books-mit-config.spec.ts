@@ -57,11 +57,14 @@ describe('BooksService.buildMitConfig', () => {
   beforeEach(() => ENV_KEYS.forEach((k) => { saved[k] = process.env[k]; delete process.env[k]; }));
   afterEach(() => ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }));
 
-  it('uses conservative resolution + bf16 + lama_large by default', () => {
+  it("uses MIT's tuned detection/inpainting sizes + bf16 + lama_large by default (#247)", () => {
     const svc = makeService();
     const cfg = JSON.parse((svc as any).buildMitConfig('JPN', 'THA', 'ja'));
-    expect(cfg.detector.detection_size).toBe(2048);
-    expect(cfg.inpainter.inpainting_size).toBe(1536);
+    // #247: match MIT's own Config defaults (detection_size 2560, inpainting_size
+    // 2048) instead of the old VRAM-conservative 2048/1536 that silently dropped
+    // small text and blurred the erased plate. Env still overrides for tight hosts.
+    expect(cfg.detector.detection_size).toBe(2560);
+    expect(cfg.inpainter.inpainting_size).toBe(2048);
     expect(cfg.inpainter.inpainter).toBe('lama_large');
     expect(cfg.inpainter.inpainting_precision).toBe('bf16');
     expect(cfg.translator.target_lang).toBe('THA');
@@ -86,8 +89,8 @@ describe('BooksService.buildMitConfig', () => {
     process.env.MIT_INPAINTING_SIZE = '-5';
     const svc = makeService();
     const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
-    expect(cfg.detector.detection_size).toBe(2048);
-    expect(cfg.inpainter.inpainting_size).toBe(1536);
+    expect(cfg.detector.detection_size).toBe(2560);
+    expect(cfg.inpainter.inpainting_size).toBe(2048);
   });
 
   it('omits source_lang when srcMIT is ANY', () => {
@@ -125,7 +128,7 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
     expect(cfg.ocr).toBeUndefined();
-    expect(cfg.detector).toEqual({ detection_size: 2048 });
+    expect(cfg.detector).toEqual({ detection_size: 2560 });
   });
 
   /** #170 bubble segmentation — opt-in; absent env leaves the config
