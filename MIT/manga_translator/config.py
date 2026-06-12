@@ -351,6 +351,11 @@ class InpainterConfig(BaseModel):
     """Size of image used for inpainting (too large will result in OOM)"""
     inpainting_precision: InpaintPrecision = InpaintPrecision.bf16
     """Inpainting precision for lama, use bf16 while you can."""
+    inpaint_context_pad: int = 0
+    """#249 (patch path only): inpaint a crop expanded by this many px on each side
+    of the render rect, then slice the result back, so LaMa's FFC global branch sees
+    real background instead of a starved tight crop (cleaner fill on textured pages).
+    Peak VRAM is bounded by min(crop, inpainting_size)². 0 → tight crop (byte-identical)."""
 
 class ColorizerConfig(BaseModel):
     colorization_size: int = 576

@@ -26,6 +26,7 @@ from .patch_geometry import (
     build_local_region,
     create_text_only_mask,
     crop_mask_for_patch,
+    expand_inpaint_crop,
     feather_alpha,
     union_refined_with_fallback,
 )
@@ -124,7 +125,32 @@ class PatchRenderer:
                     patch_ctx.mask = text_only_mask
 
                 try:
-                    patch_ctx.img_inpainted = await driver._run_inpainting(config, patch_ctx)
+                    # #249: give LaMa a wider receptive field WITHOUT enlarging the
+                    # rendered patch. Inpaint a larger context crop (render rect +
+                    # inpaint_context_pad px), then slice the result back to the
+                    # render rect. The FFC global branch then has real background to
+                    # copy instead of a starved tight crop. 0 → tight crop,
+                    # byte-identical.
+                    ctx_pad = int(getattr(config.inpainter, 'inpaint_context_pad', 0) or 0)
+                    if ctx_pad > 0:
+                        ix1, iy1, ix2, iy2, ox, oy = expand_inpaint_crop(
+                            x1, y1, x2, y2, img_h, img_w, ctx_pad)
+                        rh, rw = y2 - y1, x2 - x1
+                        large_rgb = np.ascontiguousarray(ctx.img_rgb[iy1:iy2, ix1:ix2].copy())
+                        large_mask = np.zeros((iy2 - iy1, ix2 - ix1), dtype=np.uint8)
+                        large_mask[oy:oy + rh, ox:ox + rw] = patch_ctx.mask
+                        render_rgb, render_mask = patch_ctx.img_rgb, patch_ctx.mask
+                        # finally-restore so a failed inpaint can't leak the larger
+                        # crop/mask into the render step (which expects render-rect size).
+                        try:
+                            patch_ctx.img_rgb, patch_ctx.mask = large_rgb, large_mask
+                            large_inpainted = await driver._run_inpainting(config, patch_ctx)
+                        finally:
+                            patch_ctx.img_rgb, patch_ctx.mask = render_rgb, render_mask
+                        patch_ctx.img_inpainted = np.ascontiguousarray(
+                            large_inpainted[oy:oy + rh, ox:ox + rw])
+                    else:
+                        patch_ctx.img_inpainted = await driver._run_inpainting(config, patch_ctx)
                 except Exception as e:
                     logger.warning(
                         f"[PatchTranslate] inpainting failed for group ({x1},{y1},{x2},{y2}) "
