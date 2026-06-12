@@ -238,6 +238,10 @@ Stateful / async-orchestration (self-bound deps passed as callbacks; characteriz
 - `stages.py` (S15) — the six leaf stage adapters (`run_colorizer`/`run_upscaling`/`run_detection`/`run_mask_refinement`/`run_inpainting`/`run_text_rendering`): the `read ctx-subset → dispatch_* → return value` core of the `_run_*` methods, so the many-arg `dispatch_*` calls (detection = 12 positional) are unit-testable by stubbing. The driver keeps each stage's `time.time()`+`touch()` instrumentation and delegates. **L15** (`**ctx` splat into `dispatch_colorization`) and **L5** (always-None `render_mask`) preserved. Groundwork for the StageRunner (S23).
 - `debug_sink.py` (S14) — the verbose debug-image save bodies (`input`/`mask_raw`/`bboxes_unfiltered`/`bboxes`/`inpainted`/`final`.png; verbose guard stays at call sites), the inpaint-preview pair (`save_inpaint_preview` **unguarded** single-driver vs `save_inpaint_preview_guarded` batch — divergence pinned as two functions; preview render passed in as a callback, no ML imports) and the `ocr_debug_dir_env` context manager (`MANGA_OCR_RESULT_DIR` set/restore + 3-branch ocrs/ dir). Leaves exactly **one** `cv2.imwrite` in the god object: the **L11** streaming-placeholder branch (flow control, `_is_streaming_mode` set nowhere in-repo).
 
+Patch render path (S24, were byte-identical extractions — now carry an intentional divergence):
+- `patch_geometry.py` (S24a) — pure crop/mask geometry (`build_local_region` / `create_text_only_mask` / `crop_mask_for_patch`). **#248 divergence (no longer byte-identical with upstream's full-page path):** `crop_mask_for_patch` mask resize `INTER_LINEAR`→`INTER_NEAREST` (a binary mask must not be bilinear-fattened then re-binarized) + new `union_refined_with_fallback(refined, text_only)` — keeps the tight CRF mask everywhere it has coverage and falls back to the dilated `text_only_mask` only in connected components the refinement missed, so LaMa stops re-synthesising a halo of clean background around every glyph. `test/test_patch_geometry.py`.
+- `patch_renderer.py` (S24b) — `translate_patches` per-group async render driver. **#248:** the refinement-success mask branch now calls `union_refined_with_fallback(refined, text_only_mask)` instead of `cv2.max(refined, text_only)` (dropped the now-unused `cv2` import). **Revert hazard:** the blocky `text_only` halo returns → LaMa over-erases screentone/line-art next to bubbles.
+
 ### `server/` — modified (5)
 
 | File | What we changed | Why |
@@ -278,3 +282,10 @@ Stateful / async-orchestration (self-bound deps passed as callbacks; characteriz
    marks.
 10. `translate_patches` must keep calling `reset_page_context()` first (guarded by
     `test/test_page_context.py`) until the #140 Translation Session lands.
+11. **`MIT_SFX_DETECTOR=1` (#168) detects stylized SFX but does NOT translate the big ones** — the
+    AnimeText YOLO finds them and dedup is clean, but the 48px line-OCR can't read a giant stylized
+    glyph (e.g. ぬ): it returns garbage at prob 0.03–0.08 → below the floor → the SFX textline is
+    dropped before render. Small SFX that the OCR *can* read (e.g. フッ→"Heh.") work. Reading large
+    stylized SFX needs a VLM OCR (MangaTranslator uses `paddleocr-vl`); PaddleOCR-VL-1.5 is blocked on
+    transformers 4.55-vs-5.9 incompat (see `DONE.md` 2026-06-12 / `BENCHMARK.md`). Don't assume
+    enabling the SFX detector alone yields ぬ→LOOM.

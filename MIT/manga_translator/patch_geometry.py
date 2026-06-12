@@ -119,7 +119,39 @@ def crop_mask_for_patch(
         return np.zeros((crop_h, crop_w), dtype=np.uint8)
 
     if cropped_mask.shape[0] != crop_h or cropped_mask.shape[1] != crop_w:
-        cropped_mask = cv2.resize(cropped_mask, (crop_w, crop_h), interpolation=cv2.INTER_LINEAR)
+        # #248: nearest-neighbor on a BINARY mask. INTER_LINEAR bleeds the 255s
+        # into a gradient that the `> 0` re-binarize below turns into fattened
+        # edges (a 2x upscale of one pixel lights 16 vs nearest's 4) — that extra
+        # halo is exactly what makes LaMa over-erase. Nearest keeps the edge tight.
+        cropped_mask = cv2.resize(cropped_mask, (crop_w, crop_h), interpolation=cv2.INTER_NEAREST)
 
     cropped_mask[cropped_mask > 0] = 255
     return cropped_mask.astype(np.uint8)
+
+
+def union_refined_with_fallback(refined_mask: np.ndarray, text_only_mask: np.ndarray) -> np.ndarray:
+    """Tame the patch inpaint mask handed to LaMa (#248).
+
+    The refined (CRF-tightened) mask hugs the glyph strokes. `text_only_mask` is a
+    dilated + MORPH_CLOSE rectangle/polygon; OR-ing it wholesale (the old
+    ``cv2.max(refined, text_only)``) forces LaMa to erase a fat halo of clean
+    background around every glyph — destroying screentone / line-art next to
+    bubbles. Instead keep the tight refined mask everywhere it has coverage, and
+    fall back to ``text_only_mask`` only inside the connected components the
+    refinement missed ENTIRELY. Glyphs the CRF dropped are still covered (no
+    residue); regions it covered get no halo.
+    """
+    refined = np.ascontiguousarray(refined_mask).astype(np.uint8)
+    text_only = np.ascontiguousarray(text_only_mask).astype(np.uint8)
+
+    out = refined.copy()
+    out[out > 0] = 255
+
+    # Per-component fallback: add text_only only where refined has zero overlap.
+    num, labels = cv2.connectedComponents((text_only > 0).astype(np.uint8))
+    for label in range(1, num):
+        component = labels == label
+        if not np.any(refined[component]):
+            out[component] = 255
+
+    return out
