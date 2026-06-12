@@ -50,6 +50,9 @@ pythainlp  # Thai word segmentation for correct line-breaking (newmm engine, dic
 langcodes
 manga-ocr
 langdetect
+# #251 build-critical: DenseCRF mask refinement. If this dep is absent the worker
+# silently falls back to the raw (un-tightened) mask → faint leftover text residue.
+# refine_mask now warns once when missing; keep it in every worker image build.
 pydensecrf@https://github.com/lucasb-eyer/pydensecrf/archive/refs/heads/master.zip
 accelerate
 bitsandbytes
