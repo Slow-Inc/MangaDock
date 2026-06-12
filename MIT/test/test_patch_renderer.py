@@ -51,6 +51,8 @@ class FakeDriver:
 class _Cfg:
     class render:
         bubble_area_fit = False
+    class inpainter:
+        inpaint_context_pad = 0                        # #249: tight crop (default)
 
 
 def _ctx():
@@ -117,3 +119,41 @@ def test_process_group_render_failure_falls_back_to_inpaint():
     assert set(result) == {'x', 'y', 'w', 'h', 'img_png'}
     assert len(result['img_png']) > 0
     assert driver.calls == ['mask', 'inpaint', 'render']
+
+
+# ---- #249: larger inpaint context crop, render rect sliced back unchanged ------
+
+def test_process_group_inpaint_context_pad_enlarges_crop_then_slices_back():
+    """With inpaint_context_pad>0 the inpainter sees a crop padded on every side,
+    but the emitted patch position/size stays the render rect (result sliced back)."""
+    import logging
+    seen = {}
+
+    def record(patch_ctx):
+        seen['inpaint_shape'] = patch_ctx.img_rgb.shape
+        return patch_ctx.img_rgb                       # passthrough the larger crop
+    driver = FakeDriver(inpaint=record)
+
+    class Cfg:
+        class render:
+            bubble_area_fit = False
+        class inpainter:
+            inpaint_context_pad = 100
+
+    page = np.full((600, 600, 3), 128, dtype=np.uint8)
+    ctx = type('C', (), {'img_rgb': page, 'mask_raw': None, 'mask': None})()
+    group = [FakeRegion(
+        xyxy=(250, 250, 300, 300),
+        lines=[[[250, 250], [300, 250], [300, 300], [250, 300]]],
+        font_size=20,
+    )]
+    renderer = pr.PatchRenderer(
+        driver, ctx, Cfg, pad=40, render_extra=80, img_w=600, img_h=600,
+        source_icc=None, sem=asyncio.Semaphore(3), logger=logging.getLogger('test'),
+    )
+    result = _run(renderer.process_group(group))
+
+    # render rect = xyxy ±pad ±render_extra = (130,130,420,420) → 290×290
+    assert (result['x'], result['y'], result['w'], result['h']) == (130, 130, 290, 290)
+    # inpaint saw that rect padded by 100 on each side (clamped to the 600px page) → 490×490
+    assert seen['inpaint_shape'] == (490, 490, 3)

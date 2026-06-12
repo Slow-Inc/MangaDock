@@ -2106,3 +2106,31 @@ clipping, no patch-count change) and threads the alpha to the encoder; Backend `
 **373 pass / 18 pre-existing async / 0 new**; Backend mit-config 28/28. Branch `feat/mit-patch-feather-173`.
 Provenance in PIPELINE.md §5 (config.py row, patch_png, S24a/S24b). Visual before/after E2E batched with the inpaint
 cluster (#249).
+
+## 2026-06-13 — #249 larger inpaint context crop for the LaMa patch path
+Inpaint-cleanliness cause #2 (`docs/research/inpaint-cleanliness-vs-upstream.md`): the patch path inpaints a tight
+crop (bbox + 120px), starving LaMa's FFC global branch of clean background to copy → blurry/averaged fill. Now
+LaMa gets a wider receptive field WITHOUT enlarging the rendered patch: **(1)** pure `expand_inpaint_crop(x1,y1,x2,
+y2,img_h,img_w,pad)` in `patch_geometry.py` returns the render rect grown by `pad` (clamped) + the render-rect offset
+`(ox,oy)` inside it. **(2)** `patch_renderer` (when `inpainter.inpaint_context_pad>0`) slices a larger image crop,
+places the render-crop mask into a larger zero-mask at `(ox,oy)`, runs `_run_inpainting` on it, then slices the
+result back to the render rect (output size == input, LaMa restores it). `InpainterConfig.inpaint_context_pad: int=0`
+(0 → tight crop, byte-identical). Backend emits `inpainter.inpaint_context_pad` from `MIT_INPAINT_CONTEXT_PAD`
+(posIntEnv). **Blocked-by #247** (needs inpainting_size 2048 so the larger crop isn't downscaled) — now satisfied.
+TDD: 2 pure `expand_inpaint_crop` tests (interior pad / edge-clamp) + 1 integration in `test_patch_renderer`
+(FakeDriver records inpaint sees a 490×490 crop while the patch dict stays the 290×290 render rect — slice-back
+proven without ML). Full MIT suite **373 pass / 18 pre-existing async / 0 new**; Backend mit-config **30/30**.
+
+### ✅ E2E — Full-stack Reader via cloudflared tunnel (2026-06-13)
+First per-issue Playwright E2E run end-to-end through the live stack (per `feedback_test_every_round`). **Stack:** MIT
+worker restarted on the new code (front 5003 + worker 5004, custom_openai/9arm; killed the stale 5003+5004 by PORT
+OWNER per the restart gotcha) · Backend :4001 · Frontend :4000 · **cloudflared tunnel → `hayateotsu.space`** ·
+cache reset (L3 + patches). `.env` set `MIT_PATCH_FEATHER=16` + `MIT_INPAINT_CONTEXT_PAD=256` (det/inpaint sizes
+unpinned → #247 defaults 2560/2048 active; #248 always-on). **Flow:** Playwright (real browser, tunnel domain) →
+search "One-Punch" → One Punch-Man → "อ่านตอนที่ Benchmark" (the team's 1-page ぬ-SFX benchmark chapter) → reader
+opened anonymously (overlay, no login) → translate toggle → **→ EN** → "แปลหน้านี้" → ~50s pipeline → captured.
+**Result** (`e2e-249-after-benchmark-click.jpeg` original ↔ `e2e-249-reader-EN.jpeg` translated; direct-render
+companion `MIT/_e2e_249_cluster.png`): inpaint/text-removal **clean — no halo, no rectangular patch seam**; text
+fits the bubbles; cluster #247/#248/#173/#249 validated live. **Remaining gap vs the MangaTranslator target:** the
+big ぬ renders as JP, not "LOOM" — that is **#168** (vision-OCR SFX rescue, parked in `git stash`), not a cluster
+regression. Per-issue Playwright-via-tunnel E2E is now the standing workflow.

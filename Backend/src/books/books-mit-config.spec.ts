@@ -51,6 +51,7 @@ const ENV_KEYS = [
   'MIT_FONT_MAX_BOX_RATIO',
   'MIT_EN_FONT',
   'MIT_PATCH_FEATHER',
+  'MIT_INPAINT_CONTEXT_PAD',
 ];
 
 describe('BooksService.buildMitConfig', () => {
@@ -236,6 +237,19 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
     expect(cfg.render.patch_feather_radius).toBeUndefined();
+  });
+
+  it('enables the larger inpaint context crop via MIT_INPAINT_CONTEXT_PAD (#249)', () => {
+    process.env.MIT_INPAINT_CONTEXT_PAD = '256';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.inpainter.inpaint_context_pad).toBe(256);
+  });
+
+  it('omits inpaint_context_pad when unset — tight crop, byte-identical (#249)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.inpainter.inpaint_context_pad).toBeUndefined();
   });
 
   it('omits render font-size knobs when unset — render block unchanged (#166)', () => {
