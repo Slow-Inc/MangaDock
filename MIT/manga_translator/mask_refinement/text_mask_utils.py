@@ -65,6 +65,9 @@ def complete_mask_fill(text_lines: List[Tuple[int, int, int, int]]):
         final_mask = cv2.rectangle(final_mask, (x, y), (x + w, y + h), (255), -1)
     return final_mask
 
+import logging
+logger = logging.getLogger(__name__)
+
 try:
     from pydensecrf.utils import compute_unary, unary_from_softmax
     import pydensecrf.densecrf as dcrf
@@ -72,9 +75,22 @@ try:
 except ImportError:
     PYDENSECRF_AVAILABLE = False
 
+# #251: warn once (not per-call) when the CRF fallback fires, so a worker image
+# missing the dep is visible instead of silently degrading text removal.
+_warned_no_crf = False
+
 def refine_mask(rgbimg, rawmask):
     if not PYDENSECRF_AVAILABLE:
-        # Fallback: Return raw mask if pydensecrf is not installed
+        # Fallback: without DenseCRF the mask doesn't tighten to glyph strokes →
+        # faint leftover text residue. Return the raw mask, but warn once (#251).
+        global _warned_no_crf
+        if not _warned_no_crf:
+            logger.warning(
+                'pydensecrf is not installed — mask refinement (DenseCRF) is OFF; '
+                'text-removal masks will not tighten to glyph strokes (faint residue '
+                'possible). Pin pydensecrf in the worker image. (warns once)'
+            )
+            _warned_no_crf = True
         return rawmask
 
     if len(rawmask.shape) == 2:
