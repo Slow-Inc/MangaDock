@@ -25,6 +25,15 @@ def filter_translated_regions(text_regions: List, config) -> list:
         should_filter = False
         filter_reason = ""
 
+        # #168: a vision-OCR-rescued SFX carries text == translation (both the English
+        # onomatopoeia, e.g. "LOOM"), which would trip the identical-to-source drop
+        # below. Keep it as long as it has something to render, so the localized SFX
+        # survives and its detection mask inpaints the original art.
+        if getattr(region, 'sfx_rescued', False):
+            if region.translation.strip():
+                new_text_regions.append(region)
+            continue
+
         if not region.translation.strip():
             should_filter = True
             filter_reason = "Translation contain blank areas"

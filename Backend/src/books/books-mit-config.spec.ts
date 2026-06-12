@@ -45,6 +45,7 @@ const ENV_KEYS = [
   'MIT_FONT_SIZE_MIN',
   'MIT_BUBBLE_AREA_FIT',
   'MIT_SFX_DETECTOR',
+  'MIT_OCR_VLM_RESCUE',
   'MIT_EN_COMIC_FONT',
   'MIT_SUPERSAMPLING',
   'MIT_EN_UPPERCASE',
@@ -277,6 +278,19 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
     expect(cfg.detector.det_sfx).toBe(true);
+  });
+
+  it('enables the vision-LLM OCR rescue via MIT_OCR_VLM_RESCUE (#168/#172)', () => {
+    process.env.MIT_OCR_VLM_RESCUE = '1';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.ocr.vlm_rescue).toBe(true);
+  });
+
+  it('omits ocr.vlm_rescue when MIT_OCR_VLM_RESCUE is unset — render unchanged', () => {
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.ocr?.vlm_rescue).toBeUndefined();
   });
 
   it('carries series_context to the translator when provided (#157)', () => {
