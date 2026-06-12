@@ -19,11 +19,15 @@ geometry is the pure `patch_geometry` helpers. `logger` is injected so
 import asyncio
 import traceback
 
-import cv2
 import numpy as np
 from PIL import Image
 
-from .patch_geometry import build_local_region, create_text_only_mask, crop_mask_for_patch
+from .patch_geometry import (
+    build_local_region,
+    create_text_only_mask,
+    crop_mask_for_patch,
+    union_refined_with_fallback,
+)
 from .utils import Context
 from .utils.patch_png import encode_patch_png
 
@@ -107,7 +111,10 @@ class PatchRenderer:
                     if patch_ctx.mask is None:
                         patch_ctx.mask = text_only_mask
                     else:
-                        patch_ctx.mask = cv2.max(patch_ctx.mask.astype(np.uint8), text_only_mask)
+                        # #248: keep the tight CRF mask; only fall back to the
+                        # dilated text_only_mask where refinement missed a region
+                        # entirely — no fat halo for LaMa to over-erase.
+                        patch_ctx.mask = union_refined_with_fallback(patch_ctx.mask, text_only_mask)
                 except Exception as e:
                     logger.warning(
                         f"[PatchTranslate] mask refinement failed for group ({x1},{y1},{x2},{y2}) "
