@@ -15,6 +15,31 @@
 
 ---
 
+## 2026-06-13 — PRD#1: Backend security hardening (Turnstile/HWID guards) — #223 (#224–#227)
+
+**Severity:** major (cost-bleed + information-disclosure on the expensive MIT surface) · **Branch:** `dept/backend` (off `origin/main`), 4 commits, not yet PR'd. Derived from the read-only Backend security audit in issue #223. **TDD throughout** (RED→GREEN per step); `/security-review` on the full diff returned **no findings ≥0.7**.
+
+### Summary (index)
+| Step | What & where | Before → After | Validation | Commit |
+|---|---|---|---|---|
+| #224 | Fail-closed Turnstile config — new `auth/turnstile.config.ts` (`resolveTurnstileConfig`), wired in `turnstile.guard.ts`, `books.controller.ts` (verify-captcha), boot check in `main.ts` | missing `TURNSTILE_SECRET_KEY` silently fell back to the public test key (always-pass siteverify + forgeable HMAC) → **prod now refuses to boot** on missing/test secret; `TURNSTILE_ENABLED=false` ignored in prod | 9 unit (fail-closed matrix, mirrors `storage.module.spec.ts`) | `21423bf` |
+| #225 | Validate `X-Hardware-Id` shape — `common/middleware/hardware-id.middleware.ts` (`isValidHardwareId`) | presence-only check (any garbage passed zero-trust) → shape check `/^[A-Za-z0-9_+/=-]{8,128}$/`, rejects array/whitespace/control/injection with 401 | 42 unit (valid/empty/malformed/array/passthrough + pure fn) | `9527a35` |
+| #226 | Sanitize `AllExceptionsFilter` — `common/filters/all-exceptions.filter.ts` + 2 controller catches in `books.controller.ts` | raw internal error message + MIT error leaked to client on 500 → generic `Internal server error` / `Translation failed`; real message+stack logged server-side; HttpException + Supabase-503 preserved | 3 filter unit (generic / passthrough / 503) | `9dadb57` |
+| #227 | Guard 3 MIT endpoints + frontend clearance — `@UseGuards(TurnstileGuard)` on `translate/manga`, `…/translate-patches`, `…/batch-translate-patches`; `Frontend` global fetch interceptor (`SupabaseGuard.tsx`) attaches `x-captcha-clearance` via new pure `app/lib/zeroTrustHeaders.ts` | expensive ML/R2 pipeline reachable with only a non-empty HWID header → each requires valid HWID-bound clearance; cheap `GET translate` (description) stays open | 7 backend e2e (401-without / proceeds-with per endpoint) + 5 frontend bun (header helper) | `5a81942` |
+
+### Before → After (headline, full fields)
+
+**#224 · Fail-closed Turnstile (the headline security fix)** — *What/where:* `resolveTurnstileConfig(env)` (`auth/turnstile.config.ts`), consumed by `TurnstileGuard.canActivate` and the verify-captcha handler; boot enforcement in `main.ts:bootstrap` *before* `NestFactory.create`. *Why:* both call-sites inlined `process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA'` (Cloudflare public test key) — a forgotten secret made siteverify always pass **and** signed the HMAC clearance with a publicly-known key, so the whole captcha/zero-trust layer was silently bypassable and the token forgeable. *Before → After:* missing/test secret in prod = silent always-pass → **loud crash at boot**; outside prod the test key + `TURNSTILE_ENABLED=false` still work (dev unblocked). The `|| <test-key>` fallback is gone from both sites (grep-verified: only the constant definition remains). *Performance Δ:* N/A (string resolution per request, negligible). *Quality:* invisible to a correctly-configured deploy; reader flow unchanged. *Validation:* 9 unit covering the full prod/non-prod × missing/test/real × enabled-flag matrix. *Risk/rollback:* fail-closed (a real prod secret was always required to function correctly); revert = 1 commit. *Links:* #224, `21423bf`.
+
+**#227 · Captcha guard on the expensive surface + reused clearance** — *What/where:* `TurnstileGuard` applied to the three MIT-triggering endpoints in `books.controller.ts`; `Frontend/app/components/SupabaseGuard.tsx` global `window.fetch` interceptor now injects `x-captcha-clearance` (from `localStorage.cf_clearance_token`) alongside the existing `x-hardware-id`, via the extracted pure `withZeroTrustHeaders()` helper. *Why:* only the cached-page endpoint was guarded; single-page, batch, and manga-text translation ran the ML/LaMa + R2 pipeline for any caller with a non-empty HWID header — and the batch job keeps running after disconnect, amplifying cost (compounds the R2 concern in #197). *Before → After:* anonymous → **401** on all three; legitimate readers reuse the clearance they already obtained for page serving → **no UX change**; description translation on catalog cards stays open (pre-auth). *Performance Δ:* not measured (guard is a cheap HMAC verify). *Quality:* reader path preserved; defense matches the page endpoint. *Validation:* 7 backend e2e (focused TestingModule, mocked service) assert 401-without / 200-201-with per endpoint + description-open; 5 frontend bun on the header helper. **Live Playwright E2E deferred** (per owner decision — to be run before merge). *Risk/rollback:* a client missing/with-expired clearance gets 401 on translate (re-solve captcha re-issues it); revert = 1 commit. *Links:* #227, `5a81942`.
+
+### Open follow-ups (not in this batch)
+- Live Playwright/tunnel E2E of the reader+translation path (original↔translated) before PR — owner-deferred.
+- `console.error` used for the new server-side error logging in `books.controller.ts` (matches existing file style); will fold into the `console.* → Logger` sweep in #240.
+- `notify.ps1` toast errored on this run (`LoadXml` HRESULT `0xC00CE502`) — unrelated to this PRD; flag for the dev-notification script.
+
+---
+
 ## 2026-06-10 — HOTFIX (critical): per-chapter Cloudflare Worker `/v1/list` cost-bleed
 
 **Severity:** critical (unbounded Cloudflare R2 Class-A op spend) · **Branch:** `hotfix/r2-list-amplification` → `main` (PR #197, squash `01affd5`).
