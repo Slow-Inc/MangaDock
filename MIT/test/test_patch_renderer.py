@@ -157,3 +157,39 @@ def test_process_group_inpaint_context_pad_enlarges_crop_then_slices_back():
     assert (result['x'], result['y'], result['w'], result['h']) == (130, 130, 290, 290)
     # inpaint saw that rect padded by 100 on each side (clamped to the 600px page) → 490×490
     assert seen['inpaint_shape'] == (490, 490, 3)
+
+
+# ---- #250: page-scaled font floor applied on a per-request config copy ---------
+
+def test_patch_renderer_floors_font_min_to_page_scale_on_a_config_copy():
+    """#250: the renderer floors font_size_minimum to the PAGE-scaled value, on a
+    deep copy — the input config (shared / full-page path) is never mutated."""
+    import types
+
+    original = types.SimpleNamespace(
+        render=types.SimpleNamespace(bubble_area_fit=False, font_size_minimum=-1),
+        inpainter=types.SimpleNamespace(inpaint_context_pad=0),
+    )
+    renderer = pr.PatchRenderer(
+        FakeDriver(), _ctx(), original, pad=40, render_extra=80,
+        img_w=1400, img_h=2000, source_icc=None,
+        sem=asyncio.Semaphore(3), logger=__import__('logging').getLogger('test'),
+    )
+    assert renderer.config.render.font_size_minimum == 17    # round((2000+1400)/200)
+    assert original.render.font_size_minimum == -1           # input untouched (per-request copy)
+
+
+def test_patch_renderer_keeps_a_larger_explicit_font_min():
+    """An explicit floor already above the page scale is preserved (and no needless copy)."""
+    import types
+
+    original = types.SimpleNamespace(
+        render=types.SimpleNamespace(bubble_area_fit=False, font_size_minimum=40),
+        inpainter=types.SimpleNamespace(inpaint_context_pad=0),
+    )
+    renderer = pr.PatchRenderer(
+        FakeDriver(), _ctx(), original, pad=40, render_extra=80,
+        img_w=1400, img_h=2000, source_icc=None,
+        sem=asyncio.Semaphore(3), logger=__import__('logging').getLogger('test'),
+    )
+    assert renderer.config.render.font_size_minimum == 40    # 40 > page floor 17 → kept

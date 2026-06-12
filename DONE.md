@@ -2134,3 +2134,21 @@ companion `MIT/_e2e_249_cluster.png`): inpaint/text-removal **clean — no halo,
 fits the bubbles; cluster #247/#248/#173/#249 validated live. **Remaining gap vs the MangaTranslator target:** the
 big ぬ renders as JP, not "LOOM" — that is **#168** (vision-OCR SFX rescue, parked in `git stash`), not a cluster
 regression. Per-issue Playwright-via-tunnel E2E is now the standing workflow.
+
+## 2026-06-13 — #250 page-scaled font floor in patch mode
+Quality regression #4 (`docs/research/mit-vs-upstream-quality-divergence.md`): the renderer's auto font floor
+`(img.h+img.w)/200` is computed on the small patch crop (~300×400 → ~3-4px), not the page (~16px), and the config
+default `-1` is never overridden in prod. On the **fallback render path** (vertical / occupancy>1 / no-balloon / SFX)
+text renders unreadably small. Fix: **pure `page_scaled_font_min(img_h, img_w, existing)`** in `patch_geometry`
+(`max(existing, round((h+w)/200))`); `PatchRenderer.__init__` floors `config.render.font_size_minimum` to it on a
+**per-request `copy.deepcopy`** (guarded `page_min > existing`, so an explicit larger override is kept and the shared
+/ full-page `_translate` config is never mutated). Patch-mode only (this driver); the bubble-fit path already bypassed
+the floor. TDD: 2 pure (`page_scaled_font_min`: page value 17 on 2000×1400; keep-larger-override) + 2 wire in
+`test_patch_renderer` (floor applied on a copy + input unmutated; explicit 40 kept). Full MIT suite **380 pass / 18
+pre-existing async / 0 new**.
+
+### E2E (direct render on the benchmark page, #250 worker code)
+`MIT/_e2e_250_fontfloor.png` — narration/fallback-path text (the top-left & top-right boxes) renders a touch larger /
+fills its box better than the #249 baseline; inpaint still clean; no regression (ぬ still JP = #168). Used the fast
+direct-render path for this subtle font-floor refinement — the **full Reader/tunnel E2E was validated for the cluster
+(#249)** and is reserved for #168 (the high-visual-impact ぬ→LOOM change). Provenance in PIPELINE.md §5.

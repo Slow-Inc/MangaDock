@@ -17,6 +17,7 @@ geometry is the pure `patch_geometry` helpers. `logger` is injected so
 `set_main_logger` swaps in the driver are honoured.
 """
 import asyncio
+import copy
 import traceback
 
 import numpy as np
@@ -28,6 +29,7 @@ from .patch_geometry import (
     crop_mask_for_patch,
     expand_inpaint_crop,
     feather_alpha,
+    page_scaled_font_min,
     union_refined_with_fallback,
 )
 from .utils import Context
@@ -39,11 +41,23 @@ class PatchRenderer:
                  img_w, img_h, source_icc, sem, logger):
         self.driver = driver
         self.ctx = ctx
-        self.config = config
         self.pad = pad
         self.render_extra = render_extra
         self.img_w = img_w
         self.img_h = img_h
+        # #250: floor the render font size to a PAGE-scaled value. The renderer's
+        # auto floor is (h+w)/200 computed on the small patch crop → ~3-4px, which
+        # renders fallback-path text (vertical / occupancy>1 / no-balloon / SFX)
+        # unreadably small. Apply on a per-request COPY so the shared / full-page
+        # _translate config is never mutated. Patch-mode only (this driver).
+        render_cfg = getattr(config, 'render', None)
+        existing = getattr(render_cfg, 'font_size_minimum', -1)
+        existing = int(existing) if existing is not None else -1
+        page_min = page_scaled_font_min(img_h, img_w, existing)
+        if page_min > existing:
+            config = copy.deepcopy(config)
+            config.render.font_size_minimum = page_min
+        self.config = config
         self.source_icc = source_icc
         self.sem = sem
         self.logger = logger
