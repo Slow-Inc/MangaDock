@@ -2088,3 +2088,21 @@ nearest-resize == 4 px) — RED 2 → GREEN; INTER_NEAREST pinned (== 4, bilinea
 pass / 18 pre-existing async fails / 0 new**; `test_patch_renderer` green (wiring intact). Branch
 `fix/mit-inpaint-mask-248`. Provenance registered in PIPELINE.md §5 (S24a/S24b now diverge — no longer
 byte-identical). Visual before/after E2E batched with the inpaint cluster (#173/#249).
+
+## 2026-06-13 — #173 patch-seam edge feathering (distance-transform alpha ramp)
+Inpaint-cleanliness cause #3 (`docs/research/inpaint-cleanliness-vs-upstream.md`): each translated region is
+composited as a rectangular PNG patch; against screentone the straight edge reads as a visible rectangle (the #156
+class of complaint). MangaTranslator avoids it with a distance-transform alpha ramp at the patch edge. Added an
+**opt-in** feather across 3 vertical slices (TDD): **(1)** pure `feather_alpha(content_mask, radius)` in
+`patch_geometry.py` — `alpha = clip(1 - d_out/radius)` (EDT outside content), opaque on content, fading to 0 over
+`radius` px; `radius<=0` → hard alpha. 2 golden-numpy tests (interior opaque, band fade 0<a<255, beyond=0; radius-0
+hard). **(2)** `encode_patch_png` gains an `alpha` param → encodes **RGBA**, or **`LA`** when a GRAY ICC must stay
+honored (so #156 color-management AND the feather coexist); absent → byte-identical. 2 tests in `test_patch_png`.
+**(3)** `RenderConfig.patch_feather_radius: int = 0` + `patch_renderer` border-fades the outer band of each patch
+when radius>0 (feathers an eroded-rectangle so the **≥120px crop margin keeps the fade off rendered text** — no
+clipping, no patch-count change) and threads the alpha to the encoder; Backend `buildMitConfig` emits
+`render.patch_feather_radius` from `MIT_PATCH_FEATHER` (posIntEnv, 0/unset → omitted). 2 Backend spec tests
+(`books-mit-config` 26→28). No frontend change — the Reader overlay is already a transparent `<img>`. Full MIT suite
+**373 pass / 18 pre-existing async / 0 new**; Backend mit-config 28/28. Branch `feat/mit-patch-feather-173`.
+Provenance in PIPELINE.md §5 (config.py row, patch_png, S24a/S24b). Visual before/after E2E batched with the inpaint
+cluster (#249).

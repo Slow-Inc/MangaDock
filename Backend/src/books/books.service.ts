@@ -623,6 +623,7 @@ export class BooksService {
     const fontSizeMin = posIntEnv('MIT_FONT_SIZE_MIN');
     const supersampling = posIntEnv('MIT_SUPERSAMPLING');
     const fontMaxBoxRatio = fracEnv('MIT_FONT_MAX_BOX_RATIO');
+    const patchFeather = posIntEnv('MIT_PATCH_FEATHER');
     const model = this.imageModelKey(imageModel);
     return JSON.stringify({
       translator: {
@@ -690,6 +691,10 @@ export class BooksService {
         // Render-parity B: override the EN face by filename in fonts/ (operator-set,
         // MangaTranslator BYO font). Absent → byte-identical.
         ...(process.env.MIT_EN_FONT ? { en_font: process.env.MIT_EN_FONT } : {}),
+        // #173: feather the outer N px of each patch to a transparent alpha so the
+        // patch edge blends into the page (no rectangular seam). Absent → hard alpha,
+        // byte-identical.
+        ...(patchFeather !== undefined ? { patch_feather_radius: patchFeather } : {}),
       },
     });
   }

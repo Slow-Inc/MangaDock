@@ -155,3 +155,25 @@ def union_refined_with_fallback(refined_mask: np.ndarray, text_only_mask: np.nda
             out[component] = 255
 
     return out
+
+
+def feather_alpha(content_mask: np.ndarray, radius: int) -> np.ndarray:
+    """Distance-transform alpha ramp for blending a patch into the page (#173).
+
+    Each translated region is composited as a rectangular PNG patch; against a
+    textured/screentone background the straight edge reads as a visible rectangle.
+    This builds a per-patch alpha that is opaque (255) over the content and fades
+    to 0 over a `radius`-px band *outside* the content, so the patch blends instead
+    of showing a hard seam: ``alpha = clip(1 - d_out / radius, 0, 1)`` where
+    ``d_out`` is the Euclidean distance from each background pixel to the nearest
+    content pixel (0 inside content). ``radius <= 0`` → hard alpha (byte-identical
+    to the un-feathered patch). Pure numpy/cv2 — no ML.
+    """
+    content = (np.ascontiguousarray(content_mask) > 0).astype(np.uint8)
+    if radius <= 0:
+        return content * np.uint8(255)
+
+    background = (content == 0).astype(np.uint8)
+    d_out = cv2.distanceTransform(background, cv2.DIST_L2, 3)
+    ramp = np.clip(1.0 - d_out / float(radius), 0.0, 1.0)
+    return (ramp * 255.0).astype(np.uint8)

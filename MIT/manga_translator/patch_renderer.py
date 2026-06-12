@@ -26,6 +26,7 @@ from .patch_geometry import (
     build_local_region,
     create_text_only_mask,
     crop_mask_for_patch,
+    feather_alpha,
     union_refined_with_fallback,
 )
 from .utils import Context
@@ -143,12 +144,27 @@ class PatchRenderer:
                 )
                 patch_ctx.img_rendered = patch_ctx.img_inpainted
 
+            # #173: optionally feather the outer band of the patch so its edge
+            # blends into the page instead of showing a rectangle at the seam. The
+            # crop carries a ≥120px content margin (pad+render_extra), so fading the
+            # outer `patch_feather_radius` px never touches rendered text. 0 → None
+            # → hard-alpha patch, byte-identical to before.
+            feather = None
+            feather_radius = int(getattr(config.render, 'patch_feather_radius', 0) or 0)
+            if feather_radius > 0:
+                ph, pw = patch_ctx.img_rendered.shape[:2]
+                r = min(feather_radius, (ph - 1) // 2, (pw - 1) // 2)
+                if r > 0:
+                    inner = np.zeros((ph, pw), dtype=np.uint8)
+                    inner[r:ph - r, r:pw - r] = 255
+                    feather = feather_alpha(inner, r)
+
             # Offload PNG compression to thread pool to avoid blocking the event loop.
             # compress_level=1 is ~10x faster than optimize=True with ~15% larger file —
             # acceptable trade-off for interactive translation.
             loop = asyncio.get_running_loop()
             def _encode_png():
-                return encode_patch_png(patch_ctx.img_rendered, icc_profile=source_icc)
+                return encode_patch_png(patch_ctx.img_rendered, icc_profile=source_icc, alpha=feather)
             logger.debug(f'[PatchTranslate] encoding PNG patch ({x2-x1}×{y2-y1} px)...')
             try:
                 png_bytes = await asyncio.wait_for(

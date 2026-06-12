@@ -49,3 +49,39 @@ def test_no_profile_when_source_has_none():
     out = Image.open(io.BytesIO(png))
     assert out.info.get("icc_profile") is None
     assert np.array_equal(np.array(out), _arr())
+
+
+# ---- #173 feathered alpha: RGBA / LA patches that blend at the seam -----------
+
+def test_alpha_yields_rgba_patch_carrying_the_feather():
+    """With a feather alpha and no GRAY profile, the patch encodes as RGBA so the
+    Reader's transparent overlay blends the soft edge into the page."""
+    alpha = np.full((8, 8), 255, np.uint8)
+    alpha[0, :] = 0                                   # a fully-feathered (transparent) edge row
+
+    png = encode_patch_png(_arr(), alpha=alpha)
+
+    out = Image.open(io.BytesIO(png))
+    assert out.mode == "RGBA"
+    a = np.array(out)[:, :, 3]
+    assert a[0, 0] == 0                               # feathered edge transparent
+    assert a[4, 4] == 255                             # interior opaque
+
+
+def test_alpha_with_gray_profile_yields_LA_keeping_the_profile():
+    """#156 + #173 coexist: a GRAY ICC profile is honored only on grayscale, so a
+    feathered patch on a GRAY-tagged page encodes as mode 'LA' (grayscale + alpha)
+    — the tone stays color-managed AND the seam blends."""
+    import os
+    with open(os.path.join(os.path.dirname(__file__), "testdata", "dotgain20.icc"), "rb") as f:
+        icc = f.read()
+    alpha = np.full((8, 8), 255, np.uint8)
+    alpha[0, :] = 0
+
+    png = encode_patch_png(_arr(), icc_profile=icc, alpha=alpha)
+
+    out = Image.open(io.BytesIO(png))
+    assert out.mode == "LA"
+    assert out.info.get("icc_profile") == icc
+    a = np.array(out)[:, :, 1]                        # LA → channel 1 is alpha
+    assert a[0, 0] == 0 and a[4, 4] == 255

@@ -174,6 +174,11 @@ class RenderConfig(BaseModel):
     balloon height. 0.5 (#175) keeps a short line from becoming a giant; raise it
     (toward MangaTranslator's no-cap fill) to let text grow into the balloon.
     0.5 → byte-identical."""
+    patch_feather_radius: int = 0
+    """#173: feather the outer N px of each composited patch to a transparent
+    alpha (distance-transform ramp) so the rectangular patch edge blends into the
+    page instead of showing a seam. The crop has a ≥120px content margin, so the
+    fade never touches rendered text. 0 → hard-alpha patch (byte-identical)."""
     direction: Direction = Direction.auto
     """Force text to be rendered horizontally/vertically/none"""
     uppercase: bool = False
