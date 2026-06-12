@@ -134,6 +134,31 @@ def test_union_keeps_tight_refined_and_drops_the_text_only_halo():
     assert int((out > 0).sum()) == 16                        # exactly the 4x4 refined blob, no halo
 
 
+def test_feather_alpha_interior_opaque_edge_fades_to_zero():
+    """#173: distance-transform alpha ramp — content stays opaque, the patch fades
+    to transparent over `radius` px outside the content so the rectangular seam
+    blends into the page instead of showing a hard edge."""
+    content = np.zeros((40, 40), np.uint8)
+    content[15:25, 15:25] = 255
+    a = pg.feather_alpha(content, radius=8)
+    assert a.shape == (40, 40)
+    assert a.dtype == np.uint8
+    assert a[20, 20] == 255                          # interior opaque
+    assert a[3, 20] == 0                             # >radius outside content → transparent
+    assert 0 < a[10, 20] < 255                       # within the band → partial blend
+
+
+def test_feather_alpha_radius_zero_is_hard_alpha():
+    """radius 0 → no ramp: opaque exactly on content, transparent elsewhere (the
+    byte-identical hard-alpha fallback)."""
+    content = np.zeros((10, 10), np.uint8)
+    content[3:7, 3:7] = 200                          # nonzero but not 255
+    a = pg.feather_alpha(content, radius=0)
+    assert set(np.unique(a)).issubset({0, 255})      # no intermediate values
+    assert a[5, 5] == 255                            # content → opaque
+    assert a[0, 0] == 0                              # background → transparent
+
+
 def test_union_falls_back_to_text_only_where_refinement_missed_a_region():
     """A text component the CRF dropped entirely (no overlap) is still covered by
     text_only — no leftover-text residue."""
