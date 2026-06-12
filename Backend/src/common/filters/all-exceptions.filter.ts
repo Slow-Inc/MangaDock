@@ -18,29 +18,38 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const { httpAdapter } = this.httpAdapterHost;
     const ctx = host.switchToHttp();
 
-    const httpStatus =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+    const isHttpException = exception instanceof HttpException;
+    const httpStatus = isHttpException
+      ? exception.getStatus()
+      : HttpStatus.INTERNAL_SERVER_ERROR;
 
+    // Raw detail — used for server-side logging and Supabase detection only;
+    // it must never reach the client unless it is an intentional HttpException.
     const message = (exception as any)?.message || 'Internal server error';
     const stack = (exception as any)?.stack;
 
     // T4-STANDARD Pillar 6: Observability Standard
     // Detect Supabase connection issues (paused project)
-    const isSupabaseError = 
-      message.includes('fetch failed') || 
-      message.includes('ECONNREFUSED') || 
+    const isSupabaseError =
+      message.includes('fetch failed') ||
+      message.includes('ECONNREFUSED') ||
       message.includes('getaddrinfo ENOTFOUND') ||
       message.includes('Supabase');
+
+    // Client-facing message: the crafted Supabase signal, the intentional
+    // HttpException message, or a generic string for any other (unexpected)
+    // error — so internal detail (queries, stack, secrets) is never leaked.
+    const clientMessage = isSupabaseError
+      ? 'SUPABASE_CONNECTION_ERROR: The database is currently unreachable. Please ensure the Supabase project is active.'
+      : isHttpException
+        ? message
+        : 'Internal server error';
 
     const responseBody = {
       statusCode: isSupabaseError ? HttpStatus.SERVICE_UNAVAILABLE : httpStatus,
       timestamp: new Date().toISOString(),
       path: httpAdapter.getRequestUrl(ctx.getRequest()),
-      message: isSupabaseError 
-        ? 'SUPABASE_CONNECTION_ERROR: The database is currently unreachable. Please ensure the Supabase project is active.' 
-        : message,
+      message: clientMessage,
       code: isSupabaseError ? 'SUPABASE_OFFLINE' : 'INTERNAL_ERROR',
     };
 

@@ -187,8 +187,11 @@ export class BooksController {
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      // Log the real MIT/internal error server-side; return a generic message
+      // so internal detail never leaks to the client (#226).
+      console.error(`translate-patches failed (chapter ${chapterId} page ${pageIndex}):`, message);
       throw new HttpException(
-        { statusCode: HttpStatus.INTERNAL_SERVER_ERROR, message },
+        { statusCode: HttpStatus.INTERNAL_SERVER_ERROR, message: 'Translation failed' },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -258,8 +261,11 @@ export class BooksController {
       await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang, imageModel, derivative, body?.mangaId);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      // Log the real error server-side; emit a generic error to the SSE client
+      // so internal detail never leaks (#226).
+      console.error(`batch-translate-patches failed (chapter ${chapterId}):`, message);
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: message, pageIndex: -1, patches: [] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: 'Translation failed', pageIndex: -1, patches: [] })}\n\n`);
       }
     }
 
