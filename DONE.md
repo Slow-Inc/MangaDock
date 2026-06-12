@@ -1925,3 +1925,148 @@ TDD red→green: 8 new tests RED (AttributeError) → implement → GREEN. Valid
 pass (3 globals + 8 value-object); full suite **365 / 18 pre-existing async / 0 new fail**. One cosmetic delta:
 the batch_concurrent warning now logs under the `pipeline_params` logger name (same message/level/effect).
 **#187 CLOSED → MIT tech-debt category 6/6 complete** (#186/#187/#188/#191/#192/#193).
+
+## 2026-06-12 — STORAGE_DRIVER config + render-parity dev-enablement + #168 SFX-OCR investigation
+Three threads: (1) shipped a Backend storage-driver toggle, (2) discovered the whole render-parity feature set
+was already built behind off-by-default knobs and enabled + verified it live, (3) root-caused why SFX ぬ→LOOM
+doesn't render and hit a hard dependency wall on the local-VLM-OCR fix.
+
+### 1. PR #222 (MERGED, main a7e7b3d→e9083ec) — `STORAGE_DRIVER` env: local-disk vs Cloudflare-R2
+`Backend/src/common/storage/storage.module.ts`: the factory only auto-detected the backend from
+`WORKER_URL`/`WORKER_SECRET` presence, so a dev with R2 creds couldn't force local disk. Added explicit
+`STORAGE_DRIVER` (`disk`|`local` → DiskStorageProvider, forced even with R2 creds; `r2`|`cloudflare` →
+CloudflareR2 with a clear missing-creds error; unset → original auto-detect, byte-identical). Extracted the
+selection into a pure, env-injectable `createStorageProvider(env, logger)`. New `storage.module.spec.ts` 11/11.
+Gate: CodeQL js-ts+python green, `/scrutinize` (bilingual, verdict ship — flagged one forward-looking
+coordination item for @akkanop-x's incoming storage refactor: the `/r2-patches` URL-builder must key off the
+*selected provider*, not raw `WORKER_URL`, or `STORAGE_DRIVER=disk`+`WORKER_URL` set = split-brain). Dev then set
+`STORAGE_DRIVER=disk` → unblocks the One Punch-Man benchmark chapter (the R2-only #214 path is bypassed; the
+uploaded page is served from local disk). Verified live: `[StorageModule] storage backend: local disk (driver=disk)`.
+
+### 2. Render-parity — ALL knobs already built, just OFF; enabled in dev `.env` + verified live E2E
+Discovery: #176/#179/#180/#181 (comic font, ALL-CAPS, bubble box-fit, 4× supersampling, hyphenation) were **all
+already implemented** behind config knobs + Backend env flags (`MIT_EN_COMIC_FONT` / `MIT_EN_UPPERCASE` /
+`MIT_BUBBLE_SEG` / `MIT_BUBBLE_AREA_FIT` / `MIT_SUPERSAMPLING` / `MIT_FONT_MAX_BOX_RATIO`), unit-tested in
+`books-mit-config.spec` (26/26). The benchmark looked bad only because `Backend/.env` had none set. Enabled them in
+dev `.env`; tuned `MIT_FONT_MAX_BOX_RATIO` 0.75→0.5 (0.75 oversized text, esp. the bottom-right panel) and kept SFX
+off for the parity pass. Verified END-TO-END through the live tunnel (hayateotsu.space → One Punch-Man → Benchmark
+Pipeline MIT → EN, Playwright-driven): comic font + ALL-CAPS + box-fill + hyphenation ("SOME-WHERE") all render;
+patches served from local disk (no #214 ENOENT). Closes the bulk (~95%) of the gap vs MangaTranslator's
+`example_translation.jpg`. **NOT committed** (dev `.env` only, per the dev's "enable in dev first" decision);
+graduation to a committed Backend default is deferred (would change all translations + needs broader E2E).
+
+### 3. #168 SFX ぬ→LOOM — root-caused, then blocked on a hard dependency conflict
+SFX detector (AnimeText YOLO, gated repo, loads fine via `HF_TOKEN`) **does** detect the big stylized ぬ
+(box 67,366–326,518) + 7 others; dedup correctly drops the 6 overlapping DBNet dialogue. Diagnostic via
+`/translate/with-form/json` (per-region OCR+translation dump): of 8 SFX boxes, 7 become regions — フッ→"Heh."
+renders fine — but **ぬ is the only box dropped**: the 48px line-OCR can't read the giant stylized glyph (garbage at
+prob 0.03–0.08 → below floor → filtered before render). So ぬ→LOOM is an **OCR** problem, not detection. The earlier
+"HMPH overlap" was font-size (ratio 0.75) — gone at 0.5 (json confirms 7 clean, non-overlapping regions).
+- **MangaTranslator OCR conclusion:** its `ocr_method` = `LLM` (default — a vision-LLM reads the image) / `manga-ocr`
+  (= our 48px) / `paddleocr-vl`. It reads stylized SFX with a **VLM**, not a line-OCR transformer. The no-API match
+  = **PaddleOCR-VL-1.5** (`PaddlePaddle/PaddleOCR-VL-1.5`), a LOCAL VLM OCR (the "VLM-OCR" borrow flagged when we
+  studied the repo).
+- **BLOCKER:** PaddleOCR-VL-1.5 is **incompatible with MIT's transformers 5.9.0**. Its config is a transformers-4.55
+  schema (flat, no `text_config`); the native 5.9 impl breaks on the missing `text_config`, and the remote `auto_map`
+  code (4.55-era) breaks with `KeyError 'default'` (rope API changed 4.55→5.9). Both paths fail; downgrading
+  transformers would break the rest of MIT's pipeline (built on 5.9). GPU headroom is fine (12 GB, ~5.7 GB free).
+- **DECISION PENDING:** (a) try a transformers-5.9-native OCR-VLM (e.g. `GOT-OCR2_0`), (b) isolated OCR microservice
+  in a separate venv (infra-heavy — rejected by the north-star for one glyph), (c) defer ぬ→LOOM, re-enable SFX at
+  ratio 0.5 (フッ→Heh works), ship render-parity.
+
+Throwaway diagnostics under `MIT/tools/`: `ab_tune.py`, `feas_paddle_ocr_vl.py`, `_bubble_proof/{regions_sfx.json,
+parity2_*, sfx_*, tune_*, live_ratio05_nosfx.png}`. **No MIT production code changed this session** (investigation +
+dev `.env` only).
+
+## 2026-06-12 (cont.) — #168/#172 vision-LLM OCR rescue (built + OCR proven; render-path drop unresolved)
+Built the no-API path to ぬ→SFX after a probe ladder ruled out the alternatives. **Key reframe:** ぬ→"LOOM" is
+**contextual SFX localization** (a vision-LLM seeing the scene), NOT pure OCR — the glyph is just hiragana "ぬ";
+"LOOM" is a creative localization. So a dedicated OCR (GOT-OCR2 → read ぬ as "X"; PaddleOCR-VL → blocked on
+transformers 4.55-vs-5.9) is the wrong tool. **Decisive find:** the dev's existing translator gateway
+(`custom_openai` / 9arm, `qwen3.6-35b-a3b`) **accepts images** — a 1-shot probe of the ぬ crop returned an English
+SFX. So the clean copy of MangaTranslator's `ocr_method=LLM` idea is: re-OCR the regions the 48px loses via the
+**same 9arm gateway** — no Gemini, no local VLM, no disk/GPU/VRAM cost (the disk hit 0.2 GB free this session).
+
+- **`manga_translator/ocr_vlm.py` (new):** `vlm_localize_sfx(crop, *, api_base, api_key, model, post_fn=requests.post)`
+  → POSTs the crop to the OpenAI-compatible vision endpoint, returns an UPPERCASE English SFX (`sanitize_sfx`); any
+  failure → '' (degrades to stage-off). `post_fn` injectable so parse/sanitize is unit-tested with no network.
+  Plus `restore_sfx_translations(regions)` — re-applies the rescued SFX after the translate stage (see below).
+- **`config.py`:** `OcrConfig.vlm_rescue: bool = False` (off → byte-identical).
+- **`manga_translator.py` (`_run_textline_merge`):** in the OCR drop-branch, when `vlm_rescue` is on and a large
+  region (area ≥ 3600, min side ≥ 24 — SFX-sized) is about to be dropped, crop it from `ctx.img_rgb`, call
+  `vlm_localize_sfx` with the `custom_openai` keys, and on a hit set `region.text = region.translation = rescued`,
+  flag `region.sfx_rescued = True`, keep it. `_run_text_translation` calls `restore_sfx_translations` after
+  `apply_translations` (the translator blanks an already-English word → would be dropped by
+  `filter_translated_regions`).
+- **Backend `buildMitConfig`:** `MIT_OCR_VLM_RESCUE=1` → `ocr.vlm_rescue: true` (+2 spec tests, 28/28).
+- **Tests:** `test/test_ocr_vlm.py` **13** (sanitize, injected-HTTP contract, degrade-to-blank, restore). MIT
+  suite **375 / 18 pre-existing async / 0 new fail**. `tsc` clean.
+
+**Status — OCR layer works, render-path NOT done.** Confirmed on a clean worker: the rescue **fires** every run
+(`[OcrVLM] rescued SFX region "X" -> "SLURP"` / "NUU" / "SQUELCH" — the model guesses a generic/phonetic SFX, not
+the contextual "LOOM"; quality needs full-page context + prompt tuning). BUT the rescued region is **still dropped
+before render** — `restore_sfx_translations` did not save it, and the original ぬ isn't inpainted. The exact drop
+point (somewhere in translate → post-translation-check → `filter_translated_regions`, or the `sfx_rescued` flag not
+surviving stage hand-off) is **unresolved** — tracing it through the worker HTTP loop failed because of the gotcha
+below. Next: an **in-process** pipeline trace (no worker) to pin the drop, then fix + inpaint-mask for the SFX region.
+
+**Infra gotcha that cost most of the session (now fixed + memoried):** the MIT `--start-instance` worker is
+`python3.11.exe` (not `python.exe`), so `Stop-Process python` never killed it; an orphaned worker on `:5004` kept
+serving OLD code so edits/`logger.info` had no visible effect. **Restart by killing the PORT OWNER on 5003 AND
+5004** until both report free, then relaunch. See `.claude/memory/project_mit_worker_restart_gotcha.md`.
+
+Files: `manga_translator/ocr_vlm.py`, `test/test_ocr_vlm.py`, `config.py` + `manga_translator.py` edits;
+`Backend/src/books/books.service.ts` + `books-mit-config.spec.ts`; harness `MIT/tools/{ab_vlm.py, probe_got_ocr2.py,
+probe_qwen_vl_sfx.py}`. NOT committed yet (OCR layer is a clean, tested foundation pending the render-path fix).
+
+## 2026-06-12 (cont.) — Root-cause: why MIT text-removal (inpaint) is less clean than upstream zyddnys
+ultracode fan-out (6 agents, ~510k tokens) compared MIT vs the cloned upstream
+`manga-image-translator-Original` at file:line, no black boxes. **Verdict: the entire cleanliness gap is on the
+input/output side of an UNMODIFIED LaMa — the MIT-only patch path (`translate_patches`), not the model/precision or
+core mask/CRF code** (those are byte-identical between repos). Upstream has no patch mode; it inpaints the full page
+once. Ranked causes: **(1, biggest)** blocky `text_only_mask` union `cv2.max(...)` (`patch_renderer.py:110`) ORs a
+dilated rectangular mask onto the tight CRF mask → LaMa erases a fat halo of background → smeared/destroyed art next
+to bubbles; (2) context starvation — tight 120px crop vs full-page → LaMa can't copy clean background → blurry fill;
+(3) hard rectangular opaque composite (no alpha feather) → seam/tone-step around every bubble (= issue #173);
+(4) `inpainting_size=1536` vs upstream/Config default 2048 → ~56%-area fill then upscaled → soft smudge;
+(5) bilinear mask resize `INTER_LINEAR` in `crop_mask_for_patch` → blurred mask edges; (6) pydensecrf soft-fail
+(dormant in dev — installed). Fixes ranked by ROI (all keep LaMa/light-HW): tame the union → 2048 → INTER_NEAREST →
+alpha feather (#173) → larger context crop → pin pydensecrf. **Full report + file:line + fix table:
+`docs/research/inpaint-cleanliness-vs-upstream.md`.** **Issues published 2026-06-12:** #248 (tame mask union +
+INTER_NEAREST), #247 (raise detection_size 2560 + inpainting_size 2048), #249 (larger context crop, blocked-by
+#247), #251 (harden pydensecrf); #173 AMENDED with MIT-side file:line evidence. The user handles storage separately.
+
+## 2026-06-12 (cont.) — No-black-box scan: every MIT-vs-upstream divergence that LOWERS translation quality
+ultracode fan-out (8 agents, ~748k tokens) compared MIT vs the fork-parent `manga-image-translator-Original`
+across the WHOLE pipeline at file:line. **Throughline: MIT's patch mode (`translate_patches`) is the root, but
+cropping itself only hurts RENDER; the real losses are translation cross-page context + two Backend config knobs
+below MIT's own tuned defaults.** Ranked: **(1)** cross-page rolling context DEAD — `translate_patches` calls
+`reset_page_context()` per page + never persists (`manga_translator.py:1408`), so names/honorifics/pronouns drift
+page-to-page (upstream joins all batch pages into one prompt); **(2)** `detection_size=2048` vs MIT's own default
+2560 (`books.service.ts:640`) → misses small/faint text → stays untranslated; **(3)** `inpainting_size=1536` vs
+2048 → blurrier erase; **(4)** renderer font floor `(h+w)/200` computed on the CROP not page → ~3-4px floor →
+unreadably small text on the fallback render path; **(5)** `context_size` never enabled (corollary of #1);
+**(6)** few-shot langcodes→dict lookup (narrow, NOT in prod — THA/ENG map cleanly). **Config quick-wins (zero
+code):** `MIT_DETECTION_SIZE=2560` + `MIT_INPAINTING_SIZE=2048` recover the two biggest default-mode losses.
+**Structural (small):** page-scaled font floor in patch mode + thread rolling cross-page context (= the PRD
+#155/#159 context-aware work). **NOT the cause (byte-identical, don't chase):** OCR (prob=0.03 RECOVERS text),
+detection algorithm, textline-merge, default render path (#189/#190 preserved behavior), mask/inpaint core,
+series_context (a bonus upstream lacks). **Full report: `docs/research/mit-vs-upstream-quality-divergence.md`.**
+**Issues published 2026-06-12:** #247 (config: detection 2560 + inpaint 2048), #250 (page-scaled font floor in
+patch mode); #159 AMENDED with the prod root-cause (`reset_page_context`/`context_size` dead) = PRD #155/#159.
+few-shot regional fallback (#6) not filed — no live impact (THA/ENG).
+
+## 2026-06-13 — #247 raise MIT config defaults (detection_size 2560 + inpainting_size 2048)
+First of the quality-issue batch (#247→#251) drawn from the two divergence studies. Backend `buildMitConfig`
+shipped `detection_size=2048` / `inpainting_size=1536` — **below MIT's own tuned Config defaults (2560/2048)** —
+silently dropping small/faint glyphs below DBNet's threshold (~36% fewer px → original JP left untranslated) and
+downscaling pages before the LaMa erase then upscaling back (blurrier plate / screentone smear). Raised both
+`books.service.ts` fallbacks to the tuned defaults + refreshed the JSDoc; **env (`MIT_DETECTION_SIZE` /
+`MIT_INPAINTING_SIZE`) still overrides** so a VRAM-tight host can drop them (it IS a quality cut — raise where the
+GPU allows). TDD: updated 3 default assertions in `books-mit-config.spec.ts` (RED 3 fails → GREEN 26/26); the
+env-override + invalid-env-fallback tests prove overridability survives. Full books suite: **148 pass / 16
+pre-existing pubsub-batch fails / 0 new**. Pure config — no LaMa/model change, render byte-identical when env pins
+the old values. Branch `fix/mit-config-defaults-247`. Also lands the two analysis docs
+(`docs/research/{mit-vs-upstream-quality-divergence,inpaint-cleanliness-vs-upstream}.md`) that justify the batch.
+Visual before/after E2E is batched after the inpaint cluster (#248/#173/#249) — they change the same rendered
+output, so one benchmark validates the whole cluster instead of spinning the ML stack per tiny config PR.
