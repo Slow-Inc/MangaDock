@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { BooksService } from './books.service';
 import { StatsIncrementService } from '../cache/stats-increment.service';
 import { TurnstileGuard, generateClearanceToken } from '../auth/turnstile.guard';
+import { resolveTurnstileConfig } from '../auth/turnstile.config';
 
 @Controller('books')
 export class BooksController {
@@ -16,20 +17,21 @@ export class BooksController {
     if (!body.token) {
       throw new HttpException('Token is required', HttpStatus.BAD_REQUEST);
     }
-    const secretKey = process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA';
+    // Fail-closed config: production rejects a missing/test secret at boot (#224).
+    const { enabled, secret } = resolveTurnstileConfig(process.env);
     const hwid = req.headers['x-hardware-id'] as string;
 
     if (!hwid) {
       throw new HttpException('Hardware ID is required', HttpStatus.BAD_REQUEST);
     }
-    
-    // Ignore verification if disabled
-    if (process.env.TURNSTILE_ENABLED === 'false') {
-      return { clearanceToken: generateClearanceToken(secretKey, hwid) };
+
+    // Skip verification only when disabled outside production.
+    if (!enabled) {
+      return { clearanceToken: generateClearanceToken(secret, hwid) };
     }
 
     const formData = new URLSearchParams();
-    formData.append('secret', secretKey);
+    formData.append('secret', secret);
     formData.append('response', body.token);
 
     try {
@@ -40,7 +42,7 @@ export class BooksController {
       const outcome = await result.json();
 
       if (outcome.success) {
-        return { clearanceToken: generateClearanceToken(secretKey, hwid) };
+        return { clearanceToken: generateClearanceToken(secret, hwid) };
       }
       
       console.error('Turnstile verification failed:', outcome['error-codes']);

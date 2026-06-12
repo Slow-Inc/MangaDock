@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
+import { resolveTurnstileConfig } from './turnstile.config';
 
 // Helper to generate a time-limited clearance token bound to a hardware ID
 export function generateClearanceToken(secret: string, hwid: string): string {
@@ -41,9 +42,13 @@ export class TurnstileGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const currentHwid = request.headers['x-hardware-id'] as string;
-    
-    // Allow bypassing if explicitly disabled
-    if (process.env.TURNSTILE_ENABLED === 'false') {
+
+    // Fail-closed config: in production a missing/test secret has already
+    // crashed the app at boot, so `secret` here is always real (#224).
+    const { enabled, secret } = resolveTurnstileConfig(process.env);
+
+    // Allow bypassing only when disabled outside production.
+    if (!enabled) {
       return true;
     }
 
@@ -56,9 +61,7 @@ export class TurnstileGuard implements CanActivate {
       throw new UnauthorizedException('Captcha clearance token is missing.');
     }
 
-    const secretKey = process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA';
-
-    if (verifyClearanceToken(clearanceToken, secretKey, currentHwid)) {
+    if (verifyClearanceToken(clearanceToken, secret, currentHwid)) {
       return true;
     }
 
