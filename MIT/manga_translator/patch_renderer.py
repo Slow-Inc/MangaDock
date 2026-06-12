@@ -140,9 +140,13 @@ class PatchRenderer:
                         large_mask = np.zeros((iy2 - iy1, ix2 - ix1), dtype=np.uint8)
                         large_mask[oy:oy + rh, ox:ox + rw] = patch_ctx.mask
                         render_rgb, render_mask = patch_ctx.img_rgb, patch_ctx.mask
-                        patch_ctx.img_rgb, patch_ctx.mask = large_rgb, large_mask
-                        large_inpainted = await driver._run_inpainting(config, patch_ctx)
-                        patch_ctx.img_rgb, patch_ctx.mask = render_rgb, render_mask
+                        # finally-restore so a failed inpaint can't leak the larger
+                        # crop/mask into the render step (which expects render-rect size).
+                        try:
+                            patch_ctx.img_rgb, patch_ctx.mask = large_rgb, large_mask
+                            large_inpainted = await driver._run_inpainting(config, patch_ctx)
+                        finally:
+                            patch_ctx.img_rgb, patch_ctx.mask = render_rgb, render_mask
                         patch_ctx.img_inpainted = np.ascontiguousarray(
                             large_inpainted[oy:oy + rh, ox:ox + rw])
                     else:
