@@ -2070,3 +2070,21 @@ the old values. Branch `fix/mit-config-defaults-247`. Also lands the two analysi
 (`docs/research/{mit-vs-upstream-quality-divergence,inpaint-cleanliness-vs-upstream}.md`) that justify the batch.
 Visual before/after E2E is batched after the inpaint cluster (#248/#173/#249) — they change the same rendered
 output, so one benchmark validates the whole cluster instead of spinning the ML stack per tiny config PR.
+
+## 2026-06-13 — #248 tame the patch inpaint mask — drop the blocky text_only halo + nearest-neighbor resize
+The **#1 inpaint-cleanliness cause** (`docs/research/inpaint-cleanliness-vs-upstream.md` root cause #1 + #5). Two
+MIT-only patch-path steps fattened/blurred the mask handed to the byte-identical LaMa, which only edits `mask=1`
+pixels — so a fat mask forced LaMa to erase + re-synthesise a halo of clean background around every glyph,
+destroying screentone/line-art next to bubbles. **Fix (pure, keeps LaMa / light-HW):** (1) `patch_geometry.py`
+`crop_mask_for_patch` mask resize `INTER_LINEAR`→`INTER_NEAREST` — a binary mask bilinear-upscaled then `>0`
+re-binarized fattens edges (a 2× upscale of one pixel lights 16 px vs nearest's 4, verified empirically). (2) new
+pure `union_refined_with_fallback(refined, text_only)` (replaces `cv2.max` at `patch_renderer.py`) — keeps the tight
+CRF mask everywhere it has coverage, falls back to the dilated `text_only_mask` only in connected components the
+refinement missed entirely, so glyphs CRF dropped are still covered (no residue) without a halo where it succeeded.
+Wired into `patch_renderer.py` (dropped the now-orphan `cv2` import). **Did NOT touch** LaMa model/precision or the
+CRF/mask-refinement algorithm — byte-identical to upstream, not the cause. TDD: 3 new golden-numpy tests in
+`test_patch_geometry.py` (halo-dropped: `out[6,6]==0` where `cv2.max` would paint 255; missed-region fallback;
+nearest-resize == 4 px) — RED 2 → GREEN; INTER_NEAREST pinned (== 4, bilinear would == 16). Full MIT suite **369
+pass / 18 pre-existing async fails / 0 new**; `test_patch_renderer` green (wiring intact). Branch
+`fix/mit-inpaint-mask-248`. Provenance registered in PIPELINE.md §5 (S24a/S24b now diverge — no longer
+byte-identical). Visual before/after E2E batched with the inpaint cluster (#173/#249).

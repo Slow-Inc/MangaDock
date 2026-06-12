@@ -86,6 +86,18 @@ def test_crop_mask_scales_coords_when_mask_differs_from_image():
     assert out[50, 50] == 255
 
 
+def test_crop_mask_upscale_uses_nearest_not_bilinear():
+    """#248: a half-res binary mask upscaled to the crop must use INTER_NEAREST.
+    Bilinear bleeds an isolated 255 into a gradient that the `> 0` re-binarize
+    fattens (a 2x upscale lights 16 px vs nearest's 4) — that extra ring is what
+    makes LaMa over-erase. One isolated source pixel → exactly the 2x2 block."""
+    raw = np.zeros((50, 50), np.uint8)
+    raw[25, 25] = 255
+    out = pg.crop_mask_for_patch(raw, 0, 0, 100, 100, 100, 100)
+    assert out.shape == (100, 100)
+    assert int((out > 0).sum()) == 4                         # nearest = 4; bilinear would = 16
+
+
 def test_crop_mask_converts_3channel_to_gray():
     raw = np.zeros((20, 20, 3), np.uint8)
     raw[:, :, 2] = 255                                       # nonzero after BGR2GRAY
@@ -99,3 +111,39 @@ def test_crop_mask_out_of_bounds_returns_zeros():
     out = pg.crop_mask_for_patch(raw, 200, 200, 250, 250, 100, 100)
     assert out.shape == (50, 50)
     assert out.max() == 0                                    # nothing in range → all-zero
+
+
+# ---- union_refined_with_fallback: tame the halo (#248) ------------------------
+
+def test_union_keeps_tight_refined_and_drops_the_text_only_halo():
+    """#248: where CRF refinement covered a glyph, keep ONLY the tight mask — do
+    NOT OR the dilated text_only halo on top (the old cv2.max), so LaMa stops
+    erasing a fat ring of clean background around the glyph."""
+    refined = np.zeros((20, 20), np.uint8)
+    refined[8:12, 8:12] = 255                                # tight CRF glyph stroke
+    text_only = np.zeros((20, 20), np.uint8)
+    text_only[5:15, 5:15] = 255                              # fat dilated halo over the same glyph
+
+    out = pg.union_refined_with_fallback(refined, text_only)
+
+    assert out.shape == (20, 20)
+    assert out.dtype == np.uint8
+    assert set(np.unique(out)).issubset({0, 255})
+    assert out[10, 10] == 255                                # refined glyph kept
+    assert out[6, 6] == 0                                    # halo NOT painted (cv2.max would = 255)
+    assert int((out > 0).sum()) == 16                        # exactly the 4x4 refined blob, no halo
+
+
+def test_union_falls_back_to_text_only_where_refinement_missed_a_region():
+    """A text component the CRF dropped entirely (no overlap) is still covered by
+    text_only — no leftover-text residue."""
+    refined = np.zeros((20, 20), np.uint8)
+    refined[8:12, 8:12] = 255                                # covers ONE glyph
+    text_only = np.zeros((20, 20), np.uint8)
+    text_only[8:12, 8:12] = 255                              # same glyph (overlaps refined)
+    text_only[2:4, 2:4] = 255                                # a SECOND glyph CRF missed
+
+    out = pg.union_refined_with_fallback(refined, text_only)
+
+    assert out[10, 10] == 255                                # refined-covered glyph
+    assert out[3, 3] == 255                                  # missed glyph rescued via text_only fallback
