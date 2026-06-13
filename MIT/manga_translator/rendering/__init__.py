@@ -171,7 +171,11 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     x1f, y1f, x2f, y2f = (float(v) for v in xy)
     clean_fs = font_size_max if (font_size_max and font_size_max > 0) else \
         max(font_size_minimum, round((img_shape[0] + img_shape[1]) / 130))
-    wrap_w = clean_wrap_width(x2f - x1f, y2f - y1f, img_shape[1])
+    # Footprint width = the region's own (source-text) bbox width, so the English breaks
+    # where the source columns did — a narration stays a narrow tall block, not a wide
+    # paragraph. (The balloon box is deliberately NOT used: narration boxes also get a
+    # wide bubble_box from segmentation, which would re-widen them.)
+    wrap_w = clean_wrap_width(x2f - x1f, img_shape[1])
     # max_height is generous (full page) so wrapping is governed by width and the block
     # grows vertically — we place it on the centre regardless of the source box height.
     lines, widths = text_render.calc_horizontal(

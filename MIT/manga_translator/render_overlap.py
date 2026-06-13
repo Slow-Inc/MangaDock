@@ -35,13 +35,15 @@ def centered_box(cx: float, cy: float, w: float, h: float):
     return [(cx - hw, cy - hh), (cx + hw, cy - hh), (cx + hw, cy + hh), (cx - hw, cy + hh)]
 
 
-def clean_wrap_width(bbox_w: float, bbox_h: float, img_w: float) -> int:
-    """Wrap width (px) for the clean horizontal-layout path. A vertical-JP column is tall
-    and narrow; wrapping the translated English to its narrow width would stack one word
-    per line, so we wrap to the region's **wider** extent instead — turning the column into
-    a compact horizontal block. Clamped to [10%, 45%] of the page width so a tiny region
-    still gets a usable line and a huge one doesn't span the whole page."""
-    return int(min(max(bbox_w, bbox_h, img_w * 0.10), img_w * 0.45))
+def clean_wrap_width(ref_w: float, img_w: float) -> int:
+    """Wrap width (px) for the clean horizontal-layout path. Wrap the translated English to
+    the original's footprint width (`ref_w`) so it breaks where the source did — a vertical-JP
+    narration column stays a narrow, tall block; a dialogue balloon fills the balloon — instead
+    of reflowing into a wide novel-like paragraph (the user-flagged "doesn't reference the
+    original line-breaks"). The caller picks `ref_w`: the balloon width for dialogue, else the
+    region's own bbox width. Clamped to [11%, 45%] of the page width so a narrow dialogue
+    column still fits ~2 words a line and a wide caption doesn't span the whole page."""
+    return int(min(max(ref_w, img_w * 0.11), img_w * 0.45))
 
 
 def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: float = 0) -> Box:
