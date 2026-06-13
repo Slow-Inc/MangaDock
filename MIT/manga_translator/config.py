@@ -272,6 +272,12 @@ class TranslatorConfig(BaseModel):
     """Backend-composed context about the series being translated (#157).
     Exposed through chatgpt_config so every ConfigGPT-family translator
     appends it to its system prompt. Absent → prompts identical to today."""
+    prev_context: Optional[str] = None
+    """Rolling cross-page context (#159): the Batch Job's front-built numbered
+    `<|n|>sentence` block of recent pages' dialogue. Rides the same chatgpt_config
+    seam as series_context so every GPT-family translator carries it. The worker
+    resets its own per-request memory, so this is the batch path's only carrier.
+    Absent → prompts identical to today."""
 
     # 译后检查配置项
     enable_post_translation_check: bool = True
@@ -307,10 +313,15 @@ class TranslatorConfig(BaseModel):
         if self.gpt_config is not None and self._gpt_config is None:
             #todo: load from already loaded file
             self._gpt_config = OmegaConf.load(self.gpt_config)
-        # Series context (#157) rides the same OmegaConf all ConfigGPT
-        # translators read via _config_get — one carriage point.
+        # Series context (#157) and rolling cross-page context (#159) ride the same
+        # OmegaConf all ConfigGPT translators read via _config_get — one carriage point.
+        overrides = {}
         if self.series_context:
-            ctx = OmegaConf.create({'series_context': self.series_context})
+            overrides['series_context'] = self.series_context
+        if self.prev_context:
+            overrides['prev_context'] = self.prev_context
+        if overrides:
+            ctx = OmegaConf.create(overrides)
             return OmegaConf.merge(self._gpt_config, ctx) if self._gpt_config is not None else ctx
         return self._gpt_config
 

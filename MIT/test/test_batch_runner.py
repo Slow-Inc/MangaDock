@@ -142,3 +142,50 @@ def test_webhook_payload_carries_the_page_text_layer(monkeypatch):
 
     assert payloads[0]["regions"] == [{"src": "Huh?", "dst": "หา?"}]
     assert payloads[0]["patches"] == []
+
+
+# ---- #159 rolling cross-page context within a Batch Job --------------------------
+
+def test_rolling_context_seeds_the_next_page_with_prior_page_translations(monkeypatch):
+    """With MIT_CONTEXT_PAGES > 0, page N+1's pipeline call carries page N's translated
+    dialogue as prev_context (the Batch Job's Translation Session)."""
+    monkeypatch.setenv("MIT_CONTEXT_PAGES", "3")
+    seen_prev = []
+    dst_by_page = iter([
+        [{"src": "ガキ", "dst": "This brat"}],
+        [{"src": "フッ", "dst": "Heh"}],
+    ])
+
+    async def translate(config_str, img_bytes, progress_meta=None, prev_context=None):
+        seen_prev.append(prev_context)
+        return {"img_width": 1, "img_height": 1, "patches": [], "regions": next(dst_by_page)}
+
+    async def fake_send(url, secret, payload):
+        pass
+
+    monkeypatch.setattr(batch_runner, "_translate_page", translate)
+    monkeypatch.setattr(batch_runner, "send_webhook", fake_send)
+    _run_batch(pages=(0, 1))
+
+    assert not seen_prev[0]                              # page 0: nothing prior
+    assert "This brat" in (seen_prev[1] or "")          # page 1: carries page 0's translation
+    assert "<|1|>" in (seen_prev[1] or "")              # numbered-block format
+
+
+def test_rolling_context_off_by_default_keeps_the_call_byte_identical(monkeypatch):
+    """MIT_CONTEXT_PAGES unset/0 → no prev_context is ever passed (today's behavior)."""
+    monkeypatch.delenv("MIT_CONTEXT_PAGES", raising=False)
+    seen_kwargs = []
+
+    async def translate(config_str, img_bytes, progress_meta=None, **kwargs):
+        seen_kwargs.append(kwargs)
+        return {"img_width": 1, "img_height": 1, "patches": [], "regions": [{"src": "a", "dst": "b"}]}
+
+    async def fake_send(url, secret, payload):
+        pass
+
+    monkeypatch.setattr(batch_runner, "_translate_page", translate)
+    monkeypatch.setattr(batch_runner, "send_webhook", fake_send)
+    _run_batch(pages=(0, 1))
+
+    assert seen_kwargs == [{}, {}]                       # prev_context never injected
