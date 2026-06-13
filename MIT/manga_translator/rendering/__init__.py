@@ -10,7 +10,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -155,7 +155,7 @@ def _region_territory(region):
     return (float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3])) if xy is not None else None
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False):
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -280,10 +280,22 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             else:
                 target_scale = 1
 
+            # Cap narration/caption font (SFX exempt) BEFORE the box scaling, so the
+            # box scales to the capped font instead of an oversized block overflowing
+            # the panel. 0 → no cap (byte-identical).
+            target_font_size = apply_font_cap(
+                target_font_size, font_size_max, getattr(region, 'sfx_rescued', False))
+
             # Calculate final scaling factor
             font_size_scale = (((target_font_size - original_region_font_size) / original_region_font_size) * _FONT_SIZE_SCALE_GAIN + 1) if original_region_font_size > 0 else 1.0
             final_scale = max(font_size_scale, target_scale)
             final_scale = max(1, min(final_scale, _MAX_BBOX_SCALE))
+            # When a font cap is set, also stop the length-ratio box scaling from
+            # enlarging a non-SFX region's box (the homography would warp the capped
+            # font back up to fill it). The longer translation then wraps inside the
+            # source box (narrow-column) instead of overflowing the panel.
+            if font_size_max and font_size_max > 0 and not getattr(region, 'sfx_rescued', False):
+                final_scale = 1.0
 
             # Scale bounding box if needed
             if final_scale > 1.001:  
@@ -354,14 +366,15 @@ async def dispatch(
     bubble_fit: bool = False,
     supersampling: int = 1,
     font_max_box_ratio: float = _MAX_FONT_BOX_RATIO,
-    anti_overlap: bool = False
+    anti_overlap: bool = False,
+    font_size_max: int = 0
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
     # Resize regions that are too small
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max)
 
     # TODO: Maybe remove intersections
 
