@@ -12,11 +12,27 @@
  * DOM (SupabaseGuard wires them into the global `fetch` interceptor).
  */
 
-/** Requests that should carry the device headers (relative API + localhost + Supabase). */
-export function isApiRequest(url: string): boolean {
-  return (
-    url.startsWith("/") || url.includes("localhost") || url.includes("supabase.co")
-  );
+/**
+ * Requests that should carry the device headers.
+ *
+ * Exact-origin allow-listing (not substring matching): the clearance token is a
+ * 1-hour HWID-bound captcha-bypass credential, so it must never leak to a
+ * lookalike origin (`supabase.co.evil.com`, `//evil.com`, `?ref=supabase.co`).
+ * `allowedOrigins` are the caller's trusted absolute origins (own origin +
+ * Supabase project origin); relative same-origin paths always qualify.
+ */
+export function isApiRequest(url: string, allowedOrigins: string[]): boolean {
+  // Relative same-origin path: a single leading "/" not followed by another
+  // (reject "//evil.com" protocol-relative URLs).
+  if (url.startsWith("/")) {
+    return !url.startsWith("//");
+  }
+  // Absolute URL: trust only when the parsed origin exactly matches an allowed one.
+  try {
+    return allowedOrigins.includes(new URL(url).origin);
+  } catch {
+    return false; // malformed URL → not an API request
+  }
 }
 
 /**
