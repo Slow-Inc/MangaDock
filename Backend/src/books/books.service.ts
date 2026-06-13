@@ -713,6 +713,11 @@ export class BooksService {
         // Cap narration/caption font (SFX exempt) so it can't oversize/overflow the
         // panel. Absent → no cap, byte-identical.
         ...(fontSizeMax !== undefined ? { font_size_max: fontSizeMax } : {}),
+        // Clean horizontal layout: lay non-balloon, non-SFX text out as an upright
+        // block at a small absolute font (font_size_max, else page-scaled) instead of
+        // warping it onto the original vertical-JP quad (which stretches it oversized).
+        // Absent → byte-identical.
+        ...(flagEnv('MIT_CLEAN_LAYOUT') ? { clean_layout: true } : {}),
         // #176: render Latin/EN targets in the bundled comic font instead of the
         // worker's Prompt-Bold (a Thai face). Absent → byte-identical.
         ...(flagEnv('MIT_EN_COMIC_FONT') ? { en_comic_font: true } : {}),
