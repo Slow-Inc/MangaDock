@@ -1,0 +1,53 @@
+"""Overlap-aware render-box clamping (anti-overlap text layout).
+
+When the renderer grows a region's box to fit longer translated text, it can spill
+into a neighbouring region's territory, so the rendered English visibly overlaps the
+adjacent bubble/caption. MIT already knows every region's detected position, so before
+sizing a region's font we clamp its render box against the other regions: for each
+overlapping neighbour, separate along the axis of **least penetration** (lose the least
+space) and pull only the edge facing that neighbour. The font is then fit to the clamped
+box, so the text stays inside its own space and cannot collide.
+
+Pure stdlib geometry — no ML / numpy / `self`; unit-tested in isolation.
+"""
+from typing import Iterable, Sequence, Tuple
+
+Box = Tuple[float, float, float, float]
+
+
+def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: float = 0) -> Box:
+    """Return `box` (x1, y1, x2, y2) shrunk so it does not overlap any box in `others`.
+
+    Each overlapping neighbour pushes in exactly one edge of `box` — the one facing it,
+    chosen on the axis where the boxes penetrate least, leaving `margin` px of gap. The
+    penetration test uses the ORIGINAL box, so several neighbours on different sides each
+    constrain their own edge independently. A box squeezed past itself collapses to its
+    centre line on that axis (degenerate but non-inverted).
+    """
+    ox1, oy1, ox2, oy2 = (float(v) for v in box)
+    x1, y1, x2, y2 = ox1, oy1, ox2, oy2
+    cx, cy = (ox1 + ox2) / 2.0, (oy1 + oy2) / 2.0
+
+    for nb in others:
+        nx1, ny1, nx2, ny2 = (float(v) for v in nb)
+        pen_x = min(ox2, nx2) - max(ox1, nx1)   # x penetration vs the original box
+        pen_y = min(oy2, ny2) - max(oy1, ny1)   # y penetration
+        if pen_x <= 0 or pen_y <= 0:
+            continue                             # not overlapping
+        ncx, ncy = (nx1 + nx2) / 2.0, (ny1 + ny2) / 2.0
+        if pen_x <= pen_y:                       # separate horizontally
+            if ncx >= cx:
+                x2 = min(x2, nx1 - margin)       # neighbour to the right
+            else:
+                x1 = max(x1, nx2 + margin)       # neighbour to the left
+        else:                                    # separate vertically
+            if ncy >= cy:
+                y2 = min(y2, ny1 - margin)       # neighbour below
+            else:
+                y1 = max(y1, ny2 + margin)       # neighbour above
+
+    if x2 < x1:
+        x1 = x2 = cx
+    if y2 < y1:
+        y1 = y2 = cy
+    return (x1, y1, x2, y2)
