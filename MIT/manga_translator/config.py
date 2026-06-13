@@ -174,6 +174,11 @@ class RenderConfig(BaseModel):
     balloon height. 0.5 (#175) keeps a short line from becoming a giant; raise it
     (toward MangaTranslator's no-cap fill) to let text grow into the balloon.
     0.5 → byte-identical."""
+    font_size_max: int = 0
+    """Cap the render font (px) of non-SFX regions so narration/caption text can't be
+    scaled up by the length-ratio heuristic into an oversized block that overflows its
+    panel (matches MangaTranslator's small absolute fonts). SFX is exempt. 0 → no cap
+    (byte-identical)."""
     anti_overlap: bool = False
     """Anti-overlap text layout: clamp each region's bubble-fit box against its
     neighbours (using the detected positions) before sizing the font, so translated

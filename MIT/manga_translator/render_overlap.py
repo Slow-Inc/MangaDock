@@ -15,6 +15,16 @@ from typing import Iterable, Sequence, Tuple
 Box = Tuple[float, float, float, float]
 
 
+def apply_font_cap(size: int, cap: int, is_sfx: bool) -> int:
+    """Cap a region's render font to `cap` px so narration/dialogue can't be scaled up
+    (by the length-ratio heuristic) into an oversized block that overflows its panel —
+    matching MangaTranslator's small absolute fonts. SFX is exempt (it must stay big),
+    and `cap <= 0` disables the cap (byte-identical)."""
+    if cap and cap > 0 and not is_sfx:
+        return min(size, cap)
+    return size
+
+
 def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: float = 0) -> Box:
     """Return `box` (x1, y1, x2, y2) shrunk so it does not overlap any box in `others`.
 

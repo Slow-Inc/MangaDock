@@ -625,6 +625,7 @@ export class BooksService {
     const fontMaxBoxRatio = fracEnv('MIT_FONT_MAX_BOX_RATIO');
     const patchFeather = posIntEnv('MIT_PATCH_FEATHER');
     const inpaintContextPad = posIntEnv('MIT_INPAINT_CONTEXT_PAD');
+    const fontSizeMax = posIntEnv('MIT_FONT_SIZE_MAX');
     const model = this.imageModelKey(imageModel);
     return JSON.stringify({
       translator: {
@@ -693,6 +694,9 @@ export class BooksService {
         // Anti-overlap: clamp each region's fit box against its neighbours so
         // translated text can't grow into the adjacent bubble. Absent → byte-identical.
         ...(flagEnv('MIT_ANTI_OVERLAP') ? { anti_overlap: true } : {}),
+        // Cap narration/caption font (SFX exempt) so it can't oversize/overflow the
+        // panel. Absent → no cap, byte-identical.
+        ...(fontSizeMax !== undefined ? { font_size_max: fontSizeMax } : {}),
         // #176: render Latin/EN targets in the bundled comic font instead of the
         // worker's Prompt-Bold (a Thai face). Absent → byte-identical.
         ...(flagEnv('MIT_EN_COMIC_FONT') ? { en_comic_font: true } : {}),

@@ -14,6 +14,25 @@ def test_no_neighbors_returns_box_unchanged():
     assert clamp_box_to_neighbors((0, 0, 10, 10), []) == (0, 0, 10, 10)
 
 
+# ---- apply_font_cap: keep narration/dialogue small, exempt SFX ------------------
+
+def test_font_cap_clamps_oversized_text():
+    from manga_translator.render_overlap import apply_font_cap
+    assert apply_font_cap(40, cap=22, is_sfx=False) == 22      # capped
+    assert apply_font_cap(18, cap=22, is_sfx=False) == 18      # already under → unchanged
+
+
+def test_font_cap_exempts_sfx_so_it_stays_big():
+    from manga_translator.render_overlap import apply_font_cap
+    assert apply_font_cap(64, cap=22, is_sfx=True) == 64       # SFX never capped
+
+
+def test_font_cap_disabled_when_zero_or_negative():
+    from manga_translator.render_overlap import apply_font_cap
+    assert apply_font_cap(40, cap=0, is_sfx=False) == 40       # 0 → no cap (byte-identical)
+    assert apply_font_cap(40, cap=-1, is_sfx=False) == 40
+
+
 def test_disjoint_neighbor_leaves_box_unchanged():
     assert clamp_box_to_neighbors((0, 0, 10, 10), [(20, 20, 30, 30)]) == (0, 0, 10, 10)
 
