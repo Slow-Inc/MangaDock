@@ -207,3 +207,28 @@ def feather_alpha(content_mask: np.ndarray, radius: int) -> np.ndarray:
     d_out = cv2.distanceTransform(background, cv2.DIST_L2, 3)
     ramp = np.clip(1.0 - d_out / float(radius), 0.0, 1.0)
     return (ramp * 255.0).astype(np.uint8)
+
+
+def content_patch_alpha(erase_mask: np.ndarray, rendered_rgb: np.ndarray,
+                        background_rgb: np.ndarray, dilate: int = 1,
+                        feather_radius: int = 0, diff_threshold: int = 8) -> np.ndarray:
+    """Alpha for a *content-shaped* patch — opaque only where the patch actually changes
+    the page, transparent everywhere else so the original art shows through.
+
+    A rectangular patch composites its whole crop (the inpainted background) over the
+    page, so the inpainter's slightly-repainted background replaces untouched original
+    pixels → a visible 'painted band' over textured art (e.g. hair). This restricts the
+    opaque area to the union of:
+      * ``erase_mask`` — the original-text pixels the inpaint removed, and
+      * the newly drawn translation — where ``rendered_rgb`` differs from the erased
+        ``background_rgb`` by more than ``diff_threshold`` (per-channel max).
+    Everywhere else is transparent, so only the strokes that changed are pasted and the
+    surrounding original art is preserved. ``dilate`` closes anti-alias gaps; a positive
+    ``feather_radius`` softens the seam (reuses ``feather_alpha``). Pure numpy/cv2."""
+    changed = (np.abs(rendered_rgb.astype(np.int16) - background_rgb.astype(np.int16))
+               .max(axis=2) > int(diff_threshold))
+    content = ((np.ascontiguousarray(erase_mask) > 0) | changed).astype(np.uint8)
+    if dilate > 0:
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * dilate + 1, 2 * dilate + 1))
+        content = cv2.dilate(content, k)
+    return feather_alpha(content * np.uint8(255), feather_radius)

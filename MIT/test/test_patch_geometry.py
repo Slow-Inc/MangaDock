@@ -159,6 +159,24 @@ def test_feather_alpha_interior_opaque_edge_fades_to_zero():
     assert 0 < a[10, 20] < 255                       # within the band → partial blend
 
 
+def test_content_patch_alpha_opaque_only_on_erased_and_new_text():
+    """Content-shaped patch alpha: opaque ONLY where the patch changes the page — the
+    erased original-text pixels (erase_mask) + the newly drawn translated text (rendered
+    differs from the erased background). Untouched pixels stay transparent so the original
+    art shows through, instead of an opaque rectangle pasting the inpainted background
+    (slightly-repainted hair) over pixels that never had text → the 'painted band'."""
+    bg = np.zeros((10, 10, 3), np.uint8)                 # erased background (uniform)
+    rendered = bg.copy()
+    rendered[2, 2] = (255, 255, 255)                     # one NEW-text pixel drawn on the bg
+    erase = np.zeros((10, 10), np.uint8)
+    erase[7, 7] = 255                                    # one ORIGINAL-text pixel to erase
+    a = pg.content_patch_alpha(erase, rendered, bg, dilate=0, feather_radius=0)
+    assert a.shape == (10, 10) and a.dtype == np.uint8
+    assert a[2, 2] == 255                                # new text → opaque
+    assert a[7, 7] == 255                                # erased original text → opaque
+    assert a[5, 5] == 0                                  # untouched → transparent (original shows)
+
+
 def test_expand_inpaint_crop_interior_pads_all_sides():
     """#249: a render rect well inside the page expands by `pad` on every side; the
     returned (ox, oy) is where the render rect sits inside the larger inpaint crop."""
