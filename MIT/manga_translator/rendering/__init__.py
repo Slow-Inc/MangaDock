@@ -10,6 +10,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
+from ..render_overlap import clamp_box_to_neighbors
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -144,7 +145,17 @@ def _expand_single_axis(region, needed_count: int, used_count: int, horizontal_a
         return None
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO):
+def _region_territory(region):
+    """The box a region 'owns' for anti-overlap: its balloon (#170) if known, else its
+    detection box. Returns None when neither is available."""
+    bb = getattr(region, 'bubble_box', None)
+    if bb is not None:
+        return (float(bb[0]), float(bb[1]), float(bb[2]), float(bb[3]))
+    xy = getattr(region, 'xyxy', None)
+    return (float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3])) if xy is not None else None
+
+
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -186,6 +197,19 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             # #179: wrap to the balloon's safe *interior* (narrow column) centered
             # on the safe anchor, not the full bounding box.
             fit_w, fit_h, (acx, acy) = _bubble_interior_box(region, bubble_box, img.shape)
+            # anti-overlap: clamp the fit box so it can't grow into a neighbouring
+            # region's territory; the font is then fit to the clamped box, so the text
+            # stays in its own space instead of colliding with the next bubble.
+            if anti_overlap:
+                territories = [t for j, r in enumerate(text_regions) if j != i
+                               for t in (_region_territory(r),) if t is not None]
+                cb = clamp_box_to_neighbors(
+                    (acx - fit_w / 2.0, acy - fit_h / 2.0, acx + fit_w / 2.0, acy + fit_h / 2.0),
+                    territories, margin=2)
+                cw, ch = cb[2] - cb[0], cb[3] - cb[1]
+                if cw >= 6 and ch >= 6:
+                    fit_w, fit_h = cw, ch
+                    acx, acy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
             region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), font_max_box_ratio)
             hw, hh = fit_w / 2.0, fit_h / 2.0
             dst_points_list.append(
@@ -293,6 +317,23 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 dst_points, np.array([0, 0]),
                 np.array([img.shape[1] - 1, img.shape[0] - 1]))
 
+        # anti-overlap: clamp the (possibly expanded) render box against the other
+        # regions' territories so the warped text can't grow into the next
+        # bubble/caption. The text is homography-warped into dst_points, so a smaller
+        # box → smaller text that stays in its own space. Off → unchanged.
+        if anti_overlap and isinstance(dst_points, np.ndarray):
+            pts = dst_points.reshape(-1, 2)
+            ax1, ay1 = float(pts[:, 0].min()), float(pts[:, 1].min())
+            ax2, ay2 = float(pts[:, 0].max()), float(pts[:, 1].max())
+            territories = [t for j, r in enumerate(text_regions) if j != i
+                           for t in (_region_territory(r),) if t is not None]
+            cb = clamp_box_to_neighbors((ax1, ay1, ax2, ay2), territories, margin=2)
+            if ((cb[2] - cb[0]) >= 6 and (cb[3] - cb[1]) >= 6 and
+                    (cb[0] > ax1 + 0.5 or cb[1] > ay1 + 0.5
+                     or cb[2] < ax2 - 0.5 or cb[3] < ay2 - 0.5)):
+                dst_points = np.array([[[cb[0], cb[1]], [cb[2], cb[1]],
+                                        [cb[2], cb[3]], [cb[0], cb[3]]]], dtype=np.int64)
+
         # Store results and update font size
         dst_points_list.append(dst_points)
         region.font_size = int(target_font_size)
@@ -312,14 +353,15 @@ async def dispatch(
     disable_font_border: bool = False,
     bubble_fit: bool = False,
     supersampling: int = 1,
-    font_max_box_ratio: float = _MAX_FONT_BOX_RATIO
+    font_max_box_ratio: float = _MAX_FONT_BOX_RATIO,
+    anti_overlap: bool = False
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
     # Resize regions that are too small
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap)
 
     # TODO: Maybe remove intersections
 
