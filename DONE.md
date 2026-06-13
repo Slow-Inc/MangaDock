@@ -2283,3 +2283,17 @@ reference; the warp column shows the old oversized/overflow. One bug fixed mid-c
 required-positional — the first run raised `TypeError` and `_run_text_rendering` fell back to an inpaint-only (textless)
 patch; passing `max_height=page_h` fixed it. `.env` set `MIT_CLEAN_LAYOUT=1` + `MIT_FONT_SIZE_MAX=20`. Branch
 `feat/mit-clean-text-layout`. Provenance in PIPELINE.md §5.
+
+## 2026-06-13 — Clean layout: wrap to the source footprint (line-breaks now reference the original)
+Follow-up to #263: the user flagged that the clean-layout line-breaking still didn't reference the original — our
+narration reflowed into a wide novel-like paragraph while both the source (narrow vertical-JP columns) and the
+MangaTranslator target wrap into a **narrow tall column**. Root cause: `clean_wrap_width` wrapped to the region's
+**wider** extent (`max(bbox_w, bbox_h)`), turning a tall column into a wide block. Fix: wrap to the region's **own bbox
+width** (`ref_w = x2-x1`) so the English breaks where the source columns did — narration stays narrow/tall, and the
+floor rose 8%→**11%** of the page so a short dialogue column still fits ~2 words a line (with hyphenation) instead of
+one. The balloon width is deliberately NOT used as the reference (narration boxes also get a wide `bubble_box` from
+segmentation, which would re-widen them). `clean_wrap_width(ref_w, img_w)` (dropped the unused `bbox_h` arg). TDD:
+updated the 3 `clean_wrap_width` cases; render_overlap 13 pass, full MIT suite 418 pass / 18 pre-existing async / 0 new.
+**Verified via direct render** (`tools/ab_clean.py`): narration now a narrow column, dialogue ~2 words/line with
+hyphenation (e.g. "IT'S NOT MY BUSI-NESS, SO SHOULD I JUST LEAVE IT ALONE?") — both reference the original line-breaks,
+matching the target much more closely. Branch `fix/mit-clean-wrap-narrow`. Provenance in PIPELINE.md §5.
