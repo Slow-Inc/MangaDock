@@ -25,6 +25,7 @@ from PIL import Image
 
 from .patch_geometry import (
     build_local_region,
+    content_patch_alpha,
     create_text_only_mask,
     crop_mask_for_patch,
     expand_inpaint_crop,
@@ -198,14 +199,29 @@ class PatchRenderer:
                 )
                 patch_ctx.img_rendered = patch_ctx.img_inpainted
 
-            # #173: optionally feather the outer band of the patch so its edge
-            # blends into the page instead of showing a rectangle at the seam. The
-            # crop carries a ≥120px content margin (pad+render_extra), so fading the
-            # outer `patch_feather_radius` px never touches rendered text. 0 → None
-            # → hard-alpha patch, byte-identical to before.
+            # The erase mask for this region (where the source text was): per-crop path
+            # computed it during refinement; the full-page path slices the page mask.
+            erase_mask = patch_ctx.mask
+            if erase_mask is None and getattr(ctx, 'mask', None) is not None:
+                erase_mask = ctx.mask[y1:y2, x1:x2]
+
             feather = None
             feather_radius = int(getattr(config.render, 'patch_feather_radius', 0) or 0)
-            if feather_radius > 0:
+            if getattr(config.render, 'content_patch', False) and erase_mask is not None:
+                # Content-shaped alpha: opaque only on the erased source text + the newly
+                # drawn translation, transparent elsewhere → the patch carries just the
+                # changed pixels and the original art shows through, instead of an opaque
+                # rectangle pasting the (slightly-repainted) inpainted background over
+                # untouched pixels → no 'painted band' over textured art.
+                feather = content_patch_alpha(
+                    erase_mask, patch_ctx.img_rendered, patch_ctx.img_inpainted,
+                    dilate=1, feather_radius=feather_radius)
+            elif feather_radius > 0:
+                # #173: feather the outer band of the (rectangular) patch so its edge
+                # blends into the page instead of showing a rectangle at the seam. The
+                # crop carries a ≥120px content margin (pad+render_extra), so fading the
+                # outer `patch_feather_radius` px never touches rendered text. 0 → None
+                # → hard-alpha patch, byte-identical to before.
                 ph, pw = patch_ctx.img_rendered.shape[:2]
                 r = min(feather_radius, (ph - 1) // 2, (pw - 1) // 2)
                 if r > 0:
