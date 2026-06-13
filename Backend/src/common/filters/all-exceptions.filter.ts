@@ -29,12 +29,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const stack = (exception as any)?.stack;
 
     // T4-STANDARD Pillar 6: Observability Standard
-    // Detect Supabase connection issues (paused project)
+    // Detect Supabase connection issues (paused project). Only applies to
+    // UNEXPECTED (non-HttpException) errors — an intentional HttpException
+    // whose message merely mentions Supabase must keep its own status/code.
     const isSupabaseError =
-      message.includes('fetch failed') ||
-      message.includes('ECONNREFUSED') ||
-      message.includes('getaddrinfo ENOTFOUND') ||
-      message.includes('Supabase');
+      !isHttpException &&
+      (message.includes('fetch failed') ||
+        message.includes('ECONNREFUSED') ||
+        message.includes('getaddrinfo ENOTFOUND') ||
+        message.includes('Supabase'));
 
     // Client-facing message: the crafted Supabase signal, the intentional
     // HttpException message, or a generic string for any other (unexpected)

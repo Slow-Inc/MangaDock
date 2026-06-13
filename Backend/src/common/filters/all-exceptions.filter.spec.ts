@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import type { ArgumentsHost } from '@nestjs/common';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 
@@ -66,5 +72,25 @@ describe('AllExceptionsFilter', () => {
     expect(replies[0].status).toBe(HttpStatus.SERVICE_UNAVAILABLE);
     expect(replies[0].body.code).toBe('SUPABASE_OFFLINE');
     expect(replies[0].body.message).toContain('SUPABASE_CONNECTION_ERROR');
+  });
+
+  it('does not coerce an intentional HttpException whose message mentions Supabase to 503', () => {
+    const { filter, host, replies } = setup();
+    filter.catch(new BadRequestException('Invalid Supabase project id'), host);
+
+    expect(replies[0].status).toBe(HttpStatus.BAD_REQUEST);
+    expect(replies[0].body.statusCode).toBe(HttpStatus.BAD_REQUEST);
+    expect(replies[0].body.message).toBe('Invalid Supabase project id');
+    expect(replies[0].body.code).toBe('INTERNAL_ERROR');
+  });
+
+  it('preserves a NotFoundException whose message contains "fetch failed"', () => {
+    const { filter, host, replies } = setup();
+    filter.catch(new NotFoundException('fetch failed for X'), host);
+
+    expect(replies[0].status).toBe(HttpStatus.NOT_FOUND);
+    expect(replies[0].body.statusCode).toBe(HttpStatus.NOT_FOUND);
+    expect(replies[0].body.message).toBe('fetch failed for X');
+    expect(replies[0].body.code).toBe('INTERNAL_ERROR');
   });
 });
