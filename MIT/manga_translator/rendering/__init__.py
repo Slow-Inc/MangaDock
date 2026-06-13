@@ -10,7 +10,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -155,7 +155,34 @@ def _region_territory(region):
     return (float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3])) if xy is not None else None
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0):
+def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int):
+    """Render-layout rework: lay the translated text out as an upright horizontal block
+    at a *small absolute* font, wrapped to a compact width, ready to be placed on the
+    region's centre. Returns ``(font_size, block_w, block_h)`` — or ``None`` when the
+    region has no detection box. Unlike the legacy path (which warps the English onto the
+    original vertical-JP quad and stretches it tall/oversized), this fixes the font and
+    builds the box to match, so the homography in ``render()`` is a plain scale.
+
+    ``font_size_max`` (MIT_FONT_SIZE_MAX) sets the absolute font when >0, else a small
+    page-scaled default (≈ MangaTranslator's 12–16px on a typical page)."""
+    xy = getattr(region, 'xyxy', None)
+    if xy is None:
+        return None
+    x1f, y1f, x2f, y2f = (float(v) for v in xy)
+    clean_fs = font_size_max if (font_size_max and font_size_max > 0) else \
+        max(font_size_minimum, round((img_shape[0] + img_shape[1]) / 130))
+    wrap_w = clean_wrap_width(x2f - x1f, y2f - y1f, img_shape[1])
+    # max_height is generous (full page) so wrapping is governed by width and the block
+    # grows vertically — we place it on the centre regardless of the source box height.
+    lines, widths = text_render.calc_horizontal(
+        clean_fs, region.translation, wrap_w, int(img_shape[0]),
+        language=getattr(region, 'target_lang', 'en_US'))
+    block_w = max(widths) if widths else wrap_w
+    block_h = max(1, len(lines)) * clean_fs * _LINE_HEIGHT
+    return int(clean_fs), float(block_w), float(block_h)
+
+
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -216,6 +243,34 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
                            [acx + hw, acy + hh], [acx - hw, acy + hh]]], dtype=np.int64))
             continue
+
+        # Clean horizontal layout (render-layout rework): for the regions the bubble-fit
+        # block didn't claim — narration boxes, captions, vertical-JP columns — lay the
+        # translated English out at a small absolute font in an upright box on the region's
+        # centre, instead of warping it onto the original (often tall/vertical) detection
+        # quad which stretches it oversized and overflowing. SFX is exempt (it keeps the big
+        # stylized legacy path). Off → byte-identical.
+        sfx = getattr(region, 'sfx_rescued', False)
+        if clean_layout and not sfx and region.translation and region.translation.strip():
+            laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max)
+            if laid is not None:
+                clean_fs, block_w, block_h = laid
+                x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
+                cx, cy = (x1f + x2f) / 2.0, (y1f + y2f) / 2.0
+                # anti-overlap: shift the upright block off any neighbour's territory.
+                if anti_overlap:
+                    territories = [t for j, r in enumerate(text_regions) if j != i
+                                   for t in (_region_territory(r),) if t is not None]
+                    cb = clamp_box_to_neighbors(
+                        (cx - block_w / 2.0, cy - block_h / 2.0,
+                         cx + block_w / 2.0, cy + block_h / 2.0), territories, margin=2)
+                    if (cb[2] - cb[0]) >= 6 and (cb[3] - cb[1]) >= 6:
+                        cx, cy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
+                region.font_size = clean_fs
+                region._direction = 'h'
+                dst_points_list.append(
+                    np.array([centered_box(cx, cy, block_w, block_h)], dtype=np.int64))
+                continue
 
         # Store and validate original font size
         original_region_font_size = region.font_size
@@ -367,14 +422,15 @@ async def dispatch(
     supersampling: int = 1,
     font_max_box_ratio: float = _MAX_FONT_BOX_RATIO,
     anti_overlap: bool = False,
-    font_size_max: int = 0
+    font_size_max: int = 0,
+    clean_layout: bool = False
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
     # Resize regions that are too small
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout)
 
     # TODO: Maybe remove intersections
 

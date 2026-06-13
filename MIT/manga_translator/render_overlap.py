@@ -25,6 +25,25 @@ def apply_font_cap(size: int, cap: int, is_sfx: bool) -> int:
     return size
 
 
+def centered_box(cx: float, cy: float, w: float, h: float):
+    """Return an axis-aligned 4-point box (TL, TR, BR, BL) of size `w`×`h` centred on
+    `(cx, cy)`. Used by the clean horizontal-layout path: the translated text block is
+    laid out at a small absolute font, then placed in this upright box — so the renderer's
+    homography is a plain scale (no shear/stretch), unlike warping EN onto the original
+    vertical-JP detection quad which stretches it tall and oversized."""
+    hw, hh = w / 2.0, h / 2.0
+    return [(cx - hw, cy - hh), (cx + hw, cy - hh), (cx + hw, cy + hh), (cx - hw, cy + hh)]
+
+
+def clean_wrap_width(bbox_w: float, bbox_h: float, img_w: float) -> int:
+    """Wrap width (px) for the clean horizontal-layout path. A vertical-JP column is tall
+    and narrow; wrapping the translated English to its narrow width would stack one word
+    per line, so we wrap to the region's **wider** extent instead — turning the column into
+    a compact horizontal block. Clamped to [10%, 45%] of the page width so a tiny region
+    still gets a usable line and a huge one doesn't span the whole page."""
+    return int(min(max(bbox_w, bbox_h, img_w * 0.10), img_w * 0.45))
+
+
 def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: float = 0) -> Box:
     """Return `box` (x1, y1, x2, y2) shrunk so it does not overlap any box in `others`.
 

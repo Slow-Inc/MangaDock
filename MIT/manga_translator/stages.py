@@ -80,5 +80,6 @@ async def run_text_rendering(config, ctx, font_path):
                                           supersampling=config.render.supersampling,
                                           font_max_box_ratio=config.render.font_max_box_ratio,
                                           anti_overlap=config.render.anti_overlap,
-                                          font_size_max=config.render.font_size_max)
+                                          font_size_max=config.render.font_size_max,
+                                          clean_layout=config.render.clean_layout)
     return output
