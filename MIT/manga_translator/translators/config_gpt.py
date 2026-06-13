@@ -218,13 +218,15 @@ class ConfigGPT:
 
     @property
     def chat_system_template(self) -> str:
-        # Series context (#157): one append seam for every GPT-family
-        # translator (Qwen3, Gemini, ChatGPT, DeepSeek). Absent → template
-        # returned byte-identical.
-        return append_series_context(
+        # Series context (#157) + rolling cross-page context (#159): one append seam
+        # for every GPT-family translator (Qwen3, Gemini, ChatGPT, DeepSeek,
+        # custom_openai). Both absent → template byte-identical. (append_series_context
+        # is a plain brace-escaped text append; reused verbatim for the #159 block.)
+        template = append_series_context(
             self._config_get('chat_system_template', self._CHAT_SYSTEM_TEMPLATE),
             self._config_get('series_context'),
         )
+        return append_series_context(template, self._config_get('prev_context'))
 
     @property
     def chat_sample(self) -> Dict[str, List[str]]:
