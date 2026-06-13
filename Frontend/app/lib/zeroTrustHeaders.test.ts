@@ -8,11 +8,38 @@ import { isApiRequest, withZeroTrustHeaders } from "./zeroTrustHeaders";
 const get = (init: RequestInit, name: string) =>
   new Headers(init.headers).get(name);
 
-test("isApiRequest matches relative + localhost + supabase URLs only", () => {
-  expect(isApiRequest("/api/proxy/books/translate/manga")).toBe(true);
-  expect(isApiRequest("http://localhost:4001/x")).toBe(true);
-  expect(isApiRequest("https://abc.supabase.co/x")).toBe(true);
-  expect(isApiRequest("https://example.com/x")).toBe(false);
+const ALLOWED = ["https://app.example.com", "https://abc.supabase.co"];
+
+test("isApiRequest allows relative same-origin paths and exact allowed origins", () => {
+  // Relative same-origin paths (single leading slash).
+  expect(isApiRequest("/api/proxy/books/translate/manga", ALLOWED)).toBe(true);
+  // Absolute URLs whose origin exactly matches an allowed origin.
+  expect(isApiRequest("https://app.example.com/x", ALLOWED)).toBe(true);
+  expect(isApiRequest("https://abc.supabase.co/rest/v1/foo", ALLOWED)).toBe(
+    true,
+  );
+});
+
+test("isApiRequest rejects substring/protocol-relative origin spoofs (#1)", () => {
+  // host is evil.com, "supabase.co" only a subdomain prefix
+  expect(isApiRequest("https://supabase.co.evil.com/x", ALLOWED)).toBe(false);
+  // substring in query string
+  expect(isApiRequest("https://evil.com/?ref=supabase.co", ALLOWED)).toBe(
+    false,
+  );
+  // substring in fragment
+  expect(isApiRequest("https://evil.com/#localhost", ALLOWED)).toBe(false);
+  // substring in host
+  expect(isApiRequest("https://notlocalhost.evil.com/", ALLOWED)).toBe(false);
+  // protocol-relative → resolves to evil.com, must NOT count as relative
+  expect(isApiRequest("//evil.com/x", ALLOWED)).toBe(false);
+});
+
+test("isApiRequest rejects unrelated absolute origins and malformed input", () => {
+  expect(isApiRequest("https://example.com/x", ALLOWED)).toBe(false);
+  // Malformed input must return false, never throw.
+  expect(isApiRequest("http://", ALLOWED)).toBe(false);
+  expect(isApiRequest("", ALLOWED)).toBe(false);
 });
 
 test("injects hardware id and clearance when both are present", () => {
