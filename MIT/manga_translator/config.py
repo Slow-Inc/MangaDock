@@ -189,12 +189,6 @@ class RenderConfig(BaseModel):
     small absolute font instead of warping it onto the original (often tall/vertical)
     detection quad — the warp stretches English oversized and overflowing. Pairs with
     font_size_max as the absolute font. Off → byte-identical."""
-    content_patch: bool = False
-    """Patch path only: composite each patch with a content-shaped alpha (opaque only on
-    the erased source text + the newly drawn translation) instead of an opaque rectangle.
-    A rectangle pastes the inpainted background over untouched pixels → a visible 'painted
-    band' over textured art (hair); the content shape keeps the original art and pastes
-    only the changed strokes. Off → rectangle/feather patch (byte-identical)."""
     patch_feather_radius: int = 0
     """#173: feather the outer N px of each composited patch to a transparent
     alpha (distance-transform ramp) so the rectangular patch edge blends into the
