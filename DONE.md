@@ -2261,3 +2261,25 @@ on the next translate; two deployments with different settings no longer collide
 (`translate:manga-patches:*`). TDD: 1 spec (toggling `MIT_FONT_SIZE_MAX` → different key) + `:v6:`→`:v7:` in the existing
 assertion; `books-image-model.spec` **9 pass**. Branch `fix/backend-cache-key-config`. This was the root cause the
 render fixes (#260/#261 + the `.env` config) looked like they "did nothing" in the Reader.
+
+## 2026-06-13 — Render-layout rework: clean horizontal layout (the proper narration/dialogue-sizing fix)
+The font-cap (#261) was a fragile patch: the renderer **warps** the translated English onto the original detection quad,
+and a JP narration/column quad is tall & vertical, so horizontal English stretched onto it comes out oversized,
+overflowing, and badly line-broken — no knob (cap, area-fit, ratio) fixes this cleanly because the distortion is the
+warp itself. **Root-cause fix (ported from MangaTranslator's approach):** for non-balloon, non-SFX regions, stop warping
+onto the source quad — instead **lay the translation out as an upright horizontal block at a small absolute font, wrapped
+to a compact width, placed on the region's centre**, so the homography in `render()` is a plain scale (no shear/stretch).
+Two pure helpers in `render_overlap.py`: `centered_box(cx,cy,w,h)` (axis-aligned 4-point box) + `clean_wrap_width(bw,bh,
+img_w)` (wrap a vertical column to its wider extent, clamped 10–45% of the page). `rendering/__init__.py` gains
+`_clean_layout_dst()` (font = `font_size_max` if set, else page-scaled; `calc_horizontal` → block dims) and a new path in
+`resize_regions_to_font_size`, after bubble-fit, before legacy. SFX exempt (keeps the big stylized path); balloons still
+use bubble-fit. Gated by `RenderConfig.clean_layout` (Backend `MIT_CLEAN_LAYOUT`); off → byte-identical. With
+`clean_layout` ON, `font_size_max` becomes the clean absolute font and no longer backfires (the region returns before the
+legacy `final_scale` path). TDD: 2 pure helper tests (`centered_box`, `clean_wrap_width`) + updated `test_stages` kwargs;
+**full MIT suite 418 pass / 18 pre-existing async / 0 new**. **Verified via direct render** (`tools/ab_clean.py` montage
+`[original | warp | clean | reference]`): narration "WHAT SHOULD I DO… HIDE HIM SOMEWHERE…" now small/multi-line/inside its
+panel, dialogue small & wrapped inside the bubbles, SFX still big (MELT/LOOM) — clean column matches the MangaTranslator
+reference; the warp column shows the old oversized/overflow. One bug fixed mid-cycle: `calc_horizontal`'s `max_height` is
+required-positional — the first run raised `TypeError` and `_run_text_rendering` fell back to an inpaint-only (textless)
+patch; passing `max_height=page_h` fixed it. `.env` set `MIT_CLEAN_LAYOUT=1` + `MIT_FONT_SIZE_MAX=20`. Branch
+`feat/mit-clean-text-layout`. Provenance in PIPELINE.md §5.

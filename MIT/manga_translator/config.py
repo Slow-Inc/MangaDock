@@ -183,6 +183,12 @@ class RenderConfig(BaseModel):
     """Anti-overlap text layout: clamp each region's bubble-fit box against its
     neighbours (using the detected positions) before sizing the font, so translated
     text can't grow into the adjacent bubble/caption and overlap it. Off → byte-identical."""
+    clean_layout: bool = False
+    """Render-layout rework: for non-balloon, non-SFX regions (narration, captions,
+    vertical-JP columns), lay the translated text out as an upright horizontal block at a
+    small absolute font instead of warping it onto the original (often tall/vertical)
+    detection quad — the warp stretches English oversized and overflowing. Pairs with
+    font_size_max as the absolute font. Off → byte-identical."""
     patch_feather_radius: int = 0
     """#173: feather the outer N px of each composited patch to a transparent
     alpha (distance-transform ramp) so the rectangular patch edge blends into the

@@ -14,6 +14,24 @@ def test_no_neighbors_returns_box_unchanged():
     assert clamp_box_to_neighbors((0, 0, 10, 10), []) == (0, 0, 10, 10)
 
 
+# ---- clean horizontal layout helpers (render-layout rework) ---------------------
+
+def test_centered_box_places_an_axis_aligned_block_on_the_region_center():
+    from manga_translator.render_overlap import centered_box
+    # 40×20 block centred on (100,100) → axis-aligned, no rotation/distortion
+    assert centered_box(100, 100, 40, 20) == [
+        (80.0, 90.0), (120.0, 90.0), (120.0, 110.0), (80.0, 110.0)]
+
+
+def test_clean_wrap_width_turns_a_vertical_column_into_a_horizontal_block():
+    from manga_translator.render_overlap import clean_wrap_width
+    # tall/narrow JP column (100×400) on an 800px page → wrap to the wider extent,
+    # clamped to ≤45% of the page so it stays a compact horizontal block.
+    assert clean_wrap_width(100, 400, 800) == 360          # max(100,400,80) → 400, clamped to 360
+    # tiny region → floored to 10% of the page so it doesn't wrap one word per line.
+    assert clean_wrap_width(50, 50, 800) == 80
+
+
 # ---- apply_font_cap: keep narration/dialogue small, exempt SFX ------------------
 
 def test_font_cap_clamps_oversized_text():
