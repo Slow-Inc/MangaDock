@@ -690,6 +690,9 @@ export class BooksService {
         // area (#170 bubble_box) instead of the source textline column. Needs
         // MIT_BUBBLE_SEG to supply the masks. Absent → byte-identical.
         ...(flagEnv('MIT_BUBBLE_AREA_FIT') ? { bubble_area_fit: true } : {}),
+        // Anti-overlap: clamp each region's fit box against its neighbours so
+        // translated text can't grow into the adjacent bubble. Absent → byte-identical.
+        ...(flagEnv('MIT_ANTI_OVERLAP') ? { anti_overlap: true } : {}),
         // #176: render Latin/EN targets in the bundled comic font instead of the
         // worker's Prompt-Bold (a Thai face). Absent → byte-identical.
         ...(flagEnv('MIT_EN_COMIC_FONT') ? { en_comic_font: true } : {}),

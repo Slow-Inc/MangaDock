@@ -2214,3 +2214,23 @@ stays, so the #136 bleed class is structurally impossible). 4 TDD slices:
 the real translator + the multi-page name-consistency demo is the operator validation when `MIT_CONTEXT_PAGES>0`.
 Branch `feat/mit-rolling-context-159`. Provenance in PIPELINE.md §5. **Closes the MIT quality batch
 (#247-#251, #168, #159).**
+
+## 2026-06-13 — Anti-overlap text layout + render-fidelity tuning (user feedback vs MangaTranslator target)
+User compared our in-app render to the MangaTranslator target and flagged 3 gaps: **(1) text overlaps** between
+adjacent bubbles, **(2) font too big** (overflows bubbles), **(3) weight too heavy** (no match to the original).
+Root cause found by reading both: MangaTranslator uses a **small absolute font** (dialogue 8-16px, SFX 10-64px,
+`core/config.py`), while ours `bubble_area_fit` (#166) sizes text to *fill* the balloon → oversized + spills + overlaps,
+and `comic shanns 2` is heavier than the target's Anime Ace.
+**New feature — anti-overlap text layout** (the user's idea: compute overlap from the detected text positions):
+`render_overlap.clamp_box_to_neighbors(box, others, margin)` (pure stdlib geometry) shrinks a region's render box so
+it can't grow into a neighbour's territory — separating along the axis of **least penetration** and pulling only the
+edge facing each neighbour. Wired into `rendering/__init__.py` **both** paths: bubble-fit (clamp the fit box → font fit
+to it) and the fallthrough (clamp the warped `dst_points` → the homography shrinks the text). Gated by
+`RenderConfig.anti_overlap` (Backend `MIT_ANTI_OVERLAP`); off → byte-identical. Upstream even left a `# TODO: Maybe
+remove intersections` at the render loop — this realises it. TDD: 8 pure `test_render_overlap` (no-neighbour,
+disjoint, each-side clamp, margin, multi-neighbour) + updated `test_stages` kwargs-forward. Full MIT suite **413 pass /
+18 pre-existing async / 0 new**. **Verified via direct render on the benchmark:** `bubble_area_fit OFF` +
+`anti_overlap ON` + `en_font=anime_ace_3.ttf` → dialogue small & inside its bubble (no overlap), SFX still big,
+lighter weight — closely matches the target (`MIT/_e2e_overlap2.png`). `.env` set `MIT_ANTI_OVERLAP=1` +
+`MIT_EN_FONT=anime_ace_3.ttf` + `MIT_BUBBLE_AREA_FIT` off. Branch `feat/mit-anti-overlap-render`. Provenance in
+PIPELINE.md §5.

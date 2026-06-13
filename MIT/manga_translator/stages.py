@@ -78,5 +78,6 @@ async def run_text_rendering(config, ctx, font_path):
                                           config.render.font_size_minimum, not config.render.no_hyphenation, ctx.render_mask, config.render.line_spacing,
                                           bubble_fit=config.render.bubble_area_fit,
                                           supersampling=config.render.supersampling,
-                                          font_max_box_ratio=config.render.font_max_box_ratio)
+                                          font_max_box_ratio=config.render.font_max_box_ratio,
+                                          anti_overlap=config.render.anti_overlap)
     return output
