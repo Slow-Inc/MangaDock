@@ -2189,3 +2189,28 @@ fit). In-app Reader re-translate was blocked by the frontend's cached-translatio
 offered "ดูฉบับแปล" of the stale pre-#168 translation rather than re-running) — the full Reader/tunnel path itself
 was validated for the cluster (#249), and the direct render here is conclusive (same MIT worker, production config).
 `.env` enabled `MIT_SFX_DETECTOR=1` + `MIT_OCR_VLM_RESCUE=1`. Provenance in PIPELINE.md §5.
+
+## 2026-06-13 — #159 rolling cross-page context within a Batch Job (the Translation Session, PRD #155/P2)
+Quality regression #1 vs upstream (`mit-vs-upstream-quality-divergence.md`): the patch path's per-page worker reset
+killed cross-page context, so names/honorifics/pronouns drifted page-to-page. **Now the Batch Job carries recent
+pages' dialogue into the next page's prompt** — opt-in, born-and-dies-with-the-loop (the worker's per-request reset
+stays, so the #136 bleed class is structurally impossible). 4 TDD slices:
+1. **`server/rolling_context.py` `RollingContext`** (stdlib-only, lives with the batch loop): `add_page` / `render_block`
+   → upstream numbered `<|n|>sentence` block, bounded by **page cap** (`max_pages`, 0 disables) + **char cap** (drops
+   oldest lines so the local tokenizer never truncates the real queries). 5 pure tests (order, page cap, char cap,
+   numbered format, disabled/empty).
+2. **`TranslatorConfig.prev_context`** + `chatgpt_config` merges it next to `series_context` — the same #157 carriage
+   point; **`config_gpt.chat_system_template` appends it** so every GPT-family translator (ChatGPT, Qwen3, Gemini,
+   DeepSeek, **custom_openai**) carries it. 4 tests (config merge, coexist with series, absent→None, template append).
+3. **`batch_runner`**: a `RollingContext` per Batch Job (env `MIT_CONTEXT_PAGES`/`MIT_CONTEXT_MAX_CHARS`); seeds each
+   page via `_translate_page(..., prev_context=…)` (only when non-empty → the disabled call is byte-identical) and
+   accumulates the page's translated `dst` after. 2 tests (page N+1 carries page N's text + numbered format;
+   env unset/0 → `prev_context` never injected, byte-for-byte).
+4. **Single-page `_translate` untouched** (rolling context is the batch loop's local state; single path keeps
+   series_context only, per PRD).
+**Verified end-to-end on the REAL production translator** (`custom_openai`/9arm): `TranslatorConfig(prev_context=block)`
+→ `chat_system_template` contains the block; absent → unchanged. Full MIT suite **405 pass / 18 pre-existing async /
+0 new**. No visual E2E — #159 is translation *consistency* (not a render change); the prompt-assembly is proven against
+the real translator + the multi-page name-consistency demo is the operator validation when `MIT_CONTEXT_PAGES>0`.
+Branch `feat/mit-rolling-context-159`. Provenance in PIPELINE.md §5. **Closes the MIT quality batch
+(#247-#251, #168, #159).**
