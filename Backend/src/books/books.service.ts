@@ -546,7 +546,23 @@ export class BooksService {
     const model = this.imageModelKey(imageModel) ?? 'default';
     // v5: keyed by display derivative (#156). v6: series context (#157)
     // changes translations — context-aware and context-free patches never mix.
-    return `translate:manga-patches:v6:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}:${model}:${derivative}`;
+    // v7: include a hash of the MIT render/pipeline knobs so that changing a render
+    // env (font, anti-overlap, sizes, SFX, …) busts the cache instead of silently
+    // serving the previously-rendered patches.
+    return `translate:manga-patches:v7:${chapterId}:${pageIndex}:${srcMIT}:${tgtMIT}:${model}:${derivative}:${this.renderConfigHash()}`;
+  }
+
+  /** Short hash of every MIT_* env knob (the render/pipeline config). Two deployments
+   * with different render settings get different patch-cache keys, and toggling a knob
+   * invalidates the cache for that page — so a config change is visible on the next
+   * translate instead of replaying stale patches. */
+  private renderConfigHash(): string {
+    const knobs = Object.keys(process.env)
+      .filter((k) => k.startsWith('MIT_'))
+      .sort()
+      .map((k) => `${k}=${process.env[k] ?? ''}`)
+      .join('\n');
+    return createHash('sha1').update(knobs).digest('hex').slice(0, 10);
   }
 
   /** The registry key for a batch-translate job. MUST be built via mitLangPair

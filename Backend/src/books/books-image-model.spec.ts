@@ -64,7 +64,7 @@ describe('BooksService — per-request image translation model (#87)', () => {
     expect(keyWithModel).toContain(':gemini-2.5-pro');
     // v6: series context changes translations (#157) — context-aware and
     // context-free patches must never mix.
-    expect(keyWithModel).toContain(':v6:');
+    expect(keyWithModel).toContain(':v7:');
     expect(keyDefault).not.toBe(keyWithModel);
   });
 
@@ -88,6 +88,22 @@ describe('BooksService — per-request image translation model (#87)', () => {
     const saverKey = (service as any).patchCacheKey('ch1', 0, 'JPN', 'THA', undefined, 'saver');
     expect(defaultKey).toBe(hdKey);
     expect(saverKey).not.toBe(hdKey);
+  });
+
+  // A render-config change must bust the patch cache (v7), so a toggled knob is
+  // visible on the next translate instead of replaying stale patches.
+  it('partitions the patch cache key by the MIT render config', () => {
+    const { service } = makeService();
+    const before = (service as any).patchCacheKey('ch1', 0, 'JPN', 'THA', undefined, 'hd');
+    const saved = process.env.MIT_FONT_SIZE_MAX;
+    try {
+      process.env.MIT_FONT_SIZE_MAX = '20';
+      const after = (service as any).patchCacheKey('ch1', 0, 'JPN', 'THA', undefined, 'hd');
+      expect(after).not.toBe(before); // config change → different key → cache miss
+    } finally {
+      if (saved === undefined) delete process.env.MIT_FONT_SIZE_MAX;
+      else process.env.MIT_FONT_SIZE_MAX = saved;
+    }
   });
 
   // Same consistency trap as the v3/v4 incident above, for the derivative
