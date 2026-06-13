@@ -159,6 +159,33 @@ def test_process_group_inpaint_context_pad_enlarges_crop_then_slices_back():
     assert seen['inpaint_shape'] == (490, 490, 3)
 
 
+# ---- full-page inpaint reuse: clean background, skip per-crop mask + inpaint -----
+
+def test_process_group_full_page_inpaint_skips_per_crop_mask_and_inpaint():
+    """When a full-page inpaint is supplied, each group slices its clean background
+    from it and SKIPS the per-crop mask refinement + inpaint — those starve LaMa of
+    page context and leave a gray blob where large text sat over complex/dark art."""
+    import logging
+    seen = {}
+
+    def record_render(patch_ctx):
+        seen['bg'] = patch_ctx.img_rgb.copy()
+        return patch_ctx.img_rgb
+    driver = FakeDriver(render=record_render)
+    full = np.full((200, 200, 3), 77, dtype=np.uint8)       # distinct clean background
+
+    renderer = pr.PatchRenderer(
+        driver, _ctx(), _Cfg, pad=40, render_extra=80, img_w=200, img_h=200,
+        source_icc=None, sem=asyncio.Semaphore(3), logger=logging.getLogger('test'),
+        full_inpainted=full,
+    )
+    result = _run(renderer.process_group(_group()))
+
+    assert driver.calls == ['render']                        # no 'mask', no 'inpaint'
+    assert int(seen['bg'].mean()) == 77                      # bg is the full-page inpaint slice
+    assert set(result) == {'x', 'y', 'w', 'h', 'img_png'}
+
+
 # ---- #250: page-scaled font floor applied on a per-request config copy ---------
 
 def test_patch_renderer_floors_font_min_to_page_scale_on_a_config_copy():

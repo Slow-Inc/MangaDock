@@ -694,6 +694,10 @@ export class BooksService {
         // #249: inpaint a crop expanded by N px (patch path) so LaMa sees real
         // background instead of a starved tight crop. Absent → tight, byte-identical.
         ...(inpaintContextPad !== undefined ? { inpaint_context_pad: inpaintContextPad } : {}),
+        // Full-page inpaint (patch path): erase text on the WHOLE page once so LaMa has
+        // full context (clean over complex/dark art, no per-crop gray blob). Absent →
+        // per-crop inpaint, byte-identical.
+        ...(flagEnv('MIT_PATCH_FULLPAGE_INPAINT') ? { full_page_inpaint: true } : {}),
       },
       render: {
         direction: 'auto',
