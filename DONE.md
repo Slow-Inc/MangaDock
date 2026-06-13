@@ -2234,3 +2234,18 @@ disjoint, each-side clamp, margin, multi-neighbour) + updated `test_stages` kwar
 lighter weight — closely matches the target (`MIT/_e2e_overlap2.png`). `.env` set `MIT_ANTI_OVERLAP=1` +
 `MIT_EN_FONT=anime_ace_3.ttf` + `MIT_BUBBLE_AREA_FIT` off. Branch `feat/mit-anti-overlap-render`. Provenance in
 PIPELINE.md §5.
+
+## 2026-06-13 — Narration font cap (no-bubble caption/narration was still oversized/overflowing)
+After the anti-overlap fix, the user flagged that **no-bubble narration** (e.g. "THIS BRAT STILL DOESN'T REALIZE WHAT
+HE DID") still rendered too big and overflowed its panel. Root cause: a narration's JP detection box is tall/narrow
+(vertical source), and the fallthrough's **length-ratio box scaling** enlarges it for the longer English, then the
+homography warps the text up to fill the enlarged box → an oversized block. Fix (two levers, both gated by
+`RenderConfig.font_size_max`, SFX exempt): **(1)** pure `render_overlap.apply_font_cap(size, cap, is_sfx)` caps the
+non-SFX render font; **(2)** in `rendering/__init__.py`, when a cap is set, **stop the length-ratio `final_scale` from
+enlarging the non-SFX box** — the long translation then wraps inside the source box (narrow column) instead of
+overflowing. SFX stays big (exempt), so ぬ→GULP/SQUELCH is unaffected. Backend `MIT_FONT_SIZE_MAX`; 0 → no cap,
+byte-identical. TDD: 3 `apply_font_cap` tests (cap / SFX-exempt / disabled) + updated `test_stages` kwargs. Full MIT
+suite **416 pass / 18 pre-existing async / 0 new**. **Verified via direct render** (`MIT/_e2e_cap2.png`, `font_size_max=20`):
+narration now small & inside its panel, dialogue small & no overlap, SFX still big — matches the MangaTranslator target.
+Winning config = `bubble_area_fit OFF` + `anti_overlap ON` + `en_font=anime_ace_3.ttf` + `font_size_max≈20`. `.env` set
+`MIT_FONT_SIZE_MAX=20`. Branch `feat/mit-narration-font-cap`. Provenance in PIPELINE.md §5.
