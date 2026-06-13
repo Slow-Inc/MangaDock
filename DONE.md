@@ -2249,3 +2249,15 @@ suite **416 pass / 18 pre-existing async / 0 new**. **Verified via direct render
 narration now small & inside its panel, dialogue small & no overlap, SFX still big — matches the MangaTranslator target.
 Winning config = `bubble_area_fit OFF` + `anti_overlap ON` + `en_font=anime_ace_3.ttf` + `font_size_max≈20`. `.env` set
 `MIT_FONT_SIZE_MAX=20`. Branch `feat/mit-narration-font-cap`. Provenance in PIPELINE.md §5.
+
+## 2026-06-13 — Backend: patch cache key now includes a render-config hash (stale-render bug)
+While iterating on the render knobs, every in-app re-translate kept serving the **previously-rendered patches** — the
+patch cache key `translate:manga-patches:v6:<chapterId>:<page>:<src>:<tgt>:<model>:<derivative>` (`books.service.ts:549`)
+**did not include the MIT render/pipeline config**, so toggling a `.env` knob (font, anti-overlap, font_size_max, sizes,
+SFX, …) never invalidated the cache → the live `Cache HIT` replayed the old image (confirmed in the backend log), and
+`cache:reset` also missed the HD/ENG entry. Fix: bump the key to **v7** and append `renderConfigHash()` — a 10-char sha1
+of every `MIT_*` env knob (sorted). A config change now yields a different key → cache miss → the new render is visible
+on the next translate; two deployments with different settings no longer collide. `cache:reset` still matches
+(`translate:manga-patches:*`). TDD: 1 spec (toggling `MIT_FONT_SIZE_MAX` → different key) + `:v6:`→`:v7:` in the existing
+assertion; `books-image-model.spec` **9 pass**. Branch `fix/backend-cache-key-config`. This was the root cause the
+render fixes (#260/#261 + the `.env` config) looked like they "did nothing" in the Reader.
