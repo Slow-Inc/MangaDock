@@ -722,10 +722,6 @@ export class BooksService {
         // warping it onto the original vertical-JP quad (which stretches it oversized).
         // Absent → byte-identical.
         ...(flagEnv('MIT_CLEAN_LAYOUT') ? { clean_layout: true } : {}),
-        // Content-shaped patch alpha: composite only the erased source text + new
-        // translation (transparent elsewhere) instead of an opaque rectangle, so the
-        // original art shows through and there's no 'painted band'. Absent → rectangle.
-        ...(flagEnv('MIT_PATCH_CONTENT_ALPHA') ? { content_patch: true } : {}),
         // #176: render Latin/EN targets in the bundled comic font instead of the
         // worker's Prompt-Bold (a Thai face). Absent → byte-identical.
         ...(flagEnv('MIT_EN_COMIC_FONT') ? { en_comic_font: true } : {}),

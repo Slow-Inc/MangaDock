@@ -2315,21 +2315,3 @@ per-group inpaints). Off → per-crop, byte-identical. TDD: `test_patch_renderer
 async / 0 new**. **Verified via direct render** (`tools/ab_clean.py` + new `tools/ab_fullpage.py`): the bottom-right hair
 is now clean dark, no gray blob, English text intact — matches the full-page/upstream/target. `.env` set
 `MIT_PATCH_FULLPAGE_INPAINT=1`. Branch `fix/mit-patch-fullpage-inpaint`. Provenance in PIPELINE.md §5.
-
-## 2026-06-13 — Content-shaped patch alpha (the "painted band" — paint-over vs erase)
-After the full-page inpaint, the user noticed the text-removal still read as **"painting over" not "erasing"**: a faint
-lighter **rectangle/band** sat behind the translated text over the dark hair. Root cause is the **compositing**, not the
-inpaint: each patch is pasted as an **opaque rectangle** (render rect = inpainted background + new text), so the inpainter's
-slightly-repainted hair replaces the **whole rectangle** of untouched original art → a visible box. (The full-page `/image`
-render looked clean precisely because it never composites rectangles.) Fix (the user's "cut only the changed pieces" idea):
-a **content-shaped patch alpha** — `patch_geometry.content_patch_alpha(erase_mask, rendered, background)` makes the patch
-opaque ONLY on the **erased source-text pixels** (the region's inpaint mask) ∪ the **newly drawn translation** (where the
-render differs from the erased background), transparent everywhere else, so the patch carries just the changed strokes and
-the original art shows through. `PatchRenderer` builds the erase mask per region (per-crop: the refined mask; full-page:
-`ctx.mask[y1:y2,x1:x2]`) and uses the content alpha instead of the #173 rectangle feather. Gated by `RenderConfig.content_patch`
-(Backend `MIT_PATCH_CONTENT_ALPHA`); off → rectangle/feather (byte-identical). VRAM-free (compositing only, no model change).
-TDD: 1 pure helper test (`content_patch_alpha` opaque only on erased+new, transparent on untouched); patch suites green,
-**full MIT suite 420 pass / 18 pre-existing async / 0 new**. **Verified via a controlled direct-render A/B** (`tools/ab_clean.py`,
-both columns full-page inpaint + clean layout, only `content_patch` differs): the rectangle column shows a lighter box around
-the text; the content-patch column shows **continuous original dark hair with no box** — the text sits directly on the
-original art. `.env` set `MIT_PATCH_CONTENT_ALPHA=1`. Branch `feat/mit-content-patch-alpha`. Provenance in PIPELINE.md §5.
