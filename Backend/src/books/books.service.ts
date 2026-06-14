@@ -391,9 +391,9 @@ interface BatchJobState {
   processingPages: Set<number>;
   /** Active SSE listeners — removed on client disconnect */
   listeners: Set<BatchPageListener>;
-  /** Direct reference to the original SSE caller — guaranteed delivery regardless of Redis state */
+  /** Direct reference to the original SSE caller — guaranteed direct delivery */
   originalListener?: BatchPageListener;
-  /** Total active callers (Redis subscribers + job.listeners members). Used for
+  /** Total active callers (original caller + latecomer listeners). Used for the
    *  abort decision so the count is correct regardless of delivery path. */
   activeCallerCount: number;
   /** Resolves when ALL pages in the batch are done (or MIT closes) */
@@ -1145,7 +1145,7 @@ export class BooksService {
       completedPages: new Map(),
       processingPages: new Set(),
       // Latecomers add themselves to job.listeners via the attach path.
-      // Original caller is always delivered directly via originalListener (no Redis dependency).
+      // Original caller is always delivered directly via originalListener.
       listeners: new Set(),
       originalListener: listener,
       activeCallerCount: 1,
@@ -1171,7 +1171,7 @@ export class BooksService {
     pages.forEach((p, i) => {
       const cached = cachedResults[i];
       if (cached?.data?.patches) {
-        // Serve from cache immediately — direct call, no Redis needed
+        // Serve from cache immediately — direct call
         listener(p.pageIndex, { patches: cached.data.patches });
       } else {
         uncachedPages.push(p);
