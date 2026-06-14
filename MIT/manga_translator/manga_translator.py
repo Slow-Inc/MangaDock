@@ -752,35 +752,38 @@ class MangaTranslator:
               
             region.text = stripped_text.strip()     
             
+            # SFX rescue (#168/#172) — runs BEFORE the value/lang filter so it works for EVERY
+            # target language. A LARGE region the 48px line-OCR could only read as a few characters
+            # is a stylized SFX (e.g. ぬ); localize the crop to the TARGET language via the
+            # custom_openai/9arm vision gateway and keep it. (The old code nested the rescue inside
+            # the filter, which only caught SFX when the misread happened to match the target script
+            # — i.e. English — so SFX were dropped, leaving the raw JP glyph, for TH/ZH/KO.)
+            if config.ocr.vlm_rescue and len(region.text.strip()) <= 4:
+                x1, y1, x2, y2 = (int(v) for v in region.xyxy)
+                if (x2 - x1) * (y2 - y1) >= 3600 and min(x2 - x1, y2 - y1) >= 24:
+                    from .ocr_vlm import vlm_localize_sfx
+                    from .translators.keys import (CUSTOM_OPENAI_API_BASE,
+                                                   CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
+                    crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
+                    if crop.size:
+                        rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
+                                                   api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
+                                                   target_lang=config.translator.target_lang)
+                        if rescued:
+                            logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
+                            # The rescue produced the FINAL SFX in the target language. Pre-setting
+                            # text+translation makes source_lang auto-derive as the target so the
+                            # translate stage skips it, and filter_translated_regions keeps it.
+                            region.text = rescued
+                            region.translation = rescued
+                            region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
+                            new_text_regions.append(region)
+                            continue
+
             if len(region.text) < config.ocr.min_text_length \
                     or not is_valuable_text(region.text) \
                     or (not config.translator.no_text_lang_skip and langcodes.tag_distance(region.source_lang, config.translator.target_lang) == 0):
-                # #168/#172: before dropping a large region the 48px OCR couldn't read
-                # (stylized SFX like ぬ), try a vision-LLM rescue — localize the crop to
-                # an English onomatopoeia via the custom_openai/9arm vision gateway.
-                rescued = ''
-                if config.ocr.vlm_rescue:
-                    x1, y1, x2, y2 = (int(v) for v in region.xyxy)
-                    if (x2 - x1) * (y2 - y1) >= 3600 and min(x2 - x1, y2 - y1) >= 24:
-                        from .ocr_vlm import vlm_localize_sfx
-                        from .translators.keys import (CUSTOM_OPENAI_API_BASE,
-                                                       CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
-                        crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
-                        if crop.size:
-                            rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
-                                                       api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL)
-                if rescued:
-                    logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
-                    # The rescue already produced the FINAL target-language (English)
-                    # SFX. Setting region.text to it makes source_lang auto-derive as
-                    # the target, so the translate stage skips it; pre-setting
-                    # region.translation means the skip leaves a non-blank translation
-                    # (otherwise filter_translated_regions would drop it) and it renders.
-                    region.text = rescued
-                    region.translation = rescued
-                    region.sfx_rescued = True  # restore_sfx_translations re-applies this after translate
-                    new_text_regions.append(region)
-                elif region.text.strip():
+                if region.text.strip():
                     logger.info(f'Filtered out: {region.text}')
                     if len(region.text) < config.ocr.min_text_length:
                         logger.info('Reason: Text length is less than the minimum required length.')
@@ -1477,6 +1480,11 @@ class MangaTranslator:
                 text_only = create_text_only_mask(img_h, img_w, regions)
                 ctx.mask = (union_refined_with_fallback(full_mask, text_only)
                             if full_mask is not None else text_only)
+                # #268: shrink the full-page erase mask to the ink strokes so LaMa repaints
+                # less of the textured art (smaller band). Off → unchanged.
+                if getattr(config.inpainter, 'mask_tighten', False):
+                    from .patch_geometry import tighten_text_mask
+                    ctx.mask = tighten_text_mask(ctx.img_rgb, ctx.mask)
                 full_inpainted = await self._run_inpainting(config, ctx)
                 logger.info('[PatchTranslate] full-page inpaint done — patches reuse it')
             except Exception:

@@ -87,6 +87,7 @@ class Inpainter(str, Enum):
     lama_mpe = "lama_mpe"
     none = "none"
     original = "original"
+    flux_klein = "flux_klein"
 
 class Colorizer(str, Enum):
     none = "none"
@@ -388,6 +389,20 @@ class InpainterConfig(BaseModel):
     sees the entire page → clean reconstruction even where large text sat over complex/
     dark art (a small crop starves its global branch → a gray blob). One inpaint per page
     (often faster than N per-group inpaints). Off → per-crop inpaint (byte-identical)."""
+    lama_lum_reground: float = 0.0
+    """Patch path only (#268): re-ground the inpaint's low-frequency luminance INSIDE the
+    erase mask to the local original surroundings (per-pixel, per-RGB-channel) before the
+    translation is drawn, killing the faint "painted band" where LaMa's fill is a few levels
+    off the real art over dark hair. Strength 0→1 lerp; pure CPU (cv2/numpy), no extra VRAM.
+    0 → off, byte-identical."""
+    mask_tighten: bool = False
+    """Patch path only (#268): shrink the inpaint mask to the actual ink strokes (local-contrast
+    pixels) before LaMa runs, so it repaints thin strokes instead of the whole text rectangle and
+    the original art between strokes survives → smaller band. Pure CPU. Off → byte-identical."""
+    seamless_clone: bool = False
+    """Patch path only (#268, escalation): Poisson seamless-clone the inpainted region into the
+    original (gradient-domain) so the mean-brightness band vanishes. Cannot synthesise texture
+    (smudges high-freq art) — a comparison/escalation lever. Pure CPU. Off → byte-identical."""
 
 class ColorizerConfig(BaseModel):
     colorization_size: int = 576
