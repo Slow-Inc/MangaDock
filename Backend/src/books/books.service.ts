@@ -9,7 +9,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { MangaDexService } from './mangadex.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 import { PatchStore } from './patch-store';
-import { TranslationMemoryRepository } from './translation-memory.repository';
+import { TranslationMemoryRepository, type TextLayerRegion } from './translation-memory.repository';
 import { loadPageBytes } from './page-source';
 import { composeSeriesContext } from './series-context';
 import { RedisService } from '../cache/redis.service';
@@ -363,6 +363,26 @@ type PatchEntry = { xPct: number; yPct: number; wPct: number; hPct: number; url:
 type PageResult = { patches: PatchEntry[]; error?: string };
 type BatchPageListener = (pageIndex: number, result: PageResult) => void;
 
+/** Map raw MIT patch rects (px) + their already-stored URLs into percent-geometry
+ *  patch entries. Pure — the single source of truth for the percent math that was
+ *  previously triplicated across the single-page, batch-stream, and webhook paths
+ *  (#232). A zero image dimension degrades that axis to 0. The `url` is taken
+ *  positionally, so `rects[i]` must line up with `urls[i]` (PatchStore.put order). */
+export function toPatchEntries(
+  rects: Array<{ x: number; y: number; w: number; h: number }>,
+  urls: string[],
+  imgW: number,
+  imgH: number,
+): PatchEntry[] {
+  return rects.map((r, i) => ({
+    xPct: imgW > 0 ? r.x / imgW : 0,
+    yPct: imgH > 0 ? r.y / imgH : 0,
+    wPct: imgW > 0 ? r.w / imgW : 0,
+    hPct: imgH > 0 ? r.h / imgH : 0,
+    url: urls[i],
+  }));
+}
+
 interface BatchJobState {
   /** Pages that have already been processed (cached + saved) */
   completedPages: Map<number, PageResult>;
@@ -454,6 +474,50 @@ export class BooksService {
     }
   }
 
+  /** Shared per-page persist (#232): PatchStore write → percent-map (toPatchEntries)
+   *  → cache set (via the #229 patch cache key) → optional translation-memory save,
+   *  in one place. Cache strategy + TM save are parametrized so the webhook,
+   *  batch-stream, and single-page callers each keep byte-identical behaviour.
+   *  `recoverIfEmpty` lets the batch path swap in a source_lang_only fallback
+   *  before the single cache write. Returns the final patch entries. */
+  private async persistPage(p: {
+    chapterId: string;
+    pageIndex: number;
+    srcMIT: string;
+    tgtMIT: string;
+    storeModel?: string;
+    cacheKey: string;
+    cacheStrategy: 'plain7d' | 'tiered';
+    rects: Array<{ x: number; y: number; w: number; h: number }>;
+    buffers: Buffer[];
+    imgW: number;
+    imgH: number;
+    regions?: TextLayerRegion[];
+    tmModel?: string;
+    recoverIfEmpty?: () => Promise<PatchEntry[]>;
+  }): Promise<PatchEntry[]> {
+    const urls = await this.patchStore.put(
+      { chapterId: p.chapterId, pageIndex: p.pageIndex, srcMIT: p.srcMIT, tgtMIT: p.tgtMIT, model: p.storeModel },
+      p.buffers,
+    );
+    let patches = toPatchEntries(p.rects, urls, p.imgW, p.imgH);
+    if (patches.length === 0 && p.recoverIfEmpty) {
+      patches = await p.recoverIfEmpty();
+    }
+    if (p.cacheStrategy === 'plain7d') {
+      await this.cache.set(p.cacheKey, { patches }, 1000 * 60 * 60 * 24 * 7); // 7 days
+    } else {
+      await this.cache.setMangaCacheWithTiers(p.cacheKey, { patches });
+    }
+    // Translation memory (#160): persist this page's text layer (#158 regions).
+    // Fire-and-forget — the repository swallows its own errors, so persistence
+    // never adds latency to or fails page delivery (local-first).
+    if (Array.isArray(p.regions) && p.regions.length > 0) {
+      void this.translationMemory.savePageText(p.chapterId, p.pageIndex, p.tgtMIT, p.regions, p.tmModel);
+    }
+    return patches;
+  }
+
   async handleMitCallback(
     jobKey: string,
     pageIndex: number,
@@ -502,21 +566,9 @@ export class BooksService {
         accepted.push({ x: p.x, y: p.y, w: p.w, h: p.h, buf: Buffer.from(p.img_b64, 'base64') });
       }
 
-      const urls = await this.patchStore.put(
-        { chapterId, pageIndex, srcMIT, tgtMIT, model: jobModel },
-        accepted.map((a) => a.buf),
-      );
-      const patches: PatchEntry[] = accepted.map((a, i) => ({
-        xPct: imgW > 0 ? a.x / imgW : 0,
-        yPct: imgH > 0 ? a.y / imgH : 0,
-        wPct: imgW > 0 ? a.w / imgW : 0,
-        hPct: imgH > 0 ? a.h / imgH : 0,
-        url: urls[i],
-      }));
-
-      // Cache the result — MUST be the same key the batch pre-check and the
-      // single-page endpoint read (patchCacheKey), or webhook results are never
-      // served from cache again (found live during the #87 v4 migration).
+      // Cache key MUST match the batch pre-check and the single-page endpoint
+      // (patchCacheKey), or webhook results are never served from cache again
+      // (found live during the #87 v4 migration).
       const cacheKey = this.patchCacheKey(
         chapterId,
         pageIndex,
@@ -525,16 +577,23 @@ export class BooksService {
         jobModel,
         jobDerivative === 'saver' ? 'saver' : 'hd',
       );
-      await this.cache.set(cacheKey, { patches }, 1000 * 60 * 60 * 24 * 7); // 7 days
-
-      // Translation memory (#160): persist this page's text layer (#158 regions).
-      // Fire-and-forget — the repository swallows its own errors, so persistence
-      // never adds latency to or fails page delivery (local-first).
-      if (Array.isArray(result.regions) && result.regions.length > 0) {
-        void this.translationMemory.savePageText(
-          chapterId, pageIndex, tgtMIT, result.regions, jobModel,
-        );
-      }
+      // #232: shared per-page persist — PatchStore write + percent-map + 7-day
+      // cache set + translation-memory save.
+      const patches = await this.persistPage({
+        chapterId,
+        pageIndex,
+        srcMIT,
+        tgtMIT,
+        storeModel: jobModel,
+        cacheKey,
+        cacheStrategy: 'plain7d',
+        rects: accepted,
+        buffers: accepted.map((a) => a.buf),
+        imgW,
+        imgH,
+        regions: result.regions as TextLayerRegion[] | undefined,
+        tmModel: jobModel,
+      });
 
       pageResult = { patches };
     }
@@ -1077,20 +1136,22 @@ export class BooksService {
 
     // Persist the Patch Set via PatchStore (#137 — deterministic names, no orphans)
     const { img_width: imgW, img_height: imgH } = patchData;
-    const urls = await this.patchStore.put(
-      { chapterId, pageIndex, srcMIT, tgtMIT, model: this.imageModelKey(opts?.imageModel) },
-      patchData.patches.map((p) => Buffer.from(p.img_b64, 'base64')),
-    );
-    const patches = patchData.patches.map((p, i) => ({
-      xPct: imgW > 0 ? p.x / imgW : 0,
-      yPct: imgH > 0 ? p.y / imgH : 0,
-      wPct: imgW > 0 ? p.w / imgW : 0,
-      hPct: imgH > 0 ? p.h / imgH : 0,
-      url: urls[i],
-    }));
+    // #232: shared per-page persist — PatchStore write + percent-map + tiered cache.
+    const patches = await this.persistPage({
+      chapterId,
+      pageIndex,
+      srcMIT,
+      tgtMIT,
+      storeModel: this.imageModelKey(opts?.imageModel),
+      cacheKey,
+      cacheStrategy: 'tiered',
+      rects: patchData.patches,
+      buffers: patchData.patches.map((p) => Buffer.from(p.img_b64, 'base64')),
+      imgW,
+      imgH,
+    });
 
     const result = { patches };
-    await this.cache.setMangaCacheWithTiers(cacheKey, result);
 
     this.logger.log(
       `[MangaPatches] chapter=${chapterId} page=${pageIndex} → ${patches.length} patches`,
@@ -1467,47 +1528,52 @@ export class BooksService {
 
             const imgW = data.imgWidth;
             const imgH = data.imgHeight;
-            const pageUrls = await this.patchStore.put(
-              { chapterId, pageIndex: data.pageIndex, srcMIT, tgtMIT, model: this.imageModelKey(imageModel) },
-              data.patches.map((p) => Buffer.from(p.img_b64, 'base64')),
-            );
-            let patches: PatchEntry[] = data.patches.map((p, i) => ({
-              xPct: imgW > 0 ? p.x / imgW : 0,
-              yPct: imgH > 0 ? p.y / imgH : 0,
-              wPct: imgW > 0 ? p.w / imgW : 0,
-              hPct: imgH > 0 ? p.h / imgH : 0,
-              url: pageUrls[i],
-            }));
-
-            if (patches.length === 0 && srcMIT !== 'ANY') {
-              const pageUrl = pageUrlByIndex.get(data.pageIndex);
-              if (pageUrl) {
-                try {
-                  const fallback = await this.translateMangaPagePatches(
-                    chapterId,
-                    data.pageIndex,
-                    pageUrl,
-                    undefined,
-                    targetLangIso,
-                    { imageModel },
-                  );
-                  if (fallback.patches.length > 0) {
-                    this.logger.log(
-                      `[BatchPatches] chapter=${chapterId} page=${data.pageIndex} source_lang_only fallback recovered ${fallback.patches.length} patches`,
-                    );
-                    patches = fallback.patches;
-                  }
-                } catch (fallbackErr) {
-                  this.logger.warn(
-                    `[BatchPatches] chapter=${chapterId} page=${data.pageIndex} fallback(no source filter) failed: ${String(fallbackErr)}`,
-                  );
-                }
-              }
-            }
-
             // Cache so single-page endpoint & future batch requests skip MIT
             const cacheKey = this.patchCacheKey(chapterId, data.pageIndex, srcMIT, tgtMIT, imageModel, derivative);
-            await this.cache.setMangaCacheWithTiers(cacheKey, { patches });
+            // #232: shared per-page persist — PatchStore write + percent-map + tiered
+            // cache. recoverIfEmpty runs the source_lang_only fallback BEFORE the
+            // single cache write, so an empty first pass never caches stale-empty.
+            const patches = await this.persistPage({
+              chapterId,
+              pageIndex: data.pageIndex,
+              srcMIT,
+              tgtMIT,
+              storeModel: this.imageModelKey(imageModel),
+              cacheKey,
+              cacheStrategy: 'tiered',
+              rects: data.patches,
+              buffers: data.patches.map((p) => Buffer.from(p.img_b64, 'base64')),
+              imgW,
+              imgH,
+              recoverIfEmpty:
+                srcMIT === 'ANY'
+                  ? undefined
+                  : async () => {
+                      const pageUrl = pageUrlByIndex.get(data.pageIndex);
+                      if (!pageUrl) return [];
+                      try {
+                        const fallback = await this.translateMangaPagePatches(
+                          chapterId,
+                          data.pageIndex,
+                          pageUrl,
+                          undefined,
+                          targetLangIso,
+                          { imageModel },
+                        );
+                        if (fallback.patches.length > 0) {
+                          this.logger.log(
+                            `[BatchPatches] chapter=${chapterId} page=${data.pageIndex} source_lang_only fallback recovered ${fallback.patches.length} patches`,
+                          );
+                          return fallback.patches;
+                        }
+                      } catch (fallbackErr) {
+                        this.logger.warn(
+                          `[BatchPatches] chapter=${chapterId} page=${data.pageIndex} fallback(no source filter) failed: ${String(fallbackErr)}`,
+                        );
+                      }
+                      return [];
+                    },
+            });
 
             this.logger.log(`[BatchPatches] chapter=${chapterId} page=${data.pageIndex} → ${patches.length} patches`);
             notify(data.pageIndex, { patches });
