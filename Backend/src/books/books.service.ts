@@ -1,6 +1,4 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
@@ -15,17 +13,12 @@ import { MitTranslationService } from './mit-translation.service';
 import { MitBatchOrchestrator, type BatchPageListener } from './mit-batch-orchestrator.service';
 import { loadPageBytes } from './page-source';
 import { composeSeriesContext } from './series-context';
-// #234 S5-pre: pure MIT key/config + lang helpers moved out of this god file to
-// break the value-import cycle (mit-translation/mit-batch import them too). The
-// private delegators below keep BooksService's internal call sites byte-identical.
-import { geminiLangName } from './mit-config';
 import { GeminiModelCatalog, type GeminiModel } from './gemini-model-catalog';
 import { MangaCatalogService } from './manga-catalog.service';
+import { LandingService } from './landing.service';
 import {
-  CACHE_TTL_MS,
   type LandingBook,
   type LandingPayload,
-  type LandingRow,
   type MangaChapter,
   type MangaChapterPages,
   type MangaDetail,
@@ -41,8 +34,6 @@ export type {
   MangaChapterPages,
   LandingBook,
 } from './books.types';
-
-const LANDING_CACHE_KEY = 'landing:full:v5';
 
 // ─── Patch geometry ───────────────────────────────────────────────────────────
 type PatchEntry = { xPct: number; yPct: number; wPct: number; hPct: number; url: string };
@@ -80,6 +71,11 @@ export class BooksService {
    *  this service's mangaDex/supabase/cache; BooksService keeps thin delegators. */
   private readonly catalog: MangaCatalogService;
 
+  /** Landing assembly + Gemini text translation (description/episode) (#231).
+   *  Constructed here so it shares this service's cache/imageCache/mangaDex/
+   *  geminiCatalog + backendOrigin; BooksService keeps thin delegators. */
+  private readonly landing: LandingService;
+
   /** Single owner of Patch Set files (#137) — deterministic names, legacy sweep. */
   private readonly patchStore: PatchStore;
   private readonly translationMemory: TranslationMemoryRepository;
@@ -105,6 +101,13 @@ export class BooksService {
   ) {
     this.geminiCatalog = new GeminiModelCatalog(this.cache);
     this.catalog = new MangaCatalogService(this.mangaDex, this.supabase, this.cache);
+    this.landing = new LandingService(
+      this.cache,
+      this.imageCache,
+      this.mangaDex,
+      this.geminiCatalog,
+      () => this.backendOrigin,
+    );
     this.patchStore = new PatchStore(this.storage, () => this.backendOrigin);
     // #160: translation memory rides the already-injected service-role client;
     // best-effort, so a missing/broken Supabase never affects translation.
@@ -242,7 +245,9 @@ export class BooksService {
     }
   }
 
-  async translateMangaEpisode(payload: {
+  // #231: Gemini text translation (episode + description) lives in LandingService.
+  // Delegators keep the controller call sites + the books-translate spec byte-identical.
+  translateMangaEpisode(payload: {
     lines?: string[];
     contextHint?: string;
     chapterId?: string;
@@ -256,144 +261,7 @@ export class BooksService {
     fromCache: number;
     generated: number;
   }> {
-    const sourceLines = Array.isArray(payload.lines) ? payload.lines : [];
-    const lines = sourceLines
-      .map((line) => (line ?? '').trim())
-      .filter((line) => line.length > 0)
-      .slice(0, 60);
-
-    const modelCandidates = await this.getMangaModels(payload.model);
-    const preferredModel = modelCandidates[0];
-
-    if (lines.length === 0) {
-      return {
-        translatedLines: [],
-        translated: false,
-        model: preferredModel,
-        fromCache: 0,
-        generated: 0,
-      };
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return {
-        translatedLines: lines,
-        translated: false,
-        model: preferredModel,
-        fromCache: 0,
-        generated: 0,
-      };
-    }
-
-    const targetLang = (payload.targetLang ?? 'th').toLowerCase();
-    const contextHint = (payload.contextHint ?? '').trim().slice(0, 280);
-    const chapterTag = payload.chapterId ? `chapter:${payload.chapterId}` : 'chapter:unknown';
-    const pageTag = Number.isFinite(payload.page) ? `page:${payload.page}` : 'page:unknown';
-    const cacheScope = `${chapterTag}|${pageTag}|lang:${targetLang}|ctx:${contextHint}`;
-
-    const uniqueLineMap = new Map<string, number[]>();
-    lines.forEach((line, idx) => {
-      const list = uniqueLineMap.get(line) ?? [];
-      list.push(idx);
-      uniqueLineMap.set(line, list);
-    });
-
-    const uniqueLines = [...uniqueLineMap.keys()];
-    const translatedByUnique = new Map<string, string>();
-    let fromCache = 0;
-
-    // Lines in parallel; model fallback order preserved within each line (#148)
-    await Promise.all(
-      uniqueLines.map(async (line) => {
-        const hash = createHash('sha1').update(`${line}|${cacheScope}`).digest('hex').slice(0, 24);
-        for (const modelName of modelCandidates) {
-          const cacheKey = `translate:manga:v1:${modelName}:${hash}`;
-          const cached = await this.cache.get<{ text: string }>(cacheKey);
-          if (!cached?.data?.text) continue;
-          translatedByUnique.set(line, cached.data.text);
-          fromCache += 1;
-          break;
-        }
-      }),
-    );
-
-    const missingLines = uniqueLines.filter((line) => !translatedByUnique.has(line));
-
-    let usedModel: GeminiModel = preferredModel;
-
-    if (missingLines.length > 0) {
-      const numberedLines = missingLines.map((line, idx) => `${idx + 1}. ${line}`).join('\n');
-      const prompt = [
-        `Translate manga dialogue/narration to ${geminiLangName(targetLang)} with natural tone and context consistency.`,
-        'Output ONLY valid JSON array of strings in the same order and same length as input.',
-        'Do not include explanations, markdown, keys, or extra text.',
-        contextHint ? `Context: ${contextHint}` : '',
-        '',
-        'Input lines:',
-        numberedLines,
-      ].filter(Boolean).join('\n');
-
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      for (const modelName of modelCandidates) {
-        try {
-          const model = genAI.getGenerativeModel({ model: modelName });
-          const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { thinkingConfig: { thinkingBudget: 0 } } as any,
-          });
-
-          const raw = result.response.text().trim();
-          const normalized = raw
-            .replace(/^```json\s*/i, '')
-            .replace(/^```\s*/i, '')
-            .replace(/\s*```$/i, '')
-            .trim();
-
-          let parsed: string[] = [];
-          try {
-            const json = JSON.parse(normalized);
-            if (Array.isArray(json)) {
-              parsed = json.map((item) => String(item ?? '').trim());
-            }
-          } catch {
-            parsed = normalized
-              .split('\n')
-              .map((line) => line.replace(/^\d+\.\s*/, '').trim())
-              .filter(Boolean);
-          }
-
-          const cacheWrites: Promise<void>[] = [];
-          for (let idx = 0; idx < missingLines.length; idx += 1) {
-            const source = missingLines[idx];
-            const translated = (parsed[idx] ?? source).trim() || source;
-            translatedByUnique.set(source, translated);
-
-            const hash = createHash('sha1').update(`${source}|${cacheScope}`).digest('hex').slice(0, 24);
-            const cacheKey = `translate:manga:v1:${modelName}:${hash}`;
-            cacheWrites.push(this.cache.setMangaCacheWithTiers(cacheKey, { text: translated }));
-          }
-          await Promise.all(cacheWrites); // parallel writes (#148)
-
-          usedModel = modelName;
-          break;
-        } catch (err) {
-          this.logger.warn(`[Gemini] Manga translation failed on ${modelName}: ${String(err)}`);
-        }
-      }
-    }
-
-    const translatedLines = lines.map((line) => translatedByUnique.get(line) ?? line);
-    const generated = missingLines.length;
-    const translated = translatedLines.some((line, idx) => line !== lines[idx]);
-    return {
-      translatedLines,
-      translated,
-      model: usedModel,
-      fromCache,
-      generated,
-    };
+    return this.landing.translateMangaEpisode(payload);
   }
 
   // ─── Manga page image translation (manga-image-translator) ──────────────────
@@ -489,117 +357,12 @@ export class BooksService {
 
   // ─── Orchestrated methods ─────────────────────────────────────────────────────
 
-  async translateDescription(text: string): Promise<{ translatedText: string; translated: boolean }> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return { translatedText: text, translated: false };
-    if (!text?.trim()) return { translatedText: text, translated: false };
-
-    // Detect if already Thai — skip if >25% Thai chars
-    const thaiChars = (text.match(/[\u0E00-\u0E7F]/g) ?? []).length;
-    if (thaiChars / text.length > 0.25) return { translatedText: text, translated: false };
-
-    const models = await this.getDescriptionModels();
-    const fingerprint = Buffer.from(text.slice(0, 512)).toString('base64').slice(0, 64);
-    const cacheKey = `translate:th:v3:${models.join('|')}:${fingerprint}`;
-    const cached = await this.cache.get<{ translatedText: string; translated: boolean }>(cacheKey);
-    if (cached) return cached.data;
-
-    const prompt = `Translate the following manga/book description to Thai. Output ONLY the Thai translation. Do not include any reasoning, explanations, thoughts, or notes. Just the translated text:\n\n${text}`;
-    const genAI = new GoogleGenerativeAI(apiKey);
-
-    for (const modelName of models) {
-      try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { thinkingConfig: { thinkingBudget: 0 } } as any,
-        });
-        let translatedText = result.response.text().trim();
-        // Strip THOUGHTS section if model still outputs it (fallback)
-        if (translatedText.includes('THOUGHTS:') || translatedText.includes('* **')) {
-          const lines = translatedText.split('\n');
-          const thaiLines = lines.filter((l) => {
-            const thaiCount = (l.match(/[\u0E00-\u0E7F]/g) || []).length;
-            return thaiCount > 0 && thaiCount / Math.max(l.trim().length, 1) > 0.2;
-          });
-          if (thaiLines.length > 0) translatedText = thaiLines.join('\n').trim();
-        }
-        const payload = { translatedText, translated: true };
-        await this.cache.setMangaCacheWithTiers(cacheKey, payload);
-        return payload;
-      } catch (err) {
-        this.logger.warn(`[Gemini] Description translation failed on ${modelName}: ${String(err)}`);
-      }
-    }
-
-    return { translatedText: text, translated: false };
+  translateDescription(text: string): Promise<{ translatedText: string; translated: boolean }> {
+    return this.landing.translateDescription(text);
   }
 
-  async getLandingBooks(forceLocal = false): Promise<LandingPayload> {
-    const cacheKey = LANDING_CACHE_KEY;
-    const cached = await this.cache.get<LandingPayload>(cacheKey);
-    if (cached) {
-      this.logger.log(`Landing served from [${cached.source}] cache`);
-      const enhanced = await this.enhanceLanding(cached.data);
-      if (this.imageCache.enabled) {
-        this.patchLandingCacheIfNeeded(cacheKey, cached.data, enhanced);
-      }
-      return forceLocal ? this.applyForceLocalLanding(enhanced) : enhanced;
-    }
-
-    this.logger.log(`Cache miss — fetching from MangaDex API`);
-
-    const rows: LandingRow[] = [];
-    try {
-      for (const def of this.mangaDex.mangaRowDefs) {
-        const { items } = await this.mangaDex.fetchMangaForRow(def.order, def.limit ?? 10);
-        rows.push({ id: def.id, title: def.title, query: def.order, items });
-      }
-    } catch (err) {
-      this.logger.warn(`API fetch error: ${String(err)} — attempting stale cache fallback`);
-      const stale = this.cache.getStale<LandingPayload>(cacheKey);
-      if (stale) {
-        this.logger.log(`Serving stale landing cache (updatedAt=${stale.updatedAt})`);
-        const stalePayload: LandingPayload = {
-          ...stale.data,
-          fromStaleCache: true,
-          staleUpdatedAt: stale.updatedAt,
-        };
-        const enhanced = await this.enhanceLanding(stalePayload);
-        return forceLocal ? this.applyForceLocalLanding(enhanced) : enhanced;
-      }
-      this.logger.warn('No stale cache available — returning API offline payload');
-      return { hero: null, rows: [], updatedAt: new Date().toISOString(), apiOffline: true };
-    }
-
-    const hero = rows.find((r) => r.items.length > 0)?.items[0] ?? null;
-    const payload: LandingPayload = {
-      hero,
-      rows,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (rows.some((r) => r.items.length > 0)) {
-      await this.cache.set(cacheKey, payload, CACHE_TTL_MS);
-    } else {
-      this.logger.warn('No books returned — trying stale cache fallback');
-      const stale = this.cache.getStale<LandingPayload>(cacheKey);
-      if (stale) {
-        this.logger.log(`Serving stale landing cache (updatedAt=${stale.updatedAt})`);
-        const stalePayload: LandingPayload = {
-          ...stale.data,
-          fromStaleCache: true,
-          staleUpdatedAt: stale.updatedAt,
-        };
-        const enhanced = await this.enhanceLanding(stalePayload);
-        return forceLocal ? this.applyForceLocalLanding(enhanced) : enhanced;
-      }
-      this.logger.warn('No stale cache available — returning API offline payload');
-      return { hero: null, rows: [], updatedAt: new Date().toISOString(), apiOffline: true };
-    }
-
-    const landingEnhanced = await this.enhanceLanding(payload);
-    return forceLocal ? this.applyForceLocalLanding(landingEnhanced) : landingEnhanced;
+  getLandingBooks(forceLocal = false): Promise<LandingPayload> {
+    return this.landing.getLandingBooks(forceLocal);
   }
 
   // #231: search + alt-name lookup live in MangaCatalogService. Delegator keeps the
@@ -608,78 +371,5 @@ export class BooksService {
     return this.catalog.searchBooks(query, lang, limit, offset);
   }
 
-  // ─── Image cache enhancement (landing-level) ──────────────────────────────────
-
-  private applyForceLocalLanding(payload: LandingPayload): LandingPayload {
-    if (!this.imageCache.enabled) return payload;
-    const origin = this.backendOrigin;
-    const fix = (book: LandingBook): LandingBook => {
-      const cached = !!book.thumbnailLocal;
-      return {
-        ...book,
-        thumbnail: cached ? `${origin}${book.thumbnailLocal}` : book.thumbnail,
-        thumbnailCached: cached,
-      };
-    };
-    return {
-      ...payload,
-      hero: payload.hero ? fix(payload.hero) : null,
-      rows: payload.rows.map((row) => ({ ...row, items: row.items.map(fix) })),
-    };
-  }
-
-  private patchLandingCacheIfNeeded(
-    cacheKey: string,
-    original: LandingPayload,
-    enhanced: LandingPayload,
-  ): void {
-    const allOriginal = [
-      ...(original.hero ? [original.hero] : []),
-      ...original.rows.flatMap((r) => r.items),
-    ];
-    const allEnhanced = [
-      ...(enhanced.hero ? [enhanced.hero] : []),
-      ...enhanced.rows.flatMap((r) => r.items),
-    ];
-
-    const newCount = allEnhanced.filter(
-      (b, i) => b.thumbnailLocal && !allOriginal[i]?.thumbnailLocal,
-    ).length;
-
-    if (newCount === 0) return;
-
-    this.logger.log(
-      `[ImageCache] Patching landing cache — ${newCount} new local thumbnail(s) added`,
-    );
-    this.cache
-      .set(cacheKey, enhanced, CACHE_TTL_MS)
-      .catch((err) =>
-        this.logger.warn(`[ImageCache] Landing cache patch failed: ${String(err)}`),
-      );
-  }
-
-  private async enhanceLanding(payload: LandingPayload): Promise<LandingPayload> {
-    if (!this.imageCache.enabled) return payload;
-    
-    const enhanceBook = async (book: LandingBook): Promise<LandingBook> => ({
-      ...book,
-      thumbnailLocal:
-        book.thumbnailLocal
-          ? book.thumbnailLocal
-          : ((await this.imageCache.localThumbnailPath(book.id, book.thumbnail)) ?? undefined),
-    });
-
-    const [hero, rows] = await Promise.all([
-      payload.hero ? enhanceBook(payload.hero) : Promise.resolve(null),
-      Promise.all(
-        payload.rows.map(async (row) => ({
-          ...row,
-          items: await Promise.all(row.items.map(enhanceBook)),
-        })),
-      ),
-    ]);
-
-    return { ...payload, hero, rows };
-  }
 }
 
