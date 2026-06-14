@@ -67,6 +67,6 @@ describe('BooksService — all-cached batch job registry lifecycle', () => {
 
     await service.startOrAttachBatchJob('ch-cached-2', pages, jest.fn(), 'ja', 'th');
 
-    expect((service as any).activeBatchJobs.size).toBe(0);
+    expect((service as any).batch.activeBatchJobs.size).toBe(0);
   });
 });
