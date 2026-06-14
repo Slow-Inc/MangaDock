@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
@@ -14,7 +14,6 @@ import { MitClient } from './mit-client';
 import { MitTranslationService } from './mit-translation.service';
 import { loadPageBytes } from './page-source';
 import { composeSeriesContext } from './series-context';
-import { RedisService } from '../cache/redis.service';
 import {
   CACHE_TTL_MS,
   type LandingBook,
@@ -432,7 +431,6 @@ export class BooksService {
     private readonly imageCache: ImageCacheService,
     private readonly supabase: SupabaseService,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
-    @Optional() private readonly redis?: RedisService,
     // #230: the single HTTP boundary to MIT. Injected in production (registered in
     // BooksModule); the default keeps the manual `new BooksService(...)` in unit
     // tests working unchanged (those that exercise MIT fake global.fetch).
@@ -620,13 +618,9 @@ export class BooksService {
       pageResult = { patches: [], error: `persistence failed: ${msg}` };
     }
 
-    const published = await this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...pageResult });
-    if (this.redis && published === false) {
-      this.logger.error(`[Webhook] Redis publish failed for job=${jobKey} page=${pageIndex}`);
-    }
     job.processingPages?.delete(pageIndex);
     job.completedPages.set(pageIndex, pageResult);
-    // Direct delivery to original SSE caller (guaranteed regardless of Redis state)
+    // Direct delivery to original SSE caller
     try { job.originalListener?.(pageIndex, pageResult); } catch { /* caller may be gone */ }
     // Fan-out to latecomers
     for (const l of job.listeners) {
@@ -1202,17 +1196,11 @@ export class BooksService {
     const job = placeholderJob;
     job.expectedCount = uncachedPages.length;
 
-    // Redis pub/sub is used only for cross-instance fan-out (horizontal scale).
-    // Original caller on this instance is delivered directly via originalListener.
-    const unsubscribeRedis = (() => {}) as () => void;
-
-    // 3. Inner notify: direct delivery to original caller + Redis cross-instance fan-out + latecomers
+    // 3. Inner notify: direct delivery to original caller + latecomers.
     const notify = (pageIndex: number, result: PageResult) => {
       job.completedPages.set(pageIndex, result);
-      // Direct, synchronous delivery to original SSE caller — no Redis dependency
+      // Direct, synchronous delivery to original SSE caller
       try { job.originalListener?.(pageIndex, result); } catch { /* listener may be gone */ }
-      // Cross-instance broadcast (for future multi-node setups)
-      void this.redis?.publish(`translate:${jobKey}`, { pageIndex, ...result });
       // Fan-out to latecomers who attached to this job
       for (const l of job.listeners) {
         try {
@@ -1263,7 +1251,6 @@ export class BooksService {
       await promise;
     } finally {
       clearTimeout(timeoutHandle);
-      unsubscribeRedis();
       job.originalListener = undefined;
       if (this.activeBatchJobs.get(jobKey) === job) {
         this.activeBatchJobs.delete(jobKey);
