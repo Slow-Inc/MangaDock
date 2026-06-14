@@ -39,7 +39,7 @@ function seedJob(service: BooksService, jobKey: string) {
     reject: jest.fn(),
     cancelController,
   };
-  (service as any).activeBatchJobs.set(jobKey, job);
+  (service as any).batch.activeBatchJobs.set(jobKey, job);
   return job;
 }
 
@@ -63,7 +63,7 @@ describe('BooksService — batch cancel jobKey symmetry', () => {
     const { service } = makeService();
 
     // The key the START path registers (single source of truth).
-    const jobKey: string = (service as any).buildJobKey('ch1', 'ja', 'th');
+    const jobKey: string = (service as any).batch.buildJobKey('ch1', 'ja', 'th');
     // Sanity: the flag is honored — source collapses to ANY.
     expect(jobKey).toContain(':ANY:');
 
@@ -84,7 +84,7 @@ describe('BooksService — batch cancel jobKey symmetry', () => {
     delete process.env.MIT_SEND_SOURCE_LANG; // defaults to "true"
     const { service } = makeService();
 
-    const jobKey: string = (service as any).buildJobKey('ch2', 'ja', 'th');
+    const jobKey: string = (service as any).batch.buildJobKey('ch2', 'ja', 'th');
     const job = seedJob(service, jobKey);
 
     service.removeBatchListener('ch2', 'ja', 'th', jest.fn());

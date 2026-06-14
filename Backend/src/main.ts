@@ -1,12 +1,13 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { StructuredLoggingInterceptor } from './common/interceptors/structured-logging.interceptor';
+import { resolveTurnstileConfig } from './auth/turnstile.config';
 
 /**
  * Tee every byte written to stdout/stderr into a daily rotating log file.
@@ -51,6 +52,12 @@ function setupFileLogging(): void {
 
 async function bootstrap() {
   setupFileLogging();
+
+  // Fail-closed: refuse to boot in production with a missing/test Turnstile
+  // secret instead of silently serving an always-pass captcha (#224). Throws
+  // here, before the app is built, so the misconfiguration crashes loudly.
+  resolveTurnstileConfig(process.env, new Logger('Turnstile'));
+
   // Disable built-in 100KB body-parser limit; MIT webhook bodies contain base64 PNG patches (~1-3MB).
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   // verify hook captures the raw request bytes so the MIT webhook controller can
