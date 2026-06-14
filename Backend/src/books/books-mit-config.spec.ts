@@ -1,5 +1,5 @@
 import { BooksService } from './books.service';
-import { parseJobKey } from './mit-config';
+import { parseJobKey, renderConfigHash } from './mit-config';
 
 describe('parseJobKey', () => {
   it('round-trips a plain chapterId', () => {
@@ -86,6 +86,23 @@ describe('BooksService.buildMitConfig', () => {
     expect(cfg.inpainter.inpainting_size).toBe(1024);
     expect(cfg.inpainter.inpainter).toBe('lama_mpe');
     expect(cfg.inpainter.inpainting_precision).toBe('fp16');
+  });
+
+  it('selects the optional Flux Klein inpainter via MIT_INPAINTER=flux_klein (ADR 003)', () => {
+    process.env.MIT_INPAINTER = 'flux_klein';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.inpainter.inpainter).toBe('flux_klein');
+  });
+
+  it('folds the inpainter choice into renderConfigHash so switching busts the patch cache', () => {
+    // #229: renderConfigHash is now a pure free function over env (mit-config.ts).
+    process.env.MIT_INPAINTER = 'lama_large';
+    const lama = renderConfigHash(process.env);
+    process.env.MIT_INPAINTER = 'flux_klein';
+    const flux = renderConfigHash(process.env);
+    // a different inpainter must yield a different cache key, else the Reader replays the stale LaMa fill
+    expect(flux).not.toBe(lama);
   });
 
   it('ignores invalid size env and falls back to the default', () => {

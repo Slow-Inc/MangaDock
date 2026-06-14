@@ -210,6 +210,7 @@ export function buildMitConfig(
   const fontMaxBoxRatio = fracEnv('MIT_FONT_MAX_BOX_RATIO');
   const patchFeather = posIntEnv('MIT_PATCH_FEATHER');
   const inpaintContextPad = posIntEnv('MIT_INPAINT_CONTEXT_PAD');
+  const lamaReground = fracEnv('MIT_LAMA_LUM_REGROUND');
   const fontSizeMax = posIntEnv('MIT_FONT_SIZE_MAX');
   const model = imageModelKey(imageModel);
   return JSON.stringify({
@@ -273,6 +274,14 @@ export function buildMitConfig(
       ...(flagEnv('MIT_PATCH_FULLPAGE_INPAINT')
         ? { full_page_inpaint: true }
         : {}),
+      // #268: re-ground the inpaint's luminance inside the erase mask to the local
+      // original surround (per-pixel, pure CPU) → kill the faint "painted band" over
+      // dark hair. Strength 0–1. Absent → off, byte-identical.
+      ...(lamaReground !== undefined ? { lama_lum_reground: lamaReground } : {}),
+      // #268: shrink the erase mask to the ink strokes so LaMa repaints less art.
+      ...(flagEnv('MIT_MASK_TIGHTEN') ? { mask_tighten: true } : {}),
+      // #268: Poisson seamless-clone the inpaint into the original (escalation lever).
+      ...(flagEnv('MIT_SEAMLESS_CLONE') ? { seamless_clone: true } : {}),
     },
     render: {
       direction: 'auto',

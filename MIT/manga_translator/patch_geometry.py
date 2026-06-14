@@ -207,3 +207,137 @@ def feather_alpha(content_mask: np.ndarray, radius: int) -> np.ndarray:
     d_out = cv2.distanceTransform(background, cv2.DIST_L2, 3)
     ramp = np.clip(1.0 - d_out / float(radius), 0.0, 1.0)
     return (ramp * 255.0).astype(np.uint8)
+
+
+def seamless_blend_inpaint(inpainted_rgb: np.ndarray, original_rgb: np.ndarray,
+                           mask: np.ndarray, *, erode: int = 2) -> np.ndarray:
+    """Poisson seamless-clone the inpainted region into the original (PRD #268 escalation lever).
+
+    ``cv2.seamlessClone`` re-integrates the inpaint from the original's boundary gradients, so
+    the DC (mean-brightness) band vanishes by construction. It asserts on border-touching or
+    empty masks, so the mask is eroded, cleared off the 1-px border, and the call is skipped
+    (input returned) when nothing usable remains. Note: it cannot synthesise texture (it
+    re-integrates LaMa's already-smooth gradients), so over high-frequency art it trades a hard
+    band for a soft smudge — kept as the reserved escalation, not the primary fix. Pure cv2."""
+    mb = mask > 127
+    if not mb.any():
+        return inpainted_rgb
+    m = (mb.astype(np.uint8) * np.uint8(255))
+    if erode > 0:
+        m = cv2.erode(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * erode + 1, 2 * erode + 1)))
+    m[:1, :] = 0; m[-1:, :] = 0; m[:, :1] = 0; m[:, -1:] = 0   # seamlessClone needs a border margin
+    ys, xs = np.where(m > 0)
+    if ys.size == 0:
+        return inpainted_rgb
+    center = (int((xs.min() + xs.max()) // 2), int((ys.min() + ys.max()) // 2))
+    try:
+        return cv2.seamlessClone(np.ascontiguousarray(inpainted_rgb),
+                                 np.ascontiguousarray(original_rgb), m, center, cv2.NORMAL_CLONE)
+    except cv2.error:
+        return inpainted_rgb
+
+
+def tighten_text_mask(original_rgb: np.ndarray, coarse_mask: np.ndarray, *,
+                      dilate: int = 2, contrast: float = 18.0,
+                      min_frac: float = 0.02) -> np.ndarray:
+    """Shrink a coarse text mask to the actual ink strokes inside it (PRD #268 lever).
+
+    A coarse box mask makes LaMa repaint the whole rectangle → a big band over textured art.
+    Within the coarse mask this keeps only pixels whose luminance differs from the LOCAL
+    background by more than ``contrast`` (the ink — darker OR lighter than the surrounding
+    art), plus a small ``dilate`` to cover anti-aliased edges, clipped to the coarse mask. So
+    LaMa fills only the strokes and the original art between them survives. If too few strokes
+    are found (< ``min_frac`` of the box → contrast can't separate them, e.g. flat fill), the
+    coarse mask is returned unchanged so source text is never left un-erased. Pure cv2/numpy."""
+    coarse = np.ascontiguousarray(coarse_mask)
+    cb = coarse > 127
+    if not cb.any():
+        return coarse
+    gray = cv2.cvtColor(np.ascontiguousarray(original_rgb), cv2.COLOR_RGB2GRAY).astype(np.float32)
+    # Background estimate: inpaint the coarse-masked region of the ORIGINAL (fast-marching) so
+    # the surrounding art is propagated under the text — robust to any stroke width (a median
+    # window narrower than a thick stroke would just return the stroke itself).
+    bg = cv2.inpaint(np.ascontiguousarray(original_rgb), (cb * np.uint8(255)), 3, cv2.INPAINT_TELEA)
+    bg_gray = cv2.cvtColor(bg, cv2.COLOR_RGB2GRAY).astype(np.float32)
+    stroke = (np.abs(gray - bg_gray) > float(contrast)) & cb
+    if dilate > 0:
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * dilate + 1, 2 * dilate + 1))
+        stroke = (cv2.dilate(stroke.astype(np.uint8), k) > 0) & cb
+    if int(stroke.sum()) < min_frac * int(cb.sum()):
+        return coarse
+    return stroke.astype(np.uint8) * np.uint8(255)
+
+
+def reground_inpaint_luminance(inpainted_rgb: np.ndarray, original_rgb: np.ndarray,
+                               mask: np.ndarray, *, strength: float = 1.0,
+                               radius_frac: float = 0.06, max_delta: float = 40.0,
+                               chroma: bool = True) -> np.ndarray:
+    """Re-ground the low-frequency luminance of an inpainted crop *inside the mask* to the
+    local original surroundings — kill the "painted band" where LaMa's fill is a few levels
+    off the real art (PRD #268).
+
+    The LaMa fill can be too LIGHT over dark hair and too DARK over the lighter cheek within
+    one mask; a single global offset can only null the average. This computes, per pixel and
+    **per RGB channel**, a spatially-varying correction from two normalized convolutions (box
+    filters): the local mean of the ORIGINAL over the non-mask neighbours (``lowO``) and the
+    local mean of the INPAINT over the masked neighbours (``lowI``). ``delta = clip(lowO -
+    lowI, ±max_delta)`` added to the inpaint pulls each masked pixel's low frequency to its
+    own surround while LaMa's high-frequency detail (hair strands) — the inpaint minus its own
+    local mean — is preserved. A boundary feather tapers the correction to 0 at the mask edge
+    (no new edge-band). Over a uniform background the per-pixel field collapses to a single
+    scalar (≡ a plain mean offset). Working per RGB channel is exact for B&W manga (R=G=B → an
+    equal shift on all channels → no chroma tint, the #156-safe property) and naturally matches
+    local colour when a page has it. ``chroma=False`` forces a single shared grey delta
+    (hue-locked) as an escape hatch. Outside the mask the crop is byte-identical. Pure cv2/numpy
+    — no torch, CPU.
+
+    ``strength`` (0→1) lerps the correction (0 → input returned unchanged, byte-identical).
+    Returns a corrected RGB uint8 crop the same shape as the input."""
+    inp = np.ascontiguousarray(inpainted_rgb)
+    if strength <= 0:
+        return inp
+    h, w = mask.shape[:2]
+    mask_bool = mask > 127
+    n_mask = int(mask_bool.sum())
+    valid = ~mask_bool
+    n_valid = int(valid.sum())
+    # Nothing to erase, or too little surrounding context to ground against → leave as-is.
+    if n_mask == 0 or n_valid < 0.15 * (h * w):
+        return inp
+
+    r = max(8, int(round(radius_frac * min(h, w))))
+    k = (2 * r + 1, 2 * r + 1)
+    inp_f = inp.astype(np.float32)
+    maskf = mask_bool.astype(np.float32)
+    mask_u8 = (mask_bool * np.uint8(255))
+    # Propagate the surrounding ORIGINAL into the mask (fast-marching) so the low-frequency
+    # target is defined even deep inside a mask wider than the box kernel — a plain
+    # normalized box convolution leaves the interior of a wide mask with no valid neighbour.
+    # The propagated fill follows each side's surround → bidirectional correction (dark hair
+    # vs lighter cheek) in one pass.
+    orig_filled = cv2.inpaint(np.ascontiguousarray(original_rgb), mask_u8,
+                              max(3, r // 4), cv2.INPAINT_TELEA).astype(np.float32)
+    denM = cv2.boxFilter(maskf, -1, k, normalize=False) + 1e-3    # local count of mask
+    # Inner feather: full correction in the mask interior, tapering to 0 over the last few px
+    # at the mask edge (so the corrected interior blends into the byte-identical exterior — a
+    # GaussianBlur(sigma=r) would wrongly weaken the interior of a narrow column).
+    dist = cv2.distanceTransform(mask_bool.astype(np.uint8), cv2.DIST_L2, 3)
+    feather_px = max(2.0, r / 3.0)
+    soft = np.clip(dist / feather_px, 0.0, 1.0).astype(np.float32) * float(strength)
+
+    # Per-channel low-frequency delta (in 0–255 value space → exact for B&W, no LAB nonlinearity).
+    deltas = []
+    for c in range(3):
+        lowO = cv2.boxFilter(orig_filled[..., c], -1, k, normalize=True)          # propagated-original low-freq
+        lowI = cv2.boxFilter(inp_f[..., c] * maskf, -1, k, normalize=False) / denM  # inpaint low-freq over the mask
+        deltas.append(np.clip(lowO - lowI, -max_delta, max_delta))
+    if not chroma:                                   # hue-lock: one shared grey delta
+        shared = (deltas[0] + deltas[1] + deltas[2]) / 3.0
+        deltas = [shared, shared, shared]
+
+    out = inp_f.copy()
+    for c in range(3):
+        out[..., c] = np.clip(inp_f[..., c] + deltas[c] * soft, 0.0, 255.0)
+    out = out.astype(np.uint8)
+    out[valid] = inp[valid]   # enforce exact outside-mask byte-identity
+    return np.ascontiguousarray(out)
