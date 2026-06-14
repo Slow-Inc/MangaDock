@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useToast } from "../contexts/ToastContext";
 import { getHardwareId } from "../lib/fingerprint";
+import { isApiRequest, withZeroTrustHeaders } from "../lib/zeroTrustHeaders";
 
 /**
  * Monitors global fetch calls or specific backend error states to show a persistent
@@ -13,58 +14,75 @@ export default function SupabaseGuard() {
   const { showToast } = useToast();
 
   useEffect(() => {
+    // Exact origins that may receive the device/clearance headers: the app's own
+    // origin plus the Supabase project origin. Anything else (incl. lookalike
+    // hosts) is rejected so the HWID-bound clearance token never leaks (#1).
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    let supabaseOrigin: string | null = null;
+    if (supabaseUrl) {
+      try {
+        supabaseOrigin = new URL(supabaseUrl).origin;
+      } catch {
+        supabaseOrigin = null;
+      }
+    }
+    const allowedOrigins = [
+      window.location.origin,
+      ...(supabaseOrigin ? [supabaseOrigin] : []),
+    ];
+
     // Intercept global fetch
     const originalFetch = window.fetch;
     window.fetch = async (...args) => {
-      // T4-STANDARD Pillar 5: Zero-Trust Asset Protection (Stub)
-      // Automatically add Hardware ID to headers if it's an API request
-      const url = args[0]?.toString() || '';
-      const isApiRequest = url.startsWith('/') || url.includes('localhost') || url.includes('supabase.co');
-      
-      if (isApiRequest) {
-        const hwId = getHardwareId();
-        let options = (args[1] as RequestInit) || {};
-        const headers = new Headers(options.headers || {});
-        if (!headers.has('x-hardware-id')) {
-          headers.set('x-hardware-id', hwId);
-        }
-        options.headers = headers;
-        args[1] = options;
+      // T4-STANDARD Pillar 5: Zero-Trust Asset Protection
+      // Attach the device Hardware ID and (when present) the HWID-bound captcha
+      // clearance token (#227) so every captcha-guarded endpoint reuses the same
+      // token the reader already obtained from /books/verify-captcha.
+      const url = args[0]?.toString() || "";
+      if (isApiRequest(url, allowedOrigins)) {
+        const clearance = localStorage.getItem("cf_clearance_token");
+        args[1] = withZeroTrustHeaders(
+          args[1] as RequestInit,
+          getHardwareId(),
+          clearance,
+        );
       }
 
       try {
         const response = await originalFetch(...args);
-        
+
         // Clone response to read body without consuming it for the original caller
         const clonedResponse = response.clone();
         if (clonedResponse.status === 503 || clonedResponse.status === 500) {
           try {
             const data = await clonedResponse.json();
-            if (data.code === 'SUPABASE_OFFLINE') {
+            if (data.code === "SUPABASE_OFFLINE") {
               showToast({
-                message: "⚠️ ตรวจพบปัญหาการเชื่อมต่อฐานข้อมูล: โครงการ Supabase ของคุณอาจถูกหยุดชั่วคราว (Paused) กรุณาเปิดใช้งานที่ Supabase Dashboard",
+                message:
+                  "⚠️ ตรวจพบปัญหาการเชื่อมต่อฐานข้อมูล: โครงการ Supabase ของคุณอาจถูกหยุดชั่วคราว (Paused) กรุณาเปิดใช้งานที่ Supabase Dashboard",
                 type: "error",
-                duration: 10000
+                duration: 10000,
               });
             }
           } catch {
             // Not JSON or other error, ignore
           }
         }
-        
+
         return response;
       } catch (error) {
         // Handle network errors (when backend is down or Supabase DNS fails on client side)
         const msg = String(error);
-        if (msg.includes('fetch failed') || msg.includes('Failed to fetch')) {
+        if (msg.includes("fetch failed") || msg.includes("Failed to fetch")) {
           // Check if it's a Supabase-related URL
-          const url = args[0]?.toString() || '';
-          if (url.includes('supabase.co')) {
-             showToast({
-                message: "❌ ไม่สามารถติดต่อฐานข้อมูล Supabase ได้โดยตรง: กรุณาตรวจสอบว่าโครงการไม่ได้ถูก Pause ไว้",
-                type: "error",
-                duration: 10000
-              });
+          const url = args[0]?.toString() || "";
+          if (url.includes("supabase.co")) {
+            showToast({
+              message:
+                "❌ ไม่สามารถติดต่อฐานข้อมูล Supabase ได้โดยตรง: กรุณาตรวจสอบว่าโครงการไม่ได้ถูก Pause ไว้",
+              type: "error",
+              duration: 10000,
+            });
           }
         }
         throw error;

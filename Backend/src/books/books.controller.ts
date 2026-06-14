@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { BooksService } from './books.service';
 import { StatsIncrementService } from '../cache/stats-increment.service';
 import { TurnstileGuard, generateClearanceToken } from '../auth/turnstile.guard';
+import { resolveTurnstileConfig } from '../auth/turnstile.config';
 
 @Controller('books')
 export class BooksController {
@@ -16,20 +17,21 @@ export class BooksController {
     if (!body.token) {
       throw new HttpException('Token is required', HttpStatus.BAD_REQUEST);
     }
-    const secretKey = process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA';
+    // Fail-closed config: production rejects a missing/test secret at boot (#224).
+    const { enabled, secret } = resolveTurnstileConfig(process.env);
     const hwid = req.headers['x-hardware-id'] as string;
 
     if (!hwid) {
       throw new HttpException('Hardware ID is required', HttpStatus.BAD_REQUEST);
     }
-    
-    // Ignore verification if disabled
-    if (process.env.TURNSTILE_ENABLED === 'false') {
-      return { clearanceToken: generateClearanceToken(secretKey, hwid) };
+
+    // Skip verification only when disabled outside production.
+    if (!enabled) {
+      return { clearanceToken: generateClearanceToken(secret, hwid) };
     }
 
     const formData = new URLSearchParams();
-    formData.append('secret', secretKey);
+    formData.append('secret', secret);
     formData.append('response', body.token);
 
     try {
@@ -40,7 +42,7 @@ export class BooksController {
       const outcome = await result.json();
 
       if (outcome.success) {
-        return { clearanceToken: generateClearanceToken(secretKey, hwid) };
+        return { clearanceToken: generateClearanceToken(secret, hwid) };
       }
       
       console.error('Turnstile verification failed:', outcome['error-codes']);
@@ -139,6 +141,7 @@ export class BooksController {
     return this.booksService.translateDescription(text ?? '');
   }
 
+  @UseGuards(TurnstileGuard)
   @Post('translate/manga')
   translateMangaEpisode(
     @Body()
@@ -168,6 +171,7 @@ export class BooksController {
 
   
 
+  @UseGuards(TurnstileGuard)
   @Post('chapters/:chapterId/pages/:pageIndex/translate-patches')
   async translateMangaPagePatches(
     @Param('chapterId') chapterId: string,
@@ -185,8 +189,11 @@ export class BooksController {
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      // Log the real MIT/internal error server-side; return a generic message
+      // so internal detail never leaks to the client (#226).
+      console.error(`translate-patches failed (chapter ${chapterId} page ${pageIndex}):`, message);
       throw new HttpException(
-        { statusCode: HttpStatus.INTERNAL_SERVER_ERROR, message },
+        { statusCode: HttpStatus.INTERNAL_SERVER_ERROR, message: 'Translation failed' },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -204,6 +211,7 @@ export class BooksController {
    * background and caches each page result. A reconnecting client attaches to the
    * running job and receives already-completed pages immediately.
    */
+  @UseGuards(TurnstileGuard)
   @Post('chapters/:chapterId/batch-translate-patches')
   async batchTranslateMangaPatches(
     @Param('chapterId') chapterId: string,
@@ -256,8 +264,11 @@ export class BooksController {
       await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang, imageModel, derivative, body?.mangaId);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      // Log the real error server-side; emit a generic error to the SSE client
+      // so internal detail never leaks (#226).
+      console.error(`batch-translate-patches failed (chapter ${chapterId}):`, message);
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: message, pageIndex: -1, patches: [] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: 'Translation failed', pageIndex: -1, patches: [] })}\n\n`);
       }
     }
 

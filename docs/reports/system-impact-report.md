@@ -15,6 +15,86 @@
 
 ---
 
+## 2026-06-14 — Backend `books.service.ts` decomposition: MIT translation carve (#233 + #234)
+
+**What & where:** Carved the MIT translation subsystem out of the `Backend/src/books/books.service.ts` god object (PRD #228) into focused, individually unit-testable modules: `mit-translation.service.ts` (single-page), `mit-batch-orchestrator.service.ts` (batch state machine), `mit-config.ts` + `mit-lang-map.ts` (pure key/config/lang helpers). · **Branch:** `dept/backend` (off `origin/main`), 8 commits, **not yet pushed/PR'd**. · **Method:** byte-identical, characterization-first, 1 seam = 1 commit (TDD per seam).
+
+**Why:** `books.service.ts` was a 1834-line god file; the single-page and batch MIT paths were untestable except through the whole service, and carried a dead Redis pub/sub limb whose flaky tests were the entire 16-failure baseline.
+
+### Shipped — seams (byte-identical unless noted)
+- **#233** carve `MitTranslationService` — single-page `translateMangaPagePatches` + retry loop, MIT health, image-translator probe — `a941a4c`
+- **#234 S5a** drop dead batch Redis pub/sub (no-op subscribe; single-node) + **ADR-002** + retire `books-pubsub-batch.spec.ts` — `e0f6add`, `4f04c51`
+- **#234 S5b** unify 3 fan-out blocks → one `deliver()` — `42b4e90`
+- **#234 S5c** unify 2 completion sites → one `maybeComplete()` — `7bdc118`
+- **#234 S5-pre** move pure MIT helpers → `mit-config.ts`/`mit-lang-map.ts` (break value-import cycle) — `4a155d7`
+- **#234 S5e** carve `MitBatchOrchestrator` state machine — `c1daa07`
+- **#234 S5d** fix latecomer-listener leak on job reject + `finalize()` teardown (**behaviour fix**) — `c29dbc1`
+
+### Before → After (full fields)
+| field | before | after |
+|---|---|---|
+| books.service.ts LOC | 1834 | 841 (−54%) |
+| MIT translation modules | 1 (god file) | 4 focused + `MitClient` (#230) |
+| backend test suite | 192 pass / **16 fail** | **513 pass / 0 fail** |
+| single-page path testability | fake `global.fetch` only | faked `MitClient` (unit) |
+| batch state machine testability | only via BooksService | `MitBatchOrchestrator` direct |
+| batch fan-out blocks | 3 hand-rolled copies | 1 `deliver()` |
+| batch completion sites | 2 (webhook logged, stream silent — drift) | 1 `maybeComplete()` |
+| batch Redis pub/sub | publish ×2 + no-op subscribe (dead) | removed (single-node; ADR-002) |
+| latecomer listener on job reject | leaked (post-await delete skipped) | drained (try/finally + `finalize()`) |
+
+**Performance Δ:** books test suite ~63s → ~13s after the 16 Redis-timeout tests were retired (S5a). Runtime translation latency: unchanged (byte-identical). One fewer dead Redis publish per page (negligible).
+
+**Quality:** byte-identical on every seam except **S5d** (the only behaviour change — isolated to its own commit with a red→green repro test). BooksService keeps thin public delegators with unchanged signatures → SSE batch endpoint + MIT webhook controller unchanged. `persistPage`/`seriesContextFor` stay in BooksService, injected into both new services; the single-page translate is injected into the orchestrator **late-bound** so the `books-retry` spy still observes the batch retry path.
+
+**Validation:** `npm run build` (whole backend, tsc) clean after every seam (cross-module ripple guard). Full backend suite **513 pass / 0 fail** (54 suites); the books characterization net (batch-registry/cancel/progress/webhook/retry, image-model, series-context, mit-config) green throughout = byte-identical proof. **Code review:** 5-agent fan-out (line-by-line / removed-behaviour / cross-file / cleanup / altitude) for #233+S5a–S5c → 0 correctness bugs (1 altitude finding: the value-import cycle, fixed by S5-pre). The carve (S5-pre/S5e/S5d) reviewed by **exact whitespace-normalised byte-comparison** (agents hit a session limit) — all 7 moved helpers + 8/9 batch methods proven byte-identical to the original (the 9th = `startOrAttachBatchJob`, intentionally changed by S5d); only textual deltas elsewhere are prettier trailing-commas → **0 correctness bugs**. **Not run:** frontend E2E translation parity (`feedback_test_every_round`) — change is byte-identical so original↔translated output is unchanged by construction; recommend a confirmatory E2E pass before/with the epic PR merge.
+
+**Risk / rollback:** Low. Byte-identical decomposition; each seam is its own revertible commit. The one behaviour change (S5d) only touches the reject/timeout cleanup path (repro-tested). Redis removal (S5a) is single-node only — re-introduce a real subscriber + multi-node test when sharding (ADR-002). 12 commits unpushed on `dept/backend`.
+
+**Open follow-ups:** open the epic #228 PR → main; close issues #229/#230/#232/#233/#234 on merge; cosmetic — `PatchEntry` type declared in 3 files, `persistPage` param type duplicated (mit-translation + orchestrator), `books-mit-config.spec` describe "BooksService.buildMitConfig" now tests via `.batch`; confirmatory frontend E2E parity pass.
+
+**Links:** #228 (parent), #229/#230/#232/#233/#234 · ADR-002 (`docs/adr/002-drop-batch-redis-pubsub.md`) · commits `a941a4c e0f6add 4f04c51 42b4e90 7bdc118 4a155d7 c1daa07 c29dbc1`.
+
+---
+
+## 2026-06-13 — PRD#1: Backend security hardening (Turnstile/HWID guards) — #223 (#224–#227)
+
+**Severity:** major (cost-bleed + information-disclosure on the expensive MIT surface) · **Branch:** `dept/backend` (off `origin/main`), 4 PRD steps + 2 post-review fixes, not yet PR'd. Derived from the read-only Backend security audit in issue #223. **TDD throughout** (RED→GREEN per step); `/security-review` on the full diff returned **no findings ≥0.7** — a later high-recall `/code-review` of the rebased branch surfaced + fixed 2 more (CR#1/CR#2 below).
+
+### Summary (index)
+| Step | What & where | Before → After | Validation | Commit |
+|---|---|---|---|---|
+| #224 | Fail-closed Turnstile config — new `auth/turnstile.config.ts` (`resolveTurnstileConfig`), wired in `turnstile.guard.ts`, `books.controller.ts` (verify-captcha), boot check in `main.ts` | missing `TURNSTILE_SECRET_KEY` silently fell back to the public test key (always-pass siteverify + forgeable HMAC) → **prod now refuses to boot** on missing/test secret; `TURNSTILE_ENABLED=false` ignored in prod | 9 unit (fail-closed matrix, mirrors `storage.module.spec.ts`) | `21423bf` |
+| #225 | Validate `X-Hardware-Id` shape — `common/middleware/hardware-id.middleware.ts` (`isValidHardwareId`) | presence-only check (any garbage passed zero-trust) → shape check `/^[A-Za-z0-9_+/=-]{8,128}$/`, rejects array/whitespace/control/injection with 401 | 42 unit (valid/empty/malformed/array/passthrough + pure fn) | `9527a35` |
+| #226 | Sanitize `AllExceptionsFilter` — `common/filters/all-exceptions.filter.ts` + 2 controller catches in `books.controller.ts` | raw internal error message + MIT error leaked to client on 500 → generic `Internal server error` / `Translation failed`; real message+stack logged server-side; HttpException + Supabase-503 preserved | 3 filter unit (generic / passthrough / 503) | `9dadb57` |
+| #227 | Guard 3 MIT endpoints + frontend clearance — `@UseGuards(TurnstileGuard)` on `translate/manga`, `…/translate-patches`, `…/batch-translate-patches`; `Frontend` global fetch interceptor (`SupabaseGuard.tsx`) attaches `x-captcha-clearance` via new pure `app/lib/zeroTrustHeaders.ts` | expensive ML/R2 pipeline reachable with only a non-empty HWID header → each requires valid HWID-bound clearance; cheap `GET translate` (description) stays open | 7 backend e2e (401-without / proceeds-with per endpoint) + 5 frontend bun (header helper) | `5a81942` |
+| CR#1 | Exact-origin allow-list in `isApiRequest` — `Frontend/app/lib/zeroTrustHeaders.ts` (+ `SupabaseGuard.tsx` call site) | substring host match (`includes('supabase.co'/'localhost')`, `startsWith('/')`) leaked HWID + the #227 `x-captcha-clearance` credential to lookalike origins (`supabase.co.evil.com`, `//evil.com`) → **exact-origin allow-list** (own + `NEXT_PUBLIC_SUPABASE_URL` origin); `//` rejected, malformed → false | 7 frontend bun (5 attacker URLs → false / legit → true / malformed → false) | `075cc30` |
+| CR#2 | Gate Supabase heuristic in `AllExceptionsFilter` — `Backend/src/common/filters/all-exceptions.filter.ts` | intentional `HttpException` whose message merely mentioned Supabase was coerced to 503 `SUPABASE_OFFLINE` (wrong status, false "paused" toast) → gated `!isHttpException`; genuine non-HttpException 503 path preserved | filter unit +2 (400/404 + own message preserved) + existing 503 regression | `0c09b85` |
+
+### Before → After (headline, full fields)
+
+**#224 · Fail-closed Turnstile (the headline security fix)** — *What/where:* `resolveTurnstileConfig(env)` (`auth/turnstile.config.ts`), consumed by `TurnstileGuard.canActivate` and the verify-captcha handler; boot enforcement in `main.ts:bootstrap` *before* `NestFactory.create`. *Why:* both call-sites inlined `process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA'` (Cloudflare public test key) — a forgotten secret made siteverify always pass **and** signed the HMAC clearance with a publicly-known key, so the whole captcha/zero-trust layer was silently bypassable and the token forgeable. *Before → After:* missing/test secret in prod = silent always-pass → **loud crash at boot**; outside prod the test key + `TURNSTILE_ENABLED=false` still work (dev unblocked). The `|| <test-key>` fallback is gone from both sites (grep-verified: only the constant definition remains). *Performance Δ:* N/A (string resolution per request, negligible). *Quality:* invisible to a correctly-configured deploy; reader flow unchanged. *Validation:* 9 unit covering the full prod/non-prod × missing/test/real × enabled-flag matrix. *Risk/rollback:* fail-closed (a real prod secret was always required to function correctly); revert = 1 commit. *Links:* #224, `21423bf`.
+
+**#227 · Captcha guard on the expensive surface + reused clearance** — *What/where:* `TurnstileGuard` applied to the three MIT-triggering endpoints in `books.controller.ts`; `Frontend/app/components/SupabaseGuard.tsx` global `window.fetch` interceptor now injects `x-captcha-clearance` (from `localStorage.cf_clearance_token`) alongside the existing `x-hardware-id`, via the extracted pure `withZeroTrustHeaders()` helper. *Why:* only the cached-page endpoint was guarded; single-page, batch, and manga-text translation ran the ML/LaMa + R2 pipeline for any caller with a non-empty HWID header — and the batch job keeps running after disconnect, amplifying cost (compounds the R2 concern in #197). *Before → After:* anonymous → **401** on all three; legitimate readers reuse the clearance they already obtained for page serving → **no UX change**; description translation on catalog cards stays open (pre-auth). *Performance Δ:* not measured (guard is a cheap HMAC verify). *Quality:* reader path preserved; defense matches the page endpoint. *Validation:* 7 backend e2e (focused TestingModule, mocked service) assert 401-without / 200-201-with per endpoint + description-open; 5 frontend bun on the header helper. **Live Playwright E2E deferred** (per owner decision — to be run before merge). *Risk/rollback:* a client missing/with-expired clearance gets 401 on translate (re-solve captcha re-issues it); revert = 1 commit. *Links:* #227, `5a81942`.
+
+### Post-review hardening (`/code-review` xhigh on the rebased branch)
+
+A high-recall `/code-review` after rebasing onto `origin/main` found two issues the default-threshold `/security-review` had missed; both fixed TDD on-branch.
+
+**CR#1 · Clearance-token exfiltration via substring origin match (high)** — *What/where:* `isApiRequest` in `Frontend/app/lib/zeroTrustHeaders.ts`, wired into the global `window.fetch` interceptor (`SupabaseGuard.tsx`). *Why:* the interceptor chose which requests carry `x-hardware-id` + the HWID-bound `x-captcha-clearance` credential via substring matching (`url.includes('supabase.co'/'localhost')`, `startsWith('/')`) — pre-existing for the HWID, but #227 newly routed the 1h captcha-bypass token through the same broken matcher. Lookalike origins matched (`https://supabase.co.evil.com`, `https://evil.com/?ref=supabase.co`, `//evil.com`), so any `fetch()` to an attacker URL exfiltrated the token. *Before → After:* substring/`startsWith` → **exact-origin allow-list** — a single leading `/` (rejects `//` protocol-relative), or an absolute URL whose parsed origin ∈ {own origin, `NEXT_PUBLIC_SUPABASE_URL` origin}; malformed URL → false. Injection logic otherwise unchanged; legit relative + same-origin + Supabase traffic preserved. *Performance Δ:* N/A. *Quality:* no functional change for real origins. *Validation:* 7 frontend bun (5 attacker URLs → false, legit → true, malformed → false). *Risk/rollback:* closes a credential leak, no behaviour change for trusted origins; revert = 1 commit. *Links:* `075cc30`.
+
+**CR#2 · Supabase heuristic misclassified intentional HttpExceptions (medium)** — *What/where:* `Backend/src/common/filters/all-exceptions.filter.ts`. *Why:* `isSupabaseError` substring-scanned the message and overrode status/message **before** the HttpException branch, so a deliberate `HttpException` whose message merely mentioned Supabase (e.g. `BadRequestException('Invalid Supabase project id')`) was coerced to 503 `SUPABASE_OFFLINE` — wrong status, canned message, a false "project paused" toast on the frontend, and CRITICAL log spam. *Before → After:* `isSupabaseError` now gated with `!isHttpException` → HttpExceptions keep their own status/message/`code`; a genuine non-HttpException connection failure still maps to 503 `SUPABASE_OFFLINE` (feature preserved). *Performance Δ:* N/A. *Quality:* correctness/UX fix. *Validation:* `all-exceptions.filter.spec.ts` +2 (HttpException-with-Supabase-message → 400/404 + own message preserved) + the existing 503 regression. *Risk/rollback:* revert = 1 commit. *Links:* `0c09b85`.
+
+*Post-rebase verification:* security unit suite **56/56**, MIT guard e2e **7/7**, frontend `zeroTrustHeaders` **7/7** — all green on the new `origin/main` base.
+
+### Open follow-ups (not in this batch)
+- Live Playwright/tunnel E2E of the reader+translation path (original↔translated) before PR — owner-deferred.
+- Code-review CR#3–CR#7 (LOW/MED, several pre-existing) not yet addressed: (CR#3) `Request`-object `fetch()` skips header injection — `args[0]?.toString()` → `"[object Request]"`, fails closed; (CR#4) `/uploads/*` (UploadsController `@Get('*')`) is outside the `/^\/upload\//` HWID regex — confirm public-by-design vs gap; (CR#5) NaN-expiry not rejected in `verifyClearanceToken` (`NaN < Date.now()` is false) — defense-in-depth, HMAC still gates; (CR#6) `TurnstileGuard` reads `x-hardware-id` raw and doesn't shape-validate it on `/books/translate/manga` (route not in `HWID_REQUIRED`); (CR#7) `SupabaseGuard` fetch-interceptor absolute-restore can clobber/double-wrap on remount/foreign interceptor.
+- `console.error` used for the new server-side error logging in `books.controller.ts` (matches existing file style); will fold into the `console.* → Logger` sweep in #240.
+- `notify.ps1` toast errored on this run (`LoadXml` HRESULT `0xC00CE502`) — unrelated to this PRD; flag for the dev-notification script.
+
+---
+
 ## 2026-06-10 — HOTFIX (critical): per-chapter Cloudflare Worker `/v1/list` cost-bleed
 
 **Severity:** critical (unbounded Cloudflare R2 Class-A op spend) · **Branch:** `hotfix/r2-list-amplification` → `main` (PR #197, squash `01affd5`).
@@ -660,3 +740,33 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **18. KPI.** #187 CLOSED (26/26 seams) · MIT tech-debt category **6/6** · byte-identical (verbatim move + suite green) · 0 regressions (365 pass) · +8 isolated tests for previously-construction-only logic · 1 cosmetic delta (logger name, documented).
 
 *Validation:* TDD red→green; `test_pipeline_params.py` 11 pass (3 globals + 8 value-object) + full suite (365 / 0 new fail). *Risk/rollback:* byte-identical; revert = drop the branch. *Cosmetic delta:* the batch_concurrent warning logs under the `pipeline_params` logger name (same message/level/effect). *Links:* #187, #188, resume `docs/reports/mit-refactor-progress.md`.
+
+---
+
+# 2026-06-14 — refactor(Backend): split MangaCatalog/Landing/GeminiModelCatalog out of books.service (#231, PRD #228 step 6)
+
+**1. Type.** Behaviour-preserving structural refactor (god-file decomposition), final step of PRD #228.
+
+**2. Trigger.** `books.service.ts` still fused three non-MIT domains (Gemini model selection, MangaDex catalog passthrough + search, landing assembly + Gemini text translation) into the same class as the MIT chain — untestable in isolation, and the stale-cache fallback was duplicated verbatim.
+
+**3. Change (before → after).**
+- before: 841-line `BooksService` holding model selection (`getAvailableGeminiModels`/`filterAvailableGeminiModels`/`getMangaModels`/`getDescriptionModels`), catalog passthroughs + `searchBooks`/`findTitleIdsByAltName`, and `getLandingBooks`/`translateDescription`/`translateMangaEpisode`/`enhanceLanding`/`applyForceLocalLanding`/`patchLandingCacheIfNeeded` — with two byte-identical stale-cache fallback blocks inline.
+- after: three units — `GeminiModelCatalog` (injected env+clock), `MangaCatalogService` (mangaDex/supabase/cache), `LandingService` (cache/imageCache/mangaDex/geminiCatalog/backendOrigin/env) — constructed via `new` in the BooksService constructor; `BooksService` is a thin facade of delegators with every public signature unchanged. The two fallback blocks collapse into one `serveStale()`.
+
+**4. Seams / commits.** 6a `15e4837` GeminiModelCatalog · 6b `127ee43` MangaCatalogService · 6c `959b1bd` LandingService. One seam = one commit; build (whole backend) green at each.
+
+**5. Byte-identical proof.** Method bodies moved verbatim (only `process.env`→`this.env`, `Date.now()`→`this.now()`, `this.backendOrigin` getter→`backendOrigin()` callback). Spies preserved: BooksService keeps `getMangaModels` (books-models spy) + `translateMangaEpisode` (books-translate spec) delegators. Existing books characterization net stays green unchanged. `serveStale` is the one intended dedup (the two blocks were verbatim-identical → same result).
+
+**6. Performance.** Neutral — same call graph, one extra method hop per delegated call (negligible).
+
+**7. Quality / metrics.** `books.service.ts` 841 → **376 lines** (quartered from its 1834-line start). +3 modules, +17 isolated unit cases (6 gemini env/clock + 5 catalog search/alt-name + 6 landing serveStale/description). Full backend suite **513 → 530 pass / 0 fail**.
+
+**8. Tech debt removed.** Model selection, catalog search, and landing assembly are now editable + testable without the MIT stack; the duplicated stale-cache fallback is gone; `GeminiModelCatalog` selection is deterministic under an injected clock.
+
+**9. Risk / rollback.** Byte-identical; rollback = revert the 3 commits. No money/auth/MIT-protocol surface touched. `BooksModule` unchanged (units are `new`-constructed, not DI providers).
+
+**10. Notes.** Two pre-existing unused imports (`fs`/`path`) left in place per the surgical rule (own-orphans only) — they belong to cleanup issue #240. `MangaCatalogService` deliberately holds real search/alt-name logic rather than being a redundant forwarder over `MangaDexService`.
+
+**11. KPI.** PRD #228 CLOSED — all 6 steps landed (#229/#230/#232/#233/#234/#231) · god file 1834 → 376 (−79%) · byte-identical · 0 regressions (530 pass) · +17 isolated tests.
+
+*Validation:* `npm run build` (whole backend) + `npx jest` full suite 530/0 per seam. *Links:* #228, #231, branch `dept/backend`.
