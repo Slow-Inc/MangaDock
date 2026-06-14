@@ -87,6 +87,23 @@ describe('BooksService.buildMitConfig', () => {
     expect(cfg.inpainter.inpainting_precision).toBe('fp16');
   });
 
+  it('selects the optional Flux Klein inpainter via MIT_INPAINTER=flux_klein (ADR 003)', () => {
+    process.env.MIT_INPAINTER = 'flux_klein';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.inpainter.inpainter).toBe('flux_klein');
+  });
+
+  it('folds the inpainter choice into renderConfigHash so switching busts the patch cache', () => {
+    const svc = makeService();
+    process.env.MIT_INPAINTER = 'lama_large';
+    const lama = (svc as any).renderConfigHash();
+    process.env.MIT_INPAINTER = 'flux_klein';
+    const flux = (svc as any).renderConfigHash();
+    // a different inpainter must yield a different cache key, else the Reader replays the stale LaMa fill
+    expect(flux).not.toBe(lama);
+  });
+
   it('ignores invalid size env and falls back to the default', () => {
     process.env.MIT_DETECTION_SIZE = 'not-a-number';
     process.env.MIT_INPAINTING_SIZE = '-5';

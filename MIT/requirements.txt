@@ -21,6 +21,9 @@ backports.cached-property
 huggingface_hub
 ultralytics  # #170 bubble segmentation (YOLOv8-seg); AGPL-3.0
 transformers
+diffusers>=0.38  # ADR 003 optional Flux.2 Klein inpainter (MIT_INPAINTER=flux_klein); only loaded when selected
+gguf            # ADR 003: load the Flux Klein-4B transformer as a GGUF Q4 quant (diffusers GGUFQuantizationConfig)
+jieba           # Chinese word segmentation for line-break parity (non-ENG render): wrap on word, not mid-char
 py3langid==0.2.2
 sentencepiece
 editdistance

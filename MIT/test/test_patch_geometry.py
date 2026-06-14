@@ -187,6 +187,104 @@ def test_feather_alpha_radius_zero_is_hard_alpha():
     assert a[0, 0] == 0                              # background → transparent
 
 
+def test_tighten_text_mask_shrinks_to_the_strokes_within_the_box():
+    """A coarse box mask over text leaves LaMa to repaint the whole rectangle (a big band).
+    Tightening keeps only the actual ink strokes (local-contrast pixels) + a small dilation,
+    clipped to the box, so LaMa fills thin strokes and the original art between them survives."""
+    crop = np.full((40, 40, 3), 200, np.uint8)      # light background
+    crop[10:30, 18:22] = 30                          # a dark vertical ink stroke
+    coarse = np.zeros((40, 40), np.uint8)
+    coarse[8:32, 8:32] = 255                         # coarse box covering the stroke + bg
+    tight = pg.tighten_text_mask(crop, coarse, dilate=2, contrast=40)
+    tb, cb = tight > 127, coarse > 127
+    assert tb.sum() < 0.5 * cb.sum()                 # much tighter than the box
+    assert tb[20, 20]                                # the stroke is covered
+    assert not tb[9, 9]                              # the empty corner is freed
+    assert int((tb & ~cb).sum()) == 0                # never exceeds the original box
+
+
+def test_seamless_blend_matches_region_to_surround_and_guards_border():
+    """Poisson seamless-clone re-integrates the inpainted region from the original's boundary
+    gradients → the DC brightness band vanishes; a border-touching mask is guarded (no
+    cv2.seamlessClone assert) and returns the input."""
+    bg = np.full((60, 60, 3), 130, np.uint8)
+    inp = bg.copy(); inp[20:40, 20:40] = 100         # masked region 30 too dark
+    mask = np.zeros((60, 60), np.uint8); mask[20:40, 20:40] = 255
+    out = pg.seamless_blend_inpaint(inp, bg, mask)
+    assert abs(out[25:35, 25:35].mean() - 130) < 8   # region pulled to the surround
+    bm = np.zeros((60, 60), np.uint8); bm[0:20, 0:20] = 255   # touches the border
+    out2 = pg.seamless_blend_inpaint(inp, bg, bm)
+    assert out2.shape == inp.shape                    # guarded, no crash
+
+
+def test_tighten_text_mask_falls_back_when_no_strokes_found():
+    """If contrast finds (almost) no strokes inside the box, return the coarse mask unchanged
+    rather than leaving source text unmasked."""
+    crop = np.full((40, 40, 3), 128, np.uint8)       # flat — no strokes to find
+    coarse = np.zeros((40, 40), np.uint8); coarse[8:32, 8:32] = 255
+    out = pg.tighten_text_mask(crop, coarse, contrast=40)
+    assert np.array_equal(out > 127, coarse > 127)   # safe fallback
+
+
+def test_reground_pulls_masked_luminance_to_local_surround_bidirectional():
+    """The make-or-break: a flat LaMa fill that is too LIGHT over dark hair AND too DARK
+    over the lighter cheek -- in ONE mask -- must be pulled toward each pixel's OWN local
+    surround in a single pass (the bidirectional band the reverted #266 couldn't fix). A
+    vertical 'text column' mask straddles a hair (top, L~100) / cheek (bottom, L~220)
+    split; after re-ground the masked pixels flanked by hair drop toward 100 and those
+    flanked by cheek rise toward 220."""
+    h = w = 64
+    bg = np.empty((h, w, 3), np.uint8)
+    bg[:32] = 100                                   # hair (dark) — top
+    bg[32:] = 140                                   # cheek (lighter) — bottom
+    inpainted = bg.copy()
+    mask = np.zeros((h, w), np.uint8)
+    mask[:, 24:40] = 255                            # central vertical column over both
+    inpainted[mask > 0] = 120                       # LaMa flat fill: +20 over hair, -20 over cheek
+    out = pg.reground_inpaint_luminance(inpainted, bg, mask, radius_frac=0.18, strength=1.0)
+    # sample masked blocks well away from the hair/cheek boundary (near it the correction
+    # ramps between the two surrounds — the desired smooth behaviour, not a test target)
+    hair_block = out[4:20, 24:40].mean()            # masked, flanked by hair
+    cheek_block = out[44:60, 24:40].mean()          # masked, flanked by cheek
+    assert abs(hair_block - 100) < 5, hair_block    # was 120 (too light) -> ~100
+    assert abs(cheek_block - 140) < 5, cheek_block  # was 120 (too dark) -> ~140
+    assert np.array_equal(out[mask == 0], bg[mask == 0])   # outside mask untouched
+
+
+def test_reground_uniform_background_collapses_to_a_scalar_offset():
+    """On a single-background crop the per-pixel field degenerates to one offset (≡ a plain
+    mean match / histogram-match), so the masked fill is pulled to within 1 L of the surround."""
+    bg = np.full((48, 48, 3), 130, np.uint8)
+    inpainted = bg.copy()
+    mask = np.zeros((48, 48), np.uint8)
+    mask[16:32, 16:32] = 255
+    inpainted[mask > 0] = 112                        # flat fill, 18 too dark (the measured band)
+    out = pg.reground_inpaint_luminance(inpainted, bg, mask, radius_frac=0.25, strength=1.0)
+    assert abs(out[20:28, 20:28].mean() - 130) < 1   # masked interior pulled to the surround
+
+
+def test_reground_coverage_guard_skips_when_too_little_surround():
+    """A near-fully-masked crop (huge SFX) has no surround to ground against → return the
+    input unchanged rather than grounding to noise."""
+    bg = np.full((40, 40, 3), 90, np.uint8)
+    inpainted = bg.copy()
+    mask = np.full((40, 40), 255, np.uint8)          # ~100% masked → valid ratio < 0.15
+    inpainted[:] = 150
+    out = pg.reground_inpaint_luminance(inpainted, bg, mask, strength=1.0)
+    assert np.array_equal(out, inpainted)            # unchanged
+
+
+def test_reground_strength_zero_and_grayscale_safety():
+    """strength=0 → byte-identical input; a grayscale crop stays grayscale (no chroma tint)."""
+    bg = np.full((48, 48, 3), 120, np.uint8)
+    inpainted = bg.copy(); inpainted[16:32, 16:32] = 100
+    mask = np.zeros((48, 48), np.uint8); mask[16:32, 16:32] = 255
+    assert np.array_equal(
+        pg.reground_inpaint_luminance(inpainted, bg, mask, strength=0.0), inpainted)
+    out = pg.reground_inpaint_luminance(inpainted, bg, mask, radius_frac=0.25, strength=1.0)
+    assert np.array_equal(out[..., 0], out[..., 1]) and np.array_equal(out[..., 1], out[..., 2])
+
+
 def test_union_falls_back_to_text_only_where_refinement_missed_a_region():
     """A text component the CRF dropped entirely (no overlap) is still covered by
     text_only — no leftover-text residue."""
