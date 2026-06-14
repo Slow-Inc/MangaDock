@@ -23,6 +23,7 @@ overturns an earlier one marks the old ADR **Superseded**.
 | [013](013-service-role-supabase-authz-in-code.md) | Service-role Supabase singleton with authorization-in-code (RLS bypassed) | Backend | Accepted |
 | [014](014-frontend-single-entry-proxy.md) | Frontend single-entry `/api/proxy` (token preservation, abort propagation, asset rewrites) | Frontend | Accepted |
 | [015](015-frontend-auth-context-supabase-adapter.md) | Frontend auth context: AppUser adapter, OAuth popup, cross-user cache isolation | Frontend | Accepted |
+| [016](016-staff-console-out-of-band-observability-aggregator.md) | Staff Console: out-of-band aggregator µservice + per-service event streams + zero-trust signed-claim auth | Full-stack | Accepted — **planned** (#279) |
 
 ## Conventions
 
