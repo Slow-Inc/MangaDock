@@ -740,3 +740,33 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **18. KPI.** #187 CLOSED (26/26 seams) · MIT tech-debt category **6/6** · byte-identical (verbatim move + suite green) · 0 regressions (365 pass) · +8 isolated tests for previously-construction-only logic · 1 cosmetic delta (logger name, documented).
 
 *Validation:* TDD red→green; `test_pipeline_params.py` 11 pass (3 globals + 8 value-object) + full suite (365 / 0 new fail). *Risk/rollback:* byte-identical; revert = drop the branch. *Cosmetic delta:* the batch_concurrent warning logs under the `pipeline_params` logger name (same message/level/effect). *Links:* #187, #188, resume `docs/reports/mit-refactor-progress.md`.
+
+---
+
+# 2026-06-14 — refactor(Backend): split MangaCatalog/Landing/GeminiModelCatalog out of books.service (#231, PRD #228 step 6)
+
+**1. Type.** Behaviour-preserving structural refactor (god-file decomposition), final step of PRD #228.
+
+**2. Trigger.** `books.service.ts` still fused three non-MIT domains (Gemini model selection, MangaDex catalog passthrough + search, landing assembly + Gemini text translation) into the same class as the MIT chain — untestable in isolation, and the stale-cache fallback was duplicated verbatim.
+
+**3. Change (before → after).**
+- before: 841-line `BooksService` holding model selection (`getAvailableGeminiModels`/`filterAvailableGeminiModels`/`getMangaModels`/`getDescriptionModels`), catalog passthroughs + `searchBooks`/`findTitleIdsByAltName`, and `getLandingBooks`/`translateDescription`/`translateMangaEpisode`/`enhanceLanding`/`applyForceLocalLanding`/`patchLandingCacheIfNeeded` — with two byte-identical stale-cache fallback blocks inline.
+- after: three units — `GeminiModelCatalog` (injected env+clock), `MangaCatalogService` (mangaDex/supabase/cache), `LandingService` (cache/imageCache/mangaDex/geminiCatalog/backendOrigin/env) — constructed via `new` in the BooksService constructor; `BooksService` is a thin facade of delegators with every public signature unchanged. The two fallback blocks collapse into one `serveStale()`.
+
+**4. Seams / commits.** 6a `15e4837` GeminiModelCatalog · 6b `127ee43` MangaCatalogService · 6c `959b1bd` LandingService. One seam = one commit; build (whole backend) green at each.
+
+**5. Byte-identical proof.** Method bodies moved verbatim (only `process.env`→`this.env`, `Date.now()`→`this.now()`, `this.backendOrigin` getter→`backendOrigin()` callback). Spies preserved: BooksService keeps `getMangaModels` (books-models spy) + `translateMangaEpisode` (books-translate spec) delegators. Existing books characterization net stays green unchanged. `serveStale` is the one intended dedup (the two blocks were verbatim-identical → same result).
+
+**6. Performance.** Neutral — same call graph, one extra method hop per delegated call (negligible).
+
+**7. Quality / metrics.** `books.service.ts` 841 → **376 lines** (quartered from its 1834-line start). +3 modules, +17 isolated unit cases (6 gemini env/clock + 5 catalog search/alt-name + 6 landing serveStale/description). Full backend suite **513 → 530 pass / 0 fail**.
+
+**8. Tech debt removed.** Model selection, catalog search, and landing assembly are now editable + testable without the MIT stack; the duplicated stale-cache fallback is gone; `GeminiModelCatalog` selection is deterministic under an injected clock.
+
+**9. Risk / rollback.** Byte-identical; rollback = revert the 3 commits. No money/auth/MIT-protocol surface touched. `BooksModule` unchanged (units are `new`-constructed, not DI providers).
+
+**10. Notes.** Two pre-existing unused imports (`fs`/`path`) left in place per the surgical rule (own-orphans only) — they belong to cleanup issue #240. `MangaCatalogService` deliberately holds real search/alt-name logic rather than being a redundant forwarder over `MangaDexService`.
+
+**11. KPI.** PRD #228 CLOSED — all 6 steps landed (#229/#230/#232/#233/#234/#231) · god file 1834 → 376 (−79%) · byte-identical · 0 regressions (530 pass) · +17 isolated tests.
+
+*Validation:* `npm run build` (whole backend) + `npx jest` full suite 530/0 per seam. *Links:* #228, #231, branch `dept/backend`.
