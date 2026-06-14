@@ -150,7 +150,7 @@ describe('series context plumbing — translate paths', () => {
     );
     const config = await submitted;
     // Deliver the webhook so the job promise resolves.
-    const jobKey = (service as any).buildJobKey('ch1', 'ja', 'th', undefined, 'hd');
+    const jobKey = (service as any).batch.buildJobKey('ch1', 'ja', 'th', undefined, 'hd');
     await service.handleMitCallback(jobKey, 0, { imgWidth: 1, imgHeight: 1, patches: [] }, undefined);
     await jobPromise;
     return JSON.parse(config);
