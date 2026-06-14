@@ -10,6 +10,7 @@ import { MangaDexService } from './mangadex.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 import { PatchStore } from './patch-store';
 import { TranslationMemoryRepository, type TextLayerRegion } from './translation-memory.repository';
+import { MitClient } from './mit-client';
 import { loadPageBytes } from './page-source';
 import { composeSeriesContext } from './series-context';
 import { RedisService } from '../cache/redis.service';
@@ -427,6 +428,10 @@ export class BooksService {
     private readonly supabase: SupabaseService,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
     @Optional() private readonly redis?: RedisService,
+    // #230: the single HTTP boundary to MIT. Injected in production (registered in
+    // BooksModule); the default keeps the manual `new BooksService(...)` in unit
+    // tests working unchanged (those that exercise MIT fake global.fetch).
+    private readonly mitClient: MitClient = new MitClient(),
   ) {
     this.patchStore = new PatchStore(this.storage, () => this.backendOrigin);
     // #160: translation memory rides the already-injected service-role client;
@@ -792,8 +797,7 @@ export class BooksService {
     }
     let value: string | null = null;
     try {
-      const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
-      const res = await fetch(`${mitBaseUrl}/ready`, { signal: AbortSignal.timeout(3_000) });
+      const res = await this.mitClient.ready(3_000);
       if (res.ok) {
         const body = (await res.json()) as { translator?: unknown };
         value = typeof body?.translator === 'string' && body.translator ? body.translator : null;
@@ -1036,15 +1040,13 @@ export class BooksService {
   // ─── Manga page image translation (manga-image-translator) ──────────────────
 
   async checkMitHealth(): Promise<{ available: boolean; url: string; message?: string }> {
-    const baseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
+    const url = this.mitClient.baseUrl;
     try {
-      const res = await fetch(`${baseUrl}/ready`, {
-        signal: AbortSignal.timeout(5_000),
-      });
-      return { available: res.ok, url: baseUrl };
+      const res = await this.mitClient.ready(5_000);
+      return { available: res.ok, url };
     } catch (err) {
       this.logger.warn(`[MangaTranslate] Health check failed: ${String(err)}`);
-      return { available: false, url: baseUrl, message: String(err) };
+      return { available: false, url, message: String(err) };
     }
   }
 
@@ -1069,10 +1071,6 @@ export class BooksService {
       return cached.data;
     }
 
-    const mitUrl =
-      (process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003') +
-      '/translate/with-form/patches';
-
     // Load the source page — display-derivative aware (#156): /img-cache paths
     // are read straight from disk so the patch is generated from byte-identical
     // content to what the Reader displays; external URLs are fetched.
@@ -1092,11 +1090,7 @@ export class BooksService {
       form.append('config', config);
 
       try {
-        mitRes = await fetch(mitUrl, {
-          method: 'POST',
-          body: form,
-          signal: AbortSignal.timeout(300_000),
-        });
+        mitRes = await this.mitClient.submitSinglePage(form, 300_000);
       } catch (err) {
         const msg = String(err);
         if (msg.includes('ECONNREFUSED') || msg.includes('fetch failed')) {
@@ -1185,12 +1179,10 @@ export class BooksService {
         // Tell MIT to stop the in-flight background batch for this taskId so it
         // doesn't keep burning GPU on a job nobody is listening to. Best-effort,
         // fire-and-forget; MIT no-ops an unknown/finished taskId.
-        const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
-        void fetch(`${mitBaseUrl}/cancel/${encodeURIComponent(jobKey)}`, { method: 'POST' }).catch(
-          (err) =>
-            this.logger.debug(
-              `[BatchRegistry] MIT cancel request failed for job=${jobKey}: ${err instanceof Error ? err.message : String(err)}`,
-            ),
+        void this.mitClient.cancel(jobKey).catch((err) =>
+          this.logger.debug(
+            `[BatchRegistry] MIT cancel request failed for job=${jobKey}: ${err instanceof Error ? err.message : String(err)}`,
+          ),
         );
       }
     }
@@ -1390,9 +1382,6 @@ export class BooksService {
     derivative: 'hd' | 'saver' = 'hd',
     mangaId?: string,
   ): Promise<void> {
-    const mitBaseUrl = process.env.MANGA_TRANSLATOR_URL ?? 'http://localhost:5003';
-    const mitUrl = `${mitBaseUrl}/translate/with-form/patches/batch`;
-
     // ── 1. Fetch all source images in parallel ─────────────────────────────
     let imageBuffers: Buffer[];
     try {
@@ -1438,7 +1427,7 @@ export class BooksService {
     }
     let mitRes: Response;
     try {
-      mitRes = await fetch(mitUrl, { method: 'POST', body: form });
+      mitRes = await this.mitClient.submitBatch(form);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`[BatchPatches] chapter=${chapterId} MIT batch fetch failed: ${msg}`);
