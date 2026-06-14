@@ -8,7 +8,7 @@ import {
   buildJobKey,
   buildMitConfig,
   parseJobKey,
-} from './books.service';
+} from './mit-config';
 
 /**
  * #229: the MIT key/config builders extracted as pure, dependency-light free

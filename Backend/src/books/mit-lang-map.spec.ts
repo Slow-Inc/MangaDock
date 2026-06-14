@@ -1,4 +1,4 @@
-import { MIT_LANG_MAP, mitLangCode } from './books.service';
+import { MIT_LANG_MAP, mitLangCode } from './mit-lang-map';
 
 /**
  * MIT_LANG_MAP must only emit codes MIT's translator vocabulary actually
