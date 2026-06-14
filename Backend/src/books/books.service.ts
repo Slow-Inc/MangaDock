@@ -497,6 +497,24 @@ export class BooksService {
     }
   }
 
+  /** The single terminal-state decision (#234): once every expected page is in,
+   *  report error pages truthfully (an all-error batch must not read as "fully
+   *  completed" — that hid a dead MIT worker, 2026-06-06 incident) and resolve the
+   *  job. Idempotent — resolve() no-ops once settled. Both the webhook and the
+   *  stream completion paths funnel through here so terminal state is decided once. */
+  private maybeComplete(job: BatchJobState, jobKey: string): void {
+    if (job.completedPages.size < job.expectedCount) return;
+    const errorPages = [...job.completedPages.values()].filter((r) => r.error);
+    if (errorPages.length > 0) {
+      this.logger.warn(
+        `[BatchRegistry] Job ${jobKey} completed with ${errorPages.length}/${job.expectedCount} page errors (first: ${errorPages[0].error})`,
+      );
+    } else {
+      this.logger.log(`[BatchRegistry] Job ${jobKey} fully completed`);
+    }
+    job.resolve?.();
+  }
+
   /** Shared per-page persist (#232): PatchStore write → percent-map (toPatchEntries)
    *  → cache set (via the #229 patch cache key) → optional translation-memory save,
    *  in one place. Cache strategy + TM save are parametrized so the webhook,
@@ -630,22 +648,8 @@ export class BooksService {
     job.completedPages.set(pageIndex, pageResult);
     this.deliver(job, pageIndex, pageResult);
 
-    // Check if job is complete
-    if (job.completedPages.size >= job.expectedCount) {
-      // Report errored pages truthfully — an all-error batch used to log as
-      // "fully completed", hiding a dead MIT worker (2026-06-06 incident).
-      const errorPages = [...job.completedPages.values()].filter(
-        (r) => r.error,
-      );
-      if (errorPages.length > 0) {
-        this.logger.warn(
-          `[Webhook] Job ${jobKey} completed via webhooks with ${errorPages.length}/${job.expectedCount} page errors (first: ${errorPages[0].error})`,
-        );
-      } else {
-        this.logger.log(`[Webhook] Job ${jobKey} fully completed via webhooks`);
-      }
-      job.resolve?.();
-    }
+    // Terminal-state decision is shared with the stream path (#234).
+    this.maybeComplete(job, jobKey);
   }
 
   private get backendOrigin(): string {
@@ -1218,9 +1222,7 @@ export class BooksService {
       mangaId,
     )
       .then(() => {
-        if (job.completedPages.size >= job.expectedCount) {
-          job.resolve?.();
-        }
+        this.maybeComplete(job, jobKey);
       })
       .catch((err) => {
         job.reject?.(err);
