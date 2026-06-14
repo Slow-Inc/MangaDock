@@ -5,6 +5,7 @@ import numpy as np
 from .common import CommonInpainter, OfflineInpainter
 from .inpainting_aot import AotInpainter
 from .inpainting_lama_mpe import LamaMPEInpainter, LamaLargeInpainter
+from .inpainting_flux_klein import FluxKleinInpainter
 from .none import NoneInpainter
 from .original import OriginalInpainter
 from ..config import Inpainter, InpainterConfig
@@ -16,6 +17,7 @@ INPAINTERS = {
     Inpainter.lama_mpe: LamaMPEInpainter,
     Inpainter.none: NoneInpainter,
     Inpainter.original: OriginalInpainter,
+    Inpainter.flux_klein: FluxKleinInpainter,
 }
 _registry = DispatchRegistry(INPAINTERS, 'inpainter')
 

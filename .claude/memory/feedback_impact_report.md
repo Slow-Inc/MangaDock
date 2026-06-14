@@ -43,6 +43,8 @@ Also keep a **tech-debt register** (issues filed: number/area/severity/status) a
 
 **How to apply:** terse + linkable; one dated section per batch; a per-change block or table carrying the fields above. In addition to — not instead of — `DONE.md` ([[feedback_md_history_log]]) + `MIT/PIPELINE.md §5`. Pairs with [[feedback-techdebt-all-scenarios]].
 
+**ADR is mandatory for any quality-affecting or non-trivial change (2026-06-14).** When a change affects render/translation **quality**, VRAM/perf, or makes a non-small architectural/design decision, write an **ADR** in `docs/adr/NNN-*.md` (status · context · decision · alternatives-considered · consequences) **in addition to** the report. When a decision overturns or replaces an earlier one, mark the old ADR **Superseded by NNN** and have the new one state what it overturns (e.g. ADR 003 Flux-Klein overturned ADR 002's "Flux = OOM" assumption). Trivial one-liners are exempt. If updating ADRs to reflect the codebase would need a broad multi-area scan, say so — the user enables Ultracode (sub-agent codebase scan) for that.
+
 **Trigger — closing an issue OR opening a PR: always write a report.** Pick the right artifact:
 - **Bug fix** → fill `docs/reports/post-mortem-template.md` (Summary / Symptom / Root cause / Why-it-produced-the-symptom / Fix / How-found / Why-it-slipped / Validation / Action-items). Refuse to draft until the four required inputs are met (reliable repro · root cause known · fix identified · fix validated). Post bilingual EN+TH on the issue/PR.
 - **Feature / refactor / tech-debt** → use the full-field change record above (what/where · why · before→after · perf Δ · quality · validation · risk).

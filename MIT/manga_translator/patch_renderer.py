@@ -30,6 +30,9 @@ from .patch_geometry import (
     expand_inpaint_crop,
     feather_alpha,
     page_scaled_font_min,
+    reground_inpaint_luminance,
+    seamless_blend_inpaint,
+    tighten_text_mask,
     union_refined_with_fallback,
 )
 from .utils import Context
@@ -152,6 +155,11 @@ class PatchRenderer:
                         )
                         patch_ctx.mask = text_only_mask
 
+                    # #268: shrink the inpaint mask to the actual ink strokes so LaMa repaints
+                    # less of the textured art (smaller band). crop_rgb is the pristine original.
+                    if getattr(config.inpainter, 'mask_tighten', False) and patch_ctx.mask is not None:
+                        patch_ctx.mask = tighten_text_mask(crop_rgb, patch_ctx.mask)
+
                     try:
                         # #249: give LaMa a wider receptive field WITHOUT enlarging the
                         # rendered patch. Inpaint a larger context crop (render rect +
@@ -185,6 +193,55 @@ class PatchRenderer:
                             f"[{type(e).__name__}]: using original crop"
                         )
                         patch_ctx.img_inpainted = crop_rgb
+
+            # #268: re-ground the inpaint's low-freq luminance INSIDE the erase mask to the
+            # local original surroundings, killing the "painted band" where LaMa's fill is a
+            # few levels off the real art (over dark hair). Before the glyphs are drawn, so
+            # text can't fade. crop_rgb is the pristine original; the mask is the per-crop
+            # refined mask (or the text-only mask in the full-page-inpaint branch). Pure CPU,
+            # no extra VRAM. 0 → skipped, byte-identical.
+            # #268 tuning aid (env-gated, off in prod): dump the pristine crop + the raw inpaint
+            # + mask so any lever's band can be measured offline (no glyph / no LLM jitter).
+            import os as _os
+            _dd = _os.environ.get('MIT_DEBUG_REGROUND_DUMP')
+            if _dd:
+                _dmask = patch_ctx.mask
+                if _dmask is None and getattr(ctx, 'mask', None) is not None:
+                    _dmask = ctx.mask[y1:y2, x1:x2]
+                if _dmask is None:
+                    _dmask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
+                _os.makedirs(_dd, exist_ok=True)
+                np.savez(_os.path.join(_dd, f'g_{x1}_{y1}.npz'),
+                         crop=crop_rgb, inpaint=patch_ctx.img_inpainted, mask=_dmask)
+
+            reground = float(getattr(config.inpainter, 'lama_lum_reground', 0.0) or 0.0)
+            if reground > 0:
+                reg_mask = patch_ctx.mask
+                if reg_mask is None:
+                    reg_mask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
+                try:
+                    patch_ctx.img_inpainted = reground_inpaint_luminance(
+                        patch_ctx.img_inpainted, crop_rgb, reg_mask, strength=reground)
+                except Exception as e:
+                    logger.warning(
+                        f"[PatchTranslate] luminance re-ground failed for group ({x1},{y1},{x2},{y2}) "
+                        f"[{type(e).__name__}]: using un-grounded inpaint")
+
+            # #268 escalation: Poisson seamless-clone the inpaint into the original (kills the
+            # DC band by gradient integration). After re-ground; alternative lever for A/B.
+            if getattr(config.inpainter, 'seamless_clone', False):
+                seam_mask = patch_ctx.mask
+                if seam_mask is None and getattr(ctx, 'mask', None) is not None:
+                    seam_mask = ctx.mask[y1:y2, x1:x2]
+                if seam_mask is None:
+                    seam_mask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
+                try:
+                    patch_ctx.img_inpainted = seamless_blend_inpaint(
+                        patch_ctx.img_inpainted, crop_rgb, seam_mask)
+                except Exception as e:
+                    logger.warning(
+                        f"[PatchTranslate] seamless-clone failed for group ({x1},{y1},{x2},{y2}) "
+                        f"[{type(e).__name__}]: using un-blended inpaint")
 
             # --- CPU-bound: rendering + PNG encode (outside semaphore) ---
             patch_ctx.img_rgb = patch_ctx.img_inpainted
