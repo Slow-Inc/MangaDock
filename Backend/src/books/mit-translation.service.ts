@@ -8,7 +8,7 @@ import {
   patchCacheKey,
   buildMitConfig,
   imageModelKey,
-} from './books.service';
+} from './mit-config';
 
 type PatchEntry = {
   xPct: number;

@@ -1,4 +1,5 @@
-import { BooksService, parseJobKey } from './books.service';
+import { BooksService } from './books.service';
+import { parseJobKey } from './mit-config';
 
 describe('parseJobKey', () => {
   it('round-trips a plain chapterId', () => {
