@@ -136,7 +136,18 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
                     if time.time() - started > self._TIMEOUT + (timeout_attempt * self._TIMEOUT / 2):
                         # Server takes too long to respond
                         if timeout_attempt >= self._TIMEOUT_RETRY_ATTEMPTS:
-                            raise Exception('ollama servers did not respond quickly enough.')
+                            # Surface a structured, actionable failure (PRD #279, slice 1e)
+                            # instead of an opaque string — names the translator/endpoint/
+                            # model + cause + hint for the worker log and backend response.
+                            from server.translate_error import classify_translate_error
+                            failure = classify_translate_error(
+                                TimeoutError('translator did not respond quickly enough'),
+                                translator='custom_openai',
+                                endpoint=CUSTOM_OPENAI_API_BASE or '',
+                                model=self.model or CUSTOM_OPENAI_MODEL,
+                            )
+                            self.logger.error(failure.message())
+                            raise Exception(failure.message())
                         timeout_attempt += 1
                         self.logger.warning(f'Restarting request due to timeout. Attempt: {timeout_attempt}')
                         request_task.cancel()

@@ -262,14 +262,17 @@ Patch render path (S24, were byte-identical extractions — now carry an intenti
 | `request_extraction.py` | `requests` → async `httpx`; dropped `BatchTranslateRequest`/`get_batch_ctx`; `get_patch_ctx` accepts `progress_meta` | async correctness; live progress UX |
 | `streaming.py` | 300s stream timeout + error frame on stall | #106 |
 
-### `server/` — new (7)
+### `server/` — new (10)
 `batch_runner.py` (#100 webhook batch loop; **#159** holds a per-job `RollingContext`, seeds each page's
 `_translate_page(prev_context=…)` from the prior pages' translated `dst`, env-gated by `MIT_CONTEXT_PAGES`/
 `MIT_CONTEXT_MAX_CHARS` — 0/unset → no injection, byte-identical) · `rolling_context.py` (**#159** stdlib-only
 `RollingContext`: `add_page`/`render_block` → numbered `<|n|>` block, page + char caps; lives with the batch loop so
 the cross-job bleed class stays impossible; `test/test_rolling_context.py`) · `cancellation.py` (#101) · `path_utils.py` (#102) ·
 `readiness.py` (worker liveness, 2026-06-06 incident) · `webhook.py` (#100 signed delivery + retry + dead-letter; plus `send_progress`/`make_progress_hook` — fire-and-forget per-stage progress events the worker posts to the Backend so the Reader can show live pipeline stages; the worker attaches the hook per request in `mode/share.py`, and `batch_runner` passes `progress_meta` per page). ·
-`worker_lifecycle.py` (#193 — `port_is_free` / `ensure_worker_port_free` / `terminate_process`; the two-port `--start-instance` lifecycle guards: startup worker-port collision check (fail loud, not hang) + graceful terminate→kill orphan cleanup. Pure stdlib, unit-tested without spawning a worker. **Revert hazard:** drop it and a killed front orphans the worker on `P+1` again, and a busy worker port hangs the front silently).
+`worker_lifecycle.py` (#193 — `port_is_free` / `ensure_worker_port_free` / `terminate_process`; the two-port `--start-instance` lifecycle guards: startup worker-port collision check (fail loud, not hang) + graceful terminate→kill orphan cleanup. Pure stdlib, unit-tested without spawning a worker. **Revert hazard:** drop it and a killed front orphans the worker on `P+1` again, and a busy worker port hangs the front silently). ·
+`diagnostics.py` (**Staff Console #279 / 1b**, ADR 016 — cheap bounded translator-gateway probe, decoupled from the worker pool, classifies `ok/slow/timeout/auth/unreachable/model_missing` and distinguishes gateway-up vs model-down via `/models`; the 2026-06-14 incident reads as `timeout` "gateway /models OK but chat completion timed out — model not responding"; import-light httpx-only, `test/test_diagnostics.py` ×7) ·
+`translate_error.py` (**#279 / 1e** — `classify_translate_error` turns a raised translator exception into a structured `{stage, translator, endpoint, model, cause, hint}` failure; wired at the `custom_openai` timeout raise site so the worker log + backend response carry it instead of the opaque `'ollama servers did not respond quickly enough'`; stdlib-only, `test/test_translate_error.py` ×4) ·
+`metrics.py` (**#279 / 1d** — `parse_nvidia_smi` (pure) + `host_metrics` (psutil) + `gpu_metrics`/`collect` degrading to host-only when no GPU / nvidia-smi; zero new dep; `test/test_metrics.py` ×5).
 
 ### Removed — #191 (vendored upstream baggage, ~14.4k LOC)
 - **SD/LDM inpainter** — deleted `inpainting/ldm/**` (vendored CompVis LDM ~11.7k LOC), `guided_ldm_inpainting.py`, `inpainting_sd.py`, `sd_hack.py`, `booru_tagger.py` (SD-prompt-only), the 2 `guided_ldm_inpaint*_v15.yaml`; dropped `Inpainter.sd` (enum + `INPAINTERS`), the `<option value="sd">` web-UI entry, and `open_clip_torch` (SD-exclusive dep). `lama_large` is the production inpainter; the roadmap (MangaTranslator) uses Flux via `diffusers`, not the vendored LDM.
