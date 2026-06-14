@@ -31,7 +31,7 @@ def config(clean: bool) -> str:
         "translator": {"target_lang": "ENG"},
         "detector": {"detection_size": 2560, "det_bubble_seg": True, "det_sfx": True},
         "ocr": {"prob": 0.03, "vlm_rescue": True},
-        "inpainter": {"inpainter": "lama_large", "inpainting_size": 2048, "inpainting_precision": "bf16"},
+        "inpainter": {"inpainter": "lama_large", "inpainting_size": 2048, "inpainting_precision": "bf16", "full_page_inpaint": clean},
         "render": render,
     })
 

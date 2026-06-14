@@ -2283,3 +2283,35 @@ reference; the warp column shows the old oversized/overflow. One bug fixed mid-c
 required-positional — the first run raised `TypeError` and `_run_text_rendering` fell back to an inpaint-only (textless)
 patch; passing `max_height=page_h` fixed it. `.env` set `MIT_CLEAN_LAYOUT=1` + `MIT_FONT_SIZE_MAX=20`. Branch
 `feat/mit-clean-text-layout`. Provenance in PIPELINE.md §5.
+
+## 2026-06-13 — Clean layout: wrap to the source footprint (line-breaks now reference the original)
+Follow-up to #263: the user flagged that the clean-layout line-breaking still didn't reference the original — our
+narration reflowed into a wide novel-like paragraph while both the source (narrow vertical-JP columns) and the
+MangaTranslator target wrap into a **narrow tall column**. Root cause: `clean_wrap_width` wrapped to the region's
+**wider** extent (`max(bbox_w, bbox_h)`), turning a tall column into a wide block. Fix: wrap to the region's **own bbox
+width** (`ref_w = x2-x1`) so the English breaks where the source columns did — narration stays narrow/tall, and the
+floor rose 8%→**11%** of the page so a short dialogue column still fits ~2 words a line (with hyphenation) instead of
+one. The balloon width is deliberately NOT used as the reference (narration boxes also get a wide `bubble_box` from
+segmentation, which would re-widen them). `clean_wrap_width(ref_w, img_w)` (dropped the unused `bbox_h` arg). TDD:
+updated the 3 `clean_wrap_width` cases; render_overlap 13 pass, full MIT suite 418 pass / 18 pre-existing async / 0 new.
+**Verified via direct render** (`tools/ab_clean.py`): narration now a narrow column, dialogue ~2 words/line with
+hyphenation (e.g. "IT'S NOT MY BUSI-NESS, SO SHOULD I JUST LEAVE IT ALONE?") — both reference the original line-breaks,
+matching the target much more closely. Branch `fix/mit-clean-wrap-narrow`. Provenance in PIPELINE.md §5.
+
+## 2026-06-13 — Patch-mode full-page inpaint (clean text removal over complex art — the last gap)
+User flagged the only remaining gap: text removal wasn't clean — a **gray blob** where large stylized JP text
+("そうだよどうでもいい事じゃねーか") sat over the character's dark hair (bottom-right panel), and pointed at the upstream
+`manga-image-translator-Original` which erases just as cleanly as the MangaTranslator target. Investigation (upstream
+mask+inpaint vs ours): the upstream and our own **full-page** path inpaint the WHOLE page at once, so LaMa's FFC global
+branch has full-page context and reconstructs the hair cleanly. Our **patch path** inpaints tiny per-region crops (even
+with the #249 256px context-pad) → LaMa is starved of context → fills the big hole with averaged gray. Proven by A/B:
+our `/translate/with-form/image` (full-page) erases the same region cleanly with the **same mask**, while the patch path
+left the blob — so it's **context, not the mask** (CRF mask + pydensecrf are present and identical to upstream). Fix:
+`InpainterConfig.full_page_inpaint` (Backend `MIT_PATCH_FULLPAGE_INPAINT`) — `translate_patches` inpaints the whole page
+ONCE (mask refine all regions + `union_refined_with_fallback` + one LaMa pass), and `PatchRenderer` slices each patch's
+clean background from it, skipping the per-crop mask refinement + inpaint. One inpaint per page (often **faster** than N
+per-group inpaints). Off → per-crop, byte-identical. TDD: `test_patch_renderer` gains a case (full_inpainted supplied →
+`driver.calls == ['render']`, bg = the slice); render_overlap/stages green, **full MIT suite 419 pass / 18 pre-existing
+async / 0 new**. **Verified via direct render** (`tools/ab_clean.py` + new `tools/ab_fullpage.py`): the bottom-right hair
+is now clean dark, no gray blob, English text intact — matches the full-page/upstream/target. `.env` set
+`MIT_PATCH_FULLPAGE_INPAINT=1`. Branch `fix/mit-patch-fullpage-inpaint`. Provenance in PIPELINE.md §5.
