@@ -475,16 +475,24 @@ export class BooksService {
       stage: string;
       progress: true;
     };
+    this.deliver(job, pageIndex, event);
+  }
+
+  /** The single fan-out sink (#234): deliver one page result to the original SSE
+   *  caller and every attached latecomer. Each listener is isolated — one that
+   *  disconnected and throws never blocks the rest. Callers that record completion
+   *  set job.completedPages before calling; the progress path does not. */
+  private deliver(job: BatchJobState, pageIndex: number, result: PageResult): void {
     try {
-      job.originalListener?.(pageIndex, event);
+      job.originalListener?.(pageIndex, result);
     } catch {
       /* caller may be gone */
     }
     for (const l of job.listeners) {
       try {
-        l(pageIndex, event);
+        l(pageIndex, result);
       } catch {
-        /* listener might have disconnected */
+        /* listener may be gone */
       }
     }
   }
@@ -620,16 +628,7 @@ export class BooksService {
 
     job.processingPages?.delete(pageIndex);
     job.completedPages.set(pageIndex, pageResult);
-    // Direct delivery to original SSE caller
-    try { job.originalListener?.(pageIndex, pageResult); } catch { /* caller may be gone */ }
-    // Fan-out to latecomers
-    for (const l of job.listeners) {
-      try {
-        l(pageIndex, pageResult);
-      } catch {
-        // Listener might have disconnected
-      }
-    }
+    this.deliver(job, pageIndex, pageResult);
 
     // Check if job is complete
     if (job.completedPages.size >= job.expectedCount) {
@@ -1196,19 +1195,10 @@ export class BooksService {
     const job = placeholderJob;
     job.expectedCount = uncachedPages.length;
 
-    // 3. Inner notify: direct delivery to original caller + latecomers.
+    // 3. Inner notify: record completion + fan-out through the shared deliver() sink.
     const notify = (pageIndex: number, result: PageResult) => {
       job.completedPages.set(pageIndex, result);
-      // Direct, synchronous delivery to original SSE caller
-      try { job.originalListener?.(pageIndex, result); } catch { /* listener may be gone */ }
-      // Fan-out to latecomers who attached to this job
-      for (const l of job.listeners) {
-        try {
-          l(pageIndex, result);
-        } catch {
-          /* listener may be gone */
-        }
-      }
+      this.deliver(job, pageIndex, result);
     };
 
     // 4. Start background MIT processing
