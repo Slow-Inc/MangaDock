@@ -34,7 +34,7 @@ from .model_lifecycle import ModelLifecycle
 from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
 from .stage_runner import run_stage
-from .patch_geometry import build_local_region, create_text_only_mask, crop_mask_for_patch
+from .patch_geometry import build_local_region, create_text_only_mask, crop_mask_for_patch, union_refined_with_fallback
 from .patch_renderer import PatchRenderer
 from .batch_orchestration import placeholder_context, build_page_translation_record
 from .stages import (
@@ -1464,10 +1464,30 @@ class MangaTranslator:
         _PATCH_CONCURRENCY = int(os.environ.get('PATCH_CONCURRENCY', '3'))
         _sem = asyncio.Semaphore(_PATCH_CONCURRENCY)
 
+        # Full-page inpaint (clean text removal): inpaint the WHOLE page once so every
+        # patch's background matches full-page quality. Per-region crop inpainting starves
+        # LaMa's global (FFC) branch of context and leaves a gray blob where large text sat
+        # over complex/dark art; the full-page inpaint reconstructs it cleanly (matching the
+        # upstream full-page path). Off → per-crop inpaint (byte-identical).
+        full_inpainted = None
+        if getattr(config.inpainter, 'full_page_inpaint', False):
+            try:
+                ctx.text_regions = regions
+                full_mask = await self._run_mask_refinement(config, ctx)
+                text_only = create_text_only_mask(img_h, img_w, regions)
+                ctx.mask = (union_refined_with_fallback(full_mask, text_only)
+                            if full_mask is not None else text_only)
+                full_inpainted = await self._run_inpainting(config, ctx)
+                logger.info('[PatchTranslate] full-page inpaint done — patches reuse it')
+            except Exception:
+                logger.warning(f"[PatchTranslate] full-page inpaint failed, per-crop fallback:\n{traceback.format_exc()}")
+                full_inpainted = None
+
         renderer = PatchRenderer(
             self, ctx, config,
             pad=pad, render_extra=render_extra, img_w=img_w, img_h=img_h,
             source_icc=source_icc, sem=_sem, logger=logger,
+            full_inpainted=full_inpainted,
         )
 
         # Fire all groups concurrently (semaphore gates GPU work)

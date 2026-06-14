@@ -38,9 +38,14 @@ from .utils.patch_png import encode_patch_png
 
 class PatchRenderer:
     def __init__(self, driver, ctx, config, *, pad, render_extra,
-                 img_w, img_h, source_icc, sem, logger):
+                 img_w, img_h, source_icc, sem, logger, full_inpainted=None):
         self.driver = driver
         self.ctx = ctx
+        # When set (HxWx3 RGB), the whole page was inpainted ONCE upstream; each group
+        # slices its clean background from it and skips per-crop mask refinement +
+        # inpaint. Per-crop inpainting starves LaMa's global (FFC) branch of page
+        # context and leaves a gray blob where large text sat over complex/dark art.
+        self.full_inpainted = full_inpainted
         self.pad = pad
         self.render_extra = render_extra
         self.img_w = img_w
@@ -110,67 +115,76 @@ class PatchRenderer:
             patch_ctx.img_rgb = crop_rgb
             patch_ctx.img_alpha = None
             patch_ctx.text_regions = local_regions
-            text_only_mask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
-            raw_mask_source = ctx.mask_raw if ctx.mask_raw is not None else ctx.mask
-            if raw_mask_source is not None:
-                patch_ctx.mask_raw = crop_mask_for_patch(
-                    raw_mask_source, x1, y1, x2, y2, img_h, img_w,
-                )
-            else:
-                patch_ctx.mask_raw = text_only_mask
             patch_ctx.mask = None
 
-            # --- GPU-bound: use semaphore to limit concurrency ---
-            async with _sem:
-                try:
-                    patch_ctx.mask = await driver._run_mask_refinement(config, patch_ctx)
-                    if patch_ctx.mask is None:
-                        patch_ctx.mask = text_only_mask
-                    else:
-                        # #248: keep the tight CRF mask; only fall back to the
-                        # dilated text_only_mask where refinement missed a region
-                        # entirely — no fat halo for LaMa to over-erase.
-                        patch_ctx.mask = union_refined_with_fallback(patch_ctx.mask, text_only_mask)
-                except Exception as e:
-                    logger.warning(
-                        f"[PatchTranslate] mask refinement failed for group ({x1},{y1},{x2},{y2}) "
-                        f"[{type(e).__name__}]: using text-only fallback mask"
+            if self.full_inpainted is not None:
+                # Reuse the one-time full-page inpaint: LaMa saw the whole page, so the
+                # background reconstructs cleanly even where large text sat over complex/
+                # dark art (no per-crop gray blob). Slice this crop's clean background and
+                # skip the per-crop mask refinement + inpaint entirely.
+                patch_ctx.img_inpainted = np.ascontiguousarray(
+                    self.full_inpainted[y1:y2, x1:x2].copy())
+            else:
+                text_only_mask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
+                raw_mask_source = ctx.mask_raw if ctx.mask_raw is not None else ctx.mask
+                if raw_mask_source is not None:
+                    patch_ctx.mask_raw = crop_mask_for_patch(
+                        raw_mask_source, x1, y1, x2, y2, img_h, img_w,
                     )
-                    patch_ctx.mask = text_only_mask
+                else:
+                    patch_ctx.mask_raw = text_only_mask
 
-                try:
-                    # #249: give LaMa a wider receptive field WITHOUT enlarging the
-                    # rendered patch. Inpaint a larger context crop (render rect +
-                    # inpaint_context_pad px), then slice the result back to the
-                    # render rect. The FFC global branch then has real background to
-                    # copy instead of a starved tight crop. 0 → tight crop,
-                    # byte-identical.
-                    ctx_pad = int(getattr(config.inpainter, 'inpaint_context_pad', 0) or 0)
-                    if ctx_pad > 0:
-                        ix1, iy1, ix2, iy2, ox, oy = expand_inpaint_crop(
-                            x1, y1, x2, y2, img_h, img_w, ctx_pad)
-                        rh, rw = y2 - y1, x2 - x1
-                        large_rgb = np.ascontiguousarray(ctx.img_rgb[iy1:iy2, ix1:ix2].copy())
-                        large_mask = np.zeros((iy2 - iy1, ix2 - ix1), dtype=np.uint8)
-                        large_mask[oy:oy + rh, ox:ox + rw] = patch_ctx.mask
-                        render_rgb, render_mask = patch_ctx.img_rgb, patch_ctx.mask
-                        # finally-restore so a failed inpaint can't leak the larger
-                        # crop/mask into the render step (which expects render-rect size).
-                        try:
-                            patch_ctx.img_rgb, patch_ctx.mask = large_rgb, large_mask
-                            large_inpainted = await driver._run_inpainting(config, patch_ctx)
-                        finally:
-                            patch_ctx.img_rgb, patch_ctx.mask = render_rgb, render_mask
-                        patch_ctx.img_inpainted = np.ascontiguousarray(
-                            large_inpainted[oy:oy + rh, ox:ox + rw])
-                    else:
-                        patch_ctx.img_inpainted = await driver._run_inpainting(config, patch_ctx)
-                except Exception as e:
-                    logger.warning(
-                        f"[PatchTranslate] inpainting failed for group ({x1},{y1},{x2},{y2}) "
-                        f"[{type(e).__name__}]: using original crop"
-                    )
-                    patch_ctx.img_inpainted = crop_rgb
+                # --- GPU-bound: use semaphore to limit concurrency ---
+                async with _sem:
+                    try:
+                        patch_ctx.mask = await driver._run_mask_refinement(config, patch_ctx)
+                        if patch_ctx.mask is None:
+                            patch_ctx.mask = text_only_mask
+                        else:
+                            # #248: keep the tight CRF mask; only fall back to the
+                            # dilated text_only_mask where refinement missed a region
+                            # entirely — no fat halo for LaMa to over-erase.
+                            patch_ctx.mask = union_refined_with_fallback(patch_ctx.mask, text_only_mask)
+                    except Exception as e:
+                        logger.warning(
+                            f"[PatchTranslate] mask refinement failed for group ({x1},{y1},{x2},{y2}) "
+                            f"[{type(e).__name__}]: using text-only fallback mask"
+                        )
+                        patch_ctx.mask = text_only_mask
+
+                    try:
+                        # #249: give LaMa a wider receptive field WITHOUT enlarging the
+                        # rendered patch. Inpaint a larger context crop (render rect +
+                        # inpaint_context_pad px), then slice the result back to the
+                        # render rect. The FFC global branch then has real background to
+                        # copy instead of a starved tight crop. 0 → tight crop,
+                        # byte-identical.
+                        ctx_pad = int(getattr(config.inpainter, 'inpaint_context_pad', 0) or 0)
+                        if ctx_pad > 0:
+                            ix1, iy1, ix2, iy2, ox, oy = expand_inpaint_crop(
+                                x1, y1, x2, y2, img_h, img_w, ctx_pad)
+                            rh, rw = y2 - y1, x2 - x1
+                            large_rgb = np.ascontiguousarray(ctx.img_rgb[iy1:iy2, ix1:ix2].copy())
+                            large_mask = np.zeros((iy2 - iy1, ix2 - ix1), dtype=np.uint8)
+                            large_mask[oy:oy + rh, ox:ox + rw] = patch_ctx.mask
+                            render_rgb, render_mask = patch_ctx.img_rgb, patch_ctx.mask
+                            # finally-restore so a failed inpaint can't leak the larger
+                            # crop/mask into the render step (which expects render-rect size).
+                            try:
+                                patch_ctx.img_rgb, patch_ctx.mask = large_rgb, large_mask
+                                large_inpainted = await driver._run_inpainting(config, patch_ctx)
+                            finally:
+                                patch_ctx.img_rgb, patch_ctx.mask = render_rgb, render_mask
+                            patch_ctx.img_inpainted = np.ascontiguousarray(
+                                large_inpainted[oy:oy + rh, ox:ox + rw])
+                        else:
+                            patch_ctx.img_inpainted = await driver._run_inpainting(config, patch_ctx)
+                    except Exception as e:
+                        logger.warning(
+                            f"[PatchTranslate] inpainting failed for group ({x1},{y1},{x2},{y2}) "
+                            f"[{type(e).__name__}]: using original crop"
+                        )
+                        patch_ctx.img_inpainted = crop_rgb
 
             # --- CPU-bound: rendering + PNG encode (outside semaphore) ---
             patch_ctx.img_rgb = patch_ctx.img_inpainted

@@ -23,13 +23,14 @@ def test_centered_box_places_an_axis_aligned_block_on_the_region_center():
         (80.0, 90.0), (120.0, 90.0), (120.0, 110.0), (80.0, 110.0)]
 
 
-def test_clean_wrap_width_turns_a_vertical_column_into_a_horizontal_block():
+def test_clean_wrap_width_clamps_the_reference_width_to_the_page():
     from manga_translator.render_overlap import clean_wrap_width
-    # tall/narrow JP column (100×400) on an 800px page → wrap to the wider extent,
-    # clamped to ≤45% of the page so it stays a compact horizontal block.
-    assert clean_wrap_width(100, 400, 800) == 360          # max(100,400,80) → 400, clamped to 360
-    # tiny region → floored to 10% of the page so it doesn't wrap one word per line.
-    assert clean_wrap_width(50, 50, 800) == 80
+    # Wrap to the supplied reference width (the original footprint — a narration column's
+    # own width, or a dialogue balloon's width) so the English breaks where the original
+    # did instead of reflowing into a wide novel-like paragraph.
+    assert clean_wrap_width(120, 800) == 120               # narrow narration column → narrow wrap
+    assert clean_wrap_width(30, 800) == 88                 # very narrow strip → floored to 11% (88)
+    assert clean_wrap_width(500, 800) == 360               # wide caption → capped at 45% (360)
 
 
 # ---- apply_font_cap: keep narration/dialogue small, exempt SFX ------------------

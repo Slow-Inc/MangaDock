@@ -382,6 +382,12 @@ class InpainterConfig(BaseModel):
     of the render rect, then slice the result back, so LaMa's FFC global branch sees
     real background instead of a starved tight crop (cleaner fill on textured pages).
     Peak VRAM is bounded by min(crop, inpainting_size)². 0 → tight crop (byte-identical)."""
+    full_page_inpaint: bool = False
+    """Patch path only: inpaint the WHOLE page once (like the full-page renderer) and
+    slice each patch's background from it, instead of inpainting per-region crops. LaMa
+    sees the entire page → clean reconstruction even where large text sat over complex/
+    dark art (a small crop starves its global branch → a gray blob). One inpaint per page
+    (often faster than N per-group inpaints). Off → per-crop inpaint (byte-identical)."""
 
 class ColorizerConfig(BaseModel):
     colorization_size: int = 576
