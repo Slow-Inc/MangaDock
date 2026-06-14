@@ -15,6 +15,48 @@
 
 ---
 
+## 2026-06-14 — Backend `books.service.ts` decomposition: MIT translation carve (#233 + #234)
+
+**What & where:** Carved the MIT translation subsystem out of the `Backend/src/books/books.service.ts` god object (PRD #228) into focused, individually unit-testable modules: `mit-translation.service.ts` (single-page), `mit-batch-orchestrator.service.ts` (batch state machine), `mit-config.ts` + `mit-lang-map.ts` (pure key/config/lang helpers). · **Branch:** `dept/backend` (off `origin/main`), 8 commits, **not yet pushed/PR'd**. · **Method:** byte-identical, characterization-first, 1 seam = 1 commit (TDD per seam).
+
+**Why:** `books.service.ts` was a 1834-line god file; the single-page and batch MIT paths were untestable except through the whole service, and carried a dead Redis pub/sub limb whose flaky tests were the entire 16-failure baseline.
+
+### Shipped — seams (byte-identical unless noted)
+- **#233** carve `MitTranslationService` — single-page `translateMangaPagePatches` + retry loop, MIT health, image-translator probe — `a941a4c`
+- **#234 S5a** drop dead batch Redis pub/sub (no-op subscribe; single-node) + **ADR-002** + retire `books-pubsub-batch.spec.ts` — `e0f6add`, `4f04c51`
+- **#234 S5b** unify 3 fan-out blocks → one `deliver()` — `42b4e90`
+- **#234 S5c** unify 2 completion sites → one `maybeComplete()` — `7bdc118`
+- **#234 S5-pre** move pure MIT helpers → `mit-config.ts`/`mit-lang-map.ts` (break value-import cycle) — `4a155d7`
+- **#234 S5e** carve `MitBatchOrchestrator` state machine — `c1daa07`
+- **#234 S5d** fix latecomer-listener leak on job reject + `finalize()` teardown (**behaviour fix**) — `c29dbc1`
+
+### Before → After (full fields)
+| field | before | after |
+|---|---|---|
+| books.service.ts LOC | 1834 | 841 (−54%) |
+| MIT translation modules | 1 (god file) | 4 focused + `MitClient` (#230) |
+| backend test suite | 192 pass / **16 fail** | **513 pass / 0 fail** |
+| single-page path testability | fake `global.fetch` only | faked `MitClient` (unit) |
+| batch state machine testability | only via BooksService | `MitBatchOrchestrator` direct |
+| batch fan-out blocks | 3 hand-rolled copies | 1 `deliver()` |
+| batch completion sites | 2 (webhook logged, stream silent — drift) | 1 `maybeComplete()` |
+| batch Redis pub/sub | publish ×2 + no-op subscribe (dead) | removed (single-node; ADR-002) |
+| latecomer listener on job reject | leaked (post-await delete skipped) | drained (try/finally + `finalize()`) |
+
+**Performance Δ:** books test suite ~63s → ~13s after the 16 Redis-timeout tests were retired (S5a). Runtime translation latency: unchanged (byte-identical). One fewer dead Redis publish per page (negligible).
+
+**Quality:** byte-identical on every seam except **S5d** (the only behaviour change — isolated to its own commit with a red→green repro test). BooksService keeps thin public delegators with unchanged signatures → SSE batch endpoint + MIT webhook controller unchanged. `persistPage`/`seriesContextFor` stay in BooksService, injected into both new services; the single-page translate is injected into the orchestrator **late-bound** so the `books-retry` spy still observes the batch retry path.
+
+**Validation:** `npm run build` (whole backend, tsc) clean after every seam (cross-module ripple guard). Full backend suite **513 pass / 0 fail** (54 suites); the books characterization net (batch-registry/cancel/progress/webhook/retry, image-model, series-context, mit-config) green throughout = byte-identical proof. **Code review:** 5-agent fan-out (line-by-line / removed-behaviour / cross-file / cleanup / altitude) for #233+S5a–S5c → 0 correctness bugs (1 altitude finding: the value-import cycle, fixed by S5-pre). The carve (S5-pre/S5e/S5d) reviewed by **exact whitespace-normalised byte-comparison** (agents hit a session limit) — all 7 moved helpers + 8/9 batch methods proven byte-identical to the original (the 9th = `startOrAttachBatchJob`, intentionally changed by S5d); only textual deltas elsewhere are prettier trailing-commas → **0 correctness bugs**. **Not run:** frontend E2E translation parity (`feedback_test_every_round`) — change is byte-identical so original↔translated output is unchanged by construction; recommend a confirmatory E2E pass before/with the epic PR merge.
+
+**Risk / rollback:** Low. Byte-identical decomposition; each seam is its own revertible commit. The one behaviour change (S5d) only touches the reject/timeout cleanup path (repro-tested). Redis removal (S5a) is single-node only — re-introduce a real subscriber + multi-node test when sharding (ADR-002). 12 commits unpushed on `dept/backend`.
+
+**Open follow-ups:** open the epic #228 PR → main; close issues #229/#230/#232/#233/#234 on merge; cosmetic — `PatchEntry` type declared in 3 files, `persistPage` param type duplicated (mit-translation + orchestrator), `books-mit-config.spec` describe "BooksService.buildMitConfig" now tests via `.batch`; confirmatory frontend E2E parity pass.
+
+**Links:** #228 (parent), #229/#230/#232/#233/#234 · ADR-002 (`docs/adr/002-drop-batch-redis-pubsub.md`) · commits `a941a4c e0f6add 4f04c51 42b4e90 7bdc118 4a155d7 c1daa07 c29dbc1`.
+
+---
+
 ## 2026-06-13 — PRD#1: Backend security hardening (Turnstile/HWID guards) — #223 (#224–#227)
 
 **Severity:** major (cost-bleed + information-disclosure on the expensive MIT surface) · **Branch:** `dept/backend` (off `origin/main`), 4 PRD steps + 2 post-review fixes, not yet PR'd. Derived from the read-only Backend security audit in issue #223. **TDD throughout** (RED→GREEN per step); `/security-review` on the full diff returned **no findings ≥0.7** — a later high-recall `/code-review` of the rebased branch surfaced + fixed 2 more (CR#1/CR#2 below).
