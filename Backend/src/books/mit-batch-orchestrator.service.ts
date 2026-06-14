@@ -444,8 +444,14 @@ export class MitBatchOrchestrator {
       existing.listeners.add(listener);
       existing.activeCallerCount++;
       this.logger.log(`[BatchRegistry] job=${jobKey} attached to running job`);
-      await existing.promise;
-      existing.listeners.delete(listener);
+      try {
+        await existing.promise;
+      } finally {
+        // #234 S5d: drain even if the job rejected (15-min timeout / abort) —
+        // the post-await delete used to be skipped on reject, leaking this
+        // latecomer's listener.
+        existing.listeners.delete(listener);
+      }
       return;
     }
 
@@ -573,13 +579,24 @@ export class MitBatchOrchestrator {
       await promise;
     } finally {
       clearTimeout(timeoutHandle);
-      job.originalListener = undefined;
-      if (this.activeBatchJobs.get(jobKey) === job) {
-        this.activeBatchJobs.delete(jobKey);
-        this.logger.log(
-          `[BatchRegistry] job=${jobKey} completed & removed from registry`,
-        );
-      }
+      this.finalize(jobKey, job);
+    }
+  }
+
+  /** Single teardown for a finished/failed job (#234 S5d): drop the original-caller
+   *  reference, drain any remaining latecomer listeners, zero the caller count, and
+   *  remove the job from the registry. Called from the owner's finally on BOTH
+   *  resolve and reject (timeout/abort), so neither path can leak listeners or leave
+   *  the registry / caller count inconsistent. */
+  private finalize(jobKey: string, job: BatchJobState): void {
+    job.originalListener = undefined;
+    job.listeners.clear();
+    job.activeCallerCount = 0;
+    if (this.activeBatchJobs.get(jobKey) === job) {
+      this.activeBatchJobs.delete(jobKey);
+      this.logger.log(
+        `[BatchRegistry] job=${jobKey} completed & removed from registry`,
+      );
     }
   }
 
