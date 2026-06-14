@@ -11,6 +11,7 @@ import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storag
 import { PatchStore } from './patch-store';
 import { TranslationMemoryRepository, type TextLayerRegion } from './translation-memory.repository';
 import { MitClient } from './mit-client';
+import { MitTranslationService } from './mit-translation.service';
 import { loadPageBytes } from './page-source';
 import { composeSeriesContext } from './series-context';
 import { RedisService } from '../cache/redis.service';
@@ -420,6 +421,10 @@ export class BooksService {
   /** Single owner of Patch Set files (#137) — deterministic names, legacy sweep. */
   private readonly patchStore: PatchStore;
   private readonly translationMemory: TranslationMemoryRepository;
+  /** Single-page MIT translation + health/probe (#233). Constructed here (like
+   *  PatchStore) so it shares this service's MitClient/cache and the #232/#157
+   *  persist/series-context helpers, keeping the dependency one-way. */
+  private readonly mitTranslation: MitTranslationService;
 
   constructor(
     private readonly mangaDex: MangaDexService,
@@ -437,6 +442,13 @@ export class BooksService {
     // #160: translation memory rides the already-injected service-role client;
     // best-effort, so a missing/broken Supabase never affects translation.
     this.translationMemory = new TranslationMemoryRepository(this.supabase);
+    // #233: single-page MIT path delegates here. persistPage (#232) + seriesContextFor
+    // (#157) stay in BooksService — shared with the batch/webhook path — and are
+    // injected as callbacks so the dependency stays one-way (no circular DI).
+    this.mitTranslation = new MitTranslationService(this.mitClient, this.cache, {
+      persistPage: (p) => this.persistPage(p),
+      seriesContextFor: (mangaId) => this.seriesContextFor(mangaId),
+    });
   }
 
   onModuleInit(): void {
@@ -785,28 +797,11 @@ export class BooksService {
   }
 
   /** Cache for getImageTranslator() — one MIT round-trip per minute at most. */
-  private imageTranslatorCache: { value: string | null; expiresAt: number } | null = null;
-
   /** The translator family MIT actually runs (from /ready, #132) — e.g. 'qwen3'
    *  or 'gemini'. null when MIT is down, not ready, or predates #132; consumers
-   *  treat null as "unknown" (Reader fails open — PRD #131). */
+   *  treat null as "unknown" (Reader fails open — PRD #131). #233: delegated. */
   async getImageTranslator(): Promise<string | null> {
-    const now = Date.now();
-    if (this.imageTranslatorCache && now < this.imageTranslatorCache.expiresAt) {
-      return this.imageTranslatorCache.value;
-    }
-    let value: string | null = null;
-    try {
-      const res = await this.mitClient.ready(3_000);
-      if (res.ok) {
-        const body = (await res.json()) as { translator?: unknown };
-        value = typeof body?.translator === 'string' && body.translator ? body.translator : null;
-      }
-    } catch {
-      /* MIT down — degrade to unknown */
-    }
-    this.imageTranslatorCache = { value, expiresAt: now + 60_000 };
-    return value;
+    return this.mitTranslation.getImageTranslator();
   }
 
   /** Payload for GET /books/models (#133): the Gemini catalog the Reader can
@@ -1039,15 +1034,9 @@ export class BooksService {
 
   // ─── Manga page image translation (manga-image-translator) ──────────────────
 
+  // #233: delegated to MitTranslationService (signature unchanged for callers).
   async checkMitHealth(): Promise<{ available: boolean; url: string; message?: string }> {
-    const url = this.mitClient.baseUrl;
-    try {
-      const res = await this.mitClient.ready(5_000);
-      return { available: res.ok, url };
-    } catch (err) {
-      this.logger.warn(`[MangaTranslate] Health check failed: ${String(err)}`);
-      return { available: false, url, message: String(err) };
-    }
+    return this.mitTranslation.checkMitHealth();
   }
 
   
@@ -1060,98 +1049,17 @@ export class BooksService {
     targetLang?: string,
     opts?: { maxStartupRetries?: number; imageModel?: string; derivative?: 'hd' | 'saver'; mangaId?: string },
   ): Promise<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }> {
-    if (!chapterId || !pageUrl) {
-      throw new Error('chapterId and pageUrl are required');
-    }
-
-    const { srcMIT, tgtMIT } = this.mitLangPair(sourceLang, targetLang);
-    const cacheKey = this.patchCacheKey(chapterId, pageIndex, srcMIT, tgtMIT, opts?.imageModel, opts?.derivative ?? 'hd');
-    const cached = await this.cache.get<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }>(cacheKey);
-    if (cached?.data?.patches) {
-      return cached.data;
-    }
-
-    // Load the source page — display-derivative aware (#156): /img-cache paths
-    // are read straight from disk so the patch is generated from byte-identical
-    // content to what the Reader displays; external URLs are fetched.
-    const imgBuffer = await loadPageBytes(pageUrl, { imgCacheRoot: 'img-cache', uploadsRoot: 'uploads' });
-
-    const config = this.buildMitConfig(srcMIT, tgtMIT, sourceLang ?? '', opts?.imageModel, await this.seriesContextFor(opts?.mangaId));
-
-    const maxStartupRetries = opts?.maxStartupRetries ?? 30;
-    const startupRetryDelayMs = 5_000;
-
-    let mitRes: Response | null = null;
-    let lastErrText = '';
-
-    for (let attempt = 0; attempt <= maxStartupRetries; attempt += 1) {
-      const form = new FormData();
-      form.append('image', new Blob([new Uint8Array(imgBuffer)], { type: 'image/jpeg' }), 'page.jpg');
-      form.append('config', config);
-
-      try {
-        mitRes = await this.mitClient.submitSinglePage(form, 300_000);
-      } catch (err) {
-        const msg = String(err);
-        if (msg.includes('ECONNREFUSED') || msg.includes('fetch failed')) {
-          throw new Error(`manga-image-translator service unavailable`);
-        }
-        if (msg.includes('AbortError') || msg.includes('abort') || msg.includes('timed out')) {
-          throw new Error(`manga-image-translator timed out after 5 minutes`);
-        }
-        throw err;
-      }
-
-      if (mitRes.ok) break;
-
-      const errText = await mitRes.text().catch(() => '');
-      lastErrText = errText;
-      this.logger.warn(`[MangaPatches] MIT HTTP ${mitRes.status} body: ${errText.slice(0, 300)}`);
-
-      if (mitRes.status !== 500 || attempt === maxStartupRetries) {
-        throw new Error(`manga-image-translator error: HTTP ${mitRes.status} — ${errText.slice(0, 200)}`);
-      }
-
-      this.logger.warn(
-        `[MangaPatches] MIT not ready (attempt ${attempt + 1}/${maxStartupRetries + 1}), retrying in ${startupRetryDelayMs / 1000}s`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, startupRetryDelayMs));
-    }
-
-    if (!mitRes || !mitRes.ok) {
-      throw new Error(`manga-image-translator error: startup retries exhausted — ${lastErrText.slice(0, 200)}`);
-    }
-
-    const patchData = (await mitRes.json()) as {
-      img_width: number;
-      img_height: number;
-      patches: Array<{ x: number; y: number; w: number; h: number; img_b64: string }>;
-    };
-
-    // Persist the Patch Set via PatchStore (#137 — deterministic names, no orphans)
-    const { img_width: imgW, img_height: imgH } = patchData;
-    // #232: shared per-page persist — PatchStore write + percent-map + tiered cache.
-    const patches = await this.persistPage({
+    // #233: single-page flow lives in MitTranslationService. Kept as a delegator so
+    // the controller and the internal batch/retry callers (which spy on this method)
+    // are byte-identical.
+    return this.mitTranslation.translateMangaPagePatches(
       chapterId,
       pageIndex,
-      srcMIT,
-      tgtMIT,
-      storeModel: this.imageModelKey(opts?.imageModel),
-      cacheKey,
-      cacheStrategy: 'tiered',
-      rects: patchData.patches,
-      buffers: patchData.patches.map((p) => Buffer.from(p.img_b64, 'base64')),
-      imgW,
-      imgH,
-    });
-
-    const result = { patches };
-
-    this.logger.log(
-      `[MangaPatches] chapter=${chapterId} page=${pageIndex} → ${patches.length} patches`,
+      pageUrl,
+      sourceLang,
+      targetLang,
+      opts,
     );
-
-    return result;
   }
 
   /**
