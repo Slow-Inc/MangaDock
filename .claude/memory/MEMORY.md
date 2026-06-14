@@ -5,6 +5,8 @@
 - [Project: Cache Quality Gaps](project_cache_quality_gaps.md) — จุดอ่อนที่รู้ตัวหลัง Phase 2: redis.service under-tested, ไม่มี integration test, dead-letter ไม่มี runbook
 - [Project: Backend pre-existing test failures](project_backend_pre_existing_test_failures.md) — books suite มี 16 fail (14 pubsub-batch + 2 hmac) ที่ค้างมาก่อน อย่าไล่เป็น regression
 - [Project: Dev machine commit memory ตึง](project_dev_commit_memory.md) — Qwen3 โหลดพังด้วย OSError 1455 ถ้า commit เหลือ <15GB; MIT worker ตายเงียบ → เช็คก่อนทดสอบ translator
+- [Project: MIT worker restart gotcha](project_mit_worker_restart_gotcha.md) — process = python3.11.exe (Stop-Process python พลาด); kill by PORT OWNER บน 5003+5004 ไม่งั้น orphan worker เสิร์ฟโค้ดเก่า; debug pipeline ใช้ in-process ไม่ใช่ worker-HTTP
+- [Reference: MangaTranslator study](project_mangatranslator_study.md) — **pointer** ไป deep-scan ตัวจริงใน `docs/research/` (translator-deep-dissection ฯลฯ); headline: OCR=LLM-vision, inpaint=Flux, seg=SAM2/3, detect=YOLO; gap เรา=inpaint LaMa<Flux+ไม่มี SAM (Flux/SAM จงใจไม่เอา เครื่องตึง); re-verify: Flux sd.cpp→diffusers
 - [Feedback: บันทึก MD เป็น history](feedback_md_history_log.md) — แก้โค้ด/ทำ feature เสร็จ ให้ log ลง DONE.md (+PIPELINE.md §5 สำหรับ MIT) ทุกครั้ง
 - [Feedback: test ทุกรอบ รวม frontend](feedback_test_every_round.md) — จบงานทุกชิ้นต้อง test ครบ unit + frontend E2E (Playwright tunnel) เทียบ original↔แปล ไม่ใช่แค่ unit
 - [Feedback: ล้าง cache ก่อน test](feedback_clear_cache_before_test.md) — E2E การแปลต้องล้าง 3 ชั้น + browser ก่อน; หลัง deploy fix ต้องล้าง L3 + reload browser ด้วย ไม่งั้น replay ของเก่า
@@ -14,7 +16,7 @@
 - [Project: Render knob gating](project_render_knob_gating.md) — in-app render ดีต่อเมื่อ backend ตั้ง MIT_* ครบ; MIT_BUBBLE_AREA_FIT gate #166/#179 (ไม่ตั้ง=legacy overflow); วิธี drive benchmark E2E ผ่าน MCP_DOCKER
 - [Project: AnimeText approved](project_animetext_approved.md) — user อนุมัติ download deepghs/AnimeText_yolo (#168 SFX) 2026-06-09; .pt gate ผ่านเฉพาะ model นี้
 - [Feedback: tech-debt ต้องคิด scenario ครบ](feedback_techdebt_all_scenarios.md) — refactor core/shared module ต้องสร้าง characterization net ครอบทุก scenario ก่อนแตะโค้ด (core error = กระทบทั้งระบบ)
-- [Feedback: impact report](feedback_impact_report.md) — ปิด issue/เปิด PR ต้องเขียน report เสมอ: bug→post-mortem-template, feature/refactor→full-field change record (before→after/perf/quality/validation) ลง docs/reports/system-impact-report.md
+- [Feedback: impact report + ADR](feedback_impact_report.md) — ปิด issue/เปิด PR ต้องเขียน report เสมอ: bug→post-mortem-template, feature/refactor→full-field change record (before→after/perf/quality/validation) ลง docs/reports/system-impact-report.md; **+ ADR (docs/adr/NNN) บังคับสำหรับทุก change ที่กระทบคุณภาพ/perf หรือ decision ไม่เล็ก; decision ที่ overturn ของเก่า → mark old ADR Superseded**
 - [Feedback: core boundary](feedback_core_boundary.md) — feature ใหม่เสียบที่ seam + มี test ห้ามโตเข้า core monolith/copy boilerplate; ไม่มี seam ต้องแตก seam ก่อน (กัน tech debt ทวีคูณแบบ LINE); priority debt = core decomposition #188→#187
 - [Project: MIT refactor resume](project_mit_refactor_resume.md) — RESUME POINT เดียวของ decomposition #187/#188 = docs/reports/mit-refactor-progress.md (seam S1-S26 status + landmines); อ่านก่อนทำต่อ ไม่ต้องสำรวจใหม่
 - [Project: MIT launch env](project_mit_launch_env.md) — รัน MIT ต้องใช้ MIT/.venv (cu121 CUDA) ไม่ใช่ Store python (cpu) ไม่งั้น worker ค้าง /ready 503; poll /ready ไม่ใช่ /health; direct render E2E ผ่าน POST /translate/with-form/image เลี่ยง auth
@@ -22,3 +24,5 @@
 - [Feedback: issue ownership scope](feedback_issue_ownership_scope.md) — ทำเฉพาะ issues ที่เราเปิด (author xenodeve) หรือ tag ready-for-agent; ของ akkanop-x (#205/206/207/210/212/177, R2 #214) และ Mobile (CableMoMo2027) = log ของเขา อย่า implement
 - [Feedback: review+merge policy](feedback_review_merge_policy.md) — auto-merge PR เมื่อ CodeQL เขียว + 0 new fail แต่ **ต้อง review ด้วย skill /scrutinize ก่อน merge เสมอ**
 - [Reference: Frontend UI Libraries](reference_frontend_ui_libraries.md) — shadcn (UI primitives/Radix) vs React Bits (WebGL/GLSL effects); MCP setup และ pattern การใช้คู่กัน
+- [Project: Benchmark E2E flow](project_benchmark_e2e_flow.md) — รัน One-Punch benchmark E2E ผ่าน tunnel hayateotsu.space (Reader → อ่านตอน Benchmark → แปล→EN) + cache gotcha (re-translate ติด cache หลายชั้น → ใช้ direct render POST /translate); knobs ใน .env
+- [Project: cache:reset ordering](project_cache_reset_ordering.md) — Reader E2E ของ **code change** (renderConfigHash ไม่ขยับ) ต้อง **kill backend ก่อน → cache:reset → relaunch** ไม่งั้น L1 re-flush L3 กลับ (เห็น 3ms cached เก่าแทน 30-40s fresh); direct /translate/with-form/image เลี่ยง cache ได้

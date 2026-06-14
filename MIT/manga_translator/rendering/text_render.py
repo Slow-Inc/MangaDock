@@ -23,6 +23,27 @@ try:
 except ImportError:
     _HAS_PYTHAINLP = False
 
+# ── Chinese word segmentation (optional) ─────────────────────────────────────
+_CJK_RE = re.compile(r'[一-鿿㐀-䶿]')   # CJK Unified Ideographs (Simplified + Traditional)
+try:
+    import jieba as _jieba
+    _HAS_JIEBA = True
+except ImportError:
+    _HAS_JIEBA = False
+
+
+def _insert_cjk_word_breaks(text: str) -> str:
+    """If text contains Chinese ideographs, segment it with jieba and insert zero-width spaces
+    between tokens so calc_horizontal wraps on word boundaries instead of breaking mid-word.
+    Chinese has no spaces, so without this the wrapper falls back to a per-character split."""
+    if not _HAS_JIEBA or not _CJK_RE.search(text):
+        return text
+    try:
+        tokens = [t for t in _jieba.cut(text, cut_all=False) if t.strip()]
+        return _ZWSP.join(tokens) if len(tokens) > 1 else text
+    except Exception:
+        return text
+
 
 # Thai non-spacing marks that must never start a line: they attach to the
 # preceding base consonant (above/below vowels + tone marks). Splitting between
@@ -828,6 +849,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     # Pre-segment Thai text with zero-width spaces so wrapping can occur on
     # word boundaries without adding visible spaces to final rendered output.
     text = _insert_thai_word_breaks(text)
+    text = _insert_cjk_word_breaks(text)
     has_zwsp_breaks = _ZWSP in text
     max_width = max(max_width, 2 * font_size)
 

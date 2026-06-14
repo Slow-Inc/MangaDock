@@ -186,6 +186,42 @@ def test_process_group_full_page_inpaint_skips_per_crop_mask_and_inpaint():
     assert set(result) == {'x', 'y', 'w', 'h', 'img_png'}
 
 
+# ---- #268: luminance re-ground pulls the masked inpaint toward the local surround ----
+
+def test_process_group_regrounds_inpaint_when_knob_on():
+    """With lama_lum_reground>0 the inpaint's masked region is pulled toward the local
+    original surround before the text is drawn; off → the inpaint level is left as-is."""
+    import logging
+
+    def dark_inpaint(patch_ctx):
+        # simulate a LaMa fill ~30 levels off the 130 surround across the crop
+        return np.full_like(patch_ctx.img_rgb, 100)
+
+    def make(strength):
+        seen = {}
+        driver = FakeDriver(inpaint=dark_inpaint,
+                            render=lambda pctx: (seen.__setitem__('r', pctx.img_rgb.copy()), pctx.img_rgb)[1])
+
+        class Cfg:
+            class render:
+                bubble_area_fit = False
+                patch_feather_radius = 0
+            class inpainter:
+                inpaint_context_pad = 0
+                full_page_inpaint = False
+                lama_lum_reground = strength
+        page = np.full((200, 200, 3), 130, np.uint8)
+        ctx = type('C', (), {'img_rgb': page, 'mask_raw': None, 'mask': None})()
+        renderer = pr.PatchRenderer(
+            driver, ctx, Cfg, pad=40, render_extra=80, img_w=200, img_h=200,
+            source_icc=None, sem=asyncio.Semaphore(3), logger=logging.getLogger('test'))
+        _run(renderer.process_group(_group()))
+        return seen['r'][60:90, 60:90].mean()          # the masked text region
+
+    assert make(0.0) < 105                              # off → stays at the ~100 fill
+    assert make(1.0) > 118                              # on  → pulled toward the 130 surround
+
+
 # ---- #250: page-scaled font floor applied on a per-request config copy ---------
 
 def test_patch_renderer_floors_font_min_to_page_scale_on_a_config_copy():

@@ -16,6 +16,7 @@ import base64
 import io
 import logging
 import re
+import unicodedata
 from typing import Callable, Optional
 
 import numpy as np
@@ -23,12 +24,41 @@ from PIL import Image
 
 logger = logging.getLogger('manga_translator')
 
-_PROMPT = (
-    "This image is a cropped sound effect (SFX / onomatopoeia) from a Japanese manga panel. "
-    "Reply with ONLY the English onomatopoeia an official English manga translation would letter "
-    "in its place, matching the mood of the scene. 1-3 words, UPPERCASE, no quotes, no punctuation, "
-    "no explanation. If it is not a sound effect, reply with an empty line."
-)
+# Languages that letter SFX in Latin script (UPPERCASE convention). CJK/Thai/etc. use their own
+# script and have no case — mirrors the CJK-vs-Latin split in manga_translator.py.
+_LATIN_SFX_LANGS = {
+    'ENG', 'FRA', 'DEU', 'ESP', 'ITA', 'POR', 'NLD', 'POL', 'SWE', 'NOR', 'DAN', 'FIN',
+    'CES', 'ROM', 'HUN', 'TUR', 'IND', 'MSA', 'VIE', 'FIL', 'MAL',
+}
+_SFX_LANG_NAMES = {
+    'ENG': 'English', 'THA': 'Thai', 'CHS': 'Chinese', 'CHT': 'Chinese', 'KOR': 'Korean',
+    'JPN': 'Japanese', 'FRA': 'French', 'DEU': 'German', 'ESP': 'Spanish', 'VIE': 'Vietnamese',
+}
+# Explicit script instruction so the vision model writes the TARGET script, not the Japanese kana
+# of the source SFX (qwen-VL tends to echo Japanese onomatopoeia for a Chinese/Korean request).
+_SFX_SCRIPT_HINT = {
+    'THA': ' Write it in Thai script only.',
+    'CHS': ' Write it in Simplified Chinese characters (汉字) only, never Japanese kana.',
+    'CHT': ' Write it in Traditional Chinese characters (漢字) only, never Japanese kana.',
+    'KOR': ' Write it in Korean Hangul only, never Japanese kana.',
+}
+
+
+def build_sfx_prompt(target_lang: str = 'ENG') -> str:
+    """The vision prompt asking for an onomatopoeia in ``target_lang`` (e.g. 'THA' → Thai SFX).
+
+    For ENG (and Latin-script langs) it keeps the UPPERCASE lettering convention; for non-Latin
+    scripts (Thai/Chinese/Korean) it drops UPPERCASE since those scripts have no case and adds an
+    explicit script instruction. ENG output is byte-identical to the original hardcoded prompt."""
+    name = _SFX_LANG_NAMES.get(target_lang, 'English')
+    upper = 'UPPERCASE, ' if target_lang in _LATIN_SFX_LANGS else ''
+    return (
+        "This image is a cropped sound effect (SFX / onomatopoeia) from a Japanese manga panel. "
+        f"Reply with ONLY the {name} onomatopoeia an official {name} manga translation would letter "
+        f"in its place, matching the mood of the scene. 1-3 words, {upper}no quotes, no punctuation, "
+        "no explanation. If it is not a sound effect, reply with an empty line."
+        + _SFX_SCRIPT_HINT.get(target_lang, '')
+    )
 
 
 def _to_data_url(crop_rgb: np.ndarray) -> str:
@@ -38,17 +68,30 @@ def _to_data_url(crop_rgb: np.ndarray) -> str:
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def sanitize_sfx(raw: str) -> str:
-    """Reduce a model reply to a single lettered SFX token: first non-empty line,
-    keep letters/spaces/`-`/`!`, collapse spaces, UPPERCASE, cap at 24 chars.
+def sanitize_sfx(raw: str, target_lang: str = 'ENG') -> str:
+    """Reduce a model reply to a single lettered SFX token: first non-empty line, strip quotes/
+    punctuation, collapse spaces, cap at 24 chars. For Latin-script targets it keeps Latin (incl.
+    accented) letters and UPPERCASEs (byte-identical to the original ENG behaviour); for non-Latin
+    targets (Thai/Chinese/Korean) it keeps that script's letters and does not uppercase (no case).
     Returns '' for empty/refusal-ish replies."""
     if not raw:
         return ''
     line = next((l.strip() for l in raw.splitlines() if l.strip()), '')
-    line = re.sub(r'[^A-Za-zÀ-ɏ !\-]', ' ', line)   # letters (incl. accented) + space/!/-
-    line = re.sub(r'\s+', ' ', line).strip().upper()
-    if not line or line in ('NONE', 'N A', 'NA', 'EMPTY'):
-        return ''
+    if target_lang in _LATIN_SFX_LANGS:
+        line = re.sub(r'[^A-Za-zÀ-ɏ !\-]', ' ', line)   # letters (incl. accented) + space/!/-
+        line = re.sub(r'\s+', ' ', line).strip().upper()
+        if not line or line in ('NONE', 'N A', 'NA', 'EMPTY'):
+            return ''
+    else:
+        # Keep letters (L*) AND combining marks (M*) of any script — Thai vowels/tone marks are
+        # nonspacing marks that `\w` would strip, breaking the word — plus space/!/-; drop the rest.
+        line = ''.join(
+            c if (c in ' !-' or unicodedata.category(c)[0] in ('L', 'M')) else ' '
+            for c in line
+        )
+        line = re.sub(r'\s+', ' ', line).strip()
+        if not line:
+            return ''
     return line[:24]
 
 
@@ -69,10 +112,12 @@ def vlm_localize_sfx(
     api_base: str,
     api_key: str,
     model: str,
+    target_lang: str = 'ENG',
     timeout: float = 60.0,
     post_fn: Optional[Callable] = None,
 ) -> str:
-    """One vision call: crop → English SFX (UPPERCASE) or '' on any failure.
+    """One vision call: crop → an SFX token in ``target_lang`` (e.g. Thai onomatopoeia) or '' on
+    any failure.
 
     `post_fn(url, headers=, json=, timeout=)` defaults to `requests.post`; inject
     a fake in tests. The response is parsed as an OpenAI chat completion."""
@@ -87,7 +132,7 @@ def vlm_localize_sfx(
             "max_tokens": 24,
             "temperature": 0,
             "messages": [{"role": "user", "content": [
-                {"type": "text", "text": _PROMPT},
+                {"type": "text", "text": build_sfx_prompt(target_lang)},
                 {"type": "image_url", "image_url": {"url": _to_data_url(crop_rgb)}},
             ]}],
         }
@@ -99,7 +144,7 @@ def vlm_localize_sfx(
         )
         data = resp.json()
         content = data["choices"][0]["message"]["content"]
-        return sanitize_sfx(content if isinstance(content, str) else '')
+        return sanitize_sfx(content if isinstance(content, str) else '', target_lang)
     except Exception:
         logger.warning("[OcrVLM] SFX localize failed — region will drop as before", exc_info=True)
         return ''
