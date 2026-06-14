@@ -18,7 +18,8 @@ import { composeSeriesContext } from './series-context';
 // #234 S5-pre: pure MIT key/config + lang helpers moved out of this god file to
 // break the value-import cycle (mit-translation/mit-batch import them too). The
 // private delegators below keep BooksService's internal call sites byte-identical.
-import { geminiLangName, normalizeGeminiModelName } from './mit-config';
+import { geminiLangName } from './mit-config';
+import { GeminiModelCatalog, type GeminiModel } from './gemini-model-catalog';
 import {
   CACHE_TTL_MS,
   type LandingBook,
@@ -42,18 +43,6 @@ export type {
 
 const LANDING_CACHE_KEY = 'landing:full:v5';
 const QUERY_CACHE_PREFIX = 'books:query:';
-const DEFAULT_GEMINI_PRIMARY_MODEL = 'gemini-2.5-flash';
-const DEFAULT_GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash-lite';
-const GEMINI_MODELS_CACHE_KEY = 'gemini:models:v1';
-const GEMINI_MODELS_CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
-type GeminiModel = string;
-
-type GeminiModelListResponse = {
-  models?: Array<{
-    name?: string;
-    supportedGenerationMethods?: string[];
-  }>;
-};
 
 // ─── Patch geometry ───────────────────────────────────────────────────────────
 type PatchEntry = { xPct: number; yPct: number; wPct: number; hPct: number; url: string };
@@ -82,8 +71,10 @@ export function toPatchEntries(
 export class BooksService {
   private readonly logger = new Logger(BooksService.name);
 
-  private geminiModelsCatalog: GeminiModel[] | null = null;
-  private geminiModelsCatalogExpiresAt = 0;
+  /** Gemini model-selection catalog (#231) — memory/cache/api availability +
+   *  per-purpose candidate selection. Constructed here so it shares this service's
+   *  cache; BooksService keeps thin delegators. */
+  private readonly geminiCatalog: GeminiModelCatalog;
 
   /** Single owner of Patch Set files (#137) — deterministic names, legacy sweep. */
   private readonly patchStore: PatchStore;
@@ -108,6 +99,7 @@ export class BooksService {
     // tests working unchanged (those that exercise MIT fake global.fetch).
     private readonly mitClient: MitClient = new MitClient(),
   ) {
+    this.geminiCatalog = new GeminiModelCatalog(this.cache);
     this.patchStore = new PatchStore(this.storage, () => this.backendOrigin);
     // #160: translation memory rides the already-injected service-role client;
     // best-effort, so a missing/broken Supabase never affects translation.
@@ -201,127 +193,14 @@ export class BooksService {
     );
   }
 
-  // #229: delegates to the pure free function (single source of truth above).
-  private normalizeGeminiModelName(model?: string | null): GeminiModel | null {
-    return normalizeGeminiModelName(model);
+  // #231: Gemini model selection lives in GeminiModelCatalog. These delegators keep
+  // the internal callers — and the books-models spy on getMangaModels — byte-identical.
+  private getDescriptionModels(): Promise<GeminiModel[]> {
+    return this.geminiCatalog.getDescriptionModels();
   }
 
-  private async getAvailableGeminiModels(): Promise<Set<GeminiModel>> {
-    const now = Date.now();
-    if (this.geminiModelsCatalog && now < this.geminiModelsCatalogExpiresAt) {
-      this.logger.log(
-        `[Gemini] Model catalog [memory] count=${this.geminiModelsCatalog.length} models=${this.geminiModelsCatalog.join(', ')}`,
-      );
-      return new Set(this.geminiModelsCatalog);
-    }
-
-    const cached = await this.cache.get<{ models: GeminiModel[] }>(GEMINI_MODELS_CACHE_KEY);
-    if (cached?.data?.models?.length) {
-      this.geminiModelsCatalog = cached.data.models;
-      this.geminiModelsCatalogExpiresAt = now + GEMINI_MODELS_CACHE_TTL_MS;
-      this.logger.log(
-        `[Gemini] Model catalog [${cached.source}] count=${cached.data.models.length} models=${cached.data.models.join(', ')}`,
-      );
-      return new Set(cached.data.models);
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey) {
-      return new Set();
-    }
-
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
-        { signal: AbortSignal.timeout(8_000) },
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const payload = (await response.json()) as GeminiModelListResponse;
-      const models = [
-        ...new Set(
-          (payload.models ?? [])
-            .filter((entry) => (entry.supportedGenerationMethods ?? []).includes('generateContent'))
-            .map((entry) => this.normalizeGeminiModelName(entry.name))
-            .filter((model): model is GeminiModel => !!model),
-        ),
-      ];
-
-      if (models.length > 0) {
-        this.geminiModelsCatalog = models;
-        this.geminiModelsCatalogExpiresAt = now + GEMINI_MODELS_CACHE_TTL_MS;
-        await this.cache.set(
-          GEMINI_MODELS_CACHE_KEY,
-          { models },
-          GEMINI_MODELS_CACHE_TTL_MS,
-        );
-        this.logger.log(
-          `[Gemini] Model catalog [api] count=${models.length} models=${models.join(', ')}`,
-        );
-        return new Set(models);
-      }
-    } catch (err) {
-      this.logger.warn(`[Gemini] Failed to refresh model catalog: ${String(err)}`);
-    }
-
-    return new Set();
-  }
-
-  private async filterAvailableGeminiModels(candidates: Array<string | null | undefined>): Promise<GeminiModel[]> {
-    const normalizedCandidates = [
-      ...new Set(
-        candidates
-          .map((candidate) => this.normalizeGeminiModelName(candidate))
-          .filter((candidate): candidate is GeminiModel => !!candidate),
-      ),
-    ];
-
-    if (normalizedCandidates.length === 0) {
-      return [];
-    }
-
-    const availableModels = await this.getAvailableGeminiModels();
-    if (availableModels.size === 0) {
-      return normalizedCandidates;
-    }
-
-    const filtered = normalizedCandidates.filter((model) => availableModels.has(model));
-    const skipped = normalizedCandidates.filter((model) => !availableModels.has(model));
-
-    if (skipped.length > 0) {
-      this.logger.warn(`[Gemini] Skipping unavailable models: ${skipped.join(', ')}`);
-    }
-
-    if (filtered.length > 0) {
-      return filtered;
-    }
-
-    this.logger.warn(
-      `[Gemini] No configured models matched provider catalog; falling back to raw candidates: ${normalizedCandidates.join(', ')}`,
-    );
-    return normalizedCandidates;
-  }
-
-  private async getDescriptionModels(): Promise<GeminiModel[]> {
-    return this.filterAvailableGeminiModels([
-      process.env.GEMINI_DESCRIPTION_MODEL,
-      process.env.GEMINI_DESCRIPTION_FALLBACK_MODEL,
-      DEFAULT_GEMINI_PRIMARY_MODEL,
-      DEFAULT_GEMINI_FALLBACK_MODEL,
-    ]);
-  }
-
-  private async getMangaModels(requested?: string): Promise<GeminiModel[]> {
-    return this.filterAvailableGeminiModels([
-      requested,
-      process.env.GEMINI_MANGA_MODEL,
-      process.env.GEMINI_MANGA_FALLBACK_MODEL,
-      DEFAULT_GEMINI_PRIMARY_MODEL,
-      DEFAULT_GEMINI_FALLBACK_MODEL,
-    ]);
+  private getMangaModels(requested?: string): Promise<GeminiModel[]> {
+    return this.geminiCatalog.getMangaModels(requested);
   }
 
   /** Cache for getImageTranslator() — one MIT round-trip per minute at most. */
