@@ -17,8 +17,10 @@ import httpx
 @dataclass
 class GatewayStatus:
     status: str          # ok | slow | timeout | auth | unreachable | model_missing
-    latency_ms: int | None
+    latency_ms: int | None  # the chat-completion (inference / data plane) latency
     detail: str
+    control_ms: int | None = None  # the GET /models (control plane) latency — separates
+    #                                "control up, data hung" (the 2026-06-14 signature).
 
 
 def _timeout_s() -> float:
@@ -39,17 +41,19 @@ async def probe_translator(base_url: str, api_key: str, model: str, *, timeout: 
     headers = {"Authorization": f"Bearer {api_key}"}
     t = timeout if timeout is not None else _timeout_s()
     async with httpx.AsyncClient(timeout=t) as client:
+        c_started = time.time()
         try:
             models_resp = await client.get(f"{base}/models", headers=headers)
         except httpx.ConnectError:
             return GatewayStatus(status="unreachable", latency_ms=None, detail="could not connect to the gateway")
         except httpx.TimeoutException:
             return GatewayStatus(status="timeout", latency_ms=None, detail="gateway control plane (/models) timed out")
+        control_ms = int((time.time() - c_started) * 1000)
         if models_resp.status_code in (401, 403):
-            return GatewayStatus(status="auth", latency_ms=None, detail="gateway rejected the API key")
+            return GatewayStatus(status="auth", latency_ms=None, control_ms=control_ms, detail="gateway rejected the API key")
         listed = [m.get("id") for m in models_resp.json().get("data", [])]
         if model not in listed:
-            return GatewayStatus(status="model_missing", latency_ms=None, detail=f"gateway does not list model '{model}'")
+            return GatewayStatus(status="model_missing", latency_ms=None, control_ms=control_ms, detail=f"gateway does not list model '{model}'")
         # Control plane answered and lists the model; only the chat completion is left.
         started = time.time()
         try:
@@ -62,9 +66,10 @@ async def probe_translator(base_url: str, api_key: str, model: str, *, timeout: 
             return GatewayStatus(
                 status="timeout",
                 latency_ms=None,
+                control_ms=control_ms,
                 detail="gateway /models OK but chat completion timed out — model not responding",
             )
         latency_ms = int((time.time() - started) * 1000)
     if latency_ms > _slow_ms():
-        return GatewayStatus(status="slow", latency_ms=latency_ms, detail="model responding but slowly")
-    return GatewayStatus(status="ok", latency_ms=latency_ms, detail="gateway and model healthy")
+        return GatewayStatus(status="slow", latency_ms=latency_ms, control_ms=control_ms, detail="model responding but slowly")
+    return GatewayStatus(status="ok", latency_ms=latency_ms, control_ms=control_ms, detail="gateway and model healthy")

@@ -8,6 +8,7 @@ from fastapi.requests import Request
 from manga_translator import Config
 from server.instance import executor_instances
 from server.sent_data_internal import NotifyType
+from server.status_hub import status_hub
 
 class QueueElement:
     req: Request
@@ -37,6 +38,9 @@ class TaskQueue:
 
     def add_task(self, task: QueueElement):
         self.queue.append(task)
+        # Dev console (ADR 016): enqueue is a discrete event — push it (no loop).
+        status_hub.publish({"type": "event", "service": "mit", "kind": "translate_triggered",
+                            "detail": f"{task.task_type} · queue {len(self.queue)}"})
 
     def get_pos(self, task: QueueElement) -> Optional[int]:
         try:

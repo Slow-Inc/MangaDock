@@ -7,6 +7,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import time
 from argparse import Namespace
 import asyncio
 import atexit
@@ -14,7 +15,7 @@ import atexit
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,6 +32,10 @@ from server.readiness import count_alive
 from server.cancellation import mark_cancelled
 from server.worker_lifecycle import ensure_worker_port_free, terminate_process
 from server.path_utils import safe_result_folder
+from server import metrics, diagnostics, auth as dev_auth
+from server.status_snapshot import build_snapshot, to_messages
+from server.status_hub import status_hub
+from server.status_stream import status_frames
 
 app = FastAPI(
     title="Manga Image Translator",
@@ -110,6 +115,121 @@ async def register_instance(instance: ExecutorInstance, req: Request, req_nonce:
         raise HTTPException(401, detail="Invalid nonce")
     instance.ip = req.client.host
     executor_instances.register(instance)
+    # Dev console (ADR 016): a worker coming up is a discrete event — push it.
+    status_hub.publish({"type": "event", "service": "mit", "kind": "log",
+                        "detail": f"worker registered · {instance.ip}:{instance.port}"})
+
+
+# ── Dev console — Staff Console observability (PRD #279, ADR 016) ──────────────
+# GET /status (JSON snapshot) + GET /status/stream (SSE: sampled host/GPU metrics +
+# pushed events), gated by an independently-verified forwarded Supabase JWT. Built on
+# the import-light server.metrics / diagnostics / status_snapshot / status_hub /
+# status_stream modules. Parent server ONLY — the worker binds 127.0.0.1 and is
+# RCE-by-design, never exposed (PIPELINE.md §6.8).
+
+def _staff_allow_ids() -> set:
+    return {s.strip() for s in os.environ.get("MIT_STAFF_USER_IDS", "").split(",") if s.strip()}
+
+
+def _dev_require_provider() -> str | None:
+    # Dev-console access is forced onto this OAuth provider (default GitHub);
+    # set MIT_DEV_REQUIRE_PROVIDER="" to allow any provider (e.g. during the
+    # GitHub-provider rollout, to keep Google working).
+    return os.environ.get("MIT_DEV_REQUIRE_PROVIDER", "github").strip() or None
+
+
+async def require_staff(authorization: str = Header(default=None, alias="Authorization")):
+    """Verify the forwarded Supabase JWT independently (ADR 016 §Decision 4) and gate
+    to staff. 401 = missing/invalid/expired token; 403 = authenticated but not staff;
+    503 = Dev-console auth not configured."""
+    supabase_url = os.environ.get("SUPABASE_URL")
+    anon_key = os.environ.get("SUPABASE_ANON_KEY")
+    if not supabase_url or not anon_key:
+        raise HTTPException(503, detail="Dev-console auth not configured (SUPABASE_URL / SUPABASE_ANON_KEY)")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, detail="Missing or invalid Authorization header")
+    user = await dev_auth.verify_supabase_token(authorization[7:], supabase_url=supabase_url, anon_key=anon_key)
+    if user is None:
+        raise HTTPException(401, detail="Invalid or expired token")
+    if not dev_auth.is_staff(user, allow_ids=_staff_allow_ids(), require_provider=_dev_require_provider()):
+        raise HTTPException(403, detail="Not authorized for the Dev console (dev access requires the configured provider)")
+    return user
+
+
+# The gateway diagnostic runs a real (bounded) chat completion, so cache it and
+# refresh at most every MIT_DIAG_INTERVAL_S — never probe per metric sample.
+_gateway_cache = {"status": None, "at": 0.0}
+
+
+async def _probe_gateway():
+    base = os.environ.get("MIT_DIAG_BASE_URL") or os.environ.get("CUSTOM_OPENAI_API_BASE")
+    model = os.environ.get("MIT_DIAG_MODEL") or os.environ.get("CUSTOM_OPENAI_MODEL")
+    if not base or not model:
+        return None  # not configured for probing → snapshot reports the gateway as unprobed
+    ttl = float(os.environ.get("MIT_DIAG_INTERVAL_S", "30"))
+    now = time.monotonic()
+    if _gateway_cache["status"] is not None and now - _gateway_cache["at"] < ttl:
+        return _gateway_cache["status"]
+    key = os.environ.get("MIT_DIAG_API_KEY") or os.environ.get("CUSTOM_OPENAI_API_KEY") or ""
+    _gateway_cache["status"] = await diagnostics.probe_translator(base, key, model)
+    _gateway_cache["at"] = now
+    return _gateway_cache["status"]
+
+
+async def _collect_snapshot() -> dict:
+    m = metrics.collect()
+    workers = list(executor_instances.list)
+    alive = await count_alive(workers) if workers else 0
+    from manga_translator.config import _default_translator
+    return build_snapshot(
+        ts=time.time(),
+        host=m["host"],
+        gpus=m["gpus"],
+        gateway=await _probe_gateway(),
+        queue_size=len(task_queue.queue),
+        workers={"alive": alive, "total": len(workers), "free": executor_instances.free_executors()},
+        translator=_default_translator().value,
+    )
+
+
+@app.get("/status", tags=["dev-console"], summary="Dev-console status snapshot")
+async def dev_status(user: dict = Depends(require_staff)):
+    return await _collect_snapshot()
+
+
+@app.get("/status/stream", tags=["dev-console"], summary="Dev-console live status (SSE)")
+async def dev_status_stream(request: Request, user: dict = Depends(require_staff)):
+    queue = status_hub.subscribe()
+    interval = float(os.environ.get("MIT_STATUS_INTERVAL_S", "3"))
+    revalidate_s = float(os.environ.get("MIT_STATUS_REVALIDATE_S", "60"))
+    token = request.headers.get("authorization", "")[7:]
+    supabase_url = os.environ.get("SUPABASE_URL")
+    anon_key = os.environ.get("SUPABASE_ANON_KEY")
+    state = {"last_revalidate": time.monotonic(), "open": True}
+
+    async def sample():
+        # Zero-trust: re-verify the forwarded token every revalidate_s and close on
+        # expiry/revocation (ADR 016 §Decision 4). Returns [] on close so the loop
+        # stops at the next should_continue() rather than raising mid-stream.
+        now = time.monotonic()
+        if now - state["last_revalidate"] >= revalidate_s:
+            u = await dev_auth.verify_supabase_token(token, supabase_url=supabase_url, anon_key=anon_key)
+            if u is None or not dev_auth.is_staff(u, allow_ids=_staff_allow_ids(), require_provider=_dev_require_provider()):
+                state["open"] = False
+                return []
+            state["last_revalidate"] = now
+        return to_messages(await _collect_snapshot())
+
+    async def gen():
+        try:
+            async for frame in status_frames(queue=queue, sample=sample, interval_s=interval,
+                                              should_continue=lambda: state["open"]):
+                yield frame
+        finally:
+            status_hub.unsubscribe(queue)
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 def transform_to_image(ctx):
     # 检查是否使用占位符（在web模式下final.png保存后会设置此标记）

@@ -24,6 +24,7 @@ overturns an earlier one marks the old ADR **Superseded**.
 | [014](014-frontend-single-entry-proxy.md) | Frontend single-entry `/api/proxy` (token preservation, abort propagation, asset rewrites) | Frontend | Accepted |
 | [015](015-frontend-auth-context-supabase-adapter.md) | Frontend auth context: AppUser adapter, OAuth popup, cross-user cache isolation | Frontend | Accepted |
 | [016](016-staff-console-out-of-band-observability-aggregator.md) | Staff Console: out-of-band aggregator µservice + per-service event streams + zero-trust signed-claim auth | Full-stack | Accepted — **planned** (#279) |
+| [017](017-mit-status-stream-forward-jwt-verification.md) | MIT `/status` + `/status/stream` hybrid SSE telemetry; forwarded-JWT verified via Supabase `getUser` (refines 016's PyJWT assumption) | MIT · Dashboard | Accepted — **implemented** (#279) |
 
 ## Conventions
 

@@ -137,7 +137,8 @@ def test_slow_chat_is_slow(monkeypatch):
     a warning short of a timeout. Latency is controlled deterministically: 5s
     elapsed is over the 3s slow threshold."""
     _install(monkeypatch, models=MODELS_OK, chat=CHAT_OK)
-    ticks = iter([0.0, 5.0])
+    # 4 time reads: control start/end (0.0→0.1 = 100ms) then chat start/end (0.1→5.1 = 5s).
+    ticks = iter([0.0, 0.1, 0.1, 5.1])
     monkeypatch.setattr(diagnostics.time, "time", lambda: next(ticks))
 
     status = asyncio.run(
@@ -146,6 +147,7 @@ def test_slow_chat_is_slow(monkeypatch):
 
     assert status.status == "slow"
     assert status.latency_ms == 5000
+    assert status.control_ms == 100
 
 
 def test_control_plane_timeout_is_gateway_timeout(monkeypatch):
