@@ -660,3 +660,97 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **18. KPI.** #187 CLOSED (26/26 seams) · MIT tech-debt category **6/6** · byte-identical (verbatim move + suite green) · 0 regressions (365 pass) · +8 isolated tests for previously-construction-only logic · 1 cosmetic delta (logger name, documented).
 
 *Validation:* TDD red→green; `test_pipeline_params.py` 11 pass (3 globals + 8 value-object) + full suite (365 / 0 new fail). *Risk/rollback:* byte-identical; revert = drop the branch. *Cosmetic delta:* the batch_concurrent warning logs under the `pipeline_params` logger name (same message/level/effect). *Links:* #187, #188, resume `docs/reports/mit-refactor-progress.md`.
+
+## 2026-06-12 — `STORAGE_DRIVER` env: choose local-disk vs Cloudflare-R2 storage · PR #222
+
+**1. What Changed.** `Backend/src/common/storage/storage.module.ts` — added a `STORAGE_DRIVER` env var that selects the storage backend explicitly, and extracted the selection into a pure, env-injectable `createStorageProvider(env, logger)`. New `storage.module.spec.ts`. `.env.example` documents the flag.
+
+**2. Why.** The factory only auto-detected the backend from the presence of `WORKER_URL`/`WORKER_SECRET`, so a developer who keeps R2 creds in their env had **no way to force local disk** — and so hit the R2-only read path of #214 (`loadPageBytes` ENOENT on R2-stored uploaded pages) during local E2E.
+
+**3. How.** `disk`|`local` → `DiskStorageProvider` (forced, even with R2 creds present); `r2`|`cloudflare` → `CloudflareR2StorageProvider` (clear error if creds missing); unset/empty → original auto-detect (R2 when both creds set, else disk). Case-insensitive + trimmed; unknown value throws listing the valid options.
+
+**4. Scope.** One Backend module + its new spec + `.env.example`. No runtime path touched; no other module reads `WORKER_URL` independently (verified by grep across `src/`).
+
+**5. Results / Perf.** Pure config-selection change; **0% runtime impact** on the request path. Existing deployments with no `STORAGE_DRIVER` are byte-for-byte unchanged (auto-detect branch preserved).
+
+**6. Tests.** `storage.module.spec.ts` **11/11** — explicit-wins, aliases, case-insensitive, missing-creds error, unknown-driver error, and the backward-compatible auto-detect matrix. `page-source.spec.ts` still green. `tsc --noEmit` clean. Not user-facing (server config) → unit tests suffice, no Playwright.
+
+**7. Backward Compatibility.** Fully preserved: unset `STORAGE_DRIVER` ⇒ identical auto-detect behaviour.
+
+**8. Security.** No creds in logs (only the driver name is logged). Traversal/abuse surface unchanged (provider implementations untouched).
+
+**9. Quality Gate.** CodeQL `Analyze (javascript-typescript)` + `Analyze (python)` both green. `/scrutinize` bilingual review, verdict **ship**.
+
+**10. Review findings (`/scrutinize`).** One forward-looking coordination item (not a blocker for this PR): the `/r2-patches` URL-builder on @akkanop-x's unmerged storage-refactor branch must derive routing from the *selected provider* / `STORAGE_DRIVER`, not from raw `WORKER_URL` presence — otherwise `STORAGE_DRIVER=disk` + `WORKER_URL` set = split-brain (builds R2 URLs but stores to disk). Nothing on `main` does this yet.
+
+**11. Ownership / Coordination.** `storage.module.ts` is in @akkanop-x's Cloudflare-R2/storage domain and he is about to rewrite it; the change is small + additive + backward-compatible so it folds in easily. Flagged in the PR for him to preserve `STORAGE_DRIVER` (or rename to his convention) during the refactor.
+
+**12. Live verification.** With `STORAGE_DRIVER=disk` set in dev `.env`, boot logs `[StorageModule] storage backend: local disk (driver=disk)` and the One Punch-Man benchmark chapter (an R2-only uploaded chapter, normally #214-ENOENT) translates end-to-end through the tunnel with patches served from local disk.
+
+**13. Benefits.** Unblocks local E2E of uploaded-version chapters without R2 creds/Worker; self-documenting intent in `.env`; a clean seam for the upcoming storage refactor.
+
+**14. Risk Reduction.** Selection logic is now a pure function with 11 cases instead of an inline factory closure exercised only at boot.
+
+**15. Developer Experience.** A dev can force local disk in one line; the chosen backend is logged on boot.
+
+**16. Future Opportunities.** Graduating to a committed default + adding `STORAGE_DRIVER` to `env.validation.ts` for boot-time fail-fast (the factory already throws on unknown values).
+
+**17. Lessons Learned.** "Force local in dev" had a 90% zero-code answer (unset the two creds); the explicit toggle is the 10% for ergonomics — worth it because the dev keeps R2 creds in their env.
+
+**18. KPI.** PR #222 MERGED (main a7e7b3d→e9083ec) · 11/11 new tests · 0 runtime impact · backward-compatible · CodeQL green · /scrutinize ship.
+
+*Links:* PR #222, #214 (R2 read-path bug it unblocks). Full session narrative incl. the render-parity dev-enablement + #168 SFX-OCR investigation (PaddleOCR-VL-1.5 / transformers-5.9 blocker) is in `DONE.md` 2026-06-12 and `MIT/BENCHMARK.md` (2026-06-12 scorecard).
+
+---
+
+## 2026-06-15 — Connect MIT to the Dashboard (live telemetry) + Dashboard OAuth (PRD #279 / ADR 016, ADR 017)
+
+**1. What changed.** Exposed MIT's already-built observability primitives over HTTP and wired the standalone Dashboard to them with a real OAuth login. MIT: 4 new import-light modules (`status_snapshot`, `auth`, `status_hub`, `status_stream`) + `GET /status` / `GET /status/stream` (SSE) on the parent server, gated by a forwarded Supabase JWT; `myqueue.add_task` + `/register` push events. Dashboard: Supabase Google OAuth gate, an authenticated `/api/live` SSE proxy, `useLiveSnapshot` hook, and live telemetry on the overview (GPU util/temp/VRAM/power, CPU/disk, RAM) with a live/offline badge + MIT-status chip; mock fallback throughout.
+
+**2. Results / outcome.** Live GPU/host/gateway/queue/worker telemetry reaches the Dashboard when a staff dev is signed in. Zero-trust verified end-to-end against **production Supabase**: no-token and garbage-token both 401 at MIT (MIT really calls Supabase `/auth/v1/user`), forwarded through the `/api/live` proxy. Real metrics confirmed on the dev box (`util/temp/VRAM/power`, RAM, disk 99.1%).
+
+**3. Expected performance gain %.** N/A (new capability, not an optimization). Added load is bounded: one metric sample/3 s per open stream + a gateway probe throttled to ≤1/30 s; one Supabase round-trip per verification, re-validated only every 60 s on a stream. No effect on the translate pipeline (events come from parent-process seams; the worker pool is untouched).
+
+**4. Benefits.** An incident is diagnosable from live data, not mock. Independent per-service verification with **no shared secret** (a Dashboard leak grants nothing reusable). **Zero new dependency** (httpx/psutil/nvidia-smi/@supabase/supabase-js — the last already used by the app Frontend). Event **push** with no event-tier loop. Graceful degradation to mock.
+
+**5. Purpose.** Realize Phase-1 (1d metrics + 1f transport) of the Dev console for MIT — the "window into the box" when production can't be inspected, per ADR 016's production motivation.
+
+**6. Why + architectural impact.** ADR 016 set the architecture (out-of-band aggregator, per-service streams, forward-JWT, no shared secret). This slice implements it for MIT and **refines one detail**: MIT verifies via Supabase `getUser` rather than local PyJWT — zero new dep, no JWT secret distributed to MIT, and robust to Supabase's new asymmetric `sb_publishable_…` keys (local HMAC could not verify them). The Dashboard's `/api/live` is the authenticated proxy that lets a browser (which can't set an `EventSource` auth header) reach MIT. ADR 017 records it.
+
+**7. Problems before.** MIT's metrics/diagnostics modules were committed but unexposed; the Dashboard was 100% mock; there was no way for a dev to authenticate and pull live data.
+
+**8. Goals.** SSE event-push (operator requirement) + sampled metrics; independent per-service auth surviving a Dashboard leak; MIT only (Backend/Frontend mid-refactor). All met.
+
+**9. Architecture before.** Dashboard → `lib/services.ts` mock. MIT parent server: `/health` `/ready` `/queue-size` `/translate/*`; `metrics.py`/`diagnostics.py`/`translate_error.py` present but not routed; no auth for a console.
+
+**10. Architecture after.** Browser ──OAuth──> session JWT ──fetch `/api/live`──> Next proxy ──forward JWT──> MIT `/status/stream`; MIT verifies independently (Supabase `getUser`) + gates to staff; SSE frames fold through `lib/snapshot.ts`; UI live-or-mock. Metric sampler loop lives at the source (MIT); events push via `StatusHub`.
+
+**11. Change list.** MIT new: `server/status_snapshot.py`, `server/auth.py`, `server/status_hub.py`, `server/status_stream.py`. MIT modified: `server/main.py` (routes + `require_staff` + throttled probe + worker-up event), `server/myqueue.py` (enqueue event). Dashboard new: `lib/live.ts`, `lib/live-map.ts`, `lib/supabase.ts`, `components/auth-gate.tsx`, `components/use-live-snapshot.ts`, `app/api/live/route.ts`, `README.md`. Dashboard modified: `app/layout.tsx`, `app/page.tsx`, `components/shell.tsx`, `.env.example`/`.env.local`, `package.json`. Docs: ADR 017 (+ index), DONE.md, PIPELINE.md §5, MIT README.
+
+**12. Metrics.** New tests: MIT 24 (snapshot 6 / auth 8 / hub 5 / stream 5), Dashboard 11 (live 6 / live-map 5). Suites green: MIT new 24/24, sibling import-light server 20/20, Dashboard 91/91. ~10 new files, ~6 edited, 1 dep added.
+
+**13. Technical debt removed.** None removed; debt avoided — no PyJWT/JWT-secret plumbing in MIT; reused the committed `snapshot.ts` reducer and the existing metrics/diagnostics modules rather than new surface; events attach at parent-process seams (no god-object growth).
+
+**14. Risk reduction.** Auth fails **closed** (None/unreachable → deny). The console lives on the parent server only — never the RCE-by-design worker. The SSE hub drops on a full queue so a stuck consumer can't block the translate path. Stream re-validates + closes on token expiry.
+
+**15. Developer experience.** A dev signs in with Google and sees live GPU/host/gateway during an incident; offline/connecting/live is explicit on a badge; mock fallback means the dashboard never hard-fails.
+
+**16. Future opportunities.** Supabase `staffLevel` claim hook to retire the id allowlist; Backend (#282) + Frontend (#283) `/status/stream` reusing the same forward-JWT proxy; per-stage worker event push; VRAM-per-model live attribution.
+
+**17. Lessons learned.** Supabase's new asymmetric publishable keys make local-HMAC JWT verify a dead end — verifying via `getUser` is both simpler and the only scheme-agnostic option (and matches the Backend). The Supabase JS `getSession()` can stall in a headless context (navigator.locks) — the gate needs a splash timeout to never hang.
+
+**18. KPI.** Branch pending review/commit · MIT 24/24 + Dashboard 91/91 + sibling 20/20 new/regression tests green · 0 translate-pipeline impact · zero-trust 401/403 verified against production Supabase · live metrics verified on-box · OAuth gate rendered. Remaining: a valid-token 200 needs a human Google sign-in + the dev's id in `MIT_STAFF_USER_IDS`.
+
+*Links:* PRD #279, ADR 016, ADR 017. Provenance: PIPELINE.md §5, DONE.md 2026-06-15.
+
+### Increment (2026-06-16) — `/service/mit` real-data wiring + `control_ms` + unified debug console
+
+**1. What changed.** Finished the MIT↔Dashboard connection so the MIT *detail* page (`/service/mit`) reads live data instead of mock where MIT reports it. (a) MIT's gateway probe now times the `GET /models` control-plane call (`control_ms`) separately from the chat data-plane call (`latency_ms`) — `server/diagnostics.py` + `server/status_snapshot.py::_gateway_dict`. (b) New pure mapper `Dashboard/lib/live-panels.ts::liveGatewayProbe` turns the live gateway frame into the `GatewayDiagnosis` `GatewayProbe` (real control-vs-data split). (c) `app/service/[id]/page.tsx` overrides — only for `id==='mit'` and only when signed-in + live — the header status badge, the GPU/VRAM/queue telemetry cards, the VRAM-panel host total, and the GatewayDiagnosis probe; everything MIT doesn't instrument stays mock. (d) Unified debug console (`components/debug-console.tsx`, `lib/debug-log.ts`) aggregating Dashboard/Frontend/Backend/MIT log lines; GitHub auto-link (`components/github-auto-link.tsx`); recharts duplicate-key fix (`components/metric-card.tsx`).
+
+**2. Results / perf.** No translate-pipeline impact (additive seams; the probe is throttled by `MIT_DIAG_INTERVAL_S`). The stream connects only on the MIT detail page (`useLiveSnapshot(id==='mit' ? token : null)`), so the other service pages open no extra SSE connection.
+
+**3. Honesty boundary.** Live: status, GPU util/temp/power, VRAM used/total, queue depth + worker count, host VRAM total, gateway control/data split. Mock (MIT reports current values, not a history / doesn't instrument): GPU history charts, per-card sparklines, stage timing, quality, per-model VRAM breakdown, translate-queue job list, worker-lifecycle internals.
+
+**4. Validation.** Dashboard `bun test` 101→**115** green (`liveGatewayProbe` +4); MIT `test_diagnostics` + `test_status_snapshot` **13** green (control_ms pinned at every hop: diagnostics → snapshot frame → `mapMitSnapshot` → `liveGatewayProbe`); touched files typecheck clean; `/service/mit` SSR 200 with no error overlay. Stack restarted clean — MIT :5013 (parent-only, 9arm gateway probe), Frontend :4000, Backend :4001.
+
+**5. KPI.** Branch `feat/mit-dashboard`, pending review/commit · 115 + 13 tests green · 0 translate-pipeline impact · `control_ms` lights up the GatewayDiagnosis control-latency on this MIT restart.
