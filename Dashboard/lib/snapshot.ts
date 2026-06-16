@@ -82,7 +82,8 @@ export function reduce(state: State, msg: Message, now: number): State {
     };
   }
   if (msg.type === "event") {
-    return { ...state, events: [msg, ...state.events] };
+    // Stamp arrival time so the LogStream can show real timestamps (events carry none).
+    return { ...state, events: [{ ...msg, at: now }, ...state.events] };
   }
   if (msg.type === "status") {
     const prev = state.services[msg.service];

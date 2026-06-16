@@ -19,7 +19,7 @@ const TRANSLATION = [
   { label: "tokens spent", value: "1.2k", warn: false },
 ];
 
-export function QualityPanel() {
+export function QualityPanel({ live }: { live?: boolean }) {
   const { t } = useLang();
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="px-5 py-3" style={{ borderTop: "1px solid var(--panel-hairline)" }}>
@@ -43,6 +43,12 @@ export function QualityPanel() {
         </h2>
       </div>
 
+      {live ? (
+        <div className="flex items-center justify-center px-5 pb-4 text-center text-[11.5px]" style={{ minHeight: 180, color: "var(--ink-3)" }}>
+          No Data — MIT does not report per-run quality
+        </div>
+      ) : (
+      <>
       <Section title="per run · One-Punch ch1 p3">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{RUN.map((r) => <Stat key={r.label} {...r} />)}</div>
       </Section>
@@ -62,6 +68,8 @@ export function QualityPanel() {
       <Section title="post-translation checks">
         <div className="grid grid-cols-3 gap-3">{TRANSLATION.map((t) => <Stat key={t.label} {...t} />)}</div>
       </Section>
+      </>
+      )}
     </section>
   );
 }

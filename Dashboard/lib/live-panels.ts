@@ -55,6 +55,33 @@ export function mitTranslateStage(mit: MitLive): StageView | null {
   return { status: "error", detail: g.detail, log: [`custom_openai · ${mit.translator}`, g.detail, "pipeline stalled at translate"] };
 }
 
+/** Canonical pipeline order (MIT stage ids). */
+const PIPELINE_ORDER = ["detect", "ocr", "translate", "inpaint", "render"] as const;
+
+export interface LiveStageEntry { status: StageStatus; elapsedMs?: number }
+
+/** The live pipeline panel from MIT's per-stage timings (`mit.stages`) — timing-only,
+ *  NO faked per-stage detail (the run-summary source was removed). A stage MIT reported a
+ *  timing for is `success` with its `elapsedMs`; `translate` keeps the richer gateway-derived
+ *  state (passed in); stages MIT hasn't reported are `idle`. Before the first translate,
+ *  `stages` is empty and `translate` is null → every stage is idle (the "No Data" pipeline). */
+export function livePipelineStages(
+  stages: Array<{ id: string; liveMs: number }>,
+  translate: { status: StageStatus } | null,
+): Record<string, LiveStageEntry> {
+  const ms = new Map(stages.map((s) => [s.id, s.liveMs]));
+  const out: Record<string, LiveStageEntry> = {};
+  for (const id of PIPELINE_ORDER) {
+    if (id === "translate" && translate) {
+      out[id] = { status: translate.status };
+      continue;
+    }
+    const t = ms.get(id);
+    out[id] = t != null ? { status: "success", elapsedMs: t } : { status: "idle" };
+  }
+  return out;
+}
+
 /** Map the live gateway probe → the GatewayDiagnosis panel's GatewayProbe (control vs
  *  data split is real now MIT reports control_ms). null when unprobed → caller keeps mock. */
 export function liveGatewayProbe(mit: MitLive): GatewayProbe | null {

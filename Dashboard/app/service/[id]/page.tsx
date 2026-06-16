@@ -29,6 +29,9 @@ import {
   BACKEND_NODES, CLUSTER_NOW, CACHE_TIERS, QUEUE_JOBS, GATEWAY_PROBE, STAGE_TIMINGS, WRITE_PATH,
   type ServiceStatus,
 } from "@/lib/services";
+import type { StageTiming } from "@/lib/timing";
+import type { QueueJob, JobState } from "@/lib/queue";
+import type { LogEntry, LogLevel } from "@/lib/log";
 
 const MIT_FAILURE_META = { stage: "translate", translator: "custom_openai", endpoint: "gateway.9arm.co", model: "qwen3.6-35b-a3b" };
 
@@ -62,17 +65,38 @@ export default function ServiceDetail() {
   const effStatus: ServiceStatus = liveMit ? ((m!.status === "degraded" ? "stale" : m!.status) as ServiceStatus) : service.status;
   const sc = SERVICE_STATUS_COLOR[effStatus];
 
-  // Override the MIT-real metric values (GPU util / VRAM / queue) when live; sparklines + the
-  // rest stay mock (MIT reports current values, not a history).
+  // Override the MIT-real metric values AND sparkline data (accumulated from the live stream)
+  // when live; a metric with no MIT source (pages/min) gets an empty series → "No Data".
+  const sr = live.series;
   const metrics = liveMit
     ? service.metrics.map((mm) => {
-        if (mm.label === "GPU util" && m!.gpu) return { ...mm, value: m!.gpu.utilPct ?? mm.value, sub: `${m!.gpu.tempC ?? "—"}°C · ${m!.gpu.powerW ?? "—"}W` };
-        if (mm.label === "VRAM" && m!.gpu) return { ...mm, value: m!.gpu.vramUsedGb, sub: `/ ${m!.gpu.vramTotalGb} GB` };
-        if (mm.label === "queue depth") return { ...mm, value: m!.queueSize, sub: `${m!.workers.alive}/${m!.workers.total} worker` };
-        return mm;
+        if (mm.label === "GPU util" && m!.gpu) return { ...mm, value: m!.gpu.utilPct ?? mm.value, sub: `${m!.gpu.tempC ?? "—"}°C · ${m!.gpu.powerW ?? "—"}W`, data: sr["gpuUtil"] ?? [] };
+        if (mm.label === "VRAM" && m!.gpu) return { ...mm, value: m!.gpu.vramUsedGb, sub: `/ ${m!.gpu.vramTotalGb} GB`, data: sr["vram"] ?? [] };
+        if (mm.label === "queue depth") return { ...mm, value: m!.queueSize, sub: `${m!.workers.alive}/${m!.workers.total} worker`, data: sr["queue"] ?? [] };
+        if (mm.label === "pages/min") return { ...mm, value: "—", sub: "no source", data: [] };
+        return { ...mm, data: [] };
       })
     : service.metrics;
   const gwProbe = liveMit ? liveGatewayProbe(m!) ?? GATEWAY_PROBE : GATEWAY_PROBE;
+
+  // Map the live MIT telemetry into each panel's shape; empty → the panel shows "No Data".
+  const baselineById = new Map(STAGE_TIMINGS.map((s) => [s.id, s.baselineMs]));
+  const liveStages: StageTiming[] = (m?.stages ?? []).map((s) => ({ id: s.id, label: s.label, baselineMs: baselineById.get(s.id) ?? 0, liveMs: s.liveMs }));
+  const liveJobs: QueueJob[] = (m?.queueJobs ?? []).map((j) => ({
+    id: j.id, user: "—", manga: "—", chapter: "—", page: j.pageIndex ?? 0,
+    state: (["queued", "running", "done", "failed"].includes(j.state) ? j.state : "queued") as JobState,
+    stage: j.taskType, queuedMs: CLUSTER_NOW - (j.waitingMs ?? 0),
+  }));
+  // Real x-axis time labels for the live graphs (the wall-clock of each accumulated frame).
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const liveTimes = liveMit ? live.seriesT.map((ms) => { const d = new Date(ms); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }) : undefined;
+  const fmtT = (at?: number) => (at ? new Date(at).toTimeString().slice(0, 8) : "");
+  const liveLogs: LogEntry[] = (live.events as Array<{ kind?: string; detail?: string; at?: number }>).map((e) => ({
+    t: fmtT(e.at),
+    level: (e.kind === "error" ? "error" : "info") as LogLevel,
+    src: e.kind === "translate_triggered" ? "queue" : e.kind === "stage" ? "stage" : e.kind ?? "mit",
+    msg: e.detail ?? e.kind ?? "",
+  }));
 
   return (
     <Shell right={<ServiceTicker service={service} />}>
@@ -124,24 +148,24 @@ export default function ServiceDetail() {
       {/* telemetry KPIs (sparklines) — kept adjacent to the GPU host charts so all graphs sit together */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {metrics.map((mm) => (
-          <MetricCard key={mm.label} label={mm.label} value={mm.value} unit={mm.unit} sub={mm.sub} data={mm.data} color={mm.color} Icon={mm.Icon} domain={mm.domain} />
+          <MetricCard key={mm.label} label={mm.label} value={mm.value} unit={mm.unit} sub={mm.sub} data={mm.data} color={mm.color} Icon={mm.Icon} domain={mm.domain} times={liveTimes} />
         ))}
       </div>
 
       {/* MIT: all time-series graphs grouped here (telemetry above → GPU host charts) */}
       {service.id === "mit" && (
-        <div className="mt-3"><GpuDetail /></div>
+        <div className="mt-3"><GpuDetail series={liveMit ? sr : undefined} times={liveTimes} /></div>
       )}
 
       {/* MIT: diagnostics — gateway · queue · timing · VRAM · quality · worker */}
       {service.id === "mit" && (
         <>
           <div className="mt-3"><GatewayDiagnosis probe={gwProbe} meta={MIT_FAILURE_META} /></div>
-          <div className="mt-3"><TranslateQueue jobs={QUEUE_JOBS} now={CLUSTER_NOW} /></div>
-          <div className="mt-3"><StageTimingPanel stages={STAGE_TIMINGS} /></div>
-          <div className="mt-3"><VramPanel models={MIT_VRAM_MODELS} totalGb={liveMit && m!.gpu ? m!.gpu.vramTotalGb : MIT_HOST_VRAM_TOTAL_GB} /></div>
-          <div className="mt-3"><QualityPanel /></div>
-          <div className="mt-3"><WorkerLifecycle /></div>
+          <div className="mt-3"><TranslateQueue jobs={liveMit ? liveJobs : QUEUE_JOBS} now={CLUSTER_NOW} /></div>
+          <div className="mt-3"><StageTimingPanel stages={liveMit ? liveStages : STAGE_TIMINGS} /></div>
+          <div className="mt-3"><VramPanel models={MIT_VRAM_MODELS} totalGb={liveMit && m!.gpu ? m!.gpu.vramTotalGb : MIT_HOST_VRAM_TOTAL_GB} live={liveMit ? m!.vram : undefined} /></div>
+          <div className="mt-3"><QualityPanel live={liveMit} /></div>
+          <div className="mt-3"><WorkerLifecycle workers={liveMit ? m!.workersDetail : undefined} /></div>
         </>
       )}
 
@@ -156,14 +180,14 @@ export default function ServiceDetail() {
         </>
       )}
 
-      {/* terminal */}
+      {/* terminal — MIT gets a real read-only live console over the status stream */}
       <div className="mt-5">
-        <ServiceTerminal service={service} />
+        <ServiceTerminal service={service} mitConsole={service.id === "mit"} mit={m} events={live.events as Array<{ kind?: string; detail?: string; at?: number }>} />
       </div>
 
       {/* logs */}
       <div className="mt-3">
-        <LogStream logs={service.logs} />
+        <LogStream logs={liveMit ? liveLogs : service.logs} />
       </div>
     </Shell>
   );

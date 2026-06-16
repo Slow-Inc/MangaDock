@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { TerminalSquare } from "lucide-react";
 import { runCommand } from "@/lib/console";
+import { runMitCommand } from "@/lib/mit-console";
+import type { MitLive } from "@/lib/live-map";
 import type { Service, TerminalLine, TerminalTone } from "@/lib/services";
+
+const MIT_BANNER: TerminalLine[] = [
+  { text: "MIT live console — read-only introspection over the /status stream", tone: "muted" },
+  { text: "type 'help' for commands · 'status' for a live snapshot", tone: "muted" },
+];
 
 const TONE: Record<TerminalTone, string> = {
   cmd: "var(--panel-ink)",
@@ -13,9 +20,14 @@ const TONE: Record<TerminalTone, string> = {
   err: "var(--error)",
 };
 
-export function ServiceTerminal({ service }: { service: Service }) {
+export function ServiceTerminal({ service, mitConsole, mit, events }: {
+  service: Service;
+  mitConsole?: boolean; // MIT live console (real read-only commands over the status stream)
+  mit?: MitLive | null;
+  events?: Array<{ kind?: string; detail?: string; at?: number }>;
+}) {
   const port = service.tech.split("·").pop()?.trim() ?? service.tech;
-  const [lines, setLines] = useState<TerminalLine[]>(service.terminal);
+  const [lines, setLines] = useState<TerminalLine[]>(mitConsole ? MIT_BANNER : service.terminal);
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState<number | null>(null);
@@ -31,7 +43,7 @@ export function ServiceTerminal({ service }: { service: Service }) {
   function submit() {
     const cmd = input;
     const echo: TerminalLine = { text: `$ ${cmd}`, tone: "cmd" };
-    const result = runCommand(cmd, service);
+    const result = mitConsole ? runMitCommand(cmd, mit ?? null, events ?? []) : runCommand(cmd, service);
     setLines((prev) => (result.clear ? [] : [...prev, echo, ...result.lines]));
     if (cmd.trim()) setHistory((h) => [...h, cmd]);
     setInput("");

@@ -47,7 +47,11 @@ export function LogStream({ logs }: { logs: LogEntry[] }) {
 
       {/* rows */}
       <div className="divide-y" style={{ borderColor: "var(--panel-hairline)" }}>
-        {visible.length === 0 ? (
+        {logs.length === 0 ? (
+          <div className="flex min-h-[120px] items-center justify-center px-4 py-6 text-center text-[12px]" style={{ color: "var(--ink-3)" }}>
+            No log events yet
+          </div>
+        ) : visible.length === 0 ? (
           <div className="px-4 py-6 text-center text-[12px]" style={{ color: "var(--panel-ink-3)" }}>
             No entries at this level.
           </div>

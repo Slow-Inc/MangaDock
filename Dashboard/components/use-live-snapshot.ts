@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { parseSseFrames } from "@/lib/live";
 import { mapMitSnapshot, type MitLive } from "@/lib/live-map";
+import { pushSample, type SeriesMap } from "@/lib/live-series";
 import { reduce, initialState, type State, type Message } from "@/lib/snapshot";
 import { pushLog } from "@/lib/debug-log";
 
@@ -25,7 +26,26 @@ export interface Live {
   status: LiveStatus;
   mit: MitLive | null;
   events: Message[];
+  series: SeriesMap; // rolling per-metric history accumulated from the stream (live graphs)
+  seriesT: number[]; // epoch ms of each accumulated frame — the real x-axis for the graphs
   error?: string;
+}
+
+const SERIES_CAP = 40; // keep the time axis aligned with pushSample's default cap
+
+/** The numeric metrics worth charting, pulled from one snapshot — what the live
+ *  graphs accumulate. Keys match the components' series lookups. */
+function sampleFrom(mit: MitLive): Record<string, number | null> {
+  return {
+    gpuUtil: mit.gpu?.utilPct ?? null,
+    vram: mit.gpu?.vramUsedGb ?? null,
+    gpuTemp: mit.gpu?.tempC ?? null,
+    power: mit.gpu?.powerW ?? null,
+    fan: mit.gpu?.fanPct ?? null,
+    cpu: mit.host.cpuPct,
+    ram: mit.host.ramUsedGb,
+    queue: mit.queueSize,
+  };
 }
 
 function isMitMetric(m: Message): boolean {
@@ -33,12 +53,14 @@ function isMitMetric(m: Message): boolean {
 }
 
 export function useLiveSnapshot(token: string | null): Live {
-  const [live, setLive] = useState<Live>({ status: "connecting", mit: null, events: [] });
+  const [live, setLive] = useState<Live>({ status: "connecting", mit: null, events: [], series: {}, seriesT: [] });
   const stateRef = useRef<State>(initialState());
+  const seriesRef = useRef<SeriesMap>({});
+  const seriesTRef = useRef<number[]>([]);
 
   useEffect(() => {
     if (!token) {
-      setLive({ status: "offline", mit: null, events: [], error: "no-session" });
+      setLive({ status: "offline", mit: null, events: [], series: seriesRef.current, seriesT: seriesTRef.current, error: "no-session" });
       return;
     }
     let cancelled = false;
@@ -72,14 +94,19 @@ export function useLiveSnapshot(token: string | null): Live {
             logMitFrame(m);
           }
           const metric = [...messages].reverse().find(isMitMetric);
+          const mit = metric ? mapMitSnapshot(metric as never) : null;
+          if (mit) {
+            seriesRef.current = pushSample(seriesRef.current, sampleFrom(mit));
+            seriesTRef.current = [...seriesTRef.current, now].slice(-SERIES_CAP);
+          }
           const events = stateRef.current.events.slice(0, 50) as Message[];
-          setLive((p) => ({ status: "live", mit: metric ? mapMitSnapshot(metric as never) : p.mit, events }));
+          setLive((p) => ({ status: "live", mit: mit ?? p.mit, events, series: seriesRef.current, seriesT: seriesTRef.current }));
         }
         throw new Error("stream-ended");
       } catch (e) {
         if (cancelled) return;
         pushLog("warn", "live", `stream offline: ${String(e)}`);
-        setLive((p) => ({ status: "offline", mit: p.mit, events: p.events, error: String(e) }));
+        setLive((p) => ({ status: "offline", mit: p.mit, events: p.events, series: p.series, seriesT: p.seriesT, error: String(e) }));
         retry = setTimeout(connect, 3000);
       }
     }

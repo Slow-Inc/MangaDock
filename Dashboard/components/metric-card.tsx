@@ -21,6 +21,7 @@ export function MetricCard({
   color,
   Icon,
   domain,
+  times,
 }: {
   label: string;
   value: number | string;
@@ -30,8 +31,11 @@ export function MetricCard({
   color: string;
   Icon: LucideIcon;
   domain?: [number, number];
+  times?: string[]; // real x-axis labels (live); falls back to the deterministic mock labels
 }) {
-  const series = data.map((v, i) => ({ t: tlabel(i), v }));
+  // Live: real timestamps right-aligned onto the data; mock: the deterministic tlabel window.
+  const off = times ? times.length - data.length : 0;
+  const series = data.map((v, i) => ({ t: times?.[off + i] ?? tlabel(i), v }));
   const id = `g-${label.replace(/\s/g, "")}`;
   // Dedupe: a short live series can land first/mid/last in the same minute → identical
   // tick labels → recharts duplicate-key warning. Unique tick values fix it.
@@ -61,6 +65,11 @@ export function MetricCard({
         )}
       </div>
       <div className="h-[88px]">
+        {data.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-[11.5px]" style={{ color: "var(--ink-3)" }}>
+            No Data
+          </div>
+        ) : (
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={series} margin={{ top: 4, right: 6, bottom: 0, left: 0 }}>
             <defs>
@@ -81,6 +90,7 @@ export function MetricCard({
             <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.75} fill={`url(#${id})`} isAnimationActive={false} dot={false} />
           </AreaChart>
         </ResponsiveContainer>
+        )}
       </div>
       {sub && (
         <span className="tnum text-[10.5px]" style={{ color: "var(--panel-ink-3)" }}>

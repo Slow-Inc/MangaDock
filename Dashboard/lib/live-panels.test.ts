@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { gatewayHealth, applyMitSubsystems, mitTranslateStage, liveGatewayProbe } from "./live-panels";
+import { gatewayHealth, applyMitSubsystems, mitTranslateStage, liveGatewayProbe, livePipelineStages } from "./live-panels";
 import type { Subsystem } from "./health";
 import type { MitLive } from "./live-map";
 
@@ -77,4 +77,22 @@ test("liveGatewayProbe: unreachable = control down", () => {
 
 test("liveGatewayProbe: no probe → null", () => {
   expect(liveGatewayProbe(mit({ gateway: null }))).toBeNull();
+});
+
+test("livePipelineStages: before the first translate (no stages, no translate) every stage is idle", () => {
+  const p = livePipelineStages([], null);
+  expect(Object.keys(p)).toEqual(["detect", "ocr", "translate", "inpaint", "render"]);
+  expect(Object.values(p).every((s) => s.status === "idle")).toBe(true);
+});
+
+test("livePipelineStages: a stage MIT timed is success with its elapsedMs; untimed stays idle", () => {
+  const p = livePipelineStages([{ id: "detect", liveMs: 840 }, { id: "ocr", liveMs: 1290 }], null);
+  expect(p.detect).toEqual({ status: "success", elapsedMs: 840 });
+  expect(p.ocr).toEqual({ status: "success", elapsedMs: 1290 });
+  expect(p.inpaint).toEqual({ status: "idle" });
+});
+
+test("livePipelineStages: translate keeps the richer gateway-derived state, no faked detail", () => {
+  const p = livePipelineStages([{ id: "detect", liveMs: 840 }], { status: "error" });
+  expect(p.translate).toEqual({ status: "error" }); // no elapsedMs/detail invented
 });
