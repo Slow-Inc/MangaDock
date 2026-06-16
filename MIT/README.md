@@ -152,8 +152,9 @@ curl http://localhost:5003/health
 | GET | `/health` | ตรวจสอบสถานะ service, worker, และ queue (front ขึ้น) |
 | GET | `/ready` | worker พร้อมแปลจริง (200) หรือยังโหลดอยู่ (503) — ใช้อันนี้สำหรับ readiness |
 | POST | `/queue-size` | ดูจำนวนงานที่รออยู่ในคิว |
-| GET | `/status` | **Dev console** (PRD #279, ADR 017): snapshot host/GPU/gateway/queue/worker — ต้องมี Supabase JWT (staff) |
-| GET | `/status/stream` | **Dev console**: SSE — sample metric ทุก ~3s + push event (enqueue / worker) ต้องมี Supabase JWT (staff) |
+| GET | `/status` | **Dev console** (PRD #279, ADR 017): snapshot host/GPU/gateway/queue(+jobs)/worker(+pid/uptime)/**stage-timing**/**per-model VRAM (leak)** — ต้องมี Supabase JWT (staff) |
+| GET | `/status/stream` | **Dev console**: SSE — sample metric ทุก ~3s + push event (enqueue / worker / stage) ต้องมี Supabase JWT (staff) |
+| POST | `/internal/telemetry` | **internal** (worker→parent, `X-Nonce`): worker ส่ง stage-timing + VRAM report เข้า snapshot — ไม่ใช่ public |
 
 > **Dev console auth (`/status*`)**: forward Supabase JWT ของ dev; MIT ตรวจเองผ่าน Supabase `GET /auth/v1/user`
 > (ไม่ต้องมี JWT secret ใน MIT) แล้ว gate ด้วย staffLevel claim หรือ `MIT_STAFF_USER_IDS` allowlist —

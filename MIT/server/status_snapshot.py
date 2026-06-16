@@ -35,19 +35,31 @@ def _derive_status(workers: dict, gateway) -> str:
     return "up"
 
 
-def build_snapshot(*, ts, host, gpus, gateway, queue_size, workers, translator) -> dict:
-    """Compose the full MIT status snapshot served by `GET /status`."""
-    return {
+def build_snapshot(*, ts, host, gpus, gateway, queue_size, workers, translator,
+                   queue_jobs=None, telemetry=None) -> dict:
+    """Compose the full MIT status snapshot served by `GET /status`.
+
+    `queue_jobs` (parent-side: the TaskQueue contents) and `telemetry` (worker-reported
+    stage timings / last-run summary / per-model VRAM, via server.telemetry_store) are
+    optional — absent → omitted, so the snapshot stays lean and the Dashboard reducer
+    (which ignores unknown keys) is unaffected when there's no data."""
+    snap = {
         "service": "mit",
         "ts": ts,
         "status": _derive_status(workers, gateway),
         "host": host,
         "gpus": gpus,
         "gateway": _gateway_dict(gateway),
-        "queue": {"size": queue_size},
+        "queue": {"size": queue_size, "jobs": queue_jobs or []},
         "workers": workers,
         "translator": translator,
     }
+    if telemetry:
+        # Only surface the worker-reported sections that actually have data.
+        for key in ("stages", "vram"):
+            if telemetry.get(key):
+                snap[key] = telemetry[key]
+    return snap
 
 
 def to_messages(snapshot: dict) -> list[dict]:
