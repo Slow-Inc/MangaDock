@@ -36,6 +36,8 @@ from server import metrics, diagnostics, auth as dev_auth
 from server.status_snapshot import build_snapshot, to_messages
 from server.status_hub import status_hub
 from server.status_stream import status_frames
+from server.telemetry_store import telemetry_store
+from server.worker_view import workers_detail
 
 app = FastAPI(
     title="Manga Image Translator",
@@ -120,6 +122,21 @@ async def register_instance(instance: ExecutorInstance, req: Request, req_nonce:
                         "detail": f"worker registered · {instance.ip}:{instance.port}"})
 
 
+@app.post("/internal/telemetry", response_description="no response", tags=["internal-api"])
+async def internal_telemetry(payload: dict, req_nonce: str = Header(alias="X-Nonce")):
+    """Worker → parent pipeline telemetry for the Dev console (#279): per-stage durations,
+    last-run summary, per-model VRAM. Same X-Nonce auth as /register; folds into the
+    telemetry_store the /status snapshot reads, and pushes a status_hub event when notable.
+    Never raises on a malformed body (store.apply ignores it) — the worker must not be able
+    to break the parent."""
+    if req_nonce != nonce:
+        raise HTTPException(401, detail="Invalid nonce")
+    event = telemetry_store.apply(payload)
+    if event is not None:
+        status_hub.publish(event)
+    return {"ok": True}
+
+
 # ── Dev console — Staff Console observability (PRD #279, ADR 016) ──────────────
 # GET /status (JSON snapshot) + GET /status/stream (SSE: sampled host/GPU metrics +
 # pushed events), gated by an independently-verified forwarded Supabase JWT. Built on
@@ -187,8 +204,11 @@ async def _collect_snapshot() -> dict:
         gpus=m["gpus"],
         gateway=await _probe_gateway(),
         queue_size=len(task_queue.queue),
-        workers={"alive": alive, "total": len(workers), "free": executor_instances.free_executors()},
+        queue_jobs=task_queue.jobs_snapshot(),
+        workers={"alive": alive, "total": len(workers), "free": executor_instances.free_executors(),
+                 "detail": workers_detail(executor_instances.detail_raws(), time.monotonic())},
         translator=_default_translator().value,
+        telemetry=telemetry_store.snapshot(),
     )
 
 

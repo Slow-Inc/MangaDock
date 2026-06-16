@@ -19,6 +19,8 @@ from .region_apply import apply_original_as_translation, apply_render_casing, ap
 from .model_usage_tracker import ModelUsageTracker
 from .model_unloader import ModelUnloader
 from .memory_guard import release_memory
+from .vram_tracker import VramTracker
+from .vram_probe import read_allocated_mb, read_vram
 from .context_counts import context_page_counts
 from .dictionary import load_dictionary, apply_dictionary, apply_post_dictionary
 from .prev_context import build_prev_context
@@ -158,6 +160,9 @@ class MangaTranslator:
         apply_global_settings(params)
 
         self._model_usage_tracker = ModelUsageTracker()
+        # Dev console (#279): per-model VRAM leak detection — the unloader measures how
+        # much each unload actually frees (freed ≈ 0 while resident = a leak).
+        self._vram_tracker = VramTracker()
         self._model_unloader = ModelUnloader(
             {
                 'colorization': unload_colorization,
@@ -169,6 +174,8 @@ class MangaTranslator:
             },
             empty_cache=torch.cuda.empty_cache,
             cuda_available=torch.cuda.is_available,
+            read_vram=read_allocated_mb,
+            vram_tracker=self._vram_tracker,
         )
         self._model_reaper = ModelReaper(self._model_usage_tracker, self._model_unloader, lambda: self.models_ttl)
         self._model_lifecycle = ModelLifecycle(self._model_reaper, {
@@ -610,6 +617,15 @@ class MangaTranslator:
 
     async def _unload_model(self, tool: str, model: str):
         await self._model_unloader.unload(tool, model)
+
+    def vram_report(self) -> dict:
+        """Dev-console VRAM telemetry (#279): the worker's torch allocated/reserved
+        (the bloat signal) + per-model footprint & leak flags from the unload tracker.
+        Empty {} when CUDA is unavailable (CPU worker)."""
+        g = read_vram()
+        if g is None:
+            return {}
+        return {**g, "models": self._vram_tracker.models()}
 
 
     async def _run_ocr(self, config: Config, ctx: Context):
