@@ -28,6 +28,12 @@ export function StageTimingPanel({ stages }: { stages: StageTiming[] }) {
         )}
       </div>
 
+      {stages.length === 0 ? (
+        <div className="flex items-center justify-center px-5 pb-4" style={{ minHeight: 180, color: "var(--ink-3)" }}>
+          No Data
+        </div>
+      ) : (
+      <>
       <div className="overflow-x-auto px-5 pb-3">
         <table className="w-full border-collapse">
           <thead>
@@ -56,6 +62,8 @@ export function StageTimingPanel({ stages }: { stages: StageTiming[] }) {
       <div className="px-5 pb-4 text-[11px]" style={{ color: "var(--panel-ink-3)" }}>
         total <span className="tnum" style={{ color: "var(--panel-ink-2)" }}>{(r.totalLiveMs / 1000).toFixed(1)}s</span> vs {(r.totalBaselineMs / 1000).toFixed(1)}s baseline · flag at ≥{REGRESSION_PCT}%
       </div>
+      </>
+      )}
     </section>
   );
 }

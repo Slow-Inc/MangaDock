@@ -1,7 +1,7 @@
 "use client";
 
 import { Activity } from "lucide-react";
-import { gen } from "@/lib/series";
+import { gen, TIME } from "@/lib/series";
 import { TimeChart, type ChartMetric } from "@/components/time-chart";
 
 // Detailed GPU/host time-series (ADR 016 §1d) — beyond util/VRAM/CPU/RAM.
@@ -15,7 +15,44 @@ const METRICS: ChartMetric[] = [
   { key: "cpuUsage", title: "CPU Usage", unit: "%", color: "var(--success)", dec: 0, domain: [0, 100], data: gen(42, 18, { spike: 0.3, phase: 2, min: 8, max: 92 }) },
 ];
 
-export function GpuDetail() {
+// Live source per chart: only GPU temp / fan / power / CPU usage are reported by MIT.
+// CPU temp, graphics clock and CPU clock have no live feed → null (renders "No Data").
+const LIVE_KEY: Record<string, string | null> = {
+  gpuTemp: "gpuTemp",
+  cpuTemp: null,
+  gfxClock: null,
+  fan: "fan",
+  power: "power",
+  cpuClock: null,
+  cpuUsage: "cpu",
+};
+
+// Pair a rolling series buffer onto the X axis, latest samples right-aligned. `times`
+// (live, real epoch-derived labels) is used when present; else the mock TIME window.
+function toData(values: number[], dec: number, times?: string[]): { t: string; v: number }[] {
+  const axis = times && times.length ? times : TIME;
+  const n = Math.min(values.length, axis.length);
+  const vals = values.slice(-n);
+  const ts = axis.slice(-n);
+  const f = Math.pow(10, dec);
+  return vals.map((v, i) => ({ t: ts[i], v: Math.round(v * f) / f }));
+}
+
+function NoDataCard({ m }: { m: ChartMetric }) {
+  return (
+    <div className="rounded-xl px-3 pt-2.5 pb-1.5" style={{ background: "var(--panel-2)", border: "1px solid var(--panel-hairline)" }}>
+      <div className="mb-1 flex items-baseline justify-between">
+        <span className="text-[11.5px] font-semibold" style={{ color: "var(--panel-ink-2)" }}>{m.title}</span>
+        <span className="tnum text-[12.5px] font-semibold" style={{ color: "var(--panel-ink-3)" }}>— {m.unit}</span>
+      </div>
+      <div className="flex items-center justify-center" style={{ height: 112, color: "var(--ink-3)" }}>
+        No Data
+      </div>
+    </div>
+  );
+}
+
+export function GpuDetail({ series, times }: { series?: Record<string, number[]>; times?: string[] }) {
   return (
     <section className="theme-tx overflow-hidden rounded-[var(--radius)]" style={{ background: "var(--panel)", boxShadow: "var(--shadow-panel)", border: "1px solid var(--panel-hairline)" }}>
       <div className="flex items-center gap-2.5 px-5 pt-4 pb-3">
@@ -26,9 +63,13 @@ export function GpuDetail() {
         <span className="tnum text-[11px]" style={{ color: "var(--panel-ink-3)" }}>nvidia-smi · 5s</span>
       </div>
       <div className="grid grid-cols-1 gap-2.5 px-5 pb-4 sm:grid-cols-2 xl:grid-cols-3">
-        {METRICS.map((m) => (
-          <TimeChart key={m.key} m={m} />
-        ))}
+        {METRICS.map((m) => {
+          if (!series) return <TimeChart key={m.key} m={m} />;
+          const src = LIVE_KEY[m.key];
+          const values = src ? series[src] : undefined;
+          if (!values || values.length === 0) return <NoDataCard key={m.key} m={m} />;
+          return <TimeChart key={m.key} m={{ ...m, data: toData(values, m.dec, times) }} />;
+        })}
       </div>
     </section>
   );

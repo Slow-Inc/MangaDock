@@ -39,6 +39,12 @@ export function TranslateQueue({ jobs, now }: { jobs: QueueJob[]; now: number })
         </div>
       </div>
 
+      {jobs.length === 0 ? (
+        <div className="flex items-center justify-center px-5" style={{ minHeight: 140, color: "var(--ink-3)" }}>
+          <span className="text-[12px]">No jobs in queue</span>
+        </div>
+      ) : (
+      <>
       <div className="overflow-x-auto px-5 pb-1">
         <table className="w-full border-collapse">
           <thead>
@@ -76,6 +82,8 @@ export function TranslateQueue({ jobs, now }: { jobs: QueueJob[]; now: number })
       <div className="px-5 pb-4 pt-2.5 text-[11px]" style={{ color: "var(--panel-ink-3)" }}>
         oldest wait <span className="tnum" style={{ color: "var(--panel-ink-2)" }}>{s(q.oldestWaitMs)}</span> · {q.done} done · {q.failed} failed
       </div>
+      </>
+      )}
     </section>
   );
 }
