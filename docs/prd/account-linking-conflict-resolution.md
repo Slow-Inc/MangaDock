@@ -1,7 +1,10 @@
 # PRD — Account-linking conflict resolution ("choose which account to link")
 
-> Status: Draft (2026-06-15). Source research: `docs/research/oauth-account-linking-conflict.md`
+> Status: Draft (2026-06-15; updated 2026-06-16). Source research: `docs/research/oauth-account-linking-conflict.md`
 > (verify-first workflow, validated against live `mangadock` build + GoTrue source). Relates to ADR 017.
+> **2026-06-16 decision (verified by feasibility workflow):** the email ownership proof = **OTP code, not magic-link**
+> (see *Decision* below). The supported `linkIdentity`-while-signed-in path is GoTrue-source-confirmed; the
+> `service_role` INSERT fallback is **not** needed for the happy path.
 > EN + ไทย (ไทยแปลเต็ม).
 
 ## Problem Statement
@@ -53,7 +56,7 @@ the attacker's social account happens to list). The `linking_target_id` column i
   1. On a caught "Multiple accounts" error (or a "Link GitHub" click), Backend resolves candidates:
      `SELECT u.id,u.email,i.provider FROM auth.users u JOIN auth.identities i ON i.user_id=u.id WHERE i.identity_data->>'email' = ANY($1) AND u.is_sso_user=false;` — return **masked** identifiers only (anti-enumeration).
   2. Chooser UI lists masked candidates; user picks one.
-  3. **Ownership proof:** require an active session as that exact user (`signInWithPassword` / `signInWithOAuth`); optional extra `auth.admin.generateLink` magic-link/OTP to the chosen email.
+  3. **Ownership proof** (an active session as that exact user — the security gate): `signInWithPassword` for a password account, `signInWithOAuth` to an already-linked provider, or the universal **email OTP** — `signInWithOtp({ email, options:{ shouldCreateUser:false } })` then `verifyOtp({ email, token, type:'email' })`. For the email path use an **OTP code, not a magic-link** (see *Decision* below). `shouldCreateUser:false` is mandatory — fail closed, a mistyped email must not silently create a new account.
   4. With that session, `linkIdentity({provider:'github'})` → `linkIdentityToUser`, no 500. Handle 422 `identity_already_exists` explicitly.
 - **Gated fallback (only if a live repro proves the supported path broken on our build):** Backend custom GitHub
   OAuth captures the numeric `sub`; after the ownership re-auth, a single-txn `service_role` INSERT into `auth.identities`
@@ -62,6 +65,54 @@ the attacker's social account happens to list). The `linking_target_id` column i
   schema-assertion guard (`UNIQUE(provider_id,provider)` + generated `email`) so a GoTrue migration fails loudly.
 - **Security (non-negotiable):** attach target = the re-authenticated session user, always. Candidates masked. Only
   offer candidates whose email is in the social provider's **verified** set.
+
+## Decision (2026-06-16): email ownership proof = OTP code, not magic-link
+
+For the email-based ownership proof (the universal method when the account isn't reachable by password / an
+already-linked OAuth provider), send a **6-digit OTP code**, not a magic-link. Both use the same `signInWithOtp`
+API — the **email template** chooses what's shown (`{{ .Token }}` = code, `{{ .ConfirmationURL }}` = link) — so this
+is a template setting, not a code change.
+
+Why OTP wins **for this flow specifically** (verified against Supabase/GoTrue, feasibility workflow 2026-06-16):
+1. **Chained orchestration.** The flow doesn't end at sign-in — it must immediately chain into `linkIdentity({github})`.
+   A magic-link opens a **new tab / navigation**, so the "pending: link GitHub" state in the originating tab is lost and
+   the chain breaks. An OTP is entered in the **same tab**, so `verifyOtp` → `linkIdentity` runs in one continuous context.
+2. **PKCE same-browser.** A magic-link's code-verifier lives in the browser that started the flow; clicked from an email
+   client (esp. a mobile in-app webview) it often lands in a different browser → the code exchange fails. OTP has no
+   redirect and no verifier dependency.
+3. **Proof strength.** An OTP typed into the tab that started the flow proves the same actor controls the email; a
+   magic-link can be clicked anywhere.
+4. Users here are dev/staff → typing a 6-digit code is not meaningful friction.
+
+Magic-link would be preferable only for a single-destination sign-in (no follow-up step) — not our case.
+
+**Client sequence:** `signInWithOtp({ email, options:{ shouldCreateUser:false } })` → user enters code →
+`verifyOtp({ email, token, type:'email' })` → on that session `linkIdentity({ provider:'github', options:{ redirectTo: callbackUrl() } })`.
+
+**Operational:** customize the Supabase "Magic Link" email template to surface `{{ .Token }}` (optionally drop the link
+to avoid confusion); handle OTP expiry (~1h default) + resend; rely on Supabase's built-in attempt limiting and add a UI
+lockout after repeated failures.
+
+**(ไทย)** สำหรับการพิสูจน์ความเป็นเจ้าของผ่าน email (วิธีสากลเมื่อเข้าบัญชีด้วย password หรือ OAuth ที่ link ไว้แล้วไม่ได้)
+ให้ส่ง **OTP code 6 หลัก ไม่ใช่ magic-link** ทั้งสองใช้ API `signInWithOtp` ตัวเดียวกัน ต่างที่ **email template**
+(`{{ .Token }}` = code, `{{ .ConfirmationURL }}` = link) จึงเป็นแค่การตั้ง template ไม่ใช่แก้โค้ด
+
+ทำไม OTP ดีกว่า **เฉพาะ flow นี้** (verified กับ Supabase/GoTrue, feasibility workflow 2026-06-16):
+1. **Chained orchestration** — flow ไม่จบที่ sign-in ต้อง chain ไป `linkIdentity({github})` ต่อทันที magic-link เปิด
+   **tab/หน้าใหม่** → state "pending: link GitHub" ใน tab เดิมหาย → chain พัง OTP กรอกใน **tab เดิม** →
+   `verifyOtp` → `linkIdentity` รันต่อใน context เดียวกัน
+2. **PKCE same-browser** — code-verifier ของ magic-link อยู่ใน browser ที่เริ่ม flow คลิกจาก email app
+   (โดยเฉพาะ in-app webview มือถือ) มักเด้งไป browser อื่น → code exchange fail OTP ไม่มี redirect ไม่พึ่ง verifier
+3. **ความแข็งแรงของ proof** — OTP กรอกใน tab ที่เริ่ม flow = คนเดียวกันคุม email magic-link คลิกที่ไหนก็ได้
+4. ผู้ใช้คือ dev/staff → กรอก 6 หลักไม่เป็นภาระ
+
+magic-link เหมาะกว่าเฉพาะ sign-in ปลายทางเดียวที่ไม่มี step ต่อ — ไม่ใช่กรณีเรา
+
+**ลำดับ client:** `signInWithOtp({ email, options:{ shouldCreateUser:false } })` → user กรอก code →
+`verifyOtp({ email, token, type:'email' })` → บน session นั้น `linkIdentity({ provider:'github', options:{ redirectTo: callbackUrl() } })`
+
+**Operational:** แก้ template "Magic Link" ใน Supabase ให้โชว์ `{{ .Token }}` (จะเอาลิงก์ออกด้วยก็ได้ กันสับสน)
+จัดการ OTP หมดอายุ (~1 ชม. default) + resend อาศัย attempt-limit ของ Supabase + เพิ่ม UI lockout หลังพลาดหลายครั้ง
 
 ## Testing Decisions
 
@@ -77,5 +128,5 @@ the attacker's social account happens to list). The `linking_target_id` column i
 
 ## Further Notes
 
-- Decisive **Step 0** (no code): signed in as the target user, `linkIdentity({provider:'github', options:{skipBrowserRedirect:true}})`, inspect the callback. If it returns a github identity, the whole happy path needs **zero `auth.*` writes**.
+- **Step 0 — RESOLVED (2026-06-16):** the feasibility workflow (GoTrue-source-verified) + the production `GithubAutoLink` (which already runs signed-in `linkIdentity({github})`) confirm the happy path needs **zero `auth.*` writes** — `linkIdentityToUser` never runs the multi-account check. The gated `service_role` INSERT fallback is therefore **not required** for the happy path; keep it only as a documented break-glass.
 - Backend is being refactored by akkanop-x — the happy path adds exactly **one read-only route**; coordinate before merge. The fallback's `service_role` write is conditional and must be flagged.
