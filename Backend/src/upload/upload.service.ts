@@ -6,12 +6,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as fs from 'fs';
-import * as path from 'path';
 import * as crypto from 'crypto';
+import { fileTypeFromFile } from 'file-type';
 import { SupabaseService } from '../supabase/supabase.service';
 import { VersionsService } from '../versions/versions.service';
 import type { ChapterVersion } from '../versions/versions.types';
-import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import {
+  STORAGE_PROVIDER,
+  type StorageProvider,
+} from '../common/storage/storage-provider.interface';
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
@@ -49,12 +52,19 @@ export class UploadService {
     versionId: string,
     translatorUid: string,
     tempFilePath: string,
-    mimeType: string,
   ): Promise<{ pageUrl: string; pageIndex: number }> {
-    if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+    // Validate by magic bytes, not the client-supplied Content-Type (which is
+    // attacker-controlled). A disguised payload (e.g. <script> sent as image/png)
+    // is rejected here; an empty/truncated/undetectable file yields no detection.
+    // Mirrors forum.service uploadImage/uploadBanner. (#303)
+    const detected = await fileTypeFromFile(tempFilePath);
+    if (!detected || !ALLOWED_MIME_TYPES.has(detected.mime)) {
       if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new BadRequestException('Unsupported image format. Only JPEG, PNG, WebP and GIF are accepted.');
+      throw new BadRequestException(
+        'Unsupported image format. Only JPEG, PNG, WebP and GIF are accepted.',
+      );
     }
+    const mimeType = detected.mime;
 
     const ext = MIME_TO_EXT[mimeType];
     const filename = `${crypto.randomUUID()}${ext}`;
@@ -116,7 +126,8 @@ export class UploadService {
         query = query.eq('updated_at', versionRow.updated_at);
       }
 
-      const { data: updatedRows, error: updateError } = await query.select('version_id');
+      const { data: updatedRows, error: updateError } =
+        await query.select('version_id');
 
       if (updateError) {
         await this.storage.delete(key);
@@ -124,13 +135,17 @@ export class UploadService {
       }
 
       if ((updatedRows ?? []).length > 0) {
-        this.logger.log(`Page ${filename} added to version ${versionId} (index ${pageIndex})`);
+        this.logger.log(
+          `Page ${filename} added to version ${versionId} (index ${pageIndex})`,
+        );
         return { pageUrl, pageIndex };
       }
     }
 
     await this.storage.delete(key);
-    throw new BadRequestException('Concurrent update conflict, please retry upload');
+    throw new BadRequestException(
+      'Concurrent update conflict, please retry upload',
+    );
   }
 
   async reorderPages(
@@ -150,7 +165,9 @@ export class UploadService {
       }
     }
     if (orderedUrls.length !== version.pages.length) {
-      throw new BadRequestException('Reorder list must contain all existing pages');
+      throw new BadRequestException(
+        'Reorder list must contain all existing pages',
+      );
     }
 
     await this.versionsService.setPages(versionId, translatorUid, orderedUrls);
@@ -177,9 +194,8 @@ export class UploadService {
     try {
       await this.storage.delete(key);
       this.logger.log(`Deleted page ${filename} from version ${versionId}`);
-    } catch (err) {
+    } catch {
       this.logger.warn(`Failed to delete file from storage: ${key}`);
     }
   }
 }
-
