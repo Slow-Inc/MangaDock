@@ -6,7 +6,9 @@ import { Request, Response, NextFunction } from 'express';
 
 describe('HardwareIdMiddleware', () => {
   let middleware: HardwareIdMiddleware;
-  let mockRequest: Partial<Request>;
+  // Express `Request.path` is read-only; use a mutable shape so the per-case
+  // `mockRequest.path = …` assignments type-check, then cast at the call site.
+  let mockRequest: Partial<Omit<Request, 'path'>> & { path: string };
   let mockResponse: Partial<Response>;
   let nextFunction: NextFunction;
 

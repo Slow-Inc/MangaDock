@@ -3,7 +3,7 @@
 - [Project: Community Forum Feature](project_community_forum.md) — Community forum on feat/community-forum branch; image upload added May 2026
 - [Project: Cache Phase 2 Hardening](project_cache_phase2.md) — Phase 2.1–2.5 COMPLETE (PRs #39/#49/#50/#55/#70/#71); 279 tests; see [[project-cache-quality-gaps]]
 - [Project: Cache Quality Gaps](project_cache_quality_gaps.md) — จุดอ่อนที่รู้ตัวหลัง Phase 2: redis.service under-tested, ไม่มี integration test, dead-letter ไม่มี runbook
-- [Project: Backend pre-existing test failures](project_backend_pre_existing_test_failures.md) — books suite มี 16 fail (14 pubsub-batch + 2 hmac) ที่ค้างมาก่อน อย่าไล่เป็น regression
+- [Project: Backend pre-existing test failures](project_backend_pre_existing_test_failures.md) — baseline สะอาดแล้ว (#298): src/books 214 green + tsc 0 error; 16 fail เดิม + 2 tsc error แก้หมด → failure ใหม่ใดๆ ถือเป็นของ change ตัวเอง
 - [Project: Dev machine commit memory ตึง](project_dev_commit_memory.md) — Qwen3 โหลดพังด้วย OSError 1455 ถ้า commit เหลือ <15GB; MIT worker ตายเงียบ → เช็คก่อนทดสอบ translator
 - [Project: MIT worker restart gotcha](project_mit_worker_restart_gotcha.md) — process = python3.11.exe (Stop-Process python พลาด); kill by PORT OWNER บน 5003+5004 ไม่งั้น orphan worker เสิร์ฟโค้ดเก่า; debug pipeline ใช้ in-process ไม่ใช่ worker-HTTP
 - [Reference: MangaTranslator study](project_mangatranslator_study.md) — **pointer** ไป deep-scan ตัวจริงใน `docs/research/` (translator-deep-dissection ฯลฯ); headline: OCR=LLM-vision, inpaint=Flux, seg=SAM2/3, detect=YOLO; gap เรา=inpaint LaMa<Flux+ไม่มี SAM (Flux/SAM จงใจไม่เอา เครื่องตึง); re-verify: Flux sd.cpp→diffusers

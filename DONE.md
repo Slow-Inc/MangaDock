@@ -3,6 +3,19 @@
 
 ---
 
+## #298 — clear 2 standing tsc errors in specs + refresh stale test-failures memory (2026-06-17, /tdd, branch `chore/298-clear-tsc-spec-errors`)
+
+Mechanical cleanup. `npx tsc --noEmit` reported exactly 10 errors, all in two spec files; reproduced first, then fixed at the single root of each.
+
+- **`cache/l3-batch-writer.spec.ts` (TS2339 ×4, lines 75/93/113/129 — `mockClear` missing).** Root: `makeL3()` cast `{ write: jest.fn() }` to `L3DiskService`, erasing the `jest.Mock` type so `l3.write.mockClear()` was invalid. Fix: return `L3DiskService & { write: jest.Mock }` — one line, the mock keeps the real interface *and* the jest-mock surface.
+- **`common/middleware/hardware-id.middleware.spec.ts` (TS2540 ×6 — read-only `path`).** Root: `mockRequest: Partial<Request>`, and Express `Request.path` is read-only, so each `mockRequest.path = …` failed. Fix: type it `Partial<Omit<Request, 'path'>> & { path: string }` — `path` mutable, the `as Request` cast at the call sites unchanged.
+
+**Verify:** `npx tsc --noEmit` → 0 errors. Both specs run green (53 tests). `npx jest src/books` → 29 suites / 214 tests, **no 14-failure pubsub suite** (deleted in #231). AC all met.
+
+**Memory refresh:** `.claude/memory/project_backend_pre_existing_test_failures.md` was stale (claimed 16 books failures). Rewrote it + the local copy + the `MEMORY.md` index line: baseline is now **clean** (books 214 green, tsc 0); the 14 pubsub failures (suite deleted #231), 2 hmac failures (fixed #95), and these 2 tsc errors (#298) are all resolved → treat any new failure as your own.
+
+No production code touched (test + memory only); no ADR needed (mechanical, no decision).
+
 ## Flux.2 Klein-4B optional inpainter — feasibility proven + PRD/issues (2026-06-14, ultracode)
 
 Closed out the #268 "VRAM-neutral band fix" research: **no classical lever fixes the band cleanly** — `lama_lum_reground` was *measured* to move the band the wrong way (146→154), `mask_tighten` left a **ghost** of the original text everywhere it sat, `seamless_clone` had no effect. The band's *texture* component (LaMa's smooth fill vs hair strands) needs reconstruction, not luminance math. Disabled `MIT_MASK_TIGHTEN` (ghost fix); did **not** merge the non-Flux levers branch — main stays at #265.
