@@ -24,3 +24,7 @@ Two pre-existing `tsc --noEmit` errors in spec files — cleared on branch `fix/
 - `src/common/middleware/hardware-id.middleware.spec.ts` — TS2540 ×6: `mockRequest.path` read-only (Express types declare `path` as getter). Fix: `let mockRequest: Omit<Partial<Request>, 'path'> & { path?: string }`.
 
 `npx tsc --noEmit` now exits 0 on this branch. The 14 books-pubsub-batch failures remain (unrelated).
+
+---
+
+**Update 2026-06-18 (#294):** a full `npx jest` on `Backend/` reported **64 suites / 595 tests, 0 fail** (and `npx jest src/books` 244/0). The `books-pubsub-batch` failures are therefore **environment-dependent on a running Redis**, not unconditional — when Redis is up locally the suite is fully green. Treat the count as a baseline to diff against, but do not assume 14 reds when the machine has Redis. Verified clean baseline before the #294 transport/job-state split.
