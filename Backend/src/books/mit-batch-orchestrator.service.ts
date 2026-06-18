@@ -5,6 +5,12 @@ import { type TextLayerRegion } from './translation-memory.repository';
 import { loadPageBytes } from './page-source';
 import { parseNdjsonChunk } from './mit-batch-ndjson';
 import {
+  type PatchEntry,
+  type PageResult,
+  type BatchPageListener,
+  type MitBatchDeps,
+} from './mit-batch-types';
+import {
   mitLangPair,
   buildJobKey,
   patchCacheKey,
@@ -13,15 +19,14 @@ import {
   parseJobKey,
 } from './mit-config';
 
-type PatchEntry = {
-  xPct: number;
-  yPct: number;
-  wPct: number;
-  hPct: number;
-  url: string;
-};
-type PageResult = { patches: PatchEntry[]; error?: string };
-export type BatchPageListener = (pageIndex: number, result: PageResult) => void;
+// Re-export the shared types so existing importers (e.g. books.service) keep
+// their import path unchanged. The definitions now live in ./mit-batch-types.
+export type {
+  PatchEntry,
+  PageResult,
+  BatchPageListener,
+  MitBatchDeps,
+} from './mit-batch-types';
 
 interface BatchJobState {
   /** Pages that have already been processed (cached + saved) */
@@ -45,46 +50,6 @@ interface BatchJobState {
   reject?: (err: any) => void;
   /** Number of pages we are waiting for */
   expectedCount: number;
-}
-
-/**
- * Collaborators BooksService injects so the batch path can persist a page,
- * resolve series context, and fall back to the single-page translate without
- * owning PatchStore / TranslationMemory / MangaDex / MitTranslationService.
- * These stay in BooksService (shared with the single-page path), so the
- * dependency stays one-way (BooksService → MitBatchOrchestrator).
- */
-export interface MitBatchDeps {
-  persistPage: (p: {
-    chapterId: string;
-    pageIndex: number;
-    srcMIT: string;
-    tgtMIT: string;
-    storeModel?: string;
-    cacheKey: string;
-    cacheStrategy: 'plain7d' | 'tiered';
-    rects: Array<{ x: number; y: number; w: number; h: number }>;
-    buffers: Buffer[];
-    imgW: number;
-    imgH: number;
-    regions?: TextLayerRegion[];
-    tmModel?: string;
-    recoverIfEmpty?: () => Promise<PatchEntry[]>;
-  }) => Promise<PatchEntry[]>;
-  seriesContextFor: (mangaId?: string) => Promise<string | undefined>;
-  translateSinglePage: (
-    chapterId: string,
-    pageIndex: number,
-    pageUrl: string,
-    sourceLang?: string,
-    targetLang?: string,
-    opts?: {
-      maxStartupRetries?: number;
-      imageModel?: string;
-      derivative?: 'hd' | 'saver';
-      mangaId?: string;
-    },
-  ) => Promise<{ patches: PatchEntry[] }>;
 }
 
 /**
