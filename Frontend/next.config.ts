@@ -110,6 +110,11 @@ const nextConfig: NextConfig = {
         hostname: "api.hayateotsu.space",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "api.2552667.xyz",
+        pathname: "/**",
+      },
     ],
   },
 };

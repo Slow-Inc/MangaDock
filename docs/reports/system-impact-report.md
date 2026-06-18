@@ -15,6 +15,26 @@
 
 ---
 
+## 2026-06-17 — Upload path skipped magic-byte MIME validation (security bug) — #303
+
+**Severity:** medium (defense-in-depth gap / stored-disguised-file; contradicted a documented control) · **Branch:** `fix/303-upload-magic-byte-validation` (off `main`), TDD (RED→GREEN), not yet PR'd. Surfaced by #296 while writing the magic-byte tests. · **ADR:** [016](../adr/016-upload-magic-byte-mime-validation.md).
+
+**What & where:** `Backend/src/upload/upload.service.ts:addPage` now validates by magic bytes (`await fileTypeFromFile(tempFilePath)`) and derives the stored extension from the **detected** mime; the client `mimeType` arg is removed. `upload.controller.ts` keeps the Multer `fileFilter` client-mime check as a cheap first gate only and no longer threads `file.mimetype` into the service. Mirrors the existing `forum.service.ts:444,489` control.
+
+**Why:** both layers trusted the **client-supplied** Content-Type. `fileFilter` reads `file.mimetype` (set by Multer from the attacker-controlled multipart `Content-Type`), and `addPage` re-checked that same value against `ALLOWED_MIME_TYPES` without ever reading the bytes — contradicting `CLAUDE.md` ("upload — MIME validated with `file-type` (magic bytes, not extension)").
+
+**Before → After:** a `<script>…</script>` payload sent with `Content-Type: image/png` passed both gates and was stored as `.png` with `contentType: image/png` → it is now **rejected** (`BadRequestException`) before reaching storage, even when filename/extension/client-mime claim image. A client lying `image/png` over WebP bytes is now stored `.webp` (detected mime drives the extension). Empty/truncated/undetectable files are rejected gracefully; the temp file is unlinked on every reject path.
+
+**Performance Δ:** one extra on-disk read per upload (`fileTypeFromFile`) — negligible vs the upload itself. **Quality:** the documented control is now real for this module; upload + forum share one validation posture. **Validation:** new `upload.service.spec.ts` (8 tests, TDD): disguised-file reject (RED on the old code = mutation check), undetectable reject, temp-file-deleted-on-reject (real temp file), all 4 allowed types accepted, extension derived from detected mime. Full backend **58 suites / 540 tests green**; `eslint` clean on the 3 touched files; no new `tsc` errors (the 10 standing are #298, not yet merged to this branch). **Not run:** live in-app upload E2E (`feedback_test_every_round`) — recommend a confirmatory pass with the PR.
+
+**Risk / rollback:** Low. Single-file behaviour change on the reject side (stricter), each commit revertible. `file-type` is ESM-only → tests use the existing `src/__mocks__/file-type.js` mock (same as forum). **Note:** the `CLAUDE.md` upload claim was aspirational before this fix; it is now accurate.
+
+**Open follow-ups:** factor a shared magic-byte upload-guard helper across `forum.service` + `upload.service` (allowlist + `MIME_TO_EXT` in one place); #303 unblocks **#296** (its security AC is now satisfiable — those tests live in `upload.service.spec.ts`); `err` unused in `deletePage` + dead `path` import were cleaned in passing.
+
+**Links:** #303 (bug), #296 (surfaced it), #292 (parent) · ADR 016 · `forum.service.ts:444,489` (prior art).
+
+---
+
 ## 2026-06-14 — Backend `books.service.ts` decomposition: MIT translation carve (#233 + #234)
 
 **What & where:** Carved the MIT translation subsystem out of the `Backend/src/books/books.service.ts` god object (PRD #228) into focused, individually unit-testable modules: `mit-translation.service.ts` (single-page), `mit-batch-orchestrator.service.ts` (batch state machine), `mit-config.ts` + `mit-lang-map.ts` (pure key/config/lang helpers). · **Branch:** `dept/backend` (off `origin/main`), 8 commits, **not yet pushed/PR'd**. · **Method:** byte-identical, characterization-first, 1 seam = 1 commit (TDD per seam).

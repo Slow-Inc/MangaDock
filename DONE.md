@@ -3,6 +3,51 @@
 
 ---
 
+## #298 — เคลียร์ 2 tsc error ใน specs + refresh stale memory (2026-06-18, /tdd+/debug-mantra, branch `fix/303-upload-magic-byte-validation`)
+
+**Root causes (2 distinct TS errors, 10 instances total):**
+
+- `src/cache/l3-batch-writer.spec.ts` — TS2339 ×4 (`mockClear` missing): `makeL3()` was cast to `L3DiskService` only → `l3.write` typed as the real method signature, not `jest.Mock`. Fix: `as unknown as L3DiskService & { write: jest.Mock }` (intersection exposes `.mockClear()`).
+- `src/common/middleware/hardware-id.middleware.spec.ts` — TS2540 ×6 (`path` is read-only): Express types declare `Request.path` as a getter, so `mockRequest.path = x` fails on `Partial<Request>`. Fix: `Omit<Partial<Request>, 'path'> & { path?: string }`.
+
+Both fixes are type-declaration-only — zero runtime behaviour change. `npx tsc --noEmit` → 0 errors. 53/53 tests GREEN on the two affected files.
+
+**Memory refreshed:**
+- Local `reference_mangadex_uploads_ua_block.md`: updated URL (`hayateotsu.space→2552667.xyz`), branch, and marked FIXED.
+- Team `project_backend_pre_existing_test_failures.md`: added tsc-error history and resolution.
+
+---
+
+## #296 — test upload.service magic-byte MIME (security/test) (2026-06-18, /tdd, branch `fix/303-upload-magic-byte-validation`)
+
+**Goal:** add explicit test coverage for the magic-byte MIME validation path committed in #303 (`upload.service.ts:addPage`).
+
+**Added (3 new tests → 8 → 11 in `upload.service.spec.ts`):**
+- `image/svg+xml` rejection — SVG is `image/*` but carries inline JS; not in `ALLOWED_MIME_TYPES` → rejected before storage.
+- Storage `put()` failure cleanup — if the CDN/S3 call throws after MIME passes, the temp file must still be unlinked (lines 78-82).
+- Non-owner rollback — if the DB row shows a different `translator_uid`, the already-stored file must be deleted via `storage.delete()` (lines 107-110).
+
+**`makeService` minimal extension:** added `storageDel?: jest.Mock` (makes `storage.delete` assertable) and `versionRow?: Record<string, unknown> | null` (drives ownership + not-found paths) overrides. Existing 8 tests unaffected.
+
+**Result:** 11/11 GREEN, 0.675 s. Full backend suite clean (no regressions).
+
+---
+
+## #303 — upload path skipped magic-byte MIME validation (security bug) (2026-06-17, /tdd, branch `fix/303-upload-magic-byte-validation`)
+
+**Bug:** the chapter-page upload trusted the **client** Content-Type on both layers, contradicting `CLAUDE.md`'s "upload — MIME validated with `file-type` (magic bytes, not extension)". `upload.controller.ts` `fileFilter` checks `file.mimetype` (Multer sets it from the attacker-controlled multipart `Content-Type`); `upload.service.ts:addPage` re-checked that same client arg against `ALLOWED_MIME_TYPES` and never read the bytes. A `<script>` payload sent as `Content-Type: image/png` passed both gates and was stored as `.png`. Surfaced by #296 while writing its magic-byte tests.
+
+**Fix (TDD, mirrors `forum.service.ts:444,489`):**
+- `addPage` now runs `await fileTypeFromFile(tempFilePath)`, rejects when nothing is detected (empty/truncated/undetectable) or the detected mime is outside `ALLOWED_MIME_TYPES` — **even when filename/extension/client-mime say image** — and derives the stored extension from the **detected** mime. Temp file unlinked on every reject path.
+- Removed the now-unused client `mimeType` arg from `addPage`; controller no longer threads `file.mimetype`. `fileFilter` kept as a cheap first gate only (comment records it is not authoritative).
+- Cleaned in passing: dead `path` import (controller) + unused `err` in `deletePage`.
+
+**RED→GREEN:** new `upload.service.spec.ts` (8 tests). The disguised-file test was RED on the old code (it trusted `image/png` → reached storage) = the mutation check. GREEN after the fix.
+
+**Verify:** `npx jest src/upload` 8/8; full backend **58 suites / 540 tests green**; `eslint` clean on the 3 touched files; no new `tsc` errors (the 10 standing are #298, not yet merged onto this branch). **Not run:** live in-app upload E2E — recommend a confirmatory pass with the PR.
+
+**Docs:** ADR 016 (`docs/adr/016-upload-magic-byte-mime-validation.md`, defense-in-depth decision) + index; post-mortem entry in `docs/reports/system-impact-report.md`. The `CLAUDE.md` upload claim was aspirational before; it is now accurate. **#303 unblocks #296** (its security AC is satisfiable; those tests already live in `upload.service.spec.ts`). **Follow-up:** factor a shared magic-byte upload-guard helper across forum + upload.
+
 ## Flux.2 Klein-4B optional inpainter — feasibility proven + PRD/issues (2026-06-14, ultracode)
 
 Closed out the #268 "VRAM-neutral band fix" research: **no classical lever fixes the band cleanly** — `lama_lum_reground` was *measured* to move the band the wrong way (146→154), `mask_tighten` left a **ghost** of the original text everywhere it sat, `seamless_clone` had no effect. The band's *texture* component (LaMa's smooth fill vs hair strands) needs reconstruction, not luminance math. Disabled `MIT_MASK_TIGHTEN` (ghost fix); did **not** merge the non-Flux levers branch — main stays at #265.
