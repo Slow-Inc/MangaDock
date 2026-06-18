@@ -204,7 +204,7 @@ describe('fetchProxiedImage', () => {
         captureFetch,
       );
       expect(result.ok).toBe(true);
-      expect(sentUA).toBe('MangaDock/1.0 (+https://hayateotsu.space)');
+      expect(sentUA).toBe('MangaDock/1.0 (+https://2552667.xyz)');
       expect(sentUA).not.toMatch(/Mozilla\/5\.0 \(compatible;/);
     });
   });
