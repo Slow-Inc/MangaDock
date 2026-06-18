@@ -5,7 +5,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ForumController } from './forum.controller';
 import { ForumService } from './forum.service';
 import { ForumEventsService } from './forum-events.service';
-import { AuthGuard, USER_KEY } from '../auth/auth.guard';
+import { AuthGuard, USER_KEY, UID_KEY } from '../auth/auth.guard';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard';
 
 const TEST_USER = { uid: 'test-uid', email: 'test@test.com', name: 'Test User' };
@@ -58,7 +58,9 @@ const mockForumEventsService = {
 
 const mockAuthGuard = {
   canActivate: jest.fn().mockImplementation((ctx) => {
-    ctx.switchToHttp().getRequest()[USER_KEY] = TEST_USER;
+    const req = ctx.switchToHttp().getRequest();
+    req[USER_KEY] = TEST_USER;
+    req[UID_KEY] = TEST_USER.uid;
     return true;
   }),
 };
