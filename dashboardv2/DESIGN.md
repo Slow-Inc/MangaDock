@@ -82,12 +82,16 @@ views, not a new "System" view** (avoids redundancy).
 
 **Overview — anomaly-at-a-glance + cross-service rollup.** See what is wrong without a click; each summary drills
 down:
-1. status chips (connection + MIT health) · 2. incident banner (conditional) · 3. **SystemFlow** (cross-service
-flow FE→BE→MIT) · 4. KPI strip (Pages / Throughput / GPU + Pages/hour bar) · 5. vitals gauges (GPU/VRAM/CPU/RAM ring
-+ arc) + one inverted hero card · 6. **Subsystems board** (FE/BE/MIT/gateway/Redis/Supabase/R2/streams) · 7. node
-heatmap (punch-card, colour = usage; down nodes flagged) → node popup · 8. VRAM donut (per-model + available
-segment) · 9. **Traffic** (users online + bandwidth per service/node) · 10. **Streams** (SSE stream health) ·
-11. Live feed (real `live.events`).
+1. status chips (connection + MIT health) · 2. incident banner (conditional) · 3. KPI strip (Pages / Throughput /
+GPU + Pages/hour bar) · 4. vitals gauges (GPU/VRAM/CPU/RAM ring + arc) + one inverted hero card · 5. **Subsystems
+board** (FE/BE/MIT/gateway/Redis/Supabase/R2/streams) · 6. node heatmap (punch-card, colour = usage; down nodes
+flagged) → node popup · 7. VRAM donut (per-model + available segment) · 8. **Traffic** (users online + bandwidth per
+service/node) · 9. **Streams** (SSE stream health) · 10. Live feed (real `live.events`).
+
+> **SystemFlow dropped (2026-06-18):** the cross-service flow diagram from `:4100` was cut — redundant with the
+> Subsystems board (service health) + the pipeline spine (MIT internal flow), low incident-signal (an architecture
+> diagram, not anomaly-at-a-glance), and mostly static until FE/BE have a live source. Its intent is covered by
+> those two panels.
 
 **MIT — depth tabs:** Pipeline (gateway diagnosis + stage timing + quality) · Telemetry (vitals + **GpuDetail host
 time-charts** + VRAM by model) · Queue (full translate queue) · Workers (lifecycle; click a worker → node popup).
@@ -102,8 +106,8 @@ the Overview feed + incident banner + a red node surface the anomaly, then you d
 logs/console. Today MIT emits one worker + machine-wide GPU/host, so most per-node fields render No Data on real
 data until MIT telemetry is extended per-node (#279 follow-up); the mock fills every field so the UX can be drafted.
 
-**Category coverage (legacy → V2):** SystemFlow / SubsystemBoard / TrafficPanel / StreamHealth → Overview ·
-IncidentSummary → incident banner · PipelinePanel → Overview spine + MIT#pipeline · MetricCards / GpuDetail →
+**Category coverage (legacy → V2):** SubsystemBoard / TrafficPanel / StreamHealth → Overview (SystemFlow **dropped**
+— see above) · IncidentSummary → incident banner · PipelinePanel → Overview spine + MIT#pipeline · MetricCards / GpuDetail →
 Overview vitals + MIT#telemetry · VramPanel → Overview donut + MIT#telemetry · **Logs / Console → node popup** ·
 LiveActivity → Live feed · ServiceModal → node popup + service views.
 
@@ -136,18 +140,18 @@ status by shape + label as well as colour.
 
 ## 7. Relationship to the original Dashboard + build order
 
-- **`Dashboard/` (`:4100`)** — the original, full-featured project: OAuth/Supabase auth, the `/api/live` MIT stream
-  (real live telemetry), the route-based shell, and the old design components (kept at `/legacy`). Tech-debt-heavy,
-  old + new mixed. Stays as the live/reference deployment (cloudflared `dashboard.hayateotsu.space`) until V2 reaches
-  parity.
-- **`dashboardv2/` (`:4200`)** — this clean rebuild. Single-page shell, Speck design only, **mock-mode only for now**
-  (OAuth + `/api/live` deferred — `components/auth-gate.tsx` is a stub `{ token: null }`). The canonical place to
-  build the new design.
-- **Migration:** build the new IA here in mock mode → port OAuth + `/api/live` for realtime → point the tunnel at V2
-  → retire the original.
+- **`dashboardv2/` (`:4200`)** — **THE dashboard.** Decision (2026-06-18): abandon `:4100` and build V2 out fully,
+  porting every topic/category from the old one into this clean Speck design + IA. Single-page shell, **mock-mode
+  only for now** (OAuth + `/api/live` deferred — `components/auth-gate.tsx` is a stub `{ token: null }`).
+- **`Dashboard/` (`:4100`)** — the original (OAuth/Supabase + `/api/live` live stream + the old design at `/legacy`).
+  **Being abandoned** — kept only as a **topic/data reference** while V2 is built out (its `lib/services` mock data +
+  the `SubsystemBoard`/`TrafficPanel`/`StreamHealth`/`GpuDetail` components are the source for the V2 versions).
+  Removed once V2 covers its topics + ports realtime.
+- **Build-out:** B1 Logs/Console→node popup ✅ · B2 Overview gains Traffic ✅ + Streams ✅ (Subsystems already a
+  strip; **SystemFlow dropped**) · B3 MIT Telemetry gains GpuDetail host charts · B4 realtime (OAuth + `/api/live`).
+  Each: TDD on pure mappers + visual E2E.
 
-**Build order (against this spec):** the current V2 is the faithful single-page **port** (Overview + MIT tabs +
-FE/BE NoData + Logs/Console still as nav/tabs). Next: B1 drop Logs/Console from nav → node popup (+ Console section);
-B2 Overview adds SystemFlow / Subsystems board / Traffic / Streams; B3 MIT Telemetry adds GpuDetail host charts;
+**Build order (against this spec):** the V2 started as the faithful single-page **port**. Done: B1 (Logs/Console →
+node popup), B2 (Traffic + Streams panels; SystemFlow cut). Next: B3 MIT Telemetry adds GpuDetail host charts;
 B4 wire realtime (OAuth + `/api/live`). Each consumes the data layer + this token system, with TDD on the pure
 mappers + visual E2E.
