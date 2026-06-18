@@ -3,8 +3,12 @@
 Standalone, out-of-band mission-control dashboard for the MIT translation pipeline
 (PRD #279, [ADR 016](../docs/adr/016-staff-console-out-of-band-observability-aggregator.md) /
 [ADR 017](../docs/adr/017-mit-status-stream-forward-jwt-verification.md)). Next.js 16 + React 19,
-runs locally so it keeps working when the rest of the stack is down. Design system follows the docs-page
-(shadcn + the semantic-token theme).
+runs locally so it keeps working when the rest of the stack is down. Design system = **Speck + PremiumBuss + Arcana**
+fused (warm monotone + coral signature; see `DESIGN.md`).
+
+> **Note (2026-06-18):** the clean rebuild lives in [`../dashboardv2/`](../dashboardv2/) (`:4200`) — canonical going
+> forward. This original project (`:4100`, full OAuth + live MIT stream + the `/legacy` old design) is the
+> reference deployment until V2 reaches parity.
 
 ## Run
 

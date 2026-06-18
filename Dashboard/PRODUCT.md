@@ -14,13 +14,14 @@ A standalone, out-of-band monitoring dashboard for the MIT pipeline (PRD #279, A
 
 ## Brand Personality
 
-Mission-control precision with Apple restraint. Three words: **precise, calm, premium**. A NASA/SpaceX flight console rendered with Apple's clarity and deference — confident and technical, never loud. The interface earns trust the way Linear and a flight deck do: nothing decorative, every element load-bearing.
+A restrained, expressive monitoring console: **Speck + PremiumBuss + Arcana, fused** (see `DESIGN.md`). Three words: **precise, calm, premium**. A warm monotone canvas where color is reserved for status and data — coral signature/alert (Speck), lime drench + punch-card heatmap + oversized numbers (PremiumBuss), mono ring/arc gauges + inverted card + light theme (Arcana). Nothing decorative, every element load-bearing, the trust Linear/Vercel/Stripe earn — through this three-reference fusion, not a generic template. (Earlier framings "flight-deck / anti-SaaS" then "shadcn/ui" were both superseded; `precise/calm/premium` + signal-over-noise carry forward.) **Canonical rebuild → [`dashboardv2/`](../dashboardv2/PRODUCT.md).**
 
 ## Anti-references
 
-- Consumer-SaaS marketing pages (oversized hero, gradient text, glassmorphism-as-default, the big-number template).
+- Consumer **marketing-page** tropes inside the product (oversized hero, gradient text, glassmorphism-as-default). The SaaS aesthetic is the *product-UI* one (shadcn/Linear/Vercel), not the landing-page one.
 - Generic admin templates (AdminLTE / Bootstrap dashboards, sidebar-plus-identical-cards with no identity).
 - Cluttered Grafana (panels stacked with no hierarchy — noise without signal).
+- Color as decoration. In this console color is a signal (status, data); chrome stays neutral.
 
 ## Design Principles
 
