@@ -3,6 +3,7 @@ import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
 import { MitClient } from './mit-client';
 import { type TextLayerRegion } from './translation-memory.repository';
 import { loadPageBytes } from './page-source';
+import { parseNdjsonChunk } from './mit-batch-ndjson';
 import {
   mitLangPair,
   buildJobKey,
@@ -746,7 +747,7 @@ export class MitBatchOrchestrator {
       mitRes.body as unknown as ReadableStream<Uint8Array>
     ).getReader();
     const decoder = new TextDecoder();
-    let lineBuf = '';
+    let carry = '';
     let receivedCount = 0;
     const expectedCount = pages.length;
     const processedPageIndexes = new Set<number>();
@@ -779,59 +780,49 @@ export class MitBatchOrchestrator {
       outer: while (true) {
         const { done, value } = await readWithTimeout();
         if (done) break;
-        lineBuf += decoder.decode(value, { stream: true });
+        const { events, carry: nextCarry } = parseNdjsonChunk(
+          decoder.decode(value, { stream: true }),
+          carry,
+        );
+        carry = nextCarry;
 
-        const lines = lineBuf.split('\n');
-        lineBuf = lines.pop() ?? '';
+        for (const ev of events) {
+          // Sentinel: MIT signals it has finished all pages
+          if (ev.type === 'done') break outer;
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
+          // A line that failed JSON.parse — logged + skipped, identical to the
+          // original inline catch (this is the only path that reaches here
+          // without entering the per-page try below).
+          if (ev.type === 'malformed') {
+            this.logger.warn(
+              `[BatchPatches] NDJSON parse failed: ${ev.line.slice(0, 120)}`,
+            );
+            continue;
+          }
+
+          // The per-page try wraps persist + notify so ANY throw (including a
+          // missing `patches` array) surfaces as "NDJSON parse failed" and the
+          // page stays uncounted → retried as missing, exactly as before.
           try {
-            const raw = JSON.parse(line) as Record<string, unknown>;
-
-            // Sentinel: MIT signals it has finished all pages
-            if (raw['done'] === true) break outer;
-
-            const data = raw as {
-              pageIndex: number;
-              imgWidth: number;
-              imgHeight: number;
-              patches: Array<{
-                x: number;
-                y: number;
-                w: number;
-                h: number;
-                img_b64: string;
-              }>;
-              error: string | null;
-            };
-
-            if (
-              typeof data.pageIndex !== 'number' ||
-              Number.isNaN(data.pageIndex)
-            ) {
-              continue;
-            }
-
-            if (data.error) {
+            if (ev.type === 'error') {
               this.logger.warn(
-                `[BatchPatches] chapter=${chapterId} page=${data.pageIndex} error: ${data.error}`,
+                `[BatchPatches] chapter=${chapterId} page=${ev.pageIndex} error: ${ev.error}`,
               );
-              notify(data.pageIndex, { patches: [], error: data.error });
-              if (!processedPageIndexes.has(data.pageIndex)) {
-                processedPageIndexes.add(data.pageIndex);
+              notify(ev.pageIndex, { patches: [], error: ev.error });
+              if (!processedPageIndexes.has(ev.pageIndex)) {
+                processedPageIndexes.add(ev.pageIndex);
                 receivedCount++;
                 if (receivedCount >= expectedCount) break outer;
               }
               continue;
             }
 
-            const imgW = data.imgWidth;
-            const imgH = data.imgHeight;
+            const imgW = ev.imgWidth;
+            const imgH = ev.imgHeight;
             // Cache so single-page endpoint & future batch requests skip MIT
             const cacheKey = this.patchCacheKey(
               chapterId,
-              data.pageIndex,
+              ev.pageIndex,
               srcMIT,
               tgtMIT,
               imageModel,
@@ -842,14 +833,14 @@ export class MitBatchOrchestrator {
             // single cache write, so an empty first pass never caches stale-empty.
             const patches = await this.deps.persistPage({
               chapterId,
-              pageIndex: data.pageIndex,
+              pageIndex: ev.pageIndex,
               srcMIT,
               tgtMIT,
               storeModel: this.imageModelKey(imageModel),
               cacheKey,
               cacheStrategy: 'tiered',
-              rects: data.patches,
-              buffers: data.patches.map((p) =>
+              rects: ev.patches,
+              buffers: ev.patches.map((p) =>
                 Buffer.from(p.img_b64, 'base64'),
               ),
               imgW,
@@ -858,12 +849,12 @@ export class MitBatchOrchestrator {
                 srcMIT === 'ANY'
                   ? undefined
                   : async () => {
-                      const pageUrl = pageUrlByIndex.get(data.pageIndex);
+                      const pageUrl = pageUrlByIndex.get(ev.pageIndex);
                       if (!pageUrl) return [];
                       try {
                         const fallback = await this.deps.translateSinglePage(
                           chapterId,
-                          data.pageIndex,
+                          ev.pageIndex,
                           pageUrl,
                           undefined,
                           targetLangIso,
@@ -871,13 +862,13 @@ export class MitBatchOrchestrator {
                         );
                         if (fallback.patches.length > 0) {
                           this.logger.log(
-                            `[BatchPatches] chapter=${chapterId} page=${data.pageIndex} source_lang_only fallback recovered ${fallback.patches.length} patches`,
+                            `[BatchPatches] chapter=${chapterId} page=${ev.pageIndex} source_lang_only fallback recovered ${fallback.patches.length} patches`,
                           );
                           return fallback.patches;
                         }
                       } catch (fallbackErr) {
                         this.logger.warn(
-                          `[BatchPatches] chapter=${chapterId} page=${data.pageIndex} fallback(no source filter) failed: ${String(fallbackErr)}`,
+                          `[BatchPatches] chapter=${chapterId} page=${ev.pageIndex} fallback(no source filter) failed: ${String(fallbackErr)}`,
                         );
                       }
                       return [];
@@ -885,18 +876,18 @@ export class MitBatchOrchestrator {
             });
 
             this.logger.log(
-              `[BatchPatches] chapter=${chapterId} page=${data.pageIndex} → ${patches.length} patches`,
+              `[BatchPatches] chapter=${chapterId} page=${ev.pageIndex} → ${patches.length} patches`,
             );
-            notify(data.pageIndex, { patches });
+            notify(ev.pageIndex, { patches });
 
-            if (!processedPageIndexes.has(data.pageIndex)) {
-              processedPageIndexes.add(data.pageIndex);
+            if (!processedPageIndexes.has(ev.pageIndex)) {
+              processedPageIndexes.add(ev.pageIndex);
               receivedCount++;
               if (receivedCount >= expectedCount) break outer;
             }
           } catch {
             this.logger.warn(
-              `[BatchPatches] NDJSON parse failed: ${line.slice(0, 120)}`,
+              `[BatchPatches] NDJSON parse failed: ${ev.line.slice(0, 120)}`,
             );
           }
         }
