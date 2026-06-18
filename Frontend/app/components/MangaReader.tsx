@@ -10,15 +10,8 @@ import { buildTranslationSources } from "../lib/translationSources";
 import { buildTranslateMenu } from "../lib/translateMenu";
 import { formatEta, pillMainText, stageLabel } from "../lib/translationStages";
 import { useLocalLenis } from "../hooks/useLocalLenis";
-import { getHardwareId } from "../lib/fingerprint";
-
-function apiFetch(url: string, init?: RequestInit): Promise<Response> {
-  const hwid = getHardwareId();
-  return fetch(url, {
-    ...init,
-    headers: { 'x-hardware-id': hwid, ...(init?.headers as Record<string, string> | undefined) },
-  });
-}
+import { apiFetch } from "../lib/apiFetch";
+import { useChapters, type ChapterPageItem } from "../hooks/useChapters";
 
 type ChapterPages = {
   pages: string[];
@@ -28,22 +21,6 @@ type ChapterPages = {
   localDataSaverPages?: string[];
   /** Set to false in forceLocal responses when no pages are cached yet. */
   localCacheAvailable?: boolean;
-};
-
-type ChapterPageItem = {
-  id: string;
-  chapterNumber: string | null;
-  title: string | null;
-  translatedLanguage: string;
-};
-
-/** Entry from GET /versions/title/:mangaId (user-uploaded chapter versions). */
-type UserVersionItem = {
-  versionId: string;
-  chapterNumber?: string | null;
-  chapterTitle?: string | null;
-  language?: string | null;
-  backendAvailable?: boolean;
 };
 
 type Props = {
@@ -77,8 +54,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [currentChapterNumber, setCurrentChapterNumber] = useState(initialChapterNumber);
   const [currentChapterTitle, setCurrentChapterTitle] = useState(initialChapterTitle);
 
-  // Chapter list for navigation
-  const [chapterList, setChapterList] = useState<ChapterPageItem[]>([]);
+  // Chapter list for navigation (#302: fetch+merge lives in useChapters)
+  const chapterList = useChapters(mangaId);
   const currentIdx = chapterList.findIndex((c) => c.id === currentChapterId);
   const currentLang = chapterList[currentIdx]?.translatedLanguage ?? null;
 
@@ -490,31 +467,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     // Also sync zoom to continuous mode scroll container
     scrollContainerRef.current?.style.setProperty("--mg-zoom", String(zoom));
   }, [zoom, panX, panY]);
-
-  useEffect(() => {
-    if (!mangaId) return;
-    // Fetch MangaDex chapters + user-uploaded versions and merge
-    Promise.all([
-      apiFetch(`${API_BASE}/books/manga/${mangaId}/chapters`).then((r) => r.json()).catch(() => []),
-      apiFetch(`${API_BASE}/versions/title/${mangaId}`).then((r) => r.ok ? r.json() : []).catch(() => []),
-    ]).then(([mangaDexChapters, userVersions]: [ChapterPageItem[], UserVersionItem[]]) => {
-      const mdxList = Array.isArray(mangaDexChapters) ? mangaDexChapters : [];
-      const userList: ChapterPageItem[] = (userVersions ?? [])
-        .filter((v) => v?.backendAvailable !== false)
-        .map((v) => ({
-          id: `ver:${v.versionId}`,
-          chapterNumber: v.chapterNumber || null,
-          title: v.chapterTitle || null,
-          translatedLanguage: v.language || "th",
-        }));
-      const merged = [...mdxList, ...userList].sort((a, b) => {
-        const numA = parseFloat(a.chapterNumber ?? "0") || 0;
-        const numB = parseFloat(b.chapterNumber ?? "0") || 0;
-        return numA - numB;
-      });
-      setChapterList(merged);
-    });
-  }, [mangaId]);
 
   const goToChapter = (ch: ChapterPageItem) => {
     setCurrentChapterId(ch.id);
