@@ -12,6 +12,7 @@ import { addToHistory, getHistory } from "../lib/readingHistory";
 import { useBookActions } from "../hooks/useBookActions";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
+import { chapterAccess } from "../lib/chapterAccess";
 import { useAuth } from "../contexts/AuthContext";
 import { getWalletBalance, purchaseUnlock, getUnlocksForTitle, topupCoins } from "../lib/studioApi";
 import MangaDiscussion from "./MangaDiscussion";
@@ -414,42 +415,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   };
 
   const displayThumbnail = selectedCover ?? resolvedThumbnail(book);
-  const chapterNeedsBackup = (ch: MangaChapter) => ch.isOfflineFallback === true;
-  const chapterMissingInBackend = (ch: MangaChapter) => ch.source === "user" && ch.backendAvailable === false;
-  
-  const isChapterCoinLocked = (ch: MangaChapter) => {
-    if (chapterMissingInBackend(ch)) return false;
-    if (ch.source !== "user") return false;
-    if (!ch.priceCoins || ch.priceCoins <= 0) return false;
-    if (!ch.versionId) return false;
-    return !unlockedVersions.has(ch.versionId);
-  };
-
-  const isChapterReadable = (ch: MangaChapter) => {
-    if (chapterMissingInBackend(ch)) {
-      return false;
-    }
-    if (chapterNeedsBackup(ch)) {
-      return ch.readerAvailable === true;
-    }
-    if (isChapterCoinLocked(ch)) return false;
-    return ch.pageCount > 0;
-  };
-
-  const getUnavailableChapterLabel = (ch: MangaChapter) => {
-    if (chapterMissingInBackend(ch)) {
-      return "ไม่มีใน backend";
-    }
-    if (chapterNeedsBackup(ch) && ch.readerAvailable !== true) {
-      return "ไม่ได้สำรอง";
-    }
-    if (isChapterCoinLocked(ch)) {
-      return `🪙 ${ch.priceCoins}`;
-    }
-    return "ล็อค";
-  };
-
-  const firstReadableChapter = chapters.find((ch) => isChapterReadable(ch));
+  const firstReadableChapter = chapters.find(
+    (ch) => chapterAccess(ch, { unlockedVersions }).readable,
+  );
   const hasReadableChapter = !!firstReadableChapter;
 
   // Prefer book.categories; fall back to genres from MangaDex detail; last resort "E-Book"
@@ -1091,9 +1059,10 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                     }
 
                     const ChapterRowInner = ({ ch, isTreeChild, isLast }: { ch: MangaChapter; isTreeChild: boolean; isLast?: boolean }) => {
-                      const readable = isChapterReadable(ch);
-                      const coinLocked = isChapterCoinLocked(ch);
-                      const unavailableLabel = readable ? null : getUnavailableChapterLabel(ch);
+                      const access = chapterAccess(ch, { unlockedVersions });
+                      const readable = access.readable;
+                      const coinLocked = access.coinLocked;
+                      const unavailableLabel = readable ? null : access.unavailableLabel;
                       const isHighlighted = ch.id === effectiveHighlightId;
                       const isPurchasing = purchasingId === ch.versionId;
                       const row = (

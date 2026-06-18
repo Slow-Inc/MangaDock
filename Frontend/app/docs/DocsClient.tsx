@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LangContext, useLang, type Lang } from './lang-context';
 import {
@@ -596,7 +597,7 @@ function IssueDetailView({ number, onBack }: { number: number; onBack: () => voi
             </div>
             <div className="mt-3 flex items-center gap-4 text-[12px] text-[#6e6e73]">
               <span className="flex items-center gap-1.5">
-                <img src={issue.user.avatar_url} alt="" className="w-4 h-4 rounded-full" />
+                <Image src={issue.user.avatar_url} alt="" width={16} height={16} className="w-4 h-4 rounded-full" />
                 {issue.user.login}
               </span>
               <span>{lang === 'th' ? `เปิดเมื่อ ${relativeDate(issue.created_at)}` : `Opened ${relativeDate(issue.created_at)}`}</span>
@@ -624,7 +625,7 @@ function IssueDetailView({ number, onBack }: { number: number; onBack: () => voi
                 {comments.map(c => (
                   <div key={c.id} className="rounded-xl border border-black/[0.08] overflow-hidden">
                     <div className="flex items-center gap-3 px-4 py-3 bg-[#f5f5f7] border-b border-black/[0.06]">
-                      <img src={c.user.avatar_url} alt="" className="w-5 h-5 rounded-full" />
+                      <Image src={c.user.avatar_url} alt="" width={20} height={20} className="w-5 h-5 rounded-full" />
                       <span className="text-[13px] font-medium text-[#1d1d1f]">{c.user.login}</span>
                       <span className="text-[12px] text-[#6e6e73] ml-auto">{relativeDate(c.created_at)}</span>
                     </div>
@@ -808,7 +809,7 @@ function PullDetailView({ number, onBack }: { number: number; onBack: () => void
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-4 text-[12px] text-[#6e6e73]">
               <span className="flex items-center gap-1.5">
-                <img src={pr.user.avatar_url} alt="" className="w-4 h-4 rounded-full" />
+                <Image src={pr.user.avatar_url} alt="" width={16} height={16} className="w-4 h-4 rounded-full" />
                 {pr.user.login}
               </span>
               <span className="font-mono text-[11px] bg-black/[0.04] px-2 py-0.5 rounded">{pr.head.ref} → {pr.base.ref}</span>
