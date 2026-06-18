@@ -8,7 +8,7 @@ import BookDetailModal from "./BookDetailModal";
 import GeminiBadge from "./GeminiBadge";
 import MangaReader from "./MangaReader";
 import { useBookActions } from "../hooks/useBookActions";
-import { resolvedThumbnail } from "../lib/imgUrl";
+import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
 
 const API_BASE = "/api/proxy";
 
@@ -106,11 +106,11 @@ function HistoryCard({
             if (img.naturalWidth > img.naturalHeight) setIsLandscape(true);
           }}
           onError={(e) => {
-            if (book.thumbnailLocal && book.thumbnail) {
+            const fallback = thumbnailFallbackSrc(book);
+            if (fallback) {
               // Clear the stale path from localStorage so future loads skip it
               patchThumbnailLocal(book.id);
-              (e.currentTarget as HTMLImageElement).src =
-                `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`;
+              (e.currentTarget as HTMLImageElement).src = fallback;
             }
           }}
           className={`transition duration-300 group-hover:scale-105 ${
