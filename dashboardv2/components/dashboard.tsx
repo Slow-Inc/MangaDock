@@ -8,7 +8,7 @@
 // gate to No Data so the mock→real switch can't strand one. Rendered at `/` and `/preview`. DESIGN.md is the spec.
 
 import { useEffect, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, Boxes, Cpu, LayoutGrid, ListTree, Search, Server, Settings, Sun, Moon, Wifi, WifiOff, X, Zap, type LucideIcon } from "lucide-react";
 import { buildNodeDebug, type NodeFull } from "@/lib/node-debug";
 import { MIT_TABS } from "@/lib/service-tabs";
@@ -313,6 +313,7 @@ type MitData = {
   vramModels: { name: string; v: number; leaked: boolean }[];
   vramTotal: number;
   vramUsed: number;
+  series: Record<string, number[]>; // rolling host-metric history (GpuDetail time-charts)
 };
 
 // ── MIT depth page — tabs (Pipeline/Telemetry/Queue/Workers), DESIGN.md §4 (Logs/Console → node popup) ──
@@ -362,7 +363,54 @@ function MitPipeline({ stages, gateway }: { stages: Stage[]; gateway: MitLive["g
   );
 }
 
-function MitTelemetry({ vitals, vramModels, vramTotal, vramUsed, hasGpu }: { vitals: MitData["vitals"]; vramModels: MitData["vramModels"]; vramTotal: number; vramUsed: number; hasGpu: boolean }) {
+// GpuDetail — host metrics over time (gauges show current, these show the trend). Series from the live
+// snapshot (mock waves or accumulated stream); a metric with no series renders No Data.
+const HOST_CHARTS: { key: string; title: string; unit: string; color: string; dec: number }[] = [
+  { key: "gpuUtil", title: "GPU util", unit: "%", color: "var(--c-render)", dec: 0 },
+  { key: "vram", title: "VRAM", unit: "GB", color: "var(--coral)", dec: 1 },
+  { key: "gpuTemp", title: "GPU temp", unit: "°C", color: "var(--c-inpaint)", dec: 0 },
+  { key: "power", title: "Power", unit: "W", color: "var(--processing)", dec: 0 },
+  { key: "cpu", title: "CPU", unit: "%", color: "var(--c-detect)", dec: 0 },
+  { key: "ram", title: "RAM", unit: "GB", color: "var(--c-ocr)", dec: 1 },
+];
+
+function MiniTimeChart({ data, color }: { data: number[]; color: string }) {
+  const chartData = data.map((v, i) => ({ i, v }));
+  return (
+    <ResponsiveContainer width="100%" height={44}>
+      <AreaChart data={chartData} margin={{ top: 3, right: 0, bottom: 0, left: 0 }}>
+        <Area dataKey="v" stroke={color} strokeWidth={1.5} fill={color} fillOpacity={0.12} dot={false} isAnimationActive animationDuration={700} animationEasing="ease-out" />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+function HostCharts({ series }: { series: Record<string, number[]> }) {
+  return (
+    <Panel className="p-5">
+      <div className="mb-3 flex items-center gap-2"><Activity size={14} style={{ color: "var(--ink-2)" }} /><span className="text-[12.5px] font-semibold">Host metrics · history</span></div>
+      <div className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
+        {HOST_CHARTS.map((c) => {
+          const data = series[c.key];
+          const last = data && data.length ? data[data.length - 1] : null;
+          return (
+            <div key={c.key}>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[11px] font-medium" style={{ color: "var(--ink-2)" }}>{c.title}</span>
+                <span className="text-[13px] font-semibold tnum">{last != null ? last.toFixed(c.dec) : "—"}<span className="text-[10px]" style={{ color: "var(--ink-3)" }}> {c.unit}</span></span>
+              </div>
+              <div className="mt-1 h-[44px]">
+                {data && data.length > 1 ? <MiniTimeChart data={data} color={c.color} /> : <div className="flex h-full items-center justify-center text-[10px]" style={{ color: "var(--ink-3)" }}>No Data</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function MitTelemetry({ vitals, vramModels, vramTotal, vramUsed, hasGpu, series }: { vitals: MitData["vitals"]; vramModels: MitData["vramModels"]; vramTotal: number; vramUsed: number; hasGpu: boolean; series: Record<string, number[]> }) {
   return (
     <div className="flex flex-col gap-3">
       {vitals ? (
@@ -396,6 +444,7 @@ function MitTelemetry({ vitals, vramModels, vramTotal, vramUsed, hasGpu }: { vit
           <div className="py-8 text-center text-[12px]" style={{ color: "var(--ink-3)" }}>No GPU telemetry</div>
         )}
       </Panel>
+      <HostCharts series={series} />
     </div>
   );
 }
@@ -481,7 +530,7 @@ function MitView({ data, onOpenNode }: { data: MitData; onOpenNode: (n: { id: st
         ))}
       </div>
       {tab === "pipeline" && <MitPipeline stages={data.stages} gateway={m?.gateway} />}
-      {tab === "telemetry" && <MitTelemetry vitals={data.vitals} vramModels={data.vramModels} vramTotal={data.vramTotal} vramUsed={data.vramUsed} hasGpu={!!m?.gpu} />}
+      {tab === "telemetry" && <MitTelemetry vitals={data.vitals} vramModels={data.vramModels} vramTotal={data.vramTotal} vramUsed={data.vramUsed} hasGpu={!!m?.gpu} series={data.series} />}
       {tab === "queue" && <MitQueue jobs={m?.queueJobs ?? []} />}
       {tab === "workers" && <MitWorkers workers={m?.workersDetail ?? []} onOpenNode={onOpenNode} />}
     </ViewShell>
@@ -540,6 +589,75 @@ function StreamsPanel() {
         ))}
       </div>
     </Panel>
+  );
+}
+
+// Frontend / Backend mock service detail (mock mode only — no live source yet; realtime → No Data). Deterministic
+// sparkline waves (no Date/random → no hydration drift). Nodes reuse the CLUSTERS grid → node popup (logs/console).
+const spark = (base: number, amp: number, n = 12) => Array.from({ length: n }, (_, i) => Math.round((base + amp * Math.sin(i / 1.8)) * 10) / 10);
+const SERVICE_MOCK = {
+  Frontend: { Icon: Activity, color: "var(--accent-violet)", tech: "Next.js 16 · React 19", cluster: 0,
+    kpis: [
+      { label: "Requests/s", to: 1240, unit: "/s", dec: 0, color: "var(--accent-violet)", spark: spark(1180, 220) },
+      { label: "Latency p50", to: 12, unit: "ms", dec: 0, color: "var(--c-detect)", spark: spark(13, 4) },
+      { label: "Error rate", to: 0.3, unit: "%", dec: 1, color: "var(--success)", spark: spark(0.4, 0.25) },
+      { label: "Uptime", to: 99.98, unit: "%", dec: 2, color: "var(--success)", spark: spark(99.98, 0.02) },
+    ] },
+  Backend: { Icon: Server, color: "var(--accent-amber)", tech: "NestJS 11", cluster: 1,
+    kpis: [
+      { label: "Requests/s", to: 860, unit: "/s", dec: 0, color: "var(--accent-amber)", spark: spark(820, 180) },
+      { label: "Latency p50", to: 28, unit: "ms", dec: 0, color: "var(--c-detect)", spark: spark(30, 9) },
+      { label: "Error rate", to: 1.2, unit: "%", dec: 1, color: "var(--coral)", spark: spark(1.3, 0.7) },
+      { label: "Uptime", to: 99.21, unit: "%", dec: 2, color: "var(--accent-amber)", spark: spark(99.4, 0.4) },
+    ] },
+} as const;
+
+function ServiceMockView({ name, onOpenNode }: { name: "Frontend" | "Backend"; onOpenNode: (n: { id: string; online: boolean }) => void }) {
+  const cfg = SERVICE_MOCK[name];
+  const cluster = CLUSTERS[cfg.cluster];
+  const online = cluster.nodes.filter((n) => n.on).length;
+  const degraded = online < cluster.nodes.length;
+  const chip = (
+    <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11.5px] font-medium" style={degraded ? { background: "var(--coral-soft)", border: "1px solid color-mix(in oklch, var(--coral) 30%, transparent)", color: "var(--coral)" } : { background: "color-mix(in oklch, var(--success) 12%, transparent)", border: "1px solid color-mix(in oklch, var(--success) 26%, transparent)", color: "var(--success)" }}>
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: degraded ? "var(--coral)" : "var(--success)" }} />{online}/{cluster.nodes.length} nodes {degraded ? "· degraded" : "operational"}
+    </span>
+  );
+  return (
+    <ViewShell Icon={cfg.Icon} name={name} tech={cfg.tech} color={cfg.color} right={chip}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {cfg.kpis.map((k) => (
+          <Panel key={k.label} className="p-4">
+            <div className="text-[11.5px] font-medium" style={{ color: "var(--ink-2)" }}>{k.label}</div>
+            <div className="mt-1 flex items-baseline gap-1">
+              <CountUp to={k.to} duration={1.2} className="text-[23px] font-semibold leading-none tnum tracking-tight" />
+              <span className="text-[11px]" style={{ color: "var(--ink-3)" }}>{k.unit}</span>
+            </div>
+            <div className="mt-2 h-[34px]"><MiniTimeChart data={[...k.spark]} color={k.color} /></div>
+          </Panel>
+        ))}
+      </div>
+      <Panel className="mt-3 overflow-hidden p-5" style={{ background: "var(--drench-lime)", border: "none" }}>
+        <div className="mb-4 flex items-center justify-between" style={{ color: "#0b1e02" }}>
+          <div className="flex items-center gap-2"><Server size={14} /><span className="text-[12.5px] font-semibold">Nodes · {name}</span></div>
+          <span className="text-[11px]" style={{ opacity: 0.6 }}>colour = usage · click for debug</span>
+        </div>
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          {cluster.nodes.map((n) => {
+            const usage = n.v[n.v.length - 1] ?? 0;
+            return (
+              <button key={n.id} onClick={() => onOpenNode({ id: n.id, online: n.on })} className="flex items-center gap-2 rounded-[6px] px-1 py-0.5 text-left hover:underline" title={`${n.id} · ${n.on ? Math.round(usage * 100) + "% · click for debug" : "DOWN — click for debug"}`}>
+                <span className="h-3.5 w-3.5 shrink-0 rounded-full" style={nodeDot(n.on, usage)} />
+                <span className="truncate text-[10.5px] font-medium tnum" style={{ color: n.on ? "#0b1e02" : "#7f1d1d" }}>{n.id}{!n.on && <span className="font-bold"> · down</span>}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Panel>
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <TrafficPanel />
+        <StreamsPanel />
+      </div>
+    </ViewShell>
   );
 }
 
@@ -613,7 +731,7 @@ export default function Dashboard() {
   const degradedCount = subsystems.filter((x) => x.s === "error").length;
 
   // Bundle the live-derived MIT data for the depth tabs (one object → fewer props, same source as overview).
-  const mitData = { m, mock, stages, vitals, vramModels, vramTotal, vramUsed };
+  const mitData = { m, mock, stages, vitals, vramModels, vramTotal, vramUsed, series: live.series };
 
   return (
     <div className={dark ? "theme-dark" : "light"} style={{ background: "var(--bg)", minHeight: "100vh", color: "var(--ink)", fontFamily: "var(--font-sans)" }}>
@@ -975,8 +1093,8 @@ export default function Dashboard() {
           </>
           )}
 
-          {view === "Frontend" && <NoDataView Icon={Activity} name="Frontend" tech="Next.js 16 · React 19" color="var(--accent-violet)" msg="Telemetry not wired — Frontend /status pending (#283). This service has no live source yet; the panel populates once the endpoint ships." />}
-          {view === "Backend" && <NoDataView Icon={Server} name="Backend" tech="NestJS 11" color="var(--accent-amber)" msg="Telemetry not wired — Backend /status pending (#282). This service has no live source yet; the panel populates once the endpoint ships." />}
+          {view === "Frontend" && (mock ? <ServiceMockView name="Frontend" onOpenNode={setOpenNode} /> : <NoDataView Icon={Activity} name="Frontend" tech="Next.js 16 · React 19" color="var(--accent-violet)" msg="Telemetry not wired — Frontend /status pending (#283). This service has no live source yet; the panel populates once the endpoint ships." />)}
+          {view === "Backend" && (mock ? <ServiceMockView name="Backend" onOpenNode={setOpenNode} /> : <NoDataView Icon={Server} name="Backend" tech="NestJS 11" color="var(--accent-amber)" msg="Telemetry not wired — Backend /status pending (#282). This service has no live source yet; the panel populates once the endpoint ships." />)}
           {view === "MIT" && <MitView data={mitData} onOpenNode={setOpenNode} />}
         </main>
       </div>
