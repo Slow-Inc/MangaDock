@@ -3,6 +3,21 @@
 
 ---
 
+## #298 — เคลียร์ 2 tsc error ใน specs + refresh stale memory (2026-06-18, /tdd+/debug-mantra, branch `fix/303-upload-magic-byte-validation`)
+
+**Root causes (2 distinct TS errors, 10 instances total):**
+
+- `src/cache/l3-batch-writer.spec.ts` — TS2339 ×4 (`mockClear` missing): `makeL3()` was cast to `L3DiskService` only → `l3.write` typed as the real method signature, not `jest.Mock`. Fix: `as unknown as L3DiskService & { write: jest.Mock }` (intersection exposes `.mockClear()`).
+- `src/common/middleware/hardware-id.middleware.spec.ts` — TS2540 ×6 (`path` is read-only): Express types declare `Request.path` as a getter, so `mockRequest.path = x` fails on `Partial<Request>`. Fix: `Omit<Partial<Request>, 'path'> & { path?: string }`.
+
+Both fixes are type-declaration-only — zero runtime behaviour change. `npx tsc --noEmit` → 0 errors. 53/53 tests GREEN on the two affected files.
+
+**Memory refreshed:**
+- Local `reference_mangadex_uploads_ua_block.md`: updated URL (`hayateotsu.space→2552667.xyz`), branch, and marked FIXED.
+- Team `project_backend_pre_existing_test_failures.md`: added tsc-error history and resolution.
+
+---
+
 ## #296 — test upload.service magic-byte MIME (security/test) (2026-06-18, /tdd, branch `fix/303-upload-magic-byte-validation`)
 
 **Goal:** add explicit test coverage for the magic-byte MIME validation path committed in #303 (`upload.service.ts:addPage`).

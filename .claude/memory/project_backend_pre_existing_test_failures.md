@@ -13,3 +13,14 @@ History: the baseline used to also include 2 failures in `mit-webhook-hmac.spec.
 
 **Why:** ts-jest compiles `books.service.ts` for every books spec, so "does it still build" is answered by any passing books spec; the red suite is orthogonal.
 **How to apply:** run the specific spec you touched; only treat a failure as yours if it's outside `books-pubsub-batch.spec.ts` or if that suite's count rises above 14.
+
+---
+
+**tsc errors (now FIXED 2026-06-18, #298):**
+
+Two pre-existing `tsc --noEmit` errors in spec files — cleared on branch `fix/303-upload-magic-byte-validation`:
+
+- `src/cache/l3-batch-writer.spec.ts` — TS2339 ×4: `mockClear` inaccessible because `makeL3()` was cast to `L3DiskService` only. Fix: `as unknown as L3DiskService & { write: jest.Mock }`.
+- `src/common/middleware/hardware-id.middleware.spec.ts` — TS2540 ×6: `mockRequest.path` read-only (Express types declare `path` as getter). Fix: `let mockRequest: Omit<Partial<Request>, 'path'> & { path?: string }`.
+
+`npx tsc --noEmit` now exits 0 on this branch. The 14 books-pubsub-batch failures remain (unrelated).
