@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resolvedThumbnail, proxyImageUrl, toRelativeProxyUrl } from "./imgUrl";
+import { resolvedThumbnail, proxyImageUrl, toRelativeProxyUrl, thumbnailFallbackSrc } from "./imgUrl";
 
 const MANGADEX_URL =
   "https://uploads.mangadex.org/covers/abc123/cover.jpg";
@@ -45,5 +45,22 @@ describe("toRelativeProxyUrl", () => {
 
   test("external non-local URL → returned as-is", () => {
     expect(toRelativeProxyUrl(GOOGLE_URL)).toBe(GOOGLE_URL);
+  });
+});
+
+describe("thumbnailFallbackSrc", () => {
+  test("both thumbnailLocal and thumbnail → proxied CDN URL", () => {
+    const book = { thumbnail: MANGADEX_URL, thumbnailLocal: LOCAL_PATH };
+    expect(thumbnailFallbackSrc(book)).toBe(
+      `/api/img-proxy?url=${encodeURIComponent(MANGADEX_URL)}`
+    );
+  });
+
+  test("missing thumbnail → null", () => {
+    expect(thumbnailFallbackSrc({ thumbnailLocal: LOCAL_PATH })).toBeNull();
+  });
+
+  test("missing thumbnailLocal → null (no local cache, nothing to fall back from)", () => {
+    expect(thumbnailFallbackSrc({ thumbnail: MANGADEX_URL })).toBeNull();
   });
 });

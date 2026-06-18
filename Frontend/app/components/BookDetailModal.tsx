@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { errMessage } from "@/lib/errMessage";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import type Lenis from "lenis";
 import { createPortal } from "react-dom";
@@ -330,11 +331,12 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
         addToHistory({ ...book, lastChapterId: ch.id, lastChapterNumber: ch.chapterNumber });
         setActiveChapter({ id: ch.id, chapterNumber: ch.chapterNumber, title: ch.title });
       }
-    } catch (err: any) {
-      if (err.message?.includes("Insufficient") || err.message?.includes("ไม่พอ")) {
+    } catch (err: unknown) {
+      const msg = errMessage(err);
+      if (msg.includes("Insufficient") || msg.includes("ไม่พอ")) {
         setShowTopup(true);
       } else {
-        alert(err.message || "ไม่สามารถปลดล็อคได้");
+        alert(msg || "ไม่สามารถปลดล็อคได้");
       }
     } finally {
       setPurchasingId(null);
@@ -350,8 +352,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       const result = await topupCoins(token, topupAmount);
       setCoinBalance(result.balance);
       setShowTopup(false);
-    } catch (err: any) {
-      alert(err.message || "เติมเหรียญไม่สำเร็จ");
+    } catch (err: unknown) {
+      alert(errMessage(err) || "เติมเหรียญไม่สำเร็จ");
     } finally {
       setTopupLoading(false);
     }

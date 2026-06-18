@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { errMessage } from "@/lib/errMessage";
 
 // Server-to-server: prefer the internal URL (localhost) to avoid routing through
 // Cloudflare Tunnel twice when deployed behind a public domain.
@@ -60,10 +61,10 @@ async function handler(
       status: upstream.status,
       headers: resHeaders,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(`[ProxyError] Failed to fetch from backend: ${url}`, err);
     return NextResponse.json(
-      { ok: false, error: "Backend unreachable", details: err.message },
+      { ok: false, error: "Backend unreachable", details: errMessage(err) },
       { status: 502 },
     );
   }
