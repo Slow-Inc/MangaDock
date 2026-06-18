@@ -96,8 +96,11 @@ service/node) · 9. **Streams** (SSE stream health) · 10. Live feed (real `live
 **MIT — depth tabs:** Pipeline (gateway diagnosis + stage timing + quality) · Telemetry (vitals + **GpuDetail host
 time-charts** + VRAM by model) · Queue (full translate queue) · Workers (lifecycle; click a worker → node popup).
 
-**Frontend / Backend:** one page-level **No Data** ("telemetry not wired — #283 / #282") until those `/status`
-feeds land. In mock mode they may draft future panels; in realtime they are No Data.
+**Frontend / Backend:** in **mock mode** a full mock **service detail** — KPI cards (Requests/s · Latency p50 ·
+Error rate · Uptime) with sparklines, a node grid (→ node popup with logs/console), and Traffic + Streams
+(`ServiceMockView`). In **realtime** one page-level **No Data** ("telemetry not wired — #283 / #282") until those
+`/status` feeds land. (This honours "mock mode shows every panel" — the live-or-No-Data rule is realtime-only. The
+abandoned `:4100` `/service/*` got the same gate so it shows mock for reference: `if (!wired && !isMockMode())`.)
 
 **Node popup — per-node, the one place for a node's everything** (opened from the heatmap / Workers): Compute
 (GPU/CPU usage + clock) · Memory (VRAM / RAM) · Thermal (temp + fan) · Power · Network (bandwidth) · Spec · Errors ·
@@ -140,18 +143,25 @@ status by shape + label as well as colour.
 
 ## 7. Relationship to the original Dashboard + build order
 
-- **`dashboardv2/` (`:4200`)** — **THE dashboard.** Decision (2026-06-18): abandon `:4100` and build V2 out fully,
-  porting every topic/category from the old one into this clean Speck design + IA. Single-page shell, **mock-mode
-  only for now** (OAuth + `/api/live` deferred — `components/auth-gate.tsx` is a stub `{ token: null }`).
-- **`Dashboard/` (`:4100`)** — the original (OAuth/Supabase + `/api/live` live stream + the old design at `/legacy`).
-  **Being abandoned** — kept only as a **topic/data reference** while V2 is built out (its `lib/services` mock data +
-  the `SubsystemBoard`/`TrafficPanel`/`StreamHealth`/`GpuDetail` components are the source for the V2 versions).
-  Removed once V2 covers its topics + ports realtime.
+- **`dashboardv2/` (`:4200`)** — **THE dashboard, and the ONLY one being developed.** Decision (2026-06-18, firmed):
+  legacy `:4100` is **fully abandoned** — every topic has been ported, so it is no longer even a reference. All work
+  happens here. Single-page shell, **mock-mode for now** (B4 realtime/OAuth deferred — `components/auth-gate.tsx` is
+  a stub `{ token: null }`).
+- **`Dashboard/` (`:4100`)** — the original. **Dead — do not develop, do not reference.** Its uncommitted WIP is
+  abandoned; the directory can be removed when convenient. (It still held OAuth/Supabase + the `/api/live` SSE proxy
+  — those get re-ported into V2 fresh for B4, not revived from here.)
 - **Build-out:** B1 Logs/Console→node popup ✅ · B2 Overview gains Traffic ✅ + Streams ✅ (Subsystems already a
-  strip; **SystemFlow dropped**) · B3 MIT Telemetry gains GpuDetail host charts · B4 realtime (OAuth + `/api/live`).
-  Each: TDD on pure mappers + visual E2E.
+  strip; **SystemFlow dropped**) · B3 MIT Telemetry gains GpuDetail host charts ✅ · B5 FE/BE mock service detail
+  (`ServiceMockView`) ✅ · **B4 realtime (OAuth + `/api/live`) — only remaining, deferred.** Each: TDD + visual E2E.
 
 **Build order (against this spec):** the V2 started as the faithful single-page **port**. Done: B1 (Logs/Console →
-node popup), B2 (Traffic + Streams panels; SystemFlow cut). Next: B3 MIT Telemetry adds GpuDetail host charts;
-B4 wire realtime (OAuth + `/api/live`). Each consumes the data layer + this token system, with TDD on the pure
-mappers + visual E2E.
+node popup), B2 (Traffic + Streams panels; SystemFlow cut), B3 (GpuDetail host charts), B5 (FE/BE mock service
+detail). **Only B4 (realtime — OAuth + `/api/live` + the per-service `/status` feeds #283/#282) remains, deferred.**
+Each step consumes the data layer + this token system, with TDD on the pure mappers + visual E2E.
+
+> **Resume here (next session):** **V2 is the only project** (legacy `:4100` abandoned, do not touch). V2 is
+> feature-complete in **mock mode** — all topics built (B1–B3, B5). The only remaining work is **B4 realtime**:
+> re-port the OAuth/Supabase auth (`auth-gate` is a stub `{token:null}`) + a `/api/live` SSE proxy *fresh into V2*
+> (not revived from `:4100`), then `NEXT_PUBLIC_MOCKUP_MODE=false` reads the live MIT stream (FE/BE stay No Data
+> until #283/#282). Run: `cd dashboardv2 && bun dev` → `:4200`. Last commit: `2c303ab` (port + B1 + B2); B3 + B5 +
+> these docs were uncommitted at checkpoint — commit them first.
