@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
 import BookDetailModal from "./BookDetailModal";
 import CoverLightbox from "./CoverLightbox";
 import GeminiBadge from "./GeminiBadge";
@@ -267,29 +268,13 @@ function BookCard({
 }
 
 export default function BookRow({ rowId, rowTitle, items, seeMoreHref }: BookRowProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { ref, canScrollLeft, canScrollRight, update, scrollBy } = useHorizontalScroll();
   const [isHoveringRow, setIsHoveringRow] = useState(false);
   const [hoveredArrow, setHoveredArrow] = useState<"left" | "right" | null>(null);
 
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-
-  const updateScrollState = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 0);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
-  };
-
   useEffect(() => {
-    updateScrollState();
+    update();
   }, [items]);
-
-  const scroll = (dir: "left" | "right") => {
-    if (!scrollRef.current) return;
-    const amount = scrollRef.current.clientWidth * 0.75;
-    scrollRef.current.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
-  };
 
   return (
     <section
@@ -317,7 +302,7 @@ export default function BookRow({ rowId, rowTitle, items, seeMoreHref }: BookRow
 
         {/* Left arrow */}
         <button
-          onClick={() => scroll("left")}
+          onClick={() => scrollBy("left")}
           onMouseEnter={() => setHoveredArrow("left")}
           onMouseLeave={() => setHoveredArrow(null)}
           className={`absolute left-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/70 ring-1 ring-white/20 backdrop-blur-sm transition-all duration-300 md:flex ${
@@ -334,7 +319,7 @@ export default function BookRow({ rowId, rowTitle, items, seeMoreHref }: BookRow
 
         {/* Right arrow */}
         <button
-          onClick={() => scroll("right")}
+          onClick={() => scrollBy("right")}
           onMouseEnter={() => setHoveredArrow("right")}
           onMouseLeave={() => setHoveredArrow(null)}
           className={`absolute right-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/70 ring-1 ring-white/20 backdrop-blur-sm transition-all duration-300 md:flex ${
@@ -351,9 +336,9 @@ export default function BookRow({ rowId, rowTitle, items, seeMoreHref }: BookRow
 
         {/* Scrollable row */}
         <div
-          ref={scrollRef}
+          ref={ref}
           className="flex gap-3 overflow-x-auto overflow-y-visible pb-4 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:gap-4"
-          onScroll={updateScrollState}
+          onScroll={update}
         >
           {items.map((book) => (
             <BookCard
