@@ -809,14 +809,14 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 
 **6. Performance.** Neutral — same calls; the chapter row computes one `chapterAccess` object instead of three closure calls (one extra object alloc per row, negligible).
 
-**7. Quality / metrics.** BookDetailModal **1355 → 1324** (−31); MangaReader **1789 → 1741** (−48). +3 modules (chapterAccess / useChapters / apiFetch). `app/lib/chapterAccess.test.ts` +16 bun cases (lib suite 55 → 71 / 0 fail). `npx tsc --noEmit` clean; 0 new lint errors.
+**7. Quality / metrics.** BookDetailModal **1355 → 1324** (−31); MangaReader **1789 → 1739** (−50). +4 modules (chapterAccess / useChapters / apiFetch / zoomLevel). +22 bun cases (chapterAccess 16 + zoomLevel 6; lib suite 55 → 77 / 0 fail). `npx tsc --noEmit` clean; 0 new lint errors.
 
 **8. Tech debt removed.** The money-adjacent coin-unlock gating is now a pure, exhaustively-tested function instead of component closures; the chapter fetch is isolated from the reader's viewport/zoom/translation concerns; the HWID fetch has a single source.
 
 **9. Risk / rollback.** Byte-identical; rollback = revert the 3 commits. No backend/wallet/unlock surface touched. **Manual reader + detail/coin-unlock walkthrough is the verification net (no component harness) — to run before merge.**
 
-**10. Notes.** Slice 1 of #302. Remaining hook extractions (`useReaderZoom`, `useTranslationStream`, Turnstile) are tracked as follow-ups on the issue — deliberately separate PRs (the issue is the largest/riskiest frontend item). No ADR (routine extraction, matches #299/#300/#301).
+**10. Notes.** Slice 1 of #302 plus the pure zoom-level math slice. The full `useReaderZoom()` hook is deliberately deferred — the zoom/pan cluster is entangled with the continuous-scroll machinery (pageRefs/lenis/viewport-sync) and there is no component test harness, so a big byte-identical move needs its own plan. `useTranslationStream`/Turnstile remain follow-ups. No ADR (routine extraction, matches #299/#300/#301).
 
-**11. KPI.** #302 slice 1 · two god-components −79 LOC combined · chapterAccess pure + 16 tests · byte-identical · 0 regressions (bun 71/0, tsc clean).
+**11. KPI.** #302 slice 1 · two god-components −81 LOC combined · chapterAccess + zoomLevel pure + 22 tests · byte-identical · 0 regressions (bun 77/0, tsc clean).
 
-*Validation:* `bun test app/lib` 71/0 + `npx tsc --noEmit` clean per commit; manual walkthrough before merge. *Links:* #302, #292, branch `refactor/302-frontend-decompose`.
+*Validation:* `bun test app/lib` 77/0 + `npx tsc --noEmit` clean per commit; manual walkthrough before merge. *Links:* #302, #292, branch `refactor/302-frontend-decompose`.
