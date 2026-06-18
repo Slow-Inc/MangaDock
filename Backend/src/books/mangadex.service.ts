@@ -91,6 +91,19 @@ export class MangaDexService {
     return (process.env.MANGADEX_LANG ?? 'th').toLowerCase();
   }
 
+  // Tests can override: (service as any).fetchFn = mockFetch
+  private fetchFn: typeof fetch = (...args: Parameters<typeof fetch>) => fetch(...args);
+
+  private mangadexFetch(url: string): Promise<Response> {
+    return this.fetchFn(url, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'MangaDock/1.0 (+https://2552667.xyz)',
+      },
+      cache: 'no-store',
+    });
+  }
+
   async getMangaChapters(mangaId: string, forceLocal = false): Promise<MangaChapter[]> {
     // v3: uses pagination to fetch ALL chapters (supports decimal sub-chapters like 13.1, 13.2)
     const cacheKey = `manga:chapters:v3:${mangaId}`;
@@ -128,9 +141,8 @@ export class MangaDexService {
         params.append('contentRating[]', 'safe');
         params.append('contentRating[]', 'suggestive');
 
-        const res = await fetch(
+        const res = await this.mangadexFetch(
           `https://api.mangadex.org/manga/${mangaId}/feed?${params.toString()}`,
-          { headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' }, cache: 'no-store' },
         );
         if (!res.ok) break;
 
@@ -187,9 +199,8 @@ export class MangaDexService {
     }
 
     try {
-      const res = await fetch(
+      const res = await this.mangadexFetch(
         `https://api.mangadex.org/at-home/server/${chapterId}`,
-        { headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' }, cache: 'no-store' },
       );
       if (!res.ok) {
         const stale = this.cache.getStale<MangaChapterPages>(cacheKey);
@@ -242,9 +253,8 @@ export class MangaDexService {
       feedParams.append('contentRating[]', 'safe');
       feedParams.append('contentRating[]', 'suggestive');
 
-      const feedRes = await fetch(
+      const feedRes = await this.mangadexFetch(
         `https://api.mangadex.org/manga/${mangaId}/feed?${feedParams.toString()}`,
-        { headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' }, cache: 'no-store' },
       );
       if (!feedRes.ok) {
         await this.cache.set(cacheKey, null, CACHE_TTL_MS);
@@ -267,9 +277,8 @@ export class MangaDexService {
         return null;
       }
 
-      const atHomeRes = await fetch(
+      const atHomeRes = await this.mangadexFetch(
         `https://api.mangadex.org/at-home/server/${preferredChapter.id}`,
-        { headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' }, cache: 'no-store' },
       );
       if (!atHomeRes.ok) {
         await this.cache.set(cacheKey, null, CACHE_TTL_MS);
@@ -406,10 +415,7 @@ export class MangaDexService {
     params.set('order[followedCount]', 'desc');
 
     try {
-      const response = await fetch(`https://api.mangadex.org/manga?${params.toString()}`, {
-        headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
-        cache: 'no-store',
-      });
+      const response = await this.mangadexFetch(`https://api.mangadex.org/manga?${params.toString()}`);
       if (!response.ok) return { items: [], total: 0, slug };
       const data = (await response.json()) as MangaDexResponse & { total?: number };
       const items = this.mapManga(data);
@@ -417,7 +423,8 @@ export class MangaDexService {
       const result = { items, total, slug };
       await this.cache.set(cacheKey, result, 1000 * 60 * 15);
       return result;
-    } catch {
+    } catch (err) {
+      this.logger.warn(`[MangaDex] Genre fetch error (${slug}): ${String(err)}`);
       return { items: [], total: 0, slug };
     }
   }
@@ -469,10 +476,7 @@ export class MangaDexService {
     if (cached) return cached.data[tagName];
 
     try {
-      const res = await fetch('https://api.mangadex.org/manga/tag', {
-        headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
-        cache: 'no-store',
-      });
+      const res = await this.mangadexFetch('https://api.mangadex.org/manga/tag');
       if (!res.ok) return undefined;
       const json = await res.json() as { data: { id: string; attributes: { name: { en?: string } } }[] };
       const map: Record<string, string> = {};
@@ -482,7 +486,8 @@ export class MangaDexService {
       }
       await this.cache.set(cacheKey, map, 1000 * 60 * 60 * 24); // 24h
       return map[tagName];
-    } catch {
+    } catch (err) {
+      this.logger.warn(`[MangaDex] Tag list fetch error: ${String(err)}`);
       return undefined;
     }
   }
@@ -494,10 +499,7 @@ export class MangaDexService {
       params.set('limit', '100');
       params.set('order[volume]', 'asc');
 
-      const res = await fetch(`https://api.mangadex.org/cover?${params.toString()}`, {
-        headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
-        cache: 'no-store',
-      });
+      const res = await this.mangadexFetch(`https://api.mangadex.org/cover?${params.toString()}`);
       if (!res.ok) return [];
 
       const data = (await res.json()) as MangaDexCoverResponse;
@@ -508,7 +510,8 @@ export class MangaDexService {
             url: `https://uploads.mangadex.org/covers/${mangaId}/${cover.attributes.fileName}.512.jpg`,
           })) ?? []
       );
-    } catch {
+    } catch (err) {
+      this.logger.warn(`[MangaDex] Covers fetch error (${mangaId}): ${String(err)}`);
       return [];
     }
   }
@@ -519,10 +522,7 @@ export class MangaDexService {
       params.append('includes[]', 'author');
       params.append('includes[]', 'artist');
 
-      const res = await fetch(`https://api.mangadex.org/manga/${mangaId}?${params.toString()}`, {
-        headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
-        cache: 'no-store',
-      });
+      const res = await this.mangadexFetch(`https://api.mangadex.org/manga/${mangaId}?${params.toString()}`);
       if (!res.ok) return { title: '', authors: [], artists: [], genres: [], description: '' };
 
       const data = (await res.json()) as { data?: MangaDexManga };
@@ -546,7 +546,8 @@ export class MangaDexService {
       const title = this.pickLocalized(data.data?.attributes?.title, lang);
 
       return { title, authors, artists, genres, description: description || '' };
-    } catch {
+    } catch (err) {
+      this.logger.warn(`[MangaDex] Authors fetch error (${mangaId}): ${String(err)}`);
       return { title: '', authors: [], artists: [], genres: [], description: '' };
     }
   }
@@ -556,10 +557,7 @@ export class MangaDexService {
     this.logger.log(`[MangaDex] Fetching: ${label} | lang=${lang}`);
 
     try {
-      const response = await fetch(`https://api.mangadex.org/manga?${params.toString()}`, {
-        headers: { Accept: 'application/json', 'User-Agent': 'MetaBooks/1.0 (https://github.com/metabooks)' },
-        cache: 'no-store',
-      });
+      const response = await this.mangadexFetch(`https://api.mangadex.org/manga?${params.toString()}`);
 
       this.logger.log(`[MangaDex] ${response.status} ${response.statusText} | ${label}`);
 
