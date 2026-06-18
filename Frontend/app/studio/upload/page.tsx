@@ -269,8 +269,7 @@ function MangaPickerModal({
               >
                 <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-xl bg-white/8 border border-white/8">
                   {book.thumbnail ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={resolvedThumbnail(book as any)} alt={book.title} loading="lazy" className="h-full w-full object-cover" />
+                    <Image src={resolvedThumbnail(book as any)} alt={book.title} fill loading="lazy" className="object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-white/20">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">

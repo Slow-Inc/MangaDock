@@ -97,6 +97,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "api.dicebear.com",
       },
+      // GitHub user avatars (DocsClient issue/PR list)
+      {
+        protocol: "https",
+        hostname: "avatars.githubusercontent.com",
+      },
       // Local image cache + uploads served by the backend.
       {
         protocol: "http",

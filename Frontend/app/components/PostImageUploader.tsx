@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import Image from "next/image";
 import { uploadForumImage } from "../lib/communityApi";
 
 interface PostImageUploaderProps {
@@ -70,11 +71,12 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
         <div className={`grid gap-2 mb-3 ${images.length === 1 ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-4'}`}>
           {images.map((url, i) => (
             <div key={i} className="relative rounded-lg overflow-hidden bg-white/5 border border-white/10 group aspect-square">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={url}
                 alt={`รูปที่ ${i + 1}`}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
+                unoptimized
               />
               <button
                 type="button"
