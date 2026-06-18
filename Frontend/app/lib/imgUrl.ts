@@ -67,15 +67,21 @@ export function proxyImageUrl(url: string): string {
   return url;
 }
 
-/** The src to swap to when a cached thumbnail 404s — proxy the original CDN URL. */
+/** The src to swap to when a thumbnail fails to load. */
 export function thumbnailFallbackSrc(book: {
   thumbnail?: string;
   thumbnailLocal?: string;
 }): string | null {
-  if (book.thumbnailLocal && book.thumbnail) {
+  if (!book.thumbnail) return null;
+  // Local cache failed — retry via CDN proxy
+  if (book.thumbnailLocal) {
     return `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`;
   }
-  return null;
+  // MangaDex CDN blocks direct browser requests — must proxy
+  if (book.thumbnail.includes(MANGADEX_CDN)) {
+    return `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`;
+  }
+  return book.thumbnail;
 }
 
 export function resolvedThumbnail(book: {
