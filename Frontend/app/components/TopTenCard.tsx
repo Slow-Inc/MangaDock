@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import BookDetailModal from "./BookDetailModal";
-import { resolvedThumbnail } from "../lib/imgUrl";
+import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
 import type { LandingBook } from "../lib/types";
 
 type Props = {
@@ -43,10 +43,8 @@ export default function TopTenCard({ book, index }: Props) {
             if (img.naturalWidth > img.naturalHeight) setIsLandscape(true);
           }}
           onError={(e) => {
-            if (book.thumbnailLocal && book.thumbnail) {
-              (e.currentTarget as HTMLImageElement).src =
-                `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`;
-            }
+            const fallback = thumbnailFallbackSrc(book);
+            if (fallback) (e.currentTarget as HTMLImageElement).src = fallback;
           }}
           className={`transition duration-300 group-hover:scale-105 ${
             isLandscape ? "object-contain" : "object-cover"

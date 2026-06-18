@@ -67,6 +67,17 @@ export function proxyImageUrl(url: string): string {
   return url;
 }
 
+/** The src to swap to when a cached thumbnail 404s — proxy the original CDN URL. */
+export function thumbnailFallbackSrc(book: {
+  thumbnail?: string;
+  thumbnailLocal?: string;
+}): string | null {
+  if (book.thumbnailLocal && book.thumbnail) {
+    return `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`;
+  }
+  return null;
+}
+
 export function resolvedThumbnail(book: {
   thumbnail: string;
   thumbnailLocal?: string;
