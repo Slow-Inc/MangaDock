@@ -1,4 +1,5 @@
 import { BooksService } from './books.service';
+import { buildMitConfig } from './mit-config';
 
 /**
  * Per-request Gemini model for image translation (Issue #87, Option A).
@@ -33,20 +34,20 @@ const cachedEntry = {
 describe('BooksService — per-request image translation model (#87)', () => {
   it('buildMitConfig includes translator.model when an image model is given', () => {
     const { service } = makeService();
-    const cfg = JSON.parse((service as any).batch.buildMitConfig('ANY', 'THA', '', 'gemini-2.5-pro'));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', '', 'gemini-2.5-pro'));
     expect(cfg.translator.model).toBe('gemini-2.5-pro');
   });
 
   it('buildMitConfig omits translator.model when absent, and sanitizes unsafe names', () => {
     const { service } = makeService();
-    const noModel = JSON.parse((service as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const noModel = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(noModel.translator.model).toBeUndefined();
 
-    const unsafe = JSON.parse((service as any).batch.buildMitConfig('ANY', 'THA', '', 'evil name!:{}'));
+    const unsafe = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', '', 'evil name!:{}'));
     expect(unsafe.translator.model).toBeUndefined();
 
     // "models/" prefix from the Gemini catalog is normalized away
-    const prefixed = JSON.parse((service as any).batch.buildMitConfig('ANY', 'THA', '', 'models/gemini-2.5-flash'));
+    const prefixed = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', '', 'models/gemini-2.5-flash'));
     expect(prefixed.translator.model).toBe('gemini-2.5-flash');
   });
 
