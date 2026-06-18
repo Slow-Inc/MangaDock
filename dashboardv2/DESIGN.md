@@ -159,9 +159,70 @@ node popup), B2 (Traffic + Streams panels; SystemFlow cut), B3 (GpuDetail host c
 detail). **Only B4 (realtime — OAuth + `/api/live` + the per-service `/status` feeds #283/#282) remains, deferred.**
 Each step consumes the data layer + this token system, with TDD on the pure mappers + visual E2E.
 
-> **Resume here (next session):** **V2 is the only project** (legacy `:4100` abandoned, do not touch). V2 is
-> feature-complete in **mock mode** — all topics built (B1–B3, B5). The only remaining work is **B4 realtime**:
-> re-port the OAuth/Supabase auth (`auth-gate` is a stub `{token:null}`) + a `/api/live` SSE proxy *fresh into V2*
-> (not revived from `:4100`), then `NEXT_PUBLIC_MOCKUP_MODE=false` reads the live MIT stream (FE/BE stay No Data
-> until #283/#282). Run: `cd dashboardv2 && bun dev` → `:4200`. Last commit: `2c303ab` (port + B1 + B2); B3 + B5 +
-> these docs were uncommitted at checkpoint — commit them first.
+> **Resume here (next session):** **V2 is the only project** (legacy `:4100` abandoned, do not touch). Mock-mode;
+> all topics built (B1–B3, B5). **§8 gap analysis done; Track A chosen; Track A P0 SHIPPED** (worker-sat KPI · VRAM
+> bloat + leak magnitude · degraded-now banner · gateway plane localizer + hint · theme persistence · honest signals
+> — pure logic in `lib/incident.ts`, wired in `components/dashboard.tsx`; tsc clean · 49/49 tests · visual E2E green).
+> **Next = Track A P1** (see §8: incident-timeline rail · queue sparkline · real-worker popup · tabForHash · skeletons
+> · focus-trap · search · Export). Still open: **B** B4 realtime/OAuth (`auth-gate` stub `{token:null}` →
+> `NEXT_PUBLIC_MOCKUP_MODE=false`) · **C** cheap-mit-emit · **D** big bets. Run: `cd dashboardv2 && bun dev` →
+> `:4200`. Commits: `2c303ab` (port+B1+B2), `838f797` (B3+B5+docs), + this one (§8 gap analysis + Track A P0).
+
+---
+
+## 8. Backlog — what to add next (gap analysis 2026-06-18)
+
+> Source: the `dashboardv2-gap-analysis` workflow (3 exhaustive surveys: V2 inventory · MIT telemetry surface ·
+> legacy/domain) + direct code read. **Proposal, not yet scheduled** — every item is placed (exact location),
+> tagged `dataSource` (live-now / cheap-mit-emit / new-mit-work / frontend-only) + effort (S/M/L). Pick a track first.
+
+**Headline — V2 drops MIT data it already receives.** These `MitLive` fields are mapped in `lib/live-map.ts` but
+read **nowhere** in `components/dashboard.tsx` — the cheapest, highest-value wins, **no MIT work**:
+
+| dropped field (live-now) | where it goes |
+|---|---|
+| `m.workers.free/alive/total` | Overview KPI #4 (replace dead "pages/min · No Data" card) + MIT badge source |
+| `m.vram.allocatedMb/reservedMb` | MIT›Telemetry, above the VRAM donut (reserved−allocated = the non-release leak) |
+| `m.vram.models[].freedMb` | VRAM legend leaked-row — show leak **magnitude** (freed/footprint), not a boolean |
+| `m.gpu.fanPct / powerW` | MIT›Telemetry / real-worker node popup (today shown only from `mockNode`) |
+| `m.queueSize` | a Queue-depth KPI + sparkline (`MOCK_SERIES.queue` buffer exists, no chart consumes it) |
+| `m.translator` | MIT›Pipeline gateway card — "which engine is live" |
+| `gateway.controlMs` on Overview | Subsystems "9arm gateway" pill (today buried one nav-click deep in MIT›Pipeline) |
+
+**Tiers**
+
+- **P0 — quick win ✅ SHIPPED (2026-06-18, Track A):**
+  worker-saturation KPI (replaced the dead "pages/min · No Data" card) · VRAM bloat (allocated/reserved held gap) +
+  leak-magnitude (freed/footprint on the leaked legend row) · degraded-now summary strip in the incident banner
+  (since · for · jobs blocked · workers free, client-tracked start ts) · gateway plane-fault localizer (control vs
+  data plane) + recovery-hint chip mapping the `_GATEWAY_BAD` states to an action + engine identity · theme
+  persistence (localStorage) · honest at-a-glance signals (connection chip = transport **and** `m.status` health,
+  incl. the latent `ok`-vs-`up` fix; MIT nav badge incident-gated not hardcoded "1"; Bell dot from `live.events`
+  errors). Logic in the pure, unit-tested `lib/incident.ts` (`gatewayDiagnosis`/`vramBloat`/`workerSaturation`/
+  `formatDuration`, 12 tests); wired in `components/dashboard.tsx`. Verified: tsc clean · 49/49 tests · visual E2E at
+  `:4200` (computed values + 0 console errors).
+- **P1 — high value:** incident-timeline punch-card rail (client ring-buffer, M) · queue-depth sparkline (add a
+  `HOST_CHARTS` entry) · real-worker popup fed from live `m.gpu`/`m.host` instead of `mockNode` (M) · wire
+  `tabForHash` deep-link (dead code — drill-downs always land on `pipeline`) · subsystem-pill drill-down (false
+  affordance: `cursor-pointer`, no handler) · **skeleton/loading states** (DESIGN.md §5 promised, zero exist) ·
+  node-popup focus-trap (a11y, §6 promise) · functional search (filter live stages/workers/jobs) · Export current
+  snapshot as JSON.
+- **P1 — cheap-mit-emit** (small MIT change, unlocks real data): in-flight/running queue row (today the dispatched
+  task is removed on dispatch so the Queue table's `running`/30s-stall branch is unreachable) · per-stage fail/retry
+  flag (not just `liveMs>=30s`) · pages-completed counter + throughput (kills the biggest hardcoded mock surface) ·
+  `last_run` summary key into the `build_snapshot` telemetry slot (already filters keys).
+- **P2 / bigger bets** (net-new): honest time-range window (2m/10m over the client buffer, not fake 1h/24h) ·
+  **Quality tab** (detection regions / OCR lines / SFX rescued / retries / parity % / config-hash — legacy
+  `quality-panel.tsx`, dropped) · **recent-translations before/after gallery** (the console is about image
+  translation yet shows no image) · cache-tier health + hit-rate (needs Backend `/status`, #282) · benchmark parity
+  trend · SFX/glossary stats · economy/unlock panel (Backend-domain).
+- **Defer:** `mit@console` restart/reload-models write-actions — needs B4 auth + a default-off write-action opt-in
+  (`NEXT_PUBLIC_MIT_CONSOLE_ENABLED`) + new MIT control endpoints; heaviest and riskiest.
+
+**Top 5 to build first** (all P0, small, no MIT dependency): worker-saturation KPI · VRAM bloat + leak-magnitude ·
+degraded-now banner strip · gateway plane localizer + recovery hint · theme persistence.
+
+**Track chosen: A** (2026-06-18) — surface-existing-data + craft. **P0 done** (above). **Next = Track A P1:** incident-
+timeline punch-card rail · queue-depth sparkline · real-worker popup fed from live `m.gpu`/`m.host` · wire
+`tabForHash` deep-link · subsystem-pill drill-down · skeleton/loading states · node-popup focus-trap · functional
+search · Export-as-JSON. (Other tracks still open: **B** B4 realtime/OAuth · **C** cheap-mit-emit · **D** big bets.)
