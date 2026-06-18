@@ -28,7 +28,7 @@ function makeJsonCache(keys: string[] = []) {
 }
 
 function makeL3() {
-  return { write: jest.fn() } as unknown as L3DiskService;
+  return { write: jest.fn() } as unknown as L3DiskService & { write: jest.Mock };
 }
 
 function makeWriter(store: Record<string, string> = {}, l1Keys: string[] = []) {

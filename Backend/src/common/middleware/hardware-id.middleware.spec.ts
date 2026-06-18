@@ -6,7 +6,7 @@ import { Request, Response, NextFunction } from 'express';
 
 describe('HardwareIdMiddleware', () => {
   let middleware: HardwareIdMiddleware;
-  let mockRequest: Partial<Request>;
+  let mockRequest: Omit<Partial<Request>, 'path'> & { path?: string };
   let mockResponse: Partial<Response>;
   let nextFunction: NextFunction;
 

@@ -1,8 +1,25 @@
-import { Body, Controller, Get, HttpException, HttpStatus, NotFoundException, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import { fetchProxiedImage, MAX_PROXY_BYTES } from './img-proxy.helper';
 import type { Request, Response } from 'express';
 import { BooksService } from './books.service';
 import { StatsIncrementService } from '../cache/stats-increment.service';
-import { TurnstileGuard, generateClearanceToken } from '../auth/turnstile.guard';
+import {
+  TurnstileGuard,
+  generateClearanceToken,
+} from '../auth/turnstile.guard';
 import { resolveTurnstileConfig } from '../auth/turnstile.config';
 
 @Controller('books')
@@ -22,7 +39,10 @@ export class BooksController {
     const hwid = req.headers['x-hardware-id'] as string;
 
     if (!hwid) {
-      throw new HttpException('Hardware ID is required', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Hardware ID is required',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // Skip verification only when disabled outside production.
@@ -35,16 +55,19 @@ export class BooksController {
     formData.append('response', body.token);
 
     try {
-      const result = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-        method: 'POST',
-        body: formData,
-      });
+      const result = await fetch(
+        'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+        {
+          method: 'POST',
+          body: formData,
+        },
+      );
       const outcome = await result.json();
 
       if (outcome.success) {
         return { clearanceToken: generateClearanceToken(secret, hwid) };
       }
-      
+
       console.error('Turnstile verification failed:', outcome['error-codes']);
     } catch (e) {
       console.error('Turnstile API request failed:', e);
@@ -128,11 +151,19 @@ export class BooksController {
     @Req() req?: Request,
     @Query('forceLocal') forceLocal?: string,
   ) {
-    const result = await this.booksService.getMangaChapterPages(chapterId, forceLocal === 'true');
+    const result = await this.booksService.getMangaChapterPages(
+      chapterId,
+      forceLocal === 'true',
+    );
     if (!result) throw new NotFoundException('Chapter pages not found');
     const uid = (req?.headers?.['x-hardware-id'] as string) || 'anon';
     const date = new Date().toISOString().slice(0, 10);
-    void this.statsIncrement.recordChapterView(chapterId, mangaId ?? '', uid, date);
+    void this.statsIncrement.recordChapterView(
+      chapterId,
+      mangaId ?? '',
+      uid,
+      date,
+    );
     return result;
   }
 
@@ -169,14 +200,20 @@ export class BooksController {
     return this.booksService.getMangaModelsInfo();
   }
 
-  
-
   @UseGuards(TurnstileGuard)
   @Post('chapters/:chapterId/pages/:pageIndex/translate-patches')
   async translateMangaPagePatches(
     @Param('chapterId') chapterId: string,
     @Param('pageIndex') pageIndex: string,
-    @Body() body: { pageUrl?: string; sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: 'hd' | 'saver'; mangaId?: string },
+    @Body()
+    body: {
+      pageUrl?: string;
+      sourceLang?: string;
+      targetLang?: string;
+      imageModel?: string;
+      derivative?: 'hd' | 'saver';
+      mangaId?: string;
+    },
   ) {
     try {
       return await this.booksService.translateMangaPagePatches(
@@ -185,15 +222,25 @@ export class BooksController {
         body?.pageUrl ?? '',
         body?.sourceLang,
         body?.targetLang,
-        { imageModel: body?.imageModel, derivative: body?.derivative === 'saver' ? 'saver' : 'hd', mangaId: body?.mangaId },
+        {
+          imageModel: body?.imageModel,
+          derivative: body?.derivative === 'saver' ? 'saver' : 'hd',
+          mangaId: body?.mangaId,
+        },
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       // Log the real MIT/internal error server-side; return a generic message
       // so internal detail never leaks to the client (#226).
-      console.error(`translate-patches failed (chapter ${chapterId} page ${pageIndex}):`, message);
+      console.error(
+        `translate-patches failed (chapter ${chapterId} page ${pageIndex}):`,
+        message,
+      );
       throw new HttpException(
-        { statusCode: HttpStatus.INTERNAL_SERVER_ERROR, message: 'Translation failed' },
+        {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: 'Translation failed',
+        },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -215,7 +262,15 @@ export class BooksController {
   @Post('chapters/:chapterId/batch-translate-patches')
   async batchTranslateMangaPatches(
     @Param('chapterId') chapterId: string,
-    @Body() body: { pages?: Array<{ pageIndex: number; pageUrl: string }>; sourceLang?: string; targetLang?: string; imageModel?: string; derivative?: 'hd' | 'saver'; mangaId?: string },
+    @Body()
+    body: {
+      pages?: Array<{ pageIndex: number; pageUrl: string }>;
+      sourceLang?: string;
+      targetLang?: string;
+      imageModel?: string;
+      derivative?: 'hd' | 'saver';
+      mangaId?: string;
+    },
     @Res() res: import('express').Response,
   ): Promise<void> {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -242,33 +297,63 @@ export class BooksController {
 
     const listener = (
       pageIndex: number,
-      result: { patches: unknown[]; error?: string; stage?: string; progress?: boolean },
+      result: {
+        patches: unknown[];
+        error?: string;
+        stage?: string;
+        progress?: boolean;
+      },
     ) => {
       if (res.writableEnded) return;
       if (result.progress) {
         // Live MIT stage update — informational event, distinct shape from
         // page completions so old clients (no `type` handling) skip it.
-        res.write(`data: ${JSON.stringify({ type: 'progress', pageIndex, stage: result.stage })}\n\n`);
+        res.write(
+          `data: ${JSON.stringify({ type: 'progress', pageIndex, stage: result.stage })}\n\n`,
+        );
         return;
       }
-      res.write(`data: ${JSON.stringify({ pageIndex, patches: result.patches, error: result.error ?? null })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ pageIndex, patches: result.patches, error: result.error ?? null })}\n\n`,
+      );
     };
 
     // Remove listener on client disconnect — job continues in background
     res.on('close', () => {
       clearInterval(heartbeat);
-      this.booksService.removeBatchListener(chapterId, sourceLang, targetLang, listener, imageModel, derivative);
+      this.booksService.removeBatchListener(
+        chapterId,
+        sourceLang,
+        targetLang,
+        listener,
+        imageModel,
+        derivative,
+      );
     });
 
     try {
-      await this.booksService.startOrAttachBatchJob(chapterId, body?.pages ?? [], listener, sourceLang, targetLang, imageModel, derivative, body?.mangaId);
+      await this.booksService.startOrAttachBatchJob(
+        chapterId,
+        body?.pages ?? [],
+        listener,
+        sourceLang,
+        targetLang,
+        imageModel,
+        derivative,
+        body?.mangaId,
+      );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       // Log the real error server-side; emit a generic error to the SSE client
       // so internal detail never leaks (#226).
-      console.error(`batch-translate-patches failed (chapter ${chapterId}):`, message);
+      console.error(
+        `batch-translate-patches failed (chapter ${chapterId}):`,
+        message,
+      );
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: 'Translation failed', pageIndex: -1, patches: [] })}\n\n`);
+        res.write(
+          `data: ${JSON.stringify({ error: 'Translation failed', pageIndex: -1, patches: [] })}\n\n`,
+        );
       }
     }
 
@@ -294,47 +379,37 @@ export class BooksController {
   /** Proxy external images (e.g. MangaDex CDN) to avoid hotlink blocking. */
   @Get('img-proxy')
   async proxyImage(@Query('url') url: string, @Res() res: Response) {
-    if (!url || !/^https:\/\//.test(url)) {
-      return res.status(400).send('Invalid URL');
-    }
+    const result = await fetchProxiedImage(url);
+    if (!result.ok) return res.status(result.httpStatus).send(result.message);
+
+    const headers: Record<string, string | number> = {
+      'Content-Type': result.contentType,
+      // MangaDex URLs are content-addressed (hash in path) — safe to cache 1 year
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    };
+    if (result.contentLength !== null)
+      headers['Content-Length'] = result.contentLength;
+    res.writeHead(result.httpStatus, headers);
+
+    // Stream bytes directly — never buffer the whole image into RAM
+    const reader = result.body.getReader();
+    let received = 0;
     try {
-      const upstream = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
-          'Accept': 'image/webp,image/avif,image/*,*/*',
-          // MangaDex CDN blocks requests whose Referer is not mangadex.org
-          'Referer': 'https://mangadex.org/',
-        },
-      });
-      // Cap proxied bodies (#139): manga pages are a few MB. The body is read
-      // as a stream and the connection cancelled the moment the cap is crossed —
-      // a lying/missing Content-Length must not buffer unbounded bytes into RAM.
-      const MAX_PROXY_BYTES = 15 * 1024 * 1024;
-      const declaredLength = Number(upstream.headers.get('content-length') ?? 0);
-      if (declaredLength > MAX_PROXY_BYTES || !upstream.body) {
-        return res.status(declaredLength > MAX_PROXY_BYTES ? 413 : 502).send(
-          declaredLength > MAX_PROXY_BYTES ? 'Image too large' : 'Bad Gateway',
-        );
-      }
-      const reader = (upstream.body as unknown as ReadableStream<Uint8Array>).getReader();
-      const chunks: Uint8Array[] = [];
-      let received = 0;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         received += value.byteLength;
         if (received > MAX_PROXY_BYTES) {
+          // Headers already sent; abort connection to signal incomplete response
           reader.cancel().catch(() => {});
-          return res.status(413).send('Image too large');
+          res.destroy();
+          return;
         }
-        chunks.push(value);
+        res.write(Buffer.from(value));
       }
-      const contentType = upstream.headers.get('content-type') ?? 'image/jpeg';
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      return res.send(Buffer.concat(chunks));
+      res.end();
     } catch {
-      return res.status(502).send('Bad Gateway');
+      res.destroy();
     }
   }
 }
