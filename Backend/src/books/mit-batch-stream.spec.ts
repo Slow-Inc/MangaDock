@@ -113,6 +113,13 @@ describe('MitBatchStream.run (#294)', () => {
 
     expect(deps.persistPage).toHaveBeenCalledTimes(2);
     expect(received.map((r) => r.pageIndex).sort()).toEqual([0, 1]);
+    // Pin the cacheKey so a transposed srcMIT/tgtMIT (both string — invisible to
+    // tsc) can't silently split the cache from the single-page endpoint.
+    expect(deps.persistPage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cacheKey: expect.stringContaining('ch1:0:ANY:THA:default:hd'),
+      }),
+    );
   });
 
   it('202-accepted async: does not persist (webhook delivers later)', async () => {
