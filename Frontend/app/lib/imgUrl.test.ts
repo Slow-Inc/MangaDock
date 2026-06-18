@@ -49,18 +49,28 @@ describe("toRelativeProxyUrl", () => {
 });
 
 describe("thumbnailFallbackSrc", () => {
-  test("both thumbnailLocal and thumbnail → proxied CDN URL", () => {
+  test("thumbnailLocal present → proxied CDN URL (local cache failed, retry via proxy)", () => {
     const book = { thumbnail: MANGADEX_URL, thumbnailLocal: LOCAL_PATH };
     expect(thumbnailFallbackSrc(book)).toBe(
       `/api/img-proxy?url=${encodeURIComponent(MANGADEX_URL)}`
     );
   });
 
+  test("no thumbnailLocal, MangaDex CDN URL → proxied URL (direct CDN blocked by UA check)", () => {
+    expect(thumbnailFallbackSrc({ thumbnail: MANGADEX_URL })).toBe(
+      `/api/img-proxy?url=${encodeURIComponent(MANGADEX_URL)}`
+    );
+  });
+
+  test("no thumbnailLocal, non-MangaDex URL → raw URL (no proxy needed)", () => {
+    expect(thumbnailFallbackSrc({ thumbnail: GOOGLE_URL })).toBe(GOOGLE_URL);
+  });
+
   test("missing thumbnail → null", () => {
     expect(thumbnailFallbackSrc({ thumbnailLocal: LOCAL_PATH })).toBeNull();
   });
 
-  test("missing thumbnailLocal → null (no local cache, nothing to fall back from)", () => {
-    expect(thumbnailFallbackSrc({ thumbnail: MANGADEX_URL })).toBeNull();
+  test("empty thumbnail string → null", () => {
+    expect(thumbnailFallbackSrc({ thumbnail: "" })).toBeNull();
   });
 });

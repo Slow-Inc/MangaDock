@@ -34,6 +34,8 @@ function BookCard({
   book: LandingBook;
   rowId: string;
 }) {
+  const [thumbSrc, setThumbSrc] = useState(() => resolvedThumbnail(book));
+  const [thumbFellBack, setThumbFellBack] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showCover, setShowCover] = useState(false);
@@ -111,16 +113,19 @@ function BookCard({
           </div>
         ) : (
           <Image
-            src={resolvedThumbnail(book)}
+            src={thumbSrc}
             alt={book.title}
             fill
             onLoad={(e) => {
               const img = e.currentTarget as HTMLImageElement;
               if (img.naturalWidth > img.naturalHeight) setIsLandscape(true);
             }}
-            onError={(e) => {
-              const fallback = thumbnailFallbackSrc(book);
-              if (fallback) (e.currentTarget as HTMLImageElement).src = fallback;
+            onError={() => {
+              if (!thumbFellBack) {
+                const fallback = thumbnailFallbackSrc(book);
+                setThumbFellBack(true);
+                if (fallback) setThumbSrc(fallback);
+              }
             }}
             className={`transition duration-300 group-hover:scale-105 ${
               isLandscape ? "object-contain" : "object-cover"
@@ -248,7 +253,7 @@ function BookCard({
       )}
       {showCover && (
         <CoverLightbox
-          src={resolvedThumbnail(book)}
+          src={thumbSrc}
           alt={book.title}
           onClose={() => setShowCover(false)}
         />
