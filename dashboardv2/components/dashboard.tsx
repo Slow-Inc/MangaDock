@@ -15,6 +15,7 @@ import { MIT_TABS } from "@/lib/service-tabs";
 import { useDevAuth } from "@/components/auth-gate";
 import { useLiveSnapshot } from "@/components/use-live-snapshot";
 import type { MitLive } from "@/lib/live-map";
+import { gatewayDiagnosis, vramBloat, workerSaturation, formatDuration, type VramBloat } from "@/lib/incident";
 import CountUp from "@/components/count-up";
 
 // Palette now lives in globals.css (warm Speck tokens, dark default + .light). The toggle below
@@ -310,15 +311,19 @@ type MitData = {
   mock: boolean;
   stages: Stage[];
   vitals: { kind: "ring" | "arc"; label: string; pct: number; sub: string }[] | null;
-  vramModels: { name: string; v: number; leaked: boolean }[];
+  vramModels: { name: string; v: number; leaked: boolean; freedMb: number | null; footprintMb: number }[];
   vramTotal: number;
   vramUsed: number;
+  bloat: VramBloat | null; // torch allocator held gap (reserved − allocated)
   series: Record<string, number[]>; // rolling host-metric history (GpuDetail time-charts)
 };
 
 // ── MIT depth page — tabs (Pipeline/Telemetry/Queue/Workers), DESIGN.md §4 (Logs/Console → node popup) ──
-function MitPipeline({ stages, gateway }: { stages: Stage[]; gateway: MitLive["gateway"] | undefined }) {
-  const down = gateway?.status === "down";
+function MitPipeline({ stages, gateway, translator }: { stages: Stage[]; gateway: MitLive["gateway"] | undefined; translator?: string }) {
+  const diag = gatewayDiagnosis(gateway ?? null);
+  const down = diag.data === "down"; // a bad gateway state (translate plane is down)
+  const planeDot = (p: string) => (p === "up" ? "ok" : p === "down" ? "error" : "idle");
+  const planeColor = (p: string) => (p === "up" ? "var(--success)" : p === "down" ? "var(--coral)" : "var(--ink-3)");
   return (
     <div className="flex flex-col gap-3">
       {gateway ? (
@@ -326,13 +331,24 @@ function MitPipeline({ stages, gateway }: { stages: Stage[]; gateway: MitLive["g
           <div className="mb-3 flex items-center gap-2">
             {down ? <AlertTriangle size={14} style={{ color: "var(--coral)" }} /> : <Activity size={14} style={{ color: "var(--ink-2)" }} />}
             <span className="text-[12.5px] font-semibold" style={{ color: down ? "var(--coral)" : "var(--ink)" }}>Gateway diagnosis</span>
+            {translator && <span className="rounded-full px-2 py-0.5 text-[10.5px] font-medium tnum" style={{ background: "var(--surface-2)", color: "var(--ink-2)" }}>engine · {translator}</span>}
             <span className="ml-auto text-[11px] font-semibold" style={{ color: down ? "var(--coral)" : "var(--success)" }}>{down ? "translate stalled" : "healthy"}</span>
           </div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-[12px] sm:grid-cols-4">
-            {([["status", gateway.status], ["detail", gateway.detail ?? "—"], ["control", gateway.controlMs != null ? `${gateway.controlMs}ms` : "—"], ["latency", gateway.latencyMs != null ? `${gateway.latencyMs}ms` : "—"]] as [string, string][]).map(([k, v]) => (
-              <div key={k}><div className="text-[10.5px]" style={{ color: "var(--ink-3)" }}>{k}</div><div className="mt-0.5 truncate font-medium tnum" title={v}>{v}</div></div>
+          {/* control plane (host reachable) vs data plane (translate works) — which is down picks the fix */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {([["control plane", diag.control, gateway.controlMs != null ? `reachable · ${gateway.controlMs}ms` : "no probe response"], ["data plane", diag.data, gateway.latencyMs != null ? `translate · ${gateway.latencyMs}ms` : "no translate completed"]] as [string, string, string][]).map(([label, plane, sub]) => (
+              <div key={label} className="rounded-[10px] p-3" style={{ background: "rgba(0,0,0,0.16)", border: "1px solid var(--hairline)" }}>
+                <div className="flex items-center gap-1.5 text-[11.5px] font-medium"><Dot s={planeDot(plane)} />{label}<span className="ml-auto text-[10.5px] font-semibold" style={{ color: planeColor(plane) }}>{plane}</span></div>
+                <div className="mt-1 truncate text-[10.5px] tnum" style={{ color: "var(--ink-3)" }} title={sub}>{sub}</div>
+              </div>
             ))}
           </div>
+          <div className="mt-3 truncate text-[11px] tnum" style={{ color: "var(--ink-3)" }} title={gateway.detail}>{gateway.detail}</div>
+          {diag.hint && (
+            <div className="mt-3 flex items-center gap-2 rounded-[9px] px-3 py-2 text-[11.5px]" style={{ background: "color-mix(in oklch, var(--coral) 12%, transparent)", border: "1px solid color-mix(in oklch, var(--coral) 26%, transparent)", color: "var(--coral)" }}>
+              <Zap size={12} className="shrink-0" /> <span className="font-medium">{diag.hint}</span>
+            </div>
+          )}
         </Panel>
       ) : (
         <Panel className="py-10 text-center text-[12px]" style={{ color: "var(--ink-3)" }}>No gateway data</Panel>
@@ -410,7 +426,7 @@ function HostCharts({ series }: { series: Record<string, number[]> }) {
   );
 }
 
-function MitTelemetry({ vitals, vramModels, vramTotal, vramUsed, hasGpu, series }: { vitals: MitData["vitals"]; vramModels: MitData["vramModels"]; vramTotal: number; vramUsed: number; hasGpu: boolean; series: Record<string, number[]> }) {
+function MitTelemetry({ vitals, vramModels, vramTotal, vramUsed, hasGpu, bloat, series }: { vitals: MitData["vitals"]; vramModels: MitData["vramModels"]; vramTotal: number; vramUsed: number; hasGpu: boolean; bloat: MitData["bloat"]; series: Record<string, number[]> }) {
   return (
     <div className="flex flex-col gap-3">
       {vitals ? (
@@ -432,11 +448,12 @@ function MitTelemetry({ vitals, vramModels, vramTotal, vramUsed, hasGpu, series 
       )}
       <Panel className="p-5">
         <div className="mb-3 flex items-center gap-2"><Cpu size={14} style={{ color: "var(--ink-2)" }} /><span className="text-[12.5px] font-semibold">VRAM by model</span><span className="ml-auto text-[11px] tnum" style={{ color: "var(--ink-3)" }}>{hasGpu ? `${vramUsed} / ${vramTotal} GB` : "—"}</span></div>
+        {bloat && <div className="mb-2.5 text-[10.5px] tnum" style={{ color: bloat.bloated ? "var(--coral)" : "var(--ink-3)" }}>allocator · allocated {bloat.allocatedGb} / reserved {bloat.reservedGb} GB · +{bloat.heldGb} GB held{bloat.bloated ? " ⚠ leaking" : ""}</div>}
         {hasGpu ? (
           <div className="flex items-center gap-3">
             <VramDonut models={vramModels} totalGb={vramTotal} usedGb={vramUsed} />
             <div className="flex flex-1 flex-col gap-1.5">
-              {vramModels.map((vm, i) => (<div key={vm.name} className="flex items-center gap-2 text-[11px]"><span className="h-2 w-2 rounded-[3px]" style={{ background: VRAM_COLORS[i % VRAM_COLORS.length] }} /><span className="flex-1 truncate" style={{ color: vm.leaked ? "var(--coral)" : "var(--ink-2)" }}>{vm.name}{vm.leaked && " · leak"}</span><span className="tnum" style={{ color: "var(--ink-3)" }}>{vm.v}</span></div>))}
+              {vramModels.map((vm, i) => (<div key={vm.name} className="flex items-center gap-2 text-[11px]"><span className="h-2 w-2 rounded-[3px]" style={{ background: VRAM_COLORS[i % VRAM_COLORS.length] }} /><span className="flex-1 truncate" style={{ color: vm.leaked ? "var(--coral)" : "var(--ink-2)" }}>{vm.name}{vm.leaked && ` · leak ${vm.freedMb ?? 0}/${vm.footprintMb}MB`}</span><span className="tnum" style={{ color: "var(--ink-3)" }}>{vm.v}</span></div>))}
               <div className="flex items-center gap-2 text-[11px]"><span className="h-2 w-2 rounded-[3px]" style={{ background: "var(--surface-2)", border: "1px solid var(--hairline)" }} /><span className="flex-1 truncate" style={{ color: "var(--ink-3)" }}>available</span><span className="tnum" style={{ color: "var(--ink-3)" }}>{Math.round((vramTotal - vramUsed) * 10) / 10}</span></div>
             </div>
           </div>
@@ -529,8 +546,8 @@ function MitView({ data, onOpenNode }: { data: MitData; onOpenNode: (n: { id: st
           </button>
         ))}
       </div>
-      {tab === "pipeline" && <MitPipeline stages={data.stages} gateway={m?.gateway} />}
-      {tab === "telemetry" && <MitTelemetry vitals={data.vitals} vramModels={data.vramModels} vramTotal={data.vramTotal} vramUsed={data.vramUsed} hasGpu={!!m?.gpu} series={data.series} />}
+      {tab === "pipeline" && <MitPipeline stages={data.stages} gateway={m?.gateway} translator={m?.translator} />}
+      {tab === "telemetry" && <MitTelemetry vitals={data.vitals} vramModels={data.vramModels} vramTotal={data.vramTotal} vramUsed={data.vramUsed} hasGpu={!!m?.gpu} bloat={data.bloat} series={data.series} />}
       {tab === "queue" && <MitQueue jobs={m?.queueJobs ?? []} />}
       {tab === "workers" && <MitWorkers workers={m?.workersDetail ?? []} onOpenNode={onOpenNode} />}
     </ViewShell>
@@ -665,9 +682,17 @@ export default function Dashboard() {
   const [dark, setDark] = useState(true);
   const [view, setView] = useState("Overview");
   const [openNode, setOpenNode] = useState<{ id: string; online: boolean } | null>(null);
+  // Theme preference persists across reloads. Read after mount (not in the initializer) so the
+  // server-rendered default (dark) matches the first client render — no hydration mismatch.
+  useEffect(() => { try { const s = localStorage.getItem("mit-theme"); if (s === "light") setDark(false); else if (s === "dark") setDark(true); } catch {} }, []);
+  useEffect(() => { try { localStorage.setItem("mit-theme", dark ? "dark" : "light"); } catch {} }, [dark]);
   // Wall-clock timestamps are client-only (server/client TZ + mock Date.now() differ → hydration mismatch).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // Live clock for the incident "for HH:MM:SS" age; `incidentSince` stamps the first degraded frame.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
+  const [incidentSince, setIncidentSince] = useState<number | null>(null);
 
   // Env-synced data: useLiveSnapshot serves MOCK_MIT when NEXT_PUBLIC_MOCKUP_MODE=true, else the real
   // MIT stream — one shape (MitLive), one render path. Flipping the flag is the mock→real wiring check.
@@ -679,11 +704,10 @@ export default function Dashboard() {
   // Panels with a MitLive field read from `m` (works for mock AND live). Panels with no live source show
   // their design mock only in mock mode, else No Data — that gap surfaces what still needs wiring.
   const ratio = (used?: number, total?: number) => (used != null && total ? Math.round((used / total) * 100) : 0);
-  const metrics = [
+  const metrics: { label: string; to?: number | null; sep: string; unit: string; delta: string; sub: string; up: boolean; mockOnly?: boolean; noData?: boolean }[] = [
     { label: "Pages translated", to: 1284, sep: ",", unit: "", delta: "+24.6%", sub: "+312 · 24h", up: true, mockOnly: true },
     { label: "Throughput", to: 18.4, sep: "", unit: "/min", delta: "+9.1%", sub: "+1.6 today", up: true, mockOnly: true },
     { label: "GPU util", to: m?.gpu?.utilPct, sep: "", unit: "%", delta: "−11.4%", sub: m?.gpu ? `${m.gpu.vramUsedGb} / ${m.gpu.vramTotalGb} GB` : "no source", up: false },
-    { label: "pages/min source", to: undefined as number | undefined, sep: "", unit: "", delta: "", sub: "No Data · no source", up: false, noData: true },
   ];
   const vitals = m
     ? [
@@ -706,14 +730,23 @@ export default function Dashboard() {
     const ev = e as { kind?: string; detail?: string; at?: number };
     return { s: ev.kind === "error" ? "error" : ev.kind === "info" ? "info" : "ok", text: ev.detail ?? ev.kind ?? "", t: ev.at ? new Date(ev.at).toLocaleTimeString("en-GB") : "" };
   });
+  const hasErrors = feed.some((e) => e.s === "error"); // drives the topbar Bell unread dot
   const stalledStage = m?.stages?.find((st) => st.liveMs >= 30000);
-  const incident = m && m.status !== "ok" ? { title: stalledStage ? `Pipeline stalled at ${stalledStage.label.toLowerCase()}` : "MIT degraded", detail: m.gateway?.detail ?? "MIT reported a degraded state" } : null;
+  const mitHealthy = m ? (m.status === "ok" || m.status === "up") : false; // MIT emits "up"; older paths "ok"
+  const incident = m && !mitHealthy ? { title: stalledStage ? `Pipeline stalled at ${stalledStage.label.toLowerCase()}` : "MIT degraded", detail: m.gateway?.detail ?? "MIT reported a degraded state" } : null;
+  // Stamp the incident start on the first degraded frame; clear on recovery → drives "since · for".
+  const hasIncident = !!incident;
+  useEffect(() => { if (hasIncident) setIncidentSince((s) => s ?? Date.now()); else setIncidentSince(null); }, [hasIncident]);
+  const sinceLabel = incidentSince != null ? new Date(incidentSince).toLocaleTimeString("en-GB") : null;
+  const forLabel = incidentSince != null ? formatDuration((now ?? incidentSince) - incidentSince) : null;
 
   // VRAM by model from m.vram (footprint MB → GB); donut adds an `available` segment from the GPU total.
   const GB = (mb: number) => Math.round((mb / 1024) * 10) / 10;
-  const vramModels = (m?.vram?.models ?? []).map((vm) => ({ name: vm.model, v: GB(vm.footprintMb), leaked: vm.leaked }));
+  const vramModels = (m?.vram?.models ?? []).map((vm) => ({ name: vm.model, v: GB(vm.footprintMb), leaked: vm.leaked, freedMb: vm.freedMb, footprintMb: vm.footprintMb }));
   const vramTotal = m?.gpu?.vramTotalGb ?? 12.3;
   const vramUsed = m?.gpu?.vramUsedGb ?? 0;
+  const bloat = vramBloat(m?.vram); // allocator held gap (reserved − allocated) — the machine-wide leak signal
+  const sat = m ? workerSaturation(m.workers, m.queueSize) : null; // worker-pool saturation (free=0 + backlog)
 
   // Subsystem strip: MIT + its gateway are live-backed (from m); the rest (FE/BE/infra) have no MIT
   // source, so they read mock when mocking, "no source" when live — again surfacing what isn't wired.
@@ -731,7 +764,7 @@ export default function Dashboard() {
   const degradedCount = subsystems.filter((x) => x.s === "error").length;
 
   // Bundle the live-derived MIT data for the depth tabs (one object → fewer props, same source as overview).
-  const mitData = { m, mock, stages, vitals, vramModels, vramTotal, vramUsed, series: live.series };
+  const mitData = { m, mock, stages, vitals, vramModels, vramTotal, vramUsed, bloat, series: live.series };
 
   return (
     <div className={dark ? "theme-dark" : "light"} style={{ background: "var(--bg)", minHeight: "100vh", color: "var(--ink)", fontFamily: "var(--font-sans)" }}>
@@ -746,7 +779,7 @@ export default function Dashboard() {
             {NAV.map((n) => (
               <button key={n.label} onClick={() => setView(n.label)} className="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-left text-[13px] font-medium transition-colors" style={view === n.label ? { background: "var(--coral-soft)", color: "var(--coral)" } : { color: "var(--ink-2)" }}>
                 <n.icon size={16} /> {n.label}
-                {n.label === "MIT" && <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold tnum" style={{ background: "var(--coral)", color: "#1a0d09" }}>1</span>}
+                {n.label === "MIT" && incident && <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold tnum" style={{ background: "var(--coral)", color: "#1a0d09" }}>1</span>}
               </button>
             ))}
           </nav>
@@ -767,7 +800,7 @@ export default function Dashboard() {
               </span>
             )}
             <button className="relative flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ background: "var(--panel)", border: "1px solid var(--hairline)" }}>
-              <Bell size={15} style={{ color: "var(--ink-2)" }} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full" style={{ background: "var(--coral)" }} />
+              <Bell size={15} style={{ color: "var(--ink-2)" }} />{hasErrors && <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full" style={{ background: "var(--coral)" }} />}
             </button>
             <button onClick={() => setDark((d) => !d)} className="flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ background: "var(--panel)", border: "1px solid var(--hairline)" }}>
               {dark ? <Sun size={15} style={{ color: "var(--ink-2)" }} /> : <Moon size={15} style={{ color: "var(--ink-2)" }} />}
@@ -788,8 +821,10 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-2">
               {(() => {
-                const c = live.status === "live" ? "var(--success)" : live.status === "connecting" ? "var(--processing)" : "var(--coral)";
-                const label = live.status === "live" ? "live · MIT" : live.status === "connecting" ? "connecting…" : "offline";
+                // transport (live.status) and health (incident) are distinct — a connected stream can still be degraded.
+                const degraded = live.status === "live" && !!incident;
+                const c = live.status === "connecting" ? "var(--processing)" : live.status === "offline" ? "var(--coral)" : degraded ? "var(--coral)" : "var(--success)";
+                const label = live.status === "connecting" ? "connecting…" : live.status === "offline" ? "offline" : degraded ? "live · degraded" : "live · MIT";
                 return (
                   <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11.5px] font-medium" style={{ background: `color-mix(in oklch, ${c} 12%, transparent)`, border: `1px solid color-mix(in oklch, ${c} 26%, transparent)`, color: c }}>
                     {live.status === "offline" ? <WifiOff size={12} /> : <Wifi size={12} />} {label}
@@ -812,8 +847,17 @@ export default function Dashboard() {
               <div className="min-w-0 flex-1">
                 <div className="text-[12.5px] font-semibold" style={{ color: "var(--coral)" }}>1 active incident · {incident.title}</div>
                 <div className="mt-0.5 truncate text-[11.5px] tnum" style={{ color: "var(--ink-2)" }}>{incident.detail}</div>
+                {/* degraded-now summary — since · for · jobs blocked · workers free (live m fields + client-tracked start) */}
+                {mounted && m && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10.5px] tnum" style={{ color: "var(--ink-3)" }}>
+                    {sinceLabel && <span>since {sinceLabel}</span>}
+                    {forLabel && <span>· for <span style={{ color: "var(--coral)" }}>{forLabel}</span></span>}
+                    {m.queueSize > 0 && <span>· {m.queueSize} job{m.queueSize > 1 ? "s" : ""} blocked</span>}
+                    <span>· {m.workers.free}/{m.workers.total} workers free</span>
+                  </div>
+                )}
               </div>
-              <button onClick={() => setView("MIT")} className="shrink-0 cursor-pointer rounded-[8px] px-2.5 py-1.5 text-[11.5px] font-semibold" style={{ background: "var(--coral)", color: "#1a0d09" }}>View detail →</button>
+              <button onClick={() => setView("MIT")} className="shrink-0 cursor-pointer self-start rounded-[8px] px-2.5 py-1.5 text-[11.5px] font-semibold" style={{ background: "var(--coral)", color: "#1a0d09" }}>View detail →</button>
             </div>
           )}
 
@@ -846,6 +890,20 @@ export default function Dashboard() {
                 </Panel>
                 );
               })}
+              {/* Worker saturation — live m.workers (free=0 with a backlog ⇒ the pipeline is the bottleneck) */}
+              <Panel className="flex flex-col justify-between gap-3 p-4">
+                <div className="text-[11.5px] font-medium" style={{ color: "var(--ink-2)" }}>Workers free</div>
+                <div>
+                  <div className="flex items-baseline gap-1">
+                    {sat ? <CountUp to={sat.free} duration={1.2} className="text-[27px] font-semibold leading-none tnum tracking-tight" /> : <span className="text-[27px] font-semibold leading-none tnum tracking-tight" style={{ color: "var(--ink-3)" }}>—</span>}
+                    {sat && <span className="text-[12px] font-medium" style={{ color: "var(--ink-3)" }}>/ {sat.total}</span>}
+                  </div>
+                  <div className="mt-2.5 flex items-center gap-1.5">
+                    {sat?.saturated && <span className="rounded-[6px] px-1.5 py-0.5 text-[10.5px] font-semibold" style={{ background: "var(--coral-soft)", color: "var(--coral)" }}>saturated</span>}
+                    <span className="text-[10.5px] tnum" style={{ color: sat?.saturated ? "var(--coral)" : "var(--ink-3)" }}>{sat ? (sat.saturated ? `${sat.queued} queued` : sat.total === 0 ? "no workers" : "operational") : "No live source"}</span>
+                  </div>
+                </div>
+              </Panel>
             </div>
 
             <Panel className="p-5">
@@ -1040,6 +1098,7 @@ export default function Dashboard() {
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
             <Panel className="p-5">
               <div className="mb-1 flex items-center gap-2"><Cpu size={14} style={{ color: "var(--ink-2)" }} /><span className="text-[12.5px] font-semibold">VRAM by model</span><span className="ml-auto text-[11px] tnum" style={{ color: "var(--ink-3)" }}>{m?.gpu ? `${vramUsed} / ${vramTotal} GB` : "—"}</span></div>
+              {bloat && <div className="mb-2.5 text-[10.5px] tnum" style={{ color: bloat.bloated ? "var(--coral)" : "var(--ink-3)" }}>allocator · allocated {bloat.allocatedGb} / reserved {bloat.reservedGb} GB · +{bloat.heldGb} GB held{bloat.bloated ? " ⚠ leaking" : ""}</div>}
               {m?.gpu ? (
                 <div className="flex items-center gap-3">
                   <VramDonut models={vramModels} totalGb={vramTotal} usedGb={vramUsed} />
@@ -1047,7 +1106,7 @@ export default function Dashboard() {
                     {vramModels.map((vm, i) => (
                       <div key={vm.name} className="flex items-center gap-2 text-[11px]">
                         <span className="h-2 w-2 rounded-[3px]" style={{ background: VRAM_COLORS[i % VRAM_COLORS.length] }} />
-                        <span className="flex-1 truncate" style={{ color: vm.leaked ? "var(--coral)" : "var(--ink-2)" }}>{vm.name}{vm.leaked && " · leak"}</span>
+                        <span className="flex-1 truncate" style={{ color: vm.leaked ? "var(--coral)" : "var(--ink-2)" }}>{vm.name}{vm.leaked && ` · leak ${vm.freedMb ?? 0}/${vm.footprintMb}MB`}</span>
                         <span className="tnum" style={{ color: "var(--ink-3)" }}>{vm.v}</span>
                       </div>
                     ))}
