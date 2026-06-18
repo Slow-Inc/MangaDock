@@ -506,11 +506,12 @@ export default function PostDetailPage() {
                       post.imageUrls.length === 1 ? 'aspect-video' : 'aspect-square'
                     } ${post.imageUrls.length === 3 && i === 0 ? 'col-span-2 aspect-video' : ''}`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src={safeUrl}
                       alt={`รูปที่ ${i + 1}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      unoptimized
                     />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                       <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">

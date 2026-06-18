@@ -61,12 +61,12 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
             className={`relative shrink-0 w-28 sm:w-36 self-stretch overflow-hidden bg-white/5 border-r border-white/5 ${isSpoiler && !spoilerRevealed ? 'pointer-events-none' : ''}`}
             style={{ filter: isSpoiler && !spoilerRevealed ? 'blur(4px)' : 'blur(0px)', transition: 'filter 0.5s ease' }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={thumbUrl!}
               alt="thumbnail"
+              fill
               loading="lazy"
-              className="w-full h-full object-cover"
+              className="object-cover"
             />
             {post.imageUrls.length > 1 && (
               <div className="absolute bottom-1.5 left-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur-sm">
@@ -237,8 +237,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
                   post.imageUrls.length === 1 ? 'aspect-video' : 'aspect-square'
                 } ${post.imageUrls.length === 3 && i === 0 ? 'col-span-2' : ''}`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`รูปที่ ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
+                <Image src={url} alt={`รูปที่ ${i + 1}`} fill loading="lazy" className="object-cover" unoptimized />
                 {i === 3 && post.imageUrls.length > 4 && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                     <span className="text-white font-black text-xl">+{post.imageUrls.length - 4}</span>

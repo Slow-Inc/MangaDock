@@ -195,13 +195,14 @@ export default function PublicProfilePage() {
           className="relative h-28 sm:h-40 overflow-hidden bg-[#141414] rounded-t-2xl"
         >
           {profile.bannerUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
+            <Image
               src={profile.bannerUrl}
               alt="banner"
               draggable={false}
-              className="w-full h-full object-cover select-none"
+              fill
+              className="object-cover select-none"
               style={{ objectPosition: `center ${bannerYPos}%` }}
+              unoptimized
             />
           ) : (
             <div className={`w-full h-full ${gradientClass}`} />

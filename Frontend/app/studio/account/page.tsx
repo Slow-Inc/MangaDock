@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import { useAuth } from "../../contexts/AuthContext";
@@ -256,9 +257,9 @@ export default function StudioAccountPage() {
             />
 
             <div className="flex items-center gap-4 rounded-[1.5rem] border border-white/10 bg-white/4 p-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-600/20">
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-600/20">
                 {user?.photoURL ? (
-                  <img src={user.photoURL} alt="" className="h-full w-full object-cover" />
+                  <Image src={user.photoURL} alt="" fill className="object-cover" />
                 ) : (
                   <span className="text-2xl">👤</span>
                 )}
@@ -468,9 +469,9 @@ export default function StudioAccountPage() {
                 <div className="space-y-6">
             {/* Profile Header */}
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/3 p-5">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-600/20">
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-600/20">
                 {user?.photoURL ? (
-                  <img src={user.photoURL} alt="" className="h-full w-full object-cover" />
+                  <Image src={user.photoURL} alt="" fill className="object-cover" />
                 ) : (
                   <span className="text-2xl">👤</span>
                 )}
