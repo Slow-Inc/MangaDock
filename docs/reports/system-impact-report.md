@@ -790,3 +790,33 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **11. KPI.** PRD #228 CLOSED — all 6 steps landed (#229/#230/#232/#233/#234/#231) · god file 1834 → 376 (−79%) · byte-identical · 0 regressions (530 pass) · +17 isolated tests.
 
 *Validation:* `npm run build` (whole backend) + `npx jest` full suite 530/0 per seam. *Links:* #228, #231, branch `dept/backend`.
+
+---
+
+# 2026-06-18 — refactor(Backend): split mit-batch-orchestrator.service.ts — transport/stream vs job-state (#294)
+
+**1. Type.** Behaviour-preserving structural refactor (god-file decomposition) on the live-translation hot path. ADR [017](../adr/017-mit-batch-transport-jobstate-seam.md).
+
+**2. Trigger.** `mit-batch-orchestrator.service.ts` was 1010 LOC (largest backend file) mixing four concerns — job-state lifecycle, listener fan-out, MIT transport + NDJSON stream, webhook callback. The NDJSON stream-read loop (`_runMitBatch`) was the riskiest, most nested part and had **zero direct test coverage**: it could only be exercised by constructing the whole service.
+
+**3. Change (before → after).**
+- before: one `MitBatchOrchestrator` class owning `startOrAttachBatchJob`/`finalize`/`maybeComplete` + `deliver`/`removeBatchListener`/`notifyBatchProgress` + `_runMitBatch` (image fetch → multipart POST → NDJSON read loop → per-page persist → retry-missing) + `_retryMissingPagesIndividually` + `handleMitCallback`, with the NDJSON chunk parsing inlined and env-helper delegators (`buildMitConfig`/`imageModelKey`/`patchCacheKey`/`mitCallbackOrigin`).
+- after: four files — `mit-batch-ndjson.ts` (pure `parseNdjsonChunk(chunk, carry) → {events, carry}`), `mit-batch-stream.ts` (`MitBatchStream` = `run` + `_retryMissingPagesIndividually` + `mitCallbackOrigin`, constructed with `(MitClient, MitBatchDeps)`), `mit-batch-types.ts` (shared `PatchEntry`/`PageResult`/`BatchPageListener`/`MitBatchDeps`), and `mit-batch-orchestrator.service.ts` as the job-state machine delegating transport via `this.stream.run(...)`. Public API unchanged; `books.service` untouched.
+
+**4. Seams / commits.** 1 `6c76169` characterization net (test-only) · 2 `367d9f1` pure `parseNdjsonChunk` wired into the loop · 3 `6eb9394` extract shared types · 4 `b4a2416` move transport → `MitBatchStream`. One seam = one commit; tsc + full books suite green at each.
+
+**5. Byte-identical proof.** The read loop is lifted verbatim (only `this.patchCacheKey/buildMitConfig/imageModelKey` → direct `mit-config` calls, behaviour-identical). A 12-case characterization net added **first** (commit 1, against the pre-split code) locks the stream path — clean/multi-chunk/carry/keep-alive/malformed/non-numeric-pageIndex/stream-error/all-error dead-worker-guard/stream-drop-retry/submit-throws/202-async/handleMitCallback idempotency+persist-fail — and stays green identically through commits 2–4. Preserved landmines: the `deliver` "caller may be gone" catches, the shared "NDJSON parse failed" log (malformed line **and** persist throw), the dead-worker guard, the no-signal-on-submitBatch note, persist-fail-as-error.
+
+**6. Performance.** Neutral — same call graph; the decoder does the same split/parse the inline loop did. One extra method hop (`stream.run`) per batch.
+
+**7. Quality / metrics.** `mit-batch-orchestrator.service.ts` **1010 → 557 LOC** (−45%). +3 modules (decoder, stream, types). New tests: `mit-batch-ndjson.spec.ts` (12 chunk-boundary cases), `mit-batch-stream.spec.ts` (6 isolation cases), `mit-batch-orchestrator.characterization.spec.ts` (12). Full books suite **214 → 244 pass / 0 fail**; whole backend **595 / 0 fail**; tsc clean.
+
+**8. Tech debt removed.** The NDJSON state machine (previously untestable without the full service) is now a pure function tested with strings; the transport is testable in isolation with a faked `MitClient`; the env-helper delegators that only wrapped `mit-config` are gone from the orchestrator.
+
+**9. Risk / rollback.** Byte-identical; rollback = revert the 4 commits (each leaves the suite green). No money/auth surface; `handleMitCallback`'s wire contract and the MIT webhook protocol are untouched. **Live E2E (One-Punch benchmark via tunnel, 3-layer cache cleared) is to run before merge**, per the agreed gate.
+
+**10. Notes.** One cosmetic delta — transport logs carry the `MitBatchStream` logger context (`[BatchPatches]` message strings unchanged). `readWithTimeout` still never `clearTimeout`s its race-loser timer (pre-existing dangling-timer, left verbatim) — flagged in ADR 017 as a behind-a-flag follow-up. Memory `project_backend_pre_existing_test_failures` (16 fails) is stale: backend is 595/0.
+
+**11. KPI.** #294 implemented · god file 1010 → 557 (−45%) · byte-identical (characterization net green ×4 commits) · 0 regressions (595 pass) · +30 tests (12 decoder + 6 stream + 12 characterization) · 1 cosmetic delta (logger name, documented).
+
+*Validation:* TDD characterization-first; `npx tsc --noEmit` clean + `npx jest src/books` 244/0 per commit + full backend 595/0. *Risk/rollback:* byte-identical; revert = drop the 4 commits. *Links:* #294, #292, ADR 017, branch `refactor/294-mit-batch-stream`.
