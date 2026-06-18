@@ -12,6 +12,7 @@ import { formatEta, pillMainText, stageLabel } from "../lib/translationStages";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { apiFetch } from "../lib/apiFetch";
 import { useChapters, type ChapterPageItem } from "../hooks/useChapters";
+import { ZOOM_MIN, ZOOM_MAX, zoomInLevel, zoomOutLevel } from "../lib/zoomLevel";
 
 type ChapterPages = {
   pages: string[];
@@ -33,9 +34,6 @@ type Props = {
 };
 
 const API_BASE = "/api/proxy";
-const ZOOM_STEP = 0.25;
-const ZOOM_MIN = 0.5;
-const ZOOM_MAX = 3;
 
 export default function MangaReader({ chapterId: initialChapterId, chapterNumber: initialChapterNumber, chapterTitle: initialChapterTitle, mangaTitle, mangaId, onClose }: Props) {
   // Cloudflare Turnstile state. The clearance token is restored via a lazy
@@ -458,8 +456,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     });
   }, [getContinuousZoomAnchor, restoreContinuousZoomAnchor, syncContinuousPageFromViewport]);
 
-  const zoomIn  = () => updateZoom((z) => Math.min(+(z + ZOOM_STEP).toFixed(2), ZOOM_MAX));
-  const zoomOut = () => updateZoom((z) => Math.max(+(z - ZOOM_STEP).toFixed(2), ZOOM_MIN));
+  const zoomIn  = () => updateZoom(zoomInLevel);
+  const zoomOut = () => updateZoom(zoomOutLevel);
   const zoomReset = () => updateZoom(() => 1);
 
   useEffect(() => {
