@@ -5,7 +5,7 @@ const UPSTREAM_HEADERS = {
   // MangaDex's uploads CDN returns 400 + an HTML error page for the bot-shaped
   // UA "Mozilla/5.0 (compatible; …)". A plain product UA (matching the
   // image-cache downloader and the #293 MangaDex API client) is not blocked.
-  'User-Agent': 'MangaDock/1.0 (+https://hayateotsu.space)',
+  'User-Agent': 'MangaDock/1.0 (+https://2552667.xyz)',
   Accept: 'image/webp,image/avif,image/*,*/*',
   Referer: 'https://mangadex.org/',
 };

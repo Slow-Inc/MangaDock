@@ -77,7 +77,7 @@ export async function loadPageBytes(
   const timeout = AbortSignal.timeout(30_000);
   const res = await fetchImpl(pageUrl, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; MangaDock/1.0)',
+      'User-Agent': 'Mozilla/5.0 (+https://2552667.xyz)',
       Referer: 'https://mangadex.org/',
     },
     signal: opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
