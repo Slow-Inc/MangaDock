@@ -5,6 +5,11 @@
 - **Trigger:** the 2026-06-14 incident — the `custom_openai` gateway at `gateway.9arm.co` was up but the `qwen3.6-35b-a3b` model hung; translate failed after ~90s with a bubbled-up `'ollama servers did not respond quickly enough'`, and finding *where* it was stuck took manual black-box probing.
 - **Builds on:** the MIT integration security boundary of [ADR 012](012-mit-integration-security-boundary.md); the single-entry proxy of [ADR 014](014-frontend-single-entry-proxy.md); the Supabase auth adapter of [ADR 015](015-frontend-auth-context-supabase-adapter.md); the service-role/authz-in-code stance of [ADR 013](013-service-role-supabase-authz-in-code.md).
 
+> **Implementation note (2026-06-18):** the decision (out-of-band aggregator + per-service SSE + zero-trust JWT)
+> stands. Two details below differ from what was built: the dashboard is a **Next.js 16 app** with a server
+> `/api/live` proxy (not a Fastify-bundled UI), and its design is **Speck + PremiumBuss + Arcana** (not "shadcn").
+> The clean rebuild + canonical design/IA spec live in [`dashboardv2/DESIGN.md`](../../dashboardv2/DESIGN.md).
+
 ## Context
 
 When the translate pipeline breaks there is **no single live view** of system / subsystem / queue / resource state. The 2026-06-14 incident surfaced only as a vague exception after ~90 s; diagnosing it (gateway `/models` OK in 0.19 s, but a 16-token completion timed out at 151 s → the inference backend was hung) required a developer to hand-probe each layer. The pain is **observability**: the error told us *that* it failed, never *where*.
