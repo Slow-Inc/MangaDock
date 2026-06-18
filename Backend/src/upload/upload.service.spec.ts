@@ -24,10 +24,14 @@ type Chain = {
   then: (resolve: (v: { data: unknown; error: null }) => void) => void;
 };
 
-function makeService(overrides: { put?: jest.Mock } = {}) {
+function makeService(overrides: {
+  put?: jest.Mock;
+  storageDel?: jest.Mock;
+  versionRow?: Record<string, unknown> | null;
+} = {}) {
   const storage = {
     put: overrides.put ?? jest.fn().mockResolvedValue(undefined),
-    delete: jest.fn().mockResolvedValue(undefined),
+    delete: overrides.storageDel ?? jest.fn().mockResolvedValue(undefined),
   };
 
   const chain = {} as Chain;
@@ -35,12 +39,10 @@ function makeService(overrides: { put?: jest.Mock } = {}) {
   chain.eq = jest.fn().mockReturnValue(chain);
   chain.update = jest.fn().mockReturnValue(chain);
   chain.maybeSingle = jest.fn().mockResolvedValue({
-    data: {
-      translator_uid: 'owner',
-      status: 'draft',
-      pages: [],
-      updated_at: null,
-    },
+    data:
+      'versionRow' in overrides
+        ? overrides.versionRow
+        : { translator_uid: 'owner', status: 'draft', pages: [], updated_at: null },
     error: null,
   });
   chain.then = (resolve) =>
@@ -136,5 +138,42 @@ describe('UploadService.addPage - magic-byte MIME validation (#303)', () => {
         contentType: 'image/webp',
       },
     );
+  });
+
+  it('rejects image/svg+xml even though it is in the image/* family (inline JS attack vector)', async () => {
+    const { service, storage } = makeService();
+    mockFileType.mockResolvedValueOnce({ mime: 'image/svg+xml', ext: 'svg' });
+
+    await expect(
+      service.addPage('v1', 'owner', '/tmp/xss.svg'),
+    ).rejects.toThrow(BadRequestException);
+    expect(storage.put).not.toHaveBeenCalled();
+  });
+
+  it('deletes the temp file when storage.put() throws after MIME validation passes', async () => {
+    const put = jest.fn().mockRejectedValue(new Error('S3 timeout'));
+    const { service } = makeService({ put });
+    const tmp = writeTempFile(Buffer.from([0xff, 0xd8, 0xff]));
+    mockFileType.mockResolvedValueOnce({ mime: 'image/jpeg', ext: 'jpg' });
+
+    await expect(service.addPage('v1', 'owner', tmp)).rejects.toThrow(
+      'Failed to upload page to storage',
+    );
+    expect(fs.existsSync(tmp)).toBe(false);
+  });
+
+  it('rolls back storage when the stored file belongs to a different translator', async () => {
+    const storageDel = jest.fn().mockResolvedValue(undefined);
+    const { service } = makeService({
+      storageDel,
+      versionRow: { translator_uid: 'attacker', status: 'draft', pages: [], updated_at: null },
+    });
+    const tmp = writeTempFile(Buffer.from([0x01, 0x02, 0x03]));
+    mockFileType.mockResolvedValueOnce({ mime: 'image/jpeg', ext: 'jpg' });
+
+    await expect(service.addPage('v1', 'owner', tmp)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(storageDel).toHaveBeenCalledTimes(1);
   });
 });

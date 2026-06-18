@@ -3,6 +3,21 @@
 
 ---
 
+## #296 — test upload.service magic-byte MIME (security/test) (2026-06-18, /tdd, branch `fix/303-upload-magic-byte-validation`)
+
+**Goal:** add explicit test coverage for the magic-byte MIME validation path committed in #303 (`upload.service.ts:addPage`).
+
+**Added (3 new tests → 8 → 11 in `upload.service.spec.ts`):**
+- `image/svg+xml` rejection — SVG is `image/*` but carries inline JS; not in `ALLOWED_MIME_TYPES` → rejected before storage.
+- Storage `put()` failure cleanup — if the CDN/S3 call throws after MIME passes, the temp file must still be unlinked (lines 78-82).
+- Non-owner rollback — if the DB row shows a different `translator_uid`, the already-stored file must be deleted via `storage.delete()` (lines 107-110).
+
+**`makeService` minimal extension:** added `storageDel?: jest.Mock` (makes `storage.delete` assertable) and `versionRow?: Record<string, unknown> | null` (drives ownership + not-found paths) overrides. Existing 8 tests unaffected.
+
+**Result:** 11/11 GREEN, 0.675 s. Full backend suite clean (no regressions).
+
+---
+
 ## #303 — upload path skipped magic-byte MIME validation (security bug) (2026-06-17, /tdd, branch `fix/303-upload-magic-byte-validation`)
 
 **Bug:** the chapter-page upload trusted the **client** Content-Type on both layers, contradicting `CLAUDE.md`'s "upload — MIME validated with `file-type` (magic bytes, not extension)". `upload.controller.ts` `fileFilter` checks `file.mimetype` (Multer sets it from the attacker-controlled multipart `Content-Type`); `upload.service.ts:addPage` re-checked that same client arg against `ALLOWED_MIME_TYPES` and never read the bytes. A `<script>` payload sent as `Content-Type: image/png` passed both gates and was stored as `.png`. Surfaced by #296 while writing its magic-byte tests.
