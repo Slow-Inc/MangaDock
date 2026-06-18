@@ -1,5 +1,5 @@
 import { BooksService } from './books.service';
-import { parseJobKey, renderConfigHash } from './mit-config';
+import { parseJobKey, renderConfigHash, buildMitConfig } from './mit-config';
 
 describe('parseJobKey', () => {
   it('round-trips a plain chapterId', () => {
@@ -63,7 +63,7 @@ describe('BooksService.buildMitConfig', () => {
 
   it("uses MIT's tuned detection/inpainting sizes + bf16 + lama_large by default (#247)", () => {
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('JPN', 'THA', 'ja'));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'JPN', 'THA', 'ja'));
     // #247: match MIT's own Config defaults (detection_size 2560, inpainting_size
     // 2048) instead of the old VRAM-conservative 2048/1536 that silently dropped
     // small text and blurred the erased plate. Env still overrides for tight hosts.
@@ -81,7 +81,7 @@ describe('BooksService.buildMitConfig', () => {
     process.env.MIT_INPAINTER = 'lama_mpe';
     process.env.MIT_INPAINTING_PRECISION = 'fp16';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.detector.detection_size).toBe(1536);
     expect(cfg.inpainter.inpainting_size).toBe(1024);
     expect(cfg.inpainter.inpainter).toBe('lama_mpe');
@@ -91,7 +91,7 @@ describe('BooksService.buildMitConfig', () => {
   it('selects the optional Flux Klein inpainter via MIT_INPAINTER=flux_klein (ADR 003)', () => {
     process.env.MIT_INPAINTER = 'flux_klein';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.inpainter.inpainter).toBe('flux_klein');
   });
 
@@ -109,14 +109,14 @@ describe('BooksService.buildMitConfig', () => {
     process.env.MIT_DETECTION_SIZE = 'not-a-number';
     process.env.MIT_INPAINTING_SIZE = '-5';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.detector.detection_size).toBe(2560);
     expect(cfg.inpainter.inpainting_size).toBe(2048);
   });
 
   it('omits source_lang when srcMIT is ANY', () => {
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.translator.source_lang).toBeUndefined();
     expect(cfg.translator.source_lang_only).toBeUndefined();
   });
@@ -128,7 +128,7 @@ describe('BooksService.buildMitConfig', () => {
   it('exposes the OCR prob floor via MIT_OCR_PROB (#167)', () => {
     process.env.MIT_OCR_PROB = '0.05';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.ocr).toEqual({ prob: 0.05 });
   });
 
@@ -137,7 +137,7 @@ describe('BooksService.buildMitConfig', () => {
     process.env.MIT_DET_INVERT = '1';
     process.env.MIT_DET_GAMMA_CORRECT = '1';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.detector.text_threshold).toBe(0.3);
     expect(cfg.detector.det_invert).toBe(true);
     expect(cfg.detector.det_gamma_correct).toBe(true);
@@ -147,7 +147,7 @@ describe('BooksService.buildMitConfig', () => {
     process.env.MIT_OCR_PROB = 'not-a-number';
     process.env.MIT_TEXT_THRESHOLD = '5'; // out of (0,1] range
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.ocr).toBeUndefined();
     expect(cfg.detector).toEqual({ detection_size: 2560 });
   });
@@ -157,14 +157,14 @@ describe('BooksService.buildMitConfig', () => {
   it('enables bubble segmentation via MIT_BUBBLE_SEG (#170)', () => {
     process.env.MIT_BUBBLE_SEG = '1';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.detector.det_bubble_seg).toBe(true);
   });
 
   it('omits det_bubble_seg unless MIT_BUBBLE_SEG is exactly "1" (#170)', () => {
     process.env.MIT_BUBBLE_SEG = '0';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.detector.det_bubble_seg).toBeUndefined();
   });
 
@@ -176,7 +176,7 @@ describe('BooksService.buildMitConfig', () => {
     process.env.MIT_FONT_SIZE_MIN = '24';
     process.env.MIT_FONT_SIZE_OFFSET = '4';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.render.font_size_minimum).toBe(24);
     expect(cfg.render.font_size_offset).toBe(4);
   });
@@ -185,14 +185,14 @@ describe('BooksService.buildMitConfig', () => {
     process.env.MIT_EN_COMIC_FONT = '1';
     process.env.MIT_SUPERSAMPLING = '4';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'ENG', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'ENG', ''));
     expect(cfg.render.en_comic_font).toBe(true);
     expect(cfg.render.supersampling).toBe(4);
   });
 
   it('omits en_comic_font + supersampling when env is unset — render unchanged (#176/#181)', () => {
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'ENG', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'ENG', ''));
     expect(cfg.render.en_comic_font).toBeUndefined();
     expect(cfg.render.supersampling).toBeUndefined();
   });
@@ -203,13 +203,13 @@ describe('BooksService.buildMitConfig', () => {
   it('enables ALL-CAPS lettering via MIT_EN_UPPERCASE (#parity-A)', () => {
     process.env.MIT_EN_UPPERCASE = '1';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'ENG', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'ENG', ''));
     expect(cfg.render.uppercase).toBe(true);
   });
 
   it('omits uppercase when MIT_EN_UPPERCASE is unset — render unchanged (#parity-A)', () => {
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'ENG', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'ENG', ''));
     expect(cfg.render.uppercase).toBeUndefined();
   });
 
@@ -218,14 +218,14 @@ describe('BooksService.buildMitConfig', () => {
   it('raises the bubble-fit font cap via MIT_FONT_MAX_BOX_RATIO (#parity-C)', () => {
     process.env.MIT_FONT_MAX_BOX_RATIO = '0.8';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'ENG', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'ENG', ''));
     expect(cfg.render.font_max_box_ratio).toBe(0.8);
   });
 
   it('omits font_max_box_ratio when unset or out of (0,1] — render unchanged (#parity-C)', () => {
     process.env.MIT_FONT_MAX_BOX_RATIO = '1.5'; // out of range
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'ENG', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'ENG', ''));
     expect(cfg.render.font_max_box_ratio).toBeUndefined();
   });
 
@@ -234,46 +234,46 @@ describe('BooksService.buildMitConfig', () => {
   it('overrides the EN font via MIT_EN_FONT (#parity-B)', () => {
     process.env.MIT_EN_FONT = 'anime_ace_3.ttf';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'ENG', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'ENG', ''));
     expect(cfg.render.en_font).toBe('anime_ace_3.ttf');
   });
 
   it('omits en_font when MIT_EN_FONT is unset — render unchanged (#parity-B)', () => {
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'ENG', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'ENG', ''));
     expect(cfg.render.en_font).toBeUndefined();
   });
 
   it('enables patch-seam feathering via MIT_PATCH_FEATHER (#173)', () => {
     process.env.MIT_PATCH_FEATHER = '16';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.render.patch_feather_radius).toBe(16);
   });
 
   it('omits patch_feather_radius when unset or invalid — patches byte-identical (#173)', () => {
     process.env.MIT_PATCH_FEATHER = '0'; // posIntEnv rejects 0/negatives
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.render.patch_feather_radius).toBeUndefined();
   });
 
   it('enables the larger inpaint context crop via MIT_INPAINT_CONTEXT_PAD (#249)', () => {
     process.env.MIT_INPAINT_CONTEXT_PAD = '256';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.inpainter.inpaint_context_pad).toBe(256);
   });
 
   it('omits inpaint_context_pad when unset — tight crop, byte-identical (#249)', () => {
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.inpainter.inpaint_context_pad).toBeUndefined();
   });
 
   it('omits render font-size knobs when unset — render block unchanged (#166)', () => {
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.render.font_size_minimum).toBeUndefined();
     expect(cfg.render.font_size_offset).toBeUndefined();
   });
@@ -281,48 +281,48 @@ describe('BooksService.buildMitConfig', () => {
   it('enables bubble area-fit font sizing via MIT_BUBBLE_AREA_FIT (#166)', () => {
     process.env.MIT_BUBBLE_AREA_FIT = '1';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.render.bubble_area_fit).toBe(true);
   });
 
   it('omits bubble_area_fit unless MIT_BUBBLE_AREA_FIT is "1" (#166)', () => {
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.render.bubble_area_fit).toBeUndefined();
   });
 
   it('enables the SFX detector via MIT_SFX_DETECTOR (#168)', () => {
     process.env.MIT_SFX_DETECTOR = '1';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.detector.det_sfx).toBe(true);
   });
 
   it('enables the vision-LLM OCR rescue via MIT_OCR_VLM_RESCUE (#168/#172)', () => {
     process.env.MIT_OCR_VLM_RESCUE = '1';
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.ocr.vlm_rescue).toBe(true);
   });
 
   it('omits ocr.vlm_rescue when MIT_OCR_VLM_RESCUE is unset — render unchanged', () => {
     const svc = makeService();
-    const cfg = JSON.parse((svc as any).batch.buildMitConfig('ANY', 'THA', ''));
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.ocr?.vlm_rescue).toBeUndefined();
   });
 
   it('carries series_context to the translator when provided (#157)', () => {
     const svc = makeService();
     const cfg = JSON.parse(
-      (svc as any).batch.buildMitConfig('ANY', 'THA', '', undefined, 'You are translating the manga series "Mob Seka".'),
+      buildMitConfig(process.env, 'ANY', 'THA', '', undefined, 'You are translating the manga series "Mob Seka".'),
     );
     expect(cfg.translator.series_context).toBe('You are translating the manga series "Mob Seka".');
   });
 
   it('produces a byte-identical config when series_context is absent (local-first rule)', () => {
     const svc = makeService();
-    const withUndefined = (svc as any).batch.buildMitConfig('JPN', 'THA', 'ja', undefined, undefined);
-    const legacyCall = (svc as any).batch.buildMitConfig('JPN', 'THA', 'ja');
+    const withUndefined = buildMitConfig(process.env, 'JPN', 'THA', 'ja', undefined, undefined);
+    const legacyCall = buildMitConfig(process.env, 'JPN', 'THA', 'ja');
     expect(withUndefined).toBe(legacyCall);
     expect(withUndefined).not.toContain('series_context');
   });

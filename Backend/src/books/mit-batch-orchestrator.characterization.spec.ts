@@ -86,7 +86,13 @@ const pageLine = (i: number, patches: any[] = []) =>
     error: null,
   });
 const errorLine = (i: number, error: string) =>
-  JSON.stringify({ pageIndex: i, imgWidth: 0, imgHeight: 0, patches: [], error });
+  JSON.stringify({
+    pageIndex: i,
+    imgWidth: 0,
+    imgHeight: 0,
+    patches: [],
+    error,
+  });
 const DONE = JSON.stringify({ done: true });
 
 const flush = () => new Promise((r) => setImmediate(r));
@@ -123,7 +129,13 @@ describe('MitBatchOrchestrator characterization (#294) — NDJSON stream path', 
     );
     const { received, listener } = recorder();
 
-    await orch.startOrAttachBatchJob('ch1', TWO_PAGES, listener, undefined, 'th');
+    await orch.startOrAttachBatchJob(
+      'ch1',
+      TWO_PAGES,
+      listener,
+      undefined,
+      'th',
+    );
 
     expect(received.map((r) => r.pageIndex).sort()).toEqual([0, 1]);
     expect(deps.persistPage).toHaveBeenCalledTimes(2);
@@ -142,7 +154,13 @@ describe('MitBatchOrchestrator characterization (#294) — NDJSON stream path', 
     );
     const { received, listener } = recorder();
 
-    await orch.startOrAttachBatchJob('ch1', TWO_PAGES, listener, undefined, 'th');
+    await orch.startOrAttachBatchJob(
+      'ch1',
+      TWO_PAGES,
+      listener,
+      undefined,
+      'th',
+    );
 
     expect(received.map((r) => r.pageIndex).sort()).toEqual([0, 1]);
   });
@@ -150,11 +168,23 @@ describe('MitBatchOrchestrator characterization (#294) — NDJSON stream path', 
   it('skips empty keep-alive lines and tolerates a trailing partial before done', async () => {
     const { orch, mitClient } = makeOrchestrator();
     mitClient.submitBatch.mockResolvedValue(
-      ndjsonResponse(['\n', pageLine(0) + '\n', '\n', pageLine(1) + '\n', DONE + '\n']),
+      ndjsonResponse([
+        '\n',
+        pageLine(0) + '\n',
+        '\n',
+        pageLine(1) + '\n',
+        DONE + '\n',
+      ]),
     );
     const { received, listener } = recorder();
 
-    await orch.startOrAttachBatchJob('ch1', TWO_PAGES, listener, undefined, 'th');
+    await orch.startOrAttachBatchJob(
+      'ch1',
+      TWO_PAGES,
+      listener,
+      undefined,
+      'th',
+    );
 
     expect(received.map((r) => r.pageIndex).sort()).toEqual([0, 1]);
   });
@@ -163,12 +193,24 @@ describe('MitBatchOrchestrator characterization (#294) — NDJSON stream path', 
     const { orch, mitClient } = makeOrchestrator();
     mitClient.submitBatch.mockResolvedValue(
       ndjsonResponse([
-        'this is not json\n' + pageLine(0) + '\n' + pageLine(1) + '\n' + DONE + '\n',
+        'this is not json\n' +
+          pageLine(0) +
+          '\n' +
+          pageLine(1) +
+          '\n' +
+          DONE +
+          '\n',
       ]),
     );
     const { received, listener } = recorder();
 
-    await orch.startOrAttachBatchJob('ch1', TWO_PAGES, listener, undefined, 'th');
+    await orch.startOrAttachBatchJob(
+      'ch1',
+      TWO_PAGES,
+      listener,
+      undefined,
+      'th',
+    );
 
     expect(received.map((r) => r.pageIndex).sort()).toEqual([0, 1]);
     expect(warnSpy).toHaveBeenCalledWith(
@@ -192,7 +234,13 @@ describe('MitBatchOrchestrator characterization (#294) — NDJSON stream path', 
     );
     const { received, listener } = recorder();
 
-    await orch.startOrAttachBatchJob('ch1', TWO_PAGES, listener, undefined, 'th');
+    await orch.startOrAttachBatchJob(
+      'ch1',
+      TWO_PAGES,
+      listener,
+      undefined,
+      'th',
+    );
 
     expect(received.map((r) => r.pageIndex).sort()).toEqual([0, 1]);
     expect(deps.persistPage).toHaveBeenCalledTimes(2); // the null-pageIndex line did not persist
@@ -207,7 +255,13 @@ describe('MitBatchOrchestrator characterization (#294) — NDJSON stream path', 
     );
     const { received, listener } = recorder();
 
-    await orch.startOrAttachBatchJob('ch1', TWO_PAGES, listener, undefined, 'th');
+    await orch.startOrAttachBatchJob(
+      'ch1',
+      TWO_PAGES,
+      listener,
+      undefined,
+      'th',
+    );
 
     const p0 = received.find((r) => r.pageIndex === 0);
     expect(p0?.result.error).toBe('boom');
@@ -224,7 +278,13 @@ describe('MitBatchOrchestrator characterization (#294) — NDJSON stream path', 
     const { received, listener } = recorder();
 
     // Must not hang: an all-error batch resolves (it does not read as "fully completed").
-    await orch.startOrAttachBatchJob('ch1', TWO_PAGES, listener, undefined, 'th');
+    await orch.startOrAttachBatchJob(
+      'ch1',
+      TWO_PAGES,
+      listener,
+      undefined,
+      'th',
+    );
 
     expect(received).toHaveLength(2);
     expect(received.every((r) => r.result.error === 'dead')).toBe(true);
@@ -242,7 +302,13 @@ describe('MitBatchOrchestrator characterization (#294) — NDJSON stream path', 
     deps.translateSinglePage.mockResolvedValue({ patches: [] });
     const { received, listener } = recorder();
 
-    await orch.startOrAttachBatchJob('ch1', TWO_PAGES, listener, undefined, 'th');
+    await orch.startOrAttachBatchJob(
+      'ch1',
+      TWO_PAGES,
+      listener,
+      undefined,
+      'th',
+    );
 
     expect(deps.translateSinglePage).toHaveBeenCalledWith(
       'ch1',
@@ -260,7 +326,13 @@ describe('MitBatchOrchestrator characterization (#294) — NDJSON stream path', 
     mitClient.submitBatch.mockRejectedValue(new Error('connection refused'));
     const { received, listener } = recorder();
 
-    await orch.startOrAttachBatchJob('ch1', TWO_PAGES, listener, undefined, 'th');
+    await orch.startOrAttachBatchJob(
+      'ch1',
+      TWO_PAGES,
+      listener,
+      undefined,
+      'th',
+    );
 
     expect(deps.translateSinglePage).toHaveBeenCalledTimes(2);
     expect(received.map((r) => r.pageIndex).sort()).toEqual([0, 1]);
@@ -296,8 +368,16 @@ describe('MitBatchOrchestrator characterization (#294) — webhook (202-async) l
     await flush();
 
     // MIT calls back per page (the webhook path).
-    await orch.handleMitCallback(JOB_KEY, 0, { imgWidth: 100, imgHeight: 200, patches: [] });
-    await orch.handleMitCallback(JOB_KEY, 1, { imgWidth: 100, imgHeight: 200, patches: [] });
+    await orch.handleMitCallback(JOB_KEY, 0, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [],
+    });
+    await orch.handleMitCallback(JOB_KEY, 1, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [],
+    });
 
     await original;
     await latecomer;
@@ -318,9 +398,21 @@ describe('MitBatchOrchestrator characterization (#294) — webhook (202-async) l
       .catch(() => {});
     await flush();
 
-    await orch.handleMitCallback(JOB_KEY, 0, { imgWidth: 100, imgHeight: 200, patches: [] });
-    await orch.handleMitCallback(JOB_KEY, 0, { imgWidth: 100, imgHeight: 200, patches: [] }); // duplicate
-    await orch.handleMitCallback(JOB_KEY, 1, { imgWidth: 100, imgHeight: 200, patches: [] });
+    await orch.handleMitCallback(JOB_KEY, 0, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [],
+    });
+    await orch.handleMitCallback(JOB_KEY, 0, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [],
+    }); // duplicate
+    await orch.handleMitCallback(JOB_KEY, 1, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [],
+    });
 
     await original;
 
@@ -340,9 +432,17 @@ describe('MitBatchOrchestrator characterization (#294) — webhook (202-async) l
 
     // Must not throw despite the persist rejection.
     await expect(
-      orch.handleMitCallback(JOB_KEY, 0, { imgWidth: 100, imgHeight: 200, patches: [] }),
+      orch.handleMitCallback(JOB_KEY, 0, {
+        imgWidth: 100,
+        imgHeight: 200,
+        patches: [],
+      }),
     ).resolves.toBeUndefined();
-    await orch.handleMitCallback(JOB_KEY, 1, { imgWidth: 100, imgHeight: 200, patches: [] });
+    await orch.handleMitCallback(JOB_KEY, 1, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [],
+    });
     await original;
 
     const p0 = a.received.find((r) => r.pageIndex === 0);

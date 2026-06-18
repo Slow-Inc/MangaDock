@@ -43,7 +43,7 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    jest.spyOn((service as any).batch, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
       capturedJobKey = args[6];
     });
 
@@ -73,7 +73,7 @@ describe('BooksService — batch webhook pipeline', () => {
     jest.useFakeTimers();
     const { service } = makeService();
 
-    jest.spyOn((service as any).batch, '_runMitBatch').mockImplementation(async () => {});
+    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async () => {});
 
     const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
     const jobPromise = service.startOrAttachBatchJob('ch3', pages, jest.fn() as any);
@@ -93,7 +93,7 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    jest.spyOn((service as any).batch, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
       capturedJobKey = args[6];
     });
 
@@ -239,7 +239,7 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    jest.spyOn((service as any).batch, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
       capturedJobKey = args[6];
     });
 
@@ -277,7 +277,7 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    jest.spyOn((service as any).batch, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
       capturedJobKey = args[6];
     });
 
@@ -309,7 +309,7 @@ describe('BooksService — batch webhook pipeline', () => {
       return null;
     });
 
-    jest.spyOn((service as any).batch, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
       const jobKey = args[6];
       // Yield until after activeBatchJobs.set() runs synchronously
       await new Promise(resolve => setImmediate(resolve));
@@ -327,7 +327,7 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    const runMitSpy = jest.spyOn((service as any).batch, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+    const runMitSpy = jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
       capturedJobKey = args[6];
       // Do not deliver pages yet — let latecomer attach first
     });
@@ -355,7 +355,7 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    jest.spyOn((service as any).batch, '_runMitBatch').mockImplementation(async (...args: any[]) => {
+    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
       capturedJobKey = args[6]; // taskId = jobKey
     });
 
