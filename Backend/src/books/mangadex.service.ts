@@ -665,8 +665,10 @@ export class MangaDexService {
   private async enhanceMangaDetail(mangaId: string, detail: MangaDetail): Promise<MangaDetail> {
     if (!this.imageCache.enabled || detail.covers.length === 0) return detail;
 
-    if (detail.covers.every((c) => c.localUrl)) return detail;
-
+    // Don't trust cached localUrls blindly — files may have been wiped on
+    // restart/reset, which would 404 from the static /img-cache route.
+    // localCoverPaths re-checks existence per cover (and re-triggers downloads
+    // for missing ones), so always re-resolve from the original external urls.
     const coverUrls = detail.covers.map((c) => c.url);
     const localPaths = await this.imageCache.localCoverPaths(mangaId, coverUrls);
     return {
@@ -750,21 +752,10 @@ export class MangaDexService {
   ): Promise<MangaChapterPages> {
     if (!this.imageCache.enabled) return data;
 
-    const allLocalP = (data.localPages ?? []).every((p) =>
-      p.startsWith('/img-cache'),
-    );
-    const allLocalDs = (data.localDataSaverPages ?? []).every((p) =>
-      p.startsWith('/img-cache'),
-    );
-    const fullyPatched =
-      data.localPages &&
-      data.localDataSaverPages &&
-      data.localPages.length === data.pages.length &&
-      data.localDataSaverPages.length === data.dataSaverPages.length &&
-      allLocalP &&
-      allLocalDs;
-    if (fullyPatched) return data;
-
+    // Don't short-circuit on cached localPages/localDataSaverPages — those paths
+    // may point to files wiped on restart/reset, which would 404 from the static
+    // /img-cache route. localPagePaths re-checks existence per page (and
+    // re-triggers downloads for missing ones), so always re-resolve.
     const [localPages, localDataSaverPages] = await Promise.all([
       this.imageCache.localPagePaths(
         '_chapters',
