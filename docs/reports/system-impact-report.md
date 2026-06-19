@@ -15,6 +15,39 @@
 
 ---
 
+## 2026-06-19 — Coin Topup System: Xendit PromptPay QR (feature)
+
+**Scope:** Backend (wallet module) + Frontend (TopupModal + Navbar) + Supabase DB · **Type:** New feature — real payment gateway replacing dev-only topup stub · **Tests:** 607/607 backend green (+12 new wallet tests); Frontend tsc 0 errors.
+
+**What & where:**
+- `Backend/src/wallet/xendit.service.ts` *(new)* — wraps `POST https://api.xendit.co/payment_requests`, no SDK, plain `fetch`
+- `Backend/src/wallet/dto/create-topup.dto.ts` *(new)* — `@IsInt() @Min(20) amount`
+- `Backend/src/wallet/wallet.service.ts` — `createTopup`, `getTopupStatus`, `processXenditWebhook`; `addCoins` extended with optional `referenceId` → `p_reference_id` in `add_coins_atomic` RPC
+- `Backend/src/wallet/wallet.controller.ts` — 3 new endpoints: `POST /wallet/topup/create` (AuthGuard), `GET /wallet/topup/status/:paymentId` (AuthGuard), `POST /wallet/xendit/webhook` (public)
+- `Backend/src/app.module.ts` — `wallet/xendit/webhook` excluded from `HardwareIdMiddleware`
+- `Frontend/app/components/TopupModal.tsx` *(new)* — 3-screen state machine: TIER_SELECT (6 presets + custom ≥20) → QR_DISPLAY (countdown + 3s poll) → SUCCESS; dispatches `mb:coin-balance-update` event
+- `Frontend/app/components/NavbarActions.tsx` — coin balance chip before avatar; opens TopupModal; listens for `mb:coin-balance-update`
+- `Frontend/app/components/BookDetailModal.tsx` — inline mock topup form replaced by `<TopupModal>`
+- Supabase migration `create_coin_topups` applied: `coin_topups` table with `UNIQUE(payment_id)` idempotency guard
+
+**Why:** `POST /wallet/topup` was a dev stub throwing 403 in production. Users had no real path to purchase coins for paid chapters.
+
+**Before → After:** `POST /wallet/topup` → 403 in production, no QR, no payment / `POST /wallet/topup/create` → Xendit PromptPay QR, inline modal, polling confirms payment, coins credited atomically via `add_coins_atomic` RPC.
+
+**Security:** webhook token check fails-closed when `XENDIT_WEBHOOK_TOKEN` env var is unset; idempotency prevents double-credit on webhook retry; no SDK dependency; `x-callback-token` verified server-side only.
+
+**Performance Δ:** N/A (new code path, no regression on existing paths).
+
+**Quality:** Tiers 20/50/100/200/500/1000 + custom; countdown timer; QR blur on expiry; auto-close after success; Navbar chip updates from both Navbar-opened and BookDetailModal-opened flows via `mb:coin-balance-update` custom event.
+
+**Validation:** Backend 607/607 tests green; 12 new unit tests cover: token rejection, env-var-unset rejection, non-succeeded events, happy-path credit, idempotency, unknown payment_id, expired status, paid-with-balance; Frontend tsc 0 errors; qrcode.react@4.2.0 installed.
+
+**Risk / rollback:** Additive — existing wallet/unlock paths unchanged. Rollback: `DROP TABLE coin_topups;` + revert 11 modified files. Sandbox only (no production keys committed). Dev topup stub (`POST /wallet/topup`) retained as fallback, still production-blocked by `NODE_ENV` check.
+
+**Links:** spec `docs/coin-topup-xendit.md` · handoff `mangadock-handoff-coin-topup.md` · sandbox webhook `https://web.2552667.xyz/api/xendit/webhook`
+
+---
+
 ## 2026-06-17 — Upload path skipped magic-byte MIME validation (security bug) — #303
 
 **Severity:** medium (defense-in-depth gap / stored-disguised-file; contradicted a documented control) · **Branch:** `fix/303-upload-magic-byte-validation` (off `main`), TDD (RED→GREEN), not yet PR'd. Surfaced by #296 while writing the magic-byte tests. · **ADR:** [016](../adr/016-upload-magic-byte-mime-validation.md).

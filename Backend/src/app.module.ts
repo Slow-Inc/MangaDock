@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SupabaseModule } from './supabase/supabase.module';
 import { StorageModule } from './common/storage/storage.module';
@@ -17,7 +17,7 @@ import { validate } from './common/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ 
+    ConfigModule.forRoot({
       isGlobal: true,
       validate,
     }),
@@ -36,7 +36,9 @@ import { validate } from './common/env.validation';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(HardwareIdMiddleware).forRoutes('*');
+    consumer
+      .apply(HardwareIdMiddleware)
+      .exclude({ path: 'wallet/xendit/webhook', method: RequestMethod.POST })
+      .forRoutes('*');
   }
 }
-

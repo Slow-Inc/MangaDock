@@ -3,6 +3,36 @@
 
 ---
 
+## Coin Topup System — Xendit PromptPay QR (2026-06-19, sandbox)
+
+**Goal:** Implement real payment flow for coin topup — replacing the dev-only `POST /wallet/topup` stub that throws 403 in production.
+
+**Shipped:**
+- Supabase migration `create_coin_topups` applied (`payment_id PK`, idempotency `UNIQUE` index)
+- `Backend/src/wallet/xendit.service.ts` — wraps Xendit `/payment_requests`, no SDK
+- `Backend/src/wallet/dto/create-topup.dto.ts` — `@IsInt() @Min(20)`
+- `wallet.service.ts` — `createTopup`, `getTopupStatus`, `processXenditWebhook`; webhook fails-closed when env var unset; idempotency check prevents double-credit
+- `wallet.controller.ts` — 3 endpoints (`topup/create`, `topup/status/:id`, `xendit/webhook`); webhook is public (no AuthGuard, no HardwareIdMiddleware)
+- `app.module.ts` — exclude `wallet/xendit/webhook` from `HardwareIdMiddleware`
+- `Frontend/app/components/TopupModal.tsx` — TIER_SELECT → QR_DISPLAY (3s poll + countdown) → SUCCESS; dispatches `mb:coin-balance-update` on success
+- `NavbarActions.tsx` — coin balance chip + TopupModal + balance update listener
+- `BookDetailModal.tsx` — inline mock form → `<TopupModal>`; removed dead `topupAmount`/`topupLoading`/`handleTopup`
+- `studioApi.ts` — `createTopup`, `getTopupStatus` API functions; removed dead `topupCoins`
+- `qrcode.react@4.2.0` installed; `.env.example` updated with Xendit placeholders
+
+**Code review findings fixed:**
+- Constructor arity bug in `wallet.service.spec.ts` (would have broken CI)
+- Webhook token guard hardened: fails-closed when `XENDIT_WEBHOOK_TOKEN` unset
+- `getTopupStatus` expiry update guarded with `.eq('status', 'pending')` — prevents overwriting a `paid` row
+- `XenditService` throws `InternalServerErrorException` (was bare `Error`)
+- `mb:coin-balance-update` dispatched from TopupModal — Navbar chip now updates from both entry points
+
+**Validation:** Backend 607/607 tests green (+12 new); Frontend tsc 0 errors.
+
+**Next:** Add real Xendit sandbox keys to `.env`, set webhook URL `https://web.2552667.xyz/api/xendit/webhook` in Xendit dashboard, subscribe `payment.succeeded` event — then E2E test with a real PromptPay scan.
+
+---
+
 ## #298 — เคลียร์ 2 tsc error ใน specs + refresh stale memory (2026-06-18, /tdd+/debug-mantra, branch `fix/303-upload-magic-byte-validation`)
 
 **Root causes (2 distinct TS errors, 10 instances total):**
