@@ -449,6 +449,18 @@ describe('WalletService', () => {
       ).resolves.toEqual({ received: true });
     });
 
+    it('throws UnauthorizedException when XENDIT_WEBHOOK_SECRET is set but rawBody is absent', async () => {
+      process.env.XENDIT_WEBHOOK_SECRET = 'secret';
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-1', status: 'SUCCEEDED' } },
+          'test-webhook-token',
+          undefined,  // no rawBody
+          undefined,  // no signature
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
     it('throws UnauthorizedException on invalid HMAC when XENDIT_WEBHOOK_SECRET is set', async () => {
       process.env.XENDIT_WEBHOOK_SECRET = 'secret-key';
       await expect(

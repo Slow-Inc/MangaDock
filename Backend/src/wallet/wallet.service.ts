@@ -302,7 +302,13 @@ export class WalletService {
 
     // 2. Optional HMAC-SHA256 check (skip if XENDIT_WEBHOOK_SECRET not configured)
     const webhookSecret = process.env.XENDIT_WEBHOOK_SECRET;
-    if (webhookSecret && rawBody && signature) {
+    if (webhookSecret) {
+      if (!rawBody || !signature) {
+        throw new UnauthorizedException('Missing webhook signature');
+      }
+      if (!/^[0-9a-f]+$/i.test(signature)) {
+        throw new UnauthorizedException('Invalid webhook signature');
+      }
       const computed = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
       let valid = false;
       try {
