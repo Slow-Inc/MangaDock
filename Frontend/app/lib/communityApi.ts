@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import type { ForumPost, ForumComment, ForumCategory, UserProfileResponse } from "./types";
 import { cacheOrFetch, cacheInvalidate, cacheClearByTag, TTL } from "./apiCache";
+import { createAuthHeaders } from "./apiUtils";
 
 const API_BASE = "/api/proxy";
 
@@ -9,11 +10,6 @@ async function getAuthToken(): Promise<string | null> {
   return session?.access_token ?? null;
 }
 
-function authHeaders(token: string | null, extra: Record<string, string> = {}) {
-  const headers: Record<string, string> = { ...extra };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
-}
 
 export async function listPosts(options: {
   category?: ForumCategory;
@@ -36,7 +32,7 @@ export async function listPosts(options: {
       if (offset) params.append('offset', offset.toString());
       params.append('limit', limit.toString());
       const res = await fetch(`${API_BASE}/forum/posts?${params.toString()}`, {
-        headers: authHeaders(token),
+        headers: createAuthHeaders(token),
       });
       if (!res.ok) throw new Error("Failed to fetch posts");
       return res.json() as Promise<{ items: ForumPost[]; total: number }>;
@@ -75,7 +71,7 @@ export async function getPost(id: string) {
     async () => {
       const token = await getAuthToken();
       const res = await fetch(`${API_BASE}/forum/posts/${id}`, {
-        headers: authHeaders(token),
+        headers: createAuthHeaders(token),
       });
       if (!res.ok) throw new Error("Post not found");
       return res.json() as Promise<ForumPost>;
@@ -94,7 +90,7 @@ export async function uploadForumImage(file: File): Promise<{ imageUrl: string }
 
   const res = await fetch(`${API_BASE}/forum/upload-image`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: createAuthHeaders(token),
     body: formData,
   });
   if (!res.ok) {
@@ -118,7 +114,7 @@ export async function createPost(data: {
 
   const res = await fetch(`${API_BASE}/forum/posts`, {
     method: "POST",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
   if (!res.ok) {
@@ -136,7 +132,7 @@ export async function listComments(postId: string) {
     async () => {
       const token = await getAuthToken();
       const res = await fetch(`${API_BASE}/forum/posts/${postId}/comments`, {
-        headers: authHeaders(token),
+        headers: createAuthHeaders(token),
       });
       if (!res.ok) throw new Error("Failed to fetch comments");
       return res.json() as Promise<ForumComment[]>;
@@ -156,7 +152,7 @@ export async function createComment(data: {
 
   const res = await fetch(`${API_BASE}/forum/comments`, {
     method: "POST",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create comment");
@@ -174,7 +170,7 @@ export async function uploadProfileBanner(file: File): Promise<{ bannerUrl: stri
 
   const res = await fetch(`${API_BASE}/forum/profile/banner`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: createAuthHeaders(token),
     body: formData,
   });
   if (!res.ok) {
@@ -190,7 +186,7 @@ export async function updateBannerPosition(position: number): Promise<{ bannerPo
 
   const res = await fetch(`${API_BASE}/forum/profile/banner-position`, {
     method: "PATCH",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify({ position: Math.round(position * 100) / 100 }),
   });
   if (!res.ok) throw new Error("Failed to update banner position");
@@ -200,7 +196,7 @@ export async function updateBannerPosition(position: number): Promise<{ bannerPo
 export async function getProfile(uid: string): Promise<UserProfileResponse> {
   const token = await getAuthToken();
   const res = await fetch(`${API_BASE}/forum/profile/${uid}`, {
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
   if (!res.ok) throw new Error("Profile not found");
   return res.json() as Promise<UserProfileResponse>;
@@ -212,7 +208,7 @@ export async function deletePost(id: string): Promise<void> {
 
   const res = await fetch(`${API_BASE}/forum/posts/${id}`, {
     method: "DELETE",
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
   if (!res.ok) throw new Error("Failed to delete post");
   cacheInvalidate(`post:${id}`, `comments:${id}`);
@@ -225,7 +221,7 @@ export async function deleteComment(id: string, postId?: string): Promise<void> 
 
   const res = await fetch(`${API_BASE}/forum/comments/${id}`, {
     method: "DELETE",
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
   if (!res.ok) throw new Error("Failed to delete comment");
   if (postId) cacheInvalidate(`comments:${postId}`);
@@ -237,7 +233,7 @@ export async function updatePost(id: string, data: { title?: string; content?: s
 
   const res = await fetch(`${API_BASE}/forum/posts/${id}`, {
     method: "PATCH",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update post");
@@ -253,7 +249,7 @@ export async function updateComment(id: string, data: { content: string }) {
 
   const res = await fetch(`${API_BASE}/forum/comments/${id}`, {
     method: "PATCH",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update comment");
@@ -272,7 +268,7 @@ export async function vote(data: {
 
   const res = await fetch(`${API_BASE}/forum/vote`, {
     method: "POST",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to vote");
