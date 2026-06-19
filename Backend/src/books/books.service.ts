@@ -367,8 +367,8 @@ export class BooksService {
 
   // #231: search + alt-name lookup live in MangaCatalogService. Delegator keeps the
   // controller call site byte-identical.
-  searchBooks(query: string, lang?: string, limit = 100, offset = 0): Promise<{ items: LandingBook[]; total: number }> {
-    return this.catalog.searchBooks(query, lang, limit, offset);
+  searchBooks(query: string, lang?: string, limit = 100, offset = 0, status?: 'ongoing' | 'completed' | 'hiatus', yearFrom?: number, yearTo?: number): Promise<{ items: LandingBook[]; total: number }> {
+    return this.catalog.searchBooks(query, lang, limit, offset, status, yearFrom, yearTo);
   }
 
   getRelated(id: string, limit = 10): Promise<LandingBook[]> {
