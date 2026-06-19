@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
-import { useAuth } from "../../contexts/AuthContext";
+import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
 import {
   getWalletBalance,
@@ -145,8 +144,7 @@ function WalletSummaryModal({
 }
 
 export default function WalletPage() {
-  const router = useRouter();
-  const { user, loading, getIdToken, userRole } = useAuth();
+  const { user, loading, getIdToken, userRole } = useProtectedPage();
   const { showToast } = useToast();
   const isMobile = useIsMobile();
 
@@ -161,10 +159,6 @@ export default function WalletPage() {
   const hasFetched = useRef(false);
 
   const isCreator = userRole === "translator" || userRole === "creator";
-
-  useEffect(() => {
-    if (!loading && !user) router.replace("/");
-  }, [loading, user, router]);
 
   const fetchData = useCallback(async () => {
     if (!user) return;

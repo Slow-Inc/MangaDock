@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
-import { useAuth } from "../../contexts/AuthContext";
+import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
 import { getMyProfile, updateTranslatorProfile } from "../../lib/studioApi";
 import { getCached, setCache } from "../../lib/studioCache";
@@ -62,8 +61,7 @@ function LanguageSelect({
 }
 
 export default function StudioAccountPage() {
-  const router = useRouter();
-  const { user, loading, getIdToken } = useAuth();
+  const { user, loading, getIdToken } = useProtectedPage();
   const { showToast } = useToast();
   const isMobile = useIsMobile();
 
@@ -92,10 +90,6 @@ export default function StudioAccountPage() {
     }),
     [bio, languages, country, preferredLanguage, user?.photoURL],
   );
-
-  useEffect(() => {
-    if (!loading && !user) router.replace("/");
-  }, [loading, user, router]);
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;

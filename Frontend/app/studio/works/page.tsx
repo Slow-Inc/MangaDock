@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
-import { useAuth } from "../../contexts/AuthContext";
+import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
 import {
   getBookCoverUrl,
@@ -134,8 +133,7 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function WorksPage() {
-  const router = useRouter();
-  const { user, loading, getIdToken } = useAuth();
+  const { user, loading, getIdToken } = useProtectedPage();
   const { showToast } = useToast();
   const isMobile = useIsMobile();
 
@@ -154,8 +152,6 @@ export default function WorksPage() {
   }, []);
 
   const handleSetViewMode = (mode: ViewMode) => { setViewMode(mode); localStorage.setItem("mb:studio:viewMode", mode); };
-
-  useEffect(() => { if (!loading && !user) router.replace("/"); }, [loading, user, router]);
 
   const fetchVersions = useCallback(async () => {
     if (!user) return;
