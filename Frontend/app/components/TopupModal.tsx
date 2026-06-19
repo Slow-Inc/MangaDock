@@ -9,6 +9,10 @@ import { errMessage } from "@/lib/errMessage";
 
 type Screen = "TIER_SELECT" | "QR_DISPLAY" | "QR_EXPIRED" | "SUCCESS";
 
+export function backdropCloseable(screen: Screen): boolean {
+  return screen !== "QR_DISPLAY";
+}
+
 const TIERS = [20, 50, 100, 200, 500, 1000] as const;
 
 type Props = {
@@ -189,7 +193,7 @@ export default function TopupModal({ isOpen, onClose, onSuccess, initialAmount }
       className={`fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 transition-opacity duration-200 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
-      onClick={handleClose}
+      onClick={backdropCloseable(screen) ? handleClose : undefined}
     >
       <div
         className={`w-full max-w-xs rounded-2xl border border-white/10 bg-[#1a1a1a] shadow-2xl transition-all duration-200 ${
