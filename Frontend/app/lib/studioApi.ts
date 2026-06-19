@@ -192,11 +192,42 @@ export async function getWalletBalance(token: string): Promise<{ balance: number
   });
 }
 
-export async function topupCoins(token: string, amount: number): Promise<{ balance: number }> {
-  return apiFetch<{ balance: number }>("/wallet/topup", {
+export type TopupResult = {
+  paymentId: string;
+  qrString: string;
+  expiresAt: string;
+};
+
+export type TopupStatus = {
+  status: "pending" | "paid" | "expired";
+  balance?: number;
+};
+
+export async function createTopup(token: string, amount: number): Promise<TopupResult> {
+  return apiFetch<TopupResult>("/wallet/topup/create", {
     method: "POST",
     headers: authHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify({ amount }),
+  });
+}
+
+export async function getTopupStatus(token: string, paymentId: string): Promise<TopupStatus> {
+  return apiFetch<TopupStatus>(`/wallet/topup/status/${encodeURIComponent(paymentId)}`, {
+    headers: authHeaders(token),
+  });
+}
+
+export async function cancelTopup(token: string, paymentId: string): Promise<{ cancelled: boolean }> {
+  return apiFetch<{ cancelled: boolean }>(`/wallet/topup/${encodeURIComponent(paymentId)}/cancel`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+}
+
+export async function simulateTopup(token: string, paymentId: string): Promise<{ simulated: boolean }> {
+  return apiFetch<{ simulated: boolean }>(`/wallet/topup/${encodeURIComponent(paymentId)}/simulate`, {
+    method: 'POST',
+    headers: authHeaders(token),
   });
 }
 
@@ -301,4 +332,64 @@ export async function becomeTranslator(
     headers: authHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
+}
+
+export function subscribeTopupStream(
+  token: string,
+  paymentId: string,
+  onPaid: (balance: number) => void,
+  onError: (err: Error) => void,
+): () => void {
+  const controller = new AbortController();
+
+  (async () => {
+    let res: Response;
+    try {
+      res = await fetch(
+        `/api/proxy/wallet/topup/${encodeURIComponent(paymentId)}/stream`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        },
+      );
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') onError(e instanceof Error ? e : new Error(String(e)));
+      return;
+    }
+
+    if (!res.ok || !res.body) {
+      onError(new Error(`SSE ${res.status}`));
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          try {
+            const payload = JSON.parse(line.slice(5).trim()) as {
+              event: string;
+              balance: number;
+            };
+            if (payload.event === 'payment.paid') onPaid(payload.balance);
+          } catch {
+            // malformed SSE line — skip
+          }
+        }
+      }
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') onError(e instanceof Error ? e : new Error(String(e)));
+    }
+  })();
+
+  return () => controller.abort();
 }
