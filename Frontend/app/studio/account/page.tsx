@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Navbar from "../../components/Navbar";
-import LoadingScreen from "../../components/LoadingScreen";
 import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
 import { getMyProfile, updateTranslatorProfile } from "../../lib/studioApi";
@@ -211,7 +210,13 @@ export default function StudioAccountPage() {
     };
   }, [isMobile, mobileView]);
 
-  if (loading) return <LoadingScreen />;
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-[#141414]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+      </div>
+    );
+  }
 
   if (isMobile) {
     const saveButton = (
