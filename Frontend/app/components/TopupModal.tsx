@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { createTopup, cancelTopup, simulateTopup, subscribeTopupStream } from "../lib/studioApi";
+import { createTopup, cancelTopup, simulateTopup, subscribeTopupStream, getTopupStatus } from "../lib/studioApi";
 import { useAuth } from "../contexts/AuthContext";
 import { errMessage } from "@/lib/errMessage";
 
@@ -74,6 +74,19 @@ export default function TopupModal({ isOpen, onClose, onSuccess, initialAmount }
     setError("");
   }, [screen, paymentId, getIdToken]);
 
+  // X button: cancel active topup then close (backdrop just closes)
+  const handleXClose = useCallback(async () => {
+    if (screen === "QR_DISPLAY" && paymentId) {
+      try {
+        const token = await getIdToken();
+        if (token) await cancelTopup(token, paymentId);
+      } catch {
+        // silent — topup expires naturally
+      }
+    }
+    handleClose();
+  }, [screen, paymentId, getIdToken, handleClose]);
+
   const handleSimulate = useCallback(async () => {
     if (!paymentId) return;
     setSimulating(true);
@@ -101,6 +114,31 @@ export default function TopupModal({ isOpen, onClose, onSuccess, initialAmount }
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [expiresAt, screen]);
+
+  // Visibility check — when user returns from banking app, SSE may have dropped on mobile
+  useEffect(() => {
+    if (screen !== "QR_DISPLAY" || !paymentId) return;
+    const handler = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const token = await getIdToken();
+        if (!token) return;
+        const { status, balance } = await getTopupStatus(token, paymentId);
+        if (status === "paid" && balance !== undefined) {
+          setSuccessBalance(balance);
+          onSuccess(balance);
+          window.dispatchEvent(new CustomEvent("mb:coin-balance-update", { detail: { balance } }));
+          setScreen("SUCCESS");
+        } else if (status === "expired") {
+          setScreen("QR_EXPIRED");
+        }
+      } catch {
+        // silent — SSE countdown handles timeout UX
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, [screen, paymentId, getIdToken, onSuccess]);
 
   // SSE — receive payment confirmation push from server
   useEffect(() => {
@@ -176,7 +214,7 @@ export default function TopupModal({ isOpen, onClose, onSuccess, initialAmount }
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <h3 className="text-sm font-bold text-white">เติมเหรียญ</h3>
           <button
-            onClick={handleClose}
+            onClick={handleXClose}
             className="text-white/40 transition hover:text-white"
             aria-label="ปิด"
           >
