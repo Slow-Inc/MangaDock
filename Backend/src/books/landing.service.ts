@@ -352,13 +352,23 @@ export class LandingService {
   private async enhanceLanding(payload: LandingPayload): Promise<LandingPayload> {
     if (!this.imageCache.enabled) return payload;
 
-    const enhanceBook = async (book: LandingBook): Promise<LandingBook> => ({
-      ...book,
-      thumbnailLocal:
-        book.thumbnailLocal
+    const enhanceBook = async (book: LandingBook): Promise<LandingBook> => {
+      // A cached thumbnailLocal (from Redis) can point to a file that was wiped
+      // on restart/reset — trusting it blindly serves a 404 from the static
+      // /img-cache route. Re-verify it still exists; if gone, fall back to
+      // localThumbnailPath which re-resolves and re-triggers a download (self-heals).
+      const stillCached =
+        book.thumbnailLocal &&
+        (await this.imageCache.localPathExists(book.thumbnailLocal))
           ? book.thumbnailLocal
-          : ((await this.imageCache.localThumbnailPath(book.id, book.thumbnail)) ?? undefined),
-    });
+          : undefined;
+      return {
+        ...book,
+        thumbnailLocal:
+          stillCached ??
+          ((await this.imageCache.localThumbnailPath(book.id, book.thumbnail)) ?? undefined),
+      };
+    };
 
     const [hero, rows] = await Promise.all([
       payload.hero ? enhanceBook(payload.hero) : Promise.resolve(null),
