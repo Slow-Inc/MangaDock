@@ -4,20 +4,28 @@ import {
   ForbiddenException,
   Get,
   Headers,
+  MessageEvent,
   Param,
   Post,
   Req,
+  Sse,
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
+import { EMPTY, Observable, of, timer } from 'rxjs';
+import { map, takeUntil } from 'rxjs/operators';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { WalletService } from './wallet.service';
+import { WalletEventsService } from './wallet-events.service';
 import { CreateTopupDto } from './dto/create-topup.dto';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 
 @Controller('wallet')
 export class WalletController {
-  constructor(private readonly wallet: WalletService) {}
+  constructor(
+    private readonly wallet: WalletService,
+    private readonly walletEvents: WalletEventsService,
+  ) {}
 
   @Get('balance')
   @UseGuards(AuthGuard)
@@ -55,6 +63,47 @@ export class WalletController {
     @Param('paymentId') paymentId: string,
   ) {
     return this.wallet.getTopupStatus(paymentId, req[USER_KEY].uid);
+  }
+
+  @Sse('topup/:paymentId/stream')
+  @UseGuards(AuthGuard)
+  async streamTopupStatus(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+    @Param('paymentId') paymentId: string,
+  ): Promise<Observable<MessageEvent>> {
+    const uid = req[USER_KEY].uid;
+
+    // Ownership check — throws NotFoundException if uid mismatch
+    const topup = await this.wallet.getTopupExpiry(paymentId, uid);
+
+    // Already paid before client connected (race condition) — emit immediately
+    if (topup.status === 'paid') {
+      const balance = await this.wallet.getBalance(uid);
+      return of({
+        data: JSON.stringify({ event: 'payment.paid', balance }),
+      } as MessageEvent);
+    }
+
+    // Expired or cancelled — close immediately with no events
+    if (topup.status !== 'pending') {
+      return EMPTY;
+    }
+
+    // Auto-close when QR expires
+    const msUntilExpiry = Math.max(
+      new Date(topup.expiresAt).getTime() - Date.now(),
+      1000,
+    );
+
+    return this.walletEvents.stream$(paymentId).pipe(
+      map(
+        ({ balance }) =>
+          ({
+            data: JSON.stringify({ event: 'payment.paid', balance }),
+          }) as MessageEvent,
+      ),
+      takeUntil(timer(msUntilExpiry)),
+    );
   }
 
   @Post('topup/:paymentId/cancel')
