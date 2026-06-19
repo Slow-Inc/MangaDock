@@ -44,7 +44,6 @@ function normalizeProxyUrl(url: string): string {
   return url;
 }
 
-
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, init);
   if (!res.ok) {
@@ -56,7 +55,6 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (!text || text.trim() === "") return undefined as T;
   return JSON.parse(text) as T;
 }
-
 
 export async function searchBooks(query: string): Promise<{ items: StudioBook[]; total: number }> {
   return cacheOrFetch(
