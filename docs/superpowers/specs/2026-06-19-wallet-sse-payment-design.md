@@ -8,16 +8,18 @@
 
 ## Problem
 
-1. **Simulate ไม่อัพเดทสถานะ**: `simulateTopup` ส่งคำสั่งไปยัง Xendit sandbox ซึ่งจะยิง webhook กลับมา แต่ใน local dev Xendit ไม่สามารถเข้าถึง `localhost` ได้ → webhook ไม่ถึง → `coin_topups.status` ยังเป็น `pending` ตลอด → polling ไม่เจอ `paid` เลย
+1. **Polling ผ่าน proxy มี delay**: `setInterval(poll, 3000)` ผ่าน Next.js proxy เพิ่ม latency และ unnecessary load — ผู้ใช้รอนานโดยไม่จำเป็น
 
-2. **Polling ผ่าน proxy มี delay**: `setInterval(poll, 3000)` ผ่าน Next.js proxy เพิ่ม latency และ unnecessary load แม้แก้ webhook แล้วก็ยังรอถึง 3s
+2. **ไม่มี real-time push**: เมื่อ Xendit webhook ถึงและ credit coins แล้ว frontend ไม่รู้ทันที ต้องรอ poll รอบถัดไป (≤3s)
+
+> **Note (local dev)**: ถ้ารัน backend บน localhost โดยไม่มี tunnel (ngrok/cloudflared) Xendit sandbox webhook จะไม่ถึง ทำให้ Simulate ไม่ trigger SSE — ต้องใช้ dev tunnel หรือ deploy บน dev server ที่เข้าถึงได้จาก internet
 
 ---
 
 ## Goals
 
-- กด Simulate แล้ว SUCCESS screen ขึ้นทันที (dev + sandbox)
-- Production: webhook จาก Xendit trigger SUCCESS ทันทีผ่าน SSE push
+- กด Simulate → Xendit fires webhook → SSE push → SUCCESS screen ทันที (เหมือน production ทุกอย่าง)
+- ลบ `setInterval` polling ออก แทนด้วย SSE push จาก server
 - Security สูงสุด: JWT ใน Authorization header ตลอด, ownership check, auto-close stream
 
 ---
@@ -27,26 +29,23 @@
 ### Data Flow
 
 ```
-Dev / Sandbox:
-  [กด Simulate]
-    → POST /wallet/topup/:id/simulate  (AuthGuard + ownership check)
-    → xenditService.simulatePayment()  (optional, ยังเก็บไว้)
-    → addCoins() + UPDATE status='paid'  ← ทำเองเลย ไม่รอ webhook
-    → WalletEventsService.emit(paymentId, { balance })
-      → SSE stream ส่ง 'payment.paid' ถึง client ทันที → SUCCESS
+Dev + Production (flow เดียวกัน):
+  [กด Simulate / ชำระจริง]
+    → POST /wallet/topup/:id/simulate  (dev: AuthGuard + ownership)
+       หรือ PromptPay QR scan (prod)
+    → Xendit fires webhook → POST /wallet/xendit/webhook
+      → verify x-callback-token + HMAC-SHA256 signature
+      → addCoins() + UPDATE status='paid'
+      → WalletEventsService.emit(paymentId, { balance })
+        → SSE stream ส่ง 'payment.paid' ถึง client ทันที → SUCCESS
 
-Production:
-  Xendit → POST /wallet/xendit/webhook
-    → verify x-callback-token + HMAC-SHA256 signature
-    → addCoins() + UPDATE status='paid'
-    → WalletEventsService.emit(paymentId, { balance })
-      → SSE stream ส่ง 'payment.paid' ถึง client ทันที → SUCCESS
-
-Frontend (ทั้ง dev + prod):
+Frontend:
   fetch('/api/proxy/wallet/topup/:id/stream', { headers: { Authorization: Bearer <jwt> } })
   → ReadableStream parser (text/event-stream)
   → event 'payment.paid' → setScreen('SUCCESS')
   → cleanup: abort controller on unmount / SUCCESS / QR expired
+
+Note: simulateTopup service ไม่เปลี่ยน — คง xenditService.simulatePayment() เดิม
 ```
 
 ---
@@ -88,18 +87,9 @@ Security layers:
 4. **Complete on emit** — stream ปิดทันทีหลังส่ง `payment.paid` (1 event แล้วจบ)
 5. Response headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`
 
-### 3. `simulateTopup` (แก้ `wallet.service.ts`)
+### 3. `simulateTopup` — **ไม่เปลี่ยน**
 
-เพิ่มหลัง `xenditService.simulatePayment()`:
-
-```typescript
-// Dev-only: ทำ credit โดยตรงแทนรอ webhook
-const { balance } = await this.addCoins(uid, data.amount_coins, 'topup', 'เติมเหรียญ MangaDock', paymentId);
-await this.db.from('coin_topups').update({ status: 'paid' }).eq('payment_id', paymentId);
-this.walletEvents.emit(paymentId, { balance });
-```
-
-Guard `process.env.NODE_ENV === 'production'` ยังคงอยู่ — ถ้า prod ยัง throw `ForbiddenException`
+คงเดิมทุกอย่าง: เรียก `xenditService.simulatePayment()` แล้วรอ Xendit ยิง webhook กลับมาเหมือน production
 
 ### 4. `processXenditWebhook` (แก้ `wallet.service.ts`)
 
@@ -231,7 +221,7 @@ useEffect(() => {
 | File | Action |
 |---|---|
 | `Backend/src/wallet/wallet-events.service.ts` | สร้างใหม่ |
-| `Backend/src/wallet/wallet.service.ts` | แก้ `simulateTopup` + `processXenditWebhook` |
+| `Backend/src/wallet/wallet.service.ts` | แก้ `processXenditWebhook` เพิ่ม emit SSE |
 | `Backend/src/wallet/wallet.controller.ts` | เพิ่ม SSE endpoint |
 | `Backend/src/wallet/wallet.module.ts` | เพิ่ม `WalletEventsService` |
 | `Frontend/app/lib/studioApi.ts` | เพิ่ม `subscribeTopupStream` |
