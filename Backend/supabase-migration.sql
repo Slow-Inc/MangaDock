@@ -2,7 +2,7 @@
 -- MangaDock — Supabase Schema (single-file, idempotent)
 -- Safe to run on fresh DB or existing DB — uses IF NOT EXISTS / CREATE OR REPLACE
 -- Run in: Supabase Dashboard → SQL Editor → New query
--- Last updated: 2026-03-17
+-- Last updated: 2026-06-20
 -- =============================================================================
 
 BEGIN;
@@ -67,6 +67,8 @@ CREATE TABLE IF NOT EXISTS user_history (
   average_rating NUMERIC NOT NULL DEFAULT 0,
   ratings_count  INTEGER NOT NULL DEFAULT 0,
   last_read_at   BIGINT NOT NULL DEFAULT 0,
+  last_page      INTEGER NULL,
+  last_chapter_id TEXT NULL,
   PRIMARY KEY (uid, manga_id)
 );
 
