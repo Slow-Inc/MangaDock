@@ -9,10 +9,6 @@ import { errMessage } from "@/lib/errMessage";
 
 type Screen = "TIER_SELECT" | "QR_DISPLAY" | "QR_EXPIRED" | "SUCCESS";
 
-export function backdropCloseable(screen: Screen): boolean {
-  return screen !== "QR_DISPLAY";
-}
-
 const TIERS = [20, 50, 100, 200, 500, 1000] as const;
 
 type Props = {
@@ -77,6 +73,19 @@ export default function TopupModal({ isOpen, onClose, onSuccess, initialAmount }
     setExpiresAt(null);
     setError("");
   }, [screen, paymentId, getIdToken]);
+
+  // X button: cancel active topup then close (backdrop just closes)
+  const handleXClose = useCallback(async () => {
+    if (screen === "QR_DISPLAY" && paymentId) {
+      try {
+        const token = await getIdToken();
+        if (token) await cancelTopup(token, paymentId);
+      } catch {
+        // silent — topup expires naturally
+      }
+    }
+    handleClose();
+  }, [screen, paymentId, getIdToken, handleClose]);
 
   const handleSimulate = useCallback(async () => {
     if (!paymentId) return;
@@ -193,7 +202,7 @@ export default function TopupModal({ isOpen, onClose, onSuccess, initialAmount }
       className={`fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 transition-opacity duration-200 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
-      onClick={backdropCloseable(screen) ? handleClose : undefined}
+      onClick={handleClose}
     >
       <div
         className={`w-full max-w-xs rounded-2xl border border-white/10 bg-[#1a1a1a] shadow-2xl transition-all duration-200 ${
@@ -205,7 +214,7 @@ export default function TopupModal({ isOpen, onClose, onSuccess, initialAmount }
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <h3 className="text-sm font-bold text-white">เติมเหรียญ</h3>
           <button
-            onClick={handleClose}
+            onClick={handleXClose}
             className="text-white/40 transition hover:text-white"
             aria-label="ปิด"
           >
