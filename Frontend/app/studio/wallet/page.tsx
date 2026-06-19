@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "../../components/Navbar";
+import LoadingScreen from "../../components/LoadingScreen";
 import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
 import {
@@ -232,13 +233,7 @@ export default function WalletPage() {
     [transactions],
   );
 
-  if (loading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#141414]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   if (isMobile) {
     const renderMobileContent = () => {
