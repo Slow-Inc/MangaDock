@@ -470,7 +470,7 @@ export class MangaDexService {
     return this.fetchMangaWithParamsPaged(params, `row:${order}${tagId ? `:tag:${tagId}` : ''}`);
   }
 
-  private async getMangaTagId(tagName: string): Promise<string | undefined> {
+  async getMangaTagId(tagName: string): Promise<string | undefined> {
     const cacheKey = 'mangadex:tags:v1';
     const cached = await this.cache.get<Record<string, string>>(cacheKey);
     if (cached) return cached.data[tagName];
