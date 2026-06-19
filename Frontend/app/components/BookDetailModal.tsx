@@ -14,7 +14,8 @@ import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { chapterAccess } from "../lib/chapterAccess";
 import { useAuth } from "../contexts/AuthContext";
-import { getWalletBalance, purchaseUnlock, getUnlocksForTitle, topupCoins } from "../lib/studioApi";
+import { getWalletBalance, purchaseUnlock, getUnlocksForTitle } from "../lib/studioApi";
+import TopupModal from "./TopupModal";
 import MangaDiscussion from "./MangaDiscussion";
 import type { LandingBook, MangaDetail, MangaChapter } from "../lib/types";
 
@@ -128,8 +129,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [unlockedVersions, setUnlockedVersions] = useState<Set<string>>(new Set());
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [showTopup, setShowTopup] = useState(false);
-  const [topupAmount, setTopupAmount] = useState(100);
-  const [topupLoading, setTopupLoading] = useState(false);
 
   const lenisRef = useRef<any>(null);
 
@@ -327,7 +326,10 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       const result = await purchaseUnlock(token, ch.versionId);
       if (result.unlocked || result.alreadyUnlocked) {
         setUnlockedVersions((prev) => new Set([...prev, ch.versionId!]));
-        if (result.balance !== undefined) setCoinBalance(result.balance);
+        if (result.balance !== undefined) {
+          setCoinBalance(result.balance);
+          window.dispatchEvent(new CustomEvent('mb:coin-balance-update', { detail: { balance: result.balance } }));
+        }
         // Auto-open the chapter after unlock
         addToHistory({ ...book, lastChapterId: ch.id, lastChapterNumber: ch.chapterNumber });
         setActiveChapter({ id: ch.id, chapterNumber: ch.chapterNumber, title: ch.title });
@@ -343,22 +345,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       setPurchasingId(null);
     }
   }, [user, book]);
-
-  const handleTopup = useCallback(async () => {
-    if (!user) return;
-    setTopupLoading(true);
-    try {
-      const token = await getIdToken();
-      if (!token) return;
-      const result = await topupCoins(token, topupAmount);
-      setCoinBalance(result.balance);
-      setShowTopup(false);
-    } catch (err: unknown) {
-      alert(errMessage(err) || "เติมเหรียญไม่สำเร็จ");
-    } finally {
-      setTopupLoading(false);
-    }
-  }, [user, topupAmount]);
 
   // Scroll-aware header in page mode
   useEffect(() => {
@@ -1240,43 +1226,14 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       </div>
     </div>
 
-      {/* Topup Modal */}
-      {showTopup && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4" onClick={() => setShowTopup(false)}>
-          <div className="w-full max-w-xs rounded-2xl border border-white/10 bg-[#1a1a1a] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-1 text-center text-base font-bold text-white">เติมเหรียญ (ทดสอบ)</h3>
-            <p className="mb-4 text-center text-xs text-white/40">เหรียญปัจจุบัน: 🪙 {coinBalance ?? 0}</p>
-            <div className="mb-4 grid grid-cols-3 gap-2">
-              {[50, 100, 200, 500, 1000, 2000].map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setTopupAmount(amt)}
-                  className={`rounded-xl border py-2.5 text-sm font-semibold transition ${
-                    topupAmount === amt
-                      ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
-                      : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
-                  }`}
-                >
-                  🪙 {amt}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={handleTopup}
-              disabled={topupLoading}
-              className="w-full rounded-xl bg-amber-600 py-2.5 text-sm font-bold text-white transition hover:bg-amber-500 disabled:opacity-50"
-            >
-              {topupLoading ? "กำลังเติม..." : `เติม ${topupAmount} เหรียญ`}
-            </button>
-            <button
-              onClick={() => setShowTopup(false)}
-              className="mt-2 w-full rounded-xl border border-white/10 py-2 text-xs font-semibold text-white/50 transition hover:bg-white/5"
-            >
-              ยกเลิก
-            </button>
-          </div>
-        </div>
-      )}
+      <TopupModal
+        isOpen={showTopup}
+        onClose={() => setShowTopup(false)}
+        onSuccess={(balance) => {
+          setCoinBalance(balance);
+          setShowTopup(false);
+        }}
+      />
     </div>
   );
 
