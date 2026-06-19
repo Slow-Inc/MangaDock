@@ -24,6 +24,12 @@ describe("createAuthHeaders", () => {
       "Content-Type": "application/json",
     });
   });
+
+  test("does not mutate the passed extra object", () => {
+    const extra = { "Content-Type": "application/json" };
+    createAuthHeaders("abc", extra);
+    expect(extra).toEqual({ "Content-Type": "application/json" });
+  });
 });
 
 describe("parseErrorResponse", () => {

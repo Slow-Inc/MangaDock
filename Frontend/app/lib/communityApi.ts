@@ -10,7 +10,6 @@ async function getAuthToken(): Promise<string | null> {
   return session?.access_token ?? null;
 }
 
-
 export async function listPosts(options: {
   category?: ForumCategory;
   mangaId?: string;
