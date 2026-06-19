@@ -4,6 +4,7 @@ import request = require('supertest');
 import { UnauthorizedException } from '@nestjs/common';
 import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
+import { WalletEventsService } from './wallet-events.service';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 
 const TEST_USER = { uid: 'test-uid', email: 'test@test.com', name: 'Test User' };
@@ -13,6 +14,11 @@ const mockWalletService = {
   addCoins: jest.fn(),
   getTransactions: jest.fn(),
   getCreatorEarnings: jest.fn(),
+};
+
+const mockWalletEventsService = {
+  stream$: jest.fn(),
+  emit: jest.fn(),
 };
 
 const mockAuthGuard = {
@@ -28,7 +34,10 @@ describe('WalletController', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [WalletController],
-      providers: [{ provide: WalletService, useValue: mockWalletService }],
+      providers: [
+        { provide: WalletService, useValue: mockWalletService },
+        { provide: WalletEventsService, useValue: mockWalletEventsService },
+      ],
     })
       .overrideGuard(AuthGuard)
       .useValue(mockAuthGuard)
@@ -136,7 +145,10 @@ describe('WalletController', () => {
     beforeAll(async () => {
       const moduleRef = await Test.createTestingModule({
         controllers: [WalletController],
-        providers: [{ provide: WalletService, useValue: mockWalletService }],
+        providers: [
+          { provide: WalletService, useValue: mockWalletService },
+          { provide: WalletEventsService, useValue: mockWalletEventsService },
+        ],
       })
         .overrideGuard(AuthGuard)
         .useValue({ canActivate: () => { throw new UnauthorizedException(); } })

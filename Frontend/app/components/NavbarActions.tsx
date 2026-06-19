@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import SearchBar from "./SearchBar";
 import LoginModal from "./LoginModal";
 import AccountModal from "./AccountModal";
+import TopupModal from "./TopupModal";
 import { useAuth } from "../contexts/AuthContext";
+import { getWalletBalance } from "../lib/studioApi";
 
 export default function NavbarActions() {
   const router = useRouter();
@@ -14,8 +16,10 @@ export default function NavbarActions() {
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [accountInitialTab, setAccountInitialTab] = useState<string | undefined>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [coinBalance, setCoinBalance] = useState<number | null>(null);
+  const [showTopup, setShowTopup] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, getIdToken } = useAuth();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -39,6 +43,24 @@ export default function NavbarActions() {
     return () => window.removeEventListener("mb:open-account-modal", handler);
   }, []);
 
+  // Fetch coin balance when user logs in / out
+  useEffect(() => {
+    if (!user) { setCoinBalance(null); return; }
+    getIdToken().then((token) => {
+      if (!token) return;
+      getWalletBalance(token).then((r) => setCoinBalance(r.balance)).catch(() => {});
+    });
+  }, [user, getIdToken]);
+
+  // Listen for balance updates dispatched by TopupModal on success
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setCoinBalance((e as CustomEvent<{ balance: number }>).detail.balance);
+    };
+    window.addEventListener("mb:coin-balance-update", handler);
+    return () => window.removeEventListener("mb:coin-balance-update", handler);
+  }, []);
+
   return (
     <>
       <div className="flex items-center gap-1.5 sm:gap-2">
@@ -51,7 +73,17 @@ export default function NavbarActions() {
             <div className="hidden h-3 w-16 animate-pulse rounded bg-white/10 md:block" />
           </div>
         ) : user ? (
-          /* ── User avatar + dropdown ── */
+          /* ── Coin chip + User avatar + dropdown ── */
+          <>
+          {coinBalance !== null && (
+            <button
+              onClick={() => setShowTopup(true)}
+              className="flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-xs text-amber-300 smooth-hover-fast hover:bg-amber-400/20"
+              title="เติมเหรียญ"
+            >
+              🪙 {coinBalance.toLocaleString()}
+            </button>
+          )}
           <div ref={menuRef} className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
@@ -129,6 +161,7 @@ export default function NavbarActions() {
                 </button>
             </div>
           </div>
+          </>
         ) : (
           /* ── Sign-in button ── */
           <button
@@ -142,6 +175,11 @@ export default function NavbarActions() {
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
       <AccountModal isOpen={isAccountOpen} onClose={() => setIsAccountOpen(false)} initialTab={accountInitialTab} />
+      <TopupModal
+        isOpen={showTopup}
+        onClose={() => setShowTopup(false)}
+        onSuccess={(balance) => setCoinBalance(balance)}
+      />
     </>
   );
 }
