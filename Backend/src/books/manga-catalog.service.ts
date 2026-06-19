@@ -54,6 +54,23 @@ export class MangaCatalogService {
     return this.mangaDex.getGenreManga(slug, page, limit);
   }
 
+  async getRelated(id: string, limit = 10): Promise<LandingBook[]> {
+    let genres: string[];
+    try {
+      const detail = await this.mangaDex.getMangaDetail(id);
+      genres = detail.genres ?? [];
+    } catch {
+      return [];
+    }
+    if (genres.length === 0) return [];
+
+    const tagId = await this.mangaDex.getMangaTagId(genres[0]);
+    if (!tagId) return [];
+
+    const { items } = await this.mangaDex.fetchMangaForRow('rating', limit + 1, 0, tagId);
+    return items.filter((b) => b.id !== id).slice(0, limit);
+  }
+
   async searchBooks(query: string, lang?: string, limit = 100, offset = 0): Promise<{ items: LandingBook[]; total: number }> {
     const cacheKey = `${QUERY_CACHE_PREFIX}${query
       .toLowerCase()
