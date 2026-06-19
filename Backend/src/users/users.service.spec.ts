@@ -26,7 +26,7 @@ describe('UsersService — reading history', () => {
       client: { from: jest.fn().mockReturnValue(mockChain) },
     } as any;
 
-    service = new UsersService(supabaseService);
+    service = new UsersService(supabaseService, {} as any);
   });
 
   // ── upsertHistoryItem ──────────────────────────────────────────────────
