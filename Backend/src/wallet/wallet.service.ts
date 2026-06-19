@@ -340,41 +340,32 @@ export class WalletService {
 
     const paymentId: string = paymentRequestId;
 
-    const { data, error } = await this.db
+    // Atomic claim: UPDATE only if still pending — prevents concurrent webhook retries from double-crediting.
+    const { data: claimed, error: claimError } = await this.db
       .from('coin_topups')
-      .select('*')
+      .update({ status: 'paid' })
       .eq('payment_id', paymentId)
+      .eq('status', 'pending')
+      .select()
       .maybeSingle();
 
-    if (error || !data) {
-      this.logger.warn(`Webhook: coin_topup not found for payment_id=${paymentId}`);
+    if (claimError) {
+      throw new InternalServerErrorException(`Failed to claim topup: ${claimError.message}`);
+    }
+    if (!claimed) {
+      this.logger.warn(`Webhook: coin_topup not claimable (not found or already processed) for payment_id=${paymentId}`);
       return { received: true };
     }
 
-    if (data.status !== 'pending') {
-      return { received: true }; // idempotency — webhook retry
-    }
-
-    // Credit coins FIRST — if this fails, status stays 'pending' so Xendit webhook retry can recover.
-    // Intentional order: addCoins before UPDATE to avoid a window where status='paid' but balance unchanged.
     const { balance } = await this.addCoins(
-      data.uid,
-      data.amount_coins,
+      claimed.uid,
+      claimed.amount_coins,
       'topup',
       'เติมเหรียญ MangaDock',
       paymentId,
     );
 
-    const { error: updateError } = await this.db
-      .from('coin_topups')
-      .update({ status: 'paid' })
-      .eq('payment_id', paymentId);
-
-    if (updateError) {
-      throw new InternalServerErrorException(`Failed to update topup status: ${updateError.message}`);
-    }
-
-    // Emit SSE only after DB update succeeds — security ordering invariant
+    // Emit SSE after addCoins succeeds — security ordering invariant
     this.walletEvents.emit(paymentId, { balance });
 
     return { received: true };

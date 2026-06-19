@@ -5,18 +5,26 @@ describe('WalletService', () => {
   let service: WalletService;
   let mockRpc: jest.Mock;
   let mockChain: any;
+  let mockUpdateChain: any;
   let mockXendit: { createPromptPayCharge: jest.Mock; simulatePayment: jest.Mock };
   let mockWalletEvents: { emit: jest.Mock };
 
-  // Helper: returns a thenable chain supporting .eq() — used to mock update() chains
+  // Helper: returns a thenable chain supporting .eq()/.select()/.maybeSingle() — used to mock update() chains.
+  // The webhook atomic-claim path does: update().eq().eq().select().maybeSingle()
   const makeUpdateChain = (result: any) => {
     const chain: any = {};
     chain.eq = jest.fn().mockReturnValue(chain);
+    chain.select = jest.fn().mockReturnValue(chain);
+    chain.maybeSingle = jest.fn().mockResolvedValue(result);
     chain.then = (resolve: any, reject?: any) => Promise.resolve(result).then(resolve, reject);
     return chain;
   };
 
   beforeEach(() => {
+    // mockUpdateChain is a shared instance returned by every mockChain.update() call.
+    // Tests that need update().eq().eq().select().maybeSingle() (webhook atomic-claim) set
+    // mockUpdateChain.maybeSingle.mockResolvedValue(...) directly.
+    mockUpdateChain = makeUpdateChain({ error: null });
     mockChain = {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
@@ -24,7 +32,7 @@ describe('WalletService', () => {
       limit: jest.fn().mockReturnThis(),
       maybeSingle: jest.fn(),
       insert: jest.fn().mockResolvedValue({ error: null }),
-      update: jest.fn().mockReturnValue(makeUpdateChain({ error: null })),
+      update: jest.fn().mockReturnValue(mockUpdateChain),
     };
     mockRpc = jest.fn();
     mockXendit = { createPromptPayCharge: jest.fn(), simulatePayment: jest.fn() };
@@ -336,8 +344,9 @@ describe('WalletService', () => {
     });
 
     it('should credit coins on first succeeded webhook using data.payment_request_id', async () => {
-      mockChain.maybeSingle.mockResolvedValue({
-        data: { status: 'pending', uid: 'u1', amount_coins: 100 },
+      // Atomic claim succeeds: UPDATE returns the claimed row
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
         error: null,
       });
       mockRpc.mockResolvedValue({ data: [{ balance: 200 }], error: null });
@@ -348,9 +357,10 @@ describe('WalletService', () => {
       expect(mockRpc).toHaveBeenCalledWith('add_coins_atomic', expect.objectContaining({ p_uid: 'u1', p_amount: 100 }));
     });
 
-    it('should NOT mark as paid if addCoins RPC fails — so webhook retry can recover', async () => {
-      mockChain.maybeSingle.mockResolvedValue({
-        data: { status: 'pending', uid: 'u1', amount_coins: 100 },
+    it('should throw and propagate error when addCoins RPC fails after atomic claim', async () => {
+      // Atomic claim succeeds (status set to paid), but addCoins RPC fails
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
         error: null,
       });
       mockRpc.mockResolvedValue({ data: null, error: { message: 'RPC down' } });
@@ -359,15 +369,13 @@ describe('WalletService', () => {
         service.processXenditWebhook(succeededPayload('pr-1'), WEBHOOK_TOKEN),
       ).rejects.toThrow();
 
-      // UPDATE to 'paid' must NOT have happened — keeps status 'pending' so Xendit can retry
-      expect(mockChain.update).not.toHaveBeenCalledWith({ status: 'paid' });
+      // Atomic claim update WAS called (this is the new design — claim first, then credit)
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'paid' });
     });
 
     it('should be idempotent — no double credit if already paid', async () => {
-      mockChain.maybeSingle.mockResolvedValue({
-        data: { status: 'paid', uid: 'u1', amount_coins: 100 },
-        error: null,
-      });
+      // UPDATE .eq('status','pending') matches nothing → maybeSingle returns null
+      mockUpdateChain.maybeSingle.mockResolvedValue({ data: null, error: null });
 
       const result = await service.processXenditWebhook(succeededPayload('pr-1'), WEBHOOK_TOKEN);
       expect(result).toEqual({ received: true });
@@ -375,7 +383,8 @@ describe('WalletService', () => {
     });
 
     it('should return received:true when payment_id not found (safe unknown webhook)', async () => {
-      mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
+      // UPDATE finds no matching row → maybeSingle returns null
+      mockUpdateChain.maybeSingle.mockResolvedValue({ data: null, error: null });
 
       const result = await service.processXenditWebhook(succeededPayload('pr-unknown'), WEBHOOK_TOKEN);
       expect(result).toEqual({ received: true });
@@ -397,8 +406,9 @@ describe('WalletService', () => {
     });
 
     it('emits SSE event with balance after successful payment', async () => {
-      mockChain.maybeSingle.mockResolvedValue({
-        data: { status: 'pending', uid: 'u1', amount_coins: 100 },
+      // Atomic claim returns the claimed row
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
         error: null,
       });
       mockRpc.mockResolvedValue({ data: [{ balance: 350 }], error: null });
@@ -420,10 +430,8 @@ describe('WalletService', () => {
     });
 
     it('does NOT emit SSE when already paid (idempotency)', async () => {
-      mockChain.maybeSingle.mockResolvedValue({
-        data: { status: 'paid', uid: 'u1', amount_coins: 100 },
-        error: null,
-      });
+      // UPDATE finds no pending row (already paid) → maybeSingle returns null → no addCoins, no SSE
+      mockUpdateChain.maybeSingle.mockResolvedValue({ data: null, error: null });
       await service.processXenditWebhook(
         { event: 'payment.succeeded', data: { payment_request_id: 'pr-dup', status: 'SUCCEEDED' } },
         WEBHOOK_TOKEN,
@@ -433,8 +441,9 @@ describe('WalletService', () => {
 
     it('skips HMAC check when XENDIT_WEBHOOK_SECRET is not set', async () => {
       delete process.env.XENDIT_WEBHOOK_SECRET;
-      mockChain.maybeSingle.mockResolvedValue({
-        data: { status: 'pending', uid: 'u1', amount_coins: 50 },
+      // Atomic claim returns the claimed row
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 50, status: 'paid' },
         error: null,
       });
       mockRpc.mockResolvedValue({ data: [{ balance: 50 }], error: null });
