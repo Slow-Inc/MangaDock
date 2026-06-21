@@ -1412,12 +1412,32 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "wallet security hardening V1-
 
 ## Deployment / Ops checklist (post-merge, before prod)
 
-- [ ] Set `XENDIT_WEBHOOK_SECRET` in production (Xendit Dashboard → Webhooks → verification/signature settings) — boot will fail without it.
-- [ ] Confirm `XENDIT_ALLOW_SIMULATE` is **unset** (or `false`) in all production environments.
-- [ ] Confirm `XENDIT_WEBHOOK_TOKEN` is set in production.
-- [ ] Verify the Xendit webhook is configured to send the `x-xendit-webhook-signature` header (required once the secret is set).
-- [ ] Smoke-test one real sandbox topup end-to-end (create QR → simulate → webhook → balance increments exactly once).
-- [ ] Confirm Supabase backup taken before Task 6/7 migrations; index + `purchase_unlock_atomic` present in prod DB.
+> **ORDERED RUNBOOK — hard dependencies, do not reorder.**
+> Steps 1–3 MUST complete before step 6 (backend deploy). A missing migration with new TS code causes total outage on paid unlocks and weakens double-credit guarantee. A missing secret (step 4) causes hard boot failure.
+
+- [ ] **1. Take a Supabase backup.** Point-in-time snapshot of project `eqgcnoljbiwosecydjqd` (Dashboard → Database → Backups → Create backup). Do not proceed until the snapshot is confirmed.
+
+- [ ] **2. Run the duplicate-detection pre-check.** Via Supabase MCP `execute_sql`:
+  ```sql
+  SELECT reference_id, count(*)
+  FROM wallet_transactions
+  WHERE type = 'topup' AND reference_id IS NOT NULL
+  GROUP BY reference_id
+  HAVING count(*) > 1;
+  ```
+  Confirm **0 rows**. If any rows appear, STOP — deduplicate before continuing.
+
+- [ ] **3. Apply `Backend/migrations/2026-06-22-wallet-security-hardening.sql` to the live DB BEFORE deploying backend code.** This migration adds the idempotency index (`wallet_tx_topup_ref_uidx`), drops dead numeric overloads, and creates `purchase_unlock_atomic`. **This MUST happen BEFORE deploying the new backend code** — the new `UnlockService` calls `rpc('purchase_unlock_atomic')` and the webhook relies on the idempotency index; deploying TS first breaks all paid unlocks and weakens the double-credit guarantee.
+
+- [ ] **4. Set `XENDIT_WEBHOOK_SECRET` and `XENDIT_WEBHOOK_TOKEN` in production** (Xendit Dashboard → Webhooks → verification/signature settings). **The app now hard-fails boot without both** — a missing secret is a total outage, not degraded mode. Verify the Xendit webhook is configured to send the `x-xendit-webhook-signature` header.
+
+- [ ] **5. Confirm `XENDIT_ALLOW_SIMULATE` is unset/false in prod.** Must not be `"true"` in any production environment.
+
+- [ ] **6. Deploy the backend code.**
+
+- [ ] **7. Smoke-test end-to-end:**
+  - One real sandbox topup: create QR → simulate → webhook fires → balance increments by exactly the purchased amount, exactly once (verify idempotency by replaying the webhook — balance must not change on second delivery).
+  - One unlock: user is charged once, creator is credited, chapter is accessible.
 
 ---
 
