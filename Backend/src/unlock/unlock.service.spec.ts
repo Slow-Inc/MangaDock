@@ -76,5 +76,33 @@ describe('UnlockService', () => {
       mockRpc.mockResolvedValue({ data: null, error: { message: 'CREATOR_MISSING' } });
       await expect(service.purchaseUnlock('u1', 'v1')).rejects.toThrow(BadRequestException);
     });
+
+    it('unlocks a free published chapter without charging', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({
+        data: { ...publishedPaid, price_coins: 0, translator_uid: 'c1' }, error: null,
+      });
+      mockRpc.mockResolvedValue({
+        data: [{ balance: 100, already_unlocked: false, creator_share: 0, platform_share: 0 }],
+        error: null,
+      });
+      const res = await service.purchaseUnlock('u1', 'v1');
+      expect(res).toEqual({ unlocked: true, pricePaid: 0, balance: 100 });
+    });
+
+    it('throws NotFoundException when version does not exist', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      await expect(service.purchaseUnlock('u1', 'v1')).rejects.toThrow(NotFoundException);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when paid version has no creator', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({
+        data: { ...publishedPaid, translator_uid: null }, error: null,
+      });
+      await expect(service.purchaseUnlock('u1', 'v1')).rejects.toThrow(BadRequestException);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    // V7 status guard is exercised in Task 8.
   });
 });
