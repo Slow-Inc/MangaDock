@@ -423,6 +423,27 @@ export class UsersService {
     });
   }
 
+  async exportHistory(uid: string): Promise<string> {
+    const { data, error } = await this.db
+      .from('user_history')
+      .select('title, subtitle, last_read_at')
+      .eq('uid', uid)
+      .order('last_read_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to export history: ${error.message}`);
+    }
+
+    const escape = (v: unknown) => String(v ?? '').replace(/"/g, '""');
+
+    const rows = (data ?? []).map((row) => {
+      const r = row as Record<string, unknown>;
+      return `"${escape(r['title'])}","${escape(r['subtitle'])}","${r['last_read_at'] != null ? new Date(Number(r['last_read_at'])).toISOString() : ''}"`;
+    });
+
+    return ['title,lastChapter,lastReadAt', ...rows].join('\r\n');
+  }
+
   async getPhotoHistory(uid: string): Promise<string[]> {
     const { data, error } = await this.db
       .from('profiles')
