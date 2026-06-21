@@ -79,6 +79,11 @@ export class UnlockService {
       throw new NotFoundException(`Chapter version ${versionId} not found`);
     }
 
+    // V7: only live (published) versions are purchasable.
+    if (version.status !== 'published') {
+      throw new BadRequestException('This chapter version is not available for purchase.');
+    }
+
     const priceCoins = version.price_coins ?? 0;
     const creatorUid = version.translator_uid;
     const mangaTitle = version.title_name || 'Unknown Manga';
