@@ -103,6 +103,13 @@ describe('UnlockService', () => {
       expect(mockRpc).not.toHaveBeenCalled();
     });
 
-    // V7 status guard is exercised in Task 8.
+    it('throws BadRequestException when the version is not published', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({
+        data: { version_id: 'v1', price_coins: 10, translator_uid: 'c1', title_name: 'X', status: 'draft' },
+        error: null,
+      });
+      await expect(service.purchaseUnlock('u1', 'v1')).rejects.toThrow(BadRequestException);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
   });
 });
