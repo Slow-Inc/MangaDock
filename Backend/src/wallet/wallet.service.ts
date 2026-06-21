@@ -380,7 +380,7 @@ export class WalletService {
       throw new InternalServerErrorException('Payment verification failed');
     }
 
-    if (verified.status !== 'SUCCEEDED' || Number(verified.amount) !== claimed.amount_coins) {
+    if (verified.status !== 'SUCCEEDED' || verified.currency !== 'THB' || Number(verified.amount) !== Number(claimed.amount_coins)) {
       await this.db
         .from('coin_topups')
         .update({ status: 'pending' })

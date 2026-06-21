@@ -1,5 +1,5 @@
 import { WalletService } from './wallet.service';
-import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 
 describe('WalletService', () => {
   let service: WalletService;
@@ -545,6 +545,25 @@ describe('WalletService', () => {
       ).rejects.toThrow(UnauthorizedException);
 
       expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
+    });
+
+    it('SECURITY: reverts claim and refuses credit when Xendit is unreachable', async () => {
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
+        error: null,
+      });
+      mockXendit.getPaymentRequest.mockRejectedValue(new Error('network down'));
+
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-down', status: 'SUCCEEDED' } },
+          WEBHOOK_TOKEN,
+        ),
+      ).rejects.toThrow(InternalServerErrorException);
+
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockWalletEvents.emit).not.toHaveBeenCalled();
       expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
     });
   });
