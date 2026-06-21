@@ -227,6 +227,14 @@ CREATE INDEX IF NOT EXISTS idx_wallet_transactions_type      ON wallet_transacti
 CREATE INDEX IF NOT EXISTS idx_unlocks_uid                   ON unlocks(uid);
 CREATE INDEX IF NOT EXISTS idx_unlocks_version               ON unlocks(version_id);
 
+-- Topup idempotency: a given Xendit payment_id (reference_id) may be credited
+-- as a topup at most once. Partial index — only constrains topup rows with a
+-- non-NULL reference_id, leaving other transaction types unaffected.
+-- Applied: 2026-06-22 (wallet-security-hardening V5)
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_tx_topup_ref_uidx
+  ON wallet_transactions (reference_id)
+  WHERE type = 'topup' AND reference_id IS NOT NULL;
+
 -- ─── 5. VIEW — translator earnings ──────────────────────────────────────────
 
 CREATE OR REPLACE VIEW translator_earnings AS
@@ -392,6 +400,20 @@ BEGIN
   RETURN QUERY SELECT v_balance;
 END;
 $$;
+
+-- NOTE (2026-06-22, wallet-security-hardening V5):
+-- The topup-scoped unique index wallet_tx_topup_ref_uidx (see INDEXES section)
+-- provides defense-in-depth for add_coins_atomic topup calls: if a duplicate
+-- reference_id topup INSERT is attempted, the DB will raise a unique-violation
+-- before any balance mutation occurs.
+--
+-- The dead numeric overloads below were DROPPED from the live DB in V5:
+--   DROP FUNCTION IF EXISTS add_coins_atomic(uuid, numeric, text, text);
+--   DROP FUNCTION IF EXISTS spend_coins_atomic(uuid, numeric, text, text);
+-- They are NOT defined here (reference-only). TypeScript always resolves to the
+-- integer overloads via named parameters (p_uid, p_amount, p_type, p_description,
+-- p_reference_id). The numeric overloads were broken (missing NOT-NULL
+-- balance_after) and unreachable.
 
 -- Atomic recalculate votes: counts forum_votes and writes totals to post/comment row
 CREATE OR REPLACE FUNCTION recalculate_votes_atomic(
