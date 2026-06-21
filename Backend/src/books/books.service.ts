@@ -371,5 +371,9 @@ export class BooksService {
     return this.catalog.searchBooks(query, lang, limit, offset);
   }
 
+  getRelated(id: string, limit = 10): Promise<LandingBook[]> {
+    return this.catalog.getRelated(id, limit);
+  }
+
 }
 

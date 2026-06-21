@@ -17,6 +17,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getWalletBalance, purchaseUnlock, getUnlocksForTitle } from "../lib/studioApi";
 import TopupModal from "./TopupModal";
 import MangaDiscussion from "./MangaDiscussion";
+import RelatedManga from "./RelatedManga";
 import type { LandingBook, MangaDetail, MangaChapter } from "../lib/types";
 
 type ActiveChapter = {
@@ -1222,6 +1223,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
           {isManga && (
             <MangaDiscussion mangaId={book.id} title={book.title} cover={resolvedThumbnail(book)} />
           )}
+
+          {/* Related manga carousel (#325) */}
+          {isManga && <RelatedManga mangaId={book.id} />}
         </div>
       </div>
     </div>
