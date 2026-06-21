@@ -88,4 +88,51 @@ describe('MangaCatalogService — search + passthrough (#231)', () => {
     await svc.getNewReleases(2, 10, 'tag');
     expect(mangaDex.getNewReleases).toHaveBeenCalledWith(2, 10, 'tag');
   });
+
+  it('passes status param to MangaDex when provided', async () => {
+    const cache = makeCache(null);
+    const mangaDex = {
+      searchManga: jest.fn().mockResolvedValue({ items: [{ id: 'a', publishedDate: '2020' }], total: 1 }),
+      fetchMangaByIds: jest.fn(),
+    };
+    const svc = new MangaCatalogService(mangaDex as any, makeSupabase([]) as any, cache as any);
+
+    await svc.searchBooks('naruto', undefined, 100, 0, 'completed');
+
+    expect(mangaDex.searchManga).toHaveBeenCalledWith('naruto', undefined, 100, 0, 'completed');
+  });
+
+  it('filters results by yearFrom and yearTo', async () => {
+    const cache = makeCache(null);
+    const items = [
+      { id: 'a', publishedDate: '2009' },
+      { id: 'b', publishedDate: '2015' },
+      { id: 'c', publishedDate: '2021' },
+      { id: 'd', publishedDate: '' },
+    ];
+    const mangaDex = {
+      searchManga: jest.fn().mockResolvedValue({ items, total: 4 }),
+      fetchMangaByIds: jest.fn(),
+    };
+    const svc = new MangaCatalogService(mangaDex as any, makeSupabase([]) as any, cache as any);
+
+    const out = await svc.searchBooks('naruto', undefined, 100, 0, undefined, 2010, 2020);
+
+    expect(out.items.map((b: any) => b.id)).toEqual(['b']);
+    expect(out.total).toBe(1);
+  });
+
+  it('omitting new params returns same results as before (backward compat)', async () => {
+    const cache = makeCache(null);
+    const mangaDex = {
+      searchManga: jest.fn().mockResolvedValue({ items: [{ id: 'a' }], total: 1 }),
+      fetchMangaByIds: jest.fn(),
+    };
+    const svc = new MangaCatalogService(mangaDex as any, makeSupabase([]) as any, cache as any);
+
+    const out = await svc.searchBooks('naruto');
+
+    expect(mangaDex.searchManga).toHaveBeenCalledWith('naruto', undefined, 100, 0, undefined);
+    expect(out).toEqual({ items: [{ id: 'a' }], total: 1 });
+  });
 });

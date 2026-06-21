@@ -429,7 +429,7 @@ export class MangaDexService {
     }
   }
 
-  async searchManga(query: string, lang?: string, limit = 100, offset = 0): Promise<{ items: LandingBook[]; total: number }> {
+  async searchManga(query: string, lang?: string, limit = 100, offset = 0, status?: 'ongoing' | 'completed' | 'hiatus'): Promise<{ items: LandingBook[]; total: number }> {
     const params = new URLSearchParams();
     params.set('limit', String(Math.min(limit, 100))); // MangaDex API max is 100
     params.set('offset', String(offset));
@@ -438,8 +438,9 @@ export class MangaDexService {
     if (lang) params.append('availableTranslatedLanguage[]', lang);
     params.append('contentRating[]', 'safe');
     params.append('contentRating[]', 'suggestive');
+    if (status) params.append('status[]', status);
 
-    return this.fetchMangaWithParamsPaged(params, `search:${query}${lang ? `:${lang}` : ''}`);
+    return this.fetchMangaWithParamsPaged(params, `search:${query}${lang ? `:${lang}` : ''}${status ? `:${status}` : ''}`);
   }
 
   /** Fetch specific manga by IDs and return as LandingBook[]. */

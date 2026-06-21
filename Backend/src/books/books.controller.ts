@@ -367,12 +367,18 @@ export class BooksController {
     @Query('lang') lang?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('status') status?: 'ongoing' | 'completed' | 'hiatus',
+    @Query('yearFrom') yearFrom?: string,
+    @Query('yearTo') yearTo?: string,
   ) {
     return this.booksService.searchBooks(
       query ?? '',
       lang,
       limit ? Math.min(parseInt(limit, 10), 100) : 100,
       offset ? parseInt(offset, 10) : 0,
+      status,
+      yearFrom ? parseInt(yearFrom, 10) : undefined,
+      yearTo ? parseInt(yearTo, 10) : undefined,
     );
   }
 
