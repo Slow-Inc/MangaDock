@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
-import { useAuth } from "../../contexts/AuthContext";
+import LoadingScreen from "../../components/LoadingScreen";
+import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
 import { getMyProfile, updateTranslatorProfile } from "../../lib/studioApi";
 import { getCached, setCache } from "../../lib/studioCache";
@@ -62,8 +62,7 @@ function LanguageSelect({
 }
 
 export default function StudioAccountPage() {
-  const router = useRouter();
-  const { user, loading, getIdToken } = useAuth();
+  const { user, loading, getIdToken } = useProtectedPage();
   const { showToast } = useToast();
   const isMobile = useIsMobile();
 
@@ -92,10 +91,6 @@ export default function StudioAccountPage() {
     }),
     [bio, languages, country, preferredLanguage, user?.photoURL],
   );
-
-  useEffect(() => {
-    if (!loading && !user) router.replace("/");
-  }, [loading, user, router]);
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
@@ -216,13 +211,7 @@ export default function StudioAccountPage() {
     };
   }, [isMobile, mobileView]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#141414]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   if (isMobile) {
     const saveButton = (
