@@ -482,6 +482,24 @@ describe('WalletService', () => {
       ).rejects.toThrow(UnauthorizedException);
       expect(mockWalletEvents.emit).not.toHaveBeenCalled();
     });
+
+    it('production: throws UnauthorizedException when secret is not configured', async () => {
+      const ORIGINAL = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      delete process.env.XENDIT_WEBHOOK_SECRET;
+      try {
+        await expect(
+          service.processXenditWebhook(
+            { event: 'payment.succeeded', data: { payment_request_id: 'pr-prod', status: 'SUCCEEDED' } },
+            WEBHOOK_TOKEN,
+            Buffer.from('body'),
+            'deadbeef',
+          ),
+        ).rejects.toThrow(UnauthorizedException);
+      } finally {
+        process.env.NODE_ENV = ORIGINAL;
+      }
+    });
   });
 
   describe('getTopupExpiry', () => {

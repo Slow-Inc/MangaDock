@@ -11,6 +11,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { XenditService } from './xendit.service';
 import { WalletEventsService } from './wallet-events.service';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { safeTokenEqual } from './xendit-webhook.config';
 
 @Injectable()
 export class WalletService {
@@ -294,14 +295,19 @@ export class WalletService {
     rawBody?: Buffer,
     signature?: string,
   ): Promise<{ received: boolean }> {
-    // 1. Static token check
+    // 1. Static token check (constant-time — V8)
     const expected = process.env.XENDIT_WEBHOOK_TOKEN;
-    if (!expected || !token || token !== expected) {
+    if (!safeTokenEqual(token, expected)) {
       throw new UnauthorizedException('Invalid webhook token');
     }
 
-    // 2. Optional HMAC-SHA256 check (skip if XENDIT_WEBHOOK_SECRET not configured)
+    // 2. HMAC-SHA256 check — MANDATORY in production (V1). Outside production it
+    //    is enforced only when XENDIT_WEBHOOK_SECRET is configured.
     const webhookSecret = process.env.XENDIT_WEBHOOK_SECRET;
+    const requireHmac = process.env.NODE_ENV === 'production';
+    if (requireHmac && !webhookSecret) {
+      throw new UnauthorizedException('Webhook secret not configured');
+    }
     if (webhookSecret) {
       if (!rawBody || !signature) {
         throw new UnauthorizedException('Missing webhook signature');
