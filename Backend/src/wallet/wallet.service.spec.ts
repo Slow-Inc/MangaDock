@@ -397,6 +397,10 @@ describe('WalletService', () => {
 
       // Atomic claim update WAS called (this is the new design — claim first, then credit)
       expect(mockChain.update).toHaveBeenCalledWith({ status: 'paid' });
+      // Claim REVERTED to pending so a Xendit retry can re-credit
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
+      // SSE must NOT emit when addCoins failed
+      expect(mockWalletEvents.emit).not.toHaveBeenCalled();
     });
 
     it('should be idempotent — no double credit if already paid', async () => {

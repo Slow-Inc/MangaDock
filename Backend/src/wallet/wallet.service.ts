@@ -397,13 +397,24 @@ export class WalletService {
       throw new UnauthorizedException('Payment verification failed');
     }
 
-    const { balance } = await this.addCoins(
-      claimed.uid,
-      claimed.amount_coins,
-      'topup',
-      'เติมเหรียญ MangaDock',
-      paymentId,
-    );
+    let balance: number;
+    try {
+      ({ balance } = await this.addCoins(
+        claimed.uid,
+        claimed.amount_coins,
+        'topup',
+        'เติมเหรียญ MangaDock',
+        paymentId,
+      ));
+    } catch (err) {
+      await this.db
+        .from('coin_topups')
+        .update({ status: 'pending' })
+        .eq('payment_id', paymentId)
+        .eq('status', 'paid');
+      this.logger.error(`Webhook credit failed for ${paymentId}, reverted to pending: ${String(err)}`);
+      throw err;
+    }
 
     // Emit SSE after addCoins succeeds — security ordering invariant
     this.walletEvents.emit(paymentId, { balance });
