@@ -15,6 +15,7 @@ import {
 import { EMPTY, Observable, of, timer } from 'rxjs';
 import { map, takeUntil } from 'rxjs/operators';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
+import { TopupThrottleGuard } from './topup-throttle.guard';
 import { WalletService } from './wallet.service';
 import { WalletEventsService } from './wallet-events.service';
 import { CreateTopupDto } from './dto/create-topup.dto';
