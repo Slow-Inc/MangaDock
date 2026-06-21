@@ -10,6 +10,8 @@
  *  4. On login, AuthContext calls loadHistoryData() to restore history.
  */
 
+import { createAuthHeaders } from "./apiUtils";
+
 const API_BASE = "/api/proxy";
 const STORAGE_KEY = "mangadock_reading_history";
 const SYNCED_KEY = "mangadock_history_synced";   // IDs known to be synced to server
@@ -131,10 +133,7 @@ async function flushToServer() {
   const token = await getTokenFn?.();
   if (!token) return;
 
-  const headers: HeadersInit = {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+  const headers = createAuthHeaders(token, { "Content-Type": "application/json" });
 
   try {
     if (clearAll) {
@@ -171,7 +170,7 @@ export async function loadHistoryData(token: string) {
   loadFromLS();
   try {
     const res = await fetch(`${API_BASE}/users/me/history`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: createAuthHeaders(token),
     });
     if (!res.ok) return;
     const remote: HistoryBook[] = await res.json();
