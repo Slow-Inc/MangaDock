@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import type { NestApplication } from '@nestjs/core';
 import request = require('supertest');
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
 import { WalletEventsService } from './wallet-events.service';
@@ -70,6 +70,16 @@ describe('WalletController', () => {
   // ─── POST /wallet/topup ──────────────────────────────────────────────────
 
   describe('POST /wallet/topup', () => {
+    const ORIGINAL_FLAG = process.env.XENDIT_ALLOW_SIMULATE;
+
+    beforeEach(() => {
+      process.env.XENDIT_ALLOW_SIMULATE = 'true';
+    });
+    afterEach(() => {
+      if (ORIGINAL_FLAG === undefined) delete process.env.XENDIT_ALLOW_SIMULATE;
+      else process.env.XENDIT_ALLOW_SIMULATE = ORIGINAL_FLAG;
+    });
+
     it('should top up coins and return updated wallet', async () => {
       mockWalletService.addCoins.mockResolvedValue({ uid: TEST_USER.uid, balance: 350 });
       const res = await request(app.getHttpServer())
@@ -83,6 +93,16 @@ describe('WalletController', () => {
         'topup',
         expect.any(String),
       );
+    });
+
+    it('throws ForbiddenException when XENDIT_ALLOW_SIMULATE is not "true"', async () => {
+      delete process.env.XENDIT_ALLOW_SIMULATE;
+      const res = await request(app.getHttpServer())
+        .post('/wallet/topup')
+        .send({ amount: 50 })
+        .expect(403);
+      expect(res.body.message).toMatch(/not available/i);
+      expect(mockWalletService.addCoins).not.toHaveBeenCalled();
     });
   });
 

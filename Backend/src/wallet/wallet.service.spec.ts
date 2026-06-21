@@ -262,10 +262,14 @@ describe('WalletService', () => {
   // ─── simulateTopup ────────────────────────────────────────────────────────
 
   describe('simulateTopup', () => {
-    const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+    const ORIGINAL_FLAG = process.env.XENDIT_ALLOW_SIMULATE;
 
+    beforeEach(() => {
+      process.env.XENDIT_ALLOW_SIMULATE = 'true';
+    });
     afterEach(() => {
-      process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+      if (ORIGINAL_FLAG === undefined) delete process.env.XENDIT_ALLOW_SIMULATE;
+      else process.env.XENDIT_ALLOW_SIMULATE = ORIGINAL_FLAG;
     });
 
     it('should call xendit.simulatePayment with amount and return simulated:true when pending', async () => {
@@ -277,8 +281,8 @@ describe('WalletService', () => {
       expect(mockXendit.simulatePayment).toHaveBeenCalledWith('pay_1', 100);
     });
 
-    it('should throw ForbiddenException in production', async () => {
-      process.env.NODE_ENV = 'production';
+    it('should throw ForbiddenException when XENDIT_ALLOW_SIMULATE is not "true"', async () => {
+      delete process.env.XENDIT_ALLOW_SIMULATE;
       await expect(service.simulateTopup('pay_1', 'u1')).rejects.toThrow(ForbiddenException);
       expect(mockXendit.simulatePayment).not.toHaveBeenCalled();
     });

@@ -34,14 +34,15 @@ export class WalletController {
     return { balance };
   }
 
-  // DEV ONLY — no payment gateway yet; blocked in production until payment gateway is wired up per roadmap
+  // DEV/TEST ONLY — direct credit without payment. Fail-closed: blocked unless
+  // XENDIT_ALLOW_SIMULATE=true (never set in production).
   @Post('topup')
   @UseGuards(AuthGuard)
   async topup(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { amount: number },
+    @Body(new ValidationPipe({ whitelist: true })) body: CreateTopupDto,
   ) {
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.XENDIT_ALLOW_SIMULATE !== 'true') {
       throw new ForbiddenException('Direct topup is not available. Please use the payment gateway.');
     }
     return this.wallet.addCoins(req[USER_KEY].uid, body.amount, 'topup', 'เติมเหรียญ (ทดสอบ)');
