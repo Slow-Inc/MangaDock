@@ -71,10 +71,18 @@ export class MangaCatalogService {
     return items.filter((b) => b.id !== id).slice(0, limit);
   }
 
-  async searchBooks(query: string, lang?: string, limit = 100, offset = 0): Promise<{ items: LandingBook[]; total: number }> {
+  async searchBooks(
+    query: string,
+    lang?: string,
+    limit = 100,
+    offset = 0,
+    status?: 'ongoing' | 'completed' | 'hiatus',
+    yearFrom?: number,
+    yearTo?: number,
+  ): Promise<{ items: LandingBook[]; total: number }> {
     const cacheKey = `${QUERY_CACHE_PREFIX}${query
       .toLowerCase()
-      .replace(/\s+/g, '_')}${lang ? `:${lang}` : ''}:${offset}:${limit}`;
+      .replace(/\s+/g, '_')}${lang ? `:${lang}` : ''}${status ? `:${status}` : ''}${yearFrom != null ? `:y${yearFrom}` : ''}${yearTo != null ? `:y${yearTo}` : ''}:${offset}:${limit}`;
 
     const cached = await this.cache.get<{ items: LandingBook[]; total: number }>(cacheKey);
     if (cached) {
@@ -82,7 +90,7 @@ export class MangaCatalogService {
       return cached.data;
     }
 
-    const result = await this.mangaDex.searchManga(query, lang, limit, offset);
+    const result = await this.mangaDex.searchManga(query, lang, limit, offset, status);
 
     // Enhance: also match user-uploaded alt names in chapter_versions
     try {
@@ -97,6 +105,19 @@ export class MangaCatalogService {
       }
     } catch (err) {
       this.logger.warn(`Alt-name lookup failed: ${String(err)}`);
+    }
+
+    // Apply year range filter post-fetch (publishedDate is a year string e.g. "2015")
+    if (yearFrom != null || yearTo != null) {
+      result.items = result.items.filter((b) => {
+        if (!b.publishedDate) return false;
+        const year = parseInt(b.publishedDate, 10);
+        if (isNaN(year)) return false;
+        if (yearFrom != null && year < yearFrom) return false;
+        if (yearTo != null && year > yearTo) return false;
+        return true;
+      });
+      result.total = result.items.length;
     }
 
     if (result.items.length > 0) {
