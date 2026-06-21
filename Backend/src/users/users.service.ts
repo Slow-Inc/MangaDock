@@ -428,8 +428,7 @@ export class UsersService {
       .from('user_history')
       .select('title, subtitle, last_read_at')
       .eq('uid', uid)
-      .order('last_read_at', { ascending: false })
-      .limit(50);
+      .order('last_read_at', { ascending: false });
 
     if (error) {
       throw new Error(`Failed to export history: ${error.message}`);
@@ -439,7 +438,7 @@ export class UsersService {
 
     const rows = (data ?? []).map((row) => {
       const r = row as Record<string, unknown>;
-      return `"${escape(r['title'])}","${escape(r['subtitle'])}","${new Date(Number(r['last_read_at'] ?? 0)).toISOString()}"`;
+      return `"${escape(r['title'])}","${escape(r['subtitle'])}","${r['last_read_at'] != null ? new Date(Number(r['last_read_at'])).toISOString() : ''}"`;
     });
 
     return ['title,lastChapter,lastReadAt', ...rows].join('\r\n');

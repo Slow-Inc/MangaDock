@@ -7,7 +7,7 @@ function makeSupabaseMock(rows: unknown[], error: unknown = null) {
   const chain = {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
-    order: jest.fn().mockReturnThis(),
+    order: jest.fn().mockResolvedValue({ data: rows, error }),
     limit: jest.fn().mockResolvedValue({ data: rows, error }),
   };
   return {
