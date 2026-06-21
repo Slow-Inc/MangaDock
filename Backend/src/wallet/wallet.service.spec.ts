@@ -90,6 +90,14 @@ describe('WalletService', () => {
     it('should throw BadRequestException when amount is negative', async () => {
       await expect(service.addCoins('u1', -5, 'topup')).rejects.toThrow(BadRequestException);
     });
+
+    it('should throw BadRequestException when amount exceeds MAX_TOPUP_COINS', async () => {
+      await expect(service.addCoins('u1', 100001, 'topup')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when amount is not an integer', async () => {
+      await expect(service.addCoins('u1', 10.5, 'topup')).rejects.toThrow(BadRequestException);
+    });
   });
 
   // ─── spendCoins ──────────────────────────────────────────────────────────
@@ -109,6 +117,14 @@ describe('WalletService', () => {
 
     it('should throw BadRequestException when amount is 0', async () => {
       await expect(service.spendCoins('u1', 0, 'buy')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when amount exceeds MAX_TOPUP_COINS', async () => {
+      await expect(service.spendCoins('u1', 100001, 'buy')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when amount is not an integer', async () => {
+      await expect(service.spendCoins('u1', 10.5, 'buy')).rejects.toThrow(BadRequestException);
     });
   });
 

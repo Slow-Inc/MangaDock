@@ -13,6 +13,9 @@ import { WalletEventsService } from './wallet-events.service';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { safeTokenEqual } from './xendit-webhook.config';
 
+/** Hard upper bound per single coin mutation — bounds INTEGER-column overflow and abuse. */
+export const MAX_TOPUP_COINS = 100000;
+
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
@@ -61,8 +64,8 @@ export class WalletService {
     description?: string,
     referenceId?: string,
   ): Promise<{ balance: number }> {
-    if (!amount || amount <= 0) {
-      throw new BadRequestException('Amount must be greater than 0');
+    if (!Number.isInteger(amount) || amount <= 0 || amount > MAX_TOPUP_COINS) {
+      throw new BadRequestException(`Amount must be an integer between 1 and ${MAX_TOPUP_COINS}`);
     }
 
     const { data, error } = await this.db.rpc('add_coins_atomic', {
@@ -86,8 +89,8 @@ export class WalletService {
     description: string,
     referenceId?: string,
   ): Promise<{ balance: number }> {
-    if (!amount || amount <= 0) {
-      throw new BadRequestException('Amount must be greater than 0');
+    if (!Number.isInteger(amount) || amount <= 0 || amount > MAX_TOPUP_COINS) {
+      throw new BadRequestException(`Amount must be an integer between 1 and ${MAX_TOPUP_COINS}`);
     }
 
     const { data, error } = await this.db.rpc('spend_coins_atomic', {
