@@ -363,6 +363,36 @@ export class WalletService {
       return { received: true };
     }
 
+    // Active verification (V1/V2): the webhook payload is untrusted. Re-fetch the
+    // authoritative payment state from Xendit and reconcile the settled amount
+    // before crediting. On any mismatch or fetch failure, revert the claim back
+    // to 'pending' so a genuine later webhook can retry, and refuse to credit.
+    let verified: { status: string; amount: number; currency: string };
+    try {
+      verified = await this.xenditService.getPaymentRequest(paymentId);
+    } catch (err) {
+      await this.db
+        .from('coin_topups')
+        .update({ status: 'pending' })
+        .eq('payment_id', paymentId)
+        .eq('status', 'paid');
+      this.logger.error(`Webhook verify failed (Xendit unreachable) for ${paymentId}: ${String(err)}`);
+      throw new InternalServerErrorException('Payment verification failed');
+    }
+
+    if (verified.status !== 'SUCCEEDED' || Number(verified.amount) !== claimed.amount_coins) {
+      await this.db
+        .from('coin_topups')
+        .update({ status: 'pending' })
+        .eq('payment_id', paymentId)
+        .eq('status', 'paid');
+      this.logger.error(
+        `SECURITY: webhook verification mismatch for ${paymentId} — ` +
+          `xenditStatus=${verified.status} xenditAmount=${verified.amount} expected=${claimed.amount_coins}`,
+      );
+      throw new UnauthorizedException('Payment verification failed');
+    }
+
     const { balance } = await this.addCoins(
       claimed.uid,
       claimed.amount_coins,

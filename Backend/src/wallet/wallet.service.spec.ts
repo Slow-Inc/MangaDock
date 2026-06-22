@@ -6,7 +6,7 @@ describe('WalletService', () => {
   let mockRpc: jest.Mock;
   let mockChain: any;
   let mockUpdateChain: any;
-  let mockXendit: { createPromptPayCharge: jest.Mock; simulatePayment: jest.Mock };
+  let mockXendit: { createPromptPayCharge: jest.Mock; simulatePayment: jest.Mock; getPaymentRequest: jest.Mock };
   let mockWalletEvents: { emit: jest.Mock };
 
   // Helper: returns a thenable chain supporting .eq()/.select()/.maybeSingle() — used to mock update() chains.
@@ -35,7 +35,11 @@ describe('WalletService', () => {
       update: jest.fn().mockReturnValue(mockUpdateChain),
     };
     mockRpc = jest.fn();
-    mockXendit = { createPromptPayCharge: jest.fn(), simulatePayment: jest.fn() };
+    mockXendit = {
+      createPromptPayCharge: jest.fn(),
+      simulatePayment: jest.fn(),
+      getPaymentRequest: jest.fn(),
+    };
     mockWalletEvents = { emit: jest.fn() };
 
     const supabaseService = {
@@ -350,6 +354,7 @@ describe('WalletService', () => {
         error: null,
       });
       mockRpc.mockResolvedValue({ data: [{ balance: 200 }], error: null });
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 100, currency: 'THB' });
 
       const result = await service.processXenditWebhook(succeededPayload('pr-1'), WEBHOOK_TOKEN);
       expect(result).toEqual({ received: true });
@@ -364,6 +369,7 @@ describe('WalletService', () => {
         error: null,
       });
       mockRpc.mockResolvedValue({ data: null, error: { message: 'RPC down' } });
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 100, currency: 'THB' });
 
       await expect(
         service.processXenditWebhook(succeededPayload('pr-1'), WEBHOOK_TOKEN),
@@ -412,6 +418,7 @@ describe('WalletService', () => {
         error: null,
       });
       mockRpc.mockResolvedValue({ data: [{ balance: 350 }], error: null });
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 100, currency: 'THB' });
 
       await service.processXenditWebhook(
         { event: 'payment.succeeded', data: { payment_request_id: 'pr-sse', status: 'SUCCEEDED' } },
@@ -447,6 +454,7 @@ describe('WalletService', () => {
         error: null,
       });
       mockRpc.mockResolvedValue({ data: [{ balance: 50 }], error: null });
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 50, currency: 'THB' });
 
       await expect(
         service.processXenditWebhook(
@@ -481,6 +489,65 @@ describe('WalletService', () => {
         ),
       ).rejects.toThrow(UnauthorizedException);
       expect(mockWalletEvents.emit).not.toHaveBeenCalled();
+    });
+
+    it('SECURITY: reverts claim and refuses credit when Xendit amount mismatches', async () => {
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
+        error: null,
+      });
+      // Xendit says only 10 was actually paid → must NOT credit 100
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 10, currency: 'THB' });
+
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-mm', status: 'SUCCEEDED' } },
+          WEBHOOK_TOKEN,
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockRpc).not.toHaveBeenCalled();          // no addCoins
+      expect(mockWalletEvents.emit).not.toHaveBeenCalled();
+      // claim reverted back to pending
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
+    });
+
+    it('SECURITY: reverts claim and refuses credit when Xendit status is not SUCCEEDED', async () => {
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
+        error: null,
+      });
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'PENDING', amount: 100, currency: 'THB' });
+
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-ns', status: 'SUCCEEDED' } },
+          WEBHOOK_TOKEN,
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
+    });
+
+    it('SECURITY: reverts claim and throws when Xendit is unreachable (coins never credited unverified)', async () => {
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
+        error: null,
+      });
+      mockXendit.getPaymentRequest.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-down', status: 'SUCCEEDED' } },
+          WEBHOOK_TOKEN,
+        ),
+      ).rejects.toThrow();
+
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockWalletEvents.emit).not.toHaveBeenCalled();
+      // claim reverted so a genuine later webhook retry can re-process
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
     });
 
     it('production: throws UnauthorizedException when secret is not configured', async () => {
