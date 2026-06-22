@@ -272,8 +272,8 @@ export class WalletService {
     paymentId: string,
     uid: string,
   ): Promise<{ simulated: boolean }> {
-    if (process.env.NODE_ENV === 'production') {
-      throw new ForbiddenException('Simulate is not available in production');
+    if (process.env.XENDIT_ALLOW_SIMULATE !== 'true') {
+      throw new ForbiddenException('Simulate is not available');
     }
 
     const { data, error } = await this.db

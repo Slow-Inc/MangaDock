@@ -70,6 +70,16 @@ describe('WalletController', () => {
   // ─── POST /wallet/topup ──────────────────────────────────────────────────
 
   describe('POST /wallet/topup', () => {
+    const ORIGINAL_FLAG = process.env.XENDIT_ALLOW_SIMULATE;
+
+    beforeEach(() => {
+      process.env.XENDIT_ALLOW_SIMULATE = 'true';
+    });
+    afterEach(() => {
+      if (ORIGINAL_FLAG === undefined) delete process.env.XENDIT_ALLOW_SIMULATE;
+      else process.env.XENDIT_ALLOW_SIMULATE = ORIGINAL_FLAG;
+    });
+
     it('should top up coins and return updated wallet', async () => {
       mockWalletService.addCoins.mockResolvedValue({ uid: TEST_USER.uid, balance: 350 });
       const res = await request(app.getHttpServer())
@@ -83,6 +93,14 @@ describe('WalletController', () => {
         'topup',
         expect.any(String),
       );
+    });
+
+    it('throws 403 when XENDIT_ALLOW_SIMULATE is not "true"', async () => {
+      delete process.env.XENDIT_ALLOW_SIMULATE;
+      await request(app.getHttpServer())
+        .post('/wallet/topup')
+        .send({ amount: 50 })
+        .expect(403);
     });
   });
 
