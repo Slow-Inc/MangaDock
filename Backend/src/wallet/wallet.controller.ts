@@ -18,6 +18,7 @@ import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { WalletService } from './wallet.service';
 import { WalletEventsService } from './wallet-events.service';
 import { CreateTopupDto } from './dto/create-topup.dto';
+import { TopupThrottleGuard } from './topup-throttle.guard';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 
 @Controller('wallet')
@@ -49,7 +50,7 @@ export class WalletController {
   }
 
   @Post('topup/create')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, TopupThrottleGuard)
   async createTopup(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Body(new ValidationPipe({ whitelist: true })) body: CreateTopupDto,

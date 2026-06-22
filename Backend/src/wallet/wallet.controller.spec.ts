@@ -6,6 +6,7 @@ import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
 import { WalletEventsService } from './wallet-events.service';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
+import { TopupThrottleGuard } from './topup-throttle.guard';
 
 const TEST_USER = { uid: 'test-uid', email: 'test@test.com', name: 'Test User' };
 
@@ -41,6 +42,8 @@ describe('WalletController', () => {
     })
       .overrideGuard(AuthGuard)
       .useValue(mockAuthGuard)
+      .overrideGuard(TopupThrottleGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -170,6 +173,8 @@ describe('WalletController', () => {
       })
         .overrideGuard(AuthGuard)
         .useValue({ canActivate: () => { throw new UnauthorizedException(); } })
+        .overrideGuard(TopupThrottleGuard)
+        .useValue({ canActivate: () => true })
         .compile();
 
       unauthApp = moduleRef.createNestApplication();
