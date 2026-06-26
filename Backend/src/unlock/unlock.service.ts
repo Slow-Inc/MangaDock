@@ -65,16 +65,9 @@ export class UnlockService {
   }
 
   async purchaseUnlock(uid: string, versionId: string) {
-    // Check if already unlocked
-    const alreadyUnlocked = await this.isUnlocked(uid, versionId);
-    if (alreadyUnlocked) {
-      return { alreadyUnlocked: true };
-    }
-
-    // Fetch chapter version to get price and creator
     const { data: version, error: versionError } = await this.db
       .from('chapter_versions')
-      .select('version_id, price_coins, translator_uid, title_name')
+      .select('version_id, price_coins, translator_uid, title_name, status')
       .eq('version_id', versionId)
       .maybeSingle();
 
@@ -92,48 +85,28 @@ export class UnlockService {
       throw new BadRequestException('Cannot purchase: Creator information is missing for this version.');
     }
 
-    // Insert unlock record FIRST so access is granted even if creator payment has issues
-    const { error: unlockError } = await this.db
-      .from('unlocks')
-      .insert({ uid, version_id: versionId, price_paid: priceCoins });
+    const { data, error } = await this.db.rpc('purchase_unlock_atomic', {
+      p_uid: uid,
+      p_version_id: versionId,
+      p_price: priceCoins,
+      p_creator_uid: creatorUid ?? null,
+      p_platform_pct: 0.3,
+      p_description: `ปลดล็อคตอน: ${mangaTitle}`,
+    });
 
-    if (unlockError) {
-      throw new InternalServerErrorException(`Failed to insert unlock record: ${unlockError.message}`);
+    if (error) {
+      if (error.message?.includes('INSUFFICIENT_FUNDS')) {
+        throw new BadRequestException('Insufficient balance');
+      }
+      throw new InternalServerErrorException(`Failed to unlock chapter: ${error.message}`);
     }
 
-    let newBalance: number | undefined;
-
-    if (priceCoins > 0 && creatorUid) {
-      try {
-        const result = await this.walletService.processRevenueSplit(
-          uid,
-          creatorUid,
-          priceCoins,
-          `ปลดล็อคตอน: ${mangaTitle}`,
-          versionId,
-        );
-        newBalance = result.balance;
-      } catch (err) {
-        // Payment failed after unlock was already granted — roll back unlock row
-        const { error: rollbackErr } = await this.db
-          .from('unlocks')
-          .delete()
-          .match({ uid, version_id: versionId });
-        if (rollbackErr) {
-          this.logger.error(
-            `Unlock rollback failed — uid=${uid} versionId=${versionId}: ${rollbackErr.message}`,
-          );
-        }
-        throw err;
-      }
+    const row = Array.isArray(data) ? data[0] : (data as any);
+    if (row?.already_unlocked) {
+      return { alreadyUnlocked: true };
     }
 
     this.logger.log(`User ${uid} unlocked version ${versionId} for ${priceCoins} coins`);
-
-    return {
-      unlocked: true,
-      pricePaid: priceCoins,
-      balance: newBalance ?? (await this.walletService.getBalance(uid)),
-    };
+    return { unlocked: true, pricePaid: priceCoins, balance: row?.balance };
   }
 }

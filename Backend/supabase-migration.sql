@@ -436,4 +436,70 @@ BEGIN
 END;
 $$;
 
+-- Atomic purchase unlock: inserts unlock row, debits buyer, credits creator — single transaction
+-- Supersedes the old insert-then-split flow in unlock.service.ts (V6/V7)
+CREATE OR REPLACE FUNCTION purchase_unlock_atomic(
+  p_uid          uuid,
+  p_version_id   uuid,
+  p_price        integer,
+  p_creator_uid  uuid,
+  p_platform_pct numeric,
+  p_description  text
+)
+RETURNS TABLE(balance integer, already_unlocked boolean, creator_share integer, platform_share integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_rows            integer;
+  v_balance         integer;
+  v_creator_balance integer;
+  v_platform_share  integer := 0;
+  v_creator_share   integer := 0;
+BEGIN
+  INSERT INTO unlocks (uid, version_id, price_paid)
+  VALUES (p_uid, p_version_id, p_price)
+  ON CONFLICT (uid, version_id) DO NOTHING;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+
+  IF v_rows = 0 THEN
+    SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), true, 0, 0;
+    RETURN;
+  END IF;
+
+  IF p_price <= 0 THEN
+    SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), false, 0, 0;
+    RETURN;
+  END IF;
+
+  INSERT INTO wallets (uid, balance) VALUES (p_uid, 0) ON CONFLICT (uid) DO NOTHING;
+  UPDATE wallets
+     SET balance = wallets.balance - p_price, updated_at = now()
+   WHERE uid = p_uid AND wallets.balance >= p_price
+   RETURNING wallets.balance INTO v_balance;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'INSUFFICIENT_FUNDS';
+  END IF;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
+  VALUES (p_uid, -p_price, 'purchase', v_balance, p_description, p_version_id::text);
+
+  v_platform_share := floor(p_price * p_platform_pct);
+  v_creator_share  := p_price - v_platform_share;
+  IF v_creator_share > 0 AND p_creator_uid IS NOT NULL THEN
+    INSERT INTO wallets (uid, balance) VALUES (p_creator_uid, 0) ON CONFLICT (uid) DO NOTHING;
+    UPDATE wallets
+       SET balance = wallets.balance + v_creator_share, updated_at = now()
+     WHERE uid = p_creator_uid
+     RETURNING wallets.balance INTO v_creator_balance;
+    INSERT INTO wallet_transactions (uid, amount, type, balance_after, description)
+    VALUES (p_creator_uid, v_creator_share, 'reward', v_creator_balance, 'ส่วนแบ่งรายได้: ' || p_description);
+  END IF;
+
+  RETURN QUERY SELECT v_balance, false, v_creator_share, v_platform_share;
+END;
+$$;
+
 COMMIT;

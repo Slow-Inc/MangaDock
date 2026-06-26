@@ -5,99 +5,83 @@ describe('UnlockService', () => {
   let service: UnlockService;
   let walletService: any;
   let mockChain: any;
+  let mockRpc: jest.Mock;
 
   beforeEach(() => {
     mockChain = {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       maybeSingle: jest.fn(),
-      insert: jest.fn().mockReturnThis(),
-      then: jest.fn().mockImplementation((resolve) => {
-        resolve({ data: null, error: null });
-      }),
     };
-
+    mockRpc = jest.fn();
     const supabaseService = {
-      client: { from: jest.fn().mockReturnValue(mockChain) },
+      client: { from: jest.fn().mockReturnValue(mockChain), rpc: mockRpc },
     } as any;
-
-    walletService = {
-      spendCoins: jest.fn(),
-      processRevenueSplit: jest.fn().mockResolvedValue({ balance: 900 }),
-      getBalance: jest.fn().mockResolvedValue(100),
-    };
-
+    walletService = { getBalance: jest.fn().mockResolvedValue(100) };
     service = new UnlockService(supabaseService, walletService);
   });
 
-  // ─── isUnlocked ──────────────────────────────────────────────────────────
-
-  describe('isUnlocked', () => {
-    it('should return true when unlock record exists', async () => {
-      mockChain.maybeSingle.mockResolvedValueOnce({ data: { uid: 'u1' }, error: null });
-      expect(await service.isUnlocked('u1', 'v1')).toBe(true);
-    });
-
-    it('should return false when no unlock record exists', async () => {
-      mockChain.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
-      expect(await service.isUnlocked('u1', 'v1')).toBe(false);
-    });
-  });
-
-  // ─── purchaseUnlock ───────────────────────────────────────────────────────
-
   describe('purchaseUnlock', () => {
-    it('should return alreadyUnlocked:true if record exists (idempotent)', async () => {
-      mockChain.maybeSingle.mockResolvedValueOnce({ data: { uid: 'u1' }, error: null });
-      const res = await service.purchaseUnlock('u1', 'v1');
-      expect(res.alreadyUnlocked).toBe(true);
-      expect(walletService.processRevenueSplit).not.toHaveBeenCalled();
-    });
+    const publishedPaid = {
+      version_id: 'v1', price_coins: 10, translator_uid: 'c1',
+      title_name: 'Manga X', status: 'published',
+    };
 
-    it('should unlock successfully for paid chapters', async () => {
-      mockChain.maybeSingle
-        .mockResolvedValueOnce({ data: null, error: null })  // isUnlocked = false
-        .mockResolvedValueOnce({
-          data: { version_id: 'v1', price_coins: 10, translator_uid: 'c1', chapters: { manga: { title: 'Manga X' } } },
-          error: null,
-        }); // fetch version
-      mockChain.insert.mockResolvedValue({ error: null });
+    it('charges and unlocks a published paid chapter via the atomic RPC', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({ data: publishedPaid, error: null });
+      mockRpc.mockResolvedValue({
+        data: [{ balance: 90, already_unlocked: false, creator_share: 7, platform_share: 3 }],
+        error: null,
+      });
 
       const res = await service.purchaseUnlock('u1', 'v1');
-      expect(res.unlocked).toBe(true);
-      expect(walletService.processRevenueSplit).toHaveBeenCalled();
+      expect(res).toEqual({ unlocked: true, pricePaid: 10, balance: 90 });
+      expect(mockRpc).toHaveBeenCalledWith('purchase_unlock_atomic', expect.objectContaining({
+        p_uid: 'u1', p_version_id: 'v1', p_price: 10, p_creator_uid: 'c1', p_platform_pct: 0.3,
+      }));
     });
 
-    it('should not charge coins for free chapters (price = 0)', async () => {
-      mockChain.maybeSingle
-        .mockResolvedValueOnce({ data: null, error: null })
-        .mockResolvedValueOnce({
-          data: { version_id: 'v1', price_coins: 0, translator_uid: 'c1', chapters: { manga: { title: 'Free Manga' } } },
-          error: null,
-        });
-      mockChain.insert.mockResolvedValue({ error: null });
+    it('returns alreadyUnlocked when the RPC reports a pre-existing unlock', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({ data: publishedPaid, error: null });
+      mockRpc.mockResolvedValue({
+        data: [{ balance: 100, already_unlocked: true, creator_share: 0, platform_share: 0 }],
+        error: null,
+      });
 
       const res = await service.purchaseUnlock('u1', 'v1');
-      expect(res.unlocked).toBe(true);
-      expect(res.pricePaid).toBe(0);
-      expect(walletService.processRevenueSplit).not.toHaveBeenCalled();
+      expect(res).toEqual({ alreadyUnlocked: true });
     });
 
-    it('should throw NotFoundException when chapter version does not exist', async () => {
-      mockChain.maybeSingle
-        .mockResolvedValueOnce({ data: null, error: null })
-        .mockResolvedValueOnce({ data: null, error: null }); // version not found
-      await expect(service.purchaseUnlock('u1', 'v1')).rejects.toThrow(NotFoundException);
-    });
-
-    it('should throw BadRequestException if version has price but no creator', async () => {
-      mockChain.maybeSingle
-        .mockResolvedValueOnce({ data: null, error: null })
-        .mockResolvedValueOnce({
-          data: { version_id: 'v1', price_coins: 10, translator_uid: null },
-          error: null,
-        });
+    it('throws BadRequestException on INSUFFICIENT_FUNDS', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({ data: publishedPaid, error: null });
+      mockRpc.mockResolvedValue({ data: null, error: { message: 'INSUFFICIENT_FUNDS' } });
       await expect(service.purchaseUnlock('u1', 'v1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('unlocks a free published chapter without charging', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({
+        data: { ...publishedPaid, price_coins: 0, translator_uid: 'c1' }, error: null,
+      });
+      mockRpc.mockResolvedValue({
+        data: [{ balance: 100, already_unlocked: false, creator_share: 0, platform_share: 0 }],
+        error: null,
+      });
+      const res = await service.purchaseUnlock('u1', 'v1');
+      expect(res).toEqual({ unlocked: true, pricePaid: 0, balance: 100 });
+    });
+
+    it('throws NotFoundException when version does not exist', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      await expect(service.purchaseUnlock('u1', 'v1')).rejects.toThrow(NotFoundException);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when paid version has no creator', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({
+        data: { ...publishedPaid, translator_uid: null }, error: null,
+      });
+      await expect(service.purchaseUnlock('u1', 'v1')).rejects.toThrow(BadRequestException);
+      expect(mockRpc).not.toHaveBeenCalled();
     });
   });
 });

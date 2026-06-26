@@ -113,6 +113,7 @@ export class WalletService {
     return { balance: newBalance };
   }
 
+  // NOTE: superseded for unlocks by purchase_unlock_atomic; kept for ad-hoc/admin use.
   /**
    * High-level purchase flow that splits revenue between Creator and Platform.
    * Standard Split: 70% to Creator, 30% to Platform.
