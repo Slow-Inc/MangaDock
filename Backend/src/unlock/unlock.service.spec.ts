@@ -76,6 +76,14 @@ describe('UnlockService', () => {
       expect(mockRpc).not.toHaveBeenCalled();
     });
 
+    it('throws BadRequestException when chapter is not published', async () => {
+      mockChain.maybeSingle.mockResolvedValueOnce({
+        data: { ...publishedPaid, status: 'draft' }, error: null,
+      });
+      await expect(service.purchaseUnlock('u1', 'v1')).rejects.toThrow(BadRequestException);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
     it('throws BadRequestException when paid version has no creator', async () => {
       mockChain.maybeSingle.mockResolvedValueOnce({
         data: { ...publishedPaid, translator_uid: null }, error: null,

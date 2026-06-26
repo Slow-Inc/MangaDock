@@ -77,6 +77,9 @@ export class UnlockService {
     if (!version) {
       throw new NotFoundException(`Chapter version ${versionId} not found`);
     }
+    if (version.status !== 'published') {
+      throw new BadRequestException('Chapter is not available for purchase');
+    }
 
     const priceCoins = version.price_coins ?? 0;
     const creatorUid = version.translator_uid;
