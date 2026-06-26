@@ -11,6 +11,10 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { XenditService } from './xendit.service';
 import { WalletEventsService } from './wallet-events.service';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { safeTokenEqual } from './xendit-webhook.config';
+
+/** Hard upper bound per single coin mutation — bounds INTEGER-column overflow and abuse. */
+export const MAX_TOPUP_COINS = 100000;
 
 @Injectable()
 export class WalletService {
@@ -60,8 +64,8 @@ export class WalletService {
     description?: string,
     referenceId?: string,
   ): Promise<{ balance: number }> {
-    if (!amount || amount <= 0) {
-      throw new BadRequestException('Amount must be greater than 0');
+    if (!Number.isInteger(amount) || amount <= 0 || amount > MAX_TOPUP_COINS) {
+      throw new BadRequestException(`Amount must be an integer between 1 and ${MAX_TOPUP_COINS}`);
     }
 
     const { data, error } = await this.db.rpc('add_coins_atomic', {
@@ -85,8 +89,8 @@ export class WalletService {
     description: string,
     referenceId?: string,
   ): Promise<{ balance: number }> {
-    if (!amount || amount <= 0) {
-      throw new BadRequestException('Amount must be greater than 0');
+    if (!Number.isInteger(amount) || amount <= 0 || amount > MAX_TOPUP_COINS) {
+      throw new BadRequestException(`Amount must be an integer between 1 and ${MAX_TOPUP_COINS}`);
     }
 
     const { data, error } = await this.db.rpc('spend_coins_atomic', {
@@ -109,6 +113,7 @@ export class WalletService {
     return { balance: newBalance };
   }
 
+  // NOTE: superseded for unlocks by purchase_unlock_atomic; kept for ad-hoc/admin use.
   /**
    * High-level purchase flow that splits revenue between Creator and Platform.
    * Standard Split: 70% to Creator, 30% to Platform.
@@ -268,8 +273,8 @@ export class WalletService {
     paymentId: string,
     uid: string,
   ): Promise<{ simulated: boolean }> {
-    if (process.env.NODE_ENV === 'production') {
-      throw new ForbiddenException('Simulate is not available in production');
+    if (process.env.XENDIT_ALLOW_SIMULATE !== 'true') {
+      throw new ForbiddenException('Simulate is not available');
     }
 
     const { data, error } = await this.db
@@ -294,14 +299,19 @@ export class WalletService {
     rawBody?: Buffer,
     signature?: string,
   ): Promise<{ received: boolean }> {
-    // 1. Static token check
+    // 1. Static token check (constant-time — V8)
     const expected = process.env.XENDIT_WEBHOOK_TOKEN;
-    if (!expected || !token || token !== expected) {
+    if (!safeTokenEqual(token, expected)) {
       throw new UnauthorizedException('Invalid webhook token');
     }
 
-    // 2. Optional HMAC-SHA256 check (skip if XENDIT_WEBHOOK_SECRET not configured)
+    // 2. HMAC-SHA256 check — MANDATORY in production (V1). Outside production it
+    //    is enforced only when XENDIT_WEBHOOK_SECRET is configured.
     const webhookSecret = process.env.XENDIT_WEBHOOK_SECRET;
+    const requireHmac = process.env.NODE_ENV === 'production';
+    if (requireHmac && !webhookSecret) {
+      throw new UnauthorizedException('Webhook secret not configured');
+    }
     if (webhookSecret) {
       if (!rawBody || !signature) {
         throw new UnauthorizedException('Missing webhook signature');
@@ -355,6 +365,36 @@ export class WalletService {
     if (!claimed) {
       this.logger.warn(`Webhook: coin_topup not claimable (not found or already processed) for payment_id=${paymentId}`);
       return { received: true };
+    }
+
+    // Active verification (V1/V2): the webhook payload is untrusted. Re-fetch the
+    // authoritative payment state from Xendit and reconcile the settled amount
+    // before crediting. On any mismatch or fetch failure, revert the claim back
+    // to 'pending' so a genuine later webhook can retry, and refuse to credit.
+    let verified: { status: string; amount: number; currency: string };
+    try {
+      verified = await this.xenditService.getPaymentRequest(paymentId);
+    } catch (err) {
+      await this.db
+        .from('coin_topups')
+        .update({ status: 'pending' })
+        .eq('payment_id', paymentId)
+        .eq('status', 'paid');
+      this.logger.error(`Webhook verify failed (Xendit unreachable) for ${paymentId}: ${String(err)}`);
+      throw new InternalServerErrorException('Payment verification failed');
+    }
+
+    if (verified.status !== 'SUCCEEDED' || Number(verified.amount) !== claimed.amount_coins) {
+      await this.db
+        .from('coin_topups')
+        .update({ status: 'pending' })
+        .eq('payment_id', paymentId)
+        .eq('status', 'paid');
+      this.logger.error(
+        `SECURITY: webhook verification mismatch for ${paymentId} — ` +
+          `xenditStatus=${verified.status} xenditAmount=${verified.amount} expected=${claimed.amount_coins}`,
+      );
+      throw new UnauthorizedException('Payment verification failed');
     }
 
     const { balance } = await this.addCoins(
