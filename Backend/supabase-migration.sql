@@ -224,6 +224,10 @@ CREATE INDEX IF NOT EXISTS idx_chapter_versions_language     ON chapter_versions
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_uid       ON wallet_transactions(uid);
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_uid_created ON wallet_transactions(uid, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_type      ON wallet_transactions(type);
+-- Topup idempotency: a Xendit payment_id may be credited as a topup at most once (V5)
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_tx_topup_ref_uidx
+  ON wallet_transactions (reference_id)
+  WHERE type = 'topup' AND reference_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_unlocks_uid                   ON unlocks(uid);
 CREATE INDEX IF NOT EXISTS idx_unlocks_version               ON unlocks(version_id);
 
@@ -324,6 +328,10 @@ CREATE INDEX IF NOT EXISTS idx_forum_comments_post_created_at  ON forum_comments
 CREATE INDEX IF NOT EXISTS idx_forum_comments_parent_id        ON forum_comments (parent_id);
 
 -- ─── 8. ATOMIC RPC FUNCTIONS ─────────────────────────────────────────────────
+-- NOTE (V5): the dead numeric overloads add_coins_atomic(uuid,numeric,text,text)
+-- and spend_coins_atomic(uuid,numeric,text,text) were dropped via migration
+-- wallet_idempotency_and_cleanup — they omitted the NOT-NULL balance_after column.
+-- Only the integer overloads below are live.
 
 -- Atomic add coins: increments balance and inserts transaction in one operation
 CREATE OR REPLACE FUNCTION add_coins_atomic(
