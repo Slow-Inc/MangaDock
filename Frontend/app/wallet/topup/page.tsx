@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTopupCreate, TIERS } from "../../hooks/useTopupCreate";
 
-export default function TopupPage() {
+function TopupPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get("returnTo");
   const { user, loading, getIdToken, showLoginPrompt } = useAuth();
   const {
     selectedAmount, setSelectedAmount,
@@ -31,7 +33,8 @@ export default function TopupPage() {
         `topup:${result.paymentId}`,
         JSON.stringify({ qrString: result.qrString, expiresAt: result.expiresAt }),
       );
-      router.push(`/wallet/topup/${result.paymentId}`);
+      const dest = `/wallet/topup/${result.paymentId}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
+      router.push(dest);
     }
   };
 
@@ -95,5 +98,19 @@ export default function TopupPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function TopupPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-[#111]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+        </main>
+      }
+    >
+      <TopupPageContent />
+    </Suspense>
   );
 }

@@ -502,4 +502,12 @@ BEGIN
 END;
 $$;
 
+-- ─── SECURITY: Revoke PUBLIC execute on SECURITY DEFINER wallet RPCs ─────────
+-- These functions must only be callable by service_role (backend).
+-- PostgREST grants EXECUTE to PUBLIC by default — revoke explicitly.
+REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text) FROM anon, authenticated, PUBLIC;
+REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
+REVOKE EXECUTE ON FUNCTION purchase_unlock_atomic(uuid, uuid, integer, uuid, numeric, text) FROM anon, authenticated, PUBLIC;
+REVOKE EXECUTE ON FUNCTION spend_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
+
 COMMIT;

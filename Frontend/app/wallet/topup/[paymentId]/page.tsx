@@ -83,7 +83,7 @@ function TopupPaymentContent() {
   useEffect(() => {
     if (status !== "paid" || successBalance === null) return;
     sessionStorage.removeItem(`topup:${paymentId}`);
-    const dest = returnTo && returnTo.startsWith("/") ? returnTo : "/wallet";
+    const dest = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/wallet";
     const id = setTimeout(() => router.replace(dest), 1500);
     return () => clearTimeout(id);
   }, [status, successBalance, paymentId, returnTo, router]);
