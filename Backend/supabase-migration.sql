@@ -226,6 +226,10 @@ CREATE INDEX IF NOT EXISTS idx_chapter_versions_language     ON chapter_versions
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_uid       ON wallet_transactions(uid);
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_uid_created ON wallet_transactions(uid, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_type      ON wallet_transactions(type);
+-- Topup idempotency: a Xendit payment_id may be credited as a topup at most once (V5)
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_tx_topup_ref_uidx
+  ON wallet_transactions (reference_id)
+  WHERE type = 'topup' AND reference_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_unlocks_uid                   ON unlocks(uid);
 CREATE INDEX IF NOT EXISTS idx_unlocks_version               ON unlocks(version_id);
 
@@ -326,6 +330,10 @@ CREATE INDEX IF NOT EXISTS idx_forum_comments_post_created_at  ON forum_comments
 CREATE INDEX IF NOT EXISTS idx_forum_comments_parent_id        ON forum_comments (parent_id);
 
 -- ─── 8. ATOMIC RPC FUNCTIONS ─────────────────────────────────────────────────
+-- NOTE (V5): the dead numeric overloads add_coins_atomic(uuid,numeric,text,text)
+-- and spend_coins_atomic(uuid,numeric,text,text) were dropped via migration
+-- wallet_idempotency_and_cleanup — they omitted the NOT-NULL balance_after column.
+-- Only the integer overloads below are live.
 
 -- Atomic add coins: increments balance and inserts transaction in one operation
 CREATE OR REPLACE FUNCTION add_coins_atomic(
@@ -429,5 +437,79 @@ BEGIN
   RETURN QUERY SELECT v_upvotes, v_downvotes;
 END;
 $$;
+
+-- Atomic purchase unlock: inserts unlock row, debits buyer, credits creator — single transaction
+-- Supersedes the old insert-then-split flow in unlock.service.ts (V6/V7)
+CREATE OR REPLACE FUNCTION purchase_unlock_atomic(
+  p_uid          uuid,
+  p_version_id   uuid,
+  p_price        integer,
+  p_creator_uid  uuid,
+  p_platform_pct numeric,
+  p_description  text
+)
+RETURNS TABLE(balance integer, already_unlocked boolean, creator_share integer, platform_share integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_rows            integer;
+  v_balance         integer;
+  v_creator_balance integer;
+  v_platform_share  integer := 0;
+  v_creator_share   integer := 0;
+BEGIN
+  INSERT INTO unlocks (uid, version_id, price_paid)
+  VALUES (p_uid, p_version_id, p_price)
+  ON CONFLICT (uid, version_id) DO NOTHING;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+
+  IF v_rows = 0 THEN
+    SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), true, 0, 0;
+    RETURN;
+  END IF;
+
+  IF p_price <= 0 THEN
+    SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), false, 0, 0;
+    RETURN;
+  END IF;
+
+  INSERT INTO wallets (uid, balance) VALUES (p_uid, 0) ON CONFLICT (uid) DO NOTHING;
+  UPDATE wallets
+     SET balance = wallets.balance - p_price, updated_at = now()
+   WHERE uid = p_uid AND wallets.balance >= p_price
+   RETURNING wallets.balance INTO v_balance;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'INSUFFICIENT_FUNDS';
+  END IF;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
+  VALUES (p_uid, -p_price, 'purchase', v_balance, p_description, p_version_id::text);
+
+  v_platform_share := floor(p_price * p_platform_pct);
+  v_creator_share  := p_price - v_platform_share;
+  IF v_creator_share > 0 AND p_creator_uid IS NOT NULL THEN
+    INSERT INTO wallets (uid, balance) VALUES (p_creator_uid, 0) ON CONFLICT (uid) DO NOTHING;
+    UPDATE wallets
+       SET balance = wallets.balance + v_creator_share, updated_at = now()
+     WHERE uid = p_creator_uid
+     RETURNING wallets.balance INTO v_creator_balance;
+    INSERT INTO wallet_transactions (uid, amount, type, balance_after, description)
+    VALUES (p_creator_uid, v_creator_share, 'reward', v_creator_balance, 'ส่วนแบ่งรายได้: ' || p_description);
+  END IF;
+
+  RETURN QUERY SELECT v_balance, false, v_creator_share, v_platform_share;
+END;
+$$;
+
+-- ─── SECURITY: Revoke PUBLIC execute on SECURITY DEFINER wallet RPCs ─────────
+-- These functions must only be callable by service_role (backend).
+-- PostgREST grants EXECUTE to PUBLIC by default — revoke explicitly.
+REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text) FROM anon, authenticated, PUBLIC;
+REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
+REVOKE EXECUTE ON FUNCTION purchase_unlock_atomic(uuid, uuid, integer, uuid, numeric, text) FROM anon, authenticated, PUBLIC;
+REVOKE EXECUTE ON FUNCTION spend_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
 
 COMMIT;

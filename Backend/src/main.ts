@@ -8,6 +8,7 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { StructuredLoggingInterceptor } from './common/interceptors/structured-logging.interceptor';
 import { resolveTurnstileConfig } from './auth/turnstile.config';
+import { resolveXenditWebhookConfig } from './wallet/xendit-webhook.config';
 
 /**
  * Tee every byte written to stdout/stderr into a daily rotating log file.
@@ -57,6 +58,10 @@ async function bootstrap() {
   // secret instead of silently serving an always-pass captcha (#224). Throws
   // here, before the app is built, so the misconfiguration crashes loudly.
   resolveTurnstileConfig(process.env, new Logger('Turnstile'));
+
+  // Fail-closed: refuse to boot in production without webhook token + HMAC
+  // secret, so forged Xendit webhooks cannot mint coins (V1).
+  resolveXenditWebhookConfig(process.env, new Logger('XenditWebhook'));
 
   // Disable built-in 100KB body-parser limit; MIT webhook bodies contain base64 PNG patches (~1-3MB).
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
