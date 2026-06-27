@@ -151,6 +151,25 @@ After starting all services, verify at minimum:
 3. MIT health check passes at `http://localhost:5003/health`
 4. Backend connected to Redis at `localhost:6379`
 5. Backend connected to Supabase (verify `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`)
+
+## Continuous Integration
+
+GitHub Actions runs the existing unit suites on every PR, path-filtered per service (`.github/workflows/`). See [ADR 020](docs/adr/020-ci-test-gates.md).
+
+| Workflow | Triggers on | What it runs |
+|---|---|---|
+| `backend-ci` | `Backend/**` | `bun install` + `jest` on **Node 22** + a Redis service (`jest.ci.config.js`) |
+| `frontend-ci` | `Frontend/**` | `bun test` (excludes `*.integration.test.ts` — those need a live `:4000`) |
+| `mit-ci` | `MIT/**` | `pytest` — **report-only** until torch is lazy-imported (#359) |
+
+**Run Backend tests locally on Node 22** (Jest 30 does not support Node 26):
+
+```bash
+cd Backend
+npx jest -c jest.ci.config.js --runInBand   # the exact CI command
+```
+
+`jest.ci.config.js` inherits the `jest` block from `package.json` and adds a skip-list of documented pre-existing failures (#358) so the gate is green; remove an entry as its suite is fixed.
 <!-- lang:end -->
 
 <!-- lang:th -->

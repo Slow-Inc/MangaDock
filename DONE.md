@@ -3,6 +3,23 @@
 
 ---
 
+## CI test gates — GitHub Actions, first CI in the repo (2026-06-28, #355)
+
+**Goal:** run the 176 existing test files automatically on every PR — closing the gap where tests relied on two self-merging devs remembering to run them locally.
+
+**Shipped (PR #355, squash-merged to main `31b7a31`):**
+- `.github/workflows/{backend,frontend,mit}-ci.yml` — path-filtered per service.
+- `backend-ci`: bun install (not `npm ci` — `package-lock.json` is stale) + jest on **Node 22** + Redis service, `--runInBand`. **62 suites / 616 tests green on CI.**
+- `frontend-ci`: `bun test`, excludes `*.integration.test.ts` (needs live `:4000`). **120 green.**
+- `mit-ci`: pytest **report-only** (`continue-on-error`) until torch is lazy-imported (#359).
+- `Backend/jest.ci.config.js` — inherits `package.json`'s jest block (single source of truth) + a documented skip-list of pre-existing failures (#358); converges to zero.
+
+**TDD (first skip-list shrink):** `books-health.spec.ts` RED→GREEN — `jest.spyOn(global,'fetch')` + `restoreAllMocks()` deletes Node's lazy `fetch` global, so the 2nd test threw "Property `fetch` does not exist"; fixed by assigning `global.fetch` directly + save/restore. Skip-list **9 → 8**; re-enabled in CI (real path: `BooksService → MitTranslationService → MitClient.ready → fetch`).
+
+**Process:** scrutinized before merge (per policy) → found + fixed MAJOR 2 (jest config was duplicated, would drift) in-PR; filed the rest as #356 (safe required-checks before branch protection), #357 (pin bun + empty-files guard), #358 (shrink skip-list), #359 (MIT lazy torch). Dev box needed **Node 22** (Jest 30 can't run on Node 26 — `setTimeout` undefined in sandbox); installed via nvm-windows. ADR `docs/adr/020-ci-test-gates.md`; impact report 2026-06-28 (CI gates).
+
+---
+
 ## Coin Topup System — Xendit PromptPay QR (2026-06-19, sandbox)
 
 **Goal:** Implement real payment flow for coin topup — replacing the dev-only `POST /wallet/topup` stub that throws 403 in production.
