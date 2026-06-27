@@ -13,14 +13,21 @@ function makeService() {
 }
 
 describe('BooksService — health check (#83)', () => {
-  afterEach(() => jest.restoreAllMocks());
+  // Save the real fetch once and restore it after each test. We assign
+  // global.fetch directly instead of jest.spyOn(global, 'fetch'): Node exposes
+  // fetch as a lazy global, and spyOn + restoreAllMocks deletes it, so a second
+  // spyOn in the next test throws "Property `fetch` does not exist".
+  const originalFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.restoreAllMocks();
+  });
 
   // Cycle 1 — checkMitHealth calls /ready not root /
   it('calls /ready endpoint instead of root /', async () => {
     const { service } = makeService();
-    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-    } as Response);
+    const fetchSpy = jest.fn().mockResolvedValue({ ok: true } as Response);
+    global.fetch = fetchSpy as unknown as typeof fetch;
 
     await service.checkMitHealth();
 
@@ -37,7 +44,9 @@ describe('BooksService — health check (#83)', () => {
   // Cycle 2 — /ready returning 503 means not available
   it('reports unavailable when /ready returns 503', async () => {
     const { service } = makeService();
-    jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 503 } as Response);
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: false, status: 503 } as Response) as unknown as typeof fetch;
 
     const result = await service.checkMitHealth();
 
