@@ -15,6 +15,31 @@
 
 ---
 
+## 2026-06-28 — CI test gates: GitHub Actions, first CI in the repo (infra / tech-debt)
+
+**Scope:** repo-wide (`.github/workflows/` + `Backend/jest.ci.config.js` + one test fix) · **Type:** Infra — first automated test gate · **Tests:** backend 62 suites / 616 green on CI (Node 22), frontend 120 green; mit report-only.
+
+**What & where:**
+- `.github/workflows/{backend,frontend,mit}-ci.yml` *(new)* — path-filtered per service.
+- `Backend/jest.ci.config.js` *(new)* — inherits `package.json`'s jest block (single source of truth) + documented skip-list (#358).
+- `Backend/src/books/books-health.spec.ts` — fetch mock fixed (assign `global.fetch`, not `spyOn` on the lazy global); re-enabled.
+
+**Why:** no CI existed; the 176 test files ran only when a dev remembered. With two self-merging devs the gate stops one tired late-night merge from landing red.
+
+**Before → After:** PRs merged with CodeQL as the only check (tests on the honor system). → Every PR touching a service runs its unit suite automatically; a genuine test failure now visible pre-merge.
+
+**Performance Δ:** path-filtered so a single-service PR doesn't run the other two; backend ~1–2 min, frontend <1 min, MIT slow (full ML install) so report-only for now.
+
+**Quality:** `npm ci` was found broken on main (`package-lock.json` stale) → CI uses `bun install` (the maintained lockfile); Jest 30 found incompatible with the dev box's Node 26 → CI + local pinned to Node 22.
+
+**Validation:** verified green on CI (backend 62/616, frontend 120) + locally on Node 22; scrutinized before merge (fixed MAJOR 2 jest-config-duplication in-PR).
+
+**Risk / rollback:** additive (new files only); revert = delete the workflows. Skip-list keeps the gate green from day one without hiding debt (each entry tracked, removed as fixed).
+
+**Links:** PR #355 (`31b7a31`); ADR 020; follow-ups #356 (safe required-checks → branch protection), #357 (pin bun + empty-files guard), #358 (shrink skip-list), #359 (MIT lazy torch).
+
+---
+
 ## 2026-06-19 — Coin Topup System: Xendit PromptPay QR (feature)
 
 **Scope:** Backend (wallet module) + Frontend (TopupModal + Navbar) + Supabase DB · **Type:** New feature — real payment gateway replacing dev-only topup stub · **Tests:** 607/607 backend green (+12 new wallet tests); Frontend tsc 0 errors.
