@@ -7,6 +7,7 @@ import SearchBar from "./SearchBar";
 import LoginModal from "./LoginModal";
 import AccountModal from "./AccountModal";
 import { useAuth } from "../contexts/AuthContext";
+import TopupModal from "./TopupModal";
 import { getWalletBalance } from "../lib/studioApi";
 
 export default function NavbarActions() {
@@ -15,6 +16,7 @@ export default function NavbarActions() {
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [accountInitialTab, setAccountInitialTab] = useState<string | undefined>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [topupOpen, setTopupOpen] = useState(false);
   const [coinBalance, setCoinBalance] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, loading, signOut, getIdToken } = useAuth();
@@ -75,7 +77,7 @@ export default function NavbarActions() {
           <>
           {coinBalance !== null && (
             <button
-              onClick={() => router.push("/wallet/topup")}
+              onClick={() => setTopupOpen(true)}
               className="flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-xs text-amber-300 smooth-hover-fast hover:bg-amber-400/20"
               title="เติมเหรียญ"
             >
@@ -173,6 +175,7 @@ export default function NavbarActions() {
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
       <AccountModal isOpen={isAccountOpen} onClose={() => setIsAccountOpen(false)} initialTab={accountInitialTab} />
+      <TopupModal isOpen={topupOpen} onClose={() => setTopupOpen(false)} />
     </>
   );
 }

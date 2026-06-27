@@ -293,6 +293,17 @@ export class WalletService {
     return { simulated: true };
   }
 
+  private async revertClaim(paymentId: string): Promise<void> {
+    const { error } = await this.db
+      .from('coin_topups')
+      .update({ status: 'pending' })
+      .eq('payment_id', paymentId)
+      .eq('status', 'paid');
+    if (error) {
+      this.logger.warn(`revertClaim failed for ${paymentId}: ${error.message}`);
+    }
+  }
+
   async processXenditWebhook(
     payload: Record<string, any>,
     token: string,
@@ -375,21 +386,13 @@ export class WalletService {
     try {
       verified = await this.xenditService.getPaymentRequest(paymentId);
     } catch (err) {
-      await this.db
-        .from('coin_topups')
-        .update({ status: 'pending' })
-        .eq('payment_id', paymentId)
-        .eq('status', 'paid');
+      await this.revertClaim(paymentId);
       this.logger.error(`Webhook verify failed (Xendit unreachable) for ${paymentId}: ${String(err)}`);
       throw new InternalServerErrorException('Payment verification failed');
     }
 
     if (verified.status !== 'SUCCEEDED' || Number(verified.amount) !== claimed.amount_coins) {
-      await this.db
-        .from('coin_topups')
-        .update({ status: 'pending' })
-        .eq('payment_id', paymentId)
-        .eq('status', 'paid');
+      await this.revertClaim(paymentId);
       this.logger.error(
         `SECURITY: webhook verification mismatch for ${paymentId} — ` +
           `xenditStatus=${verified.status} xenditAmount=${verified.amount} expected=${claimed.amount_coins}`,
