@@ -345,6 +345,8 @@ export class UsersService {
       authors?: string[]; description?: string; publishedDate?: string;
       categories?: string[]; averageRating?: number; ratingsCount?: number;
       lastReadAt: number;
+      lastPage?: number | null;
+      lastChapterId?: string | null;
     },
   ) {
     const { error } = await this.db.from('user_history').upsert({
@@ -360,6 +362,8 @@ export class UsersService {
       average_rating: item.averageRating ?? 0,
       ratings_count: item.ratingsCount ?? 0,
       last_read_at: item.lastReadAt ?? Date.now(),
+      last_page: item.lastPage ?? null,
+      last_chapter_id: item.lastChapterId ?? null,
     }, {
       onConflict: 'uid,manga_id',
     });
@@ -419,8 +423,31 @@ export class UsersService {
         averageRating: Number(item['average_rating'] ?? 0),
         ratingsCount: Number(item['ratings_count'] ?? 0),
         lastReadAt: Number(item['last_read_at'] ?? 0),
+        lastPage: item['last_page'] != null ? Number(item['last_page']) : null,
+        lastChapterId: item['last_chapter_id'] != null ? String(item['last_chapter_id']) : null,
       };
     });
+  }
+
+  async exportHistory(uid: string): Promise<string> {
+    const { data, error } = await this.db
+      .from('user_history')
+      .select('title, subtitle, last_read_at')
+      .eq('uid', uid)
+      .order('last_read_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to export history: ${error.message}`);
+    }
+
+    const escape = (v: unknown) => String(v ?? '').replace(/"/g, '""');
+
+    const rows = (data ?? []).map((row) => {
+      const r = row as Record<string, unknown>;
+      return `"${escape(r['title'])}","${escape(r['subtitle'])}","${r['last_read_at'] != null ? new Date(Number(r['last_read_at'])).toISOString() : ''}"`;
+    });
+
+    return ['title,lastChapter,lastReadAt', ...rows].join('\r\n');
   }
 
   async getPhotoHistory(uid: string): Promise<string[]> {

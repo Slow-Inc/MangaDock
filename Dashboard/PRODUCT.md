@@ -10,7 +10,7 @@ The MangaDock developer (and later moderator/admin staff) monitoring the MIT tra
 
 ## Product Purpose
 
-A standalone, out-of-band monitoring dashboard for the MIT pipeline (PRD #279, ADR 016). It shows the translation pipeline as a live workflow — each stage's status (detection → OCR → inpaint → translate → render), the gateway diagnosis (the 9arm model-down case), GPU/host telemetry as charts, and a live activity/log feed. Any stage can be expanded inline for detail and live logs. Success: an incident is diagnosable at a glance, and the dashboard runs locally even when the rest of the stack is down.
+A standalone, out-of-band monitoring dashboard for the MIT pipeline (PRD #279, ADR 018). It shows the translation pipeline as a live workflow — each stage's status (detection → OCR → inpaint → translate → render), the gateway diagnosis (the 9arm model-down case), GPU/host telemetry as charts, and a live activity/log feed. Any stage can be expanded inline for detail and live logs. Success: an incident is diagnosable at a glance, and the dashboard runs locally even when the rest of the stack is down.
 
 ## Brand Personality
 

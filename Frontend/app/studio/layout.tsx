@@ -1,5 +1,6 @@
 "use client";
 
+import { errMessage } from "@/lib/errMessage";
 import { useAuth } from "../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -43,8 +44,8 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
       
       // Refresh session to get new role from JWT
       await refreshSession();
-    } catch (err: any) {
-      showToast({ type: "error", message: `ไม่สามารถอัปเกรดบัญชีได้: ${err.message}` });
+    } catch (err: unknown) {
+      showToast({ type: "error", message: `ไม่สามารถอัปเกรดบัญชีได้: ${errMessage(err)}` });
     } finally {
       setUpgrading(false);
     }

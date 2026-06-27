@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
-import { useAuth } from "../../contexts/AuthContext";
+import LoadingScreen from "../../components/LoadingScreen";
+import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
 import {
   getWalletBalance,
@@ -145,8 +145,7 @@ function WalletSummaryModal({
 }
 
 export default function WalletPage() {
-  const router = useRouter();
-  const { user, loading, getIdToken, userRole } = useAuth();
+  const { user, loading, getIdToken, userRole } = useProtectedPage();
   const { showToast } = useToast();
   const isMobile = useIsMobile();
 
@@ -161,10 +160,6 @@ export default function WalletPage() {
   const hasFetched = useRef(false);
 
   const isCreator = userRole === "translator" || userRole === "creator";
-
-  useEffect(() => {
-    if (!loading && !user) router.replace("/");
-  }, [loading, user, router]);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -238,13 +233,7 @@ export default function WalletPage() {
     [transactions],
   );
 
-  if (loading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#141414]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   if (isMobile) {
     const renderMobileContent = () => {

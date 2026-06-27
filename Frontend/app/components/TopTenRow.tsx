@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import TopTenCard from "./TopTenCard";
+import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
 import type { LandingBook } from "../lib/types";
 
 type Props = {
@@ -9,28 +10,13 @@ type Props = {
 
 
 export default function TopTenRow({ books }: Props) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { ref, canScrollLeft, canScrollRight, update, scrollBy } = useHorizontalScroll();
   const [isHovering, setIsHovering] = useState(false);
   const [hoveredArrow, setHoveredArrow] = useState<"left" | "right" | null>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-
-  const updateScrollState = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 0);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
-  };
 
   useEffect(() => {
-    updateScrollState();
+    update();
   }, [books]);
-
-  const scroll = (dir: "left" | "right") => {
-    if (!scrollRef.current) return;
-    const amount = scrollRef.current.clientWidth * 0.75;
-    scrollRef.current.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
-  };
 
   return (
     <section
@@ -43,7 +29,7 @@ export default function TopTenRow({ books }: Props) {
       <div className="relative">
         {/* Left arrow */}
         <button
-          onClick={() => scroll("left")}
+          onClick={() => scrollBy("left")}
           onMouseEnter={() => setHoveredArrow("left")}
           onMouseLeave={() => setHoveredArrow(null)}
           className={`absolute left-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/70 ring-1 ring-white/20 backdrop-blur-sm transition-all duration-300 md:flex ${
@@ -60,7 +46,7 @@ export default function TopTenRow({ books }: Props) {
 
         {/* Right arrow */}
         <button
-          onClick={() => scroll("right")}
+          onClick={() => scrollBy("right")}
           onMouseEnter={() => setHoveredArrow("right")}
           onMouseLeave={() => setHoveredArrow(null)}
           className={`absolute right-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/70 ring-1 ring-white/20 backdrop-blur-sm transition-all duration-300 md:flex ${
@@ -77,9 +63,9 @@ export default function TopTenRow({ books }: Props) {
 
         {/* Scrollable row */}
         <div
-          ref={scrollRef}
+          ref={ref}
           className="flex gap-3 overflow-x-auto overflow-y-visible pb-4 pt-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:pt-8 md:gap-4"
-          onScroll={updateScrollState}
+          onScroll={update}
         >
           {books.map((book, index) => (
             <TopTenCard key={`${book.id}-${index}`} book={book} index={index} />

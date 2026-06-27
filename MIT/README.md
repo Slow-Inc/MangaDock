@@ -152,7 +152,7 @@ curl http://localhost:5003/health
 | GET | `/health` | ตรวจสอบสถานะ service, worker, และ queue (front ขึ้น) |
 | GET | `/ready` | worker พร้อมแปลจริง (200) หรือยังโหลดอยู่ (503) — ใช้อันนี้สำหรับ readiness |
 | POST | `/queue-size` | ดูจำนวนงานที่รออยู่ในคิว |
-| GET | `/status` | **Dev console** (PRD #279, ADR 017): snapshot host/GPU/gateway/queue(+jobs)/worker(+pid/uptime)/**stage-timing**/**per-model VRAM (leak)** — ต้องมี Supabase JWT (staff) |
+| GET | `/status` | **Dev console** (PRD #279, ADR 019): snapshot host/GPU/gateway/queue(+jobs)/worker(+pid/uptime)/**stage-timing**/**per-model VRAM (leak)** — ต้องมี Supabase JWT (staff) |
 | GET | `/status/stream` | **Dev console**: SSE — sample metric ทุก ~3s + push event (enqueue / worker / stage) ต้องมี Supabase JWT (staff) |
 | POST | `/internal/telemetry` | **internal** (worker→parent, `X-Nonce`): worker ส่ง stage-timing + VRAM report เข้า snapshot — ไม่ใช่ public |
 

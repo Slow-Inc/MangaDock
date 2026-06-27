@@ -35,7 +35,7 @@ function mockFetchCapturingMitConfig(): { getConfig: () => any } {
 }
 
 async function runBatch(service: BooksService) {
-  await (service as any)._runMitBatch(
+  await (service as any).batch.stream.run(
     'ch1',
     [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }],
     jest.fn(),

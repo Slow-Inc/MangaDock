@@ -3,15 +3,93 @@
 
 ---
 
-## Staff Console — PRD + ADR 016 + Phase-1 issues, out-of-band observability (2026-06-14)
+## Staff Console — PRD + ADR 018 + Phase-1 issues, out-of-band observability (2026-06-14)
 
 Designed the **Staff Console** (role-tiered back-office: Moderator/Admin/Dev) off the 2026-06-14 9arm incident (gateway `gateway.9arm.co` up, but `qwen3.6-35b-a3b` model hung → cryptic `'ollama servers did not respond quickly enough'` after ~90s; root-caused by black-box probe — `/models` OK 0.19s, a 16-token completion timed out 151s = inference backend hung, external). A full `/grill-me` pass settled the design, then a resilience review reshaped the Dev console's data plane.
 
-- **Key decision (ADR 016):** a monitor must not share a failure domain with what it monitors → a **standalone Node-Fastify aggregator microservice** (out of the Backend, runnable local/separate host) subscribes to a per-service `/status/stream` SSE on Frontend/Backend/MIT; each multiplexes **sampled `{type:metric}`** (VRAM/CPU/temp via `torch.cuda`+`psutil`+`nvidia-smi`, zero new dep) + **pushed `{type:event}`** (translate-triggered/stage/log/error). UI stays in the Frontend (`/staff/system`, shadcn). External uptime monitor → Discord = out-of-band backstop.
+- **Key decision (ADR 018):** a monitor must not share a failure domain with what it monitors → a **standalone Node-Fastify aggregator microservice** (out of the Backend, runnable local/separate host) subscribes to a per-service `/status/stream` SSE on Frontend/Backend/MIT; each multiplexes **sampled `{type:metric}`** (VRAM/CPU/temp via `torch.cuda`+`psutil`+`nvidia-smi`, zero new dep) + **pushed `{type:event}`** (translate-triggered/stage/log/error). UI stays in the Frontend (`/staff/system`, shadcn). External uptime monitor → Discord = out-of-band backstop.
 - **Auth (zero-trust, no shared secret):** orthogonal `profiles.staffLevel` (none<moderator<admin<dev), injected as a **signed JWT claim** via a Supabase Custom Access Token Hook; the dashboard forwards the dev JWT and **each service verifies independently** (signature + expiry + claim), streams re-validate ~60s + close on expiry; MIT gains PyJWT verify.
-- **Published (bilingual, `ready-for-agent`):** PRD **#279** + Phase-1 slices **#280** (1a RBAC+signed-claim+shell) → **#285** (1f aggregator+streams) → **#282** (1b health board, the incident fix) / **#283** (1c tracer+queue) / **#284** (1d GPU/host); **#281** (1e precise error) independent. **ADR 016** `docs/adr/016-staff-console-out-of-band-observability-aggregator.md` + indexed in the ADR README.
-- **MIT modules built (TDD + karpathy, branch `feat/mit-staff-observability`, MIT-only — Frontend/Backend deferred while akkanop-x refactors them):** `server/diagnostics.py` (cheap bounded gateway probe, decoupled from the worker pool → `ok/slow/timeout`·model-down-vs-gateway-down`/auth/unreachable/model_missing`; the 2026-06-14 incident reads `timeout` + "gateway /models OK but chat completion timed out — model not responding"; 7 tests) · `server/translate_error.py` (`classify_translate_error` → structured `{stage,translator,endpoint,model,cause,hint}`, wired at the `custom_openai` timeout raise → worker log + backend response carry it instead of the opaque string; 4 tests) · `server/metrics.py` (`parse_nvidia_smi` + `host_metrics` (psutil), `collect` degrades host-only when no GPU, zero new dep; 5 tests). 16 new tests, **full MIT suite 463 passed / 19 pre-existing async / 0 new**. PIPELINE.md §5 + ADR 016 referenced. SSE `/status/stream` endpoint + JWT verify deferred (need 1a's Supabase signed-claim hook = Backend/Supabase).
+- **Published (bilingual, `ready-for-agent`):** PRD **#279** + Phase-1 slices **#280** (1a RBAC+signed-claim+shell) → **#285** (1f aggregator+streams) → **#282** (1b health board, the incident fix) / **#283** (1c tracer+queue) / **#284** (1d GPU/host); **#281** (1e precise error) independent. **ADR 018** `docs/adr/018-staff-console-out-of-band-observability-aggregator.md` + indexed in the ADR README.
+- **MIT modules built (TDD + karpathy, branch `feat/mit-staff-observability`, MIT-only — Frontend/Backend deferred while akkanop-x refactors them):** `server/diagnostics.py` (cheap bounded gateway probe, decoupled from the worker pool → `ok/slow/timeout`·model-down-vs-gateway-down`/auth/unreachable/model_missing`; the 2026-06-14 incident reads `timeout` + "gateway /models OK but chat completion timed out — model not responding"; 7 tests) · `server/translate_error.py` (`classify_translate_error` → structured `{stage,translator,endpoint,model,cause,hint}`, wired at the `custom_openai` timeout raise → worker log + backend response carry it instead of the opaque string; 4 tests) · `server/metrics.py` (`parse_nvidia_smi` + `host_metrics` (psutil), `collect` degrades host-only when no GPU, zero new dep; 5 tests). 16 new tests, **full MIT suite 463 passed / 19 pre-existing async / 0 new**. PIPELINE.md §5 + ADR 018 referenced. SSE `/status/stream` endpoint + JWT verify deferred (need 1a's Supabase signed-claim hook = Backend/Supabase).
 - **Side fix:** shadcn MCP cwd gotcha — Claude Code `.mcp.json` has no `cwd` field → added wrapper `Frontend/run-shadcn-mcp.ps1` so the server runs in `Frontend/` and reads `components.json` (`@react-bits` + `radix-rhea`); needs a full Claude Code restart (reconnect does not reload config).
+---
+
+## Coin Topup System — Xendit PromptPay QR (2026-06-19, sandbox)
+
+**Goal:** Implement real payment flow for coin topup — replacing the dev-only `POST /wallet/topup` stub that throws 403 in production.
+
+**Shipped:**
+- Supabase migration `create_coin_topups` applied (`payment_id PK`, idempotency `UNIQUE` index)
+- `Backend/src/wallet/xendit.service.ts` — wraps Xendit `/payment_requests`, no SDK
+- `Backend/src/wallet/dto/create-topup.dto.ts` — `@IsInt() @Min(20)`
+- `wallet.service.ts` — `createTopup`, `getTopupStatus`, `processXenditWebhook`; webhook fails-closed when env var unset; idempotency check prevents double-credit
+- `wallet.controller.ts` — 3 endpoints (`topup/create`, `topup/status/:id`, `xendit/webhook`); webhook is public (no AuthGuard, no HardwareIdMiddleware)
+- `app.module.ts` — exclude `wallet/xendit/webhook` from `HardwareIdMiddleware`
+- `Frontend/app/components/TopupModal.tsx` — TIER_SELECT → QR_DISPLAY (3s poll + countdown) → SUCCESS; dispatches `mb:coin-balance-update` on success
+- `NavbarActions.tsx` — coin balance chip + TopupModal + balance update listener
+- `BookDetailModal.tsx` — inline mock form → `<TopupModal>`; removed dead `topupAmount`/`topupLoading`/`handleTopup`
+- `studioApi.ts` — `createTopup`, `getTopupStatus` API functions; removed dead `topupCoins`
+- `qrcode.react@4.2.0` installed; `.env.example` updated with Xendit placeholders
+
+**Code review findings fixed:**
+- Constructor arity bug in `wallet.service.spec.ts` (would have broken CI)
+- Webhook token guard hardened: fails-closed when `XENDIT_WEBHOOK_TOKEN` unset
+- `getTopupStatus` expiry update guarded with `.eq('status', 'pending')` — prevents overwriting a `paid` row
+- `XenditService` throws `InternalServerErrorException` (was bare `Error`)
+- `mb:coin-balance-update` dispatched from TopupModal — Navbar chip now updates from both entry points
+
+**Validation:** Backend 607/607 tests green (+12 new); Frontend tsc 0 errors.
+
+**Next:** Add real Xendit sandbox keys to `.env`, set webhook URL `https://web.2552667.xyz/api/xendit/webhook` in Xendit dashboard, subscribe `payment.succeeded` event — then E2E test with a real PromptPay scan.
+
+---
+
+## #298 — เคลียร์ 2 tsc error ใน specs + refresh stale memory (2026-06-18, /tdd+/debug-mantra, branch `fix/303-upload-magic-byte-validation`)
+
+**Root causes (2 distinct TS errors, 10 instances total):**
+
+- `src/cache/l3-batch-writer.spec.ts` — TS2339 ×4 (`mockClear` missing): `makeL3()` was cast to `L3DiskService` only → `l3.write` typed as the real method signature, not `jest.Mock`. Fix: `as unknown as L3DiskService & { write: jest.Mock }` (intersection exposes `.mockClear()`).
+- `src/common/middleware/hardware-id.middleware.spec.ts` — TS2540 ×6 (`path` is read-only): Express types declare `Request.path` as a getter, so `mockRequest.path = x` fails on `Partial<Request>`. Fix: `Omit<Partial<Request>, 'path'> & { path?: string }`.
+
+Both fixes are type-declaration-only — zero runtime behaviour change. `npx tsc --noEmit` → 0 errors. 53/53 tests GREEN on the two affected files.
+
+**Memory refreshed:**
+- Local `reference_mangadex_uploads_ua_block.md`: updated URL (`hayateotsu.space→2552667.xyz`), branch, and marked FIXED.
+- Team `project_backend_pre_existing_test_failures.md`: added tsc-error history and resolution.
+
+---
+
+## #296 — test upload.service magic-byte MIME (security/test) (2026-06-18, /tdd, branch `fix/303-upload-magic-byte-validation`)
+
+**Goal:** add explicit test coverage for the magic-byte MIME validation path committed in #303 (`upload.service.ts:addPage`).
+
+**Added (3 new tests → 8 → 11 in `upload.service.spec.ts`):**
+- `image/svg+xml` rejection — SVG is `image/*` but carries inline JS; not in `ALLOWED_MIME_TYPES` → rejected before storage.
+- Storage `put()` failure cleanup — if the CDN/S3 call throws after MIME passes, the temp file must still be unlinked (lines 78-82).
+- Non-owner rollback — if the DB row shows a different `translator_uid`, the already-stored file must be deleted via `storage.delete()` (lines 107-110).
+
+**`makeService` minimal extension:** added `storageDel?: jest.Mock` (makes `storage.delete` assertable) and `versionRow?: Record<string, unknown> | null` (drives ownership + not-found paths) overrides. Existing 8 tests unaffected.
+
+**Result:** 11/11 GREEN, 0.675 s. Full backend suite clean (no regressions).
+
+---
+
+## #303 — upload path skipped magic-byte MIME validation (security bug) (2026-06-17, /tdd, branch `fix/303-upload-magic-byte-validation`)
+
+**Bug:** the chapter-page upload trusted the **client** Content-Type on both layers, contradicting `CLAUDE.md`'s "upload — MIME validated with `file-type` (magic bytes, not extension)". `upload.controller.ts` `fileFilter` checks `file.mimetype` (Multer sets it from the attacker-controlled multipart `Content-Type`); `upload.service.ts:addPage` re-checked that same client arg against `ALLOWED_MIME_TYPES` and never read the bytes. A `<script>` payload sent as `Content-Type: image/png` passed both gates and was stored as `.png`. Surfaced by #296 while writing its magic-byte tests.
+
+**Fix (TDD, mirrors `forum.service.ts:444,489`):**
+- `addPage` now runs `await fileTypeFromFile(tempFilePath)`, rejects when nothing is detected (empty/truncated/undetectable) or the detected mime is outside `ALLOWED_MIME_TYPES` — **even when filename/extension/client-mime say image** — and derives the stored extension from the **detected** mime. Temp file unlinked on every reject path.
+- Removed the now-unused client `mimeType` arg from `addPage`; controller no longer threads `file.mimetype`. `fileFilter` kept as a cheap first gate only (comment records it is not authoritative).
+- Cleaned in passing: dead `path` import (controller) + unused `err` in `deletePage`.
+
+**RED→GREEN:** new `upload.service.spec.ts` (8 tests). The disguised-file test was RED on the old code (it trusted `image/png` → reached storage) = the mutation check. GREEN after the fix.
+
+**Verify:** `npx jest src/upload` 8/8; full backend **58 suites / 540 tests green**; `eslint` clean on the 3 touched files; no new `tsc` errors (the 10 standing are #298, not yet merged onto this branch). **Not run:** live in-app upload E2E — recommend a confirmatory pass with the PR.
+
+**Docs:** ADR 016 (`docs/adr/016-upload-magic-byte-mime-validation.md`, defense-in-depth decision) + index; post-mortem entry in `docs/reports/system-impact-report.md`. The `CLAUDE.md` upload claim was aspirational before; it is now accurate. **#303 unblocks #296** (its security AC is satisfiable; those tests already live in `upload.service.spec.ts`). **Follow-up:** factor a shared magic-byte upload-guard helper across forum + upload.
+
+---
 
 ## Flux.2 Klein-4B optional inpainter — feasibility proven + PRD/issues (2026-06-14, ultracode)
 
@@ -495,14 +573,14 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 
 ---
 
-## Staff Console — PRD + ADR 016 + Phase-1 issues, out-of-band observability (2026-06-14)
+## Staff Console — PRD + ADR 018 + Phase-1 issues, out-of-band observability (2026-06-14)
 
 ออกแบบ **Staff Console** (back-office แบ่ง role: Moderator/Admin/Dev) จาก incident 2026-06-14 ของ 9arm (gateway `gateway.9arm.co` up แต่ model `qwen3.6-35b-a3b` ค้าง → error คลุมเครือ `'ollama servers did not respond quickly enough'` หลัง ~90s; หาสาเหตุด้วย black-box probe — `/models` OK 0.19s, completion 16-token timeout 151s = inference backend ค้าง, external). ผ่าน `/grill-me` เต็มรอบเพื่อ settle design แล้ว resilience review reshape data plane ของ Dev console
 
-- **Key decision (ADR 016):** monitor ต้องไม่อยู่ failure domain เดียวกับสิ่งที่มัน monitor → **standalone Node-Fastify aggregator microservice** (อยู่นอก Backend, run local/แยก host ได้) subscribe per-service `/status/stream` SSE บน Frontend/Backend/MIT; แต่ละตัว multiplex **`{type:metric}` sample** (VRAM/CPU/temp ผ่าน `torch.cuda`+`psutil`+`nvidia-smi`, zero new dep) + **`{type:event}` push** (translate-triggered/stage/log/error) UI อยู่ใน Frontend (`/staff/system`, shadcn) external uptime monitor → Discord = out-of-band backstop
+- **Key decision (ADR 018):** monitor ต้องไม่อยู่ failure domain เดียวกับสิ่งที่มัน monitor → **standalone Node-Fastify aggregator microservice** (อยู่นอก Backend, run local/แยก host ได้) subscribe per-service `/status/stream` SSE บน Frontend/Backend/MIT; แต่ละตัว multiplex **`{type:metric}` sample** (VRAM/CPU/temp ผ่าน `torch.cuda`+`psutil`+`nvidia-smi`, zero new dep) + **`{type:event}` push** (translate-triggered/stage/log/error) UI อยู่ใน Frontend (`/staff/system`, shadcn) external uptime monitor → Discord = out-of-band backstop
 - **Auth (zero-trust, ไม่มี shared secret):** orthogonal `profiles.staffLevel` (none<moderator<admin<dev) ฉีดเป็น **signed JWT claim** ผ่าน Supabase Custom Access Token Hook; dashboard forward dev JWT และ **แต่ละ service verify เองอิสระ** (signature + expiry + claim) stream re-validate ~60s + close on expiry; MIT เพิ่ม PyJWT verify
-- **Published (bilingual, `ready-for-agent`):** PRD **#279** + Phase-1 slices **#280** (1a RBAC+signed-claim+shell) → **#285** (1f aggregator+streams) → **#282** (1b health board, ตัวแก้ incident) / **#283** (1c tracer+queue) / **#284** (1d GPU/host); **#281** (1e precise error) อิสระ **ADR 016** `docs/adr/016-staff-console-out-of-band-observability-aggregator.md` + index ใน ADR README
-- **MIT modules built (TDD + karpathy, branch `feat/mit-staff-observability`, MIT-only — Frontend/Backend เลื่อนไว้ระหว่าง akkanop-x refactor):** `server/diagnostics.py` (gateway probe ที่ถูกและมี bound, decoupled จาก worker pool → `ok/slow/timeout`·model-down-vs-gateway-down`/auth/unreachable/model_missing`; incident 2026-06-14 อ่านเป็น `timeout` + "gateway /models OK but chat completion timed out — model not responding"; 7 tests) · `server/translate_error.py` (`classify_translate_error` → structured `{stage,translator,endpoint,model,cause,hint}`, wire ที่ raise site timeout ของ `custom_openai` → worker log + backend response ได้แทน string เปล่า; 4 tests) · `server/metrics.py` (`parse_nvidia_smi` + `host_metrics` (psutil), `collect` degrade host-only เมื่อไม่มี GPU, zero new dep; 5 tests). 16 tests ใหม่, **full MIT suite 463 passed / 19 pre-existing async / 0 new**. PIPELINE.md §5 + อ้าง ADR 016. SSE `/status/stream` endpoint + JWT verify เลื่อนไว้ (ต้องการ signed-claim hook ของ 1a = Backend/Supabase)
+- **Published (bilingual, `ready-for-agent`):** PRD **#279** + Phase-1 slices **#280** (1a RBAC+signed-claim+shell) → **#285** (1f aggregator+streams) → **#282** (1b health board, ตัวแก้ incident) / **#283** (1c tracer+queue) / **#284** (1d GPU/host); **#281** (1e precise error) อิสระ **ADR 018** `docs/adr/018-staff-console-out-of-band-observability-aggregator.md` + index ใน ADR README
+- **MIT modules built (TDD + karpathy, branch `feat/mit-staff-observability`, MIT-only — Frontend/Backend เลื่อนไว้ระหว่าง akkanop-x refactor):** `server/diagnostics.py` (gateway probe ที่ถูกและมี bound, decoupled จาก worker pool → `ok/slow/timeout`·model-down-vs-gateway-down`/auth/unreachable/model_missing`; incident 2026-06-14 อ่านเป็น `timeout` + "gateway /models OK but chat completion timed out — model not responding"; 7 tests) · `server/translate_error.py` (`classify_translate_error` → structured `{stage,translator,endpoint,model,cause,hint}`, wire ที่ raise site timeout ของ `custom_openai` → worker log + backend response ได้แทน string เปล่า; 4 tests) · `server/metrics.py` (`parse_nvidia_smi` + `host_metrics` (psutil), `collect` degrade host-only เมื่อไม่มี GPU, zero new dep; 5 tests). 16 tests ใหม่, **full MIT suite 463 passed / 19 pre-existing async / 0 new**. PIPELINE.md §5 + อ้าง ADR 018. SSE `/status/stream` endpoint + JWT verify เลื่อนไว้ (ต้องการ signed-claim hook ของ 1a = Backend/Supabase)
 - **Side fix:** shadcn MCP cwd gotcha — Claude Code `.mcp.json` ไม่มี field `cwd` → เพิ่ม wrapper `Frontend/run-shadcn-mcp.ps1` ให้ server รันใน `Frontend/` อ่าน `components.json` (`@react-bits` + `radix-rhea`); ต้อง full restart Claude Code (reconnect ไม่ reload config)
 
 ## ✅ LEAK SWEEP — #136 #137 #139 (+#138 falsified) — 2026-06-06, /improve-codebase-architecture → /to-issues → /tdd
@@ -2364,7 +2442,7 @@ per-group inpaints). Off → per-crop, byte-identical. TDD: `test_patch_renderer
 async / 0 new**. **Verified via direct render** (`tools/ab_clean.py` + new `tools/ab_fullpage.py`): the bottom-right hair
 is now clean dark, no gray blob, English text intact — matches the full-page/upstream/target. `.env` set
 `MIT_PATCH_FULLPAGE_INPAINT=1`. Branch `fix/mit-patch-fullpage-inpaint`. Provenance in PIPELINE.md §5.
-## 2026-06-15 — Connect MIT to the Dashboard (live telemetry) + Dashboard OAuth (PRD #279 / ADR 016, ADR 017)
+## 2026-06-15 — Connect MIT to the Dashboard (live telemetry) + Dashboard OAuth (PRD #279 / ADR 018, ADR 019)
 Wired the standalone Dev console to **live MIT data** and added **Supabase OAuth** so the dev's token reaches MIT,
 which verifies it independently (zero-trust, no shared secret). MIT-only slice — Backend/Frontend `/status` are
 separate (#282/#283, akkanop-x refactoring). Operator decisions (locked before build): SSE **event-push** (no loop on
@@ -2396,7 +2474,7 @@ signed in, else mock. `shell.tsx` gains an account/sign-out row.
 passed through the proxy) — independent per-service verification confirmed; the OAuth login gate renders. Remaining
 (human step): a *valid* token via Google sign-in → 200 + live cards (OAuth can't be driven headlessly); first sign-in
 needs the dev's user id added to `MIT_STAFF_USER_IDS`. Provenance in PIPELINE.md §5; full 18-section impact report in
-`docs/reports/system-impact-report.md`; decision in ADR 017.
+`docs/reports/system-impact-report.md`; decision in ADR 019.
 
 **Follow-up (same day): GitHub login + forced-for-dev.** Added a "Sign in with GitHub" button (primary) alongside
 Google (secondary) in the Dashboard gate, and **enforced GitHub for dev-tier access** — `auth.is_staff` gained a
@@ -2404,7 +2482,7 @@ Google (secondary) in the Dashboard gate, and **enforced GitHub for dev-tier acc
 (default `github`): an allowlisted/claimed **Google** account is denied dev (highest-privilege console = repo-collaborator
 GitHub identity; Google kept for future lower tiers; set the env empty to disable during rollout). `auth` tests 8→12;
 verified the two-button gate + "Dev access requires GitHub" note render. GitHub provider still needs a one-time Supabase
-enable (GitHub OAuth App + Authentication→Providers→GitHub). ADR 017 updated.
+enable (GitHub OAuth App + Authentication→Providers→GitHub). ADR 019 updated.
 
 **Follow-up (same day): Dashboard auth = Frontend parity (Email + Google + Facebook) + GitHub + in-app linking.** Per the dev's call (standalone console must NOT depend on the Frontend for linking, and tiers differ: Moderator→Google, Admin→both, Dev→GitHub), ported the Frontend's auth into the Dashboard standalone: popup OAuth (`signInWithOAuth({skipBrowserRedirect})` → `app/auth/callback/page.tsx` postMessages the session back — fixes the earlier redirect-to-Site-URL + surfaces errors in-app) for Google/Facebook/GitHub, email/password (sign in / sign up / reset), and a multi-provider **link/unlink** panel (`components/account-panel.tsx`, `lib/account.ts` pure + tested) + add-email/password. New pure libs: `lib/account.ts` (5 tests), `lib/oauth.ts` (`mapOAuthError`, 5 tests — incl. the manual-linking "Multiple accounts in linking domain" → "sign in with your existing provider, then link"). `auth-gate.tsx` is now a full DevAuth provider; `login-screen.tsx` mirrors LoginModal (3 OAuth + email form). Diagnosed the dev's GitHub sign-in failure via Supabase MCP: DB clean (1 google user, UUID 9c7f7717), the error = **manual-linking is on** (the app's multi-platform feature) so GoTrue refuses to auto-link a fresh GitHub sign-in onto the existing email → the dev links GitHub in Account instead. Dashboard tests 91→**101** green; login screen verified rendering all 4 methods at `https://dashboard.hayateotsu.space`. Supabase setup still needed: enable GitHub provider + redirect URLs cover `/auth/callback`.
 
@@ -2441,3 +2519,20 @@ Closing out the MIT↔Dashboard connection so the MIT service uses real data ins
 - **Honesty boundary:** live now → GPU util/VRAM/temp/power/fan + CPU usage sparklines, GpuDetail (4 of 7), worker pid/uptime, gateway. Live after a translate → stage timing, VRAM-by-model(+leak), queue jobs, logs. **No Data** (no MIT source) → pages/min, CPU temp, Graphics/CPU clock, quality panel.
 - **MIT restart:** killed a stale 14-Jun full MIT worker (orphaned `python3.11.exe` on :5004 holding ~3.9 GB VRAM — the worker-restart-gotcha) → VRAM 6.6→2.7 GB used; relaunched a **full GPU worker** on :5013 (`--use-gpu --start-instance`, gateway translator so no local LLM) so the worker telemetry actually flows.
 - **Verified:** Dashboard typecheck clean (touched files; residual recharts-Formatter + `bun:test` errors pre-existing), `bun test` **120 pass**, `/service/mit` SSR 200 no error overlay. Workflow: 8 component agents (1 transient 500 redone by hand).
+
+---
+
+## 2026-06-14 — Backend god-file decomposition: carve MIT translation out of books.service.ts (#233 + #234)
+Continued the `Backend/src/books/books.service.ts` god-object decomposition (PRD #228). Two services carved out, every seam byte-identical except one isolated behaviour fix:
+- **#233 `MitTranslationService`** — the single-page MIT path (`translateMangaPagePatches` + the startup-retry loop), the MIT health check, and the image-translator probe. Injects `MitClient` (#230) + the #229 pure helpers + BooksService's shared `persistPage`/`seriesContextFor` as callbacks; with MitClient faked the single-page path is unit-testable for the first time (cache hit / retry loop / ECONNREFUSED→unavailable / abort).
+- **#234 `MitBatchOrchestrator`** — the batch (full-chapter) state machine (registry, start/attach, stream-run, retry, webhook callback, listener-remove, progress-notify). Landed as sub-seams: **S5a** dropped the dead Redis pub/sub (subscribe side was a no-op; single-node) + ADR-002 + retired `books-pubsub-batch.spec.ts` (which was all 16 pre-existing baseline failures → baseline now 0 fail); **S5b** unified 3 fan-out blocks into one `deliver()`; **S5c** unified the 2 completion sites into one `maybeComplete()`; **S5-pre** moved the pure MIT helpers to `mit-config.ts`/`mit-lang-map.ts` (breaking a value-import cycle before the carve); **S5e** carved the orchestrator; **S5d** fixed a latecomer-listener leak on job reject (timeout/abort) + centralised teardown into `finalize()` (the only non-byte-identical step — own commit + red→green repro test).
+
+`books.service.ts` **1834 → 841 lines** (god file more than halved). New unit-testable modules: `mit-translation.service.ts`, `mit-config.ts`, `mit-lang-map.ts`, `mit-batch-orchestrator.service.ts`. Method: byte-identical, characterization-first, 1 seam = 1 commit; every seam verified `npm run build` (whole backend) + the books characterization net. **Full backend suite 513 pass / 0 fail** (was 192 pass / 16 fail). Code-reviewed (5-agent fan-out for #233+S5a–c; exact byte-comparison self-review for the carve) → **0 correctness bugs**; all 7 moved helpers + 8/9 batch methods proven byte-identical modulo prettier trailing-commas. Branch `dept/backend` (12 commits, not yet pushed). Issues #229/#230/#232/#233/#234 left open — close on merge to main. Impact report: `docs/reports/system-impact-report.md` (2026-06-14).
+
+## 2026-06-14 — Backend god-file decomposition: split Catalog/Landing/Gemini out of books.service.ts (#231, PRD #228 step 6)
+Completed PRD #228 (the `books.service.ts` god-object decomposition). Step 6 carved the three non-MIT domains into focused, unit-testable units, one seam = one commit, byte-identical (one intended dedup):
+- **6a `GeminiModelCatalog`** (`gemini-model-catalog.ts`) — model-selection state + availability catalog (memory→cache→provider API, 1-hour TTL) + per-purpose candidate filtering, with **injected env + clock** so selection is deterministic without `process.env`/wall-clock. BooksService keeps `getMangaModels`/`getDescriptionModels` delegators (the books-models spy on `getMangaModels` still observes the facade). 6 cases.
+- **6b `MangaCatalogService`** (`manga-catalog.service.ts`) — the 6 MangaDex passthroughs + `searchBooks` + the `chapter_versions` alt-name lookup (deps: mangaDex, supabase, cache). No redundant wrapper over MangaDexService — it owns real search/alt-name logic. 5 cases.
+- **6c `LandingService`** (`landing.service.ts`) — landing assembly (cache→rows→image-cache enhancement) + description + manga-episode Gemini text translation; the **two duplicated stale-cache fallback blocks collapse into one `serveStale()`** (the only behaviour-preserving cleanup). 6 cases.
+
+`books.service.ts` **841 → 376 lines** (god file quartered from its 1834 start; now a thin facade — every public signature unchanged, controllers/call-sites untouched). New unit-testable modules: `gemini-model-catalog.ts`, `manga-catalog.service.ts`, `landing.service.ts`. Constructed via `new` in the BooksService constructor (sharing its cache/imageCache/mangaDex/supabase + a `() => backendOrigin` callback) — same one-way-dependency pattern as #233/#234, so `BooksModule` is unchanged. Method: characterization-first (existing books specs are the net), byte-identical extraction, build whole backend per seam. The Thai-detect regex was restored to its `฀-๿` escapes after an encoding round-trip. **Full backend suite 530 pass / 0 fail** (was 513; +17 new). Branch `dept/backend` (3 commits `15e4837`/`127ee43`/`959b1bd`). **PRD #228 DONE — all 6 steps landed (#229/#230/#232/#233/#234/#231).** Issues left open — close on merge to main. Impact report: `docs/reports/system-impact-report.md` (2026-06-14, #231).

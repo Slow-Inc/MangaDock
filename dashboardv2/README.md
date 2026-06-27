@@ -1,6 +1,6 @@
 # MIT Dashboard (V2)
 
-Standalone mission-control dashboard for the MIT translation pipeline (PRD #279, ADR 016) — a clean Next.js 16
+Standalone mission-control dashboard for the MIT translation pipeline (PRD #279, ADR 018) — a clean Next.js 16
 rebuild. Ported from the env-synced `Dashboard/components/dashboard.tsx` shell; behaviour is identical.
 
 **Canonical specs:** [`DESIGN.md`](./DESIGN.md) (design system + data modes + IA) · [`PRODUCT.md`](./PRODUCT.md).

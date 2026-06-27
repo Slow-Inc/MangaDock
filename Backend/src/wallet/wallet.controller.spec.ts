@@ -4,7 +4,9 @@ import request = require('supertest');
 import { UnauthorizedException } from '@nestjs/common';
 import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
+import { WalletEventsService } from './wallet-events.service';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
+import { TopupThrottleGuard } from './topup-throttle.guard';
 
 const TEST_USER = { uid: 'test-uid', email: 'test@test.com', name: 'Test User' };
 
@@ -13,6 +15,11 @@ const mockWalletService = {
   addCoins: jest.fn(),
   getTransactions: jest.fn(),
   getCreatorEarnings: jest.fn(),
+};
+
+const mockWalletEventsService = {
+  stream$: jest.fn(),
+  emit: jest.fn(),
 };
 
 const mockAuthGuard = {
@@ -28,10 +35,15 @@ describe('WalletController', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [WalletController],
-      providers: [{ provide: WalletService, useValue: mockWalletService }],
+      providers: [
+        { provide: WalletService, useValue: mockWalletService },
+        { provide: WalletEventsService, useValue: mockWalletEventsService },
+      ],
     })
       .overrideGuard(AuthGuard)
       .useValue(mockAuthGuard)
+      .overrideGuard(TopupThrottleGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -61,6 +73,16 @@ describe('WalletController', () => {
   // ─── POST /wallet/topup ──────────────────────────────────────────────────
 
   describe('POST /wallet/topup', () => {
+    const ORIGINAL_FLAG = process.env.XENDIT_ALLOW_SIMULATE;
+
+    beforeEach(() => {
+      process.env.XENDIT_ALLOW_SIMULATE = 'true';
+    });
+    afterEach(() => {
+      if (ORIGINAL_FLAG === undefined) delete process.env.XENDIT_ALLOW_SIMULATE;
+      else process.env.XENDIT_ALLOW_SIMULATE = ORIGINAL_FLAG;
+    });
+
     it('should top up coins and return updated wallet', async () => {
       mockWalletService.addCoins.mockResolvedValue({ uid: TEST_USER.uid, balance: 350 });
       const res = await request(app.getHttpServer())
@@ -74,6 +96,14 @@ describe('WalletController', () => {
         'topup',
         expect.any(String),
       );
+    });
+
+    it('throws 403 when XENDIT_ALLOW_SIMULATE is not "true"', async () => {
+      delete process.env.XENDIT_ALLOW_SIMULATE;
+      await request(app.getHttpServer())
+        .post('/wallet/topup')
+        .send({ amount: 50 })
+        .expect(403);
     });
   });
 
@@ -136,10 +166,15 @@ describe('WalletController', () => {
     beforeAll(async () => {
       const moduleRef = await Test.createTestingModule({
         controllers: [WalletController],
-        providers: [{ provide: WalletService, useValue: mockWalletService }],
+        providers: [
+          { provide: WalletService, useValue: mockWalletService },
+          { provide: WalletEventsService, useValue: mockWalletEventsService },
+        ],
       })
         .overrideGuard(AuthGuard)
         .useValue({ canActivate: () => { throw new UnauthorizedException(); } })
+        .overrideGuard(TopupThrottleGuard)
+        .useValue({ canActivate: () => true })
         .compile();
 
       unauthApp = moduleRef.createNestApplication();

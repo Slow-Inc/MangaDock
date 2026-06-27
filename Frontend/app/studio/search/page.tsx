@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { searchBooks, StudioBook } from "../../lib/studioApi";
@@ -212,12 +213,12 @@ function SearchContent() {
               >
                 <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-xl bg-white/8 border border-white/8">
                   {book.thumbnail ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={resolvedThumbnail(book as any)}
                       alt={book.title}
+                      fill
                       loading="lazy"
-                      className="h-full w-full object-cover"
+                      className="object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-white/20">

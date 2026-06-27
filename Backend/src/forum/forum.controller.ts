@@ -24,11 +24,11 @@ import { Observable, merge, interval } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ForumService } from './forum.service';
 import { ForumEventsService } from './forum-events.service';
-import { AuthGuard, USER_KEY } from '../auth/auth.guard';
+import { AuthGuard } from '../auth/auth.guard';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard';
 import { CreatePostDto, CreateCommentDto, UpdatePostDto, UpdateCommentDto, UpdateBannerPositionDto, VoteDto } from './forum.dto';
 import type { ForumCategory } from './forum.types';
-import type { SupabaseAuthUser } from '../auth/auth.types';
+import type { AuthenticatedRequest, MaybeAuthenticatedRequest } from '../auth/authenticated-request';
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
@@ -60,21 +60,20 @@ export class ForumController {
   @Get('posts')
   @UseGuards(OptionalAuthGuard)
   async listPosts(
-    @Req() req: any,
+    @Req() req: MaybeAuthenticatedRequest,
     @Query('category') category?: ForumCategory,
     @Query('mangaId') mangaId?: string,
     @Query('sort') sort: 'new' | 'hot' = 'hot',
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    const user = req[USER_KEY] as SupabaseAuthUser | undefined;
     return this.forumService.listPosts(
       category,
       mangaId,
       sort,
       Math.min(100, limit ? (parseInt(limit, 10) || 20) : 20),
       offset ? (parseInt(offset, 10) || 0) : 0,
-      user?.uid
+      req.uid,
     );
   }
 
@@ -95,11 +94,10 @@ export class ForumController {
       }),
     }),
   )
-  async uploadBanner(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+  async uploadBanner(@Req() req: AuthenticatedRequest, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file provided');
-    const user = req[USER_KEY] as SupabaseAuthUser;
     try {
-      return await this.forumService.uploadBanner(user.uid, file.path, file.mimetype);
+      return await this.forumService.uploadBanner(req.uid, file.path, file.mimetype);
     } finally {
       fs.unlink(file.path, () => undefined);
     }
@@ -107,16 +105,14 @@ export class ForumController {
 
   @Patch('profile/banner-position')
   @UseGuards(AuthGuard)
-  async updateBannerPosition(@Req() req: any, @Body() dto: UpdateBannerPositionDto) {
-    const user = req[USER_KEY] as SupabaseAuthUser;
-    return this.forumService.updateBannerPosition(user.uid, dto.position);
+  async updateBannerPosition(@Req() req: AuthenticatedRequest, @Body() dto: UpdateBannerPositionDto) {
+    return this.forumService.updateBannerPosition(req.uid, dto.position);
   }
 
   @Get('profile/:uid')
   @UseGuards(OptionalAuthGuard)
-  async getPublicProfile(@Req() req: any, @Param('uid') uid: string) {
-    const viewer = req[USER_KEY] as SupabaseAuthUser | undefined;
-    return this.forumService.getPublicProfile(uid, viewer?.uid);
+  async getPublicProfile(@Req() req: MaybeAuthenticatedRequest, @Param('uid') uid: string) {
+    return this.forumService.getPublicProfile(uid, req.uid);
   }
 
   @Get('trending-manga')
@@ -126,67 +122,58 @@ export class ForumController {
 
   @Get('posts/:id')
   @UseGuards(OptionalAuthGuard)
-  async getPost(@Req() req: any, @Param('id') id: string) {
-    const user = req[USER_KEY] as SupabaseAuthUser | undefined;
-    return this.forumService.getPost(id, user?.uid);
+  async getPost(@Req() req: MaybeAuthenticatedRequest, @Param('id') id: string) {
+    return this.forumService.getPost(id, req.uid);
   }
 
   @Post('posts')
   @UseGuards(AuthGuard)
-  async createPost(@Req() req: any, @Body() dto: CreatePostDto) {
-    const user = req[USER_KEY] as SupabaseAuthUser;
-    return this.forumService.createPost(user.uid, dto);
+  async createPost(@Req() req: AuthenticatedRequest, @Body() dto: CreatePostDto) {
+    return this.forumService.createPost(req.uid, dto);
   }
 
   @Delete('posts/:id')
   @UseGuards(AuthGuard)
   @HttpCode(204)
-  async deletePost(@Req() req: any, @Param('id') id: string) {
-    const user = req[USER_KEY] as SupabaseAuthUser;
-    await this.forumService.deletePost(user.uid, id);
+  async deletePost(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    await this.forumService.deletePost(req.uid, id);
   }
 
   @Delete('comments/:id')
   @UseGuards(AuthGuard)
   @HttpCode(204)
-  async deleteComment(@Req() req: any, @Param('id') id: string) {
-    const user = req[USER_KEY] as SupabaseAuthUser;
-    await this.forumService.deleteComment(user.uid, id);
+  async deleteComment(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    await this.forumService.deleteComment(req.uid, id);
   }
 
   @Patch('posts/:id')
   @UseGuards(AuthGuard)
-  async updatePost(@Req() req: any, @Param('id') id: string, @Body() dto: UpdatePostDto) {
-    const user = req[USER_KEY] as SupabaseAuthUser;
-    return this.forumService.updatePost(user.uid, id, dto);
+  async updatePost(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdatePostDto) {
+    return this.forumService.updatePost(req.uid, id, dto);
   }
 
   @Patch('comments/:id')
   @UseGuards(AuthGuard)
-  async updateComment(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateCommentDto) {
-    const user = req[USER_KEY] as SupabaseAuthUser;
-    return this.forumService.updateComment(user.uid, id, dto);
+  async updateComment(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdateCommentDto) {
+    return this.forumService.updateComment(req.uid, id, dto);
   }
 
   @Get('posts/:id/comments')
   @UseGuards(OptionalAuthGuard)
-  async listComments(@Req() req: any, @Param('id') id: string) {
-    const user = req[USER_KEY] as SupabaseAuthUser | undefined;
-    return this.forumService.listComments(id, user?.uid);
+  async listComments(@Req() req: MaybeAuthenticatedRequest, @Param('id') id: string) {
+    return this.forumService.listComments(id, req.uid);
   }
 
   @Post('comments')
   @UseGuards(AuthGuard)
-  async createComment(@Req() req: any, @Body() dto: CreateCommentDto) {
-    const user = req[USER_KEY] as SupabaseAuthUser;
-    return this.forumService.createComment(user.uid, dto);
+  async createComment(@Req() req: AuthenticatedRequest, @Body() dto: CreateCommentDto) {
+    return this.forumService.createComment(req.uid, dto);
   }
 
   @Post('vote')
   @UseGuards(AuthGuard)
-  async vote(@Req() req: any, @Body() dto: VoteDto) {
-    const user = req[USER_KEY] as SupabaseAuthUser;
-    return this.forumService.vote(user.uid, dto);
+  async vote(@Req() req: AuthenticatedRequest, @Body() dto: VoteDto) {
+    return this.forumService.vote(req.uid, dto);
   }
 
   @Post('upload-image')
@@ -206,11 +193,10 @@ export class ForumController {
       }),
     }),
   )
-  async uploadImage(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+  async uploadImage(@Req() req: AuthenticatedRequest, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file provided');
-    const user = req[USER_KEY] as SupabaseAuthUser;
     try {
-      return await this.forumService.uploadImage(user.uid, file.path, file.mimetype);
+      return await this.forumService.uploadImage(req.uid, file.path, file.mimetype);
     } finally {
       fs.unlink(file.path, () => undefined);
     }

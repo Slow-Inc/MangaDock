@@ -1,8 +1,8 @@
 # MIT Dashboard
 
 Standalone, out-of-band mission-control dashboard for the MIT translation pipeline
-(PRD #279, [ADR 016](../docs/adr/016-staff-console-out-of-band-observability-aggregator.md) /
-[ADR 017](../docs/adr/017-mit-status-stream-forward-jwt-verification.md)). Next.js 16 + React 19,
+(PRD #279, [ADR 018](../docs/adr/018-staff-console-out-of-band-observability-aggregator.md) /
+[ADR 019](../docs/adr/019-mit-status-stream-forward-jwt-verification.md)). Next.js 16 + React 19,
 runs locally so it keeps working when the rest of the stack is down. Design system = **Speck + PremiumBuss + Arcana**
 fused (warm monotone + coral signature; see `DESIGN.md`).
 
@@ -27,7 +27,7 @@ bun run build    # production build
 | `MIT_STATUS_URL` | Server-side target for the `/api/live` proxy (e.g. `http://127.0.0.1:5003`). The proxy forwards the dev's JWT to MIT's `/status/stream`. |
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | OpenAI-compatible gateway (9arm) for the AI chat + incident summary. Unset → canned mock answers. |
 
-## How the live data flows (ADR 017)
+## How the live data flows (ADR 019)
 
 ```
 Browser  ──(Supabase Google OAuth)──>  session JWT

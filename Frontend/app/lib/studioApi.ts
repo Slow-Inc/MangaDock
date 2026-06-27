@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import type { ChapterVersion } from "./types";
 import { cacheOrFetch, TTL } from "./apiCache";
+import { createAuthHeaders, parseErrorResponse } from "./apiUtils";
 
 const API_BASE = "/api/proxy";
 
@@ -43,36 +44,16 @@ function normalizeProxyUrl(url: string): string {
   return url;
 }
 
-async function parseErrorMessage(res: Response): Promise<string> {
-  const body = await res.text().catch(() => "");
-  try {
-    const json = JSON.parse(body) as { message?: string | string[]; error?: string };
-    if (Array.isArray(json?.message)) return json.message.join(", ");
-    if (typeof json?.message === "string") return json.message;
-    if (typeof json?.error === "string") return json.error;
-  } catch {
-    // ignore parse error
-  }
-  return body || `HTTP ${res.status}`;
-}
-
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, init);
   if (!res.ok) {
-    const message = await parseErrorMessage(res);
+    const message = await parseErrorResponse(res);
     throw new Error(message);
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
   if (!text || text.trim() === "") return undefined as T;
   return JSON.parse(text) as T;
-}
-
-function authHeaders(token: string, extra?: HeadersInit): HeadersInit {
-  return {
-    Authorization: `Bearer ${token}`,
-    ...(extra ?? {}),
-  };
 }
 
 export async function searchBooks(query: string): Promise<{ items: StudioBook[]; total: number }> {
@@ -109,20 +90,20 @@ export async function getBookChapters(bookId: string): Promise<StudioChapter[]> 
 
 export async function getMyVersions(token: string): Promise<ChapterVersion[]> {
   return apiFetch<ChapterVersion[]>("/versions/me/versions", {
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
 }
 
 export async function getVersion(token: string, versionId: string): Promise<ChapterVersion> {
   return apiFetch<ChapterVersion>(`/versions/${encodeURIComponent(versionId)}`, {
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
 }
 
 export async function createVersion(token: string, payload: CreateVersionInput): Promise<ChapterVersion> {
   return apiFetch<ChapterVersion>("/versions", {
     method: "POST",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(payload),
   });
 }
@@ -134,7 +115,7 @@ export async function updateVersionMetadata(
 ): Promise<void> {
   await apiFetch<void>(`/versions/${encodeURIComponent(versionId)}`, {
     method: "PATCH",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(payload),
   });
 }
@@ -142,7 +123,7 @@ export async function updateVersionMetadata(
 export async function publishVersion(token: string, versionId: string): Promise<void> {
   await apiFetch<void>(`/versions/${encodeURIComponent(versionId)}/status`, {
     method: "PATCH",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify({ status: "published" }),
   });
 }
@@ -150,7 +131,7 @@ export async function publishVersion(token: string, versionId: string): Promise<
 export async function deleteVersion(token: string, versionId: string): Promise<void> {
   await apiFetch<void>(`/versions/${encodeURIComponent(versionId)}`, {
     method: "DELETE",
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
 }
 
@@ -159,7 +140,7 @@ export async function uploadPage(token: string, versionId: string, file: File): 
   form.append("file", file);
   return apiFetch<UploadPageResult>(`/upload/versions/${encodeURIComponent(versionId)}/pages`, {
     method: "POST",
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
     body: form,
   });
 }
@@ -167,7 +148,7 @@ export async function uploadPage(token: string, versionId: string, file: File): 
 export async function reorderPages(token: string, versionId: string, pages: string[]): Promise<void> {
   await apiFetch<void>(`/upload/versions/${encodeURIComponent(versionId)}/pages`, {
     method: "PUT",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify({ pages }),
   });
 }
@@ -175,7 +156,7 @@ export async function reorderPages(token: string, versionId: string, pages: stri
 export async function deletePage(token: string, versionId: string, pageUrl: string): Promise<void> {
   await apiFetch<void>(`/upload/versions/${encodeURIComponent(versionId)}/pages`, {
     method: "DELETE",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify({ pageUrl }),
   });
 }
@@ -188,15 +169,46 @@ export function toStudioImageUrl(pageUrl: string): string {
 
 export async function getWalletBalance(token: string): Promise<{ balance: number }> {
   return apiFetch<{ balance: number }>("/wallet/balance", {
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
 }
 
-export async function topupCoins(token: string, amount: number): Promise<{ balance: number }> {
-  return apiFetch<{ balance: number }>("/wallet/topup", {
+export type TopupResult = {
+  paymentId: string;
+  qrString: string;
+  expiresAt: string;
+};
+
+export type TopupStatus = {
+  status: "pending" | "paid" | "expired";
+  balance?: number;
+};
+
+export async function createTopup(token: string, amount: number): Promise<TopupResult> {
+  return apiFetch<TopupResult>("/wallet/topup/create", {
     method: "POST",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify({ amount }),
+  });
+}
+
+export async function getTopupStatus(token: string, paymentId: string): Promise<TopupStatus> {
+  return apiFetch<TopupStatus>(`/wallet/topup/status/${encodeURIComponent(paymentId)}`, {
+    headers: createAuthHeaders(token),
+  });
+}
+
+export async function cancelTopup(token: string, paymentId: string): Promise<{ cancelled: boolean }> {
+  return apiFetch<{ cancelled: boolean }>(`/wallet/topup/${encodeURIComponent(paymentId)}/cancel`, {
+    method: 'POST',
+    headers: createAuthHeaders(token),
+  });
+}
+
+export async function simulateTopup(token: string, paymentId: string): Promise<{ simulated: boolean }> {
+  return apiFetch<{ simulated: boolean }>(`/wallet/topup/${encodeURIComponent(paymentId)}/simulate`, {
+    method: 'POST',
+    headers: createAuthHeaders(token),
   });
 }
 
@@ -213,7 +225,7 @@ export type WalletTransaction = {
 
 export async function getWalletTransactions(token: string): Promise<WalletTransaction[]> {
   return apiFetch<WalletTransaction[]>("/wallet/transactions", {
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
 }
 
@@ -226,7 +238,7 @@ export type CreatorEarnings = {
 
 export async function getCreatorEarnings(token: string): Promise<CreatorEarnings> {
   return apiFetch<CreatorEarnings>("/wallet/earnings", {
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
 }
 
@@ -234,13 +246,13 @@ export async function getCreatorEarnings(token: string): Promise<CreatorEarnings
 
 export async function checkUnlock(token: string, versionId: string): Promise<{ unlocked: boolean }> {
   return apiFetch<{ unlocked: boolean }>(`/unlock/check/${encodeURIComponent(versionId)}`, {
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
 }
 
 export async function getUnlocksForTitle(token: string, titleId: string): Promise<string[]> {
   return apiFetch<string[]>(`/unlock/title/${encodeURIComponent(titleId)}`, {
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
 }
 
@@ -254,7 +266,7 @@ export type PurchaseResult = {
 export async function purchaseUnlock(token: string, versionId: string): Promise<PurchaseResult> {
   return apiFetch<PurchaseResult>(`/unlock/${encodeURIComponent(versionId)}`, {
     method: "POST",
-    headers: authHeaders(token),
+    headers: createAuthHeaders(token),
   });
 }
 
@@ -278,7 +290,7 @@ export async function getMyProfile(token: string) {
     translatorLanguages: string[];
     country: string;
     preferredLanguage: string;
-  }>("/users/me", { headers: authHeaders(token) });
+  }>("/users/me", { headers: createAuthHeaders(token) });
 }
 
 export async function updateTranslatorProfile(
@@ -287,7 +299,7 @@ export async function updateTranslatorProfile(
 ) {
   return apiFetch<{ message: string }>("/users/me/translator-profile", {
     method: "PATCH",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
 }
@@ -298,7 +310,67 @@ export async function becomeTranslator(
 ) {
   return apiFetch<{ ok: boolean }>("/users/me/become-translator", {
     method: "POST",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
+}
+
+export function subscribeTopupStream(
+  token: string,
+  paymentId: string,
+  onPaid: (balance: number) => void,
+  onError: (err: Error) => void,
+): () => void {
+  const controller = new AbortController();
+
+  (async () => {
+    let res: Response;
+    try {
+      res = await fetch(
+        `/api/proxy/wallet/topup/${encodeURIComponent(paymentId)}/stream`,
+        {
+          headers: createAuthHeaders(token),
+          signal: controller.signal,
+        },
+      );
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') onError(e instanceof Error ? e : new Error(String(e)));
+      return;
+    }
+
+    if (!res.ok || !res.body) {
+      onError(new Error(`SSE ${res.status}`));
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          try {
+            const payload = JSON.parse(line.slice(5).trim()) as {
+              event: string;
+              balance: number;
+            };
+            if (payload.event === 'payment.paid') onPaid(payload.balance);
+          } catch {
+            // malformed SSE line — skip
+          }
+        }
+      }
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') onError(e instanceof Error ? e : new Error(String(e)));
+    }
+  })();
+
+  return () => controller.abort();
 }

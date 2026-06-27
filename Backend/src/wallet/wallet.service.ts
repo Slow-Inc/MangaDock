@@ -1,23 +1,36 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { XenditService } from './xendit.service';
+import { WalletEventsService } from './wallet-events.service';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { safeTokenEqual } from './xendit-webhook.config';
+
+/** Hard upper bound per single coin mutation — bounds INTEGER-column overflow and abuse. */
+export const MAX_TOPUP_COINS = 100000;
 
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly xenditService: XenditService,
+    private readonly walletEvents: WalletEventsService,
+  ) {}
 
   private get db() {
     return this.supabase.client;
   }
 
   async getBalance(uid: string): Promise<number> {
-    // Upsert is handled inside the RPC; a plain SELECT suffices for read-only balance check
     const { data, error } = await this.db
       .from('wallets')
       .select('balance')
@@ -28,14 +41,31 @@ export class WalletService {
     return data?.balance ?? 0;
   }
 
+  async getTopupExpiry(
+    paymentId: string,
+    uid: string,
+  ): Promise<{ expiresAt: string; status: string }> {
+    const { data, error } = await this.db
+      .from('coin_topups')
+      .select('expires_at, status')
+      .eq('payment_id', paymentId)
+      .eq('uid', uid)
+      .maybeSingle();
+
+    if (error) throw new InternalServerErrorException(`Failed to fetch topup: ${error.message}`);
+    if (!data) throw new NotFoundException('Topup not found');
+    return { expiresAt: data.expires_at, status: data.status };
+  }
+
   async addCoins(
     uid: string,
     amount: number,
     type: 'topup' | 'reward',
     description?: string,
+    referenceId?: string,
   ): Promise<{ balance: number }> {
-    if (!amount || amount <= 0) {
-      throw new BadRequestException('Amount must be greater than 0');
+    if (!Number.isInteger(amount) || amount <= 0 || amount > MAX_TOPUP_COINS) {
+      throw new BadRequestException(`Amount must be an integer between 1 and ${MAX_TOPUP_COINS}`);
     }
 
     const { data, error } = await this.db.rpc('add_coins_atomic', {
@@ -43,6 +73,7 @@ export class WalletService {
       p_amount: amount,
       p_type: type,
       p_description: description ?? null,
+      p_reference_id: referenceId ?? null,
     });
 
     if (error) throw new InternalServerErrorException(`Failed to add coins: ${error.message}`);
@@ -58,8 +89,8 @@ export class WalletService {
     description: string,
     referenceId?: string,
   ): Promise<{ balance: number }> {
-    if (!amount || amount <= 0) {
-      throw new BadRequestException('Amount must be greater than 0');
+    if (!Number.isInteger(amount) || amount <= 0 || amount > MAX_TOPUP_COINS) {
+      throw new BadRequestException(`Amount must be an integer between 1 and ${MAX_TOPUP_COINS}`);
     }
 
     const { data, error } = await this.db.rpc('spend_coins_atomic', {
@@ -82,6 +113,7 @@ export class WalletService {
     return { balance: newBalance };
   }
 
+  // NOTE: superseded for unlocks by purchase_unlock_atomic; kept for ad-hoc/admin use.
   /**
    * High-level purchase flow that splits revenue between Creator and Platform.
    * Standard Split: 70% to Creator, 30% to Platform.
@@ -157,5 +189,225 @@ export class WalletService {
       referenceId: row.reference_id,
       createdAt: row.created_at,
     }));
+  }
+
+  // ── Xendit Topup ────────────────────────────────────────────────────────────
+
+  async createTopup(
+    uid: string,
+    amount: number,
+  ): Promise<{ paymentId: string; qrString: string; expiresAt: string }> {
+    const referenceId = randomUUID();
+    const { payment_id, qr_string, expires_at } =
+      await this.xenditService.createPromptPayCharge(amount, referenceId, 'เติมเหรียญ MangaDock');
+
+    const { error } = await this.db.from('coin_topups').insert({
+      payment_id,
+      uid,
+      amount_coins: amount,
+      status: 'pending',
+      qr_string,
+      expires_at,
+    });
+
+    if (error) throw new InternalServerErrorException(`Failed to save topup: ${error.message}`);
+
+    return { paymentId: payment_id, qrString: qr_string, expiresAt: expires_at };
+  }
+
+  async getTopupStatus(
+    paymentId: string,
+    uid: string,
+  ): Promise<{ status: string; balance?: number }> {
+    const { data, error } = await this.db
+      .from('coin_topups')
+      .select('*')
+      .eq('payment_id', paymentId)
+      .eq('uid', uid)
+      .maybeSingle();
+
+    if (error) throw new InternalServerErrorException(`Failed to get topup status: ${error.message}`);
+    if (!data) throw new NotFoundException('Topup not found');
+
+    if (data.status === 'pending' && new Date(data.expires_at) < new Date()) {
+      await this.db.from('coin_topups').update({ status: 'expired' }).eq('payment_id', paymentId).eq('status', 'pending');
+      return { status: 'expired' };
+    }
+
+    if (data.status === 'paid') {
+      const balance = await this.getBalance(uid);
+      return { status: 'paid', balance };
+    }
+
+    return { status: data.status };
+  }
+
+  async cancelTopup(
+    paymentId: string,
+    uid: string,
+  ): Promise<{ cancelled: boolean }> {
+    const { data, error } = await this.db
+      .from('coin_topups')
+      .select('status')
+      .eq('payment_id', paymentId)
+      .eq('uid', uid)
+      .maybeSingle();
+
+    if (error) throw new InternalServerErrorException(`Failed to fetch topup: ${error.message}`);
+    if (!data) throw new NotFoundException('Topup not found');
+    if (data.status !== 'pending') return { cancelled: false };
+
+    const { error: updateError } = await this.db
+      .from('coin_topups')
+      .update({ status: 'expired' })
+      .eq('payment_id', paymentId)
+      .eq('uid', uid)
+      .eq('status', 'pending');
+
+    if (updateError) throw new InternalServerErrorException(`Failed to cancel topup: ${updateError.message}`);
+    this.logger.log(`Topup cancelled by user ${uid}: ${paymentId}`);
+    return { cancelled: true };
+  }
+
+  async simulateTopup(
+    paymentId: string,
+    uid: string,
+  ): Promise<{ simulated: boolean }> {
+    if (process.env.XENDIT_ALLOW_SIMULATE !== 'true') {
+      throw new ForbiddenException('Simulate is not available');
+    }
+
+    const { data, error } = await this.db
+      .from('coin_topups')
+      .select('status, amount_coins')
+      .eq('payment_id', paymentId)
+      .eq('uid', uid)
+      .maybeSingle();
+
+    if (error) throw new InternalServerErrorException(`Failed to fetch topup: ${error.message}`);
+    if (!data) throw new NotFoundException('Topup not found');
+    if (data.status !== 'pending') throw new BadRequestException('Topup is not in pending state');
+
+    await this.xenditService.simulatePayment(paymentId, data.amount_coins);
+    this.logger.log(`Simulate payment triggered for ${paymentId} by user ${uid}`);
+    return { simulated: true };
+  }
+
+  async processXenditWebhook(
+    payload: Record<string, any>,
+    token: string,
+    rawBody?: Buffer,
+    signature?: string,
+  ): Promise<{ received: boolean }> {
+    // 1. Static token check (constant-time — V8)
+    const expected = process.env.XENDIT_WEBHOOK_TOKEN;
+    if (!safeTokenEqual(token, expected)) {
+      throw new UnauthorizedException('Invalid webhook token');
+    }
+
+    // 2. HMAC-SHA256 check — MANDATORY in production (V1). Outside production it
+    //    is enforced only when XENDIT_WEBHOOK_SECRET is configured.
+    const webhookSecret = process.env.XENDIT_WEBHOOK_SECRET;
+    const requireHmac = process.env.NODE_ENV === 'production';
+    if (requireHmac && !webhookSecret) {
+      throw new UnauthorizedException('Webhook secret not configured');
+    }
+    if (webhookSecret) {
+      if (!rawBody || !signature) {
+        throw new UnauthorizedException('Missing webhook signature');
+      }
+      if (!/^[0-9a-f]+$/i.test(signature)) {
+        throw new UnauthorizedException('Invalid webhook signature');
+      }
+      const computed = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+      let valid = false;
+      try {
+        const a = Buffer.from(computed, 'hex');
+        const b = Buffer.from(signature, 'hex');
+        valid = a.length === b.length && timingSafeEqual(a, b);
+      } catch {
+        valid = false;
+      }
+      if (!valid) throw new UnauthorizedException('Invalid webhook signature');
+    }
+
+    const event: string = payload.event;
+    const eventData: Record<string, any> = payload.data ?? {};
+    const paymentRequestId: string = eventData.payment_request_id;
+    const status: string = eventData.status;
+
+    if (event === 'payment.failed' || status === 'FAILED') {
+      if (paymentRequestId) {
+        await this.db.from('coin_topups').update({ status: 'expired' }).eq('payment_id', paymentRequestId).eq('status', 'pending');
+        this.logger.warn(`Xendit payment failed: ${paymentRequestId}`);
+      }
+      return { received: true };
+    }
+
+    if (event !== 'payment.succeeded' || status !== 'SUCCEEDED') {
+      return { received: true };
+    }
+
+    const paymentId: string = paymentRequestId;
+
+    // Atomic claim: UPDATE only if still pending — prevents concurrent webhook retries from double-crediting.
+    const { data: claimed, error: claimError } = await this.db
+      .from('coin_topups')
+      .update({ status: 'paid' })
+      .eq('payment_id', paymentId)
+      .eq('status', 'pending')
+      .select()
+      .maybeSingle();
+
+    if (claimError) {
+      throw new InternalServerErrorException(`Failed to claim topup: ${claimError.message}`);
+    }
+    if (!claimed) {
+      this.logger.warn(`Webhook: coin_topup not claimable (not found or already processed) for payment_id=${paymentId}`);
+      return { received: true };
+    }
+
+    // Active verification (V1/V2): the webhook payload is untrusted. Re-fetch the
+    // authoritative payment state from Xendit and reconcile the settled amount
+    // before crediting. On any mismatch or fetch failure, revert the claim back
+    // to 'pending' so a genuine later webhook can retry, and refuse to credit.
+    let verified: { status: string; amount: number; currency: string };
+    try {
+      verified = await this.xenditService.getPaymentRequest(paymentId);
+    } catch (err) {
+      await this.db
+        .from('coin_topups')
+        .update({ status: 'pending' })
+        .eq('payment_id', paymentId)
+        .eq('status', 'paid');
+      this.logger.error(`Webhook verify failed (Xendit unreachable) for ${paymentId}: ${String(err)}`);
+      throw new InternalServerErrorException('Payment verification failed');
+    }
+
+    if (verified.status !== 'SUCCEEDED' || Number(verified.amount) !== claimed.amount_coins) {
+      await this.db
+        .from('coin_topups')
+        .update({ status: 'pending' })
+        .eq('payment_id', paymentId)
+        .eq('status', 'paid');
+      this.logger.error(
+        `SECURITY: webhook verification mismatch for ${paymentId} — ` +
+          `xenditStatus=${verified.status} xenditAmount=${verified.amount} expected=${claimed.amount_coins}`,
+      );
+      throw new UnauthorizedException('Payment verification failed');
+    }
+
+    const { balance } = await this.addCoins(
+      claimed.uid,
+      claimed.amount_coins,
+      'topup',
+      'เติมเหรียญ MangaDock',
+      paymentId,
+    );
+
+    // Emit SSE after addCoins succeeds — security ordering invariant
+    this.walletEvents.emit(paymentId, { balance });
+
+    return { received: true };
   }
 }
