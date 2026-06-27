@@ -16,6 +16,12 @@ on:
   push:
     branches: [main]
 
+# dorny/paths-filter calls the PR listFiles API; the default GITHUB_TOKEN needs
+# pull-requests:read or it fails with "Resource not accessible by integration".
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   changes:
     name: detect changes
