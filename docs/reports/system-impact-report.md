@@ -15,6 +15,139 @@
 
 ---
 
+## 2026-06-19 — Coin Topup System: Xendit PromptPay QR (feature)
+
+**Scope:** Backend (wallet module) + Frontend (TopupModal + Navbar) + Supabase DB · **Type:** New feature — real payment gateway replacing dev-only topup stub · **Tests:** 607/607 backend green (+12 new wallet tests); Frontend tsc 0 errors.
+
+**What & where:**
+- `Backend/src/wallet/xendit.service.ts` *(new)* — wraps `POST https://api.xendit.co/payment_requests`, no SDK, plain `fetch`
+- `Backend/src/wallet/dto/create-topup.dto.ts` *(new)* — `@IsInt() @Min(20) amount`
+- `Backend/src/wallet/wallet.service.ts` — `createTopup`, `getTopupStatus`, `processXenditWebhook`; `addCoins` extended with optional `referenceId` → `p_reference_id` in `add_coins_atomic` RPC
+- `Backend/src/wallet/wallet.controller.ts` — 3 new endpoints: `POST /wallet/topup/create` (AuthGuard), `GET /wallet/topup/status/:paymentId` (AuthGuard), `POST /wallet/xendit/webhook` (public)
+- `Backend/src/app.module.ts` — `wallet/xendit/webhook` excluded from `HardwareIdMiddleware`
+- `Frontend/app/components/TopupModal.tsx` *(new)* — 3-screen state machine: TIER_SELECT (6 presets + custom ≥20) → QR_DISPLAY (countdown + 3s poll) → SUCCESS; dispatches `mb:coin-balance-update` event
+- `Frontend/app/components/NavbarActions.tsx` — coin balance chip before avatar; opens TopupModal; listens for `mb:coin-balance-update`
+- `Frontend/app/components/BookDetailModal.tsx` — inline mock topup form replaced by `<TopupModal>`
+- Supabase migration `create_coin_topups` applied: `coin_topups` table with `UNIQUE(payment_id)` idempotency guard
+
+**Why:** `POST /wallet/topup` was a dev stub throwing 403 in production. Users had no real path to purchase coins for paid chapters.
+
+**Before → After:** `POST /wallet/topup` → 403 in production, no QR, no payment / `POST /wallet/topup/create` → Xendit PromptPay QR, inline modal, polling confirms payment, coins credited atomically via `add_coins_atomic` RPC.
+
+**Security:** webhook token check fails-closed when `XENDIT_WEBHOOK_TOKEN` env var is unset; idempotency prevents double-credit on webhook retry; no SDK dependency; `x-callback-token` verified server-side only.
+
+**Performance Δ:** N/A (new code path, no regression on existing paths).
+
+**Quality:** Tiers 20/50/100/200/500/1000 + custom; countdown timer; QR blur on expiry; auto-close after success; Navbar chip updates from both Navbar-opened and BookDetailModal-opened flows via `mb:coin-balance-update` custom event.
+
+**Validation:** Backend 607/607 tests green; 12 new unit tests cover: token rejection, env-var-unset rejection, non-succeeded events, happy-path credit, idempotency, unknown payment_id, expired status, paid-with-balance; Frontend tsc 0 errors; qrcode.react@4.2.0 installed.
+
+**Risk / rollback:** Additive — existing wallet/unlock paths unchanged. Rollback: `DROP TABLE coin_topups;` + revert 11 modified files. Sandbox only (no production keys committed). Dev topup stub (`POST /wallet/topup`) retained as fallback, still production-blocked by `NODE_ENV` check.
+
+**Links:** spec `docs/coin-topup-xendit.md` · handoff `mangadock-handoff-coin-topup.md` · sandbox webhook `https://web.2552667.xyz/api/xendit/webhook`
+
+---
+
+## 2026-06-17 — Upload path skipped magic-byte MIME validation (security bug) — #303
+
+**Severity:** medium (defense-in-depth gap / stored-disguised-file; contradicted a documented control) · **Branch:** `fix/303-upload-magic-byte-validation` (off `main`), TDD (RED→GREEN), not yet PR'd. Surfaced by #296 while writing the magic-byte tests. · **ADR:** [016](../adr/016-upload-magic-byte-mime-validation.md).
+
+**What & where:** `Backend/src/upload/upload.service.ts:addPage` now validates by magic bytes (`await fileTypeFromFile(tempFilePath)`) and derives the stored extension from the **detected** mime; the client `mimeType` arg is removed. `upload.controller.ts` keeps the Multer `fileFilter` client-mime check as a cheap first gate only and no longer threads `file.mimetype` into the service. Mirrors the existing `forum.service.ts:444,489` control.
+
+**Why:** both layers trusted the **client-supplied** Content-Type. `fileFilter` reads `file.mimetype` (set by Multer from the attacker-controlled multipart `Content-Type`), and `addPage` re-checked that same value against `ALLOWED_MIME_TYPES` without ever reading the bytes — contradicting `CLAUDE.md` ("upload — MIME validated with `file-type` (magic bytes, not extension)").
+
+**Before → After:** a `<script>…</script>` payload sent with `Content-Type: image/png` passed both gates and was stored as `.png` with `contentType: image/png` → it is now **rejected** (`BadRequestException`) before reaching storage, even when filename/extension/client-mime claim image. A client lying `image/png` over WebP bytes is now stored `.webp` (detected mime drives the extension). Empty/truncated/undetectable files are rejected gracefully; the temp file is unlinked on every reject path.
+
+**Performance Δ:** one extra on-disk read per upload (`fileTypeFromFile`) — negligible vs the upload itself. **Quality:** the documented control is now real for this module; upload + forum share one validation posture. **Validation:** new `upload.service.spec.ts` (8 tests, TDD): disguised-file reject (RED on the old code = mutation check), undetectable reject, temp-file-deleted-on-reject (real temp file), all 4 allowed types accepted, extension derived from detected mime. Full backend **58 suites / 540 tests green**; `eslint` clean on the 3 touched files; no new `tsc` errors (the 10 standing are #298, not yet merged to this branch). **Not run:** live in-app upload E2E (`feedback_test_every_round`) — recommend a confirmatory pass with the PR.
+
+**Risk / rollback:** Low. Single-file behaviour change on the reject side (stricter), each commit revertible. `file-type` is ESM-only → tests use the existing `src/__mocks__/file-type.js` mock (same as forum). **Note:** the `CLAUDE.md` upload claim was aspirational before this fix; it is now accurate.
+
+**Open follow-ups:** factor a shared magic-byte upload-guard helper across `forum.service` + `upload.service` (allowlist + `MIME_TO_EXT` in one place); #303 unblocks **#296** (its security AC is now satisfiable — those tests live in `upload.service.spec.ts`); `err` unused in `deletePage` + dead `path` import were cleaned in passing.
+
+**Links:** #303 (bug), #296 (surfaced it), #292 (parent) · ADR 016 · `forum.service.ts:444,489` (prior art).
+
+---
+
+## 2026-06-14 — Backend `books.service.ts` decomposition: MIT translation carve (#233 + #234)
+
+**What & where:** Carved the MIT translation subsystem out of the `Backend/src/books/books.service.ts` god object (PRD #228) into focused, individually unit-testable modules: `mit-translation.service.ts` (single-page), `mit-batch-orchestrator.service.ts` (batch state machine), `mit-config.ts` + `mit-lang-map.ts` (pure key/config/lang helpers). · **Branch:** `dept/backend` (off `origin/main`), 8 commits, **not yet pushed/PR'd**. · **Method:** byte-identical, characterization-first, 1 seam = 1 commit (TDD per seam).
+
+**Why:** `books.service.ts` was a 1834-line god file; the single-page and batch MIT paths were untestable except through the whole service, and carried a dead Redis pub/sub limb whose flaky tests were the entire 16-failure baseline.
+
+### Shipped — seams (byte-identical unless noted)
+- **#233** carve `MitTranslationService` — single-page `translateMangaPagePatches` + retry loop, MIT health, image-translator probe — `a941a4c`
+- **#234 S5a** drop dead batch Redis pub/sub (no-op subscribe; single-node) + **ADR-002** + retire `books-pubsub-batch.spec.ts` — `e0f6add`, `4f04c51`
+- **#234 S5b** unify 3 fan-out blocks → one `deliver()` — `42b4e90`
+- **#234 S5c** unify 2 completion sites → one `maybeComplete()` — `7bdc118`
+- **#234 S5-pre** move pure MIT helpers → `mit-config.ts`/`mit-lang-map.ts` (break value-import cycle) — `4a155d7`
+- **#234 S5e** carve `MitBatchOrchestrator` state machine — `c1daa07`
+- **#234 S5d** fix latecomer-listener leak on job reject + `finalize()` teardown (**behaviour fix**) — `c29dbc1`
+
+### Before → After (full fields)
+| field | before | after |
+|---|---|---|
+| books.service.ts LOC | 1834 | 841 (−54%) |
+| MIT translation modules | 1 (god file) | 4 focused + `MitClient` (#230) |
+| backend test suite | 192 pass / **16 fail** | **513 pass / 0 fail** |
+| single-page path testability | fake `global.fetch` only | faked `MitClient` (unit) |
+| batch state machine testability | only via BooksService | `MitBatchOrchestrator` direct |
+| batch fan-out blocks | 3 hand-rolled copies | 1 `deliver()` |
+| batch completion sites | 2 (webhook logged, stream silent — drift) | 1 `maybeComplete()` |
+| batch Redis pub/sub | publish ×2 + no-op subscribe (dead) | removed (single-node; ADR-002) |
+| latecomer listener on job reject | leaked (post-await delete skipped) | drained (try/finally + `finalize()`) |
+
+**Performance Δ:** books test suite ~63s → ~13s after the 16 Redis-timeout tests were retired (S5a). Runtime translation latency: unchanged (byte-identical). One fewer dead Redis publish per page (negligible).
+
+**Quality:** byte-identical on every seam except **S5d** (the only behaviour change — isolated to its own commit with a red→green repro test). BooksService keeps thin public delegators with unchanged signatures → SSE batch endpoint + MIT webhook controller unchanged. `persistPage`/`seriesContextFor` stay in BooksService, injected into both new services; the single-page translate is injected into the orchestrator **late-bound** so the `books-retry` spy still observes the batch retry path.
+
+**Validation:** `npm run build` (whole backend, tsc) clean after every seam (cross-module ripple guard). Full backend suite **513 pass / 0 fail** (54 suites); the books characterization net (batch-registry/cancel/progress/webhook/retry, image-model, series-context, mit-config) green throughout = byte-identical proof. **Code review:** 5-agent fan-out (line-by-line / removed-behaviour / cross-file / cleanup / altitude) for #233+S5a–S5c → 0 correctness bugs (1 altitude finding: the value-import cycle, fixed by S5-pre). The carve (S5-pre/S5e/S5d) reviewed by **exact whitespace-normalised byte-comparison** (agents hit a session limit) — all 7 moved helpers + 8/9 batch methods proven byte-identical to the original (the 9th = `startOrAttachBatchJob`, intentionally changed by S5d); only textual deltas elsewhere are prettier trailing-commas → **0 correctness bugs**. **Not run:** frontend E2E translation parity (`feedback_test_every_round`) — change is byte-identical so original↔translated output is unchanged by construction; recommend a confirmatory E2E pass before/with the epic PR merge.
+
+**Risk / rollback:** Low. Byte-identical decomposition; each seam is its own revertible commit. The one behaviour change (S5d) only touches the reject/timeout cleanup path (repro-tested). Redis removal (S5a) is single-node only — re-introduce a real subscriber + multi-node test when sharding (ADR-002). 12 commits unpushed on `dept/backend`.
+
+**Open follow-ups:** open the epic #228 PR → main; close issues #229/#230/#232/#233/#234 on merge; cosmetic — `PatchEntry` type declared in 3 files, `persistPage` param type duplicated (mit-translation + orchestrator), `books-mit-config.spec` describe "BooksService.buildMitConfig" now tests via `.batch`; confirmatory frontend E2E parity pass.
+
+**Links:** #228 (parent), #229/#230/#232/#233/#234 · ADR-002 (`docs/adr/002-drop-batch-redis-pubsub.md`) · commits `a941a4c e0f6add 4f04c51 42b4e90 7bdc118 4a155d7 c1daa07 c29dbc1`.
+
+---
+
+## 2026-06-13 — PRD#1: Backend security hardening (Turnstile/HWID guards) — #223 (#224–#227)
+
+**Severity:** major (cost-bleed + information-disclosure on the expensive MIT surface) · **Branch:** `dept/backend` (off `origin/main`), 4 PRD steps + 2 post-review fixes, not yet PR'd. Derived from the read-only Backend security audit in issue #223. **TDD throughout** (RED→GREEN per step); `/security-review` on the full diff returned **no findings ≥0.7** — a later high-recall `/code-review` of the rebased branch surfaced + fixed 2 more (CR#1/CR#2 below).
+
+### Summary (index)
+| Step | What & where | Before → After | Validation | Commit |
+|---|---|---|---|---|
+| #224 | Fail-closed Turnstile config — new `auth/turnstile.config.ts` (`resolveTurnstileConfig`), wired in `turnstile.guard.ts`, `books.controller.ts` (verify-captcha), boot check in `main.ts` | missing `TURNSTILE_SECRET_KEY` silently fell back to the public test key (always-pass siteverify + forgeable HMAC) → **prod now refuses to boot** on missing/test secret; `TURNSTILE_ENABLED=false` ignored in prod | 9 unit (fail-closed matrix, mirrors `storage.module.spec.ts`) | `21423bf` |
+| #225 | Validate `X-Hardware-Id` shape — `common/middleware/hardware-id.middleware.ts` (`isValidHardwareId`) | presence-only check (any garbage passed zero-trust) → shape check `/^[A-Za-z0-9_+/=-]{8,128}$/`, rejects array/whitespace/control/injection with 401 | 42 unit (valid/empty/malformed/array/passthrough + pure fn) | `9527a35` |
+| #226 | Sanitize `AllExceptionsFilter` — `common/filters/all-exceptions.filter.ts` + 2 controller catches in `books.controller.ts` | raw internal error message + MIT error leaked to client on 500 → generic `Internal server error` / `Translation failed`; real message+stack logged server-side; HttpException + Supabase-503 preserved | 3 filter unit (generic / passthrough / 503) | `9dadb57` |
+| #227 | Guard 3 MIT endpoints + frontend clearance — `@UseGuards(TurnstileGuard)` on `translate/manga`, `…/translate-patches`, `…/batch-translate-patches`; `Frontend` global fetch interceptor (`SupabaseGuard.tsx`) attaches `x-captcha-clearance` via new pure `app/lib/zeroTrustHeaders.ts` | expensive ML/R2 pipeline reachable with only a non-empty HWID header → each requires valid HWID-bound clearance; cheap `GET translate` (description) stays open | 7 backend e2e (401-without / proceeds-with per endpoint) + 5 frontend bun (header helper) | `5a81942` |
+| CR#1 | Exact-origin allow-list in `isApiRequest` — `Frontend/app/lib/zeroTrustHeaders.ts` (+ `SupabaseGuard.tsx` call site) | substring host match (`includes('supabase.co'/'localhost')`, `startsWith('/')`) leaked HWID + the #227 `x-captcha-clearance` credential to lookalike origins (`supabase.co.evil.com`, `//evil.com`) → **exact-origin allow-list** (own + `NEXT_PUBLIC_SUPABASE_URL` origin); `//` rejected, malformed → false | 7 frontend bun (5 attacker URLs → false / legit → true / malformed → false) | `075cc30` |
+| CR#2 | Gate Supabase heuristic in `AllExceptionsFilter` — `Backend/src/common/filters/all-exceptions.filter.ts` | intentional `HttpException` whose message merely mentioned Supabase was coerced to 503 `SUPABASE_OFFLINE` (wrong status, false "paused" toast) → gated `!isHttpException`; genuine non-HttpException 503 path preserved | filter unit +2 (400/404 + own message preserved) + existing 503 regression | `0c09b85` |
+
+### Before → After (headline, full fields)
+
+**#224 · Fail-closed Turnstile (the headline security fix)** — *What/where:* `resolveTurnstileConfig(env)` (`auth/turnstile.config.ts`), consumed by `TurnstileGuard.canActivate` and the verify-captcha handler; boot enforcement in `main.ts:bootstrap` *before* `NestFactory.create`. *Why:* both call-sites inlined `process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA'` (Cloudflare public test key) — a forgotten secret made siteverify always pass **and** signed the HMAC clearance with a publicly-known key, so the whole captcha/zero-trust layer was silently bypassable and the token forgeable. *Before → After:* missing/test secret in prod = silent always-pass → **loud crash at boot**; outside prod the test key + `TURNSTILE_ENABLED=false` still work (dev unblocked). The `|| <test-key>` fallback is gone from both sites (grep-verified: only the constant definition remains). *Performance Δ:* N/A (string resolution per request, negligible). *Quality:* invisible to a correctly-configured deploy; reader flow unchanged. *Validation:* 9 unit covering the full prod/non-prod × missing/test/real × enabled-flag matrix. *Risk/rollback:* fail-closed (a real prod secret was always required to function correctly); revert = 1 commit. *Links:* #224, `21423bf`.
+
+**#227 · Captcha guard on the expensive surface + reused clearance** — *What/where:* `TurnstileGuard` applied to the three MIT-triggering endpoints in `books.controller.ts`; `Frontend/app/components/SupabaseGuard.tsx` global `window.fetch` interceptor now injects `x-captcha-clearance` (from `localStorage.cf_clearance_token`) alongside the existing `x-hardware-id`, via the extracted pure `withZeroTrustHeaders()` helper. *Why:* only the cached-page endpoint was guarded; single-page, batch, and manga-text translation ran the ML/LaMa + R2 pipeline for any caller with a non-empty HWID header — and the batch job keeps running after disconnect, amplifying cost (compounds the R2 concern in #197). *Before → After:* anonymous → **401** on all three; legitimate readers reuse the clearance they already obtained for page serving → **no UX change**; description translation on catalog cards stays open (pre-auth). *Performance Δ:* not measured (guard is a cheap HMAC verify). *Quality:* reader path preserved; defense matches the page endpoint. *Validation:* 7 backend e2e (focused TestingModule, mocked service) assert 401-without / 200-201-with per endpoint + description-open; 5 frontend bun on the header helper. **Live Playwright E2E deferred** (per owner decision — to be run before merge). *Risk/rollback:* a client missing/with-expired clearance gets 401 on translate (re-solve captcha re-issues it); revert = 1 commit. *Links:* #227, `5a81942`.
+
+### Post-review hardening (`/code-review` xhigh on the rebased branch)
+
+A high-recall `/code-review` after rebasing onto `origin/main` found two issues the default-threshold `/security-review` had missed; both fixed TDD on-branch.
+
+**CR#1 · Clearance-token exfiltration via substring origin match (high)** — *What/where:* `isApiRequest` in `Frontend/app/lib/zeroTrustHeaders.ts`, wired into the global `window.fetch` interceptor (`SupabaseGuard.tsx`). *Why:* the interceptor chose which requests carry `x-hardware-id` + the HWID-bound `x-captcha-clearance` credential via substring matching (`url.includes('supabase.co'/'localhost')`, `startsWith('/')`) — pre-existing for the HWID, but #227 newly routed the 1h captcha-bypass token through the same broken matcher. Lookalike origins matched (`https://supabase.co.evil.com`, `https://evil.com/?ref=supabase.co`, `//evil.com`), so any `fetch()` to an attacker URL exfiltrated the token. *Before → After:* substring/`startsWith` → **exact-origin allow-list** — a single leading `/` (rejects `//` protocol-relative), or an absolute URL whose parsed origin ∈ {own origin, `NEXT_PUBLIC_SUPABASE_URL` origin}; malformed URL → false. Injection logic otherwise unchanged; legit relative + same-origin + Supabase traffic preserved. *Performance Δ:* N/A. *Quality:* no functional change for real origins. *Validation:* 7 frontend bun (5 attacker URLs → false, legit → true, malformed → false). *Risk/rollback:* closes a credential leak, no behaviour change for trusted origins; revert = 1 commit. *Links:* `075cc30`.
+
+**CR#2 · Supabase heuristic misclassified intentional HttpExceptions (medium)** — *What/where:* `Backend/src/common/filters/all-exceptions.filter.ts`. *Why:* `isSupabaseError` substring-scanned the message and overrode status/message **before** the HttpException branch, so a deliberate `HttpException` whose message merely mentioned Supabase (e.g. `BadRequestException('Invalid Supabase project id')`) was coerced to 503 `SUPABASE_OFFLINE` — wrong status, canned message, a false "project paused" toast on the frontend, and CRITICAL log spam. *Before → After:* `isSupabaseError` now gated with `!isHttpException` → HttpExceptions keep their own status/message/`code`; a genuine non-HttpException connection failure still maps to 503 `SUPABASE_OFFLINE` (feature preserved). *Performance Δ:* N/A. *Quality:* correctness/UX fix. *Validation:* `all-exceptions.filter.spec.ts` +2 (HttpException-with-Supabase-message → 400/404 + own message preserved) + the existing 503 regression. *Risk/rollback:* revert = 1 commit. *Links:* `0c09b85`.
+
+*Post-rebase verification:* security unit suite **56/56**, MIT guard e2e **7/7**, frontend `zeroTrustHeaders` **7/7** — all green on the new `origin/main` base.
+
+### Open follow-ups (not in this batch)
+- Live Playwright/tunnel E2E of the reader+translation path (original↔translated) before PR — owner-deferred.
+- Code-review CR#3–CR#7 (LOW/MED, several pre-existing) not yet addressed: (CR#3) `Request`-object `fetch()` skips header injection — `args[0]?.toString()` → `"[object Request]"`, fails closed; (CR#4) `/uploads/*` (UploadsController `@Get('*')`) is outside the `/^\/upload\//` HWID regex — confirm public-by-design vs gap; (CR#5) NaN-expiry not rejected in `verifyClearanceToken` (`NaN < Date.now()` is false) — defense-in-depth, HMAC still gates; (CR#6) `TurnstileGuard` reads `x-hardware-id` raw and doesn't shape-validate it on `/books/translate/manga` (route not in `HWID_REQUIRED`); (CR#7) `SupabaseGuard` fetch-interceptor absolute-restore can clobber/double-wrap on remount/foreign interceptor.
+- `console.error` used for the new server-side error logging in `books.controller.ts` (matches existing file style); will fold into the `console.* → Logger` sweep in #240.
+- `notify.ps1` toast errored on this run (`LoadXml` HRESULT `0xC00CE502`) — unrelated to this PRD; flag for the dev-notification script.
+
+---
+
 ## 2026-06-10 — HOTFIX (critical): per-chapter Cloudflare Worker `/v1/list` cost-bleed
 
 **Severity:** critical (unbounded Cloudflare R2 Class-A op spend) · **Branch:** `hotfix/r2-list-amplification` → `main` (PR #197, squash `01affd5`).
@@ -703,7 +836,7 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 
 ---
 
-## 2026-06-15 — Connect MIT to the Dashboard (live telemetry) + Dashboard OAuth (PRD #279 / ADR 016, ADR 017)
+## 2026-06-15 — Connect MIT to the Dashboard (live telemetry) + Dashboard OAuth (PRD #279 / ADR 018, ADR 019)
 
 **1. What changed.** Exposed MIT's already-built observability primitives over HTTP and wired the standalone Dashboard to them with a real OAuth login. MIT: 4 new import-light modules (`status_snapshot`, `auth`, `status_hub`, `status_stream`) + `GET /status` / `GET /status/stream` (SSE) on the parent server, gated by a forwarded Supabase JWT; `myqueue.add_task` + `/register` push events. Dashboard: Supabase Google OAuth gate, an authenticated `/api/live` SSE proxy, `useLiveSnapshot` hook, and live telemetry on the overview (GPU util/temp/VRAM/power, CPU/disk, RAM) with a live/offline badge + MIT-status chip; mock fallback throughout.
 
@@ -713,9 +846,9 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 
 **4. Benefits.** An incident is diagnosable from live data, not mock. Independent per-service verification with **no shared secret** (a Dashboard leak grants nothing reusable). **Zero new dependency** (httpx/psutil/nvidia-smi/@supabase/supabase-js — the last already used by the app Frontend). Event **push** with no event-tier loop. Graceful degradation to mock.
 
-**5. Purpose.** Realize Phase-1 (1d metrics + 1f transport) of the Dev console for MIT — the "window into the box" when production can't be inspected, per ADR 016's production motivation.
+**5. Purpose.** Realize Phase-1 (1d metrics + 1f transport) of the Dev console for MIT — the "window into the box" when production can't be inspected, per ADR 018's production motivation.
 
-**6. Why + architectural impact.** ADR 016 set the architecture (out-of-band aggregator, per-service streams, forward-JWT, no shared secret). This slice implements it for MIT and **refines one detail**: MIT verifies via Supabase `getUser` rather than local PyJWT — zero new dep, no JWT secret distributed to MIT, and robust to Supabase's new asymmetric `sb_publishable_…` keys (local HMAC could not verify them). The Dashboard's `/api/live` is the authenticated proxy that lets a browser (which can't set an `EventSource` auth header) reach MIT. ADR 017 records it.
+**6. Why + architectural impact.** ADR 018 set the architecture (out-of-band aggregator, per-service streams, forward-JWT, no shared secret). This slice implements it for MIT and **refines one detail**: MIT verifies via Supabase `getUser` rather than local PyJWT — zero new dep, no JWT secret distributed to MIT, and robust to Supabase's new asymmetric `sb_publishable_…` keys (local HMAC could not verify them). The Dashboard's `/api/live` is the authenticated proxy that lets a browser (which can't set an `EventSource` auth header) reach MIT. ADR 019 records it.
 
 **7. Problems before.** MIT's metrics/diagnostics modules were committed but unexposed; the Dashboard was 100% mock; there was no way for a dev to authenticate and pull live data.
 
@@ -725,7 +858,7 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 
 **10. Architecture after.** Browser ──OAuth──> session JWT ──fetch `/api/live`──> Next proxy ──forward JWT──> MIT `/status/stream`; MIT verifies independently (Supabase `getUser`) + gates to staff; SSE frames fold through `lib/snapshot.ts`; UI live-or-mock. Metric sampler loop lives at the source (MIT); events push via `StatusHub`.
 
-**11. Change list.** MIT new: `server/status_snapshot.py`, `server/auth.py`, `server/status_hub.py`, `server/status_stream.py`. MIT modified: `server/main.py` (routes + `require_staff` + throttled probe + worker-up event), `server/myqueue.py` (enqueue event). Dashboard new: `lib/live.ts`, `lib/live-map.ts`, `lib/supabase.ts`, `components/auth-gate.tsx`, `components/use-live-snapshot.ts`, `app/api/live/route.ts`, `README.md`. Dashboard modified: `app/layout.tsx`, `app/page.tsx`, `components/shell.tsx`, `.env.example`/`.env.local`, `package.json`. Docs: ADR 017 (+ index), DONE.md, PIPELINE.md §5, MIT README.
+**11. Change list.** MIT new: `server/status_snapshot.py`, `server/auth.py`, `server/status_hub.py`, `server/status_stream.py`. MIT modified: `server/main.py` (routes + `require_staff` + throttled probe + worker-up event), `server/myqueue.py` (enqueue event). Dashboard new: `lib/live.ts`, `lib/live-map.ts`, `lib/supabase.ts`, `components/auth-gate.tsx`, `components/use-live-snapshot.ts`, `app/api/live/route.ts`, `README.md`. Dashboard modified: `app/layout.tsx`, `app/page.tsx`, `components/shell.tsx`, `.env.example`/`.env.local`, `package.json`. Docs: ADR 019 (+ index), DONE.md, PIPELINE.md §5, MIT README.
 
 **12. Metrics.** New tests: MIT 24 (snapshot 6 / auth 8 / hub 5 / stream 5), Dashboard 11 (live 6 / live-map 5). Suites green: MIT new 24/24, sibling import-light server 20/20, Dashboard 91/91. ~10 new files, ~6 edited, 1 dep added.
 
@@ -741,7 +874,7 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 
 **18. KPI.** Branch pending review/commit · MIT 24/24 + Dashboard 91/91 + sibling 20/20 new/regression tests green · 0 translate-pipeline impact · zero-trust 401/403 verified against production Supabase · live metrics verified on-box · OAuth gate rendered. Remaining: a valid-token 200 needs a human Google sign-in + the dev's id in `MIT_STAFF_USER_IDS`.
 
-*Links:* PRD #279, ADR 016, ADR 017. Provenance: PIPELINE.md §5, DONE.md 2026-06-15.
+*Links:* PRD #279, ADR 018, ADR 019. Provenance: PIPELINE.md §5, DONE.md 2026-06-15.
 
 ### Increment (2026-06-16) — `/service/mit` real-data wiring + `control_ms` + unified debug console
 
@@ -778,3 +911,93 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **4. Ops.** Killed a stale 14-Jun full MIT worker (orphaned `python3.11.exe` on :5004 holding ~3.9 GB VRAM — the worker-restart-gotcha); relaunched a full GPU worker on :5013 so the worker telemetry flows. No translate-pipeline change.
 
 **5. Validation / KPI.** Dashboard typecheck clean (touched files), `bun test` **130 pass / 0 fail**, `/service/mit` SSR 200 no error overlay. New modules: `lib/live-series.ts` (+5 tests), `lib/mit-console.ts` (+10 tests). Same-day follow-ups: real wall-clock x-axis on the graphs (`seriesT` → `times` prop); `mit@console` made a functional read-only live console (`runMitCommand` over the status snapshot — no shell, no mutating control). Provenance: DONE.md 2026-06-17.
+
+---
+
+# 2026-06-14 — refactor(Backend): split MangaCatalog/Landing/GeminiModelCatalog out of books.service (#231, PRD #228 step 6)
+
+**1. Type.** Behaviour-preserving structural refactor (god-file decomposition), final step of PRD #228.
+
+**2. Trigger.** `books.service.ts` still fused three non-MIT domains (Gemini model selection, MangaDex catalog passthrough + search, landing assembly + Gemini text translation) into the same class as the MIT chain — untestable in isolation, and the stale-cache fallback was duplicated verbatim.
+
+**3. Change (before → after).**
+- before: 841-line `BooksService` holding model selection (`getAvailableGeminiModels`/`filterAvailableGeminiModels`/`getMangaModels`/`getDescriptionModels`), catalog passthroughs + `searchBooks`/`findTitleIdsByAltName`, and `getLandingBooks`/`translateDescription`/`translateMangaEpisode`/`enhanceLanding`/`applyForceLocalLanding`/`patchLandingCacheIfNeeded` — with two byte-identical stale-cache fallback blocks inline.
+- after: three units — `GeminiModelCatalog` (injected env+clock), `MangaCatalogService` (mangaDex/supabase/cache), `LandingService` (cache/imageCache/mangaDex/geminiCatalog/backendOrigin/env) — constructed via `new` in the BooksService constructor; `BooksService` is a thin facade of delegators with every public signature unchanged. The two fallback blocks collapse into one `serveStale()`.
+
+**4. Seams / commits.** 6a `15e4837` GeminiModelCatalog · 6b `127ee43` MangaCatalogService · 6c `959b1bd` LandingService. One seam = one commit; build (whole backend) green at each.
+
+**5. Byte-identical proof.** Method bodies moved verbatim (only `process.env`→`this.env`, `Date.now()`→`this.now()`, `this.backendOrigin` getter→`backendOrigin()` callback). Spies preserved: BooksService keeps `getMangaModels` (books-models spy) + `translateMangaEpisode` (books-translate spec) delegators. Existing books characterization net stays green unchanged. `serveStale` is the one intended dedup (the two blocks were verbatim-identical → same result).
+
+**6. Performance.** Neutral — same call graph, one extra method hop per delegated call (negligible).
+
+**7. Quality / metrics.** `books.service.ts` 841 → **376 lines** (quartered from its 1834-line start). +3 modules, +17 isolated unit cases (6 gemini env/clock + 5 catalog search/alt-name + 6 landing serveStale/description). Full backend suite **513 → 530 pass / 0 fail**.
+
+**8. Tech debt removed.** Model selection, catalog search, and landing assembly are now editable + testable without the MIT stack; the duplicated stale-cache fallback is gone; `GeminiModelCatalog` selection is deterministic under an injected clock.
+
+**9. Risk / rollback.** Byte-identical; rollback = revert the 3 commits. No money/auth/MIT-protocol surface touched. `BooksModule` unchanged (units are `new`-constructed, not DI providers).
+
+**10. Notes.** Two pre-existing unused imports (`fs`/`path`) left in place per the surgical rule (own-orphans only) — they belong to cleanup issue #240. `MangaCatalogService` deliberately holds real search/alt-name logic rather than being a redundant forwarder over `MangaDexService`.
+
+**11. KPI.** PRD #228 CLOSED — all 6 steps landed (#229/#230/#232/#233/#234/#231) · god file 1834 → 376 (−79%) · byte-identical · 0 regressions (530 pass) · +17 isolated tests.
+
+*Validation:* `npm run build` (whole backend) + `npx jest` full suite 530/0 per seam. *Links:* #228, #231, branch `dept/backend`.
+
+---
+
+# 2026-06-18 — refactor(Backend): split mit-batch-orchestrator.service.ts — transport/stream vs job-state (#294)
+
+**1. Type.** Behaviour-preserving structural refactor (god-file decomposition) on the live-translation hot path. ADR [017](../adr/017-mit-batch-transport-jobstate-seam.md).
+
+**2. Trigger.** `mit-batch-orchestrator.service.ts` was 1010 LOC (largest backend file) mixing four concerns — job-state lifecycle, listener fan-out, MIT transport + NDJSON stream, webhook callback. The NDJSON stream-read loop (`_runMitBatch`) was the riskiest, most nested part and had **zero direct test coverage**: it could only be exercised by constructing the whole service.
+
+**3. Change (before → after).**
+- before: one `MitBatchOrchestrator` class owning `startOrAttachBatchJob`/`finalize`/`maybeComplete` + `deliver`/`removeBatchListener`/`notifyBatchProgress` + `_runMitBatch` (image fetch → multipart POST → NDJSON read loop → per-page persist → retry-missing) + `_retryMissingPagesIndividually` + `handleMitCallback`, with the NDJSON chunk parsing inlined and env-helper delegators (`buildMitConfig`/`imageModelKey`/`patchCacheKey`/`mitCallbackOrigin`).
+- after: four files — `mit-batch-ndjson.ts` (pure `parseNdjsonChunk(chunk, carry) → {events, carry}`), `mit-batch-stream.ts` (`MitBatchStream` = `run` + `_retryMissingPagesIndividually` + `mitCallbackOrigin`, constructed with `(MitClient, MitBatchDeps)`), `mit-batch-types.ts` (shared `PatchEntry`/`PageResult`/`BatchPageListener`/`MitBatchDeps`), and `mit-batch-orchestrator.service.ts` as the job-state machine delegating transport via `this.stream.run(...)`. Public API unchanged; `books.service` untouched.
+
+**4. Seams / commits.** 1 `6c76169` characterization net (test-only) · 2 `367d9f1` pure `parseNdjsonChunk` wired into the loop · 3 `6eb9394` extract shared types · 4 `b4a2416` move transport → `MitBatchStream`. One seam = one commit; tsc + full books suite green at each.
+
+**5. Byte-identical proof.** The read loop is lifted verbatim (only `this.patchCacheKey/buildMitConfig/imageModelKey` → direct `mit-config` calls, behaviour-identical). A 12-case characterization net added **first** (commit 1, against the pre-split code) locks the stream path — clean/multi-chunk/carry/keep-alive/malformed/non-numeric-pageIndex/stream-error/all-error dead-worker-guard/stream-drop-retry/submit-throws/202-async/handleMitCallback idempotency+persist-fail — and stays green identically through commits 2–4. Preserved landmines: the `deliver` "caller may be gone" catches, the shared "NDJSON parse failed" log (malformed line **and** persist throw), the dead-worker guard, the no-signal-on-submitBatch note, persist-fail-as-error.
+
+**6. Performance.** Neutral — same call graph; the decoder does the same split/parse the inline loop did. One extra method hop (`stream.run`) per batch.
+
+**7. Quality / metrics.** `mit-batch-orchestrator.service.ts` **1010 → 557 LOC** (−45%). +3 modules (decoder, stream, types). New tests: `mit-batch-ndjson.spec.ts` (12 chunk-boundary cases), `mit-batch-stream.spec.ts` (6 isolation cases), `mit-batch-orchestrator.characterization.spec.ts` (12). Full books suite **214 → 244 pass / 0 fail**; whole backend **595 / 0 fail**; tsc clean.
+
+**8. Tech debt removed.** The NDJSON state machine (previously untestable without the full service) is now a pure function tested with strings; the transport is testable in isolation with a faked `MitClient`; the env-helper delegators that only wrapped `mit-config` are gone from the orchestrator.
+
+**9. Risk / rollback.** Byte-identical; rollback = revert the 4 commits (each leaves the suite green). No money/auth surface; `handleMitCallback`'s wire contract and the MIT webhook protocol are untouched. **Live E2E (One-Punch benchmark via tunnel, 3-layer cache cleared) is to run before merge**, per the agreed gate.
+
+**10. Notes.** One cosmetic delta — transport logs carry the `MitBatchStream` logger context (`[BatchPatches]` message strings unchanged). `readWithTimeout` still never `clearTimeout`s its race-loser timer (pre-existing dangling-timer, left verbatim) — flagged in ADR 017 as a behind-a-flag follow-up. Memory `project_backend_pre_existing_test_failures` (16 fails) is stale: backend is 595/0.
+
+**11. KPI.** #294 implemented · god file 1010 → 557 (−45%) · byte-identical (characterization net green ×4 commits) · 0 regressions (595 pass) · +30 tests (12 decoder + 6 stream + 12 characterization) · 1 cosmetic delta (logger name, documented).
+
+*Validation:* TDD characterization-first; `npx tsc --noEmit` clean + `npx jest src/books` 244/0 per commit + full backend 595/0. *Risk/rollback:* byte-identical; revert = drop the 4 commits. *Links:* #294, #292, ADR 017, branch `refactor/294-mit-batch-stream`.
+
+---
+
+# 2026-06-18 — refactor(Frontend): decompose MangaReader + BookDetailModal, slice 1 (#302)
+
+**1. Type.** Behaviour-preserving extraction-by-concern of two god-components; first slice of the #292 frontend tech-debt PRD.
+
+**2. Trigger.** `BookDetailModal.tsx` (1355 LOC) buried the chapter-access gating (coin-unlock, money-adjacent) in inline closures over component state — untestable. `MangaReader.tsx` (1789 LOC) inlined the chapter-list fetch in a `useEffect`. Both files force a whole-file read to change anything.
+
+**3. Change (before → after).**
+- before: `isChapterReadable`/`isChapterCoinLocked`/`getUnavailableChapterLabel` were inline closures in BookDetailModal; the chapter-list fetch+merge+sort was an inline effect in MangaReader; the HWID `apiFetch` was MangaReader-local.
+- after: `app/lib/chapterAccess.ts` — pure `chapterAccess(ch, { unlockedVersions }) → { coinLocked, readable, unavailableLabel }` (unit-tested); `app/hooks/useChapters.ts` — `useChapters(mangaId)` owning the fetch and returning the list; `app/lib/apiFetch.ts` — the single HWID-tagged fetch. BookDetailModal calls `chapterAccess`; MangaReader uses `useChapters` + imports `apiFetch`.
+
+**4. Seams / commits.** c1 chapterAccess pure fn + tests · c2 BookDetailModal consumes it · c3 useChapters + shared apiFetch · zoomLevel pure math slice. One seam = one commit; tsc + bun lib tests green at each.
+
+**5. Byte-identical proof.** chapterAccess preserves the predicates' exact early-return order + labels; the only real input is `unlockedVersions` (the issue's illustrative `balance` is unused). The fetch effect is lifted verbatim into the hook; `apiFetch` moved verbatim. Render-loop label is still read only when `!readable`. No component-test harness yet → the pure logic is unit-tested; the byte-identical wiring is covered by `tsc` + manual walkthrough.
+
+**6. Performance.** Neutral — same calls; the chapter row computes one `chapterAccess` object instead of three closure calls (one extra object alloc per row, negligible).
+
+**7. Quality / metrics.** BookDetailModal **1355 → 1324** (−31); MangaReader **1789 → 1739** (−50). +4 modules (chapterAccess / useChapters / apiFetch / zoomLevel). +22 bun cases (chapterAccess 16 + zoomLevel 6; lib suite 55 → 77 / 0 fail). `npx tsc --noEmit` clean; 0 new lint errors.
+
+**8. Tech debt removed.** The money-adjacent coin-unlock gating is now a pure, exhaustively-tested function instead of component closures; the chapter fetch is isolated from the reader's viewport/zoom/translation concerns; the HWID fetch has a single source.
+
+**9. Risk / rollback.** Byte-identical; rollback = revert the commits. No backend/wallet/unlock surface touched. Manual reader + detail/coin-unlock + zoom walkthrough was the verification net (no component harness) — passed before merge.
+
+**10. Notes.** Slice 1 of #302 plus the pure zoom-level math slice. The full `useReaderZoom()` hook is deliberately deferred — the zoom/pan cluster is entangled with the continuous-scroll machinery (pageRefs/lenis/viewport-sync) and there is no component test harness, so a big byte-identical move needs its own plan. `useTranslationStream`/Turnstile remain follow-ups. No ADR (routine extraction, matches #299/#300/#301).
+
+**11. KPI.** #302 slice 1 · two god-components −81 LOC combined · chapterAccess + zoomLevel pure + 22 tests · byte-identical · 0 regressions (bun 77/0, tsc clean).
+
+*Validation:* `bun test app/lib` 77/0 + `npx tsc --noEmit` clean per commit; manual walkthrough passed before merge. *Links:* #302, #292, branch `refactor/302-frontend-decompose`.

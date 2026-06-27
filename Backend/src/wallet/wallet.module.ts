@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
 import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
+import { XenditService } from './xendit.service';
+import { WalletEventsService } from './wallet-events.service';
+import { TopupThrottleGuard } from './topup-throttle.guard';
 
 @Module({
   controllers: [WalletController],
-  providers: [WalletService],
+  providers: [WalletService, XenditService, WalletEventsService, TopupThrottleGuard],
   exports: [WalletService],
 })
 export class WalletModule {}

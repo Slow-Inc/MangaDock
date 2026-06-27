@@ -7,12 +7,14 @@ import {
   Patch,
   Post,
   Req,
+  Res,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
   Inject,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import * as path from 'path';
@@ -170,6 +172,18 @@ export class UsersController {
   @Delete('me/history')
   clearHistory(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
     return this.users.clearHistory(req[USER_KEY].uid);
+  }
+
+  @Get('me/history/export')
+  async exportHistory(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+    @Res() res: Response,
+  ) {
+    const csv = await this.users.exportHistory(req[USER_KEY].uid);
+    res
+      .set('Content-Type', 'text/csv')
+      .set('Content-Disposition', 'attachment; filename="reading-history.csv"')
+      .send(csv);
   }
 
   @Delete('me/history/:id')

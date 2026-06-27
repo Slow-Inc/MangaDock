@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { errMessage } from "@/lib/errMessage";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -224,8 +225,8 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
     try {
       await updateUserProfile(displayName);
       setSuccessMessage("อัปเดตชื่อผู้ใช้สำเร็จ ✓");
-    } catch (error: any) {
-      setErrorMessage(error.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+    } catch (error: unknown) {
+      setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {
       setLoading(false);
     }
@@ -240,13 +241,14 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       // Reauth successful — advance to the "type to confirm" step
       setDeleteStep("confirm");
       setDeleteConfirmText("");
-    } catch (error: any) {
-      if (error?.code === "auth/wrong-password" || error?.code === "auth/invalid-credential") {
+    } catch (error: unknown) {
+      const code = (error as { code?: string })?.code;
+      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
         setErrorMessage("รหัสผ่านไม่ถูกต้อง");
-      } else if (error?.code === "auth/user-mismatch") {
+      } else if (code === "auth/user-mismatch") {
         setErrorMessage("รหัสผ่านนี้ไม่ตรงกับบัญชีที่กำลังจะลบ กรุณาใช้รหัสผ่านของบัญชีนี้");
       } else {
-        setErrorMessage(error.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
       }
     } finally {
       setReauthenticating(null);
@@ -275,9 +277,9 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       reauthResolvedRef.current = true;
       setDeleteStep("confirm");
       setDeleteConfirmText("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       reauthResolvedRef.current = true;
-      const code = error?.code ?? "";
+      const code = (error as { code?: string })?.code ?? "";
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         // User closed popup — keep reauth step open and ready for retry
       } else if (code === "auth/popup-blocked") {
@@ -285,7 +287,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       } else if (code === "auth/user-mismatch") {
         setErrorMessage(`บัญชี ${provider === "google" ? "Google" : "Facebook"} ที่เลือกไม่ตรงกับบัญชีที่กำลังจะลบ กรุณาเลือกบัญชีให้ถูกต้อง`);
       } else {
-        setErrorMessage(error?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
       }
     } finally {
       window.removeEventListener("focus", onFocus);
@@ -313,8 +315,8 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
         ),
         duration: 5000,
       });
-    } catch (error: any) {
-      setErrorMessage(error.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+    } catch (error: unknown) {
+      setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {
       setLoading(false);
     }
@@ -365,10 +367,10 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
     try {
       await applyPhotoChange(photoURL);
       setShowPhotoPicker(false);
-    } catch (error: any) {
-      const msg = error?.code === "storage/unauthorized"
+    } catch (error: unknown) {
+      const msg = (error as { code?: string })?.code === "storage/unauthorized"
         ? "ไม่มีสิทธิ์อัพโหลด — ตรวจสอบ MangaDock Storage Rules"
-        : error?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่";
+        : errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่";
       setPhotoError(msg);
     } finally {
       setPhotoUploading(false);
@@ -385,10 +387,10 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       const url = await uploadProfilePhoto(file);
       await applyPhotoChange(url);
       setShowPhotoPicker(false);
-    } catch (error: any) {
-      const msg = error?.code === "storage/unauthorized"
+    } catch (error: unknown) {
+      const msg = (error as { code?: string })?.code === "storage/unauthorized"
         ? "ไม่มีสิทธิ์อัพโหลด — ตรวจสอบ MangaDock Storage Rules"
-        : error?.message || "อัพโหลดไม่สำเร็จ กรุณาลองใหม่";
+        : errMessage(error) || "อัพโหลดไม่สำเร็จ กรุณาลองใหม่";
       setPhotoError(msg);
     } finally {
       setPhotoUploading(false);
@@ -426,11 +428,12 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       await updateUserPassword(currentPassword, newPassword);
       setSuccessMessage("เปลี่ยนรหัสผ่านสำเร็จ ✓");
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
-    } catch (error: any) {
-      if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+    } catch (error: unknown) {
+      const code = (error as { code?: string })?.code;
+      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
         setErrorMessage("รหัสผ่านปัจจุบันไม่ถูกต้อง");
       } else {
-        setErrorMessage(error.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
       }
     } finally {
       setLoading(false);
@@ -446,11 +449,12 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       await addEmailPassword(newPassword);
       setSuccessMessage("เพิ่มรหัสผ่านสำเร็จ ✓ ตอนนี้คุณสามารถ login ด้วย Email ได้แล้ว");
       setNewPassword(""); setConfirmPassword("");
-    } catch (error: any) {
-      if (error.code === "auth/provider-already-linked") {
+    } catch (error: unknown) {
+      const code = (error as { code?: string })?.code;
+      if (code === "auth/provider-already-linked") {
         setErrorMessage("เชื่อมต่อ Email/Password อยู่แล้ว");
       } else {
-        setErrorMessage(error.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
       }
     } finally {
       setLoading(false);
@@ -477,13 +481,13 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       await fn();
       linkingResolvedRef.current = true;
       setSuccessMessage(`เชื่อมต่อบัญชี ${provider === "google" ? "Google" : "Facebook"} สำเร็จ ✓`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       linkingResolvedRef.current = true;
-      const code = error?.code ?? "";
+      const code = (error as { code?: string })?.code ?? "";
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         // User closed the popup — not an error, just silently reset
       } else if (code === "auth/credential-already-in-use") {
-        const credential = (error as any).credential;
+        const credential = (error as { credential?: unknown }).credential;
         if (credential) {
           showConflict({ credential, provider });
         } else {
@@ -492,7 +496,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       } else if (code === "auth/provider-already-linked") {
         setErrorMessage(`เชื่อมต่อกับ ${provider === "google" ? "Google" : "Facebook"} อยู่แล้ว`);
       } else {
-        setErrorMessage(error?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
       }
     } finally {
       window.removeEventListener("focus", onFocus);
@@ -516,8 +520,8 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
           try {
             await switchToConflictingAccount(info.credential);
             handleClose();
-          } catch (error: any) {
-            setErrorMessage(error.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+          } catch (error: unknown) {
+            setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
           }
         },
       },
@@ -533,8 +537,8 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
     try {
       await unlinkAccount(providerId);
       setSuccessMessage("ยกเลิกการเชื่อมต่อสำเร็จ ✓");
-    } catch (error: any) {
-      setErrorMessage(error.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+    } catch (error: unknown) {
+      setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {
       setLoading(false);
     }

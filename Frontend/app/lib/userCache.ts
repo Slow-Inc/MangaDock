@@ -10,6 +10,8 @@
  *     and merged — local additions are preserved, remote state wins for removals.
  */
 
+import { createAuthHeaders } from "./apiUtils";
+
 const API_BASE = "/api/proxy";
 const LS_FAV = "mb_favorites";
 const LS_LIKED = "mb_liked";
@@ -87,10 +89,7 @@ async function flush() {
   const token = await getTokenFn?.();
   if (!token) return; // not logged in — skip sync
 
-  const headers: HeadersInit = {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+  const headers = createAuthHeaders(token, { "Content-Type": "application/json" });
 
   // Compute diffs vs last known database state
   const toAddFav: CachedBook[] = [];
@@ -156,7 +155,7 @@ async function flush() {
 // ─── Load from server (called on login) ────────────────────────────────────
 export async function loadUserData(token: string) {
   loadFromLS();
-  const headers: HeadersInit = { Authorization: `Bearer ${token}` };
+  const headers = createAuthHeaders(token);
   try {
     const [favRes, likedRes] = await Promise.all([
       fetch(`${API_BASE}/users/me/favorites`, { headers }),

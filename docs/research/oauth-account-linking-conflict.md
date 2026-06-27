@@ -2,7 +2,7 @@
 
 > Produced by a verify-first research workflow (2026-06-15, `wf_9500d487-778`, 11 agents, ~947k tokens).
 > All facts verified against the **live `mangadock` Supabase build** + **GoTrue master source**. For the
-> Dev console GitHub-linking problem ([[project-dashboard-mit-live]], ADR 017).
+> Dev console GitHub-linking problem ([[project-dashboard-mit-live]], ADR 019).
 
 ## Root cause (verified)
 

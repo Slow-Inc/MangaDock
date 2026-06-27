@@ -1,7 +1,7 @@
 # PRD — Account-linking conflict resolution ("choose which account to link")
 
 > Status: Draft (2026-06-15; updated 2026-06-16). Source research: `docs/research/oauth-account-linking-conflict.md`
-> (verify-first workflow, validated against live `mangadock` build + GoTrue source). Relates to ADR 017.
+> (verify-first workflow, validated against live `mangadock` build + GoTrue source). Relates to ADR 019.
 > **2026-06-16 decision (verified by feasibility workflow):** the email ownership proof = **OTP code, not magic-link**
 > (see *Decision* below). The supported `linkIdentity`-while-signed-in path is GoTrue-source-confirmed; the
 > `service_role` INSERT fallback is **not** needed for the happy path.

@@ -207,6 +207,9 @@ function SearchResults() {
   const [inputValue, setInputValue]       = useState(query);
   const [source, setSource]               = useState<Source>("all");
   const [langFilter, setLangFilter]       = useState("all");
+  const [statusFilter, setStatusFilter]   = useState<'ongoing' | 'completed' | 'hiatus' | 'all'>('all');
+  const [yearFrom, setYearFrom]           = useState('');
+  const [yearTo, setYearTo]               = useState('');
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   const [apiResults, setApiResults] = useState<LandingBook[]>([]);
@@ -222,8 +225,8 @@ function SearchResults() {
   // sync input when URL changes
   useEffect(() => { setInputValue(query); }, [query]);
 
-  // reset page when query / lang / source changes
-  useEffect(() => { setPage(1); }, [query, langFilter, source]);
+  // reset page when query / lang / status / year / source changes
+  useEffect(() => { setPage(1); }, [query, langFilter, statusFilter, yearFrom, yearTo, source]);
 
   // fetch from API
   useEffect(() => {
@@ -242,6 +245,9 @@ function SearchResults() {
     const offset = (page - 1) * PAGE_SIZE;
     const qs = new URLSearchParams({ q: query, limit: String(PAGE_SIZE), offset: String(offset) });
     if (langFilter !== "all") qs.set("lang", langFilter);
+    if (statusFilter !== "all") qs.set("status", statusFilter);
+    if (yearFrom) qs.set("yearFrom", yearFrom);
+    if (yearTo) qs.set("yearTo", yearTo);
 
     fetch(`${API_BASE}/books/search?${qs}`, { signal: ctrl.signal })
       .then((r) => r.json())
@@ -255,10 +261,10 @@ function SearchResults() {
       .catch((e) => { if ((e as Error).name !== "AbortError") { setApiResults([]); setApiTotal(0); setSearched(true); setLoading(false); } });
 
     return () => ctrl.abort();
-  }, [query, langFilter, source, page]);
+  }, [query, langFilter, statusFilter, yearFrom, yearTo, source, page]);
 
   // reset category when base changes
-  useEffect(() => { setCategoryFilter("all"); }, [query, langFilter, source]);
+  useEffect(() => { setCategoryFilter("all"); }, [query, langFilter, statusFilter, yearFrom, yearTo, source]);
 
   // local books (favorites + history) — must be client-only to avoid hydration mismatch
   const [localBooks, setLocalBooks] = useState<LandingBook[]>([]);
@@ -363,7 +369,50 @@ function SearchResults() {
             )}
           </div>
 
-          {/* Row 2: หมวดหมู่ (dynamic from results) */}
+          {/* Row 2: สถานะ + ปี */}
+          {!isMyList && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-[11px] font-medium text-white/30">สถานะ</span>
+                {(['ongoing', 'completed', 'hiatus'] as const).map((s) => {
+                  const label = s === 'ongoing' ? 'กำลังดำเนินการ' : s === 'completed' ? 'จบแล้ว' : 'หยุดพัก';
+                  return (
+                    <FilterChip
+                      key={s}
+                      active={statusFilter === s}
+                      onClick={() => setStatusFilter((prev) => (prev === s ? 'all' : s))}
+                    >
+                      {label}
+                    </FilterChip>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-[11px] font-medium text-white/30">ปี</span>
+                <input
+                  type="number"
+                  value={yearFrom}
+                  onChange={(e) => setYearFrom(e.target.value)}
+                  placeholder="จาก"
+                  min={1900}
+                  max={2100}
+                  className="w-20 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white placeholder-white/30 outline-none transition focus:border-white/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <span className="text-[11px] text-white/30">–</span>
+                <input
+                  type="number"
+                  value={yearTo}
+                  onChange={(e) => setYearTo(e.target.value)}
+                  placeholder="ถึง"
+                  min={1900}
+                  max={2100}
+                  className="w-20 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white placeholder-white/30 outline-none transition focus:border-white/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Row 3: หมวดหมู่ (dynamic from results) */}
           {availableCategories.length > 0 && (
             <div className="flex items-center gap-2">
               <span className="shrink-0 text-[11px] font-medium text-white/30">หมวดหมู่</span>

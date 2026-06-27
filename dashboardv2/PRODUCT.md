@@ -16,7 +16,7 @@ inspected directly, and it must keep working when the Frontend/Backend are down.
 
 ## Product Purpose
 
-A standalone, out-of-band monitoring dashboard for the MIT pipeline (PRD #279, ADR 016). It shows the translation
+A standalone, out-of-band monitoring dashboard for the MIT pipeline (PRD #279, ADR 018). It shows the translation
 pipeline as a live workflow — each stage's status (detection → OCR → translate → inpaint → render), the gateway
 diagnosis (the 9arm model-down case), GPU/host telemetry as charts, the node fleet, traffic/streams, and a live
 activity/log feed. Per-node depth opens in a popup (logs + console included). Success: an incident is diagnosable at

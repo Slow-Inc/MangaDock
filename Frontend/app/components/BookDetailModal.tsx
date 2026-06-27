@@ -1,7 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import { errMessage } from "@/lib/errMessage";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type Lenis from "lenis";
 import { createPortal } from "react-dom";
 import CoverLightbox from "./CoverLightbox";
@@ -11,9 +13,11 @@ import { addToHistory, getHistory } from "../lib/readingHistory";
 import { useBookActions } from "../hooks/useBookActions";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
+import { chapterAccess } from "../lib/chapterAccess";
 import { useAuth } from "../contexts/AuthContext";
-import { getWalletBalance, purchaseUnlock, getUnlocksForTitle, topupCoins } from "../lib/studioApi";
+import { getWalletBalance, purchaseUnlock, getUnlocksForTitle } from "../lib/studioApi";
 import MangaDiscussion from "./MangaDiscussion";
+import RelatedManga from "./RelatedManga";
 import type { LandingBook, MangaDetail, MangaChapter } from "../lib/types";
 
 type ActiveChapter = {
@@ -121,13 +125,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
   // Coin / Unlock state
+  const router = useRouter();
   const { user, getIdToken } = useAuth();
   const [coinBalance, setCoinBalance] = useState<number | null>(null);
   const [unlockedVersions, setUnlockedVersions] = useState<Set<string>>(new Set());
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
-  const [showTopup, setShowTopup] = useState(false);
-  const [topupAmount, setTopupAmount] = useState(100);
-  const [topupLoading, setTopupLoading] = useState(false);
 
   const lenisRef = useRef<any>(null);
 
@@ -325,37 +327,26 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       const result = await purchaseUnlock(token, ch.versionId);
       if (result.unlocked || result.alreadyUnlocked) {
         setUnlockedVersions((prev) => new Set([...prev, ch.versionId!]));
-        if (result.balance !== undefined) setCoinBalance(result.balance);
+        if (result.balance !== undefined) {
+          setCoinBalance(result.balance);
+          window.dispatchEvent(new CustomEvent('mb:coin-balance-update', { detail: { balance: result.balance } }));
+        }
         // Auto-open the chapter after unlock
         addToHistory({ ...book, lastChapterId: ch.id, lastChapterNumber: ch.chapterNumber });
         setActiveChapter({ id: ch.id, chapterNumber: ch.chapterNumber, title: ch.title });
       }
-    } catch (err: any) {
-      if (err.message?.includes("Insufficient") || err.message?.includes("ไม่พอ")) {
-        setShowTopup(true);
+    } catch (err: unknown) {
+      const msg = errMessage(err);
+      if (msg.includes("Insufficient") || msg.includes("ไม่พอ")) {
+        const returnTo = typeof window !== "undefined" ? window.location.pathname : "/";
+        router.push(`/wallet/topup?returnTo=${encodeURIComponent(returnTo)}`);
       } else {
-        alert(err.message || "ไม่สามารถปลดล็อคได้");
+        alert(msg || "ไม่สามารถปลดล็อคได้");
       }
     } finally {
       setPurchasingId(null);
     }
   }, [user, book]);
-
-  const handleTopup = useCallback(async () => {
-    if (!user) return;
-    setTopupLoading(true);
-    try {
-      const token = await getIdToken();
-      if (!token) return;
-      const result = await topupCoins(token, topupAmount);
-      setCoinBalance(result.balance);
-      setShowTopup(false);
-    } catch (err: any) {
-      alert(err.message || "เติมเหรียญไม่สำเร็จ");
-    } finally {
-      setTopupLoading(false);
-    }
-  }, [user, topupAmount]);
 
   // Scroll-aware header in page mode
   useEffect(() => {
@@ -412,42 +403,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   };
 
   const displayThumbnail = selectedCover ?? resolvedThumbnail(book);
-  const chapterNeedsBackup = (ch: MangaChapter) => ch.isOfflineFallback === true;
-  const chapterMissingInBackend = (ch: MangaChapter) => ch.source === "user" && ch.backendAvailable === false;
-  
-  const isChapterCoinLocked = (ch: MangaChapter) => {
-    if (chapterMissingInBackend(ch)) return false;
-    if (ch.source !== "user") return false;
-    if (!ch.priceCoins || ch.priceCoins <= 0) return false;
-    if (!ch.versionId) return false;
-    return !unlockedVersions.has(ch.versionId);
-  };
-
-  const isChapterReadable = (ch: MangaChapter) => {
-    if (chapterMissingInBackend(ch)) {
-      return false;
-    }
-    if (chapterNeedsBackup(ch)) {
-      return ch.readerAvailable === true;
-    }
-    if (isChapterCoinLocked(ch)) return false;
-    return ch.pageCount > 0;
-  };
-
-  const getUnavailableChapterLabel = (ch: MangaChapter) => {
-    if (chapterMissingInBackend(ch)) {
-      return "ไม่มีใน backend";
-    }
-    if (chapterNeedsBackup(ch) && ch.readerAvailable !== true) {
-      return "ไม่ได้สำรอง";
-    }
-    if (isChapterCoinLocked(ch)) {
-      return `🪙 ${ch.priceCoins}`;
-    }
-    return "ล็อค";
-  };
-
-  const firstReadableChapter = chapters.find((ch) => isChapterReadable(ch));
+  const firstReadableChapter = chapters.find(
+    (ch) => chapterAccess(ch, { unlockedVersions }).readable,
+  );
   const hasReadableChapter = !!firstReadableChapter;
 
   // Prefer book.categories; fall back to genres from MangaDex detail; last resort "E-Book"
@@ -1026,7 +984,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   </h3>
                   {coinBalance !== null && (
                     <button
-                      onClick={() => setShowTopup(true)}
+                      onClick={() => router.push(`/wallet/topup?returnTo=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "/")}`)}
                       className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300 transition hover:bg-amber-500/25"
                       title="เติมเหรียญ"
                     >
@@ -1089,9 +1047,10 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                     }
 
                     const ChapterRowInner = ({ ch, isTreeChild, isLast }: { ch: MangaChapter; isTreeChild: boolean; isLast?: boolean }) => {
-                      const readable = isChapterReadable(ch);
-                      const coinLocked = isChapterCoinLocked(ch);
-                      const unavailableLabel = readable ? null : getUnavailableChapterLabel(ch);
+                      const access = chapterAccess(ch, { unlockedVersions });
+                      const readable = access.readable;
+                      const coinLocked = access.coinLocked;
+                      const unavailableLabel = readable ? null : access.unavailableLabel;
                       const isHighlighted = ch.id === effectiveHighlightId;
                       const isPurchasing = purchasingId === ch.versionId;
                       const row = (
@@ -1265,47 +1224,13 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
           {isManga && (
             <MangaDiscussion mangaId={book.id} title={book.title} cover={resolvedThumbnail(book)} />
           )}
+
+          {/* Related manga carousel (#325) */}
+          {isManga && <RelatedManga mangaId={book.id} />}
         </div>
       </div>
     </div>
 
-      {/* Topup Modal */}
-      {showTopup && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4" onClick={() => setShowTopup(false)}>
-          <div className="w-full max-w-xs rounded-2xl border border-white/10 bg-[#1a1a1a] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-1 text-center text-base font-bold text-white">เติมเหรียญ (ทดสอบ)</h3>
-            <p className="mb-4 text-center text-xs text-white/40">เหรียญปัจจุบัน: 🪙 {coinBalance ?? 0}</p>
-            <div className="mb-4 grid grid-cols-3 gap-2">
-              {[50, 100, 200, 500, 1000, 2000].map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setTopupAmount(amt)}
-                  className={`rounded-xl border py-2.5 text-sm font-semibold transition ${
-                    topupAmount === amt
-                      ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
-                      : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
-                  }`}
-                >
-                  🪙 {amt}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={handleTopup}
-              disabled={topupLoading}
-              className="w-full rounded-xl bg-amber-600 py-2.5 text-sm font-bold text-white transition hover:bg-amber-500 disabled:opacity-50"
-            >
-              {topupLoading ? "กำลังเติม..." : `เติม ${topupAmount} เหรียญ`}
-            </button>
-            <button
-              onClick={() => setShowTopup(false)}
-              className="mt-2 w-full rounded-xl border border-white/10 py-2 text-xs font-semibold text-white/50 transition hover:bg-white/5"
-            >
-              ยกเลิก
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 

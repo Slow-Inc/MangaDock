@@ -14,7 +14,6 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as os from 'os';
-import * as path from 'path';
 import * as crypto from 'crypto';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UploadService } from './upload.service';
@@ -45,7 +44,9 @@ export class UploadController {
       fileFilter: (_req, file, cb) => {
         if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
           return cb(
-            new BadRequestException('Only JPEG, PNG, WebP and GIF images are allowed'),
+            new BadRequestException(
+              'Only JPEG, PNG, WebP and GIF images are allowed',
+            ),
             false,
           );
         }
@@ -69,12 +70,9 @@ export class UploadController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('No file provided');
-    return this.uploadService.addPage(
-      versionId,
-      req[USER_KEY].uid,
-      file.path,
-      file.mimetype,
-    );
+    // The authoritative MIME check is magic-byte based inside addPage; the
+    // fileFilter above is only a cheap first gate on the client Content-Type.
+    return this.uploadService.addPage(versionId, req[USER_KEY].uid, file.path);
   }
 
   /**
@@ -88,8 +86,13 @@ export class UploadController {
     @Param('versionId') versionId: string,
     @Body() body: { pages: string[] },
   ) {
-    if (!Array.isArray(body?.pages)) throw new BadRequestException('pages must be an array');
-    await this.uploadService.reorderPages(versionId, req[USER_KEY].uid, body.pages);
+    if (!Array.isArray(body?.pages))
+      throw new BadRequestException('pages must be an array');
+    await this.uploadService.reorderPages(
+      versionId,
+      req[USER_KEY].uid,
+      body.pages,
+    );
     return { ok: true };
   }
 
@@ -105,7 +108,11 @@ export class UploadController {
     @Body() body: { pageUrl: string },
   ) {
     if (!body?.pageUrl) throw new BadRequestException('pageUrl is required');
-    await this.uploadService.deletePage(versionId, req[USER_KEY].uid, body.pageUrl);
+    await this.uploadService.deletePage(
+      versionId,
+      req[USER_KEY].uid,
+      body.pageUrl,
+    );
     return { ok: true };
   }
 }

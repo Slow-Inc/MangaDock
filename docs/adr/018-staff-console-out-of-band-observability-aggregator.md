@@ -1,4 +1,4 @@
-# ADR 016 — Staff Console observability via a standalone out-of-band aggregator with per-service event streams
+# ADR 018 — Staff Console observability via a standalone out-of-band aggregator with per-service event streams
 
 - **Status:** Accepted — **planned** (not yet implemented). PRD **#279**; Phase 1 slices **#280** (1a — RBAC `staffLevel` + signed-claim auth + gated `/staff` shell) / **#285** (1f — status aggregator microservice + per-service `/status/stream`) / **#282** (1b — subsystem health board) / **#283** (1c — live pipeline tracer + queue) / **#284** (1d — detailed GPU/host metrics) / **#281** (1e — precise translate-failure classification).
 - **Context PRD:** #279 (Staff Console — role-tiered back-office + live MIT pipeline observability)

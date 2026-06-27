@@ -22,7 +22,7 @@ function seedJob(
     cancelController: new AbortController(),
     ...overrides,
   };
-  (service as any).activeBatchJobs.set(jobKey, job);
+  (service as any).batch.activeBatchJobs.set(jobKey, job);
   return job;
 }
 

@@ -30,6 +30,25 @@ const MIME_TO_EXT: Record<string, string> = {
   'image/gif': '.gif',
 };
 
+type ForumPostRow = {
+  id: string;
+  author_uid: string;
+  title: string;
+  content: string;
+  category: string;
+  target_manga_id: string | null;
+  target_manga_title: string | null;
+  target_manga_cover: string | null;
+  image_urls: string[] | null;
+  upvotes: number;
+  downvotes: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  author?: { display_name: string | null; photo_url: string | null; role: string } | null;
+  comments?: Array<{ count: number }> | null;
+};
+
 @Injectable()
 export class ForumService {
   private readonly logger = new Logger(ForumService.name);
@@ -226,8 +245,8 @@ export class ForumService {
     const p = profileRes.data;
 
     // Fetch liked posts by IDs
-    const likedPostIds = (likedVotesRes.data ?? []).map((v: any) => v.target_id);
-    let likedPostsRaw: any[] = [];
+    const likedPostIds = (likedVotesRes.data ?? []).map((v: { target_id: string }) => v.target_id);
+    let likedPostsRaw: ForumPostRow[] = [];
     if (likedPostIds.length > 0) {
       const { data } = await this.db
         .from('forum_posts')
@@ -241,7 +260,7 @@ export class ForumService {
     const allPostIds = [...(postsRes.data ?? []).map((x: any) => x.id), ...likedPostIds];
     const viewerVotes = await this.getUserVotes(viewerUid, 'post', allPostIds);
 
-    const mapPost = (raw: any): ForumPost => ({
+    const mapPost = (raw: ForumPostRow): ForumPost => ({
       id: raw.id,
       authorUid: raw.author_uid,
       authorName: raw.author?.display_name ?? null,

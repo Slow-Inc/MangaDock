@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Navbar from "../../components/Navbar";
-import { useAuth } from "../../contexts/AuthContext";
+import LoadingScreen from "../../components/LoadingScreen";
+import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
 import { getMyProfile, updateTranslatorProfile } from "../../lib/studioApi";
 import { getCached, setCache } from "../../lib/studioCache";
@@ -61,8 +62,7 @@ function LanguageSelect({
 }
 
 export default function StudioAccountPage() {
-  const router = useRouter();
-  const { user, loading, getIdToken } = useAuth();
+  const { user, loading, getIdToken } = useProtectedPage();
   const { showToast } = useToast();
   const isMobile = useIsMobile();
 
@@ -91,10 +91,6 @@ export default function StudioAccountPage() {
     }),
     [bio, languages, country, preferredLanguage, user?.photoURL],
   );
-
-  useEffect(() => {
-    if (!loading && !user) router.replace("/");
-  }, [loading, user, router]);
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
@@ -215,13 +211,7 @@ export default function StudioAccountPage() {
     };
   }, [isMobile, mobileView]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#141414]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
   if (isMobile) {
     const saveButton = (
@@ -256,9 +246,9 @@ export default function StudioAccountPage() {
             />
 
             <div className="flex items-center gap-4 rounded-[1.5rem] border border-white/10 bg-white/4 p-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-600/20">
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-600/20">
                 {user?.photoURL ? (
-                  <img src={user.photoURL} alt="" className="h-full w-full object-cover" />
+                  <Image src={user.photoURL} alt="" fill className="object-cover" />
                 ) : (
                   <span className="text-2xl">👤</span>
                 )}
@@ -468,9 +458,9 @@ export default function StudioAccountPage() {
                 <div className="space-y-6">
             {/* Profile Header */}
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/3 p-5">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-600/20">
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-600/20">
                 {user?.photoURL ? (
-                  <img src={user.photoURL} alt="" className="h-full w-full object-cover" />
+                  <Image src={user.photoURL} alt="" fill className="object-cover" />
                 ) : (
                   <span className="text-2xl">👤</span>
                 )}

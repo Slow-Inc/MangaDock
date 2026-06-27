@@ -35,7 +35,7 @@ describe('BooksService — retry fallback (#82)', () => {
       { pageIndex: 1, pageUrl: 'http://example.com/1.jpg' },
     ];
 
-    await (service as any)._retryMissingPagesIndividually(
+    await (service as any).batch.stream._retryMissingPagesIndividually(
       'ch1', pages, new Set<number>(), notify, undefined, undefined, undefined, controller.signal,
     );
 
@@ -49,7 +49,7 @@ describe('BooksService — retry fallback (#82)', () => {
       .mockResolvedValue({ patches: [] });
 
     const notify = jest.fn();
-    await (service as any)._retryMissingPagesIndividually(
+    await (service as any).batch.stream._retryMissingPagesIndividually(
       'ch2',
       [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }],
       new Set<number>(),

@@ -16,6 +16,7 @@ import {
   type HistoryBook,
 } from "../lib/readingHistory";
 import { AuthContext } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
 
 type TabKey = "favorites" | "liked" | "history";
 
@@ -349,19 +350,45 @@ function MyListContent() {
     fadeOutStartRef.current = Date.now();
   };
 
+  const handleExport = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const res = await fetch('/api/proxy/users/me/history/export', {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'reading-history.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
       <Navbar />
 
       <main className="page-shell page-shell-nav page-shell-wide">
         {/* Page header */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
-            รายการของฉัน
-          </h1>
-          <p className="mt-1 text-sm text-white/40">
-            มังงะที่คุณบันทึก ถูกใจ และกำลังอ่าน
-          </p>
+        <div className="mb-6 sm:mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+              รายการของฉัน
+            </h1>
+            <p className="mt-1 text-sm text-white/40">
+              มังงะที่คุณบันทึก ถูกใจ และกำลังอ่าน
+            </p>
+          </div>
+          {user && activeTab === "history" && history.length > 0 && (
+            <button
+              onClick={handleExport}
+              className="shrink-0 rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-white/60 transition hover:border-white/30 hover:text-white active:scale-95"
+            >
+              Export CSV
+            </button>
+          )}
         </div>
 
         {/* Tab bar */}
