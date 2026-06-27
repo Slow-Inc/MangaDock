@@ -1,0 +1,56 @@
+name: MIT CI
+
+# Runs the MIT (Python) pytest suite on PRs/pushes that touch MIT/.
+#
+# ⚠️ PROVISIONAL — report-only (continue-on-error). It does NOT block merges yet.
+#
+# Why: manga_translator/__init__.py eagerly `import torch`, so even pure-logic
+# tests pull in the full ML stack. CI therefore has to install torch + cv2 +
+# transformers + diffusers (multi-GB, slow) just to run a font-fit unit test,
+# and a few suites (flux/ocr/render) may still need models or a GPU.
+#
+# Proper fix (tracked separately): lazy-import torch inside manga_translator so
+# the ~80 logic tests run torch-free in <1s — same pattern the repo already uses
+# for server/webhook.py. Once that lands, drop `continue-on-error` below to make
+# this a real blocking gate, and narrow the install to the lightweight deps.
+on:
+  pull_request:
+    paths:
+      - 'MIT/**'
+      - '.github/workflows/mit-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'MIT/**'
+      - '.github/workflows/mit-ci.yml'
+
+jobs:
+  test:
+    name: pytest (report-only)
+    runs-on: ubuntu-latest
+    continue-on-error: true        # ← flip to remove once torch is lazy-imported
+    defaults:
+      run:
+        working-directory: MIT
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      # opencv-python needs libGL at import time on headless runners.
+      - name: System libs for OpenCV
+        run: sudo apt-get update && sudo apt-get install -y libgl1
+
+      # CPU-only torch keeps the install size sane (the CUDA wheel is ~2GB).
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest test/ -q

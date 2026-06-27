@@ -1,0 +1,62 @@
+name: Backend CI
+
+# Runs the NestJS Jest unit suite on every PR/push that touches Backend/.
+# Path-filtered so Frontend/MIT-only changes don't pay for it.
+on:
+  pull_request:
+    paths:
+      - 'Backend/**'
+      - '.github/workflows/backend-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+jobs:
+  test:
+    name: jest (unit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend
+
+    # Many cache/forum specs talk to Redis — give them a real one.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      # Dummy values so import-time config reads don't crash unit tests.
+      SUPABASE_URL: http://localhost:54321
+      SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
+      GEMINI_API_KEY: test-gemini-key
+      GOOGLE_BOOKS_API_KEY: test-google-books-key
+      MANGA_TRANSLATOR_URL: http://localhost:5003
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # --runInBand keeps Redis-backed specs deterministic (no cross-worker
+      # state bleed). jest.ci.config.js skips documented pre-existing failures.
+      - name: Run unit tests
+        run: npx jest -c jest.ci.config.js --runInBand --ci
