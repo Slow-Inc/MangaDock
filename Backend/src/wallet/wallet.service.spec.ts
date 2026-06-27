@@ -570,6 +570,44 @@ describe('WalletService', () => {
       expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
     });
 
+    it('revertClaim: logs warn but propagates original error when revert DB call fails (Xendit unreachable path)', async () => {
+      const claimChain = makeUpdateChain({ data: { uid: 'u1', amount_coins: 100, status: 'paid' }, error: null });
+      const revertChain = makeUpdateChain({ error: { message: 'DB unavailable' } });
+      mockChain.update
+        .mockReturnValueOnce(claimChain)
+        .mockReturnValueOnce(revertChain);
+      mockXendit.getPaymentRequest.mockRejectedValue(new Error('ECONNREFUSED'));
+      const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-rv-down', status: 'SUCCEEDED' } },
+          WEBHOOK_TOKEN,
+        ),
+      ).rejects.toThrow();
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('pr-rv-down'));
+    });
+
+    it('revertClaim: logs warn but propagates UnauthorizedException when revert DB call fails (mismatch path)', async () => {
+      const claimChain = makeUpdateChain({ data: { uid: 'u1', amount_coins: 100, status: 'paid' }, error: null });
+      const revertChain = makeUpdateChain({ error: { message: 'DB unavailable' } });
+      mockChain.update
+        .mockReturnValueOnce(claimChain)
+        .mockReturnValueOnce(revertChain);
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'PENDING', amount: 100, currency: 'THB' });
+      const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-rv-mm', status: 'SUCCEEDED' } },
+          WEBHOOK_TOKEN,
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('pr-rv-mm'));
+    });
+
     it('production: throws UnauthorizedException when secret is not configured', async () => {
       const ORIGINAL = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
