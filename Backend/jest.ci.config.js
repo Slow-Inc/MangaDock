@@ -26,6 +26,7 @@ module.exports = {
     'books/books-batch-cancel.spec.ts',
     'books/books-models.spec.ts',
     'books/gemini-model-catalog.spec.ts',
-    'books/books-health.spec.ts',
+    // books-health.spec.ts FIXED — fetch mocked via assignment, not spyOn on
+    // the lazy global (which broke under restoreAllMocks). Re-enabled in CI.
   ],
 };
