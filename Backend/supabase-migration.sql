@@ -366,6 +366,42 @@ BEGIN
 END;
 $$;
 
+-- Atomic add coins (5-arg overload, with reference_id) — LIVE form used by the topup
+-- webhook. Persisting reference_id powers the wallet_tx_topup_ref_uidx idempotency
+-- index (a Xendit payment_id is credited as a topup at most once); WalletService.addCoins
+-- calls THIS overload. The 4-arg version above is kept for ad-hoc/admin credits without
+-- a reference. Both overloads are intentionally live (see REVOKE block at end of file).
+CREATE OR REPLACE FUNCTION add_coins_atomic(
+  p_uid          uuid,
+  p_amount       integer,
+  p_type         text,
+  p_description  text DEFAULT NULL,
+  p_reference_id text DEFAULT NULL
+)
+RETURNS TABLE(balance integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_balance integer;
+BEGIN
+  INSERT INTO wallets (uid, balance)
+  VALUES (p_uid, 0)
+  ON CONFLICT (uid) DO NOTHING;
+
+  UPDATE wallets
+  SET balance = balance + p_amount,
+      updated_at = now()
+  WHERE uid = p_uid
+  RETURNING wallets.balance INTO v_balance;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
+  VALUES (p_uid, p_amount, p_type, v_balance, p_description, p_reference_id);
+
+  RETURN QUERY SELECT v_balance;
+END;
+$$;
+
 -- Atomic spend coins: decrements balance only if sufficient, raises INSUFFICIENT_FUNDS otherwise
 CREATE OR REPLACE FUNCTION spend_coins_atomic(
   p_uid          uuid,
