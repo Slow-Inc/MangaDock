@@ -48,7 +48,15 @@ export class L2RecoveryService implements OnModuleInit {
     const toSync: Pending[] = [];
 
     for (const key of allKeys) {
-      const entry = this.newerEntry(this.jsonCache.peek(key) ?? undefined, l3.get(key));
+      const l1Entry = this.jsonCache.peek(key) ?? undefined;
+      const l3Entry = l3.get(key);
+      // The key was in the snapshot but has since been evicted from L1 (live read
+      // after the await) and isn't on L3 either — nothing to sync, skip. (FR-5)
+      if (!l1Entry && !l3Entry) {
+        skipped++;
+        continue;
+      }
+      const entry = this.newerEntry(l1Entry, l3Entry);
       if (this.jsonCache.isExpired(entry)) {
         skipped++;
         continue;
