@@ -2395,3 +2395,26 @@ isolated at the pixel level in-app. The clean band isolation is the **determinis
 un-erased stylized "ENCOUNTER" ghost (OCR/mask-coverage, not reground) are consistent with the documented
 "net-positive but incomplete; Poisson reserved (#418)" limit. Saved A/B patches under `MIT/tools/_reground_ab/`.
 `.env` restored to `flux_klein` + reground documented-off; running BE left on lama_large (restart for flux).
+
+## 2026-06-29 — #271 reground REGRESSION found (white caption box adjacent to art → grey) — /debug-mantra
+
+User spotted on the rendered page: caption boxes that are pure-white in the source came out **grey** in the
+reground'd patches. Investigated deterministically from the dump (`g_0_47_680_1627.npz`), measuring L inside the
+text mask of the left caption column: **original (black text on white) L=204.7 → LaMa raw fill L=223.2, p50=255
+(clean pure white) → after reground L=196.3, p50=215 (grey).** Visual `_reground_dbg/2_inpaint_lama_RAW.png` vs
+`3_reground.png` confirms: LaMa already fills every caption box bright-white; reground then **darkens** the two
+boxes whose borders touch dark art (mid-left, bottom-left) while the top box (bordered mostly by black gutter)
+stays whiter.
+
+**Root cause:** reground's target `lowO` is the original surround TELEA-propagated into the mask. For a white
+caption box **adjacent to dark art**, TELEA drags the neighbouring art's grey/black into the box → `lowO` ≪ the
+LaMa fill `lowI` (255) → `delta = lowO − lowI` strongly negative → it pulls the clean white fill toward grey.
+This is a **true regression** when LaMa already inpainted cleanly. **#271's "net-positive" verdict was incomplete**
+— it measured only the band on hair/cheek (text-on-art) and never the text-in-white-box-next-to-art case, where
+reground is strictly worse.
+
+**Implication:** the **default-off** ship decision is reaffirmed (do NOT ship reground on). Before reground could
+ever be net-positive it must guard against art-contamination of the target — e.g. clamp delta to the darkening-only
+side it was meant for, or skip/attenuate where the surround variance (art) is high, or mask the TELEA source to
+same-region pixels only. Folded into the **#418** follow-up scope. The grey the user saw is a TEST artifact (my
+temp `lama_large`+`reground=1`); resting `.env` is `flux_klein`+off → restart BE + re-translate restores white.
