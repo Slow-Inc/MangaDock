@@ -691,7 +691,8 @@ export class ForumService {
     if (error) throw new InternalServerErrorException(`Vote failed: ${error.message}`);
 
     const row = Array.isArray(data) ? data[0] : (data as any);
-    const result = { upvotes: row?.upvotes ?? 0, downvotes: row?.downvotes ?? 0 };
+    // Postgres bigint may arrive as a string over PostgREST — coerce to number.
+    const result = { upvotes: Number(row?.upvotes ?? 0), downvotes: Number(row?.downvotes ?? 0) };
 
     // Resolve postId for the broadcast (comment votes need a lookup)
     let postId: string | null = null;
