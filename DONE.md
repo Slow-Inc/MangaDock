@@ -2417,4 +2417,22 @@ reground is strictly worse.
 ever be net-positive it must guard against art-contamination of the target — e.g. clamp delta to the darkening-only
 side it was meant for, or skip/attenuate where the surround variance (art) is high, or mask the TELEA source to
 same-region pixels only. Folded into the **#418** follow-up scope. The grey the user saw is a TEST artifact (my
-temp `lama_large`+`reground=1`); resting `.env` is `flux_klein`+off → restart BE + re-translate restores white.
+temp `reground=1`); restart BE with reground off → re-translate restores white (confirmed below).
+
+## 2026-06-29 — `.env` `flux_klein` is wrong on this branch (MIT 500) → set `lama_large`; reground-off E2E = white
+
+Trying to restore the user's "normal" config (`flux_klein`) **broke MIT with HTTP 500** every translate:
+`pydantic ValidationError for Config — input_value='flux_klein'` (the `Inpainter` enum on this branch is only
+`default/lama_large/lama_mpe/none/original`). **Root cause:** `flux_klein` is added by **#277 (commit c31ff81,
+"Flux Klein optional inpainter")** which is **NOT merged into main / `feat/mit-lama-lum-reground`**. `Backend/.env`
+is gitignored and **shared across branches**, so a `flux_klein` value set while on the #277 branch silently breaks
+every branch that lacks #277. **Fix:** set `MIT_INPAINTER=lama_large` (the enum default + the correct value for any
+branch without #277) with a comment explaining the #277 dependency. This also clears up the original confusion: the
+user's "white caption boxes" come from running the **#277 (flux) branch** where Flux reconstructs texture — on this
+branch the correct path is `lama_large`, which already fills caption boxes pure-white (no reground needed).
+
+**Reground-off Reader E2E (lama_large) — PASS.** Re-translated Kouchuugun p0 (40.5s, 6 patches), opened the Reader
+through the tunnel: **every caption box renders pure-white**, including the mid-left box bordering dark art that
+went grey under reground, and the top-right box's "ENCOUNTER" ghost is gone (clean LaMa fill). Confirms the grey
+was purely the reground knob. `reground_e2e_lama_white_p1.png`. `.env` now `lama_large` + reground off = the
+correct resting config for this branch.

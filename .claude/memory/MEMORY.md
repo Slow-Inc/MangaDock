@@ -25,3 +25,4 @@
 - [Feedback: review+merge policy](feedback_review_merge_policy.md) — auto-merge PR เมื่อ CodeQL เขียว + 0 new fail แต่ **ต้อง review ด้วย skill /scrutinize ก่อน merge เสมอ**
 - [Reference: Frontend UI Libraries](reference_frontend_ui_libraries.md) — shadcn (UI primitives/Radix) vs React Bits (WebGL/GLSL effects); MCP setup และ pattern การใช้คู่กัน
 - [Project: MIT translate non-deterministic](project_mit_translate_nondeterministic.md) — translate รัน 2 ครั้งได้ text+patch geometry ต่างกัน (OCR-VLM/LLM sampling) → in-app ON/OFF render A/B confounded; ใช้ offline dump (MIT_DEBUG_REGROUND_DUMP) วัด pixel band แทน; in-app E2E ใช้ได้แค่ verify wiring
+- [Project: MIT inpainter flux↔branch](project_mit_inpainter_flux_branch.md) — Backend/.env (shared ข้าม branch) MIT_INPAINTER=flux_klein ใช้ได้เฉพาะ branch ที่มี #277 (c31ff81); branch อื่น (main-based) → MIT 500 ValidationError enum ทุก translate (แต่ /ready 200 หลอก); ใช้ lama_large
