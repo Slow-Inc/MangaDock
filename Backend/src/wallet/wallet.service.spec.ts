@@ -382,21 +382,44 @@ describe('WalletService', () => {
       expect(mockRpc).toHaveBeenCalledWith('add_coins_atomic', expect.objectContaining({ p_uid: 'u1', p_amount: 100 }));
     });
 
-    it('should throw and propagate error when addCoins RPC fails after atomic claim', async () => {
-      // Atomic claim succeeds (status set to paid), but addCoins RPC fails
+    it('reverts the claim to pending and rethrows when addCoins fails after the atomic claim', async () => {
+      // Atomic claim succeeds (status -> paid), Xendit verification passes, but the credit RPC fails.
       mockUpdateChain.maybeSingle.mockResolvedValue({
         data: { uid: 'u1', amount_coins: 100, status: 'paid' },
         error: null,
       });
-      mockRpc.mockResolvedValue({ data: null, error: { message: 'RPC down' } });
       mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 100, currency: 'THB' });
+      mockRpc.mockResolvedValue({ data: null, error: { message: 'RPC down' } });
 
       await expect(
-        service.processXenditWebhook(succeededPayload('pr-1'), WEBHOOK_TOKEN),
+        service.processXenditWebhook(succeededPayload('pr-credit-fail'), WEBHOOK_TOKEN),
       ).rejects.toThrow();
 
-      // Atomic claim update WAS called (this is the new design — claim first, then credit)
+      // Claim was taken (paid) and then reverted (pending) so a Xendit retry can re-process.
       expect(mockChain.update).toHaveBeenCalledWith({ status: 'paid' });
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
+      expect(mockWalletEvents.emit).not.toHaveBeenCalled();
+    });
+
+    it('returns received:true without reverting when the credit hits the topup idempotency unique index', async () => {
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
+        error: null,
+      });
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 100, currency: 'THB' });
+      // add_coins_atomic raises the partial unique index violation -> already credited once.
+      mockRpc.mockResolvedValue({
+        data: null,
+        error: { message: 'duplicate key value violates unique constraint "wallet_tx_topup_ref_uidx"' },
+      });
+      // getBalance re-read after detecting the duplicate
+      mockChain.maybeSingle.mockResolvedValue({ data: { balance: 250 }, error: null });
+
+      const result = await service.processXenditWebhook(succeededPayload('pr-dup-credit'), WEBHOOK_TOKEN);
+
+      expect(result).toEqual({ received: true });
+      expect(mockChain.update).not.toHaveBeenCalledWith({ status: 'pending' }); // NOT reverted
+      expect(mockWalletEvents.emit).toHaveBeenCalledWith('pr-dup-credit', { balance: 250 });
     });
 
     it('should be idempotent — no double credit if already paid', async () => {
