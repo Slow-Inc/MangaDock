@@ -18,6 +18,38 @@ from typing import Callable, List
 from .kinsoku import is_forbidden_line_end, is_forbidden_line_start
 
 
+def hyphenate_overwide_tokens(
+    tokens: List[str],
+    max_width: float,
+    word_width: Callable[[str], float],
+) -> List[str]:
+    """Split any token wider than ``max_width`` into hyphenated fragments that each fit,
+    returning a new token list (#180 — Latin hyphenation of an over-wide word). A fitting
+    token is passed through untouched, so applying this to text with no over-wide word is a
+    no-op (byte-identical). Every fragment but the last gets a trailing ``-`` (and is sized
+    so ``fragment + '-'`` still fits); the tail carries no hyphen. The DP's ``hyphen_penalty``
+    then prices those breaks. If the column is too narrow for even one char plus a hyphen, a
+    fragment degrades to a single (possibly overflowing) char so the split always terminates
+    with lossless, in-order coverage — ``''.join(f.rstrip('-') ...)`` reproduces the word."""
+    out: List[str] = []
+    for t in tokens:
+        if word_width(t) <= max_width:
+            out.append(t)
+            continue
+        i, n = 0, len(t)
+        while i < n:
+            j = i + 1  # always take at least one char so a too-narrow column can't loop
+            while j < n:
+                last = j + 1 == n        # the final fragment needs no hyphen, so it may be wider
+                cand = t[i:j + 1] + ('' if last else '-')
+                if word_width(cand) > max_width:
+                    break
+                j += 1
+            out.append(t[i:j] + ('-' if j < n else ''))
+            i = j
+    return out
+
+
 def find_optimal_line_breaks(
     tokens: List[str],
     max_width: float,

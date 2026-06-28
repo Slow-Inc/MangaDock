@@ -5,7 +5,7 @@ short last line. MangaTranslator (text_processing.py:489-579) uses a pragmatic
 Knuth-Plass DP that globally minimises total badness (slack^exponent) so lines are
 balanced. Pure arithmetic over a word-width callback — unit-tests with no PIL/fonts.
 """
-from manga_translator.line_break import find_optimal_line_breaks
+from manga_translator.line_break import find_optimal_line_breaks, hyphenate_overwide_tokens
 
 
 def width_by_len(token: str) -> float:
@@ -90,3 +90,38 @@ def test_respect_kinsoku_never_deadlocks_when_every_break_is_forbidden():
     lines = find_optimal_line_breaks(tokens, max_width=1, word_width=width_by_len,
                                      space_width=0.0, respect_kinsoku=True)
     assert lines == [['あ'], ['。'], ['。'], ['。']]
+
+
+# --- #180 step 3: Latin hyphenation of an over-wide word (AC1 third bullet) ---
+
+def test_hyphenate_leaves_a_fitting_word_untouched():
+    # A word that already fits is never split — byte-identical token stream.
+    assert hyphenate_overwide_tokens(['cat', 'dog'], max_width=5, word_width=width_by_len) == ['cat', 'dog']
+
+
+def test_hyphenate_splits_an_over_wide_word_into_fitting_fragments():
+    # max 5: every fragment (incl. its trailing '-') must fit; the last has no '-'.
+    frags = hyphenate_overwide_tokens(['supercalifragilistic'], max_width=5, word_width=width_by_len)
+    assert len(frags) > 1
+    assert all(width_by_len(f) <= 5 for f in frags)              # nothing overflows the column
+    assert all(f.endswith('-') for f in frags[:-1])    # every fragment but the last is hyphenated
+    assert not frags[-1].endswith('-')                 # the tail is not
+    assert ''.join(f.rstrip('-') for f in frags) == 'supercalifragilistic'  # lossless
+
+
+def test_hyphenate_then_break_keeps_the_long_word_within_the_column():
+    # The pre-pass + the DP together: the over-wide word now wraps across lines,
+    # each within max_width, instead of being forced to overflow on its own line.
+    tokens = hyphenate_overwide_tokens(['abcdefgh'], max_width=4, word_width=width_by_len)
+    lines = find_optimal_line_breaks(tokens, max_width=4, word_width=width_by_len, space_width=0.0)
+    flat = [t for line in lines for t in line]
+    assert flat == tokens
+    assert all(sum(width_by_len(t) for t in line) <= 4 for line in lines)
+
+
+def test_hyphenate_degrades_to_one_char_when_column_too_narrow_for_a_hyphen():
+    # max 1 can't fit even 'x-'; rather than loop forever, emit at least one char per
+    # fragment (it may overflow, but the function always terminates with full coverage).
+    frags = hyphenate_overwide_tokens(['abc'], max_width=1, word_width=width_by_len)
+    assert ''.join(f.rstrip('-') for f in frags) == 'abc'
+    assert len(frags) == 3
