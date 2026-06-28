@@ -2536,3 +2536,23 @@ Completed PRD #228 (the `books.service.ts` god-object decomposition). Step 6 car
 - **6c `LandingService`** (`landing.service.ts`) — landing assembly (cache→rows→image-cache enhancement) + description + manga-episode Gemini text translation; the **two duplicated stale-cache fallback blocks collapse into one `serveStale()`** (the only behaviour-preserving cleanup). 6 cases.
 
 `books.service.ts` **841 → 376 lines** (god file quartered from its 1834 start; now a thin facade — every public signature unchanged, controllers/call-sites untouched). New unit-testable modules: `gemini-model-catalog.ts`, `manga-catalog.service.ts`, `landing.service.ts`. Constructed via `new` in the BooksService constructor (sharing its cache/imageCache/mangaDex/supabase + a `() => backendOrigin` callback) — same one-way-dependency pattern as #233/#234, so `BooksModule` is unchanged. Method: characterization-first (existing books specs are the net), byte-identical extraction, build whole backend per seam. The Thai-detect regex was restored to its `฀-๿` escapes after an encoding round-trip. **Full backend suite 530 pass / 0 fail** (was 513; +17 new). Branch `dept/backend` (3 commits `15e4837`/`127ee43`/`959b1bd`). **PRD #228 DONE — all 6 steps landed (#229/#230/#232/#233/#234/#231).** Issues left open — close on merge to main. Impact report: `docs/reports/system-impact-report.md` (2026-06-14, #231).
+
+---
+
+## 2026-06-28 — Dashboard V2 Track A close-out + live-native leak fixes (PR #414)
+
+Resumed `dashboardv2` (the canonical `:4200` console) Track A. Committed the Track A base (`54182e0`:
+6 tested live-data libs `deep-link`/`download`/`incident-timeline`/`live-worker-node`/`search`/
+`snapshot-export` + `dashboard.tsx` wiring). **#352** (focus-trap stable via `useCallback` closeNode) and
+**#353** (robust Export download: DOM-attach anchor + deferred revoke in `lib/download.ts`) were found
+**already implemented** in Track A → verified (`tsc` clean, 74 tests) + closed. **#354** (3 nits): MIT tab
+= remember-last (documented), skeletons = deferred to B4 (annotated), queue-depth chart moved out of
+`HOST_CHARTS` (queue ≠ host metric) → commit `f49cda2`, closed.
+
+Then ran **/scrutinize** (3 parallel agents) before opening the PR — found the live-native contract
+(ADR 022) breached in **4 spots** rendering hardcoded mock values on the LIVE path: pipeline
+`95.0s · translate stalled`, GPU-util `−11.4%` delta, hero `94%` ring, vitals `0%` gauges. Fixed via a new
+tested `lib/overview-signals.ts` (`pipelineHeaderSummary`, `pctDelta`) + gating/No-Data — commit `fa64c90`,
+**82 tests pass, tsc clean**. Pushed `feat/dashboard` → **PR #414** (closes #352/#353/#354; relates #304/#279).
+ADR **022** (live-native, no fabricated values on the live path). NOTE: full frontend E2E via tunnel **not
+run** — Track B realtime unwired, console is mock-mode only (honest gap; E2E lands with B4).
