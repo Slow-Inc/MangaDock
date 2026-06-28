@@ -7,6 +7,8 @@ import { StorageProvider } from './storage-provider.interface';
 
 @Injectable()
 export class DiskStorageProvider implements StorageProvider {
+  readonly isRemote = false;
+
   private readonly logger = new Logger(DiskStorageProvider.name);
   private readonly rootDir = process.cwd();
 

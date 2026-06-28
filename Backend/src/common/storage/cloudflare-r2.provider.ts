@@ -4,6 +4,8 @@ import { StorageProvider } from './storage-provider.interface';
 
 @Injectable()
 export class CloudflareR2StorageProvider implements StorageProvider {
+  readonly isRemote = true;
+
   private readonly logger = new Logger(CloudflareR2StorageProvider.name);
 
   constructor(
