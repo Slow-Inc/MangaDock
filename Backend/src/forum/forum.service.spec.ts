@@ -82,6 +82,15 @@ describe('ForumService.vote', () => {
     expect(result).toEqual({ upvotes: 10, downvotes: 3 });
   });
 
+  it('coerces bigint totals returned as strings into numbers', async () => {
+    // Postgres bigint can serialize as a string over PostgREST.
+    mockRpc.mockResolvedValue({ data: [{ upvotes: '8', downvotes: '1' }], error: null });
+
+    const result = await service.vote('u1', dto);
+
+    expect(result).toEqual({ upvotes: 8, downvotes: 1 });
+  });
+
   it('throws when the RPC returns an error', async () => {
     mockRpc.mockResolvedValue({ data: null, error: { message: 'deadlock detected' } });
 
