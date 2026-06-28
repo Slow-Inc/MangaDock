@@ -160,13 +160,28 @@ detail). **Only B4 (realtime — OAuth + `/api/live` + the per-service `/status`
 Each step consumes the data layer + this token system, with TDD on the pure mappers + visual E2E.
 
 > **Resume here (next session):** **V2 is the only project** (legacy `:4100` abandoned, do not touch). Mock-mode;
-> all topics built (B1–B3, B5). **§8 gap analysis done; Track A chosen; Track A P0 SHIPPED** (worker-sat KPI · VRAM
-> bloat + leak magnitude · degraded-now banner · gateway plane localizer + hint · theme persistence · honest signals
-> — pure logic in `lib/incident.ts`, wired in `components/dashboard.tsx`; tsc clean · 49/49 tests · visual E2E green).
-> **Next = Track A P1** (see §8: incident-timeline rail · queue sparkline · real-worker popup · tabForHash · skeletons
-> · focus-trap · search · Export). Still open: **B** B4 realtime/OAuth (`auth-gate` stub `{token:null}` →
-> `NEXT_PUBLIC_MOCKUP_MODE=false`) · **C** cheap-mit-emit · **D** big bets. Run: `cd dashboardv2 && bun dev` →
-> `:4200`. Commits: `2c303ab` (port+B1+B2), `838f797` (B3+B5+docs), + this one (§8 gap analysis + Track A P0).
+> all topics built (B1–B3, B5). **§8 gap analysis done; Track A chosen; Track A P0 + P1 SHIPPED.**
+> **Track A P1 (2026-06-28):** incident-timeline punch-card rail (`lib/incident-timeline.ts` ring buffer, seeded in
+> mock + live-accumulating) · queue-depth sparkline (`HOST_CHARTS` entry off the `m.queueSize` series) · real-worker
+> node popup from live `m.gpu`/`m.host` (`lib/live-worker-node.ts`, replaces `mockNode` for `w-<port>`; honest No-Data
+> on un-emitted fields) · deep-link routing (`lib/deep-link.ts` — MIT tab lifted to controlled state; subsystem-pill
+> drill-down + incident "View detail" → pipeline tab; false-affordance pills demoted to plain text) · functional search
+> (`lib/search.ts` — topbar input + results dropdown over stages/workers/jobs → deep-link) · Export snapshot as JSON
+> (`lib/snapshot-export.ts`, real download) · node-popup focus-trap + Esc + focus-restore · skeleton loading states
+> (`Skeleton` + `.skeleton` shimmer on `live.status==='connecting'`). Pure logic in 5 new tested libs; wired in
+> `components/dashboard.tsx`. **tsc clean · 72/72 tests (+23) · visual E2E at `:4200` green (0 console errors); lint
+> unchanged from the pre-existing baseline.**
+> **Track A P1 review fixes (2026-06-28, /scrutinize → /to-issues → /tdd):** filed #352/#353/#354 on `Slow-Inc/MangaDock`.
+> **#352 fixed** — `NodePopup` close handler is now `useCallback`-stable so the focus-trap effect runs once on open/close,
+> not on every 1s clock re-render (E2E: `focus()` fired once over 2.6s, was ~5+). **#353 fixed** — Export download
+> extracted to the tested `lib/download.ts::triggerDownload` (DOM-attach the anchor + deferred `revokeObjectURL`; E2E:
+> `inDomAtClick=true`, `revokedSync=false`). **#354 (3 nits)** still open: MIT-tab-on-nav reset decision · skeleton
+> verify-under-B4 · queue-depth chart placement. (Fixes are in the WIP, not yet committed/closed.)
+> **Next = Track B (B4 realtime/OAuth)** — the only thing left to make it real: re-port OAuth popup + `/api/live`
+> proxy, flip `auth-gate` stub `{token:null}` → live, `NEXT_PUBLIC_MOCKUP_MODE=false`, wire MIT `/status/stream`.
+> Still open: **C** cheap-mit-emit (pages-completed throughput, in-flight queue row) · **D** big bets (Quality tab,
+> before/after gallery). Run: `cd dashboardv2 && bun dev` → `:4200`. Commits: `2c303ab` (port+B1+B2),
+> `838f797` (B3+B5+docs), `<P0 commit>` (§8 gap analysis + Track A P0), + this one (Track A P1).
 
 ---
 
@@ -201,12 +216,14 @@ read **nowhere** in `components/dashboard.tsx` — the cheapest, highest-value w
   errors). Logic in the pure, unit-tested `lib/incident.ts` (`gatewayDiagnosis`/`vramBloat`/`workerSaturation`/
   `formatDuration`, 12 tests); wired in `components/dashboard.tsx`. Verified: tsc clean · 49/49 tests · visual E2E at
   `:4200` (computed values + 0 console errors).
-- **P1 — high value:** incident-timeline punch-card rail (client ring-buffer, M) · queue-depth sparkline (add a
-  `HOST_CHARTS` entry) · real-worker popup fed from live `m.gpu`/`m.host` instead of `mockNode` (M) · wire
-  `tabForHash` deep-link (dead code — drill-downs always land on `pipeline`) · subsystem-pill drill-down (false
-  affordance: `cursor-pointer`, no handler) · **skeleton/loading states** (DESIGN.md §5 promised, zero exist) ·
-  node-popup focus-trap (a11y, §6 promise) · functional search (filter live stages/workers/jobs) · Export current
-  snapshot as JSON.
+- **P1 — high value ✅ SHIPPED (2026-06-28, Track A):** incident-timeline punch-card rail (`lib/incident-timeline.ts`
+  client ring-buffer) · queue-depth sparkline (`HOST_CHARTS` entry off `m.queueSize`) · real-worker popup fed from
+  live `m.gpu`/`m.host` (`lib/live-worker-node.ts`, replaces `mockNode` for `w-<port>`) · deep-link routing
+  (`lib/deep-link.ts` — MIT tab lifted to controlled state; replaces the dead `tabForHash` drill-down) · subsystem-pill
+  drill-down (real handler; non-drillable pills demoted from the false `cursor-pointer`) · **skeleton/loading states**
+  (`Skeleton` + `.skeleton` shimmer on `connecting`) · node-popup focus-trap + Esc + focus-restore (a11y §6) ·
+  functional search (`lib/search.ts` — topbar input → results dropdown → deep-link) · Export snapshot as JSON
+  (`lib/snapshot-export.ts`). 5 new pure tested libs; tsc clean · 72/72 tests · visual E2E green.
 - **P1 — cheap-mit-emit** (small MIT change, unlocks real data): in-flight/running queue row (today the dispatched
   task is removed on dispatch so the Queue table's `running`/30s-stall branch is unreachable) · per-stage fail/retry
   flag (not just `liveMs>=30s`) · pages-completed counter + throughput (kills the biggest hardcoded mock surface) ·
@@ -222,7 +239,7 @@ read **nowhere** in `components/dashboard.tsx` — the cheapest, highest-value w
 **Top 5 to build first** (all P0, small, no MIT dependency): worker-saturation KPI · VRAM bloat + leak-magnitude ·
 degraded-now banner strip · gateway plane localizer + recovery hint · theme persistence.
 
-**Track chosen: A** (2026-06-18) — surface-existing-data + craft. **P0 done** (above). **Next = Track A P1:** incident-
-timeline punch-card rail · queue-depth sparkline · real-worker popup fed from live `m.gpu`/`m.host` · wire
-`tabForHash` deep-link · subsystem-pill drill-down · skeleton/loading states · node-popup focus-trap · functional
-search · Export-as-JSON. (Other tracks still open: **B** B4 realtime/OAuth · **C** cheap-mit-emit · **D** big bets.)
+**Track chosen: A** (2026-06-18) — surface-existing-data + craft. **P0 + P1 done** (both ✅ above). **Next = Track B**
+(B4 realtime/OAuth) — re-port OAuth popup + `/api/live` proxy, flip `auth-gate` stub → live MIT `/status/stream`, set
+`NEXT_PUBLIC_MOCKUP_MODE=false`. (Other tracks still open: **C** cheap-mit-emit · **D** big bets — Quality tab,
+before/after gallery, cache-tier health.)
