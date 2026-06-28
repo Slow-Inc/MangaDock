@@ -2357,3 +2357,17 @@ hashes every `MIT_*` key → toggle auto-busts the patch cache. TDD: `test_patch
 infra + 11 order-dependent test-pollution that pass in isolation; first full run on the fresh
 torch-fixed machine), 0 in #270-touched files. Branch `feat/mit-lama-lum-reground`. PIPELINE.md §5
 updated. /scrutinize + E2E band measurement = the epic PR (after #271). Tune radius + E2E = #271.
+
+## 2026-06-28 — #271: tune radius_frac + E2E band measurement (PRD #268 slice 3)
+
+Launched MIT (torch fixed), added a `MIT_DEBUG_REGROUND_DUMP` hook in `patch_renderer` (gated, dumps
+the pristine crop + pre-reground inpaint + mask per group), translated the OPM benchmark page, and
+measured the band offline (`tools/ab_reground.py` path) vs the TELEA-propagated original art. Tuned
+`reground_inpaint_luminance` default `radius_frac` 0.06 → **0.02** (smaller = better in the sweep;
+0.02–0.10 × max_delta 40–150 tested). **Result (honest):** reground nulls the mean shift on SMOOTH
+backgrounds (cheek mean 5.8→5.2, near the <4 bar) but does NOT reach the bar on TEXTURED dark hair
+(mean 19.6→15.9, p95 stays 56) — the high-frequency mismatch (LaMa hair strands vs original) is beyond
+what a low-freq box-filter correction can fix. This is exactly the residual PRD #268 reserved the
+**Poisson seamless-clone escalation** for → filed as follow-up **#418**. #269 (helper) + #270 (wiring)
+ship as a net positive (fixes smooth, improves textured, default-off, VRAM-0); #418 is the escalation.
+patch_geometry 23 + patch_renderer 9 green after the radius change. Branch `feat/mit-lama-lum-reground`.

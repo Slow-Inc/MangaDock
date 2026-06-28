@@ -18,6 +18,7 @@ geometry is the pure `patch_geometry` helpers. `logger` is injected so
 """
 import asyncio
 import copy
+import os
 import traceback
 
 import numpy as np
@@ -194,12 +195,24 @@ class PatchRenderer:
             # mask, or the recomputed text-only mask in the full-page-inpaint branch. CPU /
             # VRAM-neutral. 0 → off (byte-identical, the helper early-returns).
             reground = float(getattr(config.inpainter, 'lama_lum_reground', 0.0) or 0.0)
-            if reground > 0:
+            _reground_dump = os.environ.get('MIT_DEBUG_REGROUND_DUMP')  # #271 measurement only
+            if reground > 0 or _reground_dump:
                 rg_mask = patch_ctx.mask
                 if rg_mask is None:
                     rg_mask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
-                patch_ctx.img_inpainted = reground_inpaint_luminance(
-                    patch_ctx.img_inpainted, crop_rgb, rg_mask, strength=reground)
+                if _reground_dump:
+                    # #271: dump (pristine crop, PRE-reground inpaint, erase mask) per group so
+                    # tools/ab_reground.py measures the band offline at several strengths. Debug
+                    # only — never set in production (default-off, byte-identical).
+                    try:
+                        os.makedirs(_reground_dump, exist_ok=True)
+                        np.savez(os.path.join(_reground_dump, f'g_{x1}_{y1}_{x2}_{y2}.npz'),
+                                 crop=crop_rgb, inpaint=patch_ctx.img_inpainted, mask=rg_mask)
+                    except Exception as e:
+                        logger.warning(f'[PatchTranslate] reground dump failed: {e}')
+                if reground > 0:
+                    patch_ctx.img_inpainted = reground_inpaint_luminance(
+                        patch_ctx.img_inpainted, crop_rgb, rg_mask, strength=reground)
 
             # --- CPU-bound: rendering + PNG encode (outside semaphore) ---
             patch_ctx.img_rgb = patch_ctx.img_inpainted

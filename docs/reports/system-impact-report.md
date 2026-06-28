@@ -696,3 +696,19 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 - **Quality:** correction before render → text never fades; uses the correct mask in BOTH inpaint branches; `renderConfigHash` auto-partitions on `MIT_LAMA_LUM_REGROUND` so a toggle is visible on the next translate.
 - **Validation:** `test_patch_renderer.py` (+2: off=band-intact, on=mean→surround), `books-mit-config.spec.ts` (+2: map + omit). patch_geometry 23 + patch_renderer 9 + Backend 43 green. Full MIT suite: 434 pass / **29 pre-existing fail** (18 pytest-asyncio infra + 11 order-pollution that pass in isolation — first full run post-torch-fix; **0 in #270 files**). Full-stack E2E band measurement = **#271** (deferred).
 - **Risk / rollback:** default-off (0.0 = byte-identical, helper early-returns). Pure additive wiring. **Links:** #270, PRD #268, #269.
+
+---
+
+## 2026-06-28 — MIT: #271 reground E2E band measurement + radius tune (PRD #268 slice 3)
+
+- **What & where:** `patch_renderer.py` `MIT_DEBUG_REGROUND_DUMP` measurement hook (gated, debug-only); `patch_geometry.py` default `radius_frac` 0.06 → 0.02 (tuned). Branch `feat/mit-lama-lum-reground`.
+- **Why:** PRD #268 story 13 — prove the band fix by measurement, not eyeballing (the trap that sank #266).
+- **Measurement (OPM benchmark, real patch path; target = TELEA-propagated original art):**
+  | region | off | reground on (rf=0.02) | bar (<4 / <8 p95) |
+  |--------|-----|-----------------------|-------------------|
+  | smooth (cheek) | 5.8 / 31 | **5.2 / 20** | near pass |
+  | textured hair | 19.6 / 79 | **15.9 / 56** | **FAIL** |
+- **Quality:** net positive — smooth-region band nulled; textured-hair band improved (19.6→15.9) but NOT to the <4/<8 bar. Low-freq re-ground cannot fix the high-freq LaMa-vs-original mismatch on hair strands (p95 ~56).
+- **Validation:** offline band measurement on the dumped (crop/inpaint/mask); patch_geometry 23 + patch_renderer 9 green. Multi-language benchmark = next.
+- **Risk / rollback:** default-off (strength 0). The dump hook is gated by an env never set in production.
+- **Decision:** ADR 002 (reground) stands; the textured-hair residual escalates to **Poisson seamless-clone (#418)** — the lever PRD #268 reserved for exactly this. **Links:** #271, #418, PRD #268.

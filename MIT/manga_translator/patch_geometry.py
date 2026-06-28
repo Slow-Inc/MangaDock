@@ -211,7 +211,7 @@ def feather_alpha(content_mask: np.ndarray, radius: int) -> np.ndarray:
 
 def reground_inpaint_luminance(inpainted_rgb: np.ndarray, original_rgb: np.ndarray,
                                mask: np.ndarray, *, strength: float = 1.0,
-                               radius_frac: float = 0.06, max_delta: float = 40.0,
+                               radius_frac: float = 0.02, max_delta: float = 40.0,
                                chroma: bool = True) -> np.ndarray:
     """Per-pixel low-frequency luminance re-grounding of a LaMa inpaint (#268/#269).
 
