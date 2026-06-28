@@ -49,3 +49,44 @@ def test_hyphen_penalty_avoids_ending_a_line_on_a_hyphen():
     lines = find_optimal_line_breaks(tokens, max_width=5, word_width=width_by_len,
                                      space_width=1.0)
     assert lines == [["a-", "bb"], ["cc"]]
+
+
+# --- #180 step 3: CJK kinsoku integration (consumes the kinsoku module's forbidden sets) ---
+# CJK has no inter-word spaces, so callers tokenise per-character and pass space_width=0.
+
+def test_respect_kinsoku_off_by_default_keeps_byte_identical_breaks():
+    # `あいう。え` / max 3: the balanced break is [あいう][。え] — which strands the
+    # forbidden 。 at a line START. With kinsoku OFF (the default) the DP is unchanged
+    # and still produces that break, proving byte-identity for existing callers.
+    tokens = ['あ', 'い', 'う', '。', 'え']
+    lines = find_optimal_line_breaks(tokens, max_width=3, word_width=width_by_len,
+                                     space_width=0.0)
+    assert lines == [['あ', 'い', 'う'], ['。', 'え']]
+
+
+def test_respect_kinsoku_avoids_forbidden_char_at_line_start():
+    # Same input, kinsoku ON: 。 (行頭禁則) must not open a line, so the DP picks the
+    # equal-badness-but-legal break [あい][う。え] instead.
+    tokens = ['あ', 'い', 'う', '。', 'え']
+    lines = find_optimal_line_breaks(tokens, max_width=3, word_width=width_by_len,
+                                     space_width=0.0, respect_kinsoku=True)
+    assert lines == [['あ', 'い'], ['う', '。', 'え']]
+
+
+def test_respect_kinsoku_avoids_forbidden_char_at_line_end():
+    # `あ「いう` / max 2: the balanced break [あ「][いう] ends a line on 「 (行末禁則,
+    # an opening bracket). Kinsoku ON reshuffles to [あ][「い][う] so no line ends on 「.
+    tokens = ['あ', '「', 'い', 'う']
+    lines = find_optimal_line_breaks(tokens, max_width=2, word_width=width_by_len,
+                                     space_width=0.0, respect_kinsoku=True)
+    assert lines == [['あ'], ['「', 'い'], ['う']]
+
+
+def test_respect_kinsoku_never_deadlocks_when_every_break_is_forbidden():
+    # max 1 forces one char per line, so EVERY break after the first opens on 。
+    # (行頭禁則). A FINITE penalty (not a hard skip) means the DP still returns full,
+    # in-order coverage instead of an empty/None result.
+    tokens = ['あ', '。', '。', '。']
+    lines = find_optimal_line_breaks(tokens, max_width=1, word_width=width_by_len,
+                                     space_width=0.0, respect_kinsoku=True)
+    assert lines == [['あ'], ['。'], ['。'], ['。']]

@@ -7,8 +7,15 @@ line. Lines that end in a hyphen take an extra ``hyphen_penalty``. Ported from
 MangaTranslator ``core/text/text_processing.py:489-579``; the word-width is a
 caller-supplied callback (the renderer's measurer in production, ``len`` in tests)
 so the search stays dependency-light and the prediction matches the real render.
+
+With ``respect_kinsoku`` (#180 step 3), the DP also honours CJK 禁則 rules — a break
+that would strand a 行頭禁則 char at a line start or a 行末禁則 char at a line end is
+charged ``kinsoku_penalty`` (a large but FINITE cost, so it is avoided whenever a legal
+alternative exists yet can never deadlock a run where every break violates a rule).
 """
 from typing import Callable, List
+
+from .kinsoku import is_forbidden_line_end, is_forbidden_line_start
 
 
 def find_optimal_line_breaks(
@@ -18,6 +25,8 @@ def find_optimal_line_breaks(
     space_width: float = 1.0,
     badness_exponent: float = 3.0,
     hyphen_penalty: float = 1000.0,
+    respect_kinsoku: bool = False,
+    kinsoku_penalty: float = 1e9,
 ) -> List[List[str]]:
     """Group ``tokens`` into lines minimising total badness; return the lines as
     lists of tokens.
@@ -27,7 +36,12 @@ def find_optimal_line_breaks(
     still allowed on its own line so a too-long word never deadlocks the search).
     ``badness = max(0, max_width - line_width) ** badness_exponent``, plus
     ``hyphen_penalty`` when the line's last token ends in ``-``. Empty input → ``[]``.
-    """
+
+    ``respect_kinsoku`` (default off → byte-identical to the greedy-replacing balance
+    path): when on, the break opening a line ``[j..i)`` (``j > 0``) is charged
+    ``kinsoku_penalty`` if ``tokens[j]`` may not begin a line (行頭禁則) or
+    ``tokens[j-1]`` may not end one (行末禁則). CJK callers tokenise per character and
+    pass ``space_width=0``."""
     n = len(tokens)
     if n == 0:
         return []
@@ -50,6 +64,12 @@ def find_optimal_line_breaks(
             badness = (slack ** badness_exponent) if slack > 0 else 0.0
             if tokens[i - 1].endswith("-"):
                 badness += hyphen_penalty
+            # 禁則: charge the break that opens this line if it strands a forbidden
+            # char at a line edge (start of this line, or end of the previous one).
+            if respect_kinsoku and j > 0 and (
+                is_forbidden_line_start(tokens[j]) or is_forbidden_line_end(tokens[j - 1])
+            ):
+                badness += kinsoku_penalty
             total = cost[j] + badness
             if total < cost[i]:
                 cost[i] = total

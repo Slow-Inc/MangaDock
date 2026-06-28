@@ -6,7 +6,7 @@ closing brackets, trailing punctuation, small kana, prolonged sound) or a line E
 respect these so a comma/period/closing-bracket never opens a wrapped line. These
 pure predicates are font-free and table-driven; wiring into the KP penalty model is
 the next step."""
-from manga_translator.rendering.kinsoku import (
+from manga_translator.kinsoku import (
     is_forbidden_line_start, is_forbidden_line_end,
 )
 

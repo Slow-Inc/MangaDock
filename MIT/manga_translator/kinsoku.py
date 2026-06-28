@@ -1,11 +1,11 @@
-"""#180 step 2 — kinsoku (CJK line-break) forbidden-position rules, pure.
+"""#180 — kinsoku (CJK line-break) forbidden-position rules, pure.
 
 Japanese/CJK typography forbids certain characters at a line START (行頭禁則) or a
-line END (行末禁則). The Knuth-Plass breaker (step 1, ``line_break.py``) consults
-these so a wrapped line never opens with a comma/period/closing-bracket/small-kana
-nor ends with an opening bracket. Table-driven, font-free. Wiring into the KP
-penalty model (an effectively-infinite penalty at a forbidden break) is the next
-step."""
+line END (行末禁則). The sibling Knuth-Plass breaker (``line_break.py``, same package
+root so both stay PIL/cv2-free) consults these via ``respect_kinsoku=True`` so a
+wrapped line never opens with a comma/period/closing-bracket/small-kana nor ends with
+an opening bracket — a large but finite ``kinsoku_penalty`` at such a break. Table-
+driven, font-free."""
 
 # 行頭禁則文字 — must NOT begin a line.
 KINSOKU_START = frozenset(
