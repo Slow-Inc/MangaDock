@@ -31,7 +31,13 @@ export class DiskStorageProvider implements StorageProvider {
       const writeStream = fs.createWriteStream(absPath);
       return new Promise((resolve, reject) => {
         data.pipe(writeStream);
-        data.on('error', reject);
+        // Destroy the write stream on a source error so we don't leak the FD
+        // or leave a partial file behind (the source is now always a temp-file
+        // ReadStream on the upload hot path).
+        data.on('error', (err) => {
+          writeStream.destroy();
+          reject(err);
+        });
         writeStream.on('finish', resolve);
         writeStream.on('error', reject);
       });
