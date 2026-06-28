@@ -200,3 +200,91 @@ def test_union_falls_back_to_text_only_where_refinement_missed_a_region():
 
     assert out[10, 10] == 255                                # refined-covered glyph
     assert out[3, 3] == 255                                  # missed glyph rescued via text_only fallback
+
+
+# ---- reground_inpaint_luminance (#268/#269): per-pixel LAB luminance re-ground ----
+# Pulls masked (erased) pixels' luminance toward the local mean of the surrounding
+# ORIGINAL pixels, so a LaMa fill too-light over dark hair and too-dark over the cheek
+# (same mask) is corrected toward each local surround. Golden behaviour, not impl detail.
+
+def _solid(h, w, rgb):
+    img = np.zeros((h, w, 3), np.uint8)
+    img[:] = rgb
+    return img
+
+
+def test_reground_strength_zero_returns_input_byte_identical():
+    inpaint = _solid(40, 40, (201, 201, 201))
+    orig = _solid(40, 40, (100, 100, 100))
+    mask = np.zeros((40, 40), np.uint8)
+    mask[12:28, 12:28] = 255
+    out = pg.reground_inpaint_luminance(inpaint, orig, mask, strength=0.0)
+    assert np.array_equal(out, inpaint)
+
+
+def _gray(img):  # synthetic crops are gray (R==G==B), so channel 0 is the luminance
+    return img[..., 0].astype(np.float32)
+
+
+def test_reground_bidirectional_grounds_each_side_to_its_local_surround():
+    # left "hair" ≈100, right "cheek" ≈220; one flat ≈201 fill spans both (too light over
+    # hair, slightly dark over cheek). After reground each side lands on its local surround —
+    # the bidirectional null the reverted #266 (201.5→201.3) could not achieve.
+    orig = np.zeros((80, 80, 3), np.uint8)
+    orig[:, :40] = 100
+    orig[:, 40:] = 220
+    mask = np.zeros((80, 80), np.uint8)
+    mask[24:56, 24:56] = 255
+    inpaint = orig.copy()
+    inpaint[mask > 127] = 201
+    out = pg.reground_inpaint_luminance(inpaint, orig, mask, strength=1.0, max_delta=150)
+    g, mb = _gray(out), mask > 127
+    cols = np.arange(80)[None, :]
+    hair = g[mb & (cols < 32)]     # masked, hair side, clear of the hair/cheek seam (> radius)
+    cheek = g[mb & (cols >= 48)]
+    assert abs(hair.mean() - 100) < 4
+    assert abs(cheek.mean() - 220) < 4
+
+
+def test_reground_leaves_pixels_outside_the_mask_byte_identical():
+    orig = np.zeros((60, 60, 3), np.uint8)
+    orig[:, :30] = 90
+    orig[:, 30:] = 210
+    mask = np.zeros((60, 60), np.uint8)
+    mask[20:40, 20:40] = 255
+    inpaint = orig.copy()
+    inpaint[mask > 127] = 150
+    out = pg.reground_inpaint_luminance(inpaint, orig, mask, strength=1.0)
+    assert np.array_equal(out[mask == 0], inpaint[mask == 0])
+
+
+def test_reground_uniform_background_collapses_to_a_scalar_offset():
+    orig = np.full((60, 60, 3), 150, np.uint8)
+    mask = np.zeros((60, 60), np.uint8)
+    mask[20:40, 20:40] = 255
+    inpaint = orig.copy()
+    inpaint[mask > 127] = 180
+    out = pg.reground_inpaint_luminance(inpaint, orig, mask, strength=1.0)
+    assert abs(_gray(out)[mask > 127].mean() - 150) < 1
+
+
+def test_reground_returns_input_when_too_little_surround_to_ground_against():
+    orig = np.full((40, 40, 3), 120, np.uint8)
+    mask = np.full((40, 40), 255, np.uint8)
+    mask[0:3, 0:3] = 0  # ~0.6% valid → below the 0.15 coverage floor
+    inpaint = orig.copy()
+    inpaint[mask > 127] = 200
+    out = pg.reground_inpaint_luminance(inpaint, orig, mask, strength=1.0)
+    assert np.array_equal(out, inpaint)
+
+
+def test_reground_does_not_tint_a_grayscale_context():
+    orig = np.zeros((60, 60, 3), np.uint8)
+    orig[:, :30] = 100
+    orig[:, 30:] = 200
+    mask = np.zeros((60, 60), np.uint8)
+    mask[20:40, 20:40] = 255
+    inpaint = orig.copy()
+    inpaint[mask > 127] = 150
+    out = pg.reground_inpaint_luminance(inpaint, orig, mask, strength=1.0)
+    assert int(np.abs(out[..., 0].astype(int) - out[..., 1].astype(int)).max()) <= 2

@@ -207,3 +207,77 @@ def feather_alpha(content_mask: np.ndarray, radius: int) -> np.ndarray:
     d_out = cv2.distanceTransform(background, cv2.DIST_L2, 3)
     ramp = np.clip(1.0 - d_out / float(radius), 0.0, 1.0)
     return (ramp * 255.0).astype(np.uint8)
+
+
+def reground_inpaint_luminance(inpainted_rgb: np.ndarray, original_rgb: np.ndarray,
+                               mask: np.ndarray, *, strength: float = 1.0,
+                               radius_frac: float = 0.06, max_delta: float = 40.0,
+                               chroma: bool = True) -> np.ndarray:
+    """Per-pixel low-frequency luminance re-grounding of a LaMa inpaint (#268/#269).
+
+    Pulls each masked (erased) pixel's luminance toward the local mean of the
+    immediately surrounding *original* (non-mask) pixels, killing the "painted
+    band" where LaMa's fill sits too light over dark art and too dark over light
+    art *within one mask*. LaMa's high-frequency detail is preserved (only the
+    low-frequency level is corrected). Pure cv2/numpy, CPU-only, no torch.
+
+    `strength` 0 = off (byte-identical). Works in LAB float32 via normalized
+    convolution; on a uniform background the per-pixel field collapses to a
+    single scalar offset (subsumes histogram-match). Returns the input unchanged
+    when the mask is empty/full or there is too little surround (< 15% valid).
+    Outside the mask the output is byte-identical to `inpainted_rgb`.
+    """
+    if strength <= 0:
+        return inpainted_rgb
+
+    mask_bool = mask > 127
+    total = mask_bool.size
+    masked = int(mask_bool.sum())
+    valid_n = total - masked
+    if masked == 0 or valid_n == 0 or (valid_n / total) < 0.15:
+        return inpainted_rgb  # nothing to erase, or too little context to ground against
+
+    h, w = inpainted_rgb.shape[:2]
+    r = max(8, int(round(radius_frac * min(h, w))))
+    k = (2 * r + 1, 2 * r + 1)
+    eps = 1e-6
+
+    lab_in = cv2.cvtColor(inpainted_rgb, cv2.COLOR_RGB2LAB).astype(np.float32)
+    # Propagate the ORIGINAL surround into the mask (TELEA) so the low-freq target is
+    # well-defined even deep inside a thick mask — normalized convolution only reaches
+    # ~r px in, which leaves the interior of a wide SFX/text block ungrounded.
+    mask_u8 = (mask_bool.astype(np.uint8)) * 255
+    filled_or = cv2.inpaint(np.ascontiguousarray(original_rgb), mask_u8, max(3, r // 4), cv2.INPAINT_TELEA)
+    lab_fill = cv2.cvtColor(filled_or, cv2.COLOR_RGB2LAB).astype(np.float32)
+
+    maskf = mask_bool.astype(np.float32)
+    mbox = cv2.boxFilter(maskf, -1, k, normalize=True) + eps  # local masked coverage
+    lab_out = lab_in.copy()
+
+    def _reground_channel(ch: int) -> np.ndarray:
+        C_in = lab_in[:, :, ch]
+        lowO = cv2.boxFilter(lab_fill[:, :, ch], -1, k, normalize=True)          # local original target
+        lowI = cv2.boxFilter(C_in * maskf, -1, k, normalize=True) / mbox         # local fill level (inside mask)
+        delta = np.clip(lowO - lowI, -max_delta, max_delta)                      # bidirectional low-freq correction
+        # NOTE: a boundary feather (taper the correction at the mask edge) is a
+        # smoothness refinement deferred to the #271 tuning slice; the core re-ground
+        # here applies the full low-frequency correction across the masked region.
+        return C_in + strength * delta
+
+    lab_out[:, :, 0] = _reground_channel(0)  # L always
+
+    if chroma:
+        # Only shift a/b when the surrounding context is near-grayscale — never
+        # tint a B&W scan (no #156-style regression).
+        a_v = lab_fill[:, :, 1][~mask_bool]
+        b_v = lab_fill[:, :, 2][~mask_bool]
+        near_gray = max(float(np.abs(a_v - 128).max()), float(np.abs(b_v - 128).max())) < 6.0
+        if near_gray:
+            lab_out[:, :, 1] = _reground_channel(1)
+            lab_out[:, :, 2] = _reground_channel(2)
+
+    corrected = cv2.cvtColor(np.clip(lab_out, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB)
+    # Preserve byte-identity outside the mask (only erased pixels may change).
+    out = inpainted_rgb.copy()
+    out[mask_bool] = corrected[mask_bool]
+    return out
