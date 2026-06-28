@@ -660,3 +660,27 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **18. KPI.** #187 CLOSED (26/26 seams) · MIT tech-debt category **6/6** · byte-identical (verbatim move + suite green) · 0 regressions (365 pass) · +8 isolated tests for previously-construction-only logic · 1 cosmetic delta (logger name, documented).
 
 *Validation:* TDD red→green; `test_pipeline_params.py` 11 pass (3 globals + 8 value-object) + full suite (365 / 0 new fail). *Risk/rollback:* byte-identical; revert = drop the branch. *Cosmetic delta:* the batch_concurrent warning logs under the `pipeline_params` logger name (same message/level/effect). *Links:* #187, #188, resume `docs/reports/mit-refactor-progress.md`.
+
+---
+
+## 2026-06-28 — MIT: clean-erasure luminance re-ground (#269) + dev-env torch unblock
+
+### `reground_inpaint_luminance` pure helper (#269, PRD #268 slice 1)
+
+- **What & where:** new `manga_translator/patch_geometry.py::reground_inpaint_luminance(...)` (pure cv2/numpy, no torch); `test/test_patch_geometry.py` (+6 golden cases); `MIT/PIPELINE.md §5`. Commit `d4de7f5`, branch `feat/mit-lama-lum-reground`.
+- **Why:** the LaMa fill over complex/dark art leaves a bidirectional "painted band" (too light over hair, too dark over cheek, in one mask). Content-shaped patch alpha (#266) failed (measured 201.5→201.3) and was reverted (#267) — the band lives at the erase region itself.
+- **Before → After:** per-pixel low-freq LAB re-ground inside the mask: TELEA-propagate the original surround → local target `lowO`; `delta = clip(lowO − lowI, ±max_delta)`; `L_out = L_in + strength·delta` (high-freq preserved). Synthetic: masked region 201 over hair(100)/cheek(220) → **101.7 / 219.0** (each < 4 L of its surround); the bar #266 failed.
+- **Performance Δ:** VRAM **0** (CPU cv2/numpy, outside the GPU semaphore). Latency: not measured (slice 1 unwired).
+- **Quality:** bidirectional null (the only family that corrects light-over-dark and dark-over-light in one pass); chroma shifted only on near-grayscale context (B&W safety); outside-mask byte-identical.
+- **Validation:** 6 golden numpy tests (bidirectional < 4 L, byte-identity, degenerate uniform < 1 L, coverage guard < 0.15, chroma safety, strength=0). `test_patch_geometry.py`: **23 passed**. Full-stack E2E band measurement = **#271** (deferred per slice).
+- **Risk / rollback:** default-off (strength 0 = byte-identical); not yet wired into the pipeline (slice 2 = #270). Pure addition.
+- **Links:** #269, PRD #268, commit `d4de7f5`.
+
+### Dev-env: MIT `.venv` torch import broken → force-reinstall (blocker)
+
+- **What & where:** `MIT/.venv` torch (2.5.1+cu121) `WinError 998` on import → blocked all MIT pytest + server. `pip install --force-reinstall torch==2.5.1+cu121`.
+- **Why / root cause:** venv provenance (gamin Store-Python on OneDrive → moved C:→D: → `pyvenv.cfg` repointed to python.org Python) — torch's own DLLs no longer loaded. Host was fine (fresh venv imported torch). Full write-up: `docs/reports/postmortem-2026-06-28-mit-venv-torch-998.md`.
+- **Before → After:** `import torch` fails 998 → **OK, CUDA True, RTX 4070 SUPER**.
+- **Validation:** `import torch` + `torch.cuda.is_available()`; `pytest test_patch_geometry.py` collects (23 passed).
+- **Risk / rollback:** dev-env only; no product code. Not HVCI/CET/SAC (all disproved) — see post-mortem.
+- **Links:** post-mortem above; follow-up #359 (lazy torch import for torch-free logic tests).

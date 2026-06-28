@@ -2315,3 +2315,28 @@ per-group inpaints). Off → per-crop, byte-identical. TDD: `test_patch_renderer
 async / 0 new**. **Verified via direct render** (`tools/ab_clean.py` + new `tools/ab_fullpage.py`): the bottom-right hair
 is now clean dark, no gray blob, English text intact — matches the full-page/upstream/target. `.env` set
 `MIT_PATCH_FULLPAGE_INPAINT=1`. Branch `fix/mit-patch-fullpage-inpaint`. Provenance in PIPELINE.md §5.
+---
+
+## 2026-06-28 — MIT clean-erasure re-ground (#269) + torch dev-env fix
+
+**Dev-env unblock (blocker):** `MIT/.venv` torch (2.5.1+cu121) failed `import torch` with `WinError 998`
+(c10.dll) → blocked all MIT pytest + the server. Diagnosed with /debug-mantra: ruled out HVCI/Memory
+Integrity, Smart App Control, Intel CET, VC++ age, broad venv corruption, "not installed",
+ExecutionPolicy, and the C:→D: move — the decisive experiment (a fresh clean venv imports torch on the
+same host) proved the **venv's torch install** was the problem (provenance: gamin Store-Python on
+OneDrive → drive-moved → pyvenv repointed to python.org Python). Fix: `pip install --force-reinstall
+torch==2.5.1+cu121`. → `import torch` OK, CUDA True, RTX 4070 SUPER. Post-mortem:
+`docs/reports/postmortem-2026-06-28-mit-venv-torch-998.md`. Lesson: `998 ≠ HVCI` — don't anchor a root
+cause on an error code's feel; recreate a messy-provenance venv before deep-debugging the host.
+
+**#269 — pure `reground_inpaint_luminance` helper (PRD #268 slice 1, TDD):** per-pixel low-frequency LAB
+luminance re-grounding of the LaMa fill *inside* the erase mask — kills the bidirectional "painted band"
+(too light over dark hair, too dark over the cheek, one mask) that the reverted #266 could not (201.5→201.3).
+TELEA-propagate the original surround → local target; `delta = clip(lowO − lowI, ±max_delta)`; `L_out =
+L_in + strength·delta` (LaMa high-freq preserved); chroma only on near-grayscale context; early-out on
+empty/full mask or valid-ratio < 0.15; outside-mask byte-identical. Pure cv2/numpy, CPU, **VRAM-neutral**,
+default-off. TDD: developed against a torch-free standalone verifier, then 6 golden numpy tests in
+`test_patch_geometry.py` (bidirectional < 4 L each side → 101.7/219.0, byte-identity, degenerate < 1 L,
+coverage guard, chroma safety, strength=0) — **23 passed**. Commit `d4de7f5`, branch
+`feat/mit-lama-lum-reground`. Provenance in PIPELINE.md §5. Wiring + `lama_lum_reground` knob = #270;
+tune + E2E band measurement = #271.
