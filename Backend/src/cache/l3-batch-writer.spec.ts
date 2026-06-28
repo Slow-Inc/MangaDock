@@ -24,7 +24,7 @@ function makeRedis(store: Record<string, string> = {}) {
 
 function makeJsonCache(keys: string[] = []) {
   const map = new Map(keys.map((k) => [k, makeEntry('data')]));
-  return { getAll: jest.fn().mockReturnValue(map) } as unknown as JsonCacheService;
+  return { entries: () => map.entries(), keys: () => map.keys(), has: (k: string) => map.has(k) } as unknown as JsonCacheService;
 }
 
 function makeL3() {
@@ -139,7 +139,7 @@ describe('L3BatchWriter', () => {
     const redis = { available: false, get: jest.fn() } as unknown as RedisService;
     const entry = makeEntry('important');
     const map = new Map([['manga:1', entry]]);
-    const jsonCache = { getAll: jest.fn().mockReturnValue(map) } as unknown as JsonCacheService;
+    const jsonCache = { entries: () => map.entries(), keys: () => map.keys(), has: (k: string) => map.has(k) } as unknown as JsonCacheService;
     const l3 = makeL3();
     const writer = new L3BatchWriter(redis, jsonCache, l3);
 
@@ -193,7 +193,7 @@ describe('L3BatchWriter', () => {
       get: jest.fn(),
       mget: jest.fn().mockImplementation((keys: string[]) => Promise.resolve(keys.map((k) => store[k as keyof typeof store] ?? null))),
     } as unknown as RedisService;
-    const jsonCache = { getAll: jest.fn().mockReturnValue(map) } as unknown as JsonCacheService;
+    const jsonCache = { entries: () => map.entries(), keys: () => map.keys(), has: (k: string) => map.has(k) } as unknown as JsonCacheService;
     const writer = new L3BatchWriter(redis, jsonCache, makeL3());
 
     await writer.flush();
@@ -209,7 +209,7 @@ describe('L3BatchWriter', () => {
     const walletEntry = makeEntry('coins');
     const mangaEntry = makeEntry('pages');
     const map = new Map([['wallet:user:1', walletEntry], ['manga:1', mangaEntry]]);
-    const jsonCache = { getAll: jest.fn().mockReturnValue(map) } as unknown as JsonCacheService;
+    const jsonCache = { entries: () => map.entries(), keys: () => map.keys(), has: (k: string) => map.has(k) } as unknown as JsonCacheService;
     const l3 = makeL3();
     const writer = new L3BatchWriter(redis, jsonCache, l3);
 

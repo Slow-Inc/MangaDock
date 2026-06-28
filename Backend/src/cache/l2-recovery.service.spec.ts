@@ -43,9 +43,10 @@ function makeRedis(available = true) {
   } as any;
 }
 
-function makeJsonCache(entries: Map<string, CacheEntry<unknown>> = new Map()): jest.Mocked<Pick<JsonCacheService, 'getAll' | 'isExpired'>> {
+function makeJsonCache(entries: Map<string, CacheEntry<unknown>> = new Map()): jest.Mocked<Pick<JsonCacheService, 'keys' | 'peek' | 'isExpired'>> {
   return {
-    getAll: jest.fn().mockReturnValue(entries),
+    keys: jest.fn().mockImplementation(() => entries.keys()),
+    peek: jest.fn().mockImplementation((k: string) => entries.get(k) ?? null),
     isExpired: jest.fn().mockImplementation((entry: CacheEntry<unknown>) => {
       if (entry.ttlMs <= 0) return false;
       return Date.now() - new Date(entry.updatedAt).getTime() > entry.ttlMs;
