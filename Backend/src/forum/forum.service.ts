@@ -679,41 +679,22 @@ export class ForumService {
   }
 
   async vote(uid: string, dto: VoteDto): Promise<{ upvotes: number, downvotes: number }> {
-    // T4-STANDARD Pillar 1: Idempotent voting logic
-    // 1. Check if user already voted
-    const { data: existingVote } = await this.db
-      .from('forum_votes')
-      .select('*')
-      .eq('uid', uid)
-      .eq('target_type', dto.targetType)
-      .eq('target_id', dto.targetId)
-      .maybeSingle();
+    // Atomic upsert/toggle + recalculate in a single transaction. Replaces the old
+    // select-then-write, which let concurrent votes 500 on the PK or interleave
+    // delete/update/insert into an inconsistent state (FR-9).
+    const { data, error } = await this.db.rpc('cast_vote_atomic', {
+      p_uid: uid,
+      p_target_type: dto.targetType,
+      p_target_id: dto.targetId,
+      p_vote_value: dto.voteValue,
+    });
+    if (error) throw new InternalServerErrorException(`Vote failed: ${error.message}`);
 
-    if (existingVote) {
-      if (existingVote.vote_value === dto.voteValue) {
-        // Remove vote if same value (toggle off)
-        const { error } = await this.db.from('forum_votes').delete().match({ uid, target_type: dto.targetType, target_id: dto.targetId });
-        if (error) throw new InternalServerErrorException(`Vote delete failed: ${error.message}`);
-      } else {
-        // Change vote value
-        const { error } = await this.db.from('forum_votes').update({ vote_value: dto.voteValue }).match({ uid, target_type: dto.targetType, target_id: dto.targetId });
-        if (error) throw new InternalServerErrorException(`Vote update failed: ${error.message}`);
-      }
-    } else {
-      // New vote
-      const { error } = await this.db.from('forum_votes').insert({
-        uid,
-        target_type: dto.targetType,
-        target_id: dto.targetId,
-        vote_value: dto.voteValue,
-      });
-      if (error) throw new InternalServerErrorException(`Vote insert failed: ${error.message}`);
-    }
+    const row = Array.isArray(data) ? data[0] : (data as any);
+    // Postgres bigint may arrive as a string over PostgREST — coerce to number.
+    const result = { upvotes: Number(row?.upvotes ?? 0), downvotes: Number(row?.downvotes ?? 0) };
 
-    // 2. Recalculate upvotes/downvotes for the target
-    const result = await this.recalculateVotes(dto.targetType, dto.targetId);
-
-    // 3. Resolve postId for the broadcast (comment votes need a lookup)
+    // Resolve postId for the broadcast (comment votes need a lookup)
     let postId: string | null = null;
     if (dto.targetType === 'post') {
       postId = dto.targetId;
@@ -753,20 +734,5 @@ export class ForumService {
 
     (data ?? []).forEach(v => votes.set(v.target_id, v.vote_value));
     return votes;
-  }
-
-  private async recalculateVotes(type: 'post' | 'comment', id: string) {
-    const { data, error } = await this.db.rpc('recalculate_votes_atomic', {
-      p_target_type: type,
-      p_target_id: id,
-    });
-
-    if (error) throw new InternalServerErrorException(`Failed to recalculate votes: ${error.message}`);
-
-    const row = Array.isArray(data) ? data[0] : data;
-    return {
-      upvotes: Number(row?.upvotes ?? 0),
-      downvotes: Number(row?.downvotes ?? 0),
-    };
   }
 }
