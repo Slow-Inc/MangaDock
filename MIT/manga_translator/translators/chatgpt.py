@@ -4,9 +4,12 @@ import asyncio
 import time
 import string
 from typing import List, Dict
-from rich.console import Console  
+from rich.console import Console
 from rich.panel import Panel
-from .. import manga_translator
+# NOTE (#359): `manga_translator` (the god module) is imported LAZILY inside the two methods
+# that read its `_global_console`/`_log_console` runtime globals — a top-level `from .. import
+# manga_translator` here forms a cycle (manga_translator.py imports `.translators.dispatch`,
+# which imports this module) that lazy package-init no longer masks. Runtime import is cycle-free.
 from .config_gpt import ConfigGPT
 from .common import CommonTranslator, MissingAPIKeyException, VALID_LANGUAGES
 from .keys import OPENAI_API_KEY, OPENAI_HTTP_PROXY, OPENAI_API_BASE, OPENAI_MODEL, OPENAI_GLOSSARY_PATH
@@ -72,7 +75,8 @@ class OpenAITranslator(ConfigGPT, CommonTranslator):
                 self.logger.warning(f"The glossary file does not exist: {self.dict_path}")
                 OpenAITranslator._glossary_warning_shown = True
 
-        # 添加 rich 的 Console 对象  
+        # 添加 rich 的 Console 对象
+        from .. import manga_translator  # #359: lazy — see top-of-file note (cycle-free at runtime)
         if hasattr(manga_translator, '_global_console') and manga_translator._global_console:
             self.console = manga_translator._global_console
         else:
@@ -820,7 +824,7 @@ class OpenAITranslator(ConfigGPT, CommonTranslator):
         self.console.print(panel)
         
         # 同时输出到日志文件（纯文本格式）
-        
+        from .. import manga_translator  # #359: lazy — see top-of-file note (cycle-free at runtime)
         if hasattr(manga_translator, '_log_console') and manga_translator._log_console:
             # 直接输出纯文本，不使用边框
             manga_translator._log_console.print(f"=== {title} ===")
