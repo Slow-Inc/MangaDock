@@ -38,6 +38,15 @@ describe('DiskStorageProvider', () => {
     expect((await provider.get(key)).toString()).toBe('ab');
   });
 
+  it('put rejects when the source stream errors', async () => {
+    const bad = new Readable({ read() { this.destroy(new Error('boom')); } });
+    await expect(provider.put(abs('partial.bin'), bad)).rejects.toThrow('boom');
+  });
+
+  it('get rejects when the file is absent', async () => {
+    await expect(provider.get(abs('nope.bin'))).rejects.toThrow();
+  });
+
   it('exists reflects whether the file is present', async () => {
     const key = abs('present.txt');
     expect(await provider.exists(key)).toBe(false);
@@ -71,6 +80,8 @@ describe('DiskStorageProvider', () => {
 
     await provider.deleteDir(abs('d'));
     expect(await provider.exists(abs('d'))).toBe(false);
+    // no-op (no throw) on a path that never existed
+    await expect(provider.deleteDir(abs('never-existed'))).resolves.toBeUndefined();
   });
 
   it('ensureDir creates a directory', async () => {
