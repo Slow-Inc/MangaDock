@@ -112,7 +112,7 @@ export class ForumService {
       upvotes: p.upvotes,
       downvotes: p.downvotes,
       userVote: userVotes.get(p.id) ?? 0,
-      commentCount: p.comments[0]?.count ?? 0,
+      commentCount: p.comments?.[0]?.count ?? 0,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
     }));
@@ -152,7 +152,7 @@ export class ForumService {
       upvotes: data.upvotes,
       downvotes: data.downvotes,
       userVote: userVotes.get(id) ?? 0,
-      commentCount: data.comments[0]?.count ?? 0,
+      commentCount: data.comments?.[0]?.count ?? 0,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     };
