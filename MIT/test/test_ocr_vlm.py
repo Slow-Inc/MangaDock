@@ -113,6 +113,13 @@ def test_build_prompt_eng_is_byte_identical():
     p = build_sfx_prompt('ENG')
     assert 'the English onomatopoeia an official English manga translation' in p
     assert '1-3 words, UPPERCASE, no quotes' in p          # ENG keeps the UPPERCASE instruction
+    # #278.2: pin the full literal so a stray-space/word regression is caught by ==, not substrings.
+    assert p == (
+        "This image is a cropped sound effect (SFX / onomatopoeia) from a Japanese manga panel. "
+        "Reply with ONLY the English onomatopoeia an official English manga translation would letter "
+        "in its place, matching the mood of the scene. 1-3 words, UPPERCASE, no quotes, no punctuation, "
+        "no explanation. If it is not a sound effect, reply with an empty line."
+    )
 
 
 def test_build_prompt_targets_language_without_uppercase_for_non_latin():
@@ -126,6 +133,23 @@ def test_sanitize_keeps_target_script_for_non_latin():
     assert sanitize_sfx('"ตึง"', 'THA') == 'ตึง'             # Thai kept, quotes stripped
     assert sanitize_sfx('砰！', 'CHS') == '砰'                # Chinese kept, fullwidth ! stripped
     assert sanitize_sfx('쿵', 'KOR') == '쿵'                  # Korean kept
+
+
+def test_sanitize_drops_english_refusal_for_nonlatin_target():
+    # #278.4: a model that echoes an English refusal for a Thai/Chinese request must not
+    # leak it as an SFX token — the non-Latin branch previously had no refusal guard.
+    assert sanitize_sfx('NONE', 'THA') == ''
+    assert sanitize_sfx('N/A', 'CHS') == ''
+
+
+def test_sanitize_drops_native_cjk_refusal():
+    assert sanitize_sfx('无', 'CHS') == ''                    # Chinese "none"
+    assert sanitize_sfx('없음', 'KOR') == ''                  # Korean "none"
+
+
+def test_sanitize_keeps_genuine_nonlatin_sfx_after_guard():
+    assert sanitize_sfx('ตึง', 'THA') == 'ตึง'
+    assert sanitize_sfx('砰', 'CHS') == '砰'
 
 
 def test_sanitize_eng_latin_unchanged():

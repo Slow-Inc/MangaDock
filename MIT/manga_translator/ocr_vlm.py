@@ -36,6 +36,15 @@ _SFX_LANG_NAMES = {
 }
 # Explicit script instruction so the vision model writes the TARGET script, not the Japanese kana
 # of the source SFX (qwen-VL tends to echo Japanese onomatopoeia for a Chinese/Korean request).
+# Refusal tokens to drop in BOTH the Latin and non-Latin sanitize branches (#278.4): the model
+# may echo an English refusal even for a Thai/Chinese request, or reply with a native "none". All
+# scripts here are caseless or already upper, so an `.upper()` membership test covers every target.
+_SFX_REFUSALS = frozenset({
+    'NONE', 'NA', 'N A', 'EMPTY', 'NULL', 'NO',   # English (any target)
+    '无', '没有', '无声', '无声音',                  # Chinese "none / no sound"
+    '없음', '없다',                                 # Korean "none"
+    'ไม่มี', 'ไม่มีเสียง',                          # Thai "none / no sound"
+})
 _SFX_SCRIPT_HINT = {
     'THA': ' Write it in Thai script only.',
     'CHS': ' Write it in Simplified Chinese characters (汉字) only, never Japanese kana.',
@@ -94,7 +103,7 @@ def sanitize_sfx(raw: str, target_lang: str = 'ENG') -> str:
     if target_lang in _LATIN_SFX_LANGS:
         line = re.sub(r'[^A-Za-zÀ-ɏ !\-]', ' ', line)   # letters (incl. accented) + space/!/-
         line = re.sub(r'\s+', ' ', line).strip().upper()
-        if not line or line in ('NONE', 'N A', 'NA', 'EMPTY'):
+        if not line or line in _SFX_REFUSALS:
             return ''
     else:
         # Keep letters (L*) AND combining marks (M*) of any script — Thai vowels/tone marks are
@@ -104,7 +113,7 @@ def sanitize_sfx(raw: str, target_lang: str = 'ENG') -> str:
             for c in line
         )
         line = re.sub(r'\s+', ' ', line).strip()
-        if not line:
+        if not line or line.upper() in _SFX_REFUSALS:   # #278.4: guard the non-Latin branch too
             return ''
     return line[:24]
 
