@@ -27,6 +27,7 @@ overturns an earlier one marks the old ADR **Superseded**.
 | [017](017-mit-batch-transport-jobstate-seam.md) | MIT batch path split: transport/stream (`MitBatchStream`) vs job-state (`MitBatchOrchestrator`) (#294) | Backend | Accepted |
 | [018](018-staff-console-out-of-band-observability-aggregator.md) | Staff Console: out-of-band aggregator µservice + per-service event streams + zero-trust signed-claim auth | Full-stack | Accepted — **planned** (#279) |
 | [019](019-mit-status-stream-forward-jwt-verification.md) | MIT `/status` + `/status/stream` hybrid SSE telemetry; forwarded-JWT verified via Supabase `getUser` (refines 018's PyJWT assumption) | MIT · Dashboard | Accepted — **implemented** (#279) |
+| [021](021-deployment-and-cost-architecture.md) | Deployment & cost: ephemeral on-demand 2-tier (serverless GPU + shared VPS), near-zero marginal cost, deferred until validated | Infra | Accepted — **planned** |
 
 ## Conventions
 
