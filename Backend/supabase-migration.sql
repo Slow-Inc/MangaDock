@@ -474,8 +474,52 @@ BEGIN
 END;
 $$;
 
--- FR-2: re-read price/status/creator INSIDE the txn so a concurrent price change or
--- unpublish between the caller's SELECT and the debit can no longer be exploited.
+-- Atomic cast/toggle vote: upserts/toggles the caller's forum_votes row AND recalculates
+-- the target's totals in ONE transaction. Replaces the read-then-write flow in
+-- forum.service.ts that, under concurrent votes, could 500 on the (uid,target_type,
+-- target_id) PK or interleave delete/update/insert into an inconsistent state (FR-9).
+CREATE OR REPLACE FUNCTION cast_vote_atomic(
+  p_uid         uuid,
+  p_target_type text,
+  p_target_id   uuid,
+  p_vote_value  integer
+)
+RETURNS TABLE(upvotes bigint, downvotes bigint)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_existing integer;
+BEGIN
+  -- Lock the caller's existing vote row (if any) so concurrent toggles serialize.
+  SELECT vote_value INTO v_existing
+    FROM forum_votes
+   WHERE uid = p_uid AND target_type = p_target_type AND target_id = p_target_id
+   FOR UPDATE;
+
+  IF NOT FOUND THEN
+    -- New vote. ON CONFLICT guards the rare concurrent-insert race (both saw no row).
+    INSERT INTO forum_votes (uid, target_type, target_id, vote_value)
+    VALUES (p_uid, p_target_type, p_target_id, p_vote_value)
+    ON CONFLICT (uid, target_type, target_id)
+      DO UPDATE SET vote_value = EXCLUDED.vote_value;
+  ELSIF v_existing = p_vote_value THEN
+    -- Same value again → toggle off.
+    DELETE FROM forum_votes
+     WHERE uid = p_uid AND target_type = p_target_type AND target_id = p_target_id;
+  ELSE
+    -- Opposite direction → switch.
+    UPDATE forum_votes SET vote_value = p_vote_value
+     WHERE uid = p_uid AND target_type = p_target_type AND target_id = p_target_id;
+  END IF;
+
+  RETURN QUERY SELECT * FROM recalculate_votes_atomic(p_target_type, p_target_id);
+END;
+$$;
+
+-- Atomic purchase unlock: re-reads price/status/creator INSIDE the txn so a concurrent
+-- price change or unpublish between read and debit cannot be exploited (FR-2).
+-- Supersedes the old insert-then-split flow in unlock.service.ts (V6/V7).
 DROP FUNCTION IF EXISTS purchase_unlock_atomic(uuid, uuid, integer, uuid, numeric, text);
 
 CREATE OR REPLACE FUNCTION purchase_unlock_atomic(
@@ -571,5 +615,6 @@ REVOKE EXECUTE ON FUNCTION purchase_unlock_atomic(uuid, uuid, numeric, text) FRO
 REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION spend_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
+REVOKE EXECUTE ON FUNCTION cast_vote_atomic(uuid, text, uuid, integer) FROM anon, authenticated, PUBLIC;
 
 COMMIT;
