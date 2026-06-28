@@ -1001,3 +1001,26 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **11. KPI.** #302 slice 1 · two god-components −81 LOC combined · chapterAccess + zoomLevel pure + 22 tests · byte-identical · 0 regressions (bun 77/0, tsc clean).
 
 *Validation:* `bun test app/lib` 77/0 + `npx tsc --noEmit` clean per commit; manual walkthrough passed before merge. *Links:* #302, #292, branch `refactor/302-frontend-decompose`.
+
+---
+
+## 2026-06-28 — Dashboard V2: Track A close-out + live-native leak fixes (PR #414)
+
+### Track A review nits (#352, #353, #354) — closed
+
+- **What & where:** `dashboardv2/components/dashboard.tsx` + `lib/{download,snapshot-export}.ts`. Commits `54182e0` (Track A base) / `f49cda2` (#354). Branch `feat/dashboard`.
+- **Why / Before → After:**
+  - **#352** focus-trap re-armed every 1s clock tick (`onClose` re-created each render) → keyboard focus snapped to Close every second. Fix: `closeNode = useCallback(…, [])` → stable identity → focus-trap effect runs only on open/close. *(Already implemented in Track A; verified + closed.)*
+  - **#353** Export anchor `click()`'d without DOM-attach + synchronous `revokeObjectURL` → fragile across browsers. Fix: `lib/download.ts:triggerDownload` DOM-attach → click → remove → deferred revoke (`setTimeout 0`). *(Already implemented; verified + closed.)*
+  - **#354** three nits: MIT-tab-on-nav = **remember last tab** (documented); skeletons unreachable in mock = **deferred to B4** (annotated); queue-depth chart **moved out of host-metrics** (`HOST_CHARTS`, queue ≠ host metric).
+- **Validation:** `bun test` 74 pass, `tsc --noEmit` clean.
+- **Risk / rollback:** mock-mode only; realtime (Track B/B4) deferred. **Links:** #352, #353, #354.
+
+### Live-native leak fixes (PR #414, `/scrutinize` findings) — ADR 022
+
+- **What & where:** new `dashboardv2/lib/overview-signals.ts` (`pipelineHeaderSummary`, `pctDelta`) + `dashboard.tsx`. Commit `fa64c90`. Branch `feat/dashboard` → **PR #414**.
+- **Why:** a 3-agent `/scrutinize` pass found the live-native contract (ADR 022) breached — 4 hardcoded mock values rendered on the **live** path (the cardinal sin the epic forbids), invisible to the green unit suite.
+- **Before → After:** (1) pipeline `total 95.0s · translate stalled` → derived from real `m.stages` or hidden; (2) GPU-util `−11.4%` delta → real first→last `pctDelta(series)`, badge hidden when no series; (3) hero `94%` success ring → gated behind `mock`; (4) vitals GPU/VRAM `0%` → `—` (No-Data) when `m.gpu` null.
+- **Quality:** live console no longer fabricates incident state / success rate on real MIT.
+- **Validation:** +8 golden tests for the derive libs → **82 pass / 0 fail**, `tsc --noEmit` clean. Full E2E via tunnel = **not run** (Track B realtime not wired; mock-mode only) — honest gap.
+- **Risk / rollback:** pure additions + gating; mock path unchanged. **Links:** PR #414, ADR 022, PRD #304.
