@@ -753,15 +753,16 @@ class MangaTranslator:
             region.text = stripped_text.strip()     
             
             # SFX rescue (#168/#172) — runs BEFORE the value/lang filter so it works for EVERY
-            # target language. A LARGE region the 48px line-OCR could only read as a few characters
-            # is a stylized SFX (e.g. ぬ); localize the crop to the TARGET language via the
-            # custom_openai/9arm vision gateway and keep it. (The old code nested the rescue inside
-            # the filter, which only caught SFX when the misread happened to match the target script
-            # — i.e. English — so SFX were dropped, leaving the raw JP glyph, for TH/ZH/KO.)
-            if config.ocr.vlm_rescue and len(region.text.strip()) <= 4:
+            # target language. A region carrying det_sfx provenance (#278: the second AnimeText
+            # pass flagged it `is_sfx`) is a stylized SFX the 48px line-OCR could only read as a
+            # few characters; localize the crop to the TARGET language via the custom_openai/9arm
+            # vision gateway and keep it. Gating on provenance (not text length) means a short
+            # dialogue line in a big bubble (`は？`/`HUH?`) is never sent to the gateway, so normal
+            # pages add no extra round-trip — and TH/ZH/KO no longer drop the raw JP glyph.
+            if config.ocr.vlm_rescue and region.is_sfx:
+                from .ocr_vlm import should_rescue_sfx, vlm_localize_sfx
                 x1, y1, x2, y2 = (int(v) for v in region.xyxy)
-                if (x2 - x1) * (y2 - y1) >= 3600 and min(x2 - x1, y2 - y1) >= 24:
-                    from .ocr_vlm import vlm_localize_sfx
+                if should_rescue_sfx(region.is_sfx, x1, y1, x2, y2):
                     from .translators.keys import (CUSTOM_OPENAI_API_BASE,
                                                    CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
                     crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]

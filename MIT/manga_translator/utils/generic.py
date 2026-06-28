@@ -357,7 +357,7 @@ class Quadrilateral(object):
     """
     Helper for storing textlines that contains various helper functions.
     """
-    def __init__(self, pts: np.ndarray, text: str, prob: float, fg_r: int = 0, fg_g: int = 0, fg_b: int = 0, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0):    
+    def __init__(self, pts: np.ndarray, text: str, prob: float, fg_r: int = 0, fg_g: int = 0, fg_b: int = 0, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0, is_sfx: bool = False):
         self.pts, is_vertical = sort_pnts(pts)
         if is_vertical:
             self.direction = 'v'
@@ -373,6 +373,7 @@ class Quadrilateral(object):
         self.bg_b = bg_b
         self.assigned_direction: str = None
         self.textlines: List[Quadrilateral] = []
+        self.is_sfx = is_sfx  # #278: det_sfx provenance — set by merge_sfx_detections' second pass
 
     @functools.cached_property
     def structure(self) -> List[np.ndarray]:

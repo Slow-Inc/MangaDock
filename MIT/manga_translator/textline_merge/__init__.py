@@ -202,7 +202,8 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
             angle = 0
         lines = [txtln.pts for txtln in txtlns]
         texts = [txtln.text for txtln in txtlns]
+        is_sfx = any(getattr(txtln, 'is_sfx', False) for txtln in txtlns)  # #278: det_sfx provenance
         region = TextBlock(lines, texts, font_size=font_size, angle=angle, prob=np.exp(total_logprobs),
-                           fg_color=fg_color, bg_color=bg_color)
+                           fg_color=fg_color, bg_color=bg_color, is_sfx=is_sfx)
         text_regions.append(region)
     return text_regions

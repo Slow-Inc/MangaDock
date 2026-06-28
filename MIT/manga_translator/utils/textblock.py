@@ -70,6 +70,7 @@ class TextBlock(object):
                  shadow_color: Tuple = (0, 0, 0),
                  shadow_offset: List = None,
                  prob: float = 1,
+                 is_sfx: bool = False,
                  **kwargs) -> None:
         self.lines = np.array(lines, dtype=np.int32)
         # self.lines.sort()
@@ -77,6 +78,7 @@ class TextBlock(object):
         self.font_size = round(font_size)
         self.angle = angle
         self._direction = direction
+        self.is_sfx = is_sfx  # #278: det_sfx provenance — propagated from the merged textlines
 
         self.texts = texts if texts is not None else []
         self.text = self.texts[0] if self.texts else ""

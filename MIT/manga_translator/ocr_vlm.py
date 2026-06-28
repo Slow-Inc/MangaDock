@@ -44,6 +44,20 @@ _SFX_SCRIPT_HINT = {
 }
 
 
+def should_rescue_sfx(is_sfx: bool, x1: int, y1: int, x2: int, y2: int,
+                      *, min_area: int = 3600, min_side: int = 24) -> bool:
+    """Gate for the target-independent SFX rescue (#278). Fires ONLY for a region with
+    det_sfx provenance (``is_sfx``) whose box is large enough to be a stylized SFX
+    (area >= ``min_area``, shorter side >= ``min_side``). It deliberately does NOT key
+    on text length: a short dialogue line (``は？``/``HUH?``) the primary detector found
+    is ``is_sfx=False`` and is never sent to the vision gateway, so normal pages add no
+    extra per-page round-trip."""
+    if not is_sfx:
+        return False
+    w, h = x2 - x1, y2 - y1
+    return w * h >= min_area and min(w, h) >= min_side
+
+
 def build_sfx_prompt(target_lang: str = 'ENG') -> str:
     """The vision prompt asking for an onomatopoeia in ``target_lang`` (e.g. 'THA' → Thai SFX).
 
