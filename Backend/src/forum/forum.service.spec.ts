@@ -47,45 +47,75 @@ function makeService(fromImpl: (table: string) => any, rpcImpl?: jest.Mock) {
 describe('ForumService.vote', () => {
   let service: ForumService;
   let mockChain: ReturnType<typeof buildMockChain>;
+  let mockRpc: jest.Mock;
 
   const dto = { targetType: 'post' as const, targetId: 'p1', voteValue: 1 as const };
 
   beforeEach(() => {
     mockChain = buildMockChain();
-    service = makeService(() => mockChain);
-    jest.spyOn(service as any, 'recalculateVotes').mockResolvedValue({ upvotes: 1, downvotes: 0 });
+    mockRpc = jest.fn().mockResolvedValue({ data: [{ upvotes: 5, downvotes: 2 }], error: null });
+    service = makeService(() => mockChain, mockRpc);
+    mockForumEvents.broadcastPostEvent.mockClear();
   });
 
-  it('toggle off: deletes existing vote when user votes the same value again', async () => {
-    mockChain.maybeSingle.mockResolvedValue({ data: { uid: 'u1', vote_value: 1 }, error: null });
+  it('casts the vote atomically via cast_vote_atomic without a read-then-write on forum_votes', async () => {
+    const result = await service.vote('u1', dto);
 
-    await service.vote('u1', dto);
-
-    expect(mockChain.delete).toHaveBeenCalled();
-    expect(mockChain.match).toHaveBeenCalledWith(expect.objectContaining({ uid: 'u1' }));
+    expect(mockRpc).toHaveBeenCalledWith('cast_vote_atomic', {
+      p_uid: 'u1',
+      p_target_type: 'post',
+      p_target_id: 'p1',
+      p_vote_value: 1,
+    });
+    // The race-prone select/insert/update/delete on forum_votes must be gone.
     expect(mockChain.insert).not.toHaveBeenCalled();
-  });
-
-  it('new vote: inserts row when no existing vote is found', async () => {
-    mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    await service.vote('u1', dto);
-
-    expect(mockChain.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ uid: 'u1', target_id: 'p1', vote_value: 1 }),
-    );
-    expect(mockChain.delete).not.toHaveBeenCalled();
     expect(mockChain.update).not.toHaveBeenCalled();
+    expect(mockChain.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ upvotes: 5, downvotes: 2 });
   });
 
-  it('switch vote: updates row when existing vote is in the opposite direction', async () => {
-    mockChain.maybeSingle.mockResolvedValue({ data: { uid: 'u1', vote_value: -1 }, error: null });
+  it('returns the upvote/downvote totals produced by the RPC', async () => {
+    mockRpc.mockResolvedValue({ data: [{ upvotes: 10, downvotes: 3 }], error: null });
 
-    await service.vote('u1', dto); // dto.voteValue = 1, existing = -1
+    const result = await service.vote('u1', dto);
 
-    expect(mockChain.update).toHaveBeenCalledWith({ vote_value: 1 });
-    expect(mockChain.delete).not.toHaveBeenCalled();
-    expect(mockChain.insert).not.toHaveBeenCalled();
+    expect(result).toEqual({ upvotes: 10, downvotes: 3 });
+  });
+
+  it('throws when the RPC returns an error', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'deadlock detected' } });
+
+    await expect(service.vote('u1', dto)).rejects.toThrow('Vote failed');
+  });
+
+  it('broadcasts a post vote event with the new totals', async () => {
+    await service.vote('u1', dto);
+
+    expect(mockForumEvents.broadcastPostEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'vote',
+        postId: 'p1',
+        targetType: 'post',
+        targetId: 'p1',
+        upvotes: 5,
+        downvotes: 2,
+      }),
+    );
+  });
+
+  it('resolves postId via a forum_comments lookup when voting on a comment', async () => {
+    const commentDto = { targetType: 'comment' as const, targetId: 'c1', voteValue: 1 as const };
+    mockChain.single.mockResolvedValue({ data: { post_id: 'p9' }, error: null });
+
+    await service.vote('u1', commentDto);
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      'cast_vote_atomic',
+      expect.objectContaining({ p_target_type: 'comment', p_target_id: 'c1' }),
+    );
+    expect(mockForumEvents.broadcastPostEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'vote', postId: 'p9', targetType: 'comment', targetId: 'c1' }),
+    );
   });
 });
 
