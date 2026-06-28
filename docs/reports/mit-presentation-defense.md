@@ -70,11 +70,12 @@ PER-REGION PNG PATCHES  ──►  composited over the ORIGINAL page (byte-ident
 
 **This is the question most likely to sink the viva. Prepare it explicitly.**
 
-- **Honest current state:** we have **no quantitative MT benchmark** (no BLEU/COMET/human-eval on a public set). Our evidence is **qualitative** (`docs/research/mit-vs-upstream-quality-divergence.md`) + visual E2E comparisons.
+- **What we DO have (say this first):** a **controlled render-parity benchmark** — a fixed One-Punch page vs the meangrinch/MangaTranslator reference, **automated and reproducible** (`MIT/tools/ab_benchmark.py`), scored as a **dimension scorecard**, lifting parity from **~40–50% → ~90–95%** with before/after screenshots. Full write-up: `docs/reports/mit-benchmark-and-quality.md`.
+- **The one real gap:** that benchmark measures **render/visual parity**, not **translation accuracy** (no BLEU/COMET/human-eval on a public set yet).
 - **The defensible answer:**
-  > *"We evaluated qualitatively and by visual A/B against the original page and the upstream reference — and we documented exactly where we trail and why (cross-page context disabled, detection/inpaint downscaled for VRAM). What we have **not** done is a numeric benchmark; the honest next step is to evaluate on the **OpenMantra** and **Manga109** public sets with BLEU/COMET and a small human eval. We scoped it out for this iteration because the engineering (making it a reliable service) was the thesis, but we know it's the missing piece to make a quality claim."*
-- **Why this answer works:** it shows you (a) know the standard benchmarks exist, (b) know your own gap, (c) have a concrete plan. Examiners forgive a known, planned gap; they punish a gap you didn't see.
-- **Pre-empt it in the slides** — put a "Limitations & Future Work: quantitative benchmark on OpenMantra/Manga109" slide *before* they ask.
+  > *"We measured with a controlled, reproducible before/after benchmark against a strong reference — render parity went from ~40–50% to ~90–95%, scored per dimension (text fit, SFX, lettering, inpaint), and we documented each defect we found and how we fixed it. What we have **not** yet done is a numeric **translation-accuracy** benchmark (BLEU/COMET) on OpenMantra/Manga109 — that's the honest next step. The engineering — making it a reliable, tunable service at ~90% render parity on a single 12 GB GPU — was the thesis core; accuracy benchmarking is the next iteration."*
+- **Why this answer works:** you (a) have a real measurement to show (not "qualitative only"), (b) name the precise remaining gap (accuracy, not parity), (c) have a concrete plan. Examiners forgive a known, planned gap; they punish a gap you didn't see — and they reward a team that already measured something.
+- **Pre-empt it in the slides** — show the before/after benchmark + defect table (it proves you measured), then a "Future work: translation-accuracy benchmark (OpenMantra/Manga109, BLEU/COMET)" line *before* they ask.
 
 ---
 
@@ -141,6 +142,6 @@ PER-REGION PNG PATCHES  ──►  composited over the ORIGINAL page (byte-ident
 ---
 
 ## 8. The three things to never claim (they'll get caught)
-1. ❌ "Our translation quality is better than \[Mantra/Orange/upstream\]." → you have no benchmark. Say "comparable engineering, quality not yet benchmarked."
+1. ❌ "Our translation quality is better than \[Mantra/Orange/upstream\]." → you have a **render-parity** benchmark, not a translation-**accuracy** one. Say "comparable render output at a fraction of the compute; translation accuracy not yet benchmarked."
 2. ❌ "We invented the translation pipeline." → it's a fork. Say "we engineered the service around an open-source pipeline."
-3. ❌ "It's fully production-ready." → cross-page context off, no benchmark, VRAM-bound. Say "prototype with a production-shaped architecture."
+3. ❌ "It's fully production-ready." → cross-page context being re-enabled, no accuracy benchmark, VRAM-bound. Say "prototype with a production-shaped architecture."
