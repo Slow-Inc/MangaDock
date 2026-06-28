@@ -146,6 +146,17 @@ describe('ForumService.listPosts / getPost — null-safe comment count', () => {
 
     expect(result.commentCount).toBe(0);
   });
+
+  it('getPost reads the count from a populated comments embed', async () => {
+    const chain = buildMockChain({
+      single: jest.fn().mockResolvedValue({ data: { ...baseRow, comments: [{ count: 5 }] }, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    const result = await service.getPost('p1');
+
+    expect(result.commentCount).toBe(5);
+  });
 });
 
 // ── listComments tree assembly ─────────────────────────────────────────────────
