@@ -89,6 +89,76 @@ describe('ForumService.vote', () => {
   });
 });
 
+// ── null-safe comment count (FR-10) ─────────────────────────────────────────────
+
+describe('ForumService.listPosts / getPost — null-safe comment count', () => {
+  const baseRow = {
+    id: 'p1',
+    author_uid: 'u1',
+    title: 'T',
+    content: 'C',
+    category: 'general',
+    target_manga_id: null,
+    target_manga_title: null,
+    target_manga_cover: null,
+    image_urls: null,
+    upvotes: 0,
+    downvotes: 0,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    author: { display_name: 'A', photo_url: null, role: 'user' },
+    comments: null as Array<{ count: number }> | null, // null embed — the bug trigger
+  };
+
+  it('listPosts returns commentCount 0 when the comments embed is null', async () => {
+    const chain = buildMockChain({
+      range: jest.fn().mockResolvedValue({ data: [baseRow], count: 1, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    const result = await service.listPosts();
+
+    expect(result.items[0].commentCount).toBe(0);
+  });
+
+  it('listPosts reads the count from a populated comments embed', async () => {
+    const chain = buildMockChain({
+      range: jest.fn().mockResolvedValue({
+        data: [{ ...baseRow, comments: [{ count: 7 }] }],
+        count: 1,
+        error: null,
+      }),
+    });
+    const service = makeService(() => chain);
+
+    const result = await service.listPosts();
+
+    expect(result.items[0].commentCount).toBe(7);
+  });
+
+  it('getPost returns commentCount 0 when the comments embed is null', async () => {
+    const chain = buildMockChain({
+      single: jest.fn().mockResolvedValue({ data: baseRow, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    const result = await service.getPost('p1');
+
+    expect(result.commentCount).toBe(0);
+  });
+
+  it('getPost reads the count from a populated comments embed', async () => {
+    const chain = buildMockChain({
+      single: jest.fn().mockResolvedValue({ data: { ...baseRow, comments: [{ count: 5 }] }, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    const result = await service.getPost('p1');
+
+    expect(result.commentCount).toBe(5);
+  });
+});
+
 // ── listComments tree assembly ─────────────────────────────────────────────────
 
 describe('ForumService.listComments — tree assembly', () => {
