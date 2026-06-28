@@ -400,13 +400,32 @@ export class WalletService {
       throw new UnauthorizedException('Payment verification failed');
     }
 
-    const { balance } = await this.addCoins(
-      claimed.uid,
-      claimed.amount_coins,
-      'topup',
-      'เติมเหรียญ MangaDock',
-      paymentId,
-    );
+    let balance: number;
+    try {
+      ({ balance } = await this.addCoins(
+        claimed.uid,
+        claimed.amount_coins,
+        'topup',
+        'เติมเหรียญ MangaDock',
+        paymentId,
+      ));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // DB-level topup idempotency (wallet_tx_topup_ref_uidx) means this payment was
+      // already credited once. Treat as success: do NOT revert, re-read the balance, emit.
+      if (/duplicate key|wallet_tx_topup_ref_uidx/i.test(msg)) {
+        const current = await this.getBalance(claimed.uid);
+        this.walletEvents.emit(paymentId, { balance: current });
+        return { received: true };
+      }
+      // Genuine credit failure: revert the claim so a Xendit retry re-processes it,
+      // then rethrow so Xendit receives a 5xx and retries.
+      await this.revertClaim(paymentId);
+      this.logger.error(
+        `Webhook credit failed after claim for ${paymentId}: ${msg} — claim reverted to pending for retry`,
+      );
+      throw err;
+    }
 
     // Emit SSE after addCoins succeeds — security ordering invariant
     this.walletEvents.emit(paymentId, { balance });
