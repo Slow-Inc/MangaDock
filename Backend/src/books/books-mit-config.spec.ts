@@ -53,6 +53,7 @@ const ENV_KEYS = [
   'MIT_EN_FONT',
   'MIT_PATCH_FEATHER',
   'MIT_INPAINT_CONTEXT_PAD',
+  'MIT_LAMA_LUM_REGROUND',
 ];
 
 describe('BooksService.buildMitConfig', () => {
@@ -251,6 +252,22 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
     expect(cfg.inpainter.inpaint_context_pad).toBeUndefined();
+  });
+
+  it('maps MIT_LAMA_LUM_REGROUND → lama_lum_reground strength (#268)', () => {
+    process.env.MIT_LAMA_LUM_REGROUND = '0.85';
+    const svc = makeService();
+    const cfg = JSON.parse((svc as any).buildMitConfig('ANY', 'THA', ''));
+    expect(cfg.inpainter.lama_lum_reground).toBe(0.85);
+  });
+
+  it('omits lama_lum_reground when unset / out of (0,1] — off, byte-identical (#268)', () => {
+    const svc = makeService();
+    expect(JSON.parse((svc as any).buildMitConfig('ANY', 'THA', '')).inpainter.lama_lum_reground).toBeUndefined();
+    process.env.MIT_LAMA_LUM_REGROUND = '0';   // off
+    expect(JSON.parse((svc as any).buildMitConfig('ANY', 'THA', '')).inpainter.lama_lum_reground).toBeUndefined();
+    process.env.MIT_LAMA_LUM_REGROUND = '2';   // out of range
+    expect(JSON.parse((svc as any).buildMitConfig('ANY', 'THA', '')).inpainter.lama_lum_reground).toBeUndefined();
   });
 
   it('omits render font-size knobs when unset — render block unchanged (#166)', () => {

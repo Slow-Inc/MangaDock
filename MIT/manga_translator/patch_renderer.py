@@ -24,6 +24,7 @@ import numpy as np
 from PIL import Image
 
 from .patch_geometry import (
+    reground_inpaint_luminance,
     build_local_region,
     create_text_only_mask,
     crop_mask_for_patch,
@@ -185,6 +186,20 @@ class PatchRenderer:
                             f"[{type(e).__name__}]: using original crop"
                         )
                         patch_ctx.img_inpainted = crop_rgb
+
+            # #268: luminance re-ground the inpaint inside the erase mask BEFORE glyphs are
+            # drawn (knob > 0) — pulls each erased pixel toward the local mean of the
+            # surrounding original art, killing the bidirectional "painted band". Reference is
+            # the pristine original crop (crop_rgb, pre-erase); mask is the per-crop refined
+            # mask, or the recomputed text-only mask in the full-page-inpaint branch. CPU /
+            # VRAM-neutral. 0 → off (byte-identical, the helper early-returns).
+            reground = float(getattr(config.inpainter, 'lama_lum_reground', 0.0) or 0.0)
+            if reground > 0:
+                rg_mask = patch_ctx.mask
+                if rg_mask is None:
+                    rg_mask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
+                patch_ctx.img_inpainted = reground_inpaint_luminance(
+                    patch_ctx.img_inpainted, crop_rgb, rg_mask, strength=reground)
 
             # --- CPU-bound: rendering + PNG encode (outside semaphore) ---
             patch_ctx.img_rgb = patch_ctx.img_inpainted

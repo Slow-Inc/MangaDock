@@ -388,6 +388,13 @@ class InpainterConfig(BaseModel):
     sees the entire page → clean reconstruction even where large text sat over complex/
     dark art (a small crop starves its global branch → a gray blob). One inpaint per page
     (often faster than N per-group inpaints). Off → per-crop inpaint (byte-identical)."""
+    lama_lum_reground: float = 0.0
+    """#268 (patch path only): per-pixel low-frequency luminance re-grounding strength (0→1)
+    applied to the LaMa inpaint inside the erase mask, immediately before glyphs are drawn —
+    pulls each erased pixel toward the local mean of the surrounding original art, killing the
+    bidirectional "painted band" (too light over dark hair, too dark over the cheek). Uses the
+    pristine original crop as reference; pure cv2/numpy on CPU (VRAM-neutral). 0 → off
+    (byte-identical)."""
 
 class ColorizerConfig(BaseModel):
     colorization_size: int = 576

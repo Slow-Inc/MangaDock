@@ -2340,3 +2340,20 @@ default-off. TDD: developed against a torch-free standalone verifier, then 6 gol
 coverage guard, chroma safety, strength=0) — **23 passed**. Commit `d4de7f5`, branch
 `feat/mit-lama-lum-reground`. Provenance in PIPELINE.md §5. Wiring + `lama_lum_reground` knob = #270;
 tune + E2E band measurement = #271.
+
+## 2026-06-28 — #270: wire luminance re-ground into the patch path (PRD #268 slice 2)
+
+Wired the slice-1 helper into the live patch pipeline behind `InpainterConfig.lama_lum_reground`
+(float 0→1, default 0.0 = off, byte-identical). In `patch_renderer.py`, immediately before the
+inpaint is handed to the renderer, when strength>0 → `patch_ctx.img_inpainted =
+reground_inpaint_luminance(img_inpainted, crop_rgb pristine-original, mask, strength)` — mask =
+per-crop refined `patch_ctx.mask`, or recomputed `create_text_only_mask` in the full-page-inpaint
+branch (where mask is None); correction before glyphs so text never fades. Backend
+`MIT_LAMA_LUM_REGROUND` (fracEnv (0,1]) → `inpainter.lama_lum_reground`; `renderConfigHash` already
+hashes every `MIT_*` key → toggle auto-busts the patch cache. TDD: `test_patch_renderer.py` +2
+(knob-off band intact / knob-on masked mean moves toward surround), `books-mit-config.spec.ts` +2
+(env map + omit when off/out-of-range). **Verify:** patch_geometry 23 + patch_renderer 9 + Backend
+43 = green in #270's scope; full MIT suite 434 pass / 29 fail — all 29 PRE-EXISTING (18 pytest-asyncio
+infra + 11 order-dependent test-pollution that pass in isolation; first full run on the fresh
+torch-fixed machine), 0 in #270-touched files. Branch `feat/mit-lama-lum-reground`. PIPELINE.md §5
+updated. /scrutinize + E2E band measurement = the epic PR (after #271). Tune radius + E2E = #271.

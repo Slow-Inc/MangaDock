@@ -641,6 +641,7 @@ export class BooksService {
     const fontMaxBoxRatio = fracEnv('MIT_FONT_MAX_BOX_RATIO');
     const patchFeather = posIntEnv('MIT_PATCH_FEATHER');
     const inpaintContextPad = posIntEnv('MIT_INPAINT_CONTEXT_PAD');
+    const lamaLumReground = fracEnv('MIT_LAMA_LUM_REGROUND');
     const fontSizeMax = posIntEnv('MIT_FONT_SIZE_MAX');
     const model = this.imageModelKey(imageModel);
     return JSON.stringify({
@@ -698,6 +699,10 @@ export class BooksService {
         // full context (clean over complex/dark art, no per-crop gray blob). Absent →
         // per-crop inpaint, byte-identical.
         ...(flagEnv('MIT_PATCH_FULLPAGE_INPAINT') ? { full_page_inpaint: true } : {}),
+        // #268 luminance re-ground (patch path): per-pixel low-freq correction of the LaMa
+        // fill inside the erase mask (strength 0→1), killing the bidirectional "painted band"
+        // over complex/dark art. CPU / VRAM-neutral. Absent → off, byte-identical.
+        ...(lamaLumReground !== undefined ? { lama_lum_reground: lamaLumReground } : {}),
       },
       render: {
         direction: 'auto',

@@ -220,3 +220,66 @@ def test_patch_renderer_keeps_a_larger_explicit_font_min():
         sem=asyncio.Semaphore(3), logger=__import__('logging').getLogger('test'),
     )
     assert renderer.config.render.font_size_minimum == 40    # 40 > page floor 17 → kept
+
+
+# ---- #268/#270: luminance re-ground wired before the renderer (knob lama_lum_reground) ----
+import types as _types
+from manga_translator.patch_geometry import create_text_only_mask as _ctom, build_local_region as _blr
+
+
+def _cfg_reground(strength):
+    return _types.SimpleNamespace(
+        render=_types.SimpleNamespace(bubble_area_fit=False, patch_feather_radius=0),
+        inpainter=_types.SimpleNamespace(inpaint_context_pad=0, lama_lum_reground=strength),
+    )
+
+
+def _ctx_val(v):
+    img = np.full((200, 200, 3), v, dtype=np.uint8)
+    return type('C', (), {'img_rgb': img, 'mask_raw': None, 'mask': None})()
+
+
+def _renderer_cfg(driver, cfg, ctx):
+    import logging
+    return pr.PatchRenderer(driver, ctx, cfg, pad=40, render_extra=80, img_w=200, img_h=200,
+                            source_icc=None, sem=asyncio.Semaphore(3), logger=logging.getLogger('test'))
+
+
+def _band_inpaint(fill):
+    # inpaint stub: the LaMa fill leaves the masked region at `fill` (the "band")
+    def _f(pctx):
+        out = pctx.img_rgb.copy()
+        out[pctx.mask > 127] = fill
+        return out
+    return _f
+
+
+def _capture_render(holder):
+    # capture the image handed to the renderer (= img_inpainted after any reground)
+    def _f(pctx):
+        holder['at_render'] = pctx.img_rgb.copy()
+        return pctx.img_rgb
+    return _f
+
+
+def _masked_mean(img):
+    mask = _ctom(200, 200, [_blr(r, 0, 0) for r in _group()])
+    return float(img[mask > 127].mean()), mask
+
+
+def test_process_group_reground_off_leaves_the_band_unchanged():
+    # surround (pristine) = 100, LaMa band = 200; knob off → renderer sees the band intact.
+    holder = {}
+    driver = FakeDriver(inpaint=_band_inpaint(200), render=_capture_render(holder))
+    _run(_renderer_cfg(driver, _cfg_reground(0.0), _ctx_val(100)).process_group(_group()))
+    mean, _ = _masked_mean(holder['at_render'])
+    assert abs(mean - 200) < 1   # un-grounded
+
+
+def test_process_group_reground_on_moves_masked_mean_toward_surround():
+    # same band, knob on → the masked region is pulled from 200 toward the 100 surround.
+    holder = {}
+    driver = FakeDriver(inpaint=_band_inpaint(200), render=_capture_render(holder))
+    _run(_renderer_cfg(driver, _cfg_reground(1.0), _ctx_val(100)).process_group(_group()))
+    mean, _ = _masked_mean(holder['at_render'])
+    assert mean < 160   # moved well off the 200 baseline toward 100

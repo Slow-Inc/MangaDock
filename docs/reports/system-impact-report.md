@@ -684,3 +684,15 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 - **Validation:** `import torch` + `torch.cuda.is_available()`; `pytest test_patch_geometry.py` collects (23 passed).
 - **Risk / rollback:** dev-env only; no product code. Not HVCI/CET/SAC (all disproved) — see post-mortem.
 - **Links:** post-mortem above; follow-up #359 (lazy torch import for torch-free logic tests).
+
+---
+
+## 2026-06-28 — MIT: wire luminance re-ground into patch path (#270, PRD #268 slice 2)
+
+- **What & where:** `config.py` (`InpainterConfig.lama_lum_reground: float = 0.0`); `patch_renderer.py` (reground call before the renderer, both per-crop + full-page branches); `Backend/src/books/books.service.ts` (`MIT_LAMA_LUM_REGROUND` fracEnv → `inpainter.lama_lum_reground`). Branch `feat/mit-lama-lum-reground`.
+- **Why:** ship the #269 helper end-to-end behind a default-off knob so the painted-band fix is reachable from the live translate pipeline + the Backend cache key.
+- **Before → After:** knob off (default) → byte-identical; knob>0 → the LaMa inpaint inside the erase mask is luminance-re-grounded (pristine-original reference) before glyphs are drawn.
+- **Performance Δ:** VRAM **0** (CPU helper); one cv2 pass per patch group. Not yet latency-measured (E2E = #271).
+- **Quality:** correction before render → text never fades; uses the correct mask in BOTH inpaint branches; `renderConfigHash` auto-partitions on `MIT_LAMA_LUM_REGROUND` so a toggle is visible on the next translate.
+- **Validation:** `test_patch_renderer.py` (+2: off=band-intact, on=mean→surround), `books-mit-config.spec.ts` (+2: map + omit). patch_geometry 23 + patch_renderer 9 + Backend 43 green. Full MIT suite: 434 pass / **29 pre-existing fail** (18 pytest-asyncio infra + 11 order-pollution that pass in isolation — first full run post-torch-fix; **0 in #270 files**). Full-stack E2E band measurement = **#271** (deferred).
+- **Risk / rollback:** default-off (0.0 = byte-identical, helper early-returns). Pure additive wiring. **Links:** #270, PRD #268, #269.
