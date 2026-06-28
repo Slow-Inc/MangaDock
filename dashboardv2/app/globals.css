@@ -134,6 +134,27 @@ body,
   font-family: var(--font-mono);
 }
 
+/* Loading skeleton (DESIGN.md §5) — a quiet shimmer over surface-2; the reduced-motion block below
+   stops the sweep (the static bar remains a legible placeholder). */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--ink) 8%, transparent), transparent);
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

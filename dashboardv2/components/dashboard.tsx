@@ -7,16 +7,29 @@
 // NEXT_PUBLIC_MOCKUP_MODE=true, else the live MIT stream — one render path); panels with no live source
 // gate to No Data so the mock→real switch can't strand one. Rendered at `/` and `/preview`. DESIGN.md is the spec.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, Boxes, Cpu, LayoutGrid, ListTree, Search, Server, Settings, Sun, Moon, Wifi, WifiOff, X, Zap, type LucideIcon } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, Boxes, Cpu, Download, LayoutGrid, ListTree, Search, Server, Settings, Sun, Moon, Wifi, WifiOff, X, Zap, type LucideIcon } from "lucide-react";
 import { buildNodeDebug, type NodeFull } from "@/lib/node-debug";
 import { MIT_TABS } from "@/lib/service-tabs";
 import { useDevAuth } from "@/components/auth-gate";
 import { useLiveSnapshot } from "@/components/use-live-snapshot";
 import type { MitLive } from "@/lib/live-map";
 import { gatewayDiagnosis, vramBloat, workerSaturation, formatDuration, type VramBloat } from "@/lib/incident";
+import { subsystemLink, INCIDENT_TARGET, type DeepLinkTarget } from "@/lib/deep-link";
+import { searchSnapshot } from "@/lib/search";
+import { buildSnapshotExport } from "@/lib/snapshot-export";
+import { liveWorkerNode } from "@/lib/live-worker-node";
+import { tickFromLive, pushTick, summarize, type TimelineTick } from "@/lib/incident-timeline";
+import { isMockMode } from "@/lib/mock-mode";
+import { triggerDownload } from "@/lib/download";
 import CountUp from "@/components/count-up";
+
+// Shimmer skeleton (DESIGN.md §5 — loading is a skeleton, never a centered spinner). Reduced-motion
+// kills the shimmer via globals. Used while the live stream is `connecting`.
+function Skeleton({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
+  return <div className={`skeleton rounded-[8px] ${className}`} style={{ background: "var(--surface-2)", ...style }} />;
+}
 
 // Palette now lives in globals.css (warm Speck tokens, dark default + .light). The toggle below
 // flips the .light class on the root — no local palette override.
@@ -207,19 +220,37 @@ function mockNode(id: string, online: boolean): NodeFull {
 
 /* Per-node debug popup (opened from the heatmap). Sections from buildNodeDebug; a field MIT doesn't
    emit renders "No Data". Modal pattern: backdrop click + Esc close, focus-trap left for harden. */
-function NodePopup({ node, onClose }: { node: { id: string; online: boolean } | null; onClose: () => void }) {
+function NodePopup({ node, onClose, mit, logs }: { node: { id: string; online: boolean } | null; onClose: () => void; mit: MitLive | null; logs: string[] }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Esc-close + focus-trap (DESIGN.md §6 a11y): focus the dialog on open, cycle Tab inside it, restore
+  // focus to the trigger on close. Keeps keyboard users inside the modal.
   useEffect(() => {
     if (!node) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const prev = document.activeElement as HTMLElement | null;
+    const focusables = () =>
+      dialogRef.current ? Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button, [href], input, [tabindex]:not([tabindex="-1"])')).filter((el) => !el.hasAttribute("disabled")) : [];
+    const raf = requestAnimationFrame(() => focusables()[0]?.focus());
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key !== "Tab") return;
+      const els = focusables();
+      if (!els.length) return;
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); cancelAnimationFrame(raf); prev?.focus?.(); };
   }, [node, onClose]);
   if (!node) return null;
-  const n = mockNode(node.id, node.online);
+  // Resolve the REAL MIT worker (id `w-<port>`) from live telemetry; the fictional cluster nodes
+  // (fe-0, gpu0, …) have no live source → mock, so the live/mock split is honest.
+  const liveWorker = mit?.workersDetail?.find((w) => `w-${w.port}` === node.id);
+  const n = liveWorker ? liveWorkerNode(mit!, liveWorker, logs) : mockNode(node.id, node.online);
   const sections = buildNodeDebug(n);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }} onClick={onClose}>
-      <div className="max-h-[88vh] w-full overflow-y-auto rounded-[18px] p-7" style={{ maxWidth: 700, background: "var(--panel)", border: "1px solid var(--hairline-strong)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6)" }} onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Node ${n.id}`} className="max-h-[88vh] w-full overflow-y-auto rounded-[18px] p-7" style={{ maxWidth: 700, background: "var(--panel)", border: "1px solid var(--hairline-strong)", boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6)" }} onClick={(e) => e.stopPropagation()}>
         <div className="mb-5 flex items-start justify-between border-b pb-4" style={{ borderColor: "var(--hairline)" }}>
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-[11px]" style={{ background: "var(--surface-2)" }}><Server size={18} style={{ color: "var(--ink-2)" }} /></span>
@@ -388,6 +419,7 @@ const HOST_CHARTS: { key: string; title: string; unit: string; color: string; de
   { key: "power", title: "Power", unit: "W", color: "var(--processing)", dec: 0 },
   { key: "cpu", title: "CPU", unit: "%", color: "var(--c-detect)", dec: 0 },
   { key: "ram", title: "RAM", unit: "GB", color: "var(--c-ocr)", dec: 1 },
+  { key: "queue", title: "Queue depth", unit: "jobs", color: "var(--accent-violet)", dec: 0 },
 ];
 
 function MiniTimeChart({ data, color }: { data: number[]; color: string }) {
@@ -526,8 +558,7 @@ function MitWorkers({ workers, onOpenNode }: { workers: NonNullable<MitLive["wor
   );
 }
 
-function MitView({ data, onOpenNode }: { data: MitData; onOpenNode: (n: { id: string; online: boolean }) => void }) {
-  const [tab, setTab] = useState(MIT_TABS[0].id);
+function MitView({ data, onOpenNode, tab, setTab }: { data: MitData; onOpenNode: (n: { id: string; online: boolean }) => void; tab: string; setTab: (t: string) => void }) {
   const { m } = data;
   const right = m ? (
     <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11.5px] font-medium" style={m.status === "ok" ? { background: "color-mix(in oklch, var(--success) 12%, transparent)", border: "1px solid color-mix(in oklch, var(--success) 26%, transparent)", color: "var(--success)" } : { background: "var(--coral-soft)", border: "1px solid color-mix(in oklch, var(--coral) 30%, transparent)", color: "var(--coral)" }}>
@@ -678,10 +709,36 @@ function ServiceMockView({ name, onOpenNode }: { name: "Frontend" | "Backend"; o
   );
 }
 
+// Incident-timeline rail — recent health history as a punch-card (client ring buffer,
+// lib/incident-timeline). Green = healthy tick, coral = degraded; hover for the wall-clock.
+function TimelineRail({ ticks, mounted }: { ticks: TimelineTick[]; mounted: boolean }) {
+  const s = summarize(ticks);
+  return (
+    <Panel className="mt-3 p-4">
+      <div className="mb-2.5 flex items-center gap-2">
+        <Activity size={14} style={{ color: "var(--ink-2)" }} /><span className="text-[12.5px] font-semibold">Incident timeline</span>
+        <span className="ml-auto text-[11px] tnum" style={{ color: s.degraded ? "var(--coral)" : "var(--ink-3)" }}>{s.okPct}% healthy{s.degraded ? ` · ${s.degraded} degraded` : ""}</span>
+      </div>
+      {ticks.length ? (
+        <div className="flex flex-wrap items-end gap-1">
+          {ticks.map((t, i) => (
+            <span key={i} title={mounted ? `${new Date(t.at).toLocaleTimeString("en-GB")} · ${t.status}` : t.status} className="h-5 w-2.5 rounded-[2px]" style={{ background: t.ok ? "color-mix(in oklch, var(--success) 55%, transparent)" : "var(--coral)" }} />
+          ))}
+        </div>
+      ) : (
+        <div className="py-3 text-center text-[11.5px]" style={{ color: "var(--ink-3)" }}>No history yet · accumulating</div>
+      )}
+    </Panel>
+  );
+}
+
 export default function Dashboard() {
   const [dark, setDark] = useState(true);
   const [view, setView] = useState("Overview");
   const [openNode, setOpenNode] = useState<{ id: string; online: boolean } | null>(null);
+  const [mitTab, setMitTab] = useState(MIT_TABS[0].id); // lifted so deep-links land on a specific tab
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   // Theme preference persists across reloads. Read after mount (not in the initializer) so the
   // server-rendered default (dark) matches the first client render — no hydration mismatch.
   useEffect(() => { try { const s = localStorage.getItem("mit-theme"); if (s === "light") setDark(false); else if (s === "dark") setDark(true); } catch {} }, []);
@@ -700,6 +757,47 @@ export default function Dashboard() {
   const live = useLiveSnapshot(token);
   const m = live.mit;
   const mock = live.mock ?? false;
+  const connecting = live.status === "connecting" && !mock; // drives skeletons (DESIGN.md §5)
+
+  // Drill-down routing — subsystem pills / incident / search results jump to a view + MIT tab.
+  const navigate = (t: DeepLinkTarget) => { setView(t.view); if (t.tab) setMitTab(t.tab); };
+
+  // Export the current snapshot as a downloadable JSON (pure builder + robust download helper).
+  const downloadSnapshot = () => {
+    const { filename, json } = buildSnapshotExport(m, { at: Date.now(), mock });
+    triggerDownload({ filename, content: json });
+  };
+
+  // Stable close handler so NodePopup's focus-trap effect runs only on open/close — not on every
+  // shell re-render (the 1s clock tick re-renders Dashboard; an inline closure would re-arm the trap
+  // each second and snap focus back to Close). See #352.
+  const closeNode = useCallback(() => setOpenNode(null), []);
+
+  // Functional search over the live snapshot (stages/workers/jobs) — drives the topbar dropdown.
+  const results = searchSnapshot(m, query);
+
+  // Incident-timeline ring buffer (client-accumulated; lib/incident-timeline). A ref + version bump
+  // keeps the hot poll out of React state churn. Seeded in mock mode so the punch-card drafts at once.
+  const mStatusRef = useRef<MitLive | null>(null);
+  useEffect(() => { mStatusRef.current = m; }, [m]); // latest snapshot for the poll (ref written in effect, not render)
+  // Seeded once in mock mode so the punch-card drafts immediately; realtime starts empty and accumulates.
+  // Lazy init (not an effect) keeps it out of set-state-in-effect; the `at`s only surface in mounted-gated
+  // tooltips, so the SSR/client Date.now() difference never reaches the rendered HTML.
+  const [timeline, setTimeline] = useState<TimelineTick[]>(() => {
+    if (!isMockMode()) return [];
+    const base = Date.now();
+    return Array.from({ length: 24 }, (_, i) => {
+      const degraded = i >= 18; // healthy, then the current incident
+      return { at: base - (23 - i) * 30000, status: degraded ? "degraded" : "up", ok: !degraded };
+    });
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const tick = tickFromLive(mStatusRef.current, Date.now());
+      if (tick) setTimeline((prev) => pushTick(prev, tick)); // setState in a callback (not effect body) → allowed
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
 
   // Panels with a MitLive field read from `m` (works for mock AND live). Panels with no live source show
   // their design mock only in mock mode, else No Data — that gap surfaces what still needs wiring.
@@ -731,6 +829,8 @@ export default function Dashboard() {
     return { s: ev.kind === "error" ? "error" : ev.kind === "info" ? "info" : "ok", text: ev.detail ?? ev.kind ?? "", t: ev.at ? new Date(ev.at).toLocaleTimeString("en-GB") : "" };
   });
   const hasErrors = feed.some((e) => e.s === "error"); // drives the topbar Bell unread dot
+  // Recent event details → the real worker node's Logs section (live, not mocked).
+  const nodeLogs = live.events.slice(0, 6).map((e) => { const ev = e as { detail?: string; kind?: string }; return ev.detail ?? ev.kind ?? ""; }).filter(Boolean);
   const stalledStage = m?.stages?.find((st) => st.liveMs >= 30000);
   const mitHealthy = m ? (m.status === "ok" || m.status === "up") : false; // MIT emits "up"; older paths "ok"
   const incident = m && !mitHealthy ? { title: stalledStage ? `Pipeline stalled at ${stalledStage.label.toLowerCase()}` : "MIT degraded", detail: m.gateway?.detail ?? "MIT reported a degraded state" } : null;
@@ -790,9 +890,32 @@ export default function Dashboard() {
         <main className="min-w-0 flex-1 px-6 py-5">
           {/* top bar */}
           <div className="mb-6 flex items-center gap-3">
-            <div className="flex flex-1 items-center gap-2 rounded-[11px] px-3 py-2" style={{ background: "var(--panel)", border: "1px solid var(--hairline)" }}>
-              <Search size={14} style={{ color: "var(--ink-3)" }} />
-              <span className="text-[12.5px]" style={{ color: "var(--ink-3)" }}>Search stages, workers, jobs…</span>
+            <div className="relative flex-1">
+              <div className="flex items-center gap-2 rounded-[11px] px-3 py-2" style={{ background: "var(--panel)", border: `1px solid ${searchOpen ? "var(--hairline-strong)" : "var(--hairline)"}` }}>
+                <Search size={14} style={{ color: "var(--ink-3)" }} />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onFocus={() => setSearchOpen(true)}
+                  onBlur={() => setTimeout(() => setSearchOpen(false), 120)}
+                  placeholder="Search stages, workers, jobs…"
+                  aria-label="Search stages, workers, jobs"
+                  className="w-full bg-transparent text-[12.5px] outline-none"
+                  style={{ color: "var(--ink)" }}
+                />
+                {query && <button onClick={() => setQuery("")} aria-label="Clear search" className="shrink-0"><X size={13} style={{ color: "var(--ink-3)" }} /></button>}
+              </div>
+              {searchOpen && query.trim() && (
+                <div className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-[11px]" style={{ background: "var(--panel)", border: "1px solid var(--hairline-strong)", boxShadow: "0 14px 34px -10px rgba(0,0,0,0.5)" }}>
+                  {results.length ? results.map((r, i) => (
+                    <button key={`${r.kind}-${i}`} onMouseDown={(e) => e.preventDefault()} onClick={() => { navigate(r.target); setQuery(""); setSearchOpen(false); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-[filter] hover:brightness-110" style={{ borderTop: i ? "1px solid var(--hairline)" : "none" }}>
+                      <span className="rounded-[5px] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide" style={{ background: "var(--surface-2)", color: "var(--ink-3)" }}>{r.kind}</span>
+                      <span className="flex-1 truncate text-[12px] font-medium">{r.label}</span>
+                      <span className="truncate text-[10.5px] tnum" style={{ color: "var(--ink-3)" }}>{r.sub}</span>
+                    </button>
+                  )) : <div className="px-3 py-3 text-center text-[11.5px]" style={{ color: "var(--ink-3)" }}>No matches{mock ? "" : " · live snapshot"}</div>}
+                </div>
+              )}
             </div>
             {mock && (
               <span className="flex shrink-0 items-center gap-1.5 rounded-[11px] px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide" style={{ background: "color-mix(in oklch, var(--accent-amber) 16%, transparent)", border: "1px solid color-mix(in oklch, var(--accent-amber) 34%, transparent)", color: "var(--accent-amber)" }}>
@@ -836,7 +959,7 @@ export default function Dashboard() {
                   <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--coral)" }} /> translate degraded
                 </span>
               )}
-              <span className="flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[12px] font-semibold" style={{ background: "var(--coral)", color: "#1a0d09" }}>Export</span>
+              <button onClick={downloadSnapshot} title="Download the current snapshot as JSON" className="flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[12px] font-semibold transition-[filter] hover:brightness-95" style={{ background: "var(--coral)", color: "#1a0d09" }}><Download size={13} /> Export</button>
             </div>
           </div>
 
@@ -857,7 +980,7 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-              <button onClick={() => setView("MIT")} className="shrink-0 cursor-pointer self-start rounded-[8px] px-2.5 py-1.5 text-[11.5px] font-semibold" style={{ background: "var(--coral)", color: "#1a0d09" }}>View detail →</button>
+              <button onClick={() => navigate(INCIDENT_TARGET)} className="shrink-0 cursor-pointer self-start rounded-[8px] px-2.5 py-1.5 text-[11.5px] font-semibold" style={{ background: "var(--coral)", color: "#1a0d09" }}>View detail →</button>
             </div>
           )}
 
@@ -872,12 +995,12 @@ export default function Dashboard() {
                   <div>
                     <div className="flex items-baseline gap-1">
                       {isND
-                        ? <span className="text-[27px] font-semibold leading-none tnum tracking-tight" style={{ color: "var(--ink-3)" }}>—</span>
+                        ? (connecting ? <Skeleton className="h-7 w-20" /> : <span className="text-[27px] font-semibold leading-none tnum tracking-tight" style={{ color: "var(--ink-3)" }}>—</span>)
                         : <CountUp to={mm.to as number} separator={mm.sep} duration={1.2} className="text-[27px] font-semibold leading-none tnum tracking-tight" />}
                       {!isND && mm.unit && <span className="text-[12px] font-medium" style={{ color: "var(--ink-3)" }}>{mm.unit}</span>}
                     </div>
                     {isND ? (
-                      <div className="mt-2.5 text-[11px]" style={{ color: "var(--ink-3)" }}>{mm.noData ? mm.sub : "No live source"}</div>
+                      connecting ? <Skeleton className="mt-2.5 h-3 w-24" /> : <div className="mt-2.5 text-[11px]" style={{ color: "var(--ink-3)" }}>{mm.noData ? mm.sub : "No live source"}</div>
                     ) : (
                       <div className="mt-2.5 flex items-center gap-1.5">
                         <span className="flex items-center gap-0.5 rounded-[6px] px-1.5 py-0.5 text-[10.5px] font-semibold tnum" style={{ background: mm.up ? "color-mix(in oklch, var(--up) 16%, transparent)" : "color-mix(in oklch, var(--down) 16%, transparent)", color: mm.up ? "var(--up)" : "var(--down)" }}>
@@ -978,11 +1101,19 @@ export default function Dashboard() {
                 <div className="mt-2 text-[11.5px] font-medium" style={{ color: "var(--ink-2)" }}>{v.label}</div>
                 <div className="mt-0.5 text-center text-[10px] tnum" style={{ color: "var(--ink-3)" }}>{v.sub}</div>
               </Panel>
-            )) : (
+            )) : connecting ? (
+              [0, 1, 2, 3].map((i) => (
+                <Panel key={i} className="flex flex-col items-center justify-center gap-2 p-4">
+                  <Skeleton className="h-[66px] w-[66px] rounded-full" />
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-2.5 w-20" />
+                </Panel>
+              ))
+            ) : (
               <Panel className="col-span-2 flex flex-col items-center justify-center gap-1.5 p-8 text-center sm:col-span-4">
                 <WifiOff size={18} style={{ color: "var(--ink-3)" }} />
                 <div className="text-[12px] font-medium" style={{ color: "var(--ink-2)" }}>No telemetry</div>
-                <div className="text-[11px]" style={{ color: "var(--ink-3)" }}>{live.status === "connecting" ? "connecting to MIT…" : "MIT stream offline"}</div>
+                <div className="text-[11px]" style={{ color: "var(--ink-3)" }}>MIT stream offline</div>
               </Panel>
             )}
             </div>
@@ -1028,13 +1159,21 @@ export default function Dashboard() {
               {degradedCount > 0 && <span className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: "var(--coral)" }}><Dot s="error" />{degradedCount} degraded</span>}
             </div>
             <div className="flex flex-wrap gap-2">
-              {subsystems.map((s) => (
-                <span key={s.label} className="flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: s.s === "error" ? "var(--coral-soft)" : "var(--surface-2)", border: `1px solid ${s.s === "error" ? "color-mix(in oklch, var(--coral) 30%, transparent)" : "var(--hairline)"}`, color: s.s === "error" ? "var(--coral)" : "var(--ink-2)" }}>
-                  <Dot s={s.s} />{s.label}
-                </span>
-              ))}
+              {subsystems.map((s) => {
+                const link = subsystemLink(s.label);
+                const cls = "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium";
+                const st: React.CSSProperties = { background: s.s === "error" ? "var(--coral-soft)" : "var(--surface-2)", border: `1px solid ${s.s === "error" ? "color-mix(in oklch, var(--coral) 30%, transparent)" : "var(--hairline)"}`, color: s.s === "error" ? "var(--coral)" : "var(--ink-2)" };
+                return link ? (
+                  <button key={s.label} onClick={() => navigate(link)} title={`Open ${s.label}`} className={`${cls} cursor-pointer transition-[filter] hover:brightness-110`} style={st}><Dot s={s.s} />{s.label}</button>
+                ) : (
+                  <span key={s.label} className={cls} style={st}><Dot s={s.s} />{s.label}</span>
+                );
+              })}
             </div>
           </Panel>
+
+          {/* incident timeline — recent health punch-card (client ring buffer) */}
+          <TimelineRail ticks={timeline} mounted={mounted} />
 
           {/* node status — the multi-node fleet has no live source yet (MIT emits 1 worker); mock-only,
               NoData when live, so the gap is visible (#279 extends per-node telemetry). */}
@@ -1154,10 +1293,10 @@ export default function Dashboard() {
 
           {view === "Frontend" && (mock ? <ServiceMockView name="Frontend" onOpenNode={setOpenNode} /> : <NoDataView Icon={Activity} name="Frontend" tech="Next.js 16 · React 19" color="var(--accent-violet)" msg="Telemetry not wired — Frontend /status pending (#283). This service has no live source yet; the panel populates once the endpoint ships." />)}
           {view === "Backend" && (mock ? <ServiceMockView name="Backend" onOpenNode={setOpenNode} /> : <NoDataView Icon={Server} name="Backend" tech="NestJS 11" color="var(--accent-amber)" msg="Telemetry not wired — Backend /status pending (#282). This service has no live source yet; the panel populates once the endpoint ships." />)}
-          {view === "MIT" && <MitView data={mitData} onOpenNode={setOpenNode} />}
+          {view === "MIT" && <MitView data={mitData} onOpenNode={setOpenNode} tab={mitTab} setTab={setMitTab} />}
         </main>
       </div>
-      <NodePopup node={openNode} onClose={() => setOpenNode(null)} />
+      <NodePopup node={openNode} onClose={closeNode} mit={m} logs={nodeLogs} />
     </div>
   );
 }
