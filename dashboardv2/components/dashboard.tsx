@@ -23,6 +23,7 @@ import { liveWorkerNode } from "@/lib/live-worker-node";
 import { tickFromLive, pushTick, summarize, type TimelineTick } from "@/lib/incident-timeline";
 import { isMockMode } from "@/lib/mock-mode";
 import { triggerDownload } from "@/lib/download";
+import { pipelineHeaderSummary, pctDelta } from "@/lib/overview-signals";
 import CountUp from "@/components/count-up";
 
 // Shimmer skeleton (DESIGN.md §5 — loading is a skeleton, never a centered spinner). Reduced-motion
@@ -341,7 +342,7 @@ type MitData = {
   m: MitLive | null;
   mock: boolean;
   stages: Stage[];
-  vitals: { kind: "ring" | "arc"; label: string; pct: number; sub: string }[] | null;
+  vitals: { kind: "ring" | "arc"; label: string; pct: number; sub: string; noData?: boolean }[] | null;
   vramModels: { name: string; v: number; leaked: boolean; freedMb: number | null; footprintMb: number }[];
   vramTotal: number;
   vramUsed: number;
@@ -466,9 +467,9 @@ function MitTelemetry({ vitals, vramModels, vramTotal, vramUsed, hasGpu, bloat, 
           {vitals.map((v) => (
             <Panel key={v.label} className="flex flex-col items-center justify-center p-4">
               {v.kind === "ring" ? (
-                <div className="relative flex items-center justify-center"><Ring pct={v.pct} size={66} sw={6} /><span className="absolute text-[12px] font-semibold tnum">{v.pct}%</span></div>
+                <div className="relative flex items-center justify-center"><Ring pct={v.pct} size={66} sw={6} /><span className="absolute text-[12px] font-semibold tnum">{v.noData ? "—" : `${v.pct}%`}</span></div>
               ) : (
-                <div className="relative pb-1"><Arc pct={v.pct} size={92} /><span className="absolute inset-x-0 bottom-0 text-center text-[12px] font-semibold tnum">{v.pct}%</span></div>
+                <div className="relative pb-1"><Arc pct={v.pct} size={92} /><span className="absolute inset-x-0 bottom-0 text-center text-[12px] font-semibold tnum">{v.noData ? "—" : `${v.pct}%`}</span></div>
               )}
               <div className="mt-2 text-[11.5px] font-medium" style={{ color: "var(--ink-2)" }}>{v.label}</div>
               <div className="mt-0.5 text-center text-[10px] tnum" style={{ color: "var(--ink-3)" }}>{v.sub}</div>
@@ -806,15 +807,16 @@ export default function Dashboard() {
   // Panels with a MitLive field read from `m` (works for mock AND live). Panels with no live source show
   // their design mock only in mock mode, else No Data — that gap surfaces what still needs wiring.
   const ratio = (used?: number, total?: number) => (used != null && total ? Math.round((used / total) * 100) : 0);
+  const gpuDelta = pctDelta(live.series?.gpuUtil); // real first→last trend from the series, not a hardcoded −11.4%
   const metrics: { label: string; to?: number | null; sep: string; unit: string; delta: string; sub: string; up: boolean; mockOnly?: boolean; noData?: boolean }[] = [
     { label: "Pages translated", to: 1284, sep: ",", unit: "", delta: "+24.6%", sub: "+312 · 24h", up: true, mockOnly: true },
     { label: "Throughput", to: 18.4, sep: "", unit: "/min", delta: "+9.1%", sub: "+1.6 today", up: true, mockOnly: true },
-    { label: "GPU util", to: m?.gpu?.utilPct, sep: "", unit: "%", delta: "−11.4%", sub: m?.gpu ? `${m.gpu.vramUsedGb} / ${m.gpu.vramTotalGb} GB` : "no source", up: false },
+    { label: "GPU util", to: m?.gpu?.utilPct, sep: "", unit: "%", delta: gpuDelta?.label ?? "", sub: m?.gpu ? `${m.gpu.vramUsedGb} / ${m.gpu.vramTotalGb} GB` : "no source", up: gpuDelta?.up ?? false },
   ];
   const vitals = m
     ? [
-        { kind: "ring" as const, label: "GPU util", pct: m.gpu?.utilPct ?? 0, sub: m.gpu ? `${m.gpu.vramUsedGb} / ${m.gpu.vramTotalGb} GB · ${m.gpu.tempC ?? "—"}°C` : "—" },
-        { kind: "arc" as const, label: "VRAM used", pct: m.gpu ? ratio(m.gpu.vramUsedGb, m.gpu.vramTotalGb) : 0, sub: m.gpu ? `${m.gpu.vramUsedGb} / ${m.gpu.vramTotalGb} GB` : "—" },
+        { kind: "ring" as const, label: "GPU util", pct: m.gpu?.utilPct ?? 0, sub: m.gpu ? `${m.gpu.vramUsedGb} / ${m.gpu.vramTotalGb} GB · ${m.gpu.tempC ?? "—"}°C` : "—", noData: !m.gpu },
+        { kind: "arc" as const, label: "VRAM used", pct: m.gpu ? ratio(m.gpu.vramUsedGb, m.gpu.vramTotalGb) : 0, sub: m.gpu ? `${m.gpu.vramUsedGb} / ${m.gpu.vramTotalGb} GB` : "—", noData: !m.gpu },
         { kind: "ring" as const, label: "CPU", pct: m.host.cpuPct, sub: `${m.host.diskUsedPct}% disk` },
         { kind: "arc" as const, label: "RAM", pct: ratio(m.host.ramUsedGb, m.host.ramTotalGb), sub: `${m.host.ramUsedGb} / ${m.host.ramTotalGb} GB` },
       ]
@@ -826,6 +828,9 @@ export default function Dashboard() {
     const stalled = st.liveMs >= 30000;
     return { id: st.id, label: st.label, t: st.liveMs === 0 ? "idle" : stalled ? `${Math.round(st.liveMs / 1000)}s ⚠` : fmtMs(st.liveMs), s: stalled ? "error" : st.liveMs === 0 ? "idle" : "ok" };
   });
+  // Honest pipeline header: derived total + real stalled stage, or null when no stages — never a
+  // hardcoded "95.0s · translate stalled" on a live frame (live-native contract).
+  const pipelineSummary = pipelineHeaderSummary(m?.stages);
 
   // Live feed from the event stream (mock or real); incident banner derived from MIT health.
   const feed = live.events.slice(0, 6).map((e) => {
@@ -1007,9 +1012,9 @@ export default function Dashboard() {
                       connecting ? <Skeleton className="mt-2.5 h-3 w-24" /> : <div className="mt-2.5 text-[11px]" style={{ color: "var(--ink-3)" }}>{mm.noData ? mm.sub : "No live source"}</div>
                     ) : (
                       <div className="mt-2.5 flex items-center gap-1.5">
-                        <span className="flex items-center gap-0.5 rounded-[6px] px-1.5 py-0.5 text-[10.5px] font-semibold tnum" style={{ background: mm.up ? "color-mix(in oklch, var(--up) 16%, transparent)" : "color-mix(in oklch, var(--down) 16%, transparent)", color: mm.up ? "var(--up)" : "var(--down)" }}>
+                        {mm.delta && <span className="flex items-center gap-0.5 rounded-[6px] px-1.5 py-0.5 text-[10.5px] font-semibold tnum" style={{ background: mm.up ? "color-mix(in oklch, var(--up) 16%, transparent)" : "color-mix(in oklch, var(--down) 16%, transparent)", color: mm.up ? "var(--up)" : "var(--down)" }}>
                           {mm.up ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}{mm.delta}
-                        </span>
+                        </span>}
                         <span className="text-[10.5px] tnum" style={{ color: "var(--ink-3)" }}>{mm.sub}</span>
                       </div>
                     )}
@@ -1094,12 +1099,12 @@ export default function Dashboard() {
                 {v.kind === "ring" ? (
                   <div className="relative flex items-center justify-center">
                     <Ring pct={v.pct} size={66} sw={6} />
-                    <span className="absolute text-[12px] font-semibold tnum">{v.pct}%</span>
+                    <span className="absolute text-[12px] font-semibold tnum">{v.noData ? "—" : `${v.pct}%`}</span>
                   </div>
                 ) : (
                   <div className="relative pb-1">
                     <Arc pct={v.pct} size={92} />
-                    <span className="absolute inset-x-0 bottom-0 text-center text-[12px] font-semibold tnum">{v.pct}%</span>
+                    <span className="absolute inset-x-0 bottom-0 text-center text-[12px] font-semibold tnum">{v.noData ? "—" : `${v.pct}%`}</span>
                   </div>
                 )}
                 <div className="mt-2 text-[11.5px] font-medium" style={{ color: "var(--ink-2)" }}>{v.label}</div>
@@ -1126,8 +1131,8 @@ export default function Dashboard() {
               <div className="flex items-start justify-between">
                 <span className="text-[11.5px] font-medium" style={{ color: "var(--bg)", opacity: 0.6 }}>Pages translated</span>
                 <div className="relative flex items-center justify-center">
-                  <Ring pct={94} size={42} sw={5} inverted />
-                  <span className="absolute text-[9px] font-semibold tnum" style={{ color: "var(--bg)" }}>94%</span>
+                  <Ring pct={mock ? 94 : 0} size={42} sw={5} inverted />
+                  {mock && <span className="absolute text-[9px] font-semibold tnum" style={{ color: "var(--bg)" }}>94%</span>}
                 </div>
               </div>
               <div className="mt-4">
@@ -1141,7 +1146,7 @@ export default function Dashboard() {
           <Panel className="mt-3 p-5">
             <div className="mb-4 flex items-center gap-2">
               <Activity size={14} style={{ color: "var(--ink-2)" }} /><span className="text-[12.5px] font-semibold">Pipeline</span>
-              <span className="ml-auto text-[11px]" style={{ color: "var(--ink-3)" }}>total 95.0s · baseline 8.7s · translate stalled</span>
+              {pipelineSummary && <span className="ml-auto text-[11px]" style={{ color: "var(--ink-3)" }}>{pipelineSummary}</span>}
             </div>
             <div className="flex items-stretch gap-1.5">
               {stages.map((st, i) => (
