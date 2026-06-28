@@ -11,12 +11,22 @@ Both checks run the heavy import in a CHILD interpreter (subprocess) so this tes
 itself imports nothing heavy and belongs in the torch-free logic suite. The child prints a
 `RESULT=<x>` sentinel so an unrelated startup banner on stdout can't confuse the parse.
 """
+import importlib.util
 import os
 import re
 import subprocess
 import sys
 
+import pytest
+
 _MIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# The torch-free tests below assert the package imports WITHOUT torch (they must run in the
+# lightweight logic gate). The characterization tests, by contrast, RESOLVE the heavy public
+# API (which loads the impl module → imports torch), so they can only run where torch is
+# installed (local dev / the heavy CI job). Skip those when torch is absent.
+_HAS_TORCH = importlib.util.find_spec('torch') is not None
+requires_torch = pytest.mark.skipif(not _HAS_TORCH, reason="resolves the heavy API; needs torch")
 
 
 def _result(code: str) -> str:
@@ -51,6 +61,7 @@ def test_importing_utils_subpackage_is_torch_free():
     assert got == 'False', f"torch leaked on `import manga_translator.utils` (got {got})"
 
 
+@requires_torch
 def test_utils_still_reexports_inference_names_lazily():
     # Characterization: model wrappers do `from manga_translator.utils import ModelWrapper,
     # InfererModule` — those (from .inference) must still resolve, just lazily.
@@ -62,6 +73,7 @@ def test_utils_still_reexports_inference_names_lazily():
     assert _result(code) == 'ok', "utils no longer re-exports inference / eager names"
 
 
+@requires_torch
 def test_translators_subpackage_imports_without_circular_error():
     # #359 regression guard: lazy package init must not expose the chatgpt -> `from ..
     # import manga_translator` -> manga_translator.py -> `from .translators import dispatch`
@@ -71,6 +83,7 @@ def test_translators_subpackage_imports_without_circular_error():
     assert got == 'ok', "translators subpackage hit a circular import under lazy package init"
 
 
+@requires_torch
 def test_package_still_reexports_consumed_public_api():
     # Characterization: the names server/ + mode/ import via `from manga_translator import X`
     # must still resolve to the SAME objects as the implementation module (passes eager & lazy).
