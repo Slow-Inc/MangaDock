@@ -2481,3 +2481,40 @@ Completed PRD #228 (the `books.service.ts` god-object decomposition). Step 6 car
 - **6c `LandingService`** (`landing.service.ts`) — landing assembly (cache→rows→image-cache enhancement) + description + manga-episode Gemini text translation; the **two duplicated stale-cache fallback blocks collapse into one `serveStale()`** (the only behaviour-preserving cleanup). 6 cases.
 
 `books.service.ts` **841 → 376 lines** (god file quartered from its 1834 start; now a thin facade — every public signature unchanged, controllers/call-sites untouched). New unit-testable modules: `gemini-model-catalog.ts`, `manga-catalog.service.ts`, `landing.service.ts`. Constructed via `new` in the BooksService constructor (sharing its cache/imageCache/mangaDex/supabase + a `() => backendOrigin` callback) — same one-way-dependency pattern as #233/#234, so `BooksModule` is unchanged. Method: characterization-first (existing books specs are the net), byte-identical extraction, build whole backend per seam. The Thai-detect regex was restored to its `฀-๿` escapes after an encoding round-trip. **Full backend suite 530 pass / 0 fail** (was 513; +17 new). Branch `dept/backend` (3 commits `15e4837`/`127ee43`/`959b1bd`). **PRD #228 DONE — all 6 steps landed (#229/#230/#232/#233/#234/#231).** Issues left open — close on merge to main. Impact report: `docs/reports/system-impact-report.md` (2026-06-14, #231).
+
+---
+
+## 2026-06-28 — Dashboard V2 Track A close-out + live-native leak fixes (PR #414)
+
+Resumed `dashboardv2` (the canonical `:4200` console) Track A. Committed the Track A base (`54182e0`:
+6 tested live-data libs `deep-link`/`download`/`incident-timeline`/`live-worker-node`/`search`/
+`snapshot-export` + `dashboard.tsx` wiring). **#352** (focus-trap stable via `useCallback` closeNode) and
+**#353** (robust Export download: DOM-attach anchor + deferred revoke in `lib/download.ts`) were found
+**already implemented** in Track A → verified (`tsc` clean, 74 tests) + closed. **#354** (3 nits): MIT tab
+= remember-last (documented), skeletons = deferred to B4 (annotated), queue-depth chart moved out of
+`HOST_CHARTS` (queue ≠ host metric) → commit `f49cda2`, closed.
+
+Then ran **/scrutinize** (3 parallel agents) before opening the PR — found the live-native contract
+(ADR 022) breached in **4 spots** rendering hardcoded mock values on the LIVE path: pipeline
+`95.0s · translate stalled`, GPU-util `−11.4%` delta, hero `94%` ring, vitals `0%` gauges. Fixed via a new
+tested `lib/overview-signals.ts` (`pipelineHeaderSummary`, `pctDelta`) + gating/No-Data — commit `fa64c90`,
+**82 tests pass, tsc clean**. Pushed `feat/dashboard` → **PR #414** (closes #352/#353/#354; relates #304/#279).
+ADR **022** (live-native, no fabricated values on the live path). NOTE: full frontend E2E via tunnel **not
+run** — Track B realtime unwired, console is mock-mode only (honest gap; E2E lands with B4).
+## 2026-06-29 — MIT: lazy package-import boundary so logic tests + CI run torch-free (#359)
+`manga_translator/__init__.py` ran `from .manga_translator import *` and `utils/__init__.py` ran `from .inference import *` —
+both pull torch, so EVERY import (even `from manga_translator.config import Config` in a pure-logic test) dragged in
+torch+cv2+transformers+diffusers (multi-GB). `mit-ci` therefore had to install the full ML stack for a font-fit unit test and
+stayed report-only (`continue-on-error`). Fix (ADR 023): PEP 562 `__getattr__` forwards the public API lazily in BOTH `__init__`s
+(`importlib.import_module` to avoid self-name recursion) — `import manga_translator` + lightweight submodule imports are now
+torch-free, while `from manga_translator import Config/Context/MangaTranslator/...` still resolves on first access. utils stops
+eager-importing `.inference` (its only torch puller) and forwards `ModelWrapper`/`InfererModule` lazily. CI: `mit-ci.yml` splits
+into a BLOCKING `logic` job (lightweight install via a transparent grep dep-filter, torch-free suite) + report-only `heavy` job;
+`test/conftest.py` skips the 12 torch-only modules when torch is absent; `asyncio_mode = auto` lets the bare-`async def` tests run
+(pytest-asyncio already a dev dep). **Characterization-first** (`test_lazy_import.py`, child-interpreter so the test file is itself
+torch-free): proves torch-free package + submodule import AND that the consumed public API resolves to the same objects. **Measured:**
+torch-needing test files 27→12, torch-free collection 338→413 tests, logic gate collects 0 errors / torch never imported (verified
+under a torch-absent import blocker); full MIT suite 0 new failures (21 pre-existing). Branch `worktree-ci-mit-lazy-torch`; ADR 023;
+impact report `docs/reports/system-impact-report.md` (2026-06-29). **Open follow-up:** 12 residual heavy files (genuine model/translator
+tests + `pipeline_params→ModelWrapper` transitive chain); CI grep-filter completeness + the gate's green status are validated by the
+PR's own mit-ci run. Provenance in PIPELINE.md §5.
