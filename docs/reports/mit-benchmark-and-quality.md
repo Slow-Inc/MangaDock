@@ -31,6 +31,21 @@
 - BEFORE: right-edge bubbles clipped ("This brat s…", "Yeah, reall busines…"); SFX left raw Japanese (`ぬめ`, `フッ`); mixed-case, cramped lettering; text under-fills bubbles.
 - AFTER: text fits the bubble (narrow-column wrap); **SFX translated + styled** ("SLURP", "HMPH"); **ALL-CAPS comic lettering**, centred, manga-style; bubble-area fit.
 
+### 2b. Phase 1.5 — the first version (EN→TH, standard page)
+
+Our **first version (Phase 1.5)** already produced clean output on a *standard* page — here **EN→TH**:
+
+![Phase 1.5 EN→TH before/after](../images/render-quality/phase1.5-en-th-example.png)
+
+*(left = ก่อน / source EN · right = หลัง / translated TH)*
+
+What it shows — the **core capability working early**:
+- **EN→TH translation** is clean and natural (incl. the in-panel **Notepad window** text — "ไม่มีชื่อ-Notepad… จะทำยังไงถ้าใครสักคนได้ยินเสียงเธอ!").
+- **Thai typesetting fits the bubbles** with correct combining marks ("หัวหน้าทีมโทโจ!", "มันยังเช้าอยู่เลย พนักงานยังไม่เยอะเท่าไหร่หรอก").
+- **Clean inpaint** on flat backgrounds.
+
+**Why both examples matter (the narrative):** Phase 1.5 shows the **core translate + Thai-typeset pipeline works** on standard pages; the One-Punch benchmark (§2) then attacks the **hardest case** (complex art + SFX + narration boxes, JA→EN) and pushes render parity 40–50% → 90–95%. Together: *core capability* + *conquering the hard case*. The Thai output is also a market differentiator — Orange/Mantra are EN-focused.
+
 ## 3. Defect taxonomy — found, then resolved
 
 The benchmark surfaced **five defect classes**. Each has an engineering resolution — none is a dead-end:
