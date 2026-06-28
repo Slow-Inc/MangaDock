@@ -142,7 +142,7 @@ export class MitBatchStream {
         sourceLangIso,
         targetLangIso,
         imageModel,
-        undefined,
+        signal,
         derivative,
         mangaId,
       );
@@ -176,7 +176,7 @@ export class MitBatchStream {
         sourceLangIso,
         targetLangIso,
         imageModel,
-        undefined,
+        signal,
         derivative,
         mangaId,
       );
@@ -363,7 +363,7 @@ export class MitBatchStream {
       sourceLangIso,
       targetLangIso,
       imageModel,
-      undefined,
+      signal,
       derivative,
       mangaId,
     );

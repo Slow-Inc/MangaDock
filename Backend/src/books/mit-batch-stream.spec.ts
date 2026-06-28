@@ -188,6 +188,52 @@ describe('MitBatchStream.run (#294)', () => {
   });
 });
 
+describe('MitBatchStream.run — abort signal threaded into auto-recover (FR-7)', () => {
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it('stops the auto-recover retry loop when signal aborts mid-retry (call site 3)', async () => {
+    const { stream, mitClient, deps } = makeStream();
+    const controller = new AbortController();
+
+    const THREE_PAGES = [
+      { pageIndex: 0, pageUrl: 'http://example.com/0.jpg' },
+      { pageIndex: 1, pageUrl: 'http://example.com/1.jpg' },
+      { pageIndex: 2, pageUrl: 'http://example.com/2.jpg' },
+    ];
+
+    // Stream delivers only page 0; pages 1 and 2 are "missing" → auto-recover fires
+    mitClient.submitBatch.mockResolvedValue(
+      ndjsonResponse([pageLine(0) + '\n' + DONE + '\n']),
+    );
+
+    // On the first per-page retry call, abort the controller — simulates the SSE
+    // reader disconnecting while recovery is in progress.
+    deps.translateSinglePage.mockImplementationOnce(async () => {
+      controller.abort();
+      return { patches: [] };
+    });
+
+    const { notify } = recorder();
+    await stream.run(
+      'ch1',
+      THREE_PAGES,
+      notify,
+      controller.signal,
+      'ANY',
+      'THA',
+      'taskId-fr7',
+    );
+
+    // With signal threaded: loop guard fires after 1st call → only called once.
+    // Without fix (signal was undefined): guard never fires → called twice.
+    expect(deps.translateSinglePage).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('MitBatchStream._retryMissingPagesIndividually (#82, relocated from #294)', () => {
   it('stops retrying when the AbortSignal is already aborted', async () => {
     const { stream, deps } = makeStream();
