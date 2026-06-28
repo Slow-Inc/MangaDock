@@ -2,6 +2,13 @@ import { Readable } from 'stream';
 
 export interface StorageProvider {
   /**
+   * True when the storage backend is remote/shared (e.g. Cloudflare R2).
+   * Remote storage makes files globally available — per-node presence checks
+   * are meaningless and would cost a network round-trip per call.
+   */
+  readonly isRemote: boolean;
+
+  /**
    * Save a file to the storage.
    * @param key The path/name of the file.
    * @param data The content to save.
