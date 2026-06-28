@@ -19,13 +19,17 @@
 | | Before (2026-06-08) | After (knobs on + techniques ported) |
 |---|---|---|
 | Visual render parity vs reference | **~40–50%** | **~90–95%** |
-| Screenshot | `Screenshot_2026-06-12_110117.png` (insert) | `Screenshot_2026-06-14_020712.png` (insert) |
+| Screenshot | see below ↓ | see below ↓ |
+
+**Before (defects) → After (resolved)** — One-Punch Man, JA→EN:
+
+| Before (2026-06-12) | After (2026-06-14) |
+|---|---|
+| ![MIT benchmark before](../images/render-quality/mit-benchmark-before.png) | ![MIT benchmark after](../images/render-quality/mit-benchmark-after.png) |
 
 **Observable in the screenshots:**
 - BEFORE: right-edge bubbles clipped ("This brat s…", "Yeah, reall busines…"); SFX left raw Japanese (`ぬめ`, `フッ`); mixed-case, cramped lettering; text under-fills bubbles.
 - AFTER: text fits the bubble (narrow-column wrap); **SFX translated + styled** ("SLURP", "HMPH"); **ALL-CAPS comic lettering**, centred, manga-style; bubble-area fit.
-
-> *(Insert the two screenshots here in the slide/report.)*
 
 ## 3. Defect taxonomy — found, then resolved
 
