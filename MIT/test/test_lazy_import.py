@@ -43,6 +43,25 @@ def test_importing_lightweight_submodule_is_torch_free():
     assert got == 'False', f"torch leaked via `from manga_translator.config import Config` (got {got})"
 
 
+def test_importing_utils_subpackage_is_torch_free():
+    # `manga_translator.utils.__init__` used to eager-import `.inference` (the only torch
+    # puller in utils), so any `from manga_translator.utils import X` pulled torch. It is now
+    # lazy — importing the utils subpackage (or a sibling like .generic/.textblock) is torch-free.
+    got = _result("import manga_translator.utils, sys; print('RESULT=' + str('torch' in sys.modules))")
+    assert got == 'False', f"torch leaked on `import manga_translator.utils` (got {got})"
+
+
+def test_utils_still_reexports_inference_names_lazily():
+    # Characterization: model wrappers do `from manga_translator.utils import ModelWrapper,
+    # InfererModule` — those (from .inference) must still resolve, just lazily.
+    code = (
+        "from manga_translator.utils import ModelWrapper, InfererModule\n"
+        "from manga_translator.utils import TextBlock, Quadrilateral\n"  # eager submodules still work
+        "print('RESULT=ok')\n"
+    )
+    assert _result(code) == 'ok', "utils no longer re-exports inference / eager names"
+
+
 def test_package_still_reexports_consumed_public_api():
     # Characterization: the names server/ + mode/ import via `from manga_translator import X`
     # must still resolve to the SAME objects as the implementation module (passes eager & lazy).
