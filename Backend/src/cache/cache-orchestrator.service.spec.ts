@@ -15,13 +15,12 @@ function makeRedis(available = true, store: Record<string, string> = {}): jest.M
   } as any;
 }
 
-function makeJsonCache(): jest.Mocked<Pick<JsonCacheService, 'get' | 'set' | 'delete' | 'clear' | 'getAll' | 'isExpired'>> {
+function makeJsonCache(): jest.Mocked<Pick<JsonCacheService, 'get' | 'set' | 'delete' | 'clear' | 'isExpired'>> {
   return {
     get: jest.fn().mockReturnValue(null),
     set: jest.fn(),
     delete: jest.fn(),
     clear: jest.fn(),
-    getAll: jest.fn().mockReturnValue(new Map()),
     isExpired: jest.fn().mockReturnValue(false),
   } as any;
 }

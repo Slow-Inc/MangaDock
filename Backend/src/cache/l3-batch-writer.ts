@@ -41,7 +41,6 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
   }
 
   async flush(prefix?: string): Promise<void> {
-    const all = this.jsonCache.getAll();
     const matchesPrefix = (k: string) =>
       prefix === undefined
         ? true
@@ -51,7 +50,7 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
 
     if (!this.redis.available) {
       // L1→L3 direct path: Redis unavailable (e.g., provider destroyed before us on shutdown)
-      for (const [key, entry] of all) {
+      for (const [key, entry] of this.jsonCache.entries()) {
         if (matchesPrefix(key)) this.l3.write(key, entry);
       }
       return;
@@ -60,12 +59,12 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
     // Prune high-water marks for keys evicted from L1 — without this the map
     // grows forever under key churn (manga chapters rotate through the LRU).
     for (const key of this.lastWritten.keys()) {
-      if (matchesPrefix(key) && !all.has(key)) this.lastWritten.delete(key);
+      if (matchesPrefix(key) && !this.jsonCache.has(key)) this.lastWritten.delete(key);
     }
 
     // One MGET round-trip instead of one GET per key (#147) — these timers
     // fire every 2s/5s/60s forever, so per-key RTTs were a standing tax.
-    const keys = [...all.keys()].filter(matchesPrefix);
+    const keys = [...this.jsonCache.keys()].filter(matchesPrefix);
     if (keys.length === 0) return;
     const raws = await this.redis.mget(keys);
     for (let i = 0; i < keys.length; i += 1) {
