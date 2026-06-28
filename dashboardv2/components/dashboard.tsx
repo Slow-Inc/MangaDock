@@ -412,6 +412,7 @@ function MitPipeline({ stages, gateway, translator }: { stages: Stage[]; gateway
 
 // GpuDetail — host metrics over time (gauges show current, these show the trend). Series from the live
 // snapshot (mock waves or accumulated stream); a metric with no series renders No Data.
+// Queue depth is not a host metric (#354 item 3) — it lives in the Queue tab + the overview blocked-count.
 const HOST_CHARTS: { key: string; title: string; unit: string; color: string; dec: number }[] = [
   { key: "gpuUtil", title: "GPU util", unit: "%", color: "var(--c-render)", dec: 0 },
   { key: "vram", title: "VRAM", unit: "GB", color: "var(--coral)", dec: 1 },
@@ -419,7 +420,6 @@ const HOST_CHARTS: { key: string; title: string; unit: string; color: string; de
   { key: "power", title: "Power", unit: "W", color: "var(--processing)", dec: 0 },
   { key: "cpu", title: "CPU", unit: "%", color: "var(--c-detect)", dec: 0 },
   { key: "ram", title: "RAM", unit: "GB", color: "var(--c-ocr)", dec: 1 },
-  { key: "queue", title: "Queue depth", unit: "jobs", color: "var(--accent-violet)", dec: 0 },
 ];
 
 function MiniTimeChart({ data, color }: { data: number[]; color: string }) {
@@ -736,7 +736,9 @@ export default function Dashboard() {
   const [dark, setDark] = useState(true);
   const [view, setView] = useState("Overview");
   const [openNode, setOpenNode] = useState<{ id: string; online: boolean } | null>(null);
-  const [mitTab, setMitTab] = useState(MIT_TABS[0].id); // lifted so deep-links land on a specific tab
+  // mitTab is lifted to shell state. Decided behavior (#354 item 1): a plain MIT nav click keeps the
+  //   last-viewed tab (remembered, NOT reset to Pipeline); deep-links override it via navigate().
+  const [mitTab, setMitTab] = useState(MIT_TABS[0].id);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   // Theme preference persists across reloads. Read after mount (not in the initializer) so the
@@ -758,6 +760,8 @@ export default function Dashboard() {
   const m = live.mit;
   const mock = live.mock ?? false;
   const connecting = live.status === "connecting" && !mock; // drives skeletons (DESIGN.md §5)
+  // NOTE (#354 item 2, deferred): skeletons only render while a real stream is `connecting`, which never
+  //   happens in mock mode — so they stay unexercised at runtime until Track B/B4 realtime lands.
 
   // Drill-down routing — subsystem pills / incident / search results jump to a view + MIT tab.
   const navigate = (t: DeepLinkTarget) => { setView(t.view); if (t.tab) setMitTab(t.tab); };
