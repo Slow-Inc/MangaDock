@@ -200,13 +200,21 @@ Three sub-steps inside `dispatch()`:
   patch path's HTTP text-layer contract (`share.py:99`).
 - `sfx_detector.py` (#168) — AnimeText-YOLO SFX-detector wrapper (second detection pass);
   best-effort, gated by `config.detector.det_sfx`; pairs with `sfx_merge.py`'s dedup.
-- `ocr_vlm.py` (#168/#172) — vision-OCR SFX rescue (no ML import — httpx to the OpenAI-compatible
+- `ocr_vlm.py` (#168/#172, +#278) — vision-OCR SFX rescue (no ML import — httpx to the OpenAI-compatible
   vision gateway, custom_openai/9arm): `vlm_localize_sfx(crop, ...)` posts a big-SFX crop the 48px
   line-OCR dropped (stylized ぬ) and returns a sanitized UPPERCASE English onomatopoeia; gated by
   `config.ocr.vlm_rescue`. Wired in `_run_textline_merge` (rescue branch sets `region.translation`
   + `sfx_rescued=True`); `restore_sfx_translations` re-applies after `apply_translations`, and
   `region_filter` (S1) exempts `sfx_rescued` so it survives to render. The rescued region's detection
-  `lines` drive `create_text_only_mask` → the original SFX art is inpainted out. `test/test_ocr_vlm.py`.
+  `lines` drive `create_text_only_mask` → the original SFX art is inpainted out. **#278 (ADR 022):**
+  the rescue trigger is now `region.is_sfx` (det_sfx provenance) via the pure
+  `should_rescue_sfx(is_sfx, x1,y1,x2,y2)` predicate — NOT the old `len(text)<=4` heuristic, so short
+  dialogue in a big bubble is never sent to the gateway. The flag is threaded `Quadrilateral.is_sfx`
+  (`utils/generic.py`, set by `merge_sfx_detections`) → `textline_merge.dispatch` (`any()` over merged
+  textlines) → `TextBlock.is_sfx` (`utils/textblock.py`). #278 also shares one `_SFX_REFUSALS` set
+  across both `sanitize_sfx` branches (non-Latin had no refusal guard). `test/test_ocr_vlm.py`,
+  `test/test_sfx_provenance.py`. **Revert hazard:** drop `is_sfx` → rescue misfires on any ≤4-char
+  region; with `det_sfx` off, no region is ever flagged (rescue requires det_sfx provenance — intended).
 
 ### `manga_translator/` — new: #187/#188 god-object decomposition (~22, byte-identical extractions)
 

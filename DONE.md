@@ -2433,3 +2433,22 @@ Completed PRD #228 (the `books.service.ts` god-object decomposition). Step 6 car
 - **6c `LandingService`** (`landing.service.ts`) — landing assembly (cache→rows→image-cache enhancement) + description + manga-episode Gemini text translation; the **two duplicated stale-cache fallback blocks collapse into one `serveStale()`** (the only behaviour-preserving cleanup). 6 cases.
 
 `books.service.ts` **841 → 376 lines** (god file quartered from its 1834 start; now a thin facade — every public signature unchanged, controllers/call-sites untouched). New unit-testable modules: `gemini-model-catalog.ts`, `manga-catalog.service.ts`, `landing.service.ts`. Constructed via `new` in the BooksService constructor (sharing its cache/imageCache/mangaDex/supabase + a `() => backendOrigin` callback) — same one-way-dependency pattern as #233/#234, so `BooksModule` is unchanged. Method: characterization-first (existing books specs are the net), byte-identical extraction, build whole backend per seam. The Thai-detect regex was restored to its `฀-๿` escapes after an encoding round-trip. **Full backend suite 530 pass / 0 fail** (was 513; +17 new). Branch `dept/backend` (3 commits `15e4837`/`127ee43`/`959b1bd`). **PRD #228 DONE — all 6 steps landed (#229/#230/#232/#233/#234/#231).** Issues left open — close on merge to main. Impact report: `docs/reports/system-impact-report.md` (2026-06-14, #231).
+
+## 2026-06-29 — MIT: gate SFX rescue on det_sfx provenance, not a ≤4-char heuristic (#278)
+Follow-up from the `/scrutinize` self-review of #277. The target-independent SFX rescue fired for ANY region with
+`len(text.strip()) <= 4` in a `>= 60×60` box, so short dialogue in a big bubble (`は？`/`おい`/`HUH?`) was misread as SFX →
+sent to the vision gateway → **overwritten with an onomatopoeia** (wrong render), and every such region added a ~1–2 s
+gateway round-trip to *every* translate. Fix: thread an `is_sfx` **provenance flag** from the det_sfx pass to the rescue
+site instead of guessing from length — `Quadrilateral.is_sfx` (`utils/generic.py`, stamped by `merge_sfx_detections`) →
+`textline_merge.dispatch` (`TextBlock.is_sfx = any(q.is_sfx …)`) → `utils/textblock.py`. The rescue now keys on
+`region.is_sfx` via a pure `should_rescue_sfx(is_sfx, x1,y1,x2,y2)` predicate (provenance + geometry, never text length).
+Additive optional field (default `False`) → byte-identical when `det_sfx` is off (no region flagged → rescue never fires).
+Companion review-nits (#278.2/.3/.4): pinned the ENG prompt with a `==` byte-identity assert; shared one `_SFX_REFUSALS`
+set across both `sanitize_sfx` branches (the non-Latin branch had no refusal guard, so an echoed `NONE`/`N/A` or a native
+`无`/`없음`/`ไม่มี` could leak as a token); documented jieba's lazy first-call dict build (deliberately NOT initialised at
+import so the torch-free logic suite #359 doesn't pay it). **TDD** RED→GREEN per behaviour: +11 provenance/characterization
+tests (`test_sfx_provenance.py`) + 4 nit tests; SFX suites 23→37 green; **full MIT suite 458 pass / 0 new failures** (21
+pre-existing: 18 async-not-supported + patch_png + registry_trim — confirmed identical on origin/main baseline). Branch
+`worktree-fix-mit-sfx-provenance`; ADR 022; impact report `docs/reports/system-impact-report.md` (2026-06-29). **Open
+follow-up:** live E2E SFX render for TH/ZH/KO/EN (needs MIT worker + browser; render path itself unchanged, only the
+trigger). Provenance in PIPELINE.md §5.

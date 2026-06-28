@@ -883,3 +883,33 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **11. KPI.** #302 slice 1 · two god-components −81 LOC combined · chapterAccess + zoomLevel pure + 22 tests · byte-identical · 0 regressions (bun 77/0, tsc clean).
 
 *Validation:* `bun test app/lib` 77/0 + `npx tsc --noEmit` clean per commit; manual walkthrough passed before merge. *Links:* #302, #292, branch `refactor/302-frontend-decompose`.
+
+---
+
+## 2026-06-29 — MIT: SFX rescue gated on det_sfx provenance, not a ≤4-char heuristic (#278)
+
+**1. Type.** Behaviour fix (correctness + latency) on the SFX-rescue trigger; follow-up from the `/scrutinize` self-review of #277. ADR 022.
+
+**2. Trigger.** #277's target-independent SFX rescue fired for ANY region with `len(text.strip()) <= 4` in a `>= 60×60` box. So a short dialogue line in a large bubble (`は？`/`おい`/`HUH?`) was misread as SFX → sent to the vision gateway → overwritten with an onomatopoeia (wrong render); and every such region added a ~1–2 s gateway round-trip to *every* translate. The det_sfx pass already knew which textlines were SFX but threw that provenance away.
+
+**3. Change (before → after).**
+- before: rescue gate `config.ocr.vlm_rescue and len(region.text.strip()) <= 4` + inline area/min-side check; `merge_sfx_detections` appended `Quadrilateral(pts, '', 1.0)` (provenance discarded); `sanitize_sfx` non-Latin branch had no refusal guard.
+- after: `is_sfx` provenance flag threaded `Quadrilateral` (`generic.py`) → `merge_sfx_detections` stamps `is_sfx=True` → `textline_merge.dispatch` sets `TextBlock.is_sfx = any(q.is_sfx …)` → rescue gate `config.ocr.vlm_rescue and region.is_sfx` + pure `should_rescue_sfx(is_sfx, x1,y1,x2,y2)` (provenance + geometry, never text length). Plus: shared `_SFX_REFUSALS` set guards both `sanitize_sfx` branches; ENG prompt byte-identity pinned by `==`; jieba lazy first-call cost documented.
+
+**4. Seams / commits.** c1 (Slice A) provenance threading across the 6 files + `should_rescue_sfx` (TDD, 11 new tests); c2 (Slice B) the three review nits (byte-identity `==`, refusal guard, jieba doc). One logical change per commit; RED→GREEN per behaviour.
+
+**5. Byte-identical proof.** `is_sfx` is an additive optional field (default `False`). With `det_sfx` off no textline is ever flagged → no region is `is_sfx` → rescue never fires and the merge/render path is byte-identical. ENG prompt `==` literal unchanged; `sanitize_sfx` Latin-branch refusal set is a superset of the old tuple (`NONE/N A/NA/EMPTY` ⊂ `_SFX_REFUSALS`) so prior behaviour is preserved.
+
+**6. Performance.** Removes a ~1–2 s vision-gateway round-trip per short-dialogue-in-large-bubble region on SFX-free pages (was one per such region every translate). The cheap `region.is_sfx` gate short-circuits before the lazy `ocr_vlm` import for the common non-SFX case.
+
+**7. Quality / metrics.** +11 provenance/characterization tests (`test_sfx_provenance.py`) + 4 nit tests; SFX suites 23 → 37 green. **Full MIT suite 458 passed / 0 new failures** (21 pre-existing: 18 async-not-supported + test_patch_png + test_registry_trim — confirmed identical on origin/main).
+
+**8. Tech debt removed.** The SFX trigger is now provenance-driven (the detector's own knowledge) instead of a fragile length proxy; the gate is a pure unit-tested predicate instead of inline conditionals; the non-Latin sanitize branch is no longer missing a refusal guard.
+
+**9. Risk / rollback.** Additive field → rollback = revert the two commits. Coupling note: SFX rescue now requires `det_sfx` on (it supplies provenance) — intended, since the rescue is part of the SFX pipeline `det_sfx` gates. **Remaining verification:** live E2E SFX render for TH/ZH/KO/EN (deferred — needs MIT worker + browser; the render path itself is unchanged, only the trigger).
+
+**10. Notes.** The #278 fallback heuristic ("≤2 chars + not-in-a-bubble") was unnecessary — provenance threads cleanly end-to-end. Supersedes only the #277 rescue *trigger*; the #277 multilingual prompt/sanitizer work stands.
+
+**11. KPI.** #278 · provenance gate replaces length heuristic · +15 tests · 0 new failures · ~1–2 s/region latency removed on SFX-free pages · byte-identical when det_sfx off.
+
+*Validation:* `pytest test/test_sfx_provenance.py test/test_ocr_vlm.py test/test_sfx_merge.py test/test_detection_postproc.py` 37/0; full suite 458/0-new; origin/main baseline diff confirms no new failures. *Links:* #278, #277, ADR 022, branch `worktree-fix-mit-sfx-provenance`. E2E SFX render = open follow-up.
