@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { Readable } from 'stream';
 import { StorageProvider } from './storage-provider.interface';
@@ -23,52 +24,58 @@ export class DiskStorageProvider implements StorageProvider {
     const absPath = this.getAbsPath(key);
     const dir = path.dirname(absPath);
 
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    // mkdir is idempotent with recursive:true — no need for a separate existsSync.
+    await fsp.mkdir(dir, { recursive: true });
 
     if (data instanceof Readable) {
       const writeStream = fs.createWriteStream(absPath);
       return new Promise((resolve, reject) => {
         data.pipe(writeStream);
-        data.on('error', reject);
+        // Destroy the write stream on a source error so we don't leak the FD
+        // or leave a partial file behind (the source is now always a temp-file
+        // ReadStream on the upload hot path).
+        data.on('error', (err) => {
+          writeStream.destroy();
+          reject(err);
+        });
         writeStream.on('finish', resolve);
         writeStream.on('error', reject);
       });
     }
 
-    fs.writeFileSync(absPath, data);
+    await fsp.writeFile(absPath, data);
   }
 
   async get(key: string): Promise<Buffer> {
     const absPath = this.getAbsPath(key);
-    return fs.readFileSync(absPath);
+    return fsp.readFile(absPath);
   }
 
   async delete(key: string): Promise<void> {
     const absPath = this.getAbsPath(key);
-    if (fs.existsSync(absPath)) {
-      fs.unlinkSync(absPath);
-    }
+    // force:true makes this a no-op when the file is absent (no throw).
+    await fsp.rm(absPath, { force: true });
   }
 
   async deleteDir(prefix: string): Promise<void> {
     const absPath = this.getAbsPath(prefix);
-    if (fs.existsSync(absPath)) {
-      fs.rmSync(absPath, { recursive: true, force: true });
-    }
+    await fsp.rm(absPath, { recursive: true, force: true });
   }
 
   async exists(key: string): Promise<boolean> {
     const absPath = this.getAbsPath(key);
-    return fs.existsSync(absPath);
+    try {
+      await fsp.access(absPath);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async list(prefix: string): Promise<string[]> {
     const absPath = this.getAbsPath(prefix);
-    if (!fs.existsSync(absPath)) return [];
     try {
-      return fs.readdirSync(absPath);
+      return await fsp.readdir(absPath);
     } catch {
       return [];
     }
@@ -76,8 +83,6 @@ export class DiskStorageProvider implements StorageProvider {
 
   async ensureDir(dirPath: string): Promise<void> {
     const absPath = this.getAbsPath(dirPath);
-    if (!fs.existsSync(absPath)) {
-      fs.mkdirSync(absPath, { recursive: true });
-    }
+    await fsp.mkdir(absPath, { recursive: true });
   }
 }
