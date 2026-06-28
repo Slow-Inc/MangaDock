@@ -2371,3 +2371,27 @@ what a low-freq box-filter correction can fix. This is exactly the residual PRD 
 **Poisson seamless-clone escalation** for → filed as follow-up **#418**. #269 (helper) + #270 (wiring)
 ship as a net positive (fixes smooth, improves textured, default-off, VRAM-0); #418 is the escalation.
 patch_geometry 23 + patch_renderer 9 green after the radius change. Branch `feat/mit-lama-lum-reground`.
+
+## 2026-06-29 — #271 full-stack Reader E2E (reground end-to-end through the production tunnel)
+
+Validated the reground knob as a real user via Playwright through `hayateotsu.space` (not localhost),
+closing the E2E gate before the epic PR. Setup: `.env` `MIT_LAMA_LUM_REGROUND=1` + (temp) `MIT_INPAINTER=lama_large`
+so there is a LaMa band for reground to act on (the resting `.env` uses `flux_klein`, an alternative
+texture-reconstruction band fix — reground targets the LaMa path); `npm run build`; kill BE → `cache:reset` →
+relaunch `dist/src/main`. Translated Kouchuugun ch1 p0 EN→TH.
+
+**Wiring — PASS.** Fresh 51.8s render (not cached), `page=0 → 4 patches`, served with `?v=` cache-bust.
+Backend `fracEnv('MIT_LAMA_LUM_REGROUND')` → `inpainter.lama_lum_reground` (books.service.ts:705, inside the
+inpainter block, unit-tested 43-green) reached MIT; the reground code path executed every translate (proven by
+fresh `MIT_DEBUG_REGROUND_DUMP` npz at 00:30). `renderConfigHash` correctly busts on the knob (ON `?v=78615a96…`
+≠ OFF `?v=ff1e0361…`). Thai renders correctly & positioned over the dark creature art; no gross band artifacts.
+
+**Honest caveat — in-app ON/OFF A/B is CONFOUNDED.** Attempted a clean in-app A/B (re-render same page reground
+OFF). The two runs produced **different patch geometry** (ON r0 = tall 680×1580 column; OFF r0 = tight 451px top
+box) **and different translated wording** ("เกษตรกรรม" vs "การเกษตร") — the translate pipeline (OCR-VLM / LLM
+clustering) is **non-deterministic**, so rendered patches don't correspond 1:1 and the luminance delta can't be
+isolated at the pixel level in-app. The clean band isolation is the **deterministic offline dump measurement**
+(#271 above) — same inpaint crop, reground vs not. Residual faint grey bands on uncovered inpaint regions + a faint
+un-erased stylized "ENCOUNTER" ghost (OCR/mask-coverage, not reground) are consistent with the documented
+"net-positive but incomplete; Poisson reserved (#418)" limit. Saved A/B patches under `MIT/tools/_reground_ab/`.
+`.env` restored to `flux_klein` + reground documented-off; running BE left on lama_large (restart for flux).

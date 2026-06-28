@@ -24,3 +24,4 @@
 - [Feedback: issue ownership scope](feedback_issue_ownership_scope.md) — ทำเฉพาะ issues ที่เราเปิด (author xenodeve) หรือ tag ready-for-agent; ของ akkanop-x (#205/206/207/210/212/177, R2 #214) และ Mobile (CableMoMo2027) = log ของเขา อย่า implement
 - [Feedback: review+merge policy](feedback_review_merge_policy.md) — auto-merge PR เมื่อ CodeQL เขียว + 0 new fail แต่ **ต้อง review ด้วย skill /scrutinize ก่อน merge เสมอ**
 - [Reference: Frontend UI Libraries](reference_frontend_ui_libraries.md) — shadcn (UI primitives/Radix) vs React Bits (WebGL/GLSL effects); MCP setup และ pattern การใช้คู่กัน
+- [Project: MIT translate non-deterministic](project_mit_translate_nondeterministic.md) — translate รัน 2 ครั้งได้ text+patch geometry ต่างกัน (OCR-VLM/LLM sampling) → in-app ON/OFF render A/B confounded; ใช้ offline dump (MIT_DEBUG_REGROUND_DUMP) วัด pixel band แทน; in-app E2E ใช้ได้แค่ verify wiring
