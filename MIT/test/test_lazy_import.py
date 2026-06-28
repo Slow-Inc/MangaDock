@@ -62,6 +62,15 @@ def test_utils_still_reexports_inference_names_lazily():
     assert _result(code) == 'ok', "utils no longer re-exports inference / eager names"
 
 
+def test_translators_subpackage_imports_without_circular_error():
+    # #359 regression guard: lazy package init must not expose the chatgpt -> `from ..
+    # import manga_translator` -> manga_translator.py -> `from .translators import dispatch`
+    # cycle. Importing a translators submodule standalone must succeed (it failed with
+    # "cannot import name 'dispatch' from partially initialized module ...translators").
+    got = _result("from manga_translator.translators.config_gpt import ConfigGPT; print('RESULT=ok')")
+    assert got == 'ok', "translators subpackage hit a circular import under lazy package init"
+
+
 def test_package_still_reexports_consumed_public_api():
     # Characterization: the names server/ + mode/ import via `from manga_translator import X`
     # must still resolve to the SAME objects as the implementation module (passes eager & lazy).

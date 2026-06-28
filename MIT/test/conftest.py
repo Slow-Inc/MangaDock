@@ -20,6 +20,7 @@ def _has_torch() -> bool:
 
 
 _HEAVY_TESTS = [
+    'test_async_correctness.py',     # test bodies import the pipeline (torch) at runtime
     'test_batch_preprocess.py',
     'test_det_forward_default.py',
     'test_flux_klein_inpainter.py',
@@ -27,6 +28,7 @@ _HEAVY_TESTS = [
     'test_page_context.py',
     'test_pipeline_orchestrator.py',
     'test_pipeline_params.py',
+    'test_prev_context_prompt.py',   # test body imports translators.config_gpt -> translators/__init__ (torch)
     'test_registry_trim.py',
     'test_stages.py',
     'test_translation.py',
