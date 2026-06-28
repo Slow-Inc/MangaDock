@@ -118,15 +118,15 @@ describe('BatchSyncWorker — Reliable Queue', () => {
       );
     });
 
-    // Cycle S2 — lrem NOT called when RPC returns an error object
-    it('does NOT call lrem when Supabase RPC returns an error — key stays in processing for retry', async () => {
+    // Cycle S2 — lrem IS called on a retryable error: key is removed from PROCESSING after being pushed to DIRTY
+    it('calls lrem to remove key from processing after requeueing to dirty on retryable RPC error', async () => {
       const entry = makeEntry(42);
       const supabase = makeSupabase(new Error('DB timeout'));
       const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase);
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.lrem).not.toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
     });
 
     // Cycle S3 — lrem called only after RPC succeeds
@@ -343,6 +343,54 @@ describe('BatchSyncWorker — Reliable Queue', () => {
 
       const [, params] = supabase._rpc.mock.calls[0];
       expect(params).not.toHaveProperty('p_entry');
+    });
+  });
+
+  describe('FR-11: retryable failure requeues key from PROCESSING to DIRTY', () => {
+    // F1 — rpush(DIRTY_QUEUE, key) called on below-MAX_RETRIES failure
+    it('calls rpush(DIRTY_QUEUE, key) when RPC fails with retry count below MAX_RETRIES', async () => {
+      const entry = makeEntry(42);
+      const supabase = makeSupabase(new Error('DB timeout'));
+      // hincrbyResult defaults to 1, which is < MAX_RETRIES (5) — retryable path
+      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase);
+
+      await (worker as any).flush();
+
+      expect((redis as any)._client.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'key-a');
+    });
+
+    // F2 — lrem(PROCESSING_QUEUE, 1, key) called on below-MAX_RETRIES failure (removes from processing after dirty push)
+    it('calls lrem(PROCESSING_QUEUE, 1, key) when RPC fails below MAX_RETRIES — removes from processing after dirty push', async () => {
+      const entry = makeEntry(42);
+      const supabase = makeSupabase(new Error('DB timeout'));
+      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase);
+
+      await (worker as any).flush();
+
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
+    });
+
+    // F3 — sadd(DEAD_LETTER_SET) NOT called on below-MAX_RETRIES failure
+    it('does NOT add key to dead_letter set when retry count is below MAX_RETRIES', async () => {
+      const entry = makeEntry(42);
+      const supabase = makeSupabase(new Error('DB timeout'));
+      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase);
+
+      await (worker as any).flush();
+
+      expect((redis as any)._client.sadd).not.toHaveBeenCalledWith(DEAD_LETTER_SET, 'key-a');
+    });
+
+    // F4 — rpush(DIRTY_QUEUE) NOT called when at MAX_RETRIES (dead-letter path stays distinct)
+    it('does NOT call rpush(DIRTY_QUEUE) when retry count reaches MAX_RETRIES — dead-letters instead', async () => {
+      const entry = makeEntry(42);
+      const supabase = makeSupabase(new Error('DB timeout'));
+      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase, MAX_RETRIES);
+
+      await (worker as any).flush();
+
+      expect((redis as any)._client.rpush).not.toHaveBeenCalledWith(DIRTY_QUEUE, 'key-a');
+      expect((redis as any)._client.sadd).toHaveBeenCalledWith(DEAD_LETTER_SET, 'key-a');
     });
   });
 });
