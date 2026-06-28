@@ -54,6 +54,10 @@ export class VersionsService {
    * uploaded files being present on this backend instance yet.
    */
   private async isVersionAvailableOnBackend(row: ChapterVersionRow): Promise<boolean> {
+    // Remote/shared storage (R2): files are globally available; the local-presence
+    // check is meaningless and would cost one network round-trip per version row.
+    if (this.storage.isRemote) return true;
+
     const pages = row.pages ?? [];
     if (pages.length === 0) return true;
 
