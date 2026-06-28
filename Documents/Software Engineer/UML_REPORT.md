@@ -223,3 +223,40 @@ flowchart LR
 ---
 
 *แผนภาพ UML ชุดนี้สะท้อนโครงสร้างระบบที่มีความยืดหยุ่น (Decoupled) และพร้อมสำหรับการย้ายเข้าสู่ระบบ Cloud / Cloudflare ใน Phase ถัดไป*
+
+> หมายเหตุ: แผนภาพด้านบนคือ **development topology** (ทุก service รันรวมกัน local/VPS) ส่วนแผน **production จริง** เป็นแบบ **2-tier on-demand** ตาม [ADR 021](../../docs/adr/021-deployment-and-cost-architecture.md) ด้านล่าง
+
+### 6.1 Target Production Deployment Topology (ADR 021) — ephemeral, on-demand, 2-tier
+
+```mermaid
+flowchart LR
+  Browser[User Browser]
+
+  subgraph VPS["VPS (already rented / shared) — always-on, ~0 marginal cost"]
+    FE[Frontend\nNext.js 16]
+    BE[Backend\nNestJS 11]
+    Redis[(Redis)]
+  end
+
+  subgraph GPUCloud["Serverless GPU Cloud — per-time, wakes on request"]
+    MIT[MIT AI Server\nPython / FastAPI]
+  end
+
+  subgraph Managed["Managed / External — persistent state"]
+    Supabase[(Supabase\nAuth + PostgreSQL)]
+    R2[(Cloudflare R2\nuploads / patches — free tier)]
+    LLM[(9arm Qwen3.6-35B\nin subscription — not Gemini)]
+  end
+
+  Browser -->|HTTPS| FE
+  FE -->|/api/proxy| BE
+  BE <--> Redis
+  BE <-->|state| Supabase
+  BE <-->|assets| R2
+  BE -->|on-demand translate| MIT
+  MIT -->|HMAC webhook| BE
+  MIT <-->|translate| LLM
+  MIT <-->|patches| R2
+```
+
+*State (Supabase + R2) อยู่นอก compute → ปิด FE/BE/MIT ตอนไม่ใช้ได้โดยข้อมูลไม่หาย แล้วเปิดใหม่ตอน present. รายละเอียด cost model + demo-day reliability checklist อยู่ใน ADR 021.*
