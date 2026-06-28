@@ -438,17 +438,17 @@ BEGIN
 END;
 $$;
 
--- Atomic purchase unlock: inserts unlock row, debits buyer, credits creator — single transaction
--- Supersedes the old insert-then-split flow in unlock.service.ts (V6/V7)
+-- FR-2: re-read price/status/creator INSIDE the txn so a concurrent price change or
+-- unpublish between the caller's SELECT and the debit can no longer be exploited.
+DROP FUNCTION IF EXISTS purchase_unlock_atomic(uuid, uuid, integer, uuid, numeric, text);
+
 CREATE OR REPLACE FUNCTION purchase_unlock_atomic(
-  p_uid          uuid,
-  p_version_id   uuid,
-  p_price        integer,
-  p_creator_uid  uuid,
-  p_platform_pct numeric,
-  p_description  text
+  p_uid                uuid,
+  p_version_id         uuid,
+  p_platform_pct       numeric,
+  p_description_prefix text
 )
-RETURNS TABLE(balance integer, already_unlocked boolean, creator_share integer, platform_share integer)
+RETURNS TABLE(balance integer, already_unlocked boolean, creator_share integer, platform_share integer, price_paid integer)
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
@@ -458,58 +458,82 @@ DECLARE
   v_creator_balance integer;
   v_platform_share  integer := 0;
   v_creator_share   integer := 0;
+  v_price           integer;
+  v_status          text;
+  v_creator_uid     uuid;
+  v_title_name      text;
+  v_description     text;
 BEGIN
+  -- Authoritative read inside the transaction — caller is not trusted for price/status.
+  SELECT cv.price_coins, cv.status, cv.translator_uid, cv.title_name
+    INTO v_price, v_status, v_creator_uid, v_title_name
+    FROM chapter_versions cv
+   WHERE cv.version_id = p_version_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'VERSION_NOT_FOUND';
+  END IF;
+  IF v_status <> 'published' THEN
+    RAISE EXCEPTION 'NOT_PUBLISHED';
+  END IF;
+  v_price := COALESCE(v_price, 0);
+  IF v_price > 0 AND v_creator_uid IS NULL THEN
+    RAISE EXCEPTION 'CREATOR_MISSING';
+  END IF;
+  v_description := p_description_prefix || COALESCE(v_title_name, 'Unknown Manga');
+
   INSERT INTO unlocks (uid, version_id, price_paid)
-  VALUES (p_uid, p_version_id, p_price)
+  VALUES (p_uid, p_version_id, v_price)
   ON CONFLICT (uid, version_id) DO NOTHING;
   GET DIAGNOSTICS v_rows = ROW_COUNT;
 
   IF v_rows = 0 THEN
     SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
-    RETURN QUERY SELECT COALESCE(v_balance, 0), true, 0, 0;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), true, 0, 0, v_price;
     RETURN;
   END IF;
 
-  IF p_price <= 0 THEN
+  IF v_price <= 0 THEN
     SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
-    RETURN QUERY SELECT COALESCE(v_balance, 0), false, 0, 0;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), false, 0, 0, 0;
     RETURN;
   END IF;
 
   INSERT INTO wallets (uid, balance) VALUES (p_uid, 0) ON CONFLICT (uid) DO NOTHING;
   UPDATE wallets
-     SET balance = wallets.balance - p_price, updated_at = now()
-   WHERE uid = p_uid AND wallets.balance >= p_price
+     SET balance = wallets.balance - v_price, updated_at = now()
+   WHERE uid = p_uid AND wallets.balance >= v_price
    RETURNING wallets.balance INTO v_balance;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'INSUFFICIENT_FUNDS';
   END IF;
 
   INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
-  VALUES (p_uid, -p_price, 'purchase', v_balance, p_description, p_version_id::text);
+  VALUES (p_uid, -v_price, 'purchase', v_balance, v_description, p_version_id::text);
 
-  v_platform_share := floor(p_price * p_platform_pct);
-  v_creator_share  := p_price - v_platform_share;
-  IF v_creator_share > 0 AND p_creator_uid IS NOT NULL THEN
-    INSERT INTO wallets (uid, balance) VALUES (p_creator_uid, 0) ON CONFLICT (uid) DO NOTHING;
+  v_platform_share := floor(v_price * p_platform_pct);
+  v_creator_share  := v_price - v_platform_share;
+  IF v_creator_share > 0 AND v_creator_uid IS NOT NULL THEN
+    INSERT INTO wallets (uid, balance) VALUES (v_creator_uid, 0) ON CONFLICT (uid) DO NOTHING;
     UPDATE wallets
        SET balance = wallets.balance + v_creator_share, updated_at = now()
-     WHERE uid = p_creator_uid
+     WHERE uid = v_creator_uid
      RETURNING wallets.balance INTO v_creator_balance;
     INSERT INTO wallet_transactions (uid, amount, type, balance_after, description)
-    VALUES (p_creator_uid, v_creator_share, 'reward', v_creator_balance, 'ส่วนแบ่งรายได้: ' || p_description);
+    VALUES (v_creator_uid, v_creator_share, 'reward', v_creator_balance, 'ส่วนแบ่งรายได้: ' || v_description);
   END IF;
 
-  RETURN QUERY SELECT v_balance, false, v_creator_share, v_platform_share;
+  RETURN QUERY SELECT v_balance, false, v_creator_share, v_platform_share, v_price;
 END;
 $$;
+
+-- Re-revoke PUBLIC execute on the new signature (service_role / backend only).
+REVOKE EXECUTE ON FUNCTION purchase_unlock_atomic(uuid, uuid, numeric, text) FROM anon, authenticated, PUBLIC;
 
 -- ─── SECURITY: Revoke PUBLIC execute on SECURITY DEFINER wallet RPCs ─────────
 -- These functions must only be callable by service_role (backend).
 -- PostgREST grants EXECUTE to PUBLIC by default — revoke explicitly.
 REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
-REVOKE EXECUTE ON FUNCTION purchase_unlock_atomic(uuid, uuid, integer, uuid, numeric, text) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION spend_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
 
 COMMIT;

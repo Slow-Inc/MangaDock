@@ -65,43 +65,28 @@ export class UnlockService {
   }
 
   async purchaseUnlock(uid: string, versionId: string) {
-    const { data: version, error: versionError } = await this.db
-      .from('chapter_versions')
-      .select('version_id, price_coins, translator_uid, title_name, status')
-      .eq('version_id', versionId)
-      .maybeSingle();
-
-    if (versionError) {
-      throw new InternalServerErrorException(`Failed to fetch chapter version: ${versionError.message}`);
-    }
-    if (!version) {
-      throw new NotFoundException(`Chapter version ${versionId} not found`);
-    }
-    if (version.status !== 'published') {
-      throw new BadRequestException('Chapter is not available for purchase');
-    }
-
-    const priceCoins = version.price_coins ?? 0;
-    const creatorUid = version.translator_uid;
-    const mangaTitle = version.title_name || 'Unknown Manga';
-    if (priceCoins > 0 && !creatorUid) {
-      throw new BadRequestException('Cannot purchase: Creator information is missing for this version.');
-    }
-
     const { data, error } = await this.db.rpc('purchase_unlock_atomic', {
       p_uid: uid,
       p_version_id: versionId,
-      p_price: priceCoins,
-      p_creator_uid: creatorUid ?? null,
       p_platform_pct: 0.3,
-      p_description: `ปลดล็อคตอน: ${mangaTitle}`,
+      p_description_prefix: 'ปลดล็อคตอน: ',
     });
 
     if (error) {
-      if (error.message?.includes('INSUFFICIENT_FUNDS')) {
+      const msg = error.message ?? '';
+      if (msg.includes('INSUFFICIENT_FUNDS')) {
         throw new BadRequestException('Insufficient balance');
       }
-      throw new InternalServerErrorException(`Failed to unlock chapter: ${error.message}`);
+      if (msg.includes('VERSION_NOT_FOUND')) {
+        throw new NotFoundException(`Chapter version ${versionId} not found`);
+      }
+      if (msg.includes('NOT_PUBLISHED')) {
+        throw new BadRequestException('Chapter is not available for purchase');
+      }
+      if (msg.includes('CREATOR_MISSING')) {
+        throw new BadRequestException('Cannot purchase: Creator information is missing for this version.');
+      }
+      throw new InternalServerErrorException(`Failed to unlock chapter: ${msg}`);
     }
 
     const row = Array.isArray(data) ? data[0] : (data as any);
@@ -109,7 +94,7 @@ export class UnlockService {
       return { alreadyUnlocked: true };
     }
 
-    this.logger.log(`User ${uid} unlocked version ${versionId} for ${priceCoins} coins`);
-    return { unlocked: true, pricePaid: priceCoins, balance: row?.balance };
+    this.logger.log(`User ${uid} unlocked version ${versionId} for ${row?.price_paid} coins`);
+    return { unlocked: true, pricePaid: row?.price_paid, balance: row?.balance };
   }
 }
