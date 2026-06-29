@@ -117,3 +117,26 @@ def test_font_bounds_floored_at_minimum():
     from manga_translator.render_overlap import font_bounds
     # ps=0.5 dialogue → round(4),round(8) → floored at fmin=8 → (8,8)
     assert font_bounds(False, 0.5, 8) == (8, 8)
+
+
+# ---- #175 (corrected): clean-layout font scaled by processing_scale (keeps comic font + wrap) ----
+
+def test_clean_layout_font_size_unchanged_on_benchmark_resolution():
+    from manga_translator.render_overlap import clean_layout_font_size
+    # benchmark page ~1150×800 (0.92 MP → ps≈0.96) with the prod fixed font_size_max=20 →
+    # ~19, i.e. the same look that's already good (no regress).
+    assert clean_layout_font_size(20, 1150, 800, -1) == 19
+
+
+def test_clean_layout_font_size_grows_on_higher_resolution():
+    from manga_translator.render_overlap import clean_layout_font_size
+    # the fix: a higher-res page (3 MP → ps≈1.73) scales the SAME fixed 20 up → fills bubbles
+    # instead of staying tiny (the Gal Yome ENG-source report).
+    assert clean_layout_font_size(20, 2000, 1500, -1) == 35      # round(20 * 1.732)
+
+
+def test_clean_layout_font_size_floored_and_page_default():
+    from manga_translator.render_overlap import clean_layout_font_size
+    assert clean_layout_font_size(20, 200, 200, 12) == 12        # tiny page → ps clamp 0.5 → 10 → floor 12
+    # font_size_max unset → page-scaled base (H+W)/130, then × ps
+    assert clean_layout_font_size(0, 1300, 1300, -1) == 26       # base 20 × ps(1.69MP)=1.3
