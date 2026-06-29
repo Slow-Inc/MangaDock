@@ -89,29 +89,30 @@ def test_multiple_neighbors_each_constrain_their_side():
 
 def test_clean_layout_font_size_is_proportional_to_the_source():
     from manga_translator.render_overlap import clean_layout_font_size
-    # The detected source text height drives the rendered size → matches the original
-    # per-region (no fixed-for-one-benchmark value). Bigger source → bigger output.
-    assert clean_layout_font_size(40, 1200, 800, font_size_minimum=8) == 40
-    assert clean_layout_font_size(20, 1200, 800, font_size_minimum=8) == 20
+    # The detected source text height (× the EN/source ratio, 0.6) drives the rendered size
+    # → matches the original per-region (no fixed-for-one-benchmark value). Bigger source →
+    # proportionally bigger output, so per-region emphasis is preserved.
+    assert clean_layout_font_size(40, 1200, 800, font_size_minimum=8) == 24   # round(40*0.6)
+    assert clean_layout_font_size(20, 1200, 800, font_size_minimum=8) == 12   # round(20*0.6)
 
 
 def test_clean_layout_font_size_scales_across_page_resolutions():
     # The SAME source size yields the same output regardless of page dims — it is driven
-    # by the source (which is itself bigger on a higher-res page), not by a page formula.
-    # This is the fix for "too small on other pages" (a fixed value ignored the source).
+    # by the source (a RATIO of it), which is itself bigger on a higher-res page, not by a
+    # fixed px. This is the fix for "too small on other pages" (a fixed value ignored scale).
     from manga_translator.render_overlap import clean_layout_font_size
-    assert clean_layout_font_size(30, 2000, 1500, font_size_minimum=8) == 30
-    assert clean_layout_font_size(30, 800, 600, font_size_minimum=8) == 30
+    assert clean_layout_font_size(30, 2000, 1500, font_size_minimum=8) == 18  # round(30*0.6)
+    assert clean_layout_font_size(30, 800, 600, font_size_minimum=8) == 18
 
 
 def test_clean_layout_font_size_floors_tiny_or_missing_source():
     from manga_translator.render_overlap import clean_layout_font_size
-    assert clean_layout_font_size(3, 1200, 800, font_size_minimum=10) == 10   # tiny → floor
+    assert clean_layout_font_size(3, 1200, 800, font_size_minimum=10) == 10   # round(3*0.6)=2 → floor
     # missing/invalid source → page-scaled default (≈ (H+W)/130), still floored
     assert clean_layout_font_size(0, 1300, 1300, font_size_minimum=8) == 20   # round(2600/130)
 
 
 def test_clean_layout_font_size_optional_cap_only_when_set():
     from manga_translator.render_overlap import clean_layout_font_size
-    assert clean_layout_font_size(40, 1200, 800, font_size_minimum=8, font_size_max=0) == 40   # off
-    assert clean_layout_font_size(40, 1200, 800, font_size_minimum=8, font_size_max=25) == 25  # safety cap
+    assert clean_layout_font_size(50, 1200, 800, font_size_minimum=8, font_size_max=0) == 30   # off: round(50*0.6)
+    assert clean_layout_font_size(50, 1200, 800, font_size_minimum=8, font_size_max=20) == 20  # safety cap bites

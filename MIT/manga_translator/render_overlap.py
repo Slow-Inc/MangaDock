@@ -26,21 +26,28 @@ def apply_font_cap(size: int, cap: int, is_sfx: bool) -> int:
 
 
 def clean_layout_font_size(src_font_size: float, img_h: int, img_w: int,
-                           font_size_minimum: int, font_size_max: int = 0) -> int:
+                           font_size_minimum: int, factor: float = 0.6,
+                           font_size_max: int = 0) -> int:
     """Source-proportional font size for the clean horizontal-layout path (#175).
 
     Render the translated text at the region's DETECTED source text height
-    (``src_font_size``) so it matches the original per-region AND auto-scales across page
-    resolutions — a higher-res page has bigger detected text, hence bigger output. This
-    replaces a single fixed value (``font_size_max``, e.g. 20px) that was tuned for one
-    benchmark page and so came out too small on every other page. Floored at
-    ``font_size_minimum`` so a tiny/zero detection stays legible (an invalid source falls
-    back to a page-scaled default), and capped by ``font_size_max`` only when it is set
-    (>0) as an OPTIONAL safety ceiling — leave it unset for pure source-proportional sizing.
+    (``src_font_size``) times ``factor`` — this preserves per-region emphasis (a bigger
+    source line renders bigger, like the original) AND auto-scales across page resolutions
+    (a higher-res page has bigger detected text → bigger output). It replaces a single fixed
+    value (``font_size_max``, e.g. 20px) that was tuned for one benchmark page and so came
+    out too small on every other page.
+
+    ``factor`` (0.6) is the EN-over-source typography ratio calibrated so a typical bubble
+    matches the reference render (measured: detected JA heights ~25–42px → ~15–25px output,
+    vs the accepted ~20px target). It generalises because it is a RATIO, not a page-specific
+    px. Floored at ``font_size_minimum`` for legibility (an invalid/zero source falls back to
+    a page-scaled default); ``font_size_max`` is an OPTIONAL absolute cap (default off).
     """
     page_default = max(font_size_minimum, round((img_h + img_w) / 130))
-    src = round(src_font_size) if src_font_size and src_font_size > 0 else page_default
-    fs = max(font_size_minimum, src)
+    if src_font_size and src_font_size > 0:
+        fs = max(font_size_minimum, round(src_font_size * factor))
+    else:
+        fs = page_default
     return apply_font_cap(fs, font_size_max, is_sfx=False)
 
 
