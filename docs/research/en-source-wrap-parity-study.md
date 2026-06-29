@@ -75,14 +75,43 @@ Studied from `D:/Github/MangaDock/MangaTranslator/`. **Its wrapping never reads 
 
 Trade-off summary: **D** is the cheapest partial fix (kills the `bubble_area_fit`-on narration-wide regression) but leaves EN clean-layout wrapping wide. **B** is the smallest change that is genuinely source-agnostic for *both* paths. **C** adds typographic quality (needed for long Latin lines). **E** completes parity but is the largest.
 
+## 4b. Two orthogonal axes — source-agnostic geometry vs per-TARGET-language typography
+
+"Source-agnostic" applies to **layout geometry only** (where the wrap width comes from). It does **not** mean "no per-language logic". Per-**target**-language optimisation is necessary and inevitable — these are two orthogonal axes that must not be conflated:
+
+| Axis | Should be | Why |
+|------|-----------|-----|
+| **Wrap geometry** (max line width source) | **source-agnostic** (target region space + squeeze) | fitting text into the destination space does not depend on the source script; letting source *orientation* drive it is the bug in §1 |
+| **Typography rules** (how to break, which font, vertical-allowed) | **per-TARGET-language** | output languages have real, different rules — break points, fonts, kinsoku, no-space scripts |
+
+**We already do per-target-language typography — and it is correct.** `rendering/text_render.py` preprocesses the *translated* string by target script before the generic wrapper:
+- **Thai** — `_insert_thai_word_breaks` runs **pythainlp** `word_tokenize` and inserts zero-width spaces so wrapping lands on word boundaries (Thai has no inter-word spaces; without it the wrapper char-splits mid-word). **pythainlp 5.3.4 is installed and active in `MIT/.venv`.**
+- **Chinese** — `_insert_cjk_word_breaks` runs **jieba** (installed) for the same reason.
+- **Thai combining marks** — a cluster splitter (`_THAI_COMBINING`) guarantees a non-spacing mark never starts a line even when a single token overflows.
+
+So the codebase already validates the user's architectural point: per-language optimisation is real and present. The gaps are that it is **scattered + optional** (guarded by `try: import`), **covers only Thai + Chinese** (no Korean syllable rule, no Latin hyphenation on this path), and it **feeds a greedy `calc_horizontal`** by inserting ZWSP — not a break-point model a Knuth–Plass DP can score.
+
+**Recommended shape (North Star — per-language as data, not forked engines):** keep **one** source-agnostic wrap engine and inject a **`TypographyPolicy(target_lang)`** it consumes:
+
+```
+one wrap engine (source-agnostic geometry: target-space width + ×0.90 squeeze)
+   └── TypographyPolicy(target_lang)            ← the per-language seam
+         ├── word-break model:  th=pythainlp, zh/ja=jieba/kinsoku, ko=syllable, latin=hyphenate
+         ├── font:              th=Prompt, en=comic, cjk=NotoCJK
+         └── vertical-allowed:  rtl=no, cjk=yes, …
+```
+
+This folds the **existing** scattered Thai/CJK segmenters into one policy object instead of `if lang ==` branches, and — crucially for candidate **C** — when Knuth–Plass lands it must consume the policy's **break-point set** (Thai/CJK word boundaries, Latin hyphenation, kinsoku) so the DP scores only *legal* breaks per target language. The policy is the right place to add Korean and Latin hyphenation later.
+
 ## 5. Recommendation
 
 Pursue **C = B + Knuth–Plass**, staged, behind an opt-in flag with A/B gating (PRD #434), keeping **A** as the baseline:
 
-1. **Slice 1 — target-space width derivation + squeeze (B).** Replace, *behind the flag*, the wrap-width source: balloon regions wrap to the balloon safe-area width and squeeze ×0.90 vs the mask; OSB/narration wrap to the padded target bbox. This alone makes both paths source-agnostic and is demoable on EN-source narration.
-2. **Slice 2 — Knuth–Plass DP (C) via #180** as the wrapper inside the flagged path.
-3. **Defer auto-vertical (E/#182)** to a separate concern (target-orientation, not wrap-width).
-4. Ship **D (rw/bw)** only if an immediate partial relief is wanted before B lands — it is cheap and safe but partial; log it as such.
+1. **Slice 0 — `TypographyPolicy(target_lang)` seam (§4b).** Consolidate the existing scattered per-target-language logic (pythainlp Thai, jieba Chinese, Thai combining-mark clustering) behind one policy object the wrap engine consumes (word-break model + font + vertical-allowed). No behaviour change at first — it is the seam every later slice plugs into, and the place Korean/Latin hyphenation get added.
+2. **Slice 1 — target-space width derivation + squeeze (B).** Replace, *behind the flag*, the wrap-width source: balloon regions wrap to the balloon safe-area width and squeeze ×0.90 vs the mask; OSB/narration wrap to the padded target bbox. This alone makes both paths source-agnostic and is demoable on EN-source narration.
+3. **Slice 2 — Knuth–Plass DP (C) via #180** as the wrapper inside the flagged path, scoring only the **legal break points the `TypographyPolicy` exposes** per target language (Thai/CJK word boundaries, Latin hyphenation, kinsoku).
+4. **Defer auto-vertical (E/#182)** to a separate concern (target-orientation, not wrap-width).
+5. Ship **D (rw/bw)** only if an immediate partial relief is wanted before B lands — it is cheap and safe but partial; log it as such.
 
 Rationale: B/C is exactly MangaTranslator's mechanism (§2), is source-agnostic by construction (no per-orientation branch — aligns with the Engineering North Star of removing the source-dependency rather than adding orientation branches), and reuses existing issues (#180 KP, #183 squeeze, #166 mask). The A/B gate (§3) protects the known-good JP baseline until the metrics prove the switch.
 
