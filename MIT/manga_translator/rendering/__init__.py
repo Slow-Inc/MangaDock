@@ -10,7 +10,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -67,13 +67,12 @@ _FONT_SIZE_SCALE_GAIN = 0.4
 _MAX_BBOX_SCALE = 1.1
 
 
-def _bubble_fit_font_size(region, bubble_wh, max_box_ratio: float = _MAX_FONT_BOX_RATIO) -> int:
-    """#166/#175: largest font whose wrapped translation fits the balloon box,
-    measured with the renderer's own wrapper so the prediction matches the actual
-    render — with a real line-height estimate, a fit margin, and a relative cap so
-    the text fills the balloon without overflowing it. Render-parity C: a higher
-    ``max_box_ratio`` lets short lines fill a tall balloon (MangaTranslator has no
-    cap); the default reproduces the #175 0.5 cap byte-for-byte."""
+def _bubble_fit_font_size(region, bubble_wh, img_shape, font_size_minimum: int = 8) -> int:
+    """#175: largest font whose wrapped translation fits the balloon safe-area, bounded by
+    the two-tier *processing-scaled* bounds (dialogue [8,16] / display/SFX [10,64] × √MP) —
+    mirroring MangaTranslator. This replaces the old box-relative cap (``h_box × 0.5``), which
+    over-sized short lines in tall balloons and under-sized everything on non-benchmark pages.
+    Measured with the renderer's own wrapper so the prediction matches the actual render."""
     w_box, h_box = bubble_wh
     lang = getattr(region, 'target_lang', 'en_US')
     text = region.translation
@@ -93,8 +92,11 @@ def _bubble_fit_font_size(region, bubble_wh, max_box_ratio: float = _MAX_FONT_BO
         block_h = len(lines) * size * _LINE_HEIGHT
         return block_w, block_h
 
-    high = font_high_cap(h_box, max_box_ratio, floor=8)
-    return fit_font_size((w_box, h_box), measure, low=8, high=high, margin=_FIT_MARGIN)
+    ps = processing_scale(img_shape[0], img_shape[1])
+    fmin = font_size_minimum if (font_size_minimum and font_size_minimum > 0) else 8
+    is_display = bool(getattr(region, 'sfx_rescued', False) or getattr(region, 'is_sfx', False))
+    low, high = font_bounds(is_display, ps, fmin)
+    return fit_font_size((w_box, h_box), measure, low=low, high=high, margin=_FIT_MARGIN)
 
 
 def _bubble_interior_box(region, bubble_box, crop_shape):
@@ -241,7 +243,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 if cw >= 6 and ch >= 6:
                     fit_w, fit_h = cw, ch
                     acx, acy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
-            region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), font_max_box_ratio)
+            region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), img.shape, font_size_minimum)
             hw, hh = fit_w / 2.0, fit_h / 2.0
             dst_points_list.append(
                 np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
