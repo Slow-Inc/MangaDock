@@ -11,7 +11,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, display_sfx, bubble_fit_bounds
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, display_sfx, bubble_fit_bounds, fills_bubble_width
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -248,7 +248,16 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # Only for horizontal targets (the wrapper measures horizontally); vertical,
         # balloon-less, and balloon-sharing regions fall through to legacy unchanged.
         bubble_box = getattr(region, 'bubble_box', None) if bubble_fit else None
-        if (bubble_box is not None and region.horizontal and occupancy[i] == 1
+        # #175 residual #2: only FILL the balloon for dialogue — a region whose own text
+        # footprint spans most of the balloon width. A caption/narration loosely placed in a
+        # large detected box (rw/bw low, e.g. One-Punch "THIS BRAT…") must fall through to
+        # clean-layout's narrow source-referenced column instead of ballooning up to fill.
+        _fills = True
+        if bubble_box is not None:
+            _rx = region.xyxy
+            _fills = fills_bubble_width(float(_rx[2]) - float(_rx[0]),
+                                        float(bubble_box[2]) - float(bubble_box[0]))
+        if (bubble_box is not None and _fills and region.horizontal and occupancy[i] == 1
                 and region.translation and region.translation.strip()):
             # #179: wrap to the balloon's safe *interior* (narrow column) centered
             # on the safe anchor, not the full bounding box.

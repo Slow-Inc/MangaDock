@@ -84,6 +84,18 @@ def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: 
     return (x1, y1, x2, y2)
 
 
+def fills_bubble_width(region_w: float, bubble_w: float, threshold: float = 0.72) -> bool:
+    """#175 residual #2: a region the segmenter placed in a balloon is dialogue-to-FILL only when
+    its own text footprint spans most of the balloon width (``region_w/bubble_w >= threshold``).
+    A region whose text is much narrower than its balloon is narration/caption loosely sitting in
+    a large box — it should keep clean-layout's narrow source-referenced column, not grow to fill
+    the balloon (the One-Punch "THIS BRAT…" caption ballooning up). Measured: dialogue rw/bw
+    ≈0.88–0.90, narration ≈0.40–0.59. ``bubble_w <= 0`` (no info) → don't block bubble-fit. Pure."""
+    if bubble_w <= 0:
+        return True
+    return (region_w / bubble_w) >= threshold
+
+
 def bubble_fit_bounds(box_h: float, font_size_minimum: int, abs_max: int = 200) -> Tuple[int, int]:
     """#175 (patch-path fix): the binary-search font bounds for a region that fills a known
     balloon. The font must be free to grow until it FILLS the balloon's safe-interior — so the
