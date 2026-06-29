@@ -25,8 +25,13 @@ without overflow, "WHAT SHOULD WE DO?…" / "THIS BRAT STILL DOESN'T REALIZE WHA
 balloons. TDD: 4 font-free tests (proportional, cross-resolution scaling, floor, optional cap);
 17 render-overlap tests green; render golden/guard/font_fit byte-identical (clean_layout off →
 unchanged). Branch `worktree-fix-mit-font-source-scale` (commits `e4dd200`/`d025955`).
-**Pending:** empirical 2nd-page (different resolution) E2E to confirm cross-page scaling (sound
-by construction — ratio + unit test — but the user's core concern warrants a live 2nd-page check).
+
+**Cross-page scaling CONFIRMED** (controlled live experiment, same page at 1× vs 2× resolution):
+detected source heights double on the 2× page (e.g. "THIS BRAT" 36→73px) and the output
+follows the ratio (clean_fs 22→44px), so the rendered font keeps the SAME relative size at
+both resolutions — exactly the fix for "too small on other pages" (the old fixed 20px would
+have stayed 20 on the 1600px-wide page → tiny). Verified numerically (per-region 1×/2× log)
+and visually (both composites read proportionally). Done.
 
 ---
 
