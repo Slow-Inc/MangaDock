@@ -3,6 +3,23 @@
 
 ---
 
+## MIT #175 dialogue sizing + #431 SFX overflow (2026-06-30)
+
+**Goal:** translated text must fill its speech balloon (not render tiny), and a stylized in-bubble word must not oversize and overflow the art — matching MangaTranslator. Surfaced on EN→TH (Gal Yome no Himitsu ch1 p4); the JA→EN One-Punch benchmark hid it.
+
+**Root cause:** with `MIT_BUBBLE_AREA_FIT` off, balloon dialogue fell to the legacy length-ratio path → tiny on compact targets; `clean_layout` only sizes non-balloon narration (so One-Punch JP narration looked fine). And `sfx_rescued` (a `len(src)≤4` heuristic) was the SOLE driver of the oversized display regime (`is_sfx` YOLO provenance is dead) → short in-bubble text ("DRINKING PARTY") grew to ~64px and overflowed.
+
+**Change:**
+- **S1/S2/S2-corrected (#429/#430):** `processing_scale` (√MP) + two-tier `font_bounds` ([8,16]/[10,64]); `_bubble_fit_font_size` binary-search-fits dialogue to the balloon safe-interior bounded by `[8,16]×√MP` + `anti_overlap`; `clean_layout_font_size` scales the clean-layout font by `processing_scale`.
+- **S3 (#431):** pure `display_sfx(sfx_rescued, is_sfx, has_bubble)` — only FREE-FLOATING SFX (no `bubble_box`) takes the display range/cap-exemption; bubble-internal text is dialogue. Wired at the bubble-fit bounds + legacy cap + box-scale clamp.
+- **Config:** `MIT_BUBBLE_AREA_FIT=1` (`.env`, `.env.example`) — ADR 023 supersedes the prior OFF decision.
+
+**Validation:** TDD (`test_render_overlap.py` 25 green: processing_scale/font_bounds/clean_layout_font_size/display_sfx); render golden/guard byte-identical. E2E via Reader (real backend config, hayateotsu.space tunnel): Gal Yome EN→TH p4 dialogue fills + "ปาร์ตี้" overflow gone; One-Punch JA→EN no regression (free SFX "GULP"/"NEH" stays big). Worktree branch `worktree-feat-mit-font-s1` (PR #433).
+
+**Residual:** stylized in-bubble word the SFX YOLO splits without bubble association can still render larger than its neighbours (no `bubble_box`) — detection/merge concern, deferred to S4/#432.
+
+---
+
 ## Coin Topup System — Xendit PromptPay QR (2026-06-19, sandbox)
 
 **Goal:** Implement real payment flow for coin topup — replacing the dev-only `POST /wallet/topup` stub that throws 403 in production.
