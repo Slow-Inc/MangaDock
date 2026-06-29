@@ -1,4 +1,5 @@
 import os
+import re
 import cv2
 import numpy as np
 from typing import List
@@ -10,7 +11,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, display_sfx
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, display_sfx, bubble_fit_bounds
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -83,6 +84,15 @@ def _bubble_fit_font_size(region, bubble_wh, img_shape, font_size_minimum: int =
     # (#175 self-bug).
     mw, mh = int(w_box * _FIT_MARGIN), int(h_box * _FIT_MARGIN)
 
+    # Segment Thai/Chinese into words first (region.translation is raw — the ZWSP word
+    # breaks are inserted inside calc_horizontal, not here), so the longest-token guard below
+    # is word-aware in every language instead of treating a whole spaceless Thai line as one
+    # "word". English/space languages pass through unchanged.
+    _seg = text_render._insert_cjk_word_breaks(
+        text_render._insert_thai_word_breaks(text or ''))
+    _toks = [t for t in re.split(r'[\s​]+', _seg) if t]
+    _longest = max(_toks, key=len) if _toks else ''
+
     def measure(size):
         lines, widths = text_render.calc_horizontal(
             size, text, max_width=mw, max_height=mh, language=lang)
@@ -90,18 +100,24 @@ def _bubble_fit_font_size(region, bubble_wh, img_shape, font_size_minimum: int =
         # so the search floors at `low` instead of picking the max font (#bug-hunt).
         block_w = max(widths) if widths else float('inf')
         block_h = len(lines) * size * _LINE_HEIGHT
+        # #175: reject a size that force-breaks a single WORD wider than the column (mid-word
+        # split like "HMPH"→"HM/PH"). Split on whitespace AND ZWSP (​, inserted by the
+        # Thai/CJK word segmenters) so the longest-token check is word-aware in every language —
+        # the longest Thai/Latin word must fit one line; long text still wraps at word breaks.
+        if _longest:
+            _, lww = text_render.calc_horizontal(
+                size, _longest, max_width=10 ** 7, max_height=10 ** 7, language=lang)
+            if lww and max(lww) > mw:
+                return float('inf'), float('inf')
         return block_w, block_h
 
-    ps = processing_scale(img_shape[0], img_shape[1])
-    fmin = font_size_minimum if (font_size_minimum and font_size_minimum > 0) else 8
-    # #431: this region is the sole occupant of a known balloon (that's why bubble-fit
-    # claimed it), so it is dialogue — never the oversized display/SFX regime, even when the
-    # length heuristic flagged it sfx_rescued. has_bubble=True → display_sfx is False → the
-    # binary search is bounded by dialogue [8,16]×√MP and can't grow to 64px and overflow.
-    has_bubble = getattr(region, 'bubble_box', None) is not None
-    is_display = display_sfx(getattr(region, 'sfx_rescued', False),
-                             getattr(region, 'is_sfx', False), has_bubble)
-    low, high = font_bounds(is_display, ps, fmin)
+    # #175 patch-path fix: fill the balloon — bound the binary search by the interior BOX
+    # HEIGHT, not page-area scale. In the per-crop patch path (production) `img_shape` is the
+    # *crop*, so processing_scale collapsed to ≈0.5 and the [8,16]×√MP bounds floored onto
+    # font_size_minimum, locking EN→TH dialogue at ~24px inside a ~600px balloon. The balloon's
+    # own safe-interior height is the correct fill cap; anti_overlap already stops it growing
+    # into a neighbour, and it is the sole occupant (that is why bubble-fit claimed it).
+    low, high = bubble_fit_bounds(h_box, font_size_minimum)
     return fit_font_size((w_box, h_box), measure, low=low, high=high, margin=_FIT_MARGIN)
 
 

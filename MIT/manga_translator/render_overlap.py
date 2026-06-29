@@ -84,6 +84,21 @@ def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: 
     return (x1, y1, x2, y2)
 
 
+def bubble_fit_bounds(box_h: float, font_size_minimum: int, abs_max: int = 200) -> Tuple[int, int]:
+    """#175 (patch-path fix): the binary-search font bounds for a region that fills a known
+    balloon. The font must be free to grow until it FILLS the balloon's safe-interior — so the
+    upper bound tracks the interior **box height** (a glyph can't be taller than its box),
+    capped by ``abs_max`` for sanity; the lower bound is ``font_size_minimum`` (≥8). This
+    replaces the page-area ``font_bounds`` ([8,16]×√MP) which, in the per-crop **patch path**,
+    saw the *crop* (not the page) → ``processing_scale`` collapsed to 0.5 and the bounds floored
+    to a single value, locking EN→TH dialogue at ~24px in a 600px balloon. The balloon size —
+    not page scale — is the right cap for bubble-fill. Pure arithmetic."""
+    fmin = font_size_minimum if (font_size_minimum and font_size_minimum > 0) else 8
+    low = max(fmin, 8)
+    high = max(low + 1, min(int(box_h), abs_max))
+    return (low, high)
+
+
 def display_sfx(sfx_rescued: bool, is_sfx: bool, has_bubble: bool) -> bool:
     """#431: a region renders as oversized "display" SFX — the [10,64]×√MP font range
     (:func:`font_bounds`) and font-cap exemption (:func:`apply_font_cap`) — only when it is

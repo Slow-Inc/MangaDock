@@ -168,3 +168,29 @@ def test_display_sfx_yolo_provenance_free_is_display():
     from manga_translator.render_overlap import display_sfx
     # det_sfx YOLO provenance with no balloon association → free SFX → display
     assert display_sfx(sfx_rescued=False, is_sfx=True, has_bubble=False) is True
+
+
+# ---- #175 (patch-path fix): bubble-fit fills the balloon — bound by the box, not page-scale ----
+
+def test_bubble_fit_bounds_fills_a_large_balloon():
+    from manga_translator.render_overlap import bubble_fit_bounds
+    # a tall balloon interior (≈673px) must let the binary search grow large enough to FILL it,
+    # not cap at a page-scale [8,16]. high tracks the box height (font can't exceed it),
+    # capped by an absolute sanity ceiling. This is the EN→TH "text ≪ bubble" fix.
+    low, high = bubble_fit_bounds(673, font_size_minimum=24)
+    assert low == 24 and high == 200          # high = min(box_h, abs_max=200)
+
+
+def test_bubble_fit_bounds_small_box_caps_at_box_height():
+    from manga_translator.render_overlap import bubble_fit_bounds
+    # a small box → high is the box height itself (can't fit a taller glyph)
+    assert bubble_fit_bounds(50, font_size_minimum=24) == (24, 50)
+    assert bubble_fit_bounds(30, font_size_minimum=24) == (24, 30)   # box below the floor+1 still ≥ low+1
+
+
+def test_bubble_fit_bounds_floor_and_ceiling():
+    from manga_translator.render_overlap import bubble_fit_bounds
+    # floor at font_size_minimum (min 8); ceiling clamps huge boxes
+    assert bubble_fit_bounds(10, font_size_minimum=8) == (8, 10)
+    assert bubble_fit_bounds(5000, font_size_minimum=24) == (24, 200)   # abs ceiling
+    assert bubble_fit_bounds(20, font_size_minimum=-1) == (8, 20)       # bad fmin → 8 floor
