@@ -218,3 +218,21 @@ def test_fills_bubble_width_threshold_and_degenerate():
     assert fills_bubble_width(72, 100) is True          # 0.72 exactly → fill (>=)
     assert fills_bubble_width(71, 100) is False         # just under
     assert fills_bubble_width(50, 0) is True            # no bubble width info → don't block bubble-fit
+
+
+# ---- #436 de-dup: drop a region whose box is mostly inside another's (the SFX-duplicate) ----
+
+def test_box_containment_fraction():
+    from manga_translator.render_overlap import box_containment
+    # fraction of box A's area that lies inside box B
+    assert box_containment((0, 0, 10, 10), (0, 0, 10, 10)) == 1.0      # identical → fully contained
+    assert box_containment((0, 0, 10, 10), (0, 0, 5, 10)) == 0.5       # half inside
+    assert box_containment((0, 0, 10, 10), (20, 20, 30, 30)) == 0.0    # disjoint
+    # the measured #436 case: stylized "ปาร์ตี้" (412,120,714,420) almost inside the
+    # full-sentence region (429,137,698,399) — high containment
+    assert box_containment((429, 137, 698, 399), (412, 120, 714, 420)) == 1.0
+
+
+def test_box_containment_degenerate():
+    from manga_translator.render_overlap import box_containment
+    assert box_containment((5, 5, 5, 5), (0, 0, 10, 10)) == 0.0        # zero-area A → 0

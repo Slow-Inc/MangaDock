@@ -84,6 +84,21 @@ def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: 
     return (x1, y1, x2, y2)
 
 
+def box_containment(a: Box, b: Box) -> float:
+    """Fraction of box ``a``'s area that lies inside box ``b`` (0..1). Used by #436 region
+    de-dup: the SFX detector and the line detector can both fire on the same stylized word,
+    yielding a small duplicate region almost fully inside the full-sentence region — high
+    containment + substring text ⇒ redundant. Pure geometry."""
+    ax1, ay1, ax2, ay2 = (float(v) for v in a)
+    bx1, by1, bx2, by2 = (float(v) for v in b)
+    area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+    if area_a <= 0:
+        return 0.0
+    ix = max(0.0, min(ax2, bx2) - max(ax1, bx1))
+    iy = max(0.0, min(ay2, by2) - max(ay1, by1))
+    return (ix * iy) / area_a
+
+
 def fills_bubble_width(region_w: float, bubble_w: float, threshold: float = 0.72) -> bool:
     """#175 residual #2: a region the segmenter placed in a balloon is dialogue-to-FILL only when
     its own text footprint spans most of the balloon width (``region_w/bubble_w >= threshold``).
