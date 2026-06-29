@@ -10,7 +10,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, display_sfx
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -94,7 +94,13 @@ def _bubble_fit_font_size(region, bubble_wh, img_shape, font_size_minimum: int =
 
     ps = processing_scale(img_shape[0], img_shape[1])
     fmin = font_size_minimum if (font_size_minimum and font_size_minimum > 0) else 8
-    is_display = bool(getattr(region, 'sfx_rescued', False) or getattr(region, 'is_sfx', False))
+    # #431: this region is the sole occupant of a known balloon (that's why bubble-fit
+    # claimed it), so it is dialogue — never the oversized display/SFX regime, even when the
+    # length heuristic flagged it sfx_rescued. has_bubble=True → display_sfx is False → the
+    # binary search is bounded by dialogue [8,16]×√MP and can't grow to 64px and overflow.
+    has_bubble = getattr(region, 'bubble_box', None) is not None
+    is_display = display_sfx(getattr(region, 'sfx_rescued', False),
+                             getattr(region, 'is_sfx', False), has_bubble)
     low, high = font_bounds(is_display, ps, fmin)
     return fit_font_size((w_box, h_box), measure, low=low, high=high, margin=_FIT_MARGIN)
 
@@ -345,8 +351,14 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             # Cap narration/caption font (SFX exempt) BEFORE the box scaling, so the
             # box scales to the capped font instead of an oversized block overflowing
             # the panel. 0 → no cap (byte-identical).
+            # #431: only a FREE-FLOATING SFX (no balloon) is exempt from the cap / box-scale
+            # clamp. A balloon-associated region flagged sfx_rescued by the length heuristic
+            # is dialogue ("DRINKING PARTY") — cap it so it can't oversize and overflow.
+            disp = display_sfx(getattr(region, 'sfx_rescued', False),
+                               getattr(region, 'is_sfx', False),
+                               getattr(region, 'bubble_box', None) is not None)
             target_font_size = apply_font_cap(
-                target_font_size, font_size_max, getattr(region, 'sfx_rescued', False))
+                target_font_size, font_size_max, disp)
 
             # Calculate final scaling factor
             font_size_scale = (((target_font_size - original_region_font_size) / original_region_font_size) * _FONT_SIZE_SCALE_GAIN + 1) if original_region_font_size > 0 else 1.0
@@ -356,7 +368,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             # enlarging a non-SFX region's box (the homography would warp the capped
             # font back up to fill it). The longer translation then wraps inside the
             # source box (narrow-column) instead of overflowing the panel.
-            if font_size_max and font_size_max > 0 and not getattr(region, 'sfx_rescued', False):
+            if font_size_max and font_size_max > 0 and not disp:
                 final_scale = 1.0
 
             # Scale bounding box if needed

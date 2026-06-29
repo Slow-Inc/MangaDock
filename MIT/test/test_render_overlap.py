@@ -140,3 +140,31 @@ def test_clean_layout_font_size_floored_and_page_default():
     assert clean_layout_font_size(20, 200, 200, 12) == 12        # tiny page → ps clamp 0.5 → 10 → floor 12
     # font_size_max unset → page-scaled base (H+W)/130, then × ps
     assert clean_layout_font_size(0, 1300, 1300, -1) == 26       # base 20 × ps(1.69MP)=1.3
+
+
+# ---- #431 S3: display_sfx — only FREE-FLOATING SFX gets the oversized display regime ----
+
+def test_display_sfx_free_floating_rescued_is_display():
+    from manga_translator.render_overlap import display_sfx
+    # a length-heuristic-rescued region with NO balloon → real SFX → display range/cap-exempt
+    assert display_sfx(sfx_rescued=True, is_sfx=False, has_bubble=False) is True
+
+
+def test_display_sfx_inside_bubble_is_dialogue():
+    from manga_translator.render_overlap import display_sfx
+    # the #431 bug: short source flagged SFX but it sits INSIDE a speech balloon
+    # ("DRINKING PARTY") → dialogue, NOT display → must size to the balloon, not 64px.
+    assert display_sfx(sfx_rescued=True, is_sfx=False, has_bubble=True) is False
+    assert display_sfx(sfx_rescued=False, is_sfx=True, has_bubble=True) is False
+
+
+def test_display_sfx_plain_dialogue_never_display():
+    from manga_translator.render_overlap import display_sfx
+    assert display_sfx(sfx_rescued=False, is_sfx=False, has_bubble=False) is False
+    assert display_sfx(sfx_rescued=False, is_sfx=False, has_bubble=True) is False
+
+
+def test_display_sfx_yolo_provenance_free_is_display():
+    from manga_translator.render_overlap import display_sfx
+    # det_sfx YOLO provenance with no balloon association → free SFX → display
+    assert display_sfx(sfx_rescued=False, is_sfx=True, has_bubble=False) is True
