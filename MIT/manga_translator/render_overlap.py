@@ -84,6 +84,16 @@ def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: 
     return (x1, y1, x2, y2)
 
 
+def display_sfx(sfx_rescued: bool, is_sfx: bool, has_bubble: bool) -> bool:
+    """#431: a region renders as oversized "display" SFX — the [10,64]×√MP font range
+    (:func:`font_bounds`) and font-cap exemption (:func:`apply_font_cap`) — only when it is
+    **free-floating**: not associated with a speech balloon. Onomatopoeia/SFX live OUTSIDE
+    bubbles; short source text the length heuristic flags inside a balloon (e.g. "DRINKING
+    PARTY") is dialogue and must size to the balloon ([8,16]×√MP) instead of growing to 64px
+    and overflowing onto the art. Pure boolean — no geometry, no ``self``."""
+    return bool(sfx_rescued or is_sfx) and not has_bubble
+
+
 def processing_scale(img_h: int, img_w: int, lo: float = 0.5, hi: float = 4.0) -> float:
     """Page-area font scaler (#175 S1, MangaTranslator ``pipeline.py:694``): ``sqrt(megapixels)``
     so the two-tier font bounds (:func:`font_bounds`) auto-scale with page resolution instead of
