@@ -1163,16 +1163,19 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
 
 def put_text_horizontal(font_size: int, text: str, width: int, height: int, alignment: str,
                         reversed_direction: bool, fg: Tuple[int, int, int], bg: Tuple[int, int, int],
-                        lang: str = 'en_US', hyphenate: bool = True, line_spacing: int = 0):
+                        lang: str = 'en_US', hyphenate: bool = True, line_spacing: int = 0,
+                        line_breaker: Optional[LineBreaker] = None):
     text = compact_special_symbols(text)
     if not text :
         return
     bg_size = int(max(font_size * 0.07, 1)) if bg is not None else 0
     spacing_y = int(font_size * (line_spacing or 0.01))
 
-    # calc
-    # print(width)
-    line_text_list, line_width_list = calc_horizontal(font_size, text, width, height, lang, hyphenate)
+    # calc — #180 step 2: forward the chosen line breaker so the balanced Knuth-Plass
+    # wrap reaches the rendered glyphs, not just the fit measurement. None → calc_horizontal
+    # picks GreedyLineBreaker, i.e. byte-identical to the legacy render.
+    line_text_list, line_width_list = calc_horizontal(font_size, text, width, height, lang, hyphenate,
+                                                      line_breaker=line_breaker)
     # print(line_text_list, line_width_list)
 
     # make large canvas
