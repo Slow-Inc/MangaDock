@@ -82,3 +82,23 @@ def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: 
     if y2 < y1:
         y1 = y2 = cy
     return (x1, y1, x2, y2)
+
+
+def processing_scale(img_h: int, img_w: int, lo: float = 0.5, hi: float = 4.0) -> float:
+    """Page-area font scaler (#175 S1, MangaTranslator ``pipeline.py:694``): ``sqrt(megapixels)``
+    so the two-tier font bounds (:func:`font_bounds`) auto-scale with page resolution instead of
+    a single fixed px tuned for one benchmark page. Clamped to ``[lo, hi]`` so a degenerate tiny
+    or huge page stays sane. Pure arithmetic."""
+    mp = (img_h * img_w) / 1_000_000.0
+    return max(lo, min(hi, mp ** 0.5))
+
+
+def font_bounds(is_display: bool, scale: float, font_size_minimum: int) -> Tuple[int, int]:
+    """Two-tier font-size search bounds for #175, scaled by ``scale`` (:func:`processing_scale`)
+    and floored at ``font_size_minimum``. Mirrors MangaTranslator ``config.py``: dialogue
+    ``[8,16]`` (``:102-103``), display/SFX ``[10,64]`` (``:147-148``). The binary-search fit
+    (S2/S3) searches the largest font in ``[lo,hi]`` that fits the region's safe area. Pure."""
+    base_lo, base_hi = (10, 64) if is_display else (8, 16)
+    lo = max(font_size_minimum, round(base_lo * scale))
+    hi = max(font_size_minimum, round(base_hi * scale))
+    return (lo, hi)

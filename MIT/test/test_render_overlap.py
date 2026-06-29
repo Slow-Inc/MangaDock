@@ -83,3 +83,37 @@ def test_multiple_neighbors_each_constrain_their_side():
     # neighbour right (8..) and neighbour below (..8) → clamp both edges.
     out = clamp_box_to_neighbors((0, 0, 10, 10), [(8, 0, 20, 10), (0, 8, 10, 20)])
     assert out == (0, 0, 8, 8)
+
+
+# ---- #175 S1: processing_scale — page-area font scaler (MangaTranslator pipeline) ----
+
+def test_processing_scale_is_sqrt_megapixels():
+    from manga_translator.render_overlap import processing_scale
+    assert processing_scale(1000, 1000) == 1.0          # 1 MP → 1.0
+    assert processing_scale(2000, 2000) == 2.0          # 4 MP → 2.0
+
+
+def test_processing_scale_clamps_extremes():
+    from manga_translator.render_overlap import processing_scale
+    assert processing_scale(100, 100) == 0.5            # 0.01 MP → sqrt 0.1 → clamp lo 0.5
+    assert processing_scale(5000, 5000) == 4.0          # 25 MP → sqrt 5 → clamp hi 4.0
+
+
+# ---- #175 S1: font_bounds — two-tier dialogue/display bounds (MangaTranslator config) ----
+
+def test_font_bounds_two_tier_at_scale_1():
+    from manga_translator.render_overlap import font_bounds
+    assert font_bounds(False, 1.0, 8) == (8, 16)        # dialogue 8–16
+    assert font_bounds(True, 1.0, 8) == (10, 64)        # display/SFX 10–64
+
+
+def test_font_bounds_scales_with_processing_scale():
+    from manga_translator.render_overlap import font_bounds
+    assert font_bounds(False, 2.0, 8) == (16, 32)       # dialogue ×2
+    assert font_bounds(True, 2.0, 8) == (20, 128)       # display ×2
+
+
+def test_font_bounds_floored_at_minimum():
+    from manga_translator.render_overlap import font_bounds
+    # ps=0.5 dialogue → round(4),round(8) → floored at fmin=8 → (8,8)
+    assert font_bounds(False, 0.5, 8) == (8, 8)
