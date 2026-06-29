@@ -194,3 +194,27 @@ def test_bubble_fit_bounds_floor_and_ceiling():
     assert bubble_fit_bounds(10, font_size_minimum=8) == (8, 10)
     assert bubble_fit_bounds(5000, font_size_minimum=24) == (24, 200)   # abs ceiling
     assert bubble_fit_bounds(20, font_size_minimum=-1) == (8, 20)       # bad fmin → 8 floor
+
+
+# ---- #175 residual #2: route narration out of bubble-fit (rw/bw discriminator) ----
+
+def test_fills_bubble_width_dialogue_fills():
+    from manga_translator.render_overlap import fills_bubble_width
+    # dialogue: the text footprint spans most of the balloon width → fill it (bubble-fit)
+    assert fills_bubble_width(284, 323) is True       # rw/bw=0.88 (measured dialogue)
+    assert fills_bubble_width(524, 584) is True        # 0.90
+
+
+def test_fills_bubble_width_narration_does_not_fill():
+    from manga_translator.render_overlap import fills_bubble_width
+    # narration/caption loosely placed in a large box → narrow source column, NOT fill
+    assert fills_bubble_width(128, 318) is False       # rw/bw=0.40 (measured narration)
+    assert fills_bubble_width(175, 295) is False        # 0.59
+    assert fills_bubble_width(24, 80) is False          # 0.30 short text
+
+
+def test_fills_bubble_width_threshold_and_degenerate():
+    from manga_translator.render_overlap import fills_bubble_width
+    assert fills_bubble_width(72, 100) is True          # 0.72 exactly → fill (>=)
+    assert fills_bubble_width(71, 100) is False         # just under
+    assert fills_bubble_width(50, 0) is True            # no bubble width info → don't block bubble-fit
