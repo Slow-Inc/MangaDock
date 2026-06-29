@@ -3,6 +3,33 @@
 
 ---
 
+## MIT #175 — clean-layout font sized from the source text (× 0.6), E2E-verified (2026-06-29)
+
+The clean-layout render path sized every region at a single fixed `font_size_max`
+(MIT_FONT_SIZE_MAX=20) tuned for one benchmark page → too small on every other-resolution
+page (user-reported; the user's target is `Screenshot_2026-06-14` where the benchmark looked
+right but other pages broke). Fixed with a pure `clean_layout_font_size(src_font_size, img_h,
+img_w, font_size_minimum, factor=0.6, font_size_max=0)` in `render_overlap.py`: render at the
+region's DETECTED source text height × 0.6, so it (a) preserves per-region emphasis (bigger
+source line → bigger output, like the original / MangaTranslator) and (b) auto-scales across
+resolutions because it is a RATIO, not a fixed px. Wired into `_clean_layout_dst`; font_size_max
+no longer drives clean-layout (it still caps the legacy length-ratio path clean_layout bypasses,
+so no .env change). `MIT_BUBBLE_AREA_FIT` stays OFF in prod — its fill-balloon sizing was the
+"too big" path the user flagged; clean_layout is the correct path.
+
+**Calibration was empirical, not guessed**: round 1 used ×1.0 → E2E showed overshoot (detected
+JA heights 25–42px → oversized, tall 1–2-word columns overflowing the panel). Instrumented the
+real values (img 1150×800, src_fs 25–42), set factor = 0.6 → ~15–25px output, re-ran the live
+worker (clean_layout config, JA→EN) and confirmed the composite matches the target: bubbles fill
+without overflow, "WHAT SHOULD WE DO?…" / "THIS BRAT STILL DOESN'T REALIZE WHAT HE DID" fit their
+balloons. TDD: 4 font-free tests (proportional, cross-resolution scaling, floor, optional cap);
+17 render-overlap tests green; render golden/guard/font_fit byte-identical (clean_layout off →
+unchanged). Branch `worktree-fix-mit-font-source-scale` (commits `e4dd200`/`d025955`).
+**Pending:** empirical 2nd-page (different resolution) E2E to confirm cross-page scaling (sound
+by construction — ratio + unit test — but the user's core concern warrants a live 2nd-page check).
+
+---
+
 ## Coin Topup System — Xendit PromptPay QR (2026-06-19, sandbox)
 
 **Goal:** Implement real payment flow for coin topup — replacing the dev-only `POST /wallet/topup` stub that throws 403 in production.
