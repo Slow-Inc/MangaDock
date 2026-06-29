@@ -3,6 +3,18 @@
 
 ---
 
+## MIT #180 step 2 — Knuth-Plass wrap WIRED into the render path + benchmark-verified (2026-06-29)
+
+Follow-on to the same-day #180 pure work (kinsoku + Latin hyphenation — see the older 2026-06-29 entry below). The KP seam (#186) existed but was **never selected in production** — `put_text_horizontal` → `calc_horizontal` always used the greedy packer, so the balanced DP only affected fit measurement, never the rendered glyphs. Two surgical slices fix that:
+- **2a (plumbing, `dff7f51`):** `put_text_horizontal` gains a `line_breaker` param forwarded to `calc_horizontal`; default `None` → GreedyLineBreaker → byte-identical legacy render. +2 font-free tests (forwarding + default).
+- **2b (activation, `3c7b017`):** `dispatch()` builds a `KnuthPlassLineBreaker()` when the bubble-fit parity path is on and threads it through `render()` → `put_text_horizontal`. Gated on `bubble_fit` → `None` when off → byte-identical (render golden/guard/font_fit characterization green).
+
+**Verified end-to-end on the live worker** (`tools/ab_benchmark.py`, One-Punch JA→EN, worker started from this worktree's code): the `bubble_area_fit=True` render now wraps balanced, bubble-filling lines ("This brat doesn't / seem to realize / what they've / done yet") and keeps text inside the panel, vs the legacy path's ragged short lines + off-panel clipping ("Yeah,b… / not lik… / trivial e" clipped). Closes the gap-D adoption from `docs/research/render-parity-port-plan.md`. (A/B is non-A/B-clean because each call re-translates — non-determinism, see memory — but the balanced-vs-ragged render difference is unmistakable; the deterministic KP-vs-greedy proof is `test_line_breaker.py`.)
+
+Scope: render-path wiring only. CJK kinsoku activation in the breaker (`respect_kinsoku`) + mid-word hyphenation through the seam's syllable contract remain follow-ups. Branch `worktree-feat-mit-knuth-plass-kinsoku` (PR #425). 28 line-related tests green.
+
+---
+
 ## Coin Topup System — Xendit PromptPay QR (2026-06-19, sandbox)
 
 **Goal:** Implement real payment flow for coin topup — replacing the dev-only `POST /wallet/topup` stub that throws 403 in production.
