@@ -438,12 +438,18 @@ async def dispatch(
 
     # TODO: Maybe remove intersections
 
+    # #180 step 2 (gap-D): when the bubble-fit parity path is on, wrap rendered lines with
+    # the balanced Knuth-Plass DP instead of the greedy packer (greedy strands an ugly short
+    # last line). Gated on bubble_fit so the legacy render stays byte-identical when off.
+    line_breaker = text_render.KnuthPlassLineBreaker() if bubble_fit else None
+
     # Render text
     for region, dst_points in tqdm(zip(text_regions, dst_points_list), '[render]', total=len(text_regions)):
         if render_mask is not None:
             # set render_mask to 1 for the region that is inside dst_points
             cv2.fillConvexPoly(render_mask, dst_points.astype(np.int32), 1)
-        img = render(img, region, dst_points, hyphenate, line_spacing, disable_font_border, supersampling)
+        img = render(img, region, dst_points, hyphenate, line_spacing, disable_font_border,
+                     supersampling, line_breaker=line_breaker)
     return img
 
 def _pad_box(temp_box, pad_height: bool, ext: int, offset: int):
@@ -478,7 +484,8 @@ def render(
     hyphenate,
     line_spacing,
     disable_font_border,
-    supersampling: int = 1
+    supersampling: int = 1,
+    line_breaker=None
 ):
     # #181: render the text canvas at `ss`× then downscale → crisp glyphs +
     # controlled weight (ss=1 → byte-identical).
@@ -521,6 +528,7 @@ def render(
             region.target_lang,
             hyphenate,
             line_spacing,
+            line_breaker=line_breaker,   # #180 step 2: balanced KP wrap when selected (else greedy)
         )
     else:
         temp_box = text_render.put_text_vertical(
