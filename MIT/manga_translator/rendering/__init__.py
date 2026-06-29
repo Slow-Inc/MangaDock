@@ -238,6 +238,25 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
     occupancy = (balloon_occupancy([getattr(r, 'bubble_box', None) for r in text_regions])
                  if bubble_fit else None)
 
+    # #436 de-dup: the SFX detector can re-detect a stylized word the line detector already
+    # captured (e.g. "ปาร์ตี้" sitting inside "…จัดปาร์ตี้ดื่ม…"), yielding a small duplicate
+    # region mostly inside the full-sentence region — it then renders on top of the sentence.
+    # Blank the shorter duplicate when its text is a substring AND its box is ≥60% inside the
+    # other's (containment + substring, never length alone, so a legitimate repeat survives).
+    _orig_tr = [(r.translation or '').strip() for r in text_regions]
+    for i, ri in enumerate(text_regions):
+        ti = _orig_tr[i]
+        if not ti:
+            continue
+        for j in range(len(text_regions)):
+            if i == j:
+                continue
+            tj = _orig_tr[j]
+            if tj and len(ti) < len(tj) and ti in tj \
+                    and box_containment(ri.xyxy, text_regions[j].xyxy) >= 0.6:
+                ri.translation = ''
+                break
+
     dst_points_list = []
     for i, region in enumerate(text_regions):
 
@@ -267,6 +286,34 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             # stays in its own space instead of colliding with the next bubble.
             if anti_overlap:
                 territories = [t for j, r in enumerate(text_regions) if j != i
+                               for t in (_region_territory(r),) if t is not None]
+                cb = clamp_box_to_neighbors(
+                    (acx - fit_w / 2.0, acy - fit_h / 2.0, acx + fit_w / 2.0, acy + fit_h / 2.0),
+                    territories, margin=2)
+                cw, ch = cb[2] - cb[0], cb[3] - cb[1]
+                if cw >= 6 and ch >= 6:
+                    fit_w, fit_h = cw, ch
+                    acx, acy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
+            region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), img.shape, font_size_minimum)
+            hw, hh = fit_w / 2.0, fit_h / 2.0
+            dst_points_list.append(
+                np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
+                           [acx + hw, acy + hh], [acx - hw, acy + hh]]], dtype=np.int64))
+            continue
+
+        # #436: regions that SHARE one (often over-merged) balloon — occupancy > 1 — are not
+        # the sole occupant, so the bubble-fit block above skipped them and they would render
+        # tiny via clean-layout. Fill each to its OWN detection footprint instead, so
+        # multi-balloon dialogue matches the source text size; each stays inside its own box,
+        # clamped against its siblings, so they don't collide.
+        if (bubble_box is not None and occupancy[i] > 1 and region.horizontal
+                and region.translation and region.translation.strip()):
+            x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
+            fit_w, fit_h = (x2f - x1f), (y2f - y1f)
+            acx, acy = (x1f + x2f) / 2.0, (y1f + y2f) / 2.0
+            if anti_overlap:
+                territories = [t for j, r in enumerate(text_regions) if j != i
+                               and (r.translation or '').strip()
                                for t in (_region_territory(r),) if t is not None]
                 cb = clamp_box_to_neighbors(
                     (acx - fit_w / 2.0, acy - fit_h / 2.0, acx + fit_w / 2.0, acy + fit_h / 2.0),
