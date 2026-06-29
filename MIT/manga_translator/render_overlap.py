@@ -102,3 +102,16 @@ def font_bounds(is_display: bool, scale: float, font_size_minimum: int) -> Tuple
     lo = max(font_size_minimum, round(base_lo * scale))
     hi = max(font_size_minimum, round(base_hi * scale))
     return (lo, hi)
+
+
+def clean_layout_font_size(font_size_max: int, img_h: int, img_w: int, font_size_minimum: int) -> int:
+    """#175 (corrected): the clean-layout font, scaled by :func:`processing_scale` so the
+    otherwise-FIXED size tracks page resolution — the same look on the benchmark (≈ a 1 MP page
+    → ×1) yet larger on higher-resolution pages where a single fixed px came out far smaller than
+    the bubble (the ENG-source "text << bubble" report on e.g. Gal Yome). Clean-layout's comic
+    font + source-footprint narrow wrap are unchanged; only the size scales. ``font_size_max``
+    unset (≤0) falls back to a page-scaled base ``(h+w)/130``. Floored at ``font_size_minimum``
+    (or 8). Pure arithmetic."""
+    fmin = font_size_minimum if (font_size_minimum and font_size_minimum > 0) else 8
+    base = font_size_max if (font_size_max and font_size_max > 0) else max(fmin, round((img_h + img_w) / 130))
+    return max(fmin, round(base * processing_scale(img_h, img_w)))

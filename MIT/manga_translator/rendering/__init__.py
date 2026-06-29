@@ -10,7 +10,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -171,8 +171,9 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     if xy is None:
         return None
     x1f, y1f, x2f, y2f = (float(v) for v in xy)
-    clean_fs = font_size_max if (font_size_max and font_size_max > 0) else \
-        max(font_size_minimum, round((img_shape[0] + img_shape[1]) / 130))
+    # #175: scale the clean-layout font by processing_scale so it tracks page resolution
+    # (same look on the benchmark, larger on higher-res pages where the fixed px was too small).
+    clean_fs = clean_layout_font_size(font_size_max, img_shape[0], img_shape[1], font_size_minimum)
     # Footprint width = the region's own (source-text) bbox width, so the English breaks
     # where the source columns did — a narration stays a narrow tall block, not a wide
     # paragraph. (The balloon box is deliberately NOT used: narration boxes also get a
