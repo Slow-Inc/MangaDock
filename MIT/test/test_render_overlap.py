@@ -83,3 +83,35 @@ def test_multiple_neighbors_each_constrain_their_side():
     # neighbour right (8..) and neighbour below (..8) → clamp both edges.
     out = clamp_box_to_neighbors((0, 0, 10, 10), [(8, 0, 20, 10), (0, 8, 10, 20)])
     assert out == (0, 0, 8, 8)
+
+
+# ---- clean_layout_font_size: render at the SOURCE text size, not a fixed value (#175) ----
+
+def test_clean_layout_font_size_is_proportional_to_the_source():
+    from manga_translator.render_overlap import clean_layout_font_size
+    # The detected source text height drives the rendered size → matches the original
+    # per-region (no fixed-for-one-benchmark value). Bigger source → bigger output.
+    assert clean_layout_font_size(40, 1200, 800, font_size_minimum=8) == 40
+    assert clean_layout_font_size(20, 1200, 800, font_size_minimum=8) == 20
+
+
+def test_clean_layout_font_size_scales_across_page_resolutions():
+    # The SAME source size yields the same output regardless of page dims — it is driven
+    # by the source (which is itself bigger on a higher-res page), not by a page formula.
+    # This is the fix for "too small on other pages" (a fixed value ignored the source).
+    from manga_translator.render_overlap import clean_layout_font_size
+    assert clean_layout_font_size(30, 2000, 1500, font_size_minimum=8) == 30
+    assert clean_layout_font_size(30, 800, 600, font_size_minimum=8) == 30
+
+
+def test_clean_layout_font_size_floors_tiny_or_missing_source():
+    from manga_translator.render_overlap import clean_layout_font_size
+    assert clean_layout_font_size(3, 1200, 800, font_size_minimum=10) == 10   # tiny → floor
+    # missing/invalid source → page-scaled default (≈ (H+W)/130), still floored
+    assert clean_layout_font_size(0, 1300, 1300, font_size_minimum=8) == 20   # round(2600/130)
+
+
+def test_clean_layout_font_size_optional_cap_only_when_set():
+    from manga_translator.render_overlap import clean_layout_font_size
+    assert clean_layout_font_size(40, 1200, 800, font_size_minimum=8, font_size_max=0) == 40   # off
+    assert clean_layout_font_size(40, 1200, 800, font_size_minimum=8, font_size_max=25) == 25  # safety cap

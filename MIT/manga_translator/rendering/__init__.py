@@ -10,7 +10,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, clean_layout_font_size
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -163,14 +163,19 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     original vertical-JP quad and stretches it tall/oversized), this fixes the font and
     builds the box to match, so the homography in ``render()`` is a plain scale.
 
-    ``font_size_max`` (MIT_FONT_SIZE_MAX) sets the absolute font when >0, else a small
-    page-scaled default (≈ MangaTranslator's 12–16px on a typical page)."""
+    #175: the font is sized from the region's DETECTED source text height
+    (``clean_layout_font_size``) so it matches the original per-region and auto-scales across
+    page resolutions — not a single ``font_size_max`` value, which was tuned for one benchmark
+    page and so rendered too small on every other page."""
     xy = getattr(region, 'xyxy', None)
     if xy is None:
         return None
     x1f, y1f, x2f, y2f = (float(v) for v in xy)
-    clean_fs = font_size_max if (font_size_max and font_size_max > 0) else \
-        max(font_size_minimum, round((img_shape[0] + img_shape[1]) / 130))
+    # #175: source-proportional — render at the detected source size, not a fixed value.
+    # font_size_max is intentionally NOT passed as a cap here (it was the fixed-value bug);
+    # it still caps the legacy length-ratio path, which clean_layout bypasses.
+    clean_fs = clean_layout_font_size(getattr(region, 'font_size', 0),
+                                      img_shape[0], img_shape[1], font_size_minimum)
     # Footprint width = the region's own (source-text) bbox width, so the English breaks
     # where the source columns did — a narration stays a narrow tall block, not a wide
     # paragraph. (The balloon box is deliberately NOT used: narration boxes also get a

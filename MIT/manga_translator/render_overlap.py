@@ -25,6 +25,25 @@ def apply_font_cap(size: int, cap: int, is_sfx: bool) -> int:
     return size
 
 
+def clean_layout_font_size(src_font_size: float, img_h: int, img_w: int,
+                           font_size_minimum: int, font_size_max: int = 0) -> int:
+    """Source-proportional font size for the clean horizontal-layout path (#175).
+
+    Render the translated text at the region's DETECTED source text height
+    (``src_font_size``) so it matches the original per-region AND auto-scales across page
+    resolutions — a higher-res page has bigger detected text, hence bigger output. This
+    replaces a single fixed value (``font_size_max``, e.g. 20px) that was tuned for one
+    benchmark page and so came out too small on every other page. Floored at
+    ``font_size_minimum`` so a tiny/zero detection stays legible (an invalid source falls
+    back to a page-scaled default), and capped by ``font_size_max`` only when it is set
+    (>0) as an OPTIONAL safety ceiling — leave it unset for pure source-proportional sizing.
+    """
+    page_default = max(font_size_minimum, round((img_h + img_w) / 130))
+    src = round(src_font_size) if src_font_size and src_font_size > 0 else page_default
+    fs = max(font_size_minimum, src)
+    return apply_font_cap(fs, font_size_max, is_sfx=False)
+
+
 def centered_box(cx: float, cy: float, w: float, h: float):
     """Return an axis-aligned 4-point box (TL, TR, BR, BL) of size `w`×`h` centred on
     `(cx, cy)`. Used by the clean horizontal-layout path: the translated text block is
