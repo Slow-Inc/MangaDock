@@ -25,6 +25,7 @@ from PIL import Image
 
 from .patch_geometry import (
     build_local_region,
+    content_alpha_inner,
     create_text_only_mask,
     crop_mask_for_patch,
     expand_inpaint_crop,
@@ -247,6 +248,10 @@ class PatchRenderer:
                         f"[{type(e).__name__}]: using un-blended inpaint")
 
             # --- CPU-bound: rendering + PNG encode (outside semaphore) ---
+            # #436: text rendering mutates img_rgb (the same array as img_inpainted) in place, so
+            # keep a clean copy of the inpaint here — the content alpha diffs the rendered patch
+            # against THIS to find the newly-drawn glyphs.
+            inpaint_before_text = patch_ctx.img_inpainted.copy()
             patch_ctx.img_rgb = patch_ctx.img_inpainted
 
             try:
@@ -266,13 +271,27 @@ class PatchRenderer:
             # → hard-alpha patch, byte-identical to before.
             feather = None
             feather_radius = int(getattr(config.render, 'patch_feather_radius', 0) or 0)
-            if feather_radius > 0:
+            content_alpha = bool(getattr(config.render, 'patch_content_alpha', False))
+            if feather_radius > 0 or content_alpha:
                 ph, pw = patch_ctx.img_rendered.shape[:2]
                 r = min(feather_radius, (ph - 1) // 2, (pw - 1) // 2)
-                if r > 0:
+                inner = None
+                if content_alpha:
+                    # #436: opaque only over THIS patch's own content — its new glyphs (rendered vs
+                    # the text-free inpaint) + its own original-text erase mask — so the rectangular
+                    # margins (incl. neighbour text the full-page inpaint erased) stay transparent
+                    # and an overlapping balloon's later patch no longer re-occludes this one's text.
+                    # None → shape mismatch → fall back to the rectangle below.
+                    own_mask = getattr(patch_ctx, 'mask', None)
+                    if own_mask is None:
+                        own_mask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
+                    inner = content_alpha_inner(patch_ctx.img_rendered, inpaint_before_text,
+                                                own_mask=own_mask)
+                if inner is None and r > 0:
                     inner = np.zeros((ph, pw), dtype=np.uint8)
                     inner[r:ph - r, r:pw - r] = 255
-                    feather = feather_alpha(inner, r)
+                if inner is not None:
+                    feather = feather_alpha(inner, max(r, 1))
 
             # Offload PNG compression to thread pool to avoid blocking the event loop.
             # compress_level=1 is ~10x faster than optimize=True with ~15% larger file —
