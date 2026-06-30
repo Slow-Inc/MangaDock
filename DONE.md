@@ -17,6 +17,8 @@
 
 **Relationship:** targeted stopgap inside the bubble-fit path; the general source-agnostic width-squeeze + Knuth–Plass (flag-gated, A/B) stays in PRD #434 / research #435 and reuses `squeeze_width` as-is.
 
+**E2E follow-up + NameError fix (commit e922c7d):** live Playwright E2E through the hayateotsu.space tunnel (Gal Yome ch1 p4, Thai→EN) surfaced that 94bab61 USED `squeeze_width`/`box_containment` in `rendering/__init__.py` but never added them to the `from ..render_overlap import` line → the bubble-fit path raised **NameError** at runtime, which the patch renderer swallows into an "inpaint-only patch" (translated text silently erased). The render_overlap unit tests import the helpers directly and the golden suite doesn't exercise bubble-fit, so neither caught it — only live E2E did. Fix: add both to the import; add a pure guard test asserting every render_overlap helper called in the renderer is imported (37 tests green). Re-verified: 4 patches rendered, 0 NameError, every balloon fills as a narrow multi-line centered column ("CREATED BY THE SOUND CON" → 4 lines filling, "NO PROBLEM LET'S TRY IT" → 4 lines). Two orthogonal observations logged: (a) first uncached translate hit Cloudflare **524** (>100s for full-page inpaint + 4 renders + LLM); the cached re-request returns fast and applies overlays. (b) the live `custom_openai` translator returned terse/garbled text ("INTERESTED OTHER PEOPLE", "65วงหห", "HROK") — a translation-quality issue, not rendering; the layout algorithm is correct regardless.
+
 ---
 
 ## MIT #175 dialogue sizing + #431 SFX overflow (2026-06-30)
