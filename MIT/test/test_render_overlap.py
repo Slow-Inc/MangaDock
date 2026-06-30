@@ -262,3 +262,24 @@ def test_squeeze_width_stops_at_floor():
     # text always fits (tiny block) → squeeze would narrow forever, but the longest-token floor stops it
     out = squeeze_width(lambda w: 10.0, full_w=300, min_w=250, box_h=1000)
     assert 250 <= out < 300
+
+
+# ---- guard: every render_overlap helper CALLED in rendering/__init__.py is also IMPORTED there ----
+
+def test_rendering_imports_every_render_overlap_helper_it_calls():
+    """Regression net for the #183 NameError: ``squeeze_width``/``box_containment`` were USED in
+    rendering/__init__.py but missing from its ``from ..render_overlap import`` line, so the
+    bubble-fit path raised NameError at runtime (swallowed into an inpaint-only patch — text
+    silently dropped). Unit tests import the helpers directly, and the golden render suite doesn't
+    exercise the bubble-fit path, so neither caught it; only live E2E did. This pure static check
+    asserts the import line covers every helper the renderer actually calls."""
+    import re, pathlib
+    base = pathlib.Path(__file__).resolve().parents[1] / "manga_translator"
+    ro = (base / "render_overlap.py").read_text(encoding="utf-8")
+    rend = (base / "rendering" / "__init__.py").read_text(encoding="utf-8")
+    defs = set(re.findall(r'^def (\w+)\(', ro, re.M))
+    imported = {x.strip() for x in re.search(r'from \.\.render_overlap import (.+)', rend).group(1).split(',')}
+    code = [l for l in rend.splitlines() if not l.lstrip().startswith('#')]
+    called = {fn for fn in defs if any(re.search(r'(?<![\w.])' + fn + r'\s*\(', l) for l in code)}
+    missing = called - imported
+    assert not missing, f"render_overlap helpers called but not imported in rendering/__init__.py: {sorted(missing)}"
