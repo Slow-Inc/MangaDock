@@ -9,12 +9,19 @@ Two layers of defense against breaking Thai mid-word / orphaning marks:
 
 These stay in pure-Python territory — no ML models needed.
 """
+from pathlib import Path
+from types import SimpleNamespace
+
+from manga_translator.rendering import text_render as tr
+from manga_translator.rendering import _clean_layout_dst
 from manga_translator.rendering.text_render import (
     _insert_thai_word_breaks,
     _safe_char_split,
     _ZWSP,
     _HAS_PYTHAINLP,
 )
+
+_FONT = str(Path(__file__).parent.parent / 'fonts' / 'Arial-Unicode-Regular.ttf')
 
 
 # ── _safe_char_split: cluster-safe fallback (no dependency) ───────────────────
@@ -56,6 +63,46 @@ def test_non_thai_text_is_unchanged():
 
 def test_empty_text_is_unchanged():
     assert _insert_thai_word_breaks('') == ''
+
+
+# ── longest_token_width: word-atomic width (floor against mid-word breaks) ─────
+
+def test_longest_token_width_is_word_atomic_for_thai():
+    # The widest atomic word in the line is "ข้างนอก"; the helper must return its FULL
+    # width (word-aware via ZWSP segmentation), not a per-character fragment.
+    tr.set_font(_FONT)
+    s = 'ไปกินข้างนอกกันเถอะ'
+    got = tr.longest_token_width(32, s, 'th_TH')
+    if _HAS_PYTHAINLP:
+        assert got == tr.get_string_width(32, 'ข้างนอก')
+    else:
+        # No segmentation → whole line is one token.
+        assert got == tr.get_string_width(32, s)
+
+
+def test_longest_token_width_latin_uses_widest_word():
+    tr.set_font(_FONT)
+    assert tr.longest_token_width(40, 'hi enormous ok', 'en_US') == tr.get_string_width(40, 'enormous')
+
+
+def test_longest_token_width_empty_is_zero():
+    tr.set_font(_FONT)
+    assert tr.longest_token_width(40, '', 'en_US') == 0
+
+
+# ── clean-layout must never force-break a Thai word mid-word ───────────────────
+
+def test_clean_layout_does_not_break_thai_word_in_narrow_box():
+    # A dialogue line misrouted to clean-layout with a NARROW source bbox (40px) must not
+    # force-split "ข้างนอก" mid-word: the returned block width is floored to the longest word,
+    # so re-wrapping at that width keeps the word intact. (Regression: item 9 word-break.)
+    tr.set_font(_FONT)
+    region = SimpleNamespace(xyxy=(0, 0, 40, 200), translation='ไปกินข้างนอกกันเถอะ',
+                             font_size=0, target_lang='th_TH')
+    clean_fs, block_w, block_h = _clean_layout_dst(region, (1000, 1000), 8, 0, (1000, 1000))
+    lines, _ = tr.calc_horizontal(clean_fs, region.translation, int(block_w), 10 ** 7, language='th_TH')
+    if _HAS_PYTHAINLP:
+        assert any('ข้างนอก' in ln for ln in lines), lines
 
 
 def test_thai_text_segmented_into_words_when_available():

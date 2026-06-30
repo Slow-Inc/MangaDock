@@ -232,6 +232,12 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     if clean_fs > clean_fs_flat:
         wrap_w = max(wrap_w, int(x2f - x1f))
     lang = getattr(region, 'target_lang', 'en_US')
+    # #item9: never wrap narrower than the longest atomic word, or Thai/CJK words (no Latin
+    # hyphenation) get force-split mid-word ("ข้างนอก"→"ข้า"/"งนอก"). Mirrors the guard
+    # _bubble_fit_layout already applies; here it protects dialogue misrouted to clean-layout.
+    _lw = text_render.longest_token_width(clean_fs, region.translation, lang)
+    if _lw > wrap_w:
+        wrap_w = int(_lw)
     # max_height is generous (full page) so wrapping is governed by width and the block
     # grows vertically — we place it on the centre regardless of the source box height.
     lines, widths = text_render.calc_horizontal(clean_fs, region.translation, wrap_w, int(ps_shape[0]), language=lang)
