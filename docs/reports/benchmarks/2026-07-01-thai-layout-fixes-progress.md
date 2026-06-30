@@ -131,15 +131,18 @@ out at layers that are *not* a clean, verifiable render tweak:
   out of render/mask scope); patching `mask_refinement` would be a symptom fix that still leaves p27.
   p19 partial ghost *might* be mask coverage, but distinguishing needs the inpaint mask dumped on the
   real page.
-  - *Reproduction blocker:* the Gal Yome EN source pages are **not in the repo** (only the One-Punch
-    benchmark chapter `752fc515…` is local; Gal Yome arrived via the hayateotsu.space tunnel during
-    E2E). Confirming detection-miss vs mask-gap requires re-fetching p19/p27 through the **tunnel
-    E2E** and dumping the mask — not a local in-process render.
+  - *Reproduction (CORRECTED 2026-07-01):* the Gal Yome EN pages **ARE local** at
+    `Backend/img-cache/_chapters/chapters/78e4caf1-1382-45dd-a861-9cebd8dc60d8/ds0..ds29.jpg`
+    (earlier note "not in repo" was wrong — I'd searched `uploads/`, they live in `img-cache/`).
+    So 10/11 ARE locally reproducible via `bench_all.py` (worker-direct): render p11 and pixel-peep
+    the SFX patch (item 10 blocky-vs-blur), render p27 and check patch coverage (item 11
+    detection-miss vs mask-gap). No tunnel needed.
 
-**Phase-1 verdict:** neither 10 nor 11 is a safe, locally-verifiable contained fix. 10 needs a
-shared-path render change verifiable only via the non-deterministic rescue; 11's worst instance
-(p27) is a detection miss. Honest next step is the tunnel-E2E evidence pass (dump SFX box-vs-dst for
-10; dump inpaint mask for 11) BEFORE any code — reported to user for a go/no-go on that heavier pass.
+**Phase-1 verdict:** 10's *cure* still lives on the shared legacy render path (regression risk) and
+its blocky symptom doesn't match the warp-upscale (blur) hypothesis → mechanism unconfirmed; 11's
+worst instance (p27) is a detection miss (`mask_refinement` can't erase what detection never found).
+Both are now **locally reproducible** (img-cache pages) → next step is the local evidence pass
+(pixel-peep SFX patch; dump inpaint mask) BEFORE any code — no symptom fixes.
 
 ## Decision requested (notified)
 Items 2 & 3 carry real regression trade-offs only the user should weigh (One-Punch narration
