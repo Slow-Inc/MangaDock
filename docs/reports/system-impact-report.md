@@ -911,3 +911,31 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **10. KPI.** #183/#175 residual closed · tall balloon 2 → 6 lines · +3 unit tests (36/0) · golden byte-identical · 0 regressions (One-Punch unchanged) · ADR 024.
 
 *Validation:* TDD; `pytest test/test_render_overlap.py` 36/0; render golden/guard byte-identical; benchmark via real backend config (MIT_BUBBLE_AREA_FIT=1) Gal Yome + One-Punch. *Risk/rollback:* revert the squeeze call. *Links:* #183, #175, #434, #435, ADR 023, ADR 024, branch `worktree-feat-mit-font-s1`.
+
+---
+
+# 2026-06-30 — fix(MIT): clean-layout narration scales by page resolution, not per-region crop (#175)
+
+**1. Type.** Render-quality bug fix in the MIT clean-layout sizing path; patch-path crop-vs-page (same class as #175 bubble-fit, but the clean-layout branch).
+
+**2. Trigger.** Full-chapter Gal Yome EN→Thai benchmark: narration/caption rendered tiny while dialogue in the same panel was normal-sized (user: "ทำไมตัวเล็กทั้งที่มีตัวขนาดปกติอยู่ด้วย").
+
+**3. Change (before → after).**
+- before: `_clean_layout_dst` used the per-region **crop** `img.shape` for `clean_layout_font_size`'s `processing_scale` (+ wrap-width clamp + max wrap height). Crop = full-res but tiny area → `processing_scale` floored at 0.5 → narration ≈17px (3× under the designed 35px).
+- after: thread the full-**page** shape (`PatchRenderer.img_w/img_h`) via `patch_ctx.page_shape` → `stages` → `dispatch` → `resize_regions_to_font_size` → `_clean_layout_dst`; use it for the three page-relative quantities. `page_shape=None` (full-page path) → falls back to `img.shape` → byte-identical.
+
+**4. Seam / commit.** One value (`page_shape`) threaded with `=None` defaults through 4 functions + set once on the patch Context. Commit 70c6bf1 on `worktree-feat-mit-font-s1`.
+
+**5. Byte-identical proof.** Full-page render path never sets `ctx.page_shape` → `None` → `_clean_layout_dst` uses `img.shape` (= the page) exactly as before. Render golden/guard suites byte-identical. Bubble-fit + legacy paths untouched.
+
+**6. Performance.** Neutral — same call count; one extra tuple on the Context.
+
+**7. Quality / metrics.** Narration ~17px → ~35px on a 3 MP page (≈2×, the designed size). `test_render_overlap.py` 37 → **38** (+1 page-vs-crop pin); stages kwargs characterization updated for the new kwarg.
+
+**8. Tech debt.** Closes the clean-layout half of the patch-path crop-vs-page bug (#175 fixed the bubble-fit half via box height). Residual: the rw/bw discriminator still *routes* some narration-in-large-bubble to clean-layout — separate concern.
+
+**9. Risk / rollback.** Pass `page_shape=None` (or revert the thread) → crop-scaled clean-layout; all other paths byte-identical. No money/auth surface.
+
+**10. KPI.** #175 clean-layout sizing fixed · narration ~2× (designed size) · +1 unit pin (38/0) · golden byte-identical · 0 regressions · ADR 025.
+
+*Validation:* TDD pin + stages characterization; `pytest test/test_render_overlap.py test/test_render_golden.py test/test_stages.py test/test_patch_renderer.py` green; E2E Gal Yome EN ch1 p14 → Thai (narration readable, no crash/oversize). *Risk/rollback:* `page_shape=None`. *Links:* #175, ADR 023/024/025, branch `worktree-feat-mit-font-s1`.
