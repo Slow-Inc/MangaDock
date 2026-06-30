@@ -243,6 +243,29 @@ def test_fills_bubble_width_threshold_and_degenerate():
     assert fills_bubble_width(50, 0) is True            # no bubble width info → don't block bubble-fit
 
 
+# ---- anti-overlap territory: reserve only the space the text actually uses ----
+
+def test_region_territory_box_narrow_text_reserves_its_text_box_not_the_balloon():
+    # The #436 follow-up: a narration/clean-layout region whose text is a narrow column in a big
+    # balloon must reserve only its TEXT box, not the whole balloon — else it over-clamps an
+    # overlapping neighbour's bubble-fit box and shrinks its font (the measured front bubble:
+    # rw/bw 0.40). text box (100..300) inside balloon (100..600): rw/bw=0.40 → not filling.
+    from manga_translator.render_overlap import region_territory_box
+    assert region_territory_box(100, 50, 300, 250, (100, 50, 600, 250)) == (100, 50, 300, 250)
+
+
+def test_region_territory_box_filling_dialogue_reserves_the_balloon():
+    # dialogue that fills its balloon reserves the whole balloon (unchanged behaviour).
+    from manga_translator.render_overlap import region_territory_box
+    # text 100..560 in balloon 100..600 → rw/bw=0.92 → fills → balloon box
+    assert region_territory_box(100, 50, 560, 250, (100, 50, 600, 250)) == (100.0, 50.0, 600.0, 250.0)
+
+
+def test_region_territory_box_no_balloon_reserves_text_box():
+    from manga_translator.render_overlap import region_territory_box
+    assert region_territory_box(10, 20, 90, 120, None) == (10, 20, 90, 120)
+
+
 # ---- #436 de-dup: drop a region whose box is mostly inside another's (the SFX-duplicate) ----
 
 def test_box_containment_fraction():

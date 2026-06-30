@@ -11,7 +11,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, clean_layout_target_fs, display_sfx, bubble_fit_bounds, fills_bubble_width, squeeze_width, box_containment
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, clean_layout_target_fs, region_territory_box, display_sfx, bubble_fit_bounds, fills_bubble_width, squeeze_width, box_containment
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -183,13 +183,14 @@ def _expand_single_axis(region, needed_count: int, used_count: int, horizontal_a
 
 
 def _region_territory(region):
-    """The box a region 'owns' for anti-overlap: its balloon (#170) if known, else its
-    detection box. Returns None when neither is available."""
-    bb = getattr(region, 'bubble_box', None)
-    if bb is not None:
-        return (float(bb[0]), float(bb[1]), float(bb[2]), float(bb[3]))
+    """The box a region 'owns' for anti-overlap: its balloon (#170) when its text FILLS it,
+    else just its narrow detection/text box (#436 — a narration column must not reserve the
+    whole balloon and over-clamp an overlapping neighbour). Returns None when no box is known."""
     xy = getattr(region, 'xyxy', None)
-    return (float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3])) if xy is not None else None
+    if xy is None:
+        return None
+    bb = getattr(region, 'bubble_box', None)
+    return region_territory_box(float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3]), bb)
 
 
 def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None):
