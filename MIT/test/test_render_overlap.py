@@ -142,6 +142,29 @@ def test_clean_layout_font_size_floored_and_page_default():
     assert clean_layout_font_size(0, 1300, 1300, -1) == 26       # base 20 × ps(1.69MP)=1.3
 
 
+def test_clean_layout_target_fs_narration_unchanged():
+    # #175 follow-up: narration (original lettering <= the flat clean font) must be untouched
+    # so the carefully-tuned flat clean size (ADR 025) does not regress.
+    from manga_translator.render_overlap import clean_layout_target_fs
+    assert clean_layout_target_fs(21, 26) == 26      # the measured narration region (orig 21 < flat 26)
+    assert clean_layout_target_fs(26, 26) == 26      # equal → flat
+    assert clean_layout_target_fs(0, 26) == 26       # no original size → flat
+    assert clean_layout_target_fs(None, 26) == 26
+
+
+def test_clean_layout_target_fs_display_caption_tracks_original():
+    # the measured display captions on Gal Yome page 11: render near the ORIGINAL size, not the
+    # flat 26 (which made them 2.6–3.7× too small vs the source lettering).
+    from manga_translator.render_overlap import clean_layout_target_fs
+    assert clean_layout_target_fs(96, 26) == 96      # "LOVE IS FORBIDDEN"
+    assert clean_layout_target_fs(67, 26) == 67      # "IN THIS COMPANY"
+
+
+def test_clean_layout_target_fs_caps_runaway():
+    from manga_translator.render_overlap import clean_layout_target_fs
+    assert clean_layout_target_fs(500, 26, abs_cap=120) == 120
+
+
 # ---- #431 S3: display_sfx — only FREE-FLOATING SFX gets the oversized display regime ----
 
 def test_display_sfx_free_floating_rescued_is_display():
