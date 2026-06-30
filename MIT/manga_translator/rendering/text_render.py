@@ -662,6 +662,20 @@ def _split_words_and_widths(text: str, font_size: int) -> Tuple[List[str], List[
     return words, [get_string_width(font_size, w) for w in words]
 
 
+def longest_token_width(font_size: int, text: str, language: str = 'en_US') -> int:
+    """Pixel width of the widest *atomic* word in ``text`` — the floor a wrap column must
+    not drop below, or words with no hyphenation point (especially spaceless Thai/CJK) get
+    force-split mid-word ("ข้างนอก"→"ข้า"/"งนอก"). Word boundaries come from the same ZWSP
+    segmentation ``calc_horizontal`` uses (pythainlp/jieba), so a spaceless Thai line is
+    measured per word, not as one giant token. ``language`` is accepted for call-site symmetry
+    with ``calc_horizontal`` (segmentation auto-detects script, so it is not needed here)."""
+    seg = _insert_cjk_word_breaks(_insert_thai_word_breaks(text or ''))
+    words = [w for w in re.split(rf'[\s{_ZWSP}]+', seg) if w]
+    if not words:
+        return 0
+    return max(get_string_width(font_size, w) for w in words)
+
+
 def _split_into_syllables(words: List[str], font_size: int, max_width: int, language: str) -> List[List[str]]:
     """#186: per-word syllable segmentation for the greedy horizontal wrap. Uses the
     language hyphenator, falls back to a safe char-split for short/unhyphenatable
