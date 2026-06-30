@@ -105,6 +105,23 @@ def test_clean_layout_does_not_break_thai_word_in_narrow_box():
         assert any('ข้างนอก' in ln for ln in lines), lines
 
 
+def test_supersample_wrap_floor_keeps_thai_word_whole():
+    # The renderer re-wraps the laid-out text at the SUPERSAMPLED scale (font*ss). Integer rounding
+    # of the ss-scaled column can land one pixel below the widest atomic word at font*ss and
+    # force-split a Thai word mid-cluster ("ทำอาหาร"→"ทำอา"/"หาร") — even though the layout floored
+    # the column at ss=1. render() now floors the supersampled column at longest_token_width(font*ss);
+    # this pins that the floor keeps the word whole where one px under splits it. (Regression: p19.)
+    tr.set_font(_FONT)
+    text = 'ฉันทำอาหารและงานบ้านได้'
+    fs, ss = 17, 4
+    floor_ss = tr.longest_token_width(fs * ss, text, 'th_TH')
+    lines_under, _ = tr.calc_horizontal(fs * ss, text, floor_ss - 1, 10 ** 7, language='th_TH')
+    lines_floored, _ = tr.calc_horizontal(fs * ss, text, max(floor_ss - 1, floor_ss), 10 ** 7, language='th_TH')
+    if _HAS_PYTHAINLP:
+        assert not any('ทำอาหาร' in ln for ln in lines_under), lines_under   # one px under -> split
+        assert any('ทำอาหาร' in ln for ln in lines_floored), lines_floored   # floor -> whole
+
+
 def test_thai_text_segmented_into_words_when_available():
     s = 'ตัวของฉันนั้นกำลังจะไปอยู่แล้ว'
     out = _insert_thai_word_breaks(s)

@@ -254,6 +254,19 @@ class PatchRenderer:
             inpaint_before_text = patch_ctx.img_inpainted.copy()
             patch_ctx.img_rgb = patch_ctx.img_inpainted
 
+            # Render A/B aid (env-gated, off in prod; mirrors MIT_DEBUG_REGROUND_DUMP above):
+            # dump the post-inpaint background + the exact text_regions entering the renderer, so a
+            # render-stage code change (e.g. the item9 wrap floor) can be A/B'd OFFLINE on the SAME
+            # regions — deterministic, no LLM/OCR jitter (feedback_benchmark_md_report_with_image).
+            _rd = _os.environ.get('MIT_DEBUG_RENDER_DUMP')
+            if _rd:
+                import pickle as _pkl
+                _os.makedirs(_rd, exist_ok=True)
+                with open(_os.path.join(_rd, f'r_{self.img_w}x{self.img_h}_{x1}_{y1}.pkl'), 'wb') as _f:
+                    _pkl.dump({'inpainted': inpaint_before_text, 'regions': patch_ctx.text_regions,
+                               'page_shape': patch_ctx.page_shape, 'x1': x1, 'y1': y1,
+                               'img_w': self.img_w, 'img_h': self.img_h}, _f)
+
             try:
                 patch_ctx.img_rendered = await driver._run_text_rendering(config, patch_ctx)
             except Exception as e:
