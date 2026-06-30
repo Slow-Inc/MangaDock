@@ -144,6 +144,29 @@ worst instance (p27) is a detection miss (`mask_refinement` can't erase what det
 Both are now **locally reproducible** (img-cache pages) → next step is the local evidence pass
 (pixel-peep SFX patch; dump inpaint mask) BEFORE any code — no symptom fixes.
 
+## ROOT CAUSE of p19 FOUND — deterministic A/B (supersampling, not item9 floor)
+
+Per the rule "benchmark deterministic, isolate the code change" (`feedback_benchmark_md_report_with_image`):
+added an env-gated render dump (`MIT_DEBUG_RENDER_DUMP` in `patch_renderer.py`) → dumped the EXACT
+text_regions entering the renderer for ds18/19/25 → replayed the render OFFLINE on the SAME regions
+with the item9 floor ON vs OFF, at ss=1 and ss=4, font = **Prompt-Bold** (production Thai font, not
+anime_ace).
+
+**Result (ds19 cooking bubble "ฉันทำอาหารและงานบ้านได้"):**
+- ss=1: item9-OFF **and** ON → "ทำอาหาร" **WHOLE**.
+- ss=4: item9-OFF **and** ON → "ทำอา"/"หาร" **BROKEN** (both identical).
+
+⇒ **The p19 break is a `supersampling=4` render-time re-wrap artifact, NOT a clean-layout-path gap.**
+The item9 floor (ON/OFF) makes zero difference. `render()` re-wraps the laid-out text at the
+supersampled scale; `round(norm_h*ss)` lands ~1px below the widest atomic word at `font*ss`, so the
+greedy packer (`_greedy_pack:749`, `word_widths[i] > max_width`) char-splits "ทำอาหาร". The layout's
+ss=1 word-floor is undone by the ss-scaled re-wrap. Affects EVERY render path, not just clean-layout.
+
+**Fix:** in `render()` floor the supersampled horizontal column at
+`longest_token_width(font*ss, text, lang)` — so the re-wrap can never split a word the layout meant
+to keep whole. Latin floor ≤ box → no-op (characterization goldens byte-identical). TDD test
+`test_supersample_wrap_floor_keeps_thai_word_whole`. Verified by re-replaying ds19 at ss=4 (whole).
+
 ## Decision requested (notified)
 Items 2 & 3 carry real regression trade-offs only the user should weigh (One-Punch narration
 re-balloon; dropping real SFX). Asked for direction: (A) item 2 threshold/sizing with a full

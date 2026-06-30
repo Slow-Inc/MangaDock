@@ -641,10 +641,18 @@ def render(
     #print(f"Region text: {region.text}, forced_direction: {forced_direction}, render_horizontally: {render_horizontally}")
 
     if render_horizontally:
+        # #item9 ss-rounding: the renderer RE-WRAPS the laid-out text at the supersampled scale.
+        # round(norm_h*ss) can land a pixel below the widest atomic word at font*ss and force-split
+        # a Thai/CJK word mid-cluster ("ทำอาหาร"→"ทำอา"/"หาร") — undoing the layout's ss=1 word-floor
+        # (p19). Floor the supersampled column at the longest token's width at the SAME scale so the
+        # re-wrap can never split a word the layout meant to keep whole. Latin floor ≤ box → no-op.
+        _render_text = region.get_translation_for_rendering()
+        _wrap_w_ss = max(round(norm_h[0] * ss),
+                         text_render.longest_token_width(region.font_size * ss, _render_text, region.target_lang))
         temp_box = text_render.put_text_horizontal(
             region.font_size * ss,
-            region.get_translation_for_rendering(),
-            round(norm_h[0] * ss),
+            _render_text,
+            _wrap_w_ss,
             round(norm_v[0] * ss),
             region.alignment,
             region.direction == 'hl',
