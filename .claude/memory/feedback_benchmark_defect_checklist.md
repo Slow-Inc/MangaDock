@@ -27,7 +27,7 @@ metadata:
 **2 class เด่นสุด (pervasive เกือบทุกหน้า EN→TH):** item 2 (เล็กกว่า original) + item 9 (ตัดคำผิด). แก้ 2 อันนี้ก่อน impact สูงสุด.
 
 **สถานะ + regression-watch pairing (2026-07-01):**
-- **item 9 = FIXED** (clean-layout floor `wrap_w` ที่ `longest_token_width`; ADR 025 addendum, commit `ee2e512`). verify แล้ว p25/p18/p11 ไม่หักกลางคำ Latin byte-identical. **เวลาประเมินรอบหน้า: item 9 ต้องผ่านทุกหน้า** ถ้าเจอหักกลางคำอีก = regression.
+- **item 9 = PARTIALLY FIXED / REOPENED** (clean-layout floor `wrap_w` ที่ `longest_token_width`; ADR 025 addendum, commit `ee2e512`). spot-check p25/p18/p11 สะอาด **แต่ full-chapter benchmark (commit e84b982) เจอ p19 "ทำอาหาร"→"ทำอา"/"หาร" ยังหักกลางคำ** ผ่าน path ที่ floor ไม่ครอบ. **บทเรียน: spot-check 3 หน้าไม่พอ — ต้อง full-chapter เสมอ (กฎ §meta-3 พิสูจน์ตัวเองตรงนี้).** break นี้ reproduce offline ไม่ได้ (ทั้ง _bubble_fit_layout, _clean_layout_dst, full dispatch ไม่คืน column < longest word ที่ font ปกติ) → น่าจะ non-deterministic text ผ่าน non-clean-layout path. next = instrument production (log calc_horizontal char-split + font+width+path) ก่อนแก้.
 - **item 2 fix → ต้อง re-benchmark One-Punch narration เสมอ**: การลด `fills_bubble_width` threshold (0.72) หรือ size clean-layout ตาม bubble จะเสี่ยง One-Punch "THIS BRAT…" narration **บวมเต็มบับเบิล** (0.72 ถูกเลือกมากันอันนี้). pair ที่ต้องเทียบ: dialogue เต็มขึ้น **กับ** narration ไม่บวม.
 - **item 3 fix → ต้อง confirm real SFX ยังถูก rescue**: การ drop non-ASCII read จะฆ่า SFX จริง (stylized SFX กลับมาเป็น non-ASCII โดยธรรมชาติ). pair: phantom เงียบ หาย **กับ** SFX จริง (ฮึย/ดึ๋ง ฯลฯ) ยังอยู่.
 - **non-determinism**: item 2/3 A/B ใน-app สับสนเพราะ translate สุ่ม → ใช้ offline pixel-band/dump เทียบ ([[project_mit_translate_nondeterministic]]).

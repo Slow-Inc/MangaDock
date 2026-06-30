@@ -15,6 +15,8 @@
 
 **Benchmark (visual, non-deterministic translate):** `docs/reports/benchmarks/2026-07-01-thai-word-break.md` (+ p25/p18/p11 composites) — re-rendered through the worker on `MIT/.venv`; every line breaks on a word boundary, no mid-word split; Latin column unchanged. **Side-effect:** item 2 (under-fill) incidentally improved (floored column lets fitter use more width) but font sizing unchanged → dedicated item-2 pass still warranted. Commit 63ea441, branch `worktree-feat-mit-font-s1`.
 
+**⚠️ REOPENED (2026-07-01, full-chapter benchmark):** the clean-layout floor is correct but does NOT fully fix item 9. The full 30-page Gal Yome + One Punch run (`docs/reports/benchmarks/2026-07-01-item9-fullchapter-validation.md`, commit e84b982) found **p19 "ทำอาหาร"→"ทำอา"/"หาร" still breaks mid-word** via a production path the floor doesn't cover. Spot-check (p25/p18/p11) missed it — full-chapter caught it (the rule earned its keep). The break is NOT reproducible offline: isolated `_bubble_fit_layout`, `_clean_layout_dst`, AND the full `resize_regions_to_font_size` dispatch (occupancy>1 + anti_overlap) all refuse to return a column < the longest word at a normal font. Likely non-deterministic text routed through a non-clean-layout path, or a bubble-polygon safe-area edge case. **Next:** production instrumentation (log calc_horizontal char-split with font+width+path), re-render ds19, fix with a confirmed reproduction. item 9 status: **PARTIALLY FIXED / REOPENED.** Latin (One Punch) confirmed no-regression.
+
 ---
 
 ## MIT #278 gate SFX rescue on det_sfx provenance, not ≤4-char heuristic (2026-06-30)
