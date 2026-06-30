@@ -3,6 +3,20 @@
 
 ---
 
+## MIT item9 clean-layout wrap column never narrower than longest Thai/CJK word (2026-07-01)
+
+**Goal:** fix the user-flagged "ขึ้นบรรทัดผิด มันตัดระหว่างคำ" on the full-chapter Gal Yome EN→Thai benchmark — Thai words split mid-cluster: p25 "ข้างนอก"→"ข้า"/"งนอก", p18 "พยายาม"→"พยาย"/"ามให้", "ไม่เป็นไร"→"ไม่เป็"/"นไร". For a spaceless script (Thai/JP/Khmer/Lao) the wrap must break on a **dictionary word boundary**, never inside a word.
+
+**Root cause:** `_clean_layout_dst` wrapped to the region's source-text bbox width with no word-aware floor. When that column was narrower than the widest Thai word, the greedy packer fell through to `_safe_char_split` (per-character) and force-split mid-word. Only bit **dialogue misrouted to clean-layout** (egg/oval/heart bubbles where `bubble_box is None`, or `fills_bubble_width < 0.72`); the two bubble-fit paths already guard against it (reject font where longest word > column, squeeze floor = longest word).
+
+**Change (TDD):** new pure helper `text_render.longest_token_width(font_size, text, language)` = pixel width of the widest **atomic** word (ZWSP-segmented via pythainlp/jieba; Latin = widest space-delimited word). `_clean_layout_dst` floors `wrap_w` at it, mirroring the `_bubble_fit_layout` guard. Language-agnostic — Latin floor ≤ existing wrap → byte-identical. ADR 025 Addendum (2026-07-01).
+
+**Validation:** `test/test_thai_wrap.py` 12/12 (+4: `longest_token_width` word-atomic Thai / widest Latin / empty; `_clean_layout_dst` keeps "ข้างนอก" intact in a 40px box). Characterization render goldens byte-identical (Latin + existing Thai golden); render suite 68/0 + 1 pre-existing async-infra skip (`test_default_renderer`, pytest-asyncio absent — same on main).
+
+**Benchmark (visual, non-deterministic translate):** `docs/reports/benchmarks/2026-07-01-thai-word-break.md` (+ p25/p18/p11 composites) — re-rendered through the worker on `MIT/.venv`; every line breaks on a word boundary, no mid-word split; Latin column unchanged. **Side-effect:** item 2 (under-fill) incidentally improved (floored column lets fitter use more width) but font sizing unchanged → dedicated item-2 pass still warranted. Commit 63ea441, branch `worktree-feat-mit-font-s1`.
+
+---
+
 ## MIT #278 gate SFX rescue on det_sfx provenance, not ≤4-char heuristic (2026-06-30)
 
 **Goal:** fix the user-flagged "normal text gets detected/rescued as SFX". The vision-gateway SFX rescue fired for ANY ≤4-char region in a ≥60×60 box → short dialogue ("HUH?", "おい", "は？", "ですよ") in a large bubble was misread as onomatopoeia (wrong render) + added a ~1–2 s gateway round-trip to *every* translate.
