@@ -762,7 +762,7 @@ class MangaTranslator:
             # ≤4-char heuristic — so a short dialogue line ('HUH?', 'おい') in a large bubble is not
             # misread as SFX (and doesn't add a vision-gateway round-trip). Tight ≤2-char fallback
             # only when provenance is unavailable (det_sfx off).
-            from .ocr_vlm import should_rescue_sfx
+            from .ocr_vlm import should_rescue_sfx, ocr_read_real_text
             _x1, _y1, _x2, _y2 = (int(v) for v in region.xyxy)
             if should_rescue_sfx(region.text, getattr(region, 'from_sfx_detection', False),
                                  _x2 - _x1, _y2 - _y1, config.ocr.vlm_rescue):
@@ -785,6 +785,14 @@ class MangaTranslator:
                         region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
                         new_text_regions.append(region)
                         continue
+
+            # #278: a det_sfx-provenance region whose line-OCR read real ASCII text is a detector
+            # false-positive duplicating/overlapping a dialogue bubble (the det_sfx box landed on
+            # speech, not art). Drop it — otherwise its literal fragment ('W'→'ว', 'THE'→'ที') is
+            # translated and rendered on top of the real dialogue (empty/garbled bubbles).
+            if getattr(region, 'from_sfx_detection', False) and ocr_read_real_text(region.text):
+                logger.info(f'Dropped det_sfx false-positive (real-text read): "{region.text}"')
+                continue
 
             if len(region.text) < config.ocr.min_text_length \
                     or not is_valuable_text(region.text) \

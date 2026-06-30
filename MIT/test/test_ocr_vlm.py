@@ -143,7 +143,16 @@ def test_localize_threads_target_lang_into_prompt():
 
 
 # ── should_rescue_sfx (pure provenance gate, #278) ─────────────────────────────
-from manga_translator.ocr_vlm import should_rescue_sfx  # noqa: E402
+from manga_translator.ocr_vlm import should_rescue_sfx, ocr_read_real_text  # noqa: E402
+
+
+def test_ocr_read_real_text_detects_ascii_alnum():
+    # the false-positive fragments observed across the Gal Yome EN→Thai pages
+    for s in ("W", "I", "THE", "M", "8", "1", "WHA", "HUH?"):
+        assert ocr_read_real_text(s), s
+    # the genuine dropped stylized glyphs the rescue is for — NOT real-text reads
+    for s in ("ぬ", "サ", "ぎい", "ほ。ん", "⁉", "", "  ", None):
+        assert not ocr_read_real_text(s), s
 
 
 def test_rescue_fires_for_det_sfx_provenance_short_text_large_box():
@@ -175,6 +184,27 @@ def test_rescue_blocked_for_small_box():
 
 def test_rescue_off_when_vlm_rescue_disabled():
     assert not should_rescue_sfx("ぬ", from_sfx_detection=True, box_w=200, box_h=120, vlm_rescue=False)
+
+
+def test_rescue_NOT_for_ascii_reads_even_with_provenance():
+    # #278 (root cause of the empty/garbled-bubble defect): det_sfx false-positives on
+    # dialogue bubbles get 48px-OCR'd as clean ASCII fragments ("W"/"I"/"THE"/"M"/"8"/"WHA").
+    # A genuine stylized SFX the OCR DROPS reads as non-ASCII garbage/CJK — so a readable
+    # ASCII letter/digit is proof the OCR succeeded on real text, NOT a dropped glyph.
+    # Rescuing those made the vision model hallucinate a phantom Thai SFX that merged INTO
+    # and corrupted the real dialogue render (observed across 5 Gal Yome EN→Thai pages).
+    for ascii_read in ("W", "I", "THE", "M", "8", "1", "WHA"):
+        assert not should_rescue_sfx(ascii_read, from_sfx_detection=True,
+                                     box_w=400, box_h=370, vlm_rescue=True), ascii_read
+
+
+def test_rescue_STILL_fires_for_nonascii_dropped_glyphs():
+    # regression guard: the real stylized SFX the rescue is FOR (the non-ASCII glyphs the
+    # 48px OCR drops) must still rescue — these are exactly what was localized correctly
+    # in the same run ("ほ。ん"→โฮน, "サ"→ซาซึ, "ぎい"→กิริ๊ง).
+    for glyph in ("ぬ", "サ", "ぎい", "ほ。ん"):
+        assert should_rescue_sfx(glyph, from_sfx_detection=True,
+                                 box_w=400, box_h=370, vlm_rescue=True), glyph
 
 
 # ── #278 nits: ENG prompt byte-identity (==) + non-Latin refusal guard ─────────
