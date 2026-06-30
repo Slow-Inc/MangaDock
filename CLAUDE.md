@@ -47,6 +47,8 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 
 ## Benchmarks (rule)
 
+**Every MIT change must be benchmarked to confirm the result — every time, as part of "done" (not optional).** code+tests passing is not enough; produce a benchmark (deterministic if possible, else E2E) proving the result actually improved / did not regress before calling it done.
+
 **Every time you benchmark (E2E or offline), write an MD report with the comparison image — committed to the repo.** Do not just report in chat and let the image vanish with the session.
 
 - Image → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.png` (committed; never leave it only in the worktree root / scratchpad / `.playwright-mcp`, which are gitignored and lost).
@@ -203,6 +205,8 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 ---
 
 ## Benchmarks (กฎ)
+
+**งาน MIT ทุกชิ้นเมื่อเสร็จต้อง benchmark เพื่อยืนยัน result เสมอ — เป็นส่วนหนึ่งของ "done" ไม่ใช่ทางเลือก** code+test ผ่านยังไม่นับเสร็จ; ต้อง benchmark (deterministic ถ้าได้ ไม่งั้น E2E) พิสูจน์ว่าผลจริงดีขึ้น/ไม่ regress ก่อน
 
 **ทุกครั้งที่ benchmark (E2E หรือ offline) ต้องเขียน MD report พร้อมฝังภาพเปรียบเทียบ — commit ลงรีโป** ห้ามรายงานแค่ในแชตแล้วปล่อยภาพหายไปกับ session
 
