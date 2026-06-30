@@ -63,11 +63,22 @@ This log is updated after **every** step so a fresh session can resume without r
 - Worker runs Store-python311 but with MIT/.venv site-packages; `.venv` = torch 2.5.1+cu121, cuda
   True, pythainlp ok. Restart worker with `.venv` python to load the fix.
 
-## Next
+## Done — item 9 fix VISUALLY VERIFIED (commit 63ea441)
 
-- [ ] VISUAL verify (verify-before-claiming): restart worker on `.venv`, re-render ds25/ds18/ds11,
-  confirm mid-word breaks gone. If a flagged bubble routes through bubble_fit (not clean_layout)
-  the break would persist → would mean hypothesis wrong, iterate.
+- [x] Restarted worker on MIT/.venv (cu121), re-rendered ds25 / ds18 / ds11 through the worker.
+  - **ds25**: "ไปกินข้าว/นอกบ้าน/กันเถอะ" + bottom "เราไม่ได้/ไปกินข้าว/นอกบ้าน/มานาน/แล้ว" — every
+    line breaks on a word boundary; no "ข้างนอก"→"ข้า/งนอก". Text also fills the bubble fuller.
+  - **ds18**: "พยายาม" whole on one line (was "พยาย/ามให้"); "ไม่เป็นไร" whole (was "ไม่เป็/นไร");
+    bottom bubbles word-boundary + large.
+  - **ds11**: no mid-word breaks anywhere (top "นายทั้งสองรู้/ใช่ไหมว่า/ที่นี่ห้ามมี/ความรัก",
+    mid "พวกเรายกย่อง/คนที่มีพรสวรรค์/อย่างพวกคุณ/ทั้งสอง"); Latin column unaffected.
+  - Composites saved to `scratchpad/verify/v25.png|v18.png|v11.png`.
+- **Verdict: item 9 (Thai/CJK mid-word break) FIXED on the clean-layout path. No Latin regression.**
+  Side-effect: item 2 (under-fill) visibly improved on misrouted dialogue because the floored
+  column lets the existing fitter use more width — but font sizing is unchanged, so a dedicated
+  item-2 pass is still warranted.
+
+## Next
 - [ ] item 2 (under-fill) — deferred; root is discriminator/detection routing dialogue to
   clean-layout. Higher risk.
 - [ ] item 3 phantom เงียบ; items 10/11.
