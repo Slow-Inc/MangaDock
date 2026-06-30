@@ -30,6 +30,10 @@ try:
     _HAS_JIEBA = True
 except ImportError:
     _HAS_JIEBA = False
+# #278 nit: jieba builds its prefix dict (~1 s) lazily on the FIRST `_jieba.cut` — i.e. the first
+# Chinese render per worker carries that one-time cost, not import. We deliberately do NOT call
+# `_jieba.initialize()` here so a worker that never renders Chinese pays nothing at startup
+# (lazy-cost by design); the ~1 s is amortised on the first CHS/CHT page only.
 
 
 def _insert_cjk_word_breaks(text: str) -> str:
