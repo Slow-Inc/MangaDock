@@ -78,16 +78,53 @@ This log is updated after **every** step so a fresh session can resume without r
   column lets the existing fitter use more width — but font sizing is unchanged, so a dedicated
   item-2 pass is still warranted.
 
-## Next
-- [ ] item 2 (under-fill) — deferred; root is discriminator/detection routing dialogue to
-  clean-layout. Higher risk.
-- [ ] item 3 phantom เงียบ; items 10/11.
-- [ ] TDD: failing test in `test/test_thai_wrap.py` (or calc_horizontal characterization) asserting
-  a Thai word that fits the column is never split mid-word.
-- [ ] Fix `_split_into_syllables` to keep no-hyphenation words atomic (split only when the word
-  itself overflows), + ensure `_bubble_fit_layout` never squeezes below longest-word width.
-- [ ] Re-run characterization goldens; update any that legitimately change.
-- [ ] Re-benchmark affected pages; update validation report; commit.
+## Remaining items — root cause + why each needs a DECISION (not just code)
+
+Item 9 (the most tractable of the two pervasive classes) is **done + verified + DoD-closed**
+(commit `ee2e512`). The rest were each investigated to root; none has a clean, low-risk,
+language-agnostic fix that wouldn't trade one defect for a regression elsewhere. Concretely:
+
+### item 2 — Thai dialogue under-fills big bubbles (PERVASIVE)
+- **Root (confirmed in code):** dialogue is routed to `_clean_layout_dst` (small `clean_fs`)
+  instead of `_bubble_fit_layout` (fills balloon) in two cases:
+  1. `bubble_box is None` — `det_bubble_seg` missed the balloon (egg/oval/heart shapes). Fixing
+     this is a **detection-model** change, out of render scope.
+  2. `fills_bubble_width(rw, bw) < 0.72` — a dialogue line in a *round* balloon legitimately spans
+     only ~0.60–0.85 of the (wide) bubble, so it falls under 0.72 → clean-layout → small.
+- **Why it's a decision, not a patch:** the 0.72 threshold was *measured* to separate dialogue
+  (rw/bw ≈0.88–0.90) from narration (≈0.40–0.59) and chosen to stop the One-Punch "THIS BRAT…"
+  narration **ballooning up** (`render_overlap.py:120` docstring). Lowering it (e.g. → 0.62) to
+  catch round-bubble dialogue re-opens that regression window (the 0.59–0.72 gap). The equivalent
+  alternative (size clean-layout font by the bubble when `bubble_box` exists) carries the *same*
+  trade-off. **Needs:** a user risk call + a fresh One-Punch + full-chapter A/B to confirm no
+  narration re-balloon. Confounded by translate non-determinism → offline pixel-band A/B.
+
+### item 3 — phantom "เงียบ" (det_sfx false-positive)
+- **Root (confirmed):** a det_sfx false-positive whose 48px line-OCR read is **non-ASCII** passes
+  `should_rescue_sfx` (the #278 gate drops only *ASCII*-readable reads — `ocr_vlm.py:64,793`), goes
+  to the VLM, which **hallucinates** a silence SFX ("เงียบ", the Thai of しーん) instead of replying
+  empty as the prompt asks. Kept + rendered over a notepad (p09) / dialogue (p19).
+- **Why it's a decision:** the rescue EXISTS because real stylized SFX come back non-ASCII from the
+  OCR — so "drop all non-ASCII reads" would kill legitimate SFX rescue. Distinguishing a
+  false-positive from a real dropped glyph needs one of: a brittle token blocklist (special-cases
+  Thai, violates the North Star), an ink/stroke-density heuristic (heavy, risky), or
+  containment-in-dialogue (misses the p09 notepad). **No simple win.** Best partial candidate: drop
+  a rescued SFX whose box is ≥X% contained in a *dialogue* region (catches p19, not p09).
+
+### items 10 / 11 — rarer, deeper-stage
+- **10 (SFX patch pixelation, "ฮึย"):** SFX keeps the legacy stylized warp path (not clean-layout);
+  the supersampling that smooths dialogue glyphs isn't applied to the SFX patch → aliased edges.
+  Fix is in `text_render` / patch supersampling — contained but must not change dialogue.
+- **11 (ghost original text behind inpaint, p19/p27):** inpaint mask doesn't fully cover the source
+  lettering (cursive "What…here?" on p27 untouched) → original bleeds behind the translation. Root
+  is `mask_refinement` / `inpainting` coverage, not render. Likely a mask-dilation tune; needs a
+  before/after on the inpaint mask, not the final composite.
+
+## Decision requested (notified)
+Items 2 & 3 carry real regression trade-offs only the user should weigh (One-Punch narration
+re-balloon; dropping real SFX). Asked for direction: (A) item 2 threshold/sizing with a full
+One-Punch A/B safety net, (B) item 3 partial containment gate, (C) item 10/11 first (contained, no
+pervasive-regression risk), or (D) ship item 9 alone for now.
 
 ## Decisions / landmines
 
