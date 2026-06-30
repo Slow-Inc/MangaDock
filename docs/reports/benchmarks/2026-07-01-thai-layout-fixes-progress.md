@@ -111,14 +111,35 @@ language-agnostic fix that wouldn't trade one defect for a regression elsewhere.
   containment-in-dialogue (misses the p09 notepad). **No simple win.** Best partial candidate: drop
   a rescued SFX whose box is ≥X% contained in a *dialogue* region (catches p19, not p09).
 
-### items 10 / 11 — rarer, deeper-stage
-- **10 (SFX patch pixelation, "ฮึย"):** SFX keeps the legacy stylized warp path (not clean-layout);
-  the supersampling that smooths dialogue glyphs isn't applied to the SFX patch → aliased edges.
-  Fix is in `text_render` / patch supersampling — contained but must not change dialogue.
-- **11 (ghost original text behind inpaint, p19/p27):** inpaint mask doesn't fully cover the source
-  lettering (cursive "What…here?" on p27 untouched) → original bleeds behind the translation. Root
-  is `mask_refinement` / `inpainting` coverage, not render. Likely a mask-dilation tune; needs a
-  before/after on the inpaint mask, not the final composite.
+### items 10 / 11 — investigated to root (systematic-debugging Phase 1); NOT the safe contained fixes hoped
+User picked path **C (10/11 first)** as the lowest-regression option. On investigation both bottom
+out at layers that are *not* a clean, verifiable render tweak:
+
+- **10 (SFX patch pixelation, "ฮึย"):** `render()` (`rendering/__init__.py:606`) rasterizes glyphs at
+  `font_size×ss`, downscales by `ss` (INTER_AREA → crisp 1×), then **warps the box onto `dst_points`**
+  via `warpPerspective` (INTER_LINEAR, `:708`). For dialogue the dst box is sized to the 1× render
+  (`centered_box(block_w, block_h)`) → warp ≈ 1:1 → crisp. **SFX takes the legacy path** where dst is
+  the large original stylized quad → the small 1× glyph box is **upscaled** by the warp → aliasing.
+  - *Why not a quick fix:* the cure (render SFX at a font matched to dst, or raise `ss` for the
+    large-warp case) lives on the **shared legacy path** (risks non-SFX regions) and can only be
+    **verified by rendering an actual SFX**, which requires the **non-deterministic VLM rescue** —
+    fails the reproduce-consistently + verify-before-claiming bar.
+
+- **11 (ghost original behind inpaint, p19/p27):** `mask_refinement.dispatch` only **refines the
+  detector's `raw_mask`** (`complete_mask` on detected textlines) — it cannot erase text the detector
+  never segmented. p27 cursive "What…here?" **not erased at all** ⇒ a **detection miss** (model-level,
+  out of render/mask scope); patching `mask_refinement` would be a symptom fix that still leaves p27.
+  p19 partial ghost *might* be mask coverage, but distinguishing needs the inpaint mask dumped on the
+  real page.
+  - *Reproduction blocker:* the Gal Yome EN source pages are **not in the repo** (only the One-Punch
+    benchmark chapter `752fc515…` is local; Gal Yome arrived via the hayateotsu.space tunnel during
+    E2E). Confirming detection-miss vs mask-gap requires re-fetching p19/p27 through the **tunnel
+    E2E** and dumping the mask — not a local in-process render.
+
+**Phase-1 verdict:** neither 10 nor 11 is a safe, locally-verifiable contained fix. 10 needs a
+shared-path render change verifiable only via the non-deterministic rescue; 11's worst instance
+(p27) is a detection miss. Honest next step is the tunnel-E2E evidence pass (dump SFX box-vs-dst for
+10; dump inpaint mask for 11) BEFORE any code — reported to user for a go/no-go on that heavier pass.
 
 ## Decision requested (notified)
 Items 2 & 3 carry real regression trade-offs only the user should weigh (One-Punch narration
