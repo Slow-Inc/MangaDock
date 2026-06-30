@@ -7,7 +7,7 @@ metadata:
 
 ทุกครั้งที่ benchmark งาน render (MIT), การประเมินผลต้อง **เทียบภาพ benchmark กับ original ทุกครั้ง และเทียบทุกมิติ** — ไล่ตรวจตาม checklist ข้อบกพร่องด้านล่างทุกข้อ แล้วรายงานทีละข้อใน MD report (pass/fail + จุดที่เจอ) — ไม่ใช่แค่บอก "ดีขึ้น/OK" รวมๆ. user เคย flag ข้อพวกนี้ทีละข้อในรอบ Gal Yome EN→TH; เป็น regression-watch list.
 
-**กฎ meta (ผู้ใช้สั่ง):** (1) เทียบ benchmark↔original ทุกครั้ง ทุกมิติ เสมอ; (2) checklist นี้เป็น **living document** — ทุกครั้งที่ผู้ใช้ให้ "ข้อพิจารณา" ใหม่สำหรับการประเมิน ต้อง **append เข้า checklist นี้ทันที** เพื่อใช้ประเมินรอบต่อไป.
+**กฎ meta (ผู้ใช้สั่ง):** (1) เทียบ benchmark↔original ทุกครั้ง ทุกมิติ เสมอ; (2) checklist นี้เป็น **living document** — ทุกครั้งที่ผู้ใช้ให้ "ข้อพิจารณา" ใหม่สำหรับการประเมิน ต้อง **append เข้า checklist นี้ทันที** เพื่อใช้ประเมินรอบต่อไป; (3) **เมื่อ benchmark (spot/per-page) ดู OK แล้ว ต้อง benchmark ทั้งแชปเตอร์ (ทุกหน้า) เพื่อ confirm ว่าทั้งหมดไม่มีปัญหา + benchmark กับ One Punch (manga อื่น) ด้วยเสมอ** — กัน fix ที่ดูดีบนหน้า/manga เดียวแต่ regress หน้า/manga อื่นที่ไม่ได้ดู (โดยเฉพาะ render-parity/discriminator/territory ที่กระทบทุก content).
 
 **Checklist (เทียบ original ทุกบับเบิล/ทุก caption):**
 1. **text ว่าง/หาย** — บับเบิลที่ original มีคำแต่ฉบับแปลว่าง (มัก = บับเบิลซ้อน/ถูก patch อื่นบัง #436, หรือ region ถูก drop). เทียบจำนวนบับเบิลที่มีคำ original↔แปล
