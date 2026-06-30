@@ -330,6 +330,13 @@ export function buildMitConfig(
       ...(patchFeather !== undefined
         ? { patch_feather_radius: patchFeather }
         : {}),
+      // #436: shape each patch's alpha to its own content (new glyphs + own erase mask)
+      // instead of a full opaque rectangle, so two overlapping speech balloons stop
+      // repainting clean background over each other's text. Absent → full-rectangle
+      // (feathered) patch, byte-identical. (Distinct from the #266 luminance-band attempt
+      // that reused this name and was rolled back; this impl is content-footprint based
+      // and verified not to fade text on dark backgrounds.)
+      ...(flagEnv('MIT_PATCH_CONTENT_ALPHA') ? { patch_content_alpha: true } : {}),
     },
   });
 }
