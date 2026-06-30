@@ -627,6 +627,12 @@ def render(
             bg,
             line_spacing,
         )
+    # #436 de-dup: a region the pre-pass blanked (its translation was a duplicate substring of a
+    # neighbour, e.g. the SFX-detected "ปาร์ตี้" inside "…จัดปาร์ตี้…") survives the line-529 filter
+    # (it ran before the blanking) and still reaches here with empty text — put_text returns None.
+    # Render nothing for it (the duplicate is meant to be dropped) instead of crashing on .shape.
+    if temp_box is None:
+        return img
     if ss > 1:
         temp_box = cv2.resize(
             temp_box,
