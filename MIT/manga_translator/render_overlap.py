@@ -200,3 +200,22 @@ def clean_layout_target_fs(orig_fs, clean_fs_flat: int, abs_cap: int = 120) -> i
     flat = max(1, int(clean_fs_flat or 0))
     o = int(orig_fs or 0)
     return flat if o <= flat else min(o, abs_cap)
+
+
+def region_territory_box(rx1, ry1, rx2, ry2, bubble_box):
+    """The box a region reserves for anti-overlap clamping.
+
+    A region reserves its **balloon** only when its text FILLS the balloon (dialogue —
+    :func:`fills_bubble_width`); otherwise it reserves just its own narrow **text box**. A
+    narration / clean-layout region is a narrow column loosely sitting in a large balloon — if it
+    reserved the whole balloon it would over-clamp an *overlapping* neighbour's bubble-fit box and
+    shrink that neighbour's font (the #436 back balloon: the front balloon's narration claimed the
+    whole balloon, so the back balloon could only fit the small leftover crescent). Reserving the
+    actual text footprint lets the neighbour grow into the balloon's empty area (safe once patches
+    are content-shaped, #436). ``bubble_box`` None → the text box. Pure."""
+    if bubble_box is None:
+        return (rx1, ry1, rx2, ry2)
+    bx1, by1, bx2, by2 = bubble_box
+    if fills_bubble_width(rx2 - rx1, bx2 - bx1):
+        return (float(bx1), float(by1), float(bx2), float(by2))
+    return (rx1, ry1, rx2, ry2)
