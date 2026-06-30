@@ -3,6 +3,20 @@
 
 ---
 
+## MIT #175 clean-layout narration scales by PAGE not crop (2026-06-30)
+
+**Goal:** fix the user-flagged "ทำไมตัวอักษรหลายที่ขนาดเล็ก ทั้งที่มีตัวปกติอยู่ด้วย" — on the full-chapter Gal Yome EN→Thai benchmark, narration/caption text rendered tiny while dialogue in the same panel was normal.
+
+**Root cause:** clean-layout font = `font_size_max × processing_scale(area)`. In the per-region patch path the renderer is handed the small **crop** (full-res but tiny area) → `processing_scale` collapses to its 0.5 floor → narration ~3× too small (≈17px vs designed 35px on a 3 MP page). Dialogue was fine because bubble-fit is box-height-driven (ADR 023, page-independent) → hence the disparity. Same crop-vs-page bug class as #175's bubble-fit fix, but for the clean-layout branch (`_clean_layout_dst` used the crop `img.shape` for the font scale, wrap-width clamp, and max wrap height — all page-relative).
+
+**Change (TDD):** thread the full-**page** shape (`PatchRenderer.img_w/img_h`, already the source of `page_scaled_font_min` #250) via `patch_ctx.page_shape` → `stages` → `dispatch` → `resize_regions_to_font_size` → `_clean_layout_dst`, and use it there instead of the crop. Full-page render path passes `page_shape=None` → uses `img.shape` (the page) → **byte-identical**. ADR 025.
+
+**Validation:** pin test `clean_layout_font_size(20, crop)→floor` vs `(20, page)→35`; stages kwargs-forwarding characterization updated for the new `page_shape` kwarg; render golden/guard byte-identical; 38 render_overlap + patch_renderer + stages green (pre-existing `test_default_renderer` fails only because pytest-asyncio isn't installed — same on unmodified main). E2E (Gal Yome EN ch1 p14 → Thai): top-right narration balloon renders readable 3-line text instead of microscopic; no crashes, nothing oversized. Commit 70c6bf1, branch `worktree-feat-mit-font-s1` (PR #433).
+
+**Note:** does not change *which* regions go to clean-layout (the rw/bw discriminator still routes narration-in-large-bubble there); only fixes the size once routed.
+
+---
+
 ## MIT #183/#175 width-squeeze — narrow column fills tall balloon (2026-06-30)
 
 **Goal:** EN-source dialogue in a TALL balloon must fill the balloon height like the original (many narrow lines), not render as 2 wide lines with empty space below. Surfaced on Gal Yome no Himitsu EN ch1 p4 ("PEOPLE FROM OTHER DEPARTMENTS ARE WELCOME, DON'T YOU WANNA COME?") and user-flagged Thai targets ("ตัวเล็กแค่ 2 บรรทัด ทั้งๆ ที่ประโยคยาว").
