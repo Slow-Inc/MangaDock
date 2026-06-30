@@ -283,3 +283,18 @@ def test_rendering_imports_every_render_overlap_helper_it_calls():
     called = {fn for fn in defs if any(re.search(r'(?<![\w.])' + fn + r'\s*\(', l) for l in code)}
     missing = called - imported
     assert not missing, f"render_overlap helpers called but not imported in rendering/__init__.py: {sorted(missing)}"
+
+
+# ---- #175 patch-path follow-up: clean-layout narration must scale by PAGE area, not crop ----
+
+def test_clean_layout_font_size_page_vs_crop_resolution():
+    """The user-flagged "narration tiny while dialogue is normal" bug: clean-layout font scales by
+    ``processing_scale`` of the AREA it is given. A per-region CROP (full-res but small area) drives
+    that to its 0.5 floor → font collapses to the page-minimum; the full PAGE area scales it to the
+    designed size. ``_clean_layout_dst`` must therefore receive PAGE dims, not the crop's img.shape.
+    This pins the contract that the page_shape wiring restores."""
+    from manga_translator.render_overlap import clean_layout_font_size
+    fmin = 17                                               # page-scaled floor (#250)
+    crop = clean_layout_font_size(20, 600, 600, fmin)       # ~0.36 MP → ps floor 0.5 → 10 → floored 17
+    page = clean_layout_font_size(20, 2048, 1456, fmin)     # ~3 MP → ps 1.73 → round(34.6)=35
+    assert crop == fmin and page == 35 and page > crop

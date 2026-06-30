@@ -119,6 +119,9 @@ class PatchRenderer:
             patch_ctx.img_alpha = None
             patch_ctx.text_regions = local_regions
             patch_ctx.mask = None
+            # #175 patch-path: carry the full-PAGE shape so clean-layout narration scales by page
+            # resolution, not this small crop (whose tiny area collapses processing_scale → tiny font).
+            patch_ctx.page_shape = (self.img_h, self.img_w)
 
             if self.full_inpainted is not None:
                 # Reuse the one-time full-page inpaint: LaMa saw the whole page, so the
