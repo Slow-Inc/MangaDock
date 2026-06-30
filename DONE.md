@@ -3,6 +3,16 @@
 
 ---
 
+## MIT #278 gate SFX rescue on det_sfx provenance, not ≤4-char heuristic (2026-06-30)
+
+**Goal:** fix the user-flagged "normal text gets detected/rescued as SFX". The vision-gateway SFX rescue fired for ANY ≤4-char region in a ≥60×60 box → short dialogue ("HUH?", "おい", "は？", "ですよ") in a large bubble was misread as onomatopoeia (wrong render) + added a ~1–2 s gateway round-trip to *every* translate.
+
+**Change (TDD):** gate on **provenance** — thread `is_sfx` from the `Quadrilateral` textlines `merge_sfx_detections` appends → `textline_merge` (any SFX textline → region flagged) → `TextBlock.from_sfx_detection`; rescue only those (≤4), with a tight ≤2-char fallback when det_sfx is off. Decision extracted to pure `should_rescue_sfx()`. Plus PR #277 nits: ENG prompt `==` byte-identity; `sanitize_sfx` non-Latin refusal guard; document jieba lazy dict cost. ADR 026.
+
+**Validation:** +9 `test_ocr_vlm` (6 `should_rescue_sfx` + ENG `==` + 2 refusal-guard), 24/0; render golden untouched; affected suites green (textline_merge async fails = pre-existing pytest-asyncio gap, identical on main). **Benchmark** (deterministic, `docs/reports/benchmarks/2026-06-30-sfx-rescue-provenance-gate.md` + image): OLD rescued 5/7 representative regions, NEW 3 → **2 false-positive gateway calls eliminated**, real SFX kept. Commit 8cbd930, branch `worktree-feat-mit-font-s1` (PR #433).
+
+---
+
 ## MIT #175 clean-layout narration scales by PAGE not crop (2026-06-30)
 
 **Goal:** fix the user-flagged "ทำไมตัวอักษรหลายที่ขนาดเล็ก ทั้งที่มีตัวปกติอยู่ด้วย" — on the full-chapter Gal Yome EN→Thai benchmark, narration/caption text rendered tiny while dialogue in the same panel was normal.
