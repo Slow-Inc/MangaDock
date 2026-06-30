@@ -22,3 +22,14 @@ MIT already has a reliable signal: the `det_sfx` second pass (`merge_sfx_detecti
 - **Validated:** deterministic benchmark `docs/reports/benchmarks/2026-06-30-sfx-rescue-provenance-gate.md` — OLD rescued 5/7 representative regions, NEW 3 → **2 false-positive gateway calls eliminated**, real SFX kept. Unit: +9 `test_ocr_vlm` (6 `should_rescue_sfx` + ENG `==` + 2 refusal-guard), 24/0. Render golden untouched; affected suites green (textline_merge async failures = pre-existing pytest-asyncio gap, identical on main).
 - **Limitation:** a genuine ≤2-char SFX found only by the primary detector when `det_sfx` is **off** relies on the tight fallback; with `det_sfx` on (production default) provenance is authoritative.
 - **Reversibility:** `should_rescue_sfx` is a pure gate; loosening it back to `len ≤ 4` (ignoring provenance) restores the old behaviour. The `is_sfx`/`from_sfx_detection` flags default `False` (byte-identical when det_sfx never fires).
+
+## Addendum (2026-06-30) — provenance alone was insufficient: drop det_sfx false-positives
+
+Full-stack EN→Thai benchmarking surfaced that **`det_sfx` itself false-positives on speech bubbles** — so the provenance signal this ADR trusts is not always trustworthy. The AnimeText SFX pass produced boxes over dialogue that the 48px line-OCR read as short ASCII fragments (`W`, `I`, `THE`, `M`, `8`, `1`, `WHA`). With provenance + short text + a large box, those passed `should_rescue_sfx` → the vision gateway, told they were SFX, **hallucinated** a phantom Thai token (`W`→"ปาร์ตี้", `THE`→"เสียงดังสนั่นหวั่นไหว", `M`→"ไม่ชัดเจน", `1`→"เงียบสงบ") that merged into and corrupted the real dialogue render (empty/garbled/tiny bubbles).
+
+**Refinement (not an overturn):** the line-OCR *drops* a stylized SFX → it comes back non-ASCII/CJK; a clean **ASCII letter/digit read is proof the OCR succeeded on real text**, never a dropped glyph. New pure `ocr_read_real_text(text)` (`[A-Za-z0-9]` present):
+1. `should_rescue_sfx` returns `False` for real-text reads (no gateway round-trip, no hallucination).
+2. `_apply_ocr` **drops** a `from_sfx_detection` region whose read is real text — otherwise its literal fragment (`W`→"ว") would still be translated and rendered over the dialogue.
+
+- **Validated:** `docs/reports/benchmarks/2026-06-30-sfx-falsepos-phantom-fix.md` — across all 5 problem pages every ASCII phantom (7) is dropped and every non-ASCII SFX (ほ。ん, サ×2, ⁉, ぎい) is still rescued; bubbles render real dialogue. +1 `ocr_read_real_text` test + 1 ascii-reject + 1 nonascii-keep on `should_rescue_sfx`; `test_ocr_vlm` 27/0.
+- **Limitation:** a genuine standalone **Latin** SFX (e.g. a stylized "BOOM") found only via det_sfx is now dropped rather than localized; acceptable — this content's real SFX are CJK, and a readable Latin SFX degrades to the normal translate path, never a phantom. The `det_sfx`-over-dialogue **overlap** when both render (#436) is separate and still open.
