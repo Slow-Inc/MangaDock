@@ -939,3 +939,31 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **10. KPI.** #175 clean-layout sizing fixed · narration ~2× (designed size) · +1 unit pin (38/0) · golden byte-identical · 0 regressions · ADR 025.
 
 *Validation:* TDD pin + stages characterization; `pytest test/test_render_overlap.py test/test_render_golden.py test/test_stages.py test/test_patch_renderer.py` green; E2E Gal Yome EN ch1 p14 → Thai (narration readable, no crash/oversize). *Risk/rollback:* `page_shape=None`. *Links:* #175, ADR 023/024/025, branch `worktree-feat-mit-font-s1`.
+
+---
+
+# 2026-06-30 — fix(MIT): gate SFX rescue on det_sfx provenance, not a ≤4-char heuristic (#278)
+
+**1. Type.** Correctness + perf fix in the MIT SFX vision-rescue gate (PR #277 review follow-up).
+
+**2. Trigger.** User-flagged: normal short text detected/rescued as SFX. The rescue fired for ANY ≤4-char region in a ≥60×60 box → short dialogue ("HUH?", "おい") misread as onomatopoeia + a ~1–2 s gateway round-trip per such region on every translate.
+
+**3. Change (before → after).**
+- before: `if vlm_rescue and len(region.text.strip()) <= 4:` then area/min-side check → rescue.
+- after: pure `should_rescue_sfx(text, from_sfx_detection, w, h, vlm_rescue)` — gate on **det_sfx provenance** (`region.from_sfx_detection`, ≤4 chars), tight ≤2-char fallback when det_sfx is off. Provenance threaded: `Quadrilateral.is_sfx` (set by `merge_sfx_detections`) → `textline_merge` (any SFX textline → region) → `TextBlock.from_sfx_detection`. Plus: ENG prompt `==` byte-identity; `sanitize_sfx` non-Latin refusal guard; jieba lazy-dict documented.
+
+**4. Seam / commit.** One pure gate (`should_rescue_sfx`) + a boolean flag threaded through 3 classes with `False` defaults. Commit 8cbd930.
+
+**5. Byte-identical proof.** `is_sfx`/`from_sfx_detection` default `False` → when det_sfx never fires the flag is absent and the tight ≤2 fallback is the only change to the gate; render golden untouched. ENG prompt pinned byte-identical with `==`.
+
+**6. Performance.** Positive — removes the per-region vision-gateway round-trip (~1–2 s) for every short non-SFX region (previously on every translate).
+
+**7. Quality / metrics.** Deterministic benchmark: OLD rescued 5/7 representative regions, NEW 3 → 2 false-positive gateway calls eliminated, real SFX kept. `test_ocr_vlm` +9 (24/0).
+
+**8. Tech debt.** Replaces a length proxy with the correct provenance signal; closes the major item of the #277 review follow-up (+ its 3 nits).
+
+**9. Risk / rollback.** Loosen `should_rescue_sfx` back to `len ≤ 4` (ignore provenance) to restore old behaviour; flags default False → byte-identical when det_sfx off and no SFX detected. No money/auth surface.
+
+**10. KPI.** #278 done (major + 3 nits) · 2 false-SFX/page-class eliminated · per-translate gateway latency reduced · +9 tests (24/0) · golden byte-identical · ADR 026 + benchmark report.
+
+*Validation:* TDD `should_rescue_sfx`; `pytest test/test_ocr_vlm.py` 24/0; affected suites green; deterministic gate benchmark. *Risk/rollback:* revert the gate to length-only. *Links:* #278, #277, ADR 026, `docs/reports/benchmarks/2026-06-30-sfx-rescue-provenance-gate.md`, branch `worktree-feat-mit-font-s1`.
