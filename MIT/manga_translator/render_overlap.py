@@ -84,6 +84,24 @@ def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: 
     return (x1, y1, x2, y2)
 
 
+def squeeze_width(measure_h, full_w: float, min_w: float, box_h: float, factor: float = 0.9):
+    """#183 width-squeeze (MangaTranslator ``layout_engine.py``): narrow the wrap column by
+    ``factor`` each step so the text uses MORE lines and fills a tall balloon's *height*,
+    instead of a few wide lines with empty space below. ``measure_h(w)`` returns the wrapped
+    block height at column width ``w`` (narrower → taller). Stops at ``min_w`` (the longest
+    unbreakable token's width, so no word force-breaks) or just before the block would exceed
+    ``box_h``. Returns the chosen column width — ``full_w`` if no narrowing helps. Pure."""
+    w = float(full_w)
+    floor = float(min_w)
+    while w * factor >= floor:
+        nw = w * factor
+        if measure_h(nw) <= box_h:
+            w = nw
+        else:
+            break
+    return w
+
+
 def box_containment(a: Box, b: Box) -> float:
     """Fraction of box ``a``'s area that lies inside box ``b`` (0..1). Used by #436 region
     de-dup: the SFX detector and the line detector can both fire on the same stylized word,

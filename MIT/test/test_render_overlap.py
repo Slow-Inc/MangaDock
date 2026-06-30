@@ -236,3 +236,29 @@ def test_box_containment_fraction():
 def test_box_containment_degenerate():
     from manga_translator.render_overlap import box_containment
     assert box_containment((5, 5, 5, 5), (0, 0, 10, 10)) == 0.0        # zero-area A → 0
+
+
+# ---- #183 width-squeeze: narrow the column so text fills a tall balloon's height ----
+
+def test_squeeze_width_narrows_a_tall_box():
+    from manga_translator.render_overlap import squeeze_width
+    # block height ∝ 1/width (narrower column → more lines → taller). A roomy box_h lets the
+    # squeeze narrow the column so the block fills the height instead of a few wide lines.
+    mh = lambda w: 45000.0 / w
+    out = squeeze_width(mh, full_w=300, min_w=100, box_h=320)
+    assert out < 300 and out >= 100
+    assert mh(out) <= 320 and mh(out * 0.9) > 320      # narrowest column that still fits the height
+
+
+def test_squeeze_width_noop_when_already_full():
+    from manga_translator.render_overlap import squeeze_width
+    mh = lambda w: 45000.0 / w
+    # at full width the block already (nearly) fills box_h → narrowing would overflow → no squeeze
+    assert squeeze_width(mh, full_w=150, min_w=50, box_h=305) == 150     # mh(150)=300≤305, mh(135)=333>305
+
+
+def test_squeeze_width_stops_at_floor():
+    from manga_translator.render_overlap import squeeze_width
+    # text always fits (tiny block) → squeeze would narrow forever, but the longest-token floor stops it
+    out = squeeze_width(lambda w: 10.0, full_w=300, min_w=250, box_h=1000)
+    assert 250 <= out < 300

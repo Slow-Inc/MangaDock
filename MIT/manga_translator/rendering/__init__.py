@@ -68,57 +68,65 @@ _FONT_SIZE_SCALE_GAIN = 0.4
 _MAX_BBOX_SCALE = 1.1
 
 
-def _bubble_fit_font_size(region, bubble_wh, img_shape, font_size_minimum: int = 8) -> int:
-    """#175: largest font whose wrapped translation fits the balloon safe-area, bounded by
-    the two-tier *processing-scaled* bounds (dialogue [8,16] / display/SFX [10,64] × √MP) —
-    mirroring MangaTranslator. This replaces the old box-relative cap (``h_box × 0.5``), which
-    over-sized short lines in tall balloons and under-sized everything on non-benchmark pages.
-    Measured with the renderer's own wrapper so the prediction matches the actual render."""
+def _bubble_fit_layout(region, bubble_wh, img_shape, font_size_minimum: int = 8):
+    """#175/#183: choose the font AND wrap-column for a region that fills a balloon. (1) binary-
+    search the largest font whose word-wrapped translation fits the balloon safe-area, bounded
+    by the interior height (:func:`bubble_fit_bounds`) and never force-breaking a word. (2) width-
+    SQUEEZE the column (:func:`squeeze_width`) so the text uses more lines and fills the box
+    HEIGHT — a tall balloon gets a narrow tall column (like the original) instead of a few wide
+    lines with empty space below. Returns ``(font_size, block_w, block_h)`` — the squeezed block
+    the caller centres in the balloon."""
     w_box, h_box = bubble_wh
     lang = getattr(region, 'target_lang', 'en_US')
     text = region.translation
-
-    # Wrap to the *margin'd* width so the lines calc_horizontal produces are
-    # never wider than the fit-test (which compares against w_box * margin) —
-    # otherwise every size fails the margin check and the search floors at `low`
-    # (#175 self-bug).
     mw, mh = int(w_box * _FIT_MARGIN), int(h_box * _FIT_MARGIN)
 
-    # Segment Thai/Chinese into words first (region.translation is raw — the ZWSP word
-    # breaks are inserted inside calc_horizontal, not here), so the longest-token guard below
-    # is word-aware in every language instead of treating a whole spaceless Thai line as one
-    # "word". English/space languages pass through unchanged.
+    # Segment Thai/Chinese into words first (region.translation is raw — the ZWSP word breaks
+    # are inserted inside calc_horizontal, not here), so the longest-token checks below are
+    # word-aware in every language instead of treating a whole spaceless Thai line as one word.
     _seg = text_render._insert_cjk_word_breaks(
         text_render._insert_thai_word_breaks(text or ''))
     _toks = [t for t in re.split(r'[\s​]+', _seg) if t]
     _longest = max(_toks, key=len) if _toks else ''
 
+    def _longest_word_w(size):
+        if not _longest:
+            return 0.0
+        _, lww = text_render.calc_horizontal(
+            size, _longest, max_width=10 ** 7, max_height=10 ** 7, language=lang)
+        return max(lww) if lww else 0.0
+
     def measure(size):
         lines, widths = text_render.calc_horizontal(
             size, text, max_width=mw, max_height=mh, language=lang)
-        # Empty widths means nothing measurable wrapped — treat as "does not fit"
-        # so the search floors at `low` instead of picking the max font (#bug-hunt).
         block_w = max(widths) if widths else float('inf')
         block_h = len(lines) * size * _LINE_HEIGHT
-        # #175: reject a size that force-breaks a single WORD wider than the column (mid-word
-        # split like "HMPH"→"HM/PH"). Split on whitespace AND ZWSP (​, inserted by the
-        # Thai/CJK word segmenters) so the longest-token check is word-aware in every language —
-        # the longest Thai/Latin word must fit one line; long text still wraps at word breaks.
-        if _longest:
-            _, lww = text_render.calc_horizontal(
-                size, _longest, max_width=10 ** 7, max_height=10 ** 7, language=lang)
-            if lww and max(lww) > mw:
-                return float('inf'), float('inf')
+        # reject a size that force-breaks a single WORD wider than the column ("HMPH"→"HM/PH").
+        if _longest and _longest_word_w(size) > mw:
+            return float('inf'), float('inf')
         return block_w, block_h
 
-    # #175 patch-path fix: fill the balloon — bound the binary search by the interior BOX
-    # HEIGHT, not page-area scale. In the per-crop patch path (production) `img_shape` is the
-    # *crop*, so processing_scale collapsed to ≈0.5 and the [8,16]×√MP bounds floored onto
-    # font_size_minimum, locking EN→TH dialogue at ~24px inside a ~600px balloon. The balloon's
-    # own safe-interior height is the correct fill cap; anti_overlap already stops it growing
-    # into a neighbour, and it is the sole occupant (that is why bubble-fit claimed it).
+    # Fill the balloon — bound the search by the interior BOX HEIGHT, not page-area scale (the
+    # per-crop patch path makes processing_scale meaningless; see bubble_fit_bounds).
     low, high = bubble_fit_bounds(h_box, font_size_minimum)
-    return fit_font_size((w_box, h_box), measure, low=low, high=high, margin=_FIT_MARGIN)
+    font = fit_font_size((w_box, h_box), measure, low=low, high=high, margin=_FIT_MARGIN)
+
+    # #183 width-squeeze: narrow the column so the block fills the box HEIGHT (more lines) like
+    # the original, instead of a few wide lines. Floor = the longest token's width at `font`,
+    # so squeezing never force-breaks a word.
+    min_w = max(1.0, min(_longest_word_w(font) + 4.0, float(mw)))
+
+    def measure_h(w):
+        lines, _ = text_render.calc_horizontal(
+            font, text, max_width=int(w), max_height=10 ** 7, language=lang)
+        return len(lines) * font * _LINE_HEIGHT
+
+    used_w = squeeze_width(measure_h, mw, min_w, mh)
+    lines, widths = text_render.calc_horizontal(
+        font, text, max_width=int(used_w), max_height=10 ** 7, language=lang)
+    block_w = max(widths) if widths else used_w
+    block_h = len(lines) * font * _LINE_HEIGHT
+    return font, float(block_w), float(block_h)
 
 
 def _bubble_interior_box(region, bubble_box, crop_shape):
@@ -294,8 +302,8 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 if cw >= 6 and ch >= 6:
                     fit_w, fit_h = cw, ch
                     acx, acy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
-            region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), img.shape, font_size_minimum)
-            hw, hh = fit_w / 2.0, fit_h / 2.0
+            region.font_size, _bw, _bh = _bubble_fit_layout(region, (fit_w, fit_h), img.shape, font_size_minimum)
+            hw, hh = _bw / 2.0, _bh / 2.0
             dst_points_list.append(
                 np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
                            [acx + hw, acy + hh], [acx - hw, acy + hh]]], dtype=np.int64))
@@ -322,8 +330,8 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 if cw >= 6 and ch >= 6:
                     fit_w, fit_h = cw, ch
                     acx, acy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
-            region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), img.shape, font_size_minimum)
-            hw, hh = fit_w / 2.0, fit_h / 2.0
+            region.font_size, _bw, _bh = _bubble_fit_layout(region, (fit_w, fit_h), img.shape, font_size_minimum)
+            hw, hh = _bw / 2.0, _bh / 2.0
             dst_points_list.append(
                 np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
                            [acx + hw, acy + hh], [acx - hw, acy + hh]]], dtype=np.int64))
