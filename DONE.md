@@ -3,6 +3,22 @@
 
 ---
 
+## MIT #183/#175 width-squeeze — narrow column fills tall balloon (2026-06-30)
+
+**Goal:** EN-source dialogue in a TALL balloon must fill the balloon height like the original (many narrow lines), not render as 2 wide lines with empty space below. Surfaced on Gal Yome no Himitsu EN ch1 p4 ("PEOPLE FROM OTHER DEPARTMENTS ARE WELCOME, DON'T YOU WANNA COME?") and user-flagged Thai targets ("ตัวเล็กแค่ 2 บรรทัด ทั้งๆ ที่ประโยคยาว").
+
+**Root cause:** `_bubble_fit_layout` fit the largest font that wraps inside the balloon WITHOUT force-breaking a word, then rendered at the FULL balloon width. A tall-but-not-wide balloon → few wide lines + a vertical gap; the font couldn't grow further (capped by the no-mid-word-break guard), so the gap stayed.
+
+**Change (TDD):**
+- Pure `squeeze_width(measure_h, full_w, min_w, box_h, factor=0.9)` in `render_overlap.py` (mirrors MangaTranslator `layout_engine.py` ×0.90 step): after the font is fit, narrow the wrap column step-by-step until the block would exceed the box height, or until the longest unbreakable token's width (floor) — so the text gains lines and fills the height, never force-breaking a word.
+- `_bubble_fit_font_size` → `_bubble_fit_layout`, now returns `(font, block_w, block_h)`; both bubble-fit callers (occ==1, occ>1) centre the squeezed block in the balloon.
+
+**Validation:** 36 `render_overlap` unit tests green (+3 for `squeeze_width`: narrows-tall-box / noop-when-full / stops-at-floor); golden/guard render suites byte-identical (`clean_layout`/legacy untouched). Benchmark (real backend config, MIT_BUBBLE_AREA_FIT=1): Gal Yome EN p4 tall balloon 2 wide → **6 narrow lines** filling height; One-Punch JA→EN dialogue/narration/SFX unchanged. Commit 94bab61 on `worktree-feat-mit-font-s1` (PR #433). ADR 024.
+
+**Relationship:** targeted stopgap inside the bubble-fit path; the general source-agnostic width-squeeze + Knuth–Plass (flag-gated, A/B) stays in PRD #434 / research #435 and reuses `squeeze_width` as-is.
+
+---
+
 ## MIT #175 dialogue sizing + #431 SFX overflow (2026-06-30)
 
 **Goal:** translated text must fill its speech balloon (not render tiny), and a stylized in-bubble word must not oversize and overflow the art — matching MangaTranslator. Surfaced on EN→TH (Gal Yome no Himitsu ch1 p4); the JA→EN One-Punch benchmark hid it.

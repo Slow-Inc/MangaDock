@@ -883,3 +883,31 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **11. KPI.** #302 slice 1 · two god-components −81 LOC combined · chapterAccess + zoomLevel pure + 22 tests · byte-identical · 0 regressions (bun 77/0, tsc clean).
 
 *Validation:* `bun test app/lib` 77/0 + `npx tsc --noEmit` clean per commit; manual walkthrough passed before merge. *Links:* #302, #292, branch `refactor/302-frontend-decompose`.
+
+---
+
+# 2026-06-30 — feat(MIT): width-squeeze fills tall balloon height (#183/#175; builds on #430/#431, ADR 023→024)
+
+**1. Type.** Render-quality behaviour change in the MIT bubble-fit sizing path; opt-in via `MIT_BUBBLE_AREA_FIT` (already on per ADR 023). Targeted stopgap of the source-agnostic wrap (PRD #434).
+
+**2. Trigger.** After ADR 023 made balloon dialogue fill its balloon, a **tall, not-wide** balloon still rendered as 2 wide lines + a vertical gap: the fit picked the largest font that wraps without force-breaking a word, then rendered at full balloon width, and the font could not grow further (the no-mid-word-break guard caps it). Surfaced on Gal Yome no Himitsu EN ch1 p4 ("PEOPLE FROM OTHER DEPARTMENTS…"); user-flagged the same on Thai targets ("ตัวเล็กแค่ 2 บรรทัด ทั้งๆ ที่ประโยคยาว").
+
+**3. Change (before → after).**
+- before: `_bubble_fit_font_size(region, bubble_wh, …) → font`; the caller rendered the wrapped block at the full balloon width.
+- after: pure `squeeze_width(measure_h, full_w, min_w, box_h, factor=0.9)` (MangaTranslator `layout_engine.py` ×0.90 step) narrows the wrap column until the block would exceed the box height or hit the longest-token floor; `_bubble_fit_font_size` → `_bubble_fit_layout` returns `(font, block_w, block_h)`; both bubble-fit callers (occ==1, occ>1) centre the squeezed block. Font is unchanged — width is traded for line count.
+
+**4. Seam / commit.** One pure helper in `render_overlap.py` + one call site in `_bubble_fit_layout`. TDD: `squeeze_width` tests RED→GREEN first. Commit 94bab61 on `worktree-feat-mit-font-s1` (PR #433).
+
+**5. Byte-identical proof.** `squeeze_width` is invoked only inside `_bubble_fit_layout`; `clean_layout` and legacy paths untouched → render golden/guard suites **byte-identical**. No-op by design when text already fills the height or the longest word ≈ balloon width.
+
+**6. Performance.** Negligible — the squeeze loop is ≤ ~30 `calc_horizontal` re-wraps per bubble-fit region at constant font (log-bounded by factor 0.9 from full width to floor), only on the bubble-fit path.
+
+**7. Quality / metrics.** Gal Yome EN p4 tall balloon 2 wide → **6 narrow lines** filling height; One-Punch JA→EN dialogue/narration/SFX **unchanged**. `test_render_overlap.py` 33 → **36** (+3: narrows-a-tall-box / noop-when-full / stops-at-floor).
+
+**8. Tech debt.** The fill-height layout decision is now a pure, unit-tested function rather than implicit in the render loop. Residual: scoped to dialogue-in-balloon; narration/captions + horizontal-source wrap generally stay in the flag-gated, A/B-decided source-agnostic path (PRD #434 / research #435), which reuses `squeeze_width` as-is.
+
+**9. Risk / rollback.** Revert the call in `_bubble_fit_layout` → ADR-023 full-width rendering; paths outside bubble-fit are byte-identical. No money/auth surface.
+
+**10. KPI.** #183/#175 residual closed · tall balloon 2 → 6 lines · +3 unit tests (36/0) · golden byte-identical · 0 regressions (One-Punch unchanged) · ADR 024.
+
+*Validation:* TDD; `pytest test/test_render_overlap.py` 36/0; render golden/guard byte-identical; benchmark via real backend config (MIT_BUBBLE_AREA_FIT=1) Gal Yome + One-Punch. *Risk/rollback:* revert the squeeze call. *Links:* #183, #175, #434, #435, ADR 023, ADR 024, branch `worktree-feat-mit-font-s1`.
