@@ -25,4 +25,5 @@
 - [Feedback: review+merge policy](feedback_review_merge_policy.md) — auto-merge PR เมื่อ CodeQL เขียว + 0 new fail แต่ **ต้อง review ด้วย skill /scrutinize ก่อน merge เสมอ**
 - [Reference: Frontend UI Libraries](reference_frontend_ui_libraries.md) — shadcn (UI primitives/Radix) vs React Bits (WebGL/GLSL effects); MCP setup และ pattern การใช้คู่กัน
 - [Project: Benchmark E2E flow](project_benchmark_e2e_flow.md) — รัน One-Punch benchmark E2E ผ่าน tunnel hayateotsu.space (Reader → อ่านตอน Benchmark → แปล→EN) + cache gotcha (re-translate ติด cache หลายชั้น → ใช้ direct render POST /translate); knobs ใน .env
+- [Project: Gal Yome EN benchmark](project_gal_yome_en_benchmark.md) — Gal Yome มี 2 version (ไทย+EN); benchmark EN→ไทย ต้องกด chip "EN" ข้าง "ตอนทั้งหมด" ก่อน (default ไทย!), ยืนยันด้วย counter 1/30 + "แปล → TH"; page 4 = บับเบิลทรงสูง; 524 รอบแรก→กดซ้ำ cache hit
 - [Project: cache:reset ordering](project_cache_reset_ordering.md) — Reader E2E ของ **code change** (renderConfigHash ไม่ขยับ) ต้อง **kill backend ก่อน → cache:reset → relaunch** ไม่งั้น L1 re-flush L3 กลับ (เห็น 3ms cached เก่าแทน 30-40s fresh); direct /translate/with-form/image เลี่ยง cache ได้
