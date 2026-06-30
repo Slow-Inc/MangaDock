@@ -187,7 +187,7 @@ def _region_territory(region):
     return (float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3])) if xy is not None else None
 
 
-def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int):
+def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None):
     """Render-layout rework: lay the translated text out as an upright horizontal block
     at a *small absolute* font, wrapped to a compact width, ready to be placed on the
     region's centre. Returns ``(font_size, block_w, block_h)`` — or ``None`` when the
@@ -201,25 +201,32 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     if xy is None:
         return None
     x1f, y1f, x2f, y2f = (float(v) for v in xy)
+    # #175 patch-path fix: these three quantities are PAGE-relative — the font's
+    # processing_scale (area→resolution), the wrap-width clamp (% of page width) and the
+    # generous max-wrap-height. In the per-region patch path ``img_shape`` is the small CROP
+    # (full-res but tiny area), which collapses processing_scale to its 0.5 floor → narration
+    # rendered ~3× too small while balloon dialogue (box-driven) stayed normal. Use the PAGE
+    # shape when the caller threads it; fall back to img_shape (full-page render → identical).
+    ps_shape = page_shape if page_shape is not None else img_shape
     # #175: scale the clean-layout font by processing_scale so it tracks page resolution
     # (same look on the benchmark, larger on higher-res pages where the fixed px was too small).
-    clean_fs = clean_layout_font_size(font_size_max, img_shape[0], img_shape[1], font_size_minimum)
+    clean_fs = clean_layout_font_size(font_size_max, ps_shape[0], ps_shape[1], font_size_minimum)
     # Footprint width = the region's own (source-text) bbox width, so the English breaks
     # where the source columns did — a narration stays a narrow tall block, not a wide
     # paragraph. (The balloon box is deliberately NOT used: narration boxes also get a
     # wide bubble_box from segmentation, which would re-widen them.)
-    wrap_w = clean_wrap_width(x2f - x1f, img_shape[1])
+    wrap_w = clean_wrap_width(x2f - x1f, ps_shape[1])
     # max_height is generous (full page) so wrapping is governed by width and the block
     # grows vertically — we place it on the centre regardless of the source box height.
     lines, widths = text_render.calc_horizontal(
-        clean_fs, region.translation, wrap_w, int(img_shape[0]),
+        clean_fs, region.translation, wrap_w, int(ps_shape[0]),
         language=getattr(region, 'target_lang', 'en_US'))
     block_w = max(widths) if widths else wrap_w
     block_h = max(1, len(lines)) * clean_fs * _LINE_HEIGHT
     return int(clean_fs), float(block_w), float(block_h)
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False):
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -345,7 +352,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # stylized legacy path). Off → byte-identical.
         sfx = getattr(region, 'sfx_rescued', False)
         if clean_layout and not sfx and region.translation and region.translation.strip():
-            laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max)
+            laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max, page_shape)
             if laid is not None:
                 clean_fs, block_w, block_h = laid
                 x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
@@ -522,14 +529,16 @@ async def dispatch(
     font_max_box_ratio: float = _MAX_FONT_BOX_RATIO,
     anti_overlap: bool = False,
     font_size_max: int = 0,
-    clean_layout: bool = False
+    clean_layout: bool = False,
+    page_shape=None
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
-    # Resize regions that are too small
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout)
+    # Resize regions that are too small. `page_shape` (full-page H,W) is threaded so clean-layout
+    # narration scales by page resolution even when `img` is a per-region crop (#175 patch-path).
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape)
 
     # TODO: Maybe remove intersections
 

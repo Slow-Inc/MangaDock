@@ -81,5 +81,6 @@ async def run_text_rendering(config, ctx, font_path):
                                           font_max_box_ratio=config.render.font_max_box_ratio,
                                           anti_overlap=config.render.anti_overlap,
                                           font_size_max=config.render.font_size_max,
-                                          clean_layout=config.render.clean_layout)
+                                          clean_layout=config.render.clean_layout,
+                                          page_shape=getattr(ctx, 'page_shape', None))
     return output
