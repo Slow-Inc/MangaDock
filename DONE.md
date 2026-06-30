@@ -15,6 +15,8 @@
 
 **Note:** does not change *which* regions go to clean-layout (the rw/bw discriminator still routes narration-in-large-bubble there); only fixes the size once routed.
 
+**Benchmark (deterministic, non-E2E):** `docs/reports/benchmarks/2026-06-30-clean-layout-page-scale.md` (+ comparison image) — narration 18px (crop, floored) → 35px (page), **~1.94×** uniform across all crop sizes; golden byte-identical.
+
 ---
 
 ## MIT #183/#175 width-squeeze — narrow column fills tall balloon (2026-06-30)
