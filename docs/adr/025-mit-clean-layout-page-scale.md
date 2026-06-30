@@ -25,3 +25,12 @@ Bubble-fit and legacy paths are untouched.
 - **Validated:** unit pin `clean_layout_font_size(20, crop)→floor` vs `(20, page)→35`; render golden/guard byte-identical (page_shape=None path); 38 render_overlap + patch_renderer + stages green. E2E (Gal Yome EN ch1 p14 → Thai): the previously-microscopic top-right narration renders as readable 3-line text; no crashes, nothing oversized.
 - **Scope/limits:** does not change *which* regions go to clean-layout (the rw/bw discriminator from #175 residual #2 still routes narration-in-large-bubble there). It only fixes the size once a region is in clean-layout. Tuning `MIT_FONT_SIZE_MAX` still controls the absolute base.
 - **Reversibility:** stop threading `page_shape` (or pass None) → clean-layout reverts to crop-scaled; all other paths byte-identical.
+
+## Addendum (2026-06-30) — display captions track the ORIGINAL lettering size
+
+The page-scale fix above made the clean-layout font a single **flat** size (`font_size_max` × page-scale ≈ 26px) for every clean-layout region. That is right for narration but **collapses a big stylized display caption to narration size**: measured on Gal Yome EN→Thai page 11, "LOVE IS FORBIDDEN" was lettered at 96px in the source yet rendered at the same ~26px as a 21px narration line (3.7× too small); "IN THIS COMPANY" 67px → 26px.
+
+**Refinement:** `clean_layout_target_fs(orig_fs, clean_fs_flat)` — narration (`orig ≤ flat`) returns the flat size **unchanged** (this ADR's behaviour byte-identical, no regression); a **display caption** (`orig > flat`, i.e. original lettering markedly larger than the flat clean font) renders near its **original** size (cap 120). `_clean_layout_dst` then wraps a sized-up caption to its own wider source footprint (avoids mid-word breaks) and shrinks only to keep the block within `1.6×` the caption's original height, never below flat.
+
+- **Validated:** `docs/reports/benchmarks/2026-06-30-clean-layout-caption-size.md` — page 11 captions now render large + clean-wrapped, matching original prominence; narration unchanged. +3 `test_render_overlap` cases (`clean_layout_target_fs`: narration-unchanged / display-tracks-original / cap); render_overlap+ocr_vlm 68/0.
+- **Limit/reversibility:** narration path is untouched, so reverting is just dropping the `orig > flat` branch (clean-layout reverts to the flat page-scaled size for all regions). Display detection is purely `orig_fs > clean_fs_flat` — no new model/heuristic. Overlapping-bubble loss (#436) is separate and still open.

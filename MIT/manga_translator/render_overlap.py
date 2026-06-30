@@ -185,3 +185,18 @@ def clean_layout_font_size(font_size_max: int, img_h: int, img_w: int, font_size
     fmin = font_size_minimum if (font_size_minimum and font_size_minimum > 0) else 8
     base = font_size_max if (font_size_max and font_size_max > 0) else max(fmin, round((img_h + img_w) / 130))
     return max(fmin, round(base * processing_scale(img_h, img_w)))
+
+
+def clean_layout_target_fs(orig_fs, clean_fs_flat: int, abs_cap: int = 120) -> int:
+    """#175 follow-up: pick the clean-layout font for a region from its ORIGINAL lettering size.
+
+    The flat clean font (``clean_layout_font_size``) is right for narration, but it collapses a
+    big stylized **display caption** to narration size: e.g. "LOVE IS FORBIDDEN" lettered at 96px
+    in the source rendered at the same ~26px flat as a 21px narration line — 3–4× too small vs the
+    original. So: narration (original lettering ``<= flat``) is returned unchanged (byte-identical
+    to the flat path); a display caption (``orig > flat``) renders near its ORIGINAL size so it
+    keeps its on-page prominence, capped at ``abs_cap`` for sanity. The caller then shrinks the
+    result to fit the caption's own footprint. Pure arithmetic."""
+    flat = max(1, int(clean_fs_flat or 0))
+    o = int(orig_fs or 0)
+    return flat if o <= flat else min(o, abs_cap)

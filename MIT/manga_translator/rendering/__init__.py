@@ -11,7 +11,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, display_sfx, bubble_fit_bounds, fills_bubble_width, squeeze_width, box_containment
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, clean_layout_target_fs, display_sfx, bubble_fit_bounds, fills_bubble_width, squeeze_width, box_containment
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -56,6 +56,11 @@ def count_text_length(text: str) -> float:
 # box so rounding/glyph slack can't touch the edge; _MAX_FONT_BOX_RATIO caps the
 # font at half the box height so a short line in a big balloon isn't a giant.
 _LINE_HEIGHT = 1.2
+# #175 follow-up: a display caption may render taller than its original footprint once the font
+# tracks the original size (the translation often needs more lines). Allow it to grow to this ×
+# the source box height before shrinking the font, so big captions stay prominent without
+# spilling far past where the original lettering sat.
+_CLEAN_DISPLAY_H_TOL = 1.6
 _FIT_MARGIN = 0.92
 _MAX_FONT_BOX_RATIO = 0.5
 
@@ -210,17 +215,33 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     ps_shape = page_shape if page_shape is not None else img_shape
     # #175: scale the clean-layout font by processing_scale so it tracks page resolution
     # (same look on the benchmark, larger on higher-res pages where the fixed px was too small).
-    clean_fs = clean_layout_font_size(font_size_max, ps_shape[0], ps_shape[1], font_size_minimum)
+    clean_fs_flat = clean_layout_font_size(font_size_max, ps_shape[0], ps_shape[1], font_size_minimum)
+    # #175 follow-up: a big stylized DISPLAY caption ("LOVE IS FORBIDDEN" lettered at 96px) was
+    # collapsing to the same flat ~26px as a 21px narration line. Size it near its ORIGINAL
+    # lettering instead so it keeps its prominence; narration (orig <= flat) is byte-identical.
+    clean_fs = clean_layout_target_fs(getattr(region, 'font_size', 0), clean_fs_flat)
     # Footprint width = the region's own (source-text) bbox width, so the English breaks
     # where the source columns did — a narration stays a narrow tall block, not a wide
     # paragraph. (The balloon box is deliberately NOT used: narration boxes also get a
     # wide bubble_box from segmentation, which would re-widen them.)
     wrap_w = clean_wrap_width(x2f - x1f, ps_shape[1])
+    # A sized-up display caption wraps to its own (wider) source footprint, not the narrowed
+    # narration column — otherwise the big glyphs break into a too-narrow column (mid-word
+    # breaks). Narration keeps the narrow clean wrap.
+    if clean_fs > clean_fs_flat:
+        wrap_w = max(wrap_w, int(x2f - x1f))
+    lang = getattr(region, 'target_lang', 'en_US')
     # max_height is generous (full page) so wrapping is governed by width and the block
     # grows vertically — we place it on the centre regardless of the source box height.
-    lines, widths = text_render.calc_horizontal(
-        clean_fs, region.translation, wrap_w, int(ps_shape[0]),
-        language=getattr(region, 'target_lang', 'en_US'))
+    lines, widths = text_render.calc_horizontal(clean_fs, region.translation, wrap_w, int(ps_shape[0]), language=lang)
+    # When a display caption was sized up, shrink it just enough that the wrapped block stays
+    # within ~its original vertical footprint — keeps the caption prominent without spilling far
+    # past where the source lettering sat. Never below the flat size (narration unaffected).
+    if clean_fs > clean_fs_flat:
+        max_h = (y2f - y1f) * _CLEAN_DISPLAY_H_TOL
+        while clean_fs > clean_fs_flat and max(1, len(lines)) * clean_fs * _LINE_HEIGHT > max_h:
+            clean_fs -= 2
+            lines, widths = text_render.calc_horizontal(clean_fs, region.translation, wrap_w, int(ps_shape[0]), language=lang)
     block_w = max(widths) if widths else wrap_w
     block_h = max(1, len(lines)) * clean_fs * _LINE_HEIGHT
     return int(clean_fs), float(block_w), float(block_h)
