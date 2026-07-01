@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, NotFoundException } from '@nestjs/common';
 import { PassThrough, Writable } from 'stream';
 import type { Request, Response } from 'express';
 import { UploadsController } from './uploads.controller';
@@ -87,5 +87,59 @@ describe('UploadsController streaming errors (FR-22 review)', () => {
     (res as unknown as Writable).emit('close');
 
     expect(stream.destroyed).toBe(true);
+  });
+});
+
+// FR-23: the controller maps a user-supplied path segment straight to a
+// StorageProvider key, and the disk provider joins that key with process.cwd().
+// Without a containment check a key like `../../../etc/passwd` escapes the
+// uploads/ root and serves an arbitrary file. These tests pin down that
+// traversal payloads are rejected (404) before any storage read happens, while
+// legitimate keys still serve.
+describe('UploadsController path traversal guard (FR-23)', () => {
+  const makeRes = () => {
+    const res = {} as unknown as Response;
+    res.setHeader = jest.fn() as unknown as Response['setHeader'];
+    res.send = jest.fn() as unknown as Response['send'];
+    return res;
+  };
+
+  const makeController = () => {
+    const storage = {
+      isRemote: false,
+      get: jest.fn().mockResolvedValue(Buffer.from('img-bytes')),
+      // No getStream: exercise the buffered get() path.
+    } as unknown as StorageProvider & { get: jest.Mock };
+    return { controller: new UploadsController(storage), storage };
+  };
+
+  // Only unencoded `../` reaches the filesystem as a real traversal here: Express
+  // keeps percent-encoding in req.path, so `..%2f` stays a literal segment inside
+  // the uploads root (harmless 404), it is not decoded into a separator.
+  const traversalPaths = [
+    '/uploads/../../../etc/passwd',
+    '/uploads/foo/../../../../etc/passwd',
+    '/uploads/../src/main.ts',
+  ];
+
+  it.each(traversalPaths)('rejects traversal payload %s without reading storage', async (p) => {
+    const { controller, storage } = makeController();
+    const req = { path: p } as unknown as Request;
+
+    await expect(controller.serve(req, makeRes())).rejects.toBeInstanceOf(NotFoundException);
+    expect((storage as unknown as { get: jest.Mock }).get).not.toHaveBeenCalled();
+  });
+
+  it('serves a legitimate key within the uploads root (no regression)', async () => {
+    const { controller, storage } = makeController();
+    const req = { path: '/uploads/avatars/user-1.png' } as unknown as Request;
+    const res = makeRes();
+
+    await controller.serve(req, res);
+
+    expect((storage as unknown as { get: jest.Mock }).get).toHaveBeenCalledWith(
+      'uploads/avatars/user-1.png',
+    );
+    expect(res.send).toHaveBeenCalled();
   });
 });
