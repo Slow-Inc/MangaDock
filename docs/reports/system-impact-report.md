@@ -15,6 +15,33 @@
 
 ---
 
+## 2026-07-02 — Wallet Security Hardening V1–V9: DB layer (feature / security)
+
+**Scope:** Backend (`wallet`, `unlock` modules) + Supabase DB · **Type:** Security hardening — DB layer completion · **Tests:** 78/78 backend unit tests green (unlock×7, wallet×63, controller×8); 0 new failures.
+
+**What & where:**
+- `Backend/migrations/2026-06-22-wallet-security-hardening.sql` — `wallet_tx_topup_ref_uidx` unique partial index on `wallet_transactions(reference_id) WHERE type='topup'`; drop dead numeric overloads of `add_coins_atomic`/`spend_coins_atomic`; 4-arg `purchase_unlock_atomic` (self-contained: reads price/status/creator inside txn)
+- `Backend/supabase-migration.sql` — mirrors the same DDL (reference file)
+- `Backend/src/unlock/unlock.service.spec.ts` — 7 unit tests covering all RPC paths
+- `Backend/src/wallet/wallet.service.spec.ts` — 3 SECURITY tests (amount mismatch, currency mismatch, non-SUCCEEDED status)
+- `Backend/src/wallet/wallet.controller.ts` — `@UseGuards(AuthGuard, TopupThrottleGuard)` on `POST /topup/create`
+
+**Why:** Core runtime security code (Xendit webhook HMAC, throttle guard, coin bounds) already in main. This PR adds the DB-level idempotency index and the atomic RPC that closes the TOCTOU window at the purchase step.
+
+**Before → After:**
+- Duplicate Xendit webhook → double topup credit possible / → DB-level unique index rejects second credit
+- `purchase_unlock_atomic` trusted caller-supplied `p_price`/`p_creator_uid` (TOCTOU) / → self-contained: reads from `chapter_versions` inside the transaction; raises `VERSION_NOT_FOUND`, `NOT_PUBLISHED`, `CREATOR_MISSING` before touching the ledger
+
+**Performance Δ:** not measured (additive DB index; no hot-path code changed).
+
+**Quality:** All error paths (INSUFFICIENT_FUNDS, VERSION_NOT_FOUND, NOT_PUBLISHED, CREATOR_MISSING) confirmed by unit tests via RPC error strings.
+
+**Validation:** 78 unit tests pass; `/scrutinize` review cleared 3 blockers before merge (duplicate TS import, stale pre-SELECT mocks, wrong SQL signature). Migration SQL pre-check query confirms 0 duplicate reference_ids before index creation.
+
+**Risk / rollback:** Additive — `IF NOT EXISTS` guards index; `CREATE OR REPLACE FUNCTION` is idempotent. Rollback: `DROP INDEX IF EXISTS wallet_tx_topup_ref_uidx; DROP FUNCTION IF EXISTS purchase_unlock_atomic(uuid,uuid,numeric,text)`. Old 6-arg overload dropped first by migration.
+
+**Links:** PR #463 (`feat/wallet-security-hardening → main`), commit `72502dd`.
+
 ## 2026-07-01 — Captcha re-prompt on translate 401 (bugfix / hotfix)
 
 **Scope:** Frontend (`MangaReader.tsx`, `useChapterTranslation.ts`, `mangaTranslatePage.ts` + test) · **Type:** Bug hotfix · **Tests:** frontend 138/138 green (+4); typecheck clean; live E2E screenshot.
