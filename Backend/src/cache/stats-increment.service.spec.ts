@@ -85,13 +85,14 @@ describe('StatsIncrementService', () => {
     return Number(client.eval.mock.calls[0].at(-1));
   }
 
-  it('floors TTL at 60s near midnight instead of clamping up to a full day', async () => {
+  it('floors the seconds-until-midnight base at 60s, then adds the flush grace period', async () => {
     const { svc, client } = makeService();
     jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-28T23:59:59.000Z'));
 
     await svc.recordChapterView('ch:1', 'manga:A', 'uid:x', '2026-05-28');
 
-    expect(ttlOf(client)).toBe(60);
+    // base = max(0, 60) = 60, plus 900s grace = 960 (still nowhere near a full day).
+    expect(ttlOf(client)).toBe(960);
   });
 
   it('computes true remaining seconds until midnight for a normal time of day', async () => {
@@ -100,7 +101,25 @@ describe('StatsIncrementService', () => {
 
     await svc.recordChapterView('ch:1', 'manga:A', 'uid:x', '2026-05-28');
 
-    // 23:59:59.999 − 12:00:00.000 = 43199.999s → floored to 43199 (not 86400).
-    expect(ttlOf(client)).toBe(43199);
+    // 23:59:59.999 − 12:00:00.000 = 43199.999s → floored to 43199, +900s grace = 44099 (not 86400).
+    expect(ttlOf(client)).toBe(44099);
+  });
+
+  it('keeps near-midnight keys alive past the flush worker worst-case post-midnight drain', async () => {
+    const { svc, client } = makeService();
+    // A view recorded 60s before midnight — the FR-30 floor (60s) alone would
+    // expire this key ~1min after midnight, before the StatsFlushWorker (5-min
+    // unaligned interval) reliably drains yesterday. The grace period must keep it.
+    const setAt = Date.parse('2026-05-28T23:59:00.000Z');
+    jest.spyOn(Date, 'now').mockReturnValue(setAt);
+
+    await svc.recordChapterView('ch:1', 'manga:A', 'uid:x', '2026-05-28');
+
+    const ttl = ttlOf(client);
+    // Comfortably covers the worst-case ~5-min flush-interval lag after midnight.
+    expect(ttl).toBeGreaterThanOrEqual(900);
+    // Concretely: the key must still exist >=5min past midnight when the worker runs.
+    const expiresAtMs = setAt + ttl * 1000;
+    expect(expiresAtMs).toBeGreaterThan(Date.parse('2026-05-29T00:05:00.000Z'));
   });
 });
