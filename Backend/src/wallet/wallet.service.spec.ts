@@ -373,7 +373,6 @@ describe('WalletService', () => {
         data: { uid: 'u1', amount_coins: 100, status: 'paid' },
         error: null,
       });
-      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 100, currency: 'THB' });
       mockRpc.mockResolvedValue({ data: [{ balance: 200 }], error: null });
       mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 100, currency: 'THB' });
 
@@ -461,7 +460,6 @@ describe('WalletService', () => {
         data: { uid: 'u1', amount_coins: 100, status: 'paid' },
         error: null,
       });
-      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 100, currency: 'THB' });
       mockRpc.mockResolvedValue({ data: [{ balance: 350 }], error: null });
       mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 100, currency: 'THB' });
 
@@ -498,7 +496,6 @@ describe('WalletService', () => {
         data: { uid: 'u1', amount_coins: 50, status: 'paid' },
         error: null,
       });
-      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 50, currency: 'THB' });
       mockRpc.mockResolvedValue({ data: [{ balance: 50 }], error: null });
       mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 50, currency: 'THB' });
 

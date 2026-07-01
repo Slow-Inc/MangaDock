@@ -19,7 +19,6 @@ import { TopupThrottleGuard } from './topup-throttle.guard';
 import { WalletService } from './wallet.service';
 import { WalletEventsService } from './wallet-events.service';
 import { CreateTopupDto } from './dto/create-topup.dto';
-import { TopupThrottleGuard } from './topup-throttle.guard';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 
 @Controller('wallet')
