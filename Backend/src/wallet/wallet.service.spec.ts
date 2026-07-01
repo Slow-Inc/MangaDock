@@ -555,6 +555,27 @@ describe('WalletService', () => {
       expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
     });
 
+    it('SECURITY: reverts claim and refuses credit when Xendit currency is not THB', async () => {
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
+        error: null,
+      });
+      // Xendit settled the matching numeric amount but in the wrong currency → must NOT credit
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 100, currency: 'USD' });
+
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-cur', status: 'SUCCEEDED' } },
+          WEBHOOK_TOKEN,
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockRpc).not.toHaveBeenCalled();          // no addCoins
+      expect(mockWalletEvents.emit).not.toHaveBeenCalled();
+      // claim reverted back to pending
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
+    });
+
     it('SECURITY: reverts claim and refuses credit when Xendit status is not SUCCEEDED', async () => {
       mockUpdateChain.maybeSingle.mockResolvedValue({
         data: { uid: 'u1', amount_coins: 100, status: 'paid' },
