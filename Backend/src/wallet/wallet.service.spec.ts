@@ -1,5 +1,5 @@
 import { WalletService } from './wallet.service';
-import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 
 describe('WalletService', () => {
   let service: WalletService;
@@ -668,6 +668,64 @@ describe('WalletService', () => {
       } finally {
         process.env.NODE_ENV = ORIGINAL;
       }
+    });
+
+    it('SECURITY: reverts claim and refuses credit when Xendit amount mismatches', async () => {
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
+        error: null,
+      });
+      // Xendit says only 10 was actually paid → must NOT credit 100
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'SUCCEEDED', amount: 10, currency: 'THB' });
+
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-mm', status: 'SUCCEEDED' } },
+          WEBHOOK_TOKEN,
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockRpc).not.toHaveBeenCalled();          // no addCoins
+      expect(mockWalletEvents.emit).not.toHaveBeenCalled();
+      // claim reverted back to pending
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
+    });
+
+    it('SECURITY: reverts claim and refuses credit when Xendit status is not SUCCEEDED', async () => {
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
+        error: null,
+      });
+      mockXendit.getPaymentRequest.mockResolvedValue({ status: 'PENDING', amount: 100, currency: 'THB' });
+
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-ns', status: 'SUCCEEDED' } },
+          WEBHOOK_TOKEN,
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
+    });
+
+    it('SECURITY: reverts claim and refuses credit when Xendit is unreachable', async () => {
+      mockUpdateChain.maybeSingle.mockResolvedValue({
+        data: { uid: 'u1', amount_coins: 100, status: 'paid' },
+        error: null,
+      });
+      mockXendit.getPaymentRequest.mockRejectedValue(new Error('network down'));
+
+      await expect(
+        service.processXenditWebhook(
+          { event: 'payment.succeeded', data: { payment_request_id: 'pr-down', status: 'SUCCEEDED' } },
+          WEBHOOK_TOKEN,
+        ),
+      ).rejects.toThrow(InternalServerErrorException);
+
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockWalletEvents.emit).not.toHaveBeenCalled();
+      expect(mockChain.update).toHaveBeenCalledWith({ status: 'pending' });
     });
   });
 
