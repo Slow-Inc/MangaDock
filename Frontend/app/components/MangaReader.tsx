@@ -47,6 +47,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [turnstileExiting, setTurnstileExiting] = useState(false);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
+  // Drop the stale HWID-bound clearance token and re-show the Turnstile modal.
+  // Shared by the page-fetch 401 path and the translate 401 path (#227) so both
+  // recover the same way instead of dead-ending.
+  const resetCaptcha = useCallback(() => {
+    localStorage.removeItem("cf_clearance_token");
+    setClearanceToken(null);
+    setTurnstilePassed(false);
+  }, []);
+
   // Current chapter state — can change via navigation
   const [currentChapterId, setCurrentChapterId] = useState(initialChapterId);
   const [currentChapterNumber, setCurrentChapterNumber] = useState(initialChapterNumber);
@@ -164,6 +173,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     // Series context (#157): the Backend resolves title/synopsis from the
     // catalog so the translator knows which manga it is translating.
     mangaId,
+    // Captcha expiry mid-translate (#227): drop the stale clearance token and
+    // re-open the Turnstile modal — same reset the page-fetch 401 path uses.
+    onCaptchaExpired: resetCaptcha,
   });
 
   // Perceived-progress strings: ticking seconds + live MIT stage + honest ETA
@@ -534,9 +546,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     })
       .then((r) => {
         if (r.status === 401) {
-          localStorage.removeItem('cf_clearance_token');
-          setClearanceToken(null);
-          setTurnstilePassed(false);
+          resetCaptcha();
           throw new Error("unauthorized");
         }
         if (!r.ok) throw new Error("not ok");
@@ -565,7 +575,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       .catch(() => { setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300); });
 
     return () => { document.body.style.overflow = ""; };
-  }, [chapterId, turnstilePassed, clearanceToken]);
+  }, [chapterId, turnstilePassed, clearanceToken, resetCaptcha]);
   // Pan must reset on every page change; the page is set from many sites
   // (buttons, keyboard, IntersectionObserver), so this effect is the choke point.
   // eslint-disable-next-line react-hooks/set-state-in-effect
