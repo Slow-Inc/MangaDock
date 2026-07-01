@@ -617,4 +617,44 @@ REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text, text) FRO
 REVOKE EXECUTE ON FUNCTION spend_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION cast_vote_atomic(uuid, text, uuid, integer) FROM anon, authenticated, PUBLIC;
 
+-- ─── 9. TRENDING MANGA RPC (FR-16) ───────────────────────────────────────────
+-- Group + rank trending manga in Postgres instead of pulling a 200-row sample into
+-- Node and tallying it (forum.service.ts getTrendingManga). The old JS path
+-- undercounted / mis-ranked once a manga's within-window posts spilled past the
+-- 200-row sample. This RPC reproduces the SAME filter semantics the JS tally used —
+-- non-null target_manga_id, non-null + non-empty target_manga_title, created within
+-- the last 7 days — but COUNT/ORDER run across the full table so ranking is correct
+-- at any post volume. title/cover are display tags cached identically on every post
+-- for a given manga, so max() picks a representative value. Backed by the existing
+-- idx_forum_posts_manga_created_at (target_manga_id, created_at DESC) index.
+--
+-- Deliberate improvement over the old JS tally: excludes soft-deleted posts
+-- (deleted_at IS NULL) from the trending count. The old JS tally never filtered
+-- deleted_at (an oversight), so this is a decided behavior change, not a
+-- like-for-like port. Consistent with the rest of the forum module's soft-delete
+-- convention (see idx_forum_posts_deleted_at).
+--
+-- Read-only over already-public forum data (the trending endpoint exposes exactly
+-- this), so it is a plain STABLE function — no SECURITY DEFINER, no REVOKE needed.
+CREATE OR REPLACE FUNCTION get_trending_manga(p_limit integer DEFAULT 5)
+RETURNS TABLE(manga_id text, manga_title text, manga_cover text, post_count bigint)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    target_manga_id                 AS manga_id,
+    max(target_manga_title)         AS manga_title,
+    max(target_manga_cover)         AS manga_cover,
+    count(*)                        AS post_count
+  FROM forum_posts
+  WHERE target_manga_id IS NOT NULL
+    AND target_manga_title IS NOT NULL
+    AND target_manga_title <> ''
+    AND created_at >= now() - interval '7 days'
+    AND deleted_at IS NULL
+  GROUP BY target_manga_id
+  ORDER BY post_count DESC
+  LIMIT p_limit;
+$$;
+
 COMMIT;
