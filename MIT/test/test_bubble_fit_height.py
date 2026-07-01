@@ -41,3 +41,27 @@ def test_tall_balloon_grows_font_to_fill_height_when_word_has_headroom():
     hfill = bh / 325.0
     assert font >= 40, f'font stayed small ({font}); should grow toward the width ceiling (~44)'
     assert hfill >= 0.45, f'height still under-filled (Hfill {hfill:.2f}); tall balloon left empty'
+
+
+# ── SIMPLE-A: a long unbreakable Thai word may use the bubble BBOX width (capped) ─────────────
+
+def test_long_thai_word_uses_bubble_bbox_width_ceiling_in_narrow_balloon():
+    # "ต้องการถุงพลาสติกไหมครับ" — the word ถุงพลาสติก caps the font at ~24 against the 122px
+    # safe-interior column. Letting ONLY that word use the bubble's bbox width (147, capped ×0.92)
+    # grows it ~20% while wrapping stays in the safe interior. (Multi-agent consensus SIMPLE-A.)
+    text_render.set_font(_FONT)
+    region = SimpleNamespace(translation='ต้องการถุงพลาสติกไหมครับ', target_lang='th_TH')
+    font_safe, _, _ = _bubble_fit_layout(region, (122, 319), (1000, 1000), 8)
+    font_bbox, bw, _ = _bubble_fit_layout(region, (122, 319), (1000, 1000), 8, bubble_bbox_w=147)
+    assert font_bbox > font_safe, f'bbox word-ceiling did not grow the font ({font_bbox} vs {font_safe})'
+    assert bw <= 0.92 * 147 + 1.0, f'block width {bw:.0f} exceeded the 0.92×bbox cap (135)'
+
+
+def test_bubble_bbox_ceiling_is_noop_for_wide_balloon():
+    # a wide balloon where safe ≈ bbox: passing bubble_bbox_w must NOT change the font (the cap
+    # min(0.92·bbox, 1.20·safe) collapses to the safe width) — no One-Punch regression.
+    text_render.set_font(_FONT)
+    region = SimpleNamespace(translation='THIS BRAT IS GONNA GET US ALL KILLED', target_lang='en_US')
+    font_none, _, _ = _bubble_fit_layout(region, (240, 120), (1000, 1000), 8)
+    font_bbox, _, _ = _bubble_fit_layout(region, (240, 120), (1000, 1000), 8, bubble_bbox_w=245)
+    assert font_bbox == font_none == 28
