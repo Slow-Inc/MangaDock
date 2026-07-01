@@ -73,4 +73,34 @@ describe('StatsIncrementService', () => {
       svc.recordChapterView('ch:1', 'manga:A', 'uid:x', '2026-05-28'),
     ).resolves.toBeUndefined();
   });
+
+  /**
+   * TTL = seconds until end of the stat's UTC day, so a daily-rolling counter
+   * expires at midnight rather than lingering. The floor is 60s (never less),
+   * NOT a full day: the old `Math.max(remaining, 86_400)` clamped every TTL up
+   * to a full day (remaining is always ≤ a day for today), so keys outlived
+   * their day. Last EVAL arg is String(ttl).
+   */
+  function ttlOf(client: { eval: jest.Mock }): number {
+    return Number(client.eval.mock.calls[0].at(-1));
+  }
+
+  it('floors TTL at 60s near midnight instead of clamping up to a full day', async () => {
+    const { svc, client } = makeService();
+    jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-28T23:59:59.000Z'));
+
+    await svc.recordChapterView('ch:1', 'manga:A', 'uid:x', '2026-05-28');
+
+    expect(ttlOf(client)).toBe(60);
+  });
+
+  it('computes true remaining seconds until midnight for a normal time of day', async () => {
+    const { svc, client } = makeService();
+    jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-28T12:00:00.000Z'));
+
+    await svc.recordChapterView('ch:1', 'manga:A', 'uid:x', '2026-05-28');
+
+    // 23:59:59.999 − 12:00:00.000 = 43199.999s → floored to 43199 (not 86400).
+    expect(ttlOf(client)).toBe(43199);
+  });
 });
