@@ -1,6 +1,17 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 
+// Atomic INCR + first-hit EXPIRE in one round-trip (same named-Lua pattern as
+// ElectionService / StatsIncrementService). Sets the TTL only when the key is
+// newly created (n == 1), leaving it untouched on later hits so the window can't
+// slide. Closes the incr-then-expire race that could leave an immortal key with
+// no TTL (counter never resets → user throttled forever).
+const INCR_EXPIRE_SCRIPT = `
+local n = redis.call('INCR', KEYS[1])
+if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+return n
+`;
+
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
@@ -129,6 +140,22 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     if (!this.available) return 0;
     try {
       return await this.client!.incr(key);
+    } catch {
+      this.isConnected = false;
+      return 0;
+    }
+  }
+
+  /**
+   * Atomic increment with a guaranteed TTL on the first hit (one round-trip via
+   * Lua). Returns the post-increment count, or 0 when Redis is unavailable
+   * (fail-open, matching incr()). Use for rate-limit counters where a separate
+   * incr()+expire() would risk an immortal key if the process died between them.
+   */
+  async incrWithTtl(key: string, ttlSeconds: number): Promise<number> {
+    if (!this.available) return 0;
+    try {
+      return (await (this.client as any).eval(INCR_EXPIRE_SCRIPT, 1, key, String(ttlSeconds))) as number;
     } catch {
       this.isConnected = false;
       return 0;
