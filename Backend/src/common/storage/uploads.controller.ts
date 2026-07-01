@@ -32,6 +32,15 @@ export class UploadsController {
     const filePath = req.path.replace(/^\/uploads\//, '');
     if (!filePath || filePath === req.path) throw new NotFoundException();
     const key = `uploads/${filePath}`;
+    // Path-traversal guard (FR-23): the disk provider joins this key with
+    // process.cwd(), so a key like `../../../etc/passwd` would escape the
+    // uploads/ root. Resolve both to absolute paths and reject anything that
+    // lands outside root — a string-prefix check on the raw input is bypassable.
+    const uploadsRoot = path.resolve(process.cwd(), 'uploads');
+    const resolved = path.resolve(process.cwd(), key);
+    if (resolved !== uploadsRoot && !resolved.startsWith(uploadsRoot + path.sep)) {
+      throw new NotFoundException();
+    }
     const ext = path.extname(filePath).toLowerCase();
     const contentType = EXT_TO_MIME[ext] ?? 'application/octet-stream';
     try {
