@@ -12,6 +12,10 @@ async function getMermaid() {
       startOnLoad: false,
       theme: 'dark',
       securityLevel: 'loose',
+      flowchart: {
+        curve: 'step',
+        useMaxWidth: false,
+      },
       themeVariables: {
         background: '#0f1118',
         mainBkg: '#1c1f2e',
