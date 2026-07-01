@@ -27,9 +27,9 @@ describe('L3DiskService', () => {
   });
 
   // Cycle 2 — Round-trip
-  it('write() then readAll() round-trips the entry with the original key', () => {
+  it('write() then readAll() round-trips the entry with the original key', async () => {
     const entry = makeEntry({ hello: 'world' }, 'manga:123');
-    service.write('manga:123', entry);
+    await service.write('manga:123', entry);
 
     const result = service.readAll();
     expect(result.size).toBe(1);
@@ -37,8 +37,8 @@ describe('L3DiskService', () => {
   });
 
   // Cycle 3 — Key sanitization
-  it('write() sanitizes unsafe filename chars but readAll() restores the original key', () => {
-    service.write('wallet:user:456', makeEntry('coins'));
+  it('write() sanitizes unsafe filename chars but readAll() restores the original key', async () => {
+    await service.write('wallet:user:456', makeEntry('coins'));
 
     const files = fs.readdirSync(tmpDir);
     expect(files.every((f) => !f.includes(':'))).toBe(true);
@@ -46,8 +46,8 @@ describe('L3DiskService', () => {
   });
 
   // Cycle 7 (#147) — compact on-disk format; legacy pretty files still readable
-  it('write() stores compact JSON (no pretty-print indentation)', () => {
-    service.write('manga:9', makeEntry({ a: 1, b: [1, 2] }));
+  it('write() stores compact JSON (no pretty-print indentation)', async () => {
+    await service.write('manga:9', makeEntry({ a: 1, b: [1, 2] }));
 
     const file = fs.readdirSync(tmpDir).find((f) => f.endsWith('.json'))!;
     const raw = fs.readFileSync(path.join(tmpDir, file), 'utf-8');
@@ -80,20 +80,20 @@ describe('L3DiskService', () => {
   });
 
   // Cycle 5 — Disk write error resilience
-  it('write() swallows disk errors without throwing', () => {
+  it('write() swallows disk errors without throwing', async () => {
     // Use a plain file as the cache dir — any write inside it will fail (ENOTDIR)
     const fakeDir = path.join(tmpDir, 'impostor.json');
     fs.writeFileSync(fakeDir, '{}', 'utf-8');
     const svc = new L3DiskService(fakeDir);
-    expect(() => svc.write('key', makeEntry('x'))).not.toThrow();
+    await expect(svc.write('key', makeEntry('x'))).resolves.toBeUndefined();
   });
 
   // FR-31 (#401) — filename collision: hash/encode so distinct keys never collide.
   // Under the old naive sanitizer, ':' and '/' both mapped to '_', so 'a:b' and
   // 'a/b' collided on one file and silently overwrote each other.
-  it('write() gives keys that collide under naive sanitization distinct files (FR-31)', () => {
-    service.write('a:b', makeEntry('first'));
-    service.write('a/b', makeEntry('second'));
+  it('write() gives keys that collide under naive sanitization distinct files (FR-31)', async () => {
+    await service.write('a:b', makeEntry('first'));
+    await service.write('a/b', makeEntry('second'));
 
     const jsonFiles = fs.readdirSync(tmpDir).filter((f) => f.endsWith('.json'));
     expect(jsonFiles.length).toBe(2); // two distinct files, no collision
@@ -106,18 +106,16 @@ describe('L3DiskService', () => {
   // FR-31 (#401) — atomic write: write to *.tmp then rename. A failure at the
   // rename step must never expose a partial/corrupt file at the final path,
   // and must not leave an orphaned .tmp behind.
-  it('write() never leaves a partial file at the final path when the rename fails midway (FR-31)', () => {
-    service.write('atomic:key', makeEntry('good-old-value'));
+  it('write() never leaves a partial file at the final path when the rename fails midway (FR-31)', async () => {
+    await service.write('atomic:key', makeEntry('good-old-value'));
     const finalName = fs.readdirSync(tmpDir).find((f) => f.endsWith('.json'))!;
     const finalPath = path.join(tmpDir, finalName);
     const oldContent = fs.readFileSync(finalPath, 'utf-8');
 
     const renameSpy = jest
       .spyOn(service as any, 'renameFile')
-      .mockImplementation(() => {
-        throw new Error('simulated crash during rename');
-      });
-    service.write('atomic:key', makeEntry('new-value-that-must-not-corrupt'));
+      .mockRejectedValue(new Error('simulated crash during rename'));
+    await service.write('atomic:key', makeEntry('new-value-that-must-not-corrupt'));
     renameSpy.mockRestore();
 
     // Final path still holds the complete old content — never a partial write.
@@ -208,75 +206,75 @@ describe('L3DiskService — write watchdog (#45)', () => {
   });
 
   // Cycle W1 — successful write resets the failure counter
-  it('write() resets consecutive failure counter on success — no CRITICAL after reset', () => {
+  it('write() resets consecutive failure counter on success — no CRITICAL after reset', async () => {
     const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
     let shouldFail = false;
-    jest.spyOn(svc as any, 'writeFile').mockImplementation(() => {
+    jest.spyOn(svc as any, 'writeFile').mockImplementation(async () => {
       if (shouldFail) throw new Error('disk full');
     });
 
     // Two failures
     shouldFail = true;
-    svc.write('key-1', makeEntry(1));
-    svc.write('key-2', makeEntry(2));
+    await svc.write('key-1', makeEntry(1));
+    await svc.write('key-2', makeEntry(2));
 
     // Success resets counter
     shouldFail = false;
-    svc.write('key-ok', makeEntry('ok'));
+    await svc.write('key-ok', makeEntry('ok'));
 
     // One more failure — should NOT trigger CRITICAL (counter was reset, only 1 failure)
     shouldFail = true;
-    svc.write('key-3', makeEntry(3));
+    await svc.write('key-3', makeEntry(3));
 
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
   // Cycle W2 — CRITICAL log emitted when threshold reached
-  it('write() emits a CRITICAL-level log when consecutive failures reach the threshold', () => {
+  it('write() emits a CRITICAL-level log when consecutive failures reach the threshold', async () => {
     const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
-    jest.spyOn(svc as any, 'writeFile').mockImplementation(() => { throw new Error('ENOSPC'); });
+    jest.spyOn(svc as any, 'writeFile').mockRejectedValue(new Error('ENOSPC'));
 
     for (let i = 0; i < CONSECUTIVE_FAIL_THRESHOLD; i++) {
-      svc.write(`key-${i}`, makeEntry(i));
+      await svc.write(`key-${i}`, makeEntry(i));
     }
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('CRITICAL'));
   });
 
   // Cycle W3 — CRITICAL log fires exactly once even with many extra failures
-  it('write() emits the CRITICAL log exactly once per failure run, not on every failure after threshold', () => {
+  it('write() emits the CRITICAL log exactly once per failure run, not on every failure after threshold', async () => {
     const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
-    jest.spyOn(svc as any, 'writeFile').mockImplementation(() => { throw new Error('ENOSPC'); });
+    jest.spyOn(svc as any, 'writeFile').mockRejectedValue(new Error('ENOSPC'));
 
     for (let i = 0; i < CONSECUTIVE_FAIL_THRESHOLD + 5; i++) {
-      svc.write(`key-${i}`, makeEntry(i));
+      await svc.write(`key-${i}`, makeEntry(i));
     }
 
     expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 
   // Cycle W4 — CRITICAL can fire again after successful reset
-  it('write() emits CRITICAL again after a successful write resets the consecutive counter', () => {
+  it('write() emits CRITICAL again after a successful write resets the consecutive counter', async () => {
     const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
     let shouldFail = true;
-    jest.spyOn(svc as any, 'writeFile').mockImplementation(() => {
+    jest.spyOn(svc as any, 'writeFile').mockImplementation(async () => {
       if (shouldFail) throw new Error('ENOSPC');
     });
 
     // First failure run — triggers CRITICAL
     for (let i = 0; i < CONSECUTIVE_FAIL_THRESHOLD; i++) {
-      svc.write(`key-fail-${i}`, makeEntry(i));
+      await svc.write(`key-fail-${i}`, makeEntry(i));
     }
     expect(errorSpy).toHaveBeenCalledTimes(1);
 
     // Success resets counter
     shouldFail = false;
-    svc.write('key-ok', makeEntry('ok'));
+    await svc.write('key-ok', makeEntry('ok'));
 
     // Second failure run — CRITICAL fires again
     shouldFail = true;
     for (let i = 0; i < CONSECUTIVE_FAIL_THRESHOLD; i++) {
-      svc.write(`key-fail2-${i}`, makeEntry(i));
+      await svc.write(`key-fail2-${i}`, makeEntry(i));
     }
     expect(errorSpy).toHaveBeenCalledTimes(2);
   });

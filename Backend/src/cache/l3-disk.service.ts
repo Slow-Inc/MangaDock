@@ -44,12 +44,12 @@ export class L3DiskService {
     return map;
   }
 
-  write<T>(key: string, entry: CacheEntry<T>): void {
+  async write<T>(key: string, entry: CacheEntry<T>): Promise<void> {
     try {
       const filePath = path.join(this.cacheDir, `${this.fileNameForKey(key)}.json`);
       // Compact — these files are machine-read only; pretty-print cost ~25%
       // extra bytes on every periodic flush (#147)
-      this.writeFile(filePath, JSON.stringify({ ...entry, key }));
+      await this.writeFile(filePath, JSON.stringify({ ...entry, key }));
       this.consecutiveWriteFailures = 0;
       this.criticalAlertFired = false;
     } catch (err) {
@@ -114,14 +114,14 @@ export class L3DiskService {
    * half-written file, even if the process is killed mid-write. On any failure
    * the tmp file is removed so no orphan is left behind. (FR-31)
    */
-  protected writeFile(filePath: string, content: string): void {
+  protected async writeFile(filePath: string, content: string): Promise<void> {
     const tmpPath = `${filePath}.tmp`;
     try {
-      fs.writeFileSync(tmpPath, content, 'utf-8');
-      this.renameFile(tmpPath, filePath);
+      await fs.promises.writeFile(tmpPath, content, 'utf-8');
+      await this.renameFile(tmpPath, filePath);
     } catch (err) {
       try {
-        fs.unlinkSync(tmpPath);
+        await fs.promises.unlink(tmpPath);
       } catch {
         /* tmp may not exist / already cleaned — nothing to do */
       }
@@ -130,7 +130,7 @@ export class L3DiskService {
   }
 
   /** Isolated rename seam (atomic commit step) — overridable for testing. */
-  protected renameFile(from: string, to: string): void {
-    fs.renameSync(from, to);
+  protected async renameFile(from: string, to: string): Promise<void> {
+    await fs.promises.rename(from, to);
   }
 }
