@@ -78,7 +78,8 @@ export class ForumService {
         author:profiles(display_name, photo_url, role),
         comments:forum_comments(count)
       `, { count: 'exact' })
-      .is('deleted_at', null);
+      .is('deleted_at', null)
+      .is('comments.deleted_at', null);
 
     if (category) query = query.eq('category', category);
     if (mangaId) query = query.eq('target_manga_id', mangaId);
@@ -130,6 +131,7 @@ export class ForumService {
       `)
       .eq('id', id)
       .is('deleted_at', null)
+      .is('comments.deleted_at', null)
       .single();
 
     if (error || !data) throw new NotFoundException('Post not found');
@@ -220,6 +222,7 @@ export class ForumService {
         .select('*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)')
         .eq('author_uid', uid)
         .is('deleted_at', null)
+        .is('comments.deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(20),
       this.db.from('forum_comments')
@@ -252,7 +255,8 @@ export class ForumService {
         .from('forum_posts')
         .select('*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)')
         .in('id', likedPostIds)
-        .is('deleted_at', null);
+        .is('deleted_at', null)
+        .is('comments.deleted_at', null);
       likedPostsRaw = data ?? [];
     }
 
