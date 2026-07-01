@@ -30,10 +30,21 @@ export class UploadsController {
     const filePath = req.path.replace(/^\/uploads\//, '');
     if (!filePath || filePath === req.path) throw new NotFoundException();
     const key = `uploads/${filePath}`;
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = EXT_TO_MIME[ext] ?? 'application/octet-stream';
     try {
+      // Prefer streaming (remote R2) so a large object is piped straight to the
+      // response instead of being buffered whole in memory. getStream checks the
+      // upstream status before returning, so a missing key throws here — before
+      // any bytes are written — and still surfaces as a 404.
+      if (this.storage.getStream) {
+        const stream = await this.storage.getStream(key);
+        res.setHeader('content-type', contentType);
+        res.setHeader('cache-control', 'public, max-age=3600, stale-while-revalidate=86400');
+        stream.pipe(res);
+        return;
+      }
       const buf = await this.storage.get(key);
-      const ext = path.extname(filePath).toLowerCase();
-      const contentType = EXT_TO_MIME[ext] ?? 'application/octet-stream';
       res.setHeader('content-type', contentType);
       res.setHeader('cache-control', 'public, max-age=3600, stale-while-revalidate=86400');
       res.send(buf);
