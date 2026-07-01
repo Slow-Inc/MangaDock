@@ -44,7 +44,7 @@ class FluxKleinInpainter(OfflineInpainter):
 
         gguf_path = hf_hub_download(self._GGUF_REPO, self._GGUF_FILE)
         base_dir = snapshot_download(
-            self._BASE_REPO, ignore_patterns=["transformer/*", "flux-2-klein-4b.safetensors"])
+            self._BASE_REPO, ignore_patterns=["transformer/*.safetensors", "flux-2-klein-4b.safetensors"])
         transformer = Flux2Transformer2DModel.from_single_file(
             gguf_path, quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
             config=os.path.join(base_dir, "transformer"), torch_dtype=torch.bfloat16)
@@ -95,7 +95,7 @@ class FluxKleinInpainter(OfflineInpainter):
         if base_dir is None:                       # embed was a cache hit → still need the base dir
             from huggingface_hub import snapshot_download
             base_dir = snapshot_download(
-                self._BASE_REPO, ignore_patterns=["transformer/*", "flux-2-klein-4b.safetensors"])
+                self._BASE_REPO, ignore_patterns=["transformer/*.safetensors", "flux-2-klein-4b.safetensors"])
 
         embed_dtype = torch.bfloat16
         embed_device = device if device.startswith("cuda") else "cpu"
