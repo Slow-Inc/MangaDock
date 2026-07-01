@@ -435,7 +435,14 @@ export class UsersService {
       throw new Error(`Failed to export history: ${error.message}`);
     }
 
-    const escape = (v: unknown) => String(v ?? '').replace(/"/g, '""');
+    // CSV-injection guard: prefix a leading '=', '+', '-', or '@' with a single
+    // quote so spreadsheet apps treat the cell as text, not a formula. Escaping
+    // (double the quotes) runs after, so the quoting stays intact.
+    const escape = (v: unknown) => {
+      const s = String(v ?? '');
+      const guarded = /^[=+\-@]/.test(s) ? `'${s}` : s;
+      return guarded.replace(/"/g, '""');
+    };
 
     const rows = (data ?? []).map((row) => {
       const r = row as Record<string, unknown>;
