@@ -25,6 +25,15 @@ import { useToast } from "./ToastContext";
 
 const API_BASE = "/api/proxy";
 const DEFAULT_PUBLIC_SITE_URL = "http://localhost:4000";
+const NATIVE_AUTH_TIMEOUT_MS = 120_000;
+
+declare global {
+  interface Window {
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void;
+    };
+  }
+}
 
 // ─── AppUser — Unified user interface for UI components ───────────────
 export interface AppUser {
@@ -197,6 +206,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<Session | null>(null);
   const supabaseUserRef = useRef<SupabaseUser | null>(null);
   const lastUidRef = useRef<string | null>(null);
+  const pendingNativeAuthRef = useRef<{
+    resolve: () => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
 
   const showLoginPrompt = useCallback(() => {
     showToast({
@@ -253,6 +267,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isNativeWebView = () =>
+    typeof window !== "undefined" && !!window.ReactNativeWebView;
+
+  const startNativeOAuth = (provider: "google" | "facebook"): Promise<void> => {
+    if (!isNativeWebView()) {
+      return Promise.reject(new Error("Native auth bridge is not available"));
+    }
+
+    pendingNativeAuthRef.current?.reject(new Error("Native auth request was replaced"));
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pendingNativeAuthRef.current = null;
+        reject(Object.assign(new Error("Native login timed out"), { code: "auth/native-timeout" }));
+      }, NATIVE_AUTH_TIMEOUT_MS);
+
+      pendingNativeAuthRef.current = { resolve, reject, timer };
+      window.ReactNativeWebView?.postMessage(JSON.stringify({
+        type: "mangadock:oauth:start",
+        provider,
+      }));
+    });
+  };
+
   useEffect(() => {
     // Wire token suppliers for userCache and readingHistory
     setTokenSupplier(getIdToken);
@@ -307,6 +345,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    const onNativeAuthMessage = async (event: MessageEvent) => {
+      const payload = (() => {
+        if (typeof event.data === "string") {
+          try {
+            return JSON.parse(event.data) as Record<string, unknown>;
+          } catch {
+            return null;
+          }
+        }
+        return event.data && typeof event.data === "object"
+          ? event.data as Record<string, unknown>
+          : null;
+      })();
+
+      if (!payload || payload.type !== "mangadock:native-auth:session") return;
+
+      const pending = pendingNativeAuthRef.current;
+      pendingNativeAuthRef.current = null;
+      if (pending) clearTimeout(pending.timer);
+
+      const error = typeof payload.error === "string" ? payload.error : null;
+      if (error) {
+        pending?.reject(Object.assign(new Error(error), { code: "auth/native-oauth-failed" }));
+        return;
+      }
+
+      const accessToken = typeof payload.access_token === "string" ? payload.access_token : null;
+      const refreshToken = typeof payload.refresh_token === "string" ? payload.refresh_token : null;
+
+      if (!accessToken || !refreshToken) {
+        pending?.reject(Object.assign(new Error("Native login did not return a session"), { code: "auth/native-no-session" }));
+        return;
+      }
+
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (setSessionError) {
+        pending?.reject(setSessionError);
+        return;
+      }
+
+      pending?.resolve();
+    };
+
+    window.addEventListener("message", onNativeAuthMessage);
+    return () => window.removeEventListener("message", onNativeAuthMessage);
   }, []);
 
   /**
@@ -398,6 +488,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    if (isNativeWebView()) {
+      await startNativeOAuth("google");
+      reloadPage();
+      return;
+    }
+
     const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -409,6 +505,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithFacebook = async () => {
+    if (isNativeWebView()) {
+      await startNativeOAuth("facebook");
+      reloadPage();
+      return;
+    }
+
     const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "facebook",
