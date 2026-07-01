@@ -4,7 +4,7 @@ test('verify mermaid rendering on docs page', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
   // Go to the docs page via cloudflared tunnel
-  await page.goto('https://hayateotsu.space/docs');
+  await page.goto('http://localhost:4000/docs');
   await page.waitForTimeout(3000); 
 
   // Locate the sidebar link to 'agentic-workflow-presentation'
@@ -44,3 +44,4 @@ test('verify mermaid rendering on docs page', async ({ page }) => {
   await page.screenshot({ path: 'C:/Users/xenod/.gemini/antigravity/brain/10f528cf-9ea0-4f1a-93b3-b3c02935c3f7/mermaid_rendering_e2e.png' });
   console.log('E2E Screenshot captured successfully!');
 });
+

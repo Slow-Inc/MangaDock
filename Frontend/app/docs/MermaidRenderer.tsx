@@ -10,16 +10,34 @@ async function getMermaid() {
   if (!mermaidInitialized) {
     mermaid.initialize({
       startOnLoad: false,
-      theme: 'neutral',
-      securityLevel: 'strict',
+      theme: 'dark',
+      securityLevel: 'loose',
       themeVariables: {
-        background: 'transparent',
+        background: '#0f1118',
+        mainBkg: '#1c1f2e',
+        nodeBorder: '#4a90d9',
+        clusterBkg: '#1a1d2b',
+        clusterBorder: '#3a4060',
+        titleColor: '#e8eaf6',
+        edgeLabelBackground: '#1c1f2e',
+        lineColor: '#6baed6',
+        fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+        fontSize: '14px',
+        primaryColor: '#1c2a3e',
+        primaryTextColor: '#e8eaf6',
+        primaryBorderColor: '#4a90d9',
+        secondaryColor: '#1a2030',
+        tertiaryColor: '#141824',
+        labelBackground: '#1c1f2e',
+        textColor: '#c9d1e0',
+        nodeTextColor: '#e8eaf6',
       }
     });
     mermaidInitialized = true;
   }
   return mermaid;
 }
+
 
 export default function MermaidRenderer({ chart }: { chart: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,7 +55,11 @@ export default function MermaidRenderer({ chart }: { chart: string }) {
       })
       .then((result) => {
         if (!isMounted || !result) return;
-        setSvg(result.svg);
+        // Force SVG to fill 100% width and remove hard-coded max-width
+        const processedSvg = result.svg
+          .replace(/(<svg[^>]*)\swidth="[^"]*"/, '$1 width="100%"')
+          .replace(/(<svg[^>]*)\sstyle="[^"]*max-width:[^"]*"/, '$1');
+        setSvg(processedSvg);
       })
       .catch((err) => {
         console.error('Mermaid render error:', err);
@@ -62,9 +84,11 @@ export default function MermaidRenderer({ chart }: { chart: string }) {
   return (
     <div 
       ref={containerRef} 
-      className="my-6 p-4 flex justify-center bg-white/[0.02] border border-black/[0.06] rounded-xl overflow-x-auto"
+      className="mermaid-wrapper my-6 p-6 w-full bg-[#0d1117] border border-[#30363d] rounded-xl overflow-x-auto -mx-6 md:-mx-12 px-6 md:px-12"
+      style={{ width: 'calc(100% + 3rem)' }}
       data-mermaid-chart={chart}
       dangerouslySetInnerHTML={{ __html: svg || '<span class="text-xs text-[#86868b] font-medium">กำลังวาดแผนผัง... / Rendering diagram...</span>' }}
     />
   );
 }
+
