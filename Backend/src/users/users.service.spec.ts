@@ -77,6 +77,24 @@ describe('UsersService.exportHistory', () => {
     await build([], { message: 'db error' });
     await expect(service.exportHistory('uid-1')).rejects.toThrow('Failed to export history');
   });
+
+  // ── FR-24: CSV-injection guard (prefix formula-triggering fields) ────────
+  it.each(['=', '+', '-', '@'])(
+    'prefixes a title starting with %s with a single quote',
+    async (ch) => {
+      await build([{ title: `${ch}HYPERLINK`, subtitle: `${ch}cmd`, last_read_at: 0 }]);
+      const csv = await service.exportHistory('uid-1');
+      const [, row] = csv.split('\r\n');
+      expect(row).toBe(`"'${ch}HYPERLINK","'${ch}cmd","${new Date(0).toISOString()}"`);
+    },
+  );
+
+  it('leaves a normal title unchanged (no spurious prefix)', async () => {
+    await build([{ title: 'One Punch Man', subtitle: 'Chapter 180', last_read_at: 0 }]);
+    const csv = await service.exportHistory('uid-1');
+    const [, row] = csv.split('\r\n');
+    expect(row).toBe(`"One Punch Man","Chapter 180","${new Date(0).toISOString()}"`);
+  });
 });
 
 describe('UsersService — reading history', () => {
