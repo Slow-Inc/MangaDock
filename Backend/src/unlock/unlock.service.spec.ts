@@ -76,5 +76,6 @@ describe('UnlockService', () => {
       mockRpc.mockResolvedValue({ data: null, error: { message: 'CREATOR_MISSING' } });
       await expect(service.purchaseUnlock('u1', 'v1')).rejects.toThrow(BadRequestException);
     });
+
   });
 });
