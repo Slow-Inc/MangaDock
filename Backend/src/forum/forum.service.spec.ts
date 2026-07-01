@@ -198,6 +198,97 @@ describe('ForumService.listPosts / getPost — null-safe comment count', () => {
   });
 });
 
+// ── embedded comment count excludes soft-deleted rows (FR-17) ──────────────────
+// The embedded `comments:forum_comments(count)` must count only rows with
+// deleted_at IS NULL, so the number shown next to a post matches what
+// listComments (which already filters deleted_at) returns to a reader.
+
+describe('ForumService — embedded comment count excludes soft-deleted rows (FR-17)', () => {
+  const baseRow = {
+    id: 'p1',
+    author_uid: 'u1',
+    title: 'T',
+    content: 'C',
+    category: 'general',
+    target_manga_id: null,
+    target_manga_title: null,
+    target_manga_cover: null,
+    image_urls: null,
+    upvotes: 0,
+    downvotes: 0,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    author: { display_name: 'A', photo_url: null, role: 'user' },
+    comments: [{ count: 3 }] as Array<{ count: number }>,
+  };
+
+  it('listPosts filters the embedded comment count on deleted_at IS NULL', async () => {
+    const chain = buildMockChain({
+      range: jest.fn().mockResolvedValue({ data: [baseRow], count: 1, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    await service.listPosts();
+
+    expect(chain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+  });
+
+  it('getPost filters the embedded comment count on deleted_at IS NULL', async () => {
+    const chain = buildMockChain({
+      single: jest.fn().mockResolvedValue({ data: baseRow, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    await service.getPost('p1');
+
+    expect(chain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+  });
+
+  it('getPublicProfile filters embedded comment counts for both authored and liked posts', async () => {
+    // Two forum_posts queries run: authored posts (ends with .limit) and liked
+    // posts (ends with .is). Route each to its own chain so both can be asserted.
+    const authoredChain = buildMockChain({
+      limit: jest.fn().mockResolvedValue({ data: [baseRow], error: null }),
+    });
+    const likedChain = buildMockChain(); // ends on .is → returns the chain object
+    const forumPostsChains = [authoredChain, likedChain];
+
+    const fromImpl = (table: string) => {
+      switch (table) {
+        case 'profiles':
+          return buildMockChain({
+            single: jest.fn().mockResolvedValue({
+              data: { uid: 'u1', role: 'user', display_name: 'A' },
+              error: null,
+            }),
+          });
+        case 'forum_posts':
+          return forumPostsChains.shift();
+        case 'forum_comments':
+          return buildMockChain({ limit: jest.fn().mockResolvedValue({ data: [], error: null }) });
+        case 'forum_votes':
+          // One liked post id so the liked-posts query (site 253) runs.
+          return buildMockChain({
+            limit: jest.fn().mockResolvedValue({
+              data: [{ target_id: 'p2', created_at: '2024-01-01T00:00:00Z' }],
+              error: null,
+            }),
+          });
+        case 'chapter_versions':
+          return buildMockChain({ in: jest.fn().mockResolvedValue({ data: [], error: null }) });
+        default:
+          return buildMockChain();
+      }
+    };
+    const service = makeService(fromImpl);
+
+    await service.getPublicProfile('u1');
+
+    expect(authoredChain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+    expect(likedChain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+  });
+});
+
 // ── listComments tree assembly ─────────────────────────────────────────────────
 
 describe('ForumService.listComments — tree assembly', () => {
