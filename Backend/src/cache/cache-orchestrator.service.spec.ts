@@ -202,6 +202,26 @@ describe('CacheOrchestratorService — L1-first read path (#36)', () => {
 
     expect(jsonCache.set).toHaveBeenCalledWith('manga:1', entry.data, expect.any(Number));
   });
+
+  // FR-15 — a finite-TTL entry that has already expired in Redis must not be
+  // written into L1 as if it were immortal (ttlRemainingMs <= 0 would be
+  // treated as "permanent" by JsonCacheService.isExpired).
+  it('get() does NOT write the L2 entry into L1 when the entry has already expired (ttlRemainingMs <= 0)', async () => {
+    const entry = {
+      data: { pages: [1] },
+      updatedAt: new Date(Date.now() - 120_000).toISOString(), // 2 minutes ago
+      ttlMs: 60_000, // 1 minute TTL — already expired by the time we read it
+    };
+    const redis = makeRedis(true, { 'manga:1': JSON.stringify(entry) });
+    const jsonCache = makeJsonCache();
+    (jsonCache.get as jest.Mock).mockReturnValue(null);
+    const { svc } = makeOrchestrator({ redis, jsonCache });
+
+    const result = await svc.get('manga:1');
+
+    expect(jsonCache.set).not.toHaveBeenCalled();
+    expect(result).toEqual({ data: entry.data, source: 'redis' });
+  });
 });
 
 describe('CacheOrchestratorService — setMangaCacheWithTiers', () => {
