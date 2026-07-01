@@ -73,7 +73,7 @@ _FONT_SIZE_SCALE_GAIN = 0.4
 _MAX_BBOX_SCALE = 1.1
 
 
-def _bubble_fit_layout(region, bubble_wh, img_shape, font_size_minimum: int = 8):
+def _bubble_fit_layout(region, bubble_wh, img_shape, font_size_minimum: int = 8, bubble_bbox_w=None):
     """#175/#183: choose the font AND wrap-column for a region that fills a balloon. (1) binary-
     search the largest font whose word-wrapped translation fits the balloon safe-area, bounded
     by the interior height (:func:`bubble_fit_bounds`) and never force-breaking a word. (2) width-
@@ -85,6 +85,17 @@ def _bubble_fit_layout(region, bubble_wh, img_shape, font_size_minimum: int = 8)
     lang = getattr(region, 'target_lang', 'en_US')
     text = region.translation
     mw, mh = int(w_box * _FIT_MARGIN), int(h_box * _FIT_MARGIN)
+    # #430 SIMPLE-A (multi-agent consensus): a single unbreakable word wider than the safe-interior
+    # column may use up to the balloon's BBOX width (capped) so a long Thai word ("ถุงพลาสติก") in a
+    # narrow balloon isn't pinned tiny. ONLY the width CEILING relaxes — line wrapping + anchor stay
+    # in the safe interior. Cap = min(0.92·bbox, 1.20·safe), never below the safe width; the
+    # distance-transform already proved the safe→bbox band is mostly clear of the bubble's corners,
+    # so 0.92·bbox is the containment guard (no pixel check needed). bbox absent → exactly the safe
+    # width → byte-identical for every existing caller / the wide One-Punch case.
+    _wmax_safe = float(w_box * _FIT_MARGIN)
+    word_wmax = _wmax_safe
+    if bubble_bbox_w and bubble_bbox_w > 0:
+        word_wmax = max(_wmax_safe, min(0.92 * float(bubble_bbox_w), 1.20 * _wmax_safe))
 
     # Segment Thai/Chinese into words first (region.translation is raw — the ZWSP word breaks
     # are inserted inside calc_horizontal, not here), so the longest-token checks below are
@@ -106,6 +117,17 @@ def _bubble_fit_layout(region, bubble_wh, img_shape, font_size_minimum: int = 8)
             size, text, max_width=mw, max_height=mh, language=lang)
         block_w = max(widths) if widths else float('inf')
         block_h = len(lines) * size * _LINE_HEIGHT
+        if word_wmax > _wmax_safe:
+            # #430 SIMPLE-A (bbox gave headroom): a line may exceed the safe width ONLY if it is a
+            # single unbreakable word (can't wrap tighter) that still fits the relaxed bbox ceiling.
+            # A MULTI-word line over the safe width means the font is simply too big — reject it, so
+            # normal wrapping/One-Punch stays bound to the safe interior.
+            if _longest and _longest_word_w(size) > word_wmax:
+                return float('inf'), float('inf')
+            for _ln, _w in zip(lines, widths):
+                if _w > _wmax_safe and len([t for t in re.split(r'[\s​]+', _ln) if t]) > 1:
+                    return float('inf'), float('inf')
+            return min(block_w, _wmax_safe), block_h   # a lone over-wide word must not block the fit
         # reject a size that force-breaks a single WORD wider than the column ("HMPH"→"HM/PH").
         if _longest and _longest_word_w(size) > mw:
             return float('inf'), float('inf')
@@ -374,7 +396,12 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 if cw >= 6 and ch >= 6:
                     fit_w, fit_h = cw, ch
                     acx, acy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
-            region.font_size, _bw, _bh = _bubble_fit_layout(region, (fit_w, fit_h), img.shape, font_size_minimum)
+            # #430 SIMPLE-A: pass the balloon bbox width so a lone over-wide Thai word may use up to
+            # it (capped) instead of the narrower safe-interior column; the safe-interior still bounds
+            # wrapping/anchor. Only the sole-occupant path (its column IS the safe interior).
+            region.font_size, _bw, _bh = _bubble_fit_layout(
+                region, (fit_w, fit_h), img.shape, font_size_minimum,
+                bubble_bbox_w=float(bubble_box[2] - bubble_box[0]))
             hw, hh = _bw / 2.0, _bh / 2.0
             dst_points_list.append(
                 np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
@@ -383,7 +410,9 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 _emit_trace(dict(region_index=i, route='bubble_fit_sole', has_bubble=True,
                                  occupancy=_occ, fills_ratio=_fills_ratio, fills_threshold=0.72,
                                  orig_fs=_orig_fs, clean_fs_flat=None, final_fs=region.font_size,
-                                 block_w=float(_bw), block_h=float(_bh), avail_w=float(fit_w), avail_h=float(fit_h)))
+                                 block_w=float(_bw), block_h=float(_bh), avail_w=float(fit_w), avail_h=float(fit_h),
+                                 bubble_w=float(bubble_box[2] - bubble_box[0]),
+                                 bubble_h=float(bubble_box[3] - bubble_box[1])))
             continue
 
         # #436: regions that SHARE one (often over-merged) balloon — occupancy > 1 — are not
