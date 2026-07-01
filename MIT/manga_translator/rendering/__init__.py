@@ -301,7 +301,24 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 break
 
     dst_points_list = []
+    # item-2 measurement (#430): env-gated per-region sizing trace. Off → no import, no work,
+    # byte-identical render (render golden asserts it). One JSONL record per region, emitted at
+    # EVERY exit including the three early `continue`s (missing those would drop the sole/shared/
+    # clean regions from the sample). Analysis is the pure sizing_trace module, run offline.
+    _trace_path = os.environ.get('MIT_SIZING_TRACE')
+    if _trace_path:
+        import json as _json
+        from .sizing_trace import fill_fraction as _fill_fraction
+
+        def _emit_trace(rec):
+            rec['fill_frac'] = _fill_fraction(rec['block_w'], rec['block_h'], rec['avail_w'], rec['avail_h'])
+            with open(_trace_path, 'a', encoding='utf-8') as _f:
+                _f.write(_json.dumps(rec) + '\n')
+    else:
+        _emit_trace = None
     for i, region in enumerate(text_regions):
+        _orig_fs = getattr(region, 'font_size', 0)  # #430: snapshot BEFORE any branch overwrites it
+        _occ = int(occupancy[i]) if occupancy is not None else 1  # #430 trace: occupancy is None when bubble_fit off
 
         # #166 binary-search fit: when this region is the sole occupant of a known
         # balloon, size the font to fill the balloon box and render into that box.
@@ -315,10 +332,13 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # large detected box (rw/bw low, e.g. One-Punch "THIS BRAT…") must fall through to
         # clean-layout's narrow source-referenced column instead of ballooning up to fill.
         _fills = True
+        _fills_ratio = None  # #430 trace: retain the raw ratio (fills_bubble_width returns only a bool)
         if bubble_box is not None:
             _rx = region.xyxy
-            _fills = fills_bubble_width(float(_rx[2]) - float(_rx[0]),
-                                        float(bubble_box[2]) - float(bubble_box[0]))
+            _rw = float(_rx[2]) - float(_rx[0])
+            _bw2 = float(bubble_box[2]) - float(bubble_box[0])
+            _fills_ratio = None if _bw2 <= 0 else _rw / _bw2
+            _fills = fills_bubble_width(_rw, _bw2)
         if (bubble_box is not None and _fills and region.horizontal and occupancy[i] == 1
                 and region.translation and region.translation.strip()):
             # #179: wrap to the balloon's safe *interior* (narrow column) centered
@@ -342,6 +362,11 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             dst_points_list.append(
                 np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
                            [acx + hw, acy + hh], [acx - hw, acy + hh]]], dtype=np.int64))
+            if _emit_trace is not None:
+                _emit_trace(dict(region_index=i, route='bubble_fit_sole', has_bubble=True,
+                                 occupancy=_occ, fills_ratio=_fills_ratio, fills_threshold=0.72,
+                                 orig_fs=_orig_fs, clean_fs_flat=None, final_fs=region.font_size,
+                                 block_w=float(_bw), block_h=float(_bh), avail_w=float(fit_w), avail_h=float(fit_h)))
             continue
 
         # #436: regions that SHARE one (often over-merged) balloon — occupancy > 1 — are not
@@ -370,6 +395,11 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             dst_points_list.append(
                 np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
                            [acx + hw, acy + hh], [acx - hw, acy + hh]]], dtype=np.int64))
+            if _emit_trace is not None:
+                _emit_trace(dict(region_index=i, route='bubble_fit_shared', has_bubble=True,
+                                 occupancy=_occ, fills_ratio=_fills_ratio, fills_threshold=0.72,
+                                 orig_fs=_orig_fs, clean_fs_flat=None, final_fs=region.font_size,
+                                 block_w=float(_bw), block_h=float(_bh), avail_w=float(fit_w), avail_h=float(fit_h)))
             continue
 
         # Clean horizontal layout (render-layout rework): for the regions the bubble-fit
@@ -398,6 +428,14 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 region._direction = 'h'
                 dst_points_list.append(
                     np.array([centered_box(cx, cy, block_w, block_h)], dtype=np.int64))
+                if _emit_trace is not None:
+                    _ps = page_shape if page_shape is not None else img.shape
+                    _flat = clean_layout_font_size(font_size_max, _ps[0], _ps[1], font_size_minimum)
+                    _emit_trace(dict(region_index=i, route='clean_layout', has_bubble=bubble_box is not None,
+                                     occupancy=_occ, fills_ratio=_fills_ratio, fills_threshold=0.72,
+                                     orig_fs=_orig_fs, clean_fs_flat=_flat, final_fs=clean_fs,
+                                     block_w=float(block_w), block_h=float(block_h),
+                                     avail_w=float(x2f - x1f), avail_h=float(y2f - y1f)))
                 continue
 
         # Store and validate original font size
@@ -538,6 +576,19 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # Store results and update font size
         dst_points_list.append(dst_points)
         region.font_size = int(target_font_size)
+        if _emit_trace is not None:
+            _lx = region.xyxy
+            if isinstance(dst_points, np.ndarray):
+                _p = dst_points.reshape(-1, 2)
+                _blk_w = float(_p[:, 0].max() - _p[:, 0].min())
+                _blk_h = float(_p[:, 1].max() - _p[:, 1].min())
+            else:
+                _blk_w = _blk_h = 0.0
+            _emit_trace(dict(region_index=i, route='legacy', has_bubble=bubble_box is not None,
+                             occupancy=int(occupancy[i]), fills_ratio=_fills_ratio, fills_threshold=0.72,
+                             orig_fs=_orig_fs, clean_fs_flat=None, final_fs=int(target_font_size),
+                             block_w=_blk_w, block_h=_blk_h,
+                             avail_w=float(_lx[2]) - float(_lx[0]), avail_h=float(_lx[3]) - float(_lx[1])))
 
     return dst_points_list
 
