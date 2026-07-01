@@ -21,11 +21,11 @@
 graph TD
     User["Developer (มนุษย์)"] -->|1. ส่งโจทย์หลักครั้งเดียว| Master["Master Agent (Claude Code / Opus 4.8)"]
     
-    subgraph Master Agent Capability
+    subgraph MAC ["Master Agent Capability"]
         SkillRegistry["ศูนย์เก็บ Skill (Skill Registry)"]
     end
     
-    subgraph Multi-Turn Negotiation Loop (ทำแบบอัตโนมัติภายใน AI Session)
+    subgraph MTN ["Multi-Turn Negotiation Loop (ทำแบบอัตโนมัติภายใน AI Session)"]
         Master -->|2. เลือก Skill + ฉีดส่งพร้อม Prompt| PalOrch["Pal MCP Server (Orchestrator)"]
         
         PalOrch -->|3. ส่งทักษะ & โจทย์| Codex["Codex CLI Agent"]
