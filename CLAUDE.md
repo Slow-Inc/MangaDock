@@ -45,6 +45,21 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 
 ---
 
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `Slow-Inc/MangaDock` via the `gh` CLI. Issue **and PRD bodies must be bilingual (English + a full Thai mirror — same depth, not a summary)**; review-reply comments may be English-only. External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage states (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) map 1:1 to same-named repo labels, alongside component/type/severity/lifecycle labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` (20 ADRs) at the repo root. See `docs/agents/domain.md`.
+
+---
 
 ## Repository Structure
 
