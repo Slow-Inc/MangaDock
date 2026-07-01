@@ -116,7 +116,7 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
       this.l3.appendDirtyFallback(key);
     }
 
-    this.logger.log(`Cache SET key=${key} ttl=${Math.floor(ttlMs / 1000)}s redis=${this.redis.available}`);
+    this.logger.debug(`Cache SET key=${key} ttl=${Math.floor(ttlMs / 1000)}s redis=${this.redis.available}`);
   }
 
   /**
