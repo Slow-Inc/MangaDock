@@ -192,3 +192,184 @@ describe('UsersService — reading history', () => {
     });
   });
 });
+
+// ── FR-21: upsertUser atomic upsert (no read-then-write race) ────────────────
+describe('UsersService.upsertUser — atomic upsert', () => {
+  const okResult = { error: null };
+  let upsertMock: jest.Mock;
+  let updateMock: jest.Mock;
+  let selectMock: jest.Mock;
+  let isMock: jest.Mock;
+  let maybeSingleMock: jest.Mock;
+  let insertMock: jest.Mock;
+  let from: jest.Mock;
+  let service: UsersService;
+
+  function buildChain() {
+    upsertMock = jest.fn().mockResolvedValue(okResult);
+    updateMock = jest.fn().mockReturnThis();
+    selectMock = jest.fn().mockReturnThis();
+    isMock = jest.fn().mockResolvedValue(okResult);
+    maybeSingleMock = jest.fn().mockResolvedValue({ data: null, error: null });
+    insertMock = jest.fn().mockResolvedValue(okResult);
+    // eq() must be awaitable (email refresh path) AND expose .is / .maybeSingle (backfill / legacy paths).
+    const eqReturn: any = Object.assign(Promise.resolve(okResult), {
+      is: isMock,
+      maybeSingle: maybeSingleMock,
+    });
+    const chain: any = {
+      upsert: upsertMock,
+      update: updateMock,
+      select: selectMock,
+      insert: insertMock,
+      eq: jest.fn(() => eqReturn),
+    };
+    from = jest.fn(() => chain);
+    service = new UsersService({ client: { from } } as any, {} as any);
+  }
+
+  beforeEach(buildChain);
+
+  it('creates via atomic upsert on conflict uid with ignoreDuplicates (no existence read)', async () => {
+    await service.upsertUser('u1', { email: 'e@x.com', displayName: 'Neo', photoURL: 'http://p/a.png' });
+
+    expect(upsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: 'u1', email: 'e@x.com' }),
+      { onConflict: 'uid', ignoreDuplicates: true },
+    );
+    // No read-then-write existence check.
+    expect(selectMock).not.toHaveBeenCalled();
+    expect(maybeSingleMock).not.toHaveBeenCalled();
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it('refreshes email on every login', async () => {
+    await service.upsertUser('u1', { email: 'new@x.com' });
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'new@x.com' }),
+    );
+  });
+
+  it('backfills display_name / photo_url only when still null', async () => {
+    await service.upsertUser('u1', { email: 'e@x.com', displayName: 'Neo', photoURL: 'http://p/a.png' });
+    expect(isMock).toHaveBeenCalledWith('display_name', null);
+    expect(isMock).toHaveBeenCalledWith('photo_url', null);
+  });
+
+  it('does not attempt a display_name backfill when none is provided', async () => {
+    await service.upsertUser('u1', { email: 'e@x.com' });
+    expect(isMock).not.toHaveBeenCalled();
+  });
+
+  it('throws when the atomic create fails', async () => {
+    upsertMock.mockResolvedValue({ error: { message: 'dup' } });
+    await expect(
+      service.upsertUser('u1', { email: 'e@x.com' }),
+    ).rejects.toThrow('Failed to create user profile');
+  });
+});
+
+// ── FR-21: getProfile parallel queries ──────────────────────────────────────
+describe('UsersService.getProfile — parallel queries', () => {
+  it('dispatches profile and favorites queries in parallel (before either resolves)', async () => {
+    let resolveProfile!: (v: unknown) => void;
+    let resolveFav!: (v: unknown) => void;
+    const profileP = new Promise((r) => (resolveProfile = r));
+    const favP = new Promise((r) => (resolveFav = r));
+
+    const profilesChain: any = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn(() => profileP),
+    };
+    const favChain: any = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      order: jest.fn(() => favP),
+    };
+    const from = jest.fn((t: string) => (t === 'profiles' ? profilesChain : favChain));
+    const service = new UsersService({ client: { from } } as any, {} as any);
+
+    const promise = service.getProfile('u1');
+
+    // Both queries are issued synchronously, before the profile query resolves.
+    // Sequential code would not touch user_favorites until profiles resolved.
+    expect(from).toHaveBeenCalledWith('profiles');
+    expect(from).toHaveBeenCalledWith('user_favorites');
+    expect(favChain.order).toHaveBeenCalled();
+
+    resolveProfile({ data: { uid: 'u1', email: 'e@x.com' }, error: null });
+    resolveFav({ data: [], error: null });
+
+    const result = await promise;
+    expect(result.uid).toBe('u1');
+    expect(result.favorites).toEqual([]);
+  });
+});
+
+// ── FR-21: deleteUserAccount parallel deletes ───────────────────────────────
+describe('UsersService.deleteUserAccount — parallel deletes', () => {
+  it('dispatches the three child-table deletes in parallel, profile only after', async () => {
+    const resolvers: Record<string, (v: unknown) => void> = {};
+    const childTables = ['user_favorites', 'user_liked', 'user_history'];
+    const childChains: Record<string, any> = {};
+    for (const t of childTables) {
+      childChains[t] = {
+        delete: jest.fn().mockReturnThis(),
+        eq: jest.fn(() => new Promise((r) => (resolvers[t] = r))),
+      };
+    }
+    const profileChain: any = {
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockResolvedValue({ error: null }),
+    };
+    const from = jest.fn((t: string) => childChains[t] ?? profileChain);
+    const storage = {
+      list: jest.fn().mockResolvedValue([]),
+      delete: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new UsersService({ client: { from } } as any, storage as any);
+
+    const promise = service.deleteUserAccount('u1');
+
+    // All three child deletes issued before any resolves; profile delete not yet reached.
+    expect(from).toHaveBeenCalledWith('user_favorites');
+    expect(from).toHaveBeenCalledWith('user_liked');
+    expect(from).toHaveBeenCalledWith('user_history');
+    expect(profileChain.delete).not.toHaveBeenCalled();
+
+    childTables.forEach((t) => resolvers[t]({ error: null }));
+    await promise;
+
+    expect(profileChain.delete).toHaveBeenCalled();
+  });
+
+  it('deletes only this user\'s avatar files, in parallel', async () => {
+    const from = jest.fn(() => ({
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockResolvedValue({ error: null }),
+    }));
+    const storage = {
+      list: jest.fn().mockResolvedValue(['u1_a.png', 'u1_b.png', 'other_c.png']),
+      delete: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new UsersService({ client: { from } } as any, storage as any);
+
+    await service.deleteUserAccount('u1');
+
+    expect(storage.delete).toHaveBeenCalledWith('uploads/avatars/u1_a.png');
+    expect(storage.delete).toHaveBeenCalledWith('uploads/avatars/u1_b.png');
+    expect(storage.delete).not.toHaveBeenCalledWith('uploads/avatars/other_c.png');
+  });
+
+  it('throws when a child-table delete fails', async () => {
+    const from = jest.fn(() => ({
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockResolvedValue({ error: { message: 'boom' } }),
+    }));
+    const storage = { list: jest.fn().mockResolvedValue([]), delete: jest.fn() };
+    const service = new UsersService({ client: { from } } as any, storage as any);
+
+    await expect(service.deleteUserAccount('u1')).rejects.toThrow('Failed to delete');
+  });
+});
