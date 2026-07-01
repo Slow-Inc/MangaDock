@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import type { NestApplication } from '@nestjs/core';
 import request = require('supertest');
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
 import { WalletEventsService } from './wallet-events.service';
