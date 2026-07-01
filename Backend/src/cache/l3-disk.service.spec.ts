@@ -87,6 +87,44 @@ describe('L3DiskService', () => {
     const svc = new L3DiskService(fakeDir);
     expect(() => svc.write('key', makeEntry('x'))).not.toThrow();
   });
+
+  // FR-31 (#401) — filename collision: hash/encode so distinct keys never collide.
+  // Under the old naive sanitizer, ':' and '/' both mapped to '_', so 'a:b' and
+  // 'a/b' collided on one file and silently overwrote each other.
+  it('write() gives keys that collide under naive sanitization distinct files (FR-31)', () => {
+    service.write('a:b', makeEntry('first'));
+    service.write('a/b', makeEntry('second'));
+
+    const jsonFiles = fs.readdirSync(tmpDir).filter((f) => f.endsWith('.json'));
+    expect(jsonFiles.length).toBe(2); // two distinct files, no collision
+
+    const all = service.readAll();
+    expect(all.get('a:b')?.data).toBe('first');
+    expect(all.get('a/b')?.data).toBe('second');
+  });
+
+  // FR-31 (#401) — atomic write: write to *.tmp then rename. A failure at the
+  // rename step must never expose a partial/corrupt file at the final path,
+  // and must not leave an orphaned .tmp behind.
+  it('write() never leaves a partial file at the final path when the rename fails midway (FR-31)', () => {
+    service.write('atomic:key', makeEntry('good-old-value'));
+    const finalName = fs.readdirSync(tmpDir).find((f) => f.endsWith('.json'))!;
+    const finalPath = path.join(tmpDir, finalName);
+    const oldContent = fs.readFileSync(finalPath, 'utf-8');
+
+    const renameSpy = jest
+      .spyOn(service as any, 'renameFile')
+      .mockImplementation(() => {
+        throw new Error('simulated crash during rename');
+      });
+    service.write('atomic:key', makeEntry('new-value-that-must-not-corrupt'));
+    renameSpy.mockRestore();
+
+    // Final path still holds the complete old content — never a partial write.
+    expect(fs.readFileSync(finalPath, 'utf-8')).toBe(oldContent);
+    // No orphaned .tmp file left behind.
+    expect(fs.readdirSync(tmpDir).some((f) => f.endsWith('.tmp'))).toBe(false);
+  });
 });
 
 describe('L3DiskService — dirty fallback (#48 / #52)', () => {

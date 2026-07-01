@@ -1,6 +1,7 @@
 import { Injectable, Inject, Optional, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import type { CacheEntry } from './json-cache.service';
 
 const CONSECUTIVE_FAIL_THRESHOLD = 3;
@@ -45,8 +46,7 @@ export class L3DiskService {
 
   write<T>(key: string, entry: CacheEntry<T>): void {
     try {
-      const safeFileName = key.replace(/[:\\/*?"<>|]/g, '_');
-      const filePath = path.join(this.cacheDir, `${safeFileName}.json`);
+      const filePath = path.join(this.cacheDir, `${this.fileNameForKey(key)}.json`);
       // Compact — these files are machine-read only; pretty-print cost ~25%
       // extra bytes on every periodic flush (#147)
       this.writeFile(filePath, JSON.stringify({ ...entry, key }));
@@ -95,7 +95,42 @@ export class L3DiskService {
     }
   }
 
+  /**
+   * Hash the cache key into a fixed-length, filesystem-safe filename. A plain
+   * character-strip sanitizer collided distinct keys (e.g. `a:b` and `a/b` both
+   * became `a_b`), silently overwriting one entry with another. A sha256 hex
+   * digest guarantees distinct keys map to distinct filenames. The original key
+   * is still stored inside the JSON payload, so `readAll()` recovers it verbatim
+   * regardless of the on-disk filename. (FR-31)
+   */
+  private fileNameForKey(key: string): string {
+    return createHash('sha256').update(key).digest('hex');
+  }
+
+  /**
+   * Atomic write: stage the content in a sibling `*.tmp` file, then rename it
+   * onto the final path. `rename` is atomic on the same volume, so a reader can
+   * only ever observe the complete old file or the complete new one — never a
+   * half-written file, even if the process is killed mid-write. On any failure
+   * the tmp file is removed so no orphan is left behind. (FR-31)
+   */
   protected writeFile(filePath: string, content: string): void {
-    fs.writeFileSync(filePath, content, 'utf-8');
+    const tmpPath = `${filePath}.tmp`;
+    try {
+      fs.writeFileSync(tmpPath, content, 'utf-8');
+      this.renameFile(tmpPath, filePath);
+    } catch (err) {
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch {
+        /* tmp may not exist / already cleaned — nothing to do */
+      }
+      throw err;
+    }
+  }
+
+  /** Isolated rename seam (atomic commit step) — overridable for testing. */
+  protected renameFile(from: string, to: string): void {
+    fs.renameSync(from, to);
   }
 }
