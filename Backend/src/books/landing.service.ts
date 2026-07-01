@@ -251,12 +251,17 @@ export class LandingService {
 
     this.logger.log(`Cache miss — fetching from MangaDex API`);
 
-    const rows: LandingRow[] = [];
+    let rows: LandingRow[];
     try {
-      for (const def of this.mangaDex.mangaRowDefs) {
-        const { items } = await this.mangaDex.fetchMangaForRow(def.order, def.limit ?? 10);
-        rows.push({ id: def.id, title: def.title, query: def.order, items });
-      }
+      // Rows are independent; fetch them concurrently (Promise.all preserves
+      // input order). Any row rejecting still trips the same stale fallback,
+      // matching the previous all-or-nothing sequential behaviour (#397).
+      rows = await Promise.all(
+        this.mangaDex.mangaRowDefs.map(async (def) => {
+          const { items } = await this.mangaDex.fetchMangaForRow(def.order, def.limit ?? 10);
+          return { id: def.id, title: def.title, query: def.order, items };
+        }),
+      );
     } catch (err) {
       this.logger.warn(`API fetch error: ${String(err)} — attempting stale cache fallback`);
       return this.serveStale(cacheKey, forceLocal);
