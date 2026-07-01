@@ -116,6 +116,23 @@ def _bubble_fit_layout(region, bubble_wh, img_shape, font_size_minimum: int = 8)
     low, high = bubble_fit_bounds(h_box, font_size_minimum)
     font = fit_font_size((w_box, h_box), measure, low=low, high=high, margin=_FIT_MARGIN)
 
+    # #430 item-2 (height under-fill): fit_font_size binary-searches assuming the fit is monotonic
+    # in size, but with word-wrapping it is NOT — growing the font can break a line, DROP the block
+    # width, and re-open a valid fit at a LARGER size. A tall balloon otherwise stops at the first
+    # monotonic boundary and renders half-empty (e.g. "1858 เยนครับ" pinned at 29px in a 325px-tall
+    # balloon that actually fits ~48px). Scan upward for the largest still-fitting size; the block
+    # height only grows with the font, so stop once it clears the box (no larger size can fit) —
+    # bounded, and a no-op for the wide/monotonic case (nothing larger fits → font unchanged).
+    _wmax, _hmax = w_box * _FIT_MARGIN, h_box * _FIT_MARGIN
+    _s = font + 1
+    while _s <= high:
+        _bw, _bh = measure(_s)
+        if _bh > _hmax:
+            break
+        if _bw <= _wmax:
+            font = _s
+        _s += 1
+
     # #183 width-squeeze: narrow the column so the block fills the box HEIGHT (more lines) like
     # the original, instead of a few wide lines. Floor = the longest token's width at `font`,
     # so squeezing never force-breaks a word.
