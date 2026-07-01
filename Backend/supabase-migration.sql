@@ -628,6 +628,12 @@ REVOKE EXECUTE ON FUNCTION cast_vote_atomic(uuid, text, uuid, integer) FROM anon
 -- for a given manga, so max() picks a representative value. Backed by the existing
 -- idx_forum_posts_manga_created_at (target_manga_id, created_at DESC) index.
 --
+-- Deliberate improvement over the old JS tally: excludes soft-deleted posts
+-- (deleted_at IS NULL) from the trending count. The old JS tally never filtered
+-- deleted_at (an oversight), so this is a decided behavior change, not a
+-- like-for-like port. Consistent with the rest of the forum module's soft-delete
+-- convention (see idx_forum_posts_deleted_at).
+--
 -- Read-only over already-public forum data (the trending endpoint exposes exactly
 -- this), so it is a plain STABLE function — no SECURITY DEFINER, no REVOKE needed.
 CREATE OR REPLACE FUNCTION get_trending_manga(p_limit integer DEFAULT 5)
@@ -645,6 +651,7 @@ AS $$
     AND target_manga_title IS NOT NULL
     AND target_manga_title <> ''
     AND created_at >= now() - interval '7 days'
+    AND deleted_at IS NULL
   GROUP BY target_manga_id
   ORDER BY post_count DESC
   LIMIT p_limit;
