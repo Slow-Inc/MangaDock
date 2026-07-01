@@ -99,10 +99,23 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Collects all keys matching `pattern` via a non-blocking SCAN cursor loop.
+   * Unlike KEYS (O(N), blocks the Redis event loop over the whole keyspace),
+   * SCAN iterates in bounded batches. Deduplicates because SCAN may return the
+   * same key across iterations.
+   */
   async keys(pattern: string): Promise<string[]> {
     if (!this.available) return [];
     try {
-      return await this.client!.keys(pattern);
+      const found = new Set<string>();
+      let cursor = '0';
+      do {
+        const [next, batch] = await this.client!.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = next;
+        for (const key of batch) found.add(key);
+      } while (cursor !== '0');
+      return [...found];
     } catch {
       return [];
     }
