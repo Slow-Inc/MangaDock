@@ -97,3 +97,34 @@ def test_classify_dominant_is_none_when_nothing_underfilled():
     out = classify([_rec(fill_frac=0.95, route='bubble_fit_sole', fills_ratio=0.9)])
     assert out['underfilled'] == 0
     assert out['dominant'] is None
+
+
+# ── wiring: the dispatcher emits one JSONL record per region when MIT_SIZING_TRACE is set ──────
+
+def test_dispatcher_emits_one_record_per_region_with_orig_fs_snapshotted_before_overwrite(
+        tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+    import numpy as np
+    from manga_translator.rendering import resize_regions_to_font_size, text_render
+    from manga_translator.utils import TextBlock
+
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Arial-Unicode-Regular.ttf'))
+    trace = tmp_path / 'trace.jsonl'
+    monkeypatch.setenv('MIT_SIZING_TRACE', str(trace))
+    reg = TextBlock([[[20, 20], [600, 20], [20, 240], [600, 240]]], texts=['x'],
+                    translation='hello world', direction='h', target_lang='ENG', font_size=40)
+    reg.set_font_colors([255, 255, 255], [0, 0, 0])
+    img = np.zeros((720, 1000, 3), dtype=np.uint8)
+    # sizing only (no bubble → clean-layout path, an item-2-relevant small-font branch); the emit
+    # fires before the render stage, so no render is needed to exercise the wiring
+    resize_regions_to_font_size(img, [reg], None, 0, 0, clean_layout=True)
+
+    lines = [json.loads(x) for x in trace.read_text(encoding='utf-8').splitlines()]
+    assert len(lines) == 1                    # exactly one record for the one region
+    rec = lines[0]
+    assert rec['route'] == 'clean_layout'     # no bubble + clean_layout on → clean-layout path
+    assert rec['region_index'] == 0
+    assert rec['orig_fs'] == 40               # snapshotted BEFORE the branch overwrites font_size
+    assert rec['clean_fs_flat'] > 0           # recomputed flat cap recorded
+    assert rec['fill_frac'] >= 0.0            # derived by the emitter
