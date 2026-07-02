@@ -60,3 +60,28 @@ export const MOCK_EVENTS: Array<{ kind: string; detail: string; agoS: number }> 
   { kind: "translate_triggered", detail: "queued one-punch ch.162 p9", agoS: 140 },
   { kind: "info", detail: "worker pid 24180 · up 4h 12m", agoS: 320 },
 ];
+
+import type { ServiceStatusMap } from "./service-status";
+
+export const MOCK_SERVICE_STATUS: ServiceStatusMap = {
+  frontend: {
+    schemaVersion: 1,
+    service: "frontend",
+    status: "up",
+    reason: "all checks passed",
+    checks: [{ id: "supabase-env", status: "up", latencyMs: null }],
+    uptimeSec: 86400,
+    durationMs: 3,
+    checkedAt: "2026-07-02T00:00:00.000Z",
+  },
+  backend: {
+    schemaVersion: 1,
+    service: "backend",
+    status: "degraded",
+    reason: "latency 340ms > 200ms threshold",
+    checks: [{ id: "redis", status: "degraded", latencyMs: 340, detail: "latency 340ms > 200ms threshold" }],
+    uptimeSec: 86400,
+    durationMs: 341,
+    checkedAt: "2026-07-02T00:00:00.000Z",
+  },
+};
