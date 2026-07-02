@@ -644,6 +644,17 @@ def select_hyphenator(lang: str):
         else:
             return None
     try:
+        # #499 (multi-agent scrutinize, 3/3): the lru_cache above also caches a
+        # FAILED construction as a sticky None until worker restart. This is an
+        # accepted tradeoff, not a bug:
+        #  - EN->TH hot path: Thai has no hyphenation dictionary, so this fails
+        #    DETERMINISTICALLY (~163ms) every time — caching that None forever IS
+        #    the win the cache exists for.
+        #  - Narrow regression: for a hyphenatable target lang (DEU/FRA/…) whose
+        #    dict downloads on first use, a transient first-call network failure
+        #    would disable hyphenation for it until restart (old code retried).
+        # Not "fixed" because it's inherent to result-caching: caching only
+        # non-None would stop caching Thai's None and bring back the ~22s/page.
         return Hyphenator(lang)
     except Exception:
         return None
