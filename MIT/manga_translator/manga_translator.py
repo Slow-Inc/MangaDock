@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import cv2
+import functools
 import io
 import json
 import langcodes
@@ -110,6 +111,7 @@ def _timed_stage(stage_name):
     without touching any stage logic. `logger` is resolved as a module global at
     call time so a `set_main_logger` override is respected."""
     def deco(fn):
+        @functools.wraps(fn)
         async def wrapper(self, *args, **kwargs):
             _t0 = time.time()
             try:
