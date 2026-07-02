@@ -145,4 +145,11 @@ parser_api.add_argument('--nonce', default=os.getenv('MT_WEB_NONCE', ''), type=s
 parser_api.add_argument("--report", default=None,type=str, help='reports to server to register instance')
 parser_api.add_argument('--models-ttl', default='0', type=int, help='models TTL in memory in seconds')
 
+# Prepare-models mode (#459): pre-download + warm the configured inpainter models
+# OUT of the request path, so the first flux request never triggers an inline
+# ~10-13 GB HuggingFace download. Runs, reports, and exits — never starts a server.
+parser_prepare = subparsers.add_parser('prepare-models', help='Pre-download + warm inpainter models, then exit (no server)')
+parser_prepare.add_argument('--inpainter', default=None, type=str, help='Comma-separated inpainter keys to prepare (e.g. flux_klein,lama_large). Default: $MIT_INPAINTER or lama_large')
+parser_prepare.add_argument('--min-free-vram-gb', default=9.0, type=float, help='Refuse the one-time flux prompt-encode if free VRAM is below this (the ~8-9 GB text-encoder spike). Default 9.')
+
 subparsers.add_parser('config-help', help='Print help information for config file')
