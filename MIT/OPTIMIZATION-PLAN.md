@@ -136,22 +136,30 @@ Collect from `MIT/logs/p0-err.log` (strip `\0` bytes: `tr -d '\000'`): all `[tim
 
 **Exit criteria:** a table where layout_fit's 12-14s ≈ sum of sub-steps (nothing "unattributed" bigger than ~20%), and merge's ~10s split into step1 vs split_text_region. **Commit #2** (instrumentation).
 
-### 0-D. ACTUAL RESULT (2026-07-03, real E2E on Otome ch.1 p.2, 6× re-measured through progressively deeper instrumentation)
+### 0-D. ACTUAL RESULT (2026-07-03)
 
-**The exit criteria above was NOT met — and that's the finding.** Five full instrumentation+measure passes systematically ruled out every algorithmic hypothesis, including the ones OPTIMIZATION.md's original scan proposed:
+> 🛑 **CORRECTED — read this first.** The original 0-D below concluded the cost was "extrinsic / GIL, invisible to perf_counter." **That conclusion was WRONG, caused by a units misread**: the accumulator fields are **seconds**, not ms (`syll_s=11.4` means 11.4 **seconds**, not ~11 ms). `calc_horizontal`'s own breakdown accounted for the entire 23 s all along — dominated by `syll_s` + `hyph_s`, which are both `select_hyphenator()`.
+>
+> **Root cause (Phase 2b, commit `29fa900`):** `select_hyphenator()` was reconstructed on every call — ~163 ms (Thai) / ~372 ms (Eng) for the failing/loading `Hyphenator(lang)` dictionary attempt — called twice per `calc_horizontal` × ~68 `calc_horizontal`/page. **Fix = `lru_cache` (L2).** Measured E2E: `layout_fit` 23.7 s → **0.98 s**, render stage 26.3 s → **1.49 s**, whole page ~75 s → ~12 s. Byte-identical (characterization green). Full numbers: `docs/reports/benchmarks/2026-07-03-mit-layout-fit-and-merge-optimize.md`.
+>
+> **Lesson kept (not deleted) per team rule:** the misread cost ~2 hours of instrumenting five deeper layers chasing a non-existent "extrinsic" cause. The table below is preserved as the dead-end record — every "❌ not it" for a `_s` field was actually a "✅ that's 11 seconds" I misparsed as ms. Ironically the very FIRST layer (`calc_horizontal` internals) already had the answer; I dismissed `syll_s=12.3` / `hyph_s=11.2` as "~23ms total." **Always print units, and sanity-check that sub-parts sum to the whole before declaring a component negligible.**
+
+<details><summary>Original (wrong-conclusion) dead-end record — preserved as knowledge</summary>
+
+**The exit criteria above was [WRONGLY judged] NOT met.** Five full instrumentation+measure passes [chased a units error]:
 
 | Layer instrumented | Result | Verdict |
 |---|---|---|
-| `calc_horizontal` internals (seg/words/autogrow/syll/hyph/pack/post, `get_string_width` call counter) | 68 calls, **~23ms total** (vs 23.7s `layout_fit` stage) | ❌ not it |
+| `calc_horizontal` internals (seg/words/autogrow/syll/hyph/pack/post, `get_string_width` call counter) | 68 calls, **~23ms total** [WRONG: this was ~23 **seconds** — `syll_s`+`hyph_s`, the answer] | ~~❌ not it~~ → **✅ IT, misread** |
 | `calc_vertical` (separate function, untouched by original scan) | **0 calls** — this page has no vertical regions | ❌ ruled out entirely |
 | `_bubble_fit_layout` internals (preseg / `bubble_fit_bounds` / `fit_font_size` / `squeeze_width` / final measure, each wrapped separately) | 3 calls, **~22ms total** | ❌ not it |
 | `_bubble_interior_box` → `safe_area_box` → `cv2.distanceTransform` + `_ray_len` (pure-Python per-pixel walk — the strongest suspect, mask was a real 3.9M-px page-sized array) | 3 calls, dt≈0ms, ray≈0ms (1445 total ray steps) | ❌ not it, even at real page-mask size |
 | `anti_overlap` block (`_region_territory`/`clamp_box_to_neighbors`, `render_overlap.py`) | Pure O(n≤6) float arithmetic, no numpy/cv2 | ❌ ruled out by code inspection (not worth instrumenting — provably microseconds) |
 | Per-region wall-clock (`_t_region` at loop top → exit log at each of the 3 `continue`s + fallthrough) | **bubble_fit_sole regions: 6-9s EACH**, legacy regions: ~330ms, clean_layout: 320ms-4s (inconsistent) | ✅ confirms the time is real and per-region, but... |
 
-**Every sub-component of the `bubble_fit_sole` branch is individually fast, yet the branch's own wall-clock is 6-9 seconds per region.** This is not an algorithmic hot path — it's something *extrinsic* to the measured code: GIL contention with a concurrent thread (`patch_renderer.py`'s only concurrency is one `run_in_executor` for PNG encoding — plausible if a previous group's encode overlaps this group's layout_fit), OS-level scheduling, or something no `perf_counter` probe placed *inside* this function can see. Logging overhead was checked and ruled out (each `perf_counter()` read happens before the corresponding `logger.info()` call, so log I/O time isn't folded into any reported number).
+[The original text here reasoned that "every sub-component is fast yet the branch takes 6-9s, therefore the cost is extrinsic/GIL." This was the units-error conclusion — the sub-components were NOT fast (`syll_s`/`hyph_s` were ~11 s each, misread as ms). See the corrected box at the top of 0-D. The real per-region `bubble_fit_sole` cost was ~8 s of repeated `select_hyphenator` construction inside the `fit_font_size`/`squeeze_width` calc_horizontal calls — fixed by L2.]
 
-**Consequence for Phase 2b: do not implement any of L1/L2/L3 from OPTIMIZATION.md** — the mechanism they targeted (`calc_horizontal`'s internal cost) is now proven negligible. **Before touching layout_fit code, the next step must be a sampling profiler (`py-spy dump`/`py-spy record` attached to the live MIT worker PID during a slow translate, or `python -X importtime`/`cProfile` around just `resize_regions_to_font_size`), not another perf_counter probe** — Python-level instrumentation has exhausted what it can distinguish here; whatever is consuming the wall-clock is invisible to code-level timers, which means it's happening *between* Python bytecodes (GIL wait) or *outside* this process's Python-level control entirely.
+</details>
 
 **Textline_merge (0-B) result:** measured cleanly, no anomaly — `[timing-merge] step1_ms=~10-4500 split_ms=~0 n_boxes=9-14 pairs=~40-90` across runs, consistent with the O(n²) step-1 hypothesis. **M1/M2 (Phase 2a) are still valid to implement** — that finding was not disturbed by the layout_fit mystery.
 
