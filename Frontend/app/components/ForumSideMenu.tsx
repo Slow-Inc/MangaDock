@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { getTrendingManga, type TrendingManga } from "../lib/communityApi";
 import type { LandingBook, ForumCategory } from "../lib/types";
 import { CATEGORY_LIST } from "../lib/forumCategories";
@@ -23,6 +24,7 @@ export default function ForumSideMenu({
   onTrendingSelect,
   isOnTrending = false,
 }: ForumSideMenuProps) {
+  const router = useRouter();
   const [trending, setTrending] = useState<TrendingManga[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -254,8 +256,11 @@ export default function ForumSideMenu({
           ))}
           
           {trending.length > 5 && (
-            <button className="w-full mt-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-indigo-400/60 hover:text-indigo-400 hover:bg-indigo-500/5 rounded-xl transition-all text-center">
-              See All Communities
+            <button
+              onClick={() => router.push("/community/trending")}
+              className="w-full mt-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-indigo-400/60 hover:text-indigo-400 hover:bg-indigo-500/5 rounded-xl transition-all text-center"
+            >
+              ดูทั้งหมด
             </button>
           )}
         </div>
@@ -266,7 +271,7 @@ export default function ForumSideMenu({
         <div className="px-4 py-4 rounded-2xl bg-white/[0.01] border border-white/5">
            <h4 className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-3">Community Rules</h4>
            <ul className="space-y-2">
-             {["Respect others", "No spoilers", "No spam"].map((r, i) => (
+             {["เคารพซึ่งกันและกัน", "ไม่สปอย", "ไม่สแปม"].map((r, i) => (
                <li key={i} className="flex items-center gap-2 text-[10px] text-white/30 font-medium">
                  <div className="w-1 h-1 rounded-full bg-white/10" />
                  {r}
