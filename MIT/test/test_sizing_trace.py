@@ -128,3 +128,23 @@ def test_dispatcher_emits_one_record_per_region_with_orig_fs_snapshotted_before_
     assert rec['orig_fs'] == 40               # snapshotted BEFORE the branch overwrites font_size
     assert rec['clean_fs_flat'] > 0           # recomputed flat cap recorded
     assert rec['fill_frac'] >= 0.0            # derived by the emitter
+
+
+# #462 harness: per-axis fill + overflow classifier (the oversize side, mirroring the
+# under-fill area metric). These are the pure metrics the regression guard asserts on
+# the FINAL render — a region must not overflow width or height beyond a tolerance.
+
+def test_axis_fill_is_a_per_axis_ratio_not_area():
+    from manga_translator.rendering.sizing_trace import axis_fill
+    assert axis_fill(200, 100) == 2.0     # block twice the available width -> overflow signal
+    assert axis_fill(50, 100) == 0.5
+    assert axis_fill(50, 0) == 0.0        # degenerate available -> 0.0, never divide-by-zero
+
+
+def test_overflow_axes_flags_width_and_height_independently():
+    from manga_translator.rendering.sizing_trace import overflow_axes
+    assert overflow_axes(block_w=200, block_h=50, avail_w=100, avail_h=100) == (True, False)   # wide only
+    assert overflow_axes(block_w=50, block_h=200, avail_w=100, avail_h=100) == (False, True)   # tall only
+    assert overflow_axes(block_w=90, block_h=90, avail_w=100, avail_h=100) == (False, False)   # fits
+    # tolerance: a small slack does not count as overflow
+    assert overflow_axes(block_w=105, block_h=50, avail_w=100, avail_h=100, tol=1.1) == (False, False)

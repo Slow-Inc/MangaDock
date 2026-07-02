@@ -18,6 +18,30 @@ def fill_fraction(block_w, block_h, avail_w, avail_h):
     return (block_w * block_h) / avail
 
 
+def axis_fill(block, avail):
+    """Per-axis fill ratio ``block / avail`` (>1 ⇒ the block overflows that axis).
+
+    Unlike :func:`fill_fraction` (an AREA ratio, for the under-fill classifier), this is a
+    single-axis ratio the regression guard asserts against per axis. A degenerate available
+    length (≤ 0) yields 0.0 — unknown, never a divide-by-zero.
+    """
+    if avail <= 0:
+        return 0.0
+    return block / avail
+
+
+def overflow_axes(block_w, block_h, avail_w, avail_h, tol=1.0):
+    """``(over_w, over_h)`` — whether the block exceeds the available box on each axis.
+
+    ``tol`` is a multiplicative slack (1.0 = strict). The width and height verdicts are
+    independent so the guard can point at the axis that actually overflowed (the 2026-07-02
+    One-Punch oversize was width-only). A degenerate axis never reports overflow.
+    """
+    over_w = avail_w > 0 and block_w > avail_w * tol
+    over_h = avail_h > 0 and block_h > avail_h * tol
+    return bool(over_w), bool(over_h)
+
+
 def underfill_bucket(rec):
     """The gate that first prevented this region from filling its bubble — the fix-routing label.
 
