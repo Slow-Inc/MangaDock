@@ -15,6 +15,18 @@
 
 ---
 
+## 2026-07-01 — Captcha re-prompt on translate 401 (bugfix / hotfix)
+
+**Scope:** Frontend (`MangaReader.tsx`, `useChapterTranslation.ts`, `mangaTranslatePage.ts` + test) · **Type:** Bug hotfix · **Tests:** frontend 138/138 green (+4); typecheck clean; live E2E screenshot.
+
+**What & where:** `mangaTranslatePage.ts` new pure `isCaptchaExpiredError()`; `useChapterTranslation.ts` new `onCaptchaExpired` option — both `startTranslate` (batch) + `translateCurrentPage` route a `401` to it and skip the same-token retry; `MangaReader.tsx` extracted shared `resetCaptcha()` used by the page-fetch 401 path and the new translate 401 path.
+
+**Why:** when the 1-hour HWID-bound captcha token (#227) expired mid-session, pressing translate `401`'d and only toasted — translation dead-ended until a full page reload.
+
+**Before → After:** translate on expired token → `401` + error toast, permanently stuck / → Turnstile "ยืนยันตัวตน" modal re-appears, user re-verifies and retries in place.
+
+**Performance Δ:** N/A. **Quality:** removes a hard dead-end in the translate UX. **Validation:** unit (`isCaptchaExpiredError`) + full suite green + live E2E (inject bogus token → `401` → modal re-prompt, screenshot). **Risk / rollback:** additive; reuses the proven page-fetch recovery path; no backend change. **Links:** post-mortem `docs/reports/2026-07-01-captcha-reprompt-hotfix.md`, PR (hotfix/captcha-reprompt-on-translate-401).
+
 ## 2026-06-19 — Coin Topup System: Xendit PromptPay QR (feature)
 
 **Scope:** Backend (wallet module) + Frontend (TopupModal + Navbar) + Supabase DB · **Type:** New feature — real payment gateway replacing dev-only topup stub · **Tests:** 607/607 backend green (+12 new wallet tests); Frontend tsc 0 errors.

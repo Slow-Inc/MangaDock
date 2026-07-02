@@ -188,6 +188,52 @@ describe('MitBatchStream.run (#294)', () => {
   });
 });
 
+describe('MitBatchStream.run — abort signal threaded into auto-recover (FR-7)', () => {
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it('stops the auto-recover retry loop when signal aborts mid-retry (call site 3)', async () => {
+    const { stream, mitClient, deps } = makeStream();
+    const controller = new AbortController();
+
+    const THREE_PAGES = [
+      { pageIndex: 0, pageUrl: 'http://example.com/0.jpg' },
+      { pageIndex: 1, pageUrl: 'http://example.com/1.jpg' },
+      { pageIndex: 2, pageUrl: 'http://example.com/2.jpg' },
+    ];
+
+    // Stream delivers only page 0; pages 1 and 2 are "missing" → auto-recover fires
+    mitClient.submitBatch.mockResolvedValue(
+      ndjsonResponse([pageLine(0) + '\n' + DONE + '\n']),
+    );
+
+    // On the first per-page retry call, abort the controller — simulates the SSE
+    // reader disconnecting while recovery is in progress.
+    deps.translateSinglePage.mockImplementationOnce(async () => {
+      controller.abort();
+      return { patches: [] };
+    });
+
+    const { notify } = recorder();
+    await stream.run(
+      'ch1',
+      THREE_PAGES,
+      notify,
+      controller.signal,
+      'ANY',
+      'THA',
+      'taskId-fr7',
+    );
+
+    // With signal threaded: loop guard fires after 1st call → only called once.
+    // Without fix (signal was undefined): guard never fires → called twice.
+    expect(deps.translateSinglePage).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('MitBatchStream._retryMissingPagesIndividually (#82, relocated from #294)', () => {
   it('stops retrying when the AbortSignal is already aborted', async () => {
     const { stream, deps } = makeStream();
@@ -206,6 +252,85 @@ describe('MitBatchStream._retryMissingPagesIndividually (#82, relocated from #29
     );
 
     expect(deps.translateSinglePage).not.toHaveBeenCalled();
+  });
+
+  it('runs recovery with bounded concurrency (pool > 1), not one page at a time (FR-20)', async () => {
+    const { stream, deps } = makeStream();
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const releases: Array<() => void> = [];
+    deps.translateSinglePage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          releases.push(() => {
+            inFlight -= 1;
+            resolve({ patches: [] });
+          });
+        }),
+    );
+
+    const SIX = Array.from({ length: 6 }, (_, i) => ({
+      pageIndex: i,
+      pageUrl: `http://example.com/${i}.jpg`,
+    }));
+
+    const done = (stream as any)._retryMissingPagesIndividually(
+      'ch',
+      SIX,
+      new Set<number>(),
+      jest.fn(),
+    );
+
+    // Let the pool spin up all its workers.
+    await new Promise((r) => setImmediate(r));
+
+    // Serial loop would keep exactly 1 retry in flight; the pool keeps 4.
+    expect(maxInFlight).toBe(4);
+    expect(deps.translateSinglePage).toHaveBeenCalledTimes(4);
+
+    // Drain: releasing each wave lets the pool pull the remaining pages.
+    for (let round = 0; round < 4 && releases.length > 0; round++) {
+      releases.splice(0).forEach((r) => r());
+      await new Promise((r) => setImmediate(r));
+    }
+    await done;
+    expect(deps.translateSinglePage).toHaveBeenCalledTimes(6);
+  });
+
+  it('stops issuing new pool work once the signal aborts mid-recovery (FR-20 preserves FR-7)', async () => {
+    const { stream, deps } = makeStream();
+    const controller = new AbortController();
+
+    let calls = 0;
+    deps.translateSinglePage.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) controller.abort(); // abort during the first wave
+      return { patches: [] };
+    });
+
+    const EIGHT = Array.from({ length: 8 }, (_, i) => ({
+      pageIndex: i,
+      pageUrl: `http://example.com/${i}.jpg`,
+    }));
+
+    await (stream as any)._retryMissingPagesIndividually(
+      'ch',
+      EIGHT,
+      new Set<number>(),
+      jest.fn(),
+      undefined,
+      undefined,
+      undefined,
+      controller.signal,
+    );
+
+    // Pool must check the signal before starting each unit: no new MIT calls
+    // are issued after the abort, so far fewer than all 8 pages are attempted.
+    expect(calls).toBeLessThanOrEqual(4);
+    expect(calls).toBeLessThan(8);
   });
 
   it('passes maxStartupRetries:3 to translateSinglePage in the fallback path', async () => {

@@ -142,7 +142,7 @@ export class MitBatchStream {
         sourceLangIso,
         targetLangIso,
         imageModel,
-        undefined,
+        signal,
         derivative,
         mangaId,
       );
@@ -176,7 +176,7 @@ export class MitBatchStream {
         sourceLangIso,
         targetLangIso,
         imageModel,
-        undefined,
+        signal,
         derivative,
         mangaId,
       );
@@ -363,7 +363,7 @@ export class MitBatchStream {
       sourceLangIso,
       targetLangIso,
       imageModel,
-      undefined,
+      signal,
       derivative,
       mangaId,
     );
@@ -393,28 +393,44 @@ export class MitBatchStream {
     let recovered = 0;
     let failed = 0;
 
-    for (const missing of missingPages) {
-      if (signal?.aborted) break;
-      try {
-        const single = await this.deps.translateSinglePage(
-          chapterId,
-          missing.pageIndex,
-          missing.pageUrl,
-          sourceLangIso,
-          targetLangIso,
-          { maxStartupRetries: 3, imageModel, derivative, mangaId },
-        );
-        notify(missing.pageIndex, { patches: single.patches });
-        recovered += 1;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `[BatchPatches] fallback failed chapter=${chapterId} page=${missing.pageIndex}: ${msg}`,
-        );
-        notify(missing.pageIndex, { patches: [], error: msg });
-        failed += 1;
+    // Bounded worker pool (FR-20): recover missing pages a few at a time instead
+    // of one serial `for await`. Workers share a cursor into `missingPages`; each
+    // re-checks `signal?.aborted` before pulling the next page, so an abort
+    // mid-recovery stops the whole pool from issuing further MIT calls (not just
+    // the next serial iteration). JS is single-threaded, so `cursor++` and the
+    // recovered/failed counters need no locking.
+    const POOL_SIZE = 4;
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+      while (cursor < missingPages.length) {
+        if (signal?.aborted) return;
+        const missing = missingPages[cursor++];
+        try {
+          const single = await this.deps.translateSinglePage(
+            chapterId,
+            missing.pageIndex,
+            missing.pageUrl,
+            sourceLangIso,
+            targetLangIso,
+            { maxStartupRetries: 3, imageModel, derivative, mangaId },
+          );
+          notify(missing.pageIndex, { patches: single.patches });
+          recovered += 1;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `[BatchPatches] fallback failed chapter=${chapterId} page=${missing.pageIndex}: ${msg}`,
+          );
+          notify(missing.pageIndex, { patches: [], error: msg });
+          failed += 1;
+        }
       }
-    }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(POOL_SIZE, missingPages.length) }, () =>
+        worker(),
+      ),
+    );
 
     if (missingPages.length > 0) {
       this.logger.log(

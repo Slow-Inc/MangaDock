@@ -233,6 +233,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS wallet_tx_topup_ref_uidx
 CREATE INDEX IF NOT EXISTS idx_unlocks_uid                   ON unlocks(uid);
 CREATE INDEX IF NOT EXISTS idx_unlocks_version               ON unlocks(version_id);
 
+-- Topup idempotency: a given Xendit payment_id (reference_id) may be credited
+-- as a topup at most once. Partial index — only constrains topup rows with a
+-- non-NULL reference_id, leaving other transaction types unaffected.
+-- Applied: 2026-06-22 (wallet-security-hardening V5)
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_tx_topup_ref_uidx
+  ON wallet_transactions (reference_id)
+  WHERE type = 'topup' AND reference_id IS NOT NULL;
+
 -- ─── 5. VIEW — translator earnings ──────────────────────────────────────────
 
 CREATE OR REPLACE VIEW translator_earnings AS
@@ -366,6 +374,42 @@ BEGIN
 END;
 $$;
 
+-- Atomic add coins (5-arg overload, with reference_id) — LIVE form used by the topup
+-- webhook. Persisting reference_id powers the wallet_tx_topup_ref_uidx idempotency
+-- index (a Xendit payment_id is credited as a topup at most once); WalletService.addCoins
+-- calls THIS overload. The 4-arg version above is kept for ad-hoc/admin credits without
+-- a reference. Both overloads are intentionally live (see REVOKE block at end of file).
+CREATE OR REPLACE FUNCTION add_coins_atomic(
+  p_uid          uuid,
+  p_amount       integer,
+  p_type         text,
+  p_description  text DEFAULT NULL,
+  p_reference_id text DEFAULT NULL
+)
+RETURNS TABLE(balance integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_balance integer;
+BEGIN
+  INSERT INTO wallets (uid, balance)
+  VALUES (p_uid, 0)
+  ON CONFLICT (uid) DO NOTHING;
+
+  UPDATE wallets
+  SET balance = balance + p_amount,
+      updated_at = now()
+  WHERE uid = p_uid
+  RETURNING wallets.balance INTO v_balance;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
+  VALUES (p_uid, p_amount, p_type, v_balance, p_description, p_reference_id);
+
+  RETURN QUERY SELECT v_balance;
+END;
+$$;
+
 -- Atomic spend coins: decrements balance only if sufficient, raises INSUFFICIENT_FUNDS otherwise
 CREATE OR REPLACE FUNCTION spend_coins_atomic(
   p_uid          uuid,
@@ -400,6 +444,94 @@ BEGIN
   VALUES (p_uid, -p_amount, p_type, v_balance, p_description, p_reference_id);
 
   RETURN QUERY SELECT v_balance;
+END;
+$$;
+
+-- NOTE (2026-06-22, wallet-security-hardening V5):
+-- The topup-scoped unique index wallet_tx_topup_ref_uidx (see INDEXES section)
+-- provides defense-in-depth for add_coins_atomic topup calls: if a duplicate
+-- reference_id topup INSERT is attempted, the DB will raise a unique-violation
+-- before any balance mutation occurs.
+--
+-- The dead numeric overloads below were DROPPED from the live DB in V5:
+--   DROP FUNCTION IF EXISTS add_coins_atomic(uuid, numeric, text, text);
+--   DROP FUNCTION IF EXISTS spend_coins_atomic(uuid, numeric, text, text);
+-- They are NOT defined here (reference-only). TypeScript always resolves to the
+-- integer overloads via named parameters (p_uid, p_amount, p_type, p_description,
+-- p_reference_id). The numeric overloads were broken (missing NOT-NULL
+-- balance_after) and unreachable.
+
+-- Atomic unlock purchase: insert unlock + debit buyer + credit creator in ONE transaction (V6/V7).
+-- Raises INSUFFICIENT_FUNDS (rolls back entire txn) if buyer balance is too low.
+-- Idempotent: ON CONFLICT (uid, version_id) DO NOTHING returns already_unlocked=true without charging.
+CREATE OR REPLACE FUNCTION purchase_unlock_atomic(
+  p_uid          uuid,
+  p_version_id   uuid,
+  p_price        integer,
+  p_creator_uid  uuid,
+  p_platform_pct numeric,
+  p_description  text
+)
+RETURNS TABLE(balance integer, already_unlocked boolean, creator_share integer, platform_share integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_rows            integer;
+  v_balance         integer;
+  v_creator_balance integer;
+  v_platform_share  integer := 0;
+  v_creator_share   integer := 0;
+BEGIN
+  -- Idempotent unlock (PK uid,version_id). If the row already exists, the user
+  -- already paid — return without charging again.
+  INSERT INTO unlocks (uid, version_id, price_paid)
+  VALUES (p_uid, p_version_id, p_price)
+  ON CONFLICT (uid, version_id) DO NOTHING;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+
+  IF v_rows = 0 THEN
+    SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), true, 0, 0;
+    RETURN;
+  END IF;
+
+  -- Free chapter: granted, no ledger movement.
+  IF p_price <= 0 THEN
+    SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), false, 0, 0;
+    RETURN;
+  END IF;
+
+  -- Debit buyer atomically. NOT FOUND => insufficient funds => raise, which
+  -- rolls back the unlock insert above (single transaction).
+  INSERT INTO wallets (uid, balance) VALUES (p_uid, 0) ON CONFLICT (uid) DO NOTHING;
+  UPDATE wallets
+     SET balance = wallets.balance - p_price, updated_at = now()
+   WHERE uid = p_uid AND wallets.balance >= p_price
+   RETURNING wallets.balance INTO v_balance;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'INSUFFICIENT_FUNDS';
+  END IF;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
+  VALUES (p_uid, -p_price, 'purchase', v_balance, p_description, p_version_id::text);
+
+  -- Credit creator share (70% default). reference_id left NULL — rewards are
+  -- guarded upstream by the unlocks PK, and topup idempotency index ignores nulls.
+  v_platform_share := floor(p_price * p_platform_pct);
+  v_creator_share  := p_price - v_platform_share;
+  IF v_creator_share > 0 AND p_creator_uid IS NOT NULL THEN
+    INSERT INTO wallets (uid, balance) VALUES (p_creator_uid, 0) ON CONFLICT (uid) DO NOTHING;
+    UPDATE wallets
+       SET balance = wallets.balance + v_creator_share, updated_at = now()
+     WHERE uid = p_creator_uid
+     RETURNING wallets.balance INTO v_creator_balance;
+    INSERT INTO wallet_transactions (uid, amount, type, balance_after, description)
+    VALUES (p_creator_uid, v_creator_share, 'reward', v_creator_balance, 'ส่วนแบ่งรายได้: ' || p_description);
+  END IF;
+
+  RETURN QUERY SELECT v_balance, false, v_creator_share, v_platform_share;
 END;
 $$;
 
@@ -438,17 +570,61 @@ BEGIN
 END;
 $$;
 
--- Atomic purchase unlock: inserts unlock row, debits buyer, credits creator — single transaction
--- Supersedes the old insert-then-split flow in unlock.service.ts (V6/V7)
-CREATE OR REPLACE FUNCTION purchase_unlock_atomic(
-  p_uid          uuid,
-  p_version_id   uuid,
-  p_price        integer,
-  p_creator_uid  uuid,
-  p_platform_pct numeric,
-  p_description  text
+-- Atomic cast/toggle vote: upserts/toggles the caller's forum_votes row AND recalculates
+-- the target's totals in ONE transaction. Replaces the read-then-write flow in
+-- forum.service.ts that, under concurrent votes, could 500 on the (uid,target_type,
+-- target_id) PK or interleave delete/update/insert into an inconsistent state (FR-9).
+CREATE OR REPLACE FUNCTION cast_vote_atomic(
+  p_uid         uuid,
+  p_target_type text,
+  p_target_id   uuid,
+  p_vote_value  integer
 )
-RETURNS TABLE(balance integer, already_unlocked boolean, creator_share integer, platform_share integer)
+RETURNS TABLE(upvotes bigint, downvotes bigint)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_existing integer;
+BEGIN
+  -- Lock the caller's existing vote row (if any) so concurrent toggles serialize.
+  SELECT vote_value INTO v_existing
+    FROM forum_votes
+   WHERE uid = p_uid AND target_type = p_target_type AND target_id = p_target_id
+   FOR UPDATE;
+
+  IF NOT FOUND THEN
+    -- New vote. ON CONFLICT guards the rare concurrent-insert race (both saw no row).
+    INSERT INTO forum_votes (uid, target_type, target_id, vote_value)
+    VALUES (p_uid, p_target_type, p_target_id, p_vote_value)
+    ON CONFLICT (uid, target_type, target_id)
+      DO UPDATE SET vote_value = EXCLUDED.vote_value;
+  ELSIF v_existing = p_vote_value THEN
+    -- Same value again → toggle off.
+    DELETE FROM forum_votes
+     WHERE uid = p_uid AND target_type = p_target_type AND target_id = p_target_id;
+  ELSE
+    -- Opposite direction → switch.
+    UPDATE forum_votes SET vote_value = p_vote_value
+     WHERE uid = p_uid AND target_type = p_target_type AND target_id = p_target_id;
+  END IF;
+
+  RETURN QUERY SELECT * FROM recalculate_votes_atomic(p_target_type, p_target_id);
+END;
+$$;
+
+-- Atomic purchase unlock: re-reads price/status/creator INSIDE the txn so a concurrent
+-- price change or unpublish between read and debit cannot be exploited (FR-2).
+-- Supersedes the old insert-then-split flow in unlock.service.ts (V6/V7).
+DROP FUNCTION IF EXISTS purchase_unlock_atomic(uuid, uuid, integer, uuid, numeric, text);
+
+CREATE OR REPLACE FUNCTION purchase_unlock_atomic(
+  p_uid                uuid,
+  p_version_id         uuid,
+  p_platform_pct       numeric,
+  p_description_prefix text
+)
+RETURNS TABLE(balance integer, already_unlocked boolean, creator_share integer, platform_share integer, price_paid integer)
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
@@ -458,58 +634,123 @@ DECLARE
   v_creator_balance integer;
   v_platform_share  integer := 0;
   v_creator_share   integer := 0;
+  v_price           integer;
+  v_status          text;
+  v_creator_uid     uuid;
+  v_title_name      text;
+  v_description     text;
 BEGIN
+  -- Authoritative read inside the transaction — caller is not trusted for price/status.
+  SELECT cv.price_coins, cv.status, cv.translator_uid, cv.title_name
+    INTO v_price, v_status, v_creator_uid, v_title_name
+    FROM chapter_versions cv
+   WHERE cv.version_id = p_version_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'VERSION_NOT_FOUND';
+  END IF;
+  IF v_status <> 'published' THEN
+    RAISE EXCEPTION 'NOT_PUBLISHED';
+  END IF;
+  v_price := COALESCE(v_price, 0);
+  IF v_price > 0 AND v_creator_uid IS NULL THEN
+    RAISE EXCEPTION 'CREATOR_MISSING';
+  END IF;
+  v_description := p_description_prefix || COALESCE(v_title_name, 'Unknown Manga');
+
   INSERT INTO unlocks (uid, version_id, price_paid)
-  VALUES (p_uid, p_version_id, p_price)
+  VALUES (p_uid, p_version_id, v_price)
   ON CONFLICT (uid, version_id) DO NOTHING;
   GET DIAGNOSTICS v_rows = ROW_COUNT;
 
   IF v_rows = 0 THEN
     SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
-    RETURN QUERY SELECT COALESCE(v_balance, 0), true, 0, 0;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), true, 0, 0, v_price;
     RETURN;
   END IF;
 
-  IF p_price <= 0 THEN
+  IF v_price <= 0 THEN
     SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
-    RETURN QUERY SELECT COALESCE(v_balance, 0), false, 0, 0;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), false, 0, 0, 0;
     RETURN;
   END IF;
 
   INSERT INTO wallets (uid, balance) VALUES (p_uid, 0) ON CONFLICT (uid) DO NOTHING;
   UPDATE wallets
-     SET balance = wallets.balance - p_price, updated_at = now()
-   WHERE uid = p_uid AND wallets.balance >= p_price
+     SET balance = wallets.balance - v_price, updated_at = now()
+   WHERE uid = p_uid AND wallets.balance >= v_price
    RETURNING wallets.balance INTO v_balance;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'INSUFFICIENT_FUNDS';
   END IF;
 
   INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
-  VALUES (p_uid, -p_price, 'purchase', v_balance, p_description, p_version_id::text);
+  VALUES (p_uid, -v_price, 'purchase', v_balance, v_description, p_version_id::text);
 
-  v_platform_share := floor(p_price * p_platform_pct);
-  v_creator_share  := p_price - v_platform_share;
-  IF v_creator_share > 0 AND p_creator_uid IS NOT NULL THEN
-    INSERT INTO wallets (uid, balance) VALUES (p_creator_uid, 0) ON CONFLICT (uid) DO NOTHING;
+  v_platform_share := floor(v_price * p_platform_pct);
+  v_creator_share  := v_price - v_platform_share;
+  IF v_creator_share > 0 AND v_creator_uid IS NOT NULL THEN
+    INSERT INTO wallets (uid, balance) VALUES (v_creator_uid, 0) ON CONFLICT (uid) DO NOTHING;
     UPDATE wallets
        SET balance = wallets.balance + v_creator_share, updated_at = now()
-     WHERE uid = p_creator_uid
+     WHERE uid = v_creator_uid
      RETURNING wallets.balance INTO v_creator_balance;
     INSERT INTO wallet_transactions (uid, amount, type, balance_after, description)
-    VALUES (p_creator_uid, v_creator_share, 'reward', v_creator_balance, 'ส่วนแบ่งรายได้: ' || p_description);
+    VALUES (v_creator_uid, v_creator_share, 'reward', v_creator_balance, 'ส่วนแบ่งรายได้: ' || v_description);
   END IF;
 
-  RETURN QUERY SELECT v_balance, false, v_creator_share, v_platform_share;
+  RETURN QUERY SELECT v_balance, false, v_creator_share, v_platform_share, v_price;
 END;
 $$;
+
+-- Re-revoke PUBLIC execute on the new signature (service_role / backend only).
+REVOKE EXECUTE ON FUNCTION purchase_unlock_atomic(uuid, uuid, numeric, text) FROM anon, authenticated, PUBLIC;
 
 -- ─── SECURITY: Revoke PUBLIC execute on SECURITY DEFINER wallet RPCs ─────────
 -- These functions must only be callable by service_role (backend).
 -- PostgREST grants EXECUTE to PUBLIC by default — revoke explicitly.
 REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
-REVOKE EXECUTE ON FUNCTION purchase_unlock_atomic(uuid, uuid, integer, uuid, numeric, text) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION spend_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
+REVOKE EXECUTE ON FUNCTION cast_vote_atomic(uuid, text, uuid, integer) FROM anon, authenticated, PUBLIC;
+
+-- ─── 9. TRENDING MANGA RPC (FR-16) ───────────────────────────────────────────
+-- Group + rank trending manga in Postgres instead of pulling a 200-row sample into
+-- Node and tallying it (forum.service.ts getTrendingManga). The old JS path
+-- undercounted / mis-ranked once a manga's within-window posts spilled past the
+-- 200-row sample. This RPC reproduces the SAME filter semantics the JS tally used —
+-- non-null target_manga_id, non-null + non-empty target_manga_title, created within
+-- the last 7 days — but COUNT/ORDER run across the full table so ranking is correct
+-- at any post volume. title/cover are display tags cached identically on every post
+-- for a given manga, so max() picks a representative value. Backed by the existing
+-- idx_forum_posts_manga_created_at (target_manga_id, created_at DESC) index.
+--
+-- Deliberate improvement over the old JS tally: excludes soft-deleted posts
+-- (deleted_at IS NULL) from the trending count. The old JS tally never filtered
+-- deleted_at (an oversight), so this is a decided behavior change, not a
+-- like-for-like port. Consistent with the rest of the forum module's soft-delete
+-- convention (see idx_forum_posts_deleted_at).
+--
+-- Read-only over already-public forum data (the trending endpoint exposes exactly
+-- this), so it is a plain STABLE function — no SECURITY DEFINER, no REVOKE needed.
+CREATE OR REPLACE FUNCTION get_trending_manga(p_limit integer DEFAULT 5)
+RETURNS TABLE(manga_id text, manga_title text, manga_cover text, post_count bigint)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    target_manga_id                 AS manga_id,
+    max(target_manga_title)         AS manga_title,
+    max(target_manga_cover)         AS manga_cover,
+    count(*)                        AS post_count
+  FROM forum_posts
+  WHERE target_manga_id IS NOT NULL
+    AND target_manga_title IS NOT NULL
+    AND target_manga_title <> ''
+    AND created_at >= now() - interval '7 days'
+    AND deleted_at IS NULL
+  GROUP BY target_manga_id
+  ORDER BY post_count DESC
+  LIMIT p_limit;
+$$;
 
 COMMIT;

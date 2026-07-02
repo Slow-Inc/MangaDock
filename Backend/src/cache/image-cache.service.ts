@@ -91,21 +91,22 @@ export class ImageCacheService implements OnModuleInit {
 
     const dir = `${this.imageDir}/${bookId}/chapters/${chapterId}`;
 
+    // One list(dir) instead of one exists() per page (FR-19).
+    const cached = await this.listBasenames(dir);
+
     const missing: Array<{ url: string; key: string }> = [];
-    const results = await Promise.all(
-      pages.map(async (url, i) => {
-        const ext = this.extFrom(url);
-        const filename = `${prefix}${i}.${ext}`;
-        const key = `${dir}/${filename}`;
+    const results = pages.map((url, i) => {
+      const ext = this.extFrom(url);
+      const filename = `${prefix}${i}.${ext}`;
+      const key = `${dir}/${filename}`;
 
-        if (await this.storage.exists(key)) {
-          return `${this.publicPrefix}/${bookId}/chapters/${chapterId}/${filename}`;
-        }
+      if (cached.has(filename)) {
+        return `${this.publicPrefix}/${bookId}/chapters/${chapterId}/${filename}`;
+      }
 
-        missing.push({ url, key });
-        return url; // fall back to external URL for this request
-      }),
-    );
+      missing.push({ url, key });
+      return url; // fall back to external URL for this request
+    });
 
     if (missing.length > 0) {
       this.downloadBatch(missing, 4).catch(() => {
@@ -126,21 +127,22 @@ export class ImageCacheService implements OnModuleInit {
 
     const dir = `${this.imageDir}/${mangaId}/covers`;
 
+    // One list(dir) instead of one exists() per cover (FR-19).
+    const cached = await this.listBasenames(dir);
+
     const missing: Array<{ url: string; key: string }> = [];
-    const results = await Promise.all(
-      coverUrls.map(async (url, i) => {
-        const ext = this.extFrom(url);
-        const filename = `c${i}.${ext}`;
-        const key = `${dir}/${filename}`;
+    const results = coverUrls.map((url, i) => {
+      const ext = this.extFrom(url);
+      const filename = `c${i}.${ext}`;
+      const key = `${dir}/${filename}`;
 
-        if (await this.storage.exists(key)) {
-          return `${this.publicPrefix}/${mangaId}/covers/${filename}`;
-        }
+      if (cached.has(filename)) {
+        return `${this.publicPrefix}/${mangaId}/covers/${filename}`;
+      }
 
-        missing.push({ url, key });
-        return url;
-      }),
-    );
+      missing.push({ url, key });
+      return url;
+    });
 
     if (missing.length > 0) {
       this.downloadBatch(missing, 4).catch(() => {});
@@ -150,6 +152,22 @@ export class ImageCacheService implements OnModuleInit {
   }
 
   // ─── Internal helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Lists a directory once and returns the set of bare filenames it contains,
+   * so callers can membership-check many items with a single storage.list()
+   * call instead of one storage.exists() per item (FR-19). Tolerates both
+   * disk-style listings (bare filenames) and R2-style listings (full keys) by
+   * reducing every entry to its basename. Returns an empty set on error.
+   */
+  private async listBasenames(dir: string): Promise<Set<string>> {
+    try {
+      const entries = await this.storage.list(dir);
+      return new Set(entries.map((e) => e.split('/').pop() ?? e));
+    } catch {
+      return new Set();
+    }
+  }
 
   /**
    * Checks whether a local public path (e.g. /img-cache/bookId/thumbnail.jpg)

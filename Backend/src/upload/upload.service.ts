@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import * as crypto from 'crypto';
 import { fileTypeFromFile } from 'file-type';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -59,7 +60,7 @@ export class UploadService {
     // Mirrors forum.service uploadImage/uploadBanner. (#303)
     const detected = await fileTypeFromFile(tempFilePath);
     if (!detected || !ALLOWED_MIME_TYPES.has(detected.mime)) {
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+      await fsp.rm(tempFilePath, { force: true });
       throw new BadRequestException(
         'Unsupported image format. Only JPEG, PNG, WebP and GIF are accepted.',
       );
@@ -71,13 +72,14 @@ export class UploadService {
     const key = `${this.versionDir(versionId)}/${filename}`;
 
     try {
-      const fileData = fs.readFileSync(tempFilePath);
-      await this.storage.put(key, fileData, { contentType: mimeType });
+      // Stream the file straight to storage instead of buffering the whole
+      // page (up to ~10MB) into memory with a blocking readFileSync.
+      await this.storage.put(key, fs.createReadStream(tempFilePath), { contentType: mimeType });
       // Delete temp file after successful put
-      fs.unlinkSync(tempFilePath);
+      await fsp.rm(tempFilePath, { force: true });
     } catch (err) {
       this.logger.error(`Failed to upload page to storage: ${String(err)}`);
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+      await fsp.rm(tempFilePath, { force: true });
       throw new Error('Failed to upload page to storage');
     }
 

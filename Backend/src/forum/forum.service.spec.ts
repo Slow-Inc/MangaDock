@@ -47,45 +47,245 @@ function makeService(fromImpl: (table: string) => any, rpcImpl?: jest.Mock) {
 describe('ForumService.vote', () => {
   let service: ForumService;
   let mockChain: ReturnType<typeof buildMockChain>;
+  let mockRpc: jest.Mock;
 
   const dto = { targetType: 'post' as const, targetId: 'p1', voteValue: 1 as const };
 
   beforeEach(() => {
     mockChain = buildMockChain();
-    service = makeService(() => mockChain);
-    jest.spyOn(service as any, 'recalculateVotes').mockResolvedValue({ upvotes: 1, downvotes: 0 });
+    mockRpc = jest.fn().mockResolvedValue({ data: [{ upvotes: 5, downvotes: 2 }], error: null });
+    service = makeService(() => mockChain, mockRpc);
+    mockForumEvents.broadcastPostEvent.mockClear();
   });
 
-  it('toggle off: deletes existing vote when user votes the same value again', async () => {
-    mockChain.maybeSingle.mockResolvedValue({ data: { uid: 'u1', vote_value: 1 }, error: null });
+  it('casts the vote atomically via cast_vote_atomic without a read-then-write on forum_votes', async () => {
+    const result = await service.vote('u1', dto);
 
-    await service.vote('u1', dto);
-
-    expect(mockChain.delete).toHaveBeenCalled();
-    expect(mockChain.match).toHaveBeenCalledWith(expect.objectContaining({ uid: 'u1' }));
+    expect(mockRpc).toHaveBeenCalledWith('cast_vote_atomic', {
+      p_uid: 'u1',
+      p_target_type: 'post',
+      p_target_id: 'p1',
+      p_vote_value: 1,
+    });
+    // The race-prone select/insert/update/delete on forum_votes must be gone.
     expect(mockChain.insert).not.toHaveBeenCalled();
-  });
-
-  it('new vote: inserts row when no existing vote is found', async () => {
-    mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-
-    await service.vote('u1', dto);
-
-    expect(mockChain.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ uid: 'u1', target_id: 'p1', vote_value: 1 }),
-    );
-    expect(mockChain.delete).not.toHaveBeenCalled();
     expect(mockChain.update).not.toHaveBeenCalled();
+    expect(mockChain.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ upvotes: 5, downvotes: 2 });
   });
 
-  it('switch vote: updates row when existing vote is in the opposite direction', async () => {
-    mockChain.maybeSingle.mockResolvedValue({ data: { uid: 'u1', vote_value: -1 }, error: null });
+  it('returns the upvote/downvote totals produced by the RPC', async () => {
+    mockRpc.mockResolvedValue({ data: [{ upvotes: 10, downvotes: 3 }], error: null });
 
-    await service.vote('u1', dto); // dto.voteValue = 1, existing = -1
+    const result = await service.vote('u1', dto);
 
-    expect(mockChain.update).toHaveBeenCalledWith({ vote_value: 1 });
-    expect(mockChain.delete).not.toHaveBeenCalled();
-    expect(mockChain.insert).not.toHaveBeenCalled();
+    expect(result).toEqual({ upvotes: 10, downvotes: 3 });
+  });
+
+  it('coerces bigint totals returned as strings into numbers', async () => {
+    // Postgres bigint can serialize as a string over PostgREST.
+    mockRpc.mockResolvedValue({ data: [{ upvotes: '8', downvotes: '1' }], error: null });
+
+    const result = await service.vote('u1', dto);
+
+    expect(result).toEqual({ upvotes: 8, downvotes: 1 });
+  });
+
+  it('throws when the RPC returns an error', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'deadlock detected' } });
+
+    await expect(service.vote('u1', dto)).rejects.toThrow('Vote failed');
+  });
+
+  it('broadcasts a post vote event with the new totals', async () => {
+    await service.vote('u1', dto);
+
+    expect(mockForumEvents.broadcastPostEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'vote',
+        postId: 'p1',
+        targetType: 'post',
+        targetId: 'p1',
+        upvotes: 5,
+        downvotes: 2,
+      }),
+    );
+  });
+
+  it('resolves postId via a forum_comments lookup when voting on a comment', async () => {
+    const commentDto = { targetType: 'comment' as const, targetId: 'c1', voteValue: 1 as const };
+    mockChain.single.mockResolvedValue({ data: { post_id: 'p9' }, error: null });
+
+    await service.vote('u1', commentDto);
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      'cast_vote_atomic',
+      expect.objectContaining({ p_target_type: 'comment', p_target_id: 'c1' }),
+    );
+    expect(mockForumEvents.broadcastPostEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'vote', postId: 'p9', targetType: 'comment', targetId: 'c1' }),
+    );
+  });
+});
+
+// ── null-safe comment count (FR-10) ─────────────────────────────────────────────
+
+describe('ForumService.listPosts / getPost — null-safe comment count', () => {
+  const baseRow = {
+    id: 'p1',
+    author_uid: 'u1',
+    title: 'T',
+    content: 'C',
+    category: 'general',
+    target_manga_id: null,
+    target_manga_title: null,
+    target_manga_cover: null,
+    image_urls: null,
+    upvotes: 0,
+    downvotes: 0,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    author: { display_name: 'A', photo_url: null, role: 'user' },
+    comments: null as Array<{ count: number }> | null, // null embed — the bug trigger
+  };
+
+  it('listPosts returns commentCount 0 when the comments embed is null', async () => {
+    const chain = buildMockChain({
+      range: jest.fn().mockResolvedValue({ data: [baseRow], count: 1, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    const result = await service.listPosts();
+
+    expect(result.items[0].commentCount).toBe(0);
+  });
+
+  it('listPosts reads the count from a populated comments embed', async () => {
+    const chain = buildMockChain({
+      range: jest.fn().mockResolvedValue({
+        data: [{ ...baseRow, comments: [{ count: 7 }] }],
+        count: 1,
+        error: null,
+      }),
+    });
+    const service = makeService(() => chain);
+
+    const result = await service.listPosts();
+
+    expect(result.items[0].commentCount).toBe(7);
+  });
+
+  it('getPost returns commentCount 0 when the comments embed is null', async () => {
+    const chain = buildMockChain({
+      single: jest.fn().mockResolvedValue({ data: baseRow, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    const result = await service.getPost('p1');
+
+    expect(result.commentCount).toBe(0);
+  });
+
+  it('getPost reads the count from a populated comments embed', async () => {
+    const chain = buildMockChain({
+      single: jest.fn().mockResolvedValue({ data: { ...baseRow, comments: [{ count: 5 }] }, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    const result = await service.getPost('p1');
+
+    expect(result.commentCount).toBe(5);
+  });
+});
+
+// ── embedded comment count excludes soft-deleted rows (FR-17) ──────────────────
+// The embedded `comments:forum_comments(count)` must count only rows with
+// deleted_at IS NULL, so the number shown next to a post matches what
+// listComments (which already filters deleted_at) returns to a reader.
+
+describe('ForumService — embedded comment count excludes soft-deleted rows (FR-17)', () => {
+  const baseRow = {
+    id: 'p1',
+    author_uid: 'u1',
+    title: 'T',
+    content: 'C',
+    category: 'general',
+    target_manga_id: null,
+    target_manga_title: null,
+    target_manga_cover: null,
+    image_urls: null,
+    upvotes: 0,
+    downvotes: 0,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    author: { display_name: 'A', photo_url: null, role: 'user' },
+    comments: [{ count: 3 }] as Array<{ count: number }>,
+  };
+
+  it('listPosts filters the embedded comment count on deleted_at IS NULL', async () => {
+    const chain = buildMockChain({
+      range: jest.fn().mockResolvedValue({ data: [baseRow], count: 1, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    await service.listPosts();
+
+    expect(chain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+  });
+
+  it('getPost filters the embedded comment count on deleted_at IS NULL', async () => {
+    const chain = buildMockChain({
+      single: jest.fn().mockResolvedValue({ data: baseRow, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    await service.getPost('p1');
+
+    expect(chain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+  });
+
+  it('getPublicProfile filters embedded comment counts for both authored and liked posts', async () => {
+    // Two forum_posts queries run: authored posts (ends with .limit) and liked
+    // posts (ends with .is). Route each to its own chain so both can be asserted.
+    const authoredChain = buildMockChain({
+      limit: jest.fn().mockResolvedValue({ data: [baseRow], error: null }),
+    });
+    const likedChain = buildMockChain(); // ends on .is → returns the chain object
+    const forumPostsChains = [authoredChain, likedChain];
+
+    const fromImpl = (table: string) => {
+      switch (table) {
+        case 'profiles':
+          return buildMockChain({
+            single: jest.fn().mockResolvedValue({
+              data: { uid: 'u1', role: 'user', display_name: 'A' },
+              error: null,
+            }),
+          });
+        case 'forum_posts':
+          return forumPostsChains.shift();
+        case 'forum_comments':
+          return buildMockChain({ limit: jest.fn().mockResolvedValue({ data: [], error: null }) });
+        case 'forum_votes':
+          // One liked post id so the liked-posts query (site 253) runs.
+          return buildMockChain({
+            limit: jest.fn().mockResolvedValue({
+              data: [{ target_id: 'p2', created_at: '2024-01-01T00:00:00Z' }],
+              error: null,
+            }),
+          });
+        case 'chapter_versions':
+          return buildMockChain({ in: jest.fn().mockResolvedValue({ data: [], error: null }) });
+        default:
+          return buildMockChain();
+      }
+    };
+    const service = makeService(fromImpl);
+
+    await service.getPublicProfile('u1');
+
+    expect(authoredChain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+    expect(likedChain.is).toHaveBeenCalledWith('comments.deleted_at', null);
   });
 });
 
@@ -165,50 +365,64 @@ describe('ForumService.listComments — tree assembly', () => {
 // ── getTrendingManga ───────────────────────────────────────────────────────────
 
 describe('ForumService.getTrendingManga', () => {
-  const makePost = (mangaId: string, title: string) => ({
-    target_manga_id: mangaId,
-    target_manga_title: title,
-    target_manga_cover: `${mangaId}.jpg`,
+  // The RPC returns rows already grouped + ranked by Postgres (snake_case columns,
+  // post_count arrives as a bigint string over PostgREST).
+  const makeRow = (mangaId: string, postCount: number) => ({
+    manga_id: mangaId,
+    manga_title: `Manga ${mangaId}`,
+    manga_cover: `${mangaId}.jpg`,
+    post_count: String(postCount),
   });
 
-  it('groups posts by manga and sorts by postCount descending', async () => {
-    const posts = [
-      makePost('m1', 'Manga A'),
-      makePost('m2', 'Manga B'),
-      makePost('m1', 'Manga A'),
-      makePost('m2', 'Manga B'),
-      makePost('m2', 'Manga B'),
-    ];
-    const chain = buildMockChain({
-      limit: jest.fn().mockResolvedValue({ data: posts, error: null }),
+  it('computes trending via the get_trending_manga RPC, not an in-Node tally of a row sample', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: [makeRow('m2', 3), makeRow('m1', 2)],
+      error: null,
     });
-    const service = makeService(() => chain);
+    // from() must not be used for trending — a table-scan-then-tally is the bug we removed.
+    const from = jest.fn(() => {
+      throw new Error('forum_posts should not be scanned for trending');
+    });
+    const service = makeService(from, rpc);
 
     const result = await service.getTrendingManga(5);
 
-    expect(result[0].mangaId).toBe('m2');
-    expect(result[0].postCount).toBe(3);
-    expect(result[1].mangaId).toBe('m1');
-    expect(result[1].postCount).toBe(2);
+    expect(rpc).toHaveBeenCalledWith('get_trending_manga', { p_limit: 5 });
+    expect(from).not.toHaveBeenCalled();
+    expect(result).toEqual([
+      { mangaId: 'm2', mangaTitle: 'Manga m2', mangaCover: 'm2.jpg', postCount: 3 },
+      { mangaId: 'm1', mangaTitle: 'Manga m1', mangaCover: 'm1.jpg', postCount: 2 },
+    ]);
   });
 
-  it('respects the limit parameter', async () => {
-    const posts = Array.from({ length: 10 }, (_, i) => makePost(`m${i}`, `Manga ${i}`));
-    const chain = buildMockChain({
-      limit: jest.fn().mockResolvedValue({ data: posts, error: null }),
+  it('preserves the DB ranking (correct beyond a 200-row sample) and coerces bigint counts', async () => {
+    // A manga with more within-window activity outranks one Postgres ordered lower —
+    // the service must trust the DB order, not re-sample/re-sort locally.
+    const rpc = jest.fn().mockResolvedValue({
+      data: [makeRow('hot', 5000), makeRow('warm', 4999), makeRow('cool', 10)],
+      error: null,
     });
-    const service = makeService(() => chain);
+    const service = makeService(() => ({}), rpc);
 
-    const result = await service.getTrendingManga(3);
+    const result = await service.getTrendingManga(5);
 
-    expect(result).toHaveLength(3);
+    expect(result.map(r => r.mangaId)).toEqual(['hot', 'warm', 'cool']);
+    expect(result.map(r => r.postCount)).toEqual([5000, 4999, 10]);
+    expect(typeof result[0].postCount).toBe('number');
+  });
+
+  it('passes the limit through to the RPC', async () => {
+    const rpc = jest.fn().mockResolvedValue({ data: [], error: null });
+    const service = makeService(() => ({}), rpc);
+
+    await service.getTrendingManga(3);
+
+    expect(rpc).toHaveBeenCalledWith('get_trending_manga', { p_limit: 3 });
   });
 
   it('returns empty array on Supabase error without throwing', async () => {
-    const chain = buildMockChain({
-      limit: jest.fn().mockResolvedValue({ data: null, error: { message: 'DB failure' } }),
-    });
-    const service = makeService(() => chain);
+    const rpc = jest.fn().mockResolvedValue({ data: null, error: { message: 'DB failure' } });
+    const service = makeService(() => ({}), rpc);
 
     await expect(service.getTrendingManga()).resolves.toEqual([]);
   });

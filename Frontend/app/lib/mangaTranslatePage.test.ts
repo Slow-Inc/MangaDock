@@ -7,7 +7,11 @@
  */
 import { afterEach, expect, test } from "bun:test";
 
-import { translateMangaChapterBatchPatches, translateMangaPagePatches } from "./mangaTranslatePage";
+import {
+  isCaptchaExpiredError,
+  translateMangaChapterBatchPatches,
+  translateMangaPagePatches,
+} from "./mangaTranslatePage";
 
 const realFetch = globalThis.fetch;
 
@@ -100,6 +104,32 @@ test("non-OK batch response throws instead of resolving silently", async () => {
       () => {},
     ),
   ).rejects.toThrow("Batch translate failed (500)");
+});
+
+// ─── Captcha-expiry detection (#227): a 401 must re-prompt the Turnstile ─────
+// The translate endpoints are gated only by the captcha TurnstileGuard, so a
+// 401 from them always means the HWID-bound clearance token expired — the UI
+// must re-show the captcha instead of dead-ending on an error toast.
+
+test("isCaptchaExpiredError is true for the single-page 401 throw", () => {
+  const err = new Error(
+    'Manga page patch translation failed (401): {"statusCode":401,"message":"Captcha clearance token is invalid, expired"}',
+  );
+  expect(isCaptchaExpiredError(err)).toBe(true);
+});
+
+test("isCaptchaExpiredError is true for the batch 401 throw", () => {
+  expect(isCaptchaExpiredError(new Error("Batch translate failed (401): unauthorized"))).toBe(true);
+});
+
+test("isCaptchaExpiredError is false for a 500 (service error, not captcha)", () => {
+  expect(isCaptchaExpiredError(new Error("Batch translate failed (500): MIT not ready"))).toBe(false);
+});
+
+test("isCaptchaExpiredError is false for a network error and for non-Error input", () => {
+  expect(isCaptchaExpiredError(new Error("Failed to fetch"))).toBe(false);
+  expect(isCaptchaExpiredError("some string")).toBe(false);
+  expect(isCaptchaExpiredError(null)).toBe(false);
 });
 
 // ─── Series context (#157): mangaId rides the translate requests ─────────────

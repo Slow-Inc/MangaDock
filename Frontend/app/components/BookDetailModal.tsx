@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { errMessage } from "@/lib/errMessage";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import TopupModal from "./TopupModal";
 import type Lenis from "lenis";
 import { createPortal } from "react-dom";
 import CoverLightbox from "./CoverLightbox";
@@ -125,7 +125,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
   // Coin / Unlock state
-  const router = useRouter();
+  const [topupOpen, setTopupOpen] = useState(false);
   const { user, getIdToken } = useAuth();
   const [coinBalance, setCoinBalance] = useState<number | null>(null);
   const [unlockedVersions, setUnlockedVersions] = useState<Set<string>>(new Set());
@@ -338,8 +338,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     } catch (err: unknown) {
       const msg = errMessage(err);
       if (msg.includes("Insufficient") || msg.includes("ไม่พอ")) {
-        const returnTo = typeof window !== "undefined" ? window.location.pathname : "/";
-        router.push(`/wallet/topup?returnTo=${encodeURIComponent(returnTo)}`);
+        setTopupOpen(true);
       } else {
         alert(msg || "ไม่สามารถปลดล็อคได้");
       }
@@ -984,7 +983,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   </h3>
                   {coinBalance !== null && (
                     <button
-                      onClick={() => router.push(`/wallet/topup?returnTo=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "/")}`)}
+                      onClick={() => setTopupOpen(true)}
                       className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300 transition hover:bg-amber-500/25"
                       title="เติมเหรียญ"
                     >
@@ -1253,6 +1252,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
             onClose={() => setActiveChapter(null)}
           />
         )}
+        <TopupModal isOpen={topupOpen} onClose={() => setTopupOpen(false)} />
       </>
     );
   }
@@ -1273,6 +1273,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
           onClose={() => setActiveChapter(null)}
         />
       )}
+      <TopupModal isOpen={topupOpen} onClose={() => setTopupOpen(false)} />
     </>
   );
 }

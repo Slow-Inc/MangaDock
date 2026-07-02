@@ -16,6 +16,18 @@ import { safeTokenEqual } from './xendit-webhook.config';
 /** Hard upper bound per single coin mutation — bounds INTEGER-column overflow and abuse. */
 export const MAX_TOPUP_COINS = 100000;
 
+/**
+ * THB charged per coin credited. Topup currency is THB-only today and the ratio
+ * is 1:1, but "THB amount settled" and "coins to credit" are distinct units —
+ * this makes the conversion explicit at the webhook-verification comparison so a
+ * future pricing change (e.g. a promo ratio) can't silently break the check by
+ * comparing two differently-unitized numbers as if they were interchangeable.
+ */
+export const THB_PER_COIN = 1;
+
+/** Currency Xendit is configured to settle in; re-asserted on webhook verify. */
+export const TOPUP_CURRENCY = 'THB';
+
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
@@ -293,6 +305,17 @@ export class WalletService {
     return { simulated: true };
   }
 
+  private async revertClaim(paymentId: string): Promise<void> {
+    const { error } = await this.db
+      .from('coin_topups')
+      .update({ status: 'pending' })
+      .eq('payment_id', paymentId)
+      .eq('status', 'paid');
+    if (error) {
+      this.logger.warn(`revertClaim failed for ${paymentId}: ${error.message}`);
+    }
+  }
+
   async processXenditWebhook(
     payload: Record<string, any>,
     token: string,
@@ -375,35 +398,54 @@ export class WalletService {
     try {
       verified = await this.xenditService.getPaymentRequest(paymentId);
     } catch (err) {
-      await this.db
-        .from('coin_topups')
-        .update({ status: 'pending' })
-        .eq('payment_id', paymentId)
-        .eq('status', 'paid');
+      await this.revertClaim(paymentId);
       this.logger.error(`Webhook verify failed (Xendit unreachable) for ${paymentId}: ${String(err)}`);
       throw new InternalServerErrorException('Payment verification failed');
     }
 
-    if (verified.status !== 'SUCCEEDED' || Number(verified.amount) !== claimed.amount_coins) {
-      await this.db
-        .from('coin_topups')
-        .update({ status: 'pending' })
-        .eq('payment_id', paymentId)
-        .eq('status', 'paid');
+    // Expected THB Xendit should have settled for this claim, derived from the coin
+    // count via the explicit THB_PER_COIN conversion (units are NOT interchangeable).
+    const expectedThb = claimed.amount_coins * THB_PER_COIN;
+    if (
+      verified.status !== 'SUCCEEDED' ||
+      verified.currency !== TOPUP_CURRENCY ||
+      Number(verified.amount) !== expectedThb
+    ) {
+      await this.revertClaim(paymentId);
       this.logger.error(
         `SECURITY: webhook verification mismatch for ${paymentId} — ` +
-          `xenditStatus=${verified.status} xenditAmount=${verified.amount} expected=${claimed.amount_coins}`,
+          `xenditStatus=${verified.status} xenditCurrency=${verified.currency} ` +
+          `xenditAmount=${verified.amount} expectedCurrency=${TOPUP_CURRENCY} expectedThb=${expectedThb}`,
       );
       throw new UnauthorizedException('Payment verification failed');
     }
 
-    const { balance } = await this.addCoins(
-      claimed.uid,
-      claimed.amount_coins,
-      'topup',
-      'เติมเหรียญ MangaDock',
-      paymentId,
-    );
+    let balance: number;
+    try {
+      ({ balance } = await this.addCoins(
+        claimed.uid,
+        claimed.amount_coins,
+        'topup',
+        'เติมเหรียญ MangaDock',
+        paymentId,
+      ));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // DB-level topup idempotency (wallet_tx_topup_ref_uidx) means this payment was
+      // already credited once. Treat as success: do NOT revert, re-read the balance, emit.
+      if (/duplicate key|wallet_tx_topup_ref_uidx/i.test(msg)) {
+        const current = await this.getBalance(claimed.uid);
+        this.walletEvents.emit(paymentId, { balance: current });
+        return { received: true };
+      }
+      // Genuine credit failure: revert the claim so a Xendit retry re-processes it,
+      // then rethrow so Xendit receives a 5xx and retries.
+      await this.revertClaim(paymentId);
+      this.logger.error(
+        `Webhook credit failed after claim for ${paymentId}: ${msg} — claim reverted to pending for retry`,
+      );
+      throw err;
+    }
 
     // Emit SSE after addCoins succeeds — security ordering invariant
     this.walletEvents.emit(paymentId, { balance });

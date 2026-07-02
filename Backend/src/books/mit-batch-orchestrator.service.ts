@@ -444,6 +444,10 @@ export class MitBatchOrchestrator {
       if (cached?.data?.patches) {
         // Serve from cache immediately — direct call
         listener(p.pageIndex, { patches: cached.data.patches });
+        // FR-8: record in completedPages so latecomers receive cached pages on attach
+        placeholderJob.completedPages.set(p.pageIndex, {
+          patches: cached.data.patches,
+        });
       } else {
         uncachedPages.push(p);
       }
@@ -465,8 +469,10 @@ export class MitBatchOrchestrator {
     }
 
     // 2. Finalize job state using the placeholder already in the registry
+    // expectedCount stays at pages.length (set at placeholder creation) — FR-8:
+    // completedPages now holds cached pages from the start, so expectedCount must
+    // equal the TOTAL page count or maybeComplete would fire too early.
     const job = placeholderJob;
-    job.expectedCount = uncachedPages.length;
 
     // 3. Inner notify: record completion + fan-out through the shared deliver() sink.
     const notify = (pageIndex: number, result: PageResult) => {
