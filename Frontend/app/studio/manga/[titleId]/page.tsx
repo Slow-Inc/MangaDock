@@ -15,6 +15,7 @@ import {
 import type { ChapterVersion } from "../../../lib/types";
 import { StudioChaptersSkeleton } from "../../components/StudioSkeleton";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { CoverImage } from "../../components/CoverImage";
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   draft: { label: "แบบร่าง", color: "text-white/40 bg-white/10" },
@@ -231,30 +232,6 @@ function ChapterGroup({
       )}
     </div>
   );
-}
-
-function CoverImage({ src, alt, className }: {
-  src: string;
-  alt: string;
-  className: string;
-}) {
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    const img = new window.Image();
-    img.onload = () => {
-      if (img.naturalWidth === 0) setFailed(true);
-    };
-    img.onerror = () => setFailed(true);
-    img.src = src;
-  }, [src]);
-
-  if (failed) {
-    return <div className="flex h-full w-full items-center justify-center"><span className="text-2xl">📖</span></div>;
-  }
-
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setFailed(true)} />;
 }
 
 export default function MangaDetailPage() {
