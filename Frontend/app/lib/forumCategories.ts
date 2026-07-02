@@ -1,6 +1,6 @@
 import type { ForumCategory } from "./types/forum";
 
-const ALL_CATEGORIES: readonly ForumCategory[] = [
+export const CATEGORY_LIST: readonly ForumCategory[] = [
   "general",
   "announcement",
   "spoiler",
@@ -16,6 +16,6 @@ export function isRestrictedCategory(cat: ForumCategory): boolean {
 }
 
 export function availableCategories(role: string | null | undefined): ForumCategory[] {
-  if (PRIVILEGED_ROLES.has(role ?? "")) return [...ALL_CATEGORIES];
-  return ALL_CATEGORIES.filter((cat) => !RESTRICTED.has(cat));
+  if (PRIVILEGED_ROLES.has(role ?? "")) return [...CATEGORY_LIST];
+  return CATEGORY_LIST.filter((cat) => !RESTRICTED.has(cat));
 }
