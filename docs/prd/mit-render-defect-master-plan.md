@@ -186,6 +186,31 @@ bubbled regions (a `bubble_box` present) should fill the interior (cap = interio
 bubble-fit), only narration (no bubble) caps at the flat size. Plus KP line-break (#180) for line
 parity. This is the `fills_bubble_width` discriminator problem (item-2b) surfacing — tracked under #430/#432.
 
+## 7c. Phase-4 hits the detection boundary (2026-07-02, trace-confirmed)
+
+Added a per-role cap (`_reference_cap`: bubbled → fill interior, narration → flat) and re-verified.
+**It did NOT fix Thai under-fill.** The sizing trace (reference_layout ON, Gal Yome ds20) shows why —
+all three Thai dialogue regions:
+
+```
+route=clean_layout  has_bubble=False  orig=80 final=26  fill_frac_h=0.19   (dialogue, but no bubble)
+route=clean_layout  has_bubble=False  orig=44 final=22  fill_frac_h=0.35
+route=clean_layout  has_bubble=False  orig=33 final=22  fill_frac_h=0.57
+```
+
+`has_bubble=False` — **det_bubble_seg missed these oval/tall balloons** (item-2 root cause #1). With
+no bubble mask, the renderer treats them as narration → flat cap → under-fill. **This is a hard
+boundary: One-Punch narration is *also* `has_bubble=False` and *should* stay small, so `has_bubble`
+is the only signal that separates "dialogue in an undetected bubble" from "real narration" — and it's
+false for both.** `orig_fs` can't disambiguate either (JP narration is big-font too, which is exactly
+why the old `clean_layout_target_fs`/track-orig-fs over-sized One-Punch while "accidentally" filling
+Thai). **No render-only rule wins both without the bubble mask.**
+
+**⇒ reference_layout default-on is blocked on bubble DETECTION coverage (#170 / a detection-model
+change), not render.** The render engine is correct for detected bubbles. Next real lever: improve
+`det_bubble_seg` recall on egg/oval/tall balloons (out of render scope) — then flip reference_layout on.
+Until then it stays OFF (verified: flipping it on trades One-Punch oversize for Thai under-fill).
+
 ## 8. Immediate next actions
 
 1. Render-only replay fixture spec + dump/replay CLI (One-Punch + the 2026-07-02 oversize region +
