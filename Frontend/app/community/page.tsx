@@ -13,9 +13,12 @@ import { useLocalLenis } from "../hooks/useLocalLenis";
 import { useFeedStream } from "../hooks/useForumStream";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "../lib/forumCategories";
+import { useToast } from "../contexts/ToastContext";
+import { CommunityErrorBoundary } from "./components/CommunityErrorBoundary";
 
 function CommunityContent() {
   const { user, userRole, showLoginPrompt } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -88,12 +91,12 @@ function CommunityContent() {
     try {
       const res = await listPosts({ category, mangaId, sort });
       setPosts(res.items);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      showToast({ type: "error", message: "โหลดโพสต์ไม่สำเร็จ กรุณาลองใหม่", duration: 4000 });
     } finally {
       setLoading(false);
     }
-  }, [category, mangaId, sort]);
+  }, [category, mangaId, sort, showToast]);
 
   useEffect(() => {
     fetchPosts();
@@ -443,12 +446,14 @@ function CommunityContent() {
 
 export default function CommunityPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#141414] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
-      </div>
-    }>
-      <CommunityContent />
-    </Suspense>
+    <CommunityErrorBoundary>
+      <Suspense fallback={
+        <div className="min-h-screen bg-[#141414] flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+        </div>
+      }>
+        <CommunityContent />
+      </Suspense>
+    </CommunityErrorBoundary>
   );
 }
