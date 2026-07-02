@@ -374,6 +374,11 @@ class DetectorConfig(BaseModel):
     """#170: run a speech-balloon segmentation YOLO alongside the text detector
     and tag each text-line region with its balloon mask (renderer area,
     mask-aware crop, OCR scoping). Off → pipeline byte-identical."""
+    det_bubble_synth: bool = False
+    """#170/#178: when det_bubble_seg misses a region's balloon (YOLO recall gap on oval/tall
+    bubbles → dialogue treated as narration + under-filled), synthesize one with a classical
+    flood-fill, accepted only through acceptable_synth_bubble (encloses text, not a page leak).
+    Requires det_bubble_seg. Off → byte-identical."""
     det_sfx: bool = False
     """#168: run a second SFX/display-text detector (AnimeText YOLO) after DBNet
     and merge its boxes (IoA dedup) into the textline flow, so stylized katakana

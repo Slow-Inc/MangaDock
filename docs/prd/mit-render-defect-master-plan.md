@@ -211,6 +211,23 @@ change), not render.** The render engine is correct for detected bubbles. Next r
 `det_bubble_seg` recall on egg/oval/tall balloons (out of render scope) — then flip reference_layout on.
 Until then it stays OFF (verified: flipping it on trades One-Punch oversize for Thai under-fill).
 
+## 7d. Detection-recall fallback started — validator done, wiring in the WRONG path (2026-07-02)
+
+Built the classical flood-fill balloon fallback for the has_bubble=False root:
+- `acceptable_synth_bubble` gate (pure, TDD'd) — accepts a synth bubble only if it encloses the text,
+  is bigger than it, and isn't a page/panel leak. Committed.
+- Wired into `_tag_regions_with_bubbles` behind `det.det_bubble_synth` (flag OFF → byte-identical).
+
+**Verify (flag ON) — did NOT fix Thai; the worker log shows why:** no `[BubbleSeg]` line at all on a
+`/translate/with-form/image` render — `_tag_regions_with_bubbles` **does not run in the patch/image
+render path**. Bubble boxes for that path are assigned elsewhere (see `patch_geometry.py:28-34`, which
+sets `local_region.bubble_box`). So the synth fallback is wired at a seam the actual render doesn't use.
+One-Punch showed no regression only because the fallback never ran.
+
+**⇒ next: find the real bubble-assignment seam for the patch/image path (`patch_geometry`) and add the
+synth fallback there** (gated + validated the same way), then re-verify both targets. The validator +
+config flag are reusable; only the call site moves. Flag stays OFF until it actually runs + verifies.
+
 ## 8. Immediate next actions
 
 1. Render-only replay fixture spec + dump/replay CLI (One-Punch + the 2026-07-02 oversize region +
