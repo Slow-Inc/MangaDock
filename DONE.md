@@ -39,6 +39,18 @@
 
 ---
 
+## Staff Console — PRD + ADR 018 + Phase-1 issues, out-of-band observability (2026-06-14)
+
+Designed the **Staff Console** (role-tiered back-office: Moderator/Admin/Dev) off the 2026-06-14 9arm incident (gateway `gateway.9arm.co` up, but `qwen3.6-35b-a3b` model hung → cryptic `'ollama servers did not respond quickly enough'` after ~90s; root-caused by black-box probe — `/models` OK 0.19s, a 16-token completion timed out 151s = inference backend hung, external). A full `/grill-me` pass settled the design, then a resilience review reshaped the Dev console's data plane.
+
+- **Key decision (ADR 018):** a monitor must not share a failure domain with what it monitors → a **standalone Node-Fastify aggregator microservice** (out of the Backend, runnable local/separate host) subscribes to a per-service `/status/stream` SSE on Frontend/Backend/MIT; each multiplexes **sampled `{type:metric}`** (VRAM/CPU/temp via `torch.cuda`+`psutil`+`nvidia-smi`, zero new dep) + **pushed `{type:event}`** (translate-triggered/stage/log/error). UI stays in the Frontend (`/staff/system`, shadcn). External uptime monitor → Discord = out-of-band backstop.
+- **Auth (zero-trust, no shared secret):** orthogonal `profiles.staffLevel` (none<moderator<admin<dev), injected as a **signed JWT claim** via a Supabase Custom Access Token Hook; the dashboard forwards the dev JWT and **each service verifies independently** (signature + expiry + claim), streams re-validate ~60s + close on expiry; MIT gains PyJWT verify.
+- **Published (bilingual, `ready-for-agent`):** PRD **#279** + Phase-1 slices **#280** (1a RBAC+signed-claim+shell) → **#285** (1f aggregator+streams) → **#282** (1b health board, the incident fix) / **#283** (1c tracer+queue) / **#284** (1d GPU/host); **#281** (1e precise error) independent. **ADR 018** `docs/adr/018-staff-console-out-of-band-observability-aggregator.md` + indexed in the ADR README.
+- **MIT modules built (TDD + karpathy, branch `feat/mit-staff-observability`, MIT-only — Frontend/Backend deferred while akkanop-x refactors them):** `server/diagnostics.py` (cheap bounded gateway probe, decoupled from the worker pool → `ok/slow/timeout`·model-down-vs-gateway-down`/auth/unreachable/model_missing`; the 2026-06-14 incident reads `timeout` + "gateway /models OK but chat completion timed out — model not responding"; 7 tests) · `server/translate_error.py` (`classify_translate_error` → structured `{stage,translator,endpoint,model,cause,hint}`, wired at the `custom_openai` timeout raise → worker log + backend response carry it instead of the opaque string; 4 tests) · `server/metrics.py` (`parse_nvidia_smi` + `host_metrics` (psutil), `collect` degrades host-only when no GPU, zero new dep; 5 tests). 16 new tests, **full MIT suite 463 passed / 19 pre-existing async / 0 new**. PIPELINE.md §5 + ADR 018 referenced. SSE `/status/stream` endpoint + JWT verify deferred (need 1a's Supabase signed-claim hook = Backend/Supabase).
+- **Side fix:** shadcn MCP cwd gotcha — Claude Code `.mcp.json` has no `cwd` field → added wrapper `Frontend/run-shadcn-mcp.ps1` so the server runs in `Frontend/` and reads `components.json` (`@react-bits` + `radix-rhea`); needs a full Claude Code restart (reconnect does not reload config).
+
+---
+
 ## Coin Topup System — Xendit PromptPay QR (2026-06-19, sandbox)
 
 **Goal:** Implement real payment flow for coin topup — replacing the dev-only `POST /wallet/topup` stub that throws 403 in production.

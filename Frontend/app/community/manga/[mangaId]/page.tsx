@@ -9,7 +9,9 @@ import { listPosts, createPost } from "../../../lib/communityApi";
 import { useAuth } from "../../../contexts/AuthContext";
 import PostImageUploader from "../../../components/PostImageUploader";
 import { useLocalLenis } from "../../../hooks/useLocalLenis";
+import { useIsMobile } from "../../../hooks/useIsMobile";
 import type { LandingBook, ForumPost, ForumCategory } from "../../../lib/types";
+import { CATEGORY_LIST } from "../../../lib/forumCategories";
 
 export default function MangaCommunityPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
@@ -19,6 +21,7 @@ export default function MangaCommunityPage() {
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<"new" | "hot">("hot");
   const [viewMode, setViewMode] = useState<'card' | 'compact'>('card');
+  const isMobile = useIsMobile();
   const [mangaTitle, setMangaTitle] = useState<string | null>(null);
   const [mangaCover, setMangaCover] = useState<string | null>(null);
 
@@ -66,8 +69,8 @@ export default function MangaCommunityPage() {
   }, [fetchPosts]);
 
   useEffect(() => {
-    if (window.innerWidth < 768) setViewMode('compact');
-  }, []);
+    if (isMobile) setViewMode('compact');
+  }, [isMobile]);
 
   const handleCreatePost = async () => {
     if (!newPost.title.trim() || !newPost.content.trim() || submitting) return;
@@ -228,7 +231,11 @@ export default function MangaCommunityPage() {
                 )}
               </div>
               <button
-                onClick={() => { setShowCreateModal(false); setPostImages([]); }}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setPostImages([]);
+                  setNewPost({ title: "", content: "", category: "general" as ForumCategory });
+                }}
                 className="text-white/40 hover:text-white"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,7 +248,7 @@ export default function MangaCommunityPage() {
               <div>
                 <label className="block text-xs font-bold text-white/40 uppercase mb-2">หมวดหมู่</label>
                 <div className="flex flex-wrap gap-2">
-                  {(["general", "announcement", "spoiler", "manga_update"] as const).map((cat) => (
+                  {CATEGORY_LIST.map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setNewPost({ ...newPost, category: cat })}

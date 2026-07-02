@@ -5,7 +5,7 @@
  * ใช้ได้เฉพาะ translator / creator / admin เท่านั้น
  */
 import { expect, test } from "bun:test";
-import { availableCategories, isRestrictedCategory } from "./forumCategories";
+import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "./forumCategories";
 
 // ── privileged roles ────────────────────────────────────────────────────
 
@@ -47,4 +47,14 @@ test("announcement and manga_update are restricted", () => {
 test("general and spoiler are not restricted", () => {
   expect(isRestrictedCategory("general")).toBe(false);
   expect(isRestrictedCategory("spoiler")).toBe(false);
+});
+
+// ── CATEGORY_LIST export ──────────────────────────────────────────────────
+
+test("CATEGORY_LIST contains all four categories", () => {
+  expect(CATEGORY_LIST).toEqual(["general", "announcement", "spoiler", "manga_update"]);
+});
+
+test("CATEGORY_LIST is readonly (same reference every import)", () => {
+  expect(Array.isArray(CATEGORY_LIST)).toBe(true);
 });

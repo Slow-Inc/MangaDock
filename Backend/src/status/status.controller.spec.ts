@@ -76,4 +76,39 @@ describe('StatusController', () => {
       await request(app.getHttpServer()).get('/status/cache').expect(401);
     });
   });
+
+  // ─── GET /status ─────────────────────────────────────────────────────────────
+
+  describe('GET /status', () => {
+    // S1 — shape contract
+    it('returns schemaVersion:1 snapshot with correct shape', async () => {
+      mockCacheHealth.getHealth.mockResolvedValue(MOCK_HEALTH);
+      const res = await request(app.getHttpServer()).get('/status').expect(200);
+      expect(res.body.schemaVersion).toBe(1);
+      expect(res.body.service).toBe('backend');
+      expect(['up', 'degraded', 'down']).toContain(res.body.status);
+      expect(typeof res.body.reason).toBe('string');
+      expect(Array.isArray(res.body.checks)).toBe(true);
+      expect(typeof res.body.uptimeSec).toBe('number');
+      expect(typeof res.body.durationMs).toBe('number');
+      expect(typeof res.body.checkedAt).toBe('string');
+    });
+
+    // S2 — Redis unreachable → status:down
+    it('returns status:down when cacheHealth.getHealth throws', async () => {
+      mockCacheHealth.getHealth.mockRejectedValue(new Error('ECONNREFUSED'));
+      const res = await request(app.getHttpServer()).get('/status').expect(200);
+      expect(res.body.status).toBe('down');
+      const redis = res.body.checks.find((c: { id: string }) => c.id === 'redis');
+      expect(redis.status).toBe('down');
+      expect(redis.latencyMs).toBeNull();
+    });
+
+    // S3 — no auth guard
+    it('returns 200 when AuthGuard would deny (no guard on this route)', async () => {
+      mockAuthGuard.canActivate.mockReturnValue(false);
+      mockCacheHealth.getHealth.mockResolvedValue(MOCK_HEALTH);
+      await request(app.getHttpServer()).get('/status').expect(200);
+    });
+  });
 });

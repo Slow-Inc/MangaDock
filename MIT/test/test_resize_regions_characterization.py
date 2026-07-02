@@ -1,0 +1,130 @@
+"""Characterization golden for resize_regions_to_font_size (#speed-study Phase 1).
+
+Locks the two things this function produces per region — the returned
+``dst_points`` quad and the mutated ``region.font_size`` (plus ``translation``,
+which the #436 de-dup branch can blank) — byte-identical across the three
+dispatch branches: legacy (single-axis expansion / length-ratio scaling),
+bubble_fit (#166/#183 balloon fit + width-squeeze), and clean_layout (#175
+narration column). This is the seam Phase 2 optimizations (layout_fit fixes)
+must not disturb.
+
+Golden arrays live in test/golden/resize_regions_*.npz (committed). First run
+generates + skips; later runs assert exact equality. Delete an npz to
+regenerate when a change is expected and reviewed.
+"""
+import os
+
+import numpy as np
+import pytest
+
+from manga_translator.rendering import resize_regions_to_font_size
+from manga_translator.rendering import text_render
+from manga_translator.utils import TextBlock
+
+GOLDEN_DIR = os.path.join(os.path.dirname(__file__), 'golden')
+_FONT = os.path.join(os.path.dirname(__file__), '..', 'fonts', 'Arial-Unicode-Regular.ttf')
+
+
+def _set_font():
+    text_render.set_font(_FONT)
+
+
+def _save_or_assert(golden_path, dst_points_list, regions):
+    if not os.path.exists(golden_path):
+        os.makedirs(os.path.dirname(golden_path), exist_ok=True)
+        payload = {}
+        for i, dp in enumerate(dst_points_list):
+            payload[f'dst_{i}'] = np.asarray(dp)
+        payload['font_sizes'] = np.array([r.font_size for r in regions], dtype=np.int64)
+        payload['translations'] = '|'.join(r.translation for r in regions)
+        np.savez_compressed(golden_path, **payload)
+        pytest.skip(f'generated golden snapshot at {golden_path}; re-run to assert')
+
+    golden = np.load(golden_path)
+    for i, dp in enumerate(dst_points_list):
+        assert np.array_equal(np.asarray(dp), golden[f'dst_{i}']), f'region {i} dst_points drift'
+    assert np.array_equal(
+        np.array([r.font_size for r in regions], dtype=np.int64), golden['font_sizes']
+    ), 'font_size drift'
+    assert '|'.join(r.translation for r in regions) == str(golden['translations']), 'translation drift'
+
+
+def test_resize_regions_legacy_byte_identical():
+    """Legacy path: bubble_fit=False, clean_layout=False — single-axis expansion
+    (horizontal calc_horizontal / vertical calc_vertical) or the length-ratio
+    general-scaling fallback with the shapely Polygon scale+rotate branch."""
+    _set_font()
+    img = np.zeros((720, 1000, 3), dtype=np.uint8)
+    h_short = TextBlock(
+        [[[20, 20], [200, 20], [20, 80], [200, 80]]],
+        texts=['hello'], translation='Hi!',
+        direction='h', target_lang='ENG', font_size=30,
+    )
+    h_long = TextBlock(
+        [[[20, 120], [200, 120], [20, 180], [200, 180]]],
+        texts=['x'], translation='The quick brown fox jumps over the lazy dog repeatedly',
+        direction='h', target_lang='ENG', font_size=30,
+    )
+    v_cjk = TextBlock(
+        [[[300, 20], [360, 20], [300, 300], [360, 300]]],
+        texts=['日本'], translation='これはたてがきのテストですとてもながいぶんしょう',
+        direction='v', target_lang='JPN', font_size=30,
+    )
+    regions = [h_short, h_long, v_cjk]
+    for r in regions:
+        r.set_font_colors([255, 255, 255], [0, 0, 0])
+
+    dst_points_list = resize_regions_to_font_size(
+        img, regions, font_size_fixed=None, font_size_offset=0, font_size_minimum=8,
+        bubble_fit=False, clean_layout=False,
+    )
+    _save_or_assert(os.path.join(GOLDEN_DIR, 'resize_regions_legacy.npz'), dst_points_list, regions)
+
+
+def test_resize_regions_bubble_fit_byte_identical():
+    """bubble_fit=True path: a sole-occupant balloon region goes through
+    _bubble_fit_layout (#166/#183 binary-search font + width-squeeze); a region
+    without a bubble_box falls through to legacy."""
+    _set_font()
+    img = np.zeros((720, 1000, 3), dtype=np.uint8)
+    balloon = TextBlock(
+        [[[100, 100], [300, 100], [100, 250], [300, 250]]],
+        texts=['x'], translation='This is a dialogue line inside a speech balloon',
+        direction='h', target_lang='ENG', font_size=30,
+    )
+    balloon.bubble_box = (90, 90, 310, 260)
+    no_balloon = TextBlock(
+        [[[400, 400], [560, 400], [400, 460], [560, 460]]],
+        texts=['y'], translation='Hi!',
+        direction='h', target_lang='ENG', font_size=30,
+    )
+    regions = [balloon, no_balloon]
+    for r in regions:
+        r.set_font_colors([255, 255, 255], [0, 0, 0])
+
+    dst_points_list = resize_regions_to_font_size(
+        img, regions, font_size_fixed=None, font_size_offset=0, font_size_minimum=8,
+        bubble_fit=True, anti_overlap=True, clean_layout=False,
+    )
+    _save_or_assert(os.path.join(GOLDEN_DIR, 'resize_regions_bubble_fit.npz'), dst_points_list, regions)
+
+
+def test_resize_regions_clean_layout_byte_identical():
+    """clean_layout=True path (#175): a narration/caption region without a
+    filled balloon lays out at a small absolute font in an upright box."""
+    _set_font()
+    img = np.zeros((720, 1000, 3), dtype=np.uint8)
+    narration = TextBlock(
+        [[[50, 50], [900, 50], [900, 130], [50, 130]]],
+        texts=['narration'], translation='Meanwhile, somewhere else in the city, things were happening',
+        direction='h', target_lang='ENG', font_size=30,
+    )
+    regions = [narration]
+    for r in regions:
+        r.set_font_colors([255, 255, 255], [0, 0, 0])
+
+    dst_points_list = resize_regions_to_font_size(
+        img, regions, font_size_fixed=None, font_size_offset=0, font_size_minimum=8,
+        bubble_fit=False, clean_layout=True, font_size_max=24, page_shape=img.shape,
+    )
+    _save_or_assert(os.path.join(GOLDEN_DIR, 'resize_regions_clean_layout.npz'), dst_points_list, regions)
