@@ -15,7 +15,19 @@ defects from artifacts (per the patch-vs-image-endpoint lesson) before spending 
 
 ## Assessment
 - The narration-oversize cluster (user-flagged, demo) is already fixed + guarded (reference_layout, flag off) — see 2026-07-02-narration-readable-narrow.
-- The top REMAINING render defect on the SHIPPING path is #1/#2: **tiny bubbles + long Thai → font over-shrinks and the word is force-split into unreadable fragments.** Same class as item-9 (word-whole) but on the bubble-fit path, and compounded by tiny-box over-shrink.
-- #3–#5 are detection/translation domain (not render); log them but they need their own workstream.
+
+## CORRECTION (verified full-res + deterministic — the row #1/#2 claim was wrong)
+The "garbled small bubbles" I first read off the 560px montage is NOT a render defect. Verified three ways:
+- Deterministic replay of the ds4 fixture (2 runs): all 6 regions size to **26–66px, wrapped correctly** — no tiny-font char-split.
+- Full-res crop: the lower-left bubbles render as **clean, readable, properly-wrapped Thai** ("ฉันรู้ว่ามัน / ยากที่จะ / จินตนาการ …").
+- Inspecting the region translations: region r2 = **"เธอทำ JDB ได้อย่างยอดเยี่ยม…"** — the LLM produced the garbage token **"JDB"** (should be "งาน"/job). The render laid out the bad *text* faithfully.
+
+**⇒ The fragment/garble is a TRANSLATION-quality defect (LLM hallucination), not render.** This is a
+verify-before-claiming lesson on myself: I over-claimed a render defect from a blurry downscaled montage.
+The production RENDER sizing is in good shape (readable, wrapped, no over-shrink) on these pages.
+
+Remaining real defects are all **outside the render campaign**: translation quality (LLM garble like "JDB",
+untranslated shout "WHA-!?", romaji names) and detection (untranslated katakana SFX). They each need their
+own workstream (translator prompt/glossary; det_sfx). The render-defect master plan is substantially met.
 
 ![production defect inventory ds4 + ds12](./2026-07-02-production-defect-inventory.png)
