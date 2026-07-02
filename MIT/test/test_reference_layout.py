@@ -46,26 +46,20 @@ def test_reference_clean_layout_keeps_a_word_whole():
     assert any('SOMETHING' in ln for ln in lines), f'word split: {lines}'
 
 
-def test_reference_fit_box_uses_detection_box_when_no_bubble():
-    # Narration without a speech balloon sizes against its detection WIDTH, but with a generous
-    # vertical tolerance (_CLEAN_DISPLAY_H_TOL) so the font stays at the flat size and wraps to more
-    # lines instead of shrinking — the 2026-07-02 over-shrink fix. Centered on the detection box.
-    from manga_translator.rendering import _reference_fit_box, _CLEAN_DISPLAY_H_TOL
+def test_reference_layout_intent_no_bubble_is_flat_capped_narration():
+    # One resolver returns box + anchor + fill + cap together. Narration without a balloon sizes to its
+    # detection WIDTH with a generous vertical tolerance (_CLEAN_DISPLAY_H_TOL, so it wraps to more lines
+    # at the flat size instead of shrinking — the 2026-07-02 over-shrink fix), centered, non-fill, and
+    # capped at the flat page-scaled size. (The fill path — cap = interior height — is exercised by the
+    # Thai fixtures, where dialogue fills its bubble.)
+    from manga_translator.rendering import _reference_layout_intent, _CLEAN_DISPLAY_H_TOL
     region = SimpleNamespace(xyxy=(10, 20, 110, 220), bubble_polygon=None)
-    bw, bh, (cx, cy), fill = _reference_fit_box(region, None, (500, 500, 3))
+    bw, bh, (cx, cy), fill, cap = _reference_layout_intent(region, None, (500, 500, 3), flat=18)
     assert bw == 100.0
-    assert bh == 200.0 * _CLEAN_DISPLAY_H_TOL  # generous height, not the tight detection height
+    assert bh == 200.0 * _CLEAN_DISPLAY_H_TOL
     assert (cx, cy) == (60.0, 120.0)
-    assert fill is False  # no bubble → detection box, not a fill
-
-
-def test_reference_cap_fills_interior_when_bubbled_else_flat():
-    # A bubbled region should fill its balloon (cap = interior height, like bubble-fit); free
-    # narration caps at the flat page-scaled size. This is what lets reference_layout keep One-Punch
-    # narration small AND let Thai dialogue fill its oval (no under-fill regression).
-    from manga_translator.rendering import _reference_cap
-    assert _reference_cap(True, box_h=200, flat=18) == 200
-    assert _reference_cap(False, box_h=200, flat=18) == 18
+    assert fill is False
+    assert cap == 18  # non-fill → flat cap (fill would cap at the interior height)
 
 
 def test_should_fill_demoted_bubble_separates_fill_from_narration():

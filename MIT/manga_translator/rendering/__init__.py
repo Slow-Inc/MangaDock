@@ -320,31 +320,25 @@ def should_fill_demoted_bubble(interior_w, det_w, threshold=_REFERENCE_FILL_RATI
     return (interior_w / det_w) <= threshold
 
 
-def _reference_fit_box(region, bubble_box, crop_shape):
-    """The ``(w, h, (cx, cy), fill)`` the reference fit sizes against. When a bubble is known AND the
-    text fills it (:func:`should_fill_demoted_bubble`), use the balloon's distance-transform safe
-    interior and ``fill=True`` (grow to fill the balloon). Otherwise (no bubble, or a demoted narrow
-    column loose in a wide balloon) use the region's own detection box with ``fill=False`` (sized by
-    the flat cap, wrapped to its own footprint)."""
+def _reference_layout_intent(region, bubble_box, crop_shape, flat):
+    """Resolve the whole reference-fit intent for a clean-layout region in ONE place — returns
+    ``(box_w, box_h, (cx, cy), fill, cap)``. A single ``fill`` decision (:func:`should_fill_demoted_bubble`)
+    drives BOTH the fit box and the font cap, so the invariant can't drift across two functions:
+
+    - **fill** (a balloon whose text fills it): box = the distance-transform safe interior, cap = the
+      interior height → the font grows to fill the balloon (like bubble-fit).
+    - **non-fill** (no balloon, or a demoted narrow column loose in a wide balloon): box = the detection
+      WIDTH with a generous vertical tolerance (``_CLEAN_DISPLAY_H_TOL``) so the font stays at the flat
+      design size and wraps to MORE LINES instead of the tight detection height squeezing it tiny (the
+      2026-07-02 over-shrink); cap = the flat page-scaled size. Width stays bounded to the detection box.
+    """
     x1, y1, x2, y2 = (float(v) for v in region.xyxy)
     if bubble_box is not None:
         iw, ih, anchor = _bubble_interior_box(region, bubble_box, crop_shape)
         if should_fill_demoted_bubble(iw, x2 - x1):
-            return float(iw), float(ih), anchor, True
-    # Non-fill (narration / a demoted narrow column): wrap to the detection WIDTH but give a generous
-    # vertical tolerance (_CLEAN_DISPLAY_H_TOL) so the font stays at the flat design size and the text
-    # simply wraps to MORE LINES — instead of the tight detection height squeezing the font tiny (the
-    # 2026-07-02 over-shrink). Width stays bounded to the detection box (no spill).
-    return (x2 - x1), (y2 - y1) * _CLEAN_DISPLAY_H_TOL, ((x1 + x2) / 2.0, (y1 + y2) / 2.0), False
-
-
-def _reference_cap(fill, box_h, flat):
-    """Font cap for the reference fit. A fill region (text fills its balloon) caps at the interior
-    height so the binary search grows to fill like bubble-fit; a non-fill region (free narration, or a
-    demoted narrow column loose in a wide balloon) caps at the flat page-scaled size (small + readable).
-    This split keeps One-Punch narration/loose-bubble text small while letting a Thai dialogue line fill
-    its oval — no under-fill regression."""
-    return int(box_h) if fill else int(flat)
+            return float(iw), float(ih), anchor, True, int(ih)
+    return ((x2 - x1), (y2 - y1) * _CLEAN_DISPLAY_H_TOL,
+            ((x1 + x2) / 2.0, (y1 + y2) / 2.0), False, int(flat))
 
 
 def _reference_clean_layout(region, box_w, box_h, font_size_minimum, cap, page_w):
@@ -550,10 +544,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 # — the reference model, replacing the source-column-referenced _clean_layout_dst.
                 _ps = page_shape if page_shape is not None else img.shape
                 _flat = clean_layout_font_size(font_size_max, _ps[0], _ps[1], font_size_minimum)
-                _bw, _bh, (cx, cy), _fill = _reference_fit_box(region, bubble_box, img.shape)
-                # fills its bubble → cap = interior height (grow to fill); else (narration or a demoted
-                # narrow column loose in a wide balloon) → flat cap, wrapped to the detection box.
-                _cap = _reference_cap(_fill, _bh, _flat)
+                _bw, _bh, (cx, cy), _fill, _cap = _reference_layout_intent(region, bubble_box, img.shape, _flat)
                 clean_fs, block_w, block_h = _reference_clean_layout(
                     region, _bw, _bh, font_size_minimum, _cap, _ps[1])
                 laid = (clean_fs, block_w, block_h)

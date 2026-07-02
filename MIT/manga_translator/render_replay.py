@@ -70,8 +70,7 @@ def replay_clean_layout(fixture, reference_layout=False, font_size_max=20,
         bubble_box = getattr(r, 'bubble_box', None)
         flat = clean_layout_font_size(font_size_max, ph[0], ph[1], font_size_minimum)
         if reference_layout:
-            bw, bh, _, fill = R._reference_fit_box(r, bubble_box, img_shape)
-            cap = R._reference_cap(fill, bh, flat)
+            bw, bh, _, fill, cap = R._reference_layout_intent(r, bubble_box, img_shape, flat)
             fs, block_w, block_h = R._reference_clean_layout(r, bw, bh, font_size_minimum, cap, ph[1])
             avail_w, avail_h = float(bw), float(bh)
         else:
