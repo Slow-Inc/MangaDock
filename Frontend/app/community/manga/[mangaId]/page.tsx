@@ -231,7 +231,11 @@ export default function MangaCommunityPage() {
                 )}
               </div>
               <button
-                onClick={() => { setShowCreateModal(false); setPostImages([]); }}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setPostImages([]);
+                  setNewPost({ title: "", content: "", category: "general" as ForumCategory });
+                }}
                 className="text-white/40 hover:text-white"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
