@@ -50,9 +50,10 @@ def test_reference_fit_box_uses_detection_box_when_no_bubble():
     # Narration without a speech balloon sizes against its own detection box (w,h) centered.
     from manga_translator.rendering import _reference_fit_box
     region = SimpleNamespace(xyxy=(10, 20, 110, 220), bubble_polygon=None)
-    bw, bh, (cx, cy) = _reference_fit_box(region, None, (500, 500, 3))
+    bw, bh, (cx, cy), fill = _reference_fit_box(region, None, (500, 500, 3))
     assert (bw, bh) == (100.0, 200.0)
     assert (cx, cy) == (60.0, 120.0)
+    assert fill is False  # no bubble → detection box, not a fill
 
 
 def test_reference_cap_fills_interior_when_bubbled_else_flat():
@@ -62,3 +63,18 @@ def test_reference_cap_fills_interior_when_bubbled_else_flat():
     from manga_translator.rendering import _reference_cap
     assert _reference_cap(True, box_h=200, flat=18) == 200
     assert _reference_cap(False, box_h=200, flat=18) == 18
+
+
+def test_should_fill_demoted_bubble_separates_fill_from_narration():
+    # #178 demoted-bubble discriminator (3-agent brainstorm; threshold grounded on measured fixtures:
+    # Thai dialogue interior_w/det_w = 1.07-1.19 (fills its bubble), One-Punch = 1.61-3.43 (narrow text
+    # loose in a wide bubble). Threshold 1.4 separates with ~0.2 margin each side.
+    from manga_translator.rendering import should_fill_demoted_bubble
+    # Thai — text already ~fills the bubble → FILL
+    assert should_fill_demoted_bubble(243, 228) is True   # 1.07
+    assert should_fill_demoted_bubble(131, 110) is True   # 1.19
+    # One-Punch — bubble much wider than the text → NARROW (don't fill)
+    assert should_fill_demoted_bubble(281, 175) is False  # 1.61
+    assert should_fill_demoted_bubble(295, 128) is False  # 2.30
+    # degenerate det_w → treat as fill (no division blowup)
+    assert should_fill_demoted_bubble(100, 0) is True
