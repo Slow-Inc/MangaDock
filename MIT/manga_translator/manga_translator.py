@@ -1354,7 +1354,7 @@ class MangaTranslator:
     ) -> np.ndarray:
         return crop_mask_for_patch(raw_mask_source, x1, y1, x2, y2, img_h, img_w)
 
-    def _tag_regions_with_bubbles(self, ctx, regions: List[Any]) -> None:
+    def _tag_regions_with_bubbles(self, ctx, regions: List[Any], synth_fallback: bool = False) -> None:
         """#170: detect speech balloons and tag each region with the balloon
         containing it (``region.bubble_idx`` + ``region.bubble_box``), so
         grouping is balloon-aware and #166 can size text to the balloon.
@@ -1363,7 +1363,7 @@ class MangaTranslator:
         the pipeline behaves exactly as if the stage were off.
         """
         from .bubble_detector import detect_bubbles
-        from .bubble_association import associate_regions_to_bubbles
+        from .bubble_association import associate_regions_to_bubbles, acceptable_synth_bubble
 
         polygons = detect_bubbles(ctx.img_rgb, device=str(self.device or 'cuda'))
         if not polygons:
@@ -1372,6 +1372,8 @@ class MangaTranslator:
         boxes = [tuple(map(float, r.xyxy)) for r in regions]
         assoc = associate_regions_to_bubbles(boxes, polygons)
         tagged = 0
+        synth = 0
+        H, W = ctx.img_rgb.shape[:2]
         for r, idx in zip(regions, assoc):
             r.bubble_idx = idx
             if idx is not None:
@@ -1383,8 +1385,24 @@ class MangaTranslator:
                 # mask's true interior (narrow column), not the bounding box.
                 r.bubble_polygon = [(float(p[0]), float(p[1])) for p in poly]
                 tagged += 1
+            elif synth_fallback:
+                # #170/#178 recall fallback: YOLO missed this region's balloon (the trace-confirmed
+                # cause of oval/tall dialogue under-filling). Try a classical flood-fill and accept it
+                # ONLY through the gate (encloses text, bigger than it, not a page leak), so a leaked
+                # flood never manufactures a bogus balloon. bubble_polygon left unset → the renderer
+                # wraps to the bbox interior (safe default).
+                try:
+                    from .rendering.ballon_extractor import extract_ballon_region
+                    rx1, ry1, rx2, ry2 = (float(v) for v in r.xyxy)
+                    _mask, bxyxy = extract_ballon_region(
+                        ctx.img_rgb, [int(rx1), int(ry1), int(rx2 - rx1), int(ry2 - ry1)])
+                    if acceptable_synth_bubble(tuple(map(float, bxyxy)), (rx1, ry1, rx2, ry2), W, H):
+                        r.bubble_box = tuple(map(float, bxyxy))
+                        synth += 1
+                except Exception as e:
+                    logger.debug(f'[BubbleSeg] synth-bubble fallback skipped a region: {e}')
         logger.info(f'[BubbleSeg] {len(polygons)} balloons, '
-                    f'{tagged}/{len(regions)} regions tagged')
+                    f'{tagged}/{len(regions)} regions tagged (+{synth} classical-fallback)')
 
     def _group_nearby_regions(self, regions: List[Any], pad: int, img_w: int, img_h: int) -> List[List[Any]]:
         """Group text regions that should share one render crop.
@@ -1455,7 +1473,7 @@ class MangaTranslator:
         # detector.det_bubble_seg; untagged regions group by proximity as before.
         if config.detector.det_bubble_seg:
             try:
-                self._tag_regions_with_bubbles(ctx, regions)
+                self._tag_regions_with_bubbles(ctx, regions, synth_fallback=config.detector.det_bubble_synth)
             except Exception:
                 logger.warning(f"[BubbleSeg] tagging failed:\n{traceback.format_exc()}")
 
