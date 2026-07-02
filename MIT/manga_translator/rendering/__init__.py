@@ -13,6 +13,7 @@ from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
 from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, clean_layout_target_fs, region_territory_box, display_sfx, bubble_fit_bounds, fills_bubble_width, squeeze_width, box_containment
 from ..safe_area import safe_area_box
+from ..reference_layout import fit_to_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
 from ..utils import (
@@ -301,6 +302,32 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     block_w = max(widths) if widths else wrap_w
     block_h = max(1, len(lines)) * clean_fs * _LINE_HEIGHT
     return int(clean_fs), float(block_w), float(block_h)
+
+
+def _reference_clean_layout(region, box_w, box_h, font_size_minimum, cap, page_w):
+    """#178 Phase-4 reference fit: binary-search the font to fill the given SAFE-BOX on BOTH axes.
+
+    Unlike ``_clean_layout_dst`` (which sizes to the source-text column and can over/under-shrink),
+    this wraps to the ``box_w`` of the balloon's safe interior (the reference model's bound) and
+    shrinks the font from ``cap`` down to the largest that fits both axes, keeping words whole
+    (longest-token floor → no item-9 mid-word break). Returns ``(font, block_w, block_h)``.
+    """
+    lang = getattr(region, 'target_lang', 'en_US')
+    text = region.translation or ''
+
+    def _wrap_at(fs):
+        # never wrap narrower than the widest atomic word, so shrinking the font (not force-wrap)
+        # is what makes an over-wide word fit — words stay whole in every language.
+        lw = text_render.longest_token_width(fs, text, lang)
+        w = max(int(box_w), int(lw))
+        lines, widths = text_render.calc_horizontal(fs, text, w, int(page_w), language=lang)
+        block_w = max(widths) if widths else 0.0
+        block_h = max(1, len(lines)) * fs * _LINE_HEIGHT
+        return block_w, block_h
+
+    fs = fit_to_box(_wrap_at, float(box_w), float(box_h), int(cap), max(1, int(font_size_minimum)))
+    block_w, block_h = _wrap_at(fs)
+    return int(fs), float(block_w), float(block_h)
 
 
 def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None):
