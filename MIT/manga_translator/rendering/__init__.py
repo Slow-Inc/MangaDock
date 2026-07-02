@@ -61,6 +61,7 @@ _LINE_HEIGHT = 1.2
 # the source box height before shrinking the font, so big captions stay prominent without
 # spilling far past where the original lettering sat.
 _CLEAN_DISPLAY_H_TOL = 1.6
+_CLEAN_DISPLAY_W_TOL = 1.6  # #430: symmetric width bound for a sized-up display caption
 _FIT_MARGIN = 0.92
 _MAX_FONT_BOX_RATIO = 0.5
 
@@ -284,8 +285,17 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # within ~its original vertical footprint — keeps the caption prominent without spilling far
     # past where the source lettering sat. Never below the flat size (narration unaffected).
     if clean_fs > clean_fs_flat:
+        # #430 Phase-3 hotfix: bound the sized-up caption on BOTH axes. The height-only
+        # loop left a caption far WIDER than its source column, overflowing the art
+        # (2026-07-02 One-Punch narration, fill_frac_w ~5x). Shrink while EITHER axis
+        # exceeds its source-footprint tolerance; the longest-token floor keeps words whole
+        # as the font shrinks, so this never re-introduces a mid-word break (item 9).
         max_h = (y2f - y1f) * _CLEAN_DISPLAY_H_TOL
-        while clean_fs > clean_fs_flat and max(1, len(lines)) * clean_fs * _LINE_HEIGHT > max_h:
+        max_w = (x2f - x1f) * _CLEAN_DISPLAY_W_TOL
+        while clean_fs > clean_fs_flat and (
+            max(1, len(lines)) * clean_fs * _LINE_HEIGHT > max_h
+            or (max(widths) if widths else 0) > max_w
+        ):
             clean_fs -= 2
             lines, widths = text_render.calc_horizontal(clean_fs, region.translation, wrap_w, int(ps_shape[0]), language=lang)
     block_w = max(widths) if widths else wrap_w
