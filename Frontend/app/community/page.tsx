@@ -11,7 +11,7 @@ import MangaSearchSelector from "../components/MangaSearchSelector";
 import PostImageUploader from "../components/PostImageUploader";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { useFeedStream } from "../hooks/useForumStream";
-import { availableCategories, isRestrictedCategory } from "../lib/forumCategories";
+import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "../lib/forumCategories";
 
 function CommunityContent() {
   const { user, userRole, showLoginPrompt } = useAuth();
@@ -192,7 +192,7 @@ function CommunityContent() {
             onClick={() => handleMobileCategorySelect(undefined)}
             className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${!category ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white/50'}`}
           >ทั้งหมด</button>
-          {(['general', 'announcement', 'spoiler', 'manga_update'] as const).map(cat => (
+          {CATEGORY_LIST.map(cat => (
             <button
               key={cat}
               onClick={() => handleMobileCategorySelect(category === cat ? undefined : cat)}

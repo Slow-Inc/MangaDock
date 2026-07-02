@@ -10,6 +10,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import PostImageUploader from "../../../components/PostImageUploader";
 import { useLocalLenis } from "../../../hooks/useLocalLenis";
 import type { LandingBook, ForumPost, ForumCategory } from "../../../lib/types";
+import { CATEGORY_LIST } from "../../../lib/forumCategories";
 
 export default function MangaCommunityPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
@@ -241,7 +242,7 @@ export default function MangaCommunityPage() {
               <div>
                 <label className="block text-xs font-bold text-white/40 uppercase mb-2">หมวดหมู่</label>
                 <div className="flex flex-wrap gap-2">
-                  {(["general", "announcement", "spoiler", "manga_update"] as const).map((cat) => (
+                  {CATEGORY_LIST.map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setNewPost({ ...newPost, category: cat })}
