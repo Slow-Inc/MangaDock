@@ -190,6 +190,11 @@ class RenderConfig(BaseModel):
     small absolute font instead of warping it onto the original (often tall/vertical)
     detection quad — the warp stretches English oversized and overflowing. Pairs with
     font_size_max as the absolute font. Off → byte-identical."""
+    reference_layout: bool = False
+    """#178 Phase-4: size clean-layout regions with the MangaTranslator-parity fit — binary-search
+    the font from the flat cap DOWN to the largest that fits BOTH axes of the balloon safe interior
+    (or the detection box for narration), keeping words whole. Replaces the source-column-referenced
+    clean_layout sizing for these regions. Requires clean_layout. Off → byte-identical."""
     patch_feather_radius: int = 0
     """#173: feather the outer N px of each composited patch to a transparent
     alpha (distance-transform ramp) so the rectangular patch edge blends into the

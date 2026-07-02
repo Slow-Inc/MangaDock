@@ -44,3 +44,12 @@ def test_reference_clean_layout_keeps_a_word_whole():
     fs, block_w, _ = _reference_clean_layout(region, 90.0, 300.0, 8, 60, 1200)
     lines, _ = _tr.calc_horizontal(fs, 'SOMETHING', int(block_w) + 5, 10 ** 7, language='en_US')
     assert any('SOMETHING' in ln for ln in lines), f'word split: {lines}'
+
+
+def test_reference_fit_box_uses_detection_box_when_no_bubble():
+    # Narration without a speech balloon sizes against its own detection box (w,h) centered.
+    from manga_translator.rendering import _reference_fit_box
+    region = SimpleNamespace(xyxy=(10, 20, 110, 220), bubble_polygon=None)
+    bw, bh, (cx, cy) = _reference_fit_box(region, None, (500, 500, 3))
+    assert (bw, bh) == (100.0, 200.0)
+    assert (cx, cy) == (60.0, 120.0)

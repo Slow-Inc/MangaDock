@@ -304,6 +304,17 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     return int(clean_fs), float(block_w), float(block_h)
 
 
+def _reference_fit_box(region, bubble_box, crop_shape):
+    """The ``(w, h, (cx, cy))`` box the reference fit sizes against: the balloon's distance-transform
+    safe interior when a bubble is known (fill the balloon), else the region's own detection box
+    (narration/caption — sized by the cap, wrapped to its own footprint, not a wide balloon)."""
+    x1, y1, x2, y2 = (float(v) for v in region.xyxy)
+    if bubble_box is not None:
+        iw, ih, anchor = _bubble_interior_box(region, bubble_box, crop_shape)
+        return float(iw), float(ih), anchor
+    return (x2 - x1), (y2 - y1), ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
+
+
 def _reference_clean_layout(region, box_w, box_h, font_size_minimum, cap, page_w):
     """#178 Phase-4 reference fit: binary-search the font to fill the given SAFE-BOX on BOTH axes.
 
@@ -330,7 +341,7 @@ def _reference_clean_layout(region, box_w, box_h, font_size_minimum, cap, page_w
     return int(fs), float(block_w), float(block_h)
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None):
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None, reference_layout: bool = False):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -500,11 +511,23 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # stylized legacy path). Off → byte-identical.
         sfx = getattr(region, 'sfx_rescued', False)
         if clean_layout and not sfx and region.translation and region.translation.strip():
-            laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max, page_shape)
+            x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
+            if reference_layout:
+                # #178 Phase-4: fit against the balloon SAFE-BOX (or the detection box for narration),
+                # binary-searching the font from the flat cap DOWN to the largest that fits both axes
+                # — the reference model, replacing the source-column-referenced _clean_layout_dst.
+                _ps = page_shape if page_shape is not None else img.shape
+                _cap = clean_layout_font_size(font_size_max, _ps[0], _ps[1], font_size_minimum)
+                _bw, _bh, (cx, cy) = _reference_fit_box(region, bubble_box, img.shape)
+                clean_fs, block_w, block_h = _reference_clean_layout(
+                    region, _bw, _bh, font_size_minimum, _cap, _ps[1])
+                laid = (clean_fs, block_w, block_h)
+            else:
+                laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max, page_shape)
             if laid is not None:
                 clean_fs, block_w, block_h = laid
-                x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
-                cx, cy = (x1f + x2f) / 2.0, (y1f + y2f) / 2.0
+                if not reference_layout:
+                    cx, cy = (x1f + x2f) / 2.0, (y1f + y2f) / 2.0
                 # anti-overlap: shift the upright block off any neighbour's territory.
                 if anti_overlap:
                     territories = [t for j, r in enumerate(text_regions) if j != i
@@ -699,7 +722,8 @@ async def dispatch(
     anti_overlap: bool = False,
     font_size_max: int = 0,
     clean_layout: bool = False,
-    page_shape=None
+    page_shape=None,
+    reference_layout: bool = False
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
@@ -707,7 +731,7 @@ async def dispatch(
 
     # Resize regions that are too small. `page_shape` (full-page H,W) is threaded so clean-layout
     # narration scales by page resolution even when `img` is a per-region crop (#175 patch-path).
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape, reference_layout)
 
     # TODO: Maybe remove intersections
 
