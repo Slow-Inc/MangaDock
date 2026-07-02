@@ -334,6 +334,22 @@ TARGETED capture of a garbling run (render ds4 with MIT_DUMP_REGIONS until a fix
 char-split regions), then the fix (tiny-box word-whole floor on the bubble-fit path) can be pinned. Do
 NOT speculatively patch the production sizing without that repro.
 
+## 7j. Garble was TRANSLATION, not render — render campaign substantially met (2026-07-02)
+
+Followed up the garble "no repro". Verified full-res + deterministic + by inspecting the region text:
+the ds4 lower-left bubbles render **clean and readable at 26px, correctly wrapped** — the "fragments"
+were (a) a misread of the 560px montage and (b) region r2's translation literally being **"เธอทำ JDB
+ได้อย่างยอดเยี่ยม…"**, i.e. the **LLM emitted the garbage token "JDB"** (should be "งาน"). The render
+faithfully laid out bad *text*. So the top "render defect" from the inventory was a self-inflicted
+over-claim off a blurry image — corrected in the inventory report.
+
+**Conclusion:** on the audited pages the production RENDER is in good shape (readable, wrapped, no
+over-shrink); the narration cluster is fixed + guarded (reference_layout, flag off). The **remaining
+real quality defects are NOT render** — they are translation (LLM garble, untranslated shouts, romaji
+names) and detection (untranslated SFX), each needing its own workstream. The render-defect master plan
+(this document) is substantially met; further manga-translation quality gains move to the translation /
+detection subsystems.
+
 ## 8. Immediate next actions
 
 1. Render-only replay fixture spec + dump/replay CLI (One-Punch + the 2026-07-02 oversize region +
