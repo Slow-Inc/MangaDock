@@ -25,6 +25,10 @@ import { isMockMode } from "@/lib/mock-mode";
 import { triggerDownload } from "@/lib/download";
 import { pipelineHeaderSummary, pctDelta } from "@/lib/overview-signals";
 import CountUp from "@/components/count-up";
+import { MetricCard, BreakdownBar, StatusChip } from "@/components/widgets";
+import { formatCompact } from "@/lib/format";
+import { useServiceStatus } from "@/components/use-service-status";
+import type { ServiceSnapshot } from "@/lib/service-status";
 
 // Shimmer skeleton (DESIGN.md §5 — loading is a skeleton, never a centered spinner). Reduced-motion
 // kills the shimmer via globals. Used while the live stream is `connecting`.
@@ -145,7 +149,7 @@ function BarTip({ active, payload, label }: { active?: boolean; payload?: { valu
   return (
     <div style={tipBox}>
       <div className="text-[10px] tnum" style={{ color: "var(--ink-3)" }}>{label}</div>
-      <div className="text-[12.5px] font-semibold tnum" style={{ color: "var(--ink)" }}>{payload[0].value.toLocaleString()} <span className="font-normal" style={{ color: "var(--ink-3)" }}>pages</span></div>
+      <div className="text-[12.5px] font-semibold tnum" style={{ color: "var(--ink)" }}>{formatCompact(payload[0].value)} <span className="font-normal" style={{ color: "var(--ink-3)" }}>pages</span></div>
     </div>
   );
 }
@@ -324,9 +328,9 @@ function ViewShell({ Icon, name, tech, color, right, children }: { Icon: LucideI
 }
 
 // Frontend / Backend — no live source yet (#283/#282); one honest empty state, not mock panels.
-function NoDataView({ Icon, name, tech, color, msg }: { Icon: LucideIcon; name: string; tech: string; color: string; msg: string }) {
+function NoDataView({ Icon, name, tech, color, msg, right }: { Icon: LucideIcon; name: string; tech: string; color: string; msg: string; right?: React.ReactNode }) {
   return (
-    <ViewShell Icon={Icon} name={name} tech={tech} color={color}>
+    <ViewShell Icon={Icon} name={name} tech={tech} color={color} right={right}>
       <Panel className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center">
         <span className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "var(--surface-2)" }}><WifiOff size={20} style={{ color: "var(--ink-3)" }} /></span>
         <div className="text-[14px] font-semibold">No telemetry</div>
@@ -388,21 +392,19 @@ function MitPipeline({ stages, gateway, translator }: { stages: Stage[]; gateway
       <Panel className="p-5">
         <div className="mb-4 flex items-center gap-2"><Activity size={14} style={{ color: "var(--ink-2)" }} /><span className="text-[12.5px] font-semibold">Stage timing</span></div>
         {stages.length ? (
-          <div className="flex flex-col gap-2.5">
-            {stages.map((st) => {
+          <BreakdownBar
+            items={stages.map((st) => {
               const sec = parseFloat(st.t);
               const pct = st.s === "error" ? 100 : Math.min(100, ((isNaN(sec) ? 0 : sec) / 95) * 100);
-              return (
-                <div key={st.id} className="flex items-center gap-3">
-                  <span className="flex w-20 shrink-0 items-center gap-1.5 text-[11.5px]" style={{ color: st.s === "idle" ? "var(--ink-3)" : "var(--ink)" }}><Dot s={st.s} />{st.label}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: "var(--surface-2)" }}>
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: st.s === "error" ? "var(--coral)" : "var(--ink-2)", transition: "width 0.7s cubic-bezier(0.22,1,0.36,1)" }} />
-                  </div>
-                  <span className="w-16 shrink-0 text-right text-[11.5px] tnum" style={{ color: st.s === "error" ? "var(--coral)" : "var(--ink-2)" }}>{st.t}</span>
-                </div>
-              );
+              return {
+                key: st.id,
+                label: <span className="flex items-center gap-1.5"><Dot s={st.s} />{st.label}</span>,
+                pct,
+                valueLabel: st.t,
+                status: st.s as "ok" | "error" | "idle",
+              };
             })}
-          </div>
+          />
         ) : (
           <div className="py-6 text-center text-[12px]" style={{ color: "var(--ink-3)" }}>No pipeline data</div>
         )}
@@ -675,14 +677,14 @@ function ServiceMockView({ name, onOpenNode }: { name: "Frontend" | "Backend"; o
     <ViewShell Icon={cfg.Icon} name={name} tech={cfg.tech} color={cfg.color} right={chip}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cfg.kpis.map((k) => (
-          <Panel key={k.label} className="p-4">
-            <div className="text-[11.5px] font-medium" style={{ color: "var(--ink-2)" }}>{k.label}</div>
-            <div className="mt-1 flex items-baseline gap-1">
-              <CountUp to={k.to} duration={1.2} className="text-[23px] font-semibold leading-none tnum tracking-tight" />
-              <span className="text-[11px]" style={{ color: "var(--ink-3)" }}>{k.unit}</span>
-            </div>
-            <div className="mt-2 h-[34px]"><MiniTimeChart data={[...k.spark]} color={k.color} /></div>
-          </Panel>
+          <MetricCard
+            key={k.label}
+            label={k.label}
+            value={<CountUp to={k.to} duration={1.2} />}
+            unit={k.unit}
+            accent={k.color}
+            bottom={<div className="h-[34px]"><MiniTimeChart data={[...k.spark]} color={k.color} /></div>}
+          />
         ))}
       </div>
       <Panel className="mt-3 overflow-hidden p-5" style={{ background: "var(--drench-lime)", border: "none" }}>
@@ -760,6 +762,7 @@ export default function Dashboard() {
   const live = useLiveSnapshot(token);
   const m = live.mit;
   const mock = live.mock ?? false;
+  const svcStatus = useServiceStatus();
   const connecting = live.status === "connecting" && !mock; // drives skeletons (DESIGN.md §5)
   // NOTE (#354 item 2, deferred): skeletons only render while a real stream is `connecting`, which never
   //   happens in mock mode — so they stay unexercised at runtime until Track B/B4 realtime lands.
@@ -859,12 +862,15 @@ export default function Dashboard() {
 
   // Subsystem strip: MIT + its gateway are live-backed (from m); the rest (FE/BE/infra) have no MIT
   // source, so they read mock when mocking, "no source" when live — again surfacing what isn't wired.
-  const infra = (label: string, detail: string) => ({ label, detail: mock ? detail : "no source", s: mock ? "ok" : "idle" });
+  // infra() still used for entries without a live source (Redis/Supabase/R2/Streams).
+  const infra = (label: string, detail: string) => ({ label, detail: mock ? detail : "no source", s: mock ? "ok" : "idle" as const });
+  const toSubS = (snap: ServiceSnapshot | null): "ok" | "error" | "idle" =>
+    snap?.status === "up" ? "ok" : snap?.status === "degraded" || snap?.status === "down" ? "error" : "idle";
   const subsystems = [
-    infra("Frontend", "Next.js · 12ms p50"),
-    infra("Backend", "NestJS · 28ms p50"),
-    { label: "MIT", detail: m ? (m.status === "ok" ? "healthy" : `${m.status}`) : "offline", s: m ? (m.status === "ok" ? "ok" : "error") : "idle" },
-    { label: "9arm gateway", detail: m?.gateway?.detail ?? (m ? "ok" : "—"), s: m?.gateway?.status === "down" ? "error" : m ? "ok" : "idle" },
+    { label: "Frontend", detail: svcStatus.frontend?.reason ?? (mock ? "Next.js · 12ms p50" : "no source"), s: toSubS(svcStatus.frontend) },
+    { label: "Backend", detail: svcStatus.backend?.reason ?? (mock ? "NestJS · 28ms p50" : "no source"), s: toSubS(svcStatus.backend) },
+    { label: "MIT", detail: m ? (m.status === "ok" ? "healthy" : `${m.status}`) : "offline", s: m ? (m.status === "ok" ? "ok" : "error") : "idle" as const },
+    { label: "9arm gateway", detail: m?.gateway?.detail ?? (m ? "ok" : "—"), s: m?.gateway?.status === "down" ? "error" : m ? "ok" : "idle" as const },
     infra("Redis · L2", "pub/sub ok · 1ms"),
     infra("Supabase", "REST ok · 42ms"),
     infra("Cloudflare R2", "edge ok · 60ms"),
@@ -1066,7 +1072,7 @@ export default function Dashboard() {
                     </defs>
                     <CartesianGrid vertical={false} stroke="var(--hairline)" />
                     <XAxis dataKey="t" height={24} tickLine={false} axisLine={false} tick={{ fontSize: 10.5, fill: "var(--ink-3)" }} />
-                    <YAxis width={28} domain={[0, 1300]} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--ink-3)" }} ticks={[0, 650, 1300]} tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1).replace(/\.0$/, "")}k` : `${v}`)} />
+                    <YAxis width={28} domain={[0, 1300]} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--ink-3)" }} ticks={[0, 650, 1300]} tickFormatter={formatCompact} />
                     <Tooltip cursor={{ fill: "color-mix(in oklch, var(--coral) 9%, transparent)" }} wrapperStyle={{ outline: "none" }} content={<BarTip />} />
                     <Bar dataKey="v" shape={barShape} isAnimationActive animationBegin={150} animationDuration={850} animationEasing="ease-out" />
                   </BarChart>
@@ -1300,8 +1306,8 @@ export default function Dashboard() {
           </>
           )}
 
-          {view === "Frontend" && (mock ? <ServiceMockView name="Frontend" onOpenNode={setOpenNode} /> : <NoDataView Icon={Activity} name="Frontend" tech="Next.js 16 · React 19" color="var(--accent-violet)" msg="Telemetry not wired — Frontend /status pending (#283). This service has no live source yet; the panel populates once the endpoint ships." />)}
-          {view === "Backend" && (mock ? <ServiceMockView name="Backend" onOpenNode={setOpenNode} /> : <NoDataView Icon={Server} name="Backend" tech="NestJS 11" color="var(--accent-amber)" msg="Telemetry not wired — Backend /status pending (#282). This service has no live source yet; the panel populates once the endpoint ships." />)}
+          {view === "Frontend" && (mock ? <ServiceMockView name="Frontend" onOpenNode={setOpenNode} /> : <NoDataView Icon={Activity} name="Frontend" tech="Next.js 16 · React 19" color="var(--accent-violet)" msg="Telemetry not wired — Frontend /status pending (#283). This service has no live source yet; the panel populates once the endpoint ships." right={<StatusChip status={svcStatus.frontend?.status ?? null} label="Frontend" reason={svcStatus.frontend?.reason} />} />)}
+          {view === "Backend" && (mock ? <ServiceMockView name="Backend" onOpenNode={setOpenNode} /> : <NoDataView Icon={Server} name="Backend" tech="NestJS 11" color="var(--accent-amber)" msg="Telemetry not wired — Backend /status pending (#282). This service has no live source yet; the panel populates once the endpoint ships." right={<StatusChip status={svcStatus.backend?.status ?? null} label="Backend" reason={svcStatus.backend?.reason} />} />)}
           {view === "MIT" && <MitView data={mitData} onOpenNode={setOpenNode} tab={mitTab} setTab={setMitTab} />}
         </main>
       </div>
