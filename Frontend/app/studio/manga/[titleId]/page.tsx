@@ -14,6 +14,7 @@ import {
 } from "../../../lib/studioApi";
 import type { ChapterVersion } from "../../../lib/types";
 import { StudioChaptersSkeleton } from "../../components/StudioSkeleton";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   draft: { label: "แบบร่าง", color: "text-white/40 bg-white/10" },
@@ -281,6 +282,7 @@ export default function MangaDetailPage() {
     return true;
   });
   const hasFetched = useRef(false);
+  const [confirmDelete, setConfirmDelete] = useState<ChapterVersion | null>(null);
 
   const versions = allVersions.filter((v) => v.titleId === titleId);
   
@@ -364,8 +366,14 @@ export default function MangaDetailPage() {
     }
   };
 
-  const handleDelete = async (version: ChapterVersion) => {
-    if (!confirm(`ยืนยันการลบงานแปล ตอนที่ ${version.chapterNumber}?`)) return;
+  const handleDelete = (version: ChapterVersion) => {
+    setConfirmDelete(version);
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return;
+    const version = confirmDelete;
+    setConfirmDelete(null);
     try {
       const token = await getIdToken();
       if (!token) throw new Error("ไม่พบ token");
@@ -464,6 +472,12 @@ export default function MangaDetailPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title={`ยืนยันการลบงานแปล ตอนที่ ${confirmDelete?.chapterNumber}?`}
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }
