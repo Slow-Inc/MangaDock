@@ -9,6 +9,10 @@ lives in ``rendering/__init__.py``.
 """
 
 
+_UPWARD_RESCAN_WINDOW = 24  # font-px window above the binary-search result to re-scan for the
+# word-wrap non-monotonic gap (a larger font that fits again); wide enough for the observed ~9px gap.
+
+
 def fit_to_box(measure, box_w, box_h, cap, min_fs):
     """Largest font in ``[min_fs, cap]`` whose measured block fits ``box_w`` AND ``box_h``.
 
@@ -34,7 +38,7 @@ def fit_to_box(measure, box_w, box_h, cap, min_fs):
             hi = mid - 1
     # non-monotonic correction: a wrap-induced gap where a larger font fits again. The gap spans at
     # most a couple of line-height steps, so a small fixed window above `best` is enough.
-    for fs in range(best + 1, min(int(cap), best + 24) + 1):
+    for fs in range(best + 1, min(int(cap), best + _UPWARD_RESCAN_WINDOW) + 1):
         if _fits(fs):
             best = fs
     return best
