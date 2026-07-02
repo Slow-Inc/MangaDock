@@ -78,7 +78,8 @@ export class ForumService {
         author:profiles(display_name, photo_url, role),
         comments:forum_comments(count)
       `, { count: 'exact' })
-      .is('deleted_at', null);
+      .is('deleted_at', null)
+      .is('comments.deleted_at', null);
 
     if (category) query = query.eq('category', category);
     if (mangaId) query = query.eq('target_manga_id', mangaId);
@@ -112,7 +113,7 @@ export class ForumService {
       upvotes: p.upvotes,
       downvotes: p.downvotes,
       userVote: userVotes.get(p.id) ?? 0,
-      commentCount: p.comments[0]?.count ?? 0,
+      commentCount: p.comments?.[0]?.count ?? 0,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
     }));
@@ -130,6 +131,7 @@ export class ForumService {
       `)
       .eq('id', id)
       .is('deleted_at', null)
+      .is('comments.deleted_at', null)
       .single();
 
     if (error || !data) throw new NotFoundException('Post not found');
@@ -152,7 +154,7 @@ export class ForumService {
       upvotes: data.upvotes,
       downvotes: data.downvotes,
       userVote: userVotes.get(id) ?? 0,
-      commentCount: data.comments[0]?.count ?? 0,
+      commentCount: data.comments?.[0]?.count ?? 0,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     };
@@ -220,6 +222,7 @@ export class ForumService {
         .select('*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)')
         .eq('author_uid', uid)
         .is('deleted_at', null)
+        .is('comments.deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(20),
       this.db.from('forum_comments')
@@ -252,7 +255,8 @@ export class ForumService {
         .from('forum_posts')
         .select('*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)')
         .in('id', likedPostIds)
-        .is('deleted_at', null);
+        .is('deleted_at', null)
+        .is('comments.deleted_at', null);
       likedPostsRaw = data ?? [];
     }
 
@@ -583,42 +587,27 @@ export class ForumService {
 
   async getTrendingManga(limit = 5): Promise<TrendingManga[]> {
     try {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-      const { data, error } = await this.db
-        .from('forum_posts')
-        .select('target_manga_id, target_manga_title, target_manga_cover')
-        .not('target_manga_id', 'is', null)
-        .not('target_manga_title', 'is', null)
-        .neq('target_manga_title', '')
-        .gte('created_at', sevenDaysAgo.toISOString())
-        .limit(200); // Sample more posts for better accuracy
+      // Group + rank in Postgres. The old path pulled a 200-row sample into Node and
+      // tallied it, which undercounted / mis-ranked once a manga's within-window posts
+      // spilled past the sample. The RPC reproduces the same filter semantics
+      // (non-null id, non-empty title, created within the last 7 days) but counts and
+      // orders across the full table (FR-16).
+      const { data, error } = await this.db.rpc('get_trending_manga', {
+        p_limit: limit,
+      });
 
       if (error) {
         this.logger.error(`Supabase error fetching trending: ${error.message}`);
         return []; // Fallback to empty list instead of crashing
       }
 
-      // Manual grouping
-      const groups: Record<string, TrendingManga> = {};
-      (data ?? []).forEach(p => {
-        const id = p.target_manga_id;
-        if (!id) return;
-        if (!groups[id]) {
-          groups[id] = {
-            mangaId: id,
-            mangaTitle: p.target_manga_title || 'Unknown',
-            mangaCover: p.target_manga_cover,
-            postCount: 0
-          };
-        }
-        groups[id].postCount++;
-      });
-
-      return Object.values(groups)
-        .sort((a, b) => b.postCount - a.postCount)
-        .slice(0, limit);
+      // post_count arrives as a bigint string over PostgREST — coerce to number.
+      return ((data ?? []) as any[]).map(row => ({
+        mangaId: row.manga_id,
+        mangaTitle: row.manga_title || 'Unknown',
+        mangaCover: row.manga_cover,
+        postCount: Number(row.post_count),
+      }));
     } catch (err) {
       this.logger.error(`Unexpected error in getTrendingManga: ${String(err)}`);
       return [];
@@ -679,41 +668,22 @@ export class ForumService {
   }
 
   async vote(uid: string, dto: VoteDto): Promise<{ upvotes: number, downvotes: number }> {
-    // T4-STANDARD Pillar 1: Idempotent voting logic
-    // 1. Check if user already voted
-    const { data: existingVote } = await this.db
-      .from('forum_votes')
-      .select('*')
-      .eq('uid', uid)
-      .eq('target_type', dto.targetType)
-      .eq('target_id', dto.targetId)
-      .maybeSingle();
+    // Atomic upsert/toggle + recalculate in a single transaction. Replaces the old
+    // select-then-write, which let concurrent votes 500 on the PK or interleave
+    // delete/update/insert into an inconsistent state (FR-9).
+    const { data, error } = await this.db.rpc('cast_vote_atomic', {
+      p_uid: uid,
+      p_target_type: dto.targetType,
+      p_target_id: dto.targetId,
+      p_vote_value: dto.voteValue,
+    });
+    if (error) throw new InternalServerErrorException(`Vote failed: ${error.message}`);
 
-    if (existingVote) {
-      if (existingVote.vote_value === dto.voteValue) {
-        // Remove vote if same value (toggle off)
-        const { error } = await this.db.from('forum_votes').delete().match({ uid, target_type: dto.targetType, target_id: dto.targetId });
-        if (error) throw new InternalServerErrorException(`Vote delete failed: ${error.message}`);
-      } else {
-        // Change vote value
-        const { error } = await this.db.from('forum_votes').update({ vote_value: dto.voteValue }).match({ uid, target_type: dto.targetType, target_id: dto.targetId });
-        if (error) throw new InternalServerErrorException(`Vote update failed: ${error.message}`);
-      }
-    } else {
-      // New vote
-      const { error } = await this.db.from('forum_votes').insert({
-        uid,
-        target_type: dto.targetType,
-        target_id: dto.targetId,
-        vote_value: dto.voteValue,
-      });
-      if (error) throw new InternalServerErrorException(`Vote insert failed: ${error.message}`);
-    }
+    const row = Array.isArray(data) ? data[0] : (data as any);
+    // Postgres bigint may arrive as a string over PostgREST — coerce to number.
+    const result = { upvotes: Number(row?.upvotes ?? 0), downvotes: Number(row?.downvotes ?? 0) };
 
-    // 2. Recalculate upvotes/downvotes for the target
-    const result = await this.recalculateVotes(dto.targetType, dto.targetId);
-
-    // 3. Resolve postId for the broadcast (comment votes need a lookup)
+    // Resolve postId for the broadcast (comment votes need a lookup)
     let postId: string | null = null;
     if (dto.targetType === 'post') {
       postId = dto.targetId;
@@ -753,20 +723,5 @@ export class ForumService {
 
     (data ?? []).forEach(v => votes.set(v.target_id, v.vote_value));
     return votes;
-  }
-
-  private async recalculateVotes(type: 'post' | 'comment', id: string) {
-    const { data, error } = await this.db.rpc('recalculate_votes_atomic', {
-      p_target_type: type,
-      p_target_id: id,
-    });
-
-    if (error) throw new InternalServerErrorException(`Failed to recalculate votes: ${error.message}`);
-
-    const row = Array.isArray(data) ? data[0] : data;
-    return {
-      upvotes: Number(row?.upvotes ?? 0),
-      downvotes: Number(row?.downvotes ?? 0),
-    };
   }
 }

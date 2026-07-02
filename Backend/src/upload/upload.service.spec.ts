@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { Readable } from 'stream';
 import { UploadService } from './upload.service';
 import type { SupabaseService } from '../supabase/supabase.service';
 import type { VersionsService } from '../versions/versions.service';
@@ -138,6 +139,23 @@ describe('UploadService.addPage - magic-byte MIME validation (#303)', () => {
         contentType: 'image/webp',
       },
     );
+  });
+
+  it('streams the temp file to storage instead of buffering it in memory (FR-4)', async () => {
+    const put = jest.fn().mockResolvedValue(undefined);
+    const { service } = makeService({ put });
+    const tmp = writeTempFile(Buffer.from([0x01, 0x02, 0x03]));
+    mockFileType.mockResolvedValueOnce({ mime: 'image/png', ext: 'png' });
+
+    await service.addPage('v1', 'owner', tmp);
+
+    expect(put).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Readable),
+      { contentType: 'image/png' },
+    );
+    // temp file is still cleaned up after a successful streamed upload
+    expect(fs.existsSync(tmp)).toBe(false);
   });
 
   it('rejects image/svg+xml even though it is in the image/* family (inline JS attack vector)', async () => {

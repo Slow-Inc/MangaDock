@@ -28,9 +28,9 @@ describe('JsonCacheService — L1 in-memory only', () => {
   });
 
   // Cycle 8 — onModuleInit() warms L1 from L3
-  it('onModuleInit() loads entries written to L3 into L1 memory', () => {
+  it('onModuleInit() loads entries written to L3 into L1 memory', async () => {
     const entry = { key: 'disk:key', data: 'from disk', updatedAt: new Date().toISOString(), ttlMs: 60_000 };
-    l3.write('disk:key', entry);
+    await l3.write('disk:key', entry);
 
     const freshJc = new JsonCacheService(l3);
     freshJc.onModuleInit();
@@ -74,5 +74,51 @@ describe('JsonCacheService — byte-size LRU eviction (#53)', () => {
 
     expect(jc.get('small-1')).not.toBeNull();
     expect(jc.get('small-2')).not.toBeNull();
+  });
+});
+
+describe('JsonCacheService — live iteration API (FR-5, no full-map clone)', () => {
+  let l3: L3DiskService;
+  let jc: JsonCacheService;
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-iter-'));
+    l3 = new L3DiskService(tmpDir);
+    jc = new JsonCacheService(l3);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('entries() yields the current [key, entry] pairs from the live store', () => {
+    jc.set('a', 1, 60_000);
+    jc.set('b', 2, 60_000);
+
+    const pairs = [...jc.entries()];
+    expect(pairs.map(([k]) => k).sort()).toEqual(['a', 'b']);
+    expect(pairs.find(([k]) => k === 'a')?.[1].data).toBe(1);
+  });
+
+  it('keys() yields the current keys', () => {
+    jc.set('a', 1, 60_000);
+    jc.set('b', 2, 60_000);
+
+    expect([...jc.keys()].sort()).toEqual(['a', 'b']);
+  });
+
+  it('has() reflects whether a key is present', () => {
+    jc.set('a', 1, 60_000);
+
+    expect(jc.has('a')).toBe(true);
+    expect(jc.has('missing')).toBe(false);
+  });
+
+  it('peek() returns the entry (or null) without rebuilding the map', () => {
+    jc.set('a', { v: 1 }, 60_000);
+
+    expect(jc.peek('a')?.data).toEqual({ v: 1 });
+    expect(jc.peek('missing')).toBeNull();
   });
 });

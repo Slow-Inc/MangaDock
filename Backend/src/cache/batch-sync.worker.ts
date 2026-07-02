@@ -125,7 +125,7 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.l3.write(key, entry);
+    await this.l3.write(key, entry);
 
     try {
       const { error } = await this.supabase.client.rpc(CACHE_SYNC_RPC, {
@@ -146,8 +146,15 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
           `BatchSync: key=${key} dead-lettered after ${retryCount} consecutive failures — ${String(err)}`,
         );
       } else {
+        // Move back to DIRTY so the NEXT flush retries it — otherwise a retryable
+        // failure strands the key in PROCESSING until a leadership change runs
+        // recoverOrphans(). rpush(DIRTY) BEFORE lrem(PROCESSING): if we crash between
+        // the two, the key is in both queues; the flush dedup (`seen` + lrem) and
+        // recoverOrphans tolerate the duplicate. The reverse order could drop the key.
+        await client.rpush(DIRTY_QUEUE, key);
+        await client.lrem(PROCESSING_QUEUE, 1, key);
         this.logger.warn(
-          `BatchSync: Supabase RPC failed key=${key} (attempt ${retryCount}/${MAX_RETRIES}): ${String(err)} — left in processing for retry`,
+          `BatchSync: Supabase RPC failed key=${key} (attempt ${retryCount}/${MAX_RETRIES}): ${String(err)} — requeued to dirty for retry`,
         );
       }
     }

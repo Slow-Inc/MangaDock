@@ -4,6 +4,8 @@ import { StorageProvider } from './storage-provider.interface';
 
 @Injectable()
 export class CloudflareR2StorageProvider implements StorageProvider {
+  readonly isRemote = true;
+
   private readonly logger = new Logger(CloudflareR2StorageProvider.name);
 
   constructor(
@@ -11,7 +13,12 @@ export class CloudflareR2StorageProvider implements StorageProvider {
     private readonly workerSecret: string,
   ) {}
 
-  private workerFetch(path: string, init?: RequestInit): Promise<Response> {
+  // `duplex: 'half'` is required by Node/undici whenever the request body is a
+  // stream; it is not yet part of the lib-dom RequestInit type.
+  private workerFetch(
+    path: string,
+    init?: RequestInit & { duplex?: 'half' },
+  ): Promise<Response> {
     const url = `${this.workerUrl.replace(/\/$/, '')}${path}`;
     return fetch(url, {
       ...init,
@@ -23,23 +30,15 @@ export class CloudflareR2StorageProvider implements StorageProvider {
   }
 
   async put(key: string, data: Buffer | string | Readable, options?: { contentType?: string }): Promise<void> {
-    let body: Buffer;
-    if (data instanceof Readable) {
-      const chunks: Buffer[] = [];
-      for await (const chunk of data) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as ArrayBufferLike));
-      }
-      body = Buffer.concat(chunks);
-    } else if (typeof data === 'string') {
-      body = Buffer.from(data);
-    } else {
-      body = data;
-    }
-
+    // Hand the body straight to fetch — a Readable is streamed to the worker
+    // (never drained into a Buffer first), and Buffer/string pass through
+    // without an extra copy. Avoids double-buffering the whole object.
+    const isStream = data instanceof Readable;
     const res = await this.workerFetch(`/v1/object?key=${encodeURIComponent(key)}`, {
       method: 'PUT',
       headers: { 'content-type': options?.contentType ?? 'application/octet-stream' },
-      body: new Uint8Array(body),
+      body: data as BodyInit,
+      ...(isStream ? { duplex: 'half' } : {}),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
@@ -51,6 +50,14 @@ export class CloudflareR2StorageProvider implements StorageProvider {
     const res = await this.workerFetch(`/v1/object?key=${encodeURIComponent(key)}`);
     if (!res.ok) throw new Error(`R2 get failed [${res.status}] ${key}`);
     return Buffer.from(await res.arrayBuffer());
+  }
+
+  async getStream(key: string): Promise<Readable> {
+    const res = await this.workerFetch(`/v1/object?key=${encodeURIComponent(key)}`);
+    if (!res.ok || !res.body) throw new Error(`R2 get failed [${res.status}] ${key}`);
+    // Stream the worker response body through instead of buffering it all in
+    // memory; the caller pipes it directly to the HTTP response.
+    return Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]);
   }
 
   async delete(key: string): Promise<void> {

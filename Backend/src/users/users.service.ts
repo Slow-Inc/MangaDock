@@ -141,59 +141,58 @@ export class UsersService {
   }
 
   async upsertUser(uid: string, data: { email?: string | null; displayName?: string | null; photoURL?: string | null }) {
-    const { data: existing, error: readError } = await this.db
-      .from('profiles')
-      .select('uid, display_name, photo_url')
-      .eq('uid', uid)
-      .maybeSingle();
-
-    if (readError) {
-      throw new Error(`Failed to read user profile: ${readError.message}`);
-    }
-
     const now = new Date().toISOString();
 
-    if (!existing) {
-      const { error } = await this.db.from('profiles').insert({
+    // Atomic create-if-missing (INSERT ... ON CONFLICT (uid) DO NOTHING). Removes the
+    // read-then-write window that let concurrent logins race into a duplicate-key error.
+    // Preserve-fields (role/plan/trust_score/…) rely on their NOT NULL column defaults.
+    const { error: createError } = await this.db.from('profiles').upsert(
+      {
         uid,
         email: data.email ?? null,
         display_name: data.displayName ?? null,
         photo_url: data.photoURL ?? null,
-        role: 'user',
-        plan: 'free',
-        trust_score: 0,
-        rating_avg: 0,
-        rating_count: 0,
-        country: null,
-        preferred_language: null,
-        bio: null,
-        translator_languages: [],
-        photo_history: [],
         created_at: now,
         updated_at: now,
-      });
+      },
+      { onConflict: 'uid', ignoreDuplicates: true },
+    );
+    if (createError) {
+      throw new Error(`Failed to create user profile: ${createError.message}`);
+    }
+
+    // Refresh email on every login; each statement is idempotent so there is no race.
+    const { error: emailError } = await this.db
+      .from('profiles')
+      .update({ email: data.email ?? null, updated_at: now })
+      .eq('uid', uid);
+    if (emailError) {
+      throw new Error(`Failed to upsert user profile: ${emailError.message}`);
+    }
+
+    // Backfill display_name / photo_url only when still empty — never overwrite a value
+    // the user already has. The `.is(col, null)` filter makes this a no-op otherwise.
+    if (data.displayName) {
+      const { error } = await this.db
+        .from('profiles')
+        .update({ display_name: data.displayName })
+        .eq('uid', uid)
+        .is('display_name', null);
       if (error) {
-        throw new Error(`Failed to create user profile: ${error.message}`);
+        throw new Error(`Failed to backfill display name: ${error.message}`);
       }
-      this.logger.log(`Created user: ${uid}`);
-      return;
+    }
+    if (data.photoURL) {
+      const { error } = await this.db
+        .from('profiles')
+        .update({ photo_url: data.photoURL })
+        .eq('uid', uid)
+        .is('photo_url', null);
+      if (error) {
+        throw new Error(`Failed to backfill photo URL: ${error.message}`);
+      }
     }
 
-    const update: Record<string, unknown> = {
-      email: data.email ?? null,
-      updated_at: now,
-    };
-    if (!existing.display_name && data.displayName) {
-      update['display_name'] = data.displayName;
-    }
-    if (!existing.photo_url && data.photoURL) {
-      update['photo_url'] = data.photoURL;
-    }
-
-    const { error } = await this.db.from('profiles').update(update).eq('uid', uid);
-    if (error) {
-      throw new Error(`Failed to upsert user profile: ${error.message}`);
-    }
     this.logger.log(`Upserted user (profile preserved): ${uid}`);
   }
 
@@ -212,11 +211,14 @@ export class UsersService {
   }
 
   async getProfile(uid: string): Promise<UserProfile> {
-    const { data: profile, error: profileError } = await this.db
-      .from('profiles')
-      .select('*')
-      .eq('uid', uid)
-      .maybeSingle<ProfileRow>();
+    // The profile and favorites lookups are independent — run them in parallel.
+    const [
+      { data: profile, error: profileError },
+      { data: favoritesRows, error: favoritesError },
+    ] = await Promise.all([
+      this.db.from('profiles').select('*').eq('uid', uid).maybeSingle<ProfileRow>(),
+      this.db.from('user_favorites').select('*').eq('uid', uid).order('added_at', { ascending: false }),
+    ]);
 
     if (profileError && !this.isNotFound(profileError)) {
       throw new Error(`Failed to fetch profile: ${profileError.message}`);
@@ -224,13 +226,6 @@ export class UsersService {
     if (!profile) {
       throw new NotFoundException('User not found');
     }
-
-    const { data: favoritesRows, error: favoritesError } = await this.db
-      .from('user_favorites')
-      .select('*')
-      .eq('uid', uid)
-      .order('added_at', { ascending: false });
-
     if (favoritesError) {
       throw new Error(`Failed to fetch favorites: ${favoritesError.message}`);
     }
@@ -440,7 +435,14 @@ export class UsersService {
       throw new Error(`Failed to export history: ${error.message}`);
     }
 
-    const escape = (v: unknown) => String(v ?? '').replace(/"/g, '""');
+    // CSV-injection guard: prefix a leading '=', '+', '-', or '@' with a single
+    // quote so spreadsheet apps treat the cell as text, not a formula. Escaping
+    // (double the quotes) runs after, so the quoting stays intact.
+    const escape = (v: unknown) => {
+      const s = String(v ?? '');
+      const guarded = /^[=+\-@]/.test(s) ? `'${s}` : s;
+      return guarded.replace(/"/g, '""');
+    };
 
     const rows = (data ?? []).map((row) => {
       const r = row as Record<string, unknown>;
@@ -497,13 +499,17 @@ export class UsersService {
   }
 
   async deleteUserAccount(uid: string): Promise<void> {
+    // Child tables are independent of each other — delete them in parallel.
+    // They FK-reference profiles(uid), so the parent row must be deleted AFTER them.
     const tables = ['user_favorites', 'user_liked', 'user_history'];
-    for (const table of tables) {
-      const { error } = await this.db.from(table).delete().eq('uid', uid);
+    const results = await Promise.all(
+      tables.map((table) => this.db.from(table).delete().eq('uid', uid)),
+    );
+    results.forEach(({ error }, i) => {
       if (error) {
-        throw new Error(`Failed to delete ${table}: ${error.message}`);
+        throw new Error(`Failed to delete ${tables[i]}: ${error.message}`);
       }
-    }
+    });
 
     const { error: profileError } = await this.db.from('profiles').delete().eq('uid', uid);
     if (profileError) {
@@ -512,9 +518,9 @@ export class UsersService {
 
     const files = await this.storage.list(this.avatarsDir);
     const userFiles = files.filter((f) => f.startsWith(`${uid}_`));
-    for (const file of userFiles) {
-      await this.storage.delete(`${this.avatarsDir}/${file}`);
-    }
+    await Promise.all(
+      userFiles.map((file) => this.storage.delete(`${this.avatarsDir}/${file}`)),
+    );
 
     this.logger.log(`Deleted all data for user: ${uid}`);
   }

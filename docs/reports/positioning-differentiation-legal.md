@@ -24,7 +24,7 @@
 |---|---|---|---|
 | **Towards Fully Automated Manga Translation** (Hinami et al., UTokyo) [[arXiv 2012.14271]](https://arxiv.org/abs/2012.14271) | 2021 | First **context-aware + multimodal** manga MT; released the **OpenMantra** evaluation dataset; method to auto-build a manga parallel corpus | Defines the two hard problems we also hit: *context* and *multimodality*. Our cross-page context is currently **disabled** (§3.3) — i.e. we are *behind* the 2021 baseline on this axis. |
 | **Context-Informed MT of Manga using Multimodal LLMs** [[arXiv 2411.02589]](https://arxiv.org/html/2411.02589v2) · [[COLING 2025]](https://aclanthology.org/2025.coling-main.232.pdf) | 2024–25 | Uses **MLLMs** to inject visual context; shows earlier tag-based context was inconclusive | This is the current research frontier; our Gemini/Qwen3 path is MLLM-capable but we **don't feed page imagery as context** yet. A concrete research-aligned upgrade path. |
-| **Manga109 / Manga109-v2026** [[arXiv 2605.21182]](https://arxiv.org/html/2605.21182) | 2017 / 2026 | The foundational annotated manga dataset (detection/OCR/understanding) | The standard benchmark we could evaluate against to make claims *measurable* (we currently have **no quantitative MT benchmark** — a gap for the report). |
+| **Manga109 / Manga109-v2026** [[arXiv 2605.21182]](https://arxiv.org/html/2605.21182) | 2017 / 2026 | The foundational annotated manga dataset (detection/OCR/understanding) | The standard set for a **translation-accuracy** benchmark (BLEU/COMET) — our remaining gap. We already have a measured **render-parity** benchmark (`mit-benchmark-and-quality.md`); accuracy is future work. |
 
 > **Honest gap for the viva:** we have **no BLEU/COMET/human-eval numbers** on a public set (OpenMantra/Manga109). If we want to claim "better," we must measure. Right now our evidence is qualitative (`docs/research/*divergence*`).
 
@@ -80,9 +80,11 @@ MangaDock is **not** "another manga MT engine." It is a **vertically-integrated 
 | **Detection downscaled** 2048 (MIT default 2560) for VRAM | ~36% fewer voxels for small text → missed lines | `MIT_DETECTION_SIZE=2560` |
 | **Inpaint downscaled** 1536 (tuned 2048) | Blurrier erase on dark art | `MIT_INPAINTING_SIZE=2048` |
 | **Render parity off by default** (clean-layout/narrow-column/Knuth-Plass greedy) | EN wraps to wrong width; SFX lost | opt-in knobs / #180 |
-| **No quantitative benchmark** | Can't *prove* quality claims | Evaluate on OpenMantra/Manga109 |
+| **No translation-accuracy benchmark** (we DO have a render-parity one) | Can't *prove* accuracy claims | Evaluate on OpenMantra/Manga109 (BLEU/COMET) |
 
 > These are mostly **deliberate VRAM trade-offs on a 12 GB card** (`project_render_parity_direction.md`) — a legitimate engineering-constraints story, *if framed as a conscious trade-off rather than a bug.*
+>
+> **What we DO have (don't undersell):** a measured, reproducible **render-parity benchmark** (~40–50% → ~90–95%) + a verified **resource story** — LaMa **~6 GB**/12 GB (ADR 005), Flux opt-in **~10 GB**, both on one consumer GPU, vs MangaTranslator's YOLO×2+SAM+FLUX stack. Full write-up: `mit-benchmark-and-quality.md`.
 
 ### 3.4 The defensible "highlight" claim
 We should NOT claim "best translation quality." We **should** claim:
@@ -139,7 +141,7 @@ The premise "big players haven't done this" is **half-true** — they *are* movi
 | | |
 |---|---|
 | **Strengths** | On-demand reader-integrated translation; patch/knob A/B + 3-tier cache engineering; human-AI marketplace; operational maturity (cache/observability/security); Thai-market fit; full self-hostable stack built by 2–3 undergrads |
-| **Weaknesses** | Raw MT below SOTA (context disabled, VRAM-downscaled); no quantitative benchmark; bus-factor; **no licensors signed yet** (two-sided model is a plan); demo still uses MangaDex (must be governed by origin policy at launch); marketplace needs moderation/anti-abuse for bad-actor uploads |
+| **Weaknesses** | Raw MT below SOTA (context being re-enabled, VRAM-downscaled); no translation-*accuracy* benchmark yet (render parity measured 40→90%); bus-factor; **no licensors signed yet** (two-sided model is a plan); demo still uses MangaDex (must be governed by origin policy at launch); marketplace needs moderation/anti-abuse for bad-actor uploads |
 | **Opportunities** | Re-enable cross-page context (#140) → match research baseline; benchmark on OpenMantra/Manga109 for measurable claims; **be the neutral rail** indie + publishers both onboard (the moat incumbents can't occupy); **Thai/SEA** long tail underserved by Orange/Mantra (EN-focused) |
 | **Threats** | Incumbents (Orange/Mantra) scaling; **licensor trust / chicken-and-egg** supply onboarding; AI-translation reputational backlash spilling onto authorized AI; model/API cost; takedown/moderation load |
 
