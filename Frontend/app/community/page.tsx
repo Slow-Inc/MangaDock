@@ -46,7 +46,12 @@ function CommunityContent() {
 
   const closeModal = useCallback(() => {
     setIsModalVisible(false);
-    setTimeout(() => { setShowCreateModal(false); setPostImages([]); }, 220);
+    setTimeout(() => {
+      setShowCreateModal(false);
+      setPostImages([]);
+      setNewPost({ title: "", content: "", category: "general" as ForumCategory });
+      setSelectedManga(null);
+    }, 220);
   }, []);
 
   // Reset to 'general' when role changes and current category becomes restricted
