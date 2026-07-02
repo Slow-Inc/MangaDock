@@ -116,7 +116,10 @@ def _fixture_paths():
     return sorted(glob.glob(_os.path.join(here, 'fixtures', '*-layout.json')))
 
 
+@pytest.mark.slow
 def test_reference_layout_safety_envelope_over_corpus():
+    # Runs the reference fit over the WHOLE fixture corpus — many calc_horizontal calls, ~minutes.
+    # Marked slow (opt-in via `-m slow`); the per-fixture guards above cover the fast suite.
     from manga_translator.render_replay import load_fixture, replay_clean_layout
     paths = _fixture_paths()
     assert paths, 'no layout fixtures found'

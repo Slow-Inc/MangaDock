@@ -296,6 +296,29 @@ and honour the original's vertical orientation as the reference. Add a readabili
 (final_fs not far below the target) so the harness catches over-shrink too, not just over-spill. Until then
 the discriminator stays behind the OFF flag (production/demo unaffected — reference_layout is not the default).
 
+## 7h. reference_layout de-risk — threshold validated across corpus (2026-07-02)
+
+Post-demo, executed the brainstorm-consensus de-risk (3-agent, all read the code): the unanimous #1 risk
+was the demoted-bubble discriminator threshold (1.4) being unstable across the non-deterministic
+translator. Actions taken:
+- **Narration over-shrink fixed** (the earlier over-correction): `fit_to_box` was a plain binary search
+  that hit word-wrap NON-monotonicity and returned the tiny branch → added a bounded upward re-scan; plus
+  the non-fill path gets a generous vertical tolerance so narration wraps to more lines at the flat size.
+  Live render confirms readable narrow columns; two-sided metric guard green.
+- **Corpus expanded 2 → 4 fixtures** (One-Punch + Gal Yome ds20/ds4/ds12; a 5th was a byte-identical dup,
+  dropped). Measured discriminator ratios across **17 bubble regions**: Thai (fills) = **1.07–1.20**,
+  One-Punch (narrow) = **1.61–3.43**. **Clean separation — nothing lands in [1.20, 1.60]; ~0.2 margin each
+  side of the 1.4 threshold, consistent across every page.** The instability concern is substantially
+  reduced (no near-boundary region in the corpus).
+- **Parameterized safety-envelope guard** over the whole corpus: every region must be within the box
+  (spill ≤ 1.35×det, narration ≥ 0.6×flat, fill ≥ 0.9×flat). Passes on all 4 fixtures. Marked `slow`
+  (calc_horizontal-heavy). Any new fixture is auto-guarded.
+
+**Status:** reference_layout is now corpus-validated on 4 pages + envelope-guarded, but still **flag OFF**
+(promotion to default is a separate call — grow the corpus further + the multi-run flip check the agents
+suggested if the threshold ever needs tightening; the remaining cleanup is merging `_reference_fit_box`
++ `_reference_cap` into one intent resolver + naming the constants).
+
 ## 8. Immediate next actions
 
 1. Render-only replay fixture spec + dump/replay CLI (One-Punch + the 2026-07-02 oversize region +
