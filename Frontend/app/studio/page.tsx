@@ -100,10 +100,10 @@ export default function StudioOverviewPage() {
   const { showToast } = useToast();
   const isMobile = useIsMobile();
 
-  const [versions, setVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("overview:versions") ?? []);
+  const [versions, setVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("studio:versions") ?? []);
   const [balance, setBalance] = useState<number | null>(() => getCached<number>("overview:balance") ?? null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>(() => getCached<WalletTransaction[]>("overview:transactions") ?? []);
-  const [loadingData, setLoadingData] = useState(() => getCached("overview:versions") === null);
+  const [loadingData, setLoadingData] = useState(() => getCached("studio:versions") === null);
   const [mobileView, setMobileView] = useState<OverviewMobileView>("menu");
   const hasFetched = useRef(false);
 
@@ -120,7 +120,7 @@ export default function StudioOverviewPage() {
       setVersions(vers);
       setBalance(bal.balance);
       setTransactions(txs);
-      setCache("overview:versions", vers);
+      setCache("studio:versions", vers);
       setCache("overview:balance", bal.balance);
       setCache("overview:transactions", txs);
     } catch {
