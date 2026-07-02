@@ -149,6 +149,24 @@ Grouped by shared code-path touch-point (fix the root once per cluster):
 
 ---
 
+## 7a. Execution log + learnings (2026-07-02)
+
+- **Phase 3 (both-axis hotfix) — DONE, committed** (`df30e25e`): `_clean_layout_dst` now bounds a
+  sized-up caption on both axes (`_CLEAN_DISPLAY_W_TOL`). Removes the gross One-Punch width overflow
+  (fonts 40→18, face-covering block gone); Thai no under-fill regression. Report:
+  `docs/reports/benchmarks/2026-07-02-clean-layout-both-axis-hotfix.md`.
+- **Phase 1 (harness metric) — DONE, committed** (`c0f8b45f`, `2f71a71c`): `sizing_trace.axis_fill`
+  + `overflow_axes`; the LayoutDecision trace emits `fill_frac_w/h` + `overflow_w/h`.
+- **Phase 4 attempt — REVERTED (key learning):** a quick "shrink-to-min on overflow" made narration
+  render *too small / faint* (verified on One-Punch). Root: the bound was the **source-text column
+  width** (`x2-x1`), which for narration is much narrower than the balloon it sits in → over-shrink.
+  **The proper Phase-4 fix must bound against the balloon SAFE-BOX (distance-transform interior),
+  not the source column** — narration balloons are wider than their source column. clean_layout
+  regions often lack a `bubble_box` (det_bubble_seg misses egg/oval narration), so Phase 4 needs a
+  safe-box (or territory) fallback for those. This is the reference model exactly (safe-box →
+  binary-search-from-cap → both-axis → fail-loud) and is NOT a quick patch — it is the real Phase-4
+  reference-engine port. Do it behind a flag, gated by the harness (#462), verified on both targets.
+
 ## 8. Immediate next actions
 
 1. Render-only replay fixture spec + dump/replay CLI (One-Punch + the 2026-07-02 oversize region +
