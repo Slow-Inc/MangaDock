@@ -319,6 +319,21 @@ translator. Actions taken:
 suggested if the threshold ever needs tightening; the remaining cleanup is merging `_reference_fit_box`
 + `_reference_cap` into one intent resolver + naming the constants).
 
+## 7i. Production inventory + garble diagnostic (2026-07-02)
+
+Deterministic audit of the SHIPPING path (reference OFF) on Gal Yome ds4/ds12
+(`docs/reports/benchmarks/2026-07-02-production-defect-inventory.md`). Real production defects, by domain:
+- **RENDER:** garbled/fragmented small bubbles (ds4 "เธอ/ได/ดี/ตั") + name split mid-word (ds12 "คุณฟ/ยุกิ").
+- **DETECTION/TRANSLATION (separate workstreams):** untranslated shout "WHA-!?", untranslated katakana SFX, name romaji.
+
+**Garble diagnostic — blocked on repro (debug-mantra: no repro → don't guess).** Replaying the captured
+`thai-gy-ds4` fixture (6 regions, all final_fs 26-66) does NOT reproduce the garble — that live run had
+different/more regions than the frozen fixture (translator non-determinism + detection variance). So the
+top render defect is **real but not yet deterministically reproducible**; before a TDD fix it needs a
+TARGETED capture of a garbling run (render ds4 with MIT_DUMP_REGIONS until a fixture shows tiny-font
+char-split regions), then the fix (tiny-box word-whole floor on the bubble-fit path) can be pinned. Do
+NOT speculatively patch the production sizing without that repro.
+
 ## 8. Immediate next actions
 
 1. Render-only replay fixture spec + dump/replay CLI (One-Punch + the 2026-07-02 oversize region +
