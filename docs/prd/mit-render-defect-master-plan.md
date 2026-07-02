@@ -167,6 +167,25 @@ Grouped by shared code-path touch-point (fix the root once per cluster):
   binary-search-from-cap → both-axis → fail-loud) and is NOT a quick patch — it is the real Phase-4
   reference-engine port. Do it behind a flag, gated by the harness (#462), verified on both targets.
 
+## 7b. Phase-4 engine landed behind a flag (2026-07-02, cont.)
+
+`reference_layout` flag wired end-to-end (config → stages → dispatch → resize), OFF by default
+(golden byte-identical). Engine: `reference_layout.fit_to_box` (pure) + `_reference_clean_layout`
+(safe-box binary-search, word-whole) + `_reference_fit_box` (safe interior for bubbled regions, else
+detection box). TDD: 4 reference-layout + 3 clean-layout tests.
+
+**Worker verify (flag ON):**
+- **One-Punch (EN): fixed** — the gross overflow is gone; every region is contained + readable (no
+  more giant face-covering blocks). Slightly smaller than target + greedy line-breaks (→ KP #180).
+- **Thai (ds20): REGRESSES** — dialogue in round bubbles that `fills_bubble_width < 0.72` demotes to
+  clean_layout now caps at the flat size → **under-fills the balloon** ("มีอยู่แล้วค่ะ" small in a big
+  oval). The flat cap is right for narration but wrong for a bubbled region that should FILL.
+
+**⇒ flag stays OFF until fixed.** Before default-on, `_reference_clean_layout` needs a **per-role cap**:
+bubbled regions (a `bubble_box` present) should fill the interior (cap = interior-height bound, like
+bubble-fit), only narration (no bubble) caps at the flat size. Plus KP line-break (#180) for line
+parity. This is the `fills_bubble_width` discriminator problem (item-2b) surfacing — tracked under #430/#432.
+
 ## 8. Immediate next actions
 
 1. Render-only replay fixture spec + dump/replay CLI (One-Punch + the 2026-07-02 oversize region +
