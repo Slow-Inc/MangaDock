@@ -261,6 +261,22 @@ related.** Patch JSON: `{img_width, img_height, patches:[{x,y,w,h,img_b64}]}`; c
 **Next real step:** re-run the 12-item defect inventory on the PATCH path (reference_layout ON vs OFF)
 to find which defects are actually real in production, before any more render code.
 
+## 7f. Confirmed real (patch-path) defect: One-Punch narration blocks render LARGER than target
+
+2026-07-02, user-verified on the **patch path** (correct endpoint): the two top narration blocks
+("WHAT SHOULD WE DO…", "THIS BRAT DOESN'T REALIZE…") render clearly bigger/wider than the target's
+narrow multi-line columns. This is a REAL production defect (not the image-endpoint artifact) — these
+are `has_bubble=False` → clean_layout → `reference_cap` = flat. Two compounding causes:
+1. **Flat cap too high** — `clean_layout_font_size(font_size_max=20, page)` scales with page resolution
+   to a size above the target's narration (reference model caps in-bubble ~16). Lever: lower the
+   clean-layout narration cap (smaller `font_size_max`, or a narration-specific cap ≈ reference 16).
+2. **Wrap column too wide / greedy line-break** — target wraps into a narrower column (more lines,
+   smaller font); ours wraps wide (fewer lines, bigger). Lever: narrower wrap for narration + KP
+   line-break (#180) so the column matches the target shape.
+
+Tracked as a first-class item (was only an aside in §7e). Fix on the patch path, verify vs target,
+reference_layout ON vs OFF. Related: #180 (KP line-break), #430 (render sizing).
+
 ## 8. Immediate next actions
 
 1. Render-only replay fixture spec + dump/replay CLI (One-Punch + the 2026-07-02 oversize region +
