@@ -5,6 +5,8 @@
 > 2. `docs/reports/2026-07-02-mit-speedup-e2e-measurements.md` — how the numbers were measured.
 >
 > **Status when this plan was written (2026-07-03):** Phase −1 (already done, uncommitted in working tree). Phases 0–3 not started.
+>
+> **Status update (same day, Opus 4.8 execution):** Phases 0, 1, 2a, 2c **done and committed** on branch `perf/mit-layout-fit-and-merge` (commits `a116b41`→`304eeaa`; `git log --oneline` on that branch for the full list). **Phase 2b intentionally NOT started — this is the model-switch boundary** (see *Model assignment*). Read **§0-D** before touching layout_fit: it supersedes the original decision table in §2b, five instrumentation passes proved the mechanism everyone assumed (calc_horizontal cost) is negligible, and the real cause needs a sampling profiler (py-spy), not another perf_counter probe. **Known open item:** the deep Phase 0 instrumentation (calc_horizontal breakdown, `_bubble_fit_layout`/`safe_area_box` timers, per-region diagnostics) is uncommitted working-tree state, entangled with a pre-existing uncommitted #175/#183 feature (see §0-D's "Commit status" note) — needs a decision before Phase 3's final commit pass, not a silent merge.
 
 ---
 
