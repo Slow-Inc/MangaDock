@@ -11,6 +11,7 @@ import MangaSearchSelector from "../components/MangaSearchSelector";
 import PostImageUploader from "../components/PostImageUploader";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { useFeedStream } from "../hooks/useForumStream";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "../lib/forumCategories";
 
 function CommunityContent() {
@@ -29,7 +30,8 @@ function CommunityContent() {
   );
   const [sort, setSort] = useState<'new' | 'hot'>('new');
   const [viewMode, setViewMode] = useState<'card' | 'compact'>('card');
-  
+  const isMobile = useIsMobile();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newPost, setNewPost] = useState({ title: "", content: "", category: "general" as ForumCategory });
@@ -65,8 +67,8 @@ function CommunityContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (window.innerWidth < 768) setViewMode('compact');
-  }, []);
+    if (isMobile) setViewMode('compact');
+  }, [isMobile]);
 
   const [newPostCount, setNewPostCount] = useState(0);
 
