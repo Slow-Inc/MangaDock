@@ -315,6 +315,14 @@ def _reference_fit_box(region, bubble_box, crop_shape):
     return (x2 - x1), (y2 - y1), ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
 
 
+def _reference_cap(has_bubble, box_h, flat):
+    """Font cap for the reference fit. A bubbled region fills its balloon interior (cap = interior
+    height, so the binary search grows to fill like bubble-fit); free narration/caption caps at the
+    flat page-scaled size (small + readable). This split is what keeps One-Punch narration small
+    while letting a Thai dialogue line fill its oval — no under-fill regression."""
+    return int(box_h) if has_bubble else int(flat)
+
+
 def _reference_clean_layout(region, box_w, box_h, font_size_minimum, cap, page_w):
     """#178 Phase-4 reference fit: binary-search the font to fill the given SAFE-BOX on BOTH axes.
 
@@ -517,8 +525,10 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 # binary-searching the font from the flat cap DOWN to the largest that fits both axes
                 # — the reference model, replacing the source-column-referenced _clean_layout_dst.
                 _ps = page_shape if page_shape is not None else img.shape
-                _cap = clean_layout_font_size(font_size_max, _ps[0], _ps[1], font_size_minimum)
+                _flat = clean_layout_font_size(font_size_max, _ps[0], _ps[1], font_size_minimum)
                 _bw, _bh, (cx, cy) = _reference_fit_box(region, bubble_box, img.shape)
+                # bubbled → fill the interior (cap = interior height); narration → flat cap.
+                _cap = _reference_cap(bubble_box is not None, _bh, _flat)
                 clean_fs, block_w, block_h = _reference_clean_layout(
                     region, _bw, _bh, font_size_minimum, _cap, _ps[1])
                 laid = (clean_fs, block_w, block_h)

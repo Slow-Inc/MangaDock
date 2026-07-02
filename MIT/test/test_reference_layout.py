@@ -53,3 +53,12 @@ def test_reference_fit_box_uses_detection_box_when_no_bubble():
     bw, bh, (cx, cy) = _reference_fit_box(region, None, (500, 500, 3))
     assert (bw, bh) == (100.0, 200.0)
     assert (cx, cy) == (60.0, 120.0)
+
+
+def test_reference_cap_fills_interior_when_bubbled_else_flat():
+    # A bubbled region should fill its balloon (cap = interior height, like bubble-fit); free
+    # narration caps at the flat page-scaled size. This is what lets reference_layout keep One-Punch
+    # narration small AND let Thai dialogue fill its oval (no under-fill regression).
+    from manga_translator.rendering import _reference_cap
+    assert _reference_cap(True, box_h=200, flat=18) == 200
+    assert _reference_cap(False, box_h=200, flat=18) == 18
