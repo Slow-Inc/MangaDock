@@ -128,3 +128,35 @@ def test_resize_regions_clean_layout_byte_identical():
         bubble_fit=False, clean_layout=True, font_size_max=24, page_shape=img.shape,
     )
     _save_or_assert(os.path.join(GOLDEN_DIR, 'resize_regions_clean_layout.npz'), dst_points_list, regions)
+
+
+def test_resize_regions_thai_byte_identical():
+    """#499: the production hot path is EN->TH, but the cases above only use
+    ENG/JPN. target_lang='THA' normalizes to hyphenator tag 'th' — a DIFFERENT
+    key than the 'th_TH' -> 'th-TH' case in test_calc_horizontal_characterization,
+    so nothing else locks the exact select_hyphenator('THA')->None path the
+    @lru_cache fix optimizes. Exercise both a bubble-fit and a legacy Thai region
+    (real Thai dialogue long enough to wrap) so a change to HYPHENATOR_LANGUAGES
+    or the fallback loop can't silently regress the Thai render geometry."""
+    _set_font()
+    img = np.zeros((720, 1000, 3), dtype=np.uint8)
+    thai_balloon = TextBlock(
+        [[[100, 100], [340, 100], [100, 280], [340, 280]]],
+        texts=['x'], translation='ไฮมิยะเซนไพน่ากลัวและก็น่ารักในเวลาเดียวกันเลยนะ',
+        direction='h', target_lang='THA', font_size=30,
+    )
+    thai_balloon.bubble_box = (90, 90, 350, 290)
+    thai_legacy = TextBlock(
+        [[[400, 400], [640, 400], [400, 470], [640, 470]]],
+        texts=['y'], translation='เจ้าจะไม่ใส่ชุดเกราะเลยหรือไงกัน',
+        direction='h', target_lang='THA', font_size=30,
+    )
+    regions = [thai_balloon, thai_legacy]
+    for r in regions:
+        r.set_font_colors([255, 255, 255], [0, 0, 0])
+
+    dst_points_list = resize_regions_to_font_size(
+        img, regions, font_size_fixed=None, font_size_offset=0, font_size_minimum=8,
+        bubble_fit=True, anti_overlap=True, clean_layout=False,
+    )
+    _save_or_assert(os.path.join(GOLDEN_DIR, 'resize_regions_thai.npz'), dst_points_list, regions)
