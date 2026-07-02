@@ -85,24 +85,24 @@ export default function TrendingPage() {
     const cached = cacheGet<TrendingManga[]>("community:trending");
     if (cached) { setTrending(cached); setLoading(false); return; }
 
-    const controller = new AbortController();
+    let mounted = true;
     setLoading(true);
 
     getTrendingManga(20)
       .then((items) => {
-        if (controller.signal.aborted) return;
+        if (!mounted) return;
         cacheSet("community:trending", items, TTL.MEDIUM);
         setTrending(items);
       })
       .catch(() => {
-        if (controller.signal.aborted) return;
+        if (!mounted) return;
         showToast({ type: "error", message: "โหลดมังงะ trending ไม่สำเร็จ", duration: 4000 });
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (mounted) setLoading(false);
       });
 
-    return () => controller.abort();
+    return () => { mounted = false; };
   }, [showToast]);
 
   return (
