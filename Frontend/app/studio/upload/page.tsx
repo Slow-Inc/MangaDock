@@ -405,6 +405,10 @@ function StudioUploadContent() {
    */
   const pagesRef = useRef<PageItem[]>(pages);
   pagesRef.current = pages;
+  // Always-current ref to getIdToken so effects and callbacks don't need it
+  // in their dep arrays (it is not wrapped in useCallback in AuthContext).
+  const getIdTokenRef = useRef(getIdToken);
+  getIdTokenRef.current = getIdToken;
 
   // Pick up selected book from mobile search page via sessionStorage
   useEffect(() => {
@@ -423,7 +427,7 @@ function StudioUploadContent() {
   // Load existing version data if editing
   useEffect(() => {
     if (!existingVersionId || !user) return;
-    getIdToken().then(async (token) => {
+    getIdTokenRef.current().then(async (token) => {
       try {
         if (!token) return;
         const res = await fetch(`${API_BASE}/versions/${existingVersionId}`, {
@@ -448,8 +452,7 @@ function StudioUploadContent() {
         setLoadingExisting(false);
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existingVersionId, user]);
+  }, [existingVersionId, user, showToast]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/");
@@ -458,7 +461,7 @@ function StudioUploadContent() {
   /** Create a draft version if one doesn't exist yet. Returns the versionId.
    *  All concurrent callers share the same in-flight promise so only one
    *  version is ever created per upload session. */
-  const ensureVersion = async (token: string): Promise<string> => {
+  const ensureVersion = useCallback(async (token: string): Promise<string> => {
     // Fast path: version already exists
     if (versionId) return versionId;
 
@@ -496,7 +499,7 @@ function StudioUploadContent() {
 
     ensureVersionPromiseRef.current = creation;
     return creation;
-  };
+  }, [versionId, titleId, language, titleName, chapterId, chapterNumber, chapterTitle, description, priceCoins]);
 
   /** Upload a single page file. */
   const uploadFile = useCallback(
@@ -507,7 +510,7 @@ function StudioUploadContent() {
       setPages((prev) => [...prev, placeholder]);
 
       try {
-        const token = await getIdToken();
+        const token = await getIdTokenRef.current();
         if (!token) throw new Error("ไม่พบ token");
         const vid = await ensureVersion(token);
 
@@ -540,8 +543,7 @@ function StudioUploadContent() {
         showToast({ message: msg });
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, versionId, titleId, chapterId, language, titleName, chapterNumber, chapterTitle, description, priceCoins]
+    [user, ensureVersion, showToast]
   );
 
   // Revoke any remaining blob URLs (e.g. failed uploads) on unmount.
