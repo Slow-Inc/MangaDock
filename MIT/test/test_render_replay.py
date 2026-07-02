@@ -52,3 +52,21 @@ def test_replay_clean_layout_is_deterministic_and_bounds_reference_width():
 
     off = replay_clean_layout(fixture, reference_layout=False, font_size_max=20)
     assert 'final_fs' in off[0] and 'fill_frac_w' in off[0]
+
+
+import pytest
+
+
+@pytest.mark.xfail(reason="#178/#430 demoted-bubble regions fill the wide safe-interior and spill past "
+                          "their narrow visible detection box — target renders them as a narrow column. "
+                          "Fix needs the fills-ratio discriminator (item-2b). Flips green when fixed.",
+                   strict=True)
+def test_reference_layout_no_region_spills_past_its_detection_box():
+    # Deterministic metric guard on the real One-Punch fixture: with reference_layout ON, NO region's
+    # rendered block should spill much past its VISIBLE detection box (what the user sees as "too big").
+    # Currently the top two demoted-bubble blocks do (~2.3x) — the user-flagged oversize.
+    from manga_translator.render_replay import load_fixture, replay_clean_layout
+    fx = load_fixture('test/fixtures/onepunch-layout.json')
+    decisions = replay_clean_layout(fx, reference_layout=True, font_size_max=20)
+    worst = max(d['overflow_vs_det_w'] for d in decisions)
+    assert worst <= 1.3, f'a region spills {worst:.2f}x past its detection box (target ~narrow column)'

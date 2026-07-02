@@ -82,12 +82,17 @@ def replay_clean_layout(fixture, reference_layout=False, font_size_max=20,
                 continue
             fs, block_w, block_h = laid
             avail_w, avail_h = (x2 - x1), (y2 - y1)
+        det_w, det_h = (x2 - x1), (y2 - y1)
         out.append(dict(
             has_bubble=bubble_box is not None, orig_fs=r.font_size, final_fs=int(fs),
             block_w=round(float(block_w), 2), block_h=round(float(block_h), 2),
             avail_w=round(avail_w, 2), avail_h=round(avail_h, 2),
+            det_w=round(det_w, 2), det_h=round(det_h, 2),
             fill_frac_w=round(block_w / avail_w, 3) if avail_w else 0.0,
-            fill_frac_h=round(block_h / avail_h, 3) if avail_h else 0.0))
+            fill_frac_h=round(block_h / avail_h, 3) if avail_h else 0.0,
+            # width vs the VISIBLE detection box — the user-perceived overflow (a demoted-bubble
+            # region can fit its wide safe-interior yet still spill past its narrow visible box).
+            overflow_vs_det_w=round(block_w / det_w, 3) if det_w else 0.0))
     return out
 
 
