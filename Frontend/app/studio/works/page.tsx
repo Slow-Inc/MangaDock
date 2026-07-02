@@ -127,8 +127,8 @@ export default function WorksPage() {
   const { showToast } = useToast();
   const isMobile = useIsMobile();
 
-  const [versions, setVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("works:versions") ?? []);
-  const [loadingVersions, setLoadingVersions] = useState(() => getCached("works:versions") === null);
+  const [versions, setVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("studio:versions") ?? []);
+  const [loadingVersions, setLoadingVersions] = useState(() => getCached("studio:versions") === null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | VersionStatus>("");
@@ -150,7 +150,7 @@ export default function WorksPage() {
       if (!token) throw new Error("ไม่พบ token");
       const data = await getMyVersions(token);
       setVersions(data);
-      setCache("works:versions", data);
+      setCache("studio:versions", data);
     } catch { showToast({ type: "error", message: "ไม่สามารถโหลดรายการเวอร์ชันได้", duration: 3000 }); }
     finally { setLoadingVersions(false); }
   }, [user, getIdToken, showToast]);

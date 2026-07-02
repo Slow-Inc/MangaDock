@@ -13,6 +13,7 @@ import {
   publishVersion,
 } from "../../../lib/studioApi";
 import type { ChapterVersion } from "../../../lib/types";
+import { getCached, setCache } from "../../../lib/studioCache";
 import { StudioChaptersSkeleton } from "../../components/StudioSkeleton";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { CoverImage } from "../../components/CoverImage";
@@ -243,21 +244,8 @@ export default function MangaDetailPage() {
   const { user, loading, getIdToken } = useAuth();
   const { showToast } = useToast();
 
-  const [allVersions, setAllVersions] = useState<ChapterVersion[]>(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("mb:studio:versions:cache");
-      if (cached) {
-        try {
-          return JSON.parse(cached);
-        } catch {}
-      }
-    }
-    return [];
-  });
-  const [loadingVersions, setLoadingVersions] = useState(() => {
-    if (typeof window !== "undefined") return !localStorage.getItem("mb:studio:versions:cache");
-    return true;
-  });
+  const [allVersions, setAllVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("studio:versions") ?? []);
+  const [loadingVersions, setLoadingVersions] = useState(() => getCached("studio:versions") === null);
   const hasFetched = useRef(false);
   const [confirmDelete, setConfirmDelete] = useState<ChapterVersion | null>(null);
 
@@ -291,14 +279,10 @@ export default function MangaDetailPage() {
   const fetchVersions = useCallback(async () => {
     if (!user) return;
 
-    const cached = localStorage.getItem("mb:studio:versions:cache");
+    const cached = getCached<ChapterVersion[]>("studio:versions");
     if (cached) {
-      try {
-        setAllVersions(JSON.parse(cached));
-        setLoadingVersions(false);
-      } catch {
-        setLoadingVersions(true);
-      }
+      setAllVersions(cached);
+      setLoadingVersions(false);
     } else {
       setLoadingVersions(true);
     }
@@ -308,7 +292,7 @@ export default function MangaDetailPage() {
       if (!token) throw new Error("ไม่พบ token");
       const data = await getMyVersions(token);
       setAllVersions(data);
-      localStorage.setItem("mb:studio:versions:cache", JSON.stringify(data));
+      setCache("studio:versions", data);
     } catch {
       showToast({ type: "error", message: "ไม่สามารถโหลดรายการเวอร์ชันได้", duration: 3000 });
     } finally {
