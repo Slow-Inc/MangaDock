@@ -277,6 +277,25 @@ are `has_bubble=False` → clean_layout → `reference_cap` = flat. Two compound
 Tracked as a first-class item (was only an aside in §7e). Fix on the patch path, verify vs target,
 reference_layout ON vs OFF. Related: #180 (KP line-break), #430 (render sizing).
 
+## 7g. Discriminator OVER-CORRECTS (user feedback 2026-07-02) — narration now too SMALL
+
+The `interior_w/det_w` discriminator correctly stops the demoted-bubble from FILLING a wide interior,
+but its "narrow" treatment (flat cap + wrap to the detection box) **over-shrinks**: on the One-Punch
+page (0.92 MP → flat ≈ 19px, width-fit drops it to 10–13px) the two top blocks render TINY, and the
+target renders them as a **readable narrow column echoing the original VERTICAL narration**. User also
+saw a Thai bubble ("plastic bag") go tiny — the 3 patches are all present (no text loss), but that live
+run's region had ratio > 1.4 so it was narrowed too (the non-determinism + threshold-sensitivity the
+brainstorm agents flagged). So we traded "too big" for "too small" — the exact ping-pong the campaign warns about.
+
+**Root:** the narrow path has no readability FLOOR and its size isn't calibrated to the target. Threshold
+1.4 (from the deterministic fixture) mis-fires on other live runs of the same page (translator non-determinism).
+
+**Real fix (next):** calibrate narration size to the TARGET deterministically — measure the target's
+narration font px and set the narrow-path cap/column to match (a readable narrow column, not min font),
+and honour the original's vertical orientation as the reference. Add a readability-FLOOR metric guard
+(final_fs not far below the target) so the harness catches over-shrink too, not just over-spill. Until then
+the discriminator stays behind the OFF flag (production/demo unaffected — reference_layout is not the default).
+
 ## 8. Immediate next actions
 
 1. Render-only replay fixture spec + dump/replay CLI (One-Punch + the 2026-07-02 oversize region +
