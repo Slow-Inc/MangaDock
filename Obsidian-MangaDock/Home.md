@@ -16,6 +16,7 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 
 - [[feedback-benchmark-patch-not-image-endpoint]] — Benchmark MIT render via `/translate/with-form/patches` (production, tags bubbles), NEVER `/translate/with-form/image` (never tags bubbles → under-fill/oversize artifacts). 2026-07-02 lesson.
 - [[feedback-clear-cache-before-test]] — ก่อน test การแปลทุกครั้งต้องล้าง cache ก่อน — และหลัง deploy fix ต้องล้าง L3 + reload browser ด้วย
+- [[feedback-log-every-experiment-to-md]] — เขียนทุกอย่างที่ลอง/ทำ (รวม dead-end + การวัด) ลง MD เป็น knowledge เสมอ — กัน session ถัดไปไล่ผีซ้ำ
 - [[feedback-core-boundary]] — New features attach at a stage/module seam with a stable interface + tests — never grow the core monolith (MangaTranslator orchestrator / shared modules) or copy per-model/per-translator boilerplate. The antidote to compounding tech debt.
 - [[feedback-decomposition-method]] — Why the MIT god-object decomposition is done byte-identical / characterization-first / one-seam-per-commit, with the measured benefit — keep doing it this way
 - [[feedback-impact-report]] — Every change that affects the system goes into docs/reports/system-impact-report.md with the FULL field set (what/where, why, before→after, perf Δ, quality, validation, risk) so a whole-system report can be pulled from it. Plus the MIT tech-debt register.
