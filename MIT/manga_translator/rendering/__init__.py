@@ -358,9 +358,16 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
     if _trace_path:
         import json as _json
         from .sizing_trace import fill_fraction as _fill_fraction
+        from .sizing_trace import axis_fill as _axis_fill
+        from .sizing_trace import overflow_axes as _overflow_axes
 
         def _emit_trace(rec):
+            # area occupancy (under-fill classifier) + per-axis fill & overflow (#462 guard).
             rec['fill_frac'] = _fill_fraction(rec['block_w'], rec['block_h'], rec['avail_w'], rec['avail_h'])
+            rec['fill_frac_w'] = _axis_fill(rec['block_w'], rec['avail_w'])
+            rec['fill_frac_h'] = _axis_fill(rec['block_h'], rec['avail_h'])
+            rec['overflow_w'], rec['overflow_h'] = _overflow_axes(
+                rec['block_w'], rec['block_h'], rec['avail_w'], rec['avail_h'])
             with open(_trace_path, 'a', encoding='utf-8') as _f:
                 _f.write(_json.dumps(rec) + '\n')
     else:
