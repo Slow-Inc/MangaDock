@@ -228,6 +228,39 @@ One-Punch showed no regression only because the fallback never ran.
 synth fallback there** (gated + validated the same way), then re-verify both targets. The validator +
 config flag are reusable; only the call site moves. Flag stays OFF until it actually runs + verifies.
 
+## 7e. ⚠️ BENCHMARK METHODOLOGY CORRECTION (2026-07-02) — read this first
+
+**The whole campaign was partly benchmarked on the WRONG endpoint.** `/translate/with-form/image`
+(→ `get_ctx` → full-page `translate()`) **never tags speech bubbles** — `_tag_regions_with_bubbles`
+is called ONLY inside `translate_patches` (manga_translator.py:1476), and production (Backend) uses
+`/translate/with-form/patches` → `translate_patches`. So every render-defect conclusion drawn from the
+`image` endpoint saw `has_bubble=False` for EVERY region — a structural artifact, not real behavior.
+
+**Verified on the production `patches` endpoint (bubbles ON):**
+- Thai ds20: `[BubbleSeg] 4 balloons, 3/3 regions tagged` → dialogue **FILLS its bubbles** ("มีอยู่หนึ่งอัน"
+  fills the oval, "ราคา 1858 เยน" fills the tall bubble). The session-long "under-fill" was the
+  image-endpoint artifact. det_bubble_seg is NOT missing ovals.
+- One-Punch: `[BubbleSeg] 5 balloons, 3/6 tagged` (3 narration boxes correctly have no bubble) → text
+  present, bubbles filled, narration prominent, **no catastrophic overflow** (the giant face-covering
+  block was largely the image-endpoint artifact too).
+
+**⇒ Corrections to earlier sections:**
+- §7c "Phase-4 is detection-bound (has_bubble=False)" — **WRONG / artifact.** On the patch path bubbles
+  are tagged; that conclusion was measured on the non-tagging endpoint.
+- §7d "synth-fallback wiring in the wrong path" — **WRONG.** `translate_patches` DOES call
+  `_tag_regions_with_bubbles`; the wiring is correct. It just wasn't needed on these two pages (`+0`
+  fallback — YOLO tagged everything). Keep it (flag `det_bubble_synth`, OFF) as a genuine-miss safety net.
+- Phase-3 hotfix + Phase-4 engine: valid, tested, flag-gated code — but their **necessity must be
+  re-checked on the patch path**, where the defects they target are much milder than the image endpoint showed.
+
+**RULE (also in team memory): benchmark MIT render via `/translate/with-form/patches` (composite the
+returned patches onto the original) — NEVER `/translate/with-form/image` for anything bubble/sizing
+related.** Patch JSON: `{img_width, img_height, patches:[{x,y,w,h,img_b64}]}`; composite = paste each
+`img_b64` PNG (RGBA) at `(x,y)` onto the original.
+
+**Next real step:** re-run the 12-item defect inventory on the PATCH path (reference_layout ON vs OFF)
+to find which defects are actually real in production, before any more render code.
+
 ## 8. Immediate next actions
 
 1. Render-only replay fixture spec + dump/replay CLI (One-Punch + the 2026-07-02 oversize region +
