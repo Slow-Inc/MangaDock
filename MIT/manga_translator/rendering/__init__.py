@@ -1,4 +1,5 @@
 import os
+import time
 import cv2
 import numpy as np
 from typing import List
@@ -434,16 +435,24 @@ async def dispatch(
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
     # Resize regions that are too small
+    # #speed-study (2026-07-02): split the two sync phases of the render stage to
+    # locate where the render wall-clock goes. Both blocks are pure synchronous CPU
+    # (no `await`), so perf_counter here measures true compute — comparing their sum
+    # to the async-wrapper's stage total isolates any async/suspension overhead.
+    _t_layout = time.perf_counter()
     dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout)
+    logger.info(f"[timing-render] phase=layout_fit elapsed_ms={(time.perf_counter() - _t_layout) * 1000:.1f} regions={len(text_regions)}")
 
     # TODO: Maybe remove intersections
 
     # Render text
+    _t_raster = time.perf_counter()
     for region, dst_points in tqdm(zip(text_regions, dst_points_list), '[render]', total=len(text_regions)):
         if render_mask is not None:
             # set render_mask to 1 for the region that is inside dst_points
             cv2.fillConvexPoly(render_mask, dst_points.astype(np.int32), 1)
         img = render(img, region, dst_points, hyphenate, line_spacing, disable_font_border, supersampling)
+    logger.info(f"[timing-render] phase=raster_loop elapsed_ms={(time.perf_counter() - _t_raster) * 1000:.1f} regions={len(text_regions)} ss={supersampling}")
     return img
 
 def _pad_box(temp_box, pad_height: bool, ext: int, offset: int):

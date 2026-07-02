@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+/* MIT Dashboard — dark mission-control (ASTRO) by default, light toggle.
+   "calm is a design requirement." Apple-grade refinement. PRD #279 / ADR 016. */
+
+:root {
+  /* ── Dark mission-control (default) ── */
+  --bg: #0a0b0e;
+  --bg-grid: rgba(255, 255, 255, 0.018);
+  --surface: #131419;
+  --surface-2: #181a20;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.14);
+  --ink: #f2f3f5;
+  --ink-2: rgba(242, 243, 245, 0.56);
+  --ink-3: rgba(242, 243, 245, 0.34);
+
+  --panel: #131419;
+  --panel-2: #1b1d24;
+  --panel-3: #23262e;
+  --panel-hairline: rgba(255, 255, 255, 0.08);
+  --panel-ink: #f2f3f5;
+  --panel-ink-2: rgba(242, 243, 245, 0.56);
+  --panel-ink-3: rgba(242, 243, 245, 0.34);
+
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 24px 60px -24px rgba(0, 0, 0, 0.7);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+
+  /* Telemetry status + service accents (shared across themes) */
+  --idle: #8a8f98;
+  --processing: #ffb340;
+  --success: #32d74b;
+  --error: #ff453a;
+  --writing: #0a84ff;
+  --c-detect: #5e9eff;
+  --c-ocr: #bf8cff;
+  --c-translate: #32d74b;
+  --c-inpaint: #ff9f0a;
+  --c-render: #64d2ff;
+  --frontend: #bf8cff;
+  --backend: #ffb340;
+  --mit: #32d74b;
+
+  --radius: 16px;
+
+  --font-sans: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont,
+    "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "Geist Mono", "JetBrains Mono", "Cascadia Code", monospace;
+}
+
+.light {
+  --bg: #f5f5f7;
+  --bg-grid: rgba(0, 0, 0, 0.02);
+  --surface: #ffffff;
+  --surface-2: #fbfbfd;
+  --hairline: rgba(0, 0, 0, 0.08);
+  --hairline-strong: rgba(0, 0, 0, 0.12);
+  --ink: #1d1d1f;
+  --ink-2: #6e6e73;
+  --ink-3: #a1a1a6;
+
+  --panel: #ffffff;
+  --panel-2: #f5f5f7;
+  --panel-3: #ececf0;
+  --panel-hairline: rgba(0, 0, 0, 0.08);
+  --panel-ink: #1d1d1f;
+  --panel-ink-2: #6e6e73;
+  --panel-ink-3: #a1a1a6;
+
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.04), 0 16px 40px -16px rgba(0, 0, 0, 0.18);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+* {
+  border-color: var(--hairline);
+}
+
+html {
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+}
+
+body,
+.theme-tx {
+  transition: background-color 0.32s ease, color 0.32s ease, border-color 0.32s ease;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,166 @@
+@import "tailwindcss";
+
+/* MIT Dashboard — warm premium monotone base (Speck) adapted to Arcana, with Speck/PremiumBuss
+   expressive accents reserved for status/data and hero panels (DESIGN.md). Dark default, light
+   toggle. PRD #279 / ADR 016 / redesign #304 (I3 — palette extracted from the /preview prototype). */
+
+:root,
+.theme-dark {
+  /* ── Dark · warm premium monotone (Speck base, default) ── */
+  /* `.theme-dark` makes the dark theme an explicit class too (NOT `.dark` — Tailwind v4 reserves that
+     as its dark-mode variant and strips a raw `.dark{}` rule). A local toggle (e.g. /preview) sets it
+     so dark wins over an inherited `.light` on an ancestor (CSS custom properties inherit). */
+  --bg: #18120f;
+  --bg-grid: rgba(255, 246, 240, 0.015);
+  --surface: #221b16;
+  --surface-2: #2b221c;
+  --hairline: rgba(255, 255, 255, 0.07);
+  --hairline-strong: rgba(255, 255, 255, 0.13);
+  --ink: #f6f0ea;
+  --ink-2: rgba(246, 240, 234, 0.58);
+  --ink-3: rgba(246, 240, 234, 0.34); /* matches the approved /preview look; contrast bump is a separate opt-in (audit P1) */
+
+  --panel: #221b16;
+  --panel-2: #2b221c;
+  --panel-3: #342a23;
+  --panel-hairline: rgba(255, 255, 255, 0.07);
+  --panel-ink: #f6f0ea;
+  --panel-ink-2: rgba(246, 240, 234, 0.58);
+  --panel-ink-3: rgba(246, 240, 234, 0.34);
+
+  /* Flat, border-first elevation; one soft tier for floating cards. */
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
+
+  /* Status signal (shape + label + color; reads on any surface, including a colored hero). */
+  --idle: #8a7f78;
+  --processing: #f59e0b;
+  --success: #34d399;
+  --warning: #eab308;
+  --error: #f4654e; /* warm coral-red (Speck) — alert state + brand signature */
+  --writing: #3b82f6;
+  --up: #4ade80; /* delta up */
+  --down: #fb7185; /* delta down */
+
+  /* Coral signature (Speck) — active nav, accents, the one alert hue. */
+  --coral: #f4654e;
+  --coral-soft: rgba(244, 101, 78, 0.14);
+
+  /* Pipeline / chart stage accents — data-viz only, never on chrome. */
+  --c-detect: #60a5fa;
+  --c-ocr: #a78bfa;
+  --c-translate: #34d399;
+  --c-inpaint: #f59e0b;
+  --c-render: #38bdf8;
+  --frontend: #a78bfa;
+  --backend: #f59e0b;
+  --mit: #34d399;
+
+  /* Expressive accents (Speck / PremiumBuss) — hero panels + data viz, used with intent. */
+  --accent-lime: #a3e635;
+  --accent-coral: #fb7185;
+  --accent-teal: #2dd4bf;
+  --accent-violet: #a78bfa;
+  --accent-sky: #38bdf8;
+  --accent-amber: #fbbf24;
+  /* Drenched hero-panel surfaces (the panel IS the color — dark ink rides on top). */
+  --drench-lime: linear-gradient(135deg, #bef264, #a3e635);
+  --drench-emerald: linear-gradient(135deg, #34d399, #10b981);
+  --drench-warm: linear-gradient(135deg, #2a2420, #161210);
+
+  --radius: 12px;
+
+  --font-sans: var(--font-geist-sans), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "SF Mono", ui-monospace, "JetBrains Mono", "Cascadia Code", monospace;
+}
+
+.light {
+  /* ── Light · warm off-white ── */
+  --bg: #f6f1ec;
+  --bg-grid: rgba(0, 0, 0, 0.02);
+  --surface: #fffdfb;
+  --surface-2: #efe7df;
+  --hairline: rgba(0, 0, 0, 0.08);
+  --hairline-strong: rgba(0, 0, 0, 0.14);
+  --ink: #241c17;
+  --ink-2: #6b5f56;
+  --ink-3: #a89a8e; /* matches the approved /preview look; contrast bump is a separate opt-in (audit P1) */
+
+  --panel: #fffdfb;
+  --panel-2: #efe7df;
+  --panel-3: #e4ddd4;
+  --panel-hairline: rgba(0, 0, 0, 0.08);
+  --panel-ink: #241c17;
+  --panel-ink-2: #6b5f56;
+  --panel-ink-3: #a89a8e;
+
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px -12px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.05);
+
+  --idle: #a89a8e;
+  --success: #16a34a;
+  --error: #e6492f;
+  --up: #16a34a;
+  --down: #e11d48;
+  --coral: #e6492f;
+  --coral-soft: rgba(230, 73, 47, 0.10);
+}
+
+* {
+  border-color: var(--hairline);
+}
+
+html {
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+}
+
+body,
+.theme-tx {
+  transition: background-color 0.32s ease, color 0.32s ease, border-color 0.32s ease;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+/* Loading skeleton (DESIGN.md §5) — a quiet shimmer over surface-2; the reduced-motion block below
+   stops the sweep (the static bar remains a legible placeholder). */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--ink) 8%, transparent), transparent);
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -13,7 +13,10 @@ import {
   publishVersion,
 } from "../../../lib/studioApi";
 import type { ChapterVersion } from "../../../lib/types";
+import { getCached, setCache } from "../../../lib/studioCache";
 import { StudioChaptersSkeleton } from "../../components/StudioSkeleton";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { CoverImage } from "../../components/CoverImage";
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   draft: { label: "แบบร่าง", color: "text-white/40 bg-white/10" },
@@ -232,30 +235,6 @@ function ChapterGroup({
   );
 }
 
-function CoverImage({ src, alt, className }: {
-  src: string;
-  alt: string;
-  className: string;
-}) {
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    const img = new window.Image();
-    img.onload = () => {
-      if (img.naturalWidth === 0) setFailed(true);
-    };
-    img.onerror = () => setFailed(true);
-    img.src = src;
-  }, [src]);
-
-  if (failed) {
-    return <div className="flex h-full w-full items-center justify-center"><span className="text-2xl">📖</span></div>;
-  }
-
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setFailed(true)} />;
-}
-
 export default function MangaDetailPage() {
   const params = useParams<{ titleId: string }>();
   const titleId = decodeURIComponent(params.titleId);
@@ -265,22 +244,10 @@ export default function MangaDetailPage() {
   const { user, loading, getIdToken } = useAuth();
   const { showToast } = useToast();
 
-  const [allVersions, setAllVersions] = useState<ChapterVersion[]>(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("mb:studio:versions:cache");
-      if (cached) {
-        try {
-          return JSON.parse(cached);
-        } catch {}
-      }
-    }
-    return [];
-  });
-  const [loadingVersions, setLoadingVersions] = useState(() => {
-    if (typeof window !== "undefined") return !localStorage.getItem("mb:studio:versions:cache");
-    return true;
-  });
+  const [allVersions, setAllVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("studio:versions") ?? []);
+  const [loadingVersions, setLoadingVersions] = useState(() => getCached("studio:versions") === null);
   const hasFetched = useRef(false);
+  const [confirmDelete, setConfirmDelete] = useState<ChapterVersion | null>(null);
 
   const versions = allVersions.filter((v) => v.titleId === titleId);
   
@@ -312,14 +279,10 @@ export default function MangaDetailPage() {
   const fetchVersions = useCallback(async () => {
     if (!user) return;
 
-    const cached = localStorage.getItem("mb:studio:versions:cache");
+    const cached = getCached<ChapterVersion[]>("studio:versions");
     if (cached) {
-      try {
-        setAllVersions(JSON.parse(cached));
-        setLoadingVersions(false);
-      } catch {
-        setLoadingVersions(true);
-      }
+      setAllVersions(cached);
+      setLoadingVersions(false);
     } else {
       setLoadingVersions(true);
     }
@@ -329,7 +292,7 @@ export default function MangaDetailPage() {
       if (!token) throw new Error("ไม่พบ token");
       const data = await getMyVersions(token);
       setAllVersions(data);
-      localStorage.setItem("mb:studio:versions:cache", JSON.stringify(data));
+      setCache("studio:versions", data);
     } catch {
       showToast({ type: "error", message: "ไม่สามารถโหลดรายการเวอร์ชันได้", duration: 3000 });
     } finally {
@@ -364,15 +327,23 @@ export default function MangaDetailPage() {
     }
   };
 
-  const handleDelete = async (version: ChapterVersion) => {
-    if (!confirm(`ยืนยันการลบงานแปล ตอนที่ ${version.chapterNumber}?`)) return;
+  const handleDelete = (version: ChapterVersion) => {
+    setConfirmDelete(version);
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return;
+    const version = confirmDelete;
+    // don't close yet — let ConfirmDialog show loading spinner
     try {
       const token = await getIdToken();
       if (!token) throw new Error("ไม่พบ token");
       await deleteVersion(token, version.versionId);
+      setConfirmDelete(null); // close on success
       showToast({ type: "success", message: "ลบงานแปลแล้ว", duration: 2200 });
       await fetchVersions();
     } catch (e: unknown) {
+      setConfirmDelete(null); // also close on error
       showToast({
         type: "error",
         message: e instanceof Error ? e.message : "ไม่สามารถลบงานแปลได้",
@@ -464,6 +435,12 @@ export default function MangaDetailPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title={`ยืนยันการลบงานแปล ตอนที่ ${confirmDelete?.chapterNumber}?`}
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }
