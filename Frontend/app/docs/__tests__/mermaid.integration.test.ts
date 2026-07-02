@@ -1,3 +1,9 @@
+/**
+ * Integration (E2E) test — Playwright, requires the dev server running on :4000.
+ * Named *.integration.test.ts so the unit-CI glob (find *.test.ts -not
+ * -name '*.integration.test.ts') excludes it; it cannot run under `bun test`.
+ * Run: npx playwright test app/docs/__tests__/mermaid.integration.test.ts
+ */
 import { test, expect } from '@playwright/test';
 
 test('verify mermaid rendering on docs page', async ({ page }) => {
