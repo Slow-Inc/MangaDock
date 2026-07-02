@@ -269,7 +269,7 @@ export default function ForumSideMenu({
       {/* 4. GUIDELINES */}
       <div className="pt-6 border-t border-white/5">
         <div className="px-4 py-4 rounded-2xl bg-white/[0.01] border border-white/5">
-           <h4 className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-3">Community Rules</h4>
+           <h4 className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-3">กฎของชุมชน</h4>
            <ul className="space-y-2">
              {["เคารพซึ่งกันและกัน", "ไม่สปอย", "ไม่สแปม"].map((r, i) => (
                <li key={i} className="flex items-center gap-2 text-[10px] text-white/30 font-medium">
