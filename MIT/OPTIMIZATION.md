@@ -50,9 +50,16 @@ Per-page wall-clock on a typical interactive single page is ~15-40s. Ranked by m
 
 **Hot path.** `resize_regions_to_font_size` → per region `_bubble_fit_layout` → `fit_font_size` binary search (each `measure(size)` = `calc_horizontal` for the block **and** `_longest_word_w` = a second `calc_horizontal`) → `squeeze_width` geometric loop (each `measure_h` = one `calc_horizontal`). Net ~30-50 `calc_horizontal` calls on the *same text* per hard region.
 
-**Perf profile.** `[timing-render] phase=layout_fit` dominates; `phase=raster_loop` ~1s. The binary search is clean (~8 iters, no thrash) and the O(n²) territory pass is trivial stdlib geometry (microseconds). The cost is the **constant factor of `calc_horizontal` × ~30-50 calls**. **But the identified per-call sub-costs do not arithmetically reach 12-14s** — the adversarial pass debunked the two headline hypotheses:
-- `select_hyphenator` ctor: **no-op on the primary EN→TH path** — Thai isn't hyphenatable so it returns `None` after a cheap list scan (`text_render.py:628-640`). Only bites EN-target (JP→EN) renders, and even there ~60 dict loads ≈ 1-2s, not 12-14s.
-- `_insert_thai_word_breaks` (newmm): pythainlp caches its Trie as a module singleton, so calls 2..N don't reload — each is single-digit ms over a short bubble string. Saving ~29 of them removes tens of ms, not seconds.
+**Perf profile — SOLVED (2026-07-03, commit `29fa900`).** The dominant cost was **`select_hyphenator`**, and the adversarial "debunk" below was **WRONG**. Measured: `select_hyphenator('THA')` = **163 ms** (not a no-op — Thai matches a `th*` tag then fails a slow `Hyphenator('th')` dictionary load), `('ENG')` = 372 ms. It's called **twice per `calc_horizontal`** (directly + inside `_split_into_syllables`) × ~68 `calc_horizontal`/page ≈ **22 s/page** of repeated hyphenator setup. Fix: `@functools.lru_cache` on `select_hyphenator` (pure function of `lang`; byte-identical). **E2E: `layout_fit` 23.7 s → 0.98 s, render stage 26.3 s → 1.49 s, whole page ~75 s → ~12 s.** Full benchmark: `docs/reports/benchmarks/2026-07-03-mit-layout-fit-and-merge-optimize.md`.
+
+<details><summary>Original (wrong) adversarial debunk — preserved as a lesson</summary>
+
+The scan claimed "*the per-call sub-costs do not arithmetically reach 12-14s*" and debunked both headline hypotheses:
+- ~~`select_hyphenator` ctor: no-op on EN→TH path — Thai isn't hyphenatable so it returns `None` after a cheap list scan.~~ **FALSE** — the "cheap list scan" actually enters a 163 ms failing `Hyphenator(lang)` construction. This debunk sent the fix in the wrong direction.
+- `_insert_thai_word_breaks` (newmm): correctly minor (pythainlp caches its Trie). But `_split_into_syllables` — which the debunk didn't isolate — internally re-calls the slow `select_hyphenator`, so its 157 ms/call was misattributed.
+
+**Lesson:** the adversarial pass reasoned about the code correctly *in the abstract* but never *measured `select_hyphenator` in isolation*. A 5-line microbenchmark would have caught it. Verify perf claims with a timer, not a code-reading argument.
+</details>
 
 **Conclusion: the true mechanism is unattributed.** It is likely the sheer call count × per-char width summation (`get_string_width` → `get_char_offset_x`), the `_split_into_syllables` greedy loops, or a far higher call count than assumed. **Instrument before optimizing** (backlog #1).
 
