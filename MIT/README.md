@@ -149,8 +149,20 @@ curl http://localhost:5003/health
 
 | Method | Path | รายละเอียด |
 |--------|------|-------------|
-| GET | `/health` | ตรวจสอบสถานะ service, worker, และ queue |
+| GET | `/health` | ตรวจสอบสถานะ service, worker, และ queue (front ขึ้น) |
+| GET | `/ready` | worker พร้อมแปลจริง (200) หรือยังโหลดอยู่ (503) — ใช้อันนี้สำหรับ readiness |
 | POST | `/queue-size` | ดูจำนวนงานที่รออยู่ในคิว |
+| GET | `/status` | **Dev console** (PRD #279, ADR 019): snapshot host/GPU/gateway/queue(+jobs)/worker(+pid/uptime)/**stage-timing**/**per-model VRAM (leak)** — ต้องมี Supabase JWT (staff) |
+| GET | `/status/stream` | **Dev console**: SSE — sample metric ทุก ~3s + push event (enqueue / worker / stage) ต้องมี Supabase JWT (staff) |
+| POST | `/internal/telemetry` | **internal** (worker→parent, `X-Nonce`): worker ส่ง stage-timing + VRAM report เข้า snapshot — ไม่ใช่ public |
+
+> **Dev console auth (`/status*`)**: forward Supabase JWT ของ dev; MIT ตรวจเองผ่าน Supabase `GET /auth/v1/user`
+> (ไม่ต้องมี JWT secret ใน MIT) แล้ว gate ด้วย staffLevel claim หรือ `MIT_STAFF_USER_IDS` allowlist —
+> ไม่มี token → 401, ไม่ใช่ staff → 403. **สิทธิ์ระดับ dev บังคับ provider** ด้วย `MIT_DEV_REQUIRE_PROVIDER`
+> (default `github` — ต้อง sign in ด้วย GitHub identity; ตั้งเป็นค่าว่างเพื่อปิดการบังคับ). Env: `SUPABASE_URL`,
+> `SUPABASE_ANON_KEY`, `MIT_STAFF_USER_IDS` (user-id คั่นด้วย comma), `MIT_DEV_REQUIRE_PROVIDER` (github),
+> `MIT_STATUS_INTERVAL_S` (3), `MIT_STATUS_REVALIDATE_S` (60), `MIT_DIAG_INTERVAL_S` (30; throttle gateway probe).
+> คอนซูเมอร์คือ Dashboard standalone (port 4100).
 
 ### แปลภาพด้วย JSON body
 

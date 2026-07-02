@@ -11,10 +11,14 @@ import MangaSearchSelector from "../components/MangaSearchSelector";
 import PostImageUploader from "../components/PostImageUploader";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { useFeedStream } from "../hooks/useForumStream";
-import { availableCategories, isRestrictedCategory } from "../lib/forumCategories";
+import { useIsMobile } from "../hooks/useIsMobile";
+import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "../lib/forumCategories";
+import { useToast } from "../contexts/ToastContext";
+import { CommunityErrorBoundary } from "./components/CommunityErrorBoundary";
 
 function CommunityContent() {
   const { user, userRole, showLoginPrompt } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -29,7 +33,8 @@ function CommunityContent() {
   );
   const [sort, setSort] = useState<'new' | 'hot'>('new');
   const [viewMode, setViewMode] = useState<'card' | 'compact'>('card');
-  
+  const isMobile = useIsMobile();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newPost, setNewPost] = useState({ title: "", content: "", category: "general" as ForumCategory });
@@ -44,7 +49,12 @@ function CommunityContent() {
 
   const closeModal = useCallback(() => {
     setIsModalVisible(false);
-    setTimeout(() => { setShowCreateModal(false); setPostImages([]); }, 220);
+    setTimeout(() => {
+      setShowCreateModal(false);
+      setPostImages([]);
+      setNewPost({ title: "", content: "", category: "general" as ForumCategory });
+      setSelectedManga(null);
+    }, 220);
   }, []);
 
   // Reset to 'general' when role changes and current category becomes restricted
@@ -65,8 +75,8 @@ function CommunityContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (window.innerWidth < 768) setViewMode('compact');
-  }, []);
+    if (isMobile) setViewMode('compact');
+  }, [isMobile]);
 
   const [newPostCount, setNewPostCount] = useState(0);
 
@@ -81,12 +91,12 @@ function CommunityContent() {
     try {
       const res = await listPosts({ category, mangaId, sort });
       setPosts(res.items);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      showToast({ type: "error", message: "โหลดโพสต์ไม่สำเร็จ กรุณาลองใหม่", duration: 4000 });
     } finally {
       setLoading(false);
     }
-  }, [category, mangaId, sort]);
+  }, [category, mangaId, sort, showToast]);
 
   useEffect(() => {
     fetchPosts();
@@ -192,7 +202,7 @@ function CommunityContent() {
             onClick={() => handleMobileCategorySelect(undefined)}
             className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${!category ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white/50'}`}
           >ทั้งหมด</button>
-          {(['general', 'announcement', 'spoiler', 'manga_update'] as const).map(cat => (
+          {CATEGORY_LIST.map(cat => (
             <button
               key={cat}
               onClick={() => handleMobileCategorySelect(category === cat ? undefined : cat)}
@@ -436,12 +446,14 @@ function CommunityContent() {
 
 export default function CommunityPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#141414] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
-      </div>
-    }>
-      <CommunityContent />
-    </Suspense>
+    <CommunityErrorBoundary>
+      <Suspense fallback={
+        <div className="min-h-screen bg-[#141414] flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+        </div>
+      }>
+        <CommunityContent />
+      </Suspense>
+    </CommunityErrorBoundary>
   );
 }

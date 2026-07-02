@@ -3,20 +3,15 @@
 
 ---
 
-## Captcha re-prompt on translate 401 — hotfix (2026-07-01)
+## Staff Console — PRD + ADR 018 + Phase-1 issues, out-of-band observability (2026-06-14)
 
-**Goal:** When the 1-hour HWID-bound captcha clearance token (#227) expires mid-session, pressing translate `401`'d and only showed an error toast — translation dead-ended until a full page reload. Make the translate 401 re-prompt the Turnstile captcha, same as the page-fetch path.
+Designed the **Staff Console** (role-tiered back-office: Moderator/Admin/Dev) off the 2026-06-14 9arm incident (gateway `gateway.9arm.co` up, but `qwen3.6-35b-a3b` model hung → cryptic `'ollama servers did not respond quickly enough'` after ~90s; root-caused by black-box probe — `/models` OK 0.19s, a 16-token completion timed out 151s = inference backend hung, external). A full `/grill-me` pass settled the design, then a resilience review reshaped the Dev console's data plane.
 
-**Shipped (TDD, 4 files):**
-- `Frontend/app/lib/mangaTranslatePage.ts` — new pure `isCaptchaExpiredError(err)` predicate (matches `(401)` / `captcha clearance token`), colocated with the throw sites
-- `Frontend/app/lib/mangaTranslatePage.test.ts` — +4 tests (401 single/batch = true; 500 / network / non-Error = false)
-- `Frontend/app/hooks/useChapterTranslation.ts` — new `onCaptchaExpired` option; `startTranslate` (batch) + `translateCurrentPage` detect the 401 → call it + toast; batch **skips its 500/network retry loop** (same token would only 401 again)
-- `Frontend/app/components/MangaReader.tsx` — extracted shared `resetCaptcha()` (drop token + `setTurnstilePassed(false)`); wired to both the page-fetch 401 path and `onCaptchaExpired`
-
-**Validation:** unit `isCaptchaExpiredError` + full frontend suite **138 pass, 0 fail**; typecheck clean; no new lint warnings. **Live E2E** on `localhost:4000` (real One-Punch Benchmark chapter, authed): inject bogus token → แปลหน้านี้ → backend `401` (`Captcha clearance token is invalid, expired`) → Turnstile "ยืนยันตัวตน" modal re-appeared (screenshot), then test-key auto-solve fetched a fresh token → recovery loop confirmed.
-
-**Report:** post-mortem `docs/reports/2026-07-01-captcha-reprompt-hotfix.md` (+ image `assets/2026-07-01-captcha-reprompt.png`); pointer in `system-impact-report.md`.
-
+- **Key decision (ADR 018):** a monitor must not share a failure domain with what it monitors → a **standalone Node-Fastify aggregator microservice** (out of the Backend, runnable local/separate host) subscribes to a per-service `/status/stream` SSE on Frontend/Backend/MIT; each multiplexes **sampled `{type:metric}`** (VRAM/CPU/temp via `torch.cuda`+`psutil`+`nvidia-smi`, zero new dep) + **pushed `{type:event}`** (translate-triggered/stage/log/error). UI stays in the Frontend (`/staff/system`, shadcn). External uptime monitor → Discord = out-of-band backstop.
+- **Auth (zero-trust, no shared secret):** orthogonal `profiles.staffLevel` (none<moderator<admin<dev), injected as a **signed JWT claim** via a Supabase Custom Access Token Hook; the dashboard forwards the dev JWT and **each service verifies independently** (signature + expiry + claim), streams re-validate ~60s + close on expiry; MIT gains PyJWT verify.
+- **Published (bilingual, `ready-for-agent`):** PRD **#279** + Phase-1 slices **#280** (1a RBAC+signed-claim+shell) → **#285** (1f aggregator+streams) → **#282** (1b health board, the incident fix) / **#283** (1c tracer+queue) / **#284** (1d GPU/host); **#281** (1e precise error) independent. **ADR 018** `docs/adr/018-staff-console-out-of-band-observability-aggregator.md` + indexed in the ADR README.
+- **MIT modules built (TDD + karpathy, branch `feat/mit-staff-observability`, MIT-only — Frontend/Backend deferred while akkanop-x refactors them):** `server/diagnostics.py` (cheap bounded gateway probe, decoupled from the worker pool → `ok/slow/timeout`·model-down-vs-gateway-down`/auth/unreachable/model_missing`; the 2026-06-14 incident reads `timeout` + "gateway /models OK but chat completion timed out — model not responding"; 7 tests) · `server/translate_error.py` (`classify_translate_error` → structured `{stage,translator,endpoint,model,cause,hint}`, wired at the `custom_openai` timeout raise → worker log + backend response carry it instead of the opaque string; 4 tests) · `server/metrics.py` (`parse_nvidia_smi` + `host_metrics` (psutil), `collect` degrades host-only when no GPU, zero new dep; 5 tests). 16 new tests, **full MIT suite 463 passed / 19 pre-existing async / 0 new**. PIPELINE.md §5 + ADR 018 referenced. SSE `/status/stream` endpoint + JWT verify deferred (need 1a's Supabase signed-claim hook = Backend/Supabase).
+- **Side fix:** shadcn MCP cwd gotcha — Claude Code `.mcp.json` has no `cwd` field → added wrapper `Frontend/run-shadcn-mcp.ps1` so the server runs in `Frontend/` and reads `components.json` (`@react-bits` + `radix-rhea`); needs a full Claude Code restart (reconnect does not reload config).
 ---
 
 ## Coin Topup System — Xendit PromptPay QR (2026-06-19, sandbox)
@@ -93,6 +88,8 @@ Both fixes are type-declaration-only — zero runtime behaviour change. `npx tsc
 **Verify:** `npx jest src/upload` 8/8; full backend **58 suites / 540 tests green**; `eslint` clean on the 3 touched files; no new `tsc` errors (the 10 standing are #298, not yet merged onto this branch). **Not run:** live in-app upload E2E — recommend a confirmatory pass with the PR.
 
 **Docs:** ADR 016 (`docs/adr/016-upload-magic-byte-mime-validation.md`, defense-in-depth decision) + index; post-mortem entry in `docs/reports/system-impact-report.md`. The `CLAUDE.md` upload claim was aspirational before; it is now accurate. **#303 unblocks #296** (its security AC is satisfiable; those tests already live in `upload.service.spec.ts`). **Follow-up:** factor a shared magic-byte upload-guard helper across forum + upload.
+
+---
 
 ## Flux.2 Klein-4B optional inpainter — feasibility proven + PRD/issues (2026-06-14, ultracode)
 
@@ -575,6 +572,16 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 # DONE — Claude Code Review Fix Session (2026-05-27)
 
 ---
+
+## Staff Console — PRD + ADR 018 + Phase-1 issues, out-of-band observability (2026-06-14)
+
+ออกแบบ **Staff Console** (back-office แบ่ง role: Moderator/Admin/Dev) จาก incident 2026-06-14 ของ 9arm (gateway `gateway.9arm.co` up แต่ model `qwen3.6-35b-a3b` ค้าง → error คลุมเครือ `'ollama servers did not respond quickly enough'` หลัง ~90s; หาสาเหตุด้วย black-box probe — `/models` OK 0.19s, completion 16-token timeout 151s = inference backend ค้าง, external). ผ่าน `/grill-me` เต็มรอบเพื่อ settle design แล้ว resilience review reshape data plane ของ Dev console
+
+- **Key decision (ADR 018):** monitor ต้องไม่อยู่ failure domain เดียวกับสิ่งที่มัน monitor → **standalone Node-Fastify aggregator microservice** (อยู่นอก Backend, run local/แยก host ได้) subscribe per-service `/status/stream` SSE บน Frontend/Backend/MIT; แต่ละตัว multiplex **`{type:metric}` sample** (VRAM/CPU/temp ผ่าน `torch.cuda`+`psutil`+`nvidia-smi`, zero new dep) + **`{type:event}` push** (translate-triggered/stage/log/error) UI อยู่ใน Frontend (`/staff/system`, shadcn) external uptime monitor → Discord = out-of-band backstop
+- **Auth (zero-trust, ไม่มี shared secret):** orthogonal `profiles.staffLevel` (none<moderator<admin<dev) ฉีดเป็น **signed JWT claim** ผ่าน Supabase Custom Access Token Hook; dashboard forward dev JWT และ **แต่ละ service verify เองอิสระ** (signature + expiry + claim) stream re-validate ~60s + close on expiry; MIT เพิ่ม PyJWT verify
+- **Published (bilingual, `ready-for-agent`):** PRD **#279** + Phase-1 slices **#280** (1a RBAC+signed-claim+shell) → **#285** (1f aggregator+streams) → **#282** (1b health board, ตัวแก้ incident) / **#283** (1c tracer+queue) / **#284** (1d GPU/host); **#281** (1e precise error) อิสระ **ADR 018** `docs/adr/018-staff-console-out-of-band-observability-aggregator.md` + index ใน ADR README
+- **MIT modules built (TDD + karpathy, branch `feat/mit-staff-observability`, MIT-only — Frontend/Backend เลื่อนไว้ระหว่าง akkanop-x refactor):** `server/diagnostics.py` (gateway probe ที่ถูกและมี bound, decoupled จาก worker pool → `ok/slow/timeout`·model-down-vs-gateway-down`/auth/unreachable/model_missing`; incident 2026-06-14 อ่านเป็น `timeout` + "gateway /models OK but chat completion timed out — model not responding"; 7 tests) · `server/translate_error.py` (`classify_translate_error` → structured `{stage,translator,endpoint,model,cause,hint}`, wire ที่ raise site timeout ของ `custom_openai` → worker log + backend response ได้แทน string เปล่า; 4 tests) · `server/metrics.py` (`parse_nvidia_smi` + `host_metrics` (psutil), `collect` degrade host-only เมื่อไม่มี GPU, zero new dep; 5 tests). 16 tests ใหม่, **full MIT suite 463 passed / 19 pre-existing async / 0 new**. PIPELINE.md §5 + อ้าง ADR 018. SSE `/status/stream` endpoint + JWT verify เลื่อนไว้ (ต้องการ signed-claim hook ของ 1a = Backend/Supabase)
+- **Side fix:** shadcn MCP cwd gotcha — Claude Code `.mcp.json` ไม่มี field `cwd` → เพิ่ม wrapper `Frontend/run-shadcn-mcp.ps1` ให้ server รันใน `Frontend/` อ่าน `components.json` (`@react-bits` + `radix-rhea`); ต้อง full restart Claude Code (reconnect ไม่ reload config)
 
 ## ✅ LEAK SWEEP — #136 #137 #139 (+#138 falsified) — 2026-06-06, /improve-codebase-architecture → /to-issues → /tdd
 
@@ -2435,6 +2442,86 @@ per-group inpaints). Off → per-crop, byte-identical. TDD: `test_patch_renderer
 async / 0 new**. **Verified via direct render** (`tools/ab_clean.py` + new `tools/ab_fullpage.py`): the bottom-right hair
 is now clean dark, no gray blob, English text intact — matches the full-page/upstream/target. `.env` set
 `MIT_PATCH_FULLPAGE_INPAINT=1`. Branch `fix/mit-patch-fullpage-inpaint`. Provenance in PIPELINE.md §5.
+## 2026-06-15 — Connect MIT to the Dashboard (live telemetry) + Dashboard OAuth (PRD #279 / ADR 018, ADR 019)
+Wired the standalone Dev console to **live MIT data** and added **Supabase OAuth** so the dev's token reaches MIT,
+which verifies it independently (zero-trust, no shared secret). MIT-only slice — Backend/Frontend `/status` are
+separate (#282/#283, akkanop-x refactoring). Operator decisions (locked before build): SSE **event-push** (no loop on
+the event tier) + sampled metrics; **forward JWT, MIT verifies per-service**; **MIT only**.
+
+**MIT (new, import-light, TDD <1s — 24 tests):** `server/status_snapshot.py` (`build_snapshot`/`to_messages` — folds
+metrics+diagnostics+queue/workers into the wire shape `Dashboard/lib/snapshot.ts` consumes; the `metric` frame carries
+the whole snapshot), `server/auth.py` (`verify_supabase_token` via Supabase `GET /auth/v1/user` — **no PyJWT, no JWT
+secret in MIT**, mirrors the Backend's `getUser`; robust to the new asymmetric `sb_publishable_…` keys — `is_staff` =
+staffLevel claim OR `MIT_STAFF_USER_IDS` allowlist), `server/status_hub.py` (asyncio pub/sub, non-blocking `put_nowait`
+fan-out → event push, no event-tier loop), `server/status_stream.py` (`format_sse` + hybrid `status_frames`: initial
+sample → push events via `wait_for`, sample on the interval timeout). **Wired into** `main.py` (`GET /status` +
+`GET /status/stream` behind a `require_staff` dep that re-validates every 60 s + closes on expiry; throttled gateway
+probe cached `MIT_DIAG_INTERVAL_S`; parent server only — never the RCE-by-design worker) + `myqueue.py` (`add_task`
+pushes a `translate_triggered` event — one chokepoint).
+
+**Dashboard (new, TDD — 11 tests; 91 total green):** `lib/live.ts` (`parseSseFrames`, partial-frame safe),
+`lib/live-map.ts` (`mapMitSnapshot` mb→GB), `lib/supabase.ts` (browser client), `components/auth-gate.tsx` (Google
+OAuth gate + `useDevAuth` token context; splash never hangs — getSession stall falls through), `components/
+use-live-snapshot.ts` (fetch-stream `/api/live`, fold via `snapshot.reduce`, backoff reconnect, mock fallback),
+`app/api/live/route.ts` (authenticated SSE proxy — forwards the dev JWT to MIT, holds no secret). `page.tsx` telemetry
+(GPU util/temp/VRAM/power, CPU/disk, RAM) + a live/offline/connecting badge + MIT-status chip now read live data when
+signed in, else mock. `shell.tsx` gains an account/sign-out row.
+
+**Verified:** MIT pure modules 24/24; Dashboard 91/91; sibling import-light server tests 20/20 (no regression).
+**E2E (real Supabase, MIT on :5013 parent-only):** real GPU/host metrics flow through `build_snapshot`
+(`util/temp/VRAM/power`, RAM, disk 99.1%); `/status` + `/status/stream` + `/api/live` reject **no-token → 401** and
+**garbage token → 401** (MIT actually calls Supabase `/auth/v1/user` and returns its `Invalid or expired token`,
+passed through the proxy) — independent per-service verification confirmed; the OAuth login gate renders. Remaining
+(human step): a *valid* token via Google sign-in → 200 + live cards (OAuth can't be driven headlessly); first sign-in
+needs the dev's user id added to `MIT_STAFF_USER_IDS`. Provenance in PIPELINE.md §5; full 18-section impact report in
+`docs/reports/system-impact-report.md`; decision in ADR 019.
+
+**Follow-up (same day): GitHub login + forced-for-dev.** Added a "Sign in with GitHub" button (primary) alongside
+Google (secondary) in the Dashboard gate, and **enforced GitHub for dev-tier access** — `auth.is_staff` gained a
+`require_provider` param (checks `app_metadata.provider`/`providers`), wired in `main.py` via `MIT_DEV_REQUIRE_PROVIDER`
+(default `github`): an allowlisted/claimed **Google** account is denied dev (highest-privilege console = repo-collaborator
+GitHub identity; Google kept for future lower tiers; set the env empty to disable during rollout). `auth` tests 8→12;
+verified the two-button gate + "Dev access requires GitHub" note render. GitHub provider still needs a one-time Supabase
+enable (GitHub OAuth App + Authentication→Providers→GitHub). ADR 019 updated.
+
+**Follow-up (same day): Dashboard auth = Frontend parity (Email + Google + Facebook) + GitHub + in-app linking.** Per the dev's call (standalone console must NOT depend on the Frontend for linking, and tiers differ: Moderator→Google, Admin→both, Dev→GitHub), ported the Frontend's auth into the Dashboard standalone: popup OAuth (`signInWithOAuth({skipBrowserRedirect})` → `app/auth/callback/page.tsx` postMessages the session back — fixes the earlier redirect-to-Site-URL + surfaces errors in-app) for Google/Facebook/GitHub, email/password (sign in / sign up / reset), and a multi-provider **link/unlink** panel (`components/account-panel.tsx`, `lib/account.ts` pure + tested) + add-email/password. New pure libs: `lib/account.ts` (5 tests), `lib/oauth.ts` (`mapOAuthError`, 5 tests — incl. the manual-linking "Multiple accounts in linking domain" → "sign in with your existing provider, then link"). `auth-gate.tsx` is now a full DevAuth provider; `login-screen.tsx` mirrors LoginModal (3 OAuth + email form). Diagnosed the dev's GitHub sign-in failure via Supabase MCP: DB clean (1 google user, UUID 9c7f7717), the error = **manual-linking is on** (the app's multi-platform feature) so GoTrue refuses to auto-link a fresh GitHub sign-in onto the existing email → the dev links GitHub in Account instead. Dashboard tests 91→**101** green; login screen verified rendering all 4 methods at `https://dashboard.hayateotsu.space`. Supabase setup still needed: enable GitHub provider + redirect URLs cover `/auth/callback`.
+
+**Bug fix (same day): OAuth callback hang + navigator.locks deadlock (redirect flow).** Switched Dashboard OAuth from popup → full-page redirect flow per the dev's preference, then debugged a "/auth/callback hangs" report (debug-mantra + scrutinize). Two real bugs: (1) the root-layout `<AuthGate>` gated EVERY route incl. `/auth/callback`, so a signed-out callback rendered `<LoginScreen>` instead of the callback page → the token-exchange/redirect never ran (fix: `isCallback = usePathname()==='/auth/callback'` bypass → always render the callback page there); (2) Supabase's default `navigator.locks` lock could deadlock `getSession()`/the OAuth exchange (fix: no-op `lock` in the client — single-tab console needs no cross-tab serialization). Diagnosis was clouded by Playwright/browser caching stale client JS + flaky Turbopack HMR file-watch — proved the fix correct by curling the SSR HTML (`/auth/callback` → 0 login buttons + the spinner) and grepping the served client chunk for the marker (fresh code served on both sides). Also: redirectTo settled on `${origin}/auth/callback` paired with a `https://dashboard…/**` Supabase Redirect-URL (a bare-origin allowlist entry is exact-match only → falls back to Site URL). 101 Dashboard tests green.
+
+**Follow-up (2026-06-16): unified debug console + GitHub auto-link + recharts dup-key fix + `/service/mit` live wiring.**
+Closing out the MIT↔Dashboard connection so the MIT service uses real data instead of mock where MIT actually reports it.
+- **Unified debug console** (`components/debug-console.tsx`, `lib/debug-log.ts` + tests): one filterable in-app log surface fed from four sources — Dashboard, Frontend, **Backend**, **MIT** (the live-stream hook pushes each MIT `event`/`status` frame as a log line). Renders only when Supabase is configured.
+- **GitHub auto-link** (`components/github-auto-link.tsx`): a signed-in dev whose identity lacks `github` auto-fires `linkIdentity('github')` (the standalone console requires the repo-collaborator GitHub identity for Dev tier; the Frontend has no GitHub-link UI since it's Dashboard-only). The signed-in `linkIdentity` path bypasses GoTrue's "Multiple accounts in linking domain" 500 (that check only runs on the sign-in/create path, `targetUser==nil`) — verified end-to-end: signed in with Google → github linked → `providers=["google","github"]`.
+- **Recharts duplicate-key fix** (`components/metric-card.tsx`): short live series at minute-resolution tick labels produced non-unique x-ticks (`tick-10:25-28-28` React key spam) — deduped via `[...new Set([first, mid, last])]`.
+- **MIT `control_ms`** (`server/diagnostics.py`, `server/status_snapshot.py`): the gateway probe now times the `GET /models` control-plane call separately from the chat data-plane call, so the Dashboard's GatewayDiagnosis control-vs-data split is real (control up + data timeout = "model hung", the 2026-06-14 incident signature). `test_diagnostics` + `test_status_snapshot` updated → 13 pass.
+- **`/service/mit` detail page live-wired** (`app/service/[id]/page.tsx` + `lib/live-panels.ts::liveGatewayProbe`, pure + 4 tests): header status badge (`up/degraded/down` + `· live`), telemetry cards (GPU util/temp/power, VRAM used/total, queue depth + worker count), VRAM-panel host total, and GatewayDiagnosis (live control/data split) now read live MIT data when signed in. Panels MIT doesn't instrument stay **honestly mock** (GPU history charts, per-card sparklines, stage timing, quality, per-model VRAM breakdown, translate-queue job list, worker-lifecycle internals). The stream connects only on the MIT page (`useLiveSnapshot(id==='mit' ? token : null)`).
+- **Account-linking conflict** (research only — feature deferred): documented the "user has N Supabase accounts across N GitHub emails" UX in `docs/research/oauth-account-linking-conflict.md` + `docs/prd/account-linking-conflict-resolution.md` (choose-which-account-to-link + email-confirm flow); touches Backend so it's parked for akkanop-x coordination.
+- **Verified:** Dashboard `bun test` **101→115** green (live-panels +4); MIT diagnostics+snapshot **13** green; typecheck clean on the touched files (`page.tsx`, `live-panels.ts` — the residual recharts-Formatter + `bun:test`-in-tests tsc errors are pre-existing, excluded from the real build); `/service/mit` SSR 200, no error overlay. Stack restarted clean: MIT :5013 (new code, parent-only, gateway probe on 9arm), Frontend :4000, Backend :4001. Provenance: PIPELINE.md §5 (`diagnostics.py`/`status_snapshot.py`), impact report 2026-06-15 increment.
+
+**Follow-up (2026-06-16): MIT-side telemetry instrumentation — real data for the `/service/mit` panels (queue / stage timing / worker lifecycle / per-model VRAM leak monitoring).** The dev asked to make the MIT detail page show real status instead of mock; this is the **MIT side only** (emit the data — the Dashboard wiring that reads it is a later step). For each panel, instrumented the real source where one exists; dropped what doesn't.
+- **Queue jobs** (parent-side, real now): `TaskQueue.jobs_snapshot()` → `queue.jobs[]` (id / task_type / page / waiting_ms); `QueueElement` gained an id + enqueue time. Pure transform `server/queue_view.py` (4 tests).
+- **Stage timing** (worker→parent): `webhook.make_telemetry_hook` times each pipeline stage (gap between consecutive stage starts) and POSTs it to the parent's new `POST /internal/telemetry` (`X-Nonce` auth, same as `/register`); folds into `stages[]`. Hook added in `share.py` alongside the existing progress hook. (3 tests)
+- **Worker lifecycle** (parent-side): the worker sends its `os.getpid()` at registration, the parent stamps `registered_at` → `workers.detail[]` (pid / uptime / busy). `ExecutorInstance` gained `pid`/`registered_at`; pure `server/worker_view.py` (3 tests).
+- **Per-model VRAM leak monitoring** (the dev's real debug need — a model that doesn't return VRAM on unload → bloat, hunted by hand): **Tier 1** — the worker's `torch.cuda.memory_allocated/reserved` (`vram_probe.py`) → `vram.{allocated_mb,reserved_mb}` (reserved climbing while allocated flat = the leak; nvidia-smi total in `metrics` covers onnx). **Tier 2** — `ModelUnloader` (the one #188 unload seam) measures how much each unload frees; `VramTracker` **learns each model's footprint from its largest clean release** and flags an unload that frees far less (`leaked:true`) → `vram.models[].{footprint_mb,freed_mb,leaked}`. Keyed by the unload tool (detection/ocr/inpainting/…). **No load-site instrumentation** — the touch sites are pre-load and post-load deltas are activation-noisy, so footprint is learned from unloads instead (simpler + robust). `manga_translator/vram_tracker.py` (5 tests). Worker reports the VRAM report after each page via the same telemetry channel.
+- **Quality / run-summary: removed** per the dev (the marquee fields — parity %, tokens — have no real source). Trimmed the speculative `run` ingestion.
+- **Snapshot shape:** `build_snapshot` now carries optional `queue.jobs`, `workers.detail`, `stages`, `vram` (absent when empty → lean; the Dashboard reducer ignores unknown keys). `telemetry_store` (`apply` dispatches `stage`/`vram`) is the parent-side sink; the worker pushes via `/internal/telemetry`.
+- **Verified:** full MIT suite **519 passed / 0 new failures** (19 pre-existing: 18 async-config + `test_registry_trim` from the flux-inpainter PR #277, none mine); ~25 new import-light tests (<1s each). Note: VRAM/stage/queue are worker data → empty in the parent-only dashboard MIT until a GPU worker runs + translates; unit tests pin every hop. Engineering note: hooking the #188 `ModelUnloader` / `dispatch_registry` seams cleanly is the direct payoff of the ~3.4k-line god-object decomposition. Provenance: PIPELINE.md §5 (server new + `model_unloader`/`instance`/`myqueue` + manga_translator new), impact report 2026-06-16 increment.
+
+**Follow-up (2026-06-17): Dashboard wiring — `/service/mit` reads real MIT data on every graph/panel (or "No Data").** The dev confirmed (screenshot, ~10:34) the graphs were still mock — only GPU util/VRAM/queue-depth *numbers* were live; the sparklines + lower panels didn't move with usage. Wired the Dashboard half (MIT already emits the data).
+- **Live-graph foundation:** `lib/live-series.ts` (pure rolling per-metric accumulator, 5 tests) — MIT sends current values per SSE frame, so the dashboard accumulates each frame into a ring buffer → the static mock sparklines become live charts. `lib/live-map.ts` now exposes `stages`/`vram`/`queueJobs`/`workersDetail` (optional). `components/use-live-snapshot.ts` keeps the rolling `series` + stamps event arrival time (`lib/snapshot.ts` reducer adds `at` so the LogStream shows real timestamps).
+- **Real x-axis (follow-up same day):** `use-live-snapshot` also accumulates `seriesT` (epoch ms per frame); `page.tsx` formats it → `HH:MM` and passes a `times` prop to `metric-card` + `gpu-detail`, which plot against the **real wall-clock of each sample** (right-aligned) instead of the fixed mock 10:25–10:35 `TIME` window — fall back to mock when not live.
+- **`mit@console` made functional (follow-up same day):** `lib/mit-console.ts` (pure, 10 tests) — a real READ-ONLY command interpreter over the live status snapshot: `status`/`gpu`/`host`/`vram`(per-model+leak)/`gateway`(control vs data)/`queue`/`workers`(pid/uptime)/`stages`/`logs`/`help`/`clear`. `ServiceTerminal` gains `mitConsole`/`mit`/`events` props → uses it for the MIT page (mock terminal elsewhere). **No arbitrary shell, no mutating/control actions** — the worker is RCE-by-design and is never driven from the browser; unknown commands rejected, "not connected" until the stream is live.
+
+**Planning + I1 foundation (2026-06-17): Dashboard redesign epic — live-native (real MIT or "No Data") + Finesse UI (tech-debt).** A `/grill-me` session locked the design tree (whole dashboard → live-or-No-Data; only MIT has a live feed so non-MIT → No Data; empty Frontend/Backend pages → one page-level "telemetry not wired (#282/#283)" message; MIT feed → real `live.events`; pipeline stages → timing-only from `mit.stages`; mixed panels → per-item; mock consts → deleted; "No Data" English-only). The user expanded scope to a **full redesign** (Finesse UI reference, https://finesseui.com/) → **merged** with the de-mock (full overhaul throws the markup away, so rebuild live-native rather than de-mock-then-redesign). Published the plan: PRD `docs/prd/dashboard-live-or-no-data.md` (bilingual) + GitHub issues **#304** (PRD/epic, child of #279), **#305** (I1 — data foundation, ready-for-agent), **#306** (I2 — Finesse UI design system, HITL). I3–I6 (rebuild overview / `/service/mit` / FE-BE+shell / delete-old-mock) deferred until I2's design lands (build slices need the design).
+- **I1 durable foundation built (TDD, 9 new tests):** `lib/panel-source.ts` — `isNoData(value)` (null/[]/""=No Data, but **0 is data**) + `panelSource(id)` → `mit-live`/`mixed`/`no-source` (unknown → `no-source` fail-safe, never over-claims); `lib/live-panels.ts::livePipelineStages` — `mit.stages` → timing-only stage view (translate keeps gateway state, untimed=idle, before-first-translate=all-idle, no faked detail); `hooks/use-mit-live.ts` — folds the `useDevAuth`→`useLiveSnapshot`→`liveMit`/`series`/`seriesT`/`events` boilerplate into one hook (`connect` param so non-MIT pages open no SSE); `components/no-data.tsx` — `<NoData>` + `<NoDataPage>` primitives (minimal default; final visual owned by I2). **Old-consumer refactor deferred** to the rebuild slices (I3–I5) — those surfaces get rebuilt, so adopting `useMitLive`/`<NoData>` happens then (don't touch twice). Verified: `bun test` **130→139** green, typecheck clean on the new files.
+- **Components (8, parallel workflow + 1 by hand):** each takes a live prop + renders a centered **"No Data"** placeholder when the live data is present-but-empty, keeping the mock path backward-compatible (shared cards/log-stream still serve frontend/backend pages). metric-card (empty `data`→No Data), gpu-detail (`series?` → 4 live charts + 3 No-Data), stage-timing/translate-queue/log-stream (empty→No Data), vram-panel (`live?: MitVram` → per-model bar + **LEAK badge**), worker-lifecycle (`workers?`), quality-panel (`live?` → No Data, run-summary was removed).
+- **`page.tsx` integration:** maps live MIT telemetry into each panel's shape (live stages→`StageTiming` w/ baselines, `MitJob`→`QueueJob`, events→`LogEntry`) and passes the accumulated `series` to the cards + GpuDetail; `liveMit` gates live-vs-mock.
+- **Honesty boundary:** live now → GPU util/VRAM/temp/power/fan + CPU usage sparklines, GpuDetail (4 of 7), worker pid/uptime, gateway. Live after a translate → stage timing, VRAM-by-model(+leak), queue jobs, logs. **No Data** (no MIT source) → pages/min, CPU temp, Graphics/CPU clock, quality panel.
+- **MIT restart:** killed a stale 14-Jun full MIT worker (orphaned `python3.11.exe` on :5004 holding ~3.9 GB VRAM — the worker-restart-gotcha) → VRAM 6.6→2.7 GB used; relaunched a **full GPU worker** on :5013 (`--use-gpu --start-instance`, gateway translator so no local LLM) so the worker telemetry actually flows.
+- **Verified:** Dashboard typecheck clean (touched files; residual recharts-Formatter + `bun:test` errors pre-existing), `bun test` **120 pass**, `/service/mit` SSR 200 no error overlay. Workflow: 8 component agents (1 transient 500 redone by hand).
+
+---
+
 ## 2026-06-14 — Backend god-file decomposition: carve MIT translation out of books.service.ts (#233 + #234)
 Continued the `Backend/src/books/books.service.ts` god-object decomposition (PRD #228). Two services carved out, every seam byte-identical except one isolated behaviour fix:
 - **#233 `MitTranslationService`** — the single-page MIT path (`translateMangaPagePatches` + the startup-retry loop), the MIT health check, and the image-translator probe. Injects `MitClient` (#230) + the #229 pure helpers + BooksService's shared `persistPage`/`seriesContextFor` as callbacks; with MitClient faked the single-page path is unit-testable for the first time (cache hit / retry loop / ECONNREFUSED→unavailable / abort).
@@ -2449,3 +2536,23 @@ Completed PRD #228 (the `books.service.ts` god-object decomposition). Step 6 car
 - **6c `LandingService`** (`landing.service.ts`) — landing assembly (cache→rows→image-cache enhancement) + description + manga-episode Gemini text translation; the **two duplicated stale-cache fallback blocks collapse into one `serveStale()`** (the only behaviour-preserving cleanup). 6 cases.
 
 `books.service.ts` **841 → 376 lines** (god file quartered from its 1834 start; now a thin facade — every public signature unchanged, controllers/call-sites untouched). New unit-testable modules: `gemini-model-catalog.ts`, `manga-catalog.service.ts`, `landing.service.ts`. Constructed via `new` in the BooksService constructor (sharing its cache/imageCache/mangaDex/supabase + a `() => backendOrigin` callback) — same one-way-dependency pattern as #233/#234, so `BooksModule` is unchanged. Method: characterization-first (existing books specs are the net), byte-identical extraction, build whole backend per seam. The Thai-detect regex was restored to its `฀-๿` escapes after an encoding round-trip. **Full backend suite 530 pass / 0 fail** (was 513; +17 new). Branch `dept/backend` (3 commits `15e4837`/`127ee43`/`959b1bd`). **PRD #228 DONE — all 6 steps landed (#229/#230/#232/#233/#234/#231).** Issues left open — close on merge to main. Impact report: `docs/reports/system-impact-report.md` (2026-06-14, #231).
+
+---
+
+## 2026-06-28 — Dashboard V2 Track A close-out + live-native leak fixes (PR #414)
+
+Resumed `dashboardv2` (the canonical `:4200` console) Track A. Committed the Track A base (`54182e0`:
+6 tested live-data libs `deep-link`/`download`/`incident-timeline`/`live-worker-node`/`search`/
+`snapshot-export` + `dashboard.tsx` wiring). **#352** (focus-trap stable via `useCallback` closeNode) and
+**#353** (robust Export download: DOM-attach anchor + deferred revoke in `lib/download.ts`) were found
+**already implemented** in Track A → verified (`tsc` clean, 74 tests) + closed. **#354** (3 nits): MIT tab
+= remember-last (documented), skeletons = deferred to B4 (annotated), queue-depth chart moved out of
+`HOST_CHARTS` (queue ≠ host metric) → commit `f49cda2`, closed.
+
+Then ran **/scrutinize** (3 parallel agents) before opening the PR — found the live-native contract
+(ADR 022) breached in **4 spots** rendering hardcoded mock values on the LIVE path: pipeline
+`95.0s · translate stalled`, GPU-util `−11.4%` delta, hero `94%` ring, vitals `0%` gauges. Fixed via a new
+tested `lib/overview-signals.ts` (`pipelineHeaderSummary`, `pctDelta`) + gating/No-Data — commit `fa64c90`,
+**82 tests pass, tsc clean**. Pushed `feat/dashboard` → **PR #414** (closes #352/#353/#354; relates #304/#279).
+ADR **022** (live-native, no fabricated values on the live path). NOTE: full frontend E2E via tunnel **not
+run** — Track B realtime unwired, console is mock-mode only (honest gap; E2E lands with B4).

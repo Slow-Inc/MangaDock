@@ -1,4 +1,5 @@
 import asyncio
+import time
 from typing import List, Optional
 
 from PIL import Image
@@ -7,7 +8,9 @@ from fastapi.requests import Request
 
 from manga_translator import Config
 from server.instance import executor_instances
+from server.queue_view import jobs_view
 from server.sent_data_internal import NotifyType
+from server.status_hub import status_hub
 
 class QueueElement:
     req: Request
@@ -23,6 +26,10 @@ class QueueElement:
         # Optional {url, secret, taskId, pageIndex} — the worker forwards live
         # pipeline-stage events to this webhook while translating (UX).
         self.progress_meta = progress_meta
+        # Dev-console (#279): id + enqueue time, assigned by TaskQueue.add_task,
+        # surfaced in the /status snapshot's queue.jobs.
+        self.id: int | None = None
+        self.enqueued_at: float | None = None
 
     async def is_client_disconnected(self) -> bool:
         if await self.req.is_disconnected():
@@ -34,9 +41,23 @@ class TaskQueue:
     def __init__(self):
         self.queue: List[QueueElement] = []
         self.queue_event: asyncio.Event = asyncio.Event()
+        self._next_id: int = 0
 
     def add_task(self, task: QueueElement):
+        task.id = self._next_id
+        task.enqueued_at = time.monotonic()
+        self._next_id += 1
         self.queue.append(task)
+        # Dev console (ADR 016): enqueue is a discrete event — push it (no loop).
+        status_hub.publish({"type": "event", "service": "mit", "kind": "translate_triggered",
+                            "detail": f"{task.task_type} · queue {len(self.queue)}"})
+
+    def jobs_snapshot(self) -> list[dict]:
+        """The currently-queued jobs for the Dev-console /status snapshot (queue.jobs)."""
+        now = time.monotonic()
+        raws = [{"id": t.id, "task_type": t.task_type, "progress_meta": t.progress_meta,
+                 "enqueued_at": t.enqueued_at} for t in self.queue]
+        return jobs_view(raws, now)
 
     def get_pos(self, task: QueueElement) -> Optional[int]:
         try:
