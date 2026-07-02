@@ -44,6 +44,10 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[project-render-parity-direction]] — ทิศทางที่ตัดสินแล้ว (2026-06-08) ให้ MIT render เหมือน MangaTranslator — narrow-column + supersampling + vertical จริง + SFX
 
 
+## 📚 Reference — ตัวชี้ทรัพยากรภายนอก
+
+- [[reference-external-docs-index]] — Catalog of knowledge-bearing MD files OUTSIDE the vault (resume points, benchmark reports, ADRs, PRDs, DONE/PIPELINE logs) — read these too; reconcile new ones in so nothing is missed
+
 ---
 
 ## Definition of Done (gate ทุก task)
