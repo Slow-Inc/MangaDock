@@ -304,23 +304,43 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     return int(clean_fs), float(block_w), float(block_h)
 
 
+_REFERENCE_FILL_RATIO = 1.4  # #178: interior_w/det_w above this ⇒ text is a narrow column loose in a
+# wide balloon (One-Punch 1.61–3.43) → don't fill; at/below ⇒ text fills its bubble (Thai 1.07–1.19)
+# → fill. Grounded on measured fixtures; ~0.2 margin each side. See should_fill_demoted_bubble.
+
+
+def should_fill_demoted_bubble(interior_w, det_w, threshold=_REFERENCE_FILL_RATIO):
+    """A demoted-bubble region (has a balloon but was routed to clean-layout because the text fills
+    <72% of the bubble width) should FILL the balloon only when the balloon interior isn't much wider
+    than the text's own detection box. When the interior is ≫ the text (``interior_w/det_w > threshold``)
+    the text is a narrow column loosely inside a wide balloon (or a loose detection) and must render as
+    a narrow column, not blow up to fill the balloon. ``det_w <= 0`` → fill (avoid div-by-zero)."""
+    if det_w <= 0:
+        return True
+    return (interior_w / det_w) <= threshold
+
+
 def _reference_fit_box(region, bubble_box, crop_shape):
-    """The ``(w, h, (cx, cy))`` box the reference fit sizes against: the balloon's distance-transform
-    safe interior when a bubble is known (fill the balloon), else the region's own detection box
-    (narration/caption — sized by the cap, wrapped to its own footprint, not a wide balloon)."""
+    """The ``(w, h, (cx, cy), fill)`` the reference fit sizes against. When a bubble is known AND the
+    text fills it (:func:`should_fill_demoted_bubble`), use the balloon's distance-transform safe
+    interior and ``fill=True`` (grow to fill the balloon). Otherwise (no bubble, or a demoted narrow
+    column loose in a wide balloon) use the region's own detection box with ``fill=False`` (sized by
+    the flat cap, wrapped to its own footprint)."""
     x1, y1, x2, y2 = (float(v) for v in region.xyxy)
     if bubble_box is not None:
         iw, ih, anchor = _bubble_interior_box(region, bubble_box, crop_shape)
-        return float(iw), float(ih), anchor
-    return (x2 - x1), (y2 - y1), ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
+        if should_fill_demoted_bubble(iw, x2 - x1):
+            return float(iw), float(ih), anchor, True
+    return (x2 - x1), (y2 - y1), ((x1 + x2) / 2.0, (y1 + y2) / 2.0), False
 
 
-def _reference_cap(has_bubble, box_h, flat):
-    """Font cap for the reference fit. A bubbled region fills its balloon interior (cap = interior
-    height, so the binary search grows to fill like bubble-fit); free narration/caption caps at the
-    flat page-scaled size (small + readable). This split is what keeps One-Punch narration small
-    while letting a Thai dialogue line fill its oval — no under-fill regression."""
-    return int(box_h) if has_bubble else int(flat)
+def _reference_cap(fill, box_h, flat):
+    """Font cap for the reference fit. A fill region (text fills its balloon) caps at the interior
+    height so the binary search grows to fill like bubble-fit; a non-fill region (free narration, or a
+    demoted narrow column loose in a wide balloon) caps at the flat page-scaled size (small + readable).
+    This split keeps One-Punch narration/loose-bubble text small while letting a Thai dialogue line fill
+    its oval — no under-fill regression."""
+    return int(box_h) if fill else int(flat)
 
 
 def _reference_clean_layout(region, box_w, box_h, font_size_minimum, cap, page_w):
@@ -526,9 +546,10 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 # — the reference model, replacing the source-column-referenced _clean_layout_dst.
                 _ps = page_shape if page_shape is not None else img.shape
                 _flat = clean_layout_font_size(font_size_max, _ps[0], _ps[1], font_size_minimum)
-                _bw, _bh, (cx, cy) = _reference_fit_box(region, bubble_box, img.shape)
-                # bubbled → fill the interior (cap = interior height); narration → flat cap.
-                _cap = _reference_cap(bubble_box is not None, _bh, _flat)
+                _bw, _bh, (cx, cy), _fill = _reference_fit_box(region, bubble_box, img.shape)
+                # fills its bubble → cap = interior height (grow to fill); else (narration or a demoted
+                # narrow column loose in a wide balloon) → flat cap, wrapped to the detection box.
+                _cap = _reference_cap(_fill, _bh, _flat)
                 clean_fs, block_w, block_h = _reference_clean_layout(
                     region, _bw, _bh, font_size_minimum, _cap, _ps[1])
                 laid = (clean_fs, block_w, block_h)
