@@ -104,6 +104,21 @@ def set_main_logger(l):
     global logger
     logger = l
 
+
+def _timed_stage(stage_name):
+    """#speed-study (2026-07-02): log per-stage wall-clock at the driver seam
+    without touching any stage logic. `logger` is resolved as a module global at
+    call time so a `set_main_logger` override is respected."""
+    def deco(fn):
+        async def wrapper(self, *args, **kwargs):
+            _t0 = time.time()
+            try:
+                return await fn(self, *args, **kwargs)
+            finally:
+                logger.info(f"[timing] stage={stage_name} elapsed_ms={(time.time() - _t0) * 1000:.1f}")
+        return wrapper
+    return deco
+
 class TranslationInterrupt(Exception):
     """
     Can be raised from within a progress hook to prematurely terminate
@@ -592,16 +607,19 @@ class MangaTranslator:
 
         return ctx
 
+    @_timed_stage("colorizer")
     async def _run_colorizer(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("colorizer", config.colorizer.colorizer, current_time)
         return await run_colorizer(config, ctx, self.device)
 
+    @_timed_stage("upscaling")
     async def _run_upscaling(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("upscaling", config.upscale.upscaler, current_time)
         return await run_upscaling(config, ctx, self.device)
 
+    @_timed_stage("detection")
     async def _run_detection(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("detection", config.detector.detector, current_time)
@@ -612,6 +630,7 @@ class MangaTranslator:
         await self._model_unloader.unload(tool, model)
 
 
+    @_timed_stage("ocr")
     async def _run_ocr(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("ocr", config.ocr.ocr, current_time)
@@ -630,6 +649,7 @@ class MangaTranslator:
                 new_textlines.append(textline)
         return new_textlines
 
+    @_timed_stage("textline_merge")
     async def _run_textline_merge(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("textline_merge", "textline_merge", current_time)
@@ -848,6 +868,7 @@ class MangaTranslator:
             'cpu' if self._gpu_limited_memory else self.device
         )
 
+    @_timed_stage("translation")
     async def _run_text_translation(self, config: Config, ctx: Context):
         # 检查text_regions是否为None或空
         if not ctx.text_regions:
@@ -947,9 +968,11 @@ class MangaTranslator:
 
         return new_text_regions
 
+    @_timed_stage("mask_refinement")
     async def _run_mask_refinement(self, config: Config, ctx: Context):
         return await run_mask_refinement(config, ctx, self.verbose, self.kernel_size)
 
+    @_timed_stage("inpainting")
     async def _run_inpainting(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("inpainting", config.inpainter.inpainter, current_time)
@@ -976,6 +999,7 @@ class MangaTranslator:
                     return comic
         return self.font_path
 
+    @_timed_stage("rendering")
     async def _run_text_rendering(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("rendering", config.render.renderer, current_time)
