@@ -171,7 +171,7 @@ export default function StudioOverviewPage() {
             <StudioMobileHero
               eyebrow="Studio Dashboard"
               title="สตูดิโอของฉัน"
-              description="หน้าหลักแบบมือถือจะสรุปเฉพาะสิ่งสำคัญก่อน แล้วค่อยแยกข้อมูลลึกเป็นหน้าย่อยตามแบบ native ของโปรเจกต์"
+              description="ดูสถิติ รายได้ และกิจกรรมล่าสุดของคุณ"
               aside={(
                 <div className="rounded-2xl border border-amber-400/15 bg-amber-400/10 px-3 py-2 text-right">
                   <p className="text-[10px] text-white/45">เหรียญ</p>

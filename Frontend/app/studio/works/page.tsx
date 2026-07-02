@@ -286,7 +286,7 @@ export default function WorksPage() {
               <StudioMobileHero
                 eyebrow="Works Manager"
                 title="ผลงานของฉัน"
-                description="มือถือจะโฟกัสที่รายการงานก่อน ส่วนตัวกรองและมุมมองจะถูกแยกเป็นหน้าจอย่อย"
+                description="จัดการงานแปลและบทของคุณทั้งหมดในที่เดียว"
               />
               <div className="grid grid-cols-2 gap-3">
                 <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="title ที่มีเวอร์ชัน" tone="indigo" />
