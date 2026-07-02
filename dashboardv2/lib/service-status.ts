@@ -42,6 +42,10 @@ export async function probeService(url: string, service: string): Promise<Servic
     if (!res.ok) return fallback(service, `HTTP ${res.status}`);
     return (await res.json()) as ServiceSnapshot;
   } catch (e) {
-    return fallback(service, e instanceof Error ? e.message : "unreachable");
+    const reason =
+      e instanceof DOMException && e.name === "TimeoutError"
+        ? "probe timed out"
+        : "unreachable";
+    return fallback(service, reason);
   }
 }
