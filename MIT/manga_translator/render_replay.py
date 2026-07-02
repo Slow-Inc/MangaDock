@@ -68,13 +68,14 @@ def replay_clean_layout(fixture, reference_layout=False, font_size_max=20,
     for r in regs:
         x1, y1, x2, y2 = (float(v) for v in r.xyxy)
         bubble_box = getattr(r, 'bubble_box', None)
+        flat = clean_layout_font_size(font_size_max, ph[0], ph[1], font_size_minimum)
         if reference_layout:
-            flat = clean_layout_font_size(font_size_max, ph[0], ph[1], font_size_minimum)
             bw, bh, _, fill = R._reference_fit_box(r, bubble_box, img_shape)
             cap = R._reference_cap(fill, bh, flat)
             fs, block_w, block_h = R._reference_clean_layout(r, bw, bh, font_size_minimum, cap, ph[1])
             avail_w, avail_h = float(bw), float(bh)
         else:
+            fill = None
             laid = R._clean_layout_dst(r, img_shape, font_size_minimum, font_size_max, ph)
             if laid is None:
                 out.append(dict(has_bubble=bubble_box is not None, orig_fs=r.font_size, final_fs=None,
@@ -84,7 +85,8 @@ def replay_clean_layout(fixture, reference_layout=False, font_size_max=20,
             avail_w, avail_h = (x2 - x1), (y2 - y1)
         det_w, det_h = (x2 - x1), (y2 - y1)
         out.append(dict(
-            has_bubble=bubble_box is not None, orig_fs=r.font_size, final_fs=int(fs),
+            has_bubble=bubble_box is not None, fill=fill, orig_fs=r.font_size, final_fs=int(fs),
+            flat=int(flat),
             block_w=round(float(block_w), 2), block_h=round(float(block_h), 2),
             avail_w=round(avail_w, 2), avail_h=round(avail_h, 2),
             det_w=round(det_w, 2), det_h=round(det_h, 2),
@@ -92,7 +94,10 @@ def replay_clean_layout(fixture, reference_layout=False, font_size_max=20,
             fill_frac_h=round(block_h / avail_h, 3) if avail_h else 0.0,
             # width vs the VISIBLE detection box — the user-perceived overflow (a demoted-bubble
             # region can fit its wide safe-interior yet still spill past its narrow visible box).
-            overflow_vs_det_w=round(block_w / det_w, 3) if det_w else 0.0))
+            overflow_vs_det_w=round(block_w / det_w, 3) if det_w else 0.0,
+            # UNDER-size guard (the other failure direction): a non-fill region's font vs the flat
+            # design size. Far below 1.0 ⇒ over-shrunk / near-invisible (the 2026-07-02 over-correction).
+            readability_ratio=round(fs / flat, 3) if flat else 0.0))
     return out
 
 
