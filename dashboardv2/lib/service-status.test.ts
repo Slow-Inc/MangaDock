@@ -32,4 +32,15 @@ describe("probeService", () => {
     expect(result.status).toBe("down");
     expect(result.reason).toContain("502");
   });
+
+  it("reason does not leak raw Error.message (e.g. internal IP/port from ECONNREFUSED)", async () => {
+    global.fetch = async () => {
+      throw new Error("connect ECONNREFUSED 127.0.0.1:3001");
+    };
+    const result = await probeService("http://localhost:3001/status", "backend");
+    expect(result.status).toBe("down");
+    expect(result.reason).not.toMatch(/ECONNREFUSED/);
+    expect(result.reason).not.toMatch(/127\.0\.0\.1/);
+    expect(result.reason).toBe("unreachable");
+  });
 });
