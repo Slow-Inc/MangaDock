@@ -22,7 +22,7 @@ export function CoverImage({ src, alt, className = "", fallbackSize = 32 }: Cove
   }
 
   return (
-    <div className={`relative overflow-hidden ${className}`}>
+    <div className={`overflow-hidden ${className}`}>
       <Image
         src={src}
         alt={alt}

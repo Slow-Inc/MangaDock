@@ -334,14 +334,16 @@ export default function MangaDetailPage() {
   const executeDelete = async () => {
     if (!confirmDelete) return;
     const version = confirmDelete;
-    setConfirmDelete(null);
+    // don't close yet — let ConfirmDialog show loading spinner
     try {
       const token = await getIdToken();
       if (!token) throw new Error("ไม่พบ token");
       await deleteVersion(token, version.versionId);
+      setConfirmDelete(null); // close on success
       showToast({ type: "success", message: "ลบงานแปลแล้ว", duration: 2200 });
       await fetchVersions();
     } catch (e: unknown) {
+      setConfirmDelete(null); // also close on error
       showToast({
         type: "error",
         message: e instanceof Error ? e.message : "ไม่สามารถลบงานแปลได้",
