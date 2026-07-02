@@ -97,3 +97,40 @@ def test_reference_layout_narration_not_over_shrunk():
     assert non_fill, 'no non-fill regions to check'
     worst = min(d['readability_ratio'] for d in non_fill)
     assert worst >= 0.6, f'a non-fill region over-shrank to {worst:.2f}x the flat design size (too small)'
+
+
+import glob
+import os as _os
+
+# Safety envelope (brainstorm de-risk consensus): every clean-layout region under reference_layout
+# must land inside a two-sided box — not spill past its detection width, not over-shrink below the
+# flat design size, and a fill region must actually fill. Parameterized over the WHOLE fixture corpus
+# so any newly-captured page is auto-guarded (the pre-condition for promoting reference_layout to default).
+_SPILL_CEILING = 1.35      # block_w / det_w  (over-size / spill)
+_READABILITY_FLOOR = 0.6   # final_fs / flat  (non-fill under-shrink), for det_w >= 40 (skip tiny boxes)
+_FILL_FLOOR = 0.9          # final_fs / flat  (a fill region must reach ~the flat size, i.e. actually fill)
+
+
+def _fixture_paths():
+    here = _os.path.dirname(__file__)
+    return sorted(glob.glob(_os.path.join(here, 'fixtures', '*-layout.json')))
+
+
+def test_reference_layout_safety_envelope_over_corpus():
+    from manga_translator.render_replay import load_fixture, replay_clean_layout
+    paths = _fixture_paths()
+    assert paths, 'no layout fixtures found'
+    violations = []
+    for p in paths:
+        name = _os.path.basename(p)
+        for i, d in enumerate(replay_clean_layout(load_fixture(p), reference_layout=True, font_size_max=20)):
+            if d.get('final_fs') is None:
+                continue
+            if d['overflow_vs_det_w'] > _SPILL_CEILING:
+                violations.append(f'{name}#{i}: spill {d["overflow_vs_det_w"]}x > {_SPILL_CEILING}')
+            if d.get('fill'):
+                if d['readability_ratio'] < _FILL_FLOOR:
+                    violations.append(f'{name}#{i}: fill under-filled {d["readability_ratio"]}x < {_FILL_FLOOR}')
+            elif d.get('det_w', 0) >= 40 and d['readability_ratio'] < _READABILITY_FLOOR:
+                violations.append(f'{name}#{i}: narration over-shrank {d["readability_ratio"]}x < {_READABILITY_FLOOR}')
+    assert not violations, 'reference_layout safety-envelope violations:\n' + '\n'.join(violations)
