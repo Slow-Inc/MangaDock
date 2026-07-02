@@ -47,11 +47,14 @@ def test_reference_clean_layout_keeps_a_word_whole():
 
 
 def test_reference_fit_box_uses_detection_box_when_no_bubble():
-    # Narration without a speech balloon sizes against its own detection box (w,h) centered.
-    from manga_translator.rendering import _reference_fit_box
+    # Narration without a speech balloon sizes against its detection WIDTH, but with a generous
+    # vertical tolerance (_CLEAN_DISPLAY_H_TOL) so the font stays at the flat size and wraps to more
+    # lines instead of shrinking — the 2026-07-02 over-shrink fix. Centered on the detection box.
+    from manga_translator.rendering import _reference_fit_box, _CLEAN_DISPLAY_H_TOL
     region = SimpleNamespace(xyxy=(10, 20, 110, 220), bubble_polygon=None)
     bw, bh, (cx, cy), fill = _reference_fit_box(region, None, (500, 500, 3))
-    assert (bw, bh) == (100.0, 200.0)
+    assert bw == 100.0
+    assert bh == 200.0 * _CLEAN_DISPLAY_H_TOL  # generous height, not the tight detection height
     assert (cx, cy) == (60.0, 120.0)
     assert fill is False  # no bubble → detection box, not a fill
 

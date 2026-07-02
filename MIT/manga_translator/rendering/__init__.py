@@ -331,7 +331,11 @@ def _reference_fit_box(region, bubble_box, crop_shape):
         iw, ih, anchor = _bubble_interior_box(region, bubble_box, crop_shape)
         if should_fill_demoted_bubble(iw, x2 - x1):
             return float(iw), float(ih), anchor, True
-    return (x2 - x1), (y2 - y1), ((x1 + x2) / 2.0, (y1 + y2) / 2.0), False
+    # Non-fill (narration / a demoted narrow column): wrap to the detection WIDTH but give a generous
+    # vertical tolerance (_CLEAN_DISPLAY_H_TOL) so the font stays at the flat design size and the text
+    # simply wraps to MORE LINES — instead of the tight detection height squeezing the font tiny (the
+    # 2026-07-02 over-shrink). Width stays bounded to the detection box (no spill).
+    return (x2 - x1), (y2 - y1) * _CLEAN_DISPLAY_H_TOL, ((x1 + x2) / 2.0, (y1 + y2) / 2.0), False
 
 
 def _reference_cap(fill, box_h, flat):
