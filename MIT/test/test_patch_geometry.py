@@ -187,6 +187,57 @@ def test_feather_alpha_radius_zero_is_hard_alpha():
     assert a[0, 0] == 0                              # background → transparent
 
 
+def test_content_alpha_inner_marks_only_new_glyphs():
+    """#436: opaque over the glyphs this patch drew (rendered vs the text-free inpaint) —
+    transparent elsewhere, so an overlapping balloon's later patch no longer repaints over
+    this one's text."""
+    inpainted = np.full((40, 40, 3), 255, np.uint8)      # clean, text-free
+    rendered = inpainted.copy()
+    rendered[18:23, 18:23] = 0                            # a glyph stroke this patch drew
+    inner = pg.content_alpha_inner(rendered, inpainted, threshold=12, dilate=0)
+    assert inner[20, 20] == 255                           # new glyph → opaque
+    assert inner[2, 2] == 0                               # untouched margin → transparent
+
+
+def test_content_alpha_inner_does_not_mark_neighbour_text_the_inpaint_erased():
+    """The key #436 fix: with full-page inpaint a patch's crop has the NEIGHBOUR balloon's text
+    already erased, so rendered == inpainted there. That area must stay transparent (else the
+    later patch re-occludes the neighbour's text). Keying off rendered-vs-inpaint (not
+    rendered-vs-original) guarantees it."""
+    inpainted = np.full((40, 40, 3), 255, np.uint8)
+    rendered = inpainted.copy()                           # no new glyphs anywhere this patch
+    inner = pg.content_alpha_inner(rendered, inpainted, own_mask=None, threshold=12, dilate=0)
+    assert inner.max() == 0                               # nothing this patch owns → fully transparent
+
+
+def test_content_alpha_inner_includes_own_erase_mask():
+    """Opaque also over this group's OWN original text (own_mask) so the patch still hides it,
+    even where no new glyph lands on that exact pixel."""
+    inpainted = np.full((40, 40, 3), 255, np.uint8)
+    rendered = inpainted.copy()
+    own = np.zeros((40, 40), np.uint8)
+    own[10:14, 10:14] = 255                               # this group's own original ink
+    inner = pg.content_alpha_inner(rendered, inpainted, own_mask=own, threshold=12, dilate=0)
+    assert inner[12, 12] == 255                           # own erase area → opaque
+    assert inner[30, 30] == 0                             # elsewhere → transparent
+
+
+def test_content_alpha_inner_dilates_to_cover_antialiasing():
+    inpainted = np.full((40, 40, 3), 255, np.uint8)
+    rendered = inpainted.copy()
+    rendered[20, 20] = 0                                  # single changed pixel
+    inner = pg.content_alpha_inner(rendered, inpainted, threshold=12, dilate=3)
+    assert inner[20, 20] == 255
+    assert inner[20, 23] == 255                           # dilated halo covers the neighbourhood
+    assert inner[20, 35] == 0                             # far margin still transparent
+
+
+def test_content_alpha_inner_shape_mismatch_returns_none():
+    a = np.zeros((10, 10, 3), np.uint8)
+    b = np.zeros((8, 8, 3), np.uint8)
+    assert pg.content_alpha_inner(a, b) is None
+
+
 def test_tighten_text_mask_shrinks_to_the_strokes_within_the_box():
     """A coarse box mask over text leaves LaMa to repaint the whole rectangle (a big band).
     Tightening keeps only the actual ink strokes (local-contrast pixels) + a small dilation,

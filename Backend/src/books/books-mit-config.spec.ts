@@ -53,6 +53,7 @@ const ENV_KEYS = [
   'MIT_FONT_MAX_BOX_RATIO',
   'MIT_EN_FONT',
   'MIT_PATCH_FEATHER',
+  'MIT_PATCH_CONTENT_ALPHA',
   'MIT_INPAINT_CONTEXT_PAD',
 ];
 
@@ -256,6 +257,19 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.render.patch_feather_radius).toBeUndefined();
+  });
+
+  it('enables content-shaped patch alpha via MIT_PATCH_CONTENT_ALPHA (#436)', () => {
+    process.env.MIT_PATCH_CONTENT_ALPHA = '1';
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.patch_content_alpha).toBe(true);
+  });
+
+  it('omits patch_content_alpha when unset — patches byte-identical (#436)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.patch_content_alpha).toBeUndefined();
   });
 
   it('enables the larger inpaint context crop via MIT_INPAINT_CONTEXT_PAD (#249)', () => {

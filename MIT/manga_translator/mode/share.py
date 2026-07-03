@@ -227,11 +227,12 @@ class MangaTranslatorShared:
         # Expose to the request handlers for Dev-console stage-timing telemetry (#279).
         _PARENT["url"], _PARENT["nonce"] = report, nonce
 
-        # Inject Prompt-Bold font for Thai rendering if not already specified
+        # Inject the default Thai render font if not already specified. Prompt-Regular (weight 400,
+        # same body height as Bold ~0.64em, lighter strokes) — user preference: less-bold Thai.
         params = dict(self.params)
         if not params.get("font_path"):
             _candidate = os.path.normpath(
-                os.path.join(os.path.dirname(__file__), "..", "..", "fonts", "Prompt-Bold.ttf")
+                os.path.join(os.path.dirname(__file__), "..", "..", "fonts", "Prompt-Regular.ttf")
             )
             if os.path.isfile(_candidate):
                 params["font_path"] = _candidate

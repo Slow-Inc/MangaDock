@@ -1081,6 +1081,115 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 
 ---
 
+# 2026-06-30 — feat(MIT): width-squeeze fills tall balloon height (#183/#175; builds on #430/#431, ADR 023→024)
+
+**1. Type.** Render-quality behaviour change in the MIT bubble-fit sizing path; opt-in via `MIT_BUBBLE_AREA_FIT` (already on per ADR 023). Targeted stopgap of the source-agnostic wrap (PRD #434).
+
+**2. Trigger.** After ADR 023 made balloon dialogue fill its balloon, a **tall, not-wide** balloon still rendered as 2 wide lines + a vertical gap: the fit picked the largest font that wraps without force-breaking a word, then rendered at full balloon width, and the font could not grow further (the no-mid-word-break guard caps it). Surfaced on Gal Yome no Himitsu EN ch1 p4 ("PEOPLE FROM OTHER DEPARTMENTS…"); user-flagged the same on Thai targets ("ตัวเล็กแค่ 2 บรรทัด ทั้งๆ ที่ประโยคยาว").
+
+**3. Change (before → after).**
+- before: `_bubble_fit_font_size(region, bubble_wh, …) → font`; the caller rendered the wrapped block at the full balloon width.
+- after: pure `squeeze_width(measure_h, full_w, min_w, box_h, factor=0.9)` (MangaTranslator `layout_engine.py` ×0.90 step) narrows the wrap column until the block would exceed the box height or hit the longest-token floor; `_bubble_fit_font_size` → `_bubble_fit_layout` returns `(font, block_w, block_h)`; both bubble-fit callers (occ==1, occ>1) centre the squeezed block. Font is unchanged — width is traded for line count.
+
+**4. Seam / commit.** One pure helper in `render_overlap.py` + one call site in `_bubble_fit_layout`. TDD: `squeeze_width` tests RED→GREEN first. Commit 94bab61 on `worktree-feat-mit-font-s1` (PR #433).
+
+**5. Byte-identical proof.** `squeeze_width` is invoked only inside `_bubble_fit_layout`; `clean_layout` and legacy paths untouched → render golden/guard suites **byte-identical**. No-op by design when text already fills the height or the longest word ≈ balloon width.
+
+**6. Performance.** Negligible — the squeeze loop is ≤ ~30 `calc_horizontal` re-wraps per bubble-fit region at constant font (log-bounded by factor 0.9 from full width to floor), only on the bubble-fit path.
+
+**7. Quality / metrics.** Gal Yome EN p4 tall balloon 2 wide → **6 narrow lines** filling height; One-Punch JA→EN dialogue/narration/SFX **unchanged**. `test_render_overlap.py` 33 → **36** (+3: narrows-a-tall-box / noop-when-full / stops-at-floor).
+
+**8. Tech debt.** The fill-height layout decision is now a pure, unit-tested function rather than implicit in the render loop. Residual: scoped to dialogue-in-balloon; narration/captions + horizontal-source wrap generally stay in the flag-gated, A/B-decided source-agnostic path (PRD #434 / research #435), which reuses `squeeze_width` as-is.
+
+**9. Risk / rollback.** Revert the call in `_bubble_fit_layout` → ADR-023 full-width rendering; paths outside bubble-fit are byte-identical. No money/auth surface.
+
+**10. KPI.** #183/#175 residual closed · tall balloon 2 → 6 lines · +3 unit tests (36/0) · golden byte-identical · 0 regressions (One-Punch unchanged) · ADR 024.
+
+*Validation:* TDD; `pytest test/test_render_overlap.py` 36/0; render golden/guard byte-identical; benchmark via real backend config (MIT_BUBBLE_AREA_FIT=1) Gal Yome + One-Punch. *Risk/rollback:* revert the squeeze call. *Links:* #183, #175, #434, #435, ADR 023, ADR 024, branch `worktree-feat-mit-font-s1`.
+
+---
+
+# 2026-06-30 — fix(MIT): clean-layout narration scales by page resolution, not per-region crop (#175)
+
+**1. Type.** Render-quality bug fix in the MIT clean-layout sizing path; patch-path crop-vs-page (same class as #175 bubble-fit, but the clean-layout branch).
+
+**2. Trigger.** Full-chapter Gal Yome EN→Thai benchmark: narration/caption rendered tiny while dialogue in the same panel was normal-sized (user: "ทำไมตัวเล็กทั้งที่มีตัวขนาดปกติอยู่ด้วย").
+
+**3. Change (before → after).**
+- before: `_clean_layout_dst` used the per-region **crop** `img.shape` for `clean_layout_font_size`'s `processing_scale` (+ wrap-width clamp + max wrap height). Crop = full-res but tiny area → `processing_scale` floored at 0.5 → narration ≈17px (3× under the designed 35px).
+- after: thread the full-**page** shape (`PatchRenderer.img_w/img_h`) via `patch_ctx.page_shape` → `stages` → `dispatch` → `resize_regions_to_font_size` → `_clean_layout_dst`; use it for the three page-relative quantities. `page_shape=None` (full-page path) → falls back to `img.shape` → byte-identical.
+
+**4. Seam / commit.** One value (`page_shape`) threaded with `=None` defaults through 4 functions + set once on the patch Context. Commit 70c6bf1 on `worktree-feat-mit-font-s1`.
+
+**5. Byte-identical proof.** Full-page render path never sets `ctx.page_shape` → `None` → `_clean_layout_dst` uses `img.shape` (= the page) exactly as before. Render golden/guard suites byte-identical. Bubble-fit + legacy paths untouched.
+
+**6. Performance.** Neutral — same call count; one extra tuple on the Context.
+
+**7. Quality / metrics.** Narration ~17px → ~35px on a 3 MP page (≈2×, the designed size). `test_render_overlap.py` 37 → **38** (+1 page-vs-crop pin); stages kwargs characterization updated for the new kwarg.
+
+**8. Tech debt.** Closes the clean-layout half of the patch-path crop-vs-page bug (#175 fixed the bubble-fit half via box height). Residual: the rw/bw discriminator still *routes* some narration-in-large-bubble to clean-layout — separate concern.
+
+**9. Risk / rollback.** Pass `page_shape=None` (or revert the thread) → crop-scaled clean-layout; all other paths byte-identical. No money/auth surface.
+
+**10. KPI.** #175 clean-layout sizing fixed · narration ~2× (designed size) · +1 unit pin (38/0) · golden byte-identical · 0 regressions · ADR 025.
+
+*Validation:* TDD pin + stages characterization; `pytest test/test_render_overlap.py test/test_render_golden.py test/test_stages.py test/test_patch_renderer.py` green; E2E Gal Yome EN ch1 p14 → Thai (narration readable, no crash/oversize). *Risk/rollback:* `page_shape=None`. *Links:* #175, ADR 023/024/025, branch `worktree-feat-mit-font-s1`.
+
+---
+
+# 2026-06-30 — fix(MIT): gate SFX rescue on det_sfx provenance, not a ≤4-char heuristic (#278)
+
+**1. Type.** Correctness + perf fix in the MIT SFX vision-rescue gate (PR #277 review follow-up).
+
+**2. Trigger.** User-flagged: normal short text detected/rescued as SFX. The rescue fired for ANY ≤4-char region in a ≥60×60 box → short dialogue ("HUH?", "おい") misread as onomatopoeia + a ~1–2 s gateway round-trip per such region on every translate.
+
+**3. Change (before → after).**
+- before: `if vlm_rescue and len(region.text.strip()) <= 4:` then area/min-side check → rescue.
+- after: pure `should_rescue_sfx(text, from_sfx_detection, w, h, vlm_rescue)` — gate on **det_sfx provenance** (`region.from_sfx_detection`, ≤4 chars), tight ≤2-char fallback when det_sfx is off. Provenance threaded: `Quadrilateral.is_sfx` (set by `merge_sfx_detections`) → `textline_merge` (any SFX textline → region) → `TextBlock.from_sfx_detection`. Plus: ENG prompt `==` byte-identity; `sanitize_sfx` non-Latin refusal guard; jieba lazy-dict documented.
+
+**4. Seam / commit.** One pure gate (`should_rescue_sfx`) + a boolean flag threaded through 3 classes with `False` defaults. Commit 8cbd930.
+
+**5. Byte-identical proof.** `is_sfx`/`from_sfx_detection` default `False` → when det_sfx never fires the flag is absent and the tight ≤2 fallback is the only change to the gate; render golden untouched. ENG prompt pinned byte-identical with `==`.
+
+**6. Performance.** Positive — removes the per-region vision-gateway round-trip (~1–2 s) for every short non-SFX region (previously on every translate).
+
+**7. Quality / metrics.** Deterministic benchmark: OLD rescued 5/7 representative regions, NEW 3 → 2 false-positive gateway calls eliminated, real SFX kept. `test_ocr_vlm` +9 (24/0).
+
+**8. Tech debt.** Replaces a length proxy with the correct provenance signal; closes the major item of the #277 review follow-up (+ its 3 nits).
+
+**9. Risk / rollback.** Loosen `should_rescue_sfx` back to `len ≤ 4` (ignore provenance) to restore old behaviour; flags default False → byte-identical when det_sfx off and no SFX detected. No money/auth surface.
+
+**10. KPI.** #278 done (major + 3 nits) · 2 false-SFX/page-class eliminated · per-translate gateway latency reduced · +9 tests (24/0) · golden byte-identical · ADR 026 + benchmark report.
+
+*Validation:* TDD `should_rescue_sfx`; `pytest test/test_ocr_vlm.py` 24/0; affected suites green; deterministic gate benchmark. *Risk/rollback:* revert the gate to length-only. *Links:* #278, #277, ADR 026, `docs/reports/benchmarks/2026-06-30-sfx-rescue-provenance-gate.md`, branch `worktree-feat-mit-font-s1`.
+
+---
+
+# 2026-07-02 — feat(MIT): reference_layout render engine (opt-in) + deterministic replay harness (#178/#462/#430)
+
+**1. Type.** Render engine + test-harness feature; opt-in, production default byte-identical.
+
+**2. Trigger.** Editing the shared MIT render kept regressing already-good targets (Thai fill ↔ One-Punch narration size), and the non-deterministic translator made worker A/B unreliable. A user-flagged demo defect: One-Punch narration blocks rendering far too big.
+
+**3. Change (before → after).**
+- *Harness:* `render_replay.py` (`serialize_regions`/`replay_clean_layout`) + `MIT_DUMP_REGIONS` dump hook → the clean-layout sizing is replayed offline & deterministically from committed fixtures; a parameterized safety-envelope test asserts every region stays in a two-sided box (spill ≤1.35×det, narration ≥0.6×flat, fill ≥0.9×flat).
+- *Engine (`render.reference_layout`, default OFF):* `_reference_layout_intent` resolves box+anchor+fill+cap from one discriminator (`should_fill_demoted_bubble`: fill only if `interior_w/det_w ≤ 1.4`); `fit_to_box` = binary search + bounded upward re-scan (defeats word-wrap non-monotonicity that returned a tiny branch).
+
+**4. Seam / commits.** New modules `reference_layout.py`, `render_replay.py`; `render.reference_layout` + `detector.det_bubble_synth` config flags; `~15` commits on `worktree-feat-mit-font-s1` (PR #433).
+
+**5. Byte-identical proof.** `reference_layout` default OFF → dispatch golden byte-identical (in isolation); `MIT_DUMP_REGIONS`/`MIT_SIZING_TRACE` off → no-op.
+
+**6. Performance.** N/A for production (flag off). Harness replay is calc_horizontal-bound (~minutes for the corpus) → the corpus envelope test is `slow`-marked.
+
+**7. Quality / metrics.** Deterministic replay + live: One-Punch narration 32–44px spill ~2.3× → readable narrow columns (~flat), Thai dialogue still fills (69/28/50px). Discriminator ratio across 17 bubble regions / 4 fixtures cleanly separates (Thai 1.07–1.20 | 1.4 | One-Punch 1.61–3.43). Corrected finding: production render is in good shape; a "garble" was actually an LLM translation token ("JDB"), not render.
+
+**8. Tech debt.** Merged `_reference_fit_box`+`_reference_cap` → one intent resolver; named constants. Remaining: promote decision (needs bigger corpus + multi-run flip check), calc_horizontal font-cache (test speed), Knuth-Plass line-break (#180).
+
+**9. Risk / rollback.** Opt-in flag OFF → production unchanged. Discriminator threshold stability is the main risk before promotion (mitigated: 0.2 margin across the corpus + envelope guard). Drop the flag → zero effect.
+
+**10. KPI.** narration-oversize cluster fixed + guarded · deterministic harness + 4-fixture corpus · two-sided envelope guard green · benchmark-endpoint + verify-before-claiming rules recorded · ADR 028 + 4 benchmark reports (`docs/reports/benchmarks/2026-07-02-*`).
+
+*Validation:* TDD each increment; render golden byte-identical (flag off); reference_layout/replay suites green; live patch-path renders verified vs target. *Risk/rollback:* flag OFF default. *Links:* #178, #462, #430, ADR 028, `docs/prd/mit-render-defect-master-plan.md`, benchmarks `2026-07-02-*`, PR #433, branch `worktree-feat-mit-font-s1`.
 ## 2026-06-28 — Dashboard V2: Track A close-out + live-native leak fixes (PR #414)
 
 ### Track A review nits (#352, #353, #354) — closed
