@@ -60,6 +60,17 @@ describe('validate()', () => {
     });
   });
 
+  it('rejects custom with invalid LLM_BASE_URL format', () => {
+    expect(() =>
+      validate({
+        ...BASE,
+        LLM_PROVIDER: 'custom',
+        LLM_API_KEY: 'sk-test',
+        LLM_BASE_URL: 'not-a-url',
+      }),
+    ).toThrow();
+  });
+
   it('rejects unknown LLM_PROVIDER value', () => {
     expect(() =>
       validate({ ...BASE, LLM_PROVIDER: 'anthropic', GEMINI_API_KEY: 'key' }),

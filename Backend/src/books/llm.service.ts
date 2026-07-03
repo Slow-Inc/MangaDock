@@ -68,6 +68,8 @@ export class LlmService {
       model,
       messages: [{ role: 'user', content: prompt }],
     });
-    return response.choices[0]?.message.content ?? '';
+    const content = response.choices[0]?.message.content;
+    if (!content) throw new Error(`OpenAI returned empty content for model ${model}`);
+    return content;
   }
 }

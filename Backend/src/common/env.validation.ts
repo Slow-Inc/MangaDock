@@ -40,7 +40,7 @@ class EnvironmentVariables {
   LLM_API_KEY?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUrl({ require_tld: false, require_protocol: true })
   LLM_BASE_URL?: string;
 
   @IsOptional()

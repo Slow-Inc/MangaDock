@@ -199,6 +199,7 @@ describe('mit-config pure builders (#229)', () => {
       expect(cfg.translator.translator).toBe('chatgpt');
       expect(cfg.translator.api_key).toBe('sk-test');
       expect(cfg.translator.api_url).toBeUndefined();
+      expect(cfg.translator.model).toBe('gpt-4o-mini');
     });
 
     it('custom: adds translator=chatgpt, api_key, and api_url', () => {
@@ -214,6 +215,7 @@ describe('mit-config pure builders (#229)', () => {
       expect(cfg.translator.translator).toBe('chatgpt');
       expect(cfg.translator.api_key).toBe('sk-local');
       expect(cfg.translator.api_url).toBe('http://localhost:11434/v1');
+      expect(cfg.translator.model).toBe('llama3');
     });
   });
 });
