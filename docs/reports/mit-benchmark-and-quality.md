@@ -61,6 +61,15 @@ The benchmark surfaced **five defect classes**. Each has an engineering resoluti
 
 The techniques in 1–3 were **studied from open-source** (MangaTranslator / zyddnys: narrow-column, supersampling, bubble-seg, SFX, ALL-CAPS) and ported behind opt-in knobs — that is what lifted parity 40–50% → 90–95%.
 
+**Deterministic verification of defect #1 (2026-07-03).** The overflow/sizing fixes are now proven by a
+**deterministic render-replay harness** (#462) — region state is dumped once and the font-sizing is
+replayed offline (no non-deterministic translator), so a fix is measured, not eyeballed. On the
+committed 4-page corpus (One-Punch + Gal Yome ×3), the `reference_layout` engine takes One-Punch
+narration from **3.0× oversize/spill → 1.3×** (within tolerance) while Thai dialogue **keeps filling its
+bubbles** (no under-fill), guarded both directions by a safety-envelope test. Evidence + image:
+`docs/reports/benchmarks/2026-07-03-defect-verification.md`. Method lesson recorded: benchmark MIT render
+via `/translate/with-form/patches` (tags speech bubbles), never `/translate/with-form/image` (doesn't).
+
 ## 4. Resource efficiency (the design that frames it)
 
 | Mode | VRAM (12 GB card) | Use |
@@ -78,6 +87,7 @@ Both modes fit a **single 12 GB consumer GPU**. By contrast, MangaTranslator sta
 - **No translation-accuracy benchmark yet** (BLEU/COMET/human-eval on OpenMantra/Manga109). We have a **render-parity** benchmark (measured, reproducible); *translation-accuracy* is future work.
 - **Flux is a knob, not free** — it buys inpaint quality at +4 GB VRAM and slower per-page; LaMa stays the default.
 - **Alpha LLM ≠ dev LLM** — dev runs the free local Qwen3.6-35B (9arm); Alpha will use a stronger model (cost TBD) — state this so the cost story stays honest.
+- **The `reference_layout` sizing engine is opt-in (flag OFF) — verified but not yet the production default.** On the default path One-Punch narration is still oversized (3.0×); the fix (narrow-column engine + demoted-bubble discriminator) is proven deterministically but ships to production only after a corpus-growth + multi-run path-stability de-risk (its `interior_w/det_w` threshold must stay stable under the non-deterministic translator). The residual on One-Punch is a *slightly small* narration (~0.68× the flat design size), not oversize.
 
 ## 6. How to present / map to the thesis
 
