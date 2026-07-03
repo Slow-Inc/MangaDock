@@ -70,7 +70,7 @@ def replay_clean_layout(fixture, reference_layout=False, font_size_max=20,
         bubble_box = getattr(r, 'bubble_box', None)
         flat = clean_layout_font_size(font_size_max, ph[0], ph[1], font_size_minimum)
         if reference_layout:
-            bw, bh, _, fill, cap = R._reference_layout_intent(r, bubble_box, img_shape, flat)
+            bw, bh, (rcx, rcy), fill, cap = R._reference_layout_intent(r, bubble_box, img_shape, flat)
             fs, block_w, block_h = R._reference_clean_layout(r, bw, bh, font_size_minimum, cap, ph[1])
             avail_w, avail_h = float(bw), float(bh)
         else:
@@ -82,6 +82,7 @@ def replay_clean_layout(fixture, reference_layout=False, font_size_max=20,
                 continue
             fs, block_w, block_h = laid
             avail_w, avail_h = (x2 - x1), (y2 - y1)
+            rcx, rcy = (x1 + x2) / 2.0, (y1 + y2) / 2.0
         det_w, det_h = (x2 - x1), (y2 - y1)
         out.append(dict(
             has_bubble=bubble_box is not None, fill=fill, orig_fs=r.font_size, final_fs=int(fs),
@@ -96,8 +97,37 @@ def replay_clean_layout(fixture, reference_layout=False, font_size_max=20,
             overflow_vs_det_w=round(block_w / det_w, 3) if det_w else 0.0,
             # UNDER-size guard (the other failure direction): a non-fill region's font vs the flat
             # design size. Far below 1.0 ⇒ over-shrunk / near-invisible (the 2026-07-02 over-correction).
-            readability_ratio=round(fs / flat, 3) if flat else 0.0))
+            readability_ratio=round(fs / flat, 3) if flat else 0.0,
+            # P4 (#525): spill of the sized block past the TRUE bubble polygon (0 = inside). Sees the
+            # round/oval over-fill that overflow_vs_det_w (detection-box only) misses.
+            spill_frac_poly=spill_fraction_vs_polygon(getattr(r, 'bubble_polygon', None),
+                                                      block_w, block_h, rcx, rcy)))
     return out
+
+
+def spill_fraction_vs_polygon(polygon, block_w, block_h, cx, cy):
+    """Fraction of a ``block_w×block_h`` rectangle centred at ``(cx, cy)`` that falls OUTSIDE the bubble
+    ``polygon`` — the P4 keystone metric (#525). ``0.0`` = the sized text block sits entirely within the
+    bubble's true (possibly curved) shape; higher = more spill past the edge. Unlike ``overflow_vs_det_w``
+    (which measures vs the axis-aligned detection box) this sees a rectangular block poking past a round/oval
+    bubble. Pure: rasterises the polygon on a local canvas and counts block pixels inside it. Returns 0.0 for
+    degenerate inputs (no polygon / non-positive block)."""
+    bw, bh = int(round(block_w)), int(round(block_h))
+    if not polygon or len(polygon) < 3 or bw <= 0 or bh <= 0:
+        return 0.0
+    from PIL import Image, ImageDraw
+    import numpy as np
+    bx1, by1 = cx - block_w / 2.0, cy - block_h / 2.0
+    xs = [p[0] for p in polygon] + [bx1, bx1 + block_w]
+    ys = [p[1] for p in polygon] + [by1, by1 + block_h]
+    ox, oy = int(min(xs)) - 1, int(min(ys)) - 1
+    cw, ch = int(max(xs)) - ox + 2, int(max(ys)) - oy + 2
+    mask = Image.new('L', (cw, ch), 0)
+    ImageDraw.Draw(mask).polygon([(px - ox, py - oy) for px, py in polygon], fill=1)
+    m = np.asarray(mask, dtype=bool)
+    rx1, ry1 = int(round(bx1)) - ox, int(round(by1)) - oy
+    inside = int(m[max(0, ry1):ry1 + bh, max(0, rx1):rx1 + bw].sum())
+    return round(1.0 - inside / float(bw * bh), 4)
 
 
 def dump_fixture(regions, page_shape, path):

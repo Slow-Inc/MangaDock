@@ -109,6 +109,8 @@ import os as _os
 _SPILL_CEILING = 1.35      # block_w / det_w  (over-size / spill)
 _READABILITY_FLOOR = 0.6   # final_fs / flat  (non-fill under-shrink), for det_w >= 40 (skip tiny boxes)
 _FILL_FLOOR = 0.9          # final_fs / flat  (a fill region must reach ~the flat size, i.e. actually fill)
+_POLY_SPILL_CEILING = 0.20  # spill_frac_poly (P4 #525): block area outside the TRUE bubble polygon — the
+                            # gate the detection-box metric was blind to (corpus worst today ≈ 0.12)
 
 
 def _fixture_paths():
@@ -131,9 +133,58 @@ def test_reference_layout_safety_envelope_over_corpus():
                 continue
             if d['overflow_vs_det_w'] > _SPILL_CEILING:
                 violations.append(f'{name}#{i}: spill {d["overflow_vs_det_w"]}x > {_SPILL_CEILING}')
+            if d.get('spill_frac_poly', 0) > _POLY_SPILL_CEILING:
+                violations.append(f'{name}#{i}: polygon spill {d["spill_frac_poly"]} > {_POLY_SPILL_CEILING}')
             if d.get('fill'):
                 if d['readability_ratio'] < _FILL_FLOOR:
                     violations.append(f'{name}#{i}: fill under-filled {d["readability_ratio"]}x < {_FILL_FLOOR}')
             elif d.get('det_w', 0) >= 40 and d['readability_ratio'] < _READABILITY_FLOOR:
                 violations.append(f'{name}#{i}: narration over-shrank {d["readability_ratio"]}x < {_READABILITY_FLOOR}')
     assert not violations, 'reference_layout safety-envelope violations:\n' + '\n'.join(violations)
+
+
+# ---- P4 (#525): spill measured vs the true bubble POLYGON, not the detection box -----------
+# The keystone metric: a rectangular text block can fit the detection box yet overflow a round/oval
+# bubble's curved edge (the 2026-07-03 blind spot). overflow_vs_det_w cannot see that; this can.
+
+def test_spill_fraction_vs_polygon_zero_when_block_fully_inside():
+    from manga_translator.render_replay import spill_fraction_vs_polygon
+    square = [(0, 0), (100, 0), (100, 100), (0, 100)]
+    # a 20×20 block centred in a 100×100 square → entirely inside → no spill
+    assert spill_fraction_vs_polygon(square, 20, 20, 50, 50) == 0.0
+
+
+def test_spill_fraction_vs_polygon_half_out_at_the_edge():
+    from manga_translator.render_replay import spill_fraction_vs_polygon
+    square = [(0, 0), (100, 0), (100, 100), (0, 100)]
+    # a 40×40 block centred on the right edge (x=100) → the x>100 half is outside → ~0.5
+    s = spill_fraction_vs_polygon(square, 40, 40, 100, 50)
+    assert 0.45 <= s <= 0.55
+
+
+def test_spill_fraction_vs_polygon_oval_corner_spill():
+    from manga_translator.render_replay import spill_fraction_vs_polygon
+    # a diamond (rotated square) — an axis-aligned block's CORNERS poke past its slanted edges,
+    # exactly the oval over-fill case the detection-box metric misses.
+    diamond = [(50, 0), (100, 50), (50, 100), (0, 50)]
+    inside = spill_fraction_vs_polygon(diamond, 40, 40, 50, 50)      # small block: fits
+    corners = spill_fraction_vs_polygon(diamond, 96, 96, 50, 50)     # big block: corners spill
+    assert inside == 0.0
+    assert corners > 0.3
+
+
+def test_spill_fraction_vs_polygon_degenerate_inputs_are_safe():
+    from manga_translator.render_replay import spill_fraction_vs_polygon
+    assert spill_fraction_vs_polygon(None, 20, 20, 0, 0) == 0.0
+    assert spill_fraction_vs_polygon([(0, 0), (10, 0), (10, 10), (0, 10)], 0, 20, 5, 5) == 0.0
+
+
+def test_replay_emits_spill_frac_poly_for_sized_regions():
+    """replay_clean_layout must report each sized region's spill vs its bubble polygon, so the
+    safety-envelope can gate the true bubble shape (not just the detection box)."""
+    from manga_translator.render_replay import load_fixture, replay_clean_layout
+    out = replay_clean_layout(load_fixture('test/fixtures/thai-galyome-layout.json'), reference_layout=True)
+    sized = [d for d in out if d.get('final_fs')]
+    assert sized, 'expected at least one sized region'
+    assert all('spill_frac_poly' in d for d in sized)
+    assert all(0.0 <= d['spill_frac_poly'] <= 1.0 for d in sized)
