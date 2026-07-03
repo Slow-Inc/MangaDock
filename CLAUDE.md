@@ -23,13 +23,13 @@ When two designs are equally correct, choose the one a future maintainer (human 
 
 ## Project Memory (Team Shared)
 
-Memory files live at `.claude/memory/` in this repo — committed so all team members and agents start with full context.
+Team memory lives as an **Obsidian vault** at `Obsidian-MangaDock/` in this repo — committed so all team members and agents start with full context. (It used to be flat files under `.claude/memory/`; that folder now holds only a pointer README.)
 
-**At the start of every session, read all files in `.claude/memory/` before doing anything else.**
+**At the start of every session, read `Obsidian-MangaDock/Home.md` (the Map-of-Content index) and the notes it links, before doing anything else.**
 
-`MEMORY.md` is the index. Each linked file is a memory record (user, feedback, project, or reference type).
+`Home.md` is the index — memories grouped by `type` (`feedback`, `project`, `reference`). Each note is one memory record with `type` / `description` frontmatter and `[[wikilinks]]` to related notes; open Graph View to see the relationships (unresolved links = memories worth writing).
 
-If you write new memories during a session, update both `.claude/memory/` (for the team) and your local `~/.claude/projects/.../memory/` (for your own continuity).
+If you write a new team memory, create a note in `Obsidian-MangaDock/` (filename = its hyphen-kebab slug, matching the `name:` frontmatter so `[[wikilinks]]` resolve) and add a line to `Home.md`. Keep your own local `~/.claude/projects/.../memory/` in sync for personal continuity.
 
 ---
 
@@ -62,7 +62,7 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 
 ### Issue tracker
 
-GitHub Issues on `Slow-Inc/MangaDock` via the `gh` CLI. Issue **and PRD bodies must be bilingual (English + a full Thai mirror — same depth, not a summary)**; review-reply comments may be English-only. External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
+GitHub Issues on `Slow-Inc/MangaDock` via the `gh` CLI. Issue, PR, and PRD bodies **must be bilingual (English + a full Thai mirror — same depth, not a summary)** — a `.github/pull_request_template.md` scaffolds the EN/TH sections and `pr-bilingual-check.yml` gates on a real Thai mirror being present (structure-only; a reviewer still enforces same-depth). Review-reply comments may be English-only. External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -197,13 +197,13 @@ const safe = /^\s*(javascript|data|vbscript|file):/i.test(url.trim()) ? '#' : ur
 
 ## Project Memory (ทีมใช้ร่วมกัน)
 
-ไฟล์ memory อยู่ที่ `.claude/memory/` ใน repo นี้ — commit ไว้เพื่อให้สมาชิกทีมและ agent ทุกคนเริ่มด้วย context ครบ
+memory ของทีมอยู่เป็น **Obsidian vault** ที่ `Obsidian-MangaDock/` ใน repo นี้ — commit ไว้เพื่อให้สมาชิกทีมและ agent ทุกคนเริ่มด้วย context ครบ (เดิมเป็นไฟล์ flat ใน `.claude/memory/`; ตอนนี้โฟลเดอร์นั้นเหลือแค่ README ชี้ทาง)
 
-**ต้องอ่านทุกไฟล์ใน `.claude/memory/` ก่อนทำอะไรทุกครั้งที่เริ่ม session**
+**ทุกครั้งที่เริ่ม session ต้องอ่าน `Obsidian-MangaDock/Home.md` (Map-of-Content index) และ note ที่มัน link ไป ก่อนทำอะไร**
 
-`MEMORY.md` คือ index; แต่ละไฟล์ที่ link ไปคือ memory record (ประเภท user, feedback, project หรือ reference)
+`Home.md` คือ index — จัดกลุ่ม memory ตาม `type` (`feedback`, `project`, `reference`) แต่ละ note = memory เดียว มี frontmatter `type` / `description` + `[[wikilinks]]` เชื่อมเรื่องที่เกี่ยวข้อง; เปิด Graph View เพื่อเห็นความสัมพันธ์ (link ที่ยังไม่มีไฟล์ = memory ที่ควรเขียนเพิ่ม)
 
-ถ้าเขียน memory ใหม่ระหว่าง session ให้อัปเดตทั้ง `.claude/memory/` (สำหรับทีม) และ `~/.claude/projects/.../memory/` ของตัวเอง (สำหรับความต่อเนื่องส่วนตัว)
+ถ้าเขียน memory ใหม่ของทีม ให้สร้าง note ใน `Obsidian-MangaDock/` (ชื่อไฟล์ = slug แบบ hyphen-kebab ให้ตรงกับ `name:` ใน frontmatter เพื่อให้ `[[wikilinks]]` resolve) แล้วเพิ่มบรรทัดใน `Home.md`; และ sync `~/.claude/projects/.../memory/` ของตัวเองไว้เพื่อความต่อเนื่องส่วนตัว
 
 ---
 

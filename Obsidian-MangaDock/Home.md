@@ -30,6 +30,8 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[feedback-test-every-round]] — ทำงานเสร็จทุกครั้งต้อง test ครบทุกรอบ รวม frontend E2E (Playwright ผ่าน tunnel) ไม่ใช่แค่ unit
 - [[feedback-verify-before-claiming]] — ห้ามเคลม "แก้แล้ว" จนกว่าจะ eyeball render จริงเทียบ target + SendUserFile ให้ user confirm; test/replay ผ่าน ≠ verified; metric ต้องครอบทั้ง over/under
 - [[feedback-update-readme-on-command-change]] — แก้อะไรที่กระทบ command/script หรือเพิ่ม tool ใหม่ ต้องอัปเดต README.md ด้วยทุกครั้ง
+- [[feedback-benchmark-defect-checklist]] — ทุก MIT render benchmark ต้องประเมินภาพเทียบ original ตาม checklist ข้อบกพร่อง 12 ข้อที่ user เคย flag — living document
+- [[feedback-benchmark-md-report-with-image]] — ทุก benchmark ต้องเขียน MD report + ฝังภาพเทียบ (committed); งาน MIT ทุกชิ้นต้อง benchmark ยืนยัน result เสมอ (part of done)
 
 ## 🚧 Project — สถานะงาน & ข้อจำกัด
 
@@ -45,11 +47,18 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[project-mit-refactor-resume]] — The MIT god-object decomposition (#187/#188) is tracked in docs/reports/mit-refactor-progress.md — the single resume point. Read it first to continue without re-exploring.
 - [[project-render-knob-gating]] — In-app translation render quality depends on the FULL set of MIT_* env knobs on the backend; MIT_BUBBLE_AREA_FIT gates the #166/#179 anti-overflow + narrow-column path
 - [[project-render-parity-direction]] — ทิศทางที่ตัดสินแล้ว (2026-06-08) ให้ MIT render เหมือน MangaTranslator — narrow-column + supersampling + vertical จริง + SFX
+- [[project-benchmark-e2e-flow]] — วิธีรัน One-Punch benchmark E2E (full-stack tunnel Reader + direct render) + cache-key gotcha (render config ไม่รวมใน cache key)
+- [[project-dashboard-mit-live]] — Dashboard↔MIT live wiring — OAuth, ports, env, auth model, launch/test gotchas (ADR 019); dashboardv2 = canonical ต่อไป
+- [[project-gal-yome-en-benchmark]] — Gal Yome no Himitsu มี 2 version (ไทย+EN) — ต้องเลือก EN version ก่อน benchmark EN→ไทย
+- [[project-mit-worker-restart-gotcha]] — restart MIT --start-instance worker บน Windows ต้อง kill by PORT OWNER ทั้ง 5003+5004 (process ชื่อ python3.11.exe ไม่ใช่ python.exe)
 
 
 ## 📚 Reference — ตัวชี้ทรัพยากรภายนอก
 
 - [[reference-external-docs-index]] — Catalog of knowledge-bearing MD files OUTSIDE the vault (resume points, benchmark reports, ADRs, PRDs, DONE/PIPELINE logs) — read these too; reconcile new ones in so nothing is missed
+- [[project-mangatranslator-study]] — Pointer ไป deep-scan ตัวจริงของ meangrinch/MangaTranslator ใน `docs/research/` — headline table ว่า need ไหนอ่าน doc ไหน
+- [[reference-frontend-ui-libraries]] — shadcn (UI primitives/Radix) vs React Bits (WebGL/GLSL effects) — บทบาทต่างกัน ใช้คู่กันได้ + MCP setup
+- [[reference-gh-cli-path]] — gh CLI ไม่อยู่ใน Bash PATH — ใช้ full path `C:\Program Files\GitHub CLI\gh.exe` เสมอ
 
 ---
 
