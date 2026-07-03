@@ -12,7 +12,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, clean_layout_target_fs, region_territory_box, display_sfx, bubble_fit_bounds, fills_bubble_width, squeeze_width, box_containment
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, clean_layout_target_fs, region_territory_box, display_sfx, bubble_fit_bounds, fills_bubble_width, squeeze_width, box_containment, resolve_font_floor
 from ..safe_area import safe_area_box
 from ..reference_layout import fit_to_box
 from .text_render_eng import render_textblock_list_eng
@@ -383,11 +383,10 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         List of adjusted text region bounding boxes
     """    
     
-    # Define minimum font size
-    if font_size_minimum == -1:  
-        font_size_minimum = round((img.shape[0] + img.shape[1]) / 200)  
-    # logger.debug(f'font_size_minimum {font_size_minimum}')  
-    font_size_minimum = max(1, font_size_minimum)  
+    # Define minimum font size. -1 = auto: derive a legible floor from the PAGE (page_shape), NOT the
+    # small per-region CROP (img.shape) — the crop gave ~3px in the patch path, collapsing narrow-bubble
+    # text to sub-legible "text-loss" (master plan 2 P1). Falls back to img.shape for full-page renders.
+    font_size_minimum = resolve_font_floor(font_size_minimum, img.shape, page_shape)
 
     # #166: a fitted region is rendered into its *whole* balloon, so only the
     # sole occupant of a balloon may be fitted — two regions sharing one balloon

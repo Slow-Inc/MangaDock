@@ -344,3 +344,64 @@ def test_clean_layout_font_size_page_vs_crop_resolution():
     crop = clean_layout_font_size(20, 600, 600, fmin)       # ~0.36 MP → ps floor 0.5 → 10 → floored 17
     page = clean_layout_font_size(20, 2048, 1456, fmin)     # ~3 MP → ps 1.73 → round(34.6)=35
     assert crop == fmin and page == 35 and page > crop
+
+
+# ---- readable-floor: the -1 auto font floor must be PAGE-derived, not crop-derived --------
+# (master plan 2 P1) In the per-region patch path ``img.shape`` is the small CROP (~700px
+# perimeter → round(700/200) ≈ 3-4px), so ``font_size_minimum == -1`` collapsed narrow-bubble
+# text to a sub-legible ~3px "text-loss". The floor must come from the PAGE, clamped legible.
+
+def test_readable_floor_is_page_derived():
+    from manga_translator.render_overlap import readable_floor
+    # a full manga page (2600+1080 = 3680 → round(3680/200) = 18) yields a legible floor
+    assert readable_floor(2600, 1080) == 18
+
+
+def test_readable_floor_clamps_a_tiny_crop_to_the_legibility_minimum():
+    from manga_translator.render_overlap import readable_floor, MIN_LEGIBLE_PX
+    # a small crop (700+500 = 1200 → round/200 = 6) would be sub-legible → clamp up
+    assert readable_floor(700, 500) == MIN_LEGIBLE_PX
+    assert MIN_LEGIBLE_PX >= 10
+
+
+def test_resolve_font_floor_uses_page_not_the_crop():
+    from manga_translator.render_overlap import resolve_font_floor, readable_floor
+    # production patch path: img.shape is the CROP, page_shape is the full page.
+    # THE BUG: floor was round((700+500)/200)=6 (invisible). FIX: page-derived (18).
+    floor = resolve_font_floor(-1, (700, 500, 3), (2600, 1080))
+    assert floor == readable_floor(2600, 1080) == 18
+
+
+def test_resolve_font_floor_falls_back_to_img_shape_when_no_page():
+    from manga_translator.render_overlap import resolve_font_floor, readable_floor
+    # full-page render (no separate page_shape) → identical to using img.shape
+    assert resolve_font_floor(-1, (2600, 1080, 3), None) == readable_floor(2600, 1080)
+
+
+def test_resolve_font_floor_passes_through_an_explicit_minimum():
+    from manga_translator.render_overlap import resolve_font_floor
+    # an explicit (non -1) floor is honored unchanged (clamped to >= 1)
+    assert resolve_font_floor(8, (700, 500, 3), (2600, 1080)) == 8
+    assert resolve_font_floor(0, (700, 500, 3), (2600, 1080)) == 1
+
+
+def test_resize_regions_floors_fonts_to_the_page_not_the_crop():
+    """End-to-end: resize_regions_to_font_size with font_size_minimum=-1 must derive the floor from
+    the PAGE (page_shape), not the small per-region CROP (img.shape). Reproduces the patch-path
+    'text shrinks to ~3px invisible' defect (master plan 2 P1)."""
+    import os
+    import numpy as np
+    import manga_translator
+    from manga_translator.rendering import resize_regions_to_font_size, text_render
+    from manga_translator.render_overlap import readable_floor
+    from manga_translator.utils import TextBlock
+    text_render.set_font(os.path.join(os.path.dirname(os.path.dirname(manga_translator.__file__)),
+                                      'fonts', 'anime_ace_3.ttf'))
+    region = TextBlock([[[10, 10], [110, 10], [10, 60], [110, 60]]], texts=['x'],
+                       translation='hi', direction='h', target_lang='ENG', font_size=40)
+    region.set_font_colors([255, 255, 255], [0, 0, 0])
+    crop = np.zeros((300, 220, 3), dtype=np.uint8)          # the small per-region CROP (bug source)
+    # font_size_fixed=0 collapses the target to the resolved floor, exposing WHICH floor is used.
+    resize_regions_to_font_size(crop, [region], 0, 0, -1, page_shape=(2600, 1080))
+    # BUG: floor = round((300+220)/200) = 3 (sub-legible). FIX: page-derived readable_floor = 18.
+    assert region.font_size >= readable_floor(2600, 1080)

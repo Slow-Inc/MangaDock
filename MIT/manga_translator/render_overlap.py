@@ -187,6 +187,27 @@ def clean_layout_font_size(font_size_max: int, img_h: int, img_w: int, font_size
     return max(fmin, round(base * processing_scale(img_h, img_w)))
 
 
+MIN_LEGIBLE_PX = 11  # absolute legibility floor — no rendered glyph below this, even on a tiny page
+
+
+def readable_floor(page_h: int, page_w: int, min_legible: int = MIN_LEGIBLE_PX) -> int:
+    """The minimum legible font size for a page: the historical auto-floor ``(h+w)/200``, clamped
+    UP to ``min_legible`` so a degenerate tiny page/crop can't drive text below readability. Pure."""
+    return max(min_legible, round((page_h + page_w) / 200))
+
+
+def resolve_font_floor(font_size_minimum: int, img_shape, page_shape) -> int:
+    """Resolve ``font_size_minimum`` for a render pass. ``-1`` = auto: derive a :func:`readable_floor`
+    from the PAGE shape when threaded (falling back to ``img_shape`` for the full-page render). Using
+    ``page_shape`` — not the per-region CROP ``img_shape`` — is the fix for narrow-bubble text
+    collapsing to a sub-legible ~3px floor in the patch path (master plan 2 P1). An explicit (non
+    ``-1``) floor is honored, clamped to ``>= 1``. Pure."""
+    if font_size_minimum != -1:
+        return max(1, font_size_minimum)
+    shp = page_shape if page_shape is not None else img_shape
+    return readable_floor(shp[0], shp[1])
+
+
 def clean_layout_target_fs(orig_fs, clean_fs_flat: int, abs_cap: int = 120) -> int:
     """#175 follow-up: pick the clean-layout font for a region from its ORIGINAL lettering size.
 
