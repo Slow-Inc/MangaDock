@@ -58,7 +58,11 @@ export class LandingService {
       .filter((line) => line.length > 0)
       .slice(0, 60);
 
-    const modelCandidates = await this.geminiCatalog.getMangaModels(payload.model);
+    const provider = this.env.LLM_PROVIDER ?? 'gemini';
+    const modelCandidates =
+      provider === 'gemini'
+        ? await this.geminiCatalog.getMangaModels(payload.model)
+        : [this.llmService.getMangaModel()];
     const preferredModel = modelCandidates[0];
 
     if (lines.length === 0) {

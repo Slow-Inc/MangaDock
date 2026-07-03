@@ -186,3 +186,41 @@ describe('translateDescription() — openai provider', () => {
     expect(mockLlm.complete).not.toHaveBeenCalled();
   });
 });
+
+describe('translateMangaEpisode() — openai provider', () => {
+  it('uses llmService.getMangaModel() instead of geminiCatalog for non-gemini providers', async () => {
+    const mockLlm = {
+      isConfigured: jest.fn().mockReturnValue(true),
+      getDescriptionModel: jest.fn().mockReturnValue('gpt-4o-mini'),
+      getMangaModel: jest.fn().mockReturnValue('gpt-4o-mini'),
+      complete: jest.fn().mockResolvedValue('["翻訳済み"]'),
+    } as unknown as LlmService;
+
+    const mockCache = {
+      get: jest.fn().mockResolvedValue(null),
+      setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const svc = new LandingService(
+      mockCache as any,
+      { enabled: false } as any,
+      {} as any,
+      {} as any,
+      () => 'http://localhost',
+      { LLM_PROVIDER: 'openai', LLM_API_KEY: 'sk-test' } as NodeJS.ProcessEnv,
+      mockLlm,
+    );
+
+    const result = await svc.translateMangaEpisode({
+      lines: ['Hello', 'World'],
+      targetLang: 'tha',
+      model: 'gpt-4o-mini',
+      chapterId: 'ch1',
+      page: 0,
+    });
+
+    expect(mockLlm.getMangaModel).toHaveBeenCalled();
+    expect(mockLlm.complete).toHaveBeenCalled();
+    expect(result.translatedLines).toHaveLength(2);
+  });
+});
