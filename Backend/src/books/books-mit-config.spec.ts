@@ -45,6 +45,8 @@ const ENV_KEYS = [
   'MIT_FONT_SIZE_OFFSET',
   'MIT_FONT_SIZE_MIN',
   'MIT_BUBBLE_AREA_FIT',
+  'MIT_REFERENCE_LAYOUT',
+  'MIT_KNUTH_PLASS',
   'MIT_SFX_DETECTOR',
   'MIT_OCR_VLM_RESCUE',
   'MIT_EN_COMIC_FONT',
@@ -303,6 +305,32 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.render.bubble_area_fit).toBeUndefined();
+  });
+
+  it('enables reference_layout via MIT_REFERENCE_LAYOUT (#178 P3)', () => {
+    process.env.MIT_REFERENCE_LAYOUT = '1';
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.reference_layout).toBe(true);
+  });
+
+  it('omits reference_layout unless MIT_REFERENCE_LAYOUT is "1" (#178 P3, default byte-identical)', () => {
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.reference_layout).toBeUndefined();
+  });
+
+  it('enables knuth_plass via MIT_KNUTH_PLASS (#180 P8)', () => {
+    process.env.MIT_KNUTH_PLASS = '1';
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.knuth_plass).toBe(true);
+  });
+
+  it('omits knuth_plass unless MIT_KNUTH_PLASS is "1" (#180 P8, default greedy)', () => {
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.knuth_plass).toBeUndefined();
   });
 
   it('enables the SFX detector via MIT_SFX_DETECTOR (#168)', () => {
