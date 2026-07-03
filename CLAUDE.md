@@ -49,8 +49,9 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 
 **Every MIT change must be benchmarked to confirm the result — every time, as part of "done" (not optional).** code+tests passing is not enough; produce a benchmark (deterministic if possible, else E2E) proving the result actually improved / did not regress before calling it done.
 
-**Every time you benchmark (E2E or offline), write an MD report with the comparison image — committed to the repo.** Do not just report in chat and let the image vanish with the session.
+**Every time you benchmark (E2E or offline), write an MD report AND a committed PNG image — committed to the repo.** Do not just report a table in chat / MD and let the visual vanish with the session.
 
+- **A committed PNG is MANDATORY for every benchmark — including deterministic / numeric / non-render ones** (contract-repair, determinism gate, cache-safety, config-verify …). If the result isn't a render comparison, still render it to an image (a table / bar / before→after chart via matplotlib or PIL). Rationale: the developer **confirms a benchmark by opening the PNG**, and reuses it in the PR write-up and the whole-project report. An MD with only a table (no PNG) does **not** satisfy this rule (lesson 2026-07-04: the P7 benchmark shipped an MD table with no PNG → the developer couldn't view it).
 - Image → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.png` (committed; never leave it only in the worktree root / scratchpad / `.playwright-mcp`, which are gitignored and lost).
 - Report → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.md`: method (what path, why deterministic), a before→after numeric table with the ratio, the embedded image (`![caption](./<image>.png)`), and a short "how good" assessment (fix-root / no-regression / completeness / limitation).
 - Prefer **deterministic** benchmarks (isolate the changed knob/code; avoid the non-deterministic translator — see memory `project_mit_translate_nondeterministic`).

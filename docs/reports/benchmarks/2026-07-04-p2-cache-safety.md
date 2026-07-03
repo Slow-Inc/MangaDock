@@ -35,6 +35,8 @@ which pages reach MIT. The poison shape from #524: page 0 cached, page 1 a miss.
 | **AFTER** (context on, partial cache) | `[0, 1]` (full ordered chapter) | ✅ page 1 sees page 0 | ✅ every cached page was context-complete |
 | **AFTER** (context OFF, default) | `[1]` (only the miss) | n/a | ✅ **byte-identical to today** |
 
+![P2 #524: BEFORE sends [1] (context-free, cache-unsafe) → AFTER sends [0,1] (full chapter, cache-safe)](./2026-07-04-p2-cache-safety.png)
+
 ## Assessment
 - **fix-root:** the exact #524 poison (partial batch under context) now sends the complete ordered chapter, so
   no page is ever translated with truncated context and then cached — the P2-blocking cache-safety hole is closed.

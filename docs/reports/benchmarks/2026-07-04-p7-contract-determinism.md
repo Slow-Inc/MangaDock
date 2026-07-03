@@ -43,6 +43,8 @@ normalizer's index-keyed exactly-N boundary makes that structurally impossible.
 | **production default** (`temp=0.5, top_p=1`) | **False** | translations are **non-reproducible** — same input can yield different text/length run-to-run |
 | P7c candidate (`temp=0`) | **True** | greedy → reproducible; sound to cache/replay as a golden |
 
+![P7 contract repair (7/8→8/8) + determinism gate: production temp=0.5 is non-reproducible](./2026-07-04-p7-contract-determinism.png)
+
 ## Assessment
 - **fix-root (reproducibility):** the gate objectively confirms + *quantifies* the long-standing
   `project_mit_translate_nondeterministic` memory — the cause is `temperature=0.5`. This is the concrete

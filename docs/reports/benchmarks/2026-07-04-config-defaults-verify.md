@@ -31,6 +31,8 @@ defect (Backend pushing *below* MIT's own tuned sizes) is **not present** in the
 | #13 detection | Backend emitted **2048** (~36% fewer px) → small/faint JP dropped pre-OCR | **2560** (tuned), env-overridable, no low override | ✅ resolved |
 | #14 inpaint | Backend emitted **1536** → downscale-blur / screentone halo | **2048** (tuned) | ✅ resolved |
 
+![P5: detection 2048→2560, inpaint 1536→2048 (tuned defaults, verified deployed)](./2026-07-04-config-defaults-verify.png)
+
 ## Assessment
 - **fix-root:** the "Backend silently below MIT's tuned defaults" regression is closed at the config layer and
   guarded by 34 unit locks; the deployed `.env` carries no re-regressing override. Ties directly to defects #13/#14.
