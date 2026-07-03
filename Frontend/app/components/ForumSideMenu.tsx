@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { getTrendingManga, type TrendingManga } from "../lib/communityApi";
 import type { LandingBook, ForumCategory } from "../lib/types";
+import { CATEGORY_LIST } from "../lib/forumCategories";
 
 interface ForumSideMenuProps {
   onMangaSelect: (mangaId: string | undefined) => void;
@@ -22,54 +24,53 @@ export default function ForumSideMenu({
   onTrendingSelect,
   isOnTrending = false,
 }: ForumSideMenuProps) {
+  const router = useRouter();
   const [trending, setTrending] = useState<TrendingManga[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<LandingBook[]>([]);
   const [searching, setSearching] = useState(false);
 
-  const categories = [
-    { 
-      id: 'general', 
-      label: 'ทั่วไป', 
+  const categoryMetadata = {
+    general: {
+      label: 'ทั่วไป',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
         </svg>
       ),
-      color: "text-indigo-400"
     },
-    { 
-      id: 'announcement', 
-      label: 'ประกาศ', 
+    announcement: {
+      label: 'ประกาศ',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
         </svg>
       ),
-      color: "text-amber-400"
     },
-    { 
-      id: 'spoiler', 
-      label: 'สปอยล์', 
+    spoiler: {
+      label: 'สปอยล์',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
       ),
-      color: "text-rose-400"
     },
-    { 
-      id: 'manga_update', 
-      label: 'อัปเดตมังงะ', 
+    manga_update: {
+      label: 'อัปเดตมังงะ',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.582.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
         </svg>
       ),
-      color: "text-emerald-400"
     },
-  ] as const;
+  } as const;
+
+  const categories = CATEGORY_LIST.map(cat => ({
+    id: cat,
+    label: categoryMetadata[cat].label,
+    icon: categoryMetadata[cat].icon,
+  }));
 
   useEffect(() => {
     getTrendingManga(6) // Fetch 6 to detect if more exist beyond the 5 shown
@@ -255,8 +256,11 @@ export default function ForumSideMenu({
           ))}
           
           {trending.length > 5 && (
-            <button className="w-full mt-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-indigo-400/60 hover:text-indigo-400 hover:bg-indigo-500/5 rounded-xl transition-all text-center">
-              See All Communities
+            <button
+              onClick={() => router.push("/community/trending")}
+              className="w-full mt-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-indigo-400/60 hover:text-indigo-400 hover:bg-indigo-500/5 rounded-xl transition-all text-center"
+            >
+              ดูทั้งหมด
             </button>
           )}
         </div>
@@ -265,9 +269,9 @@ export default function ForumSideMenu({
       {/* 4. GUIDELINES */}
       <div className="pt-6 border-t border-white/5">
         <div className="px-4 py-4 rounded-2xl bg-white/[0.01] border border-white/5">
-           <h4 className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-3">Community Rules</h4>
+           <h4 className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-3">กฎของชุมชน</h4>
            <ul className="space-y-2">
-             {["Respect others", "No spoilers", "No spam"].map((r, i) => (
+             {["เคารพซึ่งกันและกัน", "ไม่สปอย", "ไม่สแปม"].map((r, i) => (
                <li key={i} className="flex items-center gap-2 text-[10px] text-white/30 font-medium">
                  <div className="w-1 h-1 rounded-full bg-white/10" />
                  {r}

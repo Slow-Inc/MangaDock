@@ -12,6 +12,7 @@ function makeDeps(opts: {
   fresh?: unknown;
   stale?: { data: unknown; updatedAt: string } | null;
   rowFetch?: jest.Mock;
+  rowDefs?: Array<{ id: string; title: string; order: string; limit?: number }>;
   env?: Record<string, string>;
 }) {
   const cache = {
@@ -22,7 +23,7 @@ function makeDeps(opts: {
   };
   const imageCache = { enabled: false };
   const mangaDex = {
-    mangaRowDefs: [{ id: 'r1', title: 'Row 1', order: 'latest', limit: 10 }],
+    mangaRowDefs: opts.rowDefs ?? [{ id: 'r1', title: 'Row 1', order: 'latest', limit: 10 }],
     fetchMangaForRow: opts.rowFetch ?? jest.fn().mockResolvedValue({ items: [] }),
   };
   const geminiCatalog = {
@@ -89,6 +90,31 @@ describe('LandingService — landing assembly + description (#231)', () => {
     expect(out.hero).toEqual({ id: 'a', thumbnail: 't' });
     expect(out.apiOffline).toBeUndefined();
     expect(cache.set).toHaveBeenCalledTimes(1);
+  });
+
+  it('fetches all landing rows concurrently, preserving input order', async () => {
+    const rowDefs = [
+      { id: 'r1', title: 'Row 1', order: 'a', limit: 10 },
+      { id: 'r2', title: 'Row 2', order: 'b', limit: 10 },
+      { id: 'r3', title: 'Row 3', order: 'c', limit: 10 },
+    ];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const rowFetch = jest.fn(async (order: string) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((r) => setTimeout(r, 10));
+      inFlight -= 1;
+      return { items: [{ id: order, thumbnail: 't' }] };
+    });
+
+    const { svc } = makeDeps({ rowDefs, rowFetch });
+    const out = await svc.getLandingBooks();
+
+    // All three fetches overlap — a sequential loop would peak at 1.
+    expect(maxInFlight).toBe(3);
+    // Promise.all preserves input order regardless of resolve order.
+    expect(out.rows.map((r) => r.id)).toEqual(['r1', 'r2', 'r3']);
   });
 
   it('description: returns untranslated when no Gemini API key is configured', async () => {

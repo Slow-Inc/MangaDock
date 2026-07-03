@@ -5,6 +5,7 @@ import {
   translateMangaChapterBatchPatches,
   translateMangaPagePatches,
   checkMitHealth,
+  isCaptchaExpiredError,
   type PatchData,
 } from "../lib/mangaTranslatePage";
 import {
@@ -36,6 +37,11 @@ type Options = {
    *  title/synopsis itself and feeds the translator its series context.
    *  Absent → context-free translation, identical to today. */
   mangaId?: string;
+  /** Called when a translate request returns 401 because the HWID-bound captcha
+   *  clearance token expired mid-session (#227). The Reader re-opens the
+   *  Turnstile modal so the user can re-verify and retry, instead of the
+   *  translate flow dead-ending on an error toast. */
+  onCaptchaExpired?: () => void;
 };
 
 /**
@@ -53,7 +59,7 @@ type Options = {
 export function useChapterTranslation(
   chapterId: string,
   pages: string[],
-  { sourceLang, currentPage, menusOpen, derivative = "hd", mangaId }: Options,
+  { sourceLang, currentPage, menusOpen, derivative = "hd", mangaId, onCaptchaExpired }: Options,
 ) {
   const [translating, setTranslating] = useState(false);
   const [translatingCurrentPage, setTranslatingCurrentPage] = useState(false);
@@ -247,7 +253,17 @@ export function useChapterTranslation(
         handleProgressEvent,
       );
     } catch (err) {
-      if (!(err instanceof Error && err.name === "AbortError")) {
+      if (err instanceof Error && err.name === "AbortError") {
+        // cancelled — nothing to do
+      } else if (isCaptchaExpiredError(err)) {
+        // The clearance token expired mid-batch. Retrying with the same token
+        // would only 401 again — re-open the captcha so the user can re-verify.
+        onCaptchaExpired?.();
+        showToast({
+          message: "เซสชันยืนยันตัวตนหมดอายุ — ยืนยันใหม่แล้วกดแปลอีกครั้ง",
+          type: "error",
+        });
+      } else {
         console.error("[BatchTranslate] Failed:", err);
 
         const msg = err instanceof Error ? err.message : String(err);
@@ -350,10 +366,19 @@ export function useChapterTranslation(
       setShowTranslation(true);
     } catch (err) {
       console.error(`[PageTranslate] Page ${pageIndex + 1} failed:`, err);
-      showToast({
-        message: `แปลหน้า ${pageIndex + 1} ไม่สำเร็จ — ${err instanceof Error ? err.message : String(err)}`,
-        type: "error",
-      });
+      if (isCaptchaExpiredError(err)) {
+        // Clearance token expired — re-open the captcha instead of failing hard.
+        onCaptchaExpired?.();
+        showToast({
+          message: "เซสชันยืนยันตัวตนหมดอายุ — ยืนยันใหม่แล้วกดแปลอีกครั้ง",
+          type: "error",
+        });
+      } else {
+        showToast({
+          message: `แปลหน้า ${pageIndex + 1} ไม่สำเร็จ — ${err instanceof Error ? err.message : String(err)}`,
+          type: "error",
+        });
+      }
     } finally {
       setTranslatingCurrentPage(false);
       setTranslatingCurrentPageIndex(null);

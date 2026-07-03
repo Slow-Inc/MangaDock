@@ -1,7 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from './redis.service';
 
-const SECONDS_IN_DAY = 86_400;
+/** Floor for the daily-stat TTL: never expire a key in under a minute, so a
+ *  view recorded moments before midnight still survives long enough to be read
+ *  back. (Not a full day — that would keep the key alive past its own day.) */
+const MIN_TTL_SECONDS = 60;
+
+/** Grace period added on top of "seconds until midnight" so the StatsFlushWorker
+ *  (5-min unaligned interval, worst-case just under 5 min of lag) still finds
+ *  yesterday's trailing-window keys when it drains them just after midnight.
+ *  15 min covers that lag with margin — nowhere near the old full-day TTL bug. */
+const GRACE_SECONDS = 900;
 
 /** All four stat writes + their TTLs in one atomic round-trip (#139) — the old
  *  two-phase write left immortal keys when the process died between the write
@@ -55,6 +64,6 @@ export class StatsIncrementService {
   private secondsUntilEndOfDay(date: string): number {
     const endOfDay = new Date(`${date}T23:59:59.999Z`);
     const remaining = Math.floor((endOfDay.getTime() - Date.now()) / 1000);
-    return Math.max(remaining, SECONDS_IN_DAY);
+    return Math.max(remaining, MIN_TTL_SECONDS) + GRACE_SECONDS;
   }
 }

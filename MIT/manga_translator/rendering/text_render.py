@@ -625,7 +625,20 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
     x, y, w, h = cv2.boundingRect(canvas_border)
     return line_box[y:y+h, x:x+w]
 
+@functools.lru_cache(maxsize=None)
 def select_hyphenator(lang: str):
+    # #speed-study Phase 2b (L2, 2026-07-03): this is a PURE function of `lang`
+    # (returns None or a stateless Hyphenator for that language; its `.syllables()`
+    # is a read-only dictionary lookup with no call-history state), so caching the
+    # result per language is byte-identical to constructing it fresh each call.
+    # Measured: uncached `select_hyphenator('THA')` = ~163ms and `('ENG')` = ~372ms
+    # (the failing `Hyphenator(lang)` construction attempt / dictionary load is the
+    # cost, NOT `standardize_tag` which is ~0ms). calc_horizontal called it TWICE
+    # per invocation (here + inside `_split_into_syllables`), ~68 calc_horizontal
+    # calls/page → ~22s/page of pure repeated hyphenator setup on the render path.
+    # Caching by `lang` alone is correct: the result depends only on `lang` and the
+    # module-constant HYPHENATOR_LANGUAGES — NOT on the module-global font state,
+    # so this sidesteps the font-cache landmine that gates other render caches.
     lang = standardize_tag(lang)
     if lang not in HYPHENATOR_LANGUAGES:
         for avail_lang in reversed(HYPHENATOR_LANGUAGES):
@@ -635,6 +648,17 @@ def select_hyphenator(lang: str):
         else:
             return None
     try:
+        # #499 (multi-agent scrutinize, 3/3): the lru_cache above also caches a
+        # FAILED construction as a sticky None until worker restart. This is an
+        # accepted tradeoff, not a bug:
+        #  - EN->TH hot path: Thai has no hyphenation dictionary, so this fails
+        #    DETERMINISTICALLY (~163ms) every time — caching that None forever IS
+        #    the win the cache exists for.
+        #  - Narrow regression: for a hyphenatable target lang (DEU/FRA/…) whose
+        #    dict downloads on first use, a transient first-call network failure
+        #    would disable hyphenation for it until restart (old code retried).
+        # Not "fixed" because it's inherent to result-caching: caching only
+        # non-None would stop caching Thai's None and bring back the ~22s/page.
         return Hyphenator(lang)
     except Exception:
         return None

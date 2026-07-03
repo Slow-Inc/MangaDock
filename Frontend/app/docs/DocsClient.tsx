@@ -14,6 +14,7 @@ import {
 import OverviewView from './OverviewView';
 import TechStackView from './TechStackView';
 import SimulationsView from './simulations/SimulationsView';
+import MermaidRenderer from './MermaidRenderer';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -128,7 +129,7 @@ function filterLangBlocks(raw: string, lang: Lang): string {
   return out.join('\n');
 }
 
-function MarkdownRenderer({ content }: { content: string }) {
+export function MarkdownRenderer({ content }: { content: string }) {
   const lang = useLang();
   const filtered = filterLangBlocks(content, lang);
   const lines = filtered.split('\n');
@@ -140,16 +141,30 @@ function MarkdownRenderer({ content }: { content: string }) {
 
     // Fenced code block
     if (line.startsWith('```')) {
-      const lang = line.slice(3).trim() || 'text';
+      const info = line.slice(3).trim();
+      const codeLang = info.split(/\s+/)[0].toLowerCase() || 'text';
       const code: string[] = [];
       i++;
       while (i < lines.length && !lines[i].startsWith('```')) { code.push(lines[i]); i++; }
       i++;
+      
+      if (codeLang === 'mermaid') {
+        nodes.push(
+          <div key={k++} className="my-5 rounded-xl overflow-hidden border border-black/[0.08] bg-[#0f1118]">
+            <div className="px-4 py-2 border-b border-black/[0.08] bg-white/[0.02]">
+              <span className="text-[11px] font-mono text-[#86868b]">mermaid</span>
+            </div>
+            <MermaidRenderer chart={code.join('\n')} />
+          </div>
+        );
+        continue;
+      }
+
       nodes.push(
         <div key={k++} className="my-5 rounded-xl overflow-hidden border border-black/[0.08] bg-[#0f1118]">
-          {lang !== 'text' && (
+          {codeLang !== 'text' && (
             <div className="px-4 py-2 border-b border-black/[0.08] bg-white/[0.02]">
-              <span className="text-[11px] font-mono text-[#86868b]">{lang}</span>
+              <span className="text-[11px] font-mono text-[#86868b]">{codeLang}</span>
             </div>
           )}
           <pre className="p-4 overflow-x-auto text-[13px] font-mono text-[rgba(248,249,251,0.8)] leading-relaxed whitespace-pre">

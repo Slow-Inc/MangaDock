@@ -31,3 +31,5 @@ Backend/prd_*.txt
 /MangaTranslator
 
 .mcp.json
+# Git worktrees
+.worktrees/
