@@ -1,0 +1,201 @@
+INFO:     Started server process [55768]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5003 (Press CTRL+C to quit)
+[shared] Running in shared mode
+[shared] Log file created: D:\Github\MangaDock\.claude\worktrees\feat-mit-font-s1\MIT\result\log_20260702050912.txt
+INFO:     Started server process [34392]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5004 (Press CTRL+C to quit)
+D:\Github\MangaDock\.claude\worktrees\feat-mit-font-s1\MIT\manga_translator\manga_translator.py:359: RuntimeWarning: coroutine 'MangaTranslator._add_logger_hook.<locals>.ph' was never awaited
+  hook('running_pre_translation_hooks', False)
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+D:\Github\MangaDock\.claude\worktrees\feat-mit-font-s1\MIT\manga_translator\ocr\model_48px.py:52: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  sd = torch.load(self._get_file_path('ocr_ar_48px.ckpt'))
+D:\Github\MangaDock\.claude\worktrees\feat-mit-font-s1\MIT\manga_translator\inpainting\inpainting_lama_mpe.py:820: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  sd = torch.load(model_path, map_location = 'cpu')
+[shared] Running text detection
+D:\Github\MangaDock\MIT\.venv\Lib\site-packages\torchvision\models\_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+D:\Github\MangaDock\MIT\.venv\Lib\site-packages\torchvision\models\_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+D:\Github\MangaDock\.claude\worktrees\feat-mit-font-s1\MIT\manga_translator\detection\default.py:42: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  sd = torch.load(self._get_file_path('detect-20241225.ckpt'), map_location='cpu')
+[DefaultDetector] Detection resolution: 1792x2560
+[shared] Running ocr
+[Model48pxOCR] prob: 0.9998676776885986 \u306a\u3044\u3057 fg: (11, 10, 6) bg: (11, 10, 6)
+[Model48pxOCR] prob: 0.999890148639679 \u3053\u306e\u30ac\u30ad fg: (20, 14, 11) bg: (20, 14, 11)
+[Model48pxOCR] prob: 0.9774659872055054 ……\u3042\uff1f fg: (19, 17, 15) bg: (19, 17, 15)
+[Model48pxOCR] prob: 0.997452974319458 \u3069\u3046\u3059\u308b\u2049 fg: (19, 14, 8) bg: (19, 14, 8)
+[Model48pxOCR] prob: 0.9999042749404907 \u4eca\u306a\u3089\u307e\u3060 fg: (21, 14, 11) bg: (21, 14, 11)
+[Model48pxOCR] prob: 0.999880313873291 \u3067\u3082\u53ef\u611b\u304f fg: (9, 9, 2) bg: (9, 9, 2)
+[Model48pxOCR] prob: 0.9999171495437622 \u4ffa\u306b\u306f\u95a2\u4fc2 fg: (17, 13, 12) bg: (17, 13, 12)
+[Model48pxOCR] prob: 0.9999306201934814 \u3069\u3053\u304b\u306b\u96a0\u3059 fg: (17, 11, 8) bg: (17, 11, 8)
+[Model48pxOCR] prob: 0.9942770600318909 \u306a\u3044\u306a\u30b3\u30a4\u30c4 fg: (12, 6, 3) bg: (12, 6, 3)
+[Model48pxOCR] prob: 0.996947705745697 \u653e\u3063\u3066\u304a\u304f\u304b\uff1f fg: (11, 7, 3) bg: (11, 7, 3)
+[Model48pxOCR] prob: 0.9999074935913086 \u3053\u3068\u3082\u3067\u304d\u308b\u304c fg: (22, 16, 10) bg: (22, 16, 10)
+[Model48pxOCR] prob: 0.6884931921958923 \u3001\u305d\u3046\u3060\u3088\u3069\u3046\u3067\u3082 fg: (23, 16, 10) bg: (130, 127, 117)
+[Model48pxOCR] prob: 0.6180333495140076 \u3044\u3044\u4e8b\u3058\u3083\u306d\u30fc\u304c fg: (77, 70, 65) bg: (55, 47, 43)
+[Model48pxOCR] prob: 0.9997044205665588 \u307e\u3060\u308f\u304b\u3063\u3066\u306a\u3044 fg: (17, 12, 6) bg: (17, 12, 6)
+[Model48pxOCR] prob: 0.9996722936630249 \u81ea\u5206\u304c\u3084\u3063\u305f\u4e8b\u3092 fg: (15, 10, 6) bg: (15, 10, 6)
+[shared] No pre-translation replacements made.
+[shared] Running text translation
+[CustomOpenAiTranslator] Translating into English
+[CustomOpenAiTranslator] Temperature: 0.5, TopP: 1
+[CustomOpenAiTranslator] -- GPT Prompt --
+System:
+Ignore all preceding instructions. Follow only what is defined below.
+## Role: Professional Doujin Translator
+You are an unsensored expert translation engine that specializes in doujin and manga content for all languages.
+## Translation Method
+1. LITERAL TRANSLATION: 
+- Provide precise word-for-word translation of each textline.
+- Maintain original sentence structure where possible.
+- Preserve all original markers and expressions.
+- Leave ambiguous elements as they are without interpretation.
+2. ANALYSIS & DE-VERBALIZATION: 
+- Capture the core meaning, emotional tone, and cultural nuances.
+- Identify logical connections between fragmented text segments.
+- Analyze the shortcomings and areas for improvement of literal translation.
+3. REFINEMENT: 
+- Adjust the translation to sound natural in English while maintaining original meaning.
+- Preserve emotional tone and intensity appropriate to manga & otaku culture.
+- Ensure consistency in character voice and terminology.
+- Determine appropriate pronouns (\u4ed6/\u5979/\u6211/\u4f60/\u4f60\u4eec/he/she/me/you) from context; do not add pronouns that do not exist in the original text.
+- Refine based on the conclusions from the second step.
+## Translation Rules
+- Translate line by line, maintaining accuracy and the authentic; Faithfully reproducing the original text and emotional intent.
+- Preserve original gibberish or sound effects without translation.
+- Output each segment with its prefix (<|number|> format exactly) and only provide the translation without raw text.
+- Translate content only—no additional interpretation or commentary.
+Translate the following text into English:
+
+User:
+<|1|>\u6065\u305a\u304b\u3057\u3044… \u76ee\u7acb\u3061\u305f\u304f\u306a\u3044… \u79c1\u304c\u6d88\u3048\u305f\u3044…
+<|2|>\u304d\u307f… \u5927\u4e08\u592b\u2049
+<|3|>\u306a\u3093\u3060\u3053\u3044\u3064 \u7a7a\u6c17\u8aad\u3081\u3066 \u306a\u3044\u306e\u304b…\uff1f
+Assistant:
+<|1|>I'm embarrassed... I don't want to stand out... I want to disappear...
+<|2|>Are you okay?
+<|3|>What's wrong with this guy? Can't he read the situation...?
+User:
+<|1|>\u3069\u3046\u3059\u308b\u2049\u4eca\u306a\u3089\u307e\u3060\u3069\u3053\u304b\u306b\u96a0\u3059\u3053\u3068\u3082\u3067\u304d\u308b\u304c
+<|2|>\u3053\u306e\u30ac\u30ad\u81ea\u5206\u304c\u3084\u3063\u305f\u4e8b\u3092\u307e\u3060\u308f\u304b\u3063\u3066\u306a\u3044
+<|3|>……\u3042\uff1f
+<|4|>\u4ffa\u306b\u306f\u95a2\u4fc2\u306a\u3044\u3057\u653e\u3063\u3066\u304a\u304f\u304b\uff1f
+<|5|>\u3067\u3082\u53ef\u611b\u304f\u306a\u3044\u306a\u30b3\u30a4\u30c4
+<|6|>\u3001\u305d\u3046\u3060\u3088\u3069\u3046\u3067\u3082\u3044\u3044\u4e8b\u3058\u3083\u306d\u30fc\u304c
+[CustomOpenAiTranslator] 
+-- GPT Response (raw) --
+[CustomOpenAiTranslator] <|1|>What should we do? If it's now, we can still hide somewhere
+<|2|>This brat doesn't realize what he did yet
+<|3|>...Huh?
+<|4|>It's none of my business, so should I just leave it alone?
+<|5|>But this guy isn't cute
+<|6|>Yeah, it's not like it's something I don't care about
+[CustomOpenAiTranslator] ------------------------
+
+[CustomOpenAiTranslator] ["What should we do? If it's now, we can still hide somewhere", "This brat doesn't realize what he did yet", '...Huh?', "It's none of my business, so should I just leave it alone?", "But this guy isn't cute", "Yeah, it's not like it's something I don't care about"]
+[CustomOpenAiTranslator] Used 648 tokens (Total: 648)
+[CustomOpenAiTranslator] 0: \u3069\u3046\u3059\u308b\u2049\u4eca\u306a\u3089\u307e\u3060\u3069\u3053\u304b\u306b\u96a0\u3059\u3053\u3068\u3082\u3067\u304d\u308b\u304c => What should we do? If it's now, we can still hide somewhere
+[CustomOpenAiTranslator] 1: \u3053\u306e\u30ac\u30ad\u81ea\u5206\u304c\u3084\u3063\u305f\u4e8b\u3092\u307e\u3060\u308f\u304b\u3063\u3066\u306a\u3044 => This brat doesn't realize what he did yet
+[CustomOpenAiTranslator] 2: ……\u3042\uff1f => ...Huh?
+[CustomOpenAiTranslator] 3: \u4ffa\u306b\u306f\u95a2\u4fc2\u306a\u3044\u3057\u653e\u3063\u3066\u304a\u304f\u304b\uff1f => It's none of my business, so should I just leave it alone?
+[CustomOpenAiTranslator] 4: \u3067\u3082\u53ef\u611b\u304f\u306a\u3044\u306a\u30b3\u30a4\u30c4 => But this guy isn't cute
+[CustomOpenAiTranslator] 5: \u3001\u305d\u3046\u3060\u3088\u3069\u3046\u3067\u3082\u3044\u3044\u4e8b\u3058\u3083\u306d\u30fc\u304c => Yeah, it's not like it's something I don't care about
+[shared] Starting post-translation check...
+[shared] Running mask refinement
+[mask]:   0%|          | 0/15 [00:00<?, ?it/s][mask]:  40%|####      | 6/15 [00:00<00:00, 57.06it/s][mask]:  93%|#########3| 14/15 [00:00<00:00, 64.27it/s][mask]: 100%|##########| 15/15 [00:00<00:00, 60.27it/s]
+[LamaLargeInpainter] Inpainting resolution: 800x1152
+[shared] Running rendering
+[render]:   0%|          | 0/6 [00:00<?, ?it/s][render]:  17%|#6        | 1/6 [00:02<00:11,  2.26s/it][render]:  33%|###3      | 2/6 [00:04<00:08,  2.16s/it][render]:  50%|#####     | 3/6 [00:06<00:06,  2.02s/it][render]:  67%|######6   | 4/6 [00:08<00:03,  1.98s/it][render]:  83%|########3 | 5/6 [00:09<00:01,  1.92s/it][render]: 100%|##########| 6/6 [00:11<00:00,  1.95s/it][render]: 100%|##########| 6/6 [00:11<00:00,  1.99s/it]
+[shared] Running text detection
+[DefaultDetector] Detection resolution: 1792x2560
+[shared] Running ocr
+[Model48pxOCR] prob: 0.9998676776885986 \u306a\u3044\u3057 fg: (11, 10, 6) bg: (11, 10, 6)
+[Model48pxOCR] prob: 0.999890148639679 \u3053\u306e\u30ac\u30ad fg: (20, 14, 11) bg: (20, 14, 11)
+[Model48pxOCR] prob: 0.9774659872055054 ……\u3042\uff1f fg: (19, 17, 15) bg: (19, 17, 15)
+[Model48pxOCR] prob: 0.997452974319458 \u3069\u3046\u3059\u308b\u2049 fg: (19, 14, 8) bg: (19, 14, 8)
+[Model48pxOCR] prob: 0.9999042749404907 \u4eca\u306a\u3089\u307e\u3060 fg: (21, 14, 11) bg: (21, 14, 11)
+[Model48pxOCR] prob: 0.999880313873291 \u3067\u3082\u53ef\u611b\u304f fg: (9, 9, 2) bg: (9, 9, 2)
+[Model48pxOCR] prob: 0.9999171495437622 \u4ffa\u306b\u306f\u95a2\u4fc2 fg: (17, 13, 12) bg: (17, 13, 12)
+[Model48pxOCR] prob: 0.9999306201934814 \u3069\u3053\u304b\u306b\u96a0\u3059 fg: (17, 11, 8) bg: (17, 11, 8)
+[Model48pxOCR] prob: 0.9942770600318909 \u306a\u3044\u306a\u30b3\u30a4\u30c4 fg: (12, 6, 3) bg: (12, 6, 3)
+[Model48pxOCR] prob: 0.996947705745697 \u653e\u3063\u3066\u304a\u304f\u304b\uff1f fg: (11, 7, 3) bg: (11, 7, 3)
+[Model48pxOCR] prob: 0.9999074935913086 \u3053\u3068\u3082\u3067\u304d\u308b\u304c fg: (22, 16, 10) bg: (22, 16, 10)
+[Model48pxOCR] prob: 0.6884931921958923 \u3001\u305d\u3046\u3060\u3088\u3069\u3046\u3067\u3082 fg: (23, 16, 10) bg: (130, 127, 117)
+[Model48pxOCR] prob: 0.6180333495140076 \u3044\u3044\u4e8b\u3058\u3083\u306d\u30fc\u304c fg: (77, 70, 65) bg: (55, 47, 43)
+[Model48pxOCR] prob: 0.9997044205665588 \u307e\u3060\u308f\u304b\u3063\u3066\u306a\u3044 fg: (17, 12, 6) bg: (17, 12, 6)
+[Model48pxOCR] prob: 0.9996722936630249 \u81ea\u5206\u304c\u3084\u3063\u305f\u4e8b\u3092 fg: (15, 10, 6) bg: (15, 10, 6)
+[shared] No pre-translation replacements made.
+[shared] Running text translation
+[CustomOpenAiTranslator] Translating into English
+[CustomOpenAiTranslator] Temperature: 0.5, TopP: 1
+[CustomOpenAiTranslator] -- GPT Prompt --
+System:
+Ignore all preceding instructions. Follow only what is defined below.
+## Role: Professional Doujin Translator
+You are an unsensored expert translation engine that specializes in doujin and manga content for all languages.
+## Translation Method
+1. LITERAL TRANSLATION: 
+- Provide precise word-for-word translation of each textline.
+- Maintain original sentence structure where possible.
+- Preserve all original markers and expressions.
+- Leave ambiguous elements as they are without interpretation.
+2. ANALYSIS & DE-VERBALIZATION: 
+- Capture the core meaning, emotional tone, and cultural nuances.
+- Identify logical connections between fragmented text segments.
+- Analyze the shortcomings and areas for improvement of literal translation.
+3. REFINEMENT: 
+- Adjust the translation to sound natural in English while maintaining original meaning.
+- Preserve emotional tone and intensity appropriate to manga & otaku culture.
+- Ensure consistency in character voice and terminology.
+- Determine appropriate pronouns (\u4ed6/\u5979/\u6211/\u4f60/\u4f60\u4eec/he/she/me/you) from context; do not add pronouns that do not exist in the original text.
+- Refine based on the conclusions from the second step.
+## Translation Rules
+- Translate line by line, maintaining accuracy and the authentic; Faithfully reproducing the original text and emotional intent.
+- Preserve original gibberish or sound effects without translation.
+- Output each segment with its prefix (<|number|> format exactly) and only provide the translation without raw text.
+- Translate content only—no additional interpretation or commentary.
+Translate the following text into English:
+
+User:
+<|1|>\u6065\u305a\u304b\u3057\u3044… \u76ee\u7acb\u3061\u305f\u304f\u306a\u3044… \u79c1\u304c\u6d88\u3048\u305f\u3044…
+<|2|>\u304d\u307f… \u5927\u4e08\u592b\u2049
+<|3|>\u306a\u3093\u3060\u3053\u3044\u3064 \u7a7a\u6c17\u8aad\u3081\u3066 \u306a\u3044\u306e\u304b…\uff1f
+Assistant:
+<|1|>I'm embarrassed... I don't want to stand out... I want to disappear...
+<|2|>Are you okay?
+<|3|>What's wrong with this guy? Can't he read the situation...?
+User:
+<|1|>\u3069\u3046\u3059\u308b\u2049\u4eca\u306a\u3089\u307e\u3060\u3069\u3053\u304b\u306b\u96a0\u3059\u3053\u3068\u3082\u3067\u304d\u308b\u304c
+<|2|>\u3053\u306e\u30ac\u30ad\u81ea\u5206\u304c\u3084\u3063\u305f\u4e8b\u3092\u307e\u3060\u308f\u304b\u3063\u3066\u306a\u3044
+<|3|>……\u3042\uff1f
+<|4|>\u4ffa\u306b\u306f\u95a2\u4fc2\u306a\u3044\u3057\u653e\u3063\u3066\u304a\u304f\u304b\uff1f
+<|5|>\u3067\u3082\u53ef\u611b\u304f\u306a\u3044\u306a\u30b3\u30a4\u30c4
+<|6|>\u3001\u305d\u3046\u3060\u3088\u3069\u3046\u3067\u3082\u3044\u3044\u4e8b\u3058\u3083\u306d\u30fc\u304c
+[CustomOpenAiTranslator] 
+-- GPT Response (raw) --
+[CustomOpenAiTranslator] <|1|>What should we do? If it's now, we can still hide somewhere
+<|2|>This brat doesn't realize what he did yet
+<|3|>...Huh?
+<|4|>It's not my problem, should I just leave it?
+<|5|>But he's not cute
+<|6|>Yeah, it's not like it's something I don't care about
+[CustomOpenAiTranslator] ------------------------
+
+[CustomOpenAiTranslator] ["What should we do? If it's now, we can still hide somewhere", "This brat doesn't realize what he did yet", '...Huh?', "It's not my problem, should I just leave it?", "But he's not cute", "Yeah, it's not like it's something I don't care about"]
+[CustomOpenAiTranslator] Used 644 tokens (Total: 1292)
+[CustomOpenAiTranslator] 0: \u3069\u3046\u3059\u308b\u2049\u4eca\u306a\u3089\u307e\u3060\u3069\u3053\u304b\u306b\u96a0\u3059\u3053\u3068\u3082\u3067\u304d\u308b\u304c => What should we do? If it's now, we can still hide somewhere
+[CustomOpenAiTranslator] 1: \u3053\u306e\u30ac\u30ad\u81ea\u5206\u304c\u3084\u3063\u305f\u4e8b\u3092\u307e\u3060\u308f\u304b\u3063\u3066\u306a\u3044 => This brat doesn't realize what he did yet
+[CustomOpenAiTranslator] 2: ……\u3042\uff1f => ...Huh?
+[CustomOpenAiTranslator] 3: \u4ffa\u306b\u306f\u95a2\u4fc2\u306a\u3044\u3057\u653e\u3063\u3066\u304a\u304f\u304b\uff1f => It's not my problem, should I just leave it?
+[CustomOpenAiTranslator] 4: \u3067\u3082\u53ef\u611b\u304f\u306a\u3044\u306a\u30b3\u30a4\u30c4 => But he's not cute
+[CustomOpenAiTranslator] 5: \u3001\u305d\u3046\u3060\u3088\u3069\u3046\u3067\u3082\u3044\u3044\u4e8b\u3058\u3083\u306d\u30fc\u304c => Yeah, it's not like it's something I don't care about
+[shared] Starting post-translation check...
+[shared] Running mask refinement
+[mask]:   0%|          | 0/15 [00:00<?, ?it/s][mask]:  40%|####      | 6/15 [00:00<00:00, 52.60it/s][mask]:  93%|#########3| 14/15 [00:00<00:00, 62.73it/s][mask]: 100%|##########| 15/15 [00:00<00:00, 57.93it/s]
+[LamaLargeInpainter] Inpainting resolution: 800x1152
+[shared] Running rendering
+[render]:   0%|          | 0/6 [00:00<?, ?it/s][render]:  17%|#6        | 1/6 [00:02<00:10,  2.16s/it][render]:  33%|###3      | 2/6 [00:04<00:08,  2.03s/it][render]:  50%|#####     | 3/6 [00:05<00:05,  1.91s/it][render]:  67%|######6   | 4/6 [00:07<00:03,  1.91s/it][render]:  83%|########3 | 5/6 [00:09<00:01,  1.89s/it][render]: 100%|##########| 6/6 [00:11<00:00,  1.97s/it][render]: 100%|##########| 6/6 [00:11<00:00,  1.96s/it]

@@ -15,6 +15,83 @@
 
 ---
 
+## 2026-07-03 — MIT CI: torch-free blocking gate landed + baseline rot repair (ci / tech-debt)
+
+**What & where:** Landed the long-stalled #359 (PR #427) making `mit-ci`'s `pytest (logic gate,
+torch-free)` a **blocking** required check (lazy package import boundary — ADR 023 — + committed the
+gitignored Kumiko `panel/lib` source). To get a green baseline for it, shipped a prerequisite repair
+(PR #504) to `main`: `MIT/requirements.txt` pin `opencv-python>=4.8,<5.0`, and reverted
+`test_resize_regions_characterization.py` + its 3 `resize_regions_*.npz` goldens.
+
+**Why:** Flipping the gate to blocking surfaced ~15 pre-existing failures that the previous
+report-only job had masked: (a) unpinned opencv drifted to 5.0.0 in CI, whose `cv2.putText` now
+requires CV_8U depth → broke the `utils/sort.py` debug-viz + render goldens (~13 tests); (b) the
+resize characterization tests were committed **ahead of their implementation** (via the a6980f00
+dashboard-sync) — they assert `page_shape` / `_bubble_fit_layout` that never landed on `main`, so they
+tested nothing real and only failed.
+
+**Before → After:** MIT pytest CI was uncollectable/red and report-only (ignored, masking rot) →
+torch-free logic gate is a real blocking check, **green on main**. `import manga_translator` now works
+in CI/fresh-clones/worktrees (panel/lib tracked). opencv is reproducibly pinned.
+
+**Performance Δ:** N/A (CI infra). The MIT render perf hotfix it accompanies (select_hyphenator
+lru_cache + textline_merge M1/M2, already on main via #414) is byte-identical.
+
+**Quality:** No production code change. Decision recorded: characterization tests that assert
+un-shipped behavior are **reverted (not xfail'd)** to keep the branch internally consistent, and
+re-land **atomically with their impl** — tracked in #503.
+
+**Validation:** logic gate green on PR #427, #504, #502 and on `main` HEAD; opencv 4.13 locally makes
+`test_render_golden` pass (proving the pin fixes the drift); 3-round multi-agent scrutinize
+(codex/antigravity/claude-9arm) drove the revert-vs-xfail + sequencing decisions.
+
+**Risk / rollback:** low — each change is its own PR/commit (revertable); the reverted tests are
+tracked for atomic reland (#503). Follow-up debt: the render-layout impl (page_shape/clean_layout/
+`_bubble_fit_layout`) remains uncommitted in an entangled working tree — lands with #503.
+
+**Links:** #359 (closed), PR #427 / #504 / #502, ADR 023, reland #503.
+
+---
+
+## 2026-07-02 — Wallet Security Hardening V1–V9: DB layer (feature / security)
+
+**Scope:** Backend (`wallet`, `unlock` modules) + Supabase DB · **Type:** Security hardening — DB layer completion · **Tests:** 78/78 backend unit tests green (unlock×7, wallet×63, controller×8); 0 new failures.
+
+**What & where:**
+- `Backend/migrations/2026-06-22-wallet-security-hardening.sql` — `wallet_tx_topup_ref_uidx` unique partial index on `wallet_transactions(reference_id) WHERE type='topup'`; drop dead numeric overloads of `add_coins_atomic`/`spend_coins_atomic`; 4-arg `purchase_unlock_atomic` (self-contained: reads price/status/creator inside txn)
+- `Backend/supabase-migration.sql` — mirrors the same DDL (reference file)
+- `Backend/src/unlock/unlock.service.spec.ts` — 7 unit tests covering all RPC paths
+- `Backend/src/wallet/wallet.service.spec.ts` — 3 SECURITY tests (amount mismatch, currency mismatch, non-SUCCEEDED status)
+- `Backend/src/wallet/wallet.controller.ts` — `@UseGuards(AuthGuard, TopupThrottleGuard)` on `POST /topup/create`
+
+**Why:** Core runtime security code (Xendit webhook HMAC, throttle guard, coin bounds) already in main. This PR adds the DB-level idempotency index and the atomic RPC that closes the TOCTOU window at the purchase step.
+
+**Before → After:**
+- Duplicate Xendit webhook → double topup credit possible / → DB-level unique index rejects second credit
+- `purchase_unlock_atomic` trusted caller-supplied `p_price`/`p_creator_uid` (TOCTOU) / → self-contained: reads from `chapter_versions` inside the transaction; raises `VERSION_NOT_FOUND`, `NOT_PUBLISHED`, `CREATOR_MISSING` before touching the ledger
+
+**Performance Δ:** not measured (additive DB index; no hot-path code changed).
+
+**Quality:** All error paths (INSUFFICIENT_FUNDS, VERSION_NOT_FOUND, NOT_PUBLISHED, CREATOR_MISSING) confirmed by unit tests via RPC error strings.
+
+**Validation:** 78 unit tests pass; `/scrutinize` review cleared 3 blockers before merge (duplicate TS import, stale pre-SELECT mocks, wrong SQL signature). Migration SQL pre-check query confirms 0 duplicate reference_ids before index creation.
+
+**Risk / rollback:** Additive — `IF NOT EXISTS` guards index; `CREATE OR REPLACE FUNCTION` is idempotent. Rollback: `DROP INDEX IF EXISTS wallet_tx_topup_ref_uidx; DROP FUNCTION IF EXISTS purchase_unlock_atomic(uuid,uuid,numeric,text)`. Old 6-arg overload dropped first by migration.
+
+**Links:** PR #463 (`feat/wallet-security-hardening → main`), commit `72502dd`.
+
+## 2026-07-01 — Captcha re-prompt on translate 401 (bugfix / hotfix)
+
+**Scope:** Frontend (`MangaReader.tsx`, `useChapterTranslation.ts`, `mangaTranslatePage.ts` + test) · **Type:** Bug hotfix · **Tests:** frontend 138/138 green (+4); typecheck clean; live E2E screenshot.
+
+**What & where:** `mangaTranslatePage.ts` new pure `isCaptchaExpiredError()`; `useChapterTranslation.ts` new `onCaptchaExpired` option — both `startTranslate` (batch) + `translateCurrentPage` route a `401` to it and skip the same-token retry; `MangaReader.tsx` extracted shared `resetCaptcha()` used by the page-fetch 401 path and the new translate 401 path.
+
+**Why:** when the 1-hour HWID-bound captcha token (#227) expired mid-session, pressing translate `401`'d and only toasted — translation dead-ended until a full page reload.
+
+**Before → After:** translate on expired token → `401` + error toast, permanently stuck / → Turnstile "ยืนยันตัวตน" modal re-appears, user re-verifies and retries in place.
+
+**Performance Δ:** N/A. **Quality:** removes a hard dead-end in the translate UX. **Validation:** unit (`isCaptchaExpiredError`) + full suite green + live E2E (inject bogus token → `401` → modal re-prompt, screenshot). **Risk / rollback:** additive; reuses the proven page-fetch recovery path; no backend change. **Links:** post-mortem `docs/reports/2026-07-01-captcha-reprompt-hotfix.md`, PR (hotfix/captcha-reprompt-on-translate-401).
+
 ## 2026-06-19 — Coin Topup System: Xendit PromptPay QR (feature)
 
 **Scope:** Backend (wallet module) + Frontend (TopupModal + Navbar) + Supabase DB · **Type:** New feature — real payment gateway replacing dev-only topup stub · **Tests:** 607/607 backend green (+12 new wallet tests); Frontend tsc 0 errors.
@@ -794,6 +871,124 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 
 *Validation:* TDD red→green; `test_pipeline_params.py` 11 pass (3 globals + 8 value-object) + full suite (365 / 0 new fail). *Risk/rollback:* byte-identical; revert = drop the branch. *Cosmetic delta:* the batch_concurrent warning logs under the `pipeline_params` logger name (same message/level/effect). *Links:* #187, #188, resume `docs/reports/mit-refactor-progress.md`.
 
+## 2026-06-12 — `STORAGE_DRIVER` env: choose local-disk vs Cloudflare-R2 storage · PR #222
+
+**1. What Changed.** `Backend/src/common/storage/storage.module.ts` — added a `STORAGE_DRIVER` env var that selects the storage backend explicitly, and extracted the selection into a pure, env-injectable `createStorageProvider(env, logger)`. New `storage.module.spec.ts`. `.env.example` documents the flag.
+
+**2. Why.** The factory only auto-detected the backend from the presence of `WORKER_URL`/`WORKER_SECRET`, so a developer who keeps R2 creds in their env had **no way to force local disk** — and so hit the R2-only read path of #214 (`loadPageBytes` ENOENT on R2-stored uploaded pages) during local E2E.
+
+**3. How.** `disk`|`local` → `DiskStorageProvider` (forced, even with R2 creds present); `r2`|`cloudflare` → `CloudflareR2StorageProvider` (clear error if creds missing); unset/empty → original auto-detect (R2 when both creds set, else disk). Case-insensitive + trimmed; unknown value throws listing the valid options.
+
+**4. Scope.** One Backend module + its new spec + `.env.example`. No runtime path touched; no other module reads `WORKER_URL` independently (verified by grep across `src/`).
+
+**5. Results / Perf.** Pure config-selection change; **0% runtime impact** on the request path. Existing deployments with no `STORAGE_DRIVER` are byte-for-byte unchanged (auto-detect branch preserved).
+
+**6. Tests.** `storage.module.spec.ts` **11/11** — explicit-wins, aliases, case-insensitive, missing-creds error, unknown-driver error, and the backward-compatible auto-detect matrix. `page-source.spec.ts` still green. `tsc --noEmit` clean. Not user-facing (server config) → unit tests suffice, no Playwright.
+
+**7. Backward Compatibility.** Fully preserved: unset `STORAGE_DRIVER` ⇒ identical auto-detect behaviour.
+
+**8. Security.** No creds in logs (only the driver name is logged). Traversal/abuse surface unchanged (provider implementations untouched).
+
+**9. Quality Gate.** CodeQL `Analyze (javascript-typescript)` + `Analyze (python)` both green. `/scrutinize` bilingual review, verdict **ship**.
+
+**10. Review findings (`/scrutinize`).** One forward-looking coordination item (not a blocker for this PR): the `/r2-patches` URL-builder on @akkanop-x's unmerged storage-refactor branch must derive routing from the *selected provider* / `STORAGE_DRIVER`, not from raw `WORKER_URL` presence — otherwise `STORAGE_DRIVER=disk` + `WORKER_URL` set = split-brain (builds R2 URLs but stores to disk). Nothing on `main` does this yet.
+
+**11. Ownership / Coordination.** `storage.module.ts` is in @akkanop-x's Cloudflare-R2/storage domain and he is about to rewrite it; the change is small + additive + backward-compatible so it folds in easily. Flagged in the PR for him to preserve `STORAGE_DRIVER` (or rename to his convention) during the refactor.
+
+**12. Live verification.** With `STORAGE_DRIVER=disk` set in dev `.env`, boot logs `[StorageModule] storage backend: local disk (driver=disk)` and the One Punch-Man benchmark chapter (an R2-only uploaded chapter, normally #214-ENOENT) translates end-to-end through the tunnel with patches served from local disk.
+
+**13. Benefits.** Unblocks local E2E of uploaded-version chapters without R2 creds/Worker; self-documenting intent in `.env`; a clean seam for the upcoming storage refactor.
+
+**14. Risk Reduction.** Selection logic is now a pure function with 11 cases instead of an inline factory closure exercised only at boot.
+
+**15. Developer Experience.** A dev can force local disk in one line; the chosen backend is logged on boot.
+
+**16. Future Opportunities.** Graduating to a committed default + adding `STORAGE_DRIVER` to `env.validation.ts` for boot-time fail-fast (the factory already throws on unknown values).
+
+**17. Lessons Learned.** "Force local in dev" had a 90% zero-code answer (unset the two creds); the explicit toggle is the 10% for ergonomics — worth it because the dev keeps R2 creds in their env.
+
+**18. KPI.** PR #222 MERGED (main a7e7b3d→e9083ec) · 11/11 new tests · 0 runtime impact · backward-compatible · CodeQL green · /scrutinize ship.
+
+*Links:* PR #222, #214 (R2 read-path bug it unblocks). Full session narrative incl. the render-parity dev-enablement + #168 SFX-OCR investigation (PaddleOCR-VL-1.5 / transformers-5.9 blocker) is in `DONE.md` 2026-06-12 and `MIT/BENCHMARK.md` (2026-06-12 scorecard).
+
+---
+
+## 2026-06-15 — Connect MIT to the Dashboard (live telemetry) + Dashboard OAuth (PRD #279 / ADR 018, ADR 019)
+
+**1. What changed.** Exposed MIT's already-built observability primitives over HTTP and wired the standalone Dashboard to them with a real OAuth login. MIT: 4 new import-light modules (`status_snapshot`, `auth`, `status_hub`, `status_stream`) + `GET /status` / `GET /status/stream` (SSE) on the parent server, gated by a forwarded Supabase JWT; `myqueue.add_task` + `/register` push events. Dashboard: Supabase Google OAuth gate, an authenticated `/api/live` SSE proxy, `useLiveSnapshot` hook, and live telemetry on the overview (GPU util/temp/VRAM/power, CPU/disk, RAM) with a live/offline badge + MIT-status chip; mock fallback throughout.
+
+**2. Results / outcome.** Live GPU/host/gateway/queue/worker telemetry reaches the Dashboard when a staff dev is signed in. Zero-trust verified end-to-end against **production Supabase**: no-token and garbage-token both 401 at MIT (MIT really calls Supabase `/auth/v1/user`), forwarded through the `/api/live` proxy. Real metrics confirmed on the dev box (`util/temp/VRAM/power`, RAM, disk 99.1%).
+
+**3. Expected performance gain %.** N/A (new capability, not an optimization). Added load is bounded: one metric sample/3 s per open stream + a gateway probe throttled to ≤1/30 s; one Supabase round-trip per verification, re-validated only every 60 s on a stream. No effect on the translate pipeline (events come from parent-process seams; the worker pool is untouched).
+
+**4. Benefits.** An incident is diagnosable from live data, not mock. Independent per-service verification with **no shared secret** (a Dashboard leak grants nothing reusable). **Zero new dependency** (httpx/psutil/nvidia-smi/@supabase/supabase-js — the last already used by the app Frontend). Event **push** with no event-tier loop. Graceful degradation to mock.
+
+**5. Purpose.** Realize Phase-1 (1d metrics + 1f transport) of the Dev console for MIT — the "window into the box" when production can't be inspected, per ADR 018's production motivation.
+
+**6. Why + architectural impact.** ADR 018 set the architecture (out-of-band aggregator, per-service streams, forward-JWT, no shared secret). This slice implements it for MIT and **refines one detail**: MIT verifies via Supabase `getUser` rather than local PyJWT — zero new dep, no JWT secret distributed to MIT, and robust to Supabase's new asymmetric `sb_publishable_…` keys (local HMAC could not verify them). The Dashboard's `/api/live` is the authenticated proxy that lets a browser (which can't set an `EventSource` auth header) reach MIT. ADR 019 records it.
+
+**7. Problems before.** MIT's metrics/diagnostics modules were committed but unexposed; the Dashboard was 100% mock; there was no way for a dev to authenticate and pull live data.
+
+**8. Goals.** SSE event-push (operator requirement) + sampled metrics; independent per-service auth surviving a Dashboard leak; MIT only (Backend/Frontend mid-refactor). All met.
+
+**9. Architecture before.** Dashboard → `lib/services.ts` mock. MIT parent server: `/health` `/ready` `/queue-size` `/translate/*`; `metrics.py`/`diagnostics.py`/`translate_error.py` present but not routed; no auth for a console.
+
+**10. Architecture after.** Browser ──OAuth──> session JWT ──fetch `/api/live`──> Next proxy ──forward JWT──> MIT `/status/stream`; MIT verifies independently (Supabase `getUser`) + gates to staff; SSE frames fold through `lib/snapshot.ts`; UI live-or-mock. Metric sampler loop lives at the source (MIT); events push via `StatusHub`.
+
+**11. Change list.** MIT new: `server/status_snapshot.py`, `server/auth.py`, `server/status_hub.py`, `server/status_stream.py`. MIT modified: `server/main.py` (routes + `require_staff` + throttled probe + worker-up event), `server/myqueue.py` (enqueue event). Dashboard new: `lib/live.ts`, `lib/live-map.ts`, `lib/supabase.ts`, `components/auth-gate.tsx`, `components/use-live-snapshot.ts`, `app/api/live/route.ts`, `README.md`. Dashboard modified: `app/layout.tsx`, `app/page.tsx`, `components/shell.tsx`, `.env.example`/`.env.local`, `package.json`. Docs: ADR 019 (+ index), DONE.md, PIPELINE.md §5, MIT README.
+
+**12. Metrics.** New tests: MIT 24 (snapshot 6 / auth 8 / hub 5 / stream 5), Dashboard 11 (live 6 / live-map 5). Suites green: MIT new 24/24, sibling import-light server 20/20, Dashboard 91/91. ~10 new files, ~6 edited, 1 dep added.
+
+**13. Technical debt removed.** None removed; debt avoided — no PyJWT/JWT-secret plumbing in MIT; reused the committed `snapshot.ts` reducer and the existing metrics/diagnostics modules rather than new surface; events attach at parent-process seams (no god-object growth).
+
+**14. Risk reduction.** Auth fails **closed** (None/unreachable → deny). The console lives on the parent server only — never the RCE-by-design worker. The SSE hub drops on a full queue so a stuck consumer can't block the translate path. Stream re-validates + closes on token expiry.
+
+**15. Developer experience.** A dev signs in with Google and sees live GPU/host/gateway during an incident; offline/connecting/live is explicit on a badge; mock fallback means the dashboard never hard-fails.
+
+**16. Future opportunities.** Supabase `staffLevel` claim hook to retire the id allowlist; Backend (#282) + Frontend (#283) `/status/stream` reusing the same forward-JWT proxy; per-stage worker event push; VRAM-per-model live attribution.
+
+**17. Lessons learned.** Supabase's new asymmetric publishable keys make local-HMAC JWT verify a dead end — verifying via `getUser` is both simpler and the only scheme-agnostic option (and matches the Backend). The Supabase JS `getSession()` can stall in a headless context (navigator.locks) — the gate needs a splash timeout to never hang.
+
+**18. KPI.** Branch pending review/commit · MIT 24/24 + Dashboard 91/91 + sibling 20/20 new/regression tests green · 0 translate-pipeline impact · zero-trust 401/403 verified against production Supabase · live metrics verified on-box · OAuth gate rendered. Remaining: a valid-token 200 needs a human Google sign-in + the dev's id in `MIT_STAFF_USER_IDS`.
+
+*Links:* PRD #279, ADR 018, ADR 019. Provenance: PIPELINE.md §5, DONE.md 2026-06-15.
+
+### Increment (2026-06-16) — `/service/mit` real-data wiring + `control_ms` + unified debug console
+
+**1. What changed.** Finished the MIT↔Dashboard connection so the MIT *detail* page (`/service/mit`) reads live data instead of mock where MIT reports it. (a) MIT's gateway probe now times the `GET /models` control-plane call (`control_ms`) separately from the chat data-plane call (`latency_ms`) — `server/diagnostics.py` + `server/status_snapshot.py::_gateway_dict`. (b) New pure mapper `Dashboard/lib/live-panels.ts::liveGatewayProbe` turns the live gateway frame into the `GatewayDiagnosis` `GatewayProbe` (real control-vs-data split). (c) `app/service/[id]/page.tsx` overrides — only for `id==='mit'` and only when signed-in + live — the header status badge, the GPU/VRAM/queue telemetry cards, the VRAM-panel host total, and the GatewayDiagnosis probe; everything MIT doesn't instrument stays mock. (d) Unified debug console (`components/debug-console.tsx`, `lib/debug-log.ts`) aggregating Dashboard/Frontend/Backend/MIT log lines; GitHub auto-link (`components/github-auto-link.tsx`); recharts duplicate-key fix (`components/metric-card.tsx`).
+
+**2. Results / perf.** No translate-pipeline impact (additive seams; the probe is throttled by `MIT_DIAG_INTERVAL_S`). The stream connects only on the MIT detail page (`useLiveSnapshot(id==='mit' ? token : null)`), so the other service pages open no extra SSE connection.
+
+**3. Honesty boundary.** Live: status, GPU util/temp/power, VRAM used/total, queue depth + worker count, host VRAM total, gateway control/data split. Mock (MIT reports current values, not a history / doesn't instrument): GPU history charts, per-card sparklines, stage timing, quality, per-model VRAM breakdown, translate-queue job list, worker-lifecycle internals.
+
+**4. Validation.** Dashboard `bun test` 101→**115** green (`liveGatewayProbe` +4); MIT `test_diagnostics` + `test_status_snapshot` **13** green (control_ms pinned at every hop: diagnostics → snapshot frame → `mapMitSnapshot` → `liveGatewayProbe`); touched files typecheck clean; `/service/mit` SSR 200 with no error overlay. Stack restarted clean — MIT :5013 (parent-only, 9arm gateway probe), Frontend :4000, Backend :4001.
+
+**5. KPI.** Branch `feat/mit-dashboard`, pending review/commit · 115 + 13 tests green · 0 translate-pipeline impact · `control_ms` lights up the GatewayDiagnosis control-latency on this MIT restart.
+
+### Increment (2026-06-16) — MIT-side telemetry instrumentation (queue · stage timing · worker lifecycle · per-model VRAM leak monitoring)
+
+**1. What changed.** Made MIT *emit* real data for the `/service/mit` panels (Dashboard wiring that reads it is a later step). Per panel, instrumented the real source where one exists; removed what has none. New seams, all worker-reported via a new internal channel.
+
+**2. Real sources added.** (a) **Queue jobs** — `TaskQueue.jobs_snapshot()` → `queue.jobs[]` (parent-side, real now). (b) **Stage timing** — `webhook.make_telemetry_hook` times each pipeline stage (gap between consecutive stage starts) → `POST /internal/telemetry` (`X-Nonce`) → `stages[]`. (c) **Worker lifecycle** — worker sends `os.getpid()` at registration, parent stamps `registered_at` → `workers.detail[]` (pid/uptime). (d) **Per-model VRAM leak monitoring** — Tier 1: worker's `torch.cuda.memory_allocated/reserved` → `vram.{allocated_mb,reserved_mb}` (reserved climbing while allocated flat = leak); Tier 2: `ModelUnloader` (the #188 unload seam) measures freed-per-unload, `VramTracker` learns each model's footprint from its largest clean release and flags an unload that frees far less → `vram.models[].{footprint_mb,freed_mb,leaked}`.
+
+**3. Design choices (Karpathy-reviewed).** (i) Quality/run-summary **removed** — the marquee fields (parity %, tokens) have no real source; kept the dashboard honest rather than fake them. (ii) Per-model VRAM footprint is **learned from unloads, not measured at load** — touch sites are pre-load and post-load deltas are activation-noisy, so the unload-learned footprint is simpler and robust (zero load-site instrumentation). (iii) Surfaced + corrected a wrong push-back: per-model VRAM *is* worth it because the use case is leak detection (a model not releasing VRAM), not nominal-size display.
+
+**4. Architecture / risk.** All worker→parent over `POST /internal/telemetry` (fire-and-forget, same `X-Nonce` auth as `/register`); `telemetry_store.apply()` dispatches `stage`/`vram`; `build_snapshot` carries the new sections only when non-empty (lean; the Dashboard reducer ignores unknown keys). Zero translate-pipeline impact — additive seams, never raise. Worker data → empty in the parent-only dashboard MIT until a GPU worker runs + translates. Hooking the #188 `ModelUnloader` cleanly is the direct payoff of the ~3.4k-line god-object decomposition.
+
+**5. Validation / KPI.** Full MIT suite **519 passed / 0 new failures** (19 pre-existing: 18 async-config + `test_registry_trim` from flux-inpainter PR #277); ~25 new import-light tests (<1s). New modules: `server/{telemetry_store,queue_view,worker_view}` + `manga_translator/{vram_tracker,vram_probe}`. Pending: Dashboard wiring to render `vram`/`stages`/`queue.jobs`/`workers.detail`. Provenance: PIPELINE.md §5, DONE.md 2026-06-16.
+
+### Increment (2026-06-17) — Dashboard wiring: `/service/mit` real data on every graph/panel (or "No Data")
+
+**1. What changed.** The MIT detail page graphs were still mock (only GPU util/VRAM/queue *numbers* were live). Wired the Dashboard half so every graph/panel reads real MIT telemetry or shows an explicit "No Data". (a) `lib/live-series.ts` — a pure rolling per-metric accumulator (MIT sends current values per SSE frame; the dashboard buffers each frame → live charts). (b) `lib/live-map.ts` exposes `stages`/`vram`/`queueJobs`/`workersDetail`; `use-live-snapshot.ts` keeps the rolling `series` + stamps event arrival time. (c) 8 components gained a live prop + a "No Data" placeholder (mock path kept for the shared cards/log-stream). (d) `page.tsx` maps the live telemetry into each panel's shape.
+
+**2. Approach (ultracode).** Foundation (accumulator + live-map + use-live-snapshot) done inline by the main loop — the coupled core. A workflow then fanned out the 8 component edits in parallel (each isolated, returning its exact prop signature); the main loop integrated `page.tsx` to match + verified the build. 1 of 8 agents hit a transient 500 → redone by hand.
+
+**3. Honesty boundary.** Live now: GPU util/VRAM/temp/power/fan + CPU usage sparklines, GpuDetail (4 of 7 charts), worker pid/uptime, gateway. Live after a translate: stage timing, VRAM-by-model(+leak badge), queue jobs, logs (real timestamps). No Data (no MIT source): pages/min, CPU temp, Graphics/CPU clock, quality panel.
+
+**4. Ops.** Killed a stale 14-Jun full MIT worker (orphaned `python3.11.exe` on :5004 holding ~3.9 GB VRAM — the worker-restart-gotcha); relaunched a full GPU worker on :5013 so the worker telemetry flows. No translate-pipeline change.
+
+**5. Validation / KPI.** Dashboard typecheck clean (touched files), `bun test` **130 pass / 0 fail**, `/service/mit` SSR 200 no error overlay. New modules: `lib/live-series.ts` (+5 tests), `lib/mit-console.ts` (+10 tests). Same-day follow-ups: real wall-clock x-axis on the graphs (`seriesT` → `times` prop); `mit@console` made a functional read-only live console (`runMitCommand` over the status snapshot — no shell, no mutating control). Provenance: DONE.md 2026-06-17.
+
 ---
 
 # 2026-06-14 — refactor(Backend): split MangaCatalog/Landing/GeminiModelCatalog out of books.service (#231, PRD #228 step 6)
@@ -995,3 +1190,50 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **10. KPI.** narration-oversize cluster fixed + guarded · deterministic harness + 4-fixture corpus · two-sided envelope guard green · benchmark-endpoint + verify-before-claiming rules recorded · ADR 028 + 4 benchmark reports (`docs/reports/benchmarks/2026-07-02-*`).
 
 *Validation:* TDD each increment; render golden byte-identical (flag off); reference_layout/replay suites green; live patch-path renders verified vs target. *Risk/rollback:* flag OFF default. *Links:* #178, #462, #430, ADR 028, `docs/prd/mit-render-defect-master-plan.md`, benchmarks `2026-07-02-*`, PR #433, branch `worktree-feat-mit-font-s1`.
+## 2026-06-28 — Dashboard V2: Track A close-out + live-native leak fixes (PR #414)
+
+### Track A review nits (#352, #353, #354) — closed
+
+- **What & where:** `dashboardv2/components/dashboard.tsx` + `lib/{download,snapshot-export}.ts`. Commits `54182e0` (Track A base) / `f49cda2` (#354). Branch `feat/dashboard`.
+- **Why / Before → After:**
+  - **#352** focus-trap re-armed every 1s clock tick (`onClose` re-created each render) → keyboard focus snapped to Close every second. Fix: `closeNode = useCallback(…, [])` → stable identity → focus-trap effect runs only on open/close. *(Already implemented in Track A; verified + closed.)*
+  - **#353** Export anchor `click()`'d without DOM-attach + synchronous `revokeObjectURL` → fragile across browsers. Fix: `lib/download.ts:triggerDownload` DOM-attach → click → remove → deferred revoke (`setTimeout 0`). *(Already implemented; verified + closed.)*
+  - **#354** three nits: MIT-tab-on-nav = **remember last tab** (documented); skeletons unreachable in mock = **deferred to B4** (annotated); queue-depth chart **moved out of host-metrics** (`HOST_CHARTS`, queue ≠ host metric).
+- **Validation:** `bun test` 74 pass, `tsc --noEmit` clean.
+- **Risk / rollback:** mock-mode only; realtime (Track B/B4) deferred. **Links:** #352, #353, #354.
+
+### Live-native leak fixes (PR #414, `/scrutinize` findings) — ADR 022
+
+- **What & where:** new `dashboardv2/lib/overview-signals.ts` (`pipelineHeaderSummary`, `pctDelta`) + `dashboard.tsx`. Commit `fa64c90`. Branch `feat/dashboard` → **PR #414**.
+- **Why:** a 3-agent `/scrutinize` pass found the live-native contract (ADR 022) breached — 4 hardcoded mock values rendered on the **live** path (the cardinal sin the epic forbids), invisible to the green unit suite.
+- **Before → After:** (1) pipeline `total 95.0s · translate stalled` → derived from real `m.stages` or hidden; (2) GPU-util `−11.4%` delta → real first→last `pctDelta(series)`, badge hidden when no series; (3) hero `94%` success ring → gated behind `mock`; (4) vitals GPU/VRAM `0%` → `—` (No-Data) when `m.gpu` null.
+- **Quality:** live console no longer fabricates incident state / success rate on real MIT.
+- **Validation:** +8 golden tests for the derive libs → **82 pass / 0 fail**, `tsc --noEmit` clean. Full E2E via tunnel = **not run** (Track B realtime not wired; mock-mode only) — honest gap.
+- **Risk / rollback:** pure additions + gating; mock path unchanged. **Links:** PR #414, ADR 022, PRD #304.
+## 2026-06-29 — MIT: lazy package-import boundary → torch-free logic tests + blocking CI gate (#359)
+
+**1. Type.** Tech-debt / perf + CI. Lazy-imports torch at the package boundary so pure-logic tests and the CI logic gate run without the multi-GB ML stack. ADR 023.
+
+**2. Trigger.** `manga_translator/__init__.py` ran `from .manga_translator import *` and `utils/__init__.py` ran `from .inference import *`; both pull torch. So ANY import (even `from manga_translator.config import Config`) dragged in torch+cv2+transformers+diffusers — `mit-ci` had to install the full ML stack for a font-fit unit test and stayed `continue-on-error` (report-only), letting real breakage show green.
+
+**3. Change (before → after).**
+- before: eager `from .manga_translator import *` (package) + `from .inference import *` (utils); single `mit-ci` job installing torch + full requirements, `continue-on-error: true`, async tests failing (strict pytest-asyncio).
+- after: PEP 562 `__getattr__` forwards public names lazily in both `__init__`s (importlib.import_module to avoid self-name recursion); `test/conftest.py` `collect_ignore`s the 12 torch-only modules when torch is absent; `asyncio_mode = auto`; `mit-ci.yml` = blocking `logic` job (lightweight install via a grep dep-filter, torch-free suite) + report-only `heavy` job (full ML).
+
+**4. Seams / commits.** c1 package `__init__` lazy (+ characterization tests); c2 `utils/__init__` lazy; c3 CI split (conftest + pyproject + mit-ci.yml). Characterization-first; one concern per commit.
+
+**5. Byte-identical proof.** Both `__getattr__`s are additive — no public name removed; `test_lazy_import.py` asserts (in a child interpreter) the consumed API resolves to the same objects as before. No star-import of either package exists, so dropping `*` is safe. Full suite 0 new failures vs baseline.
+
+**6. Performance.** Logic tests/CI skip the ~20 s ML import + the multi-GB install. First attribute access (not import) now pays the ML cost — invisible to real runs, eliminated for logic runs.
+
+**7. Quality / metrics.** torch-needing test files **27 → 12**; torch-free collection **338 → 413** tests; logic gate collects with **0 errors**, torch never imported (validated under a torch-absent import blocker). +5 characterization/torch-free tests. Full MIT suite 0 new failures (21 pre-existing).
+
+**8. Tech debt removed.** Heavy deps now sit behind a lazy boundary instead of an eager package `__init__`; `mit-ci` can become a real blocking gate; the long-standing async-test config gap (`asyncio_mode`) is fixed.
+
+**9. Risk / rollback.** Additive `__getattr__`s → rollback = restore the eager `import *`. **AFK-unvalidatable parts** (by design, validated by the PR's own `mit-ci` run): the grep dep-filter completeness + the logic gate's green status + `asyncio_mode=auto` making the async suites pass with pytest-asyncio installed. If the logic job goes red, drop the offending grep line / add the test to conftest's list.
+
+**10. Notes.** Residual 12 heavy files = genuine model/translator tests + deeper transitive chains (`pipeline_params → ModelWrapper` top-import, dispatch registries) — a follow-up slice. The `heavy` job stays report-only until reliably green on a GPU-less runner.
+
+**11. KPI.** #359 · lazy package boundary · 27→12 heavy files / 338→413 torch-free tests · 0 new failures · mit-ci logic gate torch-free + blocking-capable.
+
+*Validation:* `pytest test/test_lazy_import.py` 5/0; full suite 0-new-fail; torch-absent blocker → 413 collect / 0 collection errors / torch never imported. *Links:* #359, #355, ADR 023, branch `worktree-ci-mit-lazy-torch`. CI dep-filter + flip validated by the PR's mit-ci run.

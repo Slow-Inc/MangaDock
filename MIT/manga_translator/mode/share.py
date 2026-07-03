@@ -32,6 +32,11 @@ app = FastAPI()
 # Will be set in start()
 _translator: MangaTranslator | None = None
 
+# Parent web-server coordinates (url + nonce), set in start(). Used to report
+# per-stage pipeline timing to the parent's /internal/telemetry for the Dev console
+# (#279) — empty until a worker is started with a --report parent (standalone → no-op).
+_PARENT = {"url": None, "nonce": None}
+
 
 # ────────────────────────────────────────────────────────
 #  Internal endpoints consumed by the parent web-server
@@ -90,13 +95,28 @@ async def simple_execute_translate_patches(request: Request):
     # translator is a singleton serving one request at a time (parent gates via
     # the busy flag), so a per-request hook is safe — removed in finally.
     hook = None
+    telemetry_hook = None
     if progress_meta:
         from server.webhook import make_progress_hook
         hook = make_progress_hook(progress_meta)
         _translator.add_progress_hook(hook)
+    # Dev-console stage timing (#279): report each stage's duration to the parent,
+    # independent of the Backend progress webhook. No-op without a --report parent.
+    if _PARENT["url"]:
+        from server.webhook import make_telemetry_hook
+        telemetry_hook = make_telemetry_hook(_PARENT["url"], _PARENT["nonce"])
+        _translator.add_progress_hook(telemetry_hook)
 
     try:
         patches = await _translator.translate_patches(image, config)
+        # Dev console (#279): report the worker's VRAM (global torch alloc/reserved +
+        # per-model footprint & leak flags) to the parent after each page — this is when
+        # a non-releasing model shows up as bloat. Fire-and-forget.
+        if _PARENT["url"]:
+            from server.webhook import send_telemetry
+            report = _translator.vram_report()
+            if report:
+                await send_telemetry(_PARENT["url"], _PARENT["nonce"], {"kind": "vram", **report})
         return StreamingResponse(
             io.BytesIO(pickle.dumps(patches)),
             media_type="application/octet-stream",
@@ -105,8 +125,9 @@ async def simple_execute_translate_patches(request: Request):
         logger.error(f"Patch translation error: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=str(e))
     finally:
-        if hook is not None and hook in _translator._progress_hooks:
-            _translator._progress_hooks.remove(hook)
+        for _h in (hook, telemetry_hook):
+            if _h is not None and _h in _translator._progress_hooks:
+                _translator._progress_hooks.remove(_h)
 
 
 @app.post("/execute/translate")
@@ -175,7 +196,7 @@ async def simple_execute_translate_batch(request: Request):
 async def _register_with_parent(parent_url: str, host: str, port: int, nonce: str):
     """Tell the parent web-server that this worker is ready."""
     url = f"{parent_url}/register"
-    payload = {"ip": host, "port": port}
+    payload = {"ip": host, "port": port, "pid": os.getpid()}  # pid → Dev-console worker detail (#279)
     headers = {"X-Nonce": nonce}
     try:
         async with aiohttp.ClientSession() as session:
@@ -203,6 +224,8 @@ class MangaTranslatorShared:
         port = self.params.get("port", 5003)
         nonce = self.params.get("nonce", "")
         report = self.params.get("report")
+        # Expose to the request handlers for Dev-console stage-timing telemetry (#279).
+        _PARENT["url"], _PARENT["nonce"] = report, nonce
 
         # Inject the default Thai render font if not already specified. Prompt-Regular (weight 400,
         # same body height as Bold ~0.64em, lighter strokes) — user preference: less-bold Thai.

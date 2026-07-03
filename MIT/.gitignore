@@ -12,7 +12,12 @@ Manga-translated
 .env
 *.local
 *.local.*
-test/testdata
+# Ignore generated test outputs under testdata/, but TRACK committed fixtures (e.g. the
+# dotgain20 ICC profile test_patch_png needs). The blanket `test/testdata` ignore meant the
+# fixture was never committed, so CI / fresh clones failed (#359). Use `/*` so specific files
+# can be re-included (a file can't be re-included if its parent dir itself is excluded).
+test/testdata/*
+!test/testdata/dotgain20.icc
 .idea
 pyvenv.cfg
 Scripts
@@ -32,6 +37,11 @@ eggs/
 .eggs/
 lib/
 lib64/
+# ...but `manga_translator/utils/panel/lib/` is vendored Kumiko SOURCE (panel detection),
+# not a build artifact. The generic `lib/` rule above wrongly ignored it, so it never got
+# committed — CI / fresh clones / git worktrees then failed to import it (#359). Track it.
+!manga_translator/utils/panel/lib/
+!manga_translator/utils/panel/lib/*.py
 parts/
 sdist/
 var/

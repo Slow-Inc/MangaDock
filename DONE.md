@@ -83,6 +83,84 @@
 **Validation:** TDD (`test_render_overlap.py` 25 green: processing_scale/font_bounds/clean_layout_font_size/display_sfx); render golden/guard byte-identical. E2E via Reader (real backend config, hayateotsu.space tunnel): Gal Yome EN→TH p4 dialogue fills + "ปาร์ตี้" overflow gone; One-Punch JA→EN no regression (free SFX "GULP"/"NEH" stays big). Worktree branch `worktree-feat-mit-font-s1` (PR #433).
 
 **Residual:** stylized in-bubble word the SFX YOLO splits without bubble association can still render larger than its neighbours (no `bubble_box`) — detection/merge concern, deferred to S4/#432.
+## MIT CI: land #359 torch-free blocking gate + baseline rot repair (2026-07-03)
+
+**Goal:** Get the MIT perf hotfix + the stalled #359 CI work onto `main`, then make the MIT logic
+gate a real **blocking** check. What started as "open a PR + /scrutinize" cascaded (via 3 rounds of
+`/clink-brainstorm`) into untangling several in-flight workstreams off `main`.
+
+**What landed (4 PRs, in order):**
+1. **#504 — CI baseline** → `main`: pinned `opencv-python>=4.8,<5.0` (CI had drifted to 5.0.0, whose
+   strict-CV_8U `cv2.putText` broke ~13 render/merge tests + the render golden) and **reverted** the
+   `test_resize_regions_characterization.py` + 3 goldens that were committed *ahead of impl* (assert
+   `page_shape`/`_bubble_fit_layout` absent on main).
+2. **#427 (#359)** → `main`: rebased onto the baseline, `pytest (logic gate, torch-free)` green →
+   merged. MIT CI is now a blocking torch-free gate (lazy import boundary, ADR 023) + the gitignored
+   Kumiko `panel/lib` source is committed (fixes `import manga_translator` in CI/clones/worktrees).
+3. **#502 — perf + docs** → `main`: rebased; git auto-dropped the #459 commits (already upstream via
+   #414) and collapsed the perf commit to its one unique delta (`functools.wraps` on `_timed_stage`);
+   dropped the re-added orphan tests; marked `test_timed_stage` heavy in `conftest._HEAVY_TESTS`.
+4. **#503** — tracking issue for re-landing the render-layout characterization tests **atomically**
+   with their implementation.
+
+**Key findings (scrutinize/brainstorm):** the perf hotfix (select_hyphenator lru_cache + M1/M2) was
+**already on main** via #414's sync, so #502 was mostly redundant; the "second wave" of failures a
+reviewer predicted was real (opencv drift + tests-ahead-of-impl), hidden only by the old report-only
+job; decision = revert un-shipped-behavior tests (not xfail) and reland atomic.
+
+**Validation:** logic gate green on all 3 PRs + `main` HEAD; opencv 4.13 locally makes
+`test_render_golden` pass (proves the pin). Backend + Frontend CI green on main.
+
+**Debt:** render-layout impl (page_shape/clean_layout/`_bubble_fit_layout`) still uncommitted in an
+entangled working tree → #503. Impact report: `docs/reports/system-impact-report.md` (2026-07-03).
+
+---
+
+## Wallet Security Hardening V1–V9: DB layer + scrutinize fixes (2026-07-02)
+
+**Goal:** Land the DB-layer deliverables from `feat/wallet-security-hardening` (SQL migrations + unit tests) after the runtime code was already in main. Fix 3 scrutinize blockers before merge.
+
+**Shipped:**
+- `Backend/migrations/2026-06-22-wallet-security-hardening.sql` — `wallet_tx_topup_ref_uidx` unique partial index (at-most-once topup credit per Xendit payment_id); drop dead numeric overloads; 4-arg `purchase_unlock_atomic` (reads price/status/creator inside txn — closes TOCTOU window)
+- `Backend/supabase-migration.sql` — same DDL mirrored
+- `Backend/src/unlock/unlock.service.spec.ts` — 7 tests covering all RPC paths (paid, free, already_unlocked, 4 error cases)
+- `Backend/src/wallet/wallet.service.spec.ts` — 3 SECURITY tests (amount mismatch, currency mismatch, non-SUCCEEDED Xendit status)
+- `Backend/src/wallet/wallet.controller.ts` — `@UseGuards(AuthGuard, TopupThrottleGuard)` on `POST /topup/create`
+
+**Scrutinize fixes (3 blockers cleared):**
+1. Removed duplicate `TopupThrottleGuard` import (TS compile error)
+2. Dropped 4 stale `unlock.service.spec.ts` tests that mocked a pre-SELECT code path no longer in `purchaseUnlock`
+3. Replaced 6-arg `purchase_unlock_atomic` in migration SQL with the correct 4-arg self-contained version
+
+**Validation:** 78/78 unit tests pass; PR #463 body bilingual EN+TH; system-impact-report.md updated.
+
+**Files touched:** `Backend/migrations/2026-06-22-wallet-security-hardening.sql`, `Backend/supabase-migration.sql`, `Backend/src/unlock/unlock.service.spec.ts`, `Backend/src/wallet/wallet.service.spec.ts`, `Backend/src/wallet/wallet.controller.ts` · **Commit:** `72502dd` · **PR:** #463
+
+## Captcha re-prompt on translate 401 — hotfix (2026-07-01)
+
+**Goal:** When the 1-hour HWID-bound captcha clearance token (#227) expires mid-session, pressing translate `401`'d and only showed an error toast — translation dead-ended until a full page reload. Make the translate 401 re-prompt the Turnstile captcha, same as the page-fetch path.
+
+**Shipped (TDD, 4 files):**
+- `Frontend/app/lib/mangaTranslatePage.ts` — new pure `isCaptchaExpiredError(err)` predicate (matches `(401)` / `captcha clearance token`), colocated with the throw sites
+- `Frontend/app/lib/mangaTranslatePage.test.ts` — +4 tests (401 single/batch = true; 500 / network / non-Error = false)
+- `Frontend/app/hooks/useChapterTranslation.ts` — new `onCaptchaExpired` option; `startTranslate` (batch) + `translateCurrentPage` detect the 401 → call it + toast; batch **skips its 500/network retry loop** (same token would only 401 again)
+- `Frontend/app/components/MangaReader.tsx` — extracted shared `resetCaptcha()` (drop token + `setTurnstilePassed(false)`); wired to both the page-fetch 401 path and `onCaptchaExpired`
+
+**Validation:** unit `isCaptchaExpiredError` + full frontend suite **138 pass, 0 fail**; typecheck clean; no new lint warnings. **Live E2E** on `localhost:4000` (real One-Punch Benchmark chapter, authed): inject bogus token → แปลหน้านี้ → backend `401` (`Captcha clearance token is invalid, expired`) → Turnstile "ยืนยันตัวตน" modal re-appeared (screenshot), then test-key auto-solve fetched a fresh token → recovery loop confirmed.
+
+**Report:** post-mortem `docs/reports/2026-07-01-captcha-reprompt-hotfix.md` (+ image `assets/2026-07-01-captcha-reprompt.png`); pointer in `system-impact-report.md`.
+
+---
+
+## Staff Console — PRD + ADR 018 + Phase-1 issues, out-of-band observability (2026-06-14)
+
+Designed the **Staff Console** (role-tiered back-office: Moderator/Admin/Dev) off the 2026-06-14 9arm incident (gateway `gateway.9arm.co` up, but `qwen3.6-35b-a3b` model hung → cryptic `'ollama servers did not respond quickly enough'` after ~90s; root-caused by black-box probe — `/models` OK 0.19s, a 16-token completion timed out 151s = inference backend hung, external). A full `/grill-me` pass settled the design, then a resilience review reshaped the Dev console's data plane.
+
+- **Key decision (ADR 018):** a monitor must not share a failure domain with what it monitors → a **standalone Node-Fastify aggregator microservice** (out of the Backend, runnable local/separate host) subscribes to a per-service `/status/stream` SSE on Frontend/Backend/MIT; each multiplexes **sampled `{type:metric}`** (VRAM/CPU/temp via `torch.cuda`+`psutil`+`nvidia-smi`, zero new dep) + **pushed `{type:event}`** (translate-triggered/stage/log/error). UI stays in the Frontend (`/staff/system`, shadcn). External uptime monitor → Discord = out-of-band backstop.
+- **Auth (zero-trust, no shared secret):** orthogonal `profiles.staffLevel` (none<moderator<admin<dev), injected as a **signed JWT claim** via a Supabase Custom Access Token Hook; the dashboard forwards the dev JWT and **each service verifies independently** (signature + expiry + claim), streams re-validate ~60s + close on expiry; MIT gains PyJWT verify.
+- **Published (bilingual, `ready-for-agent`):** PRD **#279** + Phase-1 slices **#280** (1a RBAC+signed-claim+shell) → **#285** (1f aggregator+streams) → **#282** (1b health board, the incident fix) / **#283** (1c tracer+queue) / **#284** (1d GPU/host); **#281** (1e precise error) independent. **ADR 018** `docs/adr/018-staff-console-out-of-band-observability-aggregator.md` + indexed in the ADR README.
+- **MIT modules built (TDD + karpathy, branch `feat/mit-staff-observability`, MIT-only — Frontend/Backend deferred while akkanop-x refactors them):** `server/diagnostics.py` (cheap bounded gateway probe, decoupled from the worker pool → `ok/slow/timeout`·model-down-vs-gateway-down`/auth/unreachable/model_missing`; the 2026-06-14 incident reads `timeout` + "gateway /models OK but chat completion timed out — model not responding"; 7 tests) · `server/translate_error.py` (`classify_translate_error` → structured `{stage,translator,endpoint,model,cause,hint}`, wired at the `custom_openai` timeout raise → worker log + backend response carry it instead of the opaque string; 4 tests) · `server/metrics.py` (`parse_nvidia_smi` + `host_metrics` (psutil), `collect` degrades host-only when no GPU, zero new dep; 5 tests). 16 new tests, **full MIT suite 463 passed / 19 pre-existing async / 0 new**. PIPELINE.md §5 + ADR 018 referenced. SSE `/status/stream` endpoint + JWT verify deferred (need 1a's Supabase signed-claim hook = Backend/Supabase).
+- **Side fix:** shadcn MCP cwd gotcha — Claude Code `.mcp.json` has no `cwd` field → added wrapper `Frontend/run-shadcn-mcp.ps1` so the server runs in `Frontend/` and reads `components.json` (`@react-bits` + `radix-rhea`); needs a full Claude Code restart (reconnect does not reload config).
 
 ---
 
@@ -2528,3 +2606,46 @@ User flagged a back speech-balloon rendering EMPTY (page 11 "We haven't told any
 
 ## 2026-07-01 — MIT: anti-overlap territory = text footprint not whole balloon (#436 follow-up)
 RouteProbe characterization showed the overlapping back balloon (Gal Yome p11) was bubble-fit but small because `anti_overlap` clamped it against the FRONT balloon's full box, while the front was a clean-layout narration column filling only ~40% of its balloon (rw/bw 0.40). **Fix:** pure `region_territory_box` — reserve the balloon only when text fills it (`fills_bubble_width`), else just the text box; `_region_territory` delegates. The narration column stops reserving the whole balloon, so the overlapping neighbour grows into the empty area (safe with content-shaped patches #436). Characterization-first per [[feedback_techdebt_all_scenarios]]: +3 test_render_overlap cases; 44/0. Verified p11 (back balloon sizes to real space, no collision) + p4/p9 (no regression). ADR 027 addendum. Branch `worktree-feat-mit-font-s1` (PR #433).
+---
+
+## 2026-06-28 — Dashboard V2 Track A close-out + live-native leak fixes (PR #414)
+
+Resumed `dashboardv2` (the canonical `:4200` console) Track A. Committed the Track A base (`54182e0`:
+6 tested live-data libs `deep-link`/`download`/`incident-timeline`/`live-worker-node`/`search`/
+`snapshot-export` + `dashboard.tsx` wiring). **#352** (focus-trap stable via `useCallback` closeNode) and
+**#353** (robust Export download: DOM-attach anchor + deferred revoke in `lib/download.ts`) were found
+**already implemented** in Track A → verified (`tsc` clean, 74 tests) + closed. **#354** (3 nits): MIT tab
+= remember-last (documented), skeletons = deferred to B4 (annotated), queue-depth chart moved out of
+`HOST_CHARTS` (queue ≠ host metric) → commit `f49cda2`, closed.
+
+Then ran **/scrutinize** (3 parallel agents) before opening the PR — found the live-native contract
+(ADR 022) breached in **4 spots** rendering hardcoded mock values on the LIVE path: pipeline
+`95.0s · translate stalled`, GPU-util `−11.4%` delta, hero `94%` ring, vitals `0%` gauges. Fixed via a new
+tested `lib/overview-signals.ts` (`pipelineHeaderSummary`, `pctDelta`) + gating/No-Data — commit `fa64c90`,
+**82 tests pass, tsc clean**. Pushed `feat/dashboard` → **PR #414** (closes #352/#353/#354; relates #304/#279).
+ADR **022** (live-native, no fabricated values on the live path). NOTE: full frontend E2E via tunnel **not
+run** — Track B realtime unwired, console is mock-mode only (honest gap; E2E lands with B4).
+## 2026-06-29 — MIT: lazy package-import boundary so logic tests + CI run torch-free (#359)
+`manga_translator/__init__.py` ran `from .manga_translator import *` and `utils/__init__.py` ran `from .inference import *` —
+both pull torch, so EVERY import (even `from manga_translator.config import Config` in a pure-logic test) dragged in
+torch+cv2+transformers+diffusers (multi-GB). `mit-ci` therefore had to install the full ML stack for a font-fit unit test and
+stayed report-only (`continue-on-error`). Fix (ADR 023): PEP 562 `__getattr__` forwards the public API lazily in BOTH `__init__`s
+(`importlib.import_module` to avoid self-name recursion) — `import manga_translator` + lightweight submodule imports are now
+torch-free, while `from manga_translator import Config/Context/MangaTranslator/...` still resolves on first access. utils stops
+eager-importing `.inference` (its only torch puller) and forwards `ModelWrapper`/`InfererModule` lazily. CI: `mit-ci.yml` splits
+into a BLOCKING `logic` job (lightweight install via a transparent grep dep-filter, torch-free suite) + report-only `heavy` job;
+`test/conftest.py` skips the 12 torch-only modules when torch is absent; `asyncio_mode = auto` lets the bare-`async def` tests run
+(pytest-asyncio already a dev dep). **Characterization-first** (`test_lazy_import.py`, child-interpreter so the test file is itself
+torch-free): proves torch-free package + submodule import AND that the consumed public API resolves to the same objects. **Measured:**
+torch-needing test files 27→12, torch-free collection 338→413 tests, logic gate collects 0 errors / torch never imported (verified
+under a torch-absent import blocker); full MIT suite 0 new failures (21 pre-existing). Branch `worktree-ci-mit-lazy-torch`; ADR 023;
+impact report `docs/reports/system-impact-report.md` (2026-06-29). **Open follow-up:** 12 residual heavy files (genuine model/translator
+tests + `pipeline_params→ModelWrapper` transitive chain); CI grep-filter completeness + the gate's green status are validated by the
+PR's own mit-ci run. Provenance in PIPELINE.md §5.
+
+### #359 addendum (CI-validated green) — 2026-06-29
+The logic gate's green status was validated end-to-end by PR #427's own `mit-ci` run: **`pytest (logic gate, torch-free)` PASS in 1m52s** (vs the old multi-GB report-only single job). Getting there surfaced — and fixed — three things the eager `import *` had masked, all committed on the branch:
+1. **panel/lib not committed** — `MIT/.gitignore`'s generic `lib/` rule silently ignored `manga_translator/utils/panel/lib/` (Kumiko source); fresh clones/worktrees/CI all `ModuleNotFoundError`. Tracked via a gitignore exception. (This is the recurring "worktree missing panel/lib" gotcha — now fixed at the root.)
+2. **test/testdata blanket-ignored** — `test_patch_png`'s `dotgain20.icc` fixture was never committed. Tracked via `testdata/*` + re-include.
+3. **chatgpt → manga_translator circular import** — `translators/chatgpt.py` did `from .. import manga_translator` at module top; lazy init no longer pre-loads the impl module, so it cycled through `manga_translator.py → translators.dispatch` (partially-init). Moved to a runtime-local import. Regression-tested.
+Also: `asyncio_mode = auto` made the bare `async def` suites (textline_merge etc.) actually run+pass in CI; heavy-API characterization tests are `skipif(not torch)`. Heavy job stays report-only (needs models/GPU).
