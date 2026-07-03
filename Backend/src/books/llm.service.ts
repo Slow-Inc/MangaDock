@@ -26,24 +26,10 @@ export class LlmService {
   }
 
   getDescriptionModel(): string {
-    if (this.provider === 'gemini') {
-      return (
-        this.env.GEMINI_DESCRIPTION_MODEL ??
-        this.env.GEMINI_DESCRIPTION_FALLBACK_MODEL ??
-        'gemini-2.5-flash'
-      );
-    }
     return this.env.LLM_DESCRIPTION_MODEL ?? 'gpt-4o-mini';
   }
 
   getMangaModel(): string {
-    if (this.provider === 'gemini') {
-      return (
-        this.env.GEMINI_MANGA_MODEL ??
-        this.env.GEMINI_MANGA_FALLBACK_MODEL ??
-        'gemini-2.5-flash-lite'
-      );
-    }
     return this.env.LLM_MANGA_MODEL ?? 'gpt-4o-mini';
   }
 

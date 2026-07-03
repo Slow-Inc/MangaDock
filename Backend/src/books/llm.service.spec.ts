@@ -22,26 +22,6 @@ describe('LlmService — gemini provider', () => {
     expect(make({ LLM_PROVIDER: 'gemini' }).isConfigured()).toBe(false);
   });
 
-  it('getDescriptionModel() returns GEMINI_DESCRIPTION_MODEL when set', () => {
-    expect(make({ ...env, GEMINI_DESCRIPTION_MODEL: 'gemini-custom' }).getDescriptionModel()).toBe('gemini-custom');
-  });
-
-  it('getDescriptionModel() falls back to GEMINI_DESCRIPTION_FALLBACK_MODEL', () => {
-    expect(make({ ...env, GEMINI_DESCRIPTION_FALLBACK_MODEL: 'fb' }).getDescriptionModel()).toBe('fb');
-  });
-
-  it('getDescriptionModel() falls back to gemini-2.5-flash', () => {
-    expect(make(env).getDescriptionModel()).toBe('gemini-2.5-flash');
-  });
-
-  it('getMangaModel() returns GEMINI_MANGA_MODEL when set', () => {
-    expect(make({ ...env, GEMINI_MANGA_MODEL: 'gemini-lite' }).getMangaModel()).toBe('gemini-lite');
-  });
-
-  it('getMangaModel() falls back to gemini-2.5-flash-lite', () => {
-    expect(make(env).getMangaModel()).toBe('gemini-2.5-flash-lite');
-  });
-
   it('complete() calls GoogleGenerativeAI.generateContent and returns text', async () => {
     const mockGenContent = jest.fn().mockResolvedValue({ response: { text: () => 'แปลแล้ว' } });
     (GoogleGenerativeAI as jest.Mock).mockImplementation(() => ({
