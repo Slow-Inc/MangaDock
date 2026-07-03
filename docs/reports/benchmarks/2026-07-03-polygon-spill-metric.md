@@ -39,3 +39,21 @@ Corpus `spill_frac_poly` with reference_layout ON: onepunch 0.00 · thai-galyome
 
 **Tests:** `test_spill_fraction_vs_polygon_*` (inside/half-out/oval-corner/degenerate),
 `test_replay_emits_spill_frac_poly_for_sized_regions`, corpus envelope `_POLY_SPILL_CEILING`.
+
+---
+
+## Follow-up experiment (2026-07-03): safe_area corner-inscribe (Approach A) — REVERTED
+
+Tried the paired #525 fix half: uniform corner-inscribe in `safe_area_box` (binary-search the largest
+scale keeping all 4 box corners inside the mask). **Result on the corpus:** polygon spill dropped
+`0.122 → 0.000` (fixes the oval spill) BUT the reference_layout safety-envelope **failed** —
+`test_reference_layout_thai_dialogue_still_fills_its_bubble` regressed: Thai dialogue balloons ARE
+oval, so inscribing their box shrinks the fill target → dialogue under-fills (readability_ratio drops
+below the 0.9 fill floor). Corpus spill was only 0.12 (modest) to begin with, so Approach A trades a
+small spill for a real under-fill regression = **net negative**. Reverted.
+
+**Conclusion:** the naive uniform corner-inscribe over-corrects; a dialogue balloon *should* fill (text
+large, rounded corners empty is normal typesetting) — only genuine over-spill past the visible edge is a
+defect. The surgical fix (Approach B polygon-aware `safe_area`, or C exact largest-inscribed-rect gated on
+a spill threshold) is deferred until a fixture exhibits egregious live spill (the m4-ce4/ds20 case, not in
+the corpus). **The METRIC ships now (the promotion gate); the FIX waits for a case that needs it.**
