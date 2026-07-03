@@ -1063,3 +1063,30 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 - **Quality:** live console no longer fabricates incident state / success rate on real MIT.
 - **Validation:** +8 golden tests for the derive libs → **82 pass / 0 fail**, `tsc --noEmit` clean. Full E2E via tunnel = **not run** (Track B realtime not wired; mock-mode only) — honest gap.
 - **Risk / rollback:** pure additions + gating; mock path unchanged. **Links:** PR #414, ADR 022, PRD #304.
+## 2026-06-29 — MIT: lazy package-import boundary → torch-free logic tests + blocking CI gate (#359)
+
+**1. Type.** Tech-debt / perf + CI. Lazy-imports torch at the package boundary so pure-logic tests and the CI logic gate run without the multi-GB ML stack. ADR 023.
+
+**2. Trigger.** `manga_translator/__init__.py` ran `from .manga_translator import *` and `utils/__init__.py` ran `from .inference import *`; both pull torch. So ANY import (even `from manga_translator.config import Config`) dragged in torch+cv2+transformers+diffusers — `mit-ci` had to install the full ML stack for a font-fit unit test and stayed `continue-on-error` (report-only), letting real breakage show green.
+
+**3. Change (before → after).**
+- before: eager `from .manga_translator import *` (package) + `from .inference import *` (utils); single `mit-ci` job installing torch + full requirements, `continue-on-error: true`, async tests failing (strict pytest-asyncio).
+- after: PEP 562 `__getattr__` forwards public names lazily in both `__init__`s (importlib.import_module to avoid self-name recursion); `test/conftest.py` `collect_ignore`s the 12 torch-only modules when torch is absent; `asyncio_mode = auto`; `mit-ci.yml` = blocking `logic` job (lightweight install via a grep dep-filter, torch-free suite) + report-only `heavy` job (full ML).
+
+**4. Seams / commits.** c1 package `__init__` lazy (+ characterization tests); c2 `utils/__init__` lazy; c3 CI split (conftest + pyproject + mit-ci.yml). Characterization-first; one concern per commit.
+
+**5. Byte-identical proof.** Both `__getattr__`s are additive — no public name removed; `test_lazy_import.py` asserts (in a child interpreter) the consumed API resolves to the same objects as before. No star-import of either package exists, so dropping `*` is safe. Full suite 0 new failures vs baseline.
+
+**6. Performance.** Logic tests/CI skip the ~20 s ML import + the multi-GB install. First attribute access (not import) now pays the ML cost — invisible to real runs, eliminated for logic runs.
+
+**7. Quality / metrics.** torch-needing test files **27 → 12**; torch-free collection **338 → 413** tests; logic gate collects with **0 errors**, torch never imported (validated under a torch-absent import blocker). +5 characterization/torch-free tests. Full MIT suite 0 new failures (21 pre-existing).
+
+**8. Tech debt removed.** Heavy deps now sit behind a lazy boundary instead of an eager package `__init__`; `mit-ci` can become a real blocking gate; the long-standing async-test config gap (`asyncio_mode`) is fixed.
+
+**9. Risk / rollback.** Additive `__getattr__`s → rollback = restore the eager `import *`. **AFK-unvalidatable parts** (by design, validated by the PR's own `mit-ci` run): the grep dep-filter completeness + the logic gate's green status + `asyncio_mode=auto` making the async suites pass with pytest-asyncio installed. If the logic job goes red, drop the offending grep line / add the test to conftest's list.
+
+**10. Notes.** Residual 12 heavy files = genuine model/translator tests + deeper transitive chains (`pipeline_params → ModelWrapper` top-import, dispatch registries) — a follow-up slice. The `heavy` job stays report-only until reliably green on a GPU-less runner.
+
+**11. KPI.** #359 · lazy package boundary · 27→12 heavy files / 338→413 torch-free tests · 0 new failures · mit-ci logic gate torch-free + blocking-capable.
+
+*Validation:* `pytest test/test_lazy_import.py` 5/0; full suite 0-new-fail; torch-absent blocker → 413 collect / 0 collection errors / torch never imported. *Links:* #359, #355, ADR 023, branch `worktree-ci-mit-lazy-torch`. CI dep-filter + flip validated by the PR's mit-ci run.
