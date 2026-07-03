@@ -45,6 +45,19 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 
 ---
 
+## Benchmarks (rule)
+
+**Every MIT change must be benchmarked to confirm the result — every time, as part of "done" (not optional).** code+tests passing is not enough; produce a benchmark (deterministic if possible, else E2E) proving the result actually improved / did not regress before calling it done.
+
+**Every time you benchmark (E2E or offline), write an MD report with the comparison image — committed to the repo.** Do not just report in chat and let the image vanish with the session.
+
+- Image → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.png` (committed; never leave it only in the worktree root / scratchpad / `.playwright-mcp`, which are gitignored and lost).
+- Report → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.md`: method (what path, why deterministic), a before→after numeric table with the ratio, the embedded image (`![caption](./<image>.png)`), and a short "how good" assessment (fix-root / no-regression / completeness / limitation).
+- Prefer **deterministic** benchmarks (isolate the changed knob/code; avoid the non-deterministic translator — see memory `project_mit_translate_nondeterministic`).
+- Reference the report from DONE.md / the issue / the ADR. First example: `docs/reports/benchmarks/2026-06-30-clean-layout-page-scale.md`.
+
+---
+
 ## Agent skills
 
 ### Issue tracker
@@ -203,6 +216,19 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 ```
 
 `scripts/notify.ps1` ยิง Windows toast จริง (WinRT ผ่าน Windows PowerShell 5.1 → Action Center → Phone Link ส่งต่อเข้ามือถือ) tool `PushNotification` ในตัวขึ้น "sent" แต่ **ไม่เด้ง** บนเครื่อง Win11 + VS Code นี้ จึงใช้ script แทน ยิงเมื่อ: จบ task/รอบ `/tdd`, ต้อง confirm (ก่อนปิด issue / merge), หรือ AFK เสร็จ — ไม่ใช่ progress ย่อยๆ
+
+---
+
+## Benchmarks (กฎ)
+
+**งาน MIT ทุกชิ้นเมื่อเสร็จต้อง benchmark เพื่อยืนยัน result เสมอ — เป็นส่วนหนึ่งของ "done" ไม่ใช่ทางเลือก** code+test ผ่านยังไม่นับเสร็จ; ต้อง benchmark (deterministic ถ้าได้ ไม่งั้น E2E) พิสูจน์ว่าผลจริงดีขึ้น/ไม่ regress ก่อน
+
+**ทุกครั้งที่ benchmark (E2E หรือ offline) ต้องเขียน MD report พร้อมฝังภาพเปรียบเทียบ — commit ลงรีโป** ห้ามรายงานแค่ในแชตแล้วปล่อยภาพหายไปกับ session
+
+- ภาพ → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.png` (committed; อย่าทิ้งใน worktree root / scratchpad / `.playwright-mcp` ที่ถูก gitignore แล้วหาย)
+- report → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.md`: method (ผ่าน path ไหน ทำไม deterministic), ตารางตัวเลข before→after + ratio, ฝังภาพ (`![caption](./<image>.png)`), และตารางประเมิน "ดีแค่ไหน" (fix-root / no-regression / completeness / limitation)
+- เลือก benchmark แบบ **deterministic** เมื่อทำได้ (isolate เฉพาะ knob/โค้ดที่เปลี่ยน; เลี่ยง translator ที่ไม่ deterministic — ดู memory `project_mit_translate_nondeterministic`)
+- อ้าง report จาก DONE.md / issue / ADR; ตัวอย่างแรก: `docs/reports/benchmarks/2026-06-30-clean-layout-page-scale.md`
 
 ---
 
