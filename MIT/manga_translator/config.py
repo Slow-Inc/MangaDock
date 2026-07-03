@@ -195,6 +195,10 @@ class RenderConfig(BaseModel):
     the font from the flat cap DOWN to the largest that fits BOTH axes of the balloon safe interior
     (or the detection box for narration), keeping words whole. Replaces the source-column-referenced
     clean_layout sizing for these regions. Requires clean_layout. Off → byte-identical."""
+    knuth_plass: bool = False
+    """#180 P8: use the Knuth-Plass holistic line-breaker (balanced columns, no mid-word/name splits)
+    instead of the greedy packer, for every calc_horizontal call in the render pass. Off → the greedy
+    GreedyLineBreaker default (byte-identical)."""
     patch_feather_radius: int = 0
     """#173: feather the outer N px of each composited patch to a transparent
     alpha (distance-transform ramp) so the rectangular patch edge blends into the
