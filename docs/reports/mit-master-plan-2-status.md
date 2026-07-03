@@ -50,6 +50,27 @@ benchmark (the plan's hard gate), not "looks better."
    claim benchmarkable. Without it those clusters can only be *contract/reproducibility*-verified, not
    *accuracy*-verified.
 
+## Resume here (next session — exact entry points)
+
+**Branch:** `fix/mit-mp2-p2-p5` (PR #532, off `main`). MP2-work worktree: `.claude/worktrees/mp2-work`
+(Backend `node_modules` junctioned from the main checkout; MIT tests via the main `MIT/.venv` python:
+`/d/Github/MangaDock/MIT/.venv/Scripts/python.exe -m pytest MIT/test/<f>.py -p no:cacheprovider --noconftest -q`).
+
+**A — real #526 eval run (measures "human-level"; needs the user for data + grading):**
+1. Pick a series with an **official English translation** (One-Punch is in the corpus + has official EN).
+2. Assemble `MIT/eval/<series>_eval_set.json` — 100 items `{id, source, candidate (MIT), reference (official EN), bubble_type, config_label}`, spanning dialogue+narration+sfx. Candidate = run MIT `/translate/with-form/patches` (tagged) and pull `regions[].dst`.
+3. `make_blind_pairs(items, seed)` → grade blind (person B) → `RubricScore` + A/B prefs → `aggregate` → `render_scorecard` → commit to `docs/reports/benchmarks/`. This is the **P2 context ON/OFF A/B** too (two `config_label`s).
+
+**B — P7 llm-translation-quality (autonomous code; contract-tests are the accepted gate — accuracy via A above):**
+- Numbered-contract repair lives in `MIT/manga_translator/translators/chatgpt.py::_translate_batch` (`re.split(r'<\|\d+\|>')` at ~:323, mismatch handling ~:340-390) — **refactor** that ad-hoc count handling into a pure `normalize_numbered_output(raw, n)` (pad misses → `[Missing item N]`, keep `[OCR FAILED]`, truncate extras) + unit tests (a net simplification, not a new layer).
+- Determinism gate (7c): `temperature`/`top_p` set at `chatgpt.py:728-729` from `self.temperature`/`self.top_p`; add `is_deterministic_decode(temp, top_p, top_k)` and only treat a run as cacheable/replayable when true. Same-fixture-twice-at-temp0 → byte-identical test.
+- Glossary (7b): `OPENAI_GLOSSARY_PATH` seam (`load_glossary` ~:836) for recurring romaji names/shouts.
+
+**C — P3+P8 prod enable (user-gated, high blast-radius):** set `MIT_REFERENCE_LAYOUT=1` + `MIT_KNUTH_PLASS=1` in
+`Backend/.env`, cache:reset, render the defect pages via `/translate/with-form/patches`, before/after image, **user confirm** before calling done.
+
+**P4-fix:** capture-first only (corpus worst spill 0.122 < 0.20; don't force — see the P4-fix row above).
+
 ## Benchmark artifacts (all committed under `docs/reports/benchmarks/`)
 `2026-07-03-readable-floor.md` · `2026-07-03-polygon-spill-metric.md` · `2026-07-04-knuth-plass-wire.md` ·
 `2026-07-03-defect-verification.md` (honest reference_layout residuals) · `2026-07-03-comprehensive-defect-sweep.md`
