@@ -98,7 +98,7 @@ export function imageModelKey(imageModel?: string): string | undefined {
  * translate instead of replaying stale patches. */
 export function renderConfigHash(env: NodeJS.ProcessEnv): string {
   const knobs = Object.keys(env)
-    .filter((k) => k.startsWith('MIT_'))
+    .filter((k) => k.startsWith('MIT_') || k.startsWith('LLM_'))
     .sort()
     .map((k) => `${k}=${env[k] ?? ''}`)
     .join('\n');
@@ -213,6 +213,7 @@ export function buildMitConfig(
   const lamaReground = fracEnv('MIT_LAMA_LUM_REGROUND');
   const fontSizeMax = posIntEnv('MIT_FONT_SIZE_MAX');
   const model = imageModelKey(imageModel);
+  const provider = env.LLM_PROVIDER ?? 'gemini';
   return JSON.stringify({
     translator: {
       target_lang: tgtMIT,
@@ -226,6 +227,15 @@ export function buildMitConfig(
       // prompt so the model knows which manga it is translating. Absent →
       // prompt identical to the context-free behavior.
       ...(seriesContext ? { series_context: seriesContext } : {}),
+      // Provider-specific translator fields: for non-Gemini providers,
+      // add translator='chatgpt', api_key, and optionally api_url.
+      ...(provider !== 'gemini'
+        ? {
+            translator: 'chatgpt',
+            api_key: env.LLM_API_KEY,
+            ...(env.LLM_BASE_URL ? { api_url: env.LLM_BASE_URL } : {}),
+          }
+        : {}),
     },
     detector: {
       // #247: match MIT's own tuned Config default (2560). 2048 silently
