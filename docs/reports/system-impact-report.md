@@ -967,3 +967,31 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **10. KPI.** #278 done (major + 3 nits) · 2 false-SFX/page-class eliminated · per-translate gateway latency reduced · +9 tests (24/0) · golden byte-identical · ADR 026 + benchmark report.
 
 *Validation:* TDD `should_rescue_sfx`; `pytest test/test_ocr_vlm.py` 24/0; affected suites green; deterministic gate benchmark. *Risk/rollback:* revert the gate to length-only. *Links:* #278, #277, ADR 026, `docs/reports/benchmarks/2026-06-30-sfx-rescue-provenance-gate.md`, branch `worktree-feat-mit-font-s1`.
+
+---
+
+# 2026-07-02 — feat(MIT): reference_layout render engine (opt-in) + deterministic replay harness (#178/#462/#430)
+
+**1. Type.** Render engine + test-harness feature; opt-in, production default byte-identical.
+
+**2. Trigger.** Editing the shared MIT render kept regressing already-good targets (Thai fill ↔ One-Punch narration size), and the non-deterministic translator made worker A/B unreliable. A user-flagged demo defect: One-Punch narration blocks rendering far too big.
+
+**3. Change (before → after).**
+- *Harness:* `render_replay.py` (`serialize_regions`/`replay_clean_layout`) + `MIT_DUMP_REGIONS` dump hook → the clean-layout sizing is replayed offline & deterministically from committed fixtures; a parameterized safety-envelope test asserts every region stays in a two-sided box (spill ≤1.35×det, narration ≥0.6×flat, fill ≥0.9×flat).
+- *Engine (`render.reference_layout`, default OFF):* `_reference_layout_intent` resolves box+anchor+fill+cap from one discriminator (`should_fill_demoted_bubble`: fill only if `interior_w/det_w ≤ 1.4`); `fit_to_box` = binary search + bounded upward re-scan (defeats word-wrap non-monotonicity that returned a tiny branch).
+
+**4. Seam / commits.** New modules `reference_layout.py`, `render_replay.py`; `render.reference_layout` + `detector.det_bubble_synth` config flags; `~15` commits on `worktree-feat-mit-font-s1` (PR #433).
+
+**5. Byte-identical proof.** `reference_layout` default OFF → dispatch golden byte-identical (in isolation); `MIT_DUMP_REGIONS`/`MIT_SIZING_TRACE` off → no-op.
+
+**6. Performance.** N/A for production (flag off). Harness replay is calc_horizontal-bound (~minutes for the corpus) → the corpus envelope test is `slow`-marked.
+
+**7. Quality / metrics.** Deterministic replay + live: One-Punch narration 32–44px spill ~2.3× → readable narrow columns (~flat), Thai dialogue still fills (69/28/50px). Discriminator ratio across 17 bubble regions / 4 fixtures cleanly separates (Thai 1.07–1.20 | 1.4 | One-Punch 1.61–3.43). Corrected finding: production render is in good shape; a "garble" was actually an LLM translation token ("JDB"), not render.
+
+**8. Tech debt.** Merged `_reference_fit_box`+`_reference_cap` → one intent resolver; named constants. Remaining: promote decision (needs bigger corpus + multi-run flip check), calc_horizontal font-cache (test speed), Knuth-Plass line-break (#180).
+
+**9. Risk / rollback.** Opt-in flag OFF → production unchanged. Discriminator threshold stability is the main risk before promotion (mitigated: 0.2 margin across the corpus + envelope guard). Drop the flag → zero effect.
+
+**10. KPI.** narration-oversize cluster fixed + guarded · deterministic harness + 4-fixture corpus · two-sided envelope guard green · benchmark-endpoint + verify-before-claiming rules recorded · ADR 028 + 4 benchmark reports (`docs/reports/benchmarks/2026-07-02-*`).
+
+*Validation:* TDD each increment; render golden byte-identical (flag off); reference_layout/replay suites green; live patch-path renders verified vs target. *Risk/rollback:* flag OFF default. *Links:* #178, #462, #430, ADR 028, `docs/prd/mit-render-defect-master-plan.md`, benchmarks `2026-07-02-*`, PR #433, branch `worktree-feat-mit-font-s1`.
