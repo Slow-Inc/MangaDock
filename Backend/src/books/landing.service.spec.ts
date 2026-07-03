@@ -1,4 +1,5 @@
 import { LandingService } from './landing.service';
+import { LlmService } from './llm.service';
 
 /**
  * Landing assembly + description translation (#231, PRD #228 step 6). The two
@@ -132,5 +133,56 @@ describe('LandingService — landing assembly + description (#231)', () => {
       translatedText: thai,
       translated: false,
     });
+  });
+});
+
+describe('translateDescription() — openai provider', () => {
+  it('returns translated when llmService.complete resolves', async () => {
+    const mockCache = {
+      get: jest.fn().mockResolvedValue(null),
+      setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
+    };
+    const mockLlm = {
+      isConfigured: jest.fn().mockReturnValue(true),
+      getDescriptionModel: jest.fn().mockReturnValue('gpt-4o-mini'),
+      getMangaModel: jest.fn().mockReturnValue('gpt-4o-mini'),
+      complete: jest.fn().mockResolvedValue('คำแปลภาษาไทย'),
+    } as unknown as LlmService;
+
+    const svc = new LandingService(
+      mockCache as any,
+      { enabled: false } as any,
+      {} as any,
+      {} as any,
+      () => 'http://localhost',
+      { LLM_PROVIDER: 'openai', LLM_API_KEY: 'sk-test' } as NodeJS.ProcessEnv,
+      mockLlm,
+    );
+
+    const result = await svc.translateDescription('Some English description here and more text');
+    expect(result.translated).toBe(true);
+    expect(result.translatedText).toBe('คำแปลภาษาไทย');
+    expect(mockLlm.complete).toHaveBeenCalledWith(
+      expect.stringContaining('Some English description'),
+      'gpt-4o-mini',
+    );
+  });
+
+  it('returns untranslated when llmService.isConfigured() is false', async () => {
+    const mockLlm = {
+      isConfigured: jest.fn().mockReturnValue(false),
+      complete: jest.fn(),
+    } as unknown as LlmService;
+
+    const svc = new LandingService(
+      {} as any, {} as any, {} as any, {} as any,
+      () => 'http://localhost',
+      { LLM_PROVIDER: 'openai' } as NodeJS.ProcessEnv,
+      mockLlm,
+    );
+
+    const result = await svc.translateDescription('Some text');
+    expect(result.translated).toBe(false);
+    expect(mockLlm.complete).not.toHaveBeenCalled();
   });
 });
