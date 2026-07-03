@@ -1,13 +1,25 @@
 # MIT Master Plan 2 — toward human-level translation quality
 
-> **Reviewed 2026-07-03** (fable-5 + clink, both **fix-then-ship**) — see `mit-master-plan-2-review-findings.md`.
-> Amendments in force: (1) **NEW Phase-0 item: translation-quality human-eval framework** (~50-page set +
-> rubric + blind A/B) — gates any "human-level" claim; (2) **P1 readable-floor: DONE** (PR #522, 2px→18px);
-> (3) **P8 premise stale** — `KnuthPlassLineBreaker` is already on main behind `bubble_area_fit`
-> (`text_render.py:835/:923`): verify the active breaker before scheduling; (4) **P10 premise wrong** —
-> `calc_vertical` is NOT dead (`rendering/__init__.py:615`): re-diagnose before #182 work; (5) P4 polygon
-> gate **confirmed** against the objection; (6) P2 is zero-code but NOT zero-risk (prompt changes for every
-> LLM call — pair with the item-1 rubric).
+> **Reviewed 2026-07-03 by FOUR reviewers** (fable-5, clink/claude-9arm, codex, agy) — all **fix-then-ship**.
+> Full detail: `mit-master-plan-2-review-findings.md`. Amendments in force:
+> 1. **NEW Phase-0: translation-quality human-eval** — adopt agy's MVE spec: 3–5 chapters / ~100 bubbles,
+>    0-2 rubric {faithfulness, cohesion/reading-order, style}, blind A/B vs official EN. Gates "human-level".
+> 2. **P1 readable-floor: DONE** (PR #522, 2px→18px).
+> 3. **P2 RollingContext — CACHE-SAFETY GATE before any prod enable** (codex, CRITICAL): Backend sends only
+>    *uncached* pages (`mit-batch-orchestrator.service.ts:441/488`) while MIT `RollingContext` only learns
+>    pages in that loop → cached-page-0 + uncached-page-1 caches a context-free result under a context-on
+>    key. Fix (send full ordered chapter, or seed context from cached pages) + partial-batch test FIRST.
+>    Re-estimate **M**, sequence **after P7**. Zero-code but NOT zero-risk (busts patch cache; prompt-bleed).
+> 4. **P8 KP is genuinely UN-wired** (codex corrected fable-5): all `calc_horizontal` callers omit
+>    `line_breaker` → `GreedyLineBreaker` default (`text_render.py:46`); the `:44` comment is aspirational.
+>    P8 = wire `KnuthPlassLineBreaker`; **sequence before/into P3** (breaker changes the layout baseline).
+> 5. **P10 premise wrong** — `calc_vertical` is NOT dead (`rendering/__init__.py:615`): re-diagnose before #182.
+> 6. **P7 expand** beyond format hygiene: character-voice/pronoun/honorific consistency, multi-bubble clause
+>    reconstruction, SFX semantic localization (agy — the real human-level levers).
+> 7. **NEW defect 30:** fragmented-clause translation of split speech bubbles (translation domain, agy).
+> 8. **P4 polygon gate confirmed** (against clink's "drop it" — refuted by the 2026-07-03 oval-spill evidence).
+> 9. **P5 add config-JSON/version hashing**; **CUT P12** inpaint-quality → separate backlog. Real accuracy
+>    ceiling named: a **multimodal-VLM translator** (text-only LLM is blind to gender/expression/panel flow).
 >
 > Status: planning document (round 2). Branch context: `perf/mit-layout-fit-and-merge` / worktree `feat-mit-font-s1`.
 > Supersedes the round-1 scope of `docs/prd/mit-render-defect-master-plan.md` (render-defect campaign). Round 1 largely closed the *render* axis; round 2 widens scope to the whole pipeline (detection → OCR → translation → layout → render → inpaint) with the explicit target of **human-level translation quality**, not just non-broken rendering.
