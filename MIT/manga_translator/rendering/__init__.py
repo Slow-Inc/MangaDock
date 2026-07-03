@@ -749,10 +749,13 @@ async def dispatch(
     font_size_max: int = 0,
     clean_layout: bool = False,
     page_shape=None,
-    reference_layout: bool = False
+    reference_layout: bool = False,
+    knuth_plass: bool = False
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
+    # P8 (#180): flip the process-wide default line-breaker for this render pass. Off → greedy (byte-identical).
+    text_render.set_default_line_breaker(text_render.KnuthPlassLineBreaker() if knuth_plass else None)
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
     # Resize regions that are too small. `page_shape` (full-page H,W) is threaded so clean-layout
