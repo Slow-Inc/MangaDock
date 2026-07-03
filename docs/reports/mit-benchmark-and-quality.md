@@ -65,8 +65,11 @@ The techniques in 1–3 were **studied from open-source** (MangaTranslator / zyd
 **deterministic render-replay harness** (#462) — region state is dumped once and the font-sizing is
 replayed offline (no non-deterministic translator), so a fix is measured, not eyeballed. On the
 committed 4-page corpus (One-Punch + Gal Yome ×3), the `reference_layout` engine takes One-Punch
-narration from **3.0× oversize/spill → 1.3×** (within tolerance) while Thai dialogue **keeps filling its
-bubbles** (no under-fill), guarded both directions by a safety-envelope test. Evidence + image:
+narration from **3.0× oversize/spill → 1.3×** (within tolerance) — verified deterministically + visually.
+**Thai fill is NOT clean yet** (user review 2026-07-03): the oval "มีอยู่หนึ่งอันนะ" over-fills and spills past
+the bubble's curved edge, and a tall-narrow bubble loses its text — defects the metric missed because
+`overflow_vs_det_w` measures spill vs the detection box, not the true bubble polygon (a harness blind spot to
+fix). Evidence + image:
 `docs/reports/benchmarks/2026-07-03-defect-verification.md`. Method lesson recorded: benchmark MIT render
 via `/translate/with-form/patches` (tags speech bubbles), never `/translate/with-form/image` (doesn't).
 

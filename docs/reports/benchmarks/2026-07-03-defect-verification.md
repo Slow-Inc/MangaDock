@@ -18,13 +18,28 @@ and proves the symptom is gone (feedback-benchmark-confirms-md-defect-fixed).
 | narration over-shrink (§7g regression guard) | readability vs flat | — | ≥ 0.68 (≥0.6 floor) | ✅ not too small |
 
 ## Assessment
-- **fix verified** deterministically + visually: One-Punch narration goes from oversized/spilling (OFF)
-  to a contained narrow column (ON) close to the target; Thai dialogue fills its bubbles (ON).
-- **Limitation (say in the report):** `reference_layout` is **flag OFF by default** → on the production
-  default path the One-Punch oversize is still present (3.00×, left column of the image). The fix is
-  verified but **not yet live in production** — promoting `reference_layout` to default (after a
-  corpus-growth + multi-run path-stability de-risk) is the delivery step.
-- **Residual:** the ON narration is ~0.68× the flat design size on One-Punch — slightly smaller than the
-  target's mid-size column (within tolerance, not a defect; a cap tune could close it).
+- **One-Punch narration-oversize: verified resolved** (ON) — deterministically (3.0×→1.3×) and visually
+  (oversized/spilling → contained narrow column near the target). Residual: ON narration is ~0.68× the
+  flat design size — slightly smaller than the target's mid column (within tolerance, not a defect).
+
+### ⚠️ Correction (user-caught 2026-07-03) — Thai fill is NOT cleanly resolved
+Visual review of the ON render caught two real defects the deterministic metric MISSED:
+1. **Over-fill spill:** the oval bubble "มีอยู่หนึ่งอันนะ" fills at a large font but the rectangular text
+   block **spills past the oval's curved edge** — the fill is bounded by the interior *bounding box*, not
+   the true bubble shape.
+2. **Text-loss:** the tall-narrow "plastic bag" bubble renders its Thai text tiny / mostly missing.
+
+**Harness blind spot (root of the miss):** `overflow_vs_det_w` measures spill vs the **detection box**, not
+vs the **actual bubble polygon** — so a block that fits the detection box yet overflows the oval reads as
+"fill = good". The metric must be extended to measure the rendered block against the bubble mask/shape.
+
+**⇒ Honest status:** narration-oversize resolved; **Thai fill path has residual over-fill (oval spill) +
+a text-loss case → NOT done.** These are new defect items, and `reference_layout` is **not ready to
+promote** until they + the metric blind spot are fixed.
+
+### Limitation (production)
+`reference_layout` is **flag OFF by default** → on the production default path the One-Punch oversize is
+still present (3.0×, left column). The fix is verified for narration but the Thai residuals above mean the
+promote-to-default step is gated on more than just the earlier threshold de-risk.
 
 ![defect-resolution verification: One-Punch OFF/ON/target + Thai orig/ON](./2026-07-03-defect-verification.png)
