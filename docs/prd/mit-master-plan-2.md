@@ -1,5 +1,6 @@
 # MIT Master Plan 2 — toward human-level translation quality
 
+> **Tracking epic:** Slow-Inc/MangaDock#528 (maps all 12 clusters → issues; new: #524 P2 cache-safety, #525 P4 polygon-metric, #526 Phase-0 eval, #527 defect-30).
 > **Reviewed 2026-07-03 by FOUR reviewers** (fable-5, clink/claude-9arm, codex, agy) — all **fix-then-ship**.
 > Full detail: `mit-master-plan-2-review-findings.md`. Amendments in force:
 > 1. **NEW Phase-0: translation-quality human-eval** — adopt agy's MVE spec: 3–5 chapters / ~100 bubbles,
