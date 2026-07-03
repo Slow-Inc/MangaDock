@@ -31,6 +31,7 @@ _HEAVY_TESTS = [
     'test_prev_context_prompt.py',   # test body imports translators.config_gpt -> translators/__init__ (torch)
     'test_registry_trim.py',
     'test_stages.py',
+    'test_timed_stage.py',           # imports MangaTranslator (torch) to check _run_* __name__
     'test_translation.py',
     'test_translation_manual.py',
     'test_worker_bind.py',
