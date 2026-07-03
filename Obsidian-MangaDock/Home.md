@@ -7,7 +7,8 @@ tags: ["moc"]
 
 Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้องอ่านตอนพัฒนา — ย้ายมาจาก `.claude/memory/` (canonical; single source of truth ตาม [[feedback-md-update-every-change]]).
 
-> [!info] วิธีใช้
+> [!info] วิธีใช้ (index = ตัวกรอง ไม่ใช่ reading list)
+> - อ่าน one-liner ด้านล่างของทุก note ก่อน — **เปิดเฉพาะ note ที่ตรงกับ subsystem/หัวข้อของงานตรงหน้า** เปิดทั้ง 36 note ทุก session แพงเกินจำเป็น (~26K token) และส่วนใหญ่ไม่เกี่ยวกับงานเดียว — ดู `feedback-issue-ownership-scope` + `feedback-verify-before-claiming` ที่ promote ไป CLAUDE.md แล้ว (universal จริง)
 > - เปิด **Graph View** เพื่อเห็นความสัมพันธ์ระหว่าง memory (ลิงก์ที่ยังไม่มีไฟล์ = จุดที่ควรเขียนเพิ่ม)
 > - แต่ละ note = ข้อเท็จจริงเดียว มี frontmatter (`type`, `description`) + `[[wikilinks]]` เชื่อมเรื่องที่เกี่ยวข้อง
 > - **type**: `feedback` (วิธีทำงานที่ user กำหนด) · `project` (สถานะงาน/ข้อจำกัด) · `reference` (ตัวชี้ทรัพยากรภายนอก)
