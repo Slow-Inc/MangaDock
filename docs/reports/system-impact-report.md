@@ -15,6 +15,44 @@
 
 ---
 
+## 2026-07-03 — MIT CI: torch-free blocking gate landed + baseline rot repair (ci / tech-debt)
+
+**What & where:** Landed the long-stalled #359 (PR #427) making `mit-ci`'s `pytest (logic gate,
+torch-free)` a **blocking** required check (lazy package import boundary — ADR 023 — + committed the
+gitignored Kumiko `panel/lib` source). To get a green baseline for it, shipped a prerequisite repair
+(PR #504) to `main`: `MIT/requirements.txt` pin `opencv-python>=4.8,<5.0`, and reverted
+`test_resize_regions_characterization.py` + its 3 `resize_regions_*.npz` goldens.
+
+**Why:** Flipping the gate to blocking surfaced ~15 pre-existing failures that the previous
+report-only job had masked: (a) unpinned opencv drifted to 5.0.0 in CI, whose `cv2.putText` now
+requires CV_8U depth → broke the `utils/sort.py` debug-viz + render goldens (~13 tests); (b) the
+resize characterization tests were committed **ahead of their implementation** (via the a6980f00
+dashboard-sync) — they assert `page_shape` / `_bubble_fit_layout` that never landed on `main`, so they
+tested nothing real and only failed.
+
+**Before → After:** MIT pytest CI was uncollectable/red and report-only (ignored, masking rot) →
+torch-free logic gate is a real blocking check, **green on main**. `import manga_translator` now works
+in CI/fresh-clones/worktrees (panel/lib tracked). opencv is reproducibly pinned.
+
+**Performance Δ:** N/A (CI infra). The MIT render perf hotfix it accompanies (select_hyphenator
+lru_cache + textline_merge M1/M2, already on main via #414) is byte-identical.
+
+**Quality:** No production code change. Decision recorded: characterization tests that assert
+un-shipped behavior are **reverted (not xfail'd)** to keep the branch internally consistent, and
+re-land **atomically with their impl** — tracked in #503.
+
+**Validation:** logic gate green on PR #427, #504, #502 and on `main` HEAD; opencv 4.13 locally makes
+`test_render_golden` pass (proving the pin fixes the drift); 3-round multi-agent scrutinize
+(codex/antigravity/claude-9arm) drove the revert-vs-xfail + sequencing decisions.
+
+**Risk / rollback:** low — each change is its own PR/commit (revertable); the reverted tests are
+tracked for atomic reland (#503). Follow-up debt: the render-layout impl (page_shape/clean_layout/
+`_bubble_fit_layout`) remains uncommitted in an entangled working tree — lands with #503.
+
+**Links:** #359 (closed), PR #427 / #504 / #502, ADR 023, reland #503.
+
+---
+
 ## 2026-07-02 — Wallet Security Hardening V1–V9: DB layer (feature / security)
 
 **Scope:** Backend (`wallet`, `unlock` modules) + Supabase DB · **Type:** Security hardening — DB layer completion · **Tests:** 78/78 backend unit tests green (unlock×7, wallet×63, controller×8); 0 new failures.

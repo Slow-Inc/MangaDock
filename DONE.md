@@ -3,6 +3,39 @@
 
 ---
 
+## MIT CI: land #359 torch-free blocking gate + baseline rot repair (2026-07-03)
+
+**Goal:** Get the MIT perf hotfix + the stalled #359 CI work onto `main`, then make the MIT logic
+gate a real **blocking** check. What started as "open a PR + /scrutinize" cascaded (via 3 rounds of
+`/clink-brainstorm`) into untangling several in-flight workstreams off `main`.
+
+**What landed (4 PRs, in order):**
+1. **#504 — CI baseline** → `main`: pinned `opencv-python>=4.8,<5.0` (CI had drifted to 5.0.0, whose
+   strict-CV_8U `cv2.putText` broke ~13 render/merge tests + the render golden) and **reverted** the
+   `test_resize_regions_characterization.py` + 3 goldens that were committed *ahead of impl* (assert
+   `page_shape`/`_bubble_fit_layout` absent on main).
+2. **#427 (#359)** → `main`: rebased onto the baseline, `pytest (logic gate, torch-free)` green →
+   merged. MIT CI is now a blocking torch-free gate (lazy import boundary, ADR 023) + the gitignored
+   Kumiko `panel/lib` source is committed (fixes `import manga_translator` in CI/clones/worktrees).
+3. **#502 — perf + docs** → `main`: rebased; git auto-dropped the #459 commits (already upstream via
+   #414) and collapsed the perf commit to its one unique delta (`functools.wraps` on `_timed_stage`);
+   dropped the re-added orphan tests; marked `test_timed_stage` heavy in `conftest._HEAVY_TESTS`.
+4. **#503** — tracking issue for re-landing the render-layout characterization tests **atomically**
+   with their implementation.
+
+**Key findings (scrutinize/brainstorm):** the perf hotfix (select_hyphenator lru_cache + M1/M2) was
+**already on main** via #414's sync, so #502 was mostly redundant; the "second wave" of failures a
+reviewer predicted was real (opencv drift + tests-ahead-of-impl), hidden only by the old report-only
+job; decision = revert un-shipped-behavior tests (not xfail) and reland atomic.
+
+**Validation:** logic gate green on all 3 PRs + `main` HEAD; opencv 4.13 locally makes
+`test_render_golden` pass (proves the pin). Backend + Frontend CI green on main.
+
+**Debt:** render-layout impl (page_shape/clean_layout/`_bubble_fit_layout`) still uncommitted in an
+entangled working tree → #503. Impact report: `docs/reports/system-impact-report.md` (2026-07-03).
+
+---
+
 ## Wallet Security Hardening V1–V9: DB layer + scrutinize fixes (2026-07-02)
 
 **Goal:** Land the DB-layer deliverables from `feat/wallet-security-hardening` (SQL migrations + unit tests) after the runtime code was already in main. Fix 3 scrutinize blockers before merge.
