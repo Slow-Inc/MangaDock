@@ -1,5 +1,14 @@
 # MIT Master Plan 2 — toward human-level translation quality
 
+> **Reviewed 2026-07-03** (fable-5 + clink, both **fix-then-ship**) — see `mit-master-plan-2-review-findings.md`.
+> Amendments in force: (1) **NEW Phase-0 item: translation-quality human-eval framework** (~50-page set +
+> rubric + blind A/B) — gates any "human-level" claim; (2) **P1 readable-floor: DONE** (PR #522, 2px→18px);
+> (3) **P8 premise stale** — `KnuthPlassLineBreaker` is already on main behind `bubble_area_fit`
+> (`text_render.py:835/:923`): verify the active breaker before scheduling; (4) **P10 premise wrong** —
+> `calc_vertical` is NOT dead (`rendering/__init__.py:615`): re-diagnose before #182 work; (5) P4 polygon
+> gate **confirmed** against the objection; (6) P2 is zero-code but NOT zero-risk (prompt changes for every
+> LLM call — pair with the item-1 rubric).
+>
 > Status: planning document (round 2). Branch context: `perf/mit-layout-fit-and-merge` / worktree `feat-mit-font-s1`.
 > Supersedes the round-1 scope of `docs/prd/mit-render-defect-master-plan.md` (render-defect campaign). Round 1 largely closed the *render* axis; round 2 widens scope to the whole pipeline (detection → OCR → translation → layout → render → inpaint) with the explicit target of **human-level translation quality**, not just non-broken rendering.
 
