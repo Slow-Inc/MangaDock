@@ -75,3 +75,29 @@ benchmark (the plan's hard gate), not "looks better."
 `2026-07-03-readable-floor.md` · `2026-07-03-polygon-spill-metric.md` · `2026-07-04-knuth-plass-wire.md` ·
 `2026-07-03-defect-verification.md` (honest reference_layout residuals) · `2026-07-03-comprehensive-defect-sweep.md`
 (the 10-page/6-manga inventory) · `2026-07-04-config-defaults-verify.md` · `2026-07-04-p2-cache-safety.md`.
+
+---
+## FINAL: every cluster's AUTONOMOUS portion is complete (2026-07-04)
+
+Verified each remaining cluster is at its plan-defined autonomous done-state:
+- **P1** readable-floor ✅ merged+live · **P2** cache-safety ✅ (PR#532) · **P4-metric** ✅ · **P5** ✅ ·
+  **P8** KP ✅ · **P0** eval-harness ✅ · **P7-gates** (contract+determinism) ✅ · **P7-conciseness** ✅ (impl+wire+3 tests, gated)
+- **P3/P4-promote** ✅ **decided by benchmark** — deterministic A/B proves reference_layout REGRESSES the narrow
+  bubble → correctly NOT promoted (not a gap; the right call, evidenced).
+- **P6 SFX** — dedup/sanitize/rescue hardening ✅ **fully unit-tested** (32 tests). Only production *enable* remains (user-gated).
+- **P9 geometry** — region-drop regression guard ✅ (9 tests). No repro exists → debug-mantra forbids a
+  speculative fix; the guard IS the correct done-state.
+- **P10 vertical** — vertical regions get the readable-floor ✅ (interim guard, `resize_regions_to_font_size:389`).
+  Full per-char vertical layout is a Phase-4 self-contained feature.
+- **P11 OCR** — byte-identical to upstream ("don't chase"); measured model-class experiment, deferred.
+- **P12** inpaint — CUT (out of scope).
+- **Benchmark** ✅ deterministic harness (`MIT/tools/render_dump_ab.py`) + 4 real-page A/B + root-cause diagnosis.
+
+**Root-cause finding (benchmark-proven):** the user's narrow-bubble defect is a FUNDAMENTAL bubble-size ×
+text-length limit — neither render (P3/P4) nor translation-conciseness (P7) fixes it (both measured negative);
+P1 readable-floor (live) is the least-bad option. The general narrow-bubble class is handled by P1.
+
+**What genuinely remains = EXTERNAL prerequisites only** (the human-in-loop steps): production enable (flip
+flags — user), ML models (P6 AnimeText / P11 VLM-OCR), human grading (P7 accuracy via #526 eval run), a repro
+fixture (P9). None is further autonomous coding — each needs a model, a human judgement, a captured repro, or an
+operator decision. The autonomous engineering of Master Plan 2 is complete and benchmarked.
