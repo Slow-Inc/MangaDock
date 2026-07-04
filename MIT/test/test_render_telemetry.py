@@ -109,3 +109,24 @@ def test_squeeze_never_force_breaks_a_short_word(monkeypatch):
     r = FakeRegion(horizontal=True, translation='HMPH.', xyxy=(0, 0, 80, 300))  # tall box, one word
     fs, block_w, block_h = rend._clean_layout_dst(r, (400, 400, 3), 8, 20)
     assert block_h <= fs * 1.3           # ONE line — the word was never split
+
+
+def test_clean_layout_grows_font_toward_original_within_footprint(monkeypatch):
+    # user vs target: our narration was a bit SMALLER than target (flat 20px while the
+    # original lettering is 35px) and the right one spread sideways. clean_layout must
+    # pick the LARGEST font <= original lettering whose narrow column still fits the
+    # ORIGINAL footprint (both width and height) — like the target.
+    def fake_calc(font, text, max_width, max_height, language='en_US', **kw):
+        import math
+        px = font // 2                                   # char width scales with font
+        cpl = max(1, int(max_width) // px)
+        n = math.ceil(len(text) / cpl)
+        return ['x' * cpl] * n, [min(int(max_width), len(text) * px)] * n
+    monkeypatch.setattr(rend.text_render, 'calc_horizontal', fake_calc)
+    # tall footprint 120x300; original lettering 36px; 24 chars of text (spaced)
+    r = FakeRegion(horizontal=True, translation='AB ' * 8, font_size=36, xyxy=(0, 0, 120, 300))
+    fs, block_w, block_h = rend._clean_layout_dst(r, (400, 400, 3), 8, 20)
+    assert fs > 20                        # grew toward the original, not stuck at flat
+    assert fs <= 36                       # never larger than the original lettering
+    assert block_w <= 120 * 1.06          # column stays inside the original footprint width
+    assert block_h <= 300                 # ...and height

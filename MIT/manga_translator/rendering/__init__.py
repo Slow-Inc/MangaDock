@@ -186,30 +186,55 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # narrowing step would already overflow its height). Floor = calc_horizontal's
     # own 2×font so no degenerate sliver.
     box_h = max(1.0, y2f - y1f)
-
-    def _measure_h(w):
-        ls, _ = text_render.calc_horizontal(clean_fs, region.translation, int(w),
-                                            int(img_shape[0]), language=lang)
-        return max(1, len(ls)) * clean_fs * _LINE_HEIGHT
+    bbox_w = max(1.0, x2f - x1f)
 
     # #183 hard gate: the squeeze floor is the LONGEST TOKEN's width (ZWSP-aware so
     # Thai/CJK words count, not the whole spaceless line) — a single short word in a
-    # tall box must never force-break ("HMPH." → "HM/PH.", caught live).
+    # tall box must never force-break ("HMPH." → "HM/PH.", caught live). Capped at the
+    # footprint width: a token wider than the box hyphenates at syllables (the target
+    # does the same — "SOME-WHERE"), it must not veto the narrow column entirely.
     _seg = text_render._insert_cjk_word_breaks(
         text_render._insert_thai_word_breaks(region.translation or ''))
     _toks = [t for t in re.split(r'[\s​]+', _seg) if t]
     _longest = max(_toks, key=len) if _toks else ''
-    min_w = 2 * clean_fs
-    if _longest:
-        _, _lw = text_render.calc_horizontal(clean_fs, _longest, 10 ** 7, 10 ** 7, language=lang)
-        min_w = max(min_w, float(max(_lw)) if _lw else 0.0)
-    used_w = squeeze_width(_measure_h, wrap_w, min_w, box_h)
-    # max_height is generous (full page) so wrapping is governed by width and the block
-    # grows vertically — we place it on the centre regardless of the source box height.
-    lines, widths = text_render.calc_horizontal(
-        clean_fs, region.translation, int(used_w), int(img_shape[0]), language=lang)
-    block_w = max(widths) if widths else used_w
-    block_h = max(1, len(lines)) * clean_fs * _LINE_HEIGHT
+
+    def _floor_w(fs):
+        f = 2.0 * fs
+        if _longest:
+            _, _lw = text_render.calc_horizontal(fs, _longest, 10 ** 7, 10 ** 7, language=lang)
+            f = max(f, float(max(_lw)) if _lw else 0.0)
+        return min(f, max(bbox_w, 2.0 * fs))
+
+    def _layout_at(fs):
+        def _mh(w):
+            ls, _ = text_render.calc_horizontal(fs, region.translation, int(w),
+                                                int(img_shape[0]), language=lang)
+            return max(1, len(ls)) * fs * _LINE_HEIGHT
+        floor = _floor_w(fs)
+        used = squeeze_width(_mh, max(wrap_w, floor), floor, box_h)
+        lines, widths = text_render.calc_horizontal(
+            fs, region.translation, int(used), int(img_shape[0]), language=lang)
+        bw = float(max(widths)) if widths else float(used)
+        bh = max(1, len(lines)) * fs * _LINE_HEIGHT
+        return bw, bh
+
+    # #535 (user vs target, One-Punch narrations): the target letters narration near
+    # the ORIGINAL size in a tall narrow column. Pick the LARGEST font ≤ the original
+    # lettering whose squeezed column still fits the original footprint (width AND
+    # height). Falls back to the flat size (current behavior) when nothing larger
+    # fits — a short/wide caption keeps the flat look unchanged.
+    orig_fs = int(getattr(region, 'font_size', 0) or 0)
+    hi = min(max(orig_fs, clean_fs), 120)
+    fs = hi
+    while fs > clean_fs:
+        bw, bh = _layout_at(fs)
+        if bh <= box_h and bw <= bbox_w * 1.05:
+            block_w, block_h, clean_fs = bw, bh, fs
+            return int(clean_fs), float(block_w), float(block_h)
+        fs -= 2
+
+    # flat fallback: squeeze at the flat size (tall-narrow, height-bounded as before).
+    block_w, block_h = _layout_at(clean_fs)
     return int(clean_fs), float(block_w), float(block_h)
 
 
