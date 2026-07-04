@@ -107,7 +107,57 @@ def merge_empty_balloons(ctx, result, device):
             textlines.append(Quadrilateral(pts, '', 1.0))
         if fresh:
             logger.info(f"[EmptyBalloon] +{len(fresh)} uncovered inked balloon(s) queued for VLM rescue")
+
+        # #535 ink-cluster completeness: text-like ink on a LIGHT background that
+        # neither DBNet nor the balloon YOLO covered (a square panel caption, a
+        # stray sentence line) — the last net under everything.
+        gray = img.mean(axis=2).astype('uint8') if img.ndim == 3 else img
+        covered = [textline_aabb(t) for t in textlines] + list(balloons)
+        clusters = uncovered_text_clusters(gray, covered)
+        for (x1, y1, x2, y2) in clusters:
+            pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
+            textlines.append(Quadrilateral(pts, '', 1.0))
+        if clusters:
+            logger.info(f"[InkCluster] +{len(clusters)} uncovered text cluster(s) queued for VLM rescue")
         return (textlines, mask_raw, mask)
     except Exception:
         logger.warning("[EmptyBalloon] rescue failed — continuing without", exc_info=True)
         return result
+
+
+def uncovered_text_clusters(gray, covered_boxes, min_area: int = 1200,
+                            max_area_frac: float = 0.25,
+                            ink_lo: float = 0.04, ink_hi: float = 0.45,
+                            bg_light: int = 190, dilate_px: int = 9):
+    """#535 completeness (Otome "STARTING WITH…" box + the "ME OFF!" line): find
+    text-like INK CLUSTERS no detector covered — sparse dark strokes sitting on a
+    LIGHT background (typeset captions / dialogue), the exact pattern both DBNet and
+    the balloon YOLO can miss. Dark/dense art is rejected by the ink-density and
+    background-lightness gates. Pure numpy/cv2; returns page-coord boxes to append
+    as empty textlines for the VLM rescue."""
+    import cv2 as _cv2
+    import numpy as _np
+    g = gray if gray.ndim == 2 else _cv2.cvtColor(gray, _cv2.COLOR_RGB2GRAY)
+    h, w = g.shape[:2]
+    ink = (g < 128).astype(_np.uint8)
+    for (x1, y1, x2, y2) in covered_boxes or []:
+        ink[max(0, int(y1)):max(0, int(y2)), max(0, int(x1)):max(0, int(x2))] = 0
+    k = 2 * dilate_px + 1
+    blob = _cv2.dilate(ink, _np.ones((k, k), _np.uint8))
+    num, labels, stats, _ = _cv2.connectedComponentsWithStats(blob)
+    out = []
+    page_area = float(h * w)
+    for i in range(1, num):
+        x, y, bw, bh, area = stats[i]
+        if bw * bh < min_area or (bw * bh) / page_area > max_area_frac:
+            continue
+        crop = g[y:y + bh, x:x + bw]
+        crop_ink = (crop < 128)
+        density = float(crop_ink.mean())
+        if not (ink_lo <= density <= ink_hi):
+            continue                      # too sparse = speckle; too dense = art
+        non_ink = crop[~crop_ink]
+        if non_ink.size == 0 or float(_np.median(non_ink)) < bg_light:
+            continue                      # background not light = art region
+        out.append((float(x), float(y), float(x + bw), float(y + bh)))
+    return out

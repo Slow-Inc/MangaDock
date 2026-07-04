@@ -75,3 +75,41 @@ def test_truly_empty_balloon_is_not_rescued():
     from manga_translator.detection_postproc import empty_balloon_boxes
     got = empty_balloon_boxes([(0.0, 0.0, 100.0, 100.0)], [], lambda box: 5, min_ink=100)
     assert got == []
+
+
+# ---- #535 ink-cluster completeness: text ink on a LIGHT bg with no region = missed ----
+
+def _page_with(draw):
+    import numpy as np, cv2
+    img = np.full((400, 400), 240, np.uint8)
+    draw(img, cv2)
+    return img
+
+def test_uncovered_typeset_block_is_found():
+    from manga_translator.detection_postproc import uncovered_text_clusters
+    def draw(img, cv2):
+        for i, line in enumerate(['STARTING WITH', 'THE HEROINE', 'WHO IS CLEAN']):
+            cv2.putText(img, line, (60, 80 + i * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 0, 2)
+    img = _page_with(draw)
+    got = uncovered_text_clusters(img, covered_boxes=[])
+    assert len(got) == 1
+    x1, y1, x2, y2 = got[0]
+    assert x1 < 70 and y1 < 70 and x2 > 200 and y2 > 150     # covers the block
+
+
+def test_covered_block_is_skipped():
+    from manga_translator.detection_postproc import uncovered_text_clusters
+    def draw(img, cv2):
+        cv2.putText(img, 'HELLO WORLD', (60, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 0, 2)
+    img = _page_with(draw)
+    got = uncovered_text_clusters(img, covered_boxes=[(40, 60, 320, 130)])
+    assert got == []
+
+
+def test_dense_dark_art_is_rejected():
+    from manga_translator.detection_postproc import uncovered_text_clusters
+    def draw(img, cv2):
+        img[50:250, 50:250] = 40                              # solid dark art block
+    img = _page_with(draw)
+    got = uncovered_text_clusters(img, covered_boxes=[])
+    assert got == []                                          # too dense = art, not text
