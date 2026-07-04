@@ -176,4 +176,4 @@ def test_run_rendering_default_dispatch_forwards_all_kwargs(monkeypatch):
     assert out == 'RENDERED'
     # positional: img_inpainted, text_regions, font_path, font_size, offset, minimum, do_hyphenation, render_mask, line_spacing
     assert seen['args'] == ('INP', ctx.text_regions, 'FONT', 24, 0, 8, True, 'RMASK', 1)
-    assert seen['kwargs'] == {'bubble_fit': True, 'supersampling': 4, 'font_max_box_ratio': 0.5, 'anti_overlap': False, 'font_size_max': 0, 'clean_layout': False, 'knuth_plass': False}
+    assert seen['kwargs'] == {'bubble_fit': True, 'supersampling': 4, 'font_max_box_ratio': 0.5, 'anti_overlap': False, 'font_size_max': 0, 'clean_layout': False, 'knuth_plass': False, 'page_shape': None}

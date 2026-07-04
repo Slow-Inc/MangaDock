@@ -23,7 +23,7 @@ def stubs(monkeypatch):
     monkeypatch.setattr(rend, '_bubble_fit_font_size',
                         lambda region, wh, ratio: 42)
     monkeypatch.setattr(rend, '_clean_layout_dst',
-                        lambda region, shape, fmin, fmax: (20, 80.0, 30.0))
+                        lambda region, shape, fmin, fmax, page_shape=None: (20, 80.0, 30.0))
     return monkeypatch
 
 
@@ -180,3 +180,22 @@ def test_rescued_display_sfx_renders_single_line(monkeypatch):
     assert 8 < r.render_font_px <= 152
     # one line: the chosen font makes the whole word fit the box width
     assert len('SQUELCH') * r.render_font_px * 0.5 <= (300 - 20) * 1.06
+
+
+def test_clean_layout_wrap_clamps_to_page_not_crop(monkeypatch):
+    # D page_shape: in the patch path img_shape is the small CROP — clean_wrap_width's
+    # 45% cap of a 200px crop (=90px) would strangle a 150px-wide caption. With
+    # page_shape threaded, the clamp uses the PAGE width and the column keeps the
+    # caption's own footprint.
+    def fake_calc(font, text, max_width, max_height, language='en_US', **kw):
+        import math
+        cpl = max(1, int(max_width) // 10)
+        n = math.ceil(len(text) / cpl)
+        return ['x' * cpl] * n, [min(int(max_width), len(text) * 10)] * n
+    monkeypatch.setattr(rend.text_render, 'calc_horizontal', fake_calc)
+    r = FakeRegion(horizontal=True, translation='AB ' * 10, xyxy=(0, 0, 150, 60))  # short wide caption
+    # crop 200px wide, page 800px wide
+    fs, w_crop, _ = rend._clean_layout_dst(r, (200, 200, 3), 8, 20)
+    fs, w_page, _ = rend._clean_layout_dst(r, (200, 200, 3), 8, 20, page_shape=(1150, 800))
+    assert w_crop <= 92                   # crop-clamped (45% of 200) — the bug
+    assert w_page > 92                    # page-clamped keeps the caption footprint

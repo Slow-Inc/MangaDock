@@ -157,7 +157,7 @@ def _region_territory(region):
     return (float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3])) if xy is not None else None
 
 
-def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int):
+def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None):
     """Render-layout rework: lay the translated text out as an upright horizontal block
     at a *small absolute* font, wrapped to a compact width, ready to be placed on the
     region's centre. Returns ``(font_size, block_w, block_h)`` — or ``None`` when the
@@ -177,7 +177,11 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # where the source columns did — a narration stays a narrow tall block, not a wide
     # paragraph. (The balloon box is deliberately NOT used: narration boxes also get a
     # wide bubble_box from segmentation, which would re-widen them.)
-    wrap_w = clean_wrap_width(x2f - x1f, img_shape[1])
+    # D (#535): the wrap clamp is PAGE-relative — in the patch path img_shape is the
+    # small crop, whose 45% cap would strangle a wide caption (and the 11% floor
+    # under-floor). Use the page width when the caller threads it.
+    _ps = page_shape if page_shape is not None else img_shape
+    wrap_w = clean_wrap_width(x2f - x1f, _ps[1])
     lang = getattr(region, 'target_lang', 'en_US')
     # #535/#183 (user vs target): a tall original footprint (vertical-JP narration /
     # dialogue column) must render as a tall NARROW column like the target — squeeze
@@ -254,7 +258,7 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     return int(clean_fs), float(block_w), float(block_h)
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False):
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -396,7 +400,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             continue
 
         if clean_layout and not sfx and region.translation and region.translation.strip():
-            laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max)
+            laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max, page_shape)
             if laid is not None:
                 clean_fs, block_w, block_h = laid
                 x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
@@ -580,7 +584,8 @@ async def dispatch(
     anti_overlap: bool = False,
     font_size_max: int = 0,
     clean_layout: bool = False,
-    knuth_plass: bool = False
+    knuth_plass: bool = False,
+    page_shape=None
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
@@ -596,7 +601,7 @@ async def dispatch(
     # (no `await`), so perf_counter here measures true compute — comparing their sum
     # to the async-wrapper's stage total isolates any async/suspension overhead.
     _t_layout = time.perf_counter()
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape)
     logger.info(f"[timing-render] phase=layout_fit elapsed_ms={(time.perf_counter() - _t_layout) * 1000:.1f} regions={len(text_regions)}")
 
     # TODO: Maybe remove intersections

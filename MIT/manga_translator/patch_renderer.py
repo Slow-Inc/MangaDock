@@ -119,6 +119,9 @@ class PatchRenderer:
             patch_ctx.img_rgb = crop_rgb
             patch_ctx.img_alpha = None
             patch_ctx.text_regions = local_regions
+            # D (#535): the render sees only the CROP — thread the true page dims so
+            # clean_layout's wrap clamp is page-relative, not crop-relative.
+            patch_ctx.page_shape = (img_h, img_w)
             patch_ctx.mask = None
 
             if self.full_inpainted is not None:
