@@ -34,3 +34,17 @@ column until the block fills the region's ORIGINAL height. First live run force-
 force-broken word anywhere; narration follows the original's vertical proportion.
 
 ![final vs target](./2026-07-04-narrow-column-vs-target.jpg)
+
+## Update 2: size toward the ORIGINAL lettering + hyphenation-aware floor (final)
+
+User: still a bit smaller than target + the right one spread sideways. Fixes:
+1. clean_layout now picks the LARGEST font <= original lettering whose squeezed column fits the original
+   footprint (w AND h) — live: narration 35->29px, 39->25px (was flat 20px), matching the target scale.
+2. Floor is hyphenation-aware per token: hyphenatable words floor at their widest syllable (+hyphen) so long
+   words hyphenate like the target (SOME-WHERE); unhyphenatable words (HMPH./HUH?/Thai) floor at their whole
+   width — never force-broken (the wrap layer char-splits them otherwise).
+
+**Final live render matches the target's line breaks almost exactly** ("THIS/BRAT/STILL/DOESN'T/REALIZE/
+WHAT/HE'S/DONE." @29px). Telemetry: [0] 35->29, [1] 39->25, [3] 27->25; short regions keep flat 20.
+
+![final: original-size narrow column vs target](./2026-07-04-origsize-column-vs-target.jpg)
