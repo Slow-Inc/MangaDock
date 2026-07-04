@@ -1273,3 +1273,32 @@ So P3/P4 are correctly NOT promoted — an evidence-based decision, not a gap.
 gated + characterization-net-green. **Remaining MP2 work is external-only** (merge #532 [security-gated for the
 agent], ML models for P6/P11, human grading for P7-accuracy via #526, a repro fixture for P9, prod-enable
 decisions) — documented in `docs/reports/mit-master-plan-2-status.md`.
+
+## 2026-07-04 (b) — MP2 P7-accuracy LLM-judge + brainstorm-unblocked clusters (PR #533)
+
+**What / where.** `PR #533` (`fix/mit-mp2-p2-p5`): `MIT/eval/llm_judge.py` + `run_llm_judge.py` (torch-free
+LLM-judge over the #526 harness, reusing the `CUSTOM_OPENAI_*` endpoint) and 3 committed benchmarks
+(`docs/reports/benchmarks/2026-07-04-{translation-eval-llmjudged,p7-conciseness-quality-ab,brainstorm-unblocked-clusters}.{md,png}`).
+
+**Why.** The reviewers' #1 gap — translation *accuracy* — was previously "unmeasurable". A `/clink-brainstorm`
+round found the first measurement was NOT blocked on a human: the endpoint + cached EN references already exist.
+
+**Before → after.**
+- Translation quality: "unmeasurable / asserted" → **measurable**. First real LLM-judged scorecard: baseline
+  **1.70/2** over 35 bubbles (faithfulness 1.63 / cohesion 1.83 / style 1.63).
+- **Refines the (a)-entry claim** that P7 conciseness is "no help": that was a *length* finding (112≈110 chars).
+  A clean quality A/B shows `concise_bubbles` ON **improves LLM-judged quality** (overall 1.47→1.60,
+  faithfulness 1.41→1.59) — it doesn't shorten, it phrases more faithfully → proven-good enable candidate
+  (alongside P8 Knuth-Plass), still default-off.
+- P6 SFX (model cached, `detect_sfx_boxes` verified, 4 boxes) and P9 (0-drop audit = terminal state) confirmed
+  autonomously advanceable, not blocked.
+
+**Perf Δ.** None — eval/benchmarks are offline tools; no production path touched.
+
+**Quality / validation.** LLM-judged (lower-confidence than blind human grading — the gold standard remains
+~100 bubbles + human). `translation_eval` suite 9/9 green; `llm_judge` import verified torch-free (logic-gate
+safe). Every benchmark now ships a committed PNG per the benchmark rule.
+
+**Risk.** Very low — additive eval/docs only, no runtime code. Cleanup in this PR: dropped a 1396-line worker
+log that had leaked in (+ gitignore), relocated the proactive-clink-brainstorm memory to the canonical Obsidian
+vault. **Remaining = user-gated:** merge #533 + prod-enable of the proven-good flags.
