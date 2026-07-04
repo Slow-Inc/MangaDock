@@ -37,7 +37,7 @@ def test_merge_identity_when_no_sfx_boxes(monkeypatch):
 def test_inked_balloon_without_textline_is_selected():
     from manga_translator.detection_postproc import empty_balloon_boxes
     balloons = [(0, 0, 100, 100), (200, 200, 300, 300)]
-    textlines = [(10, 10, 90, 30)]                     # inside balloon 1 only
+    textlines = [(10, 10, 90, 40)]                     # 24% of balloon 1 = covered
     ink = lambda box: 500                              # both have ink
     got = empty_balloon_boxes(balloons, textlines, ink, min_ink=100)
     assert got == [(200, 200, 300, 300)]               # balloon 2: ink but no textline
