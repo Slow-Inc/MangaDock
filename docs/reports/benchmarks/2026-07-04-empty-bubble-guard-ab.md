@@ -18,8 +18,8 @@ guard active. Same code path, same inputs, one variable.
 
 | | foreign-text ink pixels ("LOST?" bubble) |
 |---|---|
-| BEFORE (guard off — pre-fix) | **0** (fully erased → white hole, nothing re-rendered) |
-| AFTER (guard on) | **629** (preserved intact) |
+| BEFORE (guard off — pre-fix) | **0** (bubble fully erased → white hole, nothing re-rendered) |
+| AFTER (guard on) | **1152** (preserved intact; kept region still re-renders normally) |
 
 ![before/after — foreign text erased vs preserved](./2026-07-04-empty-bubble-guard-ab.png)
 
