@@ -82,3 +82,16 @@ def clamp_box_to_neighbors(box: Box, others: Iterable[Sequence[float]], margin: 
     if y2 < y1:
         y1 = y2 = cy
     return (x1, y1, x2, y2)
+
+
+def fills_bubble_width(region_w: float, bubble_w: float, threshold: float = 0.72) -> bool:
+    """#175 residual #2 / #535 slice C: a region the segmenter placed in a balloon is
+    dialogue-to-FILL only when its own text footprint spans most of the balloon width
+    (``region_w/bubble_w >= threshold``). A caption/narration loosely sitting in a
+    large detected box (One-Punch "THIS BRAT…": rw/bw ≈0.40–0.59 vs dialogue
+    ≈0.88–0.90) must keep clean-layout's narrow source-referenced column — matching
+    the target's tall narrow block — not balloon up wide. ``bubble_w <= 0`` (no
+    info) → don't block bubble-fit. Pure."""
+    if bubble_w <= 0:
+        return True
+    return (region_w / bubble_w) >= threshold

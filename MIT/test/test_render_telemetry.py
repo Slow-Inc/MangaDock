@@ -48,3 +48,22 @@ def test_clean_layout_branch_stamps_telemetry(stubs):
     assert r.render_font_px == 20
     assert len(r.render_dst_box) == 4
     assert len(out) == 1
+
+
+def test_narrow_narration_in_big_balloon_falls_through_to_clean_layout(stubs):
+    # #535 slice C: tagged + sole occupant, but the text footprint spans only half
+    # the balloon width (rw/bw = 0.5 < 0.72) → NOT dialogue-to-fill; must keep the
+    # clean-layout narrow column (the target's tall narrow narration block).
+    img = np.full((200, 200, 3), 255, np.uint8)
+    r = FakeRegion(bubble_box=(0, 0, 160, 160), horizontal=True,
+                   translation='THIS BRAT STILL...', xyxy=(40, 20, 120, 140))  # rw 80 / bw 160
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, clean_layout=True)
+    assert r.render_branch == 'clean_layout'
+
+
+def test_wide_dialogue_in_balloon_still_bubble_fits(stubs):
+    img = np.full((200, 200, 3), 255, np.uint8)
+    r = FakeRegion(bubble_box=(0, 0, 100, 100), horizontal=True,
+                   translation='HELLO', xyxy=(5, 20, 95, 80))                  # rw 90 / bw 100
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, clean_layout=True)
+    assert r.render_branch == 'bubble_fit_sole'

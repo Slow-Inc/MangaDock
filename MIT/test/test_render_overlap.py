@@ -83,3 +83,25 @@ def test_multiple_neighbors_each_constrain_their_side():
     # neighbour right (8..) and neighbour below (..8) → clamp both edges.
     out = clamp_box_to_neighbors((0, 0, 10, 10), [(8, 0, 20, 10), (0, 8, 10, 20)])
     assert out == (0, 0, 8, 8)
+
+
+# ---- #535 Phase-1 slice A/C: fills_bubble_width — the narration discriminator ----
+# A region the segmenter placed in a balloon is dialogue-to-FILL only when its own
+# text footprint spans most of the balloon width. A narration column loosely sitting
+# in a big detected box (One-Punch "THIS BRAT…", rw/bw ~0.40-0.59) must fall through
+# to clean-layout's narrow source-referenced column — matching the target's tall
+# narrow block — instead of ballooning up wide.
+
+def test_dialogue_footprint_fills_balloon():
+    from manga_translator.render_overlap import fills_bubble_width
+    assert fills_bubble_width(90, 100) is True            # rw/bw 0.90 = dialogue
+
+
+def test_narration_narrow_footprint_falls_through():
+    from manga_translator.render_overlap import fills_bubble_width
+    assert fills_bubble_width(50, 100) is False           # rw/bw 0.50 = narration
+
+
+def test_no_balloon_info_does_not_block():
+    from manga_translator.render_overlap import fills_bubble_width
+    assert fills_bubble_width(50, 0) is True              # bw<=0 → don't block
