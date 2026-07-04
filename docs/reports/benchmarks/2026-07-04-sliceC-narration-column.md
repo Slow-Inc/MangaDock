@@ -23,3 +23,14 @@ bubble_fit branch with it (keeps the committed `_bubble_fit_font_size`; slice E 
   EN→TH page (2nd-manga rule) before slice C is called fully done; no local source page → pending capture.
 - Run-to-run: detection/tagging vary; the telemetry payload now records the branch per region on every request,
   so any regression is attributable from data.
+
+## Update: slice D-narrow (squeeze) + #183 no-force-break floor
+
+User caught 2 spots still wider than target → ported `squeeze_width` (#183): clean_layout narrows the wrap
+column until the block fills the region's ORIGINAL height. First live run force-broke short words
+("HMPH."→"HM/PH.") → floor corrected to the WIP's word-aware longest-token width (ZWSP pre-segmentation).
+
+**Final live render:** every column tall-narrow like the target; "HMPH." / "...HUH?" one line each; no
+force-broken word anywhere; narration follows the original's vertical proportion.
+
+![final vs target](./2026-07-04-narrow-column-vs-target.jpg)
