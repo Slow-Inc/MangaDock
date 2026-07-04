@@ -382,3 +382,32 @@ def add_own_balloon_interiors(allowed_mask: np.ndarray, regions,
         if ix2 > ix1 and iy2 > iy1:
             out[iy1:iy2, ix1:ix2] = 255
     return out
+
+
+def erase_own_balloon_ink(mask: np.ndarray, crop_rgb: np.ndarray, regions,
+                          border_frac: float = 0.06, ink_thresh: int = 128,
+                          dilate_px: int = 2) -> np.ndarray:
+    """#535 round-7 ("ME OFF!" ghost): source lines the detector's box missed leave
+    strokes the refined mask never covers — inside a region's OWN balloon they are
+    its territory (the translation re-renders over the balloon), so add exactly
+    those INK pixels (slightly dilated) to the erase mask. The white interior is
+    not flooded; the inpaint band stays minimal. Input not mutated."""
+    out = np.ascontiguousarray(mask).astype(np.uint8).copy()
+    h, w = out.shape[:2]
+    gray = crop_rgb.mean(axis=2) if crop_rgb.ndim == 3 else crop_rgb
+    for r in regions:
+        bb = getattr(r, 'bubble_box', None)
+        if bb is None:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in bb)
+        dx, dy = (x2 - x1) * border_frac, (y2 - y1) * border_frac
+        ix1, iy1 = max(0, int(x1 + dx)), max(0, int(y1 + dy))
+        ix2, iy2 = min(w, int(x2 - dx)), min(h, int(y2 - dy))
+        if ix2 <= ix1 or iy2 <= iy1:
+            continue
+        ink = (gray[iy1:iy2, ix1:ix2] < ink_thresh).astype(np.uint8) * 255
+        if dilate_px > 0:
+            k = 2 * dilate_px + 1
+            ink = cv2.dilate(ink, np.ones((k, k), np.uint8))
+        out[iy1:iy2, ix1:ix2] = np.maximum(out[iy1:iy2, ix1:ix2], ink)
+    return out

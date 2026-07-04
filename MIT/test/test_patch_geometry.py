@@ -367,3 +367,32 @@ def test_region_without_balloon_changes_nothing():
     region = SimpleNamespace()
     out = add_own_balloon_interiors(allowed, [region])
     assert (out == allowed).all()
+
+
+# ---- #535 round-7: leftover source ink inside one's OWN balloon must be erased ----
+
+def test_leftover_ink_inside_own_balloon_joins_erase_mask():
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import erase_own_balloon_ink
+    import numpy as np
+    crop = np.full((200, 200, 3), 250, np.uint8)      # white balloon interior
+    crop[150:160, 60:120] = 10                        # the "ME OFF!" leftover line
+    mask = np.zeros((200, 200), dtype=np.uint8)
+    mask[50:60, 50:100] = 255                         # refined mask covers detected lines only
+    region = SimpleNamespace(bubble_box=(40, 40, 160, 180))
+    out = erase_own_balloon_ink(mask, crop, [region])
+    assert out[155, 90] == 255                        # leftover ink now erased
+    assert out[100, 100] == 0                         # white interior NOT flooded
+    assert out[55, 70] == 255                         # original mask preserved
+    assert mask[155, 90] == 0                         # input not mutated
+
+
+def test_no_balloon_no_change():
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import erase_own_balloon_ink
+    import numpy as np
+    crop = np.full((100, 100, 3), 250, np.uint8)
+    crop[70:80, 10:60] = 10
+    mask = np.zeros((100, 100), dtype=np.uint8)
+    out = erase_own_balloon_ink(mask, crop, [SimpleNamespace()])
+    assert (out == mask).all()

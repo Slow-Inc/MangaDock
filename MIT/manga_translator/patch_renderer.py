@@ -32,6 +32,7 @@ from .patch_geometry import (
     page_scaled_font_min,
     reground_inpaint_luminance,
     add_own_balloon_interiors,
+    erase_own_balloon_ink,
     restrict_mask_to_render_regions,
     seamless_blend_inpaint,
     tighten_text_mask,
@@ -172,6 +173,11 @@ class PatchRenderer:
                     allowed_mask = add_own_balloon_interiors(text_only_mask, local_regions)
                     patch_ctx.mask = restrict_mask_to_render_regions(
                         patch_ctx.mask, allowed_mask, margin=8)
+                    # ...and leftover source strokes inside an own balloon that the
+                    # refined mask never covered ("ME OFF!") are erased explicitly —
+                    # the translation re-renders over the balloon.
+                    patch_ctx.mask = erase_own_balloon_ink(
+                        patch_ctx.mask, crop_rgb, local_regions)
 
                     # #268: shrink the inpaint mask to the actual ink strokes so LaMa repaints
                     # less of the textured art (smaller band). crop_rgb is the pristine original.
