@@ -37,3 +37,19 @@ this page doubles as the **EN-source discriminator verification** the plan owed)
 - **Next dominant class, with evidence:** `det_sfx` false positives → phantom VLM overlays / an eaten narration
   box (task #19). The metric gate + enriched payload now catch and attribute it automatically — the exact
   regression-guard loop the plan was built to create.
+
+## Round 2 — the user's 5 annotations on the AFTER render, fixed (commit 85bc7ad3)
+
+![v1 vs v2](./2026-07-04-otome-p10-v2.jpg)
+
+| user annotation | v2 |
+|---|---|
+| 1. tiny text-over-text (top) | ✅ gone — dedup now also drops an SFX box that ENGULFS a DBNet line (the FP class) |
+| 2. middle box untranslated | 🔶 improved — no longer eaten/empty (ก๊ากก FP dropped); the box now keeps its ORIGINAL EN because DBNet missed it this run (detection non-determinism; honest untranslated > erased-empty). Separate detection-coverage item. |
+| 3. top-right rectangular box: small wide text | ✅ `bubble_fit_tall` — tall readable column filling the box |
+| 4. weird "ซึเอะ" SFX-styled | ✅ in-balloon rescued SFX now renders as normal dialogue ("ฉันขอโทษ"); "Sieg…" left as small EN this run |
+| 5. โกรธมาก missing / read as SFX | ✅ the box renders as a tall column; 🔶 ghost "ME OFF!" residue remains (source line outside the detected region → never erased; checklist item 11, separate class) |
+
+Scorecard v2: `{regions:9, empty:0, size:0, overlaps:35*, asym:0}` — *overlaps=35 is a metric coordinate bug
+found by this page: `dst_box` is stamped in CROP coords, so boxes from different patch groups false-intersect
+(single-group pages never exposed it). Harness fix queued: offset dst_box to page coords in the copy-back.
