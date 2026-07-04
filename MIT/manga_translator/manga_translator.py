@@ -1395,11 +1395,19 @@ class MangaTranslator:
         """
         from .bubble_detector import detect_bubbles
         from .bubble_association import associate_regions_to_bubbles
+        from .detection_postproc import expand_balloons_with_white_boxes, white_box_candidates
 
         polygons = detect_bubbles(ctx.img_rgb, device=str(self.device or 'cuda'))
         if not polygons:
             logger.info('[BubbleSeg] no balloons detected — proximity grouping')
             return
+        # #535: the YOLO box for a square caption stops short of the true white box
+        # (live: y=1182 vs 1247) — the own-balloon erase then misses the caption's
+        # last line ("ME OFF!" ghost). Grow tagged boxes to the containing white box.
+        try:
+            _whites = white_box_candidates(ctx.img_rgb.mean(axis=2).astype('uint8'))
+        except Exception:
+            _whites = []
         boxes = [tuple(map(float, r.xyxy)) for r in regions]
         assoc = associate_regions_to_bubbles(boxes, polygons)
         tagged = 0
@@ -1410,6 +1418,9 @@ class MangaTranslator:
                 xs = [p[0] for p in poly]
                 ys = [p[1] for p in poly]
                 r.bubble_box = (min(xs), min(ys), max(xs), max(ys))
+                if _whites:
+                    r.bubble_box = expand_balloons_with_white_boxes(
+                        [r.bubble_box], _whites)[0]
                 # #179: carry the balloon polygon so the renderer can wrap to the
                 # mask's true interior (narrow column), not the bounding box.
                 r.bubble_polygon = [(float(p[0]), float(p[1])) for p in poly]

@@ -138,3 +138,24 @@ def test_small_or_irregular_bright_areas_ignored():
     cv2.fillPoly(img, [tri], 245)
     got = white_box_candidates(img)
     assert got == []
+
+
+# ---- #535 round-7: YOLO balloons stop short of the true caption box ----
+
+def test_balloon_expanded_to_containing_white_box():
+    from manga_translator.detection_postproc import expand_balloons_with_white_boxes
+    balloons = [(839.0, 1002.0, 958.0, 1182.0)]       # YOLO stops at y=1182
+    white = [(839.0, 1004.0, 954.0, 1247.0)]          # the true box reaches 1247
+    got = expand_balloons_with_white_boxes(balloons, white)
+    x1, y1, x2, y2 = got[0]
+    assert y2 == 1247.0                                # grown to the union
+    assert y1 == 1002.0 and x1 == 839.0
+
+
+def test_unrelated_white_box_leaves_balloon_alone_and_is_appended():
+    from manga_translator.detection_postproc import expand_balloons_with_white_boxes
+    balloons = [(0.0, 0.0, 100.0, 100.0)]
+    white = [(500.0, 500.0, 700.0, 700.0)]            # caption YOLO missed entirely
+    got = expand_balloons_with_white_boxes(balloons, white)
+    assert got[0] == (0.0, 0.0, 100.0, 100.0)
+    assert (500.0, 500.0, 700.0, 700.0) in got        # appended as its own balloon

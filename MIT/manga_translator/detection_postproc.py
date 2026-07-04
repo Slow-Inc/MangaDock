@@ -195,3 +195,33 @@ def white_box_candidates(gray, bright: int = 220, min_area: int = 8000,
             continue
         out.append((float(x), float(y), float(x + bw), float(y + bh)))
     return out
+
+
+def expand_balloons_with_white_boxes(balloon_aabbs, white_boxes,
+                                     containment: float = 0.7):
+    """#535 round-7 ("ME OFF!" ghost root): the balloon YOLO's box for a square
+    caption stops short of the true white box (y=1182 vs 1247 live), so both the
+    own-balloon erase and the tall fit miss the caption's last line. When a white
+    box substantially contains a balloon (>= ``containment`` of the balloon's
+    area), grow the balloon to their union; white boxes touching no balloon are
+    appended as balloons of their own. Pure geometry."""
+    def _inter(a, b):
+        ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+        iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+        return ix * iy
+
+    out = []
+    used = [False] * len(white_boxes)
+    for b in balloon_aabbs:
+        b_area = max(1.0, (b[2] - b[0]) * (b[3] - b[1]))
+        grown = tuple(b)
+        for i, wb in enumerate(white_boxes):
+            if _inter(b, wb) / b_area >= containment:
+                grown = (min(grown[0], wb[0]), min(grown[1], wb[1]),
+                         max(grown[2], wb[2]), max(grown[3], wb[3]))
+                used[i] = True
+        out.append(grown)
+    for i, wb in enumerate(white_boxes):
+        if not used[i] and all(_inter(b, wb) <= 0.0 for b in balloon_aabbs):
+            out.append(tuple(wb))
+    return out
