@@ -256,3 +256,29 @@ def test_patch_renderer_keeps_a_larger_explicit_font_min():
         sem=asyncio.Semaphore(3), logger=__import__('logging').getLogger('test'),
     )
     assert renderer.config.render.font_size_minimum == 40    # 40 > page floor 17 → kept
+
+
+# ---- #535 Phase-0b wiring: the erase mask is guarded to the group's own regions ----
+# The refined mask hunts ALL text-like strokes in the crop — including a dropped
+# region's text or a neighbouring group's bubble. Erasing those without re-rendering
+# = the empty-white-bubble defect. After refinement the mask must be restricted to
+# the regions this patch actually renders.
+
+def test_refined_mask_strokes_outside_group_regions_are_guarded_away():
+    seen = {}
+
+    def refined(patch_ctx):
+        m = np.zeros(patch_ctx.img_rgb.shape[:2], np.uint8)
+        m[60:90, 60:90] = 255       # strokes inside the group's region → erased (ok)
+        m[150:170, 150:170] = 255   # foreign strokes (dropped/other-group text) → must NOT be erased
+        return m
+
+    def inpaint(patch_ctx):
+        seen['mask'] = patch_ctx.mask.copy()
+        return patch_ctx.img_rgb
+
+    driver = FakeDriver(mask=refined, inpaint=inpaint)
+    asyncio.run(_renderer(driver).process_group(_group()))
+
+    assert seen['mask'][75, 75] == 255      # in-region erase survives
+    assert seen['mask'][160, 160] == 0      # foreign strokes protected (no erase-without-render)

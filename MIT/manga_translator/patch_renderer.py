@@ -31,6 +31,7 @@ from .patch_geometry import (
     feather_alpha,
     page_scaled_font_min,
     reground_inpaint_luminance,
+    restrict_mask_to_render_regions,
     seamless_blend_inpaint,
     tighten_text_mask,
     union_refined_with_fallback,
@@ -154,6 +155,15 @@ class PatchRenderer:
                             f"[{type(e).__name__}]: using text-only fallback mask"
                         )
                         patch_ctx.mask = text_only_mask
+
+                    # #535 empty-bubble guard: refinement hunts ALL text-like strokes in
+                    # the crop — including a dropped region's text or a neighbouring
+                    # group's bubble. Erasing those without re-rendering = the white
+                    # empty bubble. Restrict the erase mask to this group's own regions
+                    # (small margin keeps legit spill hugging a rendered glyph). The
+                    # inpaint crop/context is untouched — only what gets erased narrows.
+                    patch_ctx.mask = restrict_mask_to_render_regions(
+                        patch_ctx.mask, text_only_mask, margin=8)
 
                     # #268: shrink the inpaint mask to the actual ink strokes so LaMa repaints
                     # less of the textured art (smaller band). crop_rgb is the pristine original.

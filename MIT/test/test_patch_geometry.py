@@ -298,3 +298,45 @@ def test_union_falls_back_to_text_only_where_refinement_missed_a_region():
 
     assert out[10, 10] == 255                                # refined-covered glyph
     assert out[3, 3] == 255                                  # missed glyph rescued via text_only fallback
+
+
+# ---- restrict_mask_to_render_regions: the #535 empty-bubble erase-mask guard ----
+# The refined erase mask may never cover text strokes that this patch will not
+# re-render (a dropped region / another group's region inside the crop) — that
+# erase-without-render is the "white empty bubble" defect. The guard intersects
+# the erase mask with the allowed (to-be-rendered) region mask, plus a small
+# dilation margin so legitimate refinement spill around a rendered glyph survives.
+
+def test_restrict_mask_keeps_erase_inside_allowed_regions():
+    mask = np.zeros((40, 40), np.uint8)
+    mask[5:15, 5:15] = 255      # erase over a rendered region  → must survive
+    mask[25:35, 25:35] = 255    # erase over a NON-rendered area → must be dropped
+    allowed = np.zeros((40, 40), np.uint8)
+    allowed[5:15, 5:15] = 255
+
+    out = pg.restrict_mask_to_render_regions(mask, allowed, margin=0)
+
+    assert out[10, 10] == 255                    # inside allowed: kept
+    assert out[30, 30] == 0                      # outside allowed: guarded away
+    assert mask[30, 30] == 255                   # input not mutated
+
+
+def test_restrict_mask_margin_tolerates_refinement_spill():
+    mask = np.zeros((40, 40), np.uint8)
+    mask[10:20, 10:22] = 255    # refinement spills 2px right of the region
+    allowed = np.zeros((40, 40), np.uint8)
+    allowed[10:20, 10:20] = 255
+
+    out = pg.restrict_mask_to_render_regions(mask, allowed, margin=3)
+
+    assert out[15, 21] == 255                    # spill within margin: kept
+    assert out.sum() == mask.sum()               # nothing legitimate lost
+
+
+def test_restrict_mask_empty_allowed_erases_nothing():
+    mask = np.full((10, 10), 255, np.uint8)
+    allowed = np.zeros((10, 10), np.uint8)
+
+    out = pg.restrict_mask_to_render_regions(mask, allowed, margin=2)
+
+    assert out.sum() == 0                        # nothing rendered → nothing erased

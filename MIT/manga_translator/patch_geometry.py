@@ -157,6 +157,24 @@ def union_refined_with_fallback(refined_mask: np.ndarray, text_only_mask: np.nda
     return out
 
 
+def restrict_mask_to_render_regions(mask: np.ndarray, allowed_mask: np.ndarray,
+                                    margin: int = 3) -> np.ndarray:
+    """#535 empty-bubble guard: the erase mask may never cover text strokes this
+    patch will not re-render. The refined mask hunts ALL text-like strokes in the
+    crop — including a dropped region's text or a neighbouring group's bubble —
+    and erasing those without drawing anything back is the "white empty bubble"
+    defect. Intersect the erase mask with the allowed (to-be-rendered) region
+    mask, dilated by ``margin`` px so legitimate refinement spill hugging a
+    rendered glyph survives. Inputs are not mutated. Pure numpy/cv2."""
+    allowed = (np.ascontiguousarray(allowed_mask) > 0).astype(np.uint8)
+    if margin > 0:
+        k = 2 * margin + 1
+        allowed = cv2.dilate(allowed, np.ones((k, k), np.uint8))
+    out = np.ascontiguousarray(mask).astype(np.uint8).copy()
+    out[allowed == 0] = 0
+    return out
+
+
 def page_scaled_font_min(img_h: int, img_w: int, existing: int) -> int:
     """Page-scaled render font floor for patch mode (#250).
 
