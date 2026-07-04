@@ -20,12 +20,22 @@ the ported code (verified via parent-proc chain from the worktree launch).
 ## 1) One-Punch JA→EN — regression check (the protected target)
 ![One-Punch target vs KP+concise ON](./2026-07-04-mp2-live-onepunch-regression.jpg)
 
-- **"THIS BRAT STILL DOESN'T REALIZE…" narration fits well — NOT bloated / not overflowing** (this is the exact
-  region the register warns KP/sizing changes can balloon → **no regression**).
-- All dialogue balloons filled, balanced columns (KP), no clip/overlap/garble/fade.
-- **Pre-existing (not from these flags):** the `め` SFX is left untranslated (target shows "LOOM") — the known
-  One-Punch SFX-translation gap (checklist item 6), independent of KP (line-break) / concise (prompt).
-- **Verdict: PASS — KP + concise do not regress the One-Punch target.**
+- 🔴 **REGRESSION (I first missed it; the user caught it): the narration (clean_layout caption text) renders
+  OVERSIZED vs target** — exactly the item-2 / One-Punch narration-bloat class the register warns about.
+- **Isolated (prod-faithful `/patches`, OFF vs ON):** `MIT_KNUTH_PLASS` is the SOLE cause — KP-only = narration
+  oversized; concise-only = normal (matches target); OFF baseline = normal.
+
+  ![KP ON oversized vs KP OFF normal](./2026-07-04-mp2-kp-narration-regression.jpg)
+
+  Mechanism: KP packs balanced/wider lines → `clean_layout` font-fit inflates the font to fill the box
+  (greedy's raggeder wrap keeps more lines → font stays at the ~`font_size_max` cap). KP is right for **bubble
+  dialogue** but wrong for **clean_layout narration** because `set_default_line_breaker` applies globally to
+  every region.
+- Dialogue balloons themselves fill fine under KP (the offline A/B benefit is real); the defect is narration only.
+- `め` SFX untranslated = pre-existing (checklist item 6), unrelated.
+- **Verdict: KP REGRESSES narration → `MIT_KNUTH_PLASS` ROLLED BACK to 0 in prod.** `MIT_CONCISE_BUBBLES=1` kept
+  (proven-good, verified no narration regression). KP re-enable is gated on a fix that scopes the breaker to
+  bubble-fit dialogue (clean_layout must force greedy).
 
 ## 2) Thai JA→THA — full 12-item checklist vs original
 ![Thai original vs KP+concise ON](./2026-07-04-mp2-live-thai-patches-ab.jpg)
