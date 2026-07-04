@@ -353,6 +353,30 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 if cw >= 6 and ch >= 6:
                     fit_w, fit_h = cw, ch
                     acx, acy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
+            # Otome "THIS SCUMBAG" class: a TALL rectangular interior must render as a
+            # tall narrow column (bigger font, vertical shape) — reuse the clean-layout
+            # font-search on the interior box instead of the wide top-strip fit.
+            if fit_h > fit_w * 1.15:
+                from types import SimpleNamespace
+                _proxy = SimpleNamespace(
+                    translation=region.translation,
+                    target_lang=getattr(region, 'target_lang', 'en_US'),
+                    font_size=getattr(region, 'font_size', 0),
+                    xyxy=(acx - fit_w / 2.0, acy - fit_h / 2.0,
+                          acx + fit_w / 2.0, acy + fit_h / 2.0))
+                _laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum,
+                                          font_size_max, page_shape)
+                if _laid is not None:
+                    _fs, _bw, _bh = _laid
+                    region.font_size = int(_fs)
+                    region._direction = 'h'
+                    region.render_branch = 'bubble_fit_tall'
+                    region.render_font_px = int(_fs)
+                    region.render_dst_box = (acx - _bw / 2.0, acy - _bh / 2.0,
+                                             acx + _bw / 2.0, acy + _bh / 2.0)
+                    dst_points_list.append(
+                        np.array([centered_box(acx, acy, _bw, _bh)], dtype=np.int64))
+                    continue
             region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), font_max_box_ratio)
             hw, hh = fit_w / 2.0, fit_h / 2.0
             # #535 Phase-0c telemetry: stamp the routing decision so the /patches
@@ -376,7 +400,10 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # render on ONE big line (the target's LOOM), never wrap (SQUE/LCH caught
         # live). Shrink the font from the original lettering until the whole word
         # fits the detection-box width, then place a single-line block on the centre.
-        if sfx and region.translation and region.translation.strip():
+        # #431: display style only for FREE-FLOATING SFX — a rescued SFX inside a
+        # speech balloon (Otome "Sieg…") is dialogue and takes the normal paths.
+        _sfx_display = sfx and (getattr(region, 'bubble_box', None) is None)
+        if _sfx_display and region.translation and region.translation.strip():
             _x1, _y1, _x2, _y2 = (float(v) for v in region.xyxy)
             _bw = max(1.0, _x2 - _x1)
             _lang = getattr(region, 'target_lang', 'en_US')
@@ -399,7 +426,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             dst_points_list.append(np.array([centered_box(_cx, _cy, _w or _bw, _bh)], dtype=np.int64))
             continue
 
-        if clean_layout and not sfx and region.translation and region.translation.strip():
+        if clean_layout and not _sfx_display and region.translation and region.translation.strip():
             laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max, page_shape)
             if laid is not None:
                 clean_fs, block_w, block_h = laid

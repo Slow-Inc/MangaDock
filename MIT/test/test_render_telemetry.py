@@ -199,3 +199,37 @@ def test_clean_layout_wrap_clamps_to_page_not_crop(monkeypatch):
     fs, w_page, _ = rend._clean_layout_dst(r, (200, 200, 3), 8, 20, page_shape=(1150, 800))
     assert w_crop <= 92                   # crop-clamped (45% of 200) — the bug
     assert w_page > 92                    # page-clamped keeps the caption footprint
+
+
+def test_rescued_sfx_inside_balloon_is_dialogue_not_display(stubs):
+    # #431/#19 (Otome "Sieg..."): a rescued SFX INSIDE a speech balloon is normal
+    # dialogue — it must NOT take the big display path (which overlaid the bubble).
+    img = np.full((200, 200, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='ซึเอะ', sfx_rescued=True,
+                   bubble_box=(0, 0, 100, 100), xyxy=(20, 20, 80, 80), font_size=110)
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, clean_layout=True)
+    assert r.render_branch != 'sfx_display'
+
+
+def test_tall_balloon_interior_renders_as_tall_column_not_wide_strip(monkeypatch):
+    # Otome "THIS SCUMBAG" box: a TALL rectangular balloon rendered as small wide
+    # lines at the top (hard to read). A tall interior must reuse the narrow-column
+    # search: bigger font, column following the box's vertical shape.
+    def fake_calc(font, text, max_width, max_height, language='en_US', **kw):
+        import math
+        px = max(1, font // 2)
+        cpl = max(1, int(max_width) // px)
+        n = math.ceil(len(text) / cpl)
+        return ['x' * cpl] * n, [min(int(max_width), len(text) * px)] * n
+    monkeypatch.setattr(rend.text_render, 'calc_horizontal', fake_calc)
+    monkeypatch.setattr(rend, '_bubble_interior_box',
+                        lambda region, bubble_box, shape: (120.0, 300.0, (100.0, 170.0)))  # tall interior
+    monkeypatch.setattr(rend, '_bubble_fit_font_size', lambda region, wh, ratio: 15)       # old wide fit
+    img = np.full((400, 400, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='AB ' * 8, font_size=19,
+                   bubble_box=(40, 20, 160, 320), xyxy=(50, 30, 150, 310))
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, clean_layout=True)
+    assert r.render_branch == 'bubble_fit_tall'
+    assert r.render_font_px > 15                    # bigger than the old wide fit
+    box = r.render_dst_box
+    assert (box[3] - box[1]) > (box[2] - box[0])    # tall block, not a wide strip
