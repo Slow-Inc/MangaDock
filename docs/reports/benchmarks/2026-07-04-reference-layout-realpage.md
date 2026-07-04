@@ -50,3 +50,12 @@ produce bubble-appropriate length, which is a translation-quality effort gated o
 a render change. The main render-side narrow-bubble fix that DOES apply (bubbles that are fillable but got
 tiny text) is **P1 readable-floor, which is already merged + live**. This page's top-left bubble is the
 pathological (genuinely-too-small) tail case that only concise translation resolves.
+
+## P7 conciseness — also does NOT fix this case (measured)
+Re-translated ds3 with `concise_bubbles=ON` (the P7 bubble-length directive): total text length
+**112 chars vs 110 verbose** — no meaningful reduction. So the conciseness directive does NOT shorten this
+page's text enough to fit. **Conclusion: this specific narrow bubble is a FUNDAMENTAL limitation** — the
+balloon is genuinely too small for the (already-minimal) translation at a readable font. Neither render
+(P3/P4) nor translation-conciseness (P7) resolves it; the least-bad option is P1 readable-floor's
+slight-overflow (already live). The general narrow-bubble class is addressed by P1; this pathological tail
+case has no clean fix. P7 conciseness remains a valid tool for genuinely-verbose translations (gated, default-off).
