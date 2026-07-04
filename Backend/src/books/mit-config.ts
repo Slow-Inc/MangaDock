@@ -226,6 +226,10 @@ export function buildMitConfig(
       // prompt so the model knows which manga it is translating. Absent →
       // prompt identical to the context-free behavior.
       ...(seriesContext ? { series_context: seriesContext } : {}),
+      // Concise-bubbles (P7, #526): append a bubble-length constraint to the translator prompt so
+      // translations don't overflow tight balloons (measured #1 narrow-bubble cause = translation
+      // ~2x too tall for the bubble). Absent → prompt byte-identical.
+      ...(flagEnv('MIT_CONCISE_BUBBLES') ? { concise_bubbles: true } : {}),
     },
     detector: {
       // #247: match MIT's own tuned Config default (2560). 2048 silently
@@ -308,6 +312,9 @@ export function buildMitConfig(
       // warping it onto the original vertical-JP quad (which stretches it oversized).
       // Absent → byte-identical.
       ...(flagEnv('MIT_CLEAN_LAYOUT') ? { clean_layout: true } : {}),
+      // #180 P8: Knuth-Plass holistic line-breaking (balanced columns, no mid-word/name split) instead
+      // of the greedy packer. Enabling changes wrap width/line count → render-parity change. Absent → greedy, byte-identical.
+      ...(flagEnv('MIT_KNUTH_PLASS') ? { knuth_plass: true } : {}),
       // #176: render Latin/EN targets in the bundled comic font instead of the
       // worker's Prompt-Bold (a Thai face). Absent → byte-identical.
       ...(flagEnv('MIT_EN_COMIC_FONT') ? { en_comic_font: true } : {}),

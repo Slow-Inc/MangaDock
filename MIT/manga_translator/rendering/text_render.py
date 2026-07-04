@@ -801,6 +801,18 @@ class LineBreaker(Protocol):
         ...
 
 
+_default_line_breaker: 'Optional[LineBreaker]' = None
+
+
+def set_default_line_breaker(breaker: 'Optional[LineBreaker]') -> None:
+    """Set the process-wide default LineBreaker that :func:`calc_horizontal` uses when no explicit
+    ``line_breaker`` is passed (#180 P8). ``None`` restores the byte-identical greedy default. Set once
+    per render pass from ``render.knuth_plass`` (mirrors :func:`set_font`), so both the sizing and the
+    render calc_horizontal calls switch together without threading a flag through every call site."""
+    global _default_line_breaker
+    _default_line_breaker = breaker
+
+
 class GreedyLineBreaker:
     """#186: default strategy — ``calc_horizontal``'s original greedy packing
     (Step 1), kept byte-identical by delegating straight to :func:`_greedy_pack`.
@@ -904,7 +916,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     # GreedyLineBreaker — byte-identical to the original greedy Step 1; #180 step 2
     # selects KnuthPlassLineBreaker behind render.bubble_area_fit. Steps 2-4 below
     # post-process greedy output; a holistic strategy opts out via greedy_postprocess.
-    breaker = line_breaker if line_breaker is not None else GreedyLineBreaker()
+    breaker = line_breaker if line_breaker is not None else (_default_line_breaker or GreedyLineBreaker())
     line_words_list, line_width_list, hyphenation_idx_list = breaker.pack(
         words, word_widths, syllables, font_size, max_width,
         whitespace_offset_x, hyphen_offset_x)

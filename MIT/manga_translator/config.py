@@ -190,6 +190,10 @@ class RenderConfig(BaseModel):
     small absolute font instead of warping it onto the original (often tall/vertical)
     detection quad — the warp stretches English oversized and overflowing. Pairs with
     font_size_max as the absolute font. Off → byte-identical."""
+    knuth_plass: bool = False
+    """#180 P8: replace the greedy line-wrap with Knuth-Plass optimal line-breaking (balanced,
+    minimal-badness lines, no stranded long word) for this render pass. Off → byte-identical greedy
+    default. Enabling changes wrap width / line count → a render-parity change (needs sign-off)."""
     patch_feather_radius: int = 0
     """#173: feather the outer N px of each composited patch to a transparent
     alpha (distance-transform ramp) so the rectangular patch edge blends into the

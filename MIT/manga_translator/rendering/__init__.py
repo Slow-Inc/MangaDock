@@ -428,10 +428,15 @@ async def dispatch(
     font_max_box_ratio: float = _MAX_FONT_BOX_RATIO,
     anti_overlap: bool = False,
     font_size_max: int = 0,
-    clean_layout: bool = False
+    clean_layout: bool = False,
+    knuth_plass: bool = False
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
+    # #180 P8: switch the process-wide line breaker for this render pass. None → byte-identical greedy
+    # default (gated off), so the whole pass (sizing + raster) breaks lines consistently. Reset every
+    # pass (codex: the global would otherwise leak across requests when knuth_plass toggles).
+    text_render.set_default_line_breaker(text_render.KnuthPlassLineBreaker() if knuth_plass else None)
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
     # Resize regions that are too small
