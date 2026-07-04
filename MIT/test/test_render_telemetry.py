@@ -79,7 +79,8 @@ def test_clean_layout_squeezes_to_fill_tall_original_footprint(monkeypatch):
         n = math.ceil(len(text) / cpl)
         return ['x' * cpl] * n, [min(int(max_width), len(text) * 10)] * n
     monkeypatch.setattr(rend.text_render, 'calc_horizontal', fake_calc)
-    r = FakeRegion(horizontal=True, translation='A' * 30, xyxy=(0, 0, 150, 300))  # tall 150x300
+    # 10 short words (spaced) — squeezable; a tall 150x300 original footprint.
+    r = FakeRegion(horizontal=True, translation='AB ' * 10, xyxy=(0, 0, 150, 300))
     laid = rend._clean_layout_dst(r, (400, 400, 3), 8, 20)
     fs, block_w, block_h = laid
     # unsqueezed: 2 wide lines (~150px wide, ~48px tall). Squeezed: a tall narrow
@@ -87,3 +88,24 @@ def test_clean_layout_squeezes_to_fill_tall_original_footprint(monkeypatch):
     assert block_w < 75                  # much narrower than the 150px bbox width
     assert block_h >= 150                # ...and 3×+ taller than the unsqueezed 48px
     assert block_h <= 300                # never exceeds the original footprint height
+
+
+def test_squeeze_never_force_breaks_a_short_word(monkeypatch):
+    # #183 hard gate (live regression: "HMPH." -> "HM/PH."): the squeeze floor must
+    # be the LONGEST TOKEN's width, not 2x font — a single short word in a tall
+    # bubble must stay on one line.
+    def fake_calc(font, text, max_width, max_height, language='en_US', **kw):
+        import math
+        cpl = max(1, int(max_width) // 10)
+        toks = text.split() or ['']
+        if len(toks) == 1:                       # single word: force-break iff column < word
+            if len(text) * 10 <= max_width:
+                return [text], [len(text) * 10]
+            n = math.ceil(len(text) / cpl)
+            return [text[i*cpl:(i+1)*cpl] for i in range(n)], [cpl * 10] * n
+        n = math.ceil(len(text) / cpl)
+        return ['x' * cpl] * n, [min(int(max_width), len(text) * 10)] * n
+    monkeypatch.setattr(rend.text_render, 'calc_horizontal', fake_calc)
+    r = FakeRegion(horizontal=True, translation='HMPH.', xyxy=(0, 0, 80, 300))  # tall box, one word
+    fs, block_w, block_h = rend._clean_layout_dst(r, (400, 400, 3), 8, 20)
+    assert block_h <= fs * 1.3           # ONE line — the word was never split

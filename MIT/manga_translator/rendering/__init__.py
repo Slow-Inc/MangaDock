@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import cv2
 import numpy as np
@@ -191,7 +192,18 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
                                             int(img_shape[0]), language=lang)
         return max(1, len(ls)) * clean_fs * _LINE_HEIGHT
 
-    used_w = squeeze_width(_measure_h, wrap_w, 2 * clean_fs, box_h)
+    # #183 hard gate: the squeeze floor is the LONGEST TOKEN's width (ZWSP-aware so
+    # Thai/CJK words count, not the whole spaceless line) — a single short word in a
+    # tall box must never force-break ("HMPH." → "HM/PH.", caught live).
+    _seg = text_render._insert_cjk_word_breaks(
+        text_render._insert_thai_word_breaks(region.translation or ''))
+    _toks = [t for t in re.split(r'[\s​]+', _seg) if t]
+    _longest = max(_toks, key=len) if _toks else ''
+    min_w = 2 * clean_fs
+    if _longest:
+        _, _lw = text_render.calc_horizontal(clean_fs, _longest, 10 ** 7, 10 ** 7, language=lang)
+        min_w = max(min_w, float(max(_lw)) if _lw else 0.0)
+    used_w = squeeze_width(_measure_h, wrap_w, min_w, box_h)
     # max_height is generous (full page) so wrapping is governed by width and the block
     # grows vertically — we place it on the centre regardless of the source box height.
     lines, widths = text_render.calc_horizontal(
