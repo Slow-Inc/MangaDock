@@ -188,22 +188,38 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     box_h = max(1.0, y2f - y1f)
     bbox_w = max(1.0, x2f - x1f)
 
-    # #183 hard gate: the squeeze floor is the LONGEST TOKEN's width (ZWSP-aware so
-    # Thai/CJK words count, not the whole spaceless line) — a single short word in a
-    # tall box must never force-break ("HMPH." → "HM/PH.", caught live). Capped at the
-    # footprint width: a token wider than the box hyphenates at syllables (the target
-    # does the same — "SOME-WHERE"), it must not veto the narrow column entirely.
+    # #183 hard gate, hyphenation-aware: the squeeze floor per TOKEN is (a) the widest
+    # SYLLABLE + hyphen when the language hyphenator can split it — long words then
+    # hyphenate like the target ("SOME-WHERE", "UNDER-STAND") instead of vetoing the
+    # narrow column — or (b) the WHOLE token width when it can't ("HMPH.", "HUH?",
+    # Thai words): _split_into_syllables char-splits unhyphenatable words, so the
+    # column must never get narrower than them. Floor = max over tokens. ZWSP
+    # pre-segmentation makes Thai/CJK words count as tokens, not the whole line.
     _seg = text_render._insert_cjk_word_breaks(
         text_render._insert_thai_word_breaks(region.translation or ''))
-    _toks = [t for t in re.split(r'[\s​]+', _seg) if t]
-    _longest = max(_toks, key=len) if _toks else ''
+    _toks = list({t for t in re.split(r'[\s​]+', _seg) if t})
 
     def _floor_w(fs):
         f = 2.0 * fs
-        if _longest:
-            _, _lw = text_render.calc_horizontal(fs, _longest, 10 ** 7, 10 ** 7, language=lang)
-            f = max(f, float(max(_lw)) if _lw else 0.0)
-        return min(f, max(bbox_w, 2.0 * fs))
+        try:
+            hyph = text_render.select_hyphenator(lang)
+        except Exception:
+            hyph = None
+        for tok in _toks:
+            pieces = []
+            if hyph and len(tok) <= 100:
+                try:
+                    pieces = hyph.syllables(tok.lower())
+                except Exception:
+                    pieces = []
+            if len(pieces) > 1:
+                probe = tok[:max(len(p) for p in pieces)] + '-'
+            else:
+                probe = tok
+            _, _lw = text_render.calc_horizontal(fs, probe, 10 ** 7, 10 ** 7, language=lang)
+            if _lw:
+                f = max(f, float(max(_lw)))
+        return f
 
     def _layout_at(fs):
         def _mh(w):

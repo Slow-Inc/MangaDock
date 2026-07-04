@@ -106,7 +106,9 @@ def test_squeeze_never_force_breaks_a_short_word(monkeypatch):
         n = math.ceil(len(text) / cpl)
         return ['x' * cpl] * n, [min(int(max_width), len(text) * 10)] * n
     monkeypatch.setattr(rend.text_render, 'calc_horizontal', fake_calc)
-    r = FakeRegion(horizontal=True, translation='HMPH.', xyxy=(0, 0, 80, 300))  # tall box, one word
+    # bbox NARROWER than the word (live case: a tiny tail bubble) — the floor must
+    # still be the whole word's width because "HMPH." has no syllable split.
+    r = FakeRegion(horizontal=True, translation='HMPH.', xyxy=(0, 0, 40, 300))
     fs, block_w, block_h = rend._clean_layout_dst(r, (400, 400, 3), 8, 20)
     assert block_h <= fs * 1.3           # ONE line — the word was never split
 
