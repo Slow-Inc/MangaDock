@@ -67,3 +67,23 @@ def test_wide_dialogue_in_balloon_still_bubble_fits(stubs):
                    translation='HELLO', xyxy=(5, 20, 95, 80))                  # rw 90 / bw 100
     rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, clean_layout=True)
     assert r.render_branch == 'bubble_fit_sole'
+
+
+def test_clean_layout_squeezes_to_fill_tall_original_footprint(monkeypatch):
+    # #535 (user vs target): a tall vertical-JP narration bbox must render as a tall
+    # NARROW column (like the target), not a few wide lines. clean_layout squeezes
+    # the wrap width until the block fills the region's original height.
+    def fake_calc(font, text, max_width, max_height, language='en_US', **kw):
+        import math
+        cpl = max(1, int(max_width) // 10)              # 10px per char
+        n = math.ceil(len(text) / cpl)
+        return ['x' * cpl] * n, [min(int(max_width), len(text) * 10)] * n
+    monkeypatch.setattr(rend.text_render, 'calc_horizontal', fake_calc)
+    r = FakeRegion(horizontal=True, translation='A' * 30, xyxy=(0, 0, 150, 300))  # tall 150x300
+    laid = rend._clean_layout_dst(r, (400, 400, 3), 8, 20)
+    fs, block_w, block_h = laid
+    # unsqueezed: 2 wide lines (~150px wide, ~48px tall). Squeezed: a tall narrow
+    # column (floored at 2×font so it can't become a sliver).
+    assert block_w < 75                  # much narrower than the 150px bbox width
+    assert block_h >= 150                # ...and 3×+ taller than the unsqueezed 48px
+    assert block_h <= 300                # never exceeds the original footprint height

@@ -95,3 +95,21 @@ def fills_bubble_width(region_w: float, bubble_w: float, threshold: float = 0.72
     if bubble_w <= 0:
         return True
     return (region_w / bubble_w) >= threshold
+
+
+def squeeze_width(measure_h, full_w: float, min_w: float, box_h: float, factor: float = 0.9):
+    """#183 width-squeeze (MangaTranslator ``layout_engine.py``): narrow the wrap column by
+    ``factor`` each step so the text uses MORE lines and fills a tall box's *height*,
+    instead of a few wide lines with empty space below. ``measure_h(w)`` returns the wrapped
+    block height at column width ``w`` (narrower → taller). Stops at ``min_w`` (the longest
+    unbreakable token's width, so no word force-breaks) or just before the block would exceed
+    ``box_h``. Returns the chosen column width — ``full_w`` if no narrowing helps. Pure."""
+    w = float(full_w)
+    floor = float(min_w)
+    while w * factor >= floor:
+        nw = w * factor
+        if measure_h(nw) <= box_h:
+            w = nw
+        else:
+            break
+    return w

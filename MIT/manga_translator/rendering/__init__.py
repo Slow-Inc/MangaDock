@@ -11,7 +11,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import fills_bubble_width, clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width
+from ..render_overlap import fills_bubble_width, clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, squeeze_width
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -177,12 +177,26 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # paragraph. (The balloon box is deliberately NOT used: narration boxes also get a
     # wide bubble_box from segmentation, which would re-widen them.)
     wrap_w = clean_wrap_width(x2f - x1f, img_shape[1])
+    lang = getattr(region, 'target_lang', 'en_US')
+    # #535/#183 (user vs target): a tall original footprint (vertical-JP narration /
+    # dialogue column) must render as a tall NARROW column like the target — squeeze
+    # the wrap width until the block fills the region's original HEIGHT instead of a
+    # few wide lines with empty space below. A short/wide region no-ops (the first
+    # narrowing step would already overflow its height). Floor = calc_horizontal's
+    # own 2×font so no degenerate sliver.
+    box_h = max(1.0, y2f - y1f)
+
+    def _measure_h(w):
+        ls, _ = text_render.calc_horizontal(clean_fs, region.translation, int(w),
+                                            int(img_shape[0]), language=lang)
+        return max(1, len(ls)) * clean_fs * _LINE_HEIGHT
+
+    used_w = squeeze_width(_measure_h, wrap_w, 2 * clean_fs, box_h)
     # max_height is generous (full page) so wrapping is governed by width and the block
     # grows vertically — we place it on the centre regardless of the source box height.
     lines, widths = text_render.calc_horizontal(
-        clean_fs, region.translation, wrap_w, int(img_shape[0]),
-        language=getattr(region, 'target_lang', 'en_US'))
-    block_w = max(widths) if widths else wrap_w
+        clean_fs, region.translation, int(used_w), int(img_shape[0]), language=lang)
+    block_w = max(widths) if widths else used_w
     block_h = max(1, len(lines)) * clean_fs * _LINE_HEIGHT
     return int(clean_fs), float(block_w), float(block_h)
 

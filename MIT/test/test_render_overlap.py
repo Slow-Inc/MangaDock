@@ -105,3 +105,26 @@ def test_narration_narrow_footprint_falls_through():
 def test_no_balloon_info_does_not_block():
     from manga_translator.render_overlap import fills_bubble_width
     assert fills_bubble_width(50, 0) is True              # bw<=0 → don't block
+
+
+# ---- #535/#183: squeeze_width — narrow the column until the block fills the HEIGHT ----
+
+def test_squeeze_narrows_while_height_fits():
+    from manga_translator.render_overlap import squeeze_width
+    # block height at width w: total glyph area 3000 / w (narrower → taller)
+    measure = lambda w: 3000.0 / w
+    got = squeeze_width(measure, full_w=200.0, min_w=20.0, box_h=300.0)
+    assert got < 30                      # squeezed far below the full width
+    assert 3000.0 / got <= 300.0         # ...but the block still fits the height
+
+
+def test_squeeze_stops_at_min_width_floor():
+    from manga_translator.render_overlap import squeeze_width
+    got = squeeze_width(lambda w: 10.0, full_w=100.0, min_w=80.0, box_h=1000.0)
+    assert got >= 80.0                   # never below the longest-word floor
+
+
+def test_squeeze_noop_when_narrowing_would_overflow():
+    from manga_translator.render_overlap import squeeze_width
+    got = squeeze_width(lambda w: 500.0, full_w=100.0, min_w=10.0, box_h=300.0)
+    assert got == 100.0                  # first step already too tall → keep full
