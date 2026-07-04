@@ -84,36 +84,66 @@ refined mask vs balloon boxes on the Otome page). This one is NOT fixed in the W
 3. **Three-branch divergence with no convergence process** — the deployment/branch process is as much the root
    cause as any single bug.
 
-## 4. The real fix plan — a LANDING plan, not master plan 3
+## 4. The real fix plan — a LANDING plan, not master plan 3 (v2, refined by 3-agent brainstorm)
 
-**Phase 0 — nets (prerequisite, per `feedback_techdebt_all_scenarios`):**
-- Characterization tests for the routing table: {tagged, untagged} × {narration, dialogue} × {occupancy 1, >1}
-  × {horizontal, vertical} → which branch + font. Locks current behavior before touching it.
-- **Render-defect metric harness** (the thing that's been missing): given (original, rendered, regions payload) →
-  counts: empty-bubble (original had text, render blank), size-ratio vs original lettering (catch tiny AND
-  bloat), overlap-count (two rendered blocks intersecting), sibling-narration size-Δ. Run on full chapters.
-  This becomes the regression gate every render change must pass.
+> v2 changes after a /clink-brainstorm cross-check (antigravity/system + codex/code + 9arm/logic):
+> (1) the empty-bubble guard + telemetry MOVED to Phase 0 — the only defect with no existing fix, the worst
+> user-visible one, and fully independent of the WIP (9arm); (2) slices re-grouped by ACTUAL code dependencies —
+> the original 4 slices don't compile independently (codex traced the real diff); (3) attribution must use
+> deterministic dumps, not live full-chapter A/B (non-determinism swamps per-slice deltas); (4) deploys must
+> bust the patch cache via renderConfigHash (env knob), else users keep seeing old renders (antigravity);
+> (5) the WIP fixes themselves were never benchmarked — each slice benchmark VALIDATES the fix, not just
+> "doesn't regress" (9arm).
 
-**Phase 1 — land the WIP in slices (1 seam = 1 commit, each full-chapter benchmarked):**
-1. `#436 dedup` (kills text-over-text) — smallest, independent.
-2. `fills_bubble_width` discriminator + `clean_layout_target_fs` (kills narration ballooning + asymmetry class).
-3. `page_shape` threading + scaled clean-layout font (kills patch-path tiny narration).
-4. `_bubble_fit_layout` #175/#183 (bounded fit + squeeze) — biggest; last.
-Each slice: characterization net stays green → full-chapter /patches render (One-Punch + 2nd manga) → metric
-harness + 12-item eyeball → **user confirm → only then next slice.**
-⚠️ The WIP is the user's working tree — slicing/committing is done WITH the user (the OPTIMIZATION-PLAN itself
-says the entangled #175/#183 + instrumentation "needs a decision, not a silent merge").
+**Phase 0 — independently landable, zero WIP dependency (kills the worst defect even if WIP landing stalls):**
+- **0a. Region-drop telemetry:** log every dropped region + reason (blank/numeric/identical/prob-floor/lang)
+  per request — future text-loss becomes diagnosable from logs.
+- **0b. Empty-bubble guard (TDD):** `restrict_mask_to_render_regions()` in `patch_geometry.py` (near
+  `union_refined_with_fallback`), wired in `patch_renderer.py` after refinement, before tighten/inpaint:
+  constrain the erase mask to `create_text_only_mask(local_regions)` + dilation margin, and subtract
+  dropped-region strokes. Narrows only the ERASE mask — the crop/context stays intact so LaMa quality is
+  unaffected. Mask-subtraction over re-render-original (font mismatch would look worse; cache preserved).
+- **0c. Metric harness + payload enrichment:** extend the `/patches` regions payload with per-region
+  `id, xyxy, bubble_box, font_src_px, font_final_px, dst_box, branch, occupancy, rendered, drop_reason` —
+  then the harness computes: empty-bubble count (source ink present, rendered ink absent), size-ratio vs
+  original lettering (catches tiny AND bloat), rendered-block overlap count, sibling-narration size-Δ.
+  Without the payload the metrics are detective-only; with it they are diagnostic.
+- **0d. Deterministic attribution rig:** capture render dumps once per benchmark page; per-slice A/B replays
+  the SAME dump offline (isolates the render change from OCR/LLM sampling noise). Live full-chapter runs are
+  for detection/coverage, never attribution.
 
-**Phase 2 — close the gaps the WIP doesn't cover:**
-- Empty-bubble guard: never erase strokes we don't re-render — subtract dropped-region pixels from the refined
-  mask (or re-render the original text there). Requires the Phase-0 capture to confirm the exact bleed path.
-- Region-drop telemetry: log every dropped region + reason on every request (1 line each) so future text-loss
-  is diagnosable from logs instead of archaeology.
+**Phase 1 — land the WIP in DEPENDENCY-CORRECT slices (codex's A→E; 1 slice = 1 commit on a clean landing
+branch `perf/mit-landing-fixes` off the perf tip — never commit from the dirty checkout wholesale):**
+- **A. Pure helpers + unit tests** (`render_overlap.py`: `box_containment`, `fills_bubble_width`,
+  `clean_layout_font_size`, `clean_layout_target_fs`, `region_territory_box`, `bubble_fit_bounds`,
+  `squeeze_width`) — additive, unused-until-wired, zero behavior change.
+- **B. #436 dedup** (kills text-over-text). Note: blanking happens after the group mask is built → the
+  duplicate's source ink is erased with nothing drawn (usually benign — the dup sits inside the kept region's
+  box); mark duplicates pre-mask (`render_suppressed_reason='duplicate'`) so metrics don't count it as loss.
+- **C. Discriminator gate** (`fills_bubble_width` on the bubble_fit branch) **keeping the committed
+  `_bubble_fit_font_size`** — do NOT pull in `_bubble_fit_layout` yet (kills narration ballooning/asymmetry).
+- **D. `page_shape` threading** (`stages.py` + `dispatch` + `_clean_layout_dst`) + scaled clean-layout font
+  (kills patch-path tiny narration). Spans 3 files — stages.py is part of this slice, not an afterthought.
+- **E. `_bubble_fit_layout` #175/#183 + shared-occupancy branch** — biggest, last; strip or gate the
+  `_BUBBLE_FIT_STATS`-style mutable globals (racy under concurrent patch rendering).
+Each slice: dump-replay A/B (attribution) + live full-chapter One-Punch + 2nd manga (coverage) + metric harness
++ 12-item eyeball → **user confirm → next slice.** Each benchmark must show the slice's defect class actually
+improves (the WIP was never validated — "lands cleanly" ≠ "works").
+⚠️ The WIP is the user's working tree — port functions cleanly (copy from WIP → landing branch), never
+`git add -p` the entangled hunks; instrumentation + #175/#183 entanglement per OPTIMIZATION-PLAN §0-D.
 
-**Phase 3 — deploy + converge branches:**
-- Land the slices on the perf branch → cutover the worker → full-chapter live A/B vs pre-landing baseline.
-- Reconcile perf↔main so there is ONE stream; adopt the metric harness as the standing gate (a render change
-  that worsens any defect count does not ship).
+**Phase 2 — deploy mechanics (the part that silently fails if skipped):**
+- **Cache-bust:** the patch cache is keyed on `renderConfigHash` of MIT_* env — code-only changes do NOT bust
+  it. Bump a dedicated knob (e.g. `MIT_RENDER_VERSION=landing-v1`) in `Backend/.env` per landing deploy.
+- Audit cwd/`__file__`-relative paths (fonts/, models/, panel/lib) for worktree-launched workers; sequential
+  cutover (never 2 GPU workers); poll `/ready`.
+
+**Phase 3 — converge branches (the meta-fix):**
+- Merge order: landing branch → perf (prod stream) → then reconcile perf↔main to ONE stream. Adopt the metric
+  harness as the standing gate: a render change that worsens any defect count does not ship.
+
+**Fallback if WIP landing stalls:** Phase 0 alone kills empty-bubble (the worst defect) + makes everything
+diagnosable; slice B (dedup) is nearly independent and kills text-over-text.
 
 ## 5. Evidence index
 - Running-code routing: worktree `MIT/manga_translator/rendering/__init__.py` (resize routing, `_clean_layout_dst`).
