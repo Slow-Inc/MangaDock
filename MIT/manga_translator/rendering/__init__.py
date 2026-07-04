@@ -368,6 +368,33 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # quad which stretches it oversized and overflowing. SFX is exempt (it keeps the big
         # stylized legacy path). Off → byte-identical.
         sfx = getattr(region, 'sfx_rescued', False)
+        # #168/#535: a vision-rescued display SFX is one onomatopoeia word — it must
+        # render on ONE big line (the target's LOOM), never wrap (SQUE/LCH caught
+        # live). Shrink the font from the original lettering until the whole word
+        # fits the detection-box width, then place a single-line block on the centre.
+        if sfx and region.translation and region.translation.strip():
+            _x1, _y1, _x2, _y2 = (float(v) for v in region.xyxy)
+            _bw = max(1.0, _x2 - _x1)
+            _lang = getattr(region, 'target_lang', 'en_US')
+            _fs = max(8, int(getattr(region, 'font_size', 0) or 0) or font_size_minimum)
+            _w = None
+            while _fs > 8:
+                _, _ws = text_render.calc_horizontal(
+                    _fs, region.translation, 10 ** 7, 10 ** 7, language=_lang)
+                _w = float(max(_ws)) if _ws else 0.0
+                if _w <= _bw * 1.05:
+                    break
+                _fs -= 4
+            region.font_size = _fs
+            region._direction = 'h'
+            region.render_branch = 'sfx_display'
+            region.render_font_px = _fs
+            _bh = _fs * _LINE_HEIGHT
+            _cx, _cy = (_x1 + _x2) / 2.0, (_y1 + _y2) / 2.0
+            region.render_dst_box = (_cx - _w / 2.0, _cy - _bh / 2.0, _cx + _w / 2.0, _cy + _bh / 2.0)
+            dst_points_list.append(np.array([centered_box(_cx, _cy, _w or _bw, _bh)], dtype=np.int64))
+            continue
+
         if clean_layout and not sfx and region.translation and region.translation.strip():
             laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max)
             if laid is not None:

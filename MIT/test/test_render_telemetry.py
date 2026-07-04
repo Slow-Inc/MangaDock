@@ -157,3 +157,26 @@ def test_non_contained_repeat_survives_dedup(stubs):
     rend.resize_regions_to_font_size(img, [a, b], None, 0, 8,
                                      bubble_fit=False, clean_layout=True)
     assert a.translation == 'ปาร์ตี้'                          # far away → legit repeat, kept
+
+
+def test_rescued_display_sfx_renders_single_line(monkeypatch):
+    # SQUE/LCH live residual: a vision-rescued display SFX (one onomatopoeia word)
+    # must render on ONE line — shrink the font until the word fits the detection
+    # box width (like the target's big single-line LOOM), never wrap it.
+    def fake_calc(font, text, max_width, max_height, language='en_US', **kw):
+        import math
+        w = int(len(text) * font * 0.5)
+        if w <= max_width:
+            return [text], [w]
+        cpl = max(1, int(max_width / (font * 0.5)))
+        n = math.ceil(len(text) / cpl)
+        return [text[i*cpl:(i+1)*cpl] for i in range(n)], [int(cpl * font * 0.5)] * n
+    monkeypatch.setattr(rend.text_render, 'calc_horizontal', fake_calc)
+    img = np.full((400, 400, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='SQUELCH', font_size=152,
+                   sfx_rescued=True, xyxy=(20, 20, 300, 220))
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=False, clean_layout=True)
+    assert r.render_branch == 'sfx_display'
+    assert 8 < r.render_font_px <= 152
+    # one line: the chosen font makes the whole word fit the box width
+    assert len('SQUELCH') * r.render_font_px * 0.5 <= (300 - 20) * 1.06
