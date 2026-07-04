@@ -282,3 +282,23 @@ def test_refined_mask_strokes_outside_group_regions_are_guarded_away():
 
     assert seen['mask'][75, 75] == 255      # in-region erase survives
     assert seen['mask'][160, 160] == 0      # foreign strokes protected (no erase-without-render)
+
+
+# ---- #535 Phase-0c: render telemetry stamped on LOCAL copies flows back to originals ----
+# resize_regions runs on build_local_region deepcopies inside the patch group; the
+# /patches payload reads the ORIGINAL regions — so telemetry must be copied back.
+
+def test_render_telemetry_copied_back_to_original_regions():
+    def render(patch_ctx):
+        for lr in patch_ctx.text_regions:      # simulate dispatch stamping the local copy
+            lr.render_branch = 'clean_layout'
+            lr.render_font_px = 20
+            lr.render_dst_box = (1.0, 2.0, 3.0, 4.0)
+        return patch_ctx.img_rgb
+
+    group = _group()
+    asyncio.run(_renderer(FakeDriver(render=render)).process_group(group))
+
+    assert getattr(group[0], 'render_branch', None) == 'clean_layout'
+    assert getattr(group[0], 'render_font_px', None) == 20
+    assert getattr(group[0], 'render_dst_box', None) == (1.0, 2.0, 3.0, 4.0)

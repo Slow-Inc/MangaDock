@@ -265,6 +265,15 @@ class PatchRenderer:
                 )
                 patch_ctx.img_rendered = patch_ctx.img_inpainted
 
+            # #535 Phase-0c: the render stamped telemetry on the LOCAL deepcopies —
+            # copy it back to the original regions so the /patches payload
+            # (built from the originals) can report branch/font per region.
+            for orig, local in zip(group, local_regions):
+                for attr in ('render_branch', 'render_font_px', 'render_dst_box'):
+                    v = getattr(local, attr, None)
+                    if v is not None:
+                        setattr(orig, attr, v)
+
             # #173: optionally feather the outer band of the patch so its edge
             # blends into the page instead of showing a rectangle at the seam. The
             # crop carries a ≥120px content margin (pad+render_extra), so fading the
