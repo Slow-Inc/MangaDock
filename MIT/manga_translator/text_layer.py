@@ -10,6 +10,16 @@ ML stack. Regions are duck-typed: anything with .text / .translation.
 from typing import Iterable, List, Dict
 
 
+def _int_box(v):
+    """JSON-safe pixel box: numpy scalars → plain int (pydantic can't dump np.int32)."""
+    return [int(x) for x in v]
+
+
+def _float_box(v):
+    """JSON-safe float box: numpy scalars → plain float."""
+    return [float(x) for x in v]
+
+
 def regions_payload(regions: Iterable) -> List[Dict[str, str]]:
     """[{src, dst}] for every rendered region, in render order.
 
@@ -25,12 +35,12 @@ def regions_payload(regions: Iterable) -> List[Dict[str, str]]:
             'dst': getattr(r, 'translation', '') or '',
         }
         for attr, key, conv in (
-            ('xyxy', 'xyxy', list),
-            ('bubble_box', 'bubble_box', list),
+            ('xyxy', 'xyxy', _int_box),
+            ('bubble_box', 'bubble_box', _int_box),
             ('font_size', 'font_src_px', int),
             ('render_branch', 'branch', str),
             ('render_font_px', 'font_final_px', int),
-            ('render_dst_box', 'dst_box', list),
+            ('render_dst_box', 'dst_box', _float_box),
         ):
             v = getattr(r, attr, None)
             if v is not None:
@@ -56,7 +66,7 @@ def dropped_regions_payload(dropped: Iterable) -> List[Dict[str, str]]:
         }
         xy = getattr(r, 'xyxy', None)
         if xy is not None:
-            d['xyxy'] = list(xy)
+            d['xyxy'] = _int_box(xy)
         d['rendered'] = False
         d['drop_reason'] = reason
         out.append(d)

@@ -78,3 +78,21 @@ def test_dropped_regions_payload_reports_reason_and_not_rendered():
     out = dropped_regions_payload([(r, "Numeric translation")])
     assert out == [{"src": "123", "dst": "42", "xyxy": [1, 2, 3, 4],
                     "rendered": False, "drop_reason": "Numeric translation"}]
+
+
+def test_numpy_values_serialize_to_plain_python():
+    # live bug: region.xyxy carries numpy int32 → pydantic "Unable to serialize
+    # unknown type numpy.int32" → HTTP 500. Payload must coerce to plain Python.
+    import json
+    import numpy as np
+    r = _Region("a", "b")
+    r.xyxy = np.array([1, 2, 3, 4], dtype=np.int32)
+    r.bubble_box = (np.int32(5), np.int32(6), np.int32(7), np.int32(8))
+    r.font_size = np.int32(24)
+    r.render_font_px = np.int64(20)
+    r.render_dst_box = (np.float32(1.5), 2.0, 3.0, np.float64(4.5))
+    r.render_branch = "clean_layout"
+    out = regions_payload([r])[0]
+    json.dumps(out)                       # must not raise
+    assert all(type(x) in (int, float) for x in out["xyxy"] + out["dst_box"])
+    assert type(out["font_src_px"]) is int and type(out["font_final_px"]) is int
