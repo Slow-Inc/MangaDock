@@ -103,3 +103,22 @@ previous capability; scorecard on the clean pre-rescue run: **all zeros**.
   not fire on the caption (filters/non-det — tuning continues), so the box stays honestly untranslated EN.
 - Remaining on this page: STARTING caption + ME OFF ghost pixels (detection-coverage; mechanism built, tuning
   next), TCH duplicate pair (containment boundary).
+
+## Round 8 (096b9f0a..da55ed7b) — the page comes fully clean
+
+![ME OFF before/after](./2026-07-05-meoff-ghost-before-after.png)
+![v16](./2026-07-05-otome-p10-v16-clean.jpg)
+
+Three root causes, each found by tracing the user's annotations (the user's "patch doesn't cover the
+original text" hypothesis was the decisive lead):
+1. **langdetect misfire** — `source_lang_only` dropped perfectly good EN captions ("STARTING WITH…"→Maltese,
+   "SiEg…"→Danish, non-deterministic). Pure-ASCII text is now kept for Latin-script sources. → the caption
+   translates ("เริ่มจากตัวเอกหญิง…").
+2. **YOLO balloon short of the true box** — grown to the containing white caption box (y1182→1247), so the
+   own-balloon erase/fit reaches the last line.
+3. **THE ghost root: overlapping patches resurrected erased text** — each patch composited as a full opaque
+   rect, so the IRIS-CHAN group's crop repainted its ORIGINAL pixels (incl. "ME OFF!") over the DAMN group's
+   already-erased caption. Patch alpha now covers only pixels the patch actually CHANGED (diff vs pristine
+   crop, 3px ring, feather-composable) — patches compose instead of stomping each other.
+
+**v16: every box/bubble on the wild page carries its own translation; no ghosts, no dupes, no phantom SFX.**
