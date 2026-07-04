@@ -169,7 +169,7 @@ def uncovered_text_clusters(gray, covered_boxes, min_area: int = 1200,
 
 
 def white_box_candidates(gray, bright: int = 220, min_area: int = 8000,
-                         max_area_frac: float = 0.25, min_fill: float = 0.85):
+                         max_area_frac: float = 0.25, min_fill: float = 0.7):
     """#535 (the "STARTING WITH…" caption): a square white CAPTION BOX is not a
     speech balloon, so the balloon YOLO never proposes it — but its white interior
     is trivially detectable. Bright connected components that are large and
@@ -180,9 +180,9 @@ def white_box_candidates(gray, bright: int = 220, min_area: int = 8000,
     g = gray if gray.ndim == 2 else _cv2.cvtColor(gray, _cv2.COLOR_RGB2GRAY)
     h, w = g.shape[:2]
     bright_mask = (g >= bright).astype(_np.uint8)
-    # close small holes (the text strokes inside the box) so the box reads solid
-    bright_mask = _cv2.morphologyEx(bright_mask, _cv2.MORPH_CLOSE,
-                                    _np.ones((15, 15), _np.uint8))
+    # NO morphological close: a 15px close bridged the box's thin black border to
+    # the white art outside (one page-sized component -> rejected). The interior
+    # is already one connected component around the thin text strokes.
     num, labels, stats, _ = _cv2.connectedComponentsWithStats(bright_mask)
     out = []
     page_area = float(h * w)
