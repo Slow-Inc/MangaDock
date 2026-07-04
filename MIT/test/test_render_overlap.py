@@ -138,3 +138,15 @@ def test_containment_full_partial_none():
     assert box_containment((0, 0, 10, 10), (20, 20, 30, 30)) == 0.0     # disjoint
     half = box_containment((0, 0, 10, 10), (5, 0, 20, 10))              # right half inside
     assert 0.45 < half < 0.55
+
+
+def test_longest_token_width_thai_word_aware():
+    # item-9 port: spaceless Thai measures per WORD (ZWSP segmentation), not the
+    # whole line — the ss re-wrap floor that stops "ขอโทษ" -> "ขอโ/ทบ".
+    import os
+    from manga_translator.rendering import text_render as T
+    T.set_font(os.path.join(os.path.dirname(__file__), '..', 'fonts', 'Prompt-Bold.ttf'))
+    w_word = T.longest_token_width(24, 'ขอโทษ')
+    w_line = T.longest_token_width(24, 'ฉันขอโทษนะครับผม')
+    assert 0 < w_line < T.get_string_width(24, 'ฉันขอโทษนะครับผม')  # per-word, not whole line
+    assert w_word > 0

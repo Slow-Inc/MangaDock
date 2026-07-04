@@ -706,10 +706,16 @@ def render(
     #print(f"Region text: {region.text}, forced_direction: {forced_direction}, render_horizontally: {render_horizontally}")
 
     if render_horizontally:
+        # #item9 (main e61771a, ported): the ss-scale re-wrap must never get a column
+        # narrower than the widest atomic word at font*ss — integer rounding at ss=4
+        # otherwise force-splits Thai/CJK words the layout kept whole ("ขอโทษ"→"ขอโ/ทบ").
+        _render_text = region.get_translation_for_rendering()
+        _wrap_w_ss = max(round(norm_h[0] * ss),
+                         text_render.longest_token_width(region.font_size * ss, _render_text, region.target_lang))
         temp_box = text_render.put_text_horizontal(
             region.font_size * ss,
-            region.get_translation_for_rendering(),
-            round(norm_h[0] * ss),
+            _render_text,
+            _wrap_w_ss,
             round(norm_v[0] * ss),
             region.alignment,
             region.direction == 'hl',
