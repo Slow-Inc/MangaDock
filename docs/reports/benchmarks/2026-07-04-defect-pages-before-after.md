@@ -66,3 +66,26 @@ found by this page: `dst_box` is stamped in CROP coords, so boxes from different
 
 **Config recommendation:** `MIT_TEXT_THRESHOLD=0.3` measurably improves OCR completeness on EN pages
 (full DAMN-IT sentence vs a fragment) — candidate `.env` change after a regression sweep.
+
+## Round 4 (commits c8ffbe09..6d2ad76e+) — detection-coverage mechanism + metric coord fix
+
+![v8](./2026-07-04-otome-p10-v8.jpg)
+
+Built **empty-balloon rescue** (TDD, 3 iterations tuned live): inked balloons DBNet leaves uncovered are
+appended as empty textlines → flow through the existing vlm_rescue like SFX. Criterion evolution, each caught
+by a live run: center-containment → area-coverage (a stray sliver masked the box) → **ink-coverage with a 10%
+interior shrink** (the balloon's black border diluted the fraction; area-coverage duplicated every bubble).
+Dedup extended to blank equal-translation balloon-quads. Metric `dst_box` now page-coords (false cross-group
+overlaps 35→0).
+
+**Wins:** duplicates 17→12→clean render; カチカチ SFX chain now rescued + localized (กึกกึก) — beyond the
+previous capability; scorecard on the clean pre-rescue run: **all zeros**.
+
+**Honest remaining (documented, not hidden):**
+- The "STARTING WITH…" caption box defeats BOTH detectors (DBNet at every threshold/gamma AND the balloon YOLO
+  — it is a square panel caption, not a speech balloon). Needs a third mechanism (caption-box detector class or
+  a VLM full-page completeness sweep) — a real feature, tracked.
+- "ME OFF!" ghost persists (source line outside every detected geometry; the guard correctly refuses to erase
+  what it can't re-render).
+- Minor: the rescued Sieg-bubble quad can overlap its sibling ("ขอโทษ" at the bubble edge) — rescue-vs-textline
+  boundary tuning.
