@@ -128,3 +128,13 @@ def test_squeeze_noop_when_narrowing_would_overflow():
     from manga_translator.render_overlap import squeeze_width
     got = squeeze_width(lambda w: 500.0, full_w=100.0, min_w=10.0, box_h=300.0)
     assert got == 100.0                  # first step already too tall → keep full
+
+
+# ---- #436 slice B: box_containment — the dedup geometry ----
+
+def test_containment_full_partial_none():
+    from manga_translator.render_overlap import box_containment
+    assert box_containment((10, 10, 20, 20), (0, 0, 100, 100)) == 1.0   # fully inside
+    assert box_containment((0, 0, 10, 10), (20, 20, 30, 30)) == 0.0     # disjoint
+    half = box_containment((0, 0, 10, 10), (5, 0, 20, 10))              # right half inside
+    assert 0.45 < half < 0.55

@@ -113,3 +113,18 @@ def squeeze_width(measure_h, full_w: float, min_w: float, box_h: float, factor: 
         else:
             break
     return w
+
+
+def box_containment(a, b) -> float:
+    """#436: fraction of box ``a``'s area that lies inside box ``b`` (0..1). The SFX
+    detector and the line detector can both fire on the same stylized word, yielding a
+    small duplicate region almost fully inside the full-sentence region — high
+    containment + substring text ⇒ redundant. Pure geometry."""
+    ax1, ay1, ax2, ay2 = (float(v) for v in a)
+    bx1, by1, bx2, by2 = (float(v) for v in b)
+    aw, ah = max(0.0, ax2 - ax1), max(0.0, ay2 - ay1)
+    if aw <= 0 or ah <= 0:
+        return 0.0
+    ix = max(0.0, min(ax2, bx2) - max(ax1, bx1))
+    iy = max(0.0, min(ay2, by2) - max(ay1, by1))
+    return (ix * iy) / (aw * ah)

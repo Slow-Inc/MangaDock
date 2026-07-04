@@ -132,3 +132,28 @@ def test_clean_layout_grows_font_toward_original_within_footprint(monkeypatch):
     assert fs <= 36                       # never larger than the original lettering
     assert block_w <= 120 * 1.06          # column stays inside the original footprint width
     assert block_h <= 300                 # ...and height
+
+
+def test_duplicate_sfx_region_is_blanked_not_rendered(stubs):
+    # #436 slice B (Otome p10 text-over-text): the SFX detector re-detects a word the
+    # line detector already captured -> a small duplicate inside the full sentence
+    # renders ON TOP. Substring + >=60% containment => blank the duplicate.
+    img = np.full((300, 300, 3), 255, np.uint8)
+    full = FakeRegion(horizontal=True, translation='จัดปาร์ตี้ดื่มเหล้ากัน',
+                      xyxy=(50, 50, 250, 120))
+    dup = FakeRegion(horizontal=True, translation='ปาร์ตี้',
+                     xyxy=(100, 60, 160, 100))               # inside `full`
+    rend.resize_regions_to_font_size(img, [full, dup], None, 0, 8,
+                                     bubble_fit=False, clean_layout=True)
+    assert dup.translation == ''                              # blanked
+    assert getattr(dup, 'render_suppressed_reason', '') == 'duplicate'
+    assert full.translation == 'จัดปาร์ตี้ดื่มเหล้ากัน'          # kept intact
+
+
+def test_non_contained_repeat_survives_dedup(stubs):
+    img = np.full((300, 300, 3), 255, np.uint8)
+    a = FakeRegion(horizontal=True, translation='ปาร์ตี้', xyxy=(0, 0, 60, 40))
+    b = FakeRegion(horizontal=True, translation='จัดปาร์ตี้กัน', xyxy=(200, 200, 300, 260))
+    rend.resize_regions_to_font_size(img, [a, b], None, 0, 8,
+                                     bubble_fit=False, clean_layout=True)
+    assert a.translation == 'ปาร์ตี้'                          # far away → legit repeat, kept

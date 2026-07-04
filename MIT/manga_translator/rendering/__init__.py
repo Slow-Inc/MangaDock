@@ -12,7 +12,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import fills_bubble_width, clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, squeeze_width
+from ..render_overlap import box_containment, fills_bubble_width, clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, squeeze_width
 from ..safe_area import safe_area_box
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
@@ -281,8 +281,38 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
     occupancy = (balloon_occupancy([getattr(r, 'bubble_box', None) for r in text_regions])
                  if bubble_fit else None)
 
+    # #436 de-dup (slice B): the SFX detector can re-detect a stylized word the line
+    # detector already captured (e.g. "ปาร์ตี้" inside "…จัดปาร์ตี้ดื่ม…"), yielding a small
+    # duplicate region mostly inside the full-sentence region — it then renders on top.
+    # Blank the shorter duplicate when its text is a substring AND its box is >=60%
+    # inside the other's (containment + substring, never length alone, so a legitimate
+    # repeat elsewhere on the page survives). Marked so metrics don't count the erased
+    # duplicate as text-loss.
+    _orig_tr = [(r.translation or '').strip() for r in text_regions]
+    for _i, _ri in enumerate(text_regions):
+        _ti = _orig_tr[_i]
+        if not _ti:
+            continue
+        for _j in range(len(text_regions)):
+            if _i == _j:
+                continue
+            _tj = _orig_tr[_j]
+            if _tj and len(_ti) < len(_tj) and _ti in _tj                     and box_containment(_ri.xyxy, text_regions[_j].xyxy) >= 0.6:
+                _ri.translation = ''
+                _ri.render_suppressed_reason = 'duplicate'
+                break
+
     dst_points_list = []
     for i, region in enumerate(text_regions):
+        # #436: a deduped (blanked) duplicate renders nothing — skip layout entirely
+        # (the legacy path would choke on it); keep a degenerate dst so lists align.
+        if not (region.translation and region.translation.strip()):
+            _x1, _y1, _x2, _y2 = (float(v) for v in region.xyxy)
+            dst_points_list.append(np.array(
+                [[[_x1, _y1], [_x2, _y1], [_x2, _y2], [_x1, _y2]]], dtype=np.int64))
+            region.render_branch = 'suppressed'
+            region.render_font_px = 0
+            continue
 
         # #166 binary-search fit: when this region is the sole occupant of a known
         # balloon, size the font to fill the balloon box and render into that box.
