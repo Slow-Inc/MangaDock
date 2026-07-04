@@ -53,3 +53,16 @@ this page doubles as the **EN-source discriminator verification** the plan owed)
 Scorecard v2: `{regions:9, empty:0, size:0, overlaps:35*, asym:0}` — *overlaps=35 is a metric coordinate bug
 found by this page: `dst_box` is stamped in CROP coords, so boxes from different patch groups false-intersect
 (single-group pages never exposed it). Harness fix queued: offset dst_box to page coords in the copy-back.
+
+## Round 3 (commit 57c6c75d) — the user's 3 annotations on v2
+
+![v3](./2026-07-04-otome-p10-v3.jpg)
+
+| annotation | v3 |
+|---|---|
+| ขึ้นบรรทัดผิด ("ฉันขอโ/ทบ") | ✅ **fixed** — ported main's item-9 ss-re-wrap floor (`longest_token_width`), never ported to the perf stream; "ฉันขอโทษนะ..." now wraps at word boundaries |
+| ไม่แปล (STARTING WITH box) | ❌ still undetected by DBNet even at `text_threshold=0.3` — a genuine **detection-coverage** class (clean typeset EN caption invisible to the JP-tuned detector). Needs a detector-level experiment (gamma pass / alt detector / VLM full-page completion), tracked as the next item. |
+| ME OFF ghost / แปลไม่ครบ | 🔶 OCR now reads the FULL sentence at `text_threshold=0.3` ("DAMN IT, THIS GUY PISSES…"), but the region's line-geometry still doesn't cover the ME OFF pixels → the (correctly region-restricted) erase mask leaves them → ghost remains. Same detection-geometry class as above. |
+
+**Config recommendation:** `MIT_TEXT_THRESHOLD=0.3` measurably improves OCR completeness on EN pages
+(full DAMN-IT sentence vs a fragment) — candidate `.env` change after a regression sweep.
