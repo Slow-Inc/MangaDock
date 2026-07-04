@@ -1324,6 +1324,13 @@ class MangaTranslator:
         filtered_regions = []
         dropped_texts = []
         for region in regions:
+            # #168/#535: a vision-rescued SFX carries text ALREADY localized to the
+            # target language ("SQUELCH") — lang-detect sees EN != JPN and would drop
+            # it here even though the post-translation filter deliberately kept it
+            # (the ぬ-stays-untranslated bug: rescued but never rendered).
+            if getattr(region, 'sfx_rescued', False):
+                filtered_regions.append(region)
+                continue
             region_source_lang = self._detect_region_source_lang(region, requested_source_lang)
             text_preview = str(getattr(region, 'text', '') or '').strip()[:60]
 
