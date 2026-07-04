@@ -302,3 +302,26 @@ def test_render_telemetry_copied_back_to_original_regions():
     assert getattr(group[0], 'render_branch', None) == 'clean_layout'
     assert getattr(group[0], 'render_font_px', None) == 20
     assert getattr(group[0], 'render_dst_box', None) == (1.0, 2.0, 3.0, 4.0)
+
+
+def test_copied_back_dst_box_is_in_page_coordinates():
+    # metric coord bug (Otome p10, multi-group): dst_box stamped in CROP coords made
+    # boxes from different patch groups false-intersect (overlaps=35 on a clean page).
+    # The copy-back must offset local dst_box/render boxes by the crop origin.
+    def render(patch_ctx):
+        for lr in patch_ctx.text_regions:
+            lr.render_branch = 'clean_layout'
+            lr.render_font_px = 20
+            lr.render_dst_box = (10.0, 20.0, 30.0, 40.0)   # CROP coords
+        return patch_ctx.img_rgb
+
+    group = [FakeRegion(
+        xyxy=(150, 150, 190, 190),
+        lines=[[[150, 150], [190, 150], [190, 190], [150, 190]]],
+        font_size=20,
+    )]
+    # pad=40 + render_extra=80 clamped at page edge → crop origin (30, 30) for a 200px page
+    asyncio.run(_renderer(FakeDriver(render=render)).process_group(group))
+    x1, y1, x2, y2 = group[0].render_dst_box
+    assert (x1, y1) == (40.0, 50.0)        # 10+30, 20+30 — page coords
+    assert (x2, y2) == (60.0, 70.0)

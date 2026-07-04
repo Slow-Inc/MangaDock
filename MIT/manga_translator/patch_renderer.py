@@ -272,10 +272,17 @@ class PatchRenderer:
             # copy it back to the original regions so the /patches payload
             # (built from the originals) can report branch/font per region.
             for orig, local in zip(group, local_regions):
-                for attr in ('render_branch', 'render_font_px', 'render_dst_box'):
+                for attr in ('render_branch', 'render_font_px'):
                     v = getattr(local, attr, None)
                     if v is not None:
                         setattr(orig, attr, v)
+                # dst_box was stamped in CROP coords — offset by the crop origin so
+                # page-level consumers (the defect metric) compare boxes correctly
+                # across patch groups (false cross-group overlaps otherwise).
+                db = getattr(local, 'render_dst_box', None)
+                if db is not None:
+                    orig.render_dst_box = (float(db[0]) + x1, float(db[1]) + y1,
+                                           float(db[2]) + x1, float(db[3]) + y1)
 
             # #173: optionally feather the outer band of the patch so its edge
             # blends into the page instead of showing a rectangle at the seam. The
