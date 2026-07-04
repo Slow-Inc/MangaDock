@@ -1237,3 +1237,39 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **11. KPI.** #359 · lazy package boundary · 27→12 heavy files / 338→413 torch-free tests · 0 new failures · mit-ci logic gate torch-free + blocking-capable.
 
 *Validation:* `pytest test/test_lazy_import.py` 5/0; full suite 0-new-fail; torch-absent blocker → 413 collect / 0 collection errors / torch never imported. *Links:* #359, #355, ADR 023, branch `worktree-ci-mit-lazy-torch`. CI dep-filter + flip validated by the PR's mit-ci run.
+
+---
+## 2026-07-04 — Master Plan 2 (Phase 0–3 autonomous) + deterministic real-page benchmark harness
+
+**What / where.** `PR #532` (`fix/mit-mp2-p2-p5`): P2 cache-safety (`mit-batch-orchestrator.service.ts`), P5
+config verify, P0 eval harness (`MIT/eval/translation_eval.py`), P7 contract+determinism gates
+(`translators/numbered_contract.py`) + P7 concise-bubbles directive (`translators/config_gpt.py` +
+`Backend MIT_CONCISE_BUBBLES`), and the deterministic render A/B harness (`MIT/tools/render_dump_ab.py`).
+
+**Why.** Round-2 push toward human-level translation quality (epic #528). The load-bearing blocker was that
+**every prior render comparison was confounded by translator non-determinism** — so no fix could be trusted.
+
+**Before → after.**
+- Render benchmark method: live 2-call A/B (non-deterministic, untrustworthy) → **dump-once + re-render-N-configs
+  offline** (identical text, only the knob differs). Enabled by `MIT_DEBUG_RENDER_DUMP` + `render_dump_ab.py`.
+- P2 cross-page context: enabling it cached a context-free page under a context-on key (#524) → orchestrator now
+  sends the full ordered chapter when context on (byte-identical off).
+- P7: no reproducibility gate → `is_deterministic_decode` + finding that prod runs `temp=0.5` (non-reproducible);
+  numbered-contract normalizer (7/8→8/8 alignment on a dropped index).
+
+**Perf Δ.** None on the default path (all changes flag-gated / byte-identical off). Harness runs offline (font
+only, no ML) in <1s/config.
+
+**Quality (benchmark-proven, the key outcome).** The user's narrow-bubble defect was deterministically
+diagnosed as a **fundamental bubble-size × text-length limit**: neither `reference_layout` (P3, regresses the
+narrow column) nor `bubble_area_fit` toggling nor P7 conciseness (measured 112 vs 110 chars — no help) fixes it;
+**P1 readable-floor (already live) is the least-bad option.** The general narrow-bubble class is handled by P1.
+So P3/P4 are correctly NOT promoted — an evidence-based decision, not a gap.
+
+**Validation.** 195 tests green (129 MIT + 66 Backend); 4 committed real-page deterministic A/B benchmarks
+(`docs/reports/benchmarks/2026-07-04-*`); root-cause diagnosis committed.
+
+**Risk.** Low — all default-off/additive/docs/tools. The only production-logic change (#524 orchestrator) is
+gated + characterization-net-green. **Remaining MP2 work is external-only** (merge #532 [security-gated for the
+agent], ML models for P6/P11, human grading for P7-accuracy via #526, a repro fixture for P9, prod-enable
+decisions) — documented in `docs/reports/mit-master-plan-2-status.md`.
