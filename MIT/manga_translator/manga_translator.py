@@ -15,7 +15,7 @@ import traceback
 import numpy as np
 from PIL import Image
 from typing import Optional, Any, List
-from .region_filter import filter_translated_regions
+from .region_filter import filter_translated_regions, filter_translated_regions_with_drops
 from .region_apply import apply_original_as_translation, apply_render_casing, apply_translations
 from .model_usage_tracker import ModelUsageTracker
 from .model_unloader import ModelUnloader
@@ -77,7 +77,7 @@ from .utils import (
     sort_regions,
 )
 from .utils.lang_ratio import target_script_ratio
-from .text_layer import regions_payload
+from .text_layer import regions_payload, dropped_regions_payload
 
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
@@ -966,7 +966,9 @@ class MangaTranslator:
         )
 
         # 过滤逻辑（简化版本，保留主要过滤条件）
-        new_text_regions = filter_translated_regions(ctx.text_regions, config)
+        new_text_regions, _drops = filter_translated_regions_with_drops(ctx.text_regions, config)
+        ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+        ctx.dropped_regions.extend(_drops)  # #535 Phase-0c
 
         return new_text_regions
 
@@ -1535,7 +1537,8 @@ class MangaTranslator:
         await self._report_progress('finished', True)
         # Text layer (#158): what each rendered region said — the enabler for
         # rolling context (#159) and translation memory (#160).
-        return {'img_width': img_w, 'img_height': img_h, 'patches': patches, 'regions': regions_payload(regions)}
+        return {'img_width': img_w, 'img_height': img_h, 'patches': patches,
+                'regions': regions_payload(regions) + dropped_regions_payload(getattr(ctx, 'dropped_regions', None) or [])}
 
     async def _batch_translate_contexts(self, contexts_with_configs: List[tuple], batch_size: int) -> List[tuple]:
         """
@@ -1601,7 +1604,9 @@ class MangaTranslator:
                 # 过滤逻辑（简化版本，保留主要过滤条件）
                 for ctx, config in batch:
                     if ctx.text_regions:
-                        new_text_regions = filter_translated_regions(ctx.text_regions, config)
+                        new_text_regions, _drops = filter_translated_regions_with_drops(ctx.text_regions, config)
+                        ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+                        ctx.dropped_regions.extend(_drops)  # #535 Phase-0c
                         ctx.text_regions = new_text_regions
                         
                 results.extend(batch)
@@ -1686,7 +1691,9 @@ class MangaTranslator:
                 
                 # 过滤逻辑
                 if ctx.text_regions:
-                    new_text_regions = filter_translated_regions(ctx.text_regions, config)
+                    new_text_regions, _drops = filter_translated_regions_with_drops(ctx.text_regions, config)
+                    ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+                    ctx.dropped_regions.extend(_drops)  # #535 Phase-0c
                     ctx.text_regions = new_text_regions
                 
                 return ctx, config

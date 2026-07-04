@@ -244,6 +244,11 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                     acx, acy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
             region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), font_max_box_ratio)
             hw, hh = fit_w / 2.0, fit_h / 2.0
+            # #535 Phase-0c telemetry: stamp the routing decision so the /patches
+            # payload can explain this region (additive attrs, no behavior change).
+            region.render_branch = 'bubble_fit_sole'
+            region.render_font_px = region.font_size
+            region.render_dst_box = (acx - hw, acy - hh, acx + hw, acy + hh)
             dst_points_list.append(
                 np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
                            [acx + hw, acy + hh], [acx - hw, acy + hh]]], dtype=np.int64))
@@ -273,6 +278,11 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                         cx, cy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
                 region.font_size = clean_fs
                 region._direction = 'h'
+                # #535 Phase-0c telemetry (additive, no behavior change).
+                region.render_branch = 'clean_layout'
+                region.render_font_px = clean_fs
+                region.render_dst_box = (cx - block_w / 2.0, cy - block_h / 2.0,
+                                         cx + block_w / 2.0, cy + block_h / 2.0)
                 dst_points_list.append(
                     np.array([centered_box(cx, cy, block_w, block_h)], dtype=np.int64))
                 continue
@@ -409,6 +419,13 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # Store results and update font size
         dst_points_list.append(dst_points)
         region.font_size = int(target_font_size)
+        # #535 Phase-0c telemetry (additive, no behavior change).
+        region.render_branch = 'legacy'
+        region.render_font_px = region.font_size
+        if isinstance(dst_points, np.ndarray):
+            _pts = dst_points.reshape(-1, 2)
+            region.render_dst_box = (float(_pts[:, 0].min()), float(_pts[:, 1].min()),
+                                     float(_pts[:, 0].max()), float(_pts[:, 1].max()))
 
     return dst_points_list
 
