@@ -92,7 +92,14 @@ def merge_empty_balloons(ctx, result, device):
             gray = crop.mean(axis=2) if crop.ndim == 3 else crop
             return int((gray < 128).sum())
 
-        balloons = [_aabb(p) for p in polygons]
+        def _shrink(b, f=0.10):
+            # the balloon's black BORDER counts as ink and dilutes the coverage
+            # fraction below threshold (live v7 duplicated every bubble) — measure
+            # the interior only.
+            w, h = b[2] - b[0], b[3] - b[1]
+            return (b[0] + w * f, b[1] + h * f, b[2] - w * f, b[3] - h * f)
+
+        balloons = [_shrink(_aabb(p)) for p in polygons]
         existing = [textline_aabb(t) for t in textlines]
         fresh = empty_balloon_boxes(balloons, existing, _ink)
         for (x1, y1, x2, y2) in fresh:

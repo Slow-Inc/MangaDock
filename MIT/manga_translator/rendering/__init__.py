@@ -301,7 +301,13 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             if _i == _j:
                 continue
             _tj = _orig_tr[_j]
-            if _tj and len(_ti) < len(_tj) and _ti in _tj                     and box_containment(_ri.xyxy, text_regions[_j].xyxy) >= 0.6:
+            _area_i = (float(_ri.xyxy[2]) - float(_ri.xyxy[0])) * (float(_ri.xyxy[3]) - float(_ri.xyxy[1]))
+            _xy_j = text_regions[_j].xyxy
+            _area_j = (float(_xy_j[2]) - float(_xy_j[0])) * (float(_xy_j[3]) - float(_xy_j[1]))
+            # equal translations (a rescued balloon-quad duplicating its own textline)
+            # blank the LARGER box; substring duplicates blank the shorter as before.
+            _dup = (_tj and len(_ti) < len(_tj) and _ti in _tj) or                    (_ti == _tj and _area_i > _area_j)
+            if _dup and box_containment(_ri.xyxy, text_regions[_j].xyxy) >= 0.6:
                 _ri.translation = ''
                 _ri.render_suppressed_reason = 'duplicate'
                 break
