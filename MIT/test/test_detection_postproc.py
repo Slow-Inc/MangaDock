@@ -30,3 +30,29 @@ def test_merge_identity_when_no_sfx_boxes(monkeypatch):
     result = (['textline'], 'mask_raw', 'mask')
     out = merge_sfx_detections(ctx, result, device='cpu')
     assert out is result  # identity short-circuit
+
+
+# ---- #535 empty-balloon rescue: a balloon with INK but no textline = missed text ----
+
+def test_inked_balloon_without_textline_is_selected():
+    from manga_translator.detection_postproc import empty_balloon_boxes
+    balloons = [(0, 0, 100, 100), (200, 200, 300, 300)]
+    textlines = [(10, 10, 90, 30)]                     # inside balloon 1 only
+    ink = lambda box: 500                              # both have ink
+    got = empty_balloon_boxes(balloons, textlines, ink, min_ink=100)
+    assert got == [(200, 200, 300, 300)]               # balloon 2: ink but no textline
+
+
+def test_truly_empty_balloon_is_not_rescued():
+    from manga_translator.detection_postproc import empty_balloon_boxes
+    balloons = [(0, 0, 100, 100)]
+    got = empty_balloon_boxes(balloons, [], lambda box: 5, min_ink=100)
+    assert got == []                                   # no ink → nothing to read → no VLM bait
+
+
+def test_textline_center_inside_counts_as_covered():
+    from manga_translator.detection_postproc import empty_balloon_boxes
+    balloons = [(0, 0, 100, 100)]
+    textlines = [(80, 80, 160, 160)]                   # center (120,120) OUTSIDE
+    got = empty_balloon_boxes(balloons, textlines, lambda box: 500, min_ink=100)
+    assert got == [(0, 0, 100, 100)]                   # not covered → selected

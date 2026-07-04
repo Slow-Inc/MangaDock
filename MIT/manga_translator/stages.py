@@ -13,7 +13,7 @@ verbatim. No model/usage state lives here — these are thin, pure adapters.
 from .colorization import dispatch as dispatch_colorization
 from .upscaling import dispatch as dispatch_upscaling
 from .detection import dispatch as dispatch_detection
-from .detection_postproc import merge_sfx_detections
+from .detection_postproc import merge_sfx_detections, merge_empty_balloons
 from .mask_refinement import dispatch as dispatch_mask_refinement
 from .inpainting import dispatch as dispatch_inpainting
 from .rendering import dispatch as dispatch_rendering, dispatch_eng_render, dispatch_eng_render_pillow
@@ -47,6 +47,10 @@ async def run_detection(config, ctx, device, verbose):
     # primary detector missed are appended as empty textlines for OCR to read.
     if config.detector.det_sfx:
         result = merge_sfx_detections(ctx, result, device)
+    # #535 empty-balloon rescue: an inked balloon DBNet left uncovered is missed text
+    # (the Otome "STARTING WITH…" caption). Needs the balloon model → same gate.
+    if config.detector.det_bubble_seg:
+        result = merge_empty_balloons(ctx, result, device)
     return result
 
 
