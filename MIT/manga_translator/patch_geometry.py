@@ -411,3 +411,21 @@ def erase_own_balloon_ink(mask: np.ndarray, crop_rgb: np.ndarray, regions,
             ink = cv2.dilate(ink, np.ones((k, k), np.uint8))
         out[iy1:iy2, ix1:ix2] = np.maximum(out[iy1:iy2, ix1:ix2], ink)
     return out
+
+
+def changed_alpha(rendered: np.ndarray, original: np.ndarray,
+                  thresh: int = 8, dilate_px: int = 3) -> np.ndarray:
+    """#535 round-8 (the "ME OFF!" resurrection): patch crops overlap, and a patch
+    composited as a full opaque rectangle repaints its crop's ORIGINAL pixels over
+    a neighbouring patch's erased/rendered work — un-deleting the neighbour's
+    source text. Alpha = only the pixels this patch actually CHANGED vs the
+    pristine crop (small ``dilate_px`` ring against anti-aliased seams), so
+    overlapping patches compose instead of stomping each other. Pure numpy/cv2."""
+    diff = np.abs(rendered.astype(np.int16) - original.astype(np.int16))
+    if diff.ndim == 3:
+        diff = diff.max(axis=2)
+    changed = (diff > thresh).astype(np.uint8)
+    if dilate_px > 0:
+        k = 2 * dilate_px + 1
+        changed = cv2.dilate(changed, np.ones((k, k), np.uint8))
+    return (changed * 255).astype(np.uint8)

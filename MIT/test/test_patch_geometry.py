@@ -396,3 +396,34 @@ def test_no_balloon_no_change():
     mask = np.zeros((100, 100), dtype=np.uint8)
     out = erase_own_balloon_ink(mask, crop, [SimpleNamespace()])
     assert (out == mask).all()
+
+
+# ---- #535 round-8: overlapping patches must not repaint pixels they didn't change ----
+
+def test_changed_alpha_marks_only_modified_pixels():
+    from manga_translator.patch_geometry import changed_alpha
+    import numpy as np
+    orig = np.full((100, 100, 3), 200, np.uint8)
+    rend = orig.copy()
+    rend[40:50, 40:60] = 30                      # erased/rendered area
+    a = changed_alpha(rend, orig, dilate_px=0)
+    assert a[45, 50] == 255                      # changed -> opaque
+    assert a[10, 10] == 0                        # untouched -> transparent (won't stomp neighbours)
+
+
+def test_changed_alpha_dilates_to_avoid_halo_seams():
+    from manga_translator.patch_geometry import changed_alpha
+    import numpy as np
+    orig = np.full((50, 50, 3), 200, np.uint8)
+    rend = orig.copy()
+    rend[20:22, 20:22] = 0
+    a = changed_alpha(rend, orig, dilate_px=3)
+    assert a[24, 24] == 255                      # dilation covers the seam ring
+    assert a[40, 40] == 0
+
+
+def test_changed_alpha_identical_is_fully_transparent():
+    from manga_translator.patch_geometry import changed_alpha
+    import numpy as np
+    orig = np.full((30, 30, 3), 128, np.uint8)
+    assert int(changed_alpha(orig.copy(), orig).sum()) == 0

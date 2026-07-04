@@ -32,6 +32,7 @@ from .patch_geometry import (
     page_scaled_font_min,
     reground_inpaint_luminance,
     add_own_balloon_interiors,
+    changed_alpha,
     erase_own_balloon_ink,
     restrict_mask_to_render_regions,
     seamless_blend_inpaint,
@@ -313,9 +314,17 @@ class PatchRenderer:
             # Offload PNG compression to thread pool to avoid blocking the event loop.
             # compress_level=1 is ~10x faster than optimize=True with ~15% larger file —
             # acceptable trade-off for interactive translation.
+            # #535 round-8: patch crops OVERLAP — a full-rect opaque patch repaints its
+            # crop's original pixels over a neighbour's erased text ("ME OFF!" came back).
+            # Composite only the pixels this patch actually changed; feather still fades
+            # the outer band when configured.
+            _alpha = changed_alpha(patch_ctx.img_rendered, crop_rgb)
+            if feather is not None:
+                _alpha = ((_alpha.astype(np.uint16) * feather.astype(np.uint16)) // 255).astype(np.uint8)
+
             loop = asyncio.get_running_loop()
             def _encode_png():
-                return encode_patch_png(patch_ctx.img_rendered, icc_profile=source_icc, alpha=feather)
+                return encode_patch_png(patch_ctx.img_rendered, icc_profile=source_icc, alpha=_alpha)
             logger.debug(f'[PatchTranslate] encoding PNG patch ({x2-x1}×{y2-y1} px)...')
             try:
                 png_bytes = await asyncio.wait_for(
