@@ -1314,6 +1314,8 @@ class MangaTranslator:
         except Exception:
             return 'UNKNOWN'
 
+    _LATIN_SOURCE_LANGS = {'ENG', 'ESP', 'FRA', 'DEU', 'ITA', 'PLK', 'PTB', 'ROM', 'IND', 'FIL', 'VIN', 'CSY', 'NLD', 'HUN', 'TRK'}
+
     def _filter_regions_by_source_lang(self, regions: List[Any], config: Config) -> List[Any]:
         source_lang_only = bool(getattr(config.translator, 'source_lang_only', False))
         requested_source_lang = str(getattr(config.translator, 'source_lang', '') or '').strip().upper()
@@ -1329,6 +1331,14 @@ class MangaTranslator:
             # it here even though the post-translation filter deliberately kept it
             # (the ぬ-stays-untranslated bug: rescued but never rendered).
             if getattr(region, 'sfx_rescued', False):
+                filtered_regions.append(region)
+                continue
+            # #535: langdetect misfires on short/all-caps Latin text ("STARTING WITH
+            # THE HEROINE…"→Maltese, "SiEg…"→Danish — live Otome p10) and is
+            # non-deterministic. Pure-ASCII text cannot be a non-Latin source: when
+            # the requested source lang is Latin-script, keep it deterministically.
+            _txt = str(getattr(region, 'text', '') or '')
+            if requested_source_lang in self._LATIN_SOURCE_LANGS and _txt.strip() and                     all(ord(c) < 128 or c in '…♥' for c in _txt):
                 filtered_regions.append(region)
                 continue
             region_source_lang = self._detect_region_source_lang(region, requested_source_lang)
