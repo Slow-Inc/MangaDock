@@ -252,6 +252,41 @@ Patch render path (S24, were byte-identical extractions — now carry an intenti
 - `patch_geometry.py` (S24a) — pure crop/mask geometry (`build_local_region` / `create_text_only_mask` / `crop_mask_for_patch`). **#248 divergence (no longer byte-identical with upstream's full-page path):** `crop_mask_for_patch` mask resize `INTER_LINEAR`→`INTER_NEAREST` (a binary mask must not be bilinear-fattened then re-binarized) + new `union_refined_with_fallback(refined, text_only)` — keeps the tight CRF mask everywhere it has coverage and falls back to the dilated `text_only_mask` only in connected components the refinement missed, so LaMa stops re-synthesising a halo of clean background around every glyph. **#173:** `feather_alpha(content_mask, radius)` — distance-transform alpha ramp (opaque on content, fading to 0 over `radius` px outside) for blending a patch at the seam. **#249:** `expand_inpaint_crop(x1,y1,x2,y2,img_h,img_w,pad)` — grow the render rect by `pad` (clamped) + return the render-rect offset inside the larger crop, so the inpaint runs on a wider receptive field and the result slices back to the render rect. **#250:** `page_scaled_font_min(img_h, img_w, existing)` = `max(existing, round((h+w)/200))` — the render font floor from the full page, not the small crop. `test/test_patch_geometry.py`.
 - `patch_renderer.py` (S24b) — `translate_patches` per-group async render driver. **#250:** `__init__` floors `config.render.font_size_minimum` to the page-scaled `page_scaled_font_min(...)` on a per-request `deepcopy` (guarded so an explicit larger override is kept and the shared / full-page config is never mutated) — fallback-path text stops rendering at the ~3-4px crop floor. **#248:** the refinement-success mask branch now calls `union_refined_with_fallback(refined, text_only_mask)` instead of `cv2.max(refined, text_only)` (dropped the now-unused `cv2` import). **#173:** when `config.render.patch_feather_radius > 0`, feathers the outer band of each patch (border-fade via `feather_alpha` on an eroded-rectangle content — the ≥120px crop margin keeps the fade off rendered text) and passes the alpha to `encode_patch_png`. **#249:** when `config.inpainter.inpaint_context_pad>0`, inpaints a `pad`-expanded crop (mask placed in a larger zero-mask at the render-rect offset) and slices the result back to the render rect — LaMa sees real background, the patch position/size is unchanged. **Full-page inpaint:** when `config.inpainter.full_page_inpaint` (`MIT_PATCH_FULLPAGE_INPAINT`), `translate_patches` inpaints the WHOLE page ONCE (mask-refine all regions + `union_refined_with_fallback` + one LaMa pass) and passes it as `PatchRenderer(full_inpainted=...)`; each `process_group` slices its clean background from it and **skips the per-crop mask refinement + inpaint** (`driver.calls == ['render']`). LaMa then has full-page context so large text over complex/dark art (hair) erases cleanly instead of leaving a per-crop gray blob — matches the upstream/full-page path. One inpaint per page (often faster than N per-group). Off → per-crop, byte-identical. **Revert hazard:** the blocky `text_only` halo returns → LaMa over-erases screentone/line-art next to bubbles; patch seams turn back into hard rectangles; inpaint fill flattens from context starvation; large-text-over-art reverts to the gray blob.
 
+### PRD #535 — detection completeness + overlap-safe patches (landing/render-phase0, 2026-07-05)
+
+The Otome-p10 defect sweep (ADR 022). All helpers pure-cv2/numpy, TDD, best-effort (failure → prior
+behaviour). Full narrative + before/after PNGs: `docs/reports/benchmarks/2026-07-04-defect-pages-before-after.md`.
+
+- `detection_postproc.py` (S13, extended) — **completeness nets**, all gated `det_bubble_seg`, appended as
+  empty textlines → `vlm_rescue`: `empty_balloon_boxes(balloons, textlines, ink_of_box, min_ink)` (ink-coverage
+  ≥50%, balloon interior shrunk 10% to skip the black border) · `white_box_candidates(gray, …)` (bright box-like
+  components, fill ≥0.7 — square caption boxes the balloon YOLO can't see; **no morph-close**, it bridged the
+  border) · `expand_balloons_with_white_boxes(balloons, whites, containment=0.7)` (grow a YOLO box to the
+  containing white box; unmatched whites appended) · `uncovered_text_clusters(gray, covered_boxes, …)` (sparse
+  dark ink on light bg, density 4–45% + bg-median ≥190 to reject art). `merge_empty_balloons(ctx, result, device)`
+  wires balloon + white-box + ink-cluster rescue into `run_detection`. **Revert hazard:** captions the detectors
+  miss silently stay untranslated; a caption box's last line ghosts.
+- `patch_geometry.py` (S24a, extended) — `add_own_balloon_interiors(allowed, regions)` (a region may erase its
+  OWN balloon interior) · `erase_own_balloon_ink(mask, crop, regions)` (leftover source strokes inside one's own
+  balloon → erase mask, ink-only, interior not flooded) · **`changed_alpha(rendered, original, thresh=8,
+  dilate_px=3)`** — patch alpha = only pixels the patch CHANGED vs the pristine crop. **Revert hazard:**
+  overlapping patch crops composite as full opaque rects → a neighbour patch repaints its original pixels over an
+  already-erased caption = the "ME OFF!" resurrection.
+- `patch_renderer.py` (S24b, extended) — after the empty-bubble guard: `add_own_balloon_interiors` +
+  `erase_own_balloon_ink`; the patch alpha is now `changed_alpha(...)` multiplied with the optional feather band
+  (was a full-rect hard alpha). `render_dst_box` copy-back offsets crop→page coords (metric false-overlap fix).
+- `manga_translator.py` — `_tag_regions_with_bubbles` grows each `bubble_box` to a containing white caption box;
+  `_filter_regions_by_source_lang` keeps pure-ASCII regions for Latin-script sources (`_LATIN_SOURCE_LANGS`) —
+  langdetect misfires all-caps EN (→Maltese/Danish, non-deterministic) and was dropping good captions.
+- `translators/numbered_contract.py` (**new**, ported from main) + `common_gpt.py` — `_parse_response` maps
+  `<|i|>` blocks BY INDEX (exactly-N normalization), replacing positional `re.split` (one dropped index shifted
+  every following bubble = page-wide misalignment). Single-query no-prefix fallback preserved.
+- `rendering/__init__.py` (extended) — `bubble_fit_tall` branch (tall rectangular balloon → clean-layout column,
+  not a wide strip); `sfx_display` gated to free-floating SFX (rescued in-balloon SFX = dialogue); dedup blanks
+  equal-translation balloon-quads; `page_shape` threaded so `clean_wrap_width` clamps page-relative.
+- `rendering/text_render.py` — `longest_token_width(size, text, lang)` (ported from main, item-9): the ss=4
+  re-wrap floor that stops Thai/CJK words splitting mid-syllable (ขอโทษ→ขอโ/ทบ).
+
 ### `server/` — modified (5)
 
 | File | What we changed | Why |

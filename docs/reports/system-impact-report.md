@@ -15,6 +15,51 @@
 
 ---
 
+## 2026-07-05 — MIT render defect sweep: detection completeness + overlap-safe patches (PRD #535)
+
+**Scope:** MIT (`detection_postproc.py`, `patch_geometry.py`, `patch_renderer.py`, `rendering/__init__.py`,
+`rendering/text_render.py`, `stages.py`, `manga_translator.py`, `translators/{numbered_contract,common_gpt}.py`)
+· **Type:** Multi-root bugfix + detection-completeness features · **Branch:** `landing/render-phase0`
+· **Tests:** ~98 MIT tests green (all fixes TDD, RED→GREEN) · **ADR:** [022](../adr/022-mit-detection-completeness-and-overlap-safe-patches.md).
+
+**What & where:** one wild page (Otome p10, `img-cache/_chapters/.../ds9.jpg`) exposed **8 independent
+defect classes** across the whole pipeline. Fixes, by stage:
+- **Detection completeness (new):** `empty_balloon_boxes` (ink-coverage rescue) · `white_box_candidates`
+  (square caption boxes the balloon YOLO can't see) · `expand_balloons_with_white_boxes` (grow YOLO box to
+  the true caption) · `uncovered_text_clusters` (ink-on-light net) — all appended as empty textlines → VLM rescue.
+- **OCR filter:** `_filter_regions_by_source_lang` keeps pure-ASCII regions for Latin-script sources
+  (langdetect misfired all-caps EN→Maltese, non-deterministic, dropped good captions).
+- **Translation parsing:** ported `numbered_contract` → index-based `_parse_response` (was positional
+  `re.split` → one dropped `<|i|>` shifted every following bubble = page-wide misalignment).
+- **Mask/compositing:** `add_own_balloon_interiors` + `erase_own_balloon_ink` (own-balloon leftover strokes) ·
+  **`changed_alpha`** — patch alpha = only pixels the patch changed vs pristine crop (overlapping patches were
+  repainting neighbours' erased text = the "ME OFF!" ghost root, **confirming the user's hypothesis**).
+- **Render (extends ADR 007):** `bubble_fit_tall` (tall column for rectangular balloons) · `sfx_display` gated
+  to free-floating SFX · dedup blanks equal-translation balloon-quads · `page_shape` threaded (page-relative
+  wrap clamp) · ported item-9 `longest_token_width` ss-rewrap floor (Thai word split at ss=4) · metric `dst_box`
+  → page coords.
+
+**Why:** two prior master plans left these unfixed because the real fixes were stranded in uncommitted WIP and
+three were `main`-only ports; no defect metric existed to catch them.
+
+**Before → After:** Otome p10 — 8 visible defect classes → **fully clean** (every box/bubble carries its own
+translation; no ghost/dupe/phantom/word-split). Katakana SFX chains now localize (カチカチ→กึกกึก) — new capability.
+
+**Performance Δ:** not measured (per-page latency dominated by VLM rescue + LaMa, unchanged in order). **Quality:**
+render fidelity on the wild page went from "has every defect" to zero-visible; metric scorecard clean on the
+pre-existing pages. **Validation:** ~98 TDD tests; live per-round verification v1→v16 with committed before/after
+PNGs + scorecards (`docs/reports/benchmarks/2026-07-04-defect-pages-before-after.md`). **Risk / rollback:** all
+nets best-effort (failure = prior behaviour); **`changed_alpha` touches every patch → regression sweep on
+One-Punch p1/p2 + full-page-inpaint path NOT yet run (gating item before promotion)**; ~50-commit landing branch
+not yet converged to perf/main (Phase 3). **Links:** PRD #535, issues #536/#537/#538, ADR 022, commits
+`5f8249ec..d63970c2`.
+
+### Tech-debt register (opened by this batch)
+- **Regression sweep owed** before promotion: `changed_alpha` + `page_shape` + dedup changes are pipeline-wide.
+- **Heuristic thresholds** in the 3 completeness nets tuned on one page — may need per-manga calibration.
+- **Full-page-inpaint path** (`MIT_PATCH_FULLPAGE_INPAINT=1`, prod) bypasses per-crop guard/erase — verify separately.
+- **2nd-manga coverage** (Gal Yome EN→TH) still owed; **branch convergence** (~50 commits) is Phase 3.
+
 ## 2026-07-01 — Captcha re-prompt on translate 401 (bugfix / hotfix)
 
 **Scope:** Frontend (`MangaReader.tsx`, `useChapterTranslation.ts`, `mangaTranslatePage.ts` + test) · **Type:** Bug hotfix · **Tests:** frontend 138/138 green (+4); typecheck clean; live E2E screenshot.
