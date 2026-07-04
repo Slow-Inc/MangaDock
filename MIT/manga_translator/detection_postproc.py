@@ -47,9 +47,16 @@ def empty_balloon_boxes(balloon_aabbs, textline_aabbs, ink_of_box, min_ink: int 
     out = []
     for b in balloon_aabbs:
         bx1, by1, bx2, by2 = b
-        covered = any(bx1 <= (t[0] + t[2]) / 2.0 <= bx2 and by1 <= (t[1] + t[3]) / 2.0 <= by2
-                      for t in textline_aabbs)
-        if covered:
+        b_area = max(1.0, (bx2 - bx1) * (by2 - by1))
+        # AREA coverage, not center-containment: at a low text_threshold DBNet can
+        # leave one faint sliver inside the box (it dies later at OCR) which would
+        # wrongly mark the balloon as covered.
+        cov = 0.0
+        for t in textline_aabbs:
+            ix = max(0.0, min(bx2, t[2]) - max(bx1, t[0]))
+            iy = max(0.0, min(by2, t[3]) - max(by1, t[1]))
+            cov += ix * iy
+        if cov / b_area >= 0.2:
             continue
         if ink_of_box(b) < min_ink:
             continue

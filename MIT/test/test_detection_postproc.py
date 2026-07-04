@@ -56,3 +56,21 @@ def test_textline_center_inside_counts_as_covered():
     textlines = [(80, 80, 160, 160)]                   # center (120,120) OUTSIDE
     got = empty_balloon_boxes(balloons, textlines, lambda box: 500, min_ink=100)
     assert got == [(0, 0, 100, 100)]                   # not covered → selected
+
+
+def test_balloon_with_only_a_stray_sliver_is_still_rescued():
+    # thr=0.3 can leave one faint sliver inside the box (it dies later at OCR),
+    # which defeated the center-containment check — coverage must be AREA-based.
+    from manga_translator.detection_postproc import empty_balloon_boxes
+    balloons = [(0, 0, 200, 200)]                       # 40000 px²
+    textlines = [(10, 10, 60, 20)]                      # 500 px² = 1.25% coverage
+    got = empty_balloon_boxes(balloons, textlines, lambda b: 5000, min_ink=100)
+    assert got == [(0, 0, 200, 200)]
+
+
+def test_balloon_substantially_covered_is_not_rescued():
+    from manga_translator.detection_postproc import empty_balloon_boxes
+    balloons = [(0, 0, 200, 200)]
+    textlines = [(10, 10, 190, 120)]                    # ~50% coverage
+    got = empty_balloon_boxes(balloons, textlines, lambda b: 5000, min_ink=100)
+    assert got == []
