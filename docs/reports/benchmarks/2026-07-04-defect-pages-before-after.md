@@ -89,3 +89,17 @@ previous capability; scorecard on the clean pre-rescue run: **all zeros**.
   what it can't re-render).
 - Minor: the rescued Sieg-bubble quad can overlap its sibling ("ขอโทษ" at the bubble edge) — rescue-vs-textline
   boundary tuning.
+
+## Round 5 (a27a3c59 + 2d97edb2) — ink-cluster net + THE misalignment fix
+
+![v10](./2026-07-04-otome-p10-v10.jpg)
+
+- **Page-wide translation misalignment found & fixed:** v9 live showed every bubble carrying its NEIGHBOR's
+  translation — `_parse_response` split the model reply POSITIONALLY, so one dropped `<|i|>` shifted the whole
+  page. Ported main's `numbered_contract` (16 tests) and parse BY INDEX. **v10: every translation matches its
+  bubble** ("DAMN IT→ไอ้บ้า!", "IRIS-CHAN→ไอริส-จัง", full "โกรธ" present).
+- **Ink-cluster completeness net** added (pure cv2, TDD): sparse-ink-on-light-bg clusters with no covering
+  region are appended for VLM rescue — the mechanism for the STARTING/ME-OFF class; on this run's page it did
+  not fire on the caption (filters/non-det — tuning continues), so the box stays honestly untranslated EN.
+- Remaining on this page: STARTING caption + ME OFF ghost pixels (detection-coverage; mechanism built, tuning
+  next), TCH duplicate pair (containment boundary).
