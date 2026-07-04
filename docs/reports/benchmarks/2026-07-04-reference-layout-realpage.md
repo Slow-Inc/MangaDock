@@ -34,3 +34,19 @@ The narrow-bubble defect the user caught (`ะจัด…น้า-ฮอล์
 knobs (reference_layout, bubble_area_fit) are now deterministically A/B'd and neither cleanly fixes it. The
 next real step is P4-fix (safe_area) done right so reference_layout's narrow-column wrap stops over-narrowing —
 that is the genuine remaining render-quality work, not a flag flip.
+
+## Root-cause diagnosis (deterministic, decisive)
+Measured the top-left bubble's text ("คนจากแผนกอื่นก็มาได้ อยากมาไหม?") at the readable floor:
+- `fs=18` → longest-token width 47px → wraps to **7 lines** → block height ≈ 7·18·1.2 = **151px**.
+- The bubble interior is only **~70px tall**. So the Thai translation is **~2× too tall** for the bubble at a
+  readable font. Below 18px it is unreadable.
+
+**⇒ This narrow-bubble defect is a TRANSLATION-LENGTH × bubble-size mismatch, NOT a render bug.** No wrap
+algorithm (reference_layout, bubble_area_fit, greedy) fixes "too much text in a tiny bubble" — the options are
+unreadably-tiny (clip) or spill past the balloon. The render clusters (P3/P4) are the wrong lever here.
+
+**The real fix is a shorter, more concise translation (P7 llm-translation-quality)** — i.e. the LLM should
+produce bubble-appropriate length, which is a translation-quality effort gated on the #526 eval framework, not
+a render change. The main render-side narrow-bubble fix that DOES apply (bubbles that are fillable but got
+tiny text) is **P1 readable-floor, which is already merged + live**. This page's top-left bubble is the
+pathological (genuinely-too-small) tail case that only concise translation resolves.
