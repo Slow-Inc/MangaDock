@@ -34,43 +34,44 @@ def test_merge_identity_when_no_sfx_boxes(monkeypatch):
 
 # ---- #535 empty-balloon rescue: a balloon with INK but no textline = missed text ----
 
-def test_inked_balloon_without_textline_is_selected():
+def _ink_map(values):
+    """ink_of_box stub: exact-match boxes get their value; clipped sub-boxes get a
+    proportional share of the containing balloon's ink (uniform-ink approximation)."""
+    def ink(box):
+        box = tuple(float(v) for v in box)
+        if box in values:
+            return values[box]
+        # proportional share of the smallest registered box containing it
+        for b, v in values.items():
+            if box[0] >= b[0] and box[1] >= b[1] and box[2] <= b[2] and box[3] <= b[3]:
+                area_b = max(1.0, (b[2]-b[0])*(b[3]-b[1]))
+                area = max(0.0, (box[2]-box[0])*(box[3]-box[1]))
+                return v * area / area_b
+        return 0
+    return ink
+
+
+def test_normal_bubble_with_textline_over_its_ink_is_covered():
+    # a speech bubble's text covers only ~15% of the balloon AREA but ~all of its INK
+    # — must NOT be rescued (v6 live: duplicated every dialogue bubble).
     from manga_translator.detection_postproc import empty_balloon_boxes
-    balloons = [(0, 0, 100, 100), (200, 200, 300, 300)]
-    textlines = [(10, 10, 90, 40)]                     # 24% of balloon 1 = covered
-    ink = lambda box: 500                              # both have ink
-    got = empty_balloon_boxes(balloons, textlines, ink, min_ink=100)
-    assert got == [(200, 200, 300, 300)]               # balloon 2: ink but no textline
+    balloon = (0.0, 0.0, 200.0, 200.0)
+    text = (60.0, 80.0, 140.0, 120.0)          # 3200 px² of 40000 (8% area)
+    ink = lambda box: 900 if (abs(box[0]-60) < 1 and abs(box[1]-80) < 1) else (1000 if box == balloon else 0)
+    got = empty_balloon_boxes([balloon], [text], ink, min_ink=100)
+    assert got == []                            # 90% of the ink is inside the textline
+
+
+def test_caption_with_stray_sliver_over_little_ink_is_rescued():
+    from manga_translator.detection_postproc import empty_balloon_boxes
+    balloon = (0.0, 0.0, 200.0, 200.0)
+    sliver = (10.0, 10.0, 60.0, 20.0)
+    ink = lambda box: 40 if (abs(box[0]-10) < 1 and abs(box[1]-10) < 1) else (2000 if box == balloon else 0)
+    got = empty_balloon_boxes([balloon], [sliver], ink, min_ink=100)
+    assert got == [balloon]                     # sliver covers 2% of the ink → missed text
 
 
 def test_truly_empty_balloon_is_not_rescued():
     from manga_translator.detection_postproc import empty_balloon_boxes
-    balloons = [(0, 0, 100, 100)]
-    got = empty_balloon_boxes(balloons, [], lambda box: 5, min_ink=100)
-    assert got == []                                   # no ink → nothing to read → no VLM bait
-
-
-def test_textline_center_inside_counts_as_covered():
-    from manga_translator.detection_postproc import empty_balloon_boxes
-    balloons = [(0, 0, 100, 100)]
-    textlines = [(80, 80, 160, 160)]                   # center (120,120) OUTSIDE
-    got = empty_balloon_boxes(balloons, textlines, lambda box: 500, min_ink=100)
-    assert got == [(0, 0, 100, 100)]                   # not covered → selected
-
-
-def test_balloon_with_only_a_stray_sliver_is_still_rescued():
-    # thr=0.3 can leave one faint sliver inside the box (it dies later at OCR),
-    # which defeated the center-containment check — coverage must be AREA-based.
-    from manga_translator.detection_postproc import empty_balloon_boxes
-    balloons = [(0, 0, 200, 200)]                       # 40000 px²
-    textlines = [(10, 10, 60, 20)]                      # 500 px² = 1.25% coverage
-    got = empty_balloon_boxes(balloons, textlines, lambda b: 5000, min_ink=100)
-    assert got == [(0, 0, 200, 200)]
-
-
-def test_balloon_substantially_covered_is_not_rescued():
-    from manga_translator.detection_postproc import empty_balloon_boxes
-    balloons = [(0, 0, 200, 200)]
-    textlines = [(10, 10, 190, 120)]                    # ~50% coverage
-    got = empty_balloon_boxes(balloons, textlines, lambda b: 5000, min_ink=100)
+    got = empty_balloon_boxes([(0.0, 0.0, 100.0, 100.0)], [], lambda box: 5, min_ink=100)
     assert got == []

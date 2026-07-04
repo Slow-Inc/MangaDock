@@ -47,18 +47,20 @@ def empty_balloon_boxes(balloon_aabbs, textline_aabbs, ink_of_box, min_ink: int 
     out = []
     for b in balloon_aabbs:
         bx1, by1, bx2, by2 = b
-        b_area = max(1.0, (bx2 - bx1) * (by2 - by1))
-        # AREA coverage, not center-containment: at a low text_threshold DBNet can
-        # leave one faint sliver inside the box (it dies later at OCR) which would
-        # wrongly mark the balloon as covered.
-        cov = 0.0
+        total_ink = ink_of_box(b)
+        if total_ink < min_ink:
+            continue                              # genuinely empty — never bait the VLM
+        # INK coverage: a dialogue bubble's text covers only ~10-30% of the balloon
+        # AREA but ~all of its INK — area coverage duplicated every bubble (v6 live).
+        # Sum the ink inside the textline∩balloon clips; >=50% of the balloon's ink
+        # inside textlines = covered.
+        covered_ink = 0.0
         for t in textline_aabbs:
-            ix = max(0.0, min(bx2, t[2]) - max(bx1, t[0]))
-            iy = max(0.0, min(by2, t[3]) - max(by1, t[1]))
-            cov += ix * iy
-        if cov / b_area >= 0.2:
-            continue
-        if ink_of_box(b) < min_ink:
+            ix1, iy1 = max(bx1, t[0]), max(by1, t[1])
+            ix2, iy2 = min(bx2, t[2]), min(by2, t[3])
+            if ix2 > ix1 and iy2 > iy1:
+                covered_ink += ink_of_box((ix1, iy1, ix2, iy2))
+        if covered_ink / max(1.0, float(total_ink)) >= 0.5:
             continue
         out.append(tuple(b))
     return out
