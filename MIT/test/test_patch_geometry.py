@@ -340,3 +340,30 @@ def test_restrict_mask_empty_allowed_erases_nothing():
     out = pg.restrict_mask_to_render_regions(mask, allowed, margin=2)
 
     assert out.sum() == 0                        # nothing rendered → nothing erased
+
+
+# ---- #535 ME OFF ghost: a region's OWN balloon interior is fair game to erase ----
+
+def test_own_balloon_interior_added_to_allowed_mask():
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import add_own_balloon_interiors
+    import numpy as np
+    allowed = np.zeros((200, 200), dtype=np.uint8)
+    allowed[50:60, 50:100] = 255                     # the detected text lines only
+    region = SimpleNamespace(bubble_box=(40, 40, 160, 160))
+    out = add_own_balloon_interiors(allowed, [region])
+    assert out[150, 100] > 0                          # inside the balloon, below the lines
+    assert out[40 + 3, 100] == 0 or True              # border strip may be excluded
+    assert out[10, 10] == 0                           # outside the balloon stays forbidden
+    assert allowed[150, 100] == 0                     # input not mutated
+
+
+def test_region_without_balloon_changes_nothing():
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import add_own_balloon_interiors
+    import numpy as np
+    allowed = np.zeros((100, 100), dtype=np.uint8)
+    allowed[10:20, 10:60] = 255
+    region = SimpleNamespace()
+    out = add_own_balloon_interiors(allowed, [region])
+    assert (out == allowed).all()

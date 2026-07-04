@@ -359,3 +359,26 @@ def reground_inpaint_luminance(inpainted_rgb: np.ndarray, original_rgb: np.ndarr
     out = out.astype(np.uint8)
     out[valid] = inp[valid]   # enforce exact outside-mask byte-identity
     return np.ascontiguousarray(out)
+
+
+def add_own_balloon_interiors(allowed_mask: np.ndarray, regions,
+                              border_frac: float = 0.04) -> np.ndarray:
+    """#535 ("ME OFF!" ghost): a region that owns a speech balloon may erase ANY
+    stroke inside that balloon — the translation is re-rendered over the whole
+    balloon, so leftover source lines the detector's box missed (the last "ME
+    OFF!" line) are its own territory, not a neighbour's. Adds each region's
+    (slightly shrunk, border-safe) ``bubble_box`` interior to the allowed erase
+    mask. Regions without a balloon contribute nothing. Input not mutated."""
+    out = np.ascontiguousarray(allowed_mask).astype(np.uint8).copy()
+    h, w = out.shape[:2]
+    for r in regions:
+        bb = getattr(r, 'bubble_box', None)
+        if bb is None:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in bb)
+        dx, dy = (x2 - x1) * border_frac, (y2 - y1) * border_frac
+        ix1, iy1 = max(0, int(x1 + dx)), max(0, int(y1 + dy))
+        ix2, iy2 = min(w, int(x2 - dx)), min(h, int(y2 - dy))
+        if ix2 > ix1 and iy2 > iy1:
+            out[iy1:iy2, ix1:ix2] = 255
+    return out

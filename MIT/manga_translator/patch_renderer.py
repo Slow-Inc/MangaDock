@@ -31,6 +31,7 @@ from .patch_geometry import (
     feather_alpha,
     page_scaled_font_min,
     reground_inpaint_luminance,
+    add_own_balloon_interiors,
     restrict_mask_to_render_regions,
     seamless_blend_inpaint,
     tighten_text_mask,
@@ -165,8 +166,12 @@ class PatchRenderer:
                     # empty bubble. Restrict the erase mask to this group's own regions
                     # (small margin keeps legit spill hugging a rendered glyph). The
                     # inpaint crop/context is untouched — only what gets erased narrows.
+                    # ...a region's OWN balloon interior is its territory though —
+                    # leftover source lines the box missed ("ME OFF!") get erased
+                    # because the translation re-renders over that balloon.
+                    allowed_mask = add_own_balloon_interiors(text_only_mask, local_regions)
                     patch_ctx.mask = restrict_mask_to_render_regions(
-                        patch_ctx.mask, text_only_mask, margin=8)
+                        patch_ctx.mask, allowed_mask, margin=8)
 
                     # #268: shrink the inpaint mask to the actual ink strokes so LaMa repaints
                     # less of the textured art (smaller band). crop_rgb is the pristine original.

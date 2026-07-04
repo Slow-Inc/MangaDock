@@ -113,3 +113,28 @@ def test_dense_dark_art_is_rejected():
     img = _page_with(draw)
     got = uncovered_text_clusters(img, covered_boxes=[])
     assert got == []                                          # too dense = art, not text
+
+
+# ---- #535 white caption boxes: bright rectangles are balloons the YOLO can't see ----
+
+def test_white_caption_box_detected():
+    import numpy as np, cv2
+    from manga_translator.detection_postproc import white_box_candidates
+    img = np.full((600, 600), 120, np.uint8)          # mid-gray art page
+    img[60:260, 50:300] = 245                          # big white caption box (~14% of page)
+    cv2.putText(img, 'STARTING WITH', (70, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.8, 30, 2)
+    got = white_box_candidates(img)
+    assert len(got) == 1
+    x1, y1, x2, y2 = got[0]
+    assert x1 >= 45 and y1 >= 55 and x2 <= 305 and y2 <= 265
+
+
+def test_small_or_irregular_bright_areas_ignored():
+    import numpy as np, cv2
+    from manga_translator.detection_postproc import white_box_candidates
+    img = np.full((400, 400), 120, np.uint8)
+    img[10:40, 10:40] = 245                            # too small
+    tri = np.array([[80, 300], [300, 300], [80, 80]])  # bright triangle = low fill
+    cv2.fillPoly(img, [tri], 245)
+    got = white_box_candidates(img)
+    assert got == []

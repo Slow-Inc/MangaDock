@@ -100,6 +100,11 @@ def merge_empty_balloons(ctx, result, device):
             return (b[0] + w * f, b[1] + h * f, b[2] - w * f, b[3] - h * f)
 
         balloons = [_shrink(_aabb(p)) for p in polygons]
+        # #535: square white caption boxes are not speech balloons — the YOLO never
+        # proposes them (the "STARTING WITH…" box) — but their bright interiors are
+        # trivially detectable; give them the same ink-coverage rescue.
+        gray_pre = img.mean(axis=2).astype('uint8') if img.ndim == 3 else img
+        balloons += [_shrink(b) for b in white_box_candidates(gray_pre)]
         existing = [textline_aabb(t) for t in textlines]
         fresh = empty_balloon_boxes(balloons, existing, _ink)
         for (x1, y1, x2, y2) in fresh:
@@ -159,5 +164,34 @@ def uncovered_text_clusters(gray, covered_boxes, min_area: int = 1200,
         non_ink = crop[~crop_ink]
         if non_ink.size == 0 or float(_np.median(non_ink)) < bg_light:
             continue                      # background not light = art region
+        out.append((float(x), float(y), float(x + bw), float(y + bh)))
+    return out
+
+
+def white_box_candidates(gray, bright: int = 220, min_area: int = 8000,
+                         max_area_frac: float = 0.25, min_fill: float = 0.85):
+    """#535 (the "STARTING WITH…" caption): a square white CAPTION BOX is not a
+    speech balloon, so the balloon YOLO never proposes it — but its white interior
+    is trivially detectable. Bright connected components that are large and
+    box-like (component area >= ``min_fill`` of their bounding rect) are returned
+    as balloon-equivalent boxes for the same ink-coverage rescue. Pure cv2."""
+    import cv2 as _cv2
+    import numpy as _np
+    g = gray if gray.ndim == 2 else _cv2.cvtColor(gray, _cv2.COLOR_RGB2GRAY)
+    h, w = g.shape[:2]
+    bright_mask = (g >= bright).astype(_np.uint8)
+    # close small holes (the text strokes inside the box) so the box reads solid
+    bright_mask = _cv2.morphologyEx(bright_mask, _cv2.MORPH_CLOSE,
+                                    _np.ones((15, 15), _np.uint8))
+    num, labels, stats, _ = _cv2.connectedComponentsWithStats(bright_mask)
+    out = []
+    page_area = float(h * w)
+    for i in range(1, num):
+        x, y, bw, bh, area = stats[i]
+        rect = float(bw * bh)
+        if rect < min_area or rect / page_area > max_area_frac:
+            continue
+        if area / rect < min_fill:
+            continue
         out.append((float(x), float(y), float(x + bw), float(y + bh)))
     return out
