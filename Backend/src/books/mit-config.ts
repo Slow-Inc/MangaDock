@@ -226,6 +226,10 @@ export function buildMitConfig(
       // prompt so the model knows which manga it is translating. Absent →
       // prompt identical to the context-free behavior.
       ...(seriesContext ? { series_context: seriesContext } : {}),
+      // P7 (Master Plan 2): ask the LLM for the shortest faithful phrasing so long
+      // translations don't overflow tight balloons (the measured #1 narrow-bubble cause
+      // is a translation ~2x too tall for the bubble). Absent → prompt byte-identical.
+      ...(flagEnv('MIT_CONCISE_BUBBLES') ? { concise_bubbles: true } : {}),
     },
     detector: {
       // #247: match MIT's own tuned Config default (2560). 2048 silently

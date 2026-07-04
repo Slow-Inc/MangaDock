@@ -1,0 +1,9 @@
+{
+  "_comment": "ILLUSTRATIVE sample only — synthetic strings to demonstrate the harness format, NOT real MIT output or a quality claim. A real eval set is 100 bubbles across 3-5 chapters with an official English reference (see README).",
+  "items": [
+    {"id": "ch1-p3-b2", "source": "おにいちゃん！", "candidate": "Big brother!", "reference": "Onii-chan!", "bubble_type": "dialogue", "config_label": "context_on"},
+    {"id": "ch1-p3-b5", "source": "その頃、彼は知らなかった", "candidate": "At that time, he did not know", "reference": "Back then, he had no idea", "bubble_type": "narration", "config_label": "context_on"},
+    {"id": "ch1-p4-sfx1", "source": "ゴゴゴ", "candidate": "GOGOGO", "reference": "RUMBLE", "bubble_type": "sfx", "config_label": "context_on"},
+    {"id": "ch1-p5-b1", "source": "待って、フユキ！", "candidate": "Wait, Fuyuki!", "reference": "Wait, Fuyuki!", "bubble_type": "dialogue", "config_label": "context_on"}
+  ]
+}
