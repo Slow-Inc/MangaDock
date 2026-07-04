@@ -26,6 +26,7 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[feedback-md-update-every-change]] — อัปเดต MD (DESIGN/spec + "Resume here" note) ทุกครั้งที่แก้ เพื่อ session ใหม่เปิดมาทำงานต่อได้ทันที
 - [[feedback-notify-on-done-or-question]] — ยิง PushNotification ทุกครั้งที่งานเสร็จหรือมีเรื่องต้องถาม user จะได้ไม่ต้องเฝ้า terminal
 - [[feedback-review-merge-policy]] — Tech-debt PR policy — auto-merge when green, but REVIEW FIRST with the /scrutinize skill (not an ad-hoc read)
+- [[feedback-proactive-clink-brainstorm]] — In goal-mode, invoke /clink-brainstorm WITHOUT asking for technical forks multiple agents can enrich (Claude picks how many/which); always verify "external prereq/blocked" claims against the real repo first
 - [[feedback-techdebt-all-scenarios]] — When refactoring tech debt in shared/core modules, enumerate and characterization-test EVERY scenario you can imagine BEFORE touching code — a refactor error there breaks the whole system.
 - [[feedback-test-every-round]] — ทำงานเสร็จทุกครั้งต้อง test ครบทุกรอบ รวม frontend E2E (Playwright ผ่าน tunnel) ไม่ใช่แค่ unit
 - [[feedback-verify-before-claiming]] — ห้ามเคลม "แก้แล้ว" จนกว่าจะ eyeball render จริงเทียบ target + SendUserFile ให้ user confirm; test/replay ผ่าน ≠ verified; metric ต้องครอบทั้ง over/under

@@ -64,3 +64,7 @@ MANIFEST
 # SSL Used for running server locally
 cert.pem
 key.pem
+
+# Transient worker / A-B / render-dump scratch logs — never commit (#533 cleanup)
+_*.log
+_render_dump/

@@ -101,3 +101,25 @@ P1 readable-floor (live) is the least-bad option. The general narrow-bubble clas
 flags — user), ML models (P6 AnimeText / P11 VLM-OCR), human grading (P7 accuracy via #526 eval run), a repro
 fixture (P9). None is further autonomous coding — each needs a model, a human judgement, a captured repro, or an
 operator decision. The autonomous engineering of Master Plan 2 is complete and benchmarked.
+
+---
+## RESUME (2026-07-04 round 2 — post brainstorm) — READ THIS FIRST next session
+
+**Branch:** `fix/mit-mp2-p2-p5`. **PR #532 MERGED to main** (squash). **PR #533 OPEN** (P7-LLM-judge + brainstorm-unblocked P6/P9 + P7-conciseness quality A/B — clean 6-file diff vs main).
+
+**What the 2 brainstorm rounds unblocked/found (all committed to PR #533):**
+- **P7-accuracy = DONE-measurable**: `MIT/eval/llm_judge.py` (torch-free, custom_openai endpoint) → real scorecards. Baseline **1.70/2** (35 bubbles). Run: `MIT/eval/run_llm_judge.py`.
+- **P7 concise_bubbles = PROVEN-GOOD**: clean A/B OFF 1.47 → ON **1.60/2** (+0.18 faithfulness) → enable candidate like P8 KP.
+- **P6 SFX**: AnimeText model already cached (~/.cache/huggingface); `sfx_detector.detect_sfx_boxes` verified (4 boxes). Enable = `MIT_SFX_DETECTOR` (already in Backend/.env).
+- **P9**: 0-drop audit confirms terminal state (guard is correct done-state, no defect).
+
+**What genuinely remains = USER/EXTERNAL only (verified across 2 brainstorm rounds):**
+1. **merge #532 + #533** — user says "ยืนยัน" (per-PR auth; classifier hard-blocks agent self-merge). #532 was merged this way.
+2. **deploy + enable** the proven-good flags (`MIT_KNUTH_PLASS`, `MIT_CONCISE_BUBBLES`; **NOT** `MIT_REFERENCE_LAYOUT` — benchmark-proven regress). SAFE deploy recipe (from brainstorm): `git worktree add` off main + copy git-ignored models/ + sequential cutover on :5003 + restart Backend (do NOT run 2 GPU workers = CUDA OOM). User-gated (outward-facing).
+3. **P11 OCR** = deferred-by-plan ("don't chase"). **human blind grading** = gold-standard on top of the LLM-judge baseline (optional).
+
+**Deterministic render benchmark method (works):** `MIT/tools/render_dump_ab.py` — needs a worker launched from mp2-work checkout (has reference_layout + the MIT_DEBUG_RENDER_DUMP dump code) since the machine's venv imports code cwd-based; :5003 runs stale perf-branch code.
+
+**Root-cause (benchmark-proven):** the user's narrow-bubble defect = fundamental bubble-size × text-length limit; P1 readable-floor (live) is the least-bad option; render clusters (P3/P4) don't fix it.
+
+**New rule this session:** proactive `/clink-brainstorm` in goal-mode (see memory `feedback_proactive_clink_brainstorm`) — it unblocked 3 "blocked" clusters, so always verify "external prereq" claims against the real repo first.
