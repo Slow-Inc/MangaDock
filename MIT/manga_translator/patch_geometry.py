@@ -129,6 +129,25 @@ def crop_mask_for_patch(
     return cropped_mask.astype(np.uint8)
 
 
+def assemble_fullpage_erase_mask(refined_mask, text_only_mask, img_rgb,
+                                 restrict: bool = False, restrict_margin: int = 8):
+    """Assemble the full-page erase mask from the refined (CRF) mask + textline mask.
+
+    #540 boy-ghost: the per-crop path clips the CRF mask to the to-be-rendered
+    textlines (``restrict_mask_to_render_regions``), but the full-page (prod) path
+    did not — so CRF ink far from any textline (a figure's hair strokes inside an
+    oversized dialogue box) survived and LaMa smeared the figure. ``restrict=True``
+    brings the full-page path to parity: intersect the refined mask with the
+    dilated textline mask BEFORE the white-caption erase (which legitimately adds
+    ink outside textlines and must survive). ``restrict=False`` is byte-identical
+    to the former inline ``union_refined_with_fallback`` + caption-erase. Pure."""
+    from .detection_postproc import erase_ink_in_white_caption_boxes
+    mask = union_refined_with_fallback(refined_mask, text_only_mask)
+    if restrict:
+        mask = restrict_mask_to_render_regions(mask, text_only_mask, margin=restrict_margin)
+    return erase_ink_in_white_caption_boxes(mask, img_rgb)
+
+
 def adaptive_dilate_mask(mask: np.ndarray, gray_or_rgb: np.ndarray,
                          flat_px: int = 12, tight_px: int = 1, ring: int = 6,
                          flat_std: float = 18.0) -> np.ndarray:

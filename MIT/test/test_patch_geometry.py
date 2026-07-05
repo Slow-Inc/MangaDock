@@ -527,3 +527,46 @@ def test_adaptive_dilation_per_component_independent():
     out = adaptive_dilate_mask(mask, gray, flat_px=12, tight_px=1, ring=6, flat_std=18.0)
     assert out[100, 30] == 255                          # left (flat) widened ~12px past edge x40
     assert out[100, 245] == 0                           # right (textured) stayed tight (edge x260)
+
+
+# ---- #540 boy-ghost: full-page erase mask must restrict CRF ink to textlines ----
+# The per-crop path clips the refined (CRF) mask to the to-be-rendered textlines
+# (restrict_mask_to_render_regions, margin=8); the full-page path historically did
+# NOT, so CRF ink far from any textline — a figure's hair strokes inside an oversized
+# dialogue box — survived into the erase mask and LaMa smeared the figure away.
+
+def _boy_scene():
+    """A dialogue region whose textlines sit at the TOP of its box, with a figure
+    (hair strokes) far below. CRF grabs both; text_only marks only the textlines."""
+    import numpy as np
+    h, w = 200, 160
+    text_only = np.zeros((h, w), np.uint8)
+    text_only[20:40, 30:130] = 255          # the dialogue textline band (top)
+    crf = np.zeros((h, w), np.uint8)
+    crf[22:38, 32:128] = 255                # CRF ink hugging the textline
+    crf[150:180, 40:120] = 255              # CRF ink on the figure's hair (far below)
+    img_rgb = np.full((h, w, 3), 200, np.uint8)  # plain bg, no white caption box
+    return text_only, crf, img_rgb
+
+
+def test_assemble_fullpage_mask_restrict_drops_far_art():
+    import numpy as np
+    from manga_translator.patch_geometry import assemble_fullpage_erase_mask
+    text_only, crf, img_rgb = _boy_scene()
+    out = assemble_fullpage_erase_mask(crf, text_only, img_rgb, restrict=True, restrict_margin=8)
+    assert out[30, 80] == 255                # textline ink kept
+    assert out[165, 80] == 0                 # figure hair ink DROPPED (far from textline)
+
+
+def test_assemble_fullpage_mask_default_is_byte_identical_to_union():
+    import numpy as np
+    from manga_translator.patch_geometry import (
+        assemble_fullpage_erase_mask, union_refined_with_fallback)
+    from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
+    text_only, crf, img_rgb = _boy_scene()
+    # restrict off (default) == the old inline assembly, so the figure ink SURVIVES
+    out = assemble_fullpage_erase_mask(crf, text_only, img_rgb, restrict=False)
+    expected = erase_ink_in_white_caption_boxes(
+        union_refined_with_fallback(crf, text_only), img_rgb)
+    assert np.array_equal(out, expected)
+    assert out[165, 80] == 255               # unrestricted: figure ink still present

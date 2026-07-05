@@ -399,6 +399,11 @@ class InpainterConfig(BaseModel):
     translation is drawn, killing the faint "painted band" where LaMa's fill is a few levels
     off the real art over dark hair. Strength 0→1 lerp; pure CPU (cv2/numpy), no extra VRAM.
     0 → off, byte-identical."""
+    restrict_fullpage_mask: bool = False
+    """#540 (MIT_RESTRICT_FULLPAGE_MASK): on the full-page inpaint path, clip the refined
+    (CRF) erase mask to the to-be-rendered textlines (dilated 8px) — parity with the per-crop
+    path — so CRF ink far from any textline (a figure's hair strokes inside an oversized
+    dialogue box) is not erased, killing the "boy-ghost" figure smear. Off → byte-identical."""
     adaptive_dilate: bool = False
     """Lever 1 (MIT_ADAPTIVE_DILATE): dilate each erase-mask component wider where the local
     background is FLAT paper (removes the stroke stubs LaMa reconstructs into faint text ghosts)

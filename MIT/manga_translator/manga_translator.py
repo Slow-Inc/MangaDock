@@ -35,7 +35,7 @@ from .model_lifecycle import ModelLifecycle
 from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
 from .stage_runner import run_stage
-from .patch_geometry import build_local_region, create_text_only_mask, crop_mask_for_patch, union_refined_with_fallback
+from .patch_geometry import build_local_region, create_text_only_mask, crop_mask_for_patch
 from .patch_renderer import PatchRenderer
 from .batch_orchestration import placeholder_context, build_page_translation_record
 from .stages import (
@@ -1534,14 +1534,18 @@ class MangaTranslator:
                 ctx.text_regions = regions
                 full_mask = await self._run_mask_refinement(config, ctx)
                 text_only = create_text_only_mask(img_h, img_w, regions)
-                ctx.mask = (union_refined_with_fallback(full_mask, text_only)
-                            if full_mask is not None else text_only)
-                # A1 (leftover caption text at box edges the detection line missed):
-                # erase ALL ink inside verified WHITE caption boxes only — never speech
-                # balloons (they aren't box-like white rectangles), so art under a
-                # bubble (A2) is untouched.
-                from .detection_postproc import erase_ink_in_white_caption_boxes
-                ctx.mask = erase_ink_in_white_caption_boxes(ctx.mask, ctx.img_rgb)
+                if full_mask is not None:
+                    # A1 (leftover caption text): erase ALL ink inside verified WHITE
+                    # caption boxes only — never speech balloons, so art under a bubble
+                    # (A2) is untouched. #540: restrict_fullpage_mask clips the CRF mask
+                    # to the textlines (parity with the per-crop path) so a figure's ink
+                    # inside an oversized dialogue box is not erased (boy-ghost).
+                    from .patch_geometry import assemble_fullpage_erase_mask
+                    ctx.mask = assemble_fullpage_erase_mask(
+                        full_mask, text_only, ctx.img_rgb,
+                        restrict=getattr(config.inpainter, 'restrict_fullpage_mask', False))
+                else:
+                    ctx.mask = text_only
                 # Lever 1: dilate the erase mask wider where the local background is FLAT
                 # (kills the stroke stubs LaMa reconstructs into ghosts) but stay tight
                 # over screentone/art (preserves #248). Gated by MIT_ADAPTIVE_DILATE.
