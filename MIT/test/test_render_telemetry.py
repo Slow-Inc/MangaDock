@@ -250,3 +250,22 @@ def test_display_sfx_font_capped_to_page_fraction(stubs, monkeypatch):
                                      clean_layout=True, page_shape=(1800, 1200))
     assert r.render_branch == 'sfx_display'
     assert r.render_font_px <= int(1800 * 0.12)      # capped to <=12% of page height
+
+
+def test_duplicate_translation_display_sfx_keeps_largest(stubs, monkeypatch):
+    # p13: two チュン marks -> two identical "จุน" display SFX at different spots (not
+    # overlapping). Keep the LARGEST (most prominent) and blank the rest — via the
+    # proven blank-then-skip path (safe on the full-page render group).
+    import numpy as np
+    import manga_translator.rendering.text_render as tr
+    monkeypatch.setattr(tr, 'calc_horizontal',
+                        lambda fs, text, mw, mh, language='en_US', **k: (['x'], [float(fs)]))
+    img = np.full((400, 400, 3), 255, np.uint8)
+    big = FakeRegion(horizontal=True, translation='จุน', sfx_rescued=True, bubble_box=None,
+                     xyxy=(200, 40, 380, 160), font_size=60)          # large
+    small = FakeRegion(horizontal=True, translation='จุน', sfx_rescued=True, bubble_box=None,
+                       xyxy=(20, 60, 70, 100), font_size=30)          # small, far away
+    rend.resize_regions_to_font_size(img, [big, small], None, 0, 8,
+                                     bubble_fit=False, clean_layout=True)
+    assert big.render_branch == 'sfx_display'
+    assert small.render_branch == 'suppressed' and not small.translation

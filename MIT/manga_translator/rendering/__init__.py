@@ -314,6 +314,30 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 _ri.render_suppressed_reason = 'duplicate'
                 break
 
+    # p13: repeated onomatopoeia (チュン チュン) become identical display SFX at
+    # separate spots — two large "จุน" read as clutter. Keep the LARGEST and blank
+    # the rest (same safe blank-then-skip path). Only free-floating SFX with the
+    # SAME non-empty translation; dialogue is untouched.
+    def _is_disp_sfx(r):
+        return (getattr(r, 'sfx_rescued', False)
+                and getattr(r, 'bubble_box', None) is None
+                and (r.translation or '').strip())
+    _sfx_idx = [k for k, r in enumerate(text_regions) if _is_disp_sfx(r)]
+    _seen_sfx = {}
+    for k in _sfx_idx:
+        _t = (text_regions[k].translation or '').strip()
+        _xy = text_regions[k].xyxy
+        _area = (float(_xy[2]) - float(_xy[0])) * (float(_xy[3]) - float(_xy[1]))
+        if _t in _seen_sfx:
+            _pk, _pa = _seen_sfx[_t]
+            _loser = k if _area <= _pa else _pk
+            text_regions[_loser].translation = ''
+            text_regions[_loser].render_suppressed_reason = 'duplicate_sfx'
+            if _area > _pa:
+                _seen_sfx[_t] = (k, _area)
+        else:
+            _seen_sfx[_t] = (k, _area)
+
     dst_points_list = []
     for i, region in enumerate(text_regions):
         # #436: a deduped (blanked) duplicate renders nothing — skip layout entirely
