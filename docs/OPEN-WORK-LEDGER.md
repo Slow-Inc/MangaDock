@@ -19,7 +19,7 @@ Most render/translation-quality work is **code-complete on `landing/render-phase
 - **Stage B** = merge `landing/render-phase0` → `perf/mit-layout-fit-and-merge`. Committed-vs-committed conflict is tiny (**1 file: `MIT/test/test_sfx_merge.py`**), but `perf` carries a **312-file uncommitted WIP** that needs the dev to commit or designate per-file authority first. Classifier hard-blocks agent self-merge to the default branch.
 - **`mit-config.ts` `buildMitConfig` plumbing** (emits `selective_flux`/`protect_figures`/`restrict_fullpage_mask`/`adaptive_dilate` from `MIT_*` env) is **loose in the WIP, uncommitted** — must be committed and also landed on `landing` for Stage-B parity.
 - **Stage C** = later `perf ↔ main` divergence (123 behind / 27 ahead).
-- Refs: `RESUME-HERE.md` Queue #1/#5, `2026-07-05-phase3-convergence-plan.md`. **No GitHub issue exists for Stage B/C** → file one.
+- Refs: `RESUME-HERE.md` Queue #1/#5, `2026-07-05-phase3-convergence-plan.md`. **Now tracked as process epic #548.**
 
 ---
 
@@ -41,9 +41,9 @@ Most render/translation-quality work is **code-complete on `landing/render-phase
 | #420 translate non-determinism | 🟢 not scoped | — | pin temp0/greedy + deterministic sort + N-run test |
 | #527 split-bubble clause | 🟢 not designed | — | design reading-order/adjacency grouping first |
 | #174 flat-fill fast-path | 🟢 not started | — | confirm not redundant w/ flatten_white_captions, then build |
-| **KP line-break wiring** | 🔴 module done, **prod OFF** (rolled back, narration bloat) | — | **#180 CLOSED** — step 2 (select behind `bubble_area_fit` + E2E + tune) undone |
-| **#436 giant-bubble co-occupant** (occupancy=3) half | 🔴 only dedup half shipped | — | **#436 CLOSED** — co-occupant half unverified |
-| **boy-ghost chibi detection-FP** | 🔴 mis-filed as "#49-class" (#49 = merged cache PR) | GPU | genuinely UNTRACKED; stroke-vs-art at prod threshold, non-deterministic |
+| **KP line-break wiring** | 🟢 module done, **prod OFF** — now **#545** | — | step 2 (select behind `bubble_area_fit` + E2E + tune); was leftover under closed #180 |
+| **#436 giant-bubble co-occupant** (occupancy=3) half | 🟢 only dedup half shipped — now **#546** | — | co-occupant half unverified; was leftover under closed #436 |
+| **boy-ghost chibi detection-FP** | 🟢 now **#547** | GPU | stroke-vs-art at prod threshold, non-deterministic; was mis-filed as "#49-class" |
 | **class-B display-SFX p31** faint underline residual (minor) | 🔴 | — | `2026-07-05-page-review-defects.md` |
 | **legacy non-bubble regions overflow** (no fit-to-box) | 🔴 | — | `DONE.md:244` |
 | Epics/PRD hubs | 🟡 | children | #169 #178 #434 #535 close when children close |
@@ -66,12 +66,12 @@ Most render/translation-quality work is **code-complete on `landing/render-phase
 | Item | Status | Source |
 |---|---|---|
 | Payment/unlock correctness — FR-1 revert-claim atomicity, FR-2 price re-read in RPC | 🔴 PRD **Status: Draft**, 5 open questions | `backend-audit-remediation.md`, `2026-06-28-payment-unlock-correctness.md` |
-| RLS backstop on `unlocks`/`wallet` + boot-assert `TURNSTILE_SECRET_KEY` + CI lint guard uid-scoped queries | 🔴 | ADR 013 |
-| Webhook idempotency → **DB unique-constraint** (in-memory only today) | 🔴 | ADR 012 |
+| RLS backstop on `unlocks`/`wallet` + boot-assert `TURNSTILE_SECRET_KEY` + CI lint guard uid-scoped queries | 🟢 **#549** | ADR 013 |
+| Webhook idempotency → **DB unique-constraint** (in-memory only today) | 🟢 **#549** | ADR 012 |
 | Magic-byte upload-guard shared helper (DRY forum+upload) | 🔴 | ADR 016 |
-| `write_translations` opens file w/o `encoding=` → `UnicodeEncodeError` on Windows cp1252 | 🔴 latent bug | mit-refactor-progress |
-| `streaming.py stream()` awaits `messages.get()` w/o timeout → SSE hang if no terminal frame | 🔴 latent bug ("ยังไม่ filed") | DONE.md:922 |
-| `readWithTimeout` never `clearTimeout`s race-loser timer (dangling timer) | 🔴 latent bug | ADR 017 |
+| `write_translations` opens file w/o `encoding=` → `UnicodeEncodeError` on Windows cp1252 | 🟢 **#542** | mit-refactor-progress |
+| `streaming.py stream()` awaits `messages.get()` w/o timeout → SSE hang if no terminal frame | 🟢 **#543** | DONE.md:922 |
+| `readWithTimeout` never `clearTimeout`s race-loser timer (dangling timer) | 🟢 **#544** | ADR 017 |
 | Backend hotfix backlog: chapter-list via apiCache (~11/min re-fetch), cache `readerAvailable`, dedup `storage.list`, R2 `.list` backoff+logging, per-manga `_chapters` namespace | 🔴 | impact-report:303 |
 | L3 disk cap/TTL prune · unify 3 cross-page context windows · `models_ttl==0` eager-preload as runtime knob | 🔴 | ADR 011 / 010 / 009 |
 
