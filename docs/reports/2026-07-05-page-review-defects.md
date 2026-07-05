@@ -54,3 +54,15 @@ character figure drawn as line art). No pixel heuristic (CC size, ink fraction) 
 inside an arbitrary bubble — the safe discriminator is the **white_box_candidates** detector: erase interior
 ink ONLY inside verified box-like white rectangles (caption panels), never speech balloons. The page-by-page
 user review caught the art destruction before it shipped.
+
+## Follow-up (Fable 5, same day): the residual-text root — the user diagnosed it
+The user hypothesized the faint leftovers were **lama_large erasing un-cleanly**. Proven correct with a
+4-up isolation (original | patch-RGB | alpha | composite): the ghost squiggle existed in the PATCH's own
+pixels, and the erase mask covered ALL caption ink (631/631 px) — so it was neither mask coverage nor the
+alpha threshold: **LaMa reconstructed faint source text from the stroke stubs around the tight mask**.
+
+**Fix `48273799`+: `flatten_white_captions`** — a verified white caption box is uniform paper, so the
+source-ink pixels (incl. the anti-alias ring, thresh 200, dilate 4) are filled with the box's own paper
+median directly instead of trusting the GAN; art-gated (a figure box is skipped — the boy stays safe).
+Wired after inpaint on both the full-page and per-crop paths. Verified live: the name-box ghost is fully
+gone ("ชื่อเธออะไร นะกัน?" pristine).
