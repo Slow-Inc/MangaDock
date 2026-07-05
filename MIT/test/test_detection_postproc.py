@@ -159,3 +159,29 @@ def test_unrelated_white_box_leaves_balloon_alone_and_is_appended():
     got = expand_balloons_with_white_boxes(balloons, white)
     assert got[0] == (0.0, 0.0, 100.0, 100.0)
     assert (500.0, 500.0, 700.0, 700.0) in got        # appended as its own balloon
+
+
+# ---- A1 (leftover caption text): erase ink ONLY inside verified white caption boxes ----
+
+def test_erase_ink_in_white_caption_boxes_erases_caption_not_art():
+    import numpy as np, cv2
+    from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
+    img = np.full((600, 600), 120, np.uint8)         # mid-gray art page
+    img[60:260, 50:300] = 245                         # a distinct white caption box
+    cv2.putText(img, 'CAPTION', (70, 140), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 20, 2)
+    # a dark art figure elsewhere (NOT a white box) — must be preserved
+    img[350:520, 350:520] = 30
+    mask = np.zeros((600, 600), np.uint8)
+    out = erase_ink_in_white_caption_boxes(mask, img)
+    assert out[135, 90] == 255                        # caption stroke -> erased
+    assert out[430, 430] == 0                         # art figure -> preserved (no white box)
+
+
+def test_no_white_boxes_leaves_mask_unchanged():
+    import numpy as np
+    from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
+    img = np.full((200, 200), 120, np.uint8)          # mid-gray, no bright box
+    img[50:150, 50:150] = 30
+    mask = np.zeros((200, 200), np.uint8)
+    out = erase_ink_in_white_caption_boxes(mask, img)
+    assert (out == mask).all()

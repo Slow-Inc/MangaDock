@@ -225,3 +225,30 @@ def expand_balloons_with_white_boxes(balloon_aabbs, white_boxes,
         if not used[i] and all(_inter(b, wb) <= 0.0 for b in balloon_aabbs):
             out.append(tuple(wb))
     return out
+
+
+def erase_ink_in_white_caption_boxes(mask, gray_or_rgb, border_frac: float = 0.06,
+                                     ink_thresh: int = 128, dilate_px: int = 2):
+    """#535 A1 (leftover caption text): the detection line box misses caption text at
+    the box edges, so it survives the erase. Erase ALL ink inside a VERIFIED white
+    caption box — ``white_box_candidates`` only returns box-like bright rectangles
+    (fill >= 0.7), which are caption panels, NOT speech balloons (oval / containing
+    art). So a character figure under a bubble (A2) is never touched — it is not in
+    a white box. Pure cv2. Input not mutated."""
+    import cv2 as _cv2
+    import numpy as _np
+    gray = gray_or_rgb if gray_or_rgb.ndim == 2 else _cv2.cvtColor(gray_or_rgb, _cv2.COLOR_RGB2GRAY)
+    out = _np.ascontiguousarray(mask).astype(_np.uint8).copy()
+    h, w = out.shape[:2]
+    for (x1, y1, x2, y2) in white_box_candidates(gray):
+        dx, dy = (x2 - x1) * border_frac, (y2 - y1) * border_frac
+        ix1, iy1 = max(0, int(x1 + dx)), max(0, int(y1 + dy))
+        ix2, iy2 = min(w, int(x2 - dx)), min(h, int(y2 - dy))
+        if ix2 <= ix1 or iy2 <= iy1:
+            continue
+        ink = (gray[iy1:iy2, ix1:ix2] < ink_thresh).astype(_np.uint8) * 255
+        if dilate_px > 0:
+            k = 2 * dilate_px + 1
+            ink = _cv2.dilate(ink, _np.ones((k, k), _np.uint8))
+        out[iy1:iy2, ix1:ix2] = _np.maximum(out[iy1:iy2, ix1:ix2], ink)
+    return out

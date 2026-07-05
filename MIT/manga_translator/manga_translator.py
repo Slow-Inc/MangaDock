@@ -1536,6 +1536,12 @@ class MangaTranslator:
                 text_only = create_text_only_mask(img_h, img_w, regions)
                 ctx.mask = (union_refined_with_fallback(full_mask, text_only)
                             if full_mask is not None else text_only)
+                # A1 (leftover caption text at box edges the detection line missed):
+                # erase ALL ink inside verified WHITE caption boxes only — never speech
+                # balloons (they aren't box-like white rectangles), so art under a
+                # bubble (A2) is untouched.
+                from .detection_postproc import erase_ink_in_white_caption_boxes
+                ctx.mask = erase_ink_in_white_caption_boxes(ctx.mask, ctx.img_rgb)
                 # #268: shrink the full-page erase mask to the ink strokes so LaMa repaints
                 # less of the textured art (smaller band). Off → unchanged.
                 if getattr(config.inpainter, 'mask_tighten', False):

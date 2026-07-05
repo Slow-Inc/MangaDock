@@ -174,6 +174,10 @@ class PatchRenderer:
                     # its own region, so restrict strictly to the detected-line regions.
                     patch_ctx.mask = restrict_mask_to_render_regions(
                         patch_ctx.mask, text_only_mask, margin=8)
+                    # A1 (leftover caption text): erase all ink inside verified WHITE
+                    # caption boxes only (not speech balloons) — art under a bubble is safe.
+                    from .detection_postproc import erase_ink_in_white_caption_boxes
+                    patch_ctx.mask = erase_ink_in_white_caption_boxes(patch_ctx.mask, crop_rgb)
 
                     # #268: shrink the inpaint mask to the actual ink strokes so LaMa repaints
                     # less of the textured art (smaller band). crop_rgb is the pristine original.
