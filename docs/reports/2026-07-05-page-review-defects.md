@@ -39,9 +39,18 @@ shipped as another art-risking heuristic. Art preservation (A2) outranks caption
 group). A proper fix (cap display-SFX font growth + fix placement to the source SFX centroid + safe
 suppression on the full-page group) is queued.
 
-## Summary
+## Summary (updated after the fix pass)
 | class | pages | status |
 |---|---|---|
-| A2 over-erase (art) | One-Punch HUH | **FIXED + verified** |
-| A1 leftover caption text | p31#1/#2, p13#2 | deferred — needs white-box-only erase gating |
-| B display-SFX | p13#1, p31#3 | pending — font cap + placement + safe suppression |
+| A2 over-erase (art) | One-Punch HUH | **FIXED + verified** — interior-erase removed; boy preserved, ME-OFF still gone |
+| A1 leftover caption text | p31#1/#2, p13#2 | **FIXED (safe)** — `erase_ink_in_white_caption_boxes` erases ink only inside verified white boxes (never speech balloons); SCUMULTOS clean + boy preserved. Minor: p31 name-box faint underline residual (likely a decorative ornament / partial-inpaint ghost) remains. |
+| B display-SFX oversize | p13#1 | **FIXED** — display-SFX font capped to 10% of page height (was covering ~1/3) |
+| B display-SFX placement | p31#3 | **not a defect** — the original has a "ニ" smirk SFX at that spot; rendering "ฮึบ" there is faithful; font now capped. ("ニ→ฮึบ" is a translation nuance, not a render issue.) |
+| B display-SFX stacking | p13#1 | deferred — two จุนจุน still render; dedup crashed the full-page group earlier, needs a full-page-safe suppression |
+
+### The key lesson
+A2 was a **self-introduced regression** (the ME-OFF ghost fix erased all balloon-interior ink, which killed a
+character figure drawn as line art). No pixel heuristic (CC size, ink fraction) can tell line-art from text
+inside an arbitrary bubble — the safe discriminator is the **white_box_candidates** detector: erase interior
+ink ONLY inside verified box-like white rectangles (caption panels), never speech balloons. The page-by-page
+user review caught the art destruction before it shipped.
