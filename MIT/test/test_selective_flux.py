@@ -125,3 +125,17 @@ def test_orchestrator_fails_open_when_flux_raises():
     out, n = asyncio.run(apply_selective_flux_repair(full, img, mask, mask.copy(), boom))
     assert n == 0                                       # no repairs applied
     assert np.array_equal(out, full)                    # fail-open: LaMa result stands
+
+
+def test_skips_flat_bubble_with_thin_dark_border():
+    # The real Otome over-route class: dialogue in a WHITE bubble whose ring clips a thin
+    # dark border. Ring has SOME dark px but the surround is mostly paper — must NOT route
+    # (dark_frac below the gate). Hair, by contrast, is a mostly-dark textured surround.
+    from manga_translator.selective_flux import find_text_over_art_boxes
+    h, w = 200, 200
+    img = np.full((h, w, 3), 245, np.uint8)             # white bubble interior
+    img[:, 40:44] = 20                                  # a thin dark bubble border (left)
+    mask = np.zeros((h, w), np.uint8)
+    mask[95:105, 90:150] = 255                          # dialogue text, away from border
+    boxes = find_text_over_art_boxes(mask, img, mask.copy())
+    assert boxes == []                                  # mostly-paper ring -> skip
