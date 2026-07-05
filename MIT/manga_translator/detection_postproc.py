@@ -264,3 +264,44 @@ def erase_ink_in_white_caption_boxes(mask, gray_or_rgb, border_frac: float = 0.0
             ink = _cv2.dilate(ink, _np.ones((k, k), _np.uint8))
         out[iy1:iy2, ix1:ix2] = _np.maximum(out[iy1:iy2, ix1:ix2], ink)
     return out
+
+
+def flatten_white_captions(inpainted, gray_or_rgb_orig, border_frac: float = 0.06,
+                           ink_thresh: int = 128, dilate_px: int = 3):
+    """LaMa-ghost fix (user-diagnosed): the erase mask covered ALL caption ink, yet
+    lama_large reconstructed a faint squiggle of the source text from the stroke
+    stubs around the tight mask. A verified white caption box is UNIFORM PAPER —
+    replace the source-ink pixels (dilated) in the INPAINTED image with the box's
+    own paper colour directly, instead of trusting the GAN. Art-gated exactly like
+    ``erase_ink_in_white_caption_boxes`` (a box containing a figure is skipped).
+    Returns a new image; inputs not mutated. Pure cv2/numpy."""
+    import cv2 as _cv2
+    import numpy as _np
+    gray = (gray_or_rgb_orig if gray_or_rgb_orig.ndim == 2
+            else _cv2.cvtColor(gray_or_rgb_orig, _cv2.COLOR_RGB2GRAY))
+    out = _np.ascontiguousarray(inpainted).copy()
+    h, w = gray.shape[:2]
+    for (x1, y1, x2, y2) in white_box_candidates(gray):
+        dx, dy = (x2 - x1) * border_frac, (y2 - y1) * border_frac
+        ix1, iy1 = max(0, int(x1 + dx)), max(0, int(y1 + dy))
+        ix2, iy2 = min(w, int(x2 - dx)), min(h, int(y2 - dy))
+        if ix2 <= ix1 or iy2 <= iy1:
+            continue
+        ink = (gray[iy1:iy2, ix1:ix2] < ink_thresh).astype(_np.uint8)
+        art_dim = max(48, int(0.05 * max(h, w)))
+        num, _labels, stats, _c = _cv2.connectedComponentsWithStats(ink, connectivity=8)
+        if any(stats[c, _cv2.CC_STAT_WIDTH] > art_dim
+               and stats[c, _cv2.CC_STAT_HEIGHT] > art_dim
+               for c in range(1, num)):
+            continue                              # box contains art -> skip
+        if not ink.any():
+            continue
+        if dilate_px > 0:
+            k = 2 * dilate_px + 1
+            ink = _cv2.dilate(ink, _np.ones((k, k), _np.uint8))
+        paper_px = gray[iy1:iy2, ix1:ix2][ink == 0]
+        paper = int(_np.median(paper_px)) if paper_px.size else 255
+        region = out[iy1:iy2, ix1:ix2]
+        region[ink > 0] = paper
+        out[iy1:iy2, ix1:ix2] = region
+    return out

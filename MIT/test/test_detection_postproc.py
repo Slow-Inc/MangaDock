@@ -214,3 +214,36 @@ def test_caption_with_long_bold_text_line_still_cleaned():
     mask = np.zeros((600, 600), np.uint8)
     out = erase_ink_in_white_caption_boxes(mask, img)
     assert out[110, 200] == 255                    # thin-wide = text -> erased
+
+
+# ---- LaMa ghost in white captions: flat paper needs a direct fill, not a GAN ----
+
+def test_flatten_white_captions_replaces_lama_ghost_with_paper():
+    # User-confirmed root: the erase mask covered ALL caption ink (631/631 px) yet
+    # lama_large reconstructed a faint squiggle of the source text ("AGAIN?") from
+    # the stroke stubs around the tight mask. A white caption box is UNIFORM PAPER —
+    # fill the source-ink pixels directly with the box's paper colour instead of
+    # trusting the GAN.
+    import numpy as np, cv2
+    from manga_translator.detection_postproc import flatten_white_captions
+    orig = np.full((700, 700), 120, np.uint8)
+    orig[60:340, 50:350] = 246                     # white caption box
+    cv2.putText(orig, 'AGAIN?', (80, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 20, 2)
+    inpainted = np.full((700, 700, 3), 120, np.uint8)
+    inpainted[60:340, 50:350] = 246
+    cv2.putText(inpainted, 'AGAIN?', (80, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 180, 2)  # faint LaMa ghost
+    out = flatten_white_captions(inpainted, orig)
+    ghost = out[185:205, 80:220]
+    assert int(ghost.min()) >= 235                 # ghost flattened to paper
+    assert out[400, 400, 0] == 120                 # outside boxes untouched
+
+
+def test_flatten_skips_art_boxes():
+    import numpy as np
+    from manga_translator.detection_postproc import flatten_white_captions
+    orig = np.full((700, 700), 120, np.uint8)
+    orig[60:340, 50:350] = 246
+    orig[150:300, 150:290] = 15                    # line-art figure (art gate)
+    inpainted = np.stack([orig]*3, axis=2).copy()
+    out = flatten_white_captions(inpainted, orig)
+    assert out[220, 220, 0] == 15                  # art preserved, box skipped

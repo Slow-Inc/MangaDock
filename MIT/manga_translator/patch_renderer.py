@@ -222,6 +222,13 @@ class PatchRenderer:
                             f"[{type(e).__name__}]: using original crop"
                         )
                         patch_ctx.img_inpainted = crop_rgb
+                    else:
+                        # LaMa-ghost fix (user-diagnosed): on flat white caption boxes
+                        # LaMa reconstructs faint text from the stroke stubs around a
+                        # tight mask — flatten caption ink to the box's own paper colour.
+                        from .detection_postproc import flatten_white_captions
+                        patch_ctx.img_inpainted = flatten_white_captions(
+                            patch_ctx.img_inpainted, crop_rgb)
 
             # #268: re-ground the inpaint's low-freq luminance INSIDE the erase mask to the
             # local original surroundings, killing the "painted band" where LaMa's fill is a

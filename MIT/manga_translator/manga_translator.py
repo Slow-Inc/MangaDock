@@ -1548,6 +1548,11 @@ class MangaTranslator:
                     from .patch_geometry import tighten_text_mask
                     ctx.mask = tighten_text_mask(ctx.img_rgb, ctx.mask)
                 full_inpainted = await self._run_inpainting(config, ctx)
+                # LaMa-ghost fix (user-diagnosed): on flat white caption boxes LaMa
+                # reconstructs faint text from the stroke stubs around a tight mask —
+                # replace caption ink with the box's own paper colour directly.
+                from .detection_postproc import flatten_white_captions
+                full_inpainted = flatten_white_captions(full_inpainted, ctx.img_rgb)
                 logger.info('[PatchTranslate] full-page inpaint done — patches reuse it')
             except Exception:
                 logger.warning(f"[PatchTranslate] full-page inpaint failed, per-crop fallback:\n{traceback.format_exc()}")
