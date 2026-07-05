@@ -188,6 +188,9 @@ class MangaTranslator:
             cuda_available=torch.cuda.is_available,
         )
         self._model_reaper = ModelReaper(self._model_usage_tracker, self._model_unloader, lambda: self.models_ttl)
+        # #421: serialise the selective-Flux repair pass so two concurrent pages
+        # (batch_concurrent) never load Flux Klein at once → 12GB OOM.
+        self._flux_lock = asyncio.Lock()
         self._model_lifecycle = ModelLifecycle(self._model_reaper, {
             'upscaling': prepare_upscaling, 'detection': prepare_detection,
             'ocr': prepare_ocr, 'inpainting': prepare_inpainting,
@@ -1563,6 +1566,29 @@ class MangaTranslator:
                 # replace caption ink with the box's own paper colour directly.
                 from .detection_postproc import flatten_white_captions
                 full_inpainted = flatten_white_captions(full_inpainted, ctx.img_rgb)
+                # #421: selective-Flux repair — route text-over-textured-art regions (LaMa
+                # smears hair it can't synthesise) to Flux Klein, pasted mask-only into the
+                # LaMa result. LaMa is unloaded first (VRAM), the pass is lock-serialised
+                # (batch OOM), and any failure keeps the LaMa result. Runs AFTER flatten so
+                # the two disjoint repairs (white captions vs textured art) don't clobber.
+                if getattr(config.inpainter, 'selective_flux', False):
+                    from .selective_flux import apply_selective_flux_repair
+                    from .inpainting import dispatch as dispatch_inpainting
+                    from .config import Inpainter
+                    async with self._flux_lock:
+                        try:
+                            await self._model_unloader.unload('inpainting', config.inpainter.inpainter)
+                            async def _flux(crop, mcrop):
+                                return await dispatch_inpainting(
+                                    Inpainter.flux_klein, crop, mcrop, config.inpainter,
+                                    config.inpainter.inpainting_size, self.device, self.verbose)
+                            full_inpainted, _nrep = await apply_selective_flux_repair(
+                                full_inpainted, ctx.img_rgb, ctx.mask, text_only, _flux, logger=logger)
+                            logger.info(f'[SelectiveFlux] repaired {_nrep} text-over-art region(s)')
+                        except Exception:
+                            logger.warning(f'[SelectiveFlux] pass failed, LaMa result stands:\n{traceback.format_exc()}')
+                        finally:
+                            await self._model_unloader.unload('inpainting', Inpainter.flux_klein)
                 logger.info('[PatchTranslate] full-page inpaint done — patches reuse it')
             except Exception:
                 logger.warning(f"[PatchTranslate] full-page inpaint failed, per-crop fallback:\n{traceback.format_exc()}")

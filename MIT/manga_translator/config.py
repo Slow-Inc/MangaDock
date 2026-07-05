@@ -399,6 +399,13 @@ class InpainterConfig(BaseModel):
     translation is drawn, killing the faint "painted band" where LaMa's fill is a few levels
     off the real art over dark hair. Strength 0→1 lerp; pure CPU (cv2/numpy), no extra VRAM.
     0 → off, byte-identical."""
+    selective_flux: bool = False
+    """#421 (MIT_SELECTIVE_FLUX): after the full-page LaMa inpaint, route only the erase-mask
+    components that sit over textured ART (a character's hair under dialogue text — where LaMa
+    leaves a gray smear it cannot synthesise back) to a Flux Klein repair pass, pasted mask-only
+    into the LaMa result. LaMa handles everything else. LaMa is unloaded before Flux loads
+    (VRAM), the pass is serialised by a lock, and any failure keeps the LaMa result. Off →
+    byte-identical (no Flux, no cost)."""
     restrict_fullpage_mask: bool = False
     """#540 (MIT_RESTRICT_FULLPAGE_MASK): on the full-page inpaint path, clip the refined
     (CRF) erase mask to the to-be-rendered textlines (dilated 8px) — parity with the per-crop

@@ -50,6 +50,30 @@ def find_text_over_art_boxes(erase_mask, img_rgb, text_only_mask,
     return _merge_overlapping(boxes)
 
 
+async def apply_selective_flux_repair(full_inpainted, img_rgb, erase_mask, text_only_mask,
+                                      flux_inpaint, logger=None, **route_kw):
+    """Orchestrate the #421 repair: route text-over-art components, Flux-inpaint each crop
+    of the ORIGINAL image, paste back into ``full_inpainted``. ``flux_inpaint`` is an
+    injected ``async (crop_rgb, mask_crop) -> repaired_crop`` — the GPU/model lifecycle
+    (LaMa unload, lock, Flux load/unload) lives in the caller so this stays testable and
+    the model plumbing is not duplicated. Each box fails open independently: a Flux error
+    keeps the LaMa fill for that box. Returns ``(new_full_inpainted, n_repaired)``."""
+    boxes = find_text_over_art_boxes(erase_mask, img_rgb, text_only_mask, **route_kw)
+    out = full_inpainted
+    n = 0
+    for (x1, y1, x2, y2) in boxes:
+        crop = np.ascontiguousarray(img_rgb[y1:y2, x1:x2])
+        mcrop = np.ascontiguousarray(erase_mask[y1:y2, x1:x2])
+        try:
+            flux_crop = await flux_inpaint(crop, mcrop)
+            out = paste_flux_repair(out, flux_crop, mcrop, (x1, y1, x2, y2))
+            n += 1
+        except Exception:
+            if logger is not None:
+                logger.warning(f"[SelectiveFlux] box ({x1},{y1},{x2},{y2}) failed, keeping LaMa fill")
+    return out, n
+
+
 def paste_flux_repair(full_inpainted, flux_crop, mask_crop, box, feather: int = 6,
                       grayscale: bool = True):
     """Composite a Flux repair crop back into ``full_inpainted`` ONLY where ``mask_crop``

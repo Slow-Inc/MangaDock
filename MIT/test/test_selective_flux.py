@@ -90,3 +90,38 @@ def test_paste_grayscale_locks_flux_color_tint():
     out = paste_flux_repair(full, flux_crop, mask_crop, box, feather=0, grayscale=True)
     px = out[40, 40]
     assert px[0] == px[1] == px[2]                      # neutral (no tint)
+
+
+# ---- #421 step 3: apply_selective_flux_repair — orchestration (Flux injected, no GPU) ----
+import asyncio
+
+
+def test_orchestrator_repairs_textured_box_via_injected_flux():
+    from manga_translator.selective_flux import apply_selective_flux_repair
+    h, w = 200, 200
+    img = np.stack([_textured(h, w, 0)] * 3, axis=-1)   # textured (routes)
+    mask = np.zeros((h, w), np.uint8); mask[95:105, 60:140] = 255
+    full = np.full((h, w, 3), 200, np.uint8)            # LaMa smear stand-in
+
+    calls = []
+    async def fake_flux(crop, mcrop):
+        calls.append(crop.shape)
+        return np.zeros_like(crop)                      # Flux "reconstructs" dark
+
+    out, n = asyncio.run(apply_selective_flux_repair(full, img, mask, mask.copy(), fake_flux))
+    assert n == 1 and len(calls) == 1                   # one crop sent to Flux
+    # inside mask -> mostly flux (dark); feathered paste won't be exactly 0
+    assert out[100, 100, 0] < 30                        # ~flux, far from LaMa's 200
+
+
+def test_orchestrator_fails_open_when_flux_raises():
+    from manga_translator.selective_flux import apply_selective_flux_repair
+    h, w = 200, 200
+    img = np.stack([_textured(h, w, 0)] * 3, axis=-1)
+    mask = np.zeros((h, w), np.uint8); mask[95:105, 60:140] = 255
+    full = np.full((h, w, 3), 200, np.uint8)
+    async def boom(crop, mcrop):
+        raise RuntimeError("CUDA OOM")
+    out, n = asyncio.run(apply_selective_flux_repair(full, img, mask, mask.copy(), boom))
+    assert n == 0                                       # no repairs applied
+    assert np.array_equal(out, full)                    # fail-open: LaMa result stands
