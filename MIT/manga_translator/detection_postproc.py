@@ -31,7 +31,9 @@ def merge_sfx_detections(ctx, result, device):
     fresh = dedup_sfx_boxes(existing, sfx_boxes)
     for (x1, y1, x2, y2) in fresh:
         pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
-        textlines.append(Quadrilateral(pts, '', 1.0))
+        q = Quadrilateral(pts, '', 1.0)
+        q.is_sfx = True   # #278: provenance so the SFX rescue gates on this, not on text length
+        textlines.append(q)
     logger.info(f"[SFXDetect] {len(sfx_boxes)} boxes, +{len(fresh)} new textlines "
                 f"(deduped {len(sfx_boxes) - len(fresh)})")
     return (textlines, mask_raw, mask)

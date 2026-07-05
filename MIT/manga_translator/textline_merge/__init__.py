@@ -204,5 +204,8 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
         texts = [txtln.text for txtln in txtlns]
         region = TextBlock(lines, texts, font_size=font_size, angle=angle, prob=np.exp(total_logprobs),
                            fg_color=fg_color, bg_color=bg_color)
+        # #278: carry det_sfx provenance from the source textlines to the region so the
+        # SFX rescue can gate on it (not a length heuristic).
+        region.is_sfx = any(getattr(txtln, 'is_sfx', False) for txtln in txtlns)
         text_regions.append(region)
     return text_regions

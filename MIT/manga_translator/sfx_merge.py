@@ -11,6 +11,17 @@ from typing import List, Sequence, Tuple
 Box = Tuple[float, float, float, float]
 
 
+def should_sfx_rescue(region) -> bool:
+    """#278: gate the target-independent SFX rescue on PROVENANCE, not a length heuristic.
+
+    Only regions the det_sfx second pass appended (``merge_sfx_detections`` sets ``is_sfx``
+    on those textlines; the flag propagates through ``textline_merge`` to the region) are
+    stylized outside-bubble SFX worth a vision-gateway round-trip. The former
+    ``len(text.strip()) <= 4`` rule sent any short dialogue in a large bubble ('は？',
+    'HUH?') to the gateway and overwrote it with an onomatopoeia. Missing flag -> False."""
+    return bool(getattr(region, 'is_sfx', False))
+
+
 def _intersection_over_candidate(candidate: Box, existing: Box) -> float:
     ix1, iy1 = max(candidate[0], existing[0]), max(candidate[1], existing[1])
     ix2, iy2 = min(candidate[2], existing[2]), min(candidate[3], existing[3])

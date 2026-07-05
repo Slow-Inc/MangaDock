@@ -783,7 +783,8 @@ class MangaTranslator:
             # custom_openai/9arm vision gateway and keep it. (The old code nested the rescue inside
             # the filter, which only caught SFX when the misread happened to match the target script
             # — i.e. English — so SFX were dropped, leaving the raw JP glyph, for TH/ZH/KO.)
-            if config.ocr.vlm_rescue and len(region.text.strip()) <= 4:
+            from .sfx_merge import should_sfx_rescue
+            if config.ocr.vlm_rescue and should_sfx_rescue(region):
                 x1, y1, x2, y2 = (int(v) for v in region.xyxy)
                 if (x2 - x1) * (y2 - y1) >= 3600 and min(x2 - x1, y2 - y1) >= 24:
                     from .ocr_vlm import vlm_localize_sfx
