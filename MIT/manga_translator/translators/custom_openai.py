@@ -14,6 +14,27 @@ from .common import CommonTranslator, VALID_LANGUAGES
 from .keys import CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL, CUSTOM_OPENAI_MODEL_CONF
 
 
+def parse_numbered_translations(response: str, query_size: int):
+    """Map a ``<|i|>text`` response to EXACTLY ``query_size`` translations, BY INDEX.
+
+    #535 root: the former inline ``re.split(r'<\\|\\d+\\|>', ...)`` was positional (a dropped
+    index shifted every later bubble) and strict (a malformed ``<|10|`` with no closing ``>``
+    leaked into the text). Delegates to ``numbered_contract`` (index-based + malformed-marker
+    tolerant); falls back to a whole-body / newline split only when there is no marker at all."""
+    from .numbered_contract import normalize_numbered_output, _BLOCK_RE
+    if _BLOCK_RE.search(response or ''):
+        return [('' if t.startswith('[Missing item') else t)
+                for t in normalize_numbered_output(response, query_size)]
+    if query_size == 1:
+        return [(response or '').strip()]
+    parts = [t.strip() for t in re.split(r'\n', response or '') if t.strip()]
+    if len(parts) > query_size:
+        parts = parts[:query_size]
+    elif len(parts) < query_size:
+        parts = parts + [''] * (query_size - len(parts))
+    return parts
+
+
 class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
     _INVALID_REPEAT_COUNT = 2  # 如果检测到"无效"翻译，最多重复 2 次
     _MAX_REQUESTS_PER_MINUTE = 40  # 每分钟最大请求次数
@@ -168,41 +189,9 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             response=self.extract_capture_groups(response, rf"{self.rgx_capture}")
 
 
-            # Sometimes it will return line like "<|9>demo", and we need to fix it.
-            def add_pipe(match):
-                number = match.group(1)
-                return f"<|{number}|>"
-            response = re.sub(r"<\|?(\d+)\|?>", add_pipe, response)
-            
-
-            # self.logger.debug('-- GPT Response (filtered) --\n' + response)
-
-            # @NOTE: This should *should* be superflous now, due to `extract_capture_groups`:
-            # 
-            # Remove any text preceeding the first translation.
-            new_translations = re.split(r'<\|\d+\|>', 'pre_1\n' + response)[1:]
-            # new_translations = re.split(r'<\|\d+\|>', response)
-
-            # When there is only one query LLMs likes to exclude the <|1|>
-            if not new_translations:
-                new_translations = [response]
-
-            # Immediately clean leading and trailing whitespace from each translation text
-            new_translations = [t.strip() for t in new_translations]
-
-            # When there is only one query LLMs likes to exclude the <|1|> # Maybe it can be removed, but it causes no errors
-            if not new_translations[0].strip():
-                new_translations = new_translations[1:]
-
-            if len(new_translations) <= 1 and query_size > 1:
-                # Try splitting by newlines instead
-                new_translations = re.split(r'\n', response)
-
-            if len(new_translations) > query_size:
-                new_translations = new_translations[: query_size]
-            elif len(new_translations) < query_size:
-                new_translations = new_translations + [''] * (query_size - len(new_translations))
-
+            # #535: index-based, malformed-marker-tolerant parse (was a positional
+            # re.split that shifted on a dropped index and leaked '<|10|' fragments).
+            new_translations = parse_numbered_translations(response, query_size)
             translations.extend([t.strip() for t in new_translations])
 
         for t in translations:
