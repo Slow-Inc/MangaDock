@@ -58,3 +58,35 @@ def test_skips_high_variance_but_light_texture_no_dark_art():
     mask[95:105, 60:140] = 255
     boxes = find_text_over_art_boxes(mask, img, mask.copy())
     assert boxes == []
+
+
+# ---- #421 step 2: paste_flux_repair — mask-only feathered composite into full_inpainted ----
+
+def test_paste_replaces_only_inside_mask():
+    from manga_translator.selective_flux import paste_flux_repair
+    h, w = 120, 120
+    full = np.full((h, w, 3), 200, np.uint8)            # LaMa result (gray smear stand-in)
+    box = (30, 30, 90, 90)
+    flux_crop = np.full((60, 60, 3), 40, np.uint8)      # Flux reconstruction (dark hair)
+    mask_crop = np.zeros((60, 60), np.uint8)
+    mask_crop[10:50, 10:50] = 255                       # erase region within the crop
+    out = paste_flux_repair(full, flux_crop, mask_crop, box, feather=0)
+    # inside mask (global 40..80, 40..80) -> flux value; outside -> untouched LaMa
+    assert out[50, 50, 0] == 40                         # inside mask -> flux
+    assert out[35, 35, 0] == 200                        # inside box, outside mask -> LaMa
+    assert out[10, 10, 0] == 200                        # outside box -> untouched
+    assert full[50, 50, 0] == 200                       # input not mutated
+
+
+def test_paste_grayscale_locks_flux_color_tint():
+    # Flux Klein Q4 can tint a B/W page. On grayscale input the paste must stay neutral.
+    from manga_translator.selective_flux import paste_flux_repair
+    h, w = 80, 80
+    full = np.full((h, w, 3), 200, np.uint8)            # neutral gray (R==G==B)
+    box = (0, 0, 80, 80)
+    flux_crop = np.zeros((80, 80, 3), np.uint8)
+    flux_crop[..., 0] = 30; flux_crop[..., 1] = 60; flux_crop[..., 2] = 90  # color-tinted
+    mask_crop = np.full((80, 80), 255, np.uint8)
+    out = paste_flux_repair(full, flux_crop, mask_crop, box, feather=0, grayscale=True)
+    px = out[40, 40]
+    assert px[0] == px[1] == px[2]                      # neutral (no tint)

@@ -50,6 +50,31 @@ def find_text_over_art_boxes(erase_mask, img_rgb, text_only_mask,
     return _merge_overlapping(boxes)
 
 
+def paste_flux_repair(full_inpainted, flux_crop, mask_crop, box, feather: int = 6,
+                      grayscale: bool = True):
+    """Composite a Flux repair crop back into ``full_inpainted`` ONLY where ``mask_crop``
+    is set, with a soft ``feather`` edge. Mask-only (not full-crop) so LaMa's background
+    outside the erased text is untouched and Flux tone drift can't leak. Float32 blend,
+    cast once. ``feather`` must stay <= own_work_alpha's mask_margin (8px) or the patch
+    compositor crops the feather into a hard seam. ``grayscale`` neutralises Flux's Q4
+    colour tint on B/W manga (luminance-only). Input is not mutated. Pure."""
+    x1, y1, x2, y2 = box
+    out = full_inpainted.copy()
+    dst = out[y1:y2, x1:x2].astype(np.float32)
+    src = flux_crop.astype(np.float32)
+    if grayscale:
+        lum = cv2.cvtColor(flux_crop, cv2.COLOR_RGB2GRAY).astype(np.float32)
+        src = np.repeat(lum[:, :, None], 3, axis=2)
+    alpha = (np.ascontiguousarray(mask_crop) > 0).astype(np.float32)
+    if feather > 0:
+        k = 2 * feather + 1
+        alpha = cv2.GaussianBlur(alpha, (k, k), 0)
+    a = alpha[:, :, None]
+    blended = dst * (1.0 - a) + src * a
+    out[y1:y2, x1:x2] = np.clip(blended, 0, 255).astype(np.uint8)
+    return out
+
+
 def _merge_overlapping(boxes):
     """Union boxes whose (already padded) rectangles overlap, so a cluster of textured
     text components becomes one Flux crop instead of N. Iterates to a fixed point."""
