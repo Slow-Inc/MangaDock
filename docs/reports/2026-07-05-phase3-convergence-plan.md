@@ -74,3 +74,23 @@ sweep. Out of scope here; do it as its own reconciliation after the render strea
 > Stage A can ship now with zero risk to your WIP. Stage B needs you — either (a) commit your WIP
 > first so I can do a real 3-way merge with conflict markers, or (b) point me at which of the 8
 > shared files your WIP is the source of truth for, and I reconcile function-by-function.
+
+---
+## UPDATE (2026-07-05, Fable 5) — Stage A branch PREPARED
+
+Numbers refreshed: landing is now **85 commits / 16 MIT code files** ahead of the perf tip; the WIP now
+ALSO touches `detection_postproc.py` (it did not when this plan was written) → moved to Stage B. A
+dependency was found: `patch_renderer.py` (WIP-untouched) imports the new `patch_geometry` helpers
+(overlap file) → also moved to Stage B.
+
+**Branch `landing/stage-a-translation-fixes` (at `c4224e16`, based on the perf tip) is ready:** the
+self-contained zero-WIP-conflict set — index-based numbered-contract parse (page-wide misalignment root),
+malformed-marker tolerance, SFX engulf dedup, [RegionDrop] telemetry, enriched /patches payload, defect
+metric harness. 54 tests green standalone.
+
+**To ship Stage A the developer runs (or authorizes):** merge `landing/stage-a-translation-fixes` into
+`perf/mit-layout-fit-and-merge`. The merge is textually clean (files the WIP never touches) — but it is a
+branch op on the checkout holding the 312-file WIP, so it stays developer-gated per policy.
+
+**Stage B (now 9 overlap files + patch_renderer):** unchanged ask — commit the WIP first for a real 3-way
+merge, or designate per-file authority for a function-level reconciliation.
