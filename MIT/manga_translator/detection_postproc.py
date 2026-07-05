@@ -267,7 +267,7 @@ def erase_ink_in_white_caption_boxes(mask, gray_or_rgb, border_frac: float = 0.0
 
 
 def flatten_white_captions(inpainted, gray_or_rgb_orig, border_frac: float = 0.06,
-                           ink_thresh: int = 128, dilate_px: int = 3):
+                           ink_thresh: int = 200, dilate_px: int = 4):
     """LaMa-ghost fix (user-diagnosed): the erase mask covered ALL caption ink, yet
     lama_large reconstructed a faint squiggle of the source text from the stroke
     stubs around the tight mask. A verified white caption box is UNIFORM PAPER —
