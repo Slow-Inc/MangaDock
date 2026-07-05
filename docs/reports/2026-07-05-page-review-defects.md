@@ -46,7 +46,7 @@ suppression on the full-page group) is queued.
 | A1 leftover caption text | p31#1/#2, p13#2 | **FIXED (safe)** — `erase_ink_in_white_caption_boxes` erases ink only inside verified white boxes (never speech balloons); SCUMULTOS clean + boy preserved. Minor: p31 name-box faint underline residual (likely a decorative ornament / partial-inpaint ghost) remains. |
 | B display-SFX oversize | p13#1 | **FIXED** — display-SFX font capped to 10% of page height (was covering ~1/3) |
 | B display-SFX placement | p31#3 | **not a defect** — the original has a "ニ" smirk SFX at that spot; rendering "ฮึบ" there is faithful; font now capped. ("ニ→ฮึบ" is a translation nuance, not a render issue.) |
-| B display-SFX stacking | p13#1 | deferred — two จุนจุน still render; dedup crashed the full-page group earlier, needs a full-page-safe suppression |
+| B display-SFX stacking | p13#1 | **FIXED** — dedup duplicate-translation SFX (keep largest) via the pre-loop blank path; the render loop now skips blanked regions (empty text returned None → crashed the whole group). 1 จุนจุน, captions intact, no crash. |
 
 ### The key lesson
 A2 was a **self-introduced regression** (the ME-OFF ghost fix erased all balloon-interior ink, which killed a
