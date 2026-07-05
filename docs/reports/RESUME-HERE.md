@@ -5,6 +5,18 @@
 Worker: launch from `<worktree>/MIT` with `MIT/.venv` python, port 5003, poll `/ready`.
 **Stage A is MERGED into perf** (`1857a3bc`, user-authorized; WIP 312 files intact).
 
+
+## UPDATE 2026-07-05 (AFK session) — #421 selective-Flux DONE + #540 partial
+- **#421 Selective Flux — CODE-COMPLETE + verified** (`b989bc28`..`5f92b39e`, gated `MIT_SELECTIVE_FLUX`):
+  routes text-over-textured-art regions to a Flux Klein repair pass (LaMa smears hair it can't synthesise).
+  Discriminator data-grounded (real-mask dark_frac gap → 0.15), 11 TDD tests, live: hair→target, flat→0 cost.
+  Model-safe (LaMa-unload+lock+try/finally). Remaining: prod promotion via Stage B only.
+- **#540 boy-ghost — PARTIAL** (`ef14b97a`, gated `MIT_RESTRICT_FULLPAGE_MASK`): restrict fixes the
+  CRF-over-reach half (regression-safe); the chibi half is a detection-FP (task #49-class, upstream) — filed.
+- Team memory now encodes the full issue-workflow (GitHub Issues = task source of truth; PRD→issues→PR;
+  bilingual body; update body on progress; close with reason) in always-loaded DoD + CLAUDE.md + Obsidian.
+- Worker: last launched bg task on :5003 has the current landing code (0.15). Restart from worktree MIT/.
+
 ## Queue (in priority order)
 1. **Stage B reconciliation** — GATED on the developer: commit their 312-file WIP (then do a real 3-way
    merge of landing's 9 overlap files + patch_renderer), or they designate per-file authority.
