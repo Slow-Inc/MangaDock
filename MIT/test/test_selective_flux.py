@@ -139,3 +139,43 @@ def test_skips_flat_bubble_with_thin_dark_border():
     mask[95:105, 90:150] = 255                          # dialogue text, away from border
     boxes = find_text_over_art_boxes(mask, img, mask.copy())
     assert boxes == []                                  # mostly-paper ring -> skip
+
+
+def test_skips_solid_dark_border_in_ring_routes_textured_dark_hair():
+    # The real precision/recall fix (v2): ring dark_frac alone can't separate a solid
+    # dark BORDER (uniform dark line — LaMa fills it fine) from HAIR (dark + textured —
+    # LaMa smears). Gate on the VARIANCE of the dark ring pixels: uniform border -> skip,
+    # noisy hair -> route. Both have high dark_frac, so v1 (dark_frac only) mis-routes the
+    # border.
+    from manga_translator.selective_flux import find_text_over_art_boxes
+    h, w = 200, 200
+    rng = np.random.RandomState(7)
+
+    # (a) BORDER: white paper + a solid uniform dark bar crossing the text's ring
+    img_b = np.full((h, w, 3), 245, np.uint8)
+    img_b[85:150, :] = 20                                # solid dark bar (uniform ~20)
+    mask = np.zeros((h, w), np.uint8); mask[95:105, 60:140] = 255
+    assert find_text_over_art_boxes(mask, img_b, mask.copy()) == []   # uniform -> skip
+
+    # (b) HAIR: dark textured strands (values 0..90 noisy) around the same text
+    img_h = np.full((h, w, 3), 245, np.uint8)
+    hair = (rng.rand(65, w) * 90).astype(np.uint8)      # dark AND high-variance
+    img_h[85:150, :] = np.stack([hair] * 3, axis=-1)
+    assert len(find_text_over_art_boxes(mask, img_h, mask.copy())) == 1   # textured -> route
+
+
+def test_dark_frac_boundary_matches_real_page_distribution():
+    # Calibrated to REAL captured masks (docs/reports/benchmarks/2026-07-05-421-*): the
+    # One-Punch hair ring measures dark_frac ~0.20 (route); every Otome ds9 dialogue ring
+    # measures <=0.11 (skip). The gap puts the boundary at 0.15 — locks against a regression
+    # back to 0.05 (over-routes flat) or 0.25 (under-repairs hair).
+    from manga_translator.selective_flux import find_text_over_art_boxes
+    h, w = 200, 200
+    mask = np.zeros((h, w), np.uint8); mask[95:105, 60:140] = 255
+    for frac, expect in [(0.22, 1), (0.10, 0)]:
+        rng = np.random.RandomState(11)
+        img = np.full((h, w), 210, np.uint8)            # bright surround
+        dark = rng.rand(h, w) < frac
+        img[dark] = (rng.rand(h, w)[dark] * 80).astype(np.uint8)  # dark-textured fraction
+        img3 = np.stack([img] * 3, axis=-1)
+        assert len(find_text_over_art_boxes(mask, img3, mask.copy())) == expect

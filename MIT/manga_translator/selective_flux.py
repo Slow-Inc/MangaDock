@@ -13,7 +13,7 @@ import numpy as np
 def find_text_over_art_boxes(erase_mask, img_rgb, text_only_mask,
                              flat_std: float = 18.0, ring: int = 6,
                              min_area: int = 100, pad: int = 24,
-                             dark_thresh: int = 90, min_dark_frac: float = 0.25):
+                             dark_thresh: int = 90, min_dark_frac: float = 0.15):
     """Return padded bounding boxes ``[(x1, y1, x2, y2), ...]`` of erase-mask components
     that sit over textured ART — routed to the Flux repair pass.
 
