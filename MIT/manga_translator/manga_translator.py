@@ -1536,6 +1536,12 @@ class MangaTranslator:
                 text_only = create_text_only_mask(img_h, img_w, regions)
                 ctx.mask = (union_refined_with_fallback(full_mask, text_only)
                             if full_mask is not None else text_only)
+                # A1 (leftover caption text at box edges the detection line missed):
+                # add the region's own-box TEXT ink to the full-page erase mask. The
+                # art-aware version skips components large in both dims, so a figure
+                # under a speech bubble (A2) is preserved.
+                from .patch_geometry import erase_own_balloon_ink
+                ctx.mask = erase_own_balloon_ink(ctx.mask, ctx.img_rgb, regions)
                 # #268: shrink the full-page erase mask to the ink strokes so LaMa repaints
                 # less of the textured art (smaller band). Off → unchanged.
                 if getattr(config.inpainter, 'mask_tighten', False):
