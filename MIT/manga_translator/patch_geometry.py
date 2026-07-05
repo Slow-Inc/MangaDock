@@ -386,12 +386,16 @@ def add_own_balloon_interiors(allowed_mask: np.ndarray, regions,
 
 def erase_own_balloon_ink(mask: np.ndarray, crop_rgb: np.ndarray, regions,
                           border_frac: float = 0.06, ink_thresh: int = 128,
-                          dilate_px: int = 2) -> np.ndarray:
+                          dilate_px: int = 2, art_frac: float = 0.45) -> np.ndarray:
     """#535 round-7 ("ME OFF!" ghost): source lines the detector's box missed leave
     strokes the refined mask never covers — inside a region's OWN balloon they are
-    its territory (the translation re-renders over the balloon), so add exactly
-    those INK pixels (slightly dilated) to the erase mask. The white interior is
-    not flooded; the inpaint band stays minimal. Input not mutated."""
+    its territory (the translation re-renders over the balloon), so add those INK
+    pixels (slightly dilated) to the erase mask.
+
+    One-Punch HUH-panel regression fix: only leftover TEXT is fair game — a
+    connected component whose bbox spans > ``art_frac`` of the interior in either
+    dimension is ART (a character figure under a speech bubble) and is preserved,
+    not erased. Input not mutated."""
     out = np.ascontiguousarray(mask).astype(np.uint8).copy()
     h, w = out.shape[:2]
     gray = crop_rgb.mean(axis=2) if crop_rgb.ndim == 3 else crop_rgb
@@ -405,11 +409,22 @@ def erase_own_balloon_ink(mask: np.ndarray, crop_rgb: np.ndarray, regions,
         ix2, iy2 = min(w, int(x2 - dx)), min(h, int(y2 - dy))
         if ix2 <= ix1 or iy2 <= iy1:
             continue
-        ink = (gray[iy1:iy2, ix1:ix2] < ink_thresh).astype(np.uint8) * 255
+        ink = (gray[iy1:iy2, ix1:ix2] < ink_thresh).astype(np.uint8)
+        ih, iw = ink.shape[:2]
+        num, labels, stats, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+        keep = np.zeros(num, dtype=bool)
+        for c in range(1, num):
+            # ART = large in BOTH dimensions (a figure). A text line is wide but
+            # thin, so a component that is thin in EITHER dimension is text -> erase.
+            is_art = (stats[c, cv2.CC_STAT_WIDTH] > iw * art_frac
+                      and stats[c, cv2.CC_STAT_HEIGHT] > ih * art_frac)
+            if not is_art:
+                keep[c] = True
+        text_ink = keep[labels].astype(np.uint8) * 255
         if dilate_px > 0:
             k = 2 * dilate_px + 1
-            ink = cv2.dilate(ink, np.ones((k, k), np.uint8))
-        out[iy1:iy2, ix1:ix2] = np.maximum(out[iy1:iy2, ix1:ix2], ink)
+            text_ink = cv2.dilate(text_ink, np.ones((k, k), np.uint8))
+        out[iy1:iy2, ix1:ix2] = np.maximum(out[iy1:iy2, ix1:ix2], text_ink)
     return out
 
 

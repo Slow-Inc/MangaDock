@@ -427,3 +427,31 @@ def test_changed_alpha_identical_is_fully_transparent():
     import numpy as np
     orig = np.full((30, 30, 3), 128, np.uint8)
     assert int(changed_alpha(orig.copy(), orig).sum()) == 0
+
+
+# ---- One-Punch HUH panel: erase_own_balloon_ink must NOT wipe ART inside a bubble ----
+
+def test_own_balloon_ink_erases_text_but_preserves_large_art():
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import erase_own_balloon_ink
+    import numpy as np
+    crop = np.full((300, 300, 3), 250, np.uint8)
+    crop[30:45, 40:120] = 10           # a thin leftover TEXT line (15px tall)
+    crop[120:260, 90:210] = 20         # a big ART blob (a character figure, 140x120)
+    mask = np.zeros((300, 300), dtype=np.uint8)
+    region = SimpleNamespace(bubble_box=(20, 20, 280, 280))
+    out = erase_own_balloon_ink(mask, crop, [region])
+    assert out[37, 80] == 255          # text line -> erased
+    assert out[190, 150] == 0          # art blob -> PRESERVED (not erased)
+
+
+def test_own_balloon_ink_still_handles_small_leftover(monkeypatch=None):
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import erase_own_balloon_ink
+    import numpy as np
+    crop = np.full((200, 200, 3), 250, np.uint8)
+    crop[150:160, 60:120] = 10         # small leftover "ME OFF!" line
+    mask = np.zeros((200, 200), dtype=np.uint8)
+    region = SimpleNamespace(bubble_box=(40, 40, 160, 180))
+    out = erase_own_balloon_ink(mask, crop, [region])
+    assert out[155, 90] == 255          # still erased
