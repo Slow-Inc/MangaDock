@@ -233,3 +233,20 @@ def test_tall_balloon_interior_renders_as_tall_column_not_wide_strip(monkeypatch
     assert r.render_font_px > 15                    # bigger than the old wide fit
     box = r.render_dst_box
     assert (box[3] - box[1]) > (box[2] - box[0])    # tall block, not a wide strip
+
+
+def test_display_sfx_font_capped_to_page_fraction(stubs, monkeypatch):
+    # 2nd-manga p13: a huge チュン title SFX rendered "จุนจุน" so large it covered ~1/3
+    # of the page. The display-SFX font is capped to a fraction of PAGE height.
+    import numpy as np
+    import manga_translator.rendering.text_render as tr
+    monkeypatch.setattr(tr, 'calc_horizontal',
+                        lambda fs, text, mw, mh, language='en_US', **k: (['x'], [float(fs) * 2]))
+    img = np.full((300, 300, 3), 255, np.uint8)
+    # huge SFX bbox + huge source font on an 1800px-tall page -> would render enormous
+    r = FakeRegion(horizontal=True, translation='จุน', sfx_rescued=True, bubble_box=None,
+                   xyxy=(40, 40, 760, 400), font_size=300)
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=False,
+                                     clean_layout=True, page_shape=(1800, 1200))
+    assert r.render_branch == 'sfx_display'
+    assert r.render_font_px <= int(1800 * 0.12)      # capped to <=12% of page height

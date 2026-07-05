@@ -59,6 +59,8 @@ def count_text_length(text: str) -> float:
 _LINE_HEIGHT = 1.2
 _FIT_MARGIN = 0.92
 _MAX_FONT_BOX_RATIO = 0.5
+# display-SFX font cap as a fraction of PAGE height (p13: huge title SFX覆 1/3 page)
+_SFX_MAX_PAGE_FRAC = 0.10
 
 # #175/#181/#183 length-ratio sizing: when the translation is longer than the
 # source, grow font + bounding box proportionally. _LEN_RATIO_FONT_GAIN is the
@@ -414,6 +416,11 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             _bw = max(1.0, _x2 - _x1)
             _lang = getattr(region, 'target_lang', 'en_US')
             _fs = max(8, int(getattr(region, 'font_size', 0) or 0) or font_size_minimum)
+            # 2nd-manga p13: a huge title SFX (チュン) rendered so large it covered ~1/3
+            # of the page. Cap the display-SFX font to a fraction of PAGE height so it
+            # stays prominent without dominating the page.
+            _ps = page_shape if page_shape is not None else img.shape
+            _fs = min(_fs, max(8, int(_ps[0] * _SFX_MAX_PAGE_FRAC)))
             _w = None
             while _fs > 8:
                 _, _ws = text_render.calc_horizontal(
