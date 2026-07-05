@@ -93,3 +93,21 @@ def test_parse_response_repairs_dropped_index():
     assert out[0] == 'หนึ่ง'
     assert out[2] == 'สาม'                        # stays at ITS index, not shifted
     assert out[3] == 'สี่'
+
+
+def test_malformed_marker_missing_closing_angle_still_splits():
+    # live full-page Otome: the model emitted "<|10|" (no closing ">") which the strict
+    # regex ignored -> the marker leaked into block 9's text AND shifted every later index.
+    from manga_translator.translators.numbered_contract import parse_numbered_blocks
+    raw = '<|1|>หนึ่ง <|2|>สอง <|3|'                # 3rd marker malformed (no >)
+    blocks = parse_numbered_blocks(raw)
+    assert blocks.get(1) == 'หนึ่ง'
+    assert blocks.get(2) == 'สอง'                    # NOT "สอง <|3|" — no leaked marker
+
+
+def test_trailing_malformed_markers_stripped_from_text():
+    from manga_translator.translators.numbered_contract import normalize_numbered_output
+    raw = '<|1|>เริ่มจากตัวเอก <|2|>ถึงอิริส <|3| <|4| <|5|'
+    out = normalize_numbered_output(raw, 2)
+    assert out[0] == 'เริ่มจากตัวเอก'
+    assert out[1] == 'ถึงอิริส'                       # trailing "<|3| <|4| <|5|" stripped
