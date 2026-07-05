@@ -333,11 +333,17 @@ def test_caption_leftover_erased_but_art_preserved_end_to_end():
     # preserving a large ART figure that sits under a speech bubble.
     import numpy as np
     from manga_translator import patch_geometry as pg
-    crop = np.full((300, 300, 3), 250, np.uint8)
-    crop[20:32, 60:230] = 10          # leftover caption line (wide, thin) at box top
-    crop[150:280, 90:210] = 20        # big art figure (both dims large)
-    mask = np.zeros((300, 300), dtype=np.uint8)
-    region = type('R', (), {'bubble_box': (40, 10, 260, 290)})()
-    out = pg.erase_own_balloon_ink(mask, crop, [region])
-    assert out[26, 140] == 255        # leftover caption line -> erased
-    assert out[210, 150] == 0         # art figure -> preserved
+    # caption box (white, low ink) -> leftover text erased
+    cap = np.full((300, 300, 3), 250, np.uint8)
+    cap[20:32, 60:230] = 10           # leftover caption line
+    capmask = np.zeros((300, 300), dtype=np.uint8)
+    caption = type('R', (), {'bubble_box': (40, 10, 260, 290)})()
+    out_cap = pg.erase_own_balloon_ink(capmask, cap, [caption])
+    assert out_cap[26, 140] == 255    # leftover caption line -> erased
+    # figure box (high ink) -> whole box skipped, art preserved
+    art = np.full((300, 300, 3), 250, np.uint8)
+    art[120:280, 60:240] = 20         # a character figure fills much of the box
+    artmask = np.zeros((300, 300), dtype=np.uint8)
+    figure = type('R', (), {'bubble_box': (40, 10, 260, 290)})()
+    out_art = pg.erase_own_balloon_ink(artmask, art, [figure])
+    assert out_art[200, 150] == 0     # art -> preserved
