@@ -94,3 +94,9 @@ branch op on the checkout holding the 312-file WIP, so it stays developer-gated 
 
 **Stage B (now 9 overlap files + patch_renderer):** unchanged ask — commit the WIP first for a real 3-way
 merge, or designate per-file authority for a function-level reconciliation.
+
+### Stage A MERGED ✅ (user-authorized "ยืนยัน", 2026-07-05)
+Merge commit `1857a3bc` on `perf/mit-layout-fit-and-merge`. Pre-merge safety check: Stage A fileset (14) ∩
+WIP dirty files (312) = ∅; post-merge the WIP is intact (312 unchanged). The 6 Stage A suites pass IN the
+main checkout alongside the WIP (54/54). Remaining: Stage B (9 overlap files + patch_renderer — the render
+fixes) gated on the WIP decision; Stage C (perf↔main, 123/27) unchanged.
