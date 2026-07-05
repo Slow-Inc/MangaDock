@@ -341,6 +341,20 @@ ink-fraction both destroyed a character figure) — only erase inside VERIFIED w
   (batch_concurrent OOM), try/finally always unloads Flux, any failure keeps the LaMa result. **Revert
   hazard:** off → byte-identical (no Flux, no cost); relies on ADR 003's cached-embedding Flux path.
 
+### #278 / #172 / #540-figures (landing/render-phase0, 2026-07-05)
+
+- `sfx_merge.py` — `should_sfx_rescue(region)` (#278): gate the target-independent SFX rescue on `is_sfx`
+  PROVENANCE (set on the det_sfx textlines in `merge_sfx_detections`, propagated to the region in
+  `textline_merge`) not `len(text)<=4`, so short dialogue in a big bubble is no longer sent to the vision
+  gateway. `ocr_vlm.sanitize_sfx` now drops refusals on non-Latin targets too (`_SFX_REFUSALS`).
+- `ocr_rescue.py` (**new**, #172) — pure ML-free OCR rescue ladder: `ocr_rescue_steps(prob, aspect)` (which
+  steps fire), `split_overlong_box` (tile a long-thin line for shorter 48px reads), `rejoin_segment_reads`.
+  The OCR-flow wiring (split→OCR→rejoin) is the pending integration half.
+- `patch_geometry.py` — `protect_figure_ink(mask, regions, h, w)` (#540): clip the erase mask to the RAW
+  glyph polygons + margin (reusing `restrict_mask_to_render_regions`) so a figure the `create_text_only_mask`
+  morph-close swept in (raw 0% / closed 95%) is not erased. Gated `MIT_PROTECT_FIGURES`. **Revert hazard:**
+  off → byte-identical; on → drops ink far from any textline (verified: chibi 95%→0%, text 100%→100%).
+
 ### `server/` — modified (5)
 
 | File | What we changed | Why |
