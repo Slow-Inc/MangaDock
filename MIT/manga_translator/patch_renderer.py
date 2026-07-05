@@ -32,6 +32,7 @@ from .patch_geometry import (
     page_scaled_font_min,
     reground_inpaint_luminance,
     changed_alpha,
+    own_work_alpha,
     restrict_mask_to_render_regions,
     seamless_blend_inpaint,
     tighten_text_mask,
@@ -125,6 +126,7 @@ class PatchRenderer:
             patch_ctx.page_shape = (img_h, img_w)
             patch_ctx.mask = None
 
+            _bg_slice = None
             if self.full_inpainted is not None:
                 # Reuse the one-time full-page inpaint: LaMa saw the whole page, so the
                 # background reconstructs cleanly even where large text sat over complex/
@@ -132,6 +134,9 @@ class PatchRenderer:
                 # skip the per-crop mask refinement + inpaint entirely.
                 patch_ctx.img_inpainted = np.ascontiguousarray(
                     self.full_inpainted[y1:y2, x1:x2].copy())
+                # render() draws IN-PLACE on img_inpainted — snapshot the clean
+                # background now so the alpha can isolate the text this group drew.
+                _bg_slice = patch_ctx.img_inpainted.copy()
             else:
                 text_only_mask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
                 raw_mask_source = ctx.mask_raw if ctx.mask_raw is not None else ctx.mask
@@ -317,7 +322,18 @@ class PatchRenderer:
             # crop's original pixels over a neighbour's erased text ("ME OFF!" came back).
             # Composite only the pixels this patch actually changed; feather still fades
             # the outer band when configured.
-            _alpha = changed_alpha(patch_ctx.img_rendered, crop_rgb)
+            if _bg_slice is not None:
+                # Full-page path: the background carries the WHOLE page's inpaint, so a
+                # plain rendered-vs-original diff also marks FOREIGN erasures opaque — a
+                # later patch then painted white over an earlier patch's text along its
+                # crop edge (p13 first-glyph "cut"). Composite only this group's OWN
+                # work: its drawn text + erasure inside its own region zones.
+                _own_mask = create_text_only_mask(
+                    crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
+                _alpha = own_work_alpha(
+                    patch_ctx.img_rendered, _bg_slice, crop_rgb, _own_mask)
+            else:
+                _alpha = changed_alpha(patch_ctx.img_rendered, crop_rgb)
             if feather is not None:
                 _alpha = ((_alpha.astype(np.uint16) * feather.astype(np.uint16)) // 255).astype(np.uint8)
 

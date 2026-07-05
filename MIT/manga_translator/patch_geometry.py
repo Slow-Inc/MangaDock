@@ -444,3 +444,28 @@ def changed_alpha(rendered: np.ndarray, original: np.ndarray,
         k = 2 * dilate_px + 1
         changed = cv2.dilate(changed, np.ones((k, k), np.uint8))
     return (changed * 255).astype(np.uint8)
+
+
+def own_work_alpha(rendered: np.ndarray, background: np.ndarray, original: np.ndarray,
+                   own_mask: np.ndarray, thresh: int = 8, dilate_px: int = 3,
+                   mask_margin: int = 8) -> np.ndarray:
+    """p13 first-glyph loss root (full-page-inpaint path): every group's crop carries
+    the WHOLE page's inpainted background, so ``changed_alpha(rendered, original)``
+    also marked FOREIGN erasures (a neighbour region's inpainted-white vs its source
+    ink) opaque — a later patch then painted white over an earlier patch's text along
+    its crop edge (the aligned first-glyph "cut"). A patch may composite only its OWN
+    work:
+
+    - **text**:  ``rendered != background`` (what this group drew), anywhere;
+    - **erase**: ``background != original`` (inpaint) but ONLY inside this group's
+      own region zones (``own_mask``, dilated by ``mask_margin``).
+
+    Pure numpy/cv2; inputs not mutated."""
+    text_a = changed_alpha(rendered, background, thresh=thresh, dilate_px=dilate_px)
+    erase_a = changed_alpha(background, original, thresh=thresh, dilate_px=dilate_px)
+    own = (np.ascontiguousarray(own_mask) > 0).astype(np.uint8)
+    if mask_margin > 0:
+        k = 2 * mask_margin + 1
+        own = cv2.dilate(own, np.ones((k, k), np.uint8))
+    erase_a[own == 0] = 0
+    return np.maximum(text_a, erase_a)

@@ -455,3 +455,30 @@ def test_own_balloon_ink_still_handles_small_leftover(monkeypatch=None):
     region = SimpleNamespace(bubble_box=(40, 40, 160, 180))
     out = erase_own_balloon_ink(mask, crop, [region])
     assert out[155, 90] == 255          # still erased
+
+
+# ---- p13 first-glyph loss ROOT: full-page patches must not paint FOREIGN erasures ----
+
+def test_own_work_alpha_covers_own_text_and_erase_but_not_foreign_erase():
+    # Full-page-inpaint path: every group's crop carries the WHOLE page's inpainted
+    # background. In the overlap zone, a neighbour's crop has inpainted-white !=
+    # original-EN-ink -> changed_alpha marked it opaque -> the LATER patch painted
+    # white over the EARLIER patch's text (the aligned first-glyph "cut" at the
+    # neighbour crop's edge, x=369 live). own_work_alpha must be opaque ONLY for:
+    # (1) text this group drew, (2) erasure inside its OWN regions.
+    from manga_translator.patch_geometry import own_work_alpha
+    import numpy as np
+    H, W = 100, 100
+    original = np.full((H, W, 3), 250, np.uint8)
+    original[20:30, 10:40] = 10          # own region's source text (to erase)
+    original[20:30, 60:90] = 10          # FOREIGN region's source text
+    background = np.full((H, W, 3), 250, np.uint8)   # full-page inpaint erased BOTH
+    rendered = background.copy()
+    rendered[50:60, 12:38] = 5           # the text THIS group drew
+    own_mask = np.zeros((H, W), np.uint8)
+    own_mask[15:65, 5:45] = 255          # this group's own region zone only
+    a = own_work_alpha(rendered, background, original, own_mask)
+    assert a[55, 20] == 255              # own drawn text -> opaque
+    assert a[25, 20] == 255              # own erase -> opaque
+    assert a[25, 75] == 0                # FOREIGN erase -> TRANSPARENT (the fix)
+    assert a[80, 80] == 0                # untouched -> transparent
