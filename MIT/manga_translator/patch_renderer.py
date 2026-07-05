@@ -275,7 +275,7 @@ class PatchRenderer:
             except Exception as e:
                 logger.warning(
                     f"[PatchTranslate] rendering failed for group ({x1},{y1},{x2},{y2}) "
-                    f"[{type(e).__name__}]: using inpaint-only patch"
+                    f"[{type(e).__name__}]: using inpaint-only patch\n{traceback.format_exc()}"
                 )
                 patch_ctx.img_rendered = patch_ctx.img_inpainted
 

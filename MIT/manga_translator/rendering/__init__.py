@@ -673,6 +673,12 @@ async def dispatch(
     # Render text
     _t_raster = time.perf_counter()
     for region, dst_points in tqdm(zip(text_regions, dst_points_list), '[render]', total=len(text_regions)):
+        # A blanked/suppressed region (dedup, empty translation) renders nothing —
+        # put_text returns None on empty text and render() then crashes on
+        # None.shape, failing the WHOLE group. Skip it (the crop is left as the
+        # clean inpaint there, which is what a suppressed region wants).
+        if not (getattr(region, 'translation', None) and region.translation.strip()):
+            continue
         if render_mask is not None:
             # set render_mask to 1 for the region that is inside dst_points
             cv2.fillConvexPoly(render_mask, dst_points.astype(np.int32), 1)
