@@ -94,3 +94,26 @@ bug themselves). Each net is small, independent, and reversible.
 TDD throughout (RED→GREEN per fix); ~98-test MIT sweep green. Live per-round verification on the wild
 page with committed before/after PNGs + scorecards in
 `docs/reports/benchmarks/2026-07-04-defect-pages-before-after.md` (rounds 1→8, v1→v16).
+
+---
+## Addendum (2026-07-05, page-review pass) — erase-quality without Flux
+
+The developer's page-by-page review extended this ADR's scope with a decisive finding: the LaMa "un-clean
+erase" (faint source-text ghost) is a **fixed-mask-policy** problem, not a model weakness — so it is fixable
+with classical CPU levers, keeping Flux (ADR 003) reserved for complex-texture reconstruction behind large
+SFX only. Decisions added:
+
+- **Composite only own work.** On the full-page-inpaint path a patch carries the whole page's inpaint, so a
+  rendered-vs-original diff marks a neighbour's erasure opaque and stomps their text at the crop edge.
+  `own_work_alpha` composites only pixels the patch drew + erasure inside its own regions (twin of the
+  overlap-safe alpha). `render()` draws in-place → snapshot the background before diffing.
+- **Erase is caption-scoped, art-gated, and deterministic.** No pixel heuristic separates line-art from text
+  inside an arbitrary bubble; only VERIFIED white rectangular caption boxes are erased, and a box holding a
+  figure (both-dims CC over an absolute cap) is skipped. On those boxes, `flatten_white_captions` fills the
+  ink with the box's paper median directly rather than trusting the GAN (which reconstructs ghosts from
+  stroke stubs even when the mask covers all ink).
+- **Adaptive mask dilation (Lever 1, gated).** Dilate wider where the local background is FLAT (removes the
+  stubs), tight over screentone/line-art (preserves #248). `MIT_ADAPTIVE_DILATE`, off → byte-identical.
+
+**Superseded within this ADR:** the balloon-interior erase (`add_own_balloon_interiors` /
+`erase_own_balloon_ink`) is **unwired** — it over-erased line-art; the white-box + flatten approach replaces it.

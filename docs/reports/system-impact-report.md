@@ -15,6 +15,49 @@
 
 ---
 
+## 2026-07-05 (cont.) — Page-review erase/composite pass + LaMa-ghost levers (PRD #535)
+
+**Scope:** MIT (`patch_geometry.py`, `detection_postproc.py`, `patch_renderer.py`, `manga_translator.py`,
+`rendering/__init__.py`, `translators/custom_openai.py`, `config.py`) · **Type:** bugfixes (incl. 1
+self-introduced regression) + 2 gated erase-quality levers · **Branch:** `landing/render-phase0` · **Tests:**
+TDD throughout; owned suites green (~53–109 per run) · **Models:** Fable 5 (diagnosis+fixes), Opus (Lever 1).
+
+**What & where:** the developer's page-by-page remote-control review surfaced defects the scorecard/tests
+missed. Fixed by class:
+- **Art destruction (self-introduced regression)** — the ME-OFF ghost fix erased ALL balloon-interior ink,
+  wiping a line-art character under a bubble. No pixel heuristic (CC-size, ink-fraction) separates line-art
+  from text; **removed the interior-erase mechanisms**, ME-OFF stays fixed via detection + `changed_alpha`.
+- **First-glyph loss (p13)** — `own_work_alpha`: on the full-page path a patch was painting FOREIGN erasures
+  (neighbour region's inpaint-white) over an earlier patch's text at the crop edge; alpha now = own drawn
+  text + own-region erase only. (Diagnosed via a 4-up dump; the "vertical cut" was the aligned column of
+  missing first glyphs.)
+- **Leftover caption text (A1)** — `erase_ink_in_white_caption_boxes` (verified white rectangles only,
+  art-gated) + `flatten_white_captions` (**user-diagnosed LaMa ghost**: mask covered 631/631 px yet LaMa
+  reconstructed faint source text → fill caption ink with paper median directly, skip the GAN).
+- **Display-SFX** — font capped to 10% page height; duplicate-translation SFX deduped (keep largest); the
+  render loop skips blanked regions (empty text → put_text None → whole-group crash).
+- **Translation** — `custom_openai` (the PROD translator) parsed responses with its own inline positional
+  `re.split`, bypassing the earlier fix; now index-based + malformed-marker tolerant.
+- **Lever 1 (`adaptive_dilate_mask`, gated `MIT_ADAPTIVE_DILATE`)** — dilate the erase mask wider on FLAT
+  background (kills LaMa ghost stubs), tight over screentone/art (#248 preserved).
+
+**Why:** deliver a clean render on real wild pages; the LaMa "ghost" is a fixed-mask-policy problem, not a
+model weakness — so it's fixable **without Flux** (flatten + adaptive dilation, both pure CPU / zero VRAM).
+
+**Before → After:** One-Punch boy figure preserved (was erased); p13 first glyph of every line present (was
+cut); p31 caption boxes pristine (was faint ghost/underline); p13 SFX one prominent จุนจุน, no page-1/3
+cover. **Perf Δ:** flatten/own-work-alpha are per-page cv2, negligible; adaptive dilation +~5ms, gated off.
+**Quality:** the erase-quality gap closed without Flux. **Validation:** TDD + live A/B (adaptive: textured
+identical off↔on = #248 safe) + 4-up isolation proofs, committed under `docs/reports/benchmarks/clip-evidence/`.
+**Risk / rollback:** every fix one commit; `adaptive_dilate` off by default (byte-identical); the interior-erase
+helpers left unwired (revert = art damage). **Links:** PRD #535, commits `d04c2b7b..dda85d43`,
+ADR 022, reports `2026-07-05-{page-review-defects,render-clip-fix-plan,phase3-convergence-plan}.md`.
+
+### Tech-debt / follow-ups
+- **Boy-ghost flaky CRF** (pre-existing, item-11 class): a legit region overlaps the figure; CRF sometimes
+  flags hair strokes as text → LaMa smear. Non-deterministic; needs stroke-vs-art work in refinement.
+- **Stage A MERGED** to perf (`1857a3bc`); **Stage B** (render fixes) still WIP-gated.
+
 ## 2026-07-05 — MIT render defect sweep: detection completeness + overlap-safe patches (PRD #535)
 
 **Scope:** MIT (`detection_postproc.py`, `patch_geometry.py`, `patch_renderer.py`, `rendering/__init__.py`,

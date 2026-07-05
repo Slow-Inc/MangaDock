@@ -287,6 +287,43 @@ behaviour). Full narrative + before/after PNGs: `docs/reports/benchmarks/2026-07
 - `rendering/text_render.py` — `longest_token_width(size, text, lang)` (ported from main, item-9): the ss=4
   re-wrap floor that stops Thai/CJK words splitting mid-syllable (ขอโทษ→ขอโ/ทบ).
 
+### PRD #535 — page-review erase/composite pass (landing/render-phase0, 2026-07-05, Fable 5)
+
+The user's page-by-page review surfaced 4 render classes; each fixed TDD + live-verified. Full narrative:
+`docs/reports/2026-07-05-page-review-defects.md`, `-render-clip-fix-plan.md`. **Hard rule learned:** a
+"leftover text" symptom has FOUR distinct mechanisms (mask-not-covering / patch-overlap stomp /
+alpha-threshold leak / LaMa reconstruction) — isolate with the 4-up dump (original|patch-RGB|alpha|composite)
+before fixing. And **no pixel heuristic separates line-art from text inside a bubble** (CC-size and
+ink-fraction both destroyed a character figure) — only erase inside VERIFIED white caption boxes, art-gated.
+
+- `patch_geometry.py` (extended) — `changed_alpha(rendered, original)` (a patch composites only pixels it
+  CHANGED, so overlapping crops don't stomp each other = the ME-OFF resurrection fix) · **`own_work_alpha(
+  rendered, background, original, own_mask)`** (full-page path: the crop carries the WHOLE page's inpaint, so
+  a plain diff also marks FOREIGN erasures opaque → a later patch painted white over a neighbour's text at the
+  crop edge = the p13 first-glyph loss; alpha now = own drawn text + erase inside own regions only) ·
+  **`adaptive_dilate_mask`** (Lever 1: dilate wider where the local bg is FLAT to kill LaMa ghost stubs, tight
+  over screentone/art — #248 preserved; gated `MIT_ADAPTIVE_DILATE`). `add_own_balloon_interiors` /
+  `erase_own_balloon_ink` remain in-tree but UNWIRED (they over-erased line-art; see the white-box approach).
+- `detection_postproc.py` (extended) — completeness nets `empty_balloon_boxes` / `white_box_candidates` /
+  `expand_balloons_with_white_boxes` / `uncovered_text_clusters` / `merge_empty_balloons` (inked boxes DBNet
+  missed flow to VLM rescue) · `erase_ink_in_white_caption_boxes` (A1 leftover: erase ink ONLY inside verified
+  white rectangles, never speech balloons; **absolute both-dims CC art-gate** skips a box holding a figure) ·
+  **`flatten_white_captions(inpainted, orig)`** (LaMa-ghost fix, user-diagnosed: a white caption box is
+  uniform paper — fill source-ink pixels incl. the AA ring, thresh 200/dilate 4, with the box's paper median
+  instead of trusting the GAN; art-gated). **`changed_alpha` NOTE:** `render()` draws IN-PLACE on
+  `img_inpainted` → `patch_renderer` snapshots the clean background BEFORE render so the alpha can isolate
+  drawn text. **Revert hazard:** dropping the own-work alpha resurrects neighbours' erased text; dropping
+  flatten brings back LaMa's faint source-text ghosts on caption boxes.
+- `manga_translator.py` — `_filter_regions_by_source_lang` keeps pure-ASCII regions for Latin-script sources
+  (langdetect misfired all-caps EN → dropped good captions); `_tag_regions_with_bubbles` grows a `bubble_box`
+  to a containing white caption box; full-page mask build wires `erase_ink_in_white_caption_boxes` +
+  `flatten_white_captions` (+ optional `adaptive_dilate_mask`).
+- `rendering/__init__.py` (extended #2) — display-SFX font capped to 10% of page height (`_SFX_MAX_PAGE_FRAC`);
+  duplicate-translation display SFX deduped keeping the largest; the render loop SKIPS blanked/empty-translation
+  regions (put_text returns None on empty text → render crashed the WHOLE group otherwise).
+- `translators/custom_openai.py` — `parse_numbered_translations` (the PROD translator's OWN inline parse, which
+  bypassed the `common_gpt` fix): index-based + malformed-marker tolerant via `numbered_contract`.
+
 ### `server/` — modified (5)
 
 | File | What we changed | Why |
