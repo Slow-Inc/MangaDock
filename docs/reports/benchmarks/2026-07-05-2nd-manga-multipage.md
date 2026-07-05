@@ -27,3 +27,13 @@ zero page-wide misalignment, dialogue/caption boxes translate into tall readable
 **Conclusion:** 2nd-manga multi-page benchmark COMPLETE. The render pipeline generalizes (2/4 pages fully
 clean, marker/misalign fixes hold everywhere); the sweep did its job by surfacing one genuine new render
 class (display-SFX stacking) for the next round. Appended to the defect checklist.
+
+### Follow-up: display-SFX dedup attempted, then REVERTED (deferred)
+A dedup fix (suppress a same-text display SFX overlapping an already-placed one ≥60%) was implemented TDD
+and dropped the p13 overlap 5→2 in a probe. But on the **full-page-inpaint path** the suppressed region's
+degenerate quad crashed the single whole-page render group (`AttributeError → inpaint-only patch`), blanking
+**every** caption on the page (empty_bubbles 0→8) — a regression far worse than the original stacking. Per
+the north-star ("remove complexity rather than prop it up"), the fix was reverted (commits dropped). The
+display-SFX stacking remains a **documented, deferred** finding: a proper fix needs the suppressed-region
+path to be safe on the single full-page render group (the per-crop path tolerates it; the full-page group
+does not), which is its own small piece of work — not worth destabilizing the whole page to land now.
