@@ -246,7 +246,19 @@ def erase_ink_in_white_caption_boxes(mask, gray_or_rgb, border_frac: float = 0.0
         ix2, iy2 = min(w, int(x2 - dx)), min(h, int(y2 - dy))
         if ix2 <= ix1 or iy2 <= iy1:
             continue
-        ink = (gray[iy1:iy2, ix1:ix2] < ink_thresh).astype(_np.uint8) * 255
+        ink = (gray[iy1:iy2, ix1:ix2] < ink_thresh).astype(_np.uint8)
+        # One-Punch HUH regression #2: a bright ART PANEL with a line-art character
+        # passes the white-box test (ink ~8%). A connected ink component large in
+        # BOTH dims (absolute page-scaled cap — a figure's mass; text lines are wide
+        # but THIN) marks the box as art -> skip it entirely.
+        art_dim = max(48, int(0.05 * max(h, w)))
+        num, _labels, stats, _c = _cv2.connectedComponentsWithStats(ink, connectivity=8)
+        has_art = any(stats[c, _cv2.CC_STAT_WIDTH] > art_dim
+                      and stats[c, _cv2.CC_STAT_HEIGHT] > art_dim
+                      for c in range(1, num))
+        if has_art:
+            continue
+        ink = ink * 255
         if dilate_px > 0:
             k = 2 * dilate_px + 1
             ink = _cv2.dilate(ink, _np.ones((k, k), _np.uint8))

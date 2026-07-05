@@ -185,3 +185,32 @@ def test_no_white_boxes_leaves_mask_unchanged():
     mask = np.zeros((200, 200), np.uint8)
     out = erase_ink_in_white_caption_boxes(mask, img)
     assert (out == mask).all()
+
+
+def test_white_box_containing_line_art_character_is_skipped():
+    # One-Punch HUH panel regression #2: a bright PANEL containing a line-art
+    # character passed the white-box test (ink 8%) and the erase wiped the figure.
+    # A connected ink component large in BOTH dims (an absolute, page-scaled cap —
+    # a character's hair mass) marks the box as containing ART -> skip it entirely.
+    # A text line is wide but THIN, so captions still get cleaned.
+    import numpy as np, cv2
+    from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
+    img = np.full((700, 700), 120, np.uint8)
+    img[60:340, 50:350] = 245                      # bright panel (~17% of page)
+    img[150:300, 150:290] = 15                     # line-art figure mass (140x150 - both dims large)
+    cv2.putText(img, 'HUH?', (80, 110), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 20, 2)
+    mask = np.zeros((600, 600), np.uint8)
+    out = erase_ink_in_white_caption_boxes(mask, img)
+    assert out[220, 270] == 0                      # figure preserved (box skipped)
+    assert out[100, 100] == 0                      # even the text near it (whole box skipped)
+
+
+def test_caption_with_long_bold_text_line_still_cleaned():
+    import numpy as np
+    from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
+    img = np.full((700, 700), 120, np.uint8)
+    img[60:340, 50:350] = 245                      # caption box (~17% of page)
+    img[100:125, 70:330] = 15                      # a joined bold text LINE: wide (260) but thin (25)
+    mask = np.zeros((600, 600), np.uint8)
+    out = erase_ink_in_white_caption_boxes(mask, img)
+    assert out[110, 200] == 255                    # thin-wide = text -> erased
