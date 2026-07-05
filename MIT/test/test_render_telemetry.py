@@ -197,8 +197,8 @@ def test_clean_layout_wrap_clamps_to_page_not_crop(monkeypatch):
     # crop 200px wide, page 800px wide
     fs, w_crop, _ = rend._clean_layout_dst(r, (200, 200, 3), 8, 20)
     fs, w_page, _ = rend._clean_layout_dst(r, (200, 200, 3), 8, 20, page_shape=(1150, 800))
-    assert w_crop <= 92                   # crop-clamped (45% of 200) — the bug
-    assert w_page > 92                    # page-clamped keeps the caption footprint
+    assert w_crop <= 92 + 20              # crop-clamped (45% of 200) + breathing margin — the bug
+    assert w_page > w_crop                # page-clamped keeps the wider caption footprint
 
 
 def test_rescued_sfx_inside_balloon_is_dialogue_not_display(stubs):
@@ -269,3 +269,26 @@ def test_duplicate_translation_display_sfx_keeps_largest(stubs, monkeypatch):
                                      bubble_fit=False, clean_layout=True)
     assert big.render_branch == 'sfx_display'
     assert small.render_branch == 'suppressed' and not small.translation
+
+
+def test_clean_layout_block_has_horizontal_breathing_margin(monkeypatch):
+    # p13 True-Ending box: block_w was the TIGHT max-line width, so the homography
+    # mapped the text edge-to-edge and a glyph's left bearing (Thai ฉ loop) clipped.
+    # block_w must exceed the measured text width by a small margin.
+    def fake_calc(font, text, max_width, max_height, language='en_US', **kw):
+        import math
+        px = max(1, font // 2)
+        cpl = max(1, int(max_width) // px)
+        n = math.ceil(len(text) / cpl)
+        w = min(int(max_width), len(text) * px)
+        return ['x' * cpl] * n, [w] * n
+    monkeypatch.setattr(rend.text_render, 'calc_horizontal', fake_calc)
+    monkeypatch.setattr(rend.text_render, '_insert_cjk_word_breaks', lambda t: t)
+    monkeypatch.setattr(rend.text_render, '_insert_thai_word_breaks', lambda t: t)
+    monkeypatch.setattr(rend.text_render, 'select_hyphenator', lambda lang: None)
+    r = FakeRegion(horizontal=True, translation='ก ข ค ง', xyxy=(0, 0, 120, 300), font_size=20)
+    fs, block_w, block_h = rend._clean_layout_dst(r, (1000, 1000, 3), 8, 20)
+    # measured tight width at fs for the widest line:
+    _, widths = fake_calc(fs, 'xxxx', int(block_w), 1000)
+    tight = max(widths)
+    assert block_w >= tight + fs * 0.4      # a per-side breathing margin exists

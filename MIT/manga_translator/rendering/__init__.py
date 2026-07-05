@@ -252,12 +252,15 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
         bw, bh = _layout_at(fs)
         if bh <= box_h and bw <= bbox_w * 1.05:
             block_w, block_h, clean_fs = bw, bh, fs
-            return int(clean_fs), float(block_w), float(block_h)
+            # p13 True-Ending box: block_w was the TIGHT max-line width, so the
+            # homography mapped the text edge-to-edge and a glyph's left bearing
+            # (Thai ฉ loop) clipped. Add a per-side breathing margin.
+            return int(clean_fs), float(block_w + clean_fs * 0.5), float(block_h)
         fs -= 2
 
     # flat fallback: squeeze at the flat size (tall-narrow, height-bounded as before).
     block_w, block_h = _layout_at(clean_fs)
-    return int(clean_fs), float(block_w), float(block_h)
+    return int(clean_fs), float(block_w + clean_fs * 0.5), float(block_h)
 
 
 def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None):
