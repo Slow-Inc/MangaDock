@@ -54,8 +54,16 @@ One-Punch p1/p2 + full-page-inpaint path NOT yet run (gating item before promoti
 not yet converged to perf/main (Phase 3). **Links:** PRD #535, issues #536/#537/#538, ADR 022, commits
 `5f8249ec..d63970c2`.
 
+**Validation update (2026-07-05 cont.):** regression sweep on One-Punch p1/p2 EN+THA → **empty=0/overlap=0 hold,
+no regression** (+1 SFX rescued/page). Full-page-inpaint path (prod default, skips per-crop guard) verified
+separately → **surfaced the REAL translation root**: `custom_openai` (the prod translator) parsed its response
+with its own inline positional `re.split(<|d|>)`, bypassing the `numbered_contract` fix — the v10–v16 clean runs
+were non-deterministic luck. A malformed `<|10|` marker leaked into text + shifted DAMN→IRIS-CHAN's line. Fixed
+via `parse_numbered_translations` (index-based + malformed-marker tolerant), verified clean ×2 on the full-page
+path (`919c89fd`, `7e4e0920`, `a9488cd6`).
+
 ### Tech-debt register (opened by this batch)
-- **Regression sweep owed** before promotion: `changed_alpha` + `page_shape` + dedup changes are pipeline-wide.
+- ~~Regression sweep owed~~ **DONE** (2026-07-05): One-Punch p1/p2 EN+THA, no regression (`61824c9f`).
 - **Heuristic thresholds** in the 3 completeness nets tuned on one page — may need per-manga calibration.
 - **Full-page-inpaint path** (`MIT_PATCH_FULLPAGE_INPAINT=1`, prod) bypasses per-crop guard/erase — verify separately.
 - **2nd-manga coverage** (Gal Yome EN→TH) still owed; **branch convergence** (~50 commits) is Phase 3.
