@@ -15,6 +15,38 @@
 
 ---
 
+## 2026-07-05 (cont.) — Selective Flux repair (#421) + full-page mask restrict (#540)
+
+**Scope:** MIT (`selective_flux.py` new, `patch_geometry.py`, `manga_translator.py`, `config.py`) · **Type:**
+feature (gated) + bugfix (gated) · **Branch:** `landing/render-phase0` · **Tests:** 11 TDD (selective_flux) +
+2 (assemble_fullpage) · **Models:** Fable 5 (plan+brainstorm), Opus (build).
+
+**What & where:**
+- **#421 Selective Flux** — text drawn over textured art (a character's hair) leaves a gray smear with LaMa
+  (it can't synthesise the texture); Flux Klein reconstructs it. `selective_flux.py` routes ONLY
+  text-over-textured-art erase-mask components to a Flux repair pass on the ORIGINAL crop, pasted mask-only
+  (float32, feather ≤8px, grayscale-lock) into the LaMa page. Discriminator = ring std ≥18 AND ring dark_frac
+  ≥0.15 (data-grounded: real per-component distributions showed hair 0.20 vs dialogue ≤0.11). Wired after
+  flatten, gated `MIT_SELECTIVE_FLUX`, with LaMa-unload→lock→Flux load/unload try/finally→fail-open.
+- **#540 restrict** — `MIT_RESTRICT_FULLPAGE_MASK` clips the full-page CRF erase mask to the textlines
+  (parity with the per-crop path) so a figure far from any textline is not erased (boy-ghost CRF-over-reach
+  half).
+
+**Why:** answer "can we approach Flux quality without whole-page Flux cost/VRAM" — yes, Flux fires on 1-2
+regions only. **Before → After:** One-Punch p1 hair reconstructed to target (strands + ear) vs LaMa smear;
+flat page (Otome) routes 0 = no Flux cost. **Perf Δ:** +8.7s on a page WITH textured art (Flux cold-start +
+2 crops); flat pages ≈ baseline (0 routed); off = 0. **VRAM:** steady-state unchanged (Flux load/unload,
+cached embedding, no LaMa co-residence — ADR 003). **Quality:** closes the text-over-art gap that classical
+levers can't. **Validation:** 11 TDD tests, offline routing on real captured masks (hair 2 boxes / flat 0,
+deterministic), live A/B; benchmark `docs/reports/benchmarks/2026-07-05-421-selective-flux.md`. **Risk /
+rollback:** both gated off = byte-identical; Flux failure fail-opens to LaMa; per-page Flux lock prevents
+batch OOM. **Links:** #421, #540, ADR 003 (+2026-07-05 addendum), commits `b989bc28`..`5f92b39e`.
+
+### Tech-debt / follow-ups
+- #421 discriminator is a two-gate heuristic tuned to two pages — may need re-tuning on a wider corpus.
+- #540 detection-FP half (chibi figure erased as a text region) is upstream, still open.
+- Both land in prod only via Stage B branch convergence (user-gated).
+
 ## 2026-07-05 (cont.) — Page-review erase/composite pass + LaMa-ghost levers (PRD #535)
 
 **Scope:** MIT (`patch_geometry.py`, `detection_postproc.py`, `patch_renderer.py`, `manga_translator.py`,

@@ -324,6 +324,23 @@ ink-fraction both destroyed a character figure) — only erase inside VERIFIED w
 - `translators/custom_openai.py` — `parse_numbered_translations` (the PROD translator's OWN inline parse, which
   bypassed the `common_gpt` fix): index-based + malformed-marker tolerant via `numbered_contract`.
 
+### #540 restrict + #421 selective-Flux (landing/render-phase0, 2026-07-05)
+
+- `patch_geometry.py` — `assemble_fullpage_erase_mask(refined, text_only, img, restrict=...)` (#540): the
+  full-page erase-mask assembly (union → optional textline-restrict → white-caption erase) as one pure fn.
+  `MIT_RESTRICT_FULLPAGE_MASK` clips the CRF mask to the textlines like the per-crop path already does, so a
+  figure's ink far from any textline (boy-ghost) is not erased. **Revert hazard:** off → byte-identical; on →
+  removes ink far from textlines only (can erase less, never more).
+- `selective_flux.py` (**new**, #421) — routes text-over-textured-art erase-mask components (where LaMa smears
+  hair it can't synthesise) to a Flux Klein repair pass. `find_text_over_art_boxes` (two gates: ring std ≥ 18
+  AND ring dark_frac ≥ **0.15** — the boundary is data-grounded from real per-component distributions, hair
+  0.20 vs dialogue ≤0.11; nearby boxes merge); `paste_flux_repair` (mask-only float32 feather ≤8px,
+  grayscale-lock); `apply_selective_flux_repair` (orchestrator, Flux injected, per-box fail-open). Gated
+  `MIT_SELECTIVE_FLUX`. **Wiring** (`manga_translator.py`, full-page block after flatten): LaMa unloaded
+  (+empty_cache) BEFORE Flux loads (12GB, no co-residence), an instance `asyncio.Lock` serialises the pass
+  (batch_concurrent OOM), try/finally always unloads Flux, any failure keeps the LaMa result. **Revert
+  hazard:** off → byte-identical (no Flux, no cost); relies on ADR 003's cached-embedding Flux path.
+
 ### `server/` — modified (5)
 
 | File | What we changed | Why |
