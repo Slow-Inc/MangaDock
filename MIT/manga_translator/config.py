@@ -399,6 +399,11 @@ class InpainterConfig(BaseModel):
     translation is drawn, killing the faint "painted band" where LaMa's fill is a few levels
     off the real art over dark hair. Strength 0→1 lerp; pure CPU (cv2/numpy), no extra VRAM.
     0 → off, byte-identical."""
+    adaptive_dilate: bool = False
+    """Lever 1 (MIT_ADAPTIVE_DILATE): dilate each erase-mask component wider where the local
+    background is FLAT paper (removes the stroke stubs LaMa reconstructs into faint text ghosts)
+    but keep it tight over screentone/line-art (preserves the #248 no-over-erase guard). Pure CPU
+    (cv2/numpy), no extra VRAM. Off → byte-identical."""
     mask_tighten: bool = False
     """Patch path only (#268): shrink the inpaint mask to the actual ink strokes (local-contrast
     pixels) before LaMa runs, so it repaints thin strokes instead of the whole text rectangle and

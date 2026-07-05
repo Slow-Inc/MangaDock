@@ -129,6 +129,39 @@ def crop_mask_for_patch(
     return cropped_mask.astype(np.uint8)
 
 
+def adaptive_dilate_mask(mask: np.ndarray, gray_or_rgb: np.ndarray,
+                         flat_px: int = 12, tight_px: int = 1, ring: int = 6,
+                         flat_std: float = 18.0) -> np.ndarray:
+    """Lever 1 — dilate each erase-mask component by an amount that depends on the
+    LOCAL background texture just outside it.
+
+    LaMa reconstructs faint ghosts of the source text from the stroke stubs left
+    just beyond a tight mask when the background is FLAT paper — but a wide mask
+    over screentone/line-art makes LaMa over-erase the art (#248). So: measure the
+    pixel std-dev in a ``ring``-px band around each connected component of the
+    background image; a FLAT ring (std < ``flat_std``) dilates that component by
+    ``flat_px`` (kills the stubs), a TEXTURED ring keeps it at ``tight_px``.
+    Per-component and independent. Pure cv2/numpy; input not mutated."""
+    gray = gray_or_rgb if gray_or_rgb.ndim == 2 else cv2.cvtColor(gray_or_rgb, cv2.COLOR_RGB2GRAY)
+    m = (np.ascontiguousarray(mask) > 0).astype(np.uint8)
+    num, labels = cv2.connectedComponents(m)
+    out = np.zeros_like(m)
+    gf = gray.astype(np.float32)
+    for c in range(1, num):
+        comp = (labels == c).astype(np.uint8)
+        # ring = a band just OUTSIDE this component
+        k_ring = 2 * ring + 1
+        grown = cv2.dilate(comp, np.ones((k_ring, k_ring), np.uint8))
+        band = (grown > 0) & (comp == 0)
+        std = float(gf[band].std()) if band.any() else 0.0
+        px = flat_px if std < flat_std else tight_px
+        if px > 0:
+            k = 2 * px + 1
+            comp = cv2.dilate(comp, np.ones((k, k), np.uint8))
+        out |= comp
+    return (out * 255).astype(np.uint8)
+
+
 def union_refined_with_fallback(refined_mask: np.ndarray, text_only_mask: np.ndarray) -> np.ndarray:
     """Tame the patch inpaint mask handed to LaMa (#248).
 

@@ -1542,6 +1542,12 @@ class MangaTranslator:
                 # bubble (A2) is untouched.
                 from .detection_postproc import erase_ink_in_white_caption_boxes
                 ctx.mask = erase_ink_in_white_caption_boxes(ctx.mask, ctx.img_rgb)
+                # Lever 1: dilate the erase mask wider where the local background is FLAT
+                # (kills the stroke stubs LaMa reconstructs into ghosts) but stay tight
+                # over screentone/art (preserves #248). Gated by MIT_ADAPTIVE_DILATE.
+                if getattr(config.inpainter, 'adaptive_dilate', False):
+                    from .patch_geometry import adaptive_dilate_mask
+                    ctx.mask = adaptive_dilate_mask(ctx.mask, ctx.img_rgb)
                 # #268: shrink the full-page erase mask to the ink strokes so LaMa repaints
                 # less of the textured art (smaller band). Off → unchanged.
                 if getattr(config.inpainter, 'mask_tighten', False):

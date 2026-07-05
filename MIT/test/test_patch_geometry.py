@@ -482,3 +482,48 @@ def test_own_work_alpha_covers_own_text_and_erase_but_not_foreign_erase():
     assert a[25, 20] == 255              # own erase -> opaque
     assert a[25, 75] == 0                # FOREIGN erase -> TRANSPARENT (the fix)
     assert a[80, 80] == 0                # untouched -> transparent
+
+
+# ---- Lever 1: adaptive mask dilation (flat bg -> wide erase kills LaMa ghost) ----
+
+def test_adaptive_dilation_widens_on_flat_background():
+    # A text stroke on FLAT paper: LaMa reconstructs faint ghosts from stroke stubs
+    # left just outside a tight mask. Dilating wider on flat bg removes the stubs.
+    import numpy as np
+    from manga_translator.patch_geometry import adaptive_dilate_mask
+    gray = np.full((200, 200), 245, np.uint8)          # flat paper
+    mask = np.zeros((200, 200), np.uint8)
+    mask[95:105, 60:140] = 255                         # a thin text stroke
+    out = adaptive_dilate_mask(mask, gray, flat_px=12, tight_px=1, ring=6, flat_std=18.0)
+    # widened: the mask now reaches ~12px beyond the original stroke edge
+    assert out[100, 52] == 255                         # 8px left of stroke (edge x60) -> covered
+    assert out[88, 100] == 255                         # ~7px above stroke (edge y95) -> covered
+
+
+def test_adaptive_dilation_stays_tight_on_textured_background():
+    # A stroke over screentone/line-art: a wide mask makes LaMa over-erase the art
+    # (#248). Keep it tight so only the stroke is removed.
+    import numpy as np
+    from manga_translator.patch_geometry import adaptive_dilate_mask
+    rng = np.random.RandomState(0)
+    gray = (rng.rand(200, 200) * 255).astype(np.uint8)  # high-variance texture
+    mask = np.zeros((200, 200), np.uint8)
+    mask[95:105, 60:140] = 255
+    out = adaptive_dilate_mask(mask, gray, flat_px=12, tight_px=1, ring=6, flat_std=18.0)
+    assert out[100, 40] == 0                            # 20px left -> NOT covered (tight)
+    assert out[95, 60] == 255                           # the stroke itself still covered
+
+
+def test_adaptive_dilation_per_component_independent():
+    # One flat-bg component widens, a textured-bg component stays tight — same image.
+    import numpy as np
+    from manga_translator.patch_geometry import adaptive_dilate_mask
+    rng = np.random.RandomState(1)
+    gray = np.full((200, 400), 245, np.uint8)
+    gray[:, 200:] = (rng.rand(200, 200) * 255).astype(np.uint8)   # right half textured
+    mask = np.zeros((200, 400), np.uint8)
+    mask[95:105, 40:120] = 255                          # left: flat
+    mask[95:105, 260:340] = 255                         # right: textured
+    out = adaptive_dilate_mask(mask, gray, flat_px=12, tight_px=1, ring=6, flat_std=18.0)
+    assert out[100, 30] == 255                          # left (flat) widened ~12px past edge x40
+    assert out[100, 245] == 0                           # right (textured) stayed tight (edge x260)

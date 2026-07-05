@@ -183,6 +183,11 @@ class PatchRenderer:
                     # caption boxes only (not speech balloons) — art under a bubble is safe.
                     from .detection_postproc import erase_ink_in_white_caption_boxes
                     patch_ctx.mask = erase_ink_in_white_caption_boxes(patch_ctx.mask, crop_rgb)
+                    # Lever 1: widen the erase mask where the local background is FLAT (kills
+                    # LaMa's ghost stubs), tight over art (#248). Gated by MIT_ADAPTIVE_DILATE.
+                    if getattr(config.inpainter, 'adaptive_dilate', False) and patch_ctx.mask is not None:
+                        from .patch_geometry import adaptive_dilate_mask
+                        patch_ctx.mask = adaptive_dilate_mask(patch_ctx.mask, crop_rgb)
 
                     # #268: shrink the inpaint mask to the actual ink strokes so LaMa repaints
                     # less of the textured art (smaller band). crop_rgb is the pristine original.
