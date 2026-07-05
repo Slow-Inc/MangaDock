@@ -111,11 +111,23 @@ class FluxKleinInpainter(OfflineInpainter):
         self.pipe = pipe
 
     async def _unload(self):
+        # Free the Q4 transformer + VAE from VRAM. delattr alone leaks: the diffusers
+        # pipeline holds circular refs so it isn't collected immediately, and its GPU
+        # tensors survive empty_cache while still referenced. Move the pipe to CPU first
+        # (releases the GPU tensors even if the object lingers), then force-collect.
+        pipe = getattr(self, "pipe", None)
+        if pipe is not None:
+            try:
+                pipe.to("cpu")
+            except Exception:
+                pass
         for attr in ("pipe", "_embed"):
             if hasattr(self, attr):
                 delattr(self, attr)
         try:
+            import gc
             import torch
+            gc.collect()
             torch.cuda.empty_cache()
         except Exception:
             pass
