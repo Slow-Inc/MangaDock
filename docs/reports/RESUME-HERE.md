@@ -9,17 +9,15 @@ Worker: launch from `<worktree>/MIT` with `MIT/.venv` python, port 5003, poll `/
 1. **Stage B reconciliation** — GATED on the developer: commit their 312-file WIP (then do a real 3-way
    merge of landing's 9 overlap files + patch_renderer), or they designate per-file authority.
    Plan + measured divergence: `2026-07-05-phase3-convergence-plan.md`.
-2. **Lever 1 — adaptive mask dilation** (approved direction, not yet built): per-mask-component, measure
-   local background flatness in a ring around the component; FLAT → dilate 10-15px (kills LaMa ghost
-   seeding), TEXTURED → keep tight (preserves #248). Pure cv2 + TDD; wire where the erase mask is built
-   (full-page block in `manga_translator.py` + per-crop in `patch_renderer.py`, next to
-   `union_refined_with_fallback`). Rationale: `2026-07-05-page-review-defects.md` (LaMa-ghost follow-up).
+2. ~~**Lever 1 — adaptive mask dilation**~~ **DONE** (`888f9788`, gated `MIT_ADAPTIVE_DILATE`, off by
+   default): `adaptive_dilate_mask` in `patch_geometry.py`; verified tight-on-texture (#248 safe). Benchmark:
+   `benchmarks/2026-07-05-lever1-adaptive-dilate.md`.
 3. **Boy-ghost flaky CRF defect** — filed with evidence in `2026-07-05-render-clip-fix-plan.md` (OUTCOME):
    a legit region overlaps the figure; CRF sometimes flags hair strokes as text → erased → LaMa smear.
    Happens at prod threshold; non-deterministic. Needs stroke-vs-art work in refinement; characterize first.
-4. **Docs debt:** PIPELINE §5 + system-impact-report entries for the post-review fixes
-   (`own_work_alpha`, `flatten_white_captions`, white-box art gate, SFX cap+dedup, render-loop blank skip).
-   ADR 022 may warrant an addendum.
+4. ~~**Docs debt**~~ **DONE** (`5dab6f1b`): PIPELINE §5 + impact-report batch entry + ADR 022 addendum now
+   cover own_work_alpha / flatten_white_captions / white-box art gate / SFX cap+dedup / render-loop blank
+   skip / adaptive_dilate / custom_openai index parse.
 5. Deferred with rationale: Slice E `_bubble_fit_layout`, 0d dump-replay rig, Stage C (perf↔main 123/27),
    pushing perf to origin (ask user).
 
