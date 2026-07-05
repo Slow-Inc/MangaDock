@@ -570,3 +570,23 @@ def test_assemble_fullpage_mask_default_is_byte_identical_to_union():
         union_refined_with_fallback(crf, text_only), img_rgb)
     assert np.array_equal(out, expected)
     assert out[165, 80] == 255               # unrestricted: figure ink still present
+
+
+# ---- #540 figure-protect: mask must not erase a figure the morph-close swept in ----
+class _Reg:
+    def __init__(self, lines):
+        self.lines = __import__('numpy').array(lines, dtype=__import__('numpy').int32)
+
+
+def test_protect_figure_ink_keeps_glyph_area_drops_far_figure():
+    import numpy as np
+    from manga_translator.patch_geometry import protect_figure_ink
+    h, w = 300, 300
+    # one text region: a glyph polygon at x40-100 y40-80
+    regions = [_Reg([[[40, 40], [100, 40], [100, 80], [40, 80]]])]
+    mask = np.zeros((h, w), np.uint8)
+    mask[45:75, 45:95] = 255            # erase over the glyphs (legit)
+    mask[150:220, 150:230] = 255        # erase over a FIGURE far from any glyph (swept in by close)
+    out = protect_figure_ink(mask, regions, h, w, margin=16)
+    assert out[60, 70] == 255           # glyph-area erase kept
+    assert out[185, 190] == 0           # far figure erase dropped

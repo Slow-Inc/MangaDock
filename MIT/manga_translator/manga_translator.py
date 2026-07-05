@@ -1550,6 +1550,11 @@ class MangaTranslator:
                         restrict=getattr(config.inpainter, 'restrict_fullpage_mask', False))
                 else:
                     ctx.mask = text_only
+                # #540: protect a figure the morph-close swept into the text mask (chibi
+                # enclosed by surrounding text) — clip to the raw glyph polygons + margin.
+                if getattr(config.inpainter, 'protect_figures', False):
+                    from .patch_geometry import protect_figure_ink
+                    ctx.mask = protect_figure_ink(ctx.mask, regions, img_h, img_w)
                 # Lever 1: dilate the erase mask wider where the local background is FLAT
                 # (kills the stroke stubs LaMa reconstructs into ghosts) but stay tight
                 # over screentone/art (preserves #248). Gated by MIT_ADAPTIVE_DILATE.

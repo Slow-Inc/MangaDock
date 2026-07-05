@@ -399,6 +399,11 @@ class InpainterConfig(BaseModel):
     translation is drawn, killing the faint "painted band" where LaMa's fill is a few levels
     off the real art over dark hair. Strength 0→1 lerp; pure CPU (cv2/numpy), no extra VRAM.
     0 → off, byte-identical."""
+    protect_figures: bool = False
+    """#540 (MIT_PROTECT_FIGURES): keep the full-page erase mask from swallowing a figure that
+    create_text_only_mask's dilate+MORPH_CLOSE swept in (a small drawing enclosed by surrounding
+    text — raw glyph polygons cover 0% of it, the closed mask 95%). Clips the mask to the raw
+    glyph polygons + margin (provenance, not a pixel heuristic). Off → byte-identical."""
     selective_flux: bool = False
     """#421 (MIT_SELECTIVE_FLUX): after the full-page LaMa inpaint, route only the erase-mask
     components that sit over textured ART (a character's hair under dialogue text — where LaMa

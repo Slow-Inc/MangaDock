@@ -129,6 +129,27 @@ def crop_mask_for_patch(
     return cropped_mask.astype(np.uint8)
 
 
+def protect_figure_ink(mask, regions, img_h, img_w, margin: int = 16):
+    """#540: keep the erase mask from swallowing a figure that ``create_text_only_mask``'s
+    dilate + MORPH_CLOSE swept in (text surrounding a small drawing on multiple sides gets
+    the enclosed figure filled — raw glyph polygons cover 0% of it, the closed mask 95%).
+
+    Provenance, not a pixel heuristic: clip the mask to the RAW glyph polygons dilated by
+    ``margin`` (via the tested ``restrict_mask_to_render_regions``). Ink within ``margin`` of
+    an actual textline is kept; ink only reachable through the morph-close (a figure tens of
+    px from any glyph) is dropped. Pure."""
+    raw = np.zeros((img_h, img_w), dtype=np.uint8)
+    for r in regions:
+        lines = getattr(r, 'lines', None)
+        if lines is None:
+            continue
+        for line in lines:
+            pts = np.array(line, dtype=np.int32).reshape(-1, 2)
+            if pts.shape[0] >= 3:
+                cv2.fillPoly(raw, [pts], 255)
+    return restrict_mask_to_render_regions(mask, raw, margin=margin)
+
+
 def assemble_fullpage_erase_mask(refined_mask, text_only_mask, img_rgb,
                                  restrict: bool = False, restrict_margin: int = 8):
     """Assemble the full-page erase mask from the refined (CRF) mask + textline mask.
