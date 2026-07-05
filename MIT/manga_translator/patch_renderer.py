@@ -32,7 +32,6 @@ from .patch_geometry import (
     page_scaled_font_min,
     reground_inpaint_luminance,
     changed_alpha,
-    erase_own_balloon_ink,
     restrict_mask_to_render_regions,
     seamless_blend_inpaint,
     tighten_text_mask,
@@ -167,17 +166,14 @@ class PatchRenderer:
                     # empty bubble. Restrict the erase mask to this group's own regions
                     # (small margin keeps legit spill hugging a rendered glyph). The
                     # inpaint crop/context is untouched — only what gets erased narrows.
-                    # NOTE: add_own_balloon_interiors (blessing the whole interior so the
-                    # refined CRF mask can erase there) wiped ART under a speech bubble
-                    # (One-Punch HUH panel). Restrict strictly to the detected-line regions.
+                    # NOTE: blessing the whole balloon interior (add_own_balloon_interiors /
+                    # erase_own_balloon_ink) over-erased ART sitting under a speech bubble
+                    # (One-Punch HUH-panel: a character figure got wiped, because the refined
+                    # CRF mask flags art edges as text and the interior blessing let them
+                    # through). The detection improvements already cover the "ME OFF!" line in
+                    # its own region, so restrict strictly to the detected-line regions.
                     patch_ctx.mask = restrict_mask_to_render_regions(
                         patch_ctx.mask, text_only_mask, margin=8)
-                    # A1 (leftover caption text at box edges the detection line missed):
-                    # erase the region's own-box ink — but the ART-AWARE version skips any
-                    # connected component large in BOTH dims (a figure), so it erases the
-                    # leftover TEXT strokes without touching art under the bubble (A2).
-                    patch_ctx.mask = erase_own_balloon_ink(
-                        patch_ctx.mask, crop_rgb, local_regions)
 
                     # #268: shrink the inpaint mask to the actual ink strokes so LaMa repaints
                     # less of the textured art (smaller band). crop_rgb is the pristine original.

@@ -325,19 +325,3 @@ def test_copied_back_dst_box_is_in_page_coordinates():
     x1, y1, x2, y2 = group[0].render_dst_box
     assert (x1, y1) == (40.0, 50.0)        # 10+30, 20+30 — page coords
     assert (x2, y2) == (60.0, 70.0)
-
-
-def test_caption_leftover_erased_but_art_preserved_end_to_end():
-    # A1 (leftover caption text) + A2 (art preserved) together: the per-crop guard
-    # must erase leftover TEXT strokes inside a region's white caption box while
-    # preserving a large ART figure that sits under a speech bubble.
-    import numpy as np
-    from manga_translator import patch_geometry as pg
-    crop = np.full((300, 300, 3), 250, np.uint8)
-    crop[20:32, 60:230] = 10          # leftover caption line (wide, thin) at box top
-    crop[150:280, 90:210] = 20        # big art figure (both dims large)
-    mask = np.zeros((300, 300), dtype=np.uint8)
-    region = type('R', (), {'bubble_box': (40, 10, 260, 290)})()
-    out = pg.erase_own_balloon_ink(mask, crop, [region])
-    assert out[26, 140] == 255        # leftover caption line -> erased
-    assert out[210, 150] == 0         # art figure -> preserved
