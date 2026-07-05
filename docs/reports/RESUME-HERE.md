@@ -17,6 +17,25 @@ Worker: launch from `<worktree>/MIT` with `MIT/.venv` python, port 5003, poll `/
   bilingual body; update body on progress; close with reason) in always-loaded DoD + CLAUDE.md + Obsidian.
 - Worker: last launched bg task on :5003 has the current landing code (0.15). Restart from worktree MIT/.
 
+## UPDATE 2026-07-05 (session 2) — Flux enablement + VRAM-leak fix
+- **Backend plumbing (perf branch, WIP-uncommitted):** `Backend/src/books/mit-config.ts` `buildMitConfig`
+  now emits `selective_flux`/`protect_figures`/`restrict_fullpage_mask`/`adaptive_dilate` from the matching
+  `MIT_*` env flags (pattern `flagEnv('MIT_X') ? {x:true}:{}`). Spec +2 tests, 36/36. This was the missing
+  link — the :5003 worker had the code but the Backend never sent the gate (Reader path builds config from env).
+- **`Backend/.env`:** `MIT_SELECTIVE_FLUX=0` (OFF for speed — Flux load is slow → Cloudflare 524),
+  `MIT_PROTECT_FIGURES=1`, `MIT_RESTRICT_FULLPAGE_MASK=1`. `renderConfigHash` hashes all `MIT_*` env → adding
+  a flag auto-busts the cache.
+- **Flux VRAM leak FIXED** (`90483241`, landing, TDD): (1) `DispatchRegistry.unload` now `await inst.unload()`
+  before pop (was pop-only → the model `_unload` never ran); (2) `FluxKleinInpainter._unload` does
+  `pipe.to('cpu')` + `gc.collect()` + `empty_cache` (delattr alone leaks a diffusers pipeline). Verified live:
+  VRAM stable ~3GB across repeated Flux pages (was +2.6GB/page → 11.7GB near-OOM).
+- **Prod enablement (blockers):** (a) dev restart Backend to load `MIT_SELECTIVE_FLUX=0`; (b) Stage B merge
+  landing→perf; (c) commit the mit-config.ts plumbing (loose in WIP) + land it on landing too; (d) #459
+  pre-cache the Flux embedding at startup so the first textured-art page doesn't pay the ~9GB encode → 524;
+  (e) accept per-page Flux latency vs the tunnel's ~100s limit. selective_flux is code-complete + leak-fixed
+  but OFF.
+- Full handoff for this compaction: `<scratchpad>/HANDOFF.md`.
+
 ## Queue (in priority order)
 1. **Stage B reconciliation** — GATED on the developer: commit their 312-file WIP (then do a real 3-way
    merge of landing's 9 overlap files + patch_renderer), or they designate per-file authority.
