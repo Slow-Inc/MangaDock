@@ -431,19 +431,18 @@ def test_changed_alpha_identical_is_fully_transparent():
 
 # ---- One-Punch HUH panel: erase_own_balloon_ink must NOT wipe ART inside a bubble ----
 
-def test_own_balloon_ink_skips_box_that_contains_art():
-    # a box whose interior holds a character figure (high ink fraction) is skipped
-    # ENTIRELY — a CC-size test can't tell line-art strokes from text, so gate on
-    # the whole-box ink fraction instead (One-Punch HUH-panel figure preserved).
+def test_own_balloon_ink_erases_text_but_preserves_large_art():
     from types import SimpleNamespace
     from manga_translator.patch_geometry import erase_own_balloon_ink
     import numpy as np
     crop = np.full((300, 300, 3), 250, np.uint8)
-    crop[120:260, 90:210] = 20         # a big ART figure -> ink fraction well over 22%
+    crop[30:45, 40:120] = 10           # a thin leftover TEXT line (15px tall)
+    crop[120:260, 90:210] = 20         # a big ART blob (a character figure, 140x120)
     mask = np.zeros((300, 300), dtype=np.uint8)
     region = SimpleNamespace(bubble_box=(20, 20, 280, 280))
     out = erase_own_balloon_ink(mask, crop, [region])
-    assert out[190, 150] == 0          # art PRESERVED (whole box skipped)
+    assert out[37, 80] == 255          # text line -> erased
+    assert out[190, 150] == 0          # art blob -> PRESERVED (not erased)
 
 
 def test_own_balloon_ink_still_handles_small_leftover(monkeypatch=None):
