@@ -140,3 +140,31 @@ def test_localize_threads_target_lang_into_prompt():
     assert out == 'ตึง'                                      # Thai SFX survives sanitize
     prompt_text = post.calls['json']['messages'][0]['content'][0]['text']
     assert 'Thai' in prompt_text and 'English onomatopoeia' not in prompt_text
+
+
+# ---- #278 item 4: non-Latin refusal guard ----
+
+def test_sanitize_sfx_drops_refusals_on_non_latin_targets():
+    from manga_translator.ocr_vlm import sanitize_sfx
+    # an English refusal leaks through the non-Latin branch (L-category letters survive)
+    assert sanitize_sfx('None', 'THA') == ''
+    assert sanitize_sfx('N/A', 'ZHS') == ''
+    # a target-language refusal phrase must not pass as a SFX token
+    assert sanitize_sfx('ไม่มี', 'THA') == ''
+    assert sanitize_sfx('没有', 'ZHS') == ''
+    # a genuine target-language SFX is kept
+    assert sanitize_sfx('ตูม', 'THA') == 'ตูม'
+
+
+# ---- #278 item 2: ENG prompt byte-identity by == (pinned literal) ----
+
+def test_build_sfx_prompt_eng_equals_literal():
+    from manga_translator.ocr_vlm import build_sfx_prompt
+    expected = (
+        "This image is a cropped sound effect (SFX / onomatopoeia) from a Japanese manga "
+        "panel. Reply with ONLY the English onomatopoeia an official English manga "
+        "translation would letter in its place, matching the mood of the scene. 1-3 words, "
+        "UPPERCASE, no quotes, no punctuation, no explanation. If it is not a sound effect, "
+        "reply with an empty line."
+    )
+    assert build_sfx_prompt('ENG') == expected   # == catches a stray-space/rewording regression

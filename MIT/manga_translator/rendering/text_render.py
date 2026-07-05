@@ -28,6 +28,13 @@ _CJK_RE = re.compile(r'[一-鿿㐀-䶿]')   # CJK Unified Ideographs (Simplified
 try:
     import jieba as _jieba
     _HAS_JIEBA = True
+    # #278: jieba lazily builds its ~1s prefix dict on the FIRST cut() call — which would
+    # otherwise land on a user's first Chinese render. Build it once at module import
+    # (worker load) so the cost is off the request path.
+    try:
+        _jieba.initialize()
+    except Exception:
+        pass
 except ImportError:
     _HAS_JIEBA = False
 
