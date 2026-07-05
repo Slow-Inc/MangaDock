@@ -7,26 +7,21 @@
 // change to the jest config — transform, moduleNameMapper, rootDir — is picked
 // up here automatically, so CI never silently drifts from local `npm test`.
 //
-// Every skip below is a documented pre-existing failure, NOT a regression
-// introduced by the gate (tracked in #358; the batch ones tie back to #143).
-// Rule: do NOT add a new skip without a tracking issue. As each suite is fixed,
-// delete its line — the gate should converge toward zero exclusions.
+// The skip-list is now EMPTY (#358 closed): every previously-skipped suite was
+// fixed by the batch/cache refactors it was waiting on (#233/#234/#294/#137/#231
+// carved the batch orchestrator, mit-translator, PatchStore and gemini-catalog
+// out of books.service; #143/ADR-002 dropped the batch Redis pub/sub) and now
+// passes. The CI gate runs the FULL suite with zero exclusions.
+//
+// Rule: do NOT add a new skip without a tracking issue. If a suite ever needs to
+// be quarantined again, add its line here WITH the issue number, and delete it
+// the moment the suite is fixed — the gate must converge back toward zero.
 const base = require('./package.json').jest;
 
 module.exports = {
   ...base,
   testPathIgnorePatterns: [
     ...(base.testPathIgnorePatterns ?? ['/node_modules/']),
-    // --- pre-existing failures (#358; batch + cache rework, #143) ---
-    'cache/catastrophic-recovery.service.spec.ts',
-    'cache/l3-batch-writer.spec.ts',
-    'books/mit-translation.service.spec.ts',
-    'books/books-batch-registry.spec.ts',
-    'books/books-mit-translator.spec.ts',
-    'books/books-batch-cancel.spec.ts',
-    'books/books-models.spec.ts',
-    'books/gemini-model-catalog.spec.ts',
-    // books-health.spec.ts FIXED — fetch mocked via assignment, not spyOn on
-    // the lazy global (which broke under restoreAllMocks). Re-enabled in CI.
+    // (empty — no quarantined suites; see #358)
   ],
 };
