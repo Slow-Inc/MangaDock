@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createHash } from 'crypto';
+import { LlmService } from './llm.service';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
 import { ImageCacheService } from '../cache/image-cache.service';
 import { MangaDexService } from './mangadex.service';
@@ -35,6 +35,7 @@ export class LandingService {
     private readonly geminiCatalog: GeminiModelCatalog,
     private readonly backendOrigin: () => string,
     private readonly env: NodeJS.ProcessEnv = process.env,
+    private readonly llmService: LlmService = new LlmService(env),
   ) {}
 
   async translateMangaEpisode(payload: {
@@ -70,8 +71,7 @@ export class LandingService {
       };
     }
 
-    const apiKey = this.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    if (!this.llmService.isConfigured()) {
       return {
         translatedLines: lines,
         translated: false,
@@ -129,17 +129,9 @@ export class LandingService {
         numberedLines,
       ].filter(Boolean).join('\n');
 
-      const genAI = new GoogleGenerativeAI(apiKey);
-
       for (const modelName of modelCandidates) {
         try {
-          const model = genAI.getGenerativeModel({ model: modelName });
-          const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { thinkingConfig: { thinkingBudget: 0 } } as any,
-          });
-
-          const raw = result.response.text().trim();
+          const raw = (await this.llmService.complete(prompt, modelName)).trim();
           const normalized = raw
             .replace(/^```json\s*/i, '')
             .replace(/^```\s*/i, '')
@@ -174,7 +166,7 @@ export class LandingService {
           usedModel = modelName;
           break;
         } catch (err) {
-          this.logger.warn(`[Gemini] Manga translation failed on ${modelName}: ${String(err)}`);
+          this.logger.warn(`[LLM] Manga translation failed on ${modelName}: ${String(err)}`);
         }
       }
     }
@@ -192,31 +184,28 @@ export class LandingService {
   }
 
   async translateDescription(text: string): Promise<{ translatedText: string; translated: boolean }> {
-    const apiKey = this.env.GEMINI_API_KEY;
-    if (!apiKey) return { translatedText: text, translated: false };
+    if (!this.llmService.isConfigured()) return { translatedText: text, translated: false };
     if (!text?.trim()) return { translatedText: text, translated: false };
 
     // Detect if already Thai — skip if >25% Thai chars
     const thaiChars = (text.match(/[\u0E00-\u0E7F]/g) ?? []).length;
     if (thaiChars / text.length > 0.25) return { translatedText: text, translated: false };
 
-    const models = await this.geminiCatalog.getDescriptionModels();
+    const provider = this.env.LLM_PROVIDER ?? 'gemini';
+    const models =
+      provider === 'gemini'
+        ? await this.geminiCatalog.getDescriptionModels()
+        : [this.llmService.getDescriptionModel()];
     const fingerprint = Buffer.from(text.slice(0, 512)).toString('base64').slice(0, 64);
     const cacheKey = `translate:th:v3:${models.join('|')}:${fingerprint}`;
     const cached = await this.cache.get<{ translatedText: string; translated: boolean }>(cacheKey);
     if (cached) return cached.data;
 
     const prompt = `Translate the following manga/book description to Thai. Output ONLY the Thai translation. Do not include any reasoning, explanations, thoughts, or notes. Just the translated text:\n\n${text}`;
-    const genAI = new GoogleGenerativeAI(apiKey);
 
     for (const modelName of models) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { thinkingConfig: { thinkingBudget: 0 } } as any,
-        });
-        let translatedText = result.response.text().trim();
+        let translatedText = (await this.llmService.complete(prompt, modelName)).trim();
         // Strip THOUGHTS section if model still outputs it (fallback)
         if (translatedText.includes('THOUGHTS:') || translatedText.includes('* **')) {
           const lines = translatedText.split('\n');
@@ -230,7 +219,7 @@ export class LandingService {
         await this.cache.setMangaCacheWithTiers(cacheKey, payload);
         return payload;
       } catch (err) {
-        this.logger.warn(`[Gemini] Description translation failed on ${modelName}: ${String(err)}`);
+        this.logger.warn(`[LLM] Description translation failed on ${modelName}: ${String(err)}`);
       }
     }
 
