@@ -35,9 +35,17 @@ Run:
 
 **Worst font-size ratio ON/OFF: 1.63× — regression reproduced.**
 
-![KP OFF vs ON on the One-Punch page](./2026-07-06-545-kp-narration-oversize.png)
+**Focus crop (region [0], on clean white background — the clearest view of the regression):**
 
-Left = original (JA), middle = KP OFF (narration sits small in its box), right = KP ON (region [0] narration balloons ~1.63× and spills toward the character). KP's balanced (wider) lines feed the clean-layout font-fit, which then grows the font to fill the box — greedy's raggeder wrap keeps more lines so the font stays capped.
+![KP OFF fs=19 vs KP ON fs=31 on region 0](./2026-07-06-545-kp-region0-focus.png)
+
+Top = original (JA), middle = KP OFF (fs=19, narration sits small at top-left), bottom = KP ON (fs=31, +63% — balloons to dominate the panel). KP's balanced (wider) lines feed the clean-layout font-fit, which then grows the font to fill the box; greedy's raggeder wrap keeps more lines so the font stays capped.
+
+**Full-page montage (context):**
+
+![KP OFF vs ON full page](./2026-07-06-545-kp-narration-oversize.png)
+
+> **Note on background quality:** this benchmark ran on `origin/main` whose inpainter is `lama_large`. LaMa leaves faint ghost/smudge bands where JA text was erased on **dark/textured** panels (bottom-right) — a known LaMa limitation, **identical in KP OFF and KP ON** (same frozen `img_inpainted`), so it does not affect the font-size A/B. The best-quality inpaint is on `landing/render-phase0` via **#421 selective Flux** (commit `9ce97b85`, `2026-07-05-421-flux-hair-reconstruct.png`: LaMa smears the hair, selective-Flux reconstructs it) — a render-quality fix `main` still lacks (Stage C, #548). Region [0] above is on a white background so it is smudge-free regardless.
 
 ## Assessment
 
