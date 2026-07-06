@@ -20,6 +20,71 @@ from .utils import (
 
 # TODO: Dynamic imports to reduce ram usage in web(-server) mode. Will require dealing with args.py imports.
 
+def _free_vram_bytes(device: str):
+    """Free VRAM in bytes for a cuda device; +inf on CPU or if it can't be read
+    (so preflight never blocks when it can't measure)."""
+    if not device.startswith('cuda'):
+        return float('inf')
+    try:
+        import torch
+        free, _total = torch.cuda.mem_get_info()
+        return free
+    except Exception:
+        return float('inf')
+
+
+def _flux_needs_encode(inpainter) -> bool:
+    """True only when flux_klein's one-time prompt embedding is NOT yet cached to
+    disk (the ~8-9 GB text-encoder spike). Cached → no spike; other inpainters →
+    no such step. Conservative (True) if the probe fails."""
+    from manga_translator.config import Inpainter
+    if inpainter != Inpainter.flux_klein:
+        return False
+    try:
+        from manga_translator import flux_embed_cache
+        from manga_translator.inpainting.inpainting_flux_klein import FluxKleinInpainter
+        fi = FluxKleinInpainter()
+        cache_dir = fi._get_file_path("flux_klein_embed")
+        path = os.path.join(cache_dir, flux_embed_cache._key(FluxKleinInpainter._PROMPT) + ".npy")
+        return not os.path.exists(path)
+    except Exception:
+        return True
+
+
+async def _run_prepare_models(args: Namespace):
+    """#459: pre-download + warm the configured inpainter models OUT of the request
+    path, then exit. Reuses the existing prepare() (idempotent HF download + embed
+    cache); guards the flux one-time encode with a VRAM preflight."""
+    from manga_translator.config import Inpainter
+    from manga_translator.inpainting import prepare as prepare_inpainter
+    from manga_translator.model_prepare import preflight, resolve_inpainters
+
+    device = 'cuda' if getattr(args, 'use_gpu', False) else 'cpu'
+    explicit = [s.strip() for s in args.inpainter.split(',') if s.strip()] if args.inpainter else None
+    keys = resolve_inpainters(explicit, os.getenv('MIT_INPAINTER'))
+    min_free = int(args.min_free_vram_gb * (1024 ** 3))
+    logger.info(f'[prepare-models] preparing {keys} (device={device})')
+
+    for key in keys:
+        try:
+            inpainter = Inpainter(key)
+        except ValueError:
+            logger.error(f"[prepare-models] unknown inpainter '{key}' — valid: {[e.value for e in Inpainter]}")
+            sys.exit(2)
+
+        needs_encode = _flux_needs_encode(inpainter)
+        ok, reason = preflight(_free_vram_bytes(device), min_free, needs_encode)
+        if not ok:
+            logger.error(f'[prepare-models] {key}: {reason}')
+            sys.exit(2)
+
+        logger.info(f'[prepare-models] {key}: downloading + warming (one-time encode={needs_encode})...')
+        await prepare_inpainter(inpainter, device)
+        logger.info(f'[prepare-models] {key}: ready.')
+
+    logger.info(f'[prepare-models] done — {keys} ready; the first flux request will not download inline.')
+
+
 async def dispatch(args: Namespace):
     args_dict = vars(args)
 
@@ -73,6 +138,9 @@ async def dispatch(args: Namespace):
         from manga_translator.mode.share import MangaTranslatorShared
         worker = MangaTranslatorShared(args_dict)
         await worker.start()
+
+    elif args.mode == 'prepare-models':
+        await _run_prepare_models(args)
 
     elif args.mode == 'config-help':
         import json
