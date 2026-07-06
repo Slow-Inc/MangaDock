@@ -38,6 +38,10 @@ describe('LlmService — gemini provider', () => {
     expect(make({ ...env, GEMINI_MANGA_MODEL: 'gemini-lite' }).getMangaModel()).toBe('gemini-lite');
   });
 
+  it('getMangaModel() falls back to GEMINI_MANGA_FALLBACK_MODEL', () => {
+    expect(make({ ...env, GEMINI_MANGA_FALLBACK_MODEL: 'fb-manga' }).getMangaModel()).toBe('fb-manga');
+  });
+
   it('getMangaModel() falls back to gemini-2.5-flash-lite', () => {
     expect(make(env).getMangaModel()).toBe('gemini-2.5-flash-lite');
   });
