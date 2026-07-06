@@ -286,6 +286,12 @@ export function buildMitConfig(
       ...(flagEnv('MIT_MASK_TIGHTEN') ? { mask_tighten: true } : {}),
       // #268: Poisson seamless-clone the inpaint into the original (escalation lever).
       ...(flagEnv('MIT_SEAMLESS_CLONE') ? { seamless_clone: true } : {}),
+      // #540/#548 (full-page inpaint path): protect a figure the text mask's morph-close
+      // swept in; clip the CRF mask to the textlines (boy-ghost); dilate wider on FLAT bg
+      // (kills LaMa stroke-stub ghosts). Absent → byte-identical.
+      ...(flagEnv('MIT_PROTECT_FIGURES') ? { protect_figures: true } : {}),
+      ...(flagEnv('MIT_RESTRICT_FULLPAGE_MASK') ? { restrict_fullpage_mask: true } : {}),
+      ...(flagEnv('MIT_ADAPTIVE_DILATE') ? { adaptive_dilate: true } : {}),
     },
     render: {
       direction: 'auto',
