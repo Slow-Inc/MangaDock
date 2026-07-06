@@ -11,6 +11,7 @@
  */
 
 import { createAuthHeaders } from "./apiUtils";
+import { parseJsonArray } from "./safeJson";
 
 const API_BASE = "/api/proxy";
 const STORAGE_KEY = "mangadock_reading_history";
@@ -102,7 +103,11 @@ async function backfillChapterNumbers() {
       try {
         const res = await fetch(`${API_BASE}/books/manga/${mangaId}/chapters`);
         if (!res.ok) return;
-        const chapters: { id: string; chapterNumber: string | null }[] = await res.json();
+        const chapters = await parseJsonArray<{ id: string; chapterNumber: string | null }>(res);
+        if (!chapters) {
+          console.warn(`[readingHistory] chapter backfill skipped for ${mangaId}: response body was not a JSON array`);
+          return;
+        }
 
         let changed = false;
         for (const b of books) {
@@ -173,7 +178,8 @@ export async function loadHistoryData(token: string) {
       headers: createAuthHeaders(token),
     });
     if (!res.ok) return;
-    const remote: HistoryBook[] = await res.json();
+    const remote = await parseJsonArray<HistoryBook>(res);
+    if (!remote) return;
 
     // Merge: keep local entries not in remote, then prepend remote sorted by lastReadAt
     const localOnly = books.filter((b) => !remote.find((r) => r.id === b.id));
