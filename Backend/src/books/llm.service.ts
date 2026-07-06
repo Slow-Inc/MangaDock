@@ -58,7 +58,7 @@ export class LlmService {
     const geminiModel = genAI.getGenerativeModel({ model });
     const result = await geminiModel.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { thinkingConfig: { thinkingBudget: 0 } } as any,
     });
     return result.response.text();
   }
