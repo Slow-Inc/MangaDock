@@ -11,6 +11,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { loadPageBytes } from './page-source';
+import type { StorageProvider } from '../common/storage/storage-provider.interface';
 
 describe('loadPageBytes', () => {
   let root: string;
@@ -36,6 +37,22 @@ describe('loadPageBytes', () => {
     );
 
     expect(buf.toString()).toBe('jpeg-bytes');
+  });
+
+  it('reads an /img-cache path via StorageProvider.get when storage is provided', async () => {
+    const storage = {
+      get: jest.fn().mockResolvedValue(Buffer.from('r2-bytes')),
+    } as unknown as Pick<StorageProvider, 'get'>;
+
+    const buf = await loadPageBytes('/img-cache/_chapters/chapters/ch1/p0.jpg', {
+      imgCacheRoot: root,
+      storage,
+    });
+
+    expect((storage as unknown as { get: jest.Mock }).get).toHaveBeenCalledWith(
+      'img-cache/_chapters/chapters/ch1/p0.jpg',
+    );
+    expect(buf.toString()).toBe('r2-bytes');
   });
 
   it.each([

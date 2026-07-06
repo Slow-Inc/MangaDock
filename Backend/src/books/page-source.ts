@@ -9,6 +9,7 @@
  */
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import type { StorageProvider } from '../common/storage/storage-provider.interface';
 
 const IMG_CACHE_PREFIX = '/img-cache/';
 // Uploaded chapter pages the Reader serves from the backend's own disk. The
@@ -51,15 +52,15 @@ export async function loadPageBytes(
     uploadsRoot?: string;
     fetchImpl?: typeof fetch;
     signal?: AbortSignal;
+    storage?: Pick<StorageProvider, 'get'>;
   },
 ): Promise<Buffer> {
   if (isImgCachePath(pageUrl)) {
-    return readLocalPage(
-      opts.imgCacheRoot,
-      pageUrl.slice(IMG_CACHE_PREFIX.length),
-      'img-cache',
-      pageUrl,
-    );
+    const rel = pageUrl.slice(IMG_CACHE_PREFIX.length);
+    if (opts.storage) {
+      return opts.storage.get(`img-cache/${rel}`);
+    }
+    return readLocalPage(opts.imgCacheRoot, rel, 'img-cache', pageUrl);
   }
   // Uploaded chapter pages live on the backend's disk — read them straight from
   // there. Re-fetching the relative `/api/proxy/uploads/...` URL has no origin
