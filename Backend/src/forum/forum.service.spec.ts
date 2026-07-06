@@ -458,3 +458,40 @@ describe('ForumService.uploadImage — MIME validation', () => {
       .rejects.not.toThrow(BadRequestException);
   });
 });
+
+describe('ForumService.getPublicProfile', () => {
+  it('logs a warning when a secondary query returns an error instead of masking it', async () => {
+    // A query builder that is both chainable and awaitable, resolving to {data, error}.
+    // getPublicProfile awaits the `profiles` builder via `.single()` and the other
+    // four builders directly (they end at `.limit()`/`.in()`), so both paths are covered.
+    const thenableChain = (result: { data: unknown; error: unknown }) => {
+      const chain: any = {};
+      for (const m of ['select', 'eq', 'is', 'in', 'order', 'limit']) chain[m] = jest.fn(() => chain);
+      chain.single = jest.fn().mockResolvedValue(result);
+      chain.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+        Promise.resolve(result).then(res, rej);
+      return chain;
+    };
+
+    const service = makeService((table: string) => {
+      switch (table) {
+        case 'profiles':
+          return thenableChain({ data: { uid: 'u1', role: 'user' }, error: null });
+        case 'forum_posts':
+          return thenableChain({ data: null, error: { message: 'boom' } }); // failing secondary
+        default:
+          return thenableChain({ data: [], error: null });
+      }
+    });
+
+    const warnSpy = jest
+      .spyOn((service as any).logger, 'warn')
+      .mockImplementation(() => undefined);
+
+    await service.getPublicProfile('u1', 'viewer1');
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('posts'));
+    // Only the failing 'posts' query should warn — healthy secondary queries stay quiet.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+});
