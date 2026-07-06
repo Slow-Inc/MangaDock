@@ -491,5 +491,7 @@ describe('ForumService.getPublicProfile', () => {
     await service.getPublicProfile('u1', 'viewer1');
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('posts'));
+    // Only the failing 'posts' query should warn — healthy secondary queries stay quiet.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });

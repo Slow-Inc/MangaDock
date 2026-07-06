@@ -166,7 +166,10 @@ export async function loadUserData(token: string) {
 
     const remoteFavs = await parseJsonArray<CachedBook>(favRes);
     const remoteLiked = await parseJsonArray<string>(likedRes);
-    if (!remoteFavs || !remoteLiked) return;
+    if (!remoteFavs || !remoteLiked) {
+      console.warn("[userCache] favorites/liked sync skipped: response body was not a JSON array");
+      return;
+    }
 
     // Merge — remote is source of truth for what WAS there; keep local additions
     const remoteIds = new Set(remoteFavs.map((f) => f.id));
