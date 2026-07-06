@@ -16,6 +16,7 @@ import { composeSeriesContext } from './series-context';
 import { GeminiModelCatalog, type GeminiModel } from './gemini-model-catalog';
 import { MangaCatalogService } from './manga-catalog.service';
 import { LandingService } from './landing.service';
+import { LlmService } from './llm.service';
 import {
   type LandingBook,
   type LandingPayload,
@@ -61,6 +62,7 @@ export function toPatchEntries(
 @Injectable()
 export class BooksService {
   private readonly logger = new Logger(BooksService.name);
+  private readonly env: NodeJS.ProcessEnv = process.env;
 
   /** Gemini model-selection catalog (#231) — memory/cache/api availability +
    *  per-purpose candidate selection. Constructed here so it shares this service's
@@ -98,6 +100,7 @@ export class BooksService {
     // BooksModule); the default keeps the manual `new BooksService(...)` in unit
     // tests working unchanged (those that exercise MIT fake global.fetch).
     private readonly mitClient: MitClient = new MitClient(),
+    private readonly llmService: LlmService = new LlmService(),
   ) {
     this.geminiCatalog = new GeminiModelCatalog(this.cache);
     this.catalog = new MangaCatalogService(this.mangaDex, this.supabase, this.cache);
@@ -107,6 +110,8 @@ export class BooksService {
       this.mangaDex,
       this.geminiCatalog,
       () => this.backendOrigin,
+      this.env,
+      this.llmService,
     );
     this.patchStore = new PatchStore(this.storage, () => this.backendOrigin);
     // #160: translation memory rides the already-injected service-role client;
@@ -203,12 +208,16 @@ export class BooksService {
 
   // #231: Gemini model selection lives in GeminiModelCatalog. These delegators keep
   // the internal callers — and the books-models spy on getMangaModels — byte-identical.
-  private getDescriptionModels(): Promise<GeminiModel[]> {
-    return this.geminiCatalog.getDescriptionModels();
+  private async getDescriptionModels(): Promise<string[]> {
+    const provider = this.env.LLM_PROVIDER ?? 'gemini';
+    if (provider === 'gemini') return this.geminiCatalog.getDescriptionModels();
+    return [this.llmService.getDescriptionModel()];
   }
 
-  private getMangaModels(requested?: string): Promise<GeminiModel[]> {
-    return this.geminiCatalog.getMangaModels(requested);
+  private async getMangaModels(requested?: string): Promise<string[]> {
+    const provider = this.env.LLM_PROVIDER ?? 'gemini';
+    if (provider === 'gemini') return this.geminiCatalog.getMangaModels(requested);
+    return [this.llmService.getMangaModel()];
   }
 
   /** Cache for getImageTranslator() — one MIT round-trip per minute at most. */
