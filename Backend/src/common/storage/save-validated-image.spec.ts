@@ -112,4 +112,31 @@ describe('saveValidatedImage', () => {
 
     errorSpy.mockRestore();
   });
+
+  it('guards the orphaned read stream when storage.put throws synchronously without consuming it (missing temp path never crashes the process)', async () => {
+    mockFileType.mockResolvedValueOnce({ mime: 'image/png', ext: 'png' });
+    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    // storage.put throws BEFORE consuming its stream argument, simulating a provider
+    // that never attaches its own error handler to the (now orphaned) ReadStream.
+    const storage = makeStorage({
+      put: jest.fn(() => {
+        throw new Error('no put');
+      }),
+    });
+    // Non-existent path: fs.createReadStream(...) will asynchronously emit ENOENT
+    // on the orphaned stream. Without the guard this is an unhandled 'error' event
+    // that crashes the test process.
+    const missingPath = path.join(os.tmpdir(), `save-validated-image-missing-${Date.now()}-${Math.random()}.tmp`);
+
+    await expect(
+      saveValidatedImage(storage, missingPath, 'uploads'),
+    ).rejects.toThrow(InternalServerErrorException);
+
+    // Give the orphaned stream's async 'error' event a chance to fire; the guard
+    // must have swallowed it (no unhandled error crashes this test run).
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
+  });
 });
