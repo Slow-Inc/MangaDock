@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 
@@ -9,7 +9,7 @@ export class LlmService {
   private readonly provider: LlmProvider;
   private readonly openAiClient: OpenAI | undefined;
 
-  constructor(private readonly env: NodeJS.ProcessEnv = process.env) {
+  constructor(@Optional() private readonly env: NodeJS.ProcessEnv = process.env) {
     this.provider = (env.LLM_PROVIDER as LlmProvider) ?? 'gemini';
     if (this.provider !== 'gemini') {
       this.openAiClient = new OpenAI({
