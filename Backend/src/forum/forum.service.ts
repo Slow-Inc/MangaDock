@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import { fileTypeFromFile } from 'file-type';
 import { SupabaseService } from '../supabase/supabase.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import { saveValidatedImage } from '../common/storage/save-validated-image';
 import { ForumEventsService } from './forum-events.service';
 import {
   ForumPost,
@@ -524,29 +525,10 @@ export class ForumService {
   }
 
   async uploadImage(uid: string, tempFilePath: string, _clientMime: string): Promise<{ imageUrl: string }> {
-    // Validate by magic bytes, not the client-supplied Content-Type header
-    const detected = await fileTypeFromFile(tempFilePath);
-    if (!detected || !ALLOWED_IMAGE_MIME.has(detected.mime)) {
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed');
-    }
-    const mimeType = detected.mime;
-
-    const ext = MIME_TO_EXT[mimeType];
-    const filename = `${crypto.randomUUID()}${ext}`;
-    const key = `uploads/forum/${filename}`;
-
-    try {
-      const fileData = fs.readFileSync(tempFilePath);
-      await this.storage.put(key, fileData, { contentType: mimeType });
-      fs.unlinkSync(tempFilePath);
-    } catch (err) {
-      this.logger.error(`Forum image upload failed: ${String(err)}`);
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new InternalServerErrorException('Failed to upload image');
-    }
-
-    return { imageUrl: `/${key}` };
+    const { url } = await saveValidatedImage(this.storage, tempFilePath, 'uploads/forum', {
+      storageErrorMessage: 'Failed to upload image',
+    });
+    return { imageUrl: url };
   }
 
   async listComments(postId: string, userUid?: string): Promise<ForumComment[]> {
