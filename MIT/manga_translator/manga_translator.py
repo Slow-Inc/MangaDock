@@ -1563,14 +1563,41 @@ class MangaTranslator:
                 ctx.text_regions = regions
                 full_mask = await self._run_mask_refinement(config, ctx)
                 text_only = create_text_only_mask(img_h, img_w, regions)
-                ctx.mask = (union_refined_with_fallback(full_mask, text_only)
-                            if full_mask is not None else text_only)
+                if full_mask is not None:
+                    # A1 (leftover caption text): erase ALL ink inside verified WHITE
+                    # caption boxes only — never speech balloons, so art under a bubble
+                    # (A2) is untouched. #540: restrict_fullpage_mask clips the CRF mask
+                    # to the textlines (parity with the per-crop path) so a figure's ink
+                    # inside an oversized dialogue box is not erased (boy-ghost).
+                    from .patch_geometry import assemble_fullpage_erase_mask
+                    ctx.mask = assemble_fullpage_erase_mask(
+                        full_mask, text_only, ctx.img_rgb,
+                        restrict=getattr(config.inpainter, 'restrict_fullpage_mask', False))
+                else:
+                    ctx.mask = text_only
+                # #540: protect a figure the morph-close swept into the text mask (chibi
+                # enclosed by surrounding text) — clip to the raw glyph polygons + margin.
+                if getattr(config.inpainter, 'protect_figures', False):
+                    from .patch_geometry import protect_figure_ink
+                    ctx.mask = protect_figure_ink(ctx.mask, regions, img_h, img_w)
+                # Lever 1: dilate the erase mask wider where the local background is FLAT
+                # (kills the stroke stubs LaMa reconstructs into ghosts) but stay tight
+                # over screentone/art (preserves #248). Gated by MIT_ADAPTIVE_DILATE.
+                if getattr(config.inpainter, 'adaptive_dilate', False):
+                    from .patch_geometry import adaptive_dilate_mask
+                    ctx.mask = adaptive_dilate_mask(ctx.mask, ctx.img_rgb)
                 # #268: shrink the full-page erase mask to the ink strokes so LaMa repaints
                 # less of the textured art (smaller band). Off → unchanged.
                 if getattr(config.inpainter, 'mask_tighten', False):
                     from .patch_geometry import tighten_text_mask
                     ctx.mask = tighten_text_mask(ctx.img_rgb, ctx.mask)
                 full_inpainted = await self._run_inpainting(config, ctx)
+                # LaMa-ghost fix (user-diagnosed): on flat white caption boxes LaMa
+                # reconstructs faint text from the stroke stubs around a tight mask —
+                # replace caption ink with the box's own paper colour directly (art-gated,
+                # so a page with no white caption box is a no-op).
+                from .detection_postproc import flatten_white_captions
+                full_inpainted = flatten_white_captions(full_inpainted, ctx.img_rgb)
                 logger.info('[PatchTranslate] full-page inpaint done — patches reuse it')
             except Exception:
                 logger.warning(f"[PatchTranslate] full-page inpaint failed, per-crop fallback:\n{traceback.format_exc()}")
