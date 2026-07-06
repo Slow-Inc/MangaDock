@@ -1569,6 +1569,12 @@ class MangaTranslator:
                     # (A2) is untouched. #540: restrict_fullpage_mask clips the CRF mask
                     # to the textlines (parity with the per-crop path) so a figure's ink
                     # inside an oversized dialogue box is not erased (boy-ghost).
+                    # NOTE (scrutinize #548): the white-caption erase here + flatten below are
+                    # UNCONDITIONAL within the full-page path (they ride full_page_inpaint, not a
+                    # separate flag) — by design, matching the landing-2026-07-04 baseline. Both
+                    # are art-gated (skip any box with a large connected ink component), so a page
+                    # with no verified white caption box is a no-op. restrict/protect/adaptive stay
+                    # individually flag-gated.
                     from .patch_geometry import assemble_fullpage_erase_mask
                     ctx.mask = assemble_fullpage_erase_mask(
                         full_mask, text_only, ctx.img_rgb,
