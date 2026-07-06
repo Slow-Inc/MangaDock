@@ -43,3 +43,14 @@ def test_narration_at_flat_font_is_unaffected_by_the_width_bound():
     clean_fs_narr, _, _ = _cld((0, 0, 120, 300), 'JUST A LINE', 0)
     clean_fs_flat_only, _, _ = _cld((0, 0, 120, 300), 'X', 0)
     assert clean_fs_narr == clean_fs_flat_only, 'narration font drifted (width bound leaked into the flat path)'
+
+
+def test_big_source_narration_in_tall_column_fits_and_does_not_grow_overflow():
+    # #548 / user-2026-07-06 (One-Punch "THIS BRAT" narration): a multi-line narration whose
+    # JA source is set in LARGE vertical lettering (orig_fs 39) sits in a tall/narrow column.
+    # The grow-to-source path sized it up (block ~1.5x the source column) so the English spilled
+    # past the panel. The fit must keep the wrapped block within ~its source footprint.
+    box = (571, 22, 699, 310)          # w=128, h=288 — the real One-Punch narration box
+    clean_fs, block_w, block_h = _cld(box, "THIS BRAT DOESN'T EVEN REALIZE WHAT HE'S DONE YET", 39)
+    col_w = box[2] - box[0]
+    assert block_w <= col_w * 1.15, f'narration block_w {block_w:.0f} overflows its {col_w}px source column (grew instead of fitting)'
