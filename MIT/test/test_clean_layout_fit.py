@@ -45,6 +45,19 @@ def test_narration_at_flat_font_is_unaffected_by_the_width_bound():
     assert clean_fs_narr == clean_fs_flat_only, 'narration font drifted (width bound leaked into the flat path)'
 
 
+def test_clean_layout_font_is_flat_not_resolution_scaled():
+    # #548 scrutinize follow-up: after adopting landing's fit-to-footprint _clean_layout_dst,
+    # a flat narration (orig <= flat) sizes from font_size_max, NOT processing_scale — so it does
+    # NOT auto-inflate with page resolution (the pre-swap main behaviour). This pins the
+    # landing-2026-07-04 baseline characteristic and guards a re-introduction of grow-to-resolution.
+    text_render.set_font(_FONT)
+    def _fs(page):
+        r = SimpleNamespace(xyxy=(0, 0, 120, 300), translation='JUST A NARRATION LINE HERE',
+                            font_size=0, target_lang='en_US')
+        return _clean_layout_dst(r, page, 8, 20, page)[0]
+    assert _fs((1000, 1000)) == _fs((2800, 2000)) == 20, 'clean_layout narration font drifted with resolution (flat font_size_max expected)'
+
+
 def test_big_source_narration_in_tall_column_fits_and_does_not_grow_overflow():
     # #548 / user-2026-07-06 (One-Punch "THIS BRAT" narration): a multi-line narration whose
     # JA source is set in LARGE vertical lettering (orig_fs 39) sits in a tall/narrow column.
