@@ -424,6 +424,19 @@ class InpainterConfig(BaseModel):
     """Patch path only (#268, escalation): Poisson seamless-clone the inpainted region into the
     original (gradient-domain) so the mean-brightness band vanishes. Cannot synthesise texture
     (smudges high-freq art) — a comparison/escalation lever. Pure CPU. Off → byte-identical."""
+    protect_figures: bool = False
+    """Full-page inpaint path only (#540): keep the erase mask from swallowing a figure that
+    ``create_text_only_mask``'s dilate+MORPH_CLOSE swept in (text surrounding a small drawing
+    fills the enclosed figure). Clips the mask to the raw glyph polygons + margin. Off →
+    byte-identical."""
+    restrict_fullpage_mask: bool = False
+    """Full-page inpaint path only (#540): clip the refined (CRF) mask to the to-be-rendered
+    textlines — parity with the per-crop path — so a figure's ink inside an oversized dialogue
+    box is not erased and smeared by LaMa (boy-ghost). Off → byte-identical."""
+    adaptive_dilate: bool = False
+    """Full-page inpaint path only (Lever 1): dilate each erase-mask component wider where the
+    local background is FLAT (kills the stroke stubs LaMa reconstructs into ghosts) but stay
+    tight over screentone/art (preserves #248). Pure CPU. Off → byte-identical."""
 
 class ColorizerConfig(BaseModel):
     colorization_size: int = 576
