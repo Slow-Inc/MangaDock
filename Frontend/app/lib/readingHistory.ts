@@ -104,7 +104,10 @@ async function backfillChapterNumbers() {
         const res = await fetch(`${API_BASE}/books/manga/${mangaId}/chapters`);
         if (!res.ok) return;
         const chapters = await parseJsonArray<{ id: string; chapterNumber: string | null }>(res);
-        if (!chapters) return;
+        if (!chapters) {
+          console.warn(`[readingHistory] chapter backfill skipped for ${mangaId}: response body was not a JSON array`);
+          return;
+        }
 
         let changed = false;
         for (const b of books) {
