@@ -245,6 +245,22 @@ export class ForumService {
     ]);
 
     if (profileRes.error || !profileRes.data) throw new NotFoundException('Profile not found');
+
+    // Secondary sections degrade gracefully to empty on error, but a silently
+    // empty section is indistinguishable from a real "no data" state. Log each
+    // failure so a transient query error is observable instead of masked.
+    for (const [name, r] of [
+      ['posts', postsRes],
+      ['comments', commentsRes],
+      ['likedVotes', likedVotesRes],
+      ['versions', versionsRes],
+    ] as const) {
+      if (r.error) {
+        this.logger.warn(
+          `getPublicProfile: ${name} query failed for uid=${uid}: ${JSON.stringify(r.error)}`,
+        );
+      }
+    }
     const p = profileRes.data;
 
     // Fetch liked posts by IDs
