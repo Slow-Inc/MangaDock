@@ -202,7 +202,10 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
             angle = 0
         lines = [txtln.pts for txtln in txtlns]
         texts = [txtln.text for txtln in txtlns]
+        # #278: a merged region is det_sfx-provenance if ANY of its textlines came from the
+        # det_sfx pass — propagate so the SFX rescue gates on provenance, not a length heuristic.
+        from_sfx = any(getattr(txtln, 'is_sfx', False) for txtln in txtlns)
         region = TextBlock(lines, texts, font_size=font_size, angle=angle, prob=np.exp(total_logprobs),
-                           fg_color=fg_color, bg_color=bg_color)
+                           fg_color=fg_color, bg_color=bg_color, from_sfx_detection=from_sfx)
         text_regions.append(region)
     return text_regions

@@ -252,4 +252,16 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         self.token_count += response.usage.total_tokens
         self.token_count_last = response.usage.total_tokens
 
+        # #speed-study Phase 2c (T1, OPTIMIZATION.md): de-confound prompt vs
+        # completion tokens — total_tokens alone can't tell whether a slow
+        # translation call is prompt-bound (context/system-prompt size) or
+        # completion-bound (verbose output). The 9arm/ollama-compat gateway may
+        # not populate these fields; log 'n/a' rather than raise if absent.
+        prompt_tokens = getattr(response.usage, 'prompt_tokens', None)
+        completion_tokens = getattr(response.usage, 'completion_tokens', None)
+        self.logger.info(
+            f'Token split: prompt={prompt_tokens if prompt_tokens is not None else "n/a"} '
+            f'completion={completion_tokens if completion_tokens is not None else "n/a"}'
+        )
+
         return response.choices[0].message.content

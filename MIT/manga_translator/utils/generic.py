@@ -357,8 +357,11 @@ class Quadrilateral(object):
     """
     Helper for storing textlines that contains various helper functions.
     """
-    def __init__(self, pts: np.ndarray, text: str, prob: float, fg_r: int = 0, fg_g: int = 0, fg_b: int = 0, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0):    
+    def __init__(self, pts: np.ndarray, text: str, prob: float, fg_r: int = 0, fg_g: int = 0, fg_b: int = 0, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0, is_sfx: bool = False):
         self.pts, is_vertical = sort_pnts(pts)
+        # #278: provenance — True when appended by the det_sfx second pass (merge_sfx_detections),
+        # so the SFX rescue can fire on provenance instead of a bare ≤4-char length heuristic.
+        self.is_sfx = is_sfx
         if is_vertical:
             self.direction = 'v'
         else:
@@ -650,24 +653,58 @@ def distance_point_lineseg(p: np.ndarray, p1: np.ndarray, p2: np.ndarray):
     return np.sqrt(dx * dx + dy * dy)
 
 
+# #speed-study Phase 0 (2026-07-03): call counter to size the M1 (AABB pre-reject)
+# optimization opportunity. Logging-only, reset/read by the textline_merge dispatch.
+_QCMR_CALLS = {"n": 0}
+
+
+def reset_qcmr_calls():
+    _QCMR_CALLS["n"] = 0
+
+
+def get_qcmr_calls():
+    return _QCMR_CALLS["n"]
+
+
 def quadrilateral_can_merge_region(a: Quadrilateral, b: Quadrilateral, ratio = 1.9, discard_connection_gap = 2, char_gap_tolerance = 0.6, char_gap_tolerance2 = 1.5, font_size_ratio_tol = 1.5, aspect_ratio_tol = 2) -> bool:
+    _QCMR_CALLS["n"] += 1
     b1 = a.aabb
     b2 = b.aabb
     char_size = min(a.font_size, b.font_size)
     x1, y1, w1, h1 = b1.x, b1.y, b1.w, b1.h
     x2, y2, w2, h2 = b2.x, b2.y, b2.w, b2.h
-    # dist = rect_distance(x1, y1, x1 + w1, y1 + h1, x2, y2, x2 + w2, y2 + h2)
-    p1 = Polygon(a.pts)
-    p2 = Polygon(b.pts)
-    dist = p1.distance(p2)
-    if dist > discard_connection_gap * char_size:
-        return False
+
+    # #speed-study Phase 2a (M2): cheap scalar gates hoisted above the shapely
+    # Polygon construction + exact distance below. Each is a pure-arithmetic,
+    # side-effect-free early-return-False check independent of `dist` — an AND of
+    # independent rejects commutes, so reordering ahead of the exact geometry test
+    # is byte-identical.
     if max(a.font_size, b.font_size) / char_size > font_size_ratio_tol:
         return False
     if a.aspect_ratio > aspect_ratio_tol and b.aspect_ratio < 1. / aspect_ratio_tol:
         return False
     if b.aspect_ratio > aspect_ratio_tol and a.aspect_ratio < 1. / aspect_ratio_tol:
         return False
+
+    # #speed-study Phase 2a (M1): AABB rect-gap pre-reject before building any
+    # shapely Polygon. AABB ⊇ polygon ⇒ dist(aabbA, aabbB) ≤ dist(polyA, polyB) — so
+    # if the (cheap, cached-property-backed) AABB gap already exceeds the SAME
+    # threshold the exact polygon-distance check below uses, that exact check would
+    # reject too. Only the reject path is short-circuited; every accept still falls
+    # through to the original exact-distance code below, unchanged.
+    aabb_dx = max(x2 - (x1 + w1), x1 - (x2 + w2), 0.0)
+    aabb_dy = max(y2 - (y1 + h1), y1 - (y2 + h2), 0.0)
+    aabb_gap = (aabb_dx * aabb_dx + aabb_dy * aabb_dy) ** 0.5
+    if aabb_gap > discard_connection_gap * char_size:
+        return False
+
+    # dist = rect_distance(x1, y1, x1 + w1, y1 + h1, x2, y2, x2 + w2, y2 + h2)
+    p1 = Polygon(a.pts)
+    p2 = Polygon(b.pts)
+    dist = p1.distance(p2)
+    if dist > discard_connection_gap * char_size:
+        return False
+
     a_aa = a.is_approximate_axis_aligned
     b_aa = b.is_approximate_axis_aligned
     if a_aa and b_aa:

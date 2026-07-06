@@ -25,6 +25,7 @@ from PIL import Image
 
 from .patch_geometry import (
     build_local_region,
+    content_alpha_inner,
     create_text_only_mask,
     crop_mask_for_patch,
     expand_inpaint_crop,
@@ -119,6 +120,9 @@ class PatchRenderer:
             patch_ctx.img_alpha = None
             patch_ctx.text_regions = local_regions
             patch_ctx.mask = None
+            # #175 patch-path: carry the full-PAGE shape so clean-layout narration scales by page
+            # resolution, not this small crop (whose tiny area collapses processing_scale → tiny font).
+            patch_ctx.page_shape = (self.img_h, self.img_w)
 
             if self.full_inpainted is not None:
                 # Reuse the one-time full-page inpaint: LaMa saw the whole page, so the
@@ -244,14 +248,32 @@ class PatchRenderer:
                         f"[{type(e).__name__}]: using un-blended inpaint")
 
             # --- CPU-bound: rendering + PNG encode (outside semaphore) ---
+            # #436: text rendering mutates img_rgb (the same array as img_inpainted) in place, so
+            # keep a clean copy of the inpaint here — the content alpha diffs the rendered patch
+            # against THIS to find the newly-drawn glyphs.
+            inpaint_before_text = patch_ctx.img_inpainted.copy()
             patch_ctx.img_rgb = patch_ctx.img_inpainted
+
+            # Render A/B aid (env-gated, off in prod; mirrors MIT_DEBUG_REGROUND_DUMP above):
+            # dump the post-inpaint background + the exact text_regions entering the renderer, so a
+            # render-stage code change (e.g. the item9 wrap floor) can be A/B'd OFFLINE on the SAME
+            # regions — deterministic, no LLM/OCR jitter (feedback_benchmark_md_report_with_image).
+            _rd = _os.environ.get('MIT_DEBUG_RENDER_DUMP')
+            if _rd:
+                import pickle as _pkl
+                _os.makedirs(_rd, exist_ok=True)
+                with open(_os.path.join(_rd, f'r_{self.img_w}x{self.img_h}_{x1}_{y1}.pkl'), 'wb') as _f:
+                    _pkl.dump({'inpainted': inpaint_before_text, 'regions': patch_ctx.text_regions,
+                               'page_shape': patch_ctx.page_shape, 'x1': x1, 'y1': y1,
+                               'img_w': self.img_w, 'img_h': self.img_h}, _f)
 
             try:
                 patch_ctx.img_rendered = await driver._run_text_rendering(config, patch_ctx)
             except Exception as e:
                 logger.warning(
                     f"[PatchTranslate] rendering failed for group ({x1},{y1},{x2},{y2}) "
-                    f"[{type(e).__name__}]: using inpaint-only patch"
+                    f"[{type(e).__name__}]: using inpaint-only patch",
+                    exc_info=True
                 )
                 patch_ctx.img_rendered = patch_ctx.img_inpainted
 
@@ -262,13 +284,27 @@ class PatchRenderer:
             # → hard-alpha patch, byte-identical to before.
             feather = None
             feather_radius = int(getattr(config.render, 'patch_feather_radius', 0) or 0)
-            if feather_radius > 0:
+            content_alpha = bool(getattr(config.render, 'patch_content_alpha', False))
+            if feather_radius > 0 or content_alpha:
                 ph, pw = patch_ctx.img_rendered.shape[:2]
                 r = min(feather_radius, (ph - 1) // 2, (pw - 1) // 2)
-                if r > 0:
+                inner = None
+                if content_alpha:
+                    # #436: opaque only over THIS patch's own content — its new glyphs (rendered vs
+                    # the text-free inpaint) + its own original-text erase mask — so the rectangular
+                    # margins (incl. neighbour text the full-page inpaint erased) stay transparent
+                    # and an overlapping balloon's later patch no longer re-occludes this one's text.
+                    # None → shape mismatch → fall back to the rectangle below.
+                    own_mask = getattr(patch_ctx, 'mask', None)
+                    if own_mask is None:
+                        own_mask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
+                    inner = content_alpha_inner(patch_ctx.img_rendered, inpaint_before_text,
+                                                own_mask=own_mask)
+                if inner is None and r > 0:
                     inner = np.zeros((ph, pw), dtype=np.uint8)
                     inner[r:ph - r, r:pw - r] = 255
-                    feather = feather_alpha(inner, r)
+                if inner is not None:
+                    feather = feather_alpha(inner, max(r, 1))
 
             # Offload PNG compression to thread pool to avoid blocking the event loop.
             # compress_level=1 is ~10x faster than optimize=True with ~15% larger file —

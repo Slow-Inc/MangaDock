@@ -2,17 +2,19 @@ name: MIT CI
 
 # Runs the MIT (Python) pytest suite on PRs/pushes that touch MIT/.
 #
-# ⚠️ PROVISIONAL — report-only (continue-on-error). It does NOT block merges yet.
+# Two jobs since #359 lazy-imported torch:
 #
-# Why: manga_translator/__init__.py eagerly `import torch`, so even pure-logic
-# tests pull in the full ML stack. CI therefore has to install torch + cv2 +
-# transformers + diffusers (multi-GB, slow) just to run a font-fit unit test,
-# and a few suites (flux/ocr/render) may still need models or a GPU.
+#   • logic — the BLOCKING gate. Installs the lightweight deps only (no torch /
+#     torchvision / transformers / diffusers / ...), so the torch-free logic suite
+#     runs in seconds. test/conftest.py auto-skips the torch-only modules when torch
+#     is absent, so collection doesn't error.
+#   • heavy — report-only (continue-on-error). Full ML install; runs the suites that
+#     genuinely need torch/models (det forward, flux inpainter, translators, pipeline).
+#     Stays non-blocking until it's reliably green on a CI runner without a GPU.
 #
-# Proper fix (tracked separately): lazy-import torch inside manga_translator so
-# the ~80 logic tests run torch-free in <1s — same pattern the repo already uses
-# for server/webhook.py. Once that lands, drop `continue-on-error` below to make
-# this a real blocking gate, and narrow the install to the lightweight deps.
+# Background: manga_translator/__init__.py used to eagerly `import torch`, so every
+# pure-logic test pulled in the multi-GB ML stack. #359 made the package + utils
+# imports lazy (PEP 562 __getattr__), so the logic gate no longer needs torch.
 on:
   pull_request:
     paths:
@@ -25,10 +27,9 @@ on:
       - '.github/workflows/mit-ci.yml'
 
 jobs:
-  test:
-    name: pytest (report-only)
+  logic:
+    name: pytest (logic gate, torch-free)
     runs-on: ubuntu-latest
-    continue-on-error: true        # ← flip to remove once torch is lazy-imported
     defaults:
       run:
         working-directory: MIT
@@ -45,6 +46,38 @@ jobs:
       - name: System libs for OpenCV
         run: sudo apt-get update && sudo apt-get install -y libgl1
 
+      # Lightweight install: requirements.txt MINUS the multi-GB ML stack. The lazy
+      # import (#359) means the logic suite never imports these; conftest skips the
+      # torch-only test modules. The filter is transparent on purpose — if a logic
+      # test ever needs a filtered package, this job goes red and the line is dropped.
+      - name: Install lightweight deps (no torch/transformers/diffusers)
+        run: |
+          python -m pip install --upgrade pip
+          grep -viE '^(torch|torchvision|torch-summary|transformers|diffusers|gguf|bitsandbytes|accelerate|ctranslate2|onnxruntime|ultralytics|manga-ocr|kornia|timm|rusty-manga-image-translator|--extra-index-url)' requirements.txt > requirements-logic.txt
+          pip install -r requirements-logic.txt -r requirements-dev.txt
+
+      - name: Run torch-free logic suite
+        run: pytest test/ -q
+
+  heavy:
+    name: pytest (heavy ML, report-only)
+    runs-on: ubuntu-latest
+    continue-on-error: true        # opt-in: needs models/GPU; flip once green without a GPU
+    defaults:
+      run:
+        working-directory: MIT
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: System libs for OpenCV
+        run: sudo apt-get update && sudo apt-get install -y libgl1
+
       # CPU-only torch keeps the install size sane (the CUDA wheel is ~2GB).
       - name: Install dependencies
         run: |
@@ -52,5 +85,5 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Run tests
+      - name: Run full suite
         run: pytest test/ -q

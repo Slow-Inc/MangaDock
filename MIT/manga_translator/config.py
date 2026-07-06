@@ -190,11 +190,27 @@ class RenderConfig(BaseModel):
     small absolute font instead of warping it onto the original (often tall/vertical)
     detection quad — the warp stretches English oversized and overflowing. Pairs with
     font_size_max as the absolute font. Off → byte-identical."""
+    reference_layout: bool = False
+    """#178 Phase-4: size clean-layout regions with the MangaTranslator-parity fit — binary-search
+    the font from the flat cap DOWN to the largest that fits BOTH axes of the balloon safe interior
+    (or the detection box for narration), keeping words whole. Replaces the source-column-referenced
+    clean_layout sizing for these regions. Requires clean_layout. Off → byte-identical."""
+    knuth_plass: bool = False
+    """#180 P8: use the Knuth-Plass holistic line-breaker (balanced columns, no mid-word/name splits)
+    instead of the greedy packer, for every calc_horizontal call in the render pass. Off → the greedy
+    GreedyLineBreaker default (byte-identical)."""
     patch_feather_radius: int = 0
     """#173: feather the outer N px of each composited patch to a transparent
     alpha (distance-transform ramp) so the rectangular patch edge blends into the
     page instead of showing a seam. The crop has a ≥120px content margin, so the
     fade never touches rendered text. 0 → hard-alpha patch (byte-identical)."""
+    patch_content_alpha: bool = False
+    """#436: make each patch opaque only over the pixels it actually CHANGED (original ink the
+    inpaint erased + the new glyphs), transparent over the rest of its rectangle. Two overlapping
+    speech balloons each emit a rectangular patch; without this the one composited last repaints
+    its whole opaque rectangle of clean background over the other balloon's text (it renders
+    empty). With it the rectangular margins are transparent so the neighbour's text survives.
+    Off → full-rectangle (feathered) patch, byte-identical."""
     direction: Direction = Direction.auto
     """Force text to be rendered horizontally/vertically/none"""
     uppercase: bool = False
@@ -362,6 +378,11 @@ class DetectorConfig(BaseModel):
     """#170: run a speech-balloon segmentation YOLO alongside the text detector
     and tag each text-line region with its balloon mask (renderer area,
     mask-aware crop, OCR scoping). Off → pipeline byte-identical."""
+    det_bubble_synth: bool = False
+    """#170/#178: when det_bubble_seg misses a region's balloon (YOLO recall gap on oval/tall
+    bubbles → dialogue treated as narration + under-filled), synthesize one with a classical
+    flood-fill, accepted only through acceptable_synth_bubble (encloses text, not a page leak).
+    Requires det_bubble_seg. Off → byte-identical."""
     det_sfx: bool = False
     """#168: run a second SFX/display-text detector (AnimeText YOLO) after DBNet
     and merge its boxes (IoA dedup) into the textline flow, so stylized katakana
@@ -403,6 +424,19 @@ class InpainterConfig(BaseModel):
     """Patch path only (#268, escalation): Poisson seamless-clone the inpainted region into the
     original (gradient-domain) so the mean-brightness band vanishes. Cannot synthesise texture
     (smudges high-freq art) — a comparison/escalation lever. Pure CPU. Off → byte-identical."""
+    protect_figures: bool = False
+    """Full-page inpaint path only (#540): keep the erase mask from swallowing a figure that
+    ``create_text_only_mask``'s dilate+MORPH_CLOSE swept in (text surrounding a small drawing
+    fills the enclosed figure). Clips the mask to the raw glyph polygons + margin. Off →
+    byte-identical."""
+    restrict_fullpage_mask: bool = False
+    """Full-page inpaint path only (#540): clip the refined (CRF) mask to the to-be-rendered
+    textlines — parity with the per-crop path — so a figure's ink inside an oversized dialogue
+    box is not erased and smeared by LaMa (boy-ghost). Off → byte-identical."""
+    adaptive_dilate: bool = False
+    """Full-page inpaint path only (Lever 1): dilate each erase-mask component wider where the
+    local background is FLAT (kills the stroke stubs LaMa reconstructs into ghosts) but stay
+    tight over screentone/art (preserves #248). Pure CPU. Off → byte-identical."""
 
 class ColorizerConfig(BaseModel):
     colorization_size: int = 576

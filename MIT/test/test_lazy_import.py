@@ -1,0 +1,96 @@
+"""#359 — importing the `manga_translator` package must not eagerly load torch.
+
+`manga_translator/__init__.py` used to run `from .manga_translator import *`, dragging
+torch + cv2 + transformers + diffusers (multi-GB) into EVERY import — even a pure-logic
+test that only touches `config`/`textline_merge`/`ocr_vlm`. That made the CI logic gate
+slow and forced `mit-ci` to stay report-only. PEP 562 `__getattr__` forwards the public
+API lazily, so importing the package (or a lightweight submodule) stays torch-free while
+`from manga_translator import Config/MangaTranslator/...` still resolves on first access.
+
+Both checks run the heavy import in a CHILD interpreter (subprocess) so this test file
+itself imports nothing heavy and belongs in the torch-free logic suite. The child prints a
+`RESULT=<x>` sentinel so an unrelated startup banner on stdout can't confuse the parse.
+"""
+import importlib.util
+import os
+import re
+import subprocess
+import sys
+
+import pytest
+
+_MIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# The torch-free tests below assert the package imports WITHOUT torch (they must run in the
+# lightweight logic gate). The characterization tests, by contrast, RESOLVE the heavy public
+# API (which loads the impl module → imports torch), so they can only run where torch is
+# installed (local dev / the heavy CI job). Skip those when torch is absent.
+_HAS_TORCH = importlib.util.find_spec('torch') is not None
+requires_torch = pytest.mark.skipif(not _HAS_TORCH, reason="resolves the heavy API; needs torch")
+
+
+def _result(code: str) -> str:
+    """Run `code` in a child interpreter; return the value it prints as `RESULT=<value>`."""
+    env = dict(os.environ, PYTHONPATH=_MIT_ROOT, PYTHONIOENCODING='utf-8')
+    out = subprocess.run([sys.executable, '-c', code], capture_output=True,
+                         encoding='utf-8', errors='replace', env=env)
+    assert out.returncode == 0, f"child failed:\n{out.stderr[-1500:]}"
+    m = re.search(r'^RESULT=(.*)$', out.stdout, re.MULTILINE)
+    assert m, f"no RESULT sentinel in child stdout:\n{out.stdout[-800:]}\n{out.stderr[-800:]}"
+    return m.group(1).strip()
+
+
+def test_importing_package_is_torch_free():
+    # The goal: a bare `import manga_translator` must not pull torch into sys.modules.
+    got = _result("import manga_translator, sys; print('RESULT=' + str('torch' in sys.modules))")
+    assert got == 'False', f"torch leaked on `import manga_translator` (got {got})"
+
+
+def test_importing_lightweight_submodule_is_torch_free():
+    # The payoff: pure-logic tests import lightweight submodules — those must stay torch-free.
+    got = _result("from manga_translator.config import Config; import sys; "
+                  "print('RESULT=' + str('torch' in sys.modules))")
+    assert got == 'False', f"torch leaked via `from manga_translator.config import Config` (got {got})"
+
+
+def test_importing_utils_subpackage_is_torch_free():
+    # `manga_translator.utils.__init__` used to eager-import `.inference` (the only torch
+    # puller in utils), so any `from manga_translator.utils import X` pulled torch. It is now
+    # lazy — importing the utils subpackage (or a sibling like .generic/.textblock) is torch-free.
+    got = _result("import manga_translator.utils, sys; print('RESULT=' + str('torch' in sys.modules))")
+    assert got == 'False', f"torch leaked on `import manga_translator.utils` (got {got})"
+
+
+@requires_torch
+def test_utils_still_reexports_inference_names_lazily():
+    # Characterization: model wrappers do `from manga_translator.utils import ModelWrapper,
+    # InfererModule` — those (from .inference) must still resolve, just lazily.
+    code = (
+        "from manga_translator.utils import ModelWrapper, InfererModule\n"
+        "from manga_translator.utils import TextBlock, Quadrilateral\n"  # eager submodules still work
+        "print('RESULT=ok')\n"
+    )
+    assert _result(code) == 'ok', "utils no longer re-exports inference / eager names"
+
+
+@requires_torch
+def test_translators_subpackage_imports_without_circular_error():
+    # #359 regression guard: lazy package init must not expose the chatgpt -> `from ..
+    # import manga_translator` -> manga_translator.py -> `from .translators import dispatch`
+    # cycle. Importing a translators submodule standalone must succeed (it failed with
+    # "cannot import name 'dispatch' from partially initialized module ...translators").
+    got = _result("from manga_translator.translators.config_gpt import ConfigGPT; print('RESULT=ok')")
+    assert got == 'ok', "translators subpackage hit a circular import under lazy package init"
+
+
+@requires_torch
+def test_package_still_reexports_consumed_public_api():
+    # Characterization: the names server/ + mode/ import via `from manga_translator import X`
+    # must still resolve to the SAME objects as the implementation module (passes eager & lazy).
+    code = (
+        "import manga_translator as p\n"
+        "from manga_translator import manga_translator as m\n"
+        "names = ['Config', 'Context', 'MangaTranslator', 'TranslationInterrupt', 'logger']\n"
+        "print('RESULT=' + str(all(getattr(p, n) is getattr(m, n) for n in names)))\n"
+    )
+    assert _result(code) == 'True', "package no longer re-exports the consumed public API"
