@@ -6,12 +6,10 @@ import Image from "next/image";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useStudioUpload, validateReadyToFinish } from "../../hooks/useStudioUpload";
-import { StudioBook, getBookCoverUrl } from "../../lib/studioApi";
+import { StudioBook, getBookCoverUrl, getVersion } from "../../lib/studioApi";
 import { resolvedThumbnail } from "../../lib/imgUrl";
 import { StudioSelect } from "../components/StudioSelect";
 import { MangaPickerModal } from "../components/MangaPickerModal";
-
-const API_BASE = "/api/proxy";
 
 const SUPPORTED_LANGUAGES = [
   { code: "th", label: "ภาษาไทย" },
@@ -25,21 +23,6 @@ const SUPPORTED_LANGUAGES = [
   { code: "pt", label: "Português" },
   { code: "id", label: "Bahasa Indonesia" },
 ];
-
-type ExistingVersion = {
-  versionId: string;
-  titleId: string;
-  titleName: string;
-  titleAltName?: string;
-  chapterId: string;
-  chapterNumber: string;
-  chapterTitle: string;
-  language: string;
-  description: string | null;
-  pages: string[];
-  status: string;
-  priceCoins: number;
-};
 
 import { Suspense } from "react";
 
@@ -129,11 +112,10 @@ function StudioUploadContent() {
     getIdTokenRef.current().then(async (token) => {
       try {
         if (!token) return;
-        const res = await fetch(`${API_BASE}/versions/${existingVersionId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const data: ExistingVersion = await res.json();
+        // Routed through studioApi.getVersion so this HWID-gated /versions/:id
+        // read carries x-hardware-id (previously a raw fetch → 401 → the edit
+        // form silently never loaded). getVersion throws on !ok → the catch below.
+        const data = await getVersion(token, existingVersionId);
         setTitleId(data.titleId);
         setTitleName(data.titleName);
         setTitleAltName(data.titleAltName ?? "");

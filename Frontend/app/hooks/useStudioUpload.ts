@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-
-const API_BASE = "/api/proxy";
+import { createVersion, uploadPage, deletePage as apiDeletePage, updateVersionMetadata } from "../lib/studioApi";
 
 export type PageItem = {
   url: string;
@@ -147,30 +146,27 @@ export function useStudioUpload({
       throw new Error("กรุณาเลือกมังงะและภาษาก่อน");
     }
 
-    const creation = fetch(`${API_BASE}/versions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        titleId,
-        titleName,
-        chapterId,
-        chapterNumber,
-        chapterTitle,
-        language,
-        description,
-        priceCoins: Number(priceCoins) || 0,
-      }),
-    }).then(async (res) => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message ?? "ไม่สามารถสร้างงานแปลได้");
-      }
-      const data = await res.json();
-      setVersionId(data.versionId);
-      return data.versionId as string;
-    }).finally(() => {
-      ensureVersionPromiseRef.current = null;
-    });
+    const creation = createVersion(token, {
+      titleId,
+      titleName,
+      chapterId,
+      chapterNumber,
+      chapterTitle,
+      language,
+      description,
+      priceCoins: Number(priceCoins) || 0,
+    })
+      .then((v) => {
+        setVersionId(v.versionId);
+        return v.versionId;
+      })
+      .catch((e: unknown) => {
+        // Preserve the original "backend message, else Thai fallback" behaviour.
+        throw new Error(e instanceof Error && e.message ? e.message : "ไม่สามารถสร้างงานแปลได้");
+      })
+      .finally(() => {
+        ensureVersionPromiseRef.current = null;
+      });
 
     ensureVersionPromiseRef.current = creation;
     return creation;
@@ -188,18 +184,7 @@ export function useStudioUpload({
         if (!token) throw new Error("ไม่พบ token");
         const vid = await ensureVersion(token);
 
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch(`${API_BASE}/upload/versions/${vid}/pages`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err?.message ?? "อัปโหลดไม่สำเร็จ");
-        }
-        const { pageUrl } = await res.json();
+        const { pageUrl } = await uploadPage(token, vid, file);
         // Replace the placeholder with the real server URL, then revoke the
         // blob so it doesn't leak — we now have the permanent URL.
         setPages((prev) => replacePlaceholder(prev, placeholderUrl, pageUrl));
@@ -262,18 +247,10 @@ export function useStudioUpload({
       try {
         const token = await getIdTokenRef.current();
         if (!token) throw new Error("ไม่พบ token");
-        const res = await fetch(`${API_BASE}/upload/versions/${versionId}/pages`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ pageUrl }),
-        });
-        if (!res.ok) {
-          showToast({ message: "ไม่สามารถลบหน้าได้" });
-          return;
-        }
+        await apiDeletePage(token, versionId, pageUrl);
         setPages((prev) => removePageByUrl(prev, pageUrl));
       } catch {
-        showToast({ message: "เกิดข้อผิดพลาด" });
+        showToast({ message: "ไม่สามารถลบหน้าได้" });
       }
     },
     [user, versionId, showToast]
@@ -286,18 +263,13 @@ export function useStudioUpload({
       const token = await getIdTokenRef.current();
       if (!token) throw new Error("ไม่พบ token");
       const { description, priceCoins } = getVersionMetadataRef.current();
-      const res = await fetch(`${API_BASE}/versions/${versionId}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ description, priceCoins: Number(priceCoins) || 0 }),
+      await updateVersionMetadata(token, versionId, {
+        description,
+        priceCoins: Number(priceCoins) || 0,
       });
-      if (!res.ok) {
-        showToast({ type: "error", message: "บันทึกไม่สำเร็จ" });
-        return;
-      }
       showToast({ type: "success", message: "บันทึกแล้ว" });
     } catch {
-      showToast({ type: "error", message: "เกิดข้อผิดพลาด" });
+      showToast({ type: "error", message: "บันทึกไม่สำเร็จ" });
     } finally {
       setSaving(false);
     }
