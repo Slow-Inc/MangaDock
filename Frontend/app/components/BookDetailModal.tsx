@@ -246,9 +246,16 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       cacheOrFetch<MangaDetail>(
         `manga:${book.id}:modal-detail${forceLocal ? ":local" : ""}`,
         () =>
-          fetch(`${API_BASE}/books/manga/${book.id}${qs}`).then((r) => {
+          fetch(`${API_BASE}/books/manga/${book.id}${qs}`).then(async (r) => {
             if (!r.ok) throw new Error("detail fetch failed");
-            return r.json();
+            const d: MangaDetail = await r.json();
+            // Guard render's `[...detail.authors, ...detail.artists]` spread — a
+            // 200-with-bad-shape must throw (not cache), else it would crash the
+            // render for the whole TTL on every reopen.
+            if (!Array.isArray(d.authors) || !Array.isArray(d.artists)) {
+              throw new Error("detail shape invalid");
+            }
+            return d;
           }),
         TTL.LONG,
       )
@@ -270,9 +277,13 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
         cacheOrFetch<MangaChapter[]>(
           `manga:${book.id}:chapters${forceLocal ? ":local" : ""}`,
           () =>
-            apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => {
+            apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then(async (r) => {
               if (!r.ok) throw new Error("chapters fetch failed");
-              return r.json();
+              const data = await r.json();
+              // The merge below does mangaDexChapters.map(...); a 200-with-non-array
+              // must throw (not cache) so a contract violation can't stick per-TTL.
+              if (!Array.isArray(data)) throw new Error("chapters shape invalid");
+              return data as MangaChapter[];
             }),
           TTL.MEDIUM,
         ),
