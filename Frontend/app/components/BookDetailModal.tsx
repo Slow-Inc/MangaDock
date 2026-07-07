@@ -13,6 +13,9 @@ import { useBookActions } from "../hooks/useBookActions";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { useChapterUnlock } from "../hooks/useChapterUnlock";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
+import { apiFetch } from "../lib/apiFetch";
+import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { translateDescription } from "../lib/translateDescription";
 import { chapterAccess } from "../lib/chapterAccess";
 import { useAuth } from "../contexts/AuthContext";
 import MangaDiscussion from "./MangaDiscussion";
@@ -213,6 +216,20 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     window.addEventListener("popstate", onPop);
     if (!asPage) document.body.style.overflow = "hidden";
 
+    // Auto-translate description (#151) via the shared cached helper (F7): start
+    // from the card's description, only falling back to the detail fetch's when
+    // the card had none. The helper throws on failure / no-translation, so the
+    // .catch keeps the original text shown.
+    const translateDesc = (text: string) => {
+      setTranslatingDesc(true);
+      translateDescription(text)
+        .then((t) => {
+          setTranslatedDesc(t);
+          setTranslatingDesc(false);
+        })
+        .catch(() => setTranslatingDesc(false));
+    };
+
     if (isManga) {
       setLoadingDetail(true);
       setLoadingChapters(true);
@@ -220,23 +237,22 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       const forceLocal = localStorage.getItem("imgCacheForceLocal") === "1";
       const qs = forceLocal ? "?forceLocal=true" : "";
 
-      // Auto-translate description (#151): start immediately from the card's
-      // description — only wait for the detail fetch when the card had none.
-      const translateDesc = (text: string) => {
-        setTranslatingDesc(true);
-        fetch(`${API_BASE}/books/translate?text=${encodeURIComponent(text)}`)
-          .then((r) => r.json())
-          .then((trans: { translatedText: string; translated: boolean }) => {
-            if (trans.translated) setTranslatedDesc(trans.translatedText);
-            setTranslatingDesc(false);
-          })
-          .catch(() => setTranslatingDesc(false));
-      };
       if (book.description) translateDesc(book.description);
 
-      fetch(`${API_BASE}/books/manga/${book.id}${qs}`)
-        .then((r) => r.json())
-        .then((d: MangaDetail) => {
+      // Detail (covers/genres/authors) — cacheable, TTL.LONG. Distinct
+      // `modal-detail` key (not the community page's `manga:{id}:detail`): that
+      // fetcher caches null on !ok, which would poison this .then's `d.description`
+      // read. forceLocal gets its own key because it changes the cover URLs.
+      cacheOrFetch<MangaDetail>(
+        `manga:${book.id}:modal-detail${forceLocal ? ":local" : ""}`,
+        () =>
+          fetch(`${API_BASE}/books/manga/${book.id}${qs}`).then((r) => {
+            if (!r.ok) throw new Error("detail fetch failed");
+            return r.json();
+          }),
+        TTL.LONG,
+      )
+        .then((d) => {
           setDetail(d);
           setLoadingDetail(false);
           if (!book.description && d.description) translateDesc(d.description);
@@ -245,9 +261,22 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
       // Chapters + user versions in parallel (#151) — independent requests
       // that were a pure waterfall before (versions only merges at the end).
+      // Chapters list: cacheable (TTL.MEDIUM); via apiFetch for parity with the
+      // canonical useChapters hook (the route itself is not HWID-gated).
+      // Versions: via apiFetch because /versions/* IS HWID-gated — a plain fetch
+      // 401s, so user-uploaded chapters would silently never appear. Not cached
+      // (prices / new uploads must stay fresh).
       Promise.all([
-        fetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => r.json()),
-        fetch(`${API_BASE}/versions/title/${book.id}`)
+        cacheOrFetch<MangaChapter[]>(
+          `manga:${book.id}:chapters${forceLocal ? ":local" : ""}`,
+          () =>
+            apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => {
+              if (!r.ok) throw new Error("chapters fetch failed");
+              return r.json();
+            }),
+          TTL.MEDIUM,
+        ),
+        apiFetch(`${API_BASE}/versions/title/${book.id}`)
           .then((r) => (r.ok ? r.json() : []))
           .catch(() => []), // versions failure → MangaDex chapters only
       ])
@@ -284,16 +313,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
         .catch(() => setLoadingChapters(false));
     } else {
       // For non-manga, translate immediately
-      if (book.description) {
-        setTranslatingDesc(true);
-        fetch(`${API_BASE}/books/translate?text=${encodeURIComponent(book.description)}`)
-          .then((r) => r.json())
-          .then((d: { translatedText: string; translated: boolean }) => {
-            if (d.translated) setTranslatedDesc(d.translatedText);
-            setTranslatingDesc(false);
-          })
-          .catch(() => setTranslatingDesc(false));
-      }
+      if (book.description) translateDesc(book.description);
     }
 
     return () => {
