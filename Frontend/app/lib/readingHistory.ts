@@ -10,6 +10,7 @@
  *  4. On login, AuthContext calls loadHistoryData() to restore history.
  */
 
+import { apiFetch } from "./apiFetch";
 import { createAuthHeaders } from "./apiUtils";
 import { parseJsonArray } from "./safeJson";
 
@@ -101,7 +102,7 @@ async function backfillChapterNumbers() {
   await Promise.allSettled(
     uniqueMangaIds.map(async (mangaId) => {
       try {
-        const res = await fetch(`${API_BASE}/books/manga/${mangaId}/chapters`);
+        const res = await apiFetch(`${API_BASE}/books/manga/${mangaId}/chapters`);
         if (!res.ok) return;
         const chapters = await parseJsonArray<{ id: string; chapterNumber: string | null }>(res);
         if (!chapters) {
