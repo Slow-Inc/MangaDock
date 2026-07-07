@@ -68,7 +68,13 @@ export function checkScrutinizeVerdict({ prBody = '', headSha = '', branch = '' 
   }
 
   const head = headSha.toLowerCase();
-  const fresh = head.startsWith(commit) || commit.startsWith(head);
+  if (head.length < MIN_SHA) {
+    return { ok: false, verdict, commit, reason: 'no HEAD sha provided — cannot verify the verdict is not stale' };
+  }
+  // The recorded commit must be a prefix of the full HEAD sha. Only this direction: HEAD is
+  // always the full 40 chars, so `commit.startsWith(head)` would only ever be true for an empty
+  // head — a silent bypass (every commit "fresh"). Intentionally omitted.
+  const fresh = head.startsWith(commit);
   if (!fresh) {
     return {
       ok: false,

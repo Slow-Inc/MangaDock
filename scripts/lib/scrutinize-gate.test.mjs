@@ -83,6 +83,14 @@ test('an unknown verdict value fails', () => {
   assert.equal(r.ok, false);
 });
 
+test('an empty HEAD sha cannot be verified and fails (no bypass via startsWith(""))', () => {
+  // If CI fails to pass HEAD_SHA and git rev-parse returns '', a naive prefix check
+  // (commit.startsWith(head)) would treat every commit as fresh — a silent gate bypass.
+  const body = `<!-- scrutinize verdict=ship commit=${HEAD} -->`;
+  const r = checkScrutinizeVerdict({ prBody: body, headSha: '', branch: 'feat/1-x' });
+  assert.equal(r.ok, false);
+});
+
 test('a wip/ freeze branch is exempt', () => {
   const r = checkScrutinizeVerdict({ prBody: 'no verdict here', headSha: HEAD, branch: 'wip/perf-freeze' });
   assert.equal(r.ok, true);
