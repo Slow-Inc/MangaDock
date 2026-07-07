@@ -1,9 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, InternalServerErrorException, Inject } from '@nestjs/common';
-import * as fs from 'fs';
-import * as crypto from 'crypto';
-import { fileTypeFromFile } from 'file-type';
 import { SupabaseService } from '../supabase/supabase.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import { saveValidatedImage } from '../common/storage/save-validated-image';
 import { ForumEventsService } from './forum-events.service';
 import {
   ForumPost,
@@ -21,14 +19,6 @@ import {
   UserProfileEarnings,
   UserProfileResponse,
 } from './forum.types';
-
-const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const MIME_TO_EXT: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-};
 
 type ForumPostRow = {
   id: string;
@@ -479,35 +469,14 @@ export class ForumService {
   }
 
   async uploadBanner(uid: string, tempFilePath: string, _clientMime: string): Promise<{ bannerUrl: string }> {
-    // Validate by magic bytes, not the client-supplied Content-Type header
-    const detected = await fileTypeFromFile(tempFilePath);
-    if (!detected || !ALLOWED_IMAGE_MIME.has(detected.mime)) {
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed');
-    }
-    const mimeType = detected.mime;
-
-    const ext = MIME_TO_EXT[mimeType];
-    const filename = `${crypto.randomUUID()}${ext}`;
-    const key = `uploads/banners/${filename}`;
-
-    try {
-      const fileData = fs.readFileSync(tempFilePath);
-      await this.storage.put(key, fileData, { contentType: mimeType });
-      fs.unlinkSync(tempFilePath);
-    } catch (err) {
-      this.logger.error(`Banner upload failed: ${String(err)}`);
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new InternalServerErrorException('Failed to upload banner');
-    }
-
-    const bannerUrl = `/${key}`;
+    const { url: bannerUrl } = await saveValidatedImage(this.storage, tempFilePath, 'uploads/banners', {
+      storageErrorMessage: 'Failed to upload banner',
+    });
 
     const { error } = await this.db
       .from('profiles')
       .update({ banner_url: bannerUrl })
       .eq('uid', uid);
-
     if (error) throw new InternalServerErrorException(`Failed to update profile banner: ${error.message}`);
 
     return { bannerUrl };
@@ -524,29 +493,10 @@ export class ForumService {
   }
 
   async uploadImage(uid: string, tempFilePath: string, _clientMime: string): Promise<{ imageUrl: string }> {
-    // Validate by magic bytes, not the client-supplied Content-Type header
-    const detected = await fileTypeFromFile(tempFilePath);
-    if (!detected || !ALLOWED_IMAGE_MIME.has(detected.mime)) {
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed');
-    }
-    const mimeType = detected.mime;
-
-    const ext = MIME_TO_EXT[mimeType];
-    const filename = `${crypto.randomUUID()}${ext}`;
-    const key = `uploads/forum/${filename}`;
-
-    try {
-      const fileData = fs.readFileSync(tempFilePath);
-      await this.storage.put(key, fileData, { contentType: mimeType });
-      fs.unlinkSync(tempFilePath);
-    } catch (err) {
-      this.logger.error(`Forum image upload failed: ${String(err)}`);
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new InternalServerErrorException('Failed to upload image');
-    }
-
-    return { imageUrl: `/${key}` };
+    const { url } = await saveValidatedImage(this.storage, tempFilePath, 'uploads/forum', {
+      storageErrorMessage: 'Failed to upload image',
+    });
+    return { imageUrl: url };
   }
 
   async listComments(postId: string, userUid?: string): Promise<ForumComment[]> {
