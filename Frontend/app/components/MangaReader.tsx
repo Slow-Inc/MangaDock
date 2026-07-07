@@ -12,7 +12,8 @@ import { formatEta, pillMainText, stageLabel } from "../lib/translationStages";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { apiFetch } from "../lib/apiFetch";
 import { useChapters, type ChapterPageItem } from "../hooks/useChapters";
-import { ZOOM_MIN, ZOOM_MAX, zoomInLevel, zoomOutLevel } from "../lib/zoomLevel";
+import { ZOOM_MIN, ZOOM_MAX } from "../lib/zoomLevel";
+import { useZoomPan } from "../hooks/useZoomPan";
 
 type ChapterPages = {
   pages: string[];
@@ -194,10 +195,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       : null;
   const [imgLoading, setImgLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
   // Default to continuous mode on mobile (< 640px) for better UX
   const [continuousMode, setContinuousMode] = useState(() =>
     typeof window !== "undefined" && window.innerWidth < 640
@@ -263,20 +260,13 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     return () => document.removeEventListener("mousedown", handler);
   }, [moreMenuOpen]);
 
-  const zoomRef = useRef(1);
   const continuousModeRef = useRef(false);
-  const isZoomingRef = useRef(false);
-  const zoomingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const zoomWrapperRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const continuousContentRef = useRef<HTMLDivElement>(null);
   const continuousLenisRef = useRef<Lenis | null>(null);
   const pageRefs = useRef<(HTMLImageElement | null)[]>([]);
   const stripScrollRef = useRef<HTMLDivElement>(null);
   const activeStripBtnRef = useRef<HTMLButtonElement>(null);
-  const dragging = useRef(false);
-  const lastPos = useRef({ x: 0, y: 0 });
-  const panRef = useRef({ x: 0, y: 0 });
 
   useLocalLenis(scrollContainerRef, "vertical", continuousMode, continuousLenisRef, continuousContentRef);
   useLocalLenis(pickerScrollRef, "vertical", pickerMounted && pickerVisible);
@@ -307,89 +297,25 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     }
   }, []);
 
-  const getContinuousZoomAnchor = useCallback(() => {
-    if (!continuousModeRef.current) return null;
-    const container = scrollContainerRef.current;
-    if (!container) return null;
-
-    const containerRect = container.getBoundingClientRect();
-    const viewportTop = containerRect.top + 1;
-    let anchorIndex = -1;
-    let anchorBlock: HTMLElement | null = null;
-
-    for (let idx = 0; idx < pageRefs.current.length; idx += 1) {
-      const img = pageRefs.current[idx];
-      if (!img) continue;
-      const block = img.parentElement as HTMLElement | null;
-      if (!block) continue;
-      const rect = block.getBoundingClientRect();
-      if (rect.top <= viewportTop && rect.bottom > viewportTop) {
-        anchorIndex = idx;
-        anchorBlock = block;
-        break;
-      }
-    }
-
-    if (anchorIndex === -1) {
-      for (let idx = 0; idx < pageRefs.current.length; idx += 1) {
-        const img = pageRefs.current[idx];
-        if (!img) continue;
-        const block = img.parentElement as HTMLElement | null;
-        if (!block) continue;
-        const rect = block.getBoundingClientRect();
-        if (rect.bottom > containerRect.top) {
-          anchorIndex = idx;
-          anchorBlock = block;
-          break;
-        }
-      }
-    }
-
-    if (anchorIndex === -1 || !anchorBlock) return null;
-
-    const blockRect = anchorBlock.getBoundingClientRect();
-    const blockTopInViewport = blockRect.top - containerRect.top;
-    const blockBottomInViewport = blockRect.bottom - containerRect.top;
-    const viewportAnchorPx = blockTopInViewport <= 0
-      ? 0
-      : Math.min(Math.max(0, blockTopInViewport), blockBottomInViewport);
-    const anchorRatio =
-      blockRect.height > 0
-        ? (viewportAnchorPx - blockTopInViewport) / blockRect.height
-        : 0.5;
-
-    return {
-      pageIndex: anchorIndex,
-      viewportAnchorPx,
-      anchorRatio: Math.max(0, Math.min(1, anchorRatio)),
-    };
-  }, []);
-
-  const restoreContinuousZoomAnchor = useCallback((
-    anchor: { pageIndex: number; viewportAnchorPx: number; anchorRatio: number } | null,
-  ) => {
-    if (!anchor || !continuousModeRef.current) return;
-    const container = scrollContainerRef.current;
-    const lenis = continuousLenisRef.current;
-    const targetImg = pageRefs.current[anchor.pageIndex];
-    const targetBlock = targetImg?.parentElement as HTMLElement | null;
-    if (!container || !targetBlock) return;
-
-    const currentScroll = lenis?.actualScroll ?? container.scrollTop ?? 0;
-    const containerRect = container.getBoundingClientRect();
-    const blockRect = targetBlock.getBoundingClientRect();
-    const blockTopAbsolute = currentScroll + (blockRect.top - containerRect.top);
-    const targetScroll = Math.max(
-      0,
-      blockTopAbsolute + anchor.anchorRatio * blockRect.height - anchor.viewportAnchorPx,
-    );
-
-    if (lenis) {
-      lenis.scrollTo(targetScroll, { immediate: true, force: true });
-    } else {
-      container.scrollTop = targetScroll;
-    }
-  }, []);
+  const {
+    zoom,
+    isDragging,
+    zoomIn,
+    zoomOut,
+    zoomReset,
+    zoomWrapperRef,
+    zoomRef,
+    isZoomingRef,
+    resetZoomAndPan,
+  } = useZoomPan({
+    page,
+    continuousModeRef,
+    scrollContainerRef,
+    continuousContentRef,
+    continuousLenisRef,
+    pageRefs,
+    syncContinuousPageFromViewport,
+  });
 
   // Auto-scroll bottom strip to keep current page button visible
   // Debounced so rapid page updates (continuous mode scroll) don't spam smooth-scrolls
@@ -407,76 +333,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       container.scrollTo({ left: Math.max(0, scrollTo), behavior: "smooth" });
     }, 80);
   }, [page]);
-
-  const applyTransform = (z: number, px: number, py: number, animate = true) => {
-    const el = zoomWrapperRef.current;
-    if (!el) return;
-    el.style.setProperty("--mg-zoom", String(z));
-    el.style.setProperty("--mg-pan-x", `${px}px`);
-    el.style.setProperty("--mg-pan-y", `${py}px`);
-    el.style.setProperty("--mg-transition", animate ? "transform 0.15s ease" : "none");
-  };
-
-  const resetPan = () => {
-    panRef.current = { x: 0, y: 0 };
-    setPanX(0);
-    setPanY(0);
-  };
-
-  const markZooming = () => {
-    isZoomingRef.current = true;
-    if (zoomingTimerRef.current) clearTimeout(zoomingTimerRef.current);
-    zoomingTimerRef.current = setTimeout(() => { isZoomingRef.current = false; }, 300);
-  };
-
-  const updateZoom = useCallback((computeNext: (current: number) => number) => {
-    markZooming();
-    const currentZoom = zoomRef.current;
-    const nextZoom = computeNext(currentZoom);
-    if (nextZoom === currentZoom) return;
-
-    zoomRef.current = nextZoom;
-
-    if (!continuousModeRef.current) {
-      setZoom(nextZoom);
-      if (nextZoom <= 1) resetPan();
-      return;
-    }
-
-    const zoomAnchor = getContinuousZoomAnchor();
-
-    setZoom(nextZoom);
-    if (nextZoom <= 1) resetPan();
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const nextContainer = scrollContainerRef.current;
-        const nextContent = continuousContentRef.current;
-        const nextLenis = continuousLenisRef.current;
-        if (!nextContainer || !nextContent) {
-          syncContinuousPageFromViewport();
-          return;
-        }
-
-        nextLenis?.resize();
-        restoreContinuousZoomAnchor(zoomAnchor);
-
-        requestAnimationFrame(() => {
-          syncContinuousPageFromViewport();
-        });
-      });
-    });
-  }, [getContinuousZoomAnchor, restoreContinuousZoomAnchor, syncContinuousPageFromViewport]);
-
-  const zoomIn  = () => updateZoom(zoomInLevel);
-  const zoomOut = () => updateZoom(zoomOutLevel);
-  const zoomReset = () => updateZoom(() => 1);
-
-  useEffect(() => {
-    applyTransform(zoom, panX, panY);
-    // Also sync zoom to continuous mode scroll container
-    scrollContainerRef.current?.style.setProperty("--mg-zoom", String(zoom));
-  }, [zoom, panX, panY]);
 
   const goToChapter = (ch: ChapterPageItem) => {
     setCurrentChapterId(ch.id);
@@ -496,8 +352,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     setLoading(true);
     setContentReady(false);
     if (contentReadyTimerRef.current) clearTimeout(contentReadyTimerRef.current);
-    setZoom(1);
-    resetPan();
+    resetZoomAndPan();
     /* eslint-enable react-hooks/set-state-in-effect */
     requestAnimationFrame(() => setVisible(true));
     document.body.style.overflow = "hidden";
@@ -575,11 +430,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       .catch(() => { setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300); });
 
     return () => { document.body.style.overflow = ""; };
-  }, [chapterId, turnstilePassed, clearanceToken, resetCaptcha]);
-  // Pan must reset on every page change; the page is set from many sites
-  // (buttons, keyboard, IntersectionObserver), so this effect is the choke point.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { resetPan(); }, [page]);
+  }, [chapterId, turnstilePassed, clearanceToken, resetCaptcha, resetZoomAndPan]);
 
   // Sync continuousMode to ref so wheel handler can read it without re-binding
   useEffect(() => { continuousModeRef.current = continuousMode; }, [continuousMode]);
@@ -590,7 +441,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     requestAnimationFrame(() => {
       scrollContainerRef.current?.style.setProperty("--mg-zoom", String(zoomRef.current));
     });
-  }, [continuousMode]);
+  }, [continuousMode, zoomRef]);
 
   // Persistent ratio map: keeps the last known intersection ratio of every page
   // so the observer callback always has full visibility data, not just the delta.
@@ -620,7 +471,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     );
     pageRefs.current.forEach((el) => { if (el) observer.observe(el); });
     return () => { observer.disconnect(); pageRatioMapRef.current.clear(); };
-  }, [continuousMode, data]);
+  }, [continuousMode, data, isZoomingRef]);
 
   const handleClose = () => { setVisible(false); setTimeout(onClose, 250); };
 
@@ -738,47 +589,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     };
     window.addEventListener("wheel", onWheel, { passive: false });
     return () => window.removeEventListener("wheel", onWheel);
-  }, []);
-
-  // Mouse drag-to-pan (paged mode only)
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (e.button !== 0 || continuousModeRef.current || zoomRef.current <= 1) return;
-      e.preventDefault();
-      dragging.current = true;
-      lastPos.current = { x: e.clientX, y: e.clientY };
-      setIsDragging(true);
-      applyTransform(zoomRef.current, panRef.current.x, panRef.current.y, false);
-    };
-    const onMove = (e: MouseEvent) => {
-      if (!dragging.current) return;
-      e.preventDefault();
-      const dx = e.clientX - lastPos.current.x;
-      const dy = e.clientY - lastPos.current.y;
-      lastPos.current = { x: e.clientX, y: e.clientY };
-      panRef.current = { x: panRef.current.x + dx, y: panRef.current.y + dy };
-      const el = zoomWrapperRef.current;
-      if (el) {
-        el.style.setProperty("--mg-pan-x", `${panRef.current.x}px`);
-        el.style.setProperty("--mg-pan-y", `${panRef.current.y}px`);
-      }
-    };
-    const onUp = () => {
-      if (!dragging.current) return;
-      dragging.current = false;
-      setIsDragging(false);
-      setPanX(panRef.current.x);
-      setPanY(panRef.current.y);
-      applyTransform(zoomRef.current, panRef.current.x, panRef.current.y, true);
-    };
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
   }, []);
 
   // Scroll to page when clicking page strip in continuous mode
