@@ -12,6 +12,7 @@ import { useLocalLenis } from "../../../hooks/useLocalLenis";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import type { LandingBook, ForumPost, ForumCategory } from "../../../lib/types";
 import { CATEGORY_LIST } from "../../../lib/forumCategories";
+import { cacheOrFetch, TTL } from "../../../lib/apiCache";
 
 export default function MangaCommunityPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
@@ -35,9 +36,16 @@ export default function MangaCommunityPage() {
 
   const fetchMangaMeta = useCallback(async () => {
     try {
-      const res = await fetch(`/api/proxy/books/${mangaId}`);
-      if (!res.ok) return;
-      const book: LandingBook = await res.json();
+      const book = await cacheOrFetch<LandingBook | null>(
+        `manga:${mangaId}:detail`,
+        async () => {
+          const res = await fetch(`/api/proxy/books/${mangaId}`);
+          if (!res.ok) return null;
+          return res.json();
+        },
+        TTL.LONG,
+      );
+      if (!book) return;
       setMangaTitle((prev) => prev ?? book.title ?? null);
       setMangaCover((prev) => prev ?? book.thumbnail ?? null);
     } catch {
