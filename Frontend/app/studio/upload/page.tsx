@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useLocalLenis } from "../../hooks/useLocalLenis";
+import { useStudioUpload, validateReadyToFinish } from "../../hooks/useStudioUpload";
 import { searchBooks, StudioBook, getBookCoverUrl } from "../../lib/studioApi";
 import { resolvedThumbnail } from "../../lib/imgUrl";
 import { StudioSelect } from "../components/StudioSelect";
@@ -27,12 +28,6 @@ const SUPPORTED_LANGUAGES = [
 
 const SEARCH_DEBOUNCE_MS = 600;
 const MIN_SEARCH_QUERY_LENGTH = 2;
-
-type PageItem = {
-  url: string;
-  uploading?: boolean;
-  error?: string;
-};
 
 type ExistingVersion = {
   versionId: string;
@@ -269,7 +264,7 @@ function MangaPickerModal({
               >
                 <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-xl bg-white/8 border border-white/8">
                   {book.thumbnail ? (
-                    <Image src={resolvedThumbnail(book as any)} alt={book.title} fill loading="lazy" className="object-cover" />
+                    <Image src={resolvedThumbnail({ thumbnail: book.thumbnail })} alt={book.title} fill loading="lazy" className="object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-white/20">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
@@ -379,9 +374,6 @@ function StudioUploadContent() {
   const [description, setDescription] = useState("");
   const [priceCoins, setPriceCoins] = useState<string | number>(0);
 
-  const [versionId, setVersionId] = useState<string | null>(existingVersionId);
-  const [pages, setPages] = useState<PageItem[]>([]);
-  const [saving, setSaving] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -393,20 +385,35 @@ function StudioUploadContent() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
-  /**
-   * Single in-flight version-creation promise, shared across all concurrent
-   * uploadFile() calls. Without this, rapid multi-file selections can each
-   * see versionId === null and race to create multiple draft versions.
-   */
-  const ensureVersionPromiseRef = useRef<Promise<string> | null>(null);
-  /**
-   * Always-current ref to `pages` used by the unmount cleanup so that blob
-   * URLs added after mount are still revoked when the component unmounts.
-   */
-  const pagesRef = useRef<PageItem[]>(pages);
-  pagesRef.current = pages;
-  // Always-current ref to getIdToken so effects and callbacks don't need it
-  // in their dep arrays (it is not wrapped in useCallback in AuthContext).
+
+  const {
+    pages,
+    setPages,
+    versionId,
+    saving,
+    handleFilesSelected,
+    handleDrop,
+    deletePage: handleDeletePage,
+    saveMetadata: handleSaveMetadata,
+  } = useStudioUpload({
+    user,
+    getIdToken,
+    showToast,
+    existingVersionId,
+    getVersionMetadata: () => ({
+      titleId,
+      titleName,
+      chapterId,
+      chapterNumber,
+      chapterTitle,
+      language,
+      description,
+      priceCoins,
+    }),
+  });
+
+  // Always-current ref to getIdToken so effects don't need it in their dep
+  // array (it is not wrapped in useCallback in AuthContext).
   const getIdTokenRef = useRef(getIdToken);
   getIdTokenRef.current = getIdToken;
 
@@ -419,7 +426,7 @@ function StudioUploadContent() {
         const book: StudioBook = JSON.parse(stored);
         setTitleId(book.id);
         setTitleName(book.title);
-        setTitleThumbnail(book.thumbnail ? resolvedThumbnail(book as any) : getBookCoverUrl(book.id));
+        setTitleThumbnail(book.thumbnail ? resolvedThumbnail({ thumbnail: book.thumbnail }) : getBookCoverUrl(book.id));
       } catch {}
     }
   }, []);
@@ -452,196 +459,16 @@ function StudioUploadContent() {
         setLoadingExisting(false);
       }
     });
-  }, [existingVersionId, user, showToast]);
+  }, [existingVersionId, user, showToast, setPages]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/");
   }, [loading, user, router]);
 
-  /** Create a draft version if one doesn't exist yet. Returns the versionId.
-   *  All concurrent callers share the same in-flight promise so only one
-   *  version is ever created per upload session. */
-  const ensureVersion = useCallback(async (token: string): Promise<string> => {
-    // Fast path: version already exists
-    if (versionId) return versionId;
-
-    // If another concurrent call is already creating the version, await it
-    if (ensureVersionPromiseRef.current) return ensureVersionPromiseRef.current;
-
-    if (!titleId || !language) {
-      throw new Error("กรุณาเลือกมังงะและภาษาก่อน");
-    }
-
-    const creation = fetch(`${API_BASE}/versions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        titleId,
-        titleName,
-        chapterId,
-        chapterNumber,
-        chapterTitle,
-        language,
-        description,
-        priceCoins: Number(priceCoins) || 0,
-      }),
-    }).then(async (res) => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message ?? "ไม่สามารถสร้างงานแปลได้");
-      }
-      const data = await res.json();
-      setVersionId(data.versionId);
-      return data.versionId as string;
-    }).finally(() => {
-      ensureVersionPromiseRef.current = null;
-    });
-
-    ensureVersionPromiseRef.current = creation;
-    return creation;
-  }, [versionId, titleId, language, titleName, chapterId, chapterNumber, chapterTitle, description, priceCoins]);
-
-  /** Upload a single page file. */
-  const uploadFile = useCallback(
-    async (file: File) => {
-      if (!user) return;
-      const placeholderUrl = URL.createObjectURL(file);
-      const placeholder: PageItem = { url: placeholderUrl, uploading: true };
-      setPages((prev) => [...prev, placeholder]);
-
-      try {
-        const token = await getIdTokenRef.current();
-        if (!token) throw new Error("ไม่พบ token");
-        const vid = await ensureVersion(token);
-
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch(`${API_BASE}/upload/versions/${vid}/pages`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err?.message ?? "อัปโหลดไม่สำเร็จ");
-        }
-        const { pageUrl } = await res.json();
-        // Replace the placeholder with the real server URL, then revoke the
-        // blob so it doesn't leak — we now have the permanent URL.
-        setPages((prev) =>
-          prev.map((p) => (p.url === placeholderUrl ? { url: pageUrl } : p))
-        );
-        URL.revokeObjectURL(placeholderUrl);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ";
-        // Keep the placeholder URL in state so the preview still renders while
-        // the error is visible. The blob will be revoked when the user removes
-        // the page or navigates away (handled by the cleanup effect below).
-        setPages((prev) =>
-          prev.map((p) => (p.url === placeholderUrl ? { ...p, uploading: false, error: msg } : p))
-        );
-        showToast({ message: msg });
-      }
-    },
-    [user, ensureVersion, showToast]
-  );
-
-  // Revoke any remaining blob URLs (e.g. failed uploads) on unmount.
-  // pagesRef always holds the latest pages so URLs added after mount are covered.
-  useEffect(() => {
-    return () => {
-      pagesRef.current.forEach((p) => {
-        if (p.url.startsWith("blob:")) URL.revokeObjectURL(p.url);
-      });
-    };
-  }, []);
-
-  const handleFilesSelected = (files: FileList | null) => {
-    if (!files) return;
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (imageFiles.length === 0) {
-      showToast({ message: "กรุณาเลือกไฟล์รูปภาพเท่านั้น" });
-      return;
-    }
-    imageFiles.forEach(uploadFile);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    handleFilesSelected(e.dataTransfer.files);
-  };
-
-  const handleDeletePage = async (pageUrl: string) => {
-    // If it's a local blob (upload error case), just remove it from state and revoke
-    if (pageUrl.startsWith("blob:")) {
-      URL.revokeObjectURL(pageUrl);
-      setPages((prev) => prev.filter((p) => p.url !== pageUrl));
-      return;
-    }
-    if (!user || !versionId) {
-      setPages((prev) => prev.filter((p) => p.url !== pageUrl));
-      return;
-    }
-    try {
-      const token = await getIdToken();
-      if (!token) throw new Error("ไม่พบ token");
-      const res = await fetch(`${API_BASE}/upload/versions/${versionId}/pages`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ pageUrl }),
-      });
-      if (!res.ok) {
-        showToast({ message: "ไม่สามารถลบหน้าได้" });
-        return;
-      }
-      setPages((prev) => prev.filter((p) => p.url !== pageUrl));
-    } catch {
-      showToast({ message: "เกิดข้อผิดพลาด" });
-    }
-  };
-
-  const handleSaveMetadata = async () => {
-    if (!user || !versionId) return;
-    setSaving(true);
-    try {
-      const token = await getIdToken();
-      if (!token) throw new Error("ไม่พบ token");
-      const res = await fetch(`${API_BASE}/versions/${versionId}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ description, priceCoins: Number(priceCoins) || 0 }),
-      });
-      if (!res.ok) {
-        showToast({ type: "error", message: "บันทึกไม่สำเร็จ" });
-        return;
-      }
-      showToast({ type: "success", message: "บันทึกแล้ว" });
-    } catch {
-      showToast({ type: "error", message: "เกิดข้อผิดพลาด" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleDone = async () => {
-    if (!titleId) {
-      showToast({ type: "warning", message: "กรุณาเลือกมังงะก่อน" });
-      return;
-    }
-    if (!chapterNumber.trim()) {
-      showToast({ type: "warning", message: "กรุณากรอกหมายเลขตอน" });
-      return;
-    }
-    if (!language) {
-      showToast({ type: "warning", message: "กรุณาเลือกภาษาที่แปล" });
-      return;
-    }
-    if (pages.length === 0) {
-      showToast({ type: "warning", message: "กรุณาอัปโหลดหน้ามังงะอย่างน้อย 1 หน้า" });
-      return;
-    }
-    if (pages.some((p) => p.uploading)) {
-      showToast({ type: "info", message: "กรุณารอให้การอัปโหลดเสร็จสิ้นก่อน" });
+    const validation = validateReadyToFinish({ titleId, chapterNumber, language, pages });
+    if (!validation.ok) {
+      showToast({ type: validation.level, message: validation.message });
       return;
     }
 
@@ -907,7 +734,7 @@ function StudioUploadContent() {
         onSelect={(book) => {
           setTitleId(book.id);
           setTitleName(book.title);
-          setTitleThumbnail(book.thumbnail ? resolvedThumbnail(book as any) : getBookCoverUrl(book.id));
+          setTitleThumbnail(book.thumbnail ? resolvedThumbnail({ thumbnail: book.thumbnail }) : getBookCoverUrl(book.id));
         }}
       />
     </div>
