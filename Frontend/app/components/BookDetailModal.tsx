@@ -1,8 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { errMessage } from "@/lib/errMessage";
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import TopupModal from "./TopupModal";
 import type Lenis from "lenis";
 import { createPortal } from "react-dom";
@@ -12,10 +11,10 @@ import MangaReader from "./MangaReader";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { useBookActions } from "../hooks/useBookActions";
 import { useLocalLenis } from "../hooks/useLocalLenis";
+import { useChapterUnlock } from "../hooks/useChapterUnlock";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { chapterAccess } from "../lib/chapterAccess";
 import { useAuth } from "../contexts/AuthContext";
-import { getWalletBalance, purchaseUnlock, getUnlocksForTitle } from "../lib/studioApi";
 import MangaDiscussion from "./MangaDiscussion";
 import RelatedManga from "./RelatedManga";
 import type { LandingBook, MangaDetail, MangaChapter } from "../lib/types";
@@ -125,11 +124,17 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
   // Coin / Unlock state
-  const [topupOpen, setTopupOpen] = useState(false);
   const { user, getIdToken } = useAuth();
-  const [coinBalance, setCoinBalance] = useState<number | null>(null);
-  const [unlockedVersions, setUnlockedVersions] = useState<Set<string>>(new Set());
-  const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const { coinBalance, unlockedVersions, purchasingId, topupOpen, setTopupOpen, purchase } =
+    useChapterUnlock({
+      titleId: book.id,
+      user,
+      getIdToken,
+      onUnlocked: (ch) => {
+        addToHistory({ ...book, lastChapterId: ch.id, lastChapterNumber: ch.chapterNumber });
+        setActiveChapter({ id: ch.id, chapterNumber: ch.chapterNumber, title: ch.title });
+      },
+    });
 
   const lenisRef = useRef<any>(null);
 
@@ -297,55 +302,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       if (!asPage) document.body.style.overflow = "";
     };
   }, []);
-
-  // Fetch wallet balance and unlock status for user-uploaded chapters
-  useEffect(() => {
-    if (!user) return;
-    const fetchWalletAndUnlocks = async () => {
-      try {
-        const token = await getIdToken();
-        if (!token) return;
-        const [walletData, unlockData] = await Promise.all([
-          getWalletBalance(token),
-          getUnlocksForTitle(token, book.id),
-        ]);
-        setCoinBalance(walletData.balance);
-        setUnlockedVersions(new Set(unlockData));
-      } catch {
-        // Wallet/unlock not available yet
-      }
-    };
-    fetchWalletAndUnlocks();
-  }, [user, book.id]);
-
-  const handlePurchaseUnlock = useCallback(async (ch: MangaChapter) => {
-    if (!user || !ch.versionId) return;
-    setPurchasingId(ch.versionId);
-    try {
-      const token = await getIdToken();
-      if (!token) return;
-      const result = await purchaseUnlock(token, ch.versionId);
-      if (result.unlocked || result.alreadyUnlocked) {
-        setUnlockedVersions((prev) => new Set([...prev, ch.versionId!]));
-        if (result.balance !== undefined) {
-          setCoinBalance(result.balance);
-          window.dispatchEvent(new CustomEvent('mb:coin-balance-update', { detail: { balance: result.balance } }));
-        }
-        // Auto-open the chapter after unlock
-        addToHistory({ ...book, lastChapterId: ch.id, lastChapterNumber: ch.chapterNumber });
-        setActiveChapter({ id: ch.id, chapterNumber: ch.chapterNumber, title: ch.title });
-      }
-    } catch (err: unknown) {
-      const msg = errMessage(err);
-      if (msg.includes("Insufficient") || msg.includes("ไม่พอ")) {
-        setTopupOpen(true);
-      } else {
-        alert(msg || "ไม่สามารถปลดล็อคได้");
-      }
-    } finally {
-      setPurchasingId(null);
-    }
-  }, [user, book]);
 
   // Scroll-aware header in page mode
   useEffect(() => {
@@ -1058,7 +1014,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                           ref={isHighlighted ? highlightChapterRef : undefined}
                           onClick={() => {
                             if (coinLocked) {
-                              handlePurchaseUnlock(ch);
+                              purchase(ch);
                             } else if (readable) {
                               addToHistory({ ...book, lastChapterId: ch.id, lastChapterNumber: ch.chapterNumber });
                               setActiveChapter({ id: ch.id, chapterNumber: ch.chapterNumber, title: ch.title });
