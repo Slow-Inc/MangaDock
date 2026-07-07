@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalLenis } from "../../hooks/useLocalLenis";
+import { useModalTransition } from "../../hooks/useModalTransition";
 
 export type StudioSelectOption = {
   value: string;
@@ -21,13 +22,11 @@ export function StudioSelect({
   placeholder?: string;
   disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const [renderPanel, setRenderPanel] = useState(false);
+  const [wantOpen, setWantOpen] = useState(false);
+  const { mounted: renderPanel, visible: open } = useModalTransition(wantOpen, { duration: 200 });
   const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const closeTimerRef = useRef<number | null>(null);
-  const openFrameRef = useRef<number | null>(null);
 
   useLocalLenis(listRef as React.RefObject<HTMLElement | null>, "vertical", open && !disabled);
 
@@ -42,7 +41,7 @@ export function StudioSelect({
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!containerRef.current?.contains(e.target as Node)) setWantOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -63,35 +62,6 @@ export function StudioSelect({
     };
   }, [open, checkFlip]);
 
-  useEffect(() => {
-    if (open || !renderPanel) {
-      return;
-    }
-
-    closeTimerRef.current = window.setTimeout(() => {
-      setRenderPanel(false);
-      closeTimerRef.current = null;
-    }, 200);
-
-    return () => {
-      if (closeTimerRef.current) {
-        window.clearTimeout(closeTimerRef.current);
-        closeTimerRef.current = null;
-      }
-    };
-  }, [open, renderPanel]);
-
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) {
-        window.clearTimeout(closeTimerRef.current);
-      }
-      if (openFrameRef.current) {
-        window.cancelAnimationFrame(openFrameRef.current);
-      }
-    };
-  }, []);
-
   const selected = options.find((option) => option.value === value);
 
   return (
@@ -102,19 +72,11 @@ export function StudioSelect({
         onClick={() => {
           if (disabled) return;
           if (open) {
-            setOpen(false);
+            setWantOpen(false);
             return;
           }
-          if (closeTimerRef.current) {
-            window.clearTimeout(closeTimerRef.current);
-            closeTimerRef.current = null;
-          }
           checkFlip();
-          setRenderPanel(true);
-          openFrameRef.current = window.requestAnimationFrame(() => {
-            setOpen(true);
-            openFrameRef.current = null;
-          });
+          setWantOpen(true);
         }}
         className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-sm transition-all duration-200 ${
           disabled
@@ -158,7 +120,7 @@ export function StudioSelect({
                     type="button"
                     onClick={() => {
                       onChange(option.value);
-                      setOpen(false);
+                      setWantOpen(false);
                     }}
                     className={`flex w-full items-center justify-between px-4 py-3 text-sm transition hover:bg-white/10 ${
                       isSelected ? "text-indigo-400" : "text-white/70 hover:text-white"
