@@ -113,6 +113,29 @@ describe('saveValidatedImage', () => {
     errorSpy.mockRestore();
   });
 
+  it('throws a plain Error (not InternalServerErrorException) when storageErrorAsPlainError is true, and still deletes the temp file', async () => {
+    mockFileType.mockResolvedValueOnce({ mime: 'image/png', ext: 'png' });
+    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const storage = makeStorage({ put: jest.fn().mockRejectedValue(new Error('disk full')) });
+
+    let caught: unknown;
+    try {
+      await saveValidatedImage(storage, tempFilePath, 'uploads', {
+        storageErrorAsPlainError: true,
+        storageErrorMessage: 'boom',
+      });
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).not.toBeInstanceOf(InternalServerErrorException);
+    expect((caught as Error).constructor).toBe(Error);
+    expect((caught as Error).message).toBe('boom');
+    expect(fs.existsSync(tempFilePath)).toBe(false);
+
+    errorSpy.mockRestore();
+  });
+
   it('guards the orphaned read stream when storage.put throws synchronously without consuming it (missing temp path never crashes the process)', async () => {
     mockFileType.mockResolvedValueOnce({ mime: 'image/png', ext: 'png' });
     const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);

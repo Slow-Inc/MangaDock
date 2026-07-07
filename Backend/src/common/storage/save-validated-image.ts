@@ -11,6 +11,13 @@ export interface SaveValidatedImageOptions {
   rejectMessage?: string;
   /** Message for the InternalServerErrorException thrown when storage.put fails. */
   storageErrorMessage?: string;
+  /**
+   * When true, a storage.put failure throws a plain `Error` (NestJS hides its
+   * message → generic 500 body), matching upload.addPage's original behavior.
+   * When false/omitted, throws InternalServerErrorException (message surfaced),
+   * matching forum's original behavior.
+   */
+  storageErrorAsPlainError?: boolean;
 }
 
 /**
@@ -55,9 +62,10 @@ export async function saveValidatedImage(
       `Image storage put failed for ${key}: ${String(err)}`,
     );
     await fsp.rm(tempFilePath, { force: true });
-    throw new InternalServerErrorException(
-      opts.storageErrorMessage ?? 'Failed to save image',
-    );
+    const message = opts.storageErrorMessage ?? 'Failed to save image';
+    throw opts.storageErrorAsPlainError
+      ? new Error(message)
+      : new InternalServerErrorException(message);
   }
 
   return { url: `/${key}`, key };
