@@ -45,6 +45,7 @@ export class UploadService {
         rejectMessage:
           'Unsupported image format. Only JPEG, PNG, WebP and GIF are accepted.',
         storageErrorMessage: 'Failed to upload page to storage',
+        storageErrorAsPlainError: true,
       },
     );
     const filename = key.split('/').pop()!;
