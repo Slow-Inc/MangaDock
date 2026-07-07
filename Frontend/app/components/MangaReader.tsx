@@ -1,24 +1,22 @@
 ﻿"use client";
 
-import type Lenis from "lenis";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { useChapterTranslation, TARGET_LANG_OPTIONS } from "../hooks/useChapterTranslation";
 import { buildTranslationSources } from "../lib/translationSources";
 import { buildTranslateMenu } from "../lib/translateMenu";
 import { formatEta, pillMainText, stageLabel } from "../lib/translationStages";
-import { useLocalLenis } from "../hooks/useLocalLenis";
 import { apiFetch } from "../lib/apiFetch";
 import { useChapters, type ChapterPageItem } from "../hooks/useChapters";
 import { ZOOM_MIN, ZOOM_MAX } from "../lib/zoomLevel";
-import { useZoomPan } from "../hooks/useZoomPan";
+import { useReaderViewport } from "../hooks/useReaderViewport";
 import { useModalTransition } from "../hooks/useModalTransition";
 import { useReaderCaptcha } from "../hooks/useReaderCaptcha";
 import ReaderCaptchaGate from "./reader/ReaderCaptchaGate";
 import ChapterPicker from "./reader/ChapterPicker";
 
-type ChapterPages = {
+export type ChapterPages = {
   pages: string[];
   dataSaverPages: string[];
   /** Local /img-cache/… paths served by the backend (IMAGE_CACHE_ENABLED=true). */
@@ -236,61 +234,24 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     return () => document.removeEventListener("mousedown", handler);
   }, [moreMenuOpen]);
 
-  const continuousModeRef = useRef(false);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const continuousContentRef = useRef<HTMLDivElement>(null);
-  const continuousLenisRef = useRef<Lenis | null>(null);
-  const pageRefs = useRef<(HTMLImageElement | null)[]>([]);
   const stripScrollRef = useRef<HTMLDivElement>(null);
   const activeStripBtnRef = useRef<HTMLButtonElement>(null);
 
-  useLocalLenis(scrollContainerRef, "vertical", continuousMode, continuousLenisRef, continuousContentRef);
-
-  const syncContinuousPageFromViewport = useCallback(() => {
-    if (!continuousModeRef.current) return;
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const containerRect = container.getBoundingClientRect();
-    let bestIdx = -1;
-    let bestVisible = 0;
-
-    pageRefs.current.forEach((img, idx) => {
-      if (!img) return;
-      const rect = img.getBoundingClientRect();
-      const visibleTop = Math.max(rect.top, containerRect.top);
-      const visibleBottom = Math.min(rect.bottom, containerRect.bottom);
-      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-      if (visibleHeight > bestVisible) {
-        bestVisible = visibleHeight;
-        bestIdx = idx;
-      }
-    });
-
-    if (bestIdx >= 0) {
-      setPage(bestIdx);
-    }
-  }, []);
-
+  // Viewport: shared refs, continuous-mode Lenis, page-visibility sync, and
+  // zoom/pan — all extracted to useReaderViewport (#582). Destructured to local
+  // names (not `viewport.foo`) because eslint's react-hooks/refs rule can't
+  // statically prove a nested `viewport.refs.foo` member expression is a ref
+  // object, and flags every JSX `ref={...}` use as an unsafe render-time access.
   const {
     zoom,
     isDragging,
     zoomIn,
     zoomOut,
     zoomReset,
-    zoomWrapperRef,
-    zoomRef,
-    isZoomingRef,
     resetZoomAndPan,
-  } = useZoomPan({
-    page,
-    continuousModeRef,
-    scrollContainerRef,
-    continuousContentRef,
     continuousLenisRef,
-    pageRefs,
-    syncContinuousPageFromViewport,
-  });
+    refs: { zoomWrapperRef, scrollContainerRef, continuousContentRef, pageRefs, continuousModeRef },
+  } = useReaderViewport({ page, setPage, data, continuousMode });
 
   // Auto-scroll bottom strip to keep current page button visible
   // Debounced so rapid page updates (continuous mode scroll) don't spam smooth-scrolls
@@ -413,47 +374,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     return () => { document.body.style.overflow = ""; };
   }, [chapterId, turnstilePassed, clearanceToken, resetCaptcha, resetZoomAndPan]);
 
-  // Sync continuousMode to ref so wheel handler can read it without re-binding
-  useEffect(() => { continuousModeRef.current = continuousMode; }, [continuousMode]);
-
-  // When switching TO continuous mode, the scroll container just mounted — re-sync zoom
-  useEffect(() => {
-    if (!continuousMode) return;
-    requestAnimationFrame(() => {
-      scrollContainerRef.current?.style.setProperty("--mg-zoom", String(zoomRef.current));
-    });
-  }, [continuousMode, zoomRef]);
-
-  // Persistent ratio map: keeps the last known intersection ratio of every page
-  // so the observer callback always has full visibility data, not just the delta.
-  const pageRatioMapRef = useRef<Map<number, number>>(new Map());
-
-  // IntersectionObserver: track visible page in continuous mode
-  useEffect(() => {
-    if (!continuousMode || !data) return;
-    pageRatioMapRef.current.clear();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (isZoomingRef.current) return; // ignore reflows caused by zoom change
-        // Update the persistent map with the latest ratios from this batch
-        entries.forEach((entry) => {
-          const idx = Number((entry.target as HTMLElement).dataset.pageIdx);
-          pageRatioMapRef.current.set(idx, entry.intersectionRatio);
-        });
-        // Find the globally most-visible page across ALL observed pages
-        let bestIdx = -1;
-        let bestRatio = 0;
-        pageRatioMapRef.current.forEach((ratio, idx) => {
-          if (ratio > bestRatio) { bestRatio = ratio; bestIdx = idx; }
-        });
-        if (bestIdx >= 0 && bestRatio > 0) setPage(bestIdx);
-      },
-      { root: scrollContainerRef.current, threshold: Array.from({ length: 21 }, (_, i) => i / 20) }
-    );
-    pageRefs.current.forEach((el) => { if (el) observer.observe(el); });
-    return () => { observer.disconnect(); pageRatioMapRef.current.clear(); };
-  }, [continuousMode, data, isZoomingRef]);
-
   const handleClose = () => { setVisible(false); setTimeout(onClose, 250); };
 
   // Prefer locally-cached paths when available (backend IMAGE_CACHE_ENABLED=true).
@@ -556,7 +476,12 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [totalPages]);
+    // continuousLenisRef/continuousModeRef/scrollContainerRef are stable ref
+    // objects from useReaderViewport (identity never changes) — listed here
+    // only so eslint's exhaustive-deps can see they're accounted for; it can't
+    // infer their stability across a custom-hook boundary the way it does for
+    // a same-component `useRef()` call.
+  }, [totalPages, continuousLenisRef, continuousModeRef, scrollContainerRef]);
 
   // Wheel: zoom in paged mode, native scroll in continuous mode
   useEffect(() => {
@@ -570,7 +495,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     };
     window.addEventListener("wheel", onWheel, { passive: false });
     return () => window.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [continuousModeRef]);
 
   // Scroll to page when clicking page strip in continuous mode
   const scrollToPage = (idx: number) => {
