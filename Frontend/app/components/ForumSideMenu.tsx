@@ -88,7 +88,11 @@ export default function ForumSideMenu({
     setSearching(true);
     try {
       const items = await cacheOrFetch<LandingBook[]>(
-        `search:tag:${q}`,
+        // Distinct namespace from studioApi's `search:${query}` (which is
+        // `search:` + arbitrary user text) — a studio search for the literal
+        // "tag:foo" would otherwise collide with this key and cross-poison the
+        // cache with a different response shape ({items,total} vs LandingBook[]).
+        `tagsearch:${q}`,
         async () => {
           const res = await fetch(`/api/proxy/books/search?q=${encodeURIComponent(q)}&limit=5`);
           if (!res.ok) throw new Error("search failed");
