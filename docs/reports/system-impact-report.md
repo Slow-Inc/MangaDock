@@ -15,6 +15,26 @@
 
 ---
 
+## 2026-07-07 — MIT #503/#541: resize_regions golden portable across freetype builds (ci / test-infra)
+
+**What & where:** `MIT/test/test_resize_regions_characterization.py` + new pure `MIT/test/_golden_compare.py` (`golden_verdict`) + `MIT/test/test_golden_compare.py`; the 3 `resize_regions_*.npz` goldens regenerated with `freetype_version`/`platform` metadata. Follow-up to the 2026-07-03 #359 gate + resize reland below.
+
+**Why:** the now-blocking `pytest (logic gate, torch-free)` gate was **red on Linux CI** — `test_resize_regions_bubble_fit_byte_identical` drifted. The bubble_fit golden encodes freetype-metric geometry (font binary-search + width-squeeze over real glyph advances); it was recorded on Windows/freetype-2.14.3 (Pillow 12.2.0) but CI installs Linux/Pillow-12.3.0 (Pillow unpinned) → different advances → `dst_points` drift. Environment drift, not a logic change.
+
+**Before → After:** before — Linux logic gate `1 failed, 586 passed`, bubble_fit red on every non-dev platform, blocking #541. After — golden records its authoring env; a mismatch is a `skip` only on a *different* env and still a `fail` on the golden's own env. Logic gate `0 failed` (bubble_fit skips on CI's foreign freetype; legacy/clean_layout still assert — box-derived, portable).
+
+**Performance Δ:** N/A (test-only).
+
+**Quality:** production render output unchanged — `git diff MIT/manga_translator/` is empty (byte-untouched). Strict byte-identical coverage retained on the dev platform where refactors are developed; CI keeps real coverage of the portable resize paths.
+
+**Validation:** 3 `golden_verdict` unit tests (RED→GREEN); skip/fail/pass wiring exercised on crafted goldens; logic gate green on Linux CI (runs/28834510488). Benchmark PNG+MD: `docs/reports/benchmarks/2026-07-07-541-golden-portability.md`.
+
+**Risk / rollback:** low — test-only, no dependency pinned, no production code touched. Limitation (documented): only the golden's authoring platform asserts bubble_fit strictly; a deliberate Pillow bump on dev regenerates the golden. Scrutinized: ship.
+
+**Links:** #503, #541 (commit `ef69dd26`); builds on #359 (below).
+
+---
+
 ## 2026-07-03 — MIT CI: torch-free blocking gate landed + baseline rot repair (ci / tech-debt)
 
 **What & where:** Landed the long-stalled #359 (PR #427) making `mit-ci`'s `pytest (logic gate,

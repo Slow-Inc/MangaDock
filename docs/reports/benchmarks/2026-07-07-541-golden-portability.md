@@ -2,6 +2,8 @@
 
 **Date:** 2026-07-07 · **Branch:** `fix/jest-skiplist` · **Type:** test-infrastructure (no render behavior change)
 
+**Logged in:** `DONE.md` (2026-07-07 entry) · `docs/reports/system-impact-report.md` (2026-07-07 §) · issues #503 / #541.
+
 ![before→after logic gate + verdict table](./2026-07-07-541-golden-portability.png)
 
 ## Method
