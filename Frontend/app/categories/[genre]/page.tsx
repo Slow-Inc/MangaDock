@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import MangaGrid, { GridBook } from "../../components/MangaGrid";
+import { cacheOrFetch, TTL } from "../../lib/apiCache";
 
 const API_BASE = "/api/proxy";
 
@@ -48,12 +49,16 @@ export default function GenrePage() {
       setLoading(true);
       setError(false);
     });
-    fetch(`${API_BASE}/books/genre/${slug}?page=${page}&limit=${PAGE_SIZE}`)
-      .then((r) => {
+    cacheOrFetch<{ items: GridBook[]; total: number }>(
+      `genre:${slug}:${page}`,
+      async () => {
+        const r = await fetch(`${API_BASE}/books/genre/${slug}?page=${page}&limit=${PAGE_SIZE}`);
         if (!r.ok) throw new Error();
         return r.json();
-      })
-      .then((data: { items: GridBook[]; total: number }) => {
+      },
+      TTL.LONG,
+    )
+      .then((data) => {
         setBooks(data.items ?? []);
         setTotal(data.total ?? 0);
       })
