@@ -16,7 +16,6 @@ export interface PageRendererProps {
   page: number;
   setPage: Dispatch<SetStateAction<number>>;
   continuousMode: boolean;
-  useSaver: boolean;
   pages: string[];
   totalPages: number;
   showTranslation: boolean;
