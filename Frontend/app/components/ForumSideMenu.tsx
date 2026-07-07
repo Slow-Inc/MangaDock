@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getTrendingManga, type TrendingManga } from "../lib/communityApi";
+import { cacheOrFetch, TTL } from "../lib/apiCache";
 import type { LandingBook, ForumCategory } from "../lib/types";
 import { CATEGORY_LIST } from "../lib/forumCategories";
 
@@ -86,11 +87,17 @@ export default function ForumSideMenu({
     }
     setSearching(true);
     try {
-      const res = await fetch(`/api/proxy/books/search?q=${encodeURIComponent(q)}&limit=5`);
-      if (res.ok) {
-        const data = await res.json();
-        setSearchResults(data.items || []);
-      }
+      const items = await cacheOrFetch<LandingBook[]>(
+        `search:tag:${q}`,
+        async () => {
+          const res = await fetch(`/api/proxy/books/search?q=${encodeURIComponent(q)}&limit=5`);
+          if (!res.ok) throw new Error("search failed");
+          const data = await res.json();
+          return data.items || [];
+        },
+        TTL.MEDIUM,
+      );
+      setSearchResults(items);
     } catch (err) {
       console.error(err);
     } finally {
