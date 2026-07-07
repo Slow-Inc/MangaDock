@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { cacheOrFetch, TTL } from "../lib/apiCache";
 import type { LandingBook } from "../lib/types";
 
 interface MangaSearchSelectorProps {
@@ -23,11 +24,17 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
     }
     setSearching(true);
     try {
-      const res = await fetch(`/api/proxy/books/search?q=${encodeURIComponent(q)}&limit=5`);
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data.items || []);
-      }
+      const items = await cacheOrFetch<LandingBook[]>(
+        `search:tag:${q}`,
+        async () => {
+          const res = await fetch(`/api/proxy/books/search?q=${encodeURIComponent(q)}&limit=5`);
+          if (!res.ok) throw new Error("search failed");
+          const data = await res.json();
+          return data.items || [];
+        },
+        TTL.MEDIUM,
+      );
+      setResults(items);
     } catch (err) {
       console.error(err);
     } finally {
