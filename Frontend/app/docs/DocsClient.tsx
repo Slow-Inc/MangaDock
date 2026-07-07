@@ -88,12 +88,23 @@ interface GHComment {
 // ─── Utilities ─────────────────────────────────────────────────────────────
 
 import { relativeDate, labelFg } from './utils';
+import { cacheOrFetch, TTL } from '../lib/apiCache';
 
 async function ghFetch<T>(type: string, params: Record<string, string | number> = {}): Promise<T> {
   const qs = new URLSearchParams({ type, ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) });
-  const res = await fetch(`/api/docs/github?${qs}`);
-  if (!res.ok) throw new Error(`GitHub ${res.status}`);
-  return res.json() as Promise<T>;
+  // Cache read-only GitHub GETs by their full query string (F7) — the qs encodes
+  // type + all params, so distinct requests get distinct keys. TTL.MEDIUM keeps
+  // us off GitHub's rate limit while staying fresh enough for docs/issue lists.
+  // cacheOrFetch never caches a throw, so the !ok error path is unchanged.
+  return cacheOrFetch<T>(
+    `docs:${qs.toString()}`,
+    async () => {
+      const res = await fetch(`/api/docs/github?${qs}`);
+      if (!res.ok) throw new Error(`GitHub ${res.status}`);
+      return res.json() as Promise<T>;
+    },
+    TTL.MEDIUM,
+  );
 }
 
 // ─── Markdown Renderer ─────────────────────────────────────────────────────
