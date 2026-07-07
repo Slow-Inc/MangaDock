@@ -438,16 +438,36 @@ export class MitBatchOrchestrator {
         ),
       ),
     );
+    // #524 cache-safety: when rolling cross-page context is enabled (MIT_CONTEXT_PAGES>0),
+    // page N's translation depends on pages <N. Serving SOME pages from cache while
+    // re-translating the rest would build MIT's RollingContext from an INCOMPLETE page set,
+    // caching a context-free result under a context-on patch key. So when context is on and
+    // the batch is not fully cached, send the whole ordered chapter to MIT (complete context)
+    // and do not pre-serve the partial cache — MIT regenerates every page under full context.
+    // Context off (default) → unchanged, byte-identical. (renderConfigHash folds MIT_CONTEXT_PAGES,
+    // so context-on and context-off patches already live in separate cache namespaces.)
+    const contextPages = Number(process.env.MIT_CONTEXT_PAGES);
+    const contextEnabled = Number.isFinite(contextPages) && contextPages > 0;
+    const allCached = cachedResults.every((c) => c?.data?.patches);
+
     const uncachedPages: Array<{ pageIndex: number; pageUrl: string }> = [];
-    pages.forEach((p, i) => {
-      const cached = cachedResults[i];
-      if (cached?.data?.patches) {
-        // Serve from cache immediately — direct call
-        listener(p.pageIndex, { patches: cached.data.patches });
-      } else {
-        uncachedPages.push(p);
-      }
-    });
+    if (contextEnabled && !allCached) {
+      uncachedPages.push(...pages); // full ordered chapter; no partial pre-serve
+    } else {
+      pages.forEach((p, i) => {
+        const cached = cachedResults[i];
+        if (cached?.data?.patches) {
+          // Serve from cache immediately — direct call
+          listener(p.pageIndex, { patches: cached.data.patches });
+          // FR-8: record in completedPages so latecomers receive cached pages on attach
+          placeholderJob.completedPages.set(p.pageIndex, {
+            patches: cached.data.patches,
+          });
+        } else {
+          uncachedPages.push(p);
+        }
+      });
+    }
 
     if (uncachedPages.length === 0) {
       this.logger.log(
@@ -465,8 +485,10 @@ export class MitBatchOrchestrator {
     }
 
     // 2. Finalize job state using the placeholder already in the registry
+    // expectedCount stays at pages.length (set at placeholder creation) — FR-8:
+    // completedPages now holds cached pages from the start, so expectedCount must
+    // equal the TOTAL page count or maybeComplete would fire too early.
     const job = placeholderJob;
-    job.expectedCount = uncachedPages.length;
 
     // 3. Inner notify: record completion + fan-out through the shared deliver() sink.
     const notify = (pageIndex: number, result: PageResult) => {

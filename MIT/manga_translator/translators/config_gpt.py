@@ -216,16 +216,27 @@ class ConfigGPT:
     def prompt_template(self) -> str:
         return self._config_get('prompt_template', default=self._PROMPT_TEMPLATE)
 
+    # P7 (Master Plan 2, #526): the #1 render defect on tight bubbles is a translation that is
+    # physically too long for the balloon (measured: 7 lines @ 18px ≈ 151px in a ~70px bubble →
+    # clipped). No wrap algorithm fixes "too much text in a tiny bubble"; the lever is a shorter
+    # translation. Optional, gated on `concise_bubbles`; absent → byte-identical.
+    _CONCISE_DIRECTIVE = (
+        '\n\n## Bubble-length constraint\n'
+        'Manga speech balloons are small. For EACH numbered line, choose the SHORTEST natural phrasing '
+        'that preserves the full meaning — cut filler words, avoid redundancy — so the text fits inside '
+        'the balloon without being shrunk to an unreadable size. Never drop meaning or add words.\n'
+    )
+
     @property
     def chat_system_template(self) -> str:
         # Series context (#157) + rolling cross-page context (#159): one append seam
         # for every GPT-family translator (Qwen3, Gemini, ChatGPT, DeepSeek,
         # custom_openai). Both absent → template byte-identical. (append_series_context
         # is a plain brace-escaped text append; reused verbatim for the #159 block.)
-        template = append_series_context(
-            self._config_get('chat_system_template', self._CHAT_SYSTEM_TEMPLATE),
-            self._config_get('series_context'),
-        )
+        base = self._config_get('chat_system_template', self._CHAT_SYSTEM_TEMPLATE)
+        if self._config_get('concise_bubbles'):
+            base = base + self._CONCISE_DIRECTIVE
+        template = append_series_context(base, self._config_get('series_context'))
         return append_series_context(template, self._config_get('prev_context'))
 
     @property

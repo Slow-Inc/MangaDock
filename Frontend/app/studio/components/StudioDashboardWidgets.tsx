@@ -193,9 +193,11 @@ export function LineChart({
   const areaPath = `${linePath} L ${coords[coords.length - 1].x} ${plotBottom} L ${coords[0].x} ${plotBottom} Z`;
 
   return (
+    <div role="img" aria-label="กราฟยอดวิวรายวัน">
     <div className="space-y-4">
       <div className="overflow-hidden rounded-2xl border border-white/8 bg-black/25 p-3">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-[256px] w-full">
+          <title>กราฟยอดวิวรายวัน</title>
           {Array.from({ length: 5 }).map((_, row) => {
             const y = padding + ((plotBottom - padding) / 4) * row;
             return (
@@ -230,6 +232,7 @@ export function LineChart({
         </svg>
       </div>
     </div>
+    </div>
   );
 }
 
@@ -257,9 +260,11 @@ export function GroupedBarChart({
   );
 
   return (
+    <div role="img" aria-label="กราฟยอดวิวแยกตามมังงะ">
     <div className="space-y-4">
       <div className="overflow-hidden rounded-2xl border border-white/8 bg-black/25 p-3">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-[256px] w-full">
+          <title>กราฟยอดวิวแยกตามมังงะ</title>
           {Array.from({ length: 5 }).map((_, row) => {
             const y = padding + ((plotBottom - padding) / 4) * row;
             return (
@@ -312,6 +317,7 @@ export function GroupedBarChart({
 
       <LegendRow items={[{ label: "รายรับ", tone: "indigo" }, { label: "รายจ่าย", tone: "rose" }]} />
     </div>
+    </div>
   );
 }
 
@@ -329,6 +335,7 @@ export function HorizontalBreakdownChart({
   const maxValue = Math.max(...data.map((item) => item.value), 1);
 
   return (
+    <div role="img" aria-label="กราฟรายได้แยกประเภท">
     <div className="space-y-3">
       {data.map((item) => {
         const styles = getToneStyles(item.tone ?? "indigo");
@@ -346,6 +353,7 @@ export function HorizontalBreakdownChart({
           </div>
         );
       })}
+    </div>
     </div>
   );
 }
@@ -384,9 +392,11 @@ export function DonutChart({
   }, { offset: 0, entries: [] }).entries;
 
   return (
+    <div role="img" aria-label="กราฟสัดส่วนรายได้">
     <div className="flex flex-col gap-5 md:flex-row md:items-center">
       <div className="relative flex h-[170px] w-[170px] shrink-0 items-center justify-center self-center">
         <svg viewBox="0 0 180 180" className="h-[170px] w-[170px] -rotate-90">
+          <title>กราฟสัดส่วนรายได้</title>
           <circle cx="90" cy="90" r={radius} stroke="rgba(255,255,255,0.08)" strokeWidth={strokeWidth} fill="none" />
           {segments.map(({ item, segment, dashOffset }) => {
             const styles = getToneStyles(item.tone ?? "indigo");
@@ -430,6 +440,7 @@ export function DonutChart({
           );
         })}
       </div>
+    </div>
     </div>
   );
 }

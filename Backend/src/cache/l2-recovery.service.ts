@@ -32,10 +32,10 @@ export class L2RecoveryService implements OnModuleInit {
   }
 
   async recover(): Promise<{ synced: number; skipped: number }> {
-    const l1 = this.jsonCache.getAll();
     const l3 = this.l3.readAll();
     const fallbackKeys = this.l3.drainDirtyFallback();
-    const allKeys = new Set([...l1.keys(), ...l3.keys()]);
+    // Snapshot L1 keys synchronously (no full-map clone) before any await. (FR-5)
+    const allKeys = new Set([...this.jsonCache.keys(), ...l3.keys()]);
 
     if (allKeys.size === 0 && fallbackKeys.length === 0) return { synced: 0, skipped: 0 };
 
@@ -48,7 +48,15 @@ export class L2RecoveryService implements OnModuleInit {
     const toSync: Pending[] = [];
 
     for (const key of allKeys) {
-      const entry = this.newerEntry(l1.get(key), l3.get(key));
+      const l1Entry = this.jsonCache.peek(key) ?? undefined;
+      const l3Entry = l3.get(key);
+      // The key was in the snapshot but has since been evicted from L1 (live read
+      // after the await) and isn't on L3 either — nothing to sync, skip. (FR-5)
+      if (!l1Entry && !l3Entry) {
+        skipped++;
+        continue;
+      }
+      const entry = this.newerEntry(l1Entry, l3Entry);
       if (this.jsonCache.isExpired(entry)) {
         skipped++;
         continue;

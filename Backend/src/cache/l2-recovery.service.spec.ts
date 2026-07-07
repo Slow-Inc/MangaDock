@@ -43,9 +43,10 @@ function makeRedis(available = true) {
   } as any;
 }
 
-function makeJsonCache(entries: Map<string, CacheEntry<unknown>> = new Map()): jest.Mocked<Pick<JsonCacheService, 'getAll' | 'isExpired'>> {
+function makeJsonCache(entries: Map<string, CacheEntry<unknown>> = new Map()): jest.Mocked<Pick<JsonCacheService, 'keys' | 'peek' | 'isExpired'>> {
   return {
-    getAll: jest.fn().mockReturnValue(entries),
+    keys: jest.fn().mockImplementation(() => entries.keys()),
+    peek: jest.fn().mockImplementation((k: string) => entries.get(k) ?? null),
     isExpired: jest.fn().mockImplementation((entry: CacheEntry<unknown>) => {
       if (entry.ttlMs <= 0) return false;
       return Date.now() - new Date(entry.updatedAt).getTime() > entry.ttlMs;
@@ -92,6 +93,21 @@ describe('L2RecoveryService', () => {
 
     const pipe = redis._client.created[0];
     expect(pipe.set).toHaveBeenCalledWith('key:1', JSON.stringify(entry), 'EX', expect.any(Number));
+  });
+
+  // FR-5 regression — a key present at keys()-snapshot time may be evicted from L1
+  // during the getClient() await; peek() then returns null and it is not on L3.
+  // recover() must skip it, not throw (the old getAll() snapshot was immune).
+  it('recover() skips (does not throw) a key evicted from L1 after the keys snapshot', async () => {
+    const jsonCache = {
+      keys: jest.fn().mockImplementation(() => ['evicted:key'][Symbol.iterator]()),
+      peek: jest.fn().mockReturnValue(null), // evicted between snapshot and read
+      isExpired: jest.fn().mockImplementation((e: CacheEntry<unknown>) =>
+        e.ttlMs > 0 && Date.now() - new Date(e.updatedAt).getTime() > e.ttlMs),
+    };
+    const { svc } = makeService({ jsonCache, l3: makeL3(new Map()) });
+
+    await expect(svc.recover()).resolves.toMatchObject({ skipped: 1 });
   });
 
   // Cycle 2 — skips expired entries — no pipeline created

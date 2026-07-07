@@ -98,7 +98,7 @@ export function imageModelKey(imageModel?: string): string | undefined {
  * translate instead of replaying stale patches. */
 export function renderConfigHash(env: NodeJS.ProcessEnv): string {
   const knobs = Object.keys(env)
-    .filter((k) => k.startsWith('MIT_'))
+    .filter((k) => k.startsWith('MIT_') || k.startsWith('LLM_'))
     .sort()
     .map((k) => `${k}=${env[k] ?? ''}`)
     .join('\n');
@@ -213,6 +213,7 @@ export function buildMitConfig(
   const lamaReground = fracEnv('MIT_LAMA_LUM_REGROUND');
   const fontSizeMax = posIntEnv('MIT_FONT_SIZE_MAX');
   const model = imageModelKey(imageModel);
+  const provider = env.LLM_PROVIDER ?? 'gemini';
   return JSON.stringify({
     translator: {
       target_lang: tgtMIT,
@@ -226,6 +227,17 @@ export function buildMitConfig(
       // prompt so the model knows which manga it is translating. Absent →
       // prompt identical to the context-free behavior.
       ...(seriesContext ? { series_context: seriesContext } : {}),
+      ...(provider !== 'gemini'
+        ? {
+            translator: 'chatgpt',
+            api_key: env.LLM_API_KEY,
+            ...(env.LLM_BASE_URL ? { api_url: env.LLM_BASE_URL } : {}),
+          }
+        : {}),
+      // P7 (Master Plan 2): ask the LLM for the shortest faithful phrasing so long
+      // translations don't overflow tight balloons (the measured #1 narrow-bubble cause
+      // is a translation ~2x too tall for the bubble). Absent → prompt byte-identical.
+      ...(flagEnv('MIT_CONCISE_BUBBLES') ? { concise_bubbles: true } : {}),
     },
     detector: {
       // #247: match MIT's own tuned Config default (2560). 2048 silently
@@ -282,6 +294,12 @@ export function buildMitConfig(
       ...(flagEnv('MIT_MASK_TIGHTEN') ? { mask_tighten: true } : {}),
       // #268: Poisson seamless-clone the inpaint into the original (escalation lever).
       ...(flagEnv('MIT_SEAMLESS_CLONE') ? { seamless_clone: true } : {}),
+      // #540/#548 (full-page inpaint path): protect a figure the text mask's morph-close
+      // swept in; clip the CRF mask to the textlines (boy-ghost); dilate wider on FLAT bg
+      // (kills LaMa stroke-stub ghosts). Absent → byte-identical.
+      ...(flagEnv('MIT_PROTECT_FIGURES') ? { protect_figures: true } : {}),
+      ...(flagEnv('MIT_RESTRICT_FULLPAGE_MASK') ? { restrict_fullpage_mask: true } : {}),
+      ...(flagEnv('MIT_ADAPTIVE_DILATE') ? { adaptive_dilate: true } : {}),
     },
     render: {
       direction: 'auto',
@@ -308,6 +326,13 @@ export function buildMitConfig(
       // warping it onto the original vertical-JP quad (which stretches it oversized).
       // Absent → byte-identical.
       ...(flagEnv('MIT_CLEAN_LAYOUT') ? { clean_layout: true } : {}),
+      // #178 P3: MangaTranslator-parity fit for clean-layout regions — binary-search the font from the
+      // flat cap DOWN to the largest fitting BOTH balloon axes (narration/caption oversize fix). Needs
+      // MIT_CLEAN_LAYOUT. Gated on the polygon-spill harness (#525) staying green. Absent → byte-identical.
+      ...(flagEnv('MIT_REFERENCE_LAYOUT') ? { reference_layout: true } : {}),
+      // #180 P8: Knuth-Plass holistic line-breaking (balanced columns, no mid-word/name split) instead of
+      // the greedy packer. Absent → greedy, byte-identical.
+      ...(flagEnv('MIT_KNUTH_PLASS') ? { knuth_plass: true } : {}),
       // #176: render Latin/EN targets in the bundled comic font instead of the
       // worker's Prompt-Bold (a Thai face). Absent → byte-identical.
       ...(flagEnv('MIT_EN_COMIC_FONT') ? { en_comic_font: true } : {}),
@@ -330,6 +355,13 @@ export function buildMitConfig(
       ...(patchFeather !== undefined
         ? { patch_feather_radius: patchFeather }
         : {}),
+      // #436: shape each patch's alpha to its own content (new glyphs + own erase mask)
+      // instead of a full opaque rectangle, so two overlapping speech balloons stop
+      // repainting clean background over each other's text. Absent → full-rectangle
+      // (feathered) patch, byte-identical. (Distinct from the #266 luminance-band attempt
+      // that reused this name and was rolled back; this impl is content-footprint based
+      // and verified not to fade text on dark backgrounds.)
+      ...(flagEnv('MIT_PATCH_CONTENT_ALPHA') ? { patch_content_alpha: true } : {}),
     },
   });
 }

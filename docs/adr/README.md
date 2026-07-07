@@ -25,6 +25,9 @@ overturns an earlier one marks the old ADR **Superseded**.
 | [015](015-frontend-auth-context-supabase-adapter.md) | Frontend auth context: AppUser adapter, OAuth popup, cross-user cache isolation | Frontend | Accepted |
 | [016](016-upload-magic-byte-mime-validation.md) | Upload path validates MIME by magic bytes (not client Content-Type) — defense-in-depth (#303) | Backend | Accepted |
 | [017](017-mit-batch-transport-jobstate-seam.md) | MIT batch path split: transport/stream (`MitBatchStream`) vs job-state (`MitBatchOrchestrator`) (#294) | Backend | Accepted |
+| [018](018-staff-console-out-of-band-observability-aggregator.md) | Staff Console: out-of-band aggregator µservice + per-service event streams + zero-trust signed-claim auth | Full-stack | Accepted — **planned** (#279) |
+| [019](019-mit-status-stream-forward-jwt-verification.md) | MIT `/status` + `/status/stream` hybrid SSE telemetry; forwarded-JWT verified via Supabase `getUser` (refines 018's PyJWT assumption) | MIT · Dashboard | Accepted — **implemented** (#279) |
+| [021](021-deployment-and-cost-architecture.md) | Deployment & cost: ephemeral on-demand 2-tier (serverless GPU + shared VPS), near-zero marginal cost, deferred until validated | Infra | Accepted — **planned** |
 
 ## Conventions
 

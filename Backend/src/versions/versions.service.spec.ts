@@ -40,8 +40,9 @@ function fakeDb(data: unknown[]) {
   return { client: chain } as unknown as SupabaseService;
 }
 
-function fakeStorage(filesByDir: Record<string, string[]>) {
+function fakeStorage(filesByDir: Record<string, string[]>, isRemote = false) {
   return {
+    isRemote,
     put: jest.fn(),
     get: jest.fn(),
     delete: jest.fn(),
@@ -110,5 +111,36 @@ describe('VersionsService — backendAvailable via one list() per version (#149)
 
     expect(versions[0].backendAvailable).toBe(true);
     expect(storage.list).not.toHaveBeenCalled();
+  });
+});
+
+describe('VersionsService — backendAvailable short-circuits on remote storage (FR-6)', () => {
+  it('remote provider (isRemote: true): backendAvailable is true and storage.list is never called', async () => {
+    // With remote/R2 storage, files are globally available — the local-presence
+    // check is pointless and would cost ~100ms per network round-trip.
+    const storage = fakeStorage({ 'uploads/chapters/v1': ['page-1.png'] }, true);
+    const svc = new VersionsService(
+      fakeDb([row('v1', [pageUrl('v1', 1)])]),
+      storage,
+    );
+
+    const versions = await svc.listVersionsByChapter('ch1');
+
+    expect(versions[0].backendAvailable).toBe(true);
+    expect(storage.list).not.toHaveBeenCalled();
+  });
+
+  it('local provider (isRemote: false): storage.list IS called and result determines availability', async () => {
+    const storage = fakeStorage({ 'uploads/chapters/v1': ['page-1.png'] }, false);
+    const svc = new VersionsService(
+      fakeDb([row('v1', [pageUrl('v1', 1)])]),
+      storage,
+    );
+
+    const versions = await svc.listVersionsByChapter('ch1');
+
+    expect(versions[0].backendAvailable).toBe(true);
+    expect(storage.list).toHaveBeenCalledTimes(1);
+    expect(storage.list).toHaveBeenCalledWith('uploads/chapters/v1');
   });
 });

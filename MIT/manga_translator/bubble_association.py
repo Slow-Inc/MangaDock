@@ -186,3 +186,26 @@ def associate_regions_to_bubbles(
                     match = i
         out.append(match)
     return out
+
+
+def acceptable_synth_bubble(box, region_box, page_w, page_h, max_page_frac=0.6, min_grow=1.05):
+    """Gate a flood-fill-synthesized bubble before it is used (#170/#178 recall fallback).
+
+    Accept only when the box (1) fully ENCLOSES the text region, (2) is meaningfully BIGGER than it
+    (room to fill — not a degenerate/equal box), and (3) is NOT a page/panel leak (area below
+    ``max_page_frac`` of the page). Rejects the classic flood-fill failure modes (escaped to the
+    whole panel, or clung to the text) so the fallback never manufactures a bogus balloon.
+    """
+    bx1, by1, bx2, by2 = box
+    rx1, ry1, rx2, ry2 = region_box
+    if not (bx1 <= rx1 and by1 <= ry1 and bx2 >= rx2 and by2 >= ry2):
+        return False
+    bw, bh = bx2 - bx1, by2 - by1
+    rw, rh = rx2 - rx1, ry2 - ry1
+    if bw <= 0 or bh <= 0:
+        return False
+    if bw * bh <= (rw * rh) * min_grow:
+        return False
+    if (bw * bh) > (page_w * page_h) * max_page_frac:
+        return False
+    return True

@@ -110,12 +110,17 @@ jobs:
           echo "Running: $files"
           bun test $files
 
-  mit:
-    name: mit (pytest, report-only)
+  # MIT is two jobs since #359 lazy-imported torch (job ids use underscores — a hyphen in a
+  # job id breaks `${{ needs.mit-logic }}` expression parsing, which reads `-` as subtraction):
+  #   • mit_logic — BLOCKING gate. Lightweight deps only (no torch); test/conftest.py auto-skips
+  #     the torch-only modules, so the pure-logic suite runs in seconds and gates the merge.
+  #   • mit_heavy — report-only (continue-on-error). Full ML install; the suites that genuinely
+  #     need torch/models. Non-blocking until it's reliably green on a GPU-less runner.
+  mit_logic:
+    name: pytest (logic gate, torch-free)
     needs: changes
     if: ${{ needs.changes.outputs.mit == 'true' }}
     runs-on: ubuntu-latest
-    continue-on-error: true        # report-only until torch is lazy-imported (#359)
     defaults:
       run:
         working-directory: MIT
@@ -127,26 +132,55 @@ jobs:
           cache: pip
       - name: System libs for OpenCV
         run: sudo apt-get update && sudo apt-get install -y libgl1
+      # requirements.txt MINUS the multi-GB ML stack. If a logic test ever needs a filtered
+      # package this job goes red and the line is dropped — the filter is transparent on purpose.
+      - name: Install lightweight deps (no torch/transformers/diffusers)
+        run: |
+          python -m pip install --upgrade pip
+          grep -viE '^(torch|torchvision|torch-summary|transformers|diffusers|gguf|bitsandbytes|accelerate|ctranslate2|onnxruntime|ultralytics|manga-ocr|kornia|timm|rusty-manga-image-translator|--extra-index-url)' requirements.txt > requirements-logic.txt
+          pip install -r requirements-logic.txt -r requirements-dev.txt
+      - name: Run torch-free logic suite
+        run: pytest test/ -q
+
+  mit_heavy:
+    name: pytest (heavy ML, report-only)
+    needs: changes
+    if: ${{ needs.changes.outputs.mit == 'true' }}
+    runs-on: ubuntu-latest
+    continue-on-error: true        # opt-in: needs models/GPU; flip once green without a GPU
+    defaults:
+      run:
+        working-directory: MIT
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: System libs for OpenCV
+        run: sudo apt-get update && sudo apt-get install -y libgl1
+      # CPU-only torch keeps the install size sane (the CUDA wheel is ~2GB).
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt -r requirements-dev.txt
-      - run: pytest test/ -q
+      - name: Run full suite
+        run: pytest test/ -q
 
   gate:
     name: gate
     if: ${{ always() }}
-    needs: [backend, frontend, mit]
+    needs: [backend, frontend, mit_logic, mit_heavy]
     runs-on: ubuntu-latest
     steps:
-      # Mark ONLY this job as the required check. Skipped service jobs are fine;
-      # the gate fails only when a *required* job (backend/frontend) actually
-      # failed. MIT is report-only (continue-on-error) and never blocks.
+      # Mark ONLY this job as the required check. Skipped service jobs are fine; the gate fails
+      # only when a *required* job (backend/frontend/mit_logic) actually failed. mit_heavy is
+      # report-only (continue-on-error) and never blocks.
       - name: Verify required jobs
         run: |
-          echo "backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }} mit=${{ needs.mit.result }}"
-          if [ "${{ needs.backend.result }}" = "failure" ] || [ "${{ needs.frontend.result }}" = "failure" ]; then
+          echo "backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }} mit_logic=${{ needs.mit_logic.result }} mit_heavy=${{ needs.mit_heavy.result }}"
+          if [ "${{ needs.backend.result }}" = "failure" ] || [ "${{ needs.frontend.result }}" = "failure" ] || [ "${{ needs.mit_logic.result }}" = "failure" ]; then
             echo "::error::A required CI job failed"
             exit 1
           fi

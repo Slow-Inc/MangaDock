@@ -6,6 +6,7 @@ import {
 import { DiskStorageProvider } from './disk-storage.provider';
 import { CloudflareR2StorageProvider } from './cloudflare-r2.provider';
 import { UploadsController } from './uploads.controller';
+import { ImgCacheController } from './img-cache.controller';
 
 /**
  * Select the storage backend.
@@ -59,7 +60,7 @@ export function createStorageProvider(
 
 @Global()
 @Module({
-  controllers: [UploadsController],
+  controllers: [UploadsController, ImgCacheController],
   providers: [
     {
       provide: STORAGE_PROVIDER,

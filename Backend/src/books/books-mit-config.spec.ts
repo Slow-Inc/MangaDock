@@ -45,6 +45,8 @@ const ENV_KEYS = [
   'MIT_FONT_SIZE_OFFSET',
   'MIT_FONT_SIZE_MIN',
   'MIT_BUBBLE_AREA_FIT',
+  'MIT_REFERENCE_LAYOUT',
+  'MIT_KNUTH_PLASS',
   'MIT_SFX_DETECTOR',
   'MIT_OCR_VLM_RESCUE',
   'MIT_EN_COMIC_FONT',
@@ -53,7 +55,11 @@ const ENV_KEYS = [
   'MIT_FONT_MAX_BOX_RATIO',
   'MIT_EN_FONT',
   'MIT_PATCH_FEATHER',
+  'MIT_PATCH_CONTENT_ALPHA',
   'MIT_INPAINT_CONTEXT_PAD',
+  'MIT_PROTECT_FIGURES',
+  'MIT_RESTRICT_FULLPAGE_MASK',
+  'MIT_ADAPTIVE_DILATE',
 ];
 
 describe('BooksService.buildMitConfig', () => {
@@ -93,6 +99,25 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.inpainter.inpainter).toBe('flux_klein');
+  });
+
+  it('emits the #548 mask-quality inpainter flags from MIT_PROTECT_FIGURES / MIT_RESTRICT_FULLPAGE_MASK / MIT_ADAPTIVE_DILATE', () => {
+    process.env.MIT_PROTECT_FIGURES = '1';
+    process.env.MIT_RESTRICT_FULLPAGE_MASK = '1';
+    process.env.MIT_ADAPTIVE_DILATE = '1';
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'JPN', 'THA', 'ja'));
+    expect(cfg.inpainter.protect_figures).toBe(true);
+    expect(cfg.inpainter.restrict_fullpage_mask).toBe(true);
+    expect(cfg.inpainter.adaptive_dilate).toBe(true);
+  });
+
+  it('omits the #548 mask-quality flags when their env is unset (byte-identical default)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'JPN', 'THA', 'ja'));
+    expect(cfg.inpainter.protect_figures).toBeUndefined();
+    expect(cfg.inpainter.restrict_fullpage_mask).toBeUndefined();
+    expect(cfg.inpainter.adaptive_dilate).toBeUndefined();
   });
 
   it('folds the inpainter choice into renderConfigHash so switching busts the patch cache', () => {
@@ -258,6 +283,19 @@ describe('BooksService.buildMitConfig', () => {
     expect(cfg.render.patch_feather_radius).toBeUndefined();
   });
 
+  it('enables content-shaped patch alpha via MIT_PATCH_CONTENT_ALPHA (#436)', () => {
+    process.env.MIT_PATCH_CONTENT_ALPHA = '1';
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.patch_content_alpha).toBe(true);
+  });
+
+  it('omits patch_content_alpha when unset — patches byte-identical (#436)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.patch_content_alpha).toBeUndefined();
+  });
+
   it('enables the larger inpaint context crop via MIT_INPAINT_CONTEXT_PAD (#249)', () => {
     process.env.MIT_INPAINT_CONTEXT_PAD = '256';
     const svc = makeService();
@@ -289,6 +327,32 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.render.bubble_area_fit).toBeUndefined();
+  });
+
+  it('enables reference_layout via MIT_REFERENCE_LAYOUT (#178 P3)', () => {
+    process.env.MIT_REFERENCE_LAYOUT = '1';
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.reference_layout).toBe(true);
+  });
+
+  it('omits reference_layout unless MIT_REFERENCE_LAYOUT is "1" (#178 P3, default byte-identical)', () => {
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.reference_layout).toBeUndefined();
+  });
+
+  it('enables knuth_plass via MIT_KNUTH_PLASS (#180 P8)', () => {
+    process.env.MIT_KNUTH_PLASS = '1';
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.knuth_plass).toBe(true);
+  });
+
+  it('omits knuth_plass unless MIT_KNUTH_PLASS is "1" (#180 P8, default greedy)', () => {
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.knuth_plass).toBeUndefined();
   });
 
   it('enables the SFX detector via MIT_SFX_DETECTOR (#168)', () => {

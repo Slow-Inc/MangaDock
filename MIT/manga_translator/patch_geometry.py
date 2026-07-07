@@ -209,6 +209,36 @@ def feather_alpha(content_mask: np.ndarray, radius: int) -> np.ndarray:
     return (ramp * 255.0).astype(np.uint8)
 
 
+def content_alpha_inner(rendered_rgb: np.ndarray, inpainted_rgb: np.ndarray,
+                        own_mask: np.ndarray = None, threshold: int = 12, dilate: int = 8) -> np.ndarray:
+    """Content-footprint mask for a patch (#436): 255 only over what *this* patch contributes —
+    its newly-drawn glyphs **and** the area of its own original text it must hide — else 0.
+
+    Fed to :func:`feather_alpha` instead of a full rectangle so the patch is opaque only over its
+    own content and **transparent everywhere else**. Two overlapping speech balloons each emit a
+    rectangular patch; the one composited last used to repaint its whole opaque rectangle over the
+    other's text. A content alpha makes the margins transparent so the neighbour's text survives.
+
+    Crucially it must NOT key off ``rendered != original``: with full-page inpaint each patch's
+    crop already has *every* balloon's original text erased, so that diff would also mark the
+    neighbour-text it erased and re-occlude it. Instead:
+      * new glyphs  = ``|rendered - inpainted|`` (the inpaint has no text, so this is only the
+        glyphs this patch drew), and
+      * own erase   = ``own_mask`` (this group's text-only mask — its own original ink), if given.
+    Their union, dilated by ``dilate`` px to cover anti-aliasing. ``None`` on a rendered/inpaint
+    shape mismatch → caller falls back to the rectangle. Pure numpy/cv2."""
+    if rendered_rgb.shape[:2] != inpainted_rgb.shape[:2]:
+        return None
+    diff = np.abs(rendered_rgb.astype(np.int16) - inpainted_rgb.astype(np.int16)).max(axis=2)
+    inner = (diff > threshold).astype(np.uint8) * np.uint8(255)
+    if own_mask is not None and own_mask.shape[:2] == rendered_rgb.shape[:2]:
+        inner = np.maximum(inner, (own_mask > 0).astype(np.uint8) * np.uint8(255))
+    if dilate > 0:
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * dilate + 1, 2 * dilate + 1))
+        inner = cv2.dilate(inner, k)
+    return inner
+
+
 def seamless_blend_inpaint(inpainted_rgb: np.ndarray, original_rgb: np.ndarray,
                            mask: np.ndarray, *, erode: int = 2) -> np.ndarray:
     """Poisson seamless-clone the inpainted region into the original (PRD #268 escalation lever).
@@ -341,3 +371,208 @@ def reground_inpaint_luminance(inpainted_rgb: np.ndarray, original_rgb: np.ndarr
     out = out.astype(np.uint8)
     out[valid] = inp[valid]   # enforce exact outside-mask byte-identity
     return np.ascontiguousarray(out)
+
+
+# --- #548 Stage C slice 3: mask-quality family ported from landing render stack ---
+# --- protect_figures/restrict (#540), adaptive dilation, overlap-safe patch alpha,
+# --- own-balloon erase, full-page mask assembly. Pure numpy/cv2; wiring lands in a follow-up. ---
+
+def protect_figure_ink(mask, regions, img_h, img_w, margin: int = 16):
+    """#540: keep the erase mask from swallowing a figure that ``create_text_only_mask``'s
+    dilate + MORPH_CLOSE swept in (text surrounding a small drawing on multiple sides gets
+    the enclosed figure filled — raw glyph polygons cover 0% of it, the closed mask 95%).
+
+    Provenance, not a pixel heuristic: clip the mask to the RAW glyph polygons dilated by
+    ``margin`` (via the tested ``restrict_mask_to_render_regions``). Ink within ``margin`` of
+    an actual textline is kept; ink only reachable through the morph-close (a figure tens of
+    px from any glyph) is dropped. Pure."""
+    raw = np.zeros((img_h, img_w), dtype=np.uint8)
+    for r in regions:
+        lines = getattr(r, 'lines', None)
+        if lines is None:
+            continue
+        for line in lines:
+            pts = np.array(line, dtype=np.int32).reshape(-1, 2)
+            if pts.shape[0] >= 3:
+                cv2.fillPoly(raw, [pts], 255)
+    return restrict_mask_to_render_regions(mask, raw, margin=margin)
+
+
+def assemble_fullpage_erase_mask(refined_mask, text_only_mask, img_rgb,
+                                 restrict: bool = False, restrict_margin: int = 8):
+    """Assemble the full-page erase mask from the refined (CRF) mask + textline mask.
+
+    #540 boy-ghost: the per-crop path clips the CRF mask to the to-be-rendered
+    textlines (``restrict_mask_to_render_regions``), but the full-page (prod) path
+    did not — so CRF ink far from any textline (a figure's hair strokes inside an
+    oversized dialogue box) survived and LaMa smeared the figure. ``restrict=True``
+    brings the full-page path to parity: intersect the refined mask with the
+    dilated textline mask BEFORE the white-caption erase (which legitimately adds
+    ink outside textlines and must survive). ``restrict=False`` is byte-identical
+    to the former inline ``union_refined_with_fallback`` + caption-erase. Pure."""
+    from .detection_postproc import erase_ink_in_white_caption_boxes
+    mask = union_refined_with_fallback(refined_mask, text_only_mask)
+    if restrict:
+        mask = restrict_mask_to_render_regions(mask, text_only_mask, margin=restrict_margin)
+    return erase_ink_in_white_caption_boxes(mask, img_rgb)
+
+
+def adaptive_dilate_mask(mask: np.ndarray, gray_or_rgb: np.ndarray,
+                         flat_px: int = 12, tight_px: int = 1, ring: int = 6,
+                         flat_std: float = 18.0) -> np.ndarray:
+    """Lever 1 — dilate each erase-mask component by an amount that depends on the
+    LOCAL background texture just outside it.
+
+    LaMa reconstructs faint ghosts of the source text from the stroke stubs left
+    just beyond a tight mask when the background is FLAT paper — but a wide mask
+    over screentone/line-art makes LaMa over-erase the art (#248). So: measure the
+    pixel std-dev in a ``ring``-px band around each connected component of the
+    background image; a FLAT ring (std < ``flat_std``) dilates that component by
+    ``flat_px`` (kills the stubs), a TEXTURED ring keeps it at ``tight_px``.
+    Per-component and independent. Pure cv2/numpy; input not mutated."""
+    gray = gray_or_rgb if gray_or_rgb.ndim == 2 else cv2.cvtColor(gray_or_rgb, cv2.COLOR_RGB2GRAY)
+    m = (np.ascontiguousarray(mask) > 0).astype(np.uint8)
+    num, labels = cv2.connectedComponents(m)
+    out = np.zeros_like(m)
+    gf = gray.astype(np.float32)
+    for c in range(1, num):
+        comp = (labels == c).astype(np.uint8)
+        # ring = a band just OUTSIDE this component
+        k_ring = 2 * ring + 1
+        grown = cv2.dilate(comp, np.ones((k_ring, k_ring), np.uint8))
+        band = (grown > 0) & (comp == 0)
+        std = float(gf[band].std()) if band.any() else 0.0
+        px = flat_px if std < flat_std else tight_px
+        if px > 0:
+            k = 2 * px + 1
+            comp = cv2.dilate(comp, np.ones((k, k), np.uint8))
+        out |= comp
+    return (out * 255).astype(np.uint8)
+
+
+def restrict_mask_to_render_regions(mask: np.ndarray, allowed_mask: np.ndarray,
+                                    margin: int = 3) -> np.ndarray:
+    """#535 empty-bubble guard: the erase mask may never cover text strokes this
+    patch will not re-render. The refined mask hunts ALL text-like strokes in the
+    crop — including a dropped region's text or a neighbouring group's bubble —
+    and erasing those without drawing anything back is the "white empty bubble"
+    defect. Intersect the erase mask with the allowed (to-be-rendered) region
+    mask, dilated by ``margin`` px so legitimate refinement spill hugging a
+    rendered glyph survives. Inputs are not mutated. Pure numpy/cv2."""
+    allowed = (np.ascontiguousarray(allowed_mask) > 0).astype(np.uint8)
+    if margin > 0:
+        k = 2 * margin + 1
+        allowed = cv2.dilate(allowed, np.ones((k, k), np.uint8))
+    out = np.ascontiguousarray(mask).astype(np.uint8).copy()
+    out[allowed == 0] = 0
+    return out
+
+
+def add_own_balloon_interiors(allowed_mask: np.ndarray, regions,
+                              border_frac: float = 0.04) -> np.ndarray:
+    """#535 ("ME OFF!" ghost): a region that owns a speech balloon may erase ANY
+    stroke inside that balloon — the translation is re-rendered over the whole
+    balloon, so leftover source lines the detector's box missed (the last "ME
+    OFF!" line) are its own territory, not a neighbour's. Adds each region's
+    (slightly shrunk, border-safe) ``bubble_box`` interior to the allowed erase
+    mask. Regions without a balloon contribute nothing. Input not mutated."""
+    out = np.ascontiguousarray(allowed_mask).astype(np.uint8).copy()
+    h, w = out.shape[:2]
+    for r in regions:
+        bb = getattr(r, 'bubble_box', None)
+        if bb is None:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in bb)
+        dx, dy = (x2 - x1) * border_frac, (y2 - y1) * border_frac
+        ix1, iy1 = max(0, int(x1 + dx)), max(0, int(y1 + dy))
+        ix2, iy2 = min(w, int(x2 - dx)), min(h, int(y2 - dy))
+        if ix2 > ix1 and iy2 > iy1:
+            out[iy1:iy2, ix1:ix2] = 255
+    return out
+
+
+def erase_own_balloon_ink(mask: np.ndarray, crop_rgb: np.ndarray, regions,
+                          border_frac: float = 0.06, ink_thresh: int = 128,
+                          dilate_px: int = 2, art_frac: float = 0.45) -> np.ndarray:
+    """#535 round-7 ("ME OFF!" ghost): source lines the detector's box missed leave
+    strokes the refined mask never covers — inside a region's OWN balloon they are
+    its territory (the translation re-renders over the balloon), so add those INK
+    pixels (slightly dilated) to the erase mask.
+
+    One-Punch HUH-panel regression fix: only leftover TEXT is fair game — a
+    connected component whose bbox spans > ``art_frac`` of the interior in either
+    dimension is ART (a character figure under a speech bubble) and is preserved,
+    not erased. Input not mutated."""
+    out = np.ascontiguousarray(mask).astype(np.uint8).copy()
+    h, w = out.shape[:2]
+    gray = crop_rgb.mean(axis=2) if crop_rgb.ndim == 3 else crop_rgb
+    for r in regions:
+        bb = getattr(r, 'bubble_box', None)
+        if bb is None:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in bb)
+        dx, dy = (x2 - x1) * border_frac, (y2 - y1) * border_frac
+        ix1, iy1 = max(0, int(x1 + dx)), max(0, int(y1 + dy))
+        ix2, iy2 = min(w, int(x2 - dx)), min(h, int(y2 - dy))
+        if ix2 <= ix1 or iy2 <= iy1:
+            continue
+        ink = (gray[iy1:iy2, ix1:ix2] < ink_thresh).astype(np.uint8)
+        ih, iw = ink.shape[:2]
+        num, labels, stats, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+        keep = np.zeros(num, dtype=bool)
+        for c in range(1, num):
+            # ART = large in BOTH dimensions (a figure). A text line is wide but
+            # thin, so a component that is thin in EITHER dimension is text -> erase.
+            is_art = (stats[c, cv2.CC_STAT_WIDTH] > iw * art_frac
+                      and stats[c, cv2.CC_STAT_HEIGHT] > ih * art_frac)
+            if not is_art:
+                keep[c] = True
+        text_ink = keep[labels].astype(np.uint8) * 255
+        if dilate_px > 0:
+            k = 2 * dilate_px + 1
+            text_ink = cv2.dilate(text_ink, np.ones((k, k), np.uint8))
+        out[iy1:iy2, ix1:ix2] = np.maximum(out[iy1:iy2, ix1:ix2], text_ink)
+    return out
+
+
+def changed_alpha(rendered: np.ndarray, original: np.ndarray,
+                  thresh: int = 8, dilate_px: int = 3) -> np.ndarray:
+    """#535 round-8 (the "ME OFF!" resurrection): patch crops overlap, and a patch
+    composited as a full opaque rectangle repaints its crop's ORIGINAL pixels over
+    a neighbouring patch's erased/rendered work — un-deleting the neighbour's
+    source text. Alpha = only the pixels this patch actually CHANGED vs the
+    pristine crop (small ``dilate_px`` ring against anti-aliased seams), so
+    overlapping patches compose instead of stomping each other. Pure numpy/cv2."""
+    diff = np.abs(rendered.astype(np.int16) - original.astype(np.int16))
+    if diff.ndim == 3:
+        diff = diff.max(axis=2)
+    changed = (diff > thresh).astype(np.uint8)
+    if dilate_px > 0:
+        k = 2 * dilate_px + 1
+        changed = cv2.dilate(changed, np.ones((k, k), np.uint8))
+    return (changed * 255).astype(np.uint8)
+
+
+def own_work_alpha(rendered: np.ndarray, background: np.ndarray, original: np.ndarray,
+                   own_mask: np.ndarray, thresh: int = 8, dilate_px: int = 3,
+                   mask_margin: int = 8) -> np.ndarray:
+    """p13 first-glyph loss root (full-page-inpaint path): every group's crop carries
+    the WHOLE page's inpainted background, so ``changed_alpha(rendered, original)``
+    also marked FOREIGN erasures (a neighbour region's inpainted-white vs its source
+    ink) opaque — a later patch then painted white over an earlier patch's text along
+    its crop edge (the aligned first-glyph "cut"). A patch may composite only its OWN
+    work:
+
+    - **text**:  ``rendered != background`` (what this group drew), anywhere;
+    - **erase**: ``background != original`` (inpaint) but ONLY inside this group's
+      own region zones (``own_mask``, dilated by ``mask_margin``).
+
+    Pure numpy/cv2; inputs not mutated."""
+    text_a = changed_alpha(rendered, background, thresh=thresh, dilate_px=dilate_px)
+    erase_a = changed_alpha(background, original, thresh=thresh, dilate_px=dilate_px)
+    own = (np.ascontiguousarray(own_mask) > 0).astype(np.uint8)
+    if mask_margin > 0:
+        k = 2 * mask_margin + 1
+        own = cv2.dilate(own, np.ones((k, k), np.uint8))
+    erase_a[own == 0] = 0
+    return np.maximum(text_a, erase_a)
