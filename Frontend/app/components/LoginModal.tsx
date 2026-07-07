@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getDisposableEmailError, normalizeEmail } from "../lib/emailValidation";
+import { useModalTransition } from "../hooks/useModalTransition";
 
 type Mode = "login" | "register" | "forgot-password";
 
@@ -19,8 +20,6 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const registerRef = useRef<HTMLFormElement>(null);
   const forgotPasswordRef = useRef<HTMLFormElement>(null);
   const [panelHeight, setPanelHeight] = useState<number | null>(null);
-  const [mounted, setMounted] = useState(false);
-  const [visible, setVisible] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<"google" | "facebook" | null>(null);
@@ -35,12 +34,17 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
   const { signInWithGoogle, signInWithFacebook, signUpWithEmail, signInWithEmail, sendPasswordReset } = useAuth();
 
+  const { mounted, visible, close } = useModalTransition(isOpen, {
+    duration: 300,
+    onClosed: onClose,
+  });
+
   const signInWithPopupGuard = (provider: "google" | "facebook", fn: () => Promise<void>) => async () => {
     setAuthError(null);
     setSocialLoading(provider);
     try {
       await fn();
-      handleClose();
+      close();
       setTimeout(() => setSocialLoading(null), 400);
     } catch (e: unknown) {
       setSocialLoading(null);
@@ -57,38 +61,11 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   };
 
-  useEffect(() => { setMounted(true); }, []);
-
   useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => setVisible(true), 10);
-      return () => clearTimeout(timer);
-    } else {
-      setVisible(false);
-    }
-  }, [isOpen]);
-
-  const handleClose = useCallback(() => {
-    setVisible(false);
-    setTimeout(() => {
-      onClose();
-      setMode("login");
-      setLoginEmail("");
-      setLoginPassword("");
-      setForgotPasswordEmail("");
-      setRegisterName("");
-      setRegisterEmail("");
-      setRegisterPassword("");
-      setRegisterConfirmPassword("");
-      setAuthError(null);
-    }, 300);
-  }, [onClose]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     if (isOpen) window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, handleClose]);
+  }, [isOpen, close]);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -112,7 +89,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setAuthLoading(true);
     try {
       await signInWithEmail(loginEmail, loginPassword);
-      handleClose();
+      close();
     } catch (error: unknown) {
       const err = error as { code?: string; message?: string };
       if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
@@ -142,7 +119,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setAuthLoading(true);
     try {
       await signUpWithEmail(normalizedEmail, registerPassword, registerName.trim());
-      handleClose();
+      close();
     } catch (error: unknown) {
       const err = error as { code?: string; message?: string };
       if (err.code === "auth/email-already-in-use") {
@@ -200,16 +177,15 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const inputCls = "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/30";
   const submitCls = "w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed";
 
-  if (!mounted) return null;
+  if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
     <div
       ref={overlayRef}
-      onClick={(e) => { if (e.target === overlayRef.current) handleClose(); }}
+      onClick={(e) => { if (e.target === overlayRef.current) close(); }}
       className={`fixed inset-0 z-[300] flex items-end md:items-center justify-center md:p-4 bg-black/70 md:bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
-      style={{ display: isOpen || visible ? "flex" : "none" }}
     >
       <div
         className={`relative w-full md:max-w-3xl transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
@@ -248,7 +224,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
         {/* ── Close button ── */}
         <button
-          onClick={handleClose}
+          onClick={close}
           className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
           aria-label="ปิด"
         >
