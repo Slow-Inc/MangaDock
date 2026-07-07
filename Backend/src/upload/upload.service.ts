@@ -5,10 +5,6 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import * as fs from 'fs';
-import * as fsp from 'fs/promises';
-import * as crypto from 'crypto';
-import { fileTypeFromFile } from 'file-type';
 import { SupabaseService } from '../supabase/supabase.service';
 import { VersionsService } from '../versions/versions.service';
 import type { ChapterVersion } from '../versions/versions.types';
@@ -16,20 +12,7 @@ import {
   STORAGE_PROVIDER,
   type StorageProvider,
 } from '../common/storage/storage-provider.interface';
-
-const ALLOWED_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-]);
-
-const MIME_TO_EXT: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-};
+import { saveValidatedImage } from '../common/storage/save-validated-image';
 
 @Injectable()
 export class UploadService {
@@ -54,36 +37,17 @@ export class UploadService {
     translatorUid: string,
     tempFilePath: string,
   ): Promise<{ pageUrl: string; pageIndex: number }> {
-    // Validate by magic bytes, not the client-supplied Content-Type (which is
-    // attacker-controlled). A disguised payload (e.g. <script> sent as image/png)
-    // is rejected here; an empty/truncated/undetectable file yields no detection.
-    // Mirrors forum.service uploadImage/uploadBanner. (#303)
-    const detected = await fileTypeFromFile(tempFilePath);
-    if (!detected || !ALLOWED_MIME_TYPES.has(detected.mime)) {
-      await fsp.rm(tempFilePath, { force: true });
-      throw new BadRequestException(
-        'Unsupported image format. Only JPEG, PNG, WebP and GIF are accepted.',
-      );
-    }
-    const mimeType = detected.mime;
-
-    const ext = MIME_TO_EXT[mimeType];
-    const filename = `${crypto.randomUUID()}${ext}`;
-    const key = `${this.versionDir(versionId)}/${filename}`;
-
-    try {
-      // Stream the file straight to storage instead of buffering the whole
-      // page (up to ~10MB) into memory with a blocking readFileSync.
-      await this.storage.put(key, fs.createReadStream(tempFilePath), { contentType: mimeType });
-      // Delete temp file after successful put
-      await fsp.rm(tempFilePath, { force: true });
-    } catch (err) {
-      this.logger.error(`Failed to upload page to storage: ${String(err)}`);
-      await fsp.rm(tempFilePath, { force: true });
-      throw new Error('Failed to upload page to storage');
-    }
-
-    const pageUrl = `/${key}`;
+    const { url: pageUrl, key } = await saveValidatedImage(
+      this.storage,
+      tempFilePath,
+      this.versionDir(versionId),
+      {
+        rejectMessage:
+          'Unsupported image format. Only JPEG, PNG, WebP and GIF are accepted.',
+        storageErrorMessage: 'Failed to upload page to storage',
+      },
+    );
+    const filename = key.split('/').pop()!;
 
     let pageIndex = -1;
     for (let attempt = 0; attempt < 3; attempt += 1) {
