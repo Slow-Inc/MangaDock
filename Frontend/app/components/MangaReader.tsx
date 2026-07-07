@@ -14,6 +14,7 @@ import { apiFetch } from "../lib/apiFetch";
 import { useChapters, type ChapterPageItem } from "../hooks/useChapters";
 import { ZOOM_MIN, ZOOM_MAX } from "../lib/zoomLevel";
 import { useZoomPan } from "../hooks/useZoomPan";
+import { useModalTransition } from "../hooks/useModalTransition";
 
 type ChapterPages = {
   pages: string[];
@@ -203,26 +204,23 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   // Track last valid page count so the counter can show it during fade-out.
   // State (not a ref) — it's read during render, which react-hooks/refs forbids.
   const [lastValidTotalPages, setLastValidTotalPages] = useState(0);
-  const [pickerMounted, setPickerMounted] = useState(false);
-  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const { mounted: pickerMounted, visible: pickerVisible } = useModalTransition(pickerOpen, {
+    duration: 300,
+  });
   const showChapterPickerRef = useRef(false);
   const [pickerLangFilter, setPickerLangFilter] = useState<string>("all");
   const pickerRef = useRef<HTMLDivElement>(null);
   const pickerScrollRef = useRef<HTMLDivElement>(null);
   const activeChapterBtnRef = useRef<HTMLButtonElement>(null);
-  const pickerCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openPicker = (lang: string) => {
-    if (pickerCloseTimerRef.current) clearTimeout(pickerCloseTimerRef.current);
     setPickerLangFilter(lang);
-    setPickerMounted(true);
-    // Defer visible so mount happens first, then CSS transition kicks in
-    requestAnimationFrame(() => requestAnimationFrame(() => setPickerVisible(true)));
+    setPickerOpen(true);
   };
 
   const closePicker = () => {
-    setPickerVisible(false);
-    pickerCloseTimerRef.current = setTimeout(() => setPickerMounted(false), 300);
+    setPickerOpen(false);
   };
 
   // Sync picker open state to ref for ESC handler
