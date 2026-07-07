@@ -668,8 +668,9 @@ export class MangaDexService {
 
     // Don't trust cached localUrls blindly — files may have been wiped on
     // restart/reset, which would 404 from the static /img-cache route.
-    // localCoverPaths re-checks existence per cover (and re-triggers downloads
-    // for missing ones), so always re-resolve from the original external urls.
+    // localCoverPaths re-checks existence (one batched list per manga, and
+    // re-triggers downloads for missing ones), so always re-resolve from the
+    // original external urls.
     const coverUrls = detail.covers.map((c) => c.url);
     const localPaths = await this.imageCache.localCoverPaths(mangaId, coverUrls);
     return {
@@ -755,8 +756,9 @@ export class MangaDexService {
 
     // Don't short-circuit on cached localPages/localDataSaverPages — those paths
     // may point to files wiped on restart/reset, which would 404 from the static
-    // /img-cache route. localPagePaths re-checks existence per page (and
-    // re-triggers downloads for missing ones), so always re-resolve.
+    // /img-cache route. localPagePaths re-checks existence (one batched list
+    // per chapter, and re-triggers downloads for missing ones), so always
+    // re-resolve.
     const [localPages, localDataSaverPages] = await Promise.all([
       this.imageCache.localPagePaths(
         '_chapters',

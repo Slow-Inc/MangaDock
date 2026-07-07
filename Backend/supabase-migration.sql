@@ -233,6 +233,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS wallet_tx_topup_ref_uidx
 CREATE INDEX IF NOT EXISTS idx_unlocks_uid                   ON unlocks(uid);
 CREATE INDEX IF NOT EXISTS idx_unlocks_version               ON unlocks(version_id);
 
+-- Topup idempotency: a given Xendit payment_id (reference_id) may be credited
+-- as a topup at most once. Partial index — only constrains topup rows with a
+-- non-NULL reference_id, leaving other transaction types unaffected.
+-- Applied: 2026-06-22 (wallet-security-hardening V5)
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_tx_topup_ref_uidx
+  ON wallet_transactions (reference_id)
+  WHERE type = 'topup' AND reference_id IS NOT NULL;
+
 -- ─── 5. VIEW — translator earnings ──────────────────────────────────────────
 
 CREATE OR REPLACE VIEW translator_earnings AS
@@ -439,6 +447,94 @@ BEGIN
 END;
 $$;
 
+-- NOTE (2026-06-22, wallet-security-hardening V5):
+-- The topup-scoped unique index wallet_tx_topup_ref_uidx (see INDEXES section)
+-- provides defense-in-depth for add_coins_atomic topup calls: if a duplicate
+-- reference_id topup INSERT is attempted, the DB will raise a unique-violation
+-- before any balance mutation occurs.
+--
+-- The dead numeric overloads below were DROPPED from the live DB in V5:
+--   DROP FUNCTION IF EXISTS add_coins_atomic(uuid, numeric, text, text);
+--   DROP FUNCTION IF EXISTS spend_coins_atomic(uuid, numeric, text, text);
+-- They are NOT defined here (reference-only). TypeScript always resolves to the
+-- integer overloads via named parameters (p_uid, p_amount, p_type, p_description,
+-- p_reference_id). The numeric overloads were broken (missing NOT-NULL
+-- balance_after) and unreachable.
+
+-- Atomic unlock purchase: insert unlock + debit buyer + credit creator in ONE transaction (V6/V7).
+-- Raises INSUFFICIENT_FUNDS (rolls back entire txn) if buyer balance is too low.
+-- Idempotent: ON CONFLICT (uid, version_id) DO NOTHING returns already_unlocked=true without charging.
+CREATE OR REPLACE FUNCTION purchase_unlock_atomic(
+  p_uid          uuid,
+  p_version_id   uuid,
+  p_price        integer,
+  p_creator_uid  uuid,
+  p_platform_pct numeric,
+  p_description  text
+)
+RETURNS TABLE(balance integer, already_unlocked boolean, creator_share integer, platform_share integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_rows            integer;
+  v_balance         integer;
+  v_creator_balance integer;
+  v_platform_share  integer := 0;
+  v_creator_share   integer := 0;
+BEGIN
+  -- Idempotent unlock (PK uid,version_id). If the row already exists, the user
+  -- already paid — return without charging again.
+  INSERT INTO unlocks (uid, version_id, price_paid)
+  VALUES (p_uid, p_version_id, p_price)
+  ON CONFLICT (uid, version_id) DO NOTHING;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+
+  IF v_rows = 0 THEN
+    SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), true, 0, 0;
+    RETURN;
+  END IF;
+
+  -- Free chapter: granted, no ledger movement.
+  IF p_price <= 0 THEN
+    SELECT w.balance INTO v_balance FROM wallets w WHERE w.uid = p_uid;
+    RETURN QUERY SELECT COALESCE(v_balance, 0), false, 0, 0;
+    RETURN;
+  END IF;
+
+  -- Debit buyer atomically. NOT FOUND => insufficient funds => raise, which
+  -- rolls back the unlock insert above (single transaction).
+  INSERT INTO wallets (uid, balance) VALUES (p_uid, 0) ON CONFLICT (uid) DO NOTHING;
+  UPDATE wallets
+     SET balance = wallets.balance - p_price, updated_at = now()
+   WHERE uid = p_uid AND wallets.balance >= p_price
+   RETURNING wallets.balance INTO v_balance;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'INSUFFICIENT_FUNDS';
+  END IF;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
+  VALUES (p_uid, -p_price, 'purchase', v_balance, p_description, p_version_id::text);
+
+  -- Credit creator share (70% default). reference_id left NULL — rewards are
+  -- guarded upstream by the unlocks PK, and topup idempotency index ignores nulls.
+  v_platform_share := floor(p_price * p_platform_pct);
+  v_creator_share  := p_price - v_platform_share;
+  IF v_creator_share > 0 AND p_creator_uid IS NOT NULL THEN
+    INSERT INTO wallets (uid, balance) VALUES (p_creator_uid, 0) ON CONFLICT (uid) DO NOTHING;
+    UPDATE wallets
+       SET balance = wallets.balance + v_creator_share, updated_at = now()
+     WHERE uid = p_creator_uid
+     RETURNING wallets.balance INTO v_creator_balance;
+    INSERT INTO wallet_transactions (uid, amount, type, balance_after, description)
+    VALUES (p_creator_uid, v_creator_share, 'reward', v_creator_balance, 'ส่วนแบ่งรายได้: ' || p_description);
+  END IF;
+
+  RETURN QUERY SELECT v_balance, false, v_creator_share, v_platform_share;
+END;
+$$;
+
 -- Atomic recalculate votes: counts forum_votes and writes totals to post/comment row
 CREATE OR REPLACE FUNCTION recalculate_votes_atomic(
   p_target_type text,
@@ -616,5 +712,45 @@ REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text) FROM anon
 REVOKE EXECUTE ON FUNCTION add_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION spend_coins_atomic(uuid, integer, text, text, text) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION cast_vote_atomic(uuid, text, uuid, integer) FROM anon, authenticated, PUBLIC;
+
+-- ─── 9. TRENDING MANGA RPC (FR-16) ───────────────────────────────────────────
+-- Group + rank trending manga in Postgres instead of pulling a 200-row sample into
+-- Node and tallying it (forum.service.ts getTrendingManga). The old JS path
+-- undercounted / mis-ranked once a manga's within-window posts spilled past the
+-- 200-row sample. This RPC reproduces the SAME filter semantics the JS tally used —
+-- non-null target_manga_id, non-null + non-empty target_manga_title, created within
+-- the last 7 days — but COUNT/ORDER run across the full table so ranking is correct
+-- at any post volume. title/cover are display tags cached identically on every post
+-- for a given manga, so max() picks a representative value. Backed by the existing
+-- idx_forum_posts_manga_created_at (target_manga_id, created_at DESC) index.
+--
+-- Deliberate improvement over the old JS tally: excludes soft-deleted posts
+-- (deleted_at IS NULL) from the trending count. The old JS tally never filtered
+-- deleted_at (an oversight), so this is a decided behavior change, not a
+-- like-for-like port. Consistent with the rest of the forum module's soft-delete
+-- convention (see idx_forum_posts_deleted_at).
+--
+-- Read-only over already-public forum data (the trending endpoint exposes exactly
+-- this), so it is a plain STABLE function — no SECURITY DEFINER, no REVOKE needed.
+CREATE OR REPLACE FUNCTION get_trending_manga(p_limit integer DEFAULT 5)
+RETURNS TABLE(manga_id text, manga_title text, manga_cover text, post_count bigint)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    target_manga_id                 AS manga_id,
+    max(target_manga_title)         AS manga_title,
+    max(target_manga_cover)         AS manga_cover,
+    count(*)                        AS post_count
+  FROM forum_posts
+  WHERE target_manga_id IS NOT NULL
+    AND target_manga_title IS NOT NULL
+    AND target_manga_title <> ''
+    AND created_at >= now() - interval '7 days'
+    AND deleted_at IS NULL
+  GROUP BY target_manga_id
+  ORDER BY post_count DESC
+  LIMIT p_limit;
+$$;
 
 COMMIT;

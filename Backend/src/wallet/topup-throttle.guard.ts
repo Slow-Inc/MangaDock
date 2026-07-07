@@ -26,11 +26,10 @@ export class TopupThrottleGuard implements CanActivate {
     if (!uid) return true; // AuthGuard runs first; if no uid, let it handle auth
 
     const key = `topup:create:rl:${uid}`;
-    const count = await this.redis.incr(key);
+    // Atomic incr + first-hit TTL in one round-trip — no window where the key
+    // exists without an expiry (which would throttle the user forever).
+    const count = await this.redis.incrWithTtl(key, TOPUP_RL_WINDOW_SEC);
     if (count === 0) return true; // Redis unavailable → fail open
-    if (count === 1) {
-      await this.redis.expire(key, TOPUP_RL_WINDOW_SEC);
-    }
     if (count > TOPUP_RL_MAX) {
       throw new HttpException('Too many topup requests. Please wait a minute.', HttpStatus.TOO_MANY_REQUESTS);
     }

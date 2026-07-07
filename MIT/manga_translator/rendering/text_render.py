@@ -30,6 +30,10 @@ try:
     _HAS_JIEBA = True
 except ImportError:
     _HAS_JIEBA = False
+# #278 nit: jieba builds its prefix dict (~1 s) lazily on the FIRST `_jieba.cut` — i.e. the first
+# Chinese render per worker carries that one-time cost, not import. We deliberately do NOT call
+# `_jieba.initialize()` here so a worker that never renders Chinese pays nothing at startup
+# (lazy-cost by design); the ~1 s is amortised on the first CHS/CHT page only.
 
 
 def _insert_cjk_word_breaks(text: str) -> str:
@@ -621,7 +625,20 @@ def put_text_vertical(font_size: int, text: str, h: int, alignment: str, fg: Tup
     x, y, w, h = cv2.boundingRect(canvas_border)
     return line_box[y:y+h, x:x+w]
 
+@functools.lru_cache(maxsize=None)
 def select_hyphenator(lang: str):
+    # #speed-study Phase 2b (L2, 2026-07-03): this is a PURE function of `lang`
+    # (returns None or a stateless Hyphenator for that language; its `.syllables()`
+    # is a read-only dictionary lookup with no call-history state), so caching the
+    # result per language is byte-identical to constructing it fresh each call.
+    # Measured: uncached `select_hyphenator('THA')` = ~163ms and `('ENG')` = ~372ms
+    # (the failing `Hyphenator(lang)` construction attempt / dictionary load is the
+    # cost, NOT `standardize_tag` which is ~0ms). calc_horizontal called it TWICE
+    # per invocation (here + inside `_split_into_syllables`), ~68 calc_horizontal
+    # calls/page → ~22s/page of pure repeated hyphenator setup on the render path.
+    # Caching by `lang` alone is correct: the result depends only on `lang` and the
+    # module-constant HYPHENATOR_LANGUAGES — NOT on the module-global font state,
+    # so this sidesteps the font-cache landmine that gates other render caches.
     lang = standardize_tag(lang)
     if lang not in HYPHENATOR_LANGUAGES:
         for avail_lang in reversed(HYPHENATOR_LANGUAGES):
@@ -631,6 +648,17 @@ def select_hyphenator(lang: str):
         else:
             return None
     try:
+        # #499 (multi-agent scrutinize, 3/3): the lru_cache above also caches a
+        # FAILED construction as a sticky None until worker restart. This is an
+        # accepted tradeoff, not a bug:
+        #  - EN->TH hot path: Thai has no hyphenation dictionary, so this fails
+        #    DETERMINISTICALLY (~163ms) every time — caching that None forever IS
+        #    the win the cache exists for.
+        #  - Narrow regression: for a hyphenatable target lang (DEU/FRA/…) whose
+        #    dict downloads on first use, a transient first-call network failure
+        #    would disable hyphenation for it until restart (old code retried).
+        # Not "fixed" because it's inherent to result-caching: caching only
+        # non-None would stop caching Thai's None and bring back the ~22s/page.
         return Hyphenator(lang)
     except Exception:
         return None
@@ -656,6 +684,20 @@ def _split_words_and_widths(text: str, font_size: int) -> Tuple[List[str], List[
     pixel width. Extracted verbatim from ``calc_horizontal``."""
     words = re.split(rf'[\s{_ZWSP}]+', text)
     return words, [get_string_width(font_size, w) for w in words]
+
+
+def longest_token_width(font_size: int, text: str, language: str = 'en_US') -> int:
+    """Pixel width of the widest *atomic* word in ``text`` — the floor a wrap column must
+    not drop below, or words with no hyphenation point (especially spaceless Thai/CJK) get
+    force-split mid-word ("ข้างนอก"→"ข้า"/"งนอก"). Word boundaries come from the same ZWSP
+    segmentation ``calc_horizontal`` uses (pythainlp/jieba), so a spaceless Thai line is
+    measured per word, not as one giant token. ``language`` is accepted for call-site symmetry
+    with ``calc_horizontal`` (segmentation auto-detects script, so it is not needed here)."""
+    seg = _insert_cjk_word_breaks(_insert_thai_word_breaks(text or ''))
+    words = [w for w in re.split(rf'[\s{_ZWSP}]+', seg) if w]
+    if not words:
+        return 0
+    return max(get_string_width(font_size, w) for w in words)
 
 
 def _split_into_syllables(words: List[str], font_size: int, max_width: int, language: str) -> List[List[str]]:
@@ -777,6 +819,18 @@ class LineBreaker(Protocol):
         ...
 
 
+_default_line_breaker: 'Optional[LineBreaker]' = None
+
+
+def set_default_line_breaker(breaker: 'Optional[LineBreaker]') -> None:
+    """Set the process-wide default LineBreaker that :func:`calc_horizontal` uses when no explicit
+    ``line_breaker`` is passed (#180 P8). ``None`` restores the byte-identical greedy default. Set once
+    per render pass from ``render.knuth_plass`` (mirrors :func:`set_font`), so both the sizing and the
+    render calc_horizontal calls switch together without threading a flag through every call site."""
+    global _default_line_breaker
+    _default_line_breaker = breaker
+
+
 class GreedyLineBreaker:
     """#186: default strategy — ``calc_horizontal``'s original greedy packing
     (Step 1), kept byte-identical by delegating straight to :func:`_greedy_pack`.
@@ -880,7 +934,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     # GreedyLineBreaker — byte-identical to the original greedy Step 1; #180 step 2
     # selects KnuthPlassLineBreaker behind render.bubble_area_fit. Steps 2-4 below
     # post-process greedy output; a holistic strategy opts out via greedy_postprocess.
-    breaker = line_breaker if line_breaker is not None else GreedyLineBreaker()
+    breaker = line_breaker if line_breaker is not None else (_default_line_breaker or GreedyLineBreaker())
     line_words_list, line_width_list, hyphenation_idx_list = breaker.pack(
         words, word_widths, syllables, font_size, max_width,
         whitespace_offset_x, hyphen_offset_x)

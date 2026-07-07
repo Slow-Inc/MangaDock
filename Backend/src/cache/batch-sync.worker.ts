@@ -125,7 +125,7 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.l3.write(key, entry);
+    await this.l3.write(key, entry);
 
     try {
       const { error } = await this.supabase.client.rpc(CACHE_SYNC_RPC, {

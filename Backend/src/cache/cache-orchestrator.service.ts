@@ -78,7 +78,12 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
           const ttlRemainingMs = entry.ttlMs <= 0
             ? entry.ttlMs
             : entry.ttlMs - (Date.now() - new Date(entry.updatedAt).getTime());
-          this.jsonCache.set(key, entry.data, ttlRemainingMs);
+          // A finite TTL that has already elapsed must not be written into L1:
+          // JsonCacheService.isExpired() treats ttlMs <= 0 as "permanent", so
+          // writing a lapsed remainder would make the entry immortal in L1.
+          if (entry.ttlMs <= 0 || ttlRemainingMs > 0) {
+            this.jsonCache.set(key, entry.data, ttlRemainingMs);
+          }
           return { data: entry.data, source: 'redis' };
         } catch {
           this.logger.warn(`Redis entry corrupt for key=${key}, will re-fetch`);
@@ -111,7 +116,7 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
       this.l3.appendDirtyFallback(key);
     }
 
-    this.logger.log(`Cache SET key=${key} ttl=${Math.floor(ttlMs / 1000)}s redis=${this.redis.available}`);
+    this.logger.debug(`Cache SET key=${key} ttl=${Math.floor(ttlMs / 1000)}s redis=${this.redis.available}`);
   }
 
   /**

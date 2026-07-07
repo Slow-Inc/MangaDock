@@ -198,6 +198,97 @@ describe('ForumService.listPosts / getPost — null-safe comment count', () => {
   });
 });
 
+// ── embedded comment count excludes soft-deleted rows (FR-17) ──────────────────
+// The embedded `comments:forum_comments(count)` must count only rows with
+// deleted_at IS NULL, so the number shown next to a post matches what
+// listComments (which already filters deleted_at) returns to a reader.
+
+describe('ForumService — embedded comment count excludes soft-deleted rows (FR-17)', () => {
+  const baseRow = {
+    id: 'p1',
+    author_uid: 'u1',
+    title: 'T',
+    content: 'C',
+    category: 'general',
+    target_manga_id: null,
+    target_manga_title: null,
+    target_manga_cover: null,
+    image_urls: null,
+    upvotes: 0,
+    downvotes: 0,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    author: { display_name: 'A', photo_url: null, role: 'user' },
+    comments: [{ count: 3 }] as Array<{ count: number }>,
+  };
+
+  it('listPosts filters the embedded comment count on deleted_at IS NULL', async () => {
+    const chain = buildMockChain({
+      range: jest.fn().mockResolvedValue({ data: [baseRow], count: 1, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    await service.listPosts();
+
+    expect(chain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+  });
+
+  it('getPost filters the embedded comment count on deleted_at IS NULL', async () => {
+    const chain = buildMockChain({
+      single: jest.fn().mockResolvedValue({ data: baseRow, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    await service.getPost('p1');
+
+    expect(chain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+  });
+
+  it('getPublicProfile filters embedded comment counts for both authored and liked posts', async () => {
+    // Two forum_posts queries run: authored posts (ends with .limit) and liked
+    // posts (ends with .is). Route each to its own chain so both can be asserted.
+    const authoredChain = buildMockChain({
+      limit: jest.fn().mockResolvedValue({ data: [baseRow], error: null }),
+    });
+    const likedChain = buildMockChain(); // ends on .is → returns the chain object
+    const forumPostsChains = [authoredChain, likedChain];
+
+    const fromImpl = (table: string) => {
+      switch (table) {
+        case 'profiles':
+          return buildMockChain({
+            single: jest.fn().mockResolvedValue({
+              data: { uid: 'u1', role: 'user', display_name: 'A' },
+              error: null,
+            }),
+          });
+        case 'forum_posts':
+          return forumPostsChains.shift();
+        case 'forum_comments':
+          return buildMockChain({ limit: jest.fn().mockResolvedValue({ data: [], error: null }) });
+        case 'forum_votes':
+          // One liked post id so the liked-posts query (site 253) runs.
+          return buildMockChain({
+            limit: jest.fn().mockResolvedValue({
+              data: [{ target_id: 'p2', created_at: '2024-01-01T00:00:00Z' }],
+              error: null,
+            }),
+          });
+        case 'chapter_versions':
+          return buildMockChain({ in: jest.fn().mockResolvedValue({ data: [], error: null }) });
+        default:
+          return buildMockChain();
+      }
+    };
+    const service = makeService(fromImpl);
+
+    await service.getPublicProfile('u1');
+
+    expect(authoredChain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+    expect(likedChain.is).toHaveBeenCalledWith('comments.deleted_at', null);
+  });
+});
+
 // ── listComments tree assembly ─────────────────────────────────────────────────
 
 describe('ForumService.listComments — tree assembly', () => {
@@ -274,50 +365,64 @@ describe('ForumService.listComments — tree assembly', () => {
 // ── getTrendingManga ───────────────────────────────────────────────────────────
 
 describe('ForumService.getTrendingManga', () => {
-  const makePost = (mangaId: string, title: string) => ({
-    target_manga_id: mangaId,
-    target_manga_title: title,
-    target_manga_cover: `${mangaId}.jpg`,
+  // The RPC returns rows already grouped + ranked by Postgres (snake_case columns,
+  // post_count arrives as a bigint string over PostgREST).
+  const makeRow = (mangaId: string, postCount: number) => ({
+    manga_id: mangaId,
+    manga_title: `Manga ${mangaId}`,
+    manga_cover: `${mangaId}.jpg`,
+    post_count: String(postCount),
   });
 
-  it('groups posts by manga and sorts by postCount descending', async () => {
-    const posts = [
-      makePost('m1', 'Manga A'),
-      makePost('m2', 'Manga B'),
-      makePost('m1', 'Manga A'),
-      makePost('m2', 'Manga B'),
-      makePost('m2', 'Manga B'),
-    ];
-    const chain = buildMockChain({
-      limit: jest.fn().mockResolvedValue({ data: posts, error: null }),
+  it('computes trending via the get_trending_manga RPC, not an in-Node tally of a row sample', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: [makeRow('m2', 3), makeRow('m1', 2)],
+      error: null,
     });
-    const service = makeService(() => chain);
+    // from() must not be used for trending — a table-scan-then-tally is the bug we removed.
+    const from = jest.fn(() => {
+      throw new Error('forum_posts should not be scanned for trending');
+    });
+    const service = makeService(from, rpc);
 
     const result = await service.getTrendingManga(5);
 
-    expect(result[0].mangaId).toBe('m2');
-    expect(result[0].postCount).toBe(3);
-    expect(result[1].mangaId).toBe('m1');
-    expect(result[1].postCount).toBe(2);
+    expect(rpc).toHaveBeenCalledWith('get_trending_manga', { p_limit: 5 });
+    expect(from).not.toHaveBeenCalled();
+    expect(result).toEqual([
+      { mangaId: 'm2', mangaTitle: 'Manga m2', mangaCover: 'm2.jpg', postCount: 3 },
+      { mangaId: 'm1', mangaTitle: 'Manga m1', mangaCover: 'm1.jpg', postCount: 2 },
+    ]);
   });
 
-  it('respects the limit parameter', async () => {
-    const posts = Array.from({ length: 10 }, (_, i) => makePost(`m${i}`, `Manga ${i}`));
-    const chain = buildMockChain({
-      limit: jest.fn().mockResolvedValue({ data: posts, error: null }),
+  it('preserves the DB ranking (correct beyond a 200-row sample) and coerces bigint counts', async () => {
+    // A manga with more within-window activity outranks one Postgres ordered lower —
+    // the service must trust the DB order, not re-sample/re-sort locally.
+    const rpc = jest.fn().mockResolvedValue({
+      data: [makeRow('hot', 5000), makeRow('warm', 4999), makeRow('cool', 10)],
+      error: null,
     });
-    const service = makeService(() => chain);
+    const service = makeService(() => ({}), rpc);
 
-    const result = await service.getTrendingManga(3);
+    const result = await service.getTrendingManga(5);
 
-    expect(result).toHaveLength(3);
+    expect(result.map(r => r.mangaId)).toEqual(['hot', 'warm', 'cool']);
+    expect(result.map(r => r.postCount)).toEqual([5000, 4999, 10]);
+    expect(typeof result[0].postCount).toBe('number');
+  });
+
+  it('passes the limit through to the RPC', async () => {
+    const rpc = jest.fn().mockResolvedValue({ data: [], error: null });
+    const service = makeService(() => ({}), rpc);
+
+    await service.getTrendingManga(3);
+
+    expect(rpc).toHaveBeenCalledWith('get_trending_manga', { p_limit: 3 });
   });
 
   it('returns empty array on Supabase error without throwing', async () => {
-    const chain = buildMockChain({
-      limit: jest.fn().mockResolvedValue({ data: null, error: { message: 'DB failure' } }),
-    });
-    const service = makeService(() => chain);
+    const rpc = jest.fn().mockResolvedValue({ data: null, error: { message: 'DB failure' } });
+    const service = makeService(() => ({}), rpc);
 
     await expect(service.getTrendingManga()).resolves.toEqual([]);
   });
@@ -351,5 +456,42 @@ describe('ForumService.uploadImage — MIME validation', () => {
     // BadRequestException should NOT be thrown — any other error (ENOENT) is acceptable
     await expect(service.uploadImage('u1', '/tmp/nonexistent', 'ignored'))
       .rejects.not.toThrow(BadRequestException);
+  });
+});
+
+describe('ForumService.getPublicProfile', () => {
+  it('logs a warning when a secondary query returns an error instead of masking it', async () => {
+    // A query builder that is both chainable and awaitable, resolving to {data, error}.
+    // getPublicProfile awaits the `profiles` builder via `.single()` and the other
+    // four builders directly (they end at `.limit()`/`.in()`), so both paths are covered.
+    const thenableChain = (result: { data: unknown; error: unknown }) => {
+      const chain: any = {};
+      for (const m of ['select', 'eq', 'is', 'in', 'order', 'limit']) chain[m] = jest.fn(() => chain);
+      chain.single = jest.fn().mockResolvedValue(result);
+      chain.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+        Promise.resolve(result).then(res, rej);
+      return chain;
+    };
+
+    const service = makeService((table: string) => {
+      switch (table) {
+        case 'profiles':
+          return thenableChain({ data: { uid: 'u1', role: 'user' }, error: null });
+        case 'forum_posts':
+          return thenableChain({ data: null, error: { message: 'boom' } }); // failing secondary
+        default:
+          return thenableChain({ data: [], error: null });
+      }
+    });
+
+    const warnSpy = jest
+      .spyOn((service as any).logger, 'warn')
+      .mockImplementation(() => undefined);
+
+    await service.getPublicProfile('u1', 'viewer1');
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('posts'));
+    // Only the failing 'posts' query should warn — healthy secondary queries stay quiet.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });

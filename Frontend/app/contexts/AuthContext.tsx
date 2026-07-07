@@ -21,6 +21,7 @@ import { setTokenSupplier, loadUserData, clearUserCache, flushNow } from "../lib
 import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData } from "../lib/readingHistory";
 import { clearAllApiCache } from "../lib/apiCache";
 import { reloadPage, redirectToHome } from "../lib/browserActions";
+import { resolveAvatarUrl } from "../lib/avatarUpload";
 import { useToast } from "./ToastContext";
 
 const API_BASE = "/api/proxy";
@@ -722,13 +723,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.message || `อัพโหลดไม่สำเร็จ (${res.status})`);
-    }
-    const data = await res.json();
-    const url = data.url as string;
-    return url.startsWith("/") ? `/api/proxy${url}` : url;
+    return resolveAvatarUrl(res);
   };
 
   const updateUserPhotoURL = async (photoURL: string): Promise<void> => {

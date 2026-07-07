@@ -51,7 +51,7 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
     if (!this.redis.available) {
       // L1→L3 direct path: Redis unavailable (e.g., provider destroyed before us on shutdown)
       for (const [key, entry] of this.jsonCache.entries()) {
-        if (matchesPrefix(key)) this.l3.write(key, entry);
+        if (matchesPrefix(key)) await this.l3.write(key, entry);
       }
       return;
     }
@@ -74,7 +74,7 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
       try {
         const entry = JSON.parse(raw) as CacheEntry<unknown>;
         if (this.lastWritten.get(key) === entry.updatedAt) continue; // unchanged since last flush
-        this.l3.write(key, entry);
+        await this.l3.write(key, entry);
         this.lastWritten.set(key, entry.updatedAt);
       } catch (err) {
         this.logger.warn(`L3BatchWriter: corrupt L2 data for key=${key}: ${String(err)}`);

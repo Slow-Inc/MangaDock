@@ -78,7 +78,8 @@ export class ForumService {
         author:profiles(display_name, photo_url, role),
         comments:forum_comments(count)
       `, { count: 'exact' })
-      .is('deleted_at', null);
+      .is('deleted_at', null)
+      .is('comments.deleted_at', null);
 
     if (category) query = query.eq('category', category);
     if (mangaId) query = query.eq('target_manga_id', mangaId);
@@ -130,6 +131,7 @@ export class ForumService {
       `)
       .eq('id', id)
       .is('deleted_at', null)
+      .is('comments.deleted_at', null)
       .single();
 
     if (error || !data) throw new NotFoundException('Post not found');
@@ -220,6 +222,7 @@ export class ForumService {
         .select('*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)')
         .eq('author_uid', uid)
         .is('deleted_at', null)
+        .is('comments.deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(20),
       this.db.from('forum_comments')
@@ -242,6 +245,22 @@ export class ForumService {
     ]);
 
     if (profileRes.error || !profileRes.data) throw new NotFoundException('Profile not found');
+
+    // Secondary sections degrade gracefully to empty on error, but a silently
+    // empty section is indistinguishable from a real "no data" state. Log each
+    // failure so a transient query error is observable instead of masked.
+    for (const [name, r] of [
+      ['posts', postsRes],
+      ['comments', commentsRes],
+      ['likedVotes', likedVotesRes],
+      ['versions', versionsRes],
+    ] as const) {
+      if (r.error) {
+        this.logger.warn(
+          `getPublicProfile: ${name} query failed for uid=${uid}: ${JSON.stringify(r.error)}`,
+        );
+      }
+    }
     const p = profileRes.data;
 
     // Fetch liked posts by IDs
@@ -252,7 +271,8 @@ export class ForumService {
         .from('forum_posts')
         .select('*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)')
         .in('id', likedPostIds)
-        .is('deleted_at', null);
+        .is('deleted_at', null)
+        .is('comments.deleted_at', null);
       likedPostsRaw = data ?? [];
     }
 
@@ -583,42 +603,27 @@ export class ForumService {
 
   async getTrendingManga(limit = 5): Promise<TrendingManga[]> {
     try {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-      const { data, error } = await this.db
-        .from('forum_posts')
-        .select('target_manga_id, target_manga_title, target_manga_cover')
-        .not('target_manga_id', 'is', null)
-        .not('target_manga_title', 'is', null)
-        .neq('target_manga_title', '')
-        .gte('created_at', sevenDaysAgo.toISOString())
-        .limit(200); // Sample more posts for better accuracy
+      // Group + rank in Postgres. The old path pulled a 200-row sample into Node and
+      // tallied it, which undercounted / mis-ranked once a manga's within-window posts
+      // spilled past the sample. The RPC reproduces the same filter semantics
+      // (non-null id, non-empty title, created within the last 7 days) but counts and
+      // orders across the full table (FR-16).
+      const { data, error } = await this.db.rpc('get_trending_manga', {
+        p_limit: limit,
+      });
 
       if (error) {
         this.logger.error(`Supabase error fetching trending: ${error.message}`);
         return []; // Fallback to empty list instead of crashing
       }
 
-      // Manual grouping
-      const groups: Record<string, TrendingManga> = {};
-      (data ?? []).forEach(p => {
-        const id = p.target_manga_id;
-        if (!id) return;
-        if (!groups[id]) {
-          groups[id] = {
-            mangaId: id,
-            mangaTitle: p.target_manga_title || 'Unknown',
-            mangaCover: p.target_manga_cover,
-            postCount: 0
-          };
-        }
-        groups[id].postCount++;
-      });
-
-      return Object.values(groups)
-        .sort((a, b) => b.postCount - a.postCount)
-        .slice(0, limit);
+      // post_count arrives as a bigint string over PostgREST — coerce to number.
+      return ((data ?? []) as any[]).map(row => ({
+        mangaId: row.manga_id,
+        mangaTitle: row.manga_title || 'Unknown',
+        mangaCover: row.manga_cover,
+        postCount: Number(row.post_count),
+      }));
     } catch (err) {
       this.logger.error(`Unexpected error in getTrendingManga: ${String(err)}`);
       return [];
