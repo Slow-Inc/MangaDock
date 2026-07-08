@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { errMessage } from "@/lib/errMessage";
+import { proxyRequestsTotal, proxyRequestDuration } from "@/lib/metrics";
 
 // Server-to-server: prefer the internal URL (localhost) to avoid routing through
 // Cloudflare Tunnel twice when deployed behind a public domain.
@@ -36,6 +37,7 @@ async function handler(
   const body =
     req.method === "GET" || req.method === "HEAD" ? undefined : req.body;
 
+  const t0 = Date.now();
   try {
     const upstream = await fetch(url, {
       method: req.method,
@@ -51,6 +53,13 @@ async function handler(
       duplex: body ? "half" : undefined,
     });
 
+    proxyRequestsTotal.inc({
+      service: "frontend",
+      method: req.method,
+      status_code: String(upstream.status),
+    });
+    proxyRequestDuration.observe({ service: "frontend", method: req.method }, Date.now() - t0);
+
     const resHeaders = new Headers();
     for (const [key, value] of upstream.headers.entries()) {
       if (["transfer-encoding", "connection"].includes(key.toLowerCase())) continue;
@@ -62,6 +71,7 @@ async function handler(
       headers: resHeaders,
     });
   } catch (err: unknown) {
+    proxyRequestsTotal.inc({ service: "frontend", method: req.method, status_code: "502" });
     console.error(`[ProxyError] Failed to fetch from backend: ${url}`, err);
     return NextResponse.json(
       { ok: false, error: "Backend unreachable", details: errMessage(err) },
