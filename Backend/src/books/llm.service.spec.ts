@@ -10,36 +10,28 @@ function make(env: Partial<NodeJS.ProcessEnv>): LlmService {
 }
 
 describe('LlmService — gemini provider', () => {
-  const env = { LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'gkey' };
+  const env = { LLM_PROVIDER: 'gemini', LLM_API_KEY: 'gkey' };
 
   afterEach(() => jest.resetAllMocks());
 
-  it('isConfigured() true when GEMINI_API_KEY present', () => {
+  it('isConfigured() true when LLM_API_KEY present', () => {
     expect(make(env).isConfigured()).toBe(true);
   });
 
-  it('isConfigured() false when GEMINI_API_KEY absent', () => {
+  it('isConfigured() false when LLM_API_KEY absent', () => {
     expect(make({ LLM_PROVIDER: 'gemini' }).isConfigured()).toBe(false);
   });
 
-  it('getDescriptionModel() returns GEMINI_DESCRIPTION_MODEL when set', () => {
-    expect(make({ ...env, GEMINI_DESCRIPTION_MODEL: 'gemini-custom' }).getDescriptionModel()).toBe('gemini-custom');
-  });
-
-  it('getDescriptionModel() falls back to GEMINI_DESCRIPTION_FALLBACK_MODEL', () => {
-    expect(make({ ...env, GEMINI_DESCRIPTION_FALLBACK_MODEL: 'fb' }).getDescriptionModel()).toBe('fb');
+  it('getDescriptionModel() returns LLM_DESCRIPTION_MODEL when set', () => {
+    expect(make({ ...env, LLM_DESCRIPTION_MODEL: 'gemini-custom' }).getDescriptionModel()).toBe('gemini-custom');
   });
 
   it('getDescriptionModel() falls back to gemini-2.5-flash', () => {
     expect(make(env).getDescriptionModel()).toBe('gemini-2.5-flash');
   });
 
-  it('getMangaModel() returns GEMINI_MANGA_MODEL when set', () => {
-    expect(make({ ...env, GEMINI_MANGA_MODEL: 'gemini-lite' }).getMangaModel()).toBe('gemini-lite');
-  });
-
-  it('getMangaModel() falls back to GEMINI_MANGA_FALLBACK_MODEL', () => {
-    expect(make({ ...env, GEMINI_MANGA_FALLBACK_MODEL: 'fb-manga' }).getMangaModel()).toBe('fb-manga');
+  it('getMangaModel() returns LLM_MANGA_MODEL when set', () => {
+    expect(make({ ...env, LLM_MANGA_MODEL: 'gemini-lite' }).getMangaModel()).toBe('gemini-lite');
   });
 
   it('getMangaModel() falls back to gemini-2.5-flash-lite', () => {
