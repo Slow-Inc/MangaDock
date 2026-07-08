@@ -9,6 +9,8 @@ import { th } from "date-fns/locale";
 import VoteButtons from "./VoteButtons";
 import type { ForumPost } from "../lib/types";
 
+const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
+
 function MarqueeMangaTag({ title, maxWidth }: { title: string; maxWidth: number }) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
@@ -184,7 +186,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
             {post.authorName || 'Unknown User'}
             {post.authorRole > 0 && (
               <span className="ml-1.5 px-1 bg-white/10 rounded text-[9px] uppercase tracking-tighter text-white/70">
-                {post.authorRole}
+                {ROLE_LABEL[post.authorRole] ?? String(post.authorRole)}
               </span>
             )}
           </Link>
