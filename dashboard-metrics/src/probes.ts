@@ -36,8 +36,8 @@ export async function probeSupabase(): Promise<ProbeResult> {
     });
     const latencyMs = Date.now() - t0;
     if (!res.ok) return { up: false, degraded: false, latencyMs: -1 };
-    const body = (await res.json()) as { status?: string };
-    return { up: body.status === "Healthy", degraded: false, latencyMs };
+    const text = await res.text();
+    return { up: text.trim() === "Healthy", degraded: false, latencyMs };
   } catch {
     return { up: false, degraded: false, latencyMs: -1 };
   }

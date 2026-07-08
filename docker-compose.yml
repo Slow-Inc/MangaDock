@@ -1,20 +1,20 @@
 version: '3.9'
 
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: mangadock_redis
-    restart: unless-stopped
-    ports:
-      - '6379:6379'
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: mangadock_redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - '6379:6379'
+  #   command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ['CMD', 'redis-cli', 'ping']
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   dashboard-metrics:
     build: ./dashboard-metrics
@@ -23,7 +23,7 @@ services:
     env_file: ./dashboard-metrics/.env
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9091/health"]
+      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost:9091/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 15s
       timeout: 5s
       retries: 3
