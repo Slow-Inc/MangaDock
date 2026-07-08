@@ -13,6 +13,8 @@ import VoteButtons from "../../../components/VoteButtons";
 import CommentThread from "../../../components/CommentThread";
 import { useAuth } from "../../../contexts/AuthContext";
 import { usePostStream } from "../../../hooks/useForumStream";
+
+const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 import type { ForumPost, ForumComment } from "../../../lib/types";
 
 function MarqueeText({ text, textClassName, active }: { text: string; textClassName?: string; active: boolean }) {
@@ -315,7 +317,7 @@ export default function PostDetailPage() {
                 {post.authorName || 'Unknown User'}
                 {post.authorRole > 0 && (
                   <span className="ml-1.5 px-1 bg-white/10 rounded text-[9px] uppercase tracking-tighter text-white/70">
-                    {post.authorRole}
+                    {ROLE_LABEL[post.authorRole] ?? String(post.authorRole)}
                   </span>
                 )}
               </Link>
