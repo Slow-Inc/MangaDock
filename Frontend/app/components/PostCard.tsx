@@ -92,8 +92,8 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
               href={`/community/profile/${post.authorUid}`}
               onClick={(e) => e.stopPropagation()}
               className={`font-bold hover:underline underline-offset-2 truncate max-w-[80px] sm:max-w-none smooth-hover ${
-                post.authorRole === 'translator' ? "text-indigo-400" :
-                post.authorRole === 'creator' ? "text-orange-400" : "text-white/50"
+                post.authorRole === 1 ? "text-indigo-400" :
+                post.authorRole === 2 ? "text-orange-400" : "text-white/50"
               }`}
             >
               {post.authorName || 'Unknown'}
@@ -177,12 +177,12 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
             href={`/community/profile/${post.authorUid}`}
             onClick={(e) => e.stopPropagation()}
             className={`font-bold text-sm truncate smooth-hover hover:underline underline-offset-2 ${
-              post.authorRole === 'translator' ? "text-indigo-400" :
-              post.authorRole === 'creator' ? "text-orange-400" : "text-white/80"
+              post.authorRole === 1 ? "text-indigo-400" :
+              post.authorRole === 2 ? "text-orange-400" : "text-white/80"
             }`}
           >
             {post.authorName || 'Unknown User'}
-            {post.authorRole !== 'user' && (
+            {post.authorRole > 0 && (
               <span className="ml-1.5 px-1 bg-white/10 rounded text-[9px] uppercase tracking-tighter text-white/70">
                 {post.authorRole}
               </span>
