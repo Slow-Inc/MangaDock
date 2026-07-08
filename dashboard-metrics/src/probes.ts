@@ -65,6 +65,7 @@ const SERVICES: Array<{ name: string; probe: () => Promise<ProbeResult> }> = [
   { name: "backend",    probe: () => probeStatusEndpoint(`${config.BACKEND_STATUS_URL}/status`) },
   { name: "supabase",   probe: probeSupabase },
   { name: "cf-worker",  probe: probeCfWorker },
+  // TODO: replace with real probe when AI gateway / MIT health endpoints are available
   { name: "ai-gateway", probe: probeMock() },
   { name: "mit",        probe: probeMock() },
 ];

@@ -16,6 +16,7 @@ async function handler(
 ) {
   const { path } = await params;
   const targetPath = path.join("/");
+  const route = "/" + (path?.join("/") ?? "");
 
   // Forward original query string
   const qs = req.nextUrl.search; // includes leading "?" or ""
@@ -56,9 +57,10 @@ async function handler(
     proxyRequestsTotal.inc({
       service: "frontend",
       method: req.method,
+      route,
       status_code: String(upstream.status),
     });
-    proxyRequestDuration.observe({ service: "frontend", method: req.method }, Date.now() - t0);
+    proxyRequestDuration.observe({ service: "frontend", method: req.method, route }, Date.now() - t0);
 
     const resHeaders = new Headers();
     for (const [key, value] of upstream.headers.entries()) {
@@ -71,7 +73,7 @@ async function handler(
       headers: resHeaders,
     });
   } catch (err: unknown) {
-    proxyRequestsTotal.inc({ service: "frontend", method: req.method, status_code: "502" });
+    proxyRequestsTotal.inc({ service: "frontend", method: req.method, route, status_code: "502" });
     console.error(`[ProxyError] Failed to fetch from backend: ${url}`, err);
     return NextResponse.json(
       { ok: false, error: "Backend unreachable", details: errMessage(err) },
