@@ -98,7 +98,7 @@ export function imageModelKey(imageModel?: string): string | undefined {
  * translate instead of replaying stale patches. */
 export function renderConfigHash(env: NodeJS.ProcessEnv): string {
   const knobs = Object.keys(env)
-    .filter((k) => k.startsWith('MIT_') || k.startsWith('LLM_'))
+    .filter((k) => k.startsWith('MIT_') || (k.startsWith('LLM_') && k !== 'LLM_API_KEY' && k !== 'LLM_BASE_URL'))
     .sort()
     .map((k) => `${k}=${env[k] ?? ''}`)
     .join('\n');
