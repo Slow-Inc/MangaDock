@@ -308,12 +308,12 @@ export default function PostDetailPage() {
               <Link
                 href={`/community/profile/${post.authorUid}`}
                 className={`font-bold text-sm hover:underline underline-offset-2 transition-opacity hover:opacity-80 ${
-                  post.authorRole === 'translator' ? "text-indigo-400" :
-                  post.authorRole === 'creator' ? "text-orange-400" : "text-white/80"
+                  post.authorRole === 1 ? "text-indigo-400" :
+                  post.authorRole === 2 ? "text-orange-400" : "text-white/80"
                 }`}
               >
                 {post.authorName || 'Unknown User'}
-                {post.authorRole !== 'user' && (
+                {post.authorRole > 0 && (
                   <span className="ml-1.5 px-1 bg-white/10 rounded text-[9px] uppercase tracking-tighter text-white/70">
                     {post.authorRole}
                   </span>
