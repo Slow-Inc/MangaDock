@@ -20,31 +20,21 @@ export class LlmService {
   }
 
   isConfigured(): boolean {
-    return this.provider === 'gemini'
-      ? !!this.env.GEMINI_API_KEY
-      : !!this.env.LLM_API_KEY;
+    return !!this.env.LLM_API_KEY;
   }
 
   getDescriptionModel(): string {
-    if (this.provider === 'gemini') {
-      return (
-        this.env.GEMINI_DESCRIPTION_MODEL ??
-        this.env.GEMINI_DESCRIPTION_FALLBACK_MODEL ??
-        'gemini-2.5-flash'
-      );
-    }
-    return this.env.LLM_DESCRIPTION_MODEL ?? 'gpt-4o-mini';
+    return (
+      this.env.LLM_DESCRIPTION_MODEL ??
+      (this.provider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini')
+    );
   }
 
   getMangaModel(): string {
-    if (this.provider === 'gemini') {
-      return (
-        this.env.GEMINI_MANGA_MODEL ??
-        this.env.GEMINI_MANGA_FALLBACK_MODEL ??
-        'gemini-2.5-flash-lite'
-      );
-    }
-    return this.env.LLM_MANGA_MODEL ?? 'gpt-4o-mini';
+    return (
+      this.env.LLM_MANGA_MODEL ??
+      (this.provider === 'gemini' ? 'gemini-2.5-flash-lite' : 'gpt-4o-mini')
+    );
   }
 
   async complete(prompt: string, model: string): Promise<string> {
@@ -54,7 +44,7 @@ export class LlmService {
   }
 
   private async geminiComplete(prompt: string, model: string): Promise<string> {
-    const genAI = new GoogleGenerativeAI(this.env.GEMINI_API_KEY!);
+    const genAI = new GoogleGenerativeAI(this.env.LLM_API_KEY!);
     const geminiModel = genAI.getGenerativeModel({ model });
     const result = await geminiModel.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
