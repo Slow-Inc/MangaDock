@@ -1,16 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
-import { useLocalLenis } from "../../hooks/useLocalLenis";
-import { searchBooks, StudioBook, getBookCoverUrl } from "../../lib/studioApi";
+import { useStudioUpload, validateReadyToFinish } from "../../hooks/useStudioUpload";
+import { StudioBook, getBookCoverUrl, getVersion } from "../../lib/studioApi";
 import { resolvedThumbnail } from "../../lib/imgUrl";
 import { StudioSelect } from "../components/StudioSelect";
-
-const API_BASE = "/api/proxy";
+import { MangaPickerModal } from "../components/MangaPickerModal";
 
 const SUPPORTED_LANGUAGES = [
   { code: "th", label: "ภาษาไทย" },
@@ -24,335 +23,6 @@ const SUPPORTED_LANGUAGES = [
   { code: "pt", label: "Português" },
   { code: "id", label: "Bahasa Indonesia" },
 ];
-
-const SEARCH_DEBOUNCE_MS = 600;
-const MIN_SEARCH_QUERY_LENGTH = 2;
-
-type PageItem = {
-  url: string;
-  uploading?: boolean;
-  error?: string;
-};
-
-type ExistingVersion = {
-  versionId: string;
-  titleId: string;
-  titleName: string;
-  titleAltName?: string;
-  chapterId: string;
-  chapterNumber: string;
-  chapterTitle: string;
-  language: string;
-  description: string | null;
-  pages: string[];
-  status: string;
-  priceCoins: number;
-};
-
-function MangaPickerModal({
-  isOpen,
-  onClose,
-  onSelect,
-  asPage,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onSelect: (book: StudioBook) => void;
-  asPage?: boolean;
-}) {
-  const pickerRouter = useRouter();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<StudioBook[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [shouldRender, setShouldRender] = useState(isOpen);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchRequestRef = useRef(0);
-  const resultsScrollRef = useRef<HTMLDivElement>(null);
-
-  useLocalLenis(resultsScrollRef, "vertical", shouldRender && visible);
-
-  // On mobile, redirect to dedicated search page instead of showing modal
-  useEffect(() => {
-    if (isOpen && !asPage && typeof window !== "undefined" && window.innerWidth < 768) {
-      pickerRouter.push("/studio/search");
-      onClose();
-      return;
-    }
-  }, [isOpen, asPage, pickerRouter, onClose]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const trimmed = query.trim();
-    if (!trimmed) {
-      setResults([]);
-      setSearching(false);
-      setHasSearched(false);
-      return;
-    }
-
-    if (trimmed.length < MIN_SEARCH_QUERY_LENGTH) {
-      setResults([]);
-      setSearching(false);
-      setHasSearched(false);
-      return;
-    }
-
-    setSearching(false);
-    setHasSearched(false);
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    const requestId = ++searchRequestRef.current;
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const data = await searchBooks(trimmed);
-        if (requestId !== searchRequestRef.current) return;
-        setResults(data.items);
-        setHasSearched(true);
-      } catch {
-        if (requestId !== searchRequestRef.current) return;
-        setResults([]);
-        setHasSearched(true);
-      } finally {
-        if (requestId !== searchRequestRef.current) return;
-        setSearching(false);
-      }
-    }, SEARCH_DEBOUNCE_MS);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query, isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true);
-      const timer = setTimeout(() => setVisible(true), 10);
-      return () => clearTimeout(timer);
-    }
-
-    setVisible(false);
-    const timer = setTimeout(() => {
-      setShouldRender(false);
-      setQuery("");
-      setResults([]);
-      setSearching(false);
-      setHasSearched(false);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (asPage || !shouldRender) return;
-
-    const scrollY = window.scrollY;
-    const originalBodyPosition = document.body.style.position;
-    const originalBodyTop = document.body.style.top;
-    const originalBodyWidth = document.body.style.width;
-    const originalBodyOverflow = document.body.style.overflow;
-
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.position = originalBodyPosition;
-      document.body.style.top = originalBodyTop;
-      document.body.style.width = originalBodyWidth;
-      document.body.style.overflow = originalBodyOverflow;
-      window.scrollTo(0, scrollY);
-    };
-  }, [shouldRender, asPage]);
-
-  if (!shouldRender) return null;
-
-  const trimmedQuery = query.trim();
-  const isSearchReady = trimmedQuery.length >= MIN_SEARCH_QUERY_LENGTH;
-
-  const searchInput = (
-    <div className="relative">
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/35"
-      >
-        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-      </svg>
-      <input
-        autoFocus
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="ค้นหาชื่อมังงะ..."
-        className="w-full rounded-2xl border border-white/12 bg-white/5 py-3 pl-12 pr-12 text-base text-white placeholder-white/25 outline-none transition focus:border-white/25 focus:bg-white/8"
-      />
-      {searching && (
-        <div className="absolute right-4 top-1/2 -translate-y-1/2">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-        </div>
-      )}
-      {!searching && query && (
-        <button
-          type="button"
-          onClick={() => setQuery("")}
-          className="absolute right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/50 transition hover:bg-white/20 hover:text-white"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      )}
-    </div>
-  );
-
-  const resultsHeightClass = !isSearchReady
-    ? "h-44"
-    : searching
-      ? "h-56"
-      : results.length === 0
-        ? "h-44"
-        : results.length <= 3
-          ? "h-56"
-          : "h-[420px]";
-
-  const resultsList = (
-    <div
-      ref={resultsScrollRef}
-      className={asPage ? "custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain" : `custom-scrollbar min-h-0 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-black/20 transition-[height] duration-300 ${resultsHeightClass}`}
-    >
-      <div>
-        {!isSearchReady ? (
-          <div className="flex h-full min-h-[160px] flex-col items-center justify-center gap-3 px-4 text-white/40">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/8 bg-white/5">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-6 w-6 text-white/30">
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-medium text-white/40">พิมพ์ชื่อมังงะเพื่อค้นหา</p>
-            </div>
-          </div>
-        ) : searching ? (
-          <div className="divide-y divide-white/5">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3">
-                <div className="h-14 w-10 shrink-0 animate-pulse rounded-xl bg-white/10" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-3/4 animate-pulse rounded-full bg-white/10" />
-                  <div className="h-3 w-1/2 animate-pulse rounded-full bg-white/8" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : hasSearched && results.length === 0 ? (
-          <div className="flex h-full min-h-[160px] flex-col items-center justify-center gap-2 px-4 text-white/40">
-            <p className="text-sm">ไม่พบผลลัพธ์สำหรับ &ldquo;{trimmedQuery}&rdquo;</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-white/5">
-            {results.map((book) => (
-              <button
-                key={book.id}
-                type="button"
-                onClick={() => {
-                  onSelect(book);
-                  onClose();
-                }}
-                className="flex w-full items-center gap-3.5 px-4 py-3 text-left transition-colors hover:bg-white/5 active:bg-white/8"
-              >
-                <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-xl bg-white/8 border border-white/8">
-                  {book.thumbnail ? (
-                    <Image src={resolvedThumbnail(book as any)} alt={book.title} fill loading="lazy" className="object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-white/20">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm font-semibold leading-snug text-white">{book.title}</p>
-                  {book.subtitle ? <p className="mt-0.5 truncate text-xs text-white/35">{book.subtitle}</p> : null}
-                  {book.authors && book.authors.length > 0 && (
-                    <p className="mt-1 truncate text-[11px] text-indigo-400/60">{book.authors[0]}</p>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // Full-page mode for mobile
-  if (asPage) {
-    return (
-      <div className="flex min-h-dvh flex-col bg-[#141414] pb-[calc(var(--mobile-nav-height)+1.5rem+env(safe-area-inset-bottom))]">
-        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-[#141414]/90 px-4 py-3 backdrop-blur-xl">
-          <button
-            onClick={onClose}
-            aria-label="กลับ"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-white">ค้นหามังงะ</p>
-            <p className="text-[11px] text-white/40">เลือกมังงะสำหรับอัปโหลดงานแปล</p>
-          </div>
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-          {searchInput}
-          {resultsList}
-        </div>
-      </div>
-    );
-  }
-
-  // Desktop modal mode
-  return (
-    <div
-      className={`fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-12 sm:pt-16 transition-opacity duration-300 ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
-      onClick={onClose}
-    >
-      <div
-        className={`flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#151515] shadow-2xl transition-all duration-300 ${
-          visible ? "translate-y-0 scale-100 opacity-100" : "-translate-y-2 scale-95 opacity-0"
-        }`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h3 className="text-sm font-semibold text-white/90">ค้นหามังงะ</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-xs text-white/50 transition hover:bg-white/10 hover:text-white"
-          >
-            ปิด
-          </button>
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-          {searchInput}
-          {resultsList}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 import { Suspense } from "react";
 
@@ -379,9 +49,6 @@ function StudioUploadContent() {
   const [description, setDescription] = useState("");
   const [priceCoins, setPriceCoins] = useState<string | number>(0);
 
-  const [versionId, setVersionId] = useState<string | null>(existingVersionId);
-  const [pages, setPages] = useState<PageItem[]>([]);
-  const [saving, setSaving] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -393,20 +60,35 @@ function StudioUploadContent() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
-  /**
-   * Single in-flight version-creation promise, shared across all concurrent
-   * uploadFile() calls. Without this, rapid multi-file selections can each
-   * see versionId === null and race to create multiple draft versions.
-   */
-  const ensureVersionPromiseRef = useRef<Promise<string> | null>(null);
-  /**
-   * Always-current ref to `pages` used by the unmount cleanup so that blob
-   * URLs added after mount are still revoked when the component unmounts.
-   */
-  const pagesRef = useRef<PageItem[]>(pages);
-  pagesRef.current = pages;
-  // Always-current ref to getIdToken so effects and callbacks don't need it
-  // in their dep arrays (it is not wrapped in useCallback in AuthContext).
+
+  const {
+    pages,
+    setPages,
+    versionId,
+    saving,
+    handleFilesSelected,
+    handleDrop,
+    deletePage: handleDeletePage,
+    saveMetadata: handleSaveMetadata,
+  } = useStudioUpload({
+    user,
+    getIdToken,
+    showToast,
+    existingVersionId,
+    getVersionMetadata: () => ({
+      titleId,
+      titleName,
+      chapterId,
+      chapterNumber,
+      chapterTitle,
+      language,
+      description,
+      priceCoins,
+    }),
+  });
+
+  // Always-current ref to getIdToken so effects don't need it in their dep
+  // array (it is not wrapped in useCallback in AuthContext).
   const getIdTokenRef = useRef(getIdToken);
   getIdTokenRef.current = getIdToken;
 
@@ -419,7 +101,7 @@ function StudioUploadContent() {
         const book: StudioBook = JSON.parse(stored);
         setTitleId(book.id);
         setTitleName(book.title);
-        setTitleThumbnail(book.thumbnail ? resolvedThumbnail(book as any) : getBookCoverUrl(book.id));
+        setTitleThumbnail(book.thumbnail ? resolvedThumbnail({ thumbnail: book.thumbnail }) : getBookCoverUrl(book.id));
       } catch {}
     }
   }, []);
@@ -430,11 +112,10 @@ function StudioUploadContent() {
     getIdTokenRef.current().then(async (token) => {
       try {
         if (!token) return;
-        const res = await fetch(`${API_BASE}/versions/${existingVersionId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const data: ExistingVersion = await res.json();
+        // Routed through studioApi.getVersion so this HWID-gated /versions/:id
+        // read carries x-hardware-id (previously a raw fetch → 401 → the edit
+        // form silently never loaded). getVersion throws on !ok → the catch below.
+        const data = await getVersion(token, existingVersionId);
         setTitleId(data.titleId);
         setTitleName(data.titleName);
         setTitleAltName(data.titleAltName ?? "");
@@ -452,196 +133,16 @@ function StudioUploadContent() {
         setLoadingExisting(false);
       }
     });
-  }, [existingVersionId, user, showToast]);
+  }, [existingVersionId, user, showToast, setPages]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/");
   }, [loading, user, router]);
 
-  /** Create a draft version if one doesn't exist yet. Returns the versionId.
-   *  All concurrent callers share the same in-flight promise so only one
-   *  version is ever created per upload session. */
-  const ensureVersion = useCallback(async (token: string): Promise<string> => {
-    // Fast path: version already exists
-    if (versionId) return versionId;
-
-    // If another concurrent call is already creating the version, await it
-    if (ensureVersionPromiseRef.current) return ensureVersionPromiseRef.current;
-
-    if (!titleId || !language) {
-      throw new Error("กรุณาเลือกมังงะและภาษาก่อน");
-    }
-
-    const creation = fetch(`${API_BASE}/versions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        titleId,
-        titleName,
-        chapterId,
-        chapterNumber,
-        chapterTitle,
-        language,
-        description,
-        priceCoins: Number(priceCoins) || 0,
-      }),
-    }).then(async (res) => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message ?? "ไม่สามารถสร้างงานแปลได้");
-      }
-      const data = await res.json();
-      setVersionId(data.versionId);
-      return data.versionId as string;
-    }).finally(() => {
-      ensureVersionPromiseRef.current = null;
-    });
-
-    ensureVersionPromiseRef.current = creation;
-    return creation;
-  }, [versionId, titleId, language, titleName, chapterId, chapterNumber, chapterTitle, description, priceCoins]);
-
-  /** Upload a single page file. */
-  const uploadFile = useCallback(
-    async (file: File) => {
-      if (!user) return;
-      const placeholderUrl = URL.createObjectURL(file);
-      const placeholder: PageItem = { url: placeholderUrl, uploading: true };
-      setPages((prev) => [...prev, placeholder]);
-
-      try {
-        const token = await getIdTokenRef.current();
-        if (!token) throw new Error("ไม่พบ token");
-        const vid = await ensureVersion(token);
-
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch(`${API_BASE}/upload/versions/${vid}/pages`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err?.message ?? "อัปโหลดไม่สำเร็จ");
-        }
-        const { pageUrl } = await res.json();
-        // Replace the placeholder with the real server URL, then revoke the
-        // blob so it doesn't leak — we now have the permanent URL.
-        setPages((prev) =>
-          prev.map((p) => (p.url === placeholderUrl ? { url: pageUrl } : p))
-        );
-        URL.revokeObjectURL(placeholderUrl);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ";
-        // Keep the placeholder URL in state so the preview still renders while
-        // the error is visible. The blob will be revoked when the user removes
-        // the page or navigates away (handled by the cleanup effect below).
-        setPages((prev) =>
-          prev.map((p) => (p.url === placeholderUrl ? { ...p, uploading: false, error: msg } : p))
-        );
-        showToast({ message: msg });
-      }
-    },
-    [user, ensureVersion, showToast]
-  );
-
-  // Revoke any remaining blob URLs (e.g. failed uploads) on unmount.
-  // pagesRef always holds the latest pages so URLs added after mount are covered.
-  useEffect(() => {
-    return () => {
-      pagesRef.current.forEach((p) => {
-        if (p.url.startsWith("blob:")) URL.revokeObjectURL(p.url);
-      });
-    };
-  }, []);
-
-  const handleFilesSelected = (files: FileList | null) => {
-    if (!files) return;
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (imageFiles.length === 0) {
-      showToast({ message: "กรุณาเลือกไฟล์รูปภาพเท่านั้น" });
-      return;
-    }
-    imageFiles.forEach(uploadFile);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    handleFilesSelected(e.dataTransfer.files);
-  };
-
-  const handleDeletePage = async (pageUrl: string) => {
-    // If it's a local blob (upload error case), just remove it from state and revoke
-    if (pageUrl.startsWith("blob:")) {
-      URL.revokeObjectURL(pageUrl);
-      setPages((prev) => prev.filter((p) => p.url !== pageUrl));
-      return;
-    }
-    if (!user || !versionId) {
-      setPages((prev) => prev.filter((p) => p.url !== pageUrl));
-      return;
-    }
-    try {
-      const token = await getIdToken();
-      if (!token) throw new Error("ไม่พบ token");
-      const res = await fetch(`${API_BASE}/upload/versions/${versionId}/pages`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ pageUrl }),
-      });
-      if (!res.ok) {
-        showToast({ message: "ไม่สามารถลบหน้าได้" });
-        return;
-      }
-      setPages((prev) => prev.filter((p) => p.url !== pageUrl));
-    } catch {
-      showToast({ message: "เกิดข้อผิดพลาด" });
-    }
-  };
-
-  const handleSaveMetadata = async () => {
-    if (!user || !versionId) return;
-    setSaving(true);
-    try {
-      const token = await getIdToken();
-      if (!token) throw new Error("ไม่พบ token");
-      const res = await fetch(`${API_BASE}/versions/${versionId}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ description, priceCoins: Number(priceCoins) || 0 }),
-      });
-      if (!res.ok) {
-        showToast({ type: "error", message: "บันทึกไม่สำเร็จ" });
-        return;
-      }
-      showToast({ type: "success", message: "บันทึกแล้ว" });
-    } catch {
-      showToast({ type: "error", message: "เกิดข้อผิดพลาด" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleDone = async () => {
-    if (!titleId) {
-      showToast({ type: "warning", message: "กรุณาเลือกมังงะก่อน" });
-      return;
-    }
-    if (!chapterNumber.trim()) {
-      showToast({ type: "warning", message: "กรุณากรอกหมายเลขตอน" });
-      return;
-    }
-    if (!language) {
-      showToast({ type: "warning", message: "กรุณาเลือกภาษาที่แปล" });
-      return;
-    }
-    if (pages.length === 0) {
-      showToast({ type: "warning", message: "กรุณาอัปโหลดหน้ามังงะอย่างน้อย 1 หน้า" });
-      return;
-    }
-    if (pages.some((p) => p.uploading)) {
-      showToast({ type: "info", message: "กรุณารอให้การอัปโหลดเสร็จสิ้นก่อน" });
+    const validation = validateReadyToFinish({ titleId, chapterNumber, language, pages });
+    if (!validation.ok) {
+      showToast({ type: validation.level, message: validation.message });
       return;
     }
 
@@ -907,7 +408,7 @@ function StudioUploadContent() {
         onSelect={(book) => {
           setTitleId(book.id);
           setTitleName(book.title);
-          setTitleThumbnail(book.thumbnail ? resolvedThumbnail(book as any) : getBookCoverUrl(book.id));
+          setTitleThumbnail(book.thumbnail ? resolvedThumbnail({ thumbnail: book.thumbnail }) : getBookCoverUrl(book.id));
         }}
       />
     </div>

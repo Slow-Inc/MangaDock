@@ -9,6 +9,7 @@ import { th } from "date-fns/locale";
 import VoteButtons from "./VoteButtons";
 import { createComment, updateComment, deleteComment } from "../lib/communityApi";
 import { useAuth } from "../contexts/AuthContext";
+import { useModalTransition } from "../hooks/useModalTransition";
 import type { ForumComment } from "../lib/types";
 
 export default function CommentThread({
@@ -35,8 +36,11 @@ export default function CommentThread({
   const [isDeleted, setIsDeleted] = useState(false);
 
   // Mobile long-press context menu
-  const [contextMenuOpen, setContextMenuOpen] = useState(false);
-  const [sheetVisible, setSheetVisible] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const { mounted: contextMenuOpen, visible: sheetVisible } = useModalTransition(sheetOpen, {
+    duration: 300,
+    onClosed: () => setConfirmDelete(false),
+  });
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -47,10 +51,8 @@ export default function CommentThread({
     longPressStartRef.current = { x: e.clientX, y: e.clientY };
     longPressTimerRef.current = setTimeout(() => {
       setConfirmDelete(false);
-      setContextMenuOpen(true);
+      setSheetOpen(true);
       if (navigator.vibrate) navigator.vibrate(30);
-      // mount first, then trigger CSS transition next frame
-      requestAnimationFrame(() => requestAnimationFrame(() => setSheetVisible(true)));
     }, 500);
   };
 
@@ -82,10 +84,7 @@ export default function CommentThread({
     }
   };
 
-  const closeSheet = () => {
-    setSheetVisible(false);
-    setTimeout(() => { setContextMenuOpen(false); setConfirmDelete(false); }, 300);
-  };
+  const closeSheet = () => setSheetOpen(false);
 
   const handleEditStart = () => {
     setEditContent(displayContent);

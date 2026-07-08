@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../contexts/AuthContext";
 import AccountModal from "../components/AccountModal";
@@ -11,6 +11,8 @@ function AccountContent() {
   const tab = searchParams.get("tab") ?? undefined;
   const { user, loading } = useAuth();
 
+  const handleClose = useCallback(() => router.back(), [router]);
+
   useEffect(() => {
     if (!loading && !user) router.replace("/");
   }, [user, loading, router]);
@@ -19,7 +21,7 @@ function AccountContent() {
 
   return (
     <main className="bg-[#141414]">
-      <AccountModal isOpen asPage onClose={() => router.back()} initialTab={tab} />
+      <AccountModal isOpen asPage onClose={handleClose} initialTab={tab} />
     </main>
   );
 }

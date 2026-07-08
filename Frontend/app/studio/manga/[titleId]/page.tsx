@@ -14,6 +14,7 @@ import {
 } from "../../../lib/studioApi";
 import type { ChapterVersion } from "../../../lib/types";
 import { getCached, setCache } from "../../../lib/studioCache";
+import { cacheOrFetch, TTL } from "../../../lib/apiCache";
 import { StudioChaptersSkeleton } from "../../components/StudioSkeleton";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { CoverImage } from "../../components/CoverImage";
@@ -261,8 +262,14 @@ export default function MangaDetailPage() {
     if (versions.length > 0) {
       setDisplayTitle(versions[0]?.titleName ?? "ไม่ระบุชื่อเรื่อง");
     } else if (!loadingVersions && displayTitle === "กำลังโหลด...") {
-      fetch(`/api/proxy/books/manga/${titleId}`)
-        .then((res) => res.json())
+      cacheOrFetch<{ title?: string }>(
+        `manga:${titleId}:studio-detail`,
+        async () => {
+          const res = await fetch(`/api/proxy/books/manga/${titleId}`);
+          return res.json();
+        },
+        TTL.LONG,
+      )
         .then((data) => {
           if (data && data.title) {
             setDisplayTitle(data.title);
