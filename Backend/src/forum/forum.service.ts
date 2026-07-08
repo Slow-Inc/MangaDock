@@ -295,7 +295,7 @@ export class ForumService {
     const translatedTitles = this.groupTranslatedTitles(versionsRes.data ?? []);
 
     // Earnings: only for own creator/translator profile
-    const earnings = await this.fetchOwnEarnings(uid, viewerUid, p.role as string);
+    const earnings = await this.fetchOwnEarnings(uid, viewerUid, p.role as number);
 
     const profile = this.mapPublicProfile(p);
 
