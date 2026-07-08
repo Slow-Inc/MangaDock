@@ -1,4 +1,5 @@
-export type UserRole = 'user' | 'translator' | 'creator' | 'admin';
+export const ROLE = { USER: 0, TRANSLATOR: 1, CREATOR: 2, ADMIN: 8, DEV: 9 } as const;
+export type UserRole = typeof ROLE[keyof typeof ROLE]; // 0 | 1 | 2 | 8 | 9
 export type UserPlan = 'free' | 'premium' | 'pro';
 
 export type FavoriteItem = {
