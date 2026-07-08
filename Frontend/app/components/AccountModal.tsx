@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { errMessage } from "@/lib/errMessage";
+import { formReducer, initialFormState } from "./account/formReducer";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -39,9 +40,8 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [formState, dispatch] = useReducer(formReducer, initialFormState);
+  const { loading, successMessage, errorMessage } = formState;
 
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const [previousPhotos, setPreviousPhotos] = useState<string[]>([]);
@@ -144,13 +144,10 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isOpen]);
 
-  const clearMessages = () => {
-    setSuccessMessage(null);
-    setErrorMessage(null);
-  };
+  const clearMessages = () => dispatch({ type: "CLEAR" });
 
   const resetTransientState = useCallback(() => {
-    clearMessages();
+    dispatch({ type: "CLEAR" });
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
@@ -223,21 +220,21 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
 
   const handleUpdateProfile = async () => {
     clearMessages();
-    setLoading(true);
+    dispatch({ type: "SET_LOADING", value: true });
     try {
       await updateUserProfile(displayName);
-      setSuccessMessage("อัปเดตชื่อผู้ใช้สำเร็จ ✓");
+      dispatch({ type: "SET_SUCCESS", message: "อัปเดตชื่อผู้ใช้สำเร็จ ✓" });
     } catch (error: unknown) {
-      setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      dispatch({ type: "SET_ERROR", message: errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่" });
     } finally {
-      setLoading(false);
+      dispatch({ type: "SET_LOADING", value: false });
     }
   };
 
   /** Step 1 → 2 (password): re-authenticate, then advance to confirm step. */
   const handlePasswordReauthForDelete = async () => {
     setReauthenticating("password");
-    setErrorMessage(null);
+    dispatch({ type: "CLEAR" });
     try {
       await reauthenticateUser("password", reauthPassword);
       // Reauth successful — advance to the "type to confirm" step
@@ -246,11 +243,11 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
     } catch (error: unknown) {
       const code = (error as { code?: string })?.code;
       if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
-        setErrorMessage("รหัสผ่านไม่ถูกต้อง");
+        dispatch({ type: "SET_ERROR", message: "รหัสผ่านไม่ถูกต้อง" });
       } else if (code === "auth/user-mismatch") {
-        setErrorMessage("รหัสผ่านนี้ไม่ตรงกับบัญชีที่กำลังจะลบ กรุณาใช้รหัสผ่านของบัญชีนี้");
+        dispatch({ type: "SET_ERROR", message: "รหัสผ่านนี้ไม่ตรงกับบัญชีที่กำลังจะลบ กรุณาใช้รหัสผ่านของบัญชีนี้" });
       } else {
-        setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        dispatch({ type: "SET_ERROR", message: errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่" });
       }
     } finally {
       setReauthenticating(null);
@@ -263,7 +260,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
    */
   const withDeleteReauthPopupGuard = (provider: "google" | "facebook") => async () => {
     setReauthenticating(provider);
-    setErrorMessage(null);
+    dispatch({ type: "CLEAR" });
     reauthResolvedRef.current = false;
 
     let focusTimer: ReturnType<typeof setTimeout> | null = null;
@@ -285,11 +282,11 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         // User closed popup — keep reauth step open and ready for retry
       } else if (code === "auth/popup-blocked") {
-        setErrorMessage("เบราว์เซอร์บล็อก popup กรุณาอนุญาต popup แล้วลองอีกครั้ง");
+        dispatch({ type: "SET_ERROR", message: "เบราว์เซอร์บล็อก popup กรุณาอนุญาต popup แล้วลองอีกครั้ง" });
       } else if (code === "auth/user-mismatch") {
-        setErrorMessage(`บัญชี ${provider === "google" ? "Google" : "Facebook"} ที่เลือกไม่ตรงกับบัญชีที่กำลังจะลบ กรุณาเลือกบัญชีให้ถูกต้อง`);
+        dispatch({ type: "SET_ERROR", message: `บัญชี ${provider === "google" ? "Google" : "Facebook"} ที่เลือกไม่ตรงกับบัญชีที่กำลังจะลบ กรุณาเลือกบัญชีให้ถูกต้อง` });
       } else {
-        setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        dispatch({ type: "SET_ERROR", message: errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่" });
       }
     } finally {
       window.removeEventListener("focus", onFocus);
@@ -303,7 +300,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
 
   /** Step 3: the actual delete, called only after typing the confirmation phrase. */
   const handleDeleteAccount = async () => {
-    setLoading(true);
+    dispatch({ type: "SET_LOADING", value: true });
     try {
       await deleteAccount();
       handleClose();
@@ -318,9 +315,9 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
         duration: 5000,
       });
     } catch (error: unknown) {
-      setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      dispatch({ type: "SET_ERROR", message: errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่" });
     } finally {
-      setLoading(false);
+      dispatch({ type: "SET_LOADING", value: false });
     }
   };
 
@@ -423,43 +420,43 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
 
   const handleUpdatePassword = async () => {
     clearMessages();
-    if (newPassword !== confirmPassword) { setErrorMessage("รหัสผ่านใหม่ไม่ตรงกัน"); return; }
-    if (newPassword.length < 6) { setErrorMessage("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร"); return; }
-    setLoading(true);
+    if (newPassword !== confirmPassword) { dispatch({ type: "SET_ERROR", message: "รหัสผ่านใหม่ไม่ตรงกัน" }); return; }
+    if (newPassword.length < 6) { dispatch({ type: "SET_ERROR", message: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร" }); return; }
+    dispatch({ type: "SET_LOADING", value: true });
     try {
       await updateUserPassword(currentPassword, newPassword);
-      setSuccessMessage("เปลี่ยนรหัสผ่านสำเร็จ ✓");
+      dispatch({ type: "SET_SUCCESS", message: "เปลี่ยนรหัสผ่านสำเร็จ ✓" });
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
     } catch (error: unknown) {
       const code = (error as { code?: string })?.code;
       if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
-        setErrorMessage("รหัสผ่านปัจจุบันไม่ถูกต้อง");
+        dispatch({ type: "SET_ERROR", message: "รหัสผ่านปัจจุบันไม่ถูกต้อง" });
       } else {
-        setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        dispatch({ type: "SET_ERROR", message: errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่" });
       }
     } finally {
-      setLoading(false);
+      dispatch({ type: "SET_LOADING", value: false });
     }
   };
 
   const handleAddEmailPassword = async () => {
     clearMessages();
-    if (newPassword !== confirmPassword) { setErrorMessage("รหัสผ่านไม่ตรงกัน"); return; }
-    if (newPassword.length < 6) { setErrorMessage("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร"); return; }
-    setLoading(true);
+    if (newPassword !== confirmPassword) { dispatch({ type: "SET_ERROR", message: "รหัสผ่านไม่ตรงกัน" }); return; }
+    if (newPassword.length < 6) { dispatch({ type: "SET_ERROR", message: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร" }); return; }
+    dispatch({ type: "SET_LOADING", value: true });
     try {
       await addEmailPassword(newPassword);
-      setSuccessMessage("เพิ่มรหัสผ่านสำเร็จ ✓ ตอนนี้คุณสามารถ login ด้วย Email ได้แล้ว");
+      dispatch({ type: "SET_SUCCESS", message: "เพิ่มรหัสผ่านสำเร็จ ✓ ตอนนี้คุณสามารถ login ด้วย Email ได้แล้ว" });
       setNewPassword(""); setConfirmPassword("");
     } catch (error: unknown) {
       const code = (error as { code?: string })?.code;
       if (code === "auth/provider-already-linked") {
-        setErrorMessage("เชื่อมต่อ Email/Password อยู่แล้ว");
+        dispatch({ type: "SET_ERROR", message: "เชื่อมต่อ Email/Password อยู่แล้ว" });
       } else {
-        setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        dispatch({ type: "SET_ERROR", message: errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่" });
       }
     } finally {
-      setLoading(false);
+      dispatch({ type: "SET_LOADING", value: false });
     }
   };
 
@@ -482,7 +479,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
     try {
       await fn();
       linkingResolvedRef.current = true;
-      setSuccessMessage(`เชื่อมต่อบัญชี ${provider === "google" ? "Google" : "Facebook"} สำเร็จ ✓`);
+      dispatch({ type: "SET_SUCCESS", message: `เชื่อมต่อบัญชี ${provider === "google" ? "Google" : "Facebook"} สำเร็จ ✓` });
     } catch (error: unknown) {
       linkingResolvedRef.current = true;
       const code = (error as { code?: string })?.code ?? "";
@@ -493,12 +490,12 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
         if (credential) {
           showConflict({ credential, provider });
         } else {
-          setErrorMessage(`บัญชี ${provider === "google" ? "Google" : "Facebook"} นี้เชื่อมต่อกับผู้ใช้อื่นแล้ว`);
+          dispatch({ type: "SET_ERROR", message: `บัญชี ${provider === "google" ? "Google" : "Facebook"} นี้เชื่อมต่อกับผู้ใช้อื่นแล้ว` });
         }
       } else if (code === "auth/provider-already-linked") {
-        setErrorMessage(`เชื่อมต่อกับ ${provider === "google" ? "Google" : "Facebook"} อยู่แล้ว`);
+        dispatch({ type: "SET_ERROR", message: `เชื่อมต่อกับ ${provider === "google" ? "Google" : "Facebook"} อยู่แล้ว` });
       } else {
-        setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        dispatch({ type: "SET_ERROR", message: errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่" });
       }
     } finally {
       window.removeEventListener("focus", onFocus);
@@ -523,7 +520,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
             await switchToConflictingAccount(info.credential);
             handleClose();
           } catch (error: unknown) {
-            setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+            dispatch({ type: "SET_ERROR", message: errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่" });
           }
         },
       },
@@ -535,14 +532,14 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
 
   const handleUnlinkProvider = async (providerId: string) => {
     clearMessages();
-    setLoading(true);
+    dispatch({ type: "SET_LOADING", value: true });
     try {
       await unlinkAccount(providerId);
-      setSuccessMessage("ยกเลิกการเชื่อมต่อสำเร็จ ✓");
+      dispatch({ type: "SET_SUCCESS", message: "ยกเลิกการเชื่อมต่อสำเร็จ ✓" });
     } catch (error: unknown) {
-      setErrorMessage(errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      dispatch({ type: "SET_ERROR", message: errMessage(error) || "เกิดข้อผิดพลาด กรุณาลองใหม่" });
     } finally {
-      setLoading(false);
+      dispatch({ type: "SET_LOADING", value: false });
     }
   };
 
