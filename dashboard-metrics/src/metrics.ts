@@ -24,7 +24,7 @@ export const serviceLatency = new Gauge({
 });
 
 // Initialise all services to 0 so Grafana sees the series immediately
-const SERVICES = ["frontend", "backend", "supabase", "cf-worker", "ai-gateway", "mit"] as const;
+const SERVICES = ["frontend", "backend", "supabase", "cf-worker", "ai-gateway", "mit", "redis"] as const;
 for (const s of SERVICES) {
   serviceUp.set({ service: s }, 0);
   serviceDegraded.set({ service: s }, 0);

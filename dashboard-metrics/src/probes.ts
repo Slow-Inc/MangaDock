@@ -68,6 +68,8 @@ const SERVICES: Array<{ name: string; probe: () => Promise<ProbeResult> }> = [
   // TODO: replace with real probe when AI gateway / MIT health endpoints are available
   { name: "ai-gateway", probe: probeMock() },
   { name: "mit",        probe: probeMock() },
+  // TODO: replace with real Redis health probe
+  { name: "redis",      probe: probeMock() },
 ];
 
 export function startProbeLoop(): void {
