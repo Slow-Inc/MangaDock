@@ -16,5 +16,36 @@ services:
       timeout: 5s
       retries: 5
 
+  dashboard-metrics:
+    build: ./dashboard-metrics
+    ports:
+      - "9091:9091"
+    env_file: ./dashboard-metrics/.env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  grafana-alloy:
+    image: grafana/alloy:latest
+    volumes:
+      - ./dashboard-metrics/alloy/config.alloy:/etc/alloy/config.alloy:ro
+    command: run /etc/alloy/config.alloy
+    restart: unless-stopped
+    depends_on:
+      dashboard-metrics:
+        condition: service_healthy
+    environment:
+      - METRICS_BASIC_AUTH_USER=${METRICS_BASIC_AUTH_USER}
+      - METRICS_BASIC_AUTH_PASS=${METRICS_BASIC_AUTH_PASS}
+      - GRAFANA_REMOTE_WRITE_URL=${GRAFANA_REMOTE_WRITE_URL}
+      - GRAFANA_CLOUD_USER=${GRAFANA_CLOUD_USER}
+      - GRAFANA_CLOUD_API_KEY=${GRAFANA_CLOUD_API_KEY}
+      - BACKEND_HOST=${BACKEND_HOST:-host.docker.internal:3001}
+      - FRONTEND_HOST=${FRONTEND_HOST:-host.docker.internal:4000}
+
 volumes:
   redis_data:

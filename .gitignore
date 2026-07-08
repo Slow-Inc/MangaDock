@@ -33,3 +33,7 @@ Backend/prd_*.txt
 .mcp.json
 # Git worktrees
 .worktrees/
+Run.bat
+
+# Environment variables
+.env
