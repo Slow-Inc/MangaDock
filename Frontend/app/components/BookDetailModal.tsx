@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import CoverLightbox from "./CoverLightbox";
 import GeminiBadge from "./GeminiBadge";
@@ -90,7 +90,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [selectedCover, setSelectedCover] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const [loadingChapters, setLoadingChapters] = useState(false);
+  const [loadingChapters, setLoadingChapters] = useState(true);
   const [firstReadableChapter, setFirstReadableChapter] = useState<MangaChapter | undefined>();
   const [chaptersEmpty, setChaptersEmpty] = useState(false);
   const [activeChapter, setActiveChapter] = useState<ActiveChapter | null>(null);
@@ -98,6 +98,15 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [translatingDesc, setTranslatingDesc] = useState(false);
   const [showOriginalDesc, setShowOriginalDesc] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
+
+  const handleChapterReadyState = useCallback(
+    (loading: boolean, firstReadable: MangaChapter | undefined, isEmpty: boolean) => {
+      setLoadingChapters(loading);
+      setFirstReadableChapter(firstReadable);
+      setChaptersEmpty(isEmpty);
+    },
+    [],
+  );
 
   const coverRowRef = useRef<HTMLDivElement>(null);
   const chaptersRef = useRef<HTMLDivElement>(null); // For scrolling to start
@@ -852,11 +861,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               visible={visible && activeChapter === null}
               onChapterSelect={setActiveChapter}
               sectionRef={chaptersRef}
-              onReadyState={(loading, firstReadable, isEmpty) => {
-                setLoadingChapters(loading);
-                setFirstReadableChapter(firstReadable);
-                setChaptersEmpty(isEmpty);
-              }}
+              onReadyState={handleChapterReadyState}
             />
           )}
 
