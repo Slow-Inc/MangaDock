@@ -35,7 +35,7 @@ type ForumPostRow = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
-  author?: { display_name: string | null; photo_url: string | null; role: string } | null;
+  author?: { display_name: string | null; photo_url: string | null; role: number } | null;
   comments?: Array<{ count: number }> | null;
 };
 
@@ -171,6 +171,20 @@ export class ForumService {
   }
 
   async createPost(uid: string, dto: CreatePostDto): Promise<ForumPost> {
+    const { data: callerProfile } = await this.db
+      .from('profiles')
+      .select('role')
+      .eq('uid', uid)
+      .maybeSingle<{ role: number | null }>();
+    const callerRole = callerProfile?.role ?? 0;
+
+    if (dto.category === 'announcement' && callerRole < 8) {
+      throw new ForbiddenException('Only admins can post announcements');
+    }
+    if (dto.category === 'manga_update' && callerRole < 1) {
+      throw new ForbiddenException('Only translators and above can post manga updates');
+    }
+
     const { data, error } = await this.db
       .from('forum_posts')
       .insert({
@@ -323,7 +337,7 @@ export class ForumService {
       authorUid: raw.author_uid,
       authorName: raw.author?.display_name ?? null,
       authorPhotoUrl: raw.author?.photo_url ?? null,
-      authorRole: raw.author?.role ?? 'user',
+      authorRole: raw.author?.role ?? 0,
       title: raw.title,
       content: raw.content,
       category: raw.category as ForumCategory,
@@ -363,8 +377,8 @@ export class ForumService {
     return Array.from(titleMap.values());
   }
 
-  private async fetchOwnEarnings(uid: string, viewerUid: string | undefined, role: string): Promise<UserProfileEarnings | null> {
-    const isCreator = role === 'translator' || role === 'creator';
+  private async fetchOwnEarnings(uid: string, viewerUid: string | undefined, role: number): Promise<UserProfileEarnings | null> {
+    const isCreator = role >= 1;
     if (!(isCreator && viewerUid === uid)) return null;
     const { data: earningsData } = await this.db
       .from('translator_earnings')
