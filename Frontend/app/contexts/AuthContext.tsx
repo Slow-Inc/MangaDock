@@ -712,7 +712,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const getPhotoHistory = async (): Promise<string[]> => {
+  const getPhotoHistory = useCallback(async (): Promise<string[]> => {
     if (!user) return [];
     try {
       const token = await getIdToken();
@@ -726,7 +726,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return [];
     }
-  };
+  }, [user, getIdToken]);
 
   const savePhotoHistory = async (photos: string[]): Promise<void> => {
     if (!user) return;
