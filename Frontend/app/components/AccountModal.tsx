@@ -102,8 +102,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
     } else {
       setVisible(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, initialTab, asPage]);
+  }, [isOpen, initialTab, asPage, onClose, router]);
 
   // Measure active panel height automatically via ResizeObserver
   useEffect(() => {
@@ -125,8 +124,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
       getPhotoHistory().then(setPreviousPhotos).catch(() => setPreviousPhotos([]));
     }
     if (!isOpen) { setShowPhotoPicker(false); setPhotoError(null); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isOpen]);
+  }, [user, isOpen, getPhotoHistory]);
 
   const clearMessages = () => dispatch({ type: "CLEAR" });
 
