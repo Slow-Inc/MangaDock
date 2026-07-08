@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { errMessage } from "@/lib/errMessage";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -62,12 +62,10 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
   const reauthResolvedRef = useRef(false);
   const [sendingVerification, setSendingVerification] = useState(false);
 
-  const tabRefs: Record<Tab, React.RefObject<HTMLDivElement | null>> = {
-    profile: profileRef,
-    password: passwordRef,
-    accounts: accountsRef,
-    danger: dangerRef,
-  };
+  const tabRefs = useMemo<Record<Tab, React.RefObject<HTMLDivElement | null>>>(
+    () => ({ profile: profileRef, password: passwordRef, accounts: accountsRef, danger: dangerRef }),
+    [] // refs are stable objects — correct to omit them
+  );
 
   const hasGoogleProvider = user?.providerData.some(p => p.providerId === "google.com");
   const hasFacebookProvider = user?.providerData.some(p => p.providerId === "facebook.com");
@@ -121,15 +119,19 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialTab, asPage]);
 
-  // Measure active panel height on tab/message/visibility change
+  // Measure active panel height automatically via ResizeObserver
   useEffect(() => {
     if (!isOpen || !visible || asPage) return;
-    requestAnimationFrame(() => {
-      const target = tabRefs[tab].current;
-      if (target) setPanelHeight(target.offsetHeight);
+    const target = tabRefs[tab]?.current;
+    if (!target) return;
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry) setPanelHeight(Math.round(entry.contentRect.height));
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, visible, tab, asPage, successMessage, errorMessage, showPhotoPicker, photoUploading, deleteStep, deleteConfirmText, reauthenticating, sendingVerification]);
+    observer.observe(target);
+    setPanelHeight(target.offsetHeight);
+    return () => observer.disconnect();
+  }, [isOpen, visible, tab, asPage, tabRefs]);
 
   useEffect(() => {
     if (user && isOpen) {
