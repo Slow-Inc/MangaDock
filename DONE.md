@@ -3,6 +3,14 @@
 
 ---
 
+## Guard #4 — append-only log-header guard (#610, 2026-07-09)
+
+**Goal:** prevent the stale-base clobber class (#553 → #608) at PR time — a PR off an old base silently dropping newer `## ` entries from `DONE.md` / `system-impact-report.md`.
+
+**Change (TDD, 3-agent brainstorm design):** `scripts/lib/append-only.mjs` compares the MULTISET of `## ` headers in the base blob vs HEAD blob (codex refinement — not diff parsing → robust to moves/edits/code-fences/CRLF, avoids the `git diff ...` three-dot trap). Fails a PR that removes an existing header; `[log-trim]` in the PR title exempts curation. CLI wrapper + README + CI wiring. **Validation:** 15 unit tests RED→GREEN, full guard suite 45/45, CLI verified end-to-end (committed removal → exit 1). Wire into required `gate` job; also enable "require branches up to date" (defense-in-depth). Core-code clobber stays guarded per-seam by AST wiring tests (#608).
+
+---
+
 ## MIT #503/#541 resize_regions golden portable across freetype builds (2026-07-07)
 
 **Goal:** fix the `pytest (logic gate, torch-free)` **red on Linux CI** blocking PR #541 — `test_resize_regions_bubble_fit_byte_identical` failed with "region 0 dst_points drift".
