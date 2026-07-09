@@ -63,15 +63,19 @@ export function probeMock(): () => Promise<ProbeResult> {
 const REDIS_PROBE_TIMEOUT_MS = 3000;
 
 export async function probeRedisExporter(exporterUrl: string): Promise<ProbeResult> {
-  const t0 = Date.now();
+  const t0 = performance.now();
   try {
     const res = await fetch(`${exporterUrl}/metrics`, {
       signal: AbortSignal.timeout(REDIS_PROBE_TIMEOUT_MS),
     });
-    const latencyMs = Date.now() - t0;
     if (!res.ok) return { up: false, degraded: false, latencyMs: -1 };
     const text = await res.text();
     const up = /^redis_up(?:\{[^}]*\})?\s+1(?:\s|$)/m.test(text);
+    // Prefer exporter's own scrape duration (real Redis probe time); fall back to HTTP round-trip
+    const scrapeMatch = text.match(/^redis_exporter_last_scrape_duration_seconds\s+([\d.e+\-]+)/m);
+    const latencyMs = scrapeMatch
+      ? Math.round(parseFloat(scrapeMatch[1]) * 1000)
+      : Math.round(performance.now() - t0);
     return { up, degraded: up && latencyMs > 200, latencyMs };
   } catch {
     return { up: false, degraded: false, latencyMs: -1 };
