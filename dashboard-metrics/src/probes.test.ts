@@ -6,7 +6,7 @@ process.env.METRICS_BASIC_AUTH_PASS = "p";
 process.env.SUPABASE_HEALTH_URL = "https://test.supabase.co/health";
 process.env.SUPABASE_ANON_KEY = "test-key";
 
-const { probeStatusEndpoint, probeSupabase, probeCfWorker, probeMock } =
+const { probeStatusEndpoint, probeSupabase, probeCfWorker, probeMock, probeRedisExporter } =
   await import("./probes");
 
 const originalFetch = global.fetch;
@@ -103,5 +103,40 @@ describe("probeCfWorker", () => {
 describe("probeMock", () => {
   it("always returns up=true, degraded=false, latencyMs=0", async () => {
     expect(await probeMock()()).toEqual({ up: true, degraded: false, latencyMs: 0 });
+  });
+});
+
+// ── probeRedisExporter ────────────────────────────────────────────────────────
+
+describe("probeRedisExporter", () => {
+  it("returns up=true when redis_up 1 found in metrics response", async () => {
+    global.fetch = async () =>
+      new Response("# HELP redis_up Redis up\n# TYPE redis_up gauge\nredis_up 1\n", {
+        status: 200,
+      }) as Response;
+    const r = await probeRedisExporter("http://redis-exporter:9121");
+    expect(r.up).toBe(true);
+    expect(r.degraded).toBe(false);
+    expect(r.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("returns up=false when redis_up 0 found (exporter reachable, Redis down)", async () => {
+    global.fetch = async () =>
+      new Response("redis_up 0\n", { status: 200 }) as Response;
+    const r = await probeRedisExporter("http://redis-exporter:9121");
+    expect(r.up).toBe(false);
+    expect(r.degraded).toBe(false);
+  });
+
+  it("returns up=false, latencyMs=-1 on fetch throw", async () => {
+    global.fetch = async () => { throw new Error("ECONNREFUSED"); };
+    const r = await probeRedisExporter("http://redis-exporter:9121");
+    expect(r).toEqual({ up: false, degraded: false, latencyMs: -1 });
+  });
+
+  it("returns up=false, latencyMs=-1 on non-200 response", async () => {
+    global.fetch = async () => new Response("bad gateway", { status: 502 }) as Response;
+    const r = await probeRedisExporter("http://redis-exporter:9121");
+    expect(r).toEqual({ up: false, degraded: false, latencyMs: -1 });
   });
 });

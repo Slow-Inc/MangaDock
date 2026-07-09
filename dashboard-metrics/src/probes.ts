@@ -60,6 +60,24 @@ export function probeMock(): () => Promise<ProbeResult> {
   return async () => ({ up: true, degraded: false, latencyMs: 0 });
 }
 
+const REDIS_PROBE_TIMEOUT_MS = 3000;
+
+export async function probeRedisExporter(exporterUrl: string): Promise<ProbeResult> {
+  const t0 = Date.now();
+  try {
+    const res = await fetch(`${exporterUrl}/metrics`, {
+      signal: AbortSignal.timeout(REDIS_PROBE_TIMEOUT_MS),
+    });
+    const latencyMs = Date.now() - t0;
+    if (!res.ok) return { up: false, degraded: false, latencyMs: -1 };
+    const text = await res.text();
+    const up = /^redis_up\s+1(\s|$)/m.test(text);
+    return { up, degraded: up && latencyMs > 200, latencyMs };
+  } catch {
+    return { up: false, degraded: false, latencyMs: -1 };
+  }
+}
+
 const SERVICES: Array<{ name: string; probe: () => Promise<ProbeResult> }> = [
   { name: "frontend",   probe: () => probeStatusEndpoint(`${config.FRONTEND_STATUS_URL}/status`) },
   { name: "backend",    probe: () => probeStatusEndpoint(`${config.BACKEND_STATUS_URL}/status`) },
@@ -68,8 +86,7 @@ const SERVICES: Array<{ name: string; probe: () => Promise<ProbeResult> }> = [
   // TODO: replace with real probe when AI gateway / MIT health endpoints are available
   { name: "ai-gateway", probe: probeMock() },
   { name: "mit",        probe: probeMock() },
-  // TODO: replace with real Redis health probe
-  { name: "redis",      probe: probeMock() },
+  { name: "redis",      probe: () => probeRedisExporter(config.REDIS_EXPORTER_URL) },
 ];
 
 export function startProbeLoop(): void {

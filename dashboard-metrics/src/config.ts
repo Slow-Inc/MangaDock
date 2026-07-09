@@ -12,4 +12,5 @@ export const config = {
   BACKEND_STATUS_URL: process.env.BACKEND_STATUS_URL ?? "http://localhost:3001",
   SUPABASE_HEALTH_URL: required("SUPABASE_HEALTH_URL"),
   SUPABASE_ANON_KEY: required("SUPABASE_ANON_KEY"),
+  REDIS_EXPORTER_URL: process.env.REDIS_EXPORTER_URL ?? "http://redis-exporter:9121",
 } as const;
