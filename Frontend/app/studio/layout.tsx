@@ -63,7 +63,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   if (!user) return null;
 
   // 3. RBAC Enforcement: Onboarding for regular 'user' role
-  const isAuthorized = userRole === "translator" || userRole === "creator" || userRole === "admin";
+  const isAuthorized = typeof userRole === 'number' && userRole >= 1;
 
   if (!isAuthorized) {
     return (

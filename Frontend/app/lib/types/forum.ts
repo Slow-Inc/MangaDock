@@ -23,7 +23,7 @@ export interface PublicUserProfile {
   photoUrl: string | null;
   bannerUrl: string | null;
   bannerPosition: number;
-  role: string;
+  role: number;
   bio: string | null;
   country: string | null;
   translatorLanguages: string[];
@@ -53,7 +53,7 @@ export interface ForumPost {
   authorUid: string;
   authorName: string | null;
   authorPhotoUrl: string | null;
-  authorRole: string;
+  authorRole: number;
   title: string;
   content: string;
   category: ForumCategory;
@@ -76,7 +76,7 @@ export interface ForumComment {
   authorUid: string;
   authorName: string | null;
   authorPhotoUrl: string | null;
-  authorRole: string;
+  authorRole: number;
   content: string;
   upvotes: number;
   downvotes: number;

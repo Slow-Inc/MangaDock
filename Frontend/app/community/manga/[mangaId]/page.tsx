@@ -107,7 +107,7 @@ export default function MangaCommunityPage() {
       authorUid: user?.uid ?? "",
       authorName: user?.displayName ?? null,
       authorPhotoUrl: user?.photoURL ?? null,
-      authorRole: user?.role ?? "user",
+      authorRole: user?.role ?? 0,
       upvotes: 0,
       downvotes: 0,
       userVote: 0,

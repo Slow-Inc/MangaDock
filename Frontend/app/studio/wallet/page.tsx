@@ -160,7 +160,7 @@ export default function WalletPage() {
   const [earnings, setEarnings] = useState<CreatorEarnings | null>(null);
   const hasFetched = useRef(false);
 
-  const isCreator = userRole === "translator" || userRole === "creator";
+  const isCreator = typeof userRole === 'number' && userRole >= 1;
 
   const fetchData = useCallback(async () => {
     if (!user) return;

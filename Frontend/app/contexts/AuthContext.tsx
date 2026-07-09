@@ -35,7 +35,7 @@ export interface AppUser {
   displayName: string | null;
   photoURL: string | null;
   emailVerified: boolean;
-  role?: string | null;
+  role?: number | null;
   providerData: Array<{
     providerId: string;
     photoURL?: string | null;
@@ -53,10 +53,11 @@ function mapProviderId(provider: string): string {
 
 /** Adapt a Supabase User to the AppUser interface used by UI components. */
 function adaptUser(u: SupabaseUser): AppUser {
-  const meta = (u.user_metadata ?? {}) as Record<string, string | null | undefined>;
-  const displayName = meta.display_name ?? meta.full_name ?? meta.name ?? null;
-  const photoURL = meta.avatar_url ?? meta.picture ?? null;
-  const role = meta.role ?? null;
+  const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+  const displayName =
+    (meta.display_name ?? meta.full_name ?? meta.name) as string | null | undefined ?? null;
+  const photoURL = (meta.avatar_url ?? meta.picture) as string | null | undefined ?? null;
+  const role: number | null = typeof meta.role === 'number' ? meta.role : null;
 
   const providerData = (u.identities ?? []).map((identity) => {
     const idata = (identity.identity_data ?? {}) as Record<string, string | null | undefined>;
@@ -82,12 +83,14 @@ function adaptUser(u: SupabaseUser): AppUser {
 type BackendProfile = {
   displayName: string | null;
   photoURL: string | null;
-  role: string | null;
+  role: number | null;
 };
 
 function extractBackendProfile(payload: unknown): BackendProfile | null {
-  const read = (v: unknown): string | null =>
+  const readStr = (v: unknown): string | null =>
     typeof v === "string" && v.trim().length > 0 ? v : null;
+  const readRole = (v: unknown): number | null =>
+    typeof v === "number" ? v : null;
 
   const candidates: unknown[] = [payload];
   if (payload && typeof payload === "object") {
@@ -98,21 +101,21 @@ function extractBackendProfile(payload: unknown): BackendProfile | null {
   for (const item of candidates) {
     if (!item || typeof item !== "object") continue;
     const obj = item as Record<string, unknown>;
-    const displayName = read(obj.displayName) ?? read(obj.name);
+    const displayName = readStr(obj.displayName) ?? readStr(obj.name);
     const photoURL =
-      read(obj.photoURL) ??
-      read(obj.photoUrl) ??
-      read(obj.avatarUrl) ??
-      read(obj.avatar_url);
-    const role = read(obj.role);
-    if (displayName || photoURL || role) return { displayName, photoURL, role };
+      readStr(obj.photoURL) ??
+      readStr(obj.photoUrl) ??
+      readStr(obj.avatarUrl) ??
+      readStr(obj.avatar_url);
+    const role = readRole(obj.role);
+    if (displayName || photoURL || role != null) return { displayName, photoURL, role };
   }
   return null;
 }
 
 type AuthContextType = {
   user: AppUser | null;
-  userRole: string | null;
+  userRole: number | null;
   isTranslator: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
@@ -749,7 +752,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const userRole = user?.role ?? null;
-  const isTranslator = userRole === "translator" || userRole === "creator" || userRole === "admin";
+  const isTranslator = typeof userRole === 'number' && userRole >= 1;
 
   // Memoized provider value (#152): without this, any provider state change
   // (including loginOpen open/close) re-rendered every useAuth() consumer.
