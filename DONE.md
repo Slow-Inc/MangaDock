@@ -3,6 +3,18 @@
 
 ---
 
+## MIT #503/#541 resize_regions golden portable across freetype builds (2026-07-07)
+
+**Goal:** fix the `pytest (logic gate, torch-free)` **red on Linux CI** blocking PR #541 — `test_resize_regions_bubble_fit_byte_identical` failed with "region 0 dst_points drift".
+
+**Root cause (systematic-debugging, not guessed):** the bubble_fit characterization golden encodes freetype-metric geometry — `_bubble_fit_layout`'s font binary-search + width-squeeze pivot on real glyph advances (`text_render.calc_horizontal`). The golden was recorded on Windows / Pillow 12.2.0 / freetype 2.14.3; CI installs Linux / **Pillow 12.3.0** (Pillow is unpinned in `requirements.txt`), whose freetype build yields different advances → fitted `dst_points` drift a few px → byte-equality fails. `legacy` + `clean_layout` are box-derived (metric-independent) and pass on both platforms. This is environment drift, **not** a logic change — the inherent limit of a byte-identical freetype-metric golden across platforms.
+
+**Change (TDD, test-only — production render code byte-untouched):** each golden now records the `freetype_version` + `platform` it was made on. New pure `test/_golden_compare.py::golden_verdict(arrays_equal, same_env)` → `pass` (match → assert holds anywhere) / `fail` (mismatch on the golden's OWN env → real regression) / `skip` (mismatch on a DIFFERENT env → metric drift, regenerate to assert). `_save_or_assert` stores env + dispatches on the verdict. Portable goldens keep asserting everywhere (CI retains real coverage of the resize dispatcher); bubble_fit skips only on a foreign freetype, still asserts strictly on the dev platform where Phase-2 refactors happen. No dependency pinned (surgical, no ML-stack risk).
+
+**Validation:** `test/test_golden_compare.py` 3 unit tests (RED→GREEN); skip/fail/pass wiring exercised on crafted goldens locally (env-diff+array-diff→skip, same-env+array-diff→fail, match→pass); goldens regenerated (byte-identical dst on dev freetype + new metadata). Logic gate **green on Linux CI** (the environment that failed). Scrutinized: ship (one inherent limitation documented — only the golden's authoring platform asserts strictly). Benchmark (test-infra before→after, PNG+MD): `docs/reports/benchmarks/2026-07-07-541-golden-portability.md`. PR #541, commit `ef69dd26`.
+
+---
+
 ## Staff Console — PRD + ADR 018 + Phase-1 issues, out-of-band observability (2026-06-14)
 
 Designed the **Staff Console** (role-tiered back-office: Moderator/Admin/Dev) off the 2026-06-14 9arm incident (gateway `gateway.9arm.co` up, but `qwen3.6-35b-a3b` model hung → cryptic `'ollama servers did not respond quickly enough'` after ~90s; root-caused by black-box probe — `/models` OK 0.19s, a 16-token completion timed out 151s = inference backend hung, external). A full `/grill-me` pass settled the design, then a resilience review reshaped the Dev console's data plane.
