@@ -10,6 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.0",
     "lucide-react": "^1.18.0",
     "motion": "^12.40.0",
     "next": "16.2.9",

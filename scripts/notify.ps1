@@ -40,4 +40,7 @@ $inner = @"
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier(`$AppId).Show(`$toast)
 "@
 
-& $ps51 -NoProfile -Command $inner
+$tmp = [System.IO.Path]::GetTempFileName() + ".ps1"
+$inner | Out-File -FilePath $tmp -Encoding utf8
+& $ps51 -NoProfile -File $tmp
+Remove-Item $tmp -Force

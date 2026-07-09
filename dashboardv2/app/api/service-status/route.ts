@@ -10,7 +10,7 @@ export async function GET() {
       "frontend",
     ),
     probeService(
-      process.env.BACKEND_STATUS_URL ?? "http://localhost:3001/status",
+      process.env.BACKEND_STATUS_URL ?? "http://localhost:4001/status",
       "backend",
     ),
   ]);
