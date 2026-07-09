@@ -50,6 +50,14 @@ and main touched the same lines); `check-append-only.mjs` catches the *disjoint*
 entries the PR's old base never saw) on the changelog files. Neither alone is sufficient — the
 brainstorm (antigravity + codex + claude-9arm) converged that you want both.
 
+**Human pre-merge step (backs the setting; required for `gh`/CLI merges the GitHub button can't gate):**
+before merging any PR, `git fetch origin main` and check whether main advanced past the PR's branch
+point — `git merge-base --is-ancestor origin/main HEAD` (non-zero exit = main moved), or
+`git log --oneline origin/main ^HEAD`. If it moved, **rebase onto latest main, re-run the tests, and
+re-run `/scrutinize` (re-stamp the marker — HEAD moved) before merging.** The branch-protection setting
+enforces this on the GitHub merge button; this is the same discipline for a local/CLI merge. Skipping it
+is exactly how #553 shipped a stale-base clobber onto `main`.
+
 The append-only guard is CI-only (needs the base + HEAD blobs + PR title). Core-**code** clobber is
 guarded per-seam by AST wiring tests (e.g. `MIT/test/test_stage_c_wiring.py` from #608), not this
 generic guard.
