@@ -31,6 +31,14 @@ prometheus.scrape "redis_exporter" {
   metrics_path    = "/metrics"
   scrape_interval = "15s"
   scrape_timeout  = "5s"
+  forward_to = [prometheus.relabel.redis_addr.receiver]
+}
+
+prometheus.relabel "redis_addr" {
+  rule {
+    target_label = "addr"
+    replacement  = "redis://redis:6379"
+  }
   forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
