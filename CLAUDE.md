@@ -23,13 +23,16 @@ When two designs are equally correct, choose the one a future maintainer (human 
 
 ## Project Memory (Team Shared)
 
-Memory files live at `.claude/memory/` in this repo — committed so all team members and agents start with full context.
+Team memory lives as an **Obsidian vault** at `Obsidian-MangaDock/` in this repo — committed so all team members and agents start with full context. (It used to be flat files under `.claude/memory/`; that folder now holds only a pointer README.)
 
-**At the start of every session, read all files in `.claude/memory/` before doing anything else.**
+**At the start of every session, read `Obsidian-MangaDock/Home.md` (the Map-of-Content index).** Home.md's one-liners are a **filter, not a reading list** — open only the individual notes whose description matches the subsystem/topic of the task at hand (Frontend / Backend / MIT / general process). Do **not** open all linked notes by default: the full vault is dozens of notes and mostly off-topic for any single task — measured ~26K tokens to open every note vs ~2K to read the index alone. Two rules are universal enough to promote here instead of leaving them topical:
 
-`MEMORY.md` is the index. Each linked file is a memory record (user, feedback, project, or reference type).
+- **Issue ownership scope:** only action issues authored by `xenodeve` or labeled `ready-for-agent` — other contributors' issues are their own logs, not ours to implement. Detail: `Obsidian-MangaDock/feedback-issue-ownership-scope.md`.
+- **Verify before claiming:** never say a fix/feature is "done" without eyeballing the real output (render/test/E2E) against the target — a passing test or a plausible diff alone is not verification. Detail: `Obsidian-MangaDock/feedback-verify-before-claiming.md`.
 
-If you write new memories during a session, update both `.claude/memory/` (for the team) and your local `~/.claude/projects/.../memory/` (for your own continuity).
+`Home.md` groups memories by `type` (`feedback`, `project`, `reference`). Each note has `type` / `description` frontmatter and `[[wikilinks]]` to related notes; open Graph View to see the relationships (unresolved links = memories worth writing).
+
+If you write a new team memory, create a note in `Obsidian-MangaDock/` (filename = its hyphen-kebab slug, matching the `name:` frontmatter so `[[wikilinks]]` resolve) and add a line to `Home.md`. **Before writing, ask: is this universal — every task needs it, states in ≤3 bullets, high cost if missed, not already covered elsewhere in this file?** → promote a short summary here instead of (or in addition to) the vault note. Otherwise it stays a topical vault note. Keep your own local `~/.claude/projects/.../memory/` in sync for personal continuity.
 
 ---
 
@@ -65,7 +68,7 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 
 ### Issue tracker
 
-GitHub Issues on `Slow-Inc/MangaDock` via the `gh` CLI. Issue **and PRD bodies must be bilingual (English + a full Thai mirror — same depth, not a summary)**; review-reply comments may be English-only. External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
+GitHub Issues on `Slow-Inc/MangaDock` via the `gh` CLI. Issue, PR, and PRD bodies **must be bilingual (English + a full Thai mirror — same depth, not a summary)** — a `.github/pull_request_template.md` scaffolds the EN/TH sections and `pr-bilingual-check.yml` gates on a real Thai mirror being present (structure-only; a reviewer still enforces same-depth). Review-reply comments may be English-only. External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -200,13 +203,16 @@ const safe = /^\s*(javascript|data|vbscript|file):/i.test(url.trim()) ? '#' : ur
 
 ## Project Memory (ทีมใช้ร่วมกัน)
 
-ไฟล์ memory อยู่ที่ `.claude/memory/` ใน repo นี้ — commit ไว้เพื่อให้สมาชิกทีมและ agent ทุกคนเริ่มด้วย context ครบ
+memory ของทีมอยู่เป็น **Obsidian vault** ที่ `Obsidian-MangaDock/` ใน repo นี้ — commit ไว้เพื่อให้สมาชิกทีมและ agent ทุกคนเริ่มด้วย context ครบ (เดิมเป็นไฟล์ flat ใน `.claude/memory/`; ตอนนี้โฟลเดอร์นั้นเหลือแค่ README ชี้ทาง)
 
-**ต้องอ่านทุกไฟล์ใน `.claude/memory/` ก่อนทำอะไรทุกครั้งที่เริ่ม session**
+**ทุกครั้งที่เริ่ม session ต้องอ่าน `Obsidian-MangaDock/Home.md` (Map-of-Content index)** one-liner ใน Home.md คือ **ตัวกรอง ไม่ใช่ reading list** — เปิดเฉพาะ note ที่คำอธิบายตรงกับ subsystem/หัวข้อของงานตรงหน้า (Frontend / Backend / MIT / กระบวนการทั่วไป) **ห้าม**เปิดทุก note ที่ link ไว้เป็น default — vault เต็มมีหลายสิบ note ส่วนใหญ่ไม่เกี่ยวกับงานเดียว — วัดได้ว่า ~26K token ถ้าเปิดทุก note เทียบกับ ~2K token ถ้าอ่านแค่ index มี 2 กฎที่ universal พอจะ promote มาไว้ตรงนี้แทนการปล่อยเป็น topical:
 
-`MEMORY.md` คือ index; แต่ละไฟล์ที่ link ไปคือ memory record (ประเภท user, feedback, project หรือ reference)
+- **ขอบเขต issue:** ทำเฉพาะ issue ที่ author เป็น `xenodeve` หรือ tag `ready-for-agent` — ของ contributor คนอื่นเป็น log ของเขา ไม่ใช่ของเราที่จะ implement รายละเอียด: `Obsidian-MangaDock/feedback-issue-ownership-scope.md`
+- **verify ก่อนเคลม:** ห้ามบอกว่า fix/feature "เสร็จ" จนกว่าจะ eyeball ผลจริง (render/test/E2E) เทียบ target — test ผ่านหรือ diff ที่ดูสมเหตุสมผล ไม่ใช่ verification รายละเอียด: `Obsidian-MangaDock/feedback-verify-before-claiming.md`
 
-ถ้าเขียน memory ใหม่ระหว่าง session ให้อัปเดตทั้ง `.claude/memory/` (สำหรับทีม) และ `~/.claude/projects/.../memory/` ของตัวเอง (สำหรับความต่อเนื่องส่วนตัว)
+`Home.md` คือ index — จัดกลุ่ม memory ตาม `type` (`feedback`, `project`, `reference`) แต่ละ note มี frontmatter `type` / `description` + `[[wikilinks]]` เชื่อมเรื่องที่เกี่ยวข้อง; เปิด Graph View เพื่อเห็นความสัมพันธ์ (link ที่ยังไม่มีไฟล์ = memory ที่ควรเขียนเพิ่ม)
+
+ถ้าเขียน memory ใหม่ของทีม ให้สร้าง note ใน `Obsidian-MangaDock/` (ชื่อไฟล์ = slug แบบ hyphen-kebab ให้ตรงกับ `name:` ใน frontmatter เพื่อให้ `[[wikilinks]]` resolve) แล้วเพิ่มบรรทัดใน `Home.md` **ก่อนเขียน ถามตัวเองว่า: นี่ universal ไหม — ทุก task ต้องใช้, พูดจบใน ≤3 bullet, cost สูงถ้าพลาด, ยังไม่มีที่อื่นในไฟล์นี้พูดถึง?** → promote เป็นสรุปสั้นไว้ตรงนี้แทน (หรือเพิ่มเติมจาก) vault note ถ้าไม่ใช่ ให้เป็น topical vault note ต่อไป; และ sync `~/.claude/projects/.../memory/` ของตัวเองไว้เพื่อความต่อเนื่องส่วนตัว
 
 ---
 

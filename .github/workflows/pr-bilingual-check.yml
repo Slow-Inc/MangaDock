@@ -1,0 +1,25 @@
+name: PR bilingual body check
+
+# CLAUDE.md / docs/agents/issue-tracker.md: issue, PR, and PRD bodies must mirror English with
+# a full Thai translation. Structure-only gate (a minimum Thai-script character count) — it
+# cannot verify translation quality or depth-parity, only that a real Thai mirror is present.
+# Bypass: put [skip-bilingual] in the PR title, or it's a dependabot PR.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/check-pr-bilingual.mjs
+          sparse-checkout-cone-mode: false
+      - run: node scripts/check-pr-bilingual.mjs
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
