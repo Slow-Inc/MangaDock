@@ -13,11 +13,16 @@ function makeStats() {
   return { recordChapterView: jest.fn().mockResolvedValue(undefined) };
 }
 
-function makeController(books = makeBooks(), stats = makeStats()) {
+function makeBiz() {
+  return { recordRead: jest.fn() };
+}
+
+function makeController(books = makeBooks(), stats = makeStats(), biz = makeBiz()) {
   return {
-    ctrl: new BooksController(books as any, stats as unknown as StatsIncrementService),
+    ctrl: new BooksController(books as any, stats as unknown as StatsIncrementService, biz as any),
     books,
     stats,
+    biz,
   };
 }
 

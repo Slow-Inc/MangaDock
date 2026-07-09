@@ -18,6 +18,7 @@ import { fetchProxiedImage, MAX_PROXY_BYTES } from './img-proxy.helper';
 import type { Request, Response } from 'express';
 import { BooksService } from './books.service';
 import { StatsIncrementService } from '../cache/stats-increment.service';
+import { BusinessMetricsService } from '../metrics/business-metrics.service';
 import {
   TurnstileGuard,
   generateClearanceToken,
@@ -32,6 +33,7 @@ export class BooksController {
   constructor(
     private readonly booksService: BooksService,
     private readonly statsIncrement: StatsIncrementService,
+    private readonly biz: BusinessMetricsService,
   ) {}
 
   @Post('verify-captcha')
@@ -162,6 +164,7 @@ export class BooksController {
       uid,
       date,
     );
+    this.biz.recordRead();
     return result;
   }
 

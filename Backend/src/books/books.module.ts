@@ -8,9 +8,10 @@ import { MitClient } from './mit-client';
 import { LlmService } from './llm.service';
 import { StatusModule } from '../status/status.module';
 import { CacheModule } from '../cache/cache.module';
+import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
-  imports: [StatusModule, CacheModule],
+  imports: [StatusModule, CacheModule, MetricsModule],
   controllers: [BooksController, MitWebhookController, PatchesController],
   providers: [BooksService, MangaDexService, MitClient, LlmService],
   exports: [BooksService],
