@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from manga_translator.translators import (
@@ -37,6 +39,11 @@ async def test_chain():
         print(e)
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    bool(os.environ.get('CI')),
+    reason='#618: exercises live online translators; the CI runner is offline so a '
+    'scraper regex .group()s a None response. Runs locally when network is available.',
+)
 async def test_online_translators():
     queries = ['僕はアイネと共に一度、宿の方に戻った', '改めて直面するのは部屋の問題――部屋のベッドが一つでは、さすがに狭すぎるだろう。']
     for key in TRANSLATORS:
