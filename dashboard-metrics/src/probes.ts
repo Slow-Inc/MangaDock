@@ -71,7 +71,7 @@ export async function probeRedisExporter(exporterUrl: string): Promise<ProbeResu
     const latencyMs = Date.now() - t0;
     if (!res.ok) return { up: false, degraded: false, latencyMs: -1 };
     const text = await res.text();
-    const up = /^redis_up\s+1(\s|$)/m.test(text);
+    const up = /^redis_up(?:\{[^}]*\})?\s+1(?:\s|$)/m.test(text);
     return { up, degraded: up && latencyMs > 200, latencyMs };
   } catch {
     return { up: false, degraded: false, latencyMs: -1 };

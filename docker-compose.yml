@@ -30,7 +30,7 @@ services:
       start_period: 10s
 
   redis-exporter:
-    image: oliver006/redis_exporter:latest
+    image: oliver006/redis_exporter:v1.67.0
     environment:
       - REDIS_ADDR=${REDIS_ADDR:-redis://host.docker.internal:6379}
     restart: unless-stopped

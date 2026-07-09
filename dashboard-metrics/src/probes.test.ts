@@ -139,4 +139,14 @@ describe("probeRedisExporter", () => {
     const r = await probeRedisExporter("http://redis-exporter:9121");
     expect(r).toEqual({ up: false, degraded: false, latencyMs: -1 });
   });
+
+  it("returns up=true when redis_up has labels (real exporter format)", async () => {
+    global.fetch = async () =>
+      new Response(
+        '# HELP redis_up Information about the Redis instance\n# TYPE redis_up gauge\nredis_up{addr="redis://127.0.0.1:6379",alias=""} 1\n',
+        { status: 200 },
+      ) as Response;
+    const r = await probeRedisExporter("http://redis-exporter:9121");
+    expect(r.up).toBe(true);
+  });
 });
