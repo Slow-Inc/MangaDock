@@ -29,6 +29,12 @@ services:
       retries: 3
       start_period: 10s
 
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    environment:
+      - REDIS_ADDR=${REDIS_ADDR:-redis://host.docker.internal:6379}
+    restart: unless-stopped
+
   grafana-alloy:
     image: grafana/alloy:latest
     volumes:
