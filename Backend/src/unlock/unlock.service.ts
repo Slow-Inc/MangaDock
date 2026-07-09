@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { WalletService } from '../wallet/wallet.service';
+import { BusinessMetricsService } from '../metrics/business-metrics.service';
 
 @Injectable()
 export class UnlockService {
@@ -15,6 +16,7 @@ export class UnlockService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly walletService: WalletService,
+    private readonly biz: BusinessMetricsService,
   ) {}
 
   private get db() {
@@ -30,7 +32,9 @@ export class UnlockService {
       .maybeSingle();
 
     if (error) {
-      throw new InternalServerErrorException(`Failed to check unlock status: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to check unlock status: ${error.message}`,
+      );
     }
 
     return !!data;
@@ -46,7 +50,9 @@ export class UnlockService {
         .eq('chapter_versions.title_id', titleId);
 
       if (error) {
-        throw new InternalServerErrorException(`Failed to fetch unlocked versions: ${error.message}`);
+        throw new InternalServerErrorException(
+          `Failed to fetch unlocked versions: ${error.message}`,
+        );
       }
 
       return (data ?? []).map((row) => row.version_id);
@@ -58,7 +64,9 @@ export class UnlockService {
       .eq('uid', uid);
 
     if (error) {
-      throw new InternalServerErrorException(`Failed to fetch unlocked versions: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch unlocked versions: ${error.message}`,
+      );
     }
 
     return (data ?? []).map((row) => row.version_id);
@@ -84,17 +92,28 @@ export class UnlockService {
         throw new BadRequestException('Chapter is not available for purchase');
       }
       if (msg.includes('CREATOR_MISSING')) {
-        throw new BadRequestException('Cannot purchase: Creator information is missing for this version.');
+        throw new BadRequestException(
+          'Cannot purchase: Creator information is missing for this version.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to unlock chapter: ${msg}`);
+      throw new InternalServerErrorException(
+        `Failed to unlock chapter: ${msg}`,
+      );
     }
 
-    const row = Array.isArray(data) ? data[0] : (data as any);
+    const row = Array.isArray(data) ? data[0] : data;
     if (row?.already_unlocked) {
       return { alreadyUnlocked: true };
     }
 
-    this.logger.log(`User ${uid} unlocked version ${versionId} for ${row?.price_paid} coins`);
-    return { unlocked: true, pricePaid: row?.price_paid, balance: row?.balance };
+    this.logger.log(
+      `User ${uid} unlocked version ${versionId} for ${row?.price_paid} coins`,
+    );
+    this.biz.recordUnlock(row?.price_paid ?? 0);
+    return {
+      unlocked: true,
+      pricePaid: row?.price_paid,
+      balance: row?.balance,
+    };
   }
 }
