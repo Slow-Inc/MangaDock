@@ -69,9 +69,9 @@ Most render/translation-quality work is **code-complete on `landing/render-phase
 | RLS backstop on `unlocks`/`wallet` + boot-assert `TURNSTILE_SECRET_KEY` + CI lint guard uid-scoped queries | 🟢 **#549** | ADR 013 |
 | Webhook idempotency → **DB unique-constraint** (in-memory only today) | 🟢 **#549** | ADR 012 |
 | Magic-byte upload-guard shared helper (DRY forum+upload) | 🔴 | ADR 016 |
-| `write_translations` opens file w/o `encoding=` → `UnicodeEncodeError` on Windows cp1252 | 🟢 **#542** | mit-refactor-progress |
-| `streaming.py stream()` awaits `messages.get()` w/o timeout → SSE hang if no terminal frame | 🟢 **#543** | DONE.md:922 |
-| `readWithTimeout` never `clearTimeout`s race-loser timer (dangling timer) | 🟢 **#544** | ADR 017 |
+| `write_translations` opens file w/o `encoding=` → `UnicodeEncodeError` on Windows cp1252 | ✅ **#542 → PR #612** (TDD, `encoding="utf-8"` pinned on write+read) | mit-refactor-progress |
+| ~~`streaming.py stream()` SSE hang — no timeout~~ | ✅ **#543 CLOSED obsolete** — already fixed by #106 (`1de61ffe`: `wait_for` + error frame); the MD sweep double-counted the pre-#106 note | DONE.md:922 / :1167 |
+| `readWithTimeout` never `clearTimeout`s race-loser timer (dangling timer) | ✅ **#544 → PR #613** (TDD, extract helper + `clearTimeout` in `finally`) | ADR 017 |
 | Backend hotfix backlog: chapter-list via apiCache (~11/min re-fetch), cache `readerAvailable`, dedup `storage.list`, R2 `.list` backoff+logging, per-manga `_chapters` namespace | 🔴 | impact-report:303 |
 | L3 disk cap/TTL prune · unify 3 cross-page context windows · `models_ttl==0` eager-preload as runtime knob | 🔴 | ADR 011 / 010 / 009 |
 
@@ -101,8 +101,8 @@ Most render/translation-quality work is **code-complete on `landing/render-phase
 
 | Item | Status | Source |
 |---|---|---|
-| BaseGPTTranslator base-abstraction half of #188 | 🔴 **#188 CLOSED** — "still open (xhigh)" leftover | mit-refactor-progress L87 |
-| `load_dotenv()` import side-effect extraction | 🔴 **#192 CLOSED** — only parse seam taken | ADR 008, PIPELINE §230 |
+| BaseGPTTranslator base-abstraction half of #188 | 🟢 **filed → #615** (focused leftover; grep-confirmed absent; parent #188 stays closed) | mit-refactor-progress L87 |
+| `load_dotenv()` import side-effect extraction | 🟢 **filed → #614** (parse seam `parse_and_validate_config` shipped; extraction leftover; parent #192 stays closed) | ADR 008, PIPELINE §230 |
 | Priority debt: core decomposition #188→#187 (per team memory) | 🟢 | continue byte-identical/characterization-first |
 
 ---
