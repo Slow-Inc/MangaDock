@@ -2,8 +2,10 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpException,
   HttpStatus,
+  Logger,
   NotFoundException,
   Param,
   Post,
@@ -21,22 +23,27 @@ import {
   generateClearanceToken,
 } from '../auth/turnstile.guard';
 import { resolveTurnstileConfig } from '../auth/turnstile.config';
+import { verifyTurnstileToken } from '../auth/turnstile.verify';
 
 @Controller('books')
 export class BooksController {
+  private readonly logger = new Logger(BooksController.name);
+
   constructor(
     private readonly booksService: BooksService,
     private readonly statsIncrement: StatsIncrementService,
   ) {}
 
   @Post('verify-captcha')
-  async verifyCaptcha(@Req() req: any, @Body() body: { token: string }) {
+  async verifyCaptcha(
+    @Headers('x-hardware-id') hwid: string,
+    @Body() body: { token: string },
+  ) {
     if (!body.token) {
       throw new HttpException('Token is required', HttpStatus.BAD_REQUEST);
     }
     // Fail-closed config: production rejects a missing/test secret at boot (#224).
     const { enabled, secret } = resolveTurnstileConfig(process.env);
-    const hwid = req.headers['x-hardware-id'] as string;
 
     if (!hwid) {
       throw new HttpException(
@@ -50,27 +57,18 @@ export class BooksController {
       return { clearanceToken: generateClearanceToken(secret, hwid) };
     }
 
-    const formData = new URLSearchParams();
-    formData.append('secret', secret);
-    formData.append('response', body.token);
-
     try {
-      const result = await fetch(
-        'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-        {
-          method: 'POST',
-          body: formData,
-        },
-      );
-      const outcome = await result.json();
-
+      const outcome = await verifyTurnstileToken(body.token, secret);
       if (outcome.success) {
         return { clearanceToken: generateClearanceToken(secret, hwid) };
       }
-
-      console.error('Turnstile verification failed:', outcome['error-codes']);
+      this.logger.error(
+        `Turnstile verification failed: ${outcome.errorCodes?.join(', ')}`,
+      );
     } catch (e) {
-      console.error('Turnstile API request failed:', e);
+      this.logger.error(
+        `Turnstile API request failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
 
     throw new HttpException('Invalid Captcha token', HttpStatus.UNAUTHORIZED);
@@ -232,9 +230,8 @@ export class BooksController {
       const message = err instanceof Error ? err.message : String(err);
       // Log the real MIT/internal error server-side; return a generic message
       // so internal detail never leaks to the client (#226).
-      console.error(
-        `translate-patches failed (chapter ${chapterId} page ${pageIndex}):`,
-        message,
+      this.logger.error(
+        `translate-patches failed (chapter ${chapterId} page ${pageIndex}): ${message}`,
       );
       throw new HttpException(
         {
@@ -346,9 +343,8 @@ export class BooksController {
       const message = err instanceof Error ? err.message : String(err);
       // Log the real error server-side; emit a generic error to the SSE client
       // so internal detail never leaks (#226).
-      console.error(
-        `batch-translate-patches failed (chapter ${chapterId}):`,
-        message,
+      this.logger.error(
+        `batch-translate-patches failed (chapter ${chapterId}): ${message}`,
       );
       if (!res.writableEnded) {
         res.write(

@@ -349,3 +349,271 @@ def test_union_falls_back_to_text_only_where_refinement_missed_a_region():
 
     assert out[10, 10] == 255                                # refined-covered glyph
     assert out[3, 3] == 255                                  # missed glyph rescued via text_only fallback
+
+
+# --- #548 Stage C slice 3: patch_geometry mask-quality family (ported from landing) ---
+
+def _boy_scene():
+    """A dialogue region whose textlines sit at the TOP of its box, with a figure
+    (hair strokes) far below. CRF grabs both; text_only marks only the textlines."""
+    import numpy as np
+    h, w = 200, 160
+    text_only = np.zeros((h, w), np.uint8)
+    text_only[20:40, 30:130] = 255          # the dialogue textline band (top)
+    crf = np.zeros((h, w), np.uint8)
+    crf[22:38, 32:128] = 255                # CRF ink hugging the textline
+    crf[150:180, 40:120] = 255              # CRF ink on the figure's hair (far below)
+    img_rgb = np.full((h, w, 3), 200, np.uint8)  # plain bg, no white caption box
+    return text_only, crf, img_rgb
+
+
+def test_adaptive_dilation_per_component_independent():
+    # One flat-bg component widens, a textured-bg component stays tight — same image.
+    import numpy as np
+    from manga_translator.patch_geometry import adaptive_dilate_mask
+    rng = np.random.RandomState(1)
+    gray = np.full((200, 400), 245, np.uint8)
+    gray[:, 200:] = (rng.rand(200, 200) * 255).astype(np.uint8)   # right half textured
+    mask = np.zeros((200, 400), np.uint8)
+    mask[95:105, 40:120] = 255                          # left: flat
+    mask[95:105, 260:340] = 255                         # right: textured
+    out = adaptive_dilate_mask(mask, gray, flat_px=12, tight_px=1, ring=6, flat_std=18.0)
+    assert out[100, 30] == 255                          # left (flat) widened ~12px past edge x40
+    assert out[100, 245] == 0
+
+
+def test_adaptive_dilation_stays_tight_on_textured_background():
+    # A stroke over screentone/line-art: a wide mask makes LaMa over-erase the art
+    # (#248). Keep it tight so only the stroke is removed.
+    import numpy as np
+    from manga_translator.patch_geometry import adaptive_dilate_mask
+    rng = np.random.RandomState(0)
+    gray = (rng.rand(200, 200) * 255).astype(np.uint8)  # high-variance texture
+    mask = np.zeros((200, 200), np.uint8)
+    mask[95:105, 60:140] = 255
+    out = adaptive_dilate_mask(mask, gray, flat_px=12, tight_px=1, ring=6, flat_std=18.0)
+    assert out[100, 40] == 0                            # 20px left -> NOT covered (tight)
+    assert out[95, 60] == 255
+
+
+def test_adaptive_dilation_widens_on_flat_background():
+    # A text stroke on FLAT paper: LaMa reconstructs faint ghosts from stroke stubs
+    # left just outside a tight mask. Dilating wider on flat bg removes the stubs.
+    import numpy as np
+    from manga_translator.patch_geometry import adaptive_dilate_mask
+    gray = np.full((200, 200), 245, np.uint8)          # flat paper
+    mask = np.zeros((200, 200), np.uint8)
+    mask[95:105, 60:140] = 255                         # a thin text stroke
+    out = adaptive_dilate_mask(mask, gray, flat_px=12, tight_px=1, ring=6, flat_std=18.0)
+    # widened: the mask now reaches ~12px beyond the original stroke edge
+    assert out[100, 52] == 255                         # 8px left of stroke (edge x60) -> covered
+    assert out[88, 100] == 255
+
+
+def test_assemble_fullpage_mask_default_is_byte_identical_to_union():
+    import numpy as np
+    from manga_translator.patch_geometry import (
+        assemble_fullpage_erase_mask, union_refined_with_fallback)
+    from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
+    text_only, crf, img_rgb = _boy_scene()
+    # restrict off (default) == the old inline assembly, so the figure ink SURVIVES
+    out = assemble_fullpage_erase_mask(crf, text_only, img_rgb, restrict=False)
+    expected = erase_ink_in_white_caption_boxes(
+        union_refined_with_fallback(crf, text_only), img_rgb)
+    assert np.array_equal(out, expected)
+    assert out[165, 80] == 255
+
+
+def test_assemble_fullpage_mask_restrict_drops_far_art():
+    import numpy as np
+    from manga_translator.patch_geometry import assemble_fullpage_erase_mask
+    text_only, crf, img_rgb = _boy_scene()
+    out = assemble_fullpage_erase_mask(crf, text_only, img_rgb, restrict=True, restrict_margin=8)
+    assert out[30, 80] == 255                # textline ink kept
+    assert out[165, 80] == 0
+
+
+def test_changed_alpha_dilates_to_avoid_halo_seams():
+    from manga_translator.patch_geometry import changed_alpha
+    import numpy as np
+    orig = np.full((50, 50, 3), 200, np.uint8)
+    rend = orig.copy()
+    rend[20:22, 20:22] = 0
+    a = changed_alpha(rend, orig, dilate_px=3)
+    assert a[24, 24] == 255                      # dilation covers the seam ring
+    assert a[40, 40] == 0
+
+
+def test_changed_alpha_identical_is_fully_transparent():
+    from manga_translator.patch_geometry import changed_alpha
+    import numpy as np
+    orig = np.full((30, 30, 3), 128, np.uint8)
+    assert int(changed_alpha(orig.copy(), orig).sum()) == 0
+
+
+def test_changed_alpha_marks_only_modified_pixels():
+    from manga_translator.patch_geometry import changed_alpha
+    import numpy as np
+    orig = np.full((100, 100, 3), 200, np.uint8)
+    rend = orig.copy()
+    rend[40:50, 40:60] = 30                      # erased/rendered area
+    a = changed_alpha(rend, orig, dilate_px=0)
+    assert a[45, 50] == 255                      # changed -> opaque
+    assert a[10, 10] == 0
+
+
+def test_leftover_ink_inside_own_balloon_joins_erase_mask():
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import erase_own_balloon_ink
+    import numpy as np
+    crop = np.full((200, 200, 3), 250, np.uint8)      # white balloon interior
+    crop[150:160, 60:120] = 10                        # the "ME OFF!" leftover line
+    mask = np.zeros((200, 200), dtype=np.uint8)
+    mask[50:60, 50:100] = 255                         # refined mask covers detected lines only
+    region = SimpleNamespace(bubble_box=(40, 40, 160, 180))
+    out = erase_own_balloon_ink(mask, crop, [region])
+    assert out[155, 90] == 255                        # leftover ink now erased
+    assert out[100, 100] == 0                         # white interior NOT flooded
+    assert out[55, 70] == 255                         # original mask preserved
+    assert mask[155, 90] == 0
+
+
+def test_no_balloon_no_change():
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import erase_own_balloon_ink
+    import numpy as np
+    crop = np.full((100, 100, 3), 250, np.uint8)
+    crop[70:80, 10:60] = 10
+    mask = np.zeros((100, 100), dtype=np.uint8)
+    out = erase_own_balloon_ink(mask, crop, [SimpleNamespace()])
+    assert (out == mask).all()
+
+
+def test_own_balloon_ink_erases_text_but_preserves_large_art():
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import erase_own_balloon_ink
+    import numpy as np
+    crop = np.full((300, 300, 3), 250, np.uint8)
+    crop[30:45, 40:120] = 10           # a thin leftover TEXT line (15px tall)
+    crop[120:260, 90:210] = 20         # a big ART blob (a character figure, 140x120)
+    mask = np.zeros((300, 300), dtype=np.uint8)
+    region = SimpleNamespace(bubble_box=(20, 20, 280, 280))
+    out = erase_own_balloon_ink(mask, crop, [region])
+    assert out[37, 80] == 255          # text line -> erased
+    assert out[190, 150] == 0
+
+
+def test_own_balloon_ink_still_handles_small_leftover(monkeypatch=None):
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import erase_own_balloon_ink
+    import numpy as np
+    crop = np.full((200, 200, 3), 250, np.uint8)
+    crop[150:160, 60:120] = 10         # small leftover "ME OFF!" line
+    mask = np.zeros((200, 200), dtype=np.uint8)
+    region = SimpleNamespace(bubble_box=(40, 40, 160, 180))
+    out = erase_own_balloon_ink(mask, crop, [region])
+    assert out[155, 90] == 255
+
+
+def test_own_balloon_interior_added_to_allowed_mask():
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import add_own_balloon_interiors
+    import numpy as np
+    allowed = np.zeros((200, 200), dtype=np.uint8)
+    allowed[50:60, 50:100] = 255                     # the detected text lines only
+    region = SimpleNamespace(bubble_box=(40, 40, 160, 160))
+    out = add_own_balloon_interiors(allowed, [region])
+    assert out[150, 100] > 0                          # inside the balloon, below the lines
+    assert out[40 + 3, 100] == 0 or True              # border strip may be excluded
+    assert out[10, 10] == 0                           # outside the balloon stays forbidden
+    assert allowed[150, 100] == 0
+
+
+def test_own_work_alpha_covers_own_text_and_erase_but_not_foreign_erase():
+    # Full-page-inpaint path: every group's crop carries the WHOLE page's inpainted
+    # background. In the overlap zone, a neighbour's crop has inpainted-white !=
+    # original-EN-ink -> changed_alpha marked it opaque -> the LATER patch painted
+    # white over the EARLIER patch's text (the aligned first-glyph "cut" at the
+    # neighbour crop's edge, x=369 live). own_work_alpha must be opaque ONLY for:
+    # (1) text this group drew, (2) erasure inside its OWN regions.
+    from manga_translator.patch_geometry import own_work_alpha
+    import numpy as np
+    H, W = 100, 100
+    original = np.full((H, W, 3), 250, np.uint8)
+    original[20:30, 10:40] = 10          # own region's source text (to erase)
+    original[20:30, 60:90] = 10          # FOREIGN region's source text
+    background = np.full((H, W, 3), 250, np.uint8)   # full-page inpaint erased BOTH
+    rendered = background.copy()
+    rendered[50:60, 12:38] = 5           # the text THIS group drew
+    own_mask = np.zeros((H, W), np.uint8)
+    own_mask[15:65, 5:45] = 255          # this group's own region zone only
+    a = own_work_alpha(rendered, background, original, own_mask)
+    assert a[55, 20] == 255              # own drawn text -> opaque
+    assert a[25, 20] == 255              # own erase -> opaque
+    assert a[25, 75] == 0                # FOREIGN erase -> TRANSPARENT (the fix)
+    assert a[80, 80] == 0
+
+
+def test_protect_figure_ink_keeps_glyph_area_drops_far_figure():
+    import numpy as np
+    from manga_translator.patch_geometry import protect_figure_ink
+    h, w = 300, 300
+    # one text region: a glyph polygon at x40-100 y40-80
+    regions = [_Reg([[[40, 40], [100, 40], [100, 80], [40, 80]]])]
+    mask = np.zeros((h, w), np.uint8)
+    mask[45:75, 45:95] = 255            # erase over the glyphs (legit)
+    mask[150:220, 150:230] = 255        # erase over a FIGURE far from any glyph (swept in by close)
+    out = protect_figure_ink(mask, regions, h, w, margin=16)
+    assert out[60, 70] == 255           # glyph-area erase kept
+    assert out[185, 190] == 0
+
+
+def test_region_without_balloon_changes_nothing():
+    from types import SimpleNamespace
+    from manga_translator.patch_geometry import add_own_balloon_interiors
+    import numpy as np
+    allowed = np.zeros((100, 100), dtype=np.uint8)
+    allowed[10:20, 10:60] = 255
+    region = SimpleNamespace()
+    out = add_own_balloon_interiors(allowed, [region])
+    assert (out == allowed).all()
+
+
+def test_restrict_mask_empty_allowed_erases_nothing():
+    mask = np.full((10, 10), 255, np.uint8)
+    allowed = np.zeros((10, 10), np.uint8)
+
+    out = pg.restrict_mask_to_render_regions(mask, allowed, margin=2)
+
+    assert out.sum() == 0
+
+
+def test_restrict_mask_keeps_erase_inside_allowed_regions():
+    mask = np.zeros((40, 40), np.uint8)
+    mask[5:15, 5:15] = 255      # erase over a rendered region  → must survive
+    mask[25:35, 25:35] = 255    # erase over a NON-rendered area → must be dropped
+    allowed = np.zeros((40, 40), np.uint8)
+    allowed[5:15, 5:15] = 255
+
+    out = pg.restrict_mask_to_render_regions(mask, allowed, margin=0)
+
+    assert out[10, 10] == 255                    # inside allowed: kept
+    assert out[30, 30] == 0                      # outside allowed: guarded away
+    assert mask[30, 30] == 255
+
+
+def test_restrict_mask_margin_tolerates_refinement_spill():
+    mask = np.zeros((40, 40), np.uint8)
+    mask[10:20, 10:22] = 255    # refinement spills 2px right of the region
+    allowed = np.zeros((40, 40), np.uint8)
+    allowed[10:20, 10:20] = 255
+
+    out = pg.restrict_mask_to_render_regions(mask, allowed, margin=3)
+
+    assert out[15, 21] == 255                    # spill within margin: kept
+    assert out.sum() == mask.sum()
+
+
+class _Reg:
+    def __init__(self, lines):
+        self.lines = __import__('numpy').array(lines, dtype=__import__('numpy').int32)

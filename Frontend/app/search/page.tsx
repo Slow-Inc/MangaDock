@@ -9,6 +9,7 @@ import Navbar from "../components/Navbar";
 import { getFavorites, type CachedBook } from "../lib/userCache";
 import { getHistory, type HistoryBook } from "../lib/readingHistory";
 import { resolvedThumbnail } from "../lib/imgUrl";
+import { cacheOrFetch, TTL } from "../lib/apiCache";
 import type { LandingBook } from "../lib/types";
 
 const API_BASE = "/api/proxy";
@@ -249,9 +250,16 @@ function SearchResults() {
     if (yearFrom) qs.set("yearFrom", yearFrom);
     if (yearTo) qs.set("yearTo", yearTo);
 
-    fetch(`${API_BASE}/books/search?${qs}`, { signal: ctrl.signal })
-      .then((r) => r.json())
-      .then((data: { items: LandingBook[]; total: number }) => {
+    const cacheKey = `search:page:${query}:${page}:${langFilter}:${statusFilter}:${yearFrom}:${yearTo}`;
+    cacheOrFetch<{ items: LandingBook[]; total: number }>(
+      cacheKey,
+      async () => {
+        const r = await fetch(`${API_BASE}/books/search?${qs}`, { signal: ctrl.signal });
+        return r.json();
+      },
+      TTL.MEDIUM,
+    )
+      .then((data) => {
         const items = Array.isArray(data.items) ? data.items : Array.isArray(data as any) ? data as any : [];
         setApiResults(items);
         setApiTotal(data.total ?? items.length);

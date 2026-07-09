@@ -11,6 +11,7 @@
  */
 
 import { createAuthHeaders } from "./apiUtils";
+import { parseJsonArray } from "./safeJson";
 
 const API_BASE = "/api/proxy";
 const LS_FAV = "mb_favorites";
@@ -163,8 +164,12 @@ export async function loadUserData(token: string) {
     ]);
     if (!favRes.ok || !likedRes.ok) return;
 
-    const remoteFavs: CachedBook[] = await favRes.json();
-    const remoteLiked: string[] = await likedRes.json();
+    const remoteFavs = await parseJsonArray<CachedBook>(favRes);
+    const remoteLiked = await parseJsonArray<string>(likedRes);
+    if (!remoteFavs || !remoteLiked) {
+      console.warn("[userCache] favorites/liked sync skipped: response body was not a JSON array");
+      return;
+    }
 
     // Merge — remote is source of truth for what WAS there; keep local additions
     const remoteIds = new Set(remoteFavs.map((f) => f.id));
