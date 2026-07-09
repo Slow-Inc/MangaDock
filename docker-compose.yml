@@ -1,20 +1,20 @@
 version: '3.9'
 
 services:
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: mangadock_redis
-  #   restart: unless-stopped
-  #   ports:
-  #     - '6379:6379'
-  #   command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1
-  #   volumes:
-  #     - redis_data:/data
-  #   healthcheck:
-  #     test: ['CMD', 'redis-cli', 'ping']
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   dashboard-metrics:
     build: ./dashboard-metrics
@@ -32,7 +32,7 @@ services:
   redis-exporter:
     image: oliver006/redis_exporter:v1.67.0
     environment:
-      - REDIS_ADDR=${REDIS_ADDR:-redis://MangaDock:6379}
+      - REDIS_ADDR=${REDIS_ADDR:-redis://redis:6379}
     restart: unless-stopped
 
   grafana-alloy:
