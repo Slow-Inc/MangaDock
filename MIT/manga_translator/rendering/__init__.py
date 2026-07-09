@@ -12,7 +12,7 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, clean_layout_target_fs, region_territory_box, display_sfx, bubble_fit_bounds, fills_bubble_width, squeeze_width, box_containment, resolve_font_floor
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, region_territory_box, display_sfx, bubble_fit_bounds, fills_bubble_width, squeeze_width, box_containment, resolve_font_floor
 from ..safe_area import safe_area_box
 from ..reference_layout import fit_to_box
 from .text_render_eng import render_textblock_list_eng
@@ -249,59 +249,90 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     if xy is None:
         return None
     x1f, y1f, x2f, y2f = (float(v) for v in xy)
-    # #175 patch-path fix: these three quantities are PAGE-relative — the font's
-    # processing_scale (area→resolution), the wrap-width clamp (% of page width) and the
-    # generous max-wrap-height. In the per-region patch path ``img_shape`` is the small CROP
-    # (full-res but tiny area), which collapses processing_scale to its 0.5 floor → narration
-    # rendered ~3× too small while balloon dialogue (box-driven) stayed normal. Use the PAGE
-    # shape when the caller threads it; fall back to img_shape (full-page render → identical).
-    ps_shape = page_shape if page_shape is not None else img_shape
-    # #175: scale the clean-layout font by processing_scale so it tracks page resolution
-    # (same look on the benchmark, larger on higher-res pages where the fixed px was too small).
-    clean_fs_flat = clean_layout_font_size(font_size_max, ps_shape[0], ps_shape[1], font_size_minimum)
-    # #175 follow-up: a big stylized DISPLAY caption ("LOVE IS FORBIDDEN" lettered at 96px) was
-    # collapsing to the same flat ~26px as a 21px narration line. Size it near its ORIGINAL
-    # lettering instead so it keeps its prominence; narration (orig <= flat) is byte-identical.
-    clean_fs = clean_layout_target_fs(getattr(region, 'font_size', 0), clean_fs_flat)
+    clean_fs = font_size_max if (font_size_max and font_size_max > 0) else \
+        max(font_size_minimum, round((img_shape[0] + img_shape[1]) / 130))
     # Footprint width = the region's own (source-text) bbox width, so the English breaks
     # where the source columns did — a narration stays a narrow tall block, not a wide
     # paragraph. (The balloon box is deliberately NOT used: narration boxes also get a
     # wide bubble_box from segmentation, which would re-widen them.)
-    wrap_w = clean_wrap_width(x2f - x1f, ps_shape[1])
-    # A sized-up display caption wraps to its own (wider) source footprint, not the narrowed
-    # narration column — otherwise the big glyphs break into a too-narrow column (mid-word
-    # breaks). Narration keeps the narrow clean wrap.
-    if clean_fs > clean_fs_flat:
-        wrap_w = max(wrap_w, int(x2f - x1f))
+    # D (#535): the wrap clamp is PAGE-relative — in the patch path img_shape is the
+    # small crop, whose 45% cap would strangle a wide caption (and the 11% floor
+    # under-floor). Use the page width when the caller threads it.
+    _ps = page_shape if page_shape is not None else img_shape
+    wrap_w = clean_wrap_width(x2f - x1f, _ps[1])
     lang = getattr(region, 'target_lang', 'en_US')
-    # #item9: never wrap narrower than the longest atomic word, or Thai/CJK words (no Latin
-    # hyphenation) get force-split mid-word ("ข้างนอก"→"ข้า"/"งนอก"). Mirrors the guard
-    # _bubble_fit_layout already applies; here it protects dialogue misrouted to clean-layout.
-    _lw = text_render.longest_token_width(clean_fs, region.translation, lang)
-    if _lw > wrap_w:
-        wrap_w = int(_lw)
-    # max_height is generous (full page) so wrapping is governed by width and the block
-    # grows vertically — we place it on the centre regardless of the source box height.
-    lines, widths = text_render.calc_horizontal(clean_fs, region.translation, wrap_w, int(ps_shape[0]), language=lang)
-    # When a display caption was sized up, shrink it just enough that the wrapped block stays
-    # within ~its original vertical footprint — keeps the caption prominent without spilling far
-    # past where the source lettering sat. Never below the flat size (narration unaffected).
-    if clean_fs > clean_fs_flat:
-        # #430 Phase-3 hotfix: bound the sized-up caption on BOTH axes. The height-only
-        # loop left a caption far WIDER than its source column, overflowing the art
-        # (2026-07-02 One-Punch narration, fill_frac_w ~5x). Shrink while EITHER axis
-        # exceeds its source-footprint tolerance; the longest-token floor keeps words whole
-        # as the font shrinks, so this never re-introduces a mid-word break (item 9).
-        max_h = (y2f - y1f) * _CLEAN_DISPLAY_H_TOL
-        max_w = (x2f - x1f) * _CLEAN_DISPLAY_W_TOL
-        while clean_fs > clean_fs_flat and (
-            max(1, len(lines)) * clean_fs * _LINE_HEIGHT > max_h
-            or (max(widths) if widths else 0) > max_w
-        ):
-            clean_fs -= 2
-            lines, widths = text_render.calc_horizontal(clean_fs, region.translation, wrap_w, int(ps_shape[0]), language=lang)
-    block_w = max(widths) if widths else wrap_w
-    block_h = max(1, len(lines)) * clean_fs * _LINE_HEIGHT
+    # #535/#183 (user vs target): a tall original footprint (vertical-JP narration /
+    # dialogue column) must render as a tall NARROW column like the target — squeeze
+    # the wrap width until the block fills the region's original HEIGHT instead of a
+    # few wide lines with empty space below. A short/wide region no-ops (the first
+    # narrowing step would already overflow its height). Floor = calc_horizontal's
+    # own 2×font so no degenerate sliver.
+    box_h = max(1.0, y2f - y1f)
+    bbox_w = max(1.0, x2f - x1f)
+
+    # #183 hard gate, hyphenation-aware: the squeeze floor per TOKEN is (a) the widest
+    # SYLLABLE + hyphen when the language hyphenator can split it — long words then
+    # hyphenate like the target ("SOME-WHERE", "UNDER-STAND") instead of vetoing the
+    # narrow column — or (b) the WHOLE token width when it can't ("HMPH.", "HUH?",
+    # Thai words): _split_into_syllables char-splits unhyphenatable words, so the
+    # column must never get narrower than them. Floor = max over tokens. ZWSP
+    # pre-segmentation makes Thai/CJK words count as tokens, not the whole line.
+    _seg = text_render._insert_cjk_word_breaks(
+        text_render._insert_thai_word_breaks(region.translation or ''))
+    _toks = list({t for t in re.split(r'[\s​]+', _seg) if t})
+
+    def _floor_w(fs):
+        f = 2.0 * fs
+        try:
+            hyph = text_render.select_hyphenator(lang)
+        except Exception:
+            hyph = None
+        for tok in _toks:
+            pieces = []
+            if hyph and len(tok) <= 100:
+                try:
+                    pieces = hyph.syllables(tok.lower())
+                except Exception:
+                    pieces = []
+            if len(pieces) > 1:
+                probe = tok[:max(len(p) for p in pieces)] + '-'
+            else:
+                probe = tok
+            _, _lw = text_render.calc_horizontal(fs, probe, 10 ** 7, 10 ** 7, language=lang)
+            if _lw:
+                f = max(f, float(max(_lw)))
+        return f
+
+    def _layout_at(fs):
+        def _mh(w):
+            ls, _ = text_render.calc_horizontal(fs, region.translation, int(w),
+                                                int(img_shape[0]), language=lang)
+            return max(1, len(ls)) * fs * _LINE_HEIGHT
+        floor = _floor_w(fs)
+        used = squeeze_width(_mh, max(wrap_w, floor), floor, box_h)
+        lines, widths = text_render.calc_horizontal(
+            fs, region.translation, int(used), int(img_shape[0]), language=lang)
+        bw = float(max(widths)) if widths else float(used)
+        bh = max(1, len(lines)) * fs * _LINE_HEIGHT
+        return bw, bh
+
+    # #535 (user vs target, One-Punch narrations): the target letters narration near
+    # the ORIGINAL size in a tall narrow column. Pick the LARGEST font ≤ the original
+    # lettering whose squeezed column still fits the original footprint (width AND
+    # height). Falls back to the flat size (current behavior) when nothing larger
+    # fits — a short/wide caption keeps the flat look unchanged.
+    orig_fs = int(getattr(region, 'font_size', 0) or 0)
+    hi = min(max(orig_fs, clean_fs), 120)
+    fs = hi
+    while fs > clean_fs:
+        bw, bh = _layout_at(fs)
+        if bh <= box_h and bw <= bbox_w * 1.05:
+            block_w, block_h, clean_fs = bw, bh, fs
+            return int(clean_fs), float(block_w), float(block_h)
+        fs -= 2
+
+    # flat fallback: squeeze at the flat size (tall-narrow, height-bounded as before).
+    block_w, block_h = _layout_at(clean_fs)
     return int(clean_fs), float(block_w), float(block_h)
 
 

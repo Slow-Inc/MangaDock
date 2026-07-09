@@ -57,6 +57,9 @@ const ENV_KEYS = [
   'MIT_PATCH_FEATHER',
   'MIT_PATCH_CONTENT_ALPHA',
   'MIT_INPAINT_CONTEXT_PAD',
+  'MIT_PROTECT_FIGURES',
+  'MIT_RESTRICT_FULLPAGE_MASK',
+  'MIT_ADAPTIVE_DILATE',
 ];
 
 describe('BooksService.buildMitConfig', () => {
@@ -96,6 +99,25 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.inpainter.inpainter).toBe('flux_klein');
+  });
+
+  it('emits the #548 mask-quality inpainter flags from MIT_PROTECT_FIGURES / MIT_RESTRICT_FULLPAGE_MASK / MIT_ADAPTIVE_DILATE', () => {
+    process.env.MIT_PROTECT_FIGURES = '1';
+    process.env.MIT_RESTRICT_FULLPAGE_MASK = '1';
+    process.env.MIT_ADAPTIVE_DILATE = '1';
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'JPN', 'THA', 'ja'));
+    expect(cfg.inpainter.protect_figures).toBe(true);
+    expect(cfg.inpainter.restrict_fullpage_mask).toBe(true);
+    expect(cfg.inpainter.adaptive_dilate).toBe(true);
+  });
+
+  it('omits the #548 mask-quality flags when their env is unset (byte-identical default)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'JPN', 'THA', 'ja'));
+    expect(cfg.inpainter.protect_figures).toBeUndefined();
+    expect(cfg.inpainter.restrict_fullpage_mask).toBeUndefined();
+    expect(cfg.inpainter.adaptive_dilate).toBeUndefined();
   });
 
   it('folds the inpainter choice into renderConfigHash so switching busts the patch cache', () => {

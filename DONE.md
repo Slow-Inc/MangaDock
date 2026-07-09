@@ -3,155 +3,6 @@
 
 ---
 
-## MIT item9 clean-layout wrap column never narrower than longest Thai/CJK word (2026-07-01)
-
-**Goal:** fix the user-flagged "ขึ้นบรรทัดผิด มันตัดระหว่างคำ" on the full-chapter Gal Yome EN→Thai benchmark — Thai words split mid-cluster: p25 "ข้างนอก"→"ข้า"/"งนอก", p18 "พยายาม"→"พยาย"/"ามให้", "ไม่เป็นไร"→"ไม่เป็"/"นไร". For a spaceless script (Thai/JP/Khmer/Lao) the wrap must break on a **dictionary word boundary**, never inside a word.
-
-**Root cause:** `_clean_layout_dst` wrapped to the region's source-text bbox width with no word-aware floor. When that column was narrower than the widest Thai word, the greedy packer fell through to `_safe_char_split` (per-character) and force-split mid-word. Only bit **dialogue misrouted to clean-layout** (egg/oval/heart bubbles where `bubble_box is None`, or `fills_bubble_width < 0.72`); the two bubble-fit paths already guard against it (reject font where longest word > column, squeeze floor = longest word).
-
-**Change (TDD):** new pure helper `text_render.longest_token_width(font_size, text, language)` = pixel width of the widest **atomic** word (ZWSP-segmented via pythainlp/jieba; Latin = widest space-delimited word). `_clean_layout_dst` floors `wrap_w` at it, mirroring the `_bubble_fit_layout` guard. Language-agnostic — Latin floor ≤ existing wrap → byte-identical. ADR 025 Addendum (2026-07-01).
-
-**Validation:** `test/test_thai_wrap.py` 12/12 (+4: `longest_token_width` word-atomic Thai / widest Latin / empty; `_clean_layout_dst` keeps "ข้างนอก" intact in a 40px box). Characterization render goldens byte-identical (Latin + existing Thai golden); render suite 68/0 + 1 pre-existing async-infra skip (`test_default_renderer`, pytest-asyncio absent — same on main).
-
-**Benchmark (visual, non-deterministic translate):** `docs/reports/benchmarks/2026-07-01-thai-word-break.md` (+ p25/p18/p11 composites) — re-rendered through the worker on `MIT/.venv`; every line breaks on a word boundary, no mid-word split; Latin column unchanged. **Side-effect:** item 2 (under-fill) incidentally improved (floored column lets fitter use more width) but font sizing unchanged → dedicated item-2 pass still warranted. Commit 63ea441, branch `worktree-feat-mit-font-s1`.
-
-**⚠️ REOPENED (2026-07-01, full-chapter benchmark):** the clean-layout floor is correct but does NOT fully fix item 9. The full 30-page Gal Yome + One Punch run (`docs/reports/benchmarks/2026-07-01-item9-fullchapter-validation.md`, commit e84b982) found **p19 "ทำอาหาร"→"ทำอา"/"หาร" still breaks mid-word** via a production path the floor doesn't cover. Spot-check (p25/p18/p11) missed it — full-chapter caught it (the rule earned its keep).
-
-**✅ RESOLVED (2026-07-01, commit e61771a):** ROOT CAUSE found via deterministic dump+replay A/B = **supersampling**, not the clean-layout floor. `render()` RE-WRAPS the laid-out text at the supersampled scale (`font*ss`, width `round(norm_h*ss)`). At ss=4 the integer rounding lands one pixel below the widest atomic word at `font*ss` and force-splits the Thai word mid-cluster — undoing the layout's ss=1 word-floor. The break was NOT reproducible at ss=1 (why the offline isolation of `_bubble_fit_layout`/`_clean_layout_dst`/full dispatch all refused to split — they run at ss=1); it only emerges at ss=4. **Fix:** floor the supersampled column at `longest_token_width(font*ss)` in `render()`'s horizontal branch so the re-wrap can never split a word the layout meant to keep whole (Latin floor ≤ box → no-op). **Verified on real worker** (Gal Yome p19, ss=4, `MIT/.venv`): cooking bubble renders `ฉัน/ทำอาหาร/และ/งานบ้าน/ได้นะ` — `ทำอาหาร` whole on one line, every bubble's text present, no clipping (`scratchpad/dumpref_p19.png`, `zoom_cooking_p19.png`). Deterministic A/B (dumped regions, floor OFF vs ON) confirms the floor is the only delta; the "missing text" in the offline replay triptych is a replay-harness paste artifact present **identically in OFF and ON**, NOT from this change. Tests 59 green (thai_wrap 13 inc. `test_supersample_wrap_floor_keeps_thai_word_whole` + render_golden/overlap/characterization 46). Added env-gated `MIT_DEBUG_RENDER_DUMP` (mirrors `MIT_DEBUG_REGROUND_DUMP`) for offline render A/B. item 9 status: **FIXED & VERIFIED.** Latin (One Punch) confirmed no-regression. Items 2 (under-fill) + 3 (phantom เงียบ det_sfx) remain separate, still open.
-
----
-
-## MIT #278 gate SFX rescue on det_sfx provenance, not ≤4-char heuristic (2026-06-30)
-
-**Goal:** fix the user-flagged "normal text gets detected/rescued as SFX". The vision-gateway SFX rescue fired for ANY ≤4-char region in a ≥60×60 box → short dialogue ("HUH?", "おい", "は？", "ですよ") in a large bubble was misread as onomatopoeia (wrong render) + added a ~1–2 s gateway round-trip to *every* translate.
-
-**Change (TDD):** gate on **provenance** — thread `is_sfx` from the `Quadrilateral` textlines `merge_sfx_detections` appends → `textline_merge` (any SFX textline → region flagged) → `TextBlock.from_sfx_detection`; rescue only those (≤4), with a tight ≤2-char fallback when det_sfx is off. Decision extracted to pure `should_rescue_sfx()`. Plus PR #277 nits: ENG prompt `==` byte-identity; `sanitize_sfx` non-Latin refusal guard; document jieba lazy dict cost. ADR 026.
-
-**Validation:** +9 `test_ocr_vlm` (6 `should_rescue_sfx` + ENG `==` + 2 refusal-guard), 24/0; render golden untouched; affected suites green (textline_merge async fails = pre-existing pytest-asyncio gap, identical on main). **Benchmark** (deterministic, `docs/reports/benchmarks/2026-06-30-sfx-rescue-provenance-gate.md` + image): OLD rescued 5/7 representative regions, NEW 3 → **2 false-positive gateway calls eliminated**, real SFX kept. Commit 8cbd930, branch `worktree-feat-mit-font-s1` (PR #433).
-
----
-
-## MIT #175 clean-layout narration scales by PAGE not crop (2026-06-30)
-
-**Goal:** fix the user-flagged "ทำไมตัวอักษรหลายที่ขนาดเล็ก ทั้งที่มีตัวปกติอยู่ด้วย" — on the full-chapter Gal Yome EN→Thai benchmark, narration/caption text rendered tiny while dialogue in the same panel was normal.
-
-**Root cause:** clean-layout font = `font_size_max × processing_scale(area)`. In the per-region patch path the renderer is handed the small **crop** (full-res but tiny area) → `processing_scale` collapses to its 0.5 floor → narration ~3× too small (≈17px vs designed 35px on a 3 MP page). Dialogue was fine because bubble-fit is box-height-driven (ADR 023, page-independent) → hence the disparity. Same crop-vs-page bug class as #175's bubble-fit fix, but for the clean-layout branch (`_clean_layout_dst` used the crop `img.shape` for the font scale, wrap-width clamp, and max wrap height — all page-relative).
-
-**Change (TDD):** thread the full-**page** shape (`PatchRenderer.img_w/img_h`, already the source of `page_scaled_font_min` #250) via `patch_ctx.page_shape` → `stages` → `dispatch` → `resize_regions_to_font_size` → `_clean_layout_dst`, and use it there instead of the crop. Full-page render path passes `page_shape=None` → uses `img.shape` (the page) → **byte-identical**. ADR 025.
-
-**Validation:** pin test `clean_layout_font_size(20, crop)→floor` vs `(20, page)→35`; stages kwargs-forwarding characterization updated for the new `page_shape` kwarg; render golden/guard byte-identical; 38 render_overlap + patch_renderer + stages green (pre-existing `test_default_renderer` fails only because pytest-asyncio isn't installed — same on unmodified main). E2E (Gal Yome EN ch1 p14 → Thai): top-right narration balloon renders readable 3-line text instead of microscopic; no crashes, nothing oversized. Commit 70c6bf1, branch `worktree-feat-mit-font-s1` (PR #433).
-
-**Note:** does not change *which* regions go to clean-layout (the rw/bw discriminator still routes narration-in-large-bubble there); only fixes the size once routed.
-
-**Benchmark (deterministic, non-E2E):** `docs/reports/benchmarks/2026-06-30-clean-layout-page-scale.md` (+ comparison image) — narration 18px (crop, floored) → 35px (page), **~1.94×** uniform across all crop sizes; golden byte-identical.
-
----
-
-## MIT #183/#175 width-squeeze — narrow column fills tall balloon (2026-06-30)
-
-**Goal:** EN-source dialogue in a TALL balloon must fill the balloon height like the original (many narrow lines), not render as 2 wide lines with empty space below. Surfaced on Gal Yome no Himitsu EN ch1 p4 ("PEOPLE FROM OTHER DEPARTMENTS ARE WELCOME, DON'T YOU WANNA COME?") and user-flagged Thai targets ("ตัวเล็กแค่ 2 บรรทัด ทั้งๆ ที่ประโยคยาว").
-
-**Root cause:** `_bubble_fit_layout` fit the largest font that wraps inside the balloon WITHOUT force-breaking a word, then rendered at the FULL balloon width. A tall-but-not-wide balloon → few wide lines + a vertical gap; the font couldn't grow further (capped by the no-mid-word-break guard), so the gap stayed.
-
-**Change (TDD):**
-- Pure `squeeze_width(measure_h, full_w, min_w, box_h, factor=0.9)` in `render_overlap.py` (mirrors MangaTranslator `layout_engine.py` ×0.90 step): after the font is fit, narrow the wrap column step-by-step until the block would exceed the box height, or until the longest unbreakable token's width (floor) — so the text gains lines and fills the height, never force-breaking a word.
-- `_bubble_fit_font_size` → `_bubble_fit_layout`, now returns `(font, block_w, block_h)`; both bubble-fit callers (occ==1, occ>1) centre the squeezed block in the balloon.
-
-**Validation:** 36 `render_overlap` unit tests green (+3 for `squeeze_width`: narrows-tall-box / noop-when-full / stops-at-floor); golden/guard render suites byte-identical (`clean_layout`/legacy untouched). Benchmark (real backend config, MIT_BUBBLE_AREA_FIT=1): Gal Yome EN p4 tall balloon 2 wide → **6 narrow lines** filling height; One-Punch JA→EN dialogue/narration/SFX unchanged. Commit 94bab61 on `worktree-feat-mit-font-s1` (PR #433). ADR 024.
-
-**Relationship:** targeted stopgap inside the bubble-fit path; the general source-agnostic width-squeeze + Knuth–Plass (flag-gated, A/B) stays in PRD #434 / research #435 and reuses `squeeze_width` as-is.
-
-**E2E follow-up + NameError fix (commit e922c7d):** live Playwright E2E through the hayateotsu.space tunnel (Gal Yome ch1 p4, Thai→EN) surfaced that 94bab61 USED `squeeze_width`/`box_containment` in `rendering/__init__.py` but never added them to the `from ..render_overlap import` line → the bubble-fit path raised **NameError** at runtime, which the patch renderer swallows into an "inpaint-only patch" (translated text silently erased). The render_overlap unit tests import the helpers directly and the golden suite doesn't exercise bubble-fit, so neither caught it — only live E2E did. Fix: add both to the import; add a pure guard test asserting every render_overlap helper called in the renderer is imported (37 tests green). Re-verified: 4 patches rendered, 0 NameError, every balloon fills as a narrow multi-line centered column ("CREATED BY THE SOUND CON" → 4 lines filling, "NO PROBLEM LET'S TRY IT" → 4 lines). Two orthogonal observations logged: (a) first uncached translate hit Cloudflare **524** (>100s for full-page inpaint + 4 renders + LLM); the cached re-request returns fast and applies overlays. (b) the live `custom_openai` translator returned terse/garbled text ("INTERESTED OTHER PEOPLE", "65วงหห", "HROK") — a translation-quality issue, not rendering; the layout algorithm is correct regardless.
-
-**Correct EN→Thai E2E + second NameError-class bug (AttributeError, commit bb4100e):** the runs above were Thai-source→EN (Gal Yome's Thai-scanlation version); the user's actual case is the **EN-scanlation version → Thai** (select the **"EN" chip beside "ตอนทั้งหมด"** in the modal — default is ภาษาไทย; confirm counter "1/30" + direction "แปล → TH"). Re-running EN→Thai surfaced a SECOND swallowed crash: the **#436 de-dup** blanks a duplicate region's translation to `''` *inside* `resize_regions_to_font_size`, but the empty-translation filter (`dispatch` line 529) runs *before* it → the blanked region survives, gets a dst_points entry, reaches `render()`, `put_text` returns None → `temp_box.shape` raised **AttributeError**, swallowed into an inpaint-only patch (top panel rendered text-less). Only fires when a region's translation is a substring of a neighbour's AND ≥60% contained (Thai "ปาร์ตี้" inside "…จัดปาร์ตี้ดื่ม…"); the EN-target run stayed under the threshold so it was latent. Fix: guard `render()` to skip a None `temp_box`; add `exc_info=True` to the swallow-warning (it hid BOTH this and the NameError). **Re-verified EN→Thai (real Reader, EN ch1 p4): 0 AttributeError, 3 patches, the tall balloon "เปิดรับนักศึกษาจากภาควิชาอื่นๆ ด้วยนะ…" fills with ~6 narrow Thai lines like the English original's 6-line layout — the user-reported "ตัวเล็กมาก" defect is fixed.** Benchmark method saved to memory `project_gal_yome_en_benchmark`. **Lesson:** unit tests (import helpers directly) + golden render (no bubble-fit path) missed both bugs; only live E2E caught them — added a pure import-completeness guard test, but the render-path None/exception classes still need live E2E coverage.
-
-**Full-chapter benchmark (Gal Yome EN ch1 → Thai, all 30 pages via "แปลทั้งตอน"):** 0 render crashes across the whole chapter (112 patches, 29 text pages); dialogue/thought balloons fill well (tall balloons → ~6 narrow lines: p4 "เปิดรับนักศึกษา…", p14 "ว้าว…", p23 "ถ้าฉันเข้าไปดู COOKP*D…"). **Remaining anomalies** (logged, not fixed this round): (1) **SFX-over-dialogue overlap** — p11 renders SFX "เงียบสงัด" superimposed on dialogue "เรายังไม่ได้บอกใคร…" in one balloon → tracked on **#436** (the de-dup only catches substring duplicates; these are distinct co-occupant regions). (2) stylized SFX/name labels left as romaji/kanji untranslated (TOUJOUFUYUKI p5, PAI p14, 秘密 title) — OCR/translate, #431/#432. (3) a few large bubbles keep small narration (rw/bw → clean-layout) — p14. (4) occasional awkward SFX line-split (p9 "ตังกุณ"). Headline: width-squeeze + the 3 crash fixes hold chapter-wide; the one clear visible defect left is the #436 overlap.
-
----
-
-## MIT #175 dialogue sizing + #431 SFX overflow (2026-06-30)
-
-**Goal:** translated text must fill its speech balloon (not render tiny), and a stylized in-bubble word must not oversize and overflow the art — matching MangaTranslator. Surfaced on EN→TH (Gal Yome no Himitsu ch1 p4); the JA→EN One-Punch benchmark hid it.
-
-**Root cause:** with `MIT_BUBBLE_AREA_FIT` off, balloon dialogue fell to the legacy length-ratio path → tiny on compact targets; `clean_layout` only sizes non-balloon narration (so One-Punch JP narration looked fine). And `sfx_rescued` (a `len(src)≤4` heuristic) was the SOLE driver of the oversized display regime (`is_sfx` YOLO provenance is dead) → short in-bubble text ("DRINKING PARTY") grew to ~64px and overflowed.
-
-**Change:**
-- **S1/S2/S2-corrected (#429/#430):** `processing_scale` (√MP) + two-tier `font_bounds` ([8,16]/[10,64]); `_bubble_fit_font_size` binary-search-fits dialogue to the balloon safe-interior bounded by `[8,16]×√MP` + `anti_overlap`; `clean_layout_font_size` scales the clean-layout font by `processing_scale`.
-- **S3 (#431):** pure `display_sfx(sfx_rescued, is_sfx, has_bubble)` — only FREE-FLOATING SFX (no `bubble_box`) takes the display range/cap-exemption; bubble-internal text is dialogue. Wired at the bubble-fit bounds + legacy cap + box-scale clamp.
-- **Config:** `MIT_BUBBLE_AREA_FIT=1` (`.env`, `.env.example`) — ADR 023 supersedes the prior OFF decision.
-
-**Validation:** TDD (`test_render_overlap.py` 25 green: processing_scale/font_bounds/clean_layout_font_size/display_sfx); render golden/guard byte-identical. E2E via Reader (real backend config, hayateotsu.space tunnel): Gal Yome EN→TH p4 dialogue fills + "ปาร์ตี้" overflow gone; One-Punch JA→EN no regression (free SFX "GULP"/"NEH" stays big). Worktree branch `worktree-feat-mit-font-s1` (PR #433).
-
-**Residual:** stylized in-bubble word the SFX YOLO splits without bubble association can still render larger than its neighbours (no `bubble_box`) — detection/merge concern, deferred to S4/#432.
-## MIT CI: land #359 torch-free blocking gate + baseline rot repair (2026-07-03)
-
-**Goal:** Get the MIT perf hotfix + the stalled #359 CI work onto `main`, then make the MIT logic
-gate a real **blocking** check. What started as "open a PR + /scrutinize" cascaded (via 3 rounds of
-`/clink-brainstorm`) into untangling several in-flight workstreams off `main`.
-
-**What landed (4 PRs, in order):**
-1. **#504 — CI baseline** → `main`: pinned `opencv-python>=4.8,<5.0` (CI had drifted to 5.0.0, whose
-   strict-CV_8U `cv2.putText` broke ~13 render/merge tests + the render golden) and **reverted** the
-   `test_resize_regions_characterization.py` + 3 goldens that were committed *ahead of impl* (assert
-   `page_shape`/`_bubble_fit_layout` absent on main).
-2. **#427 (#359)** → `main`: rebased onto the baseline, `pytest (logic gate, torch-free)` green →
-   merged. MIT CI is now a blocking torch-free gate (lazy import boundary, ADR 023) + the gitignored
-   Kumiko `panel/lib` source is committed (fixes `import manga_translator` in CI/clones/worktrees).
-3. **#502 — perf + docs** → `main`: rebased; git auto-dropped the #459 commits (already upstream via
-   #414) and collapsed the perf commit to its one unique delta (`functools.wraps` on `_timed_stage`);
-   dropped the re-added orphan tests; marked `test_timed_stage` heavy in `conftest._HEAVY_TESTS`.
-4. **#503** — tracking issue for re-landing the render-layout characterization tests **atomically**
-   with their implementation.
-
-**Key findings (scrutinize/brainstorm):** the perf hotfix (select_hyphenator lru_cache + M1/M2) was
-**already on main** via #414's sync, so #502 was mostly redundant; the "second wave" of failures a
-reviewer predicted was real (opencv drift + tests-ahead-of-impl), hidden only by the old report-only
-job; decision = revert un-shipped-behavior tests (not xfail) and reland atomic.
-
-**Validation:** logic gate green on all 3 PRs + `main` HEAD; opencv 4.13 locally makes
-`test_render_golden` pass (proves the pin). Backend + Frontend CI green on main.
-
-**Debt:** render-layout impl (page_shape/clean_layout/`_bubble_fit_layout`) still uncommitted in an
-entangled working tree → #503. Impact report: `docs/reports/system-impact-report.md` (2026-07-03).
-
----
-
-## Wallet Security Hardening V1–V9: DB layer + scrutinize fixes (2026-07-02)
-
-**Goal:** Land the DB-layer deliverables from `feat/wallet-security-hardening` (SQL migrations + unit tests) after the runtime code was already in main. Fix 3 scrutinize blockers before merge.
-
-**Shipped:**
-- `Backend/migrations/2026-06-22-wallet-security-hardening.sql` — `wallet_tx_topup_ref_uidx` unique partial index (at-most-once topup credit per Xendit payment_id); drop dead numeric overloads; 4-arg `purchase_unlock_atomic` (reads price/status/creator inside txn — closes TOCTOU window)
-- `Backend/supabase-migration.sql` — same DDL mirrored
-- `Backend/src/unlock/unlock.service.spec.ts` — 7 tests covering all RPC paths (paid, free, already_unlocked, 4 error cases)
-- `Backend/src/wallet/wallet.service.spec.ts` — 3 SECURITY tests (amount mismatch, currency mismatch, non-SUCCEEDED Xendit status)
-- `Backend/src/wallet/wallet.controller.ts` — `@UseGuards(AuthGuard, TopupThrottleGuard)` on `POST /topup/create`
-
-**Scrutinize fixes (3 blockers cleared):**
-1. Removed duplicate `TopupThrottleGuard` import (TS compile error)
-2. Dropped 4 stale `unlock.service.spec.ts` tests that mocked a pre-SELECT code path no longer in `purchaseUnlock`
-3. Replaced 6-arg `purchase_unlock_atomic` in migration SQL with the correct 4-arg self-contained version
-
-**Validation:** 78/78 unit tests pass; PR #463 body bilingual EN+TH; system-impact-report.md updated.
-
-**Files touched:** `Backend/migrations/2026-06-22-wallet-security-hardening.sql`, `Backend/supabase-migration.sql`, `Backend/src/unlock/unlock.service.spec.ts`, `Backend/src/wallet/wallet.service.spec.ts`, `Backend/src/wallet/wallet.controller.ts` · **Commit:** `72502dd` · **PR:** #463
-
-## Captcha re-prompt on translate 401 — hotfix (2026-07-01)
-
-**Goal:** When the 1-hour HWID-bound captcha clearance token (#227) expires mid-session, pressing translate `401`'d and only showed an error toast — translation dead-ended until a full page reload. Make the translate 401 re-prompt the Turnstile captcha, same as the page-fetch path.
-
-**Shipped (TDD, 4 files):**
-- `Frontend/app/lib/mangaTranslatePage.ts` — new pure `isCaptchaExpiredError(err)` predicate (matches `(401)` / `captcha clearance token`), colocated with the throw sites
-- `Frontend/app/lib/mangaTranslatePage.test.ts` — +4 tests (401 single/batch = true; 500 / network / non-Error = false)
-- `Frontend/app/hooks/useChapterTranslation.ts` — new `onCaptchaExpired` option; `startTranslate` (batch) + `translateCurrentPage` detect the 401 → call it + toast; batch **skips its 500/network retry loop** (same token would only 401 again)
-- `Frontend/app/components/MangaReader.tsx` — extracted shared `resetCaptcha()` (drop token + `setTurnstilePassed(false)`); wired to both the page-fetch 401 path and `onCaptchaExpired`
-
-**Validation:** unit `isCaptchaExpiredError` + full frontend suite **138 pass, 0 fail**; typecheck clean; no new lint warnings. **Live E2E** on `localhost:4000` (real One-Punch Benchmark chapter, authed): inject bogus token → แปลหน้านี้ → backend `401` (`Captcha clearance token is invalid, expired`) → Turnstile "ยืนยันตัวตน" modal re-appeared (screenshot), then test-key auto-solve fetched a fresh token → recovery loop confirmed.
-
-**Report:** post-mortem `docs/reports/2026-07-01-captcha-reprompt-hotfix.md` (+ image `assets/2026-07-01-captcha-reprompt.png`); pointer in `system-impact-report.md`.
-
----
-
 ## Staff Console — PRD + ADR 018 + Phase-1 issues, out-of-band observability (2026-06-14)
 
 Designed the **Staff Console** (role-tiered back-office: Moderator/Admin/Dev) off the 2026-06-14 9arm incident (gateway `gateway.9arm.co` up, but `qwen3.6-35b-a3b` model hung → cryptic `'ollama servers did not respond quickly enough'` after ~90s; root-caused by black-box probe — `/models` OK 0.19s, a 16-token completion timed out 151s = inference backend hung, external). A full `/grill-me` pass settled the design, then a resilience review reshaped the Dev console's data plane.
@@ -161,7 +12,6 @@ Designed the **Staff Console** (role-tiered back-office: Moderator/Admin/Dev) of
 - **Published (bilingual, `ready-for-agent`):** PRD **#279** + Phase-1 slices **#280** (1a RBAC+signed-claim+shell) → **#285** (1f aggregator+streams) → **#282** (1b health board, the incident fix) / **#283** (1c tracer+queue) / **#284** (1d GPU/host); **#281** (1e precise error) independent. **ADR 018** `docs/adr/018-staff-console-out-of-band-observability-aggregator.md` + indexed in the ADR README.
 - **MIT modules built (TDD + karpathy, branch `feat/mit-staff-observability`, MIT-only — Frontend/Backend deferred while akkanop-x refactors them):** `server/diagnostics.py` (cheap bounded gateway probe, decoupled from the worker pool → `ok/slow/timeout`·model-down-vs-gateway-down`/auth/unreachable/model_missing`; the 2026-06-14 incident reads `timeout` + "gateway /models OK but chat completion timed out — model not responding"; 7 tests) · `server/translate_error.py` (`classify_translate_error` → structured `{stage,translator,endpoint,model,cause,hint}`, wired at the `custom_openai` timeout raise → worker log + backend response carry it instead of the opaque string; 4 tests) · `server/metrics.py` (`parse_nvidia_smi` + `host_metrics` (psutil), `collect` degrades host-only when no GPU, zero new dep; 5 tests). 16 new tests, **full MIT suite 463 passed / 19 pre-existing async / 0 new**. PIPELINE.md §5 + ADR 018 referenced. SSE `/status/stream` endpoint + JWT verify deferred (need 1a's Supabase signed-claim hook = Backend/Supabase).
 - **Side fix:** shadcn MCP cwd gotcha — Claude Code `.mcp.json` has no `cwd` field → added wrapper `Frontend/run-shadcn-mcp.ps1` so the server runs in `Frontend/` and reads `components.json` (`@react-bits` + `radix-rhea`); needs a full Claude Code restart (reconnect does not reload config).
-
 ---
 
 ## Coin Topup System — Xendit PromptPay QR (2026-06-19, sandbox)
@@ -238,6 +88,8 @@ Both fixes are type-declaration-only — zero runtime behaviour change. `npx tsc
 **Verify:** `npx jest src/upload` 8/8; full backend **58 suites / 540 tests green**; `eslint` clean on the 3 touched files; no new `tsc` errors (the 10 standing are #298, not yet merged onto this branch). **Not run:** live in-app upload E2E — recommend a confirmatory pass with the PR.
 
 **Docs:** ADR 016 (`docs/adr/016-upload-magic-byte-mime-validation.md`, defense-in-depth decision) + index; post-mortem entry in `docs/reports/system-impact-report.md`. The `CLAUDE.md` upload claim was aspirational before; it is now accurate. **#303 unblocks #296** (its security AC is satisfiable; those tests already live in `upload.service.spec.ts`). **Follow-up:** factor a shared magic-byte upload-guard helper across forum + upload.
+
+---
 
 ## Flux.2 Klein-4B optional inpainter — feasibility proven + PRD/issues (2026-06-14, ultracode)
 
@@ -720,6 +572,16 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 # DONE — Claude Code Review Fix Session (2026-05-27)
 
 ---
+
+## Staff Console — PRD + ADR 018 + Phase-1 issues, out-of-band observability (2026-06-14)
+
+ออกแบบ **Staff Console** (back-office แบ่ง role: Moderator/Admin/Dev) จาก incident 2026-06-14 ของ 9arm (gateway `gateway.9arm.co` up แต่ model `qwen3.6-35b-a3b` ค้าง → error คลุมเครือ `'ollama servers did not respond quickly enough'` หลัง ~90s; หาสาเหตุด้วย black-box probe — `/models` OK 0.19s, completion 16-token timeout 151s = inference backend ค้าง, external). ผ่าน `/grill-me` เต็มรอบเพื่อ settle design แล้ว resilience review reshape data plane ของ Dev console
+
+- **Key decision (ADR 018):** monitor ต้องไม่อยู่ failure domain เดียวกับสิ่งที่มัน monitor → **standalone Node-Fastify aggregator microservice** (อยู่นอก Backend, run local/แยก host ได้) subscribe per-service `/status/stream` SSE บน Frontend/Backend/MIT; แต่ละตัว multiplex **`{type:metric}` sample** (VRAM/CPU/temp ผ่าน `torch.cuda`+`psutil`+`nvidia-smi`, zero new dep) + **`{type:event}` push** (translate-triggered/stage/log/error) UI อยู่ใน Frontend (`/staff/system`, shadcn) external uptime monitor → Discord = out-of-band backstop
+- **Auth (zero-trust, ไม่มี shared secret):** orthogonal `profiles.staffLevel` (none<moderator<admin<dev) ฉีดเป็น **signed JWT claim** ผ่าน Supabase Custom Access Token Hook; dashboard forward dev JWT และ **แต่ละ service verify เองอิสระ** (signature + expiry + claim) stream re-validate ~60s + close on expiry; MIT เพิ่ม PyJWT verify
+- **Published (bilingual, `ready-for-agent`):** PRD **#279** + Phase-1 slices **#280** (1a RBAC+signed-claim+shell) → **#285** (1f aggregator+streams) → **#282** (1b health board, ตัวแก้ incident) / **#283** (1c tracer+queue) / **#284** (1d GPU/host); **#281** (1e precise error) อิสระ **ADR 018** `docs/adr/018-staff-console-out-of-band-observability-aggregator.md` + index ใน ADR README
+- **MIT modules built (TDD + karpathy, branch `feat/mit-staff-observability`, MIT-only — Frontend/Backend เลื่อนไว้ระหว่าง akkanop-x refactor):** `server/diagnostics.py` (gateway probe ที่ถูกและมี bound, decoupled จาก worker pool → `ok/slow/timeout`·model-down-vs-gateway-down`/auth/unreachable/model_missing`; incident 2026-06-14 อ่านเป็น `timeout` + "gateway /models OK but chat completion timed out — model not responding"; 7 tests) · `server/translate_error.py` (`classify_translate_error` → structured `{stage,translator,endpoint,model,cause,hint}`, wire ที่ raise site timeout ของ `custom_openai` → worker log + backend response ได้แทน string เปล่า; 4 tests) · `server/metrics.py` (`parse_nvidia_smi` + `host_metrics` (psutil), `collect` degrade host-only เมื่อไม่มี GPU, zero new dep; 5 tests). 16 tests ใหม่, **full MIT suite 463 passed / 19 pre-existing async / 0 new**. PIPELINE.md §5 + อ้าง ADR 018. SSE `/status/stream` endpoint + JWT verify เลื่อนไว้ (ต้องการ signed-claim hook ของ 1a = Backend/Supabase)
+- **Side fix:** shadcn MCP cwd gotcha — Claude Code `.mcp.json` ไม่มี field `cwd` → เพิ่ม wrapper `Frontend/run-shadcn-mcp.ps1` ให้ server รันใน `Frontend/` อ่าน `components.json` (`@react-bits` + `radix-rhea`); ต้อง full restart Claude Code (reconnect ไม่ reload config)
 
 ## ✅ LEAK SWEEP — #136 #137 #139 (+#138 falsified) — 2026-06-06, /improve-codebase-architecture → /to-issues → /tdd
 
@@ -2580,6 +2442,86 @@ per-group inpaints). Off → per-crop, byte-identical. TDD: `test_patch_renderer
 async / 0 new**. **Verified via direct render** (`tools/ab_clean.py` + new `tools/ab_fullpage.py`): the bottom-right hair
 is now clean dark, no gray blob, English text intact — matches the full-page/upstream/target. `.env` set
 `MIT_PATCH_FULLPAGE_INPAINT=1`. Branch `fix/mit-patch-fullpage-inpaint`. Provenance in PIPELINE.md §5.
+## 2026-06-15 — Connect MIT to the Dashboard (live telemetry) + Dashboard OAuth (PRD #279 / ADR 018, ADR 019)
+Wired the standalone Dev console to **live MIT data** and added **Supabase OAuth** so the dev's token reaches MIT,
+which verifies it independently (zero-trust, no shared secret). MIT-only slice — Backend/Frontend `/status` are
+separate (#282/#283, akkanop-x refactoring). Operator decisions (locked before build): SSE **event-push** (no loop on
+the event tier) + sampled metrics; **forward JWT, MIT verifies per-service**; **MIT only**.
+
+**MIT (new, import-light, TDD <1s — 24 tests):** `server/status_snapshot.py` (`build_snapshot`/`to_messages` — folds
+metrics+diagnostics+queue/workers into the wire shape `Dashboard/lib/snapshot.ts` consumes; the `metric` frame carries
+the whole snapshot), `server/auth.py` (`verify_supabase_token` via Supabase `GET /auth/v1/user` — **no PyJWT, no JWT
+secret in MIT**, mirrors the Backend's `getUser`; robust to the new asymmetric `sb_publishable_…` keys — `is_staff` =
+staffLevel claim OR `MIT_STAFF_USER_IDS` allowlist), `server/status_hub.py` (asyncio pub/sub, non-blocking `put_nowait`
+fan-out → event push, no event-tier loop), `server/status_stream.py` (`format_sse` + hybrid `status_frames`: initial
+sample → push events via `wait_for`, sample on the interval timeout). **Wired into** `main.py` (`GET /status` +
+`GET /status/stream` behind a `require_staff` dep that re-validates every 60 s + closes on expiry; throttled gateway
+probe cached `MIT_DIAG_INTERVAL_S`; parent server only — never the RCE-by-design worker) + `myqueue.py` (`add_task`
+pushes a `translate_triggered` event — one chokepoint).
+
+**Dashboard (new, TDD — 11 tests; 91 total green):** `lib/live.ts` (`parseSseFrames`, partial-frame safe),
+`lib/live-map.ts` (`mapMitSnapshot` mb→GB), `lib/supabase.ts` (browser client), `components/auth-gate.tsx` (Google
+OAuth gate + `useDevAuth` token context; splash never hangs — getSession stall falls through), `components/
+use-live-snapshot.ts` (fetch-stream `/api/live`, fold via `snapshot.reduce`, backoff reconnect, mock fallback),
+`app/api/live/route.ts` (authenticated SSE proxy — forwards the dev JWT to MIT, holds no secret). `page.tsx` telemetry
+(GPU util/temp/VRAM/power, CPU/disk, RAM) + a live/offline/connecting badge + MIT-status chip now read live data when
+signed in, else mock. `shell.tsx` gains an account/sign-out row.
+
+**Verified:** MIT pure modules 24/24; Dashboard 91/91; sibling import-light server tests 20/20 (no regression).
+**E2E (real Supabase, MIT on :5013 parent-only):** real GPU/host metrics flow through `build_snapshot`
+(`util/temp/VRAM/power`, RAM, disk 99.1%); `/status` + `/status/stream` + `/api/live` reject **no-token → 401** and
+**garbage token → 401** (MIT actually calls Supabase `/auth/v1/user` and returns its `Invalid or expired token`,
+passed through the proxy) — independent per-service verification confirmed; the OAuth login gate renders. Remaining
+(human step): a *valid* token via Google sign-in → 200 + live cards (OAuth can't be driven headlessly); first sign-in
+needs the dev's user id added to `MIT_STAFF_USER_IDS`. Provenance in PIPELINE.md §5; full 18-section impact report in
+`docs/reports/system-impact-report.md`; decision in ADR 019.
+
+**Follow-up (same day): GitHub login + forced-for-dev.** Added a "Sign in with GitHub" button (primary) alongside
+Google (secondary) in the Dashboard gate, and **enforced GitHub for dev-tier access** — `auth.is_staff` gained a
+`require_provider` param (checks `app_metadata.provider`/`providers`), wired in `main.py` via `MIT_DEV_REQUIRE_PROVIDER`
+(default `github`): an allowlisted/claimed **Google** account is denied dev (highest-privilege console = repo-collaborator
+GitHub identity; Google kept for future lower tiers; set the env empty to disable during rollout). `auth` tests 8→12;
+verified the two-button gate + "Dev access requires GitHub" note render. GitHub provider still needs a one-time Supabase
+enable (GitHub OAuth App + Authentication→Providers→GitHub). ADR 019 updated.
+
+**Follow-up (same day): Dashboard auth = Frontend parity (Email + Google + Facebook) + GitHub + in-app linking.** Per the dev's call (standalone console must NOT depend on the Frontend for linking, and tiers differ: Moderator→Google, Admin→both, Dev→GitHub), ported the Frontend's auth into the Dashboard standalone: popup OAuth (`signInWithOAuth({skipBrowserRedirect})` → `app/auth/callback/page.tsx` postMessages the session back — fixes the earlier redirect-to-Site-URL + surfaces errors in-app) for Google/Facebook/GitHub, email/password (sign in / sign up / reset), and a multi-provider **link/unlink** panel (`components/account-panel.tsx`, `lib/account.ts` pure + tested) + add-email/password. New pure libs: `lib/account.ts` (5 tests), `lib/oauth.ts` (`mapOAuthError`, 5 tests — incl. the manual-linking "Multiple accounts in linking domain" → "sign in with your existing provider, then link"). `auth-gate.tsx` is now a full DevAuth provider; `login-screen.tsx` mirrors LoginModal (3 OAuth + email form). Diagnosed the dev's GitHub sign-in failure via Supabase MCP: DB clean (1 google user, UUID 9c7f7717), the error = **manual-linking is on** (the app's multi-platform feature) so GoTrue refuses to auto-link a fresh GitHub sign-in onto the existing email → the dev links GitHub in Account instead. Dashboard tests 91→**101** green; login screen verified rendering all 4 methods at `https://dashboard.hayateotsu.space`. Supabase setup still needed: enable GitHub provider + redirect URLs cover `/auth/callback`.
+
+**Bug fix (same day): OAuth callback hang + navigator.locks deadlock (redirect flow).** Switched Dashboard OAuth from popup → full-page redirect flow per the dev's preference, then debugged a "/auth/callback hangs" report (debug-mantra + scrutinize). Two real bugs: (1) the root-layout `<AuthGate>` gated EVERY route incl. `/auth/callback`, so a signed-out callback rendered `<LoginScreen>` instead of the callback page → the token-exchange/redirect never ran (fix: `isCallback = usePathname()==='/auth/callback'` bypass → always render the callback page there); (2) Supabase's default `navigator.locks` lock could deadlock `getSession()`/the OAuth exchange (fix: no-op `lock` in the client — single-tab console needs no cross-tab serialization). Diagnosis was clouded by Playwright/browser caching stale client JS + flaky Turbopack HMR file-watch — proved the fix correct by curling the SSR HTML (`/auth/callback` → 0 login buttons + the spinner) and grepping the served client chunk for the marker (fresh code served on both sides). Also: redirectTo settled on `${origin}/auth/callback` paired with a `https://dashboard…/**` Supabase Redirect-URL (a bare-origin allowlist entry is exact-match only → falls back to Site URL). 101 Dashboard tests green.
+
+**Follow-up (2026-06-16): unified debug console + GitHub auto-link + recharts dup-key fix + `/service/mit` live wiring.**
+Closing out the MIT↔Dashboard connection so the MIT service uses real data instead of mock where MIT actually reports it.
+- **Unified debug console** (`components/debug-console.tsx`, `lib/debug-log.ts` + tests): one filterable in-app log surface fed from four sources — Dashboard, Frontend, **Backend**, **MIT** (the live-stream hook pushes each MIT `event`/`status` frame as a log line). Renders only when Supabase is configured.
+- **GitHub auto-link** (`components/github-auto-link.tsx`): a signed-in dev whose identity lacks `github` auto-fires `linkIdentity('github')` (the standalone console requires the repo-collaborator GitHub identity for Dev tier; the Frontend has no GitHub-link UI since it's Dashboard-only). The signed-in `linkIdentity` path bypasses GoTrue's "Multiple accounts in linking domain" 500 (that check only runs on the sign-in/create path, `targetUser==nil`) — verified end-to-end: signed in with Google → github linked → `providers=["google","github"]`.
+- **Recharts duplicate-key fix** (`components/metric-card.tsx`): short live series at minute-resolution tick labels produced non-unique x-ticks (`tick-10:25-28-28` React key spam) — deduped via `[...new Set([first, mid, last])]`.
+- **MIT `control_ms`** (`server/diagnostics.py`, `server/status_snapshot.py`): the gateway probe now times the `GET /models` control-plane call separately from the chat data-plane call, so the Dashboard's GatewayDiagnosis control-vs-data split is real (control up + data timeout = "model hung", the 2026-06-14 incident signature). `test_diagnostics` + `test_status_snapshot` updated → 13 pass.
+- **`/service/mit` detail page live-wired** (`app/service/[id]/page.tsx` + `lib/live-panels.ts::liveGatewayProbe`, pure + 4 tests): header status badge (`up/degraded/down` + `· live`), telemetry cards (GPU util/temp/power, VRAM used/total, queue depth + worker count), VRAM-panel host total, and GatewayDiagnosis (live control/data split) now read live MIT data when signed in. Panels MIT doesn't instrument stay **honestly mock** (GPU history charts, per-card sparklines, stage timing, quality, per-model VRAM breakdown, translate-queue job list, worker-lifecycle internals). The stream connects only on the MIT page (`useLiveSnapshot(id==='mit' ? token : null)`).
+- **Account-linking conflict** (research only — feature deferred): documented the "user has N Supabase accounts across N GitHub emails" UX in `docs/research/oauth-account-linking-conflict.md` + `docs/prd/account-linking-conflict-resolution.md` (choose-which-account-to-link + email-confirm flow); touches Backend so it's parked for akkanop-x coordination.
+- **Verified:** Dashboard `bun test` **101→115** green (live-panels +4); MIT diagnostics+snapshot **13** green; typecheck clean on the touched files (`page.tsx`, `live-panels.ts` — the residual recharts-Formatter + `bun:test`-in-tests tsc errors are pre-existing, excluded from the real build); `/service/mit` SSR 200, no error overlay. Stack restarted clean: MIT :5013 (new code, parent-only, gateway probe on 9arm), Frontend :4000, Backend :4001. Provenance: PIPELINE.md §5 (`diagnostics.py`/`status_snapshot.py`), impact report 2026-06-15 increment.
+
+**Follow-up (2026-06-16): MIT-side telemetry instrumentation — real data for the `/service/mit` panels (queue / stage timing / worker lifecycle / per-model VRAM leak monitoring).** The dev asked to make the MIT detail page show real status instead of mock; this is the **MIT side only** (emit the data — the Dashboard wiring that reads it is a later step). For each panel, instrumented the real source where one exists; dropped what doesn't.
+- **Queue jobs** (parent-side, real now): `TaskQueue.jobs_snapshot()` → `queue.jobs[]` (id / task_type / page / waiting_ms); `QueueElement` gained an id + enqueue time. Pure transform `server/queue_view.py` (4 tests).
+- **Stage timing** (worker→parent): `webhook.make_telemetry_hook` times each pipeline stage (gap between consecutive stage starts) and POSTs it to the parent's new `POST /internal/telemetry` (`X-Nonce` auth, same as `/register`); folds into `stages[]`. Hook added in `share.py` alongside the existing progress hook. (3 tests)
+- **Worker lifecycle** (parent-side): the worker sends its `os.getpid()` at registration, the parent stamps `registered_at` → `workers.detail[]` (pid / uptime / busy). `ExecutorInstance` gained `pid`/`registered_at`; pure `server/worker_view.py` (3 tests).
+- **Per-model VRAM leak monitoring** (the dev's real debug need — a model that doesn't return VRAM on unload → bloat, hunted by hand): **Tier 1** — the worker's `torch.cuda.memory_allocated/reserved` (`vram_probe.py`) → `vram.{allocated_mb,reserved_mb}` (reserved climbing while allocated flat = the leak; nvidia-smi total in `metrics` covers onnx). **Tier 2** — `ModelUnloader` (the one #188 unload seam) measures how much each unload frees; `VramTracker` **learns each model's footprint from its largest clean release** and flags an unload that frees far less (`leaked:true`) → `vram.models[].{footprint_mb,freed_mb,leaked}`. Keyed by the unload tool (detection/ocr/inpainting/…). **No load-site instrumentation** — the touch sites are pre-load and post-load deltas are activation-noisy, so footprint is learned from unloads instead (simpler + robust). `manga_translator/vram_tracker.py` (5 tests). Worker reports the VRAM report after each page via the same telemetry channel.
+- **Quality / run-summary: removed** per the dev (the marquee fields — parity %, tokens — have no real source). Trimmed the speculative `run` ingestion.
+- **Snapshot shape:** `build_snapshot` now carries optional `queue.jobs`, `workers.detail`, `stages`, `vram` (absent when empty → lean; the Dashboard reducer ignores unknown keys). `telemetry_store` (`apply` dispatches `stage`/`vram`) is the parent-side sink; the worker pushes via `/internal/telemetry`.
+- **Verified:** full MIT suite **519 passed / 0 new failures** (19 pre-existing: 18 async-config + `test_registry_trim` from the flux-inpainter PR #277, none mine); ~25 new import-light tests (<1s each). Note: VRAM/stage/queue are worker data → empty in the parent-only dashboard MIT until a GPU worker runs + translates; unit tests pin every hop. Engineering note: hooking the #188 `ModelUnloader` / `dispatch_registry` seams cleanly is the direct payoff of the ~3.4k-line god-object decomposition. Provenance: PIPELINE.md §5 (server new + `model_unloader`/`instance`/`myqueue` + manga_translator new), impact report 2026-06-16 increment.
+
+**Follow-up (2026-06-17): Dashboard wiring — `/service/mit` reads real MIT data on every graph/panel (or "No Data").** The dev confirmed (screenshot, ~10:34) the graphs were still mock — only GPU util/VRAM/queue-depth *numbers* were live; the sparklines + lower panels didn't move with usage. Wired the Dashboard half (MIT already emits the data).
+- **Live-graph foundation:** `lib/live-series.ts` (pure rolling per-metric accumulator, 5 tests) — MIT sends current values per SSE frame, so the dashboard accumulates each frame into a ring buffer → the static mock sparklines become live charts. `lib/live-map.ts` now exposes `stages`/`vram`/`queueJobs`/`workersDetail` (optional). `components/use-live-snapshot.ts` keeps the rolling `series` + stamps event arrival time (`lib/snapshot.ts` reducer adds `at` so the LogStream shows real timestamps).
+- **Real x-axis (follow-up same day):** `use-live-snapshot` also accumulates `seriesT` (epoch ms per frame); `page.tsx` formats it → `HH:MM` and passes a `times` prop to `metric-card` + `gpu-detail`, which plot against the **real wall-clock of each sample** (right-aligned) instead of the fixed mock 10:25–10:35 `TIME` window — fall back to mock when not live.
+- **`mit@console` made functional (follow-up same day):** `lib/mit-console.ts` (pure, 10 tests) — a real READ-ONLY command interpreter over the live status snapshot: `status`/`gpu`/`host`/`vram`(per-model+leak)/`gateway`(control vs data)/`queue`/`workers`(pid/uptime)/`stages`/`logs`/`help`/`clear`. `ServiceTerminal` gains `mitConsole`/`mit`/`events` props → uses it for the MIT page (mock terminal elsewhere). **No arbitrary shell, no mutating/control actions** — the worker is RCE-by-design and is never driven from the browser; unknown commands rejected, "not connected" until the stream is live.
+
+**Planning + I1 foundation (2026-06-17): Dashboard redesign epic — live-native (real MIT or "No Data") + Finesse UI (tech-debt).** A `/grill-me` session locked the design tree (whole dashboard → live-or-No-Data; only MIT has a live feed so non-MIT → No Data; empty Frontend/Backend pages → one page-level "telemetry not wired (#282/#283)" message; MIT feed → real `live.events`; pipeline stages → timing-only from `mit.stages`; mixed panels → per-item; mock consts → deleted; "No Data" English-only). The user expanded scope to a **full redesign** (Finesse UI reference, https://finesseui.com/) → **merged** with the de-mock (full overhaul throws the markup away, so rebuild live-native rather than de-mock-then-redesign). Published the plan: PRD `docs/prd/dashboard-live-or-no-data.md` (bilingual) + GitHub issues **#304** (PRD/epic, child of #279), **#305** (I1 — data foundation, ready-for-agent), **#306** (I2 — Finesse UI design system, HITL). I3–I6 (rebuild overview / `/service/mit` / FE-BE+shell / delete-old-mock) deferred until I2's design lands (build slices need the design).
+- **I1 durable foundation built (TDD, 9 new tests):** `lib/panel-source.ts` — `isNoData(value)` (null/[]/""=No Data, but **0 is data**) + `panelSource(id)` → `mit-live`/`mixed`/`no-source` (unknown → `no-source` fail-safe, never over-claims); `lib/live-panels.ts::livePipelineStages` — `mit.stages` → timing-only stage view (translate keeps gateway state, untimed=idle, before-first-translate=all-idle, no faked detail); `hooks/use-mit-live.ts` — folds the `useDevAuth`→`useLiveSnapshot`→`liveMit`/`series`/`seriesT`/`events` boilerplate into one hook (`connect` param so non-MIT pages open no SSE); `components/no-data.tsx` — `<NoData>` + `<NoDataPage>` primitives (minimal default; final visual owned by I2). **Old-consumer refactor deferred** to the rebuild slices (I3–I5) — those surfaces get rebuilt, so adopting `useMitLive`/`<NoData>` happens then (don't touch twice). Verified: `bun test` **130→139** green, typecheck clean on the new files.
+- **Components (8, parallel workflow + 1 by hand):** each takes a live prop + renders a centered **"No Data"** placeholder when the live data is present-but-empty, keeping the mock path backward-compatible (shared cards/log-stream still serve frontend/backend pages). metric-card (empty `data`→No Data), gpu-detail (`series?` → 4 live charts + 3 No-Data), stage-timing/translate-queue/log-stream (empty→No Data), vram-panel (`live?: MitVram` → per-model bar + **LEAK badge**), worker-lifecycle (`workers?`), quality-panel (`live?` → No Data, run-summary was removed).
+- **`page.tsx` integration:** maps live MIT telemetry into each panel's shape (live stages→`StageTiming` w/ baselines, `MitJob`→`QueueJob`, events→`LogEntry`) and passes the accumulated `series` to the cards + GpuDetail; `liveMit` gates live-vs-mock.
+- **Honesty boundary:** live now → GPU util/VRAM/temp/power/fan + CPU usage sparklines, GpuDetail (4 of 7), worker pid/uptime, gateway. Live after a translate → stage timing, VRAM-by-model(+leak), queue jobs, logs. **No Data** (no MIT source) → pages/min, CPU temp, Graphics/CPU clock, quality panel.
+- **MIT restart:** killed a stale 14-Jun full MIT worker (orphaned `python3.11.exe` on :5004 holding ~3.9 GB VRAM — the worker-restart-gotcha) → VRAM 6.6→2.7 GB used; relaunched a **full GPU worker** on :5013 (`--use-gpu --start-instance`, gateway translator so no local LLM) so the worker telemetry actually flows.
+- **Verified:** Dashboard typecheck clean (touched files; residual recharts-Formatter + `bun:test` errors pre-existing), `bun test` **120 pass**, `/service/mit` SSR 200 no error overlay. Workflow: 8 component agents (1 transient 500 redone by hand).
+
+---
+
 ## 2026-06-14 — Backend god-file decomposition: carve MIT translation out of books.service.ts (#233 + #234)
 Continued the `Backend/src/books/books.service.ts` god-object decomposition (PRD #228). Two services carved out, every seam byte-identical except one isolated behaviour fix:
 - **#233 `MitTranslationService`** — the single-page MIT path (`translateMangaPagePatches` + the startup-retry loop), the MIT health check, and the image-translator probe. Injects `MitClient` (#230) + the #229 pure helpers + BooksService's shared `persistPage`/`seriesContextFor` as callbacks; with MitClient faked the single-page path is unit-testable for the first time (cache hit / retry loop / ECONNREFUSED→unavailable / abort).
@@ -2595,17 +2537,6 @@ Completed PRD #228 (the `books.service.ts` god-object decomposition). Step 6 car
 
 `books.service.ts` **841 → 376 lines** (god file quartered from its 1834 start; now a thin facade — every public signature unchanged, controllers/call-sites untouched). New unit-testable modules: `gemini-model-catalog.ts`, `manga-catalog.service.ts`, `landing.service.ts`. Constructed via `new` in the BooksService constructor (sharing its cache/imageCache/mangaDex/supabase + a `() => backendOrigin` callback) — same one-way-dependency pattern as #233/#234, so `BooksModule` is unchanged. Method: characterization-first (existing books specs are the net), byte-identical extraction, build whole backend per seam. The Thai-detect regex was restored to its `฀-๿` escapes after an encoding round-trip. **Full backend suite 530 pass / 0 fail** (was 513; +17 new). Branch `dept/backend` (3 commits `15e4837`/`127ee43`/`959b1bd`). **PRD #228 DONE — all 6 steps landed (#229/#230/#232/#233/#234/#231).** Issues left open — close on merge to main. Impact report: `docs/reports/system-impact-report.md` (2026-06-14, #231).
 
-## 2026-06-30 — MIT: drop det_sfx false-positives so SFX-rescue stops hallucinating over dialogue (#278 follow-up)
-Full-stack EN→Thai benchmarking (Gal Yome ch1, 5 user-flagged pages) traced the residual **empty/tiny/missing/garbled bubble** defects to ONE root cause via systematic-debugging + worker telemetry: **not the 9arm gateway** (it translated dialogue correctly) and **not memory** — the `det_sfx` second pass false-positives on speech bubbles, which the 48px line-OCR reads as short ASCII fragments (`W`/`I`/`THE`/`M`/`8`/`1`/`WHA`). Those passed the #278 provenance gate (short + det_sfx + large box) → the vision gateway, told they were SFX, **hallucinated** a phantom Thai token (`W`→"ปาร์ตี้", `THE`→"เสียงดังสนั่นหวั่นไหว", `M`→"ไม่ชัดเจน", `1`→"เงียบสงบ") that merged into and corrupted the real dialogue render. ADR 026's provenance signal was insufficient because det_sfx itself is unreliable. **Fix:** a genuine stylized SFX the OCR *drops* comes back non-ASCII/CJK — a clean ASCII letter/digit read is proof the OCR succeeded on real text, never a dropped glyph. New pure `ocr_read_real_text(text)` ⇒ (1) `should_rescue_sfx` returns False for real-text reads (no gateway round-trip, no hallucination), (2) `_apply_ocr` **drops** a `from_sfx_detection` region whose read is real text (so its literal fragment `W`→"ว" isn't rendered over dialogue). TDD red→green, `test_ocr_vlm` **27/0**. **Benchmark-verified** across all 5 pages (direct-worker, real `Backend/.env` config): every ASCII phantom (7) dropped, every non-ASCII SFX (ほ。ん, サ×2, ⁉, ぎい) still rescued to Thai; bubbles render real dialogue; page 11 "LOVE IS FORBIDDEN"→"ความรักเป็นสิ่งต้องห้าม", page 14 "HARA-SENPAI"→"ฮาระเซเน่" (Korean-glyph leak gone). Report `docs/reports/benchmarks/2026-06-30-sfx-falsepos-phantom-fix.md` (+5 committed images). ADR 026 addendum. Remaining: #436 overlapping-bubble (page 11 second balloon translated but render-hidden) — separate, open. Branch `worktree-feat-mit-font-s1` (PR #433).
-
-## 2026-06-30 — MIT: display captions track original lettering size in clean-layout (#175 follow-up)
-User flagged that big on-art **display captions** (e.g. "LOVE IS FORBIDDEN", "IN THIS COMPANY" on Gal Yome EN→Thai p11) render far smaller than the original. Root cause (proven by per-region font telemetry): `_clean_layout_dst` sized every clean-layout region with the **flat** `clean_layout_font_size` (≈26px), ignoring `region.font_size` — so a 96px stylized caption and a 21px narration line both came out ~26px (3.7× / 2.6× too small). **Fix:** new pure `clean_layout_target_fs(orig_fs, clean_fs_flat)` — narration (`orig ≤ flat`) returns the flat size **byte-identical** (no ADR-025/#175 regression); a display caption (`orig > flat`) renders near its **original** size (cap 120). `_clean_layout_dst` then wraps a sized-up caption to its own wider source footprint (no mid-word breaks) and shrinks only to keep the block within `1.6×` the original height, never below flat. TDD: +3 `test_render_overlap` cases; render_overlap+ocr_vlm **68/0**. **Benchmark-verified** (direct-worker, real config): p11 "ความรักถูกห้ามปราม" now renders large + clean-wrapped ("ความรักถูก / ห้ามปราม"), matching the original "LOVE IS FORBIDDEN" prominence; "ในบริษัทนี้…" large; narration unchanged. Report `docs/reports/benchmarks/2026-06-30-clean-layout-caption-size.md` (+image); ADR 025 addendum. Remaining: #436 overlapping-bubble (p11 second balloon empty, p4 bubble-2 clip) — separate, open. Branch `worktree-feat-mit-font-s1` (PR #433).
-
-## 2026-07-01 — MIT: content-shaped patch alpha so overlapping balloons stop erasing each other (#436)
-User flagged a back speech-balloon rendering EMPTY (page 11 "We haven't told anyone…") though translated. Root cause (verified by decoding patches): the two overlapping balloons are correctly separate regions and anti_overlap places their text apart, but each is composited as a rectangular ~92%-opaque patch — with full_page_inpaint, the balloon composited last repaints its clean-background rectangle over the other's text (decoded: both patches held glyphs, 70% overlap). **Fix:** new `render.patch_content_alpha` knob (env MIT_PATCH_CONTENT_ALPHA, default off=byte-identical) → `content_alpha_inner(rendered, inpaint_before_text, own_mask)` builds the patch alpha from its OWN content (new glyphs = rendered vs the text-free inpaint, ∪ this group's own text mask), so margins are transparent and a neighbour's text survives. **Two bugs caught only by viewing the render (verify-before-claiming rule), then pinned as tests:** (1) diffing rendered-vs-original re-marked the neighbour's erased text → re-occluded; fixed by diffing vs the inpaint; (2) text rendering mutates img_rgb (aliases img_inpainted) → diff empty → fully-transparent patches → page rendered raw English; fixed by snapshotting inpaint_before_text. TDD: +5 `content_alpha_inner` cases; test_patch_geometry+test_patch_renderer **37/0**. **Benchmark-verified:** page 11 both overlapping balloons now render ("เราไม่ได้บอกใคร…" + "ดังนั้นเราจึงคิดจะบอกคุณก่อน…"), no English residue; pages 4/9 no regression (page-4 bubble-2 clip also recovered). Report `docs/reports/benchmarks/2026-07-01-overlap-content-alpha.md` (+3 images); ADR 027. Remaining: needs Backend MIT_PATCH_CONTENT_ALPHA wiring to activate in the reader; true glyph-on-glyph overlap still needs anti-overlap re-placement (separate). Branch `worktree-feat-mit-font-s1` (PR #433).
-
-## 2026-07-01 — MIT: anti-overlap territory = text footprint not whole balloon (#436 follow-up)
-RouteProbe characterization showed the overlapping back balloon (Gal Yome p11) was bubble-fit but small because `anti_overlap` clamped it against the FRONT balloon's full box, while the front was a clean-layout narration column filling only ~40% of its balloon (rw/bw 0.40). **Fix:** pure `region_territory_box` — reserve the balloon only when text fills it (`fills_bubble_width`), else just the text box; `_region_territory` delegates. The narration column stops reserving the whole balloon, so the overlapping neighbour grows into the empty area (safe with content-shaped patches #436). Characterization-first per [[feedback_techdebt_all_scenarios]]: +3 test_render_overlap cases; 44/0. Verified p11 (back balloon sizes to real space, no collision) + p4/p9 (no regression). ADR 027 addendum. Branch `worktree-feat-mit-font-s1` (PR #433).
 ---
 
 ## 2026-06-28 — Dashboard V2 Track A close-out + live-native leak fixes (PR #414)
@@ -2625,27 +2556,3 @@ tested `lib/overview-signals.ts` (`pipelineHeaderSummary`, `pctDelta`) + gating/
 **82 tests pass, tsc clean**. Pushed `feat/dashboard` → **PR #414** (closes #352/#353/#354; relates #304/#279).
 ADR **022** (live-native, no fabricated values on the live path). NOTE: full frontend E2E via tunnel **not
 run** — Track B realtime unwired, console is mock-mode only (honest gap; E2E lands with B4).
-## 2026-06-29 — MIT: lazy package-import boundary so logic tests + CI run torch-free (#359)
-`manga_translator/__init__.py` ran `from .manga_translator import *` and `utils/__init__.py` ran `from .inference import *` —
-both pull torch, so EVERY import (even `from manga_translator.config import Config` in a pure-logic test) dragged in
-torch+cv2+transformers+diffusers (multi-GB). `mit-ci` therefore had to install the full ML stack for a font-fit unit test and
-stayed report-only (`continue-on-error`). Fix (ADR 023): PEP 562 `__getattr__` forwards the public API lazily in BOTH `__init__`s
-(`importlib.import_module` to avoid self-name recursion) — `import manga_translator` + lightweight submodule imports are now
-torch-free, while `from manga_translator import Config/Context/MangaTranslator/...` still resolves on first access. utils stops
-eager-importing `.inference` (its only torch puller) and forwards `ModelWrapper`/`InfererModule` lazily. CI: `mit-ci.yml` splits
-into a BLOCKING `logic` job (lightweight install via a transparent grep dep-filter, torch-free suite) + report-only `heavy` job;
-`test/conftest.py` skips the 12 torch-only modules when torch is absent; `asyncio_mode = auto` lets the bare-`async def` tests run
-(pytest-asyncio already a dev dep). **Characterization-first** (`test_lazy_import.py`, child-interpreter so the test file is itself
-torch-free): proves torch-free package + submodule import AND that the consumed public API resolves to the same objects. **Measured:**
-torch-needing test files 27→12, torch-free collection 338→413 tests, logic gate collects 0 errors / torch never imported (verified
-under a torch-absent import blocker); full MIT suite 0 new failures (21 pre-existing). Branch `worktree-ci-mit-lazy-torch`; ADR 023;
-impact report `docs/reports/system-impact-report.md` (2026-06-29). **Open follow-up:** 12 residual heavy files (genuine model/translator
-tests + `pipeline_params→ModelWrapper` transitive chain); CI grep-filter completeness + the gate's green status are validated by the
-PR's own mit-ci run. Provenance in PIPELINE.md §5.
-
-### #359 addendum (CI-validated green) — 2026-06-29
-The logic gate's green status was validated end-to-end by PR #427's own `mit-ci` run: **`pytest (logic gate, torch-free)` PASS in 1m52s** (vs the old multi-GB report-only single job). Getting there surfaced — and fixed — three things the eager `import *` had masked, all committed on the branch:
-1. **panel/lib not committed** — `MIT/.gitignore`'s generic `lib/` rule silently ignored `manga_translator/utils/panel/lib/` (Kumiko source); fresh clones/worktrees/CI all `ModuleNotFoundError`. Tracked via a gitignore exception. (This is the recurring "worktree missing panel/lib" gotcha — now fixed at the root.)
-2. **test/testdata blanket-ignored** — `test_patch_png`'s `dotgain20.icc` fixture was never committed. Tracked via `testdata/*` + re-include.
-3. **chatgpt → manga_translator circular import** — `translators/chatgpt.py` did `from .. import manga_translator` at module top; lazy init no longer pre-loads the impl module, so it cycled through `manga_translator.py → translators.dispatch` (partially-init). Moved to a runtime-local import. Regression-tested.
-Also: `asyncio_mode = auto` made the bare `async def` suites (textline_merge etc.) actually run+pass in CI; heavy-API characterization tests are `skipif(not torch)`. Heavy job stays report-only (needs models/GPU).

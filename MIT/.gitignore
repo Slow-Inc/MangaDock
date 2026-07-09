@@ -65,8 +65,9 @@ MANIFEST
 cert.pem
 key.pem
 
-# Ad-hoc scratch / worker dumps (leading underscore) — never commit (worktree-budget artifact class)
+# Transient worker / A-B / render-dump / scratch dumps — never commit (worktree-budget artifact class; #533)
 _*.log
 _dump_sweep.json
 _dump_*.json
 _kp*_out/
+_render_dump/

@@ -1,0 +1,187 @@
+name: CI
+
+# Single consolidated CI workflow with a path-filter dispatcher + a summary gate.
+#
+# Why one workflow instead of three path-filtered ones (#356): GitHub required
+# status checks + per-workflow path filters deadlock — a PR that doesn't touch a
+# service never triggers that service's check, so a required check sits in
+# "Expected — waiting for status" forever and the PR can't merge. Here the
+# `changes` job ALWAYS runs, decides which service jobs to run, and a single
+# `gate` job (always runs) summarizes them. Mark **only `gate`** as the required
+# check in branch protection — it passes when service jobs are skipped and fails
+# only when a required one actually fails.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# dorny/paths-filter calls the PR listFiles API; the default GITHUB_TOKEN needs
+# pull-requests:read or it fails with "Resource not accessible by integration".
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      mit: ${{ steps.filter.outputs.mit }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'Backend/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'Frontend/**'
+              - '.github/workflows/ci.yml'
+            mit:
+              - 'MIT/**'
+              - '.github/workflows/ci.yml'
+
+  backend:
+    name: backend (jest)
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      SUPABASE_URL: http://localhost:54321
+      SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
+      GEMINI_API_KEY: test-gemini-key
+      GOOGLE_BOOKS_API_KEY: test-google-books-key
+      MANGA_TRANSLATOR_URL: http://localhost:5003
+    steps:
+      - uses: actions/checkout@v4
+      # bun.lock is the maintained lockfile; package-lock.json is stale → npm ci fails.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      # --runInBand keeps Redis-backed specs deterministic; jest.ci.config.js
+      # skips documented pre-existing failures (#358).
+      - run: npx jest -c jest.ci.config.js --runInBand --ci
+
+  frontend:
+    name: frontend (bun test)
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+      - run: bun install --frozen-lockfile
+      # Exclude *.integration.test.ts (needs a live :4000 server). Guard the
+      # empty case so we never fall back to running ALL tests.
+      - name: Run unit tests
+        run: |
+          files=$(find app lib -name '*.test.ts' -not -name '*.integration.test.ts')
+          if [ -z "$files" ]; then echo "No unit test files found"; exit 1; fi
+          echo "Running: $files"
+          bun test $files
+
+  # MIT is two jobs since #359 lazy-imported torch (job ids use underscores — a hyphen in a
+  # job id breaks `${{ needs.mit-logic }}` expression parsing, which reads `-` as subtraction):
+  #   • mit_logic — BLOCKING gate. Lightweight deps only (no torch); test/conftest.py auto-skips
+  #     the torch-only modules, so the pure-logic suite runs in seconds and gates the merge.
+  #   • mit_heavy — report-only (continue-on-error). Full ML install; the suites that genuinely
+  #     need torch/models. Non-blocking until it's reliably green on a GPU-less runner.
+  mit_logic:
+    name: pytest (logic gate, torch-free)
+    needs: changes
+    if: ${{ needs.changes.outputs.mit == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: MIT
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: System libs for OpenCV
+        run: sudo apt-get update && sudo apt-get install -y libgl1
+      # requirements.txt MINUS the multi-GB ML stack. If a logic test ever needs a filtered
+      # package this job goes red and the line is dropped — the filter is transparent on purpose.
+      - name: Install lightweight deps (no torch/transformers/diffusers)
+        run: |
+          python -m pip install --upgrade pip
+          grep -viE '^(torch|torchvision|torch-summary|transformers|diffusers|gguf|bitsandbytes|accelerate|ctranslate2|onnxruntime|ultralytics|manga-ocr|kornia|timm|rusty-manga-image-translator|--extra-index-url)' requirements.txt > requirements-logic.txt
+          pip install -r requirements-logic.txt -r requirements-dev.txt
+      - name: Run torch-free logic suite
+        run: pytest test/ -q
+
+  mit_heavy:
+    name: pytest (heavy ML, report-only)
+    needs: changes
+    if: ${{ needs.changes.outputs.mit == 'true' }}
+    runs-on: ubuntu-latest
+    continue-on-error: true        # opt-in: needs models/GPU; flip once green without a GPU
+    defaults:
+      run:
+        working-directory: MIT
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: System libs for OpenCV
+        run: sudo apt-get update && sudo apt-get install -y libgl1
+      # CPU-only torch keeps the install size sane (the CUDA wheel is ~2GB).
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run full suite
+        run: pytest test/ -q
+
+  gate:
+    name: gate
+    if: ${{ always() }}
+    needs: [backend, frontend, mit_logic, mit_heavy]
+    runs-on: ubuntu-latest
+    steps:
+      # Mark ONLY this job as the required check. Skipped service jobs are fine; the gate fails
+      # only when a *required* job (backend/frontend/mit_logic) actually failed. mit_heavy is
+      # report-only (continue-on-error) and never blocks.
+      - name: Verify required jobs
+        run: |
+          echo "backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }} mit_logic=${{ needs.mit_logic.result }} mit_heavy=${{ needs.mit_heavy.result }}"
+          if [ "${{ needs.backend.result }}" = "failure" ] || [ "${{ needs.frontend.result }}" = "failure" ] || [ "${{ needs.mit_logic.result }}" = "failure" ]; then
+            echo "::error::A required CI job failed"
+            exit 1
+          fi
+          echo "CI gate passed."

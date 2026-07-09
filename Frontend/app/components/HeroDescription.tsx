@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import GeminiBadge from "./GeminiBadge";
-
-const API_BASE = "/api/proxy";
+import { translateDescription } from "../lib/translateDescription";
 
 const truncate = (text: string, length: number) =>
   text.length > length ? `${text.slice(0, length)}...` : text;
@@ -16,10 +15,9 @@ export default function HeroDescription({ description }: { description: string }
   useEffect(() => {
     if (!description) return;
     setTranslating(true);
-    fetch(`${API_BASE}/books/translate?text=${encodeURIComponent(description)}`)
-      .then((r) => r.json())
-      .then((d: { translatedText: string; translated: boolean }) => {
-        if (d.translated) setTranslated(d.translatedText);
+    translateDescription(description)
+      .then((text) => {
+        setTranslated(text);
         setTranslating(false);
       })
       .catch(() => setTranslating(false));

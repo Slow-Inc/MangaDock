@@ -154,3 +154,72 @@ describe('mit-config pure builders (#229)', () => {
     });
   });
 });
+
+const MIT_BASE = { MIT_SEND_SOURCE_LANG: 'false' } as NodeJS.ProcessEnv;
+
+describe('renderConfigHash() — LLM_* support', () => {
+  it('changes when LLM_PROVIDER changes', () => {
+    const h1 = renderConfigHash({ LLM_PROVIDER: 'gemini' } as NodeJS.ProcessEnv);
+    const h2 = renderConfigHash({ LLM_PROVIDER: 'openai' } as NodeJS.ProcessEnv);
+    expect(h1).not.toBe(h2);
+  });
+
+  it('changes when LLM_MANGA_MODEL changes', () => {
+    const h1 = renderConfigHash({ LLM_MANGA_MODEL: 'gpt-4o-mini' } as NodeJS.ProcessEnv);
+    const h2 = renderConfigHash({ LLM_MANGA_MODEL: 'gpt-4o' } as NodeJS.ProcessEnv);
+    expect(h1).not.toBe(h2);
+  });
+
+  it('is stable for same LLM_* values', () => {
+    const env = { MIT_OCR_PROB: '0.03', LLM_PROVIDER: 'openai' } as NodeJS.ProcessEnv;
+    expect(renderConfigHash(env)).toBe(renderConfigHash(env));
+  });
+
+  it('is unaffected by non-MIT_ non-LLM_ keys', () => {
+    const h1 = renderConfigHash({ SUPABASE_URL: 'https://a.supabase.co' } as NodeJS.ProcessEnv);
+    const h2 = renderConfigHash({ SUPABASE_URL: 'https://b.supabase.co' } as NodeJS.ProcessEnv);
+    expect(h1).toBe(h2);
+  });
+});
+
+describe('buildMitConfig() — provider-aware translator section', () => {
+  it('gemini (default): no translator/api_key fields', () => {
+    const cfg = JSON.parse(buildMitConfig(
+      { ...MIT_BASE, LLM_PROVIDER: 'gemini' } as NodeJS.ProcessEnv,
+      'JPN', 'THA', 'ja', 'gemini-2.5-flash-lite',
+    ));
+    expect(cfg.translator.translator).toBeUndefined();
+    expect(cfg.translator.api_key).toBeUndefined();
+    expect(cfg.translator.model).toBe('gemini-2.5-flash-lite');
+  });
+
+  it('omitted LLM_PROVIDER defaults to gemini behavior', () => {
+    const cfg = JSON.parse(buildMitConfig(MIT_BASE, 'JPN', 'THA', 'ja', 'gemini-2.5-flash-lite'));
+    expect(cfg.translator.translator).toBeUndefined();
+  });
+
+  it('openai: adds translator=chatgpt and api_key, no api_url', () => {
+    const cfg = JSON.parse(buildMitConfig(
+      { ...MIT_BASE, LLM_PROVIDER: 'openai', LLM_API_KEY: 'sk-test' } as NodeJS.ProcessEnv,
+      'JPN', 'THA', 'ja', 'gpt-4o-mini',
+    ));
+    expect(cfg.translator.translator).toBe('chatgpt');
+    expect(cfg.translator.api_key).toBe('sk-test');
+    expect(cfg.translator.api_url).toBeUndefined();
+  });
+
+  it('custom: adds translator=chatgpt, api_key, and api_url', () => {
+    const cfg = JSON.parse(buildMitConfig(
+      {
+        ...MIT_BASE,
+        LLM_PROVIDER: 'custom',
+        LLM_API_KEY: 'sk-local',
+        LLM_BASE_URL: 'http://localhost:11434/v1',
+      } as NodeJS.ProcessEnv,
+      'JPN', 'THA', 'ja', 'llama3',
+    ));
+    expect(cfg.translator.translator).toBe('chatgpt');
+    expect(cfg.translator.api_key).toBe('sk-local');
+    expect(cfg.translator.api_url).toBe('http://localhost:11434/v1');
+  });
+});

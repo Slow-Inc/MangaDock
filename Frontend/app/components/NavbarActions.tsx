@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import SearchBar from "./SearchBar";
@@ -20,6 +20,8 @@ export default function NavbarActions() {
   const [coinBalance, setCoinBalance] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, loading, signOut, getIdToken } = useAuth();
+
+  const handleAccountClose = useCallback(() => setIsAccountOpen(false), []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -174,7 +176,7 @@ export default function NavbarActions() {
       </div>
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
-      <AccountModal isOpen={isAccountOpen} onClose={() => setIsAccountOpen(false)} initialTab={accountInitialTab} />
+      <AccountModal isOpen={isAccountOpen} onClose={handleAccountClose} initialTab={accountInitialTab} />
       <TopupModal isOpen={topupOpen} onClose={() => setTopupOpen(false)} />
     </>
   );

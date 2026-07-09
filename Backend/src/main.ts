@@ -91,12 +91,8 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Serve cached images from img-cache/ under /img-cache/
-  app.useStaticAssets(path.resolve(process.cwd(), 'img-cache'), {
-    prefix: '/img-cache/',
-  });
-  // /uploads/** is served by UploadsController (StorageModule) so it works
-  // with both disk and R2 storage — no express.static needed here.
+  // /uploads/** and /img-cache/** are served by UploadsController and
+  // ImgCacheController (StorageModule) so they work with both disk and R2 storage.
 
   // Enable graceful shutdown hooks (T4-STANDARD Pillar 3)
   app.enableShutdownHooks();
