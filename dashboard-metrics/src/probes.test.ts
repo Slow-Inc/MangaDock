@@ -55,7 +55,7 @@ describe("probeStatusEndpoint", () => {
 describe("probeSupabase", () => {
   it('returns up=true when status is "Healthy"', async () => {
     global.fetch = async () =>
-      new Response(JSON.stringify({ status: "Healthy" }), { status: 200 }) as Response;
+      new Response("Healthy", { status: 200 }) as Response;
     const r = await probeSupabase();
     expect(r.up).toBe(true);
     expect(r.degraded).toBe(false);
