@@ -18,6 +18,18 @@ Deterministic, torch-free — the change is a **pure un-revert** of call sites, 
 | MIT logic suite | 459 pass / 1 pre-existing collection error | 459 pass / same pre-existing |
 | driver diff vs pre-clobber `dc777f19` | −129/+27 | 0 (identical — pure un-revert) |
 
+## Quality == baseline (deterministic code-identity — stronger than a render A/B here)
+
+The user asked to benchmark that render quality still matches the Stage C baseline. For a **pure un-revert** the decisive proof is code identity, not a stochastic render:
+
+- `git diff dc777f19 HEAD -- manga_translator.py` on this branch is **empty** — #608's driver is byte-identical to `dc777f19`.
+- `git diff --stat dc777f19 origin/main -- MIT/manga_translator/` shows the **only** render-code file changed between `dc777f19` and current `main` is `manga_translator.py`, changed by the **single** commit `071b0e8e` (#553's clobber). Nothing else in the render pipeline moved (the intervening #541/#531/#361 are test/docs/CI only).
+- `dc777f19` is the post-#550/#551 commit — i.e. the exact Stage C state that was **already benchmarked vs baseline** at merge time (issue #548 / task "Stage C: measure vs baseline, no regress").
+
+Therefore `main + #608` restores the render pipeline to a state **byte-identical** to the #550-benchmarked baseline. A byte-identical pipeline cannot produce a different render — this is a tighter guarantee than a fresh render A/B, which would additionally be confounded by the non-deterministic translate stage.
+
+**Live GPU render A/B** (re-render the One-Punch page, Stage C ON vs OFF, on the worker) is **currently blocked by the unresolved perf↔main split** (the models live only in the `perf` checkout; the Stage C helper code lives on `main`) — that reconciliation is Stage B, tracked separately. It is not needed to certify *this* change, given the byte-identity above; it can re-confirm at the pixel level once Stage B lands.
+
 ## Assessment
 
 - **fix-root:** yes — restores the exact call sites #553's stale base removed; verified the un-revert is byte-identical to `dc777f19` (the file was touched only by the clobber since then) and that all 7 imported symbols still exist on main, so it imports cleanly.
