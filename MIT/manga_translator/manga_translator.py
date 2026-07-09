@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import cv2
+import functools
 import io
 import json
 import langcodes
@@ -105,6 +106,22 @@ _log_console = None
 def set_main_logger(l):
     global logger
     logger = l
+
+
+def _timed_stage(stage_name):
+    """#speed-study (2026-07-02): log per-stage wall-clock at the driver seam
+    without touching any stage logic. `logger` is resolved as a module global at
+    call time so a `set_main_logger` override is respected."""
+    def deco(fn):
+        @functools.wraps(fn)
+        async def wrapper(self, *args, **kwargs):
+            _t0 = time.time()
+            try:
+                return await fn(self, *args, **kwargs)
+            finally:
+                logger.info(f"[timing] stage={stage_name} elapsed_ms={(time.time() - _t0) * 1000:.1f}")
+        return wrapper
+    return deco
 
 class TranslationInterrupt(Exception):
     """
@@ -599,16 +616,19 @@ class MangaTranslator:
 
         return ctx
 
+    @_timed_stage("colorizer")
     async def _run_colorizer(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("colorizer", config.colorizer.colorizer, current_time)
         return await run_colorizer(config, ctx, self.device)
 
+    @_timed_stage("upscaling")
     async def _run_upscaling(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("upscaling", config.upscale.upscaler, current_time)
         return await run_upscaling(config, ctx, self.device)
 
+    @_timed_stage("detection")
     async def _run_detection(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("detection", config.detector.detector, current_time)
@@ -628,6 +648,7 @@ class MangaTranslator:
         return {**g, "models": self._vram_tracker.models()}
 
 
+    @_timed_stage("ocr")
     async def _run_ocr(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("ocr", config.ocr.ocr, current_time)
@@ -646,6 +667,7 @@ class MangaTranslator:
                 new_textlines.append(textline)
         return new_textlines
 
+    @_timed_stage("textline_merge")
     async def _run_textline_merge(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("textline_merge", "textline_merge", current_time)
@@ -774,27 +796,41 @@ class MangaTranslator:
             # custom_openai/9arm vision gateway and keep it. (The old code nested the rescue inside
             # the filter, which only caught SFX when the misread happened to match the target script
             # — i.e. English — so SFX were dropped, leaving the raw JP glyph, for TH/ZH/KO.)
-            if config.ocr.vlm_rescue and len(region.text.strip()) <= 4:
-                x1, y1, x2, y2 = (int(v) for v in region.xyxy)
-                if (x2 - x1) * (y2 - y1) >= 3600 and min(x2 - x1, y2 - y1) >= 24:
-                    from .ocr_vlm import vlm_localize_sfx
-                    from .translators.keys import (CUSTOM_OPENAI_API_BASE,
-                                                   CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
-                    crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
-                    if crop.size:
-                        rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
-                                                   api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
-                                                   target_lang=config.translator.target_lang)
-                        if rescued:
-                            logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
-                            # The rescue produced the FINAL SFX in the target language. Pre-setting
-                            # text+translation makes source_lang auto-derive as the target so the
-                            # translate stage skips it, and filter_translated_regions keeps it.
-                            region.text = rescued
-                            region.translation = rescued
-                            region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
-                            new_text_regions.append(region)
-                            continue
+            # #278: gate the rescue on det_sfx PROVENANCE (region.from_sfx_detection), not a bare
+            # ≤4-char heuristic — so a short dialogue line ('HUH?', 'おい') in a large bubble is not
+            # misread as SFX (and doesn't add a vision-gateway round-trip). Tight ≤2-char fallback
+            # only when provenance is unavailable (det_sfx off).
+            from .ocr_vlm import should_rescue_sfx, ocr_read_real_text
+            _x1, _y1, _x2, _y2 = (int(v) for v in region.xyxy)
+            if should_rescue_sfx(region.text, getattr(region, 'from_sfx_detection', False),
+                                 _x2 - _x1, _y2 - _y1, config.ocr.vlm_rescue):
+                x1, y1, x2, y2 = _x1, _y1, _x2, _y2
+                from .ocr_vlm import vlm_localize_sfx
+                from .translators.keys import (CUSTOM_OPENAI_API_BASE,
+                                               CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
+                crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
+                if crop.size:
+                    rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
+                                               api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
+                                               target_lang=config.translator.target_lang)
+                    if rescued:
+                        logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
+                        # The rescue produced the FINAL SFX in the target language. Pre-setting
+                        # text+translation makes source_lang auto-derive as the target so the
+                        # translate stage skips it, and filter_translated_regions keeps it.
+                        region.text = rescued
+                        region.translation = rescued
+                        region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
+                        new_text_regions.append(region)
+                        continue
+
+            # #278: a det_sfx-provenance region whose line-OCR read real ASCII text is a detector
+            # false-positive duplicating/overlapping a dialogue bubble (the det_sfx box landed on
+            # speech, not art). Drop it — otherwise its literal fragment ('W'→'ว', 'THE'→'ที') is
+            # translated and rendered on top of the real dialogue (empty/garbled bubbles).
+            if getattr(region, 'from_sfx_detection', False) and ocr_read_real_text(region.text):
+                logger.info(f'Dropped det_sfx false-positive (real-text read): "{region.text}"')
+                continue
 
             if len(region.text) < config.ocr.min_text_length \
                     or not is_valuable_text(region.text) \
@@ -864,6 +900,7 @@ class MangaTranslator:
             'cpu' if self._gpu_limited_memory else self.device
         )
 
+    @_timed_stage("translation")
     async def _run_text_translation(self, config: Config, ctx: Context):
         # 检查text_regions是否为None或空
         if not ctx.text_regions:
@@ -963,9 +1000,11 @@ class MangaTranslator:
 
         return new_text_regions
 
+    @_timed_stage("mask_refinement")
     async def _run_mask_refinement(self, config: Config, ctx: Context):
         return await run_mask_refinement(config, ctx, self.verbose, self.kernel_size)
 
+    @_timed_stage("inpainting")
     async def _run_inpainting(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("inpainting", config.inpainter.inpainter, current_time)
@@ -992,6 +1031,7 @@ class MangaTranslator:
                     return comic
         return self.font_path
 
+    @_timed_stage("rendering")
     async def _run_text_rendering(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("rendering", config.render.renderer, current_time)
@@ -1356,7 +1396,7 @@ class MangaTranslator:
     ) -> np.ndarray:
         return crop_mask_for_patch(raw_mask_source, x1, y1, x2, y2, img_h, img_w)
 
-    def _tag_regions_with_bubbles(self, ctx, regions: List[Any]) -> None:
+    def _tag_regions_with_bubbles(self, ctx, regions: List[Any], synth_fallback: bool = False) -> None:
         """#170: detect speech balloons and tag each region with the balloon
         containing it (``region.bubble_idx`` + ``region.bubble_box``), so
         grouping is balloon-aware and #166 can size text to the balloon.
@@ -1365,7 +1405,7 @@ class MangaTranslator:
         the pipeline behaves exactly as if the stage were off.
         """
         from .bubble_detector import detect_bubbles
-        from .bubble_association import associate_regions_to_bubbles
+        from .bubble_association import associate_regions_to_bubbles, acceptable_synth_bubble
 
         polygons = detect_bubbles(ctx.img_rgb, device=str(self.device or 'cuda'))
         if not polygons:
@@ -1374,6 +1414,8 @@ class MangaTranslator:
         boxes = [tuple(map(float, r.xyxy)) for r in regions]
         assoc = associate_regions_to_bubbles(boxes, polygons)
         tagged = 0
+        synth = 0
+        H, W = ctx.img_rgb.shape[:2]
         for r, idx in zip(regions, assoc):
             r.bubble_idx = idx
             if idx is not None:
@@ -1385,8 +1427,24 @@ class MangaTranslator:
                 # mask's true interior (narrow column), not the bounding box.
                 r.bubble_polygon = [(float(p[0]), float(p[1])) for p in poly]
                 tagged += 1
+            elif synth_fallback:
+                # #170/#178 recall fallback: YOLO missed this region's balloon (the trace-confirmed
+                # cause of oval/tall dialogue under-filling). Try a classical flood-fill and accept it
+                # ONLY through the gate (encloses text, bigger than it, not a page leak), so a leaked
+                # flood never manufactures a bogus balloon. bubble_polygon left unset → the renderer
+                # wraps to the bbox interior (safe default).
+                try:
+                    from .rendering.ballon_extractor import extract_ballon_region
+                    rx1, ry1, rx2, ry2 = (float(v) for v in r.xyxy)
+                    _mask, bxyxy = extract_ballon_region(
+                        ctx.img_rgb, [int(rx1), int(ry1), int(rx2 - rx1), int(ry2 - ry1)])
+                    if acceptable_synth_bubble(tuple(map(float, bxyxy)), (rx1, ry1, rx2, ry2), W, H):
+                        r.bubble_box = tuple(map(float, bxyxy))
+                        synth += 1
+                except Exception as e:
+                    logger.debug(f'[BubbleSeg] synth-bubble fallback skipped a region: {e}')
         logger.info(f'[BubbleSeg] {len(polygons)} balloons, '
-                    f'{tagged}/{len(regions)} regions tagged')
+                    f'{tagged}/{len(regions)} regions tagged (+{synth} classical-fallback)')
 
     def _group_nearby_regions(self, regions: List[Any], pad: int, img_w: int, img_h: int) -> List[List[Any]]:
         """Group text regions that should share one render crop.
@@ -1457,9 +1515,20 @@ class MangaTranslator:
         # detector.det_bubble_seg; untagged regions group by proximity as before.
         if config.detector.det_bubble_seg:
             try:
-                self._tag_regions_with_bubbles(ctx, regions)
+                self._tag_regions_with_bubbles(ctx, regions, synth_fallback=config.detector.det_bubble_synth)
             except Exception:
                 logger.warning(f"[BubbleSeg] tagging failed:\n{traceback.format_exc()}")
+
+        # #462 render replay: dump the post-translate/post-tag region state so the render sizing can be
+        # replayed offline & deterministically (the live translator is non-deterministic). Off → no-op.
+        _dump = os.environ.get('MIT_DUMP_REGIONS')
+        if _dump:
+            try:
+                from .render_replay import dump_fixture
+                dump_fixture(regions, (img_h, img_w), _dump)
+                logger.info(f'[replay] dumped {len(regions)} regions → {_dump}')
+            except Exception:
+                logger.warning(f"[replay] region dump failed:\n{traceback.format_exc()}")
 
         await self._report_progress('mask-generation')
         await self._report_progress('inpainting')
@@ -1494,14 +1563,47 @@ class MangaTranslator:
                 ctx.text_regions = regions
                 full_mask = await self._run_mask_refinement(config, ctx)
                 text_only = create_text_only_mask(img_h, img_w, regions)
-                ctx.mask = (union_refined_with_fallback(full_mask, text_only)
-                            if full_mask is not None else text_only)
+                if full_mask is not None:
+                    # A1 (leftover caption text): erase ALL ink inside verified WHITE
+                    # caption boxes only — never speech balloons, so art under a bubble
+                    # (A2) is untouched. #540: restrict_fullpage_mask clips the CRF mask
+                    # to the textlines (parity with the per-crop path) so a figure's ink
+                    # inside an oversized dialogue box is not erased (boy-ghost).
+                    # NOTE (scrutinize #548): the white-caption erase here + flatten below are
+                    # UNCONDITIONAL within the full-page path (they ride full_page_inpaint, not a
+                    # separate flag) — by design, matching the landing-2026-07-04 baseline. Both
+                    # are art-gated (skip any box with a large connected ink component), so a page
+                    # with no verified white caption box is a no-op. restrict/protect/adaptive stay
+                    # individually flag-gated.
+                    from .patch_geometry import assemble_fullpage_erase_mask
+                    ctx.mask = assemble_fullpage_erase_mask(
+                        full_mask, text_only, ctx.img_rgb,
+                        restrict=getattr(config.inpainter, 'restrict_fullpage_mask', False))
+                else:
+                    ctx.mask = text_only
+                # #540: protect a figure the morph-close swept into the text mask (chibi
+                # enclosed by surrounding text) — clip to the raw glyph polygons + margin.
+                if getattr(config.inpainter, 'protect_figures', False):
+                    from .patch_geometry import protect_figure_ink
+                    ctx.mask = protect_figure_ink(ctx.mask, regions, img_h, img_w)
+                # Lever 1: dilate the erase mask wider where the local background is FLAT
+                # (kills the stroke stubs LaMa reconstructs into ghosts) but stay tight
+                # over screentone/art (preserves #248). Gated by MIT_ADAPTIVE_DILATE.
+                if getattr(config.inpainter, 'adaptive_dilate', False):
+                    from .patch_geometry import adaptive_dilate_mask
+                    ctx.mask = adaptive_dilate_mask(ctx.mask, ctx.img_rgb)
                 # #268: shrink the full-page erase mask to the ink strokes so LaMa repaints
                 # less of the textured art (smaller band). Off → unchanged.
                 if getattr(config.inpainter, 'mask_tighten', False):
                     from .patch_geometry import tighten_text_mask
                     ctx.mask = tighten_text_mask(ctx.img_rgb, ctx.mask)
                 full_inpainted = await self._run_inpainting(config, ctx)
+                # LaMa-ghost fix (user-diagnosed): on flat white caption boxes LaMa
+                # reconstructs faint text from the stroke stubs around a tight mask —
+                # replace caption ink with the box's own paper colour directly (art-gated,
+                # so a page with no white caption box is a no-op).
+                from .detection_postproc import flatten_white_captions
+                full_inpainted = flatten_white_captions(full_inpainted, ctx.img_rgb)
                 logger.info('[PatchTranslate] full-page inpaint done — patches reuse it')
             except Exception:
                 logger.warning(f"[PatchTranslate] full-page inpaint failed, per-crop fallback:\n{traceback.format_exc()}")
