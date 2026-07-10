@@ -198,7 +198,8 @@ class RenderConfig(BaseModel):
     knuth_plass: bool = False
     """#180 P8: use the Knuth-Plass holistic line-breaker (balanced columns, no mid-word/name splits)
     instead of the greedy packer, for every calc_horizontal call in the render pass. Off → the greedy
-    GreedyLineBreaker default (byte-identical)."""
+    GreedyLineBreaker default (byte-identical). Enabling changes wrap width / line count → a
+    render-parity change (needs sign-off)."""
     patch_feather_radius: int = 0
     """#173: feather the outer N px of each composited patch to a transparent
     alpha (distance-transform ramp) so the rectangular patch edge blends into the
@@ -416,6 +417,28 @@ class InpainterConfig(BaseModel):
     translation is drawn, killing the faint "painted band" where LaMa's fill is a few levels
     off the real art over dark hair. Strength 0→1 lerp; pure CPU (cv2/numpy), no extra VRAM.
     0 → off, byte-identical."""
+    protect_figures: bool = False
+    """#540 (MIT_PROTECT_FIGURES): keep the full-page erase mask from swallowing a figure that
+    create_text_only_mask's dilate+MORPH_CLOSE swept in (a small drawing enclosed by surrounding
+    text — raw glyph polygons cover 0% of it, the closed mask 95%). Clips the mask to the raw
+    glyph polygons + margin (provenance, not a pixel heuristic). Off → byte-identical."""
+    selective_flux: bool = False
+    """#421 (MIT_SELECTIVE_FLUX): after the full-page LaMa inpaint, route only the erase-mask
+    components that sit over textured ART (a character's hair under dialogue text — where LaMa
+    leaves a gray smear it cannot synthesise back) to a Flux Klein repair pass, pasted mask-only
+    into the LaMa result. LaMa handles everything else. LaMa is unloaded before Flux loads
+    (VRAM), the pass is serialised by a lock, and any failure keeps the LaMa result. Off →
+    byte-identical (no Flux, no cost)."""
+    restrict_fullpage_mask: bool = False
+    """#540 (MIT_RESTRICT_FULLPAGE_MASK): on the full-page inpaint path, clip the refined
+    (CRF) erase mask to the to-be-rendered textlines (dilated 8px) — parity with the per-crop
+    path — so CRF ink far from any textline (a figure's hair strokes inside an oversized
+    dialogue box) is not erased, killing the "boy-ghost" figure smear. Off → byte-identical."""
+    adaptive_dilate: bool = False
+    """Lever 1 (MIT_ADAPTIVE_DILATE): dilate each erase-mask component wider where the local
+    background is FLAT paper (removes the stroke stubs LaMa reconstructs into faint text ghosts)
+    but keep it tight over screentone/line-art (preserves the #248 no-over-erase guard). Pure CPU
+    (cv2/numpy), no extra VRAM. Off → byte-identical."""
     mask_tighten: bool = False
     """Patch path only (#268): shrink the inpaint mask to the actual ink strokes (local-contrast
     pixels) before LaMa runs, so it repaints thin strokes instead of the whole text rectangle and

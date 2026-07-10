@@ -69,7 +69,7 @@ def _det_config(det_sfx):
     return SimpleNamespace(detector=SimpleNamespace(
         detector='default', detection_size=2048, text_threshold=0.5, box_threshold=0.7,
         unclip_ratio=2.3, det_invert=False, det_gamma_correct=True, det_rotate=False,
-        det_auto_rotate=True, det_sfx=det_sfx))
+        det_auto_rotate=True, det_sfx=det_sfx, det_bubble_seg=False))
 
 
 def test_run_detection_forwards_12_args_and_skips_sfx_when_off(monkeypatch):

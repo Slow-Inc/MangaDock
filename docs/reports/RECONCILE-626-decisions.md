@@ -1,0 +1,114 @@
+# #626 landing→main render/translation feature-merge — per-slice decisions log
+
+Running log of the hand-merge on `integrate/render-reconcile` (off `origin/main`, merging
+`origin/landing/render-phase0`). Reconciled at function granularity. Consolidated into
+`docs/reports/system-impact-report.md` at the end of the merge. See `docs/RECONCILIATION-PLAN.md`.
+
+Verification model: the 175-test characterization net imports the conflicted modules, so it can
+only run green once ALL source+test markers are resolved. Per slice → AST/syntax check (no broken
+code left behind); full behavioral net after slices 1–5; goldens regenerated from reconciled code
+(slice 6); render + translation benchmark gates before Phase E.
+
+## Slice 1 — flag contract (config.py + mit-config.ts) ✓
+- `config.py` conflict: kept **main's superset** (`reference_layout` #178 + `knuth_plass` #180);
+  landing had only `knuth_plass`. Grafted landing's render-parity note into the KP docstring.
+- `mit-config.ts` hunk 1: kept main's multi-provider `translator:'chatgpt'` block (landing lacks);
+  merged the concise-bubbles comment. Hunk 2: kept main's `MIT_REFERENCE_LAYOUT` mapping (landing lacks).
+- **Gap fixed:** landing's `selective_flux` (#421, InpaintConfig) had NO Backend env mapping while
+  every sibling inpaint flag did → it was dead. Added `MIT_SELECTIVE_FLUX` (flagEnv-gated, default
+  OFF → prod-safe per VRAM landmine #3; drivable for Phase-D). `MIT` itself never read it from env.
+
+## Slice 2 — crux `rendering/__init__.py` + `text_render.py` ✓
+Method: base→main = 481 changed lines, base→landing = 264. main is the **structural superset** —
+it received landing's render stack via the completed Stage-C port (#67, measured no-regress) AND
+adds its own `reference_layout` machinery. So resolved the crux to **main's version wholesale**
+(port-verified spine) and grafted only landing's genuine, render-affecting deltas:
+- **GRAFTED — `#436` dedup refinements** (render-affecting; main lacked): equal-translation →
+  blank the LARGER box; repeated free-floating onomatopoeia (same translation) → keep largest,
+  blank rest. Set `render_suppressed_reason` at the blank site (cheap, aids `/patches` attribution).
+- **DROPPED — landing's `bubble_fit_tall` branch.** Trace: main's `_bubble_fit_layout` already
+  produces the tall-narrow column via height-bounded `bubble_fit_bounds` + monotonic re-open —
+  the *general* solution to the same "tall rectangular interior" case landing special-cased by
+  rerouting to `_clean_layout_dst`. Grafting it would add a competing layout mechanism. **Phase-D
+  render benchmark MUST confirm no tall-interior (Otome "THIS SCUMBAG" class) regression** — if it
+  regresses, revisit.
+- **DEFERRED — landing's per-branch layout telemetry** (`render_branch`/`render_font_px`/
+  `render_dst_box` at ~5 layout branch exits). main already has a **richer** telemetry
+  (`_emit_trace` with route + full fit params, feeds #462 replay). landing's attrs feed a different
+  consumer (`text_layer.py`→`/patches` payload, `patch_renderer.py`). Both consumers are
+  **getattr-safe** → absence only omits diagnostic fields; render/translation byte-identical.
+  Grafting 15+ lines into 5 layout branch exits of the baseline-critical file for a diagnostic-only
+  benefit violates surgical/fewest-moving-parts. → **FOLLOW-UP ISSUE: unify MIT render telemetry**
+  (graft the attrs OR adapt text_layer/patch_renderer to read `_emit_trace`).
+- `text_render.py`: docstring-only conflict; kept HEAD (documents the `language=` param the merged
+  signature `longest_token_width(font_size, text, language='en_US')` actually has).
+
+## Slice 3 — inpaint/rescue wiring (7 files) ✓
+Per-file base-diff showed a MIXED superset (not uniformly "take landing"): render_overlap/patch_geometry
+→ main; patch_renderer/detection_postproc → landing; manga_translator → true two-way.
+- **render_overlap.py**: main's version wholesale — superset (9 funcs landing lacks, 0 landing-unique;
+  only cosmetic docstring/annotation diffs). Exports all 14 names the crux imports (verified).
+- **patch_geometry.py**: **dropped main's duplicate unwired block** (protect_figure_ink /
+  assemble_fullpage_erase_mask / adaptive_dilate_mask / restrict_mask_to_render_regions — main's
+  "wiring in follow-up" copies) — landing's WIRED copies already auto-merged at 132-233 (verified
+  identical for the 2 that matter). Prevents double-def.
+- **patch_renderer.py**: kept HEAD's `exc_info=True` logging (cleaner than landing's inline
+  `traceback.format_exc()`; `traceback` still used elsewhere).
+- **detection_postproc.py**: H1 kept HEAD's `Quadrilateral(...,is_sfx=True)` constructor form
+  (ctor accepts it); H2 dropped main's now-stale "wiring in follow-up" comment; H3 took landing's
+  wired `merge_empty_balloons` (#535). Call site `stages.py:53` is gated by `det_bubble_seg`
+  (`MIT_BUBBLE_SEG`, OFF by default) → VRAM landmine #3 satisfied.
+- **textline_merge/__init__.py** (LANDMINE #1): main stored det_sfx provenance as
+  `region.from_sfx_detection` but the crux's `display_sfx()` reads `region.is_sfx` → main's #431
+  display-SFX arm was dead-by-typo. Resolved by populating BOTH attrs from the one `from_sfx` value
+  (from_sfx_detection for the rescue gate at manga_translator:806; is_sfx for the crux sizing arm).
+  Activating is_sfx is the intended #278 behavior (landing's baseline). Unifying to one
+  `is_display_sfx_region` helper = tracked follow-up.
+- **stages.py**: kept HEAD's `reference_layout=config.render.reference_layout` kwarg (crux signature
+  needs it).
+- **manga_translator.py** (5 hunks): H1 dropped stray blank; **H2 kept HEAD's SFX rescue** —
+  provenance-gated `should_rescue_sfx(...,from_sfx_detection,...)` PLUS the det_sfx false-positive
+  drop (`ocr_read_real_text`→drop) that stops garbled fragments over dialogue (protects the
+  TRANSLATION gate); landing's `should_sfx_rescue` had 0 other refs. H3 **merged both import lines**
+  (main's `acceptable_synth_bubble` #170/#178 + landing's `expand_balloons_with_white_boxes,
+  white_box_candidates` — both have call sites). H4 kept HEAD's design NOTE. **H5 took landing's
+  wired `selective_flux` (#421)** block — gated `if config.inpainter.selective_flux` (OFF by default
+  via the slice-1 `MIT_SELECTIVE_FLUX` flag); deps verified (`Inpainter.flux_klein`,
+  `apply_selective_flux_repair` async def, `_flux_lock`, `traceback` all present).
+- **Validation:** full crux import chain (rendering + render_overlap + detection_postproc +
+  patch_geometry + textline_merge) imports clean; all 14 crux imports resolve.
+
+## Slice 4 — translators (numbered_contract + custom_openai #623 fold) ✓
+- **numbered_contract.py**: took landing's TOLERANT parse (both hunks) — `_BLOCK_RE`
+  `<\|\s*(\d+)\s*\|?>?` + `_STRAY_MARKER_RE` accept a malformed marker (`<|10|` / `<|10>`,
+  live Otome) so it still SPLITS (no leaked marker, no index shift). Strictly more robust than
+  main's `<\|(\d+)\|>` → a translation-quality improvement (protects the gate).
+- **custom_openai.py**: auto-merged clean to landing's #535 version (`parse_numbered_translations`).
+  **Folded #623 thinking control** (was perf-only, d05fb4dc; absent from main+landing → without it the
+  integration branch would REGRESS to the qwen3 `content=None` 500 on dense pages). Added `import os`
+  + `resolve_enable_thinking(env)` + `thinking_extra_body(enable_thinking)` + wired `extra_body`
+  into the create call. Default **thinking OFF** (matches perf prod; avoids the 500). Ported #623's
+  test `test_custom_openai_thinking.py` FIRST (RED: ImportError) → added funcs → GREEN (5 thinking +
+  4 parse = 9 passed).
+- **OPEN (translation gate, Phase D):** #623 default thinking-OFF vs thinking-ON-with-raised-max_tokens
+  must be A/B benchmarked on the One-Punch page before Phase E — the flag stays configurable; do not
+  silently ship thinking-off as the final quality trade without the benchmark.
+
+## Slice 5 — 7 test files reconciled to source ✓
+Rule: each test matches its reconciled SOURCE side; where both sides added tests at one append
+point, verified they were overlapping-name (take superset) not complementary.
+- **test_render_overlap.py**: HEAD (main superset — tests processing_scale/font_bounds/display_sfx/
+  bubble_fit_bounds/etc.; landing's 8 unique tests were redundant coverage of shared funcs).
+- **test_ocr_vlm.py**: HEAD (main superset — should_rescue_sfx/ocr_read_real_text provenance rescue).
+- **test_numbered_contract.py**: landing (HEAD empty; tolerant-parse tests match landing source).
+- **test_stages.py**: HEAD both hunks (assertions expect `reference_layout` in kwargs — matches source).
+- **test_patch_geometry.py**: HEAD (superset, +5 tests; net verifies against landing's wired bodies).
+- **test_detection_postproc.py**: landing all 3 hunks (HEAD empty/shorter; landing adds `_ink_map`
+  stub + fuller comments the 18 shared tests need).
+- **test_resize_regions_characterization.py** (CRUX NET): MERGED — HEAD's env-aware golden infra
+  (sys/PIL.features/golden_verdict/freetype+platform gating, #541/#503) + landing's unique
+  `test_resize_regions_thai_byte_identical` (#499 EN→TH hot path).
+- **Goldens**: removed the 3 conflicted binaries; regenerated from RECONCILED code (never accept a
+  side). Net: **193 passed, 0 skipped** (first run saved goldens as `sss`, second asserts green).
+  4 goldens now: bubble_fit/clean_layout/legacy + new `resize_regions_thai.npz`. Green = source
+  coherent + deterministic; render QUALITY vs baseline = Phase-D GPU benchmark (pending).

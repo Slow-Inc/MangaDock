@@ -32,6 +32,9 @@ from .patch_geometry import (
     feather_alpha,
     page_scaled_font_min,
     reground_inpaint_luminance,
+    changed_alpha,
+    own_work_alpha,
+    restrict_mask_to_render_regions,
     seamless_blend_inpaint,
     tighten_text_mask,
     union_refined_with_fallback,
@@ -119,11 +122,15 @@ class PatchRenderer:
             patch_ctx.img_rgb = crop_rgb
             patch_ctx.img_alpha = None
             patch_ctx.text_regions = local_regions
+            # D (#535): the render sees only the CROP — thread the true page dims so
+            # clean_layout's wrap clamp is page-relative, not crop-relative.
+            patch_ctx.page_shape = (img_h, img_w)
             patch_ctx.mask = None
             # #175 patch-path: carry the full-PAGE shape so clean-layout narration scales by page
             # resolution, not this small crop (whose tiny area collapses processing_scale → tiny font).
             patch_ctx.page_shape = (self.img_h, self.img_w)
 
+            _bg_slice = None
             if self.full_inpainted is not None:
                 # Reuse the one-time full-page inpaint: LaMa saw the whole page, so the
                 # background reconstructs cleanly even where large text sat over complex/
@@ -131,6 +138,9 @@ class PatchRenderer:
                 # skip the per-crop mask refinement + inpaint entirely.
                 patch_ctx.img_inpainted = np.ascontiguousarray(
                     self.full_inpainted[y1:y2, x1:x2].copy())
+                # render() draws IN-PLACE on img_inpainted — snapshot the clean
+                # background now so the alpha can isolate the text this group drew.
+                _bg_slice = patch_ctx.img_inpainted.copy()
             else:
                 text_only_mask = create_text_only_mask(crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
                 raw_mask_source = ctx.mask_raw if ctx.mask_raw is not None else ctx.mask
@@ -158,6 +168,30 @@ class PatchRenderer:
                             f"[{type(e).__name__}]: using text-only fallback mask"
                         )
                         patch_ctx.mask = text_only_mask
+
+                    # #535 empty-bubble guard: refinement hunts ALL text-like strokes in
+                    # the crop — including a dropped region's text or a neighbouring
+                    # group's bubble. Erasing those without re-rendering = the white
+                    # empty bubble. Restrict the erase mask to this group's own regions
+                    # (small margin keeps legit spill hugging a rendered glyph). The
+                    # inpaint crop/context is untouched — only what gets erased narrows.
+                    # NOTE: blessing the whole balloon interior (add_own_balloon_interiors /
+                    # erase_own_balloon_ink) over-erased ART sitting under a speech bubble
+                    # (One-Punch HUH-panel: a character figure got wiped, because the refined
+                    # CRF mask flags art edges as text and the interior blessing let them
+                    # through). The detection improvements already cover the "ME OFF!" line in
+                    # its own region, so restrict strictly to the detected-line regions.
+                    patch_ctx.mask = restrict_mask_to_render_regions(
+                        patch_ctx.mask, text_only_mask, margin=8)
+                    # A1 (leftover caption text): erase all ink inside verified WHITE
+                    # caption boxes only (not speech balloons) — art under a bubble is safe.
+                    from .detection_postproc import erase_ink_in_white_caption_boxes
+                    patch_ctx.mask = erase_ink_in_white_caption_boxes(patch_ctx.mask, crop_rgb)
+                    # Lever 1: widen the erase mask where the local background is FLAT (kills
+                    # LaMa's ghost stubs), tight over art (#248). Gated by MIT_ADAPTIVE_DILATE.
+                    if getattr(config.inpainter, 'adaptive_dilate', False) and patch_ctx.mask is not None:
+                        from .patch_geometry import adaptive_dilate_mask
+                        patch_ctx.mask = adaptive_dilate_mask(patch_ctx.mask, crop_rgb)
 
                     # #268: shrink the inpaint mask to the actual ink strokes so LaMa repaints
                     # less of the textured art (smaller band). crop_rgb is the pristine original.
@@ -197,6 +231,13 @@ class PatchRenderer:
                             f"[{type(e).__name__}]: using original crop"
                         )
                         patch_ctx.img_inpainted = crop_rgb
+                    else:
+                        # LaMa-ghost fix (user-diagnosed): on flat white caption boxes
+                        # LaMa reconstructs faint text from the stroke stubs around a
+                        # tight mask — flatten caption ink to the box's own paper colour.
+                        from .detection_postproc import flatten_white_captions
+                        patch_ctx.img_inpainted = flatten_white_captions(
+                            patch_ctx.img_inpainted, crop_rgb)
 
             # #268: re-ground the inpaint's low-freq luminance INSIDE the erase mask to the
             # local original surroundings, killing the "painted band" where LaMa's fill is a
@@ -277,6 +318,22 @@ class PatchRenderer:
                 )
                 patch_ctx.img_rendered = patch_ctx.img_inpainted
 
+            # #535 Phase-0c: the render stamped telemetry on the LOCAL deepcopies —
+            # copy it back to the original regions so the /patches payload
+            # (built from the originals) can report branch/font per region.
+            for orig, local in zip(group, local_regions):
+                for attr in ('render_branch', 'render_font_px'):
+                    v = getattr(local, attr, None)
+                    if v is not None:
+                        setattr(orig, attr, v)
+                # dst_box was stamped in CROP coords — offset by the crop origin so
+                # page-level consumers (the defect metric) compare boxes correctly
+                # across patch groups (false cross-group overlaps otherwise).
+                db = getattr(local, 'render_dst_box', None)
+                if db is not None:
+                    orig.render_dst_box = (float(db[0]) + x1, float(db[1]) + y1,
+                                           float(db[2]) + x1, float(db[3]) + y1)
+
             # #173: optionally feather the outer band of the patch so its edge
             # blends into the page instead of showing a rectangle at the seam. The
             # crop carries a ≥120px content margin (pad+render_extra), so fading the
@@ -309,9 +366,28 @@ class PatchRenderer:
             # Offload PNG compression to thread pool to avoid blocking the event loop.
             # compress_level=1 is ~10x faster than optimize=True with ~15% larger file —
             # acceptable trade-off for interactive translation.
+            # #535 round-8: patch crops OVERLAP — a full-rect opaque patch repaints its
+            # crop's original pixels over a neighbour's erased text ("ME OFF!" came back).
+            # Composite only the pixels this patch actually changed; feather still fades
+            # the outer band when configured.
+            if _bg_slice is not None:
+                # Full-page path: the background carries the WHOLE page's inpaint, so a
+                # plain rendered-vs-original diff also marks FOREIGN erasures opaque — a
+                # later patch then painted white over an earlier patch's text along its
+                # crop edge (p13 first-glyph "cut"). Composite only this group's OWN
+                # work: its drawn text + erasure inside its own region zones.
+                _own_mask = create_text_only_mask(
+                    crop_rgb.shape[0], crop_rgb.shape[1], local_regions)
+                _alpha = own_work_alpha(
+                    patch_ctx.img_rendered, _bg_slice, crop_rgb, _own_mask)
+            else:
+                _alpha = changed_alpha(patch_ctx.img_rendered, crop_rgb)
+            if feather is not None:
+                _alpha = ((_alpha.astype(np.uint16) * feather.astype(np.uint16)) // 255).astype(np.uint8)
+
             loop = asyncio.get_running_loop()
             def _encode_png():
-                return encode_patch_png(patch_ctx.img_rendered, icc_profile=source_icc, alpha=feather)
+                return encode_patch_png(patch_ctx.img_rendered, icc_profile=source_icc, alpha=_alpha)
             logger.debug(f'[PatchTranslate] encoding PNG patch ({x2-x1}×{y2-y1} px)...')
             try:
                 png_bytes = await asyncio.wait_for(

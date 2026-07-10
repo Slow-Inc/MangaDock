@@ -430,19 +430,52 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
     # region mostly inside the full-sentence region — it then renders on top of the sentence.
     # Blank the shorter duplicate when its text is a substring AND its box is ≥60% inside the
     # other's (containment + substring, never length alone, so a legitimate repeat survives).
+    # Extended (landing): EQUAL translations (a rescued balloon-quad duplicating its own
+    # textline) blank the LARGER box; substring duplicates blank the shorter as before.
     _orig_tr = [(r.translation or '').strip() for r in text_regions]
     for i, ri in enumerate(text_regions):
         ti = _orig_tr[i]
         if not ti:
             continue
+        _area_i = (float(ri.xyxy[2]) - float(ri.xyxy[0])) * (float(ri.xyxy[3]) - float(ri.xyxy[1]))
         for j in range(len(text_regions)):
             if i == j:
                 continue
             tj = _orig_tr[j]
-            if tj and len(ti) < len(tj) and ti in tj \
-                    and box_containment(ri.xyxy, text_regions[j].xyxy) >= 0.6:
+            if not tj:
+                continue
+            _xy_j = text_regions[j].xyxy
+            _area_j = (float(_xy_j[2]) - float(_xy_j[0])) * (float(_xy_j[3]) - float(_xy_j[1]))
+            _dup = (len(ti) < len(tj) and ti in tj) or (ti == tj and _area_i > _area_j)
+            if _dup and box_containment(ri.xyxy, text_regions[j].xyxy) >= 0.6:
                 ri.translation = ''
+                ri.render_suppressed_reason = 'duplicate'
                 break
+
+    # p13 (landing): repeated onomatopoeia (チュン チュン) become identical display SFX at
+    # separate spots — two large "จุน" read as clutter. Keep the LARGEST and blank the rest
+    # (main's blanked-region handling then skips them). Only free-floating SFX with the SAME
+    # non-empty translation; dialogue (bubble-associated) is untouched.
+    def _is_disp_sfx(r):
+        return (getattr(r, 'sfx_rescued', False)
+                and getattr(r, 'bubble_box', None) is None
+                and (r.translation or '').strip())
+    _seen_sfx = {}
+    for k, r in enumerate(text_regions):
+        if not _is_disp_sfx(r):
+            continue
+        _t = (r.translation or '').strip()
+        _xy = r.xyxy
+        _area = (float(_xy[2]) - float(_xy[0])) * (float(_xy[3]) - float(_xy[1]))
+        if _t in _seen_sfx:
+            _pk, _pa = _seen_sfx[_t]
+            _loser = k if _area <= _pa else _pk
+            text_regions[_loser].translation = ''
+            text_regions[_loser].render_suppressed_reason = 'duplicate_sfx'
+            if _area > _pa:
+                _seen_sfx[_t] = (k, _area)
+        else:
+            _seen_sfx[_t] = (k, _area)
 
     dst_points_list = []
     # item-2 measurement (#430): env-gated per-region sizing trace. Off → no import, no work,

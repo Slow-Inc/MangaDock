@@ -30,4 +30,14 @@ class DispatchRegistry:
         return self._cache[key]
 
     async def unload(self, key):
-        self._cache.pop(key, None)
+        # #421 VRAM leak: run the cached model's OWN cleanup (`_unload` via `unload()`
+        # — dels the pipeline + torch.cuda.empty_cache) before dropping the reference.
+        # Popping alone left a diffusers/GGUF pipeline (e.g. Flux Klein) resident in VRAM.
+        # Models without an `unload()` are simply popped as before.
+        inst = self._cache.pop(key, None)
+        unload = getattr(inst, 'unload', None)
+        if callable(unload):
+            try:
+                await unload()
+            except Exception:
+                pass

@@ -28,6 +28,13 @@ _CJK_RE = re.compile(r'[一-鿿㐀-䶿]')   # CJK Unified Ideographs (Simplified
 try:
     import jieba as _jieba
     _HAS_JIEBA = True
+    # #278: jieba lazily builds its ~1s prefix dict on the FIRST cut() call — which would
+    # otherwise land on a user's first Chinese render. Build it once at module import
+    # (worker load) so the cost is off the request path.
+    try:
+        _jieba.initialize()
+    except Exception:
+        pass
 except ImportError:
     _HAS_JIEBA = False
 # #278 nit: jieba builds its prefix dict (~1 s) lazily on the FIRST `_jieba.cut` — i.e. the first
@@ -1227,7 +1234,6 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
     # calc
     # print(width)
     line_text_list, line_width_list = calc_horizontal(font_size, text, width, height, lang, hyphenate)
-    # print(line_text_list, line_width_list)
 
     # make large canvas
     canvas_w = max(line_width_list) + (font_size + bg_size) * 2
