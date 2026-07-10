@@ -424,3 +424,12 @@ the cross-job bleed class stays impossible; `test/test_rolling_context.py`) · `
     stylized SFX needs a VLM OCR (MangaTranslator uses `paddleocr-vl`); PaddleOCR-VL-1.5 is blocked on
     transformers 4.55-vs-5.9 incompat (see `DONE.md` 2026-06-12 / `BENCHMARK.md`). Don't assume
     enabling the SFX detector alone yields ぬ→LOOM.
+
+### #626 render reconciliation — render pipeline = landing baseline (integration, 2026-07-11)
+The `integrate/render-reconcile` branch resets the render-geometry subsystem to `landing/render-phase0`'s
+EXACT code (rendering/__init__.py, render_overlap, text_render, patch_geometry, patch_renderer, text_layer,
+stages) — verified byte-identical, render == baseline for all inputs. main's render campaign (reference_layout
+#178 / KP #180 / width-squeeze #183 / replay #462) is SHELVED (orphaned modules + inert flags; removal tracked
+#630). Kept main's non-render work (translators+#623, CI-infra). Decision: ADR 030. Foot-gun: `render_replay.py`
++ `sizing_trace.py` reference main-crux internals (`_reference_layout_intent`, `_emit_trace`) that landing's crux
+lacks → BROKEN if invoked (dead in the default path; do not wire them without #630).
