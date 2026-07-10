@@ -1,3 +1,5 @@
+import type { UserRole } from './user';
+
 export type ForumCategory = 'general' | 'announcement' | 'spoiler' | 'manga_update';
 
 export interface ProfileComment {
@@ -23,7 +25,7 @@ export interface PublicUserProfile {
   photoUrl: string | null;
   bannerUrl: string | null;
   bannerPosition: number;
-  role: string;
+  role: UserRole;
   bio: string | null;
   country: string | null;
   translatorLanguages: string[];
@@ -53,7 +55,7 @@ export interface ForumPost {
   authorUid: string;
   authorName: string | null;
   authorPhotoUrl: string | null;
-  authorRole: string;
+  authorRole: UserRole;
   title: string;
   content: string;
   category: ForumCategory;
@@ -76,7 +78,7 @@ export interface ForumComment {
   authorUid: string;
   authorName: string | null;
   authorPhotoUrl: string | null;
-  authorRole: string;
+  authorRole: UserRole;
   content: string;
   upvotes: number;
   downvotes: number;

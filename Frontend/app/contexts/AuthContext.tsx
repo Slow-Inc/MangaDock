@@ -22,6 +22,7 @@ import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData
 import { clearAllApiCache } from "../lib/apiCache";
 import { reloadPage, redirectToHome } from "../lib/browserActions";
 import { resolveAvatarUrl } from "../lib/avatarUpload";
+import { ROLE, type UserRole } from "../lib/types/user";
 import { useToast } from "./ToastContext";
 
 const API_BASE = "/api/proxy";
@@ -35,7 +36,7 @@ export interface AppUser {
   displayName: string | null;
   photoURL: string | null;
   emailVerified: boolean;
-  role?: string | null;
+  role?: UserRole | null;
   providerData: Array<{
     providerId: string;
     photoURL?: string | null;
@@ -51,12 +52,33 @@ function mapProviderId(provider: string): string {
   return provider;
 }
 
+/** Coerce a role value (numeric, or numeric string from a JWT/metadata claim)
+ *  to a known numeric UserRole, or null. Roles are numeric end-to-end (#606);
+ *  anything not matching a known ROLE value is treated as unknown. */
+const VALID_ROLES = new Set<number>(Object.values(ROLE));
+function coerceRole(v: unknown): UserRole | null {
+  const n =
+    typeof v === "number"
+      ? v
+      : typeof v === "string" && v.trim() !== ""
+        ? Number(v)
+        : NaN;
+  return VALID_ROLES.has(n) ? (n as UserRole) : null;
+}
+
 /** Adapt a Supabase User to the AppUser interface used by UI components. */
 function adaptUser(u: SupabaseUser): AppUser {
-  const meta = (u.user_metadata ?? {}) as Record<string, string | null | undefined>;
-  const displayName = meta.display_name ?? meta.full_name ?? meta.name ?? null;
-  const photoURL = meta.avatar_url ?? meta.picture ?? null;
-  const role = meta.role ?? null;
+  const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+  const displayName =
+    (meta.display_name as string | null | undefined) ??
+    (meta.full_name as string | null | undefined) ??
+    (meta.name as string | null | undefined) ??
+    null;
+  const photoURL =
+    (meta.avatar_url as string | null | undefined) ??
+    (meta.picture as string | null | undefined) ??
+    null;
+  const role = coerceRole(meta.role);
 
   const providerData = (u.identities ?? []).map((identity) => {
     const idata = (identity.identity_data ?? {}) as Record<string, string | null | undefined>;
@@ -82,7 +104,7 @@ function adaptUser(u: SupabaseUser): AppUser {
 type BackendProfile = {
   displayName: string | null;
   photoURL: string | null;
-  role: string | null;
+  role: UserRole | null;
 };
 
 function extractBackendProfile(payload: unknown): BackendProfile | null {
@@ -104,15 +126,16 @@ function extractBackendProfile(payload: unknown): BackendProfile | null {
       read(obj.photoUrl) ??
       read(obj.avatarUrl) ??
       read(obj.avatar_url);
-    const role = read(obj.role);
-    if (displayName || photoURL || role) return { displayName, photoURL, role };
+    const role = coerceRole(obj.role);
+    if (displayName || photoURL || role !== null)
+      return { displayName, photoURL, role };
   }
   return null;
 }
 
 type AuthContextType = {
   user: AppUser | null;
-  userRole: string | null;
+  userRole: UserRole | null;
   isTranslator: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
@@ -749,7 +772,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const userRole = user?.role ?? null;
-  const isTranslator = userRole === "translator" || userRole === "creator" || userRole === "admin";
+  const isTranslator =
+    userRole === ROLE.TRANSLATOR ||
+    userRole === ROLE.CREATOR ||
+    userRole === ROLE.ADMIN;
 
   // Memoized provider value (#152): without this, any provider state change
   // (including loginOpen open/close) re-rendered every useAuth() consumer.

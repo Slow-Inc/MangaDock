@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { ROLE } from "../../../lib/types/user";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import PostCard from "../../../components/PostCard";
@@ -107,7 +108,7 @@ export default function MangaCommunityPage() {
       authorUid: user?.uid ?? "",
       authorName: user?.displayName ?? null,
       authorPhotoUrl: user?.photoURL ?? null,
-      authorRole: user?.role ?? "user",
+      authorRole: user?.role ?? ROLE.USER,
       upvotes: 0,
       downvotes: 0,
       userVote: 0,
