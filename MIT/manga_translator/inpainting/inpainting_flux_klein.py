@@ -18,7 +18,6 @@ import numpy as np
 
 from .common import OfflineInpainter
 from ..config import InpainterConfig
-from .. import flux_embed_cache
 from ..flux_image_prep import pad_to_multiple, unpad
 
 
@@ -89,6 +88,13 @@ class FluxKleinInpainter(OfflineInpainter):
             transformer, base_dir = self._build_transformer()
             base_dir_holder["dir"] = base_dir
             return self._encode_prompt_numpy(base_dir, prompt)
+
+        # Lazy import per this module's docstring: keep importing the module / the
+        # INPAINTERS registry free of the manga_translator core. The module-level form
+        # `from .. import flux_embed_cache` hits the package lazy __getattr__ (PEP 562),
+        # which eager-loads the core and deadlocks when `inpainting` is imported before
+        # it (circular import via stages → inpainting.dispatch) — #616.
+        from .. import flux_embed_cache
 
         embed = flux_embed_cache.get_embed(_encode, self._PROMPT, cache_dir)
         base_dir = base_dir_holder.get("dir")
