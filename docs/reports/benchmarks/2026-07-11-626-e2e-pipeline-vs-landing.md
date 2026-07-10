@@ -60,3 +60,24 @@ this tuned config), orthogonal to #626 — worth a separate look but not a recon
 
 **Net:** "render/quality == baseline" is confirmed to the extent testable — the reconciliation reproduces
 landing's exact behavior wherever landing works, and fails identically where landing fails. No divergence found.
+
+## CORRECTION (2026-07-11) — earlier E2E "byte-identical" claim was HOLLOW; proper patch-path render is gateway-BLOCKED
+
+The dev correctly caught that the before-onepunch E2E "reconciled == landing 0%" was HOLLOW: reconciled
+differs from the SOURCE by only **0.193%** — the pipeline barely did anything (1 region on the low-res
+preview), so "reconciled == landing" just meant "both no-op'd on the source." NOT a real render-quality proof.
+
+Attempted the CORRECT benchmark per `feedback-benchmark-patch-not-image-endpoint` + `feedback-verify-before-claiming`:
+launched a LIVE MIT worker on the integration branch, POSTed the real JP source
+(`MangaTranslator/docs/images/example_original.jpg`) to **`/translate/with-form/patches`** (production path that
+tags bubbles) with the exact Backend/.env prod config. **BLOCKED:** every real manga page (3 tested:
+example_original, mit-speedstudy-p1, mit-p3-page2) returns **HTTP 500 `content=None`** ("expected string or
+bytes-like object, got NoneType"). Small direct translates work ('Good morning' etc.), so it's the
+dense/real-page numbered-translate request the gateway/model returns None for — the #623 ROOT, NOT prevented by
+thinking-off, and the translator crashes on None instead of guarding it. Affects BOTH branches (same
+custom_openai + gateway) → a prod issue (filed separately).
+
+**Honest status:** render QUALITY has NOT been verified via a real patch-path render (gateway-blocked). The
+only VERIFIED facts remain: (1) the 7 render files are byte-identical to landing (`git diff` — a code fact,
+page-independent), (2) characterization net 159 green. "Render == baseline" rests on the byte-identical CODE,
+not on an eyeballed real render — that eyeball is still owed once the gateway serves dense pages.
