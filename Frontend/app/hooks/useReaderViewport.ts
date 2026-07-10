@@ -1,7 +1,7 @@
 "use client";
 
 import type Lenis from "lenis";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocalLenis } from "./useLocalLenis";
 import { useZoomPan } from "./useZoomPan";
 import type { ChapterPages } from "../components/MangaReader";
@@ -141,22 +141,45 @@ export function useReaderViewport({
     return () => { observer.disconnect(); pageRatioMapRef.current.clear(); };
   }, [continuousMode, data, isZoomingRef, setPage]);
 
-  return {
-    zoom,
-    isDragging,
-    zoomIn,
-    zoomOut,
-    zoomReset,
-    resetZoomAndPan,
-    isZoomingRef,
-    continuousLenisRef,
-    refs: {
+  // Memoized so the returned object keeps a stable identity across renders that
+  // don't change zoom/drag state (e.g. the 1s translation tick). Refs are stable
+  // useRef values; zoomIn/out/reset/resetZoomAndPan are useCallback-stable. This
+  // lets the React.memo'd PageRenderer skip re-render when nothing it reads
+  // changed (plan 2026-07-11 Perf 1).
+  return useMemo(
+    () => ({
+      zoom,
+      isDragging,
+      zoomIn,
+      zoomOut,
+      zoomReset,
+      resetZoomAndPan,
+      isZoomingRef,
+      continuousLenisRef,
+      refs: {
+        zoomWrapperRef,
+        zoomRef,
+        scrollContainerRef,
+        continuousContentRef,
+        pageRefs,
+        continuousModeRef,
+      },
+    }),
+    [
+      zoom,
+      isDragging,
+      zoomIn,
+      zoomOut,
+      zoomReset,
+      resetZoomAndPan,
+      isZoomingRef,
+      continuousLenisRef,
       zoomWrapperRef,
       zoomRef,
       scrollContainerRef,
       continuousContentRef,
       pageRefs,
       continuousModeRef,
-    },
-  };
+    ],
+  );
 }

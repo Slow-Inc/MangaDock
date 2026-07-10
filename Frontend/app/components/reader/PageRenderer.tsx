@@ -1,6 +1,6 @@
 "use client";
 
-import type { Dispatch, SetStateAction } from "react";
+import { memo, type Dispatch, type SetStateAction } from "react";
 import type { ReaderViewport } from "../../hooks/useReaderViewport";
 import type { ChapterPages } from "../MangaReader";
 import type { ChapterPageItem } from "../../hooks/useChapters";
@@ -50,7 +50,7 @@ export interface PageRendererProps {
  * Lenis setup reads them on mount, before chapter data has loaded), so their
  * containing elements cannot be gated behind `data`.
  */
-export default function PageRenderer({
+function PageRendererImpl({
   viewport,
   page,
   setPage,
@@ -264,3 +264,13 @@ export default function PageRenderer({
     </>
   );
 }
+
+/**
+ * Memoized: the parent (MangaReader) re-renders once per second during batch
+ * translation (page-elapsed tick) and on every scroll-driven setPage. With
+ * stable props (plan 2026-07-11 Task 5 + memoized viewport) memo skips
+ * re-reconciling all N page <img> subtrees when nothing this component reads
+ * has changed.
+ */
+const PageRenderer = memo(PageRendererImpl);
+export default PageRenderer;

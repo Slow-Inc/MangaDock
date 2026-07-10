@@ -230,9 +230,11 @@ export function useZoomPan({
     syncContinuousPageFromViewport,
   ]);
 
-  const zoomIn = () => updateZoom(zoomInLevel);
-  const zoomOut = () => updateZoom(zoomOutLevel);
-  const zoomReset = () => updateZoom(() => 1);
+  // Stable identities so useReaderViewport's memoized value (and thus the
+  // React.memo'd PageRenderer) is not invalidated every render (plan Perf 1).
+  const zoomIn = useCallback(() => updateZoom(zoomInLevel), [updateZoom]);
+  const zoomOut = useCallback(() => updateZoom(zoomOutLevel), [updateZoom]);
+  const zoomReset = useCallback(() => updateZoom(() => 1), [updateZoom]);
 
   const resetZoomAndPan = useCallback(() => {
     setZoom(1);
