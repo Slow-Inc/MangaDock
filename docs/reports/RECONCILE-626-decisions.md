@@ -130,3 +130,16 @@ spine) differed **3.96%** from landing baseline — filled balloons larger. Dev 
   deferred telemetry gap (#628) is resolved for the render path (landing already wired it).
 - Net: **159 passed** (landing render suite is smaller than main's superset; all green).
 - **Translation gate** (#623 A/B + detect/ocr text == baseline) still needs a GPU translate run.
+
+## Translation gate — BLOCKED by external LLM gateway (2026-07-10)
+Attempted the #623 live A/B (thinking OFF vs ON on a dense JPN→ENG request) via the remote LLM
+(`gateway.9arm.co`, `qwen3.6-35b-a3b` — no local GPU needed; the translator LLM is API-based per
+`project_mit_qwen_via_api`). **The gateway returns EMPTY content (finish=stop, completion_tokens=1)
+for EVERY request — even "Say the single word: HELLO"** — regardless of the thinking flag. This is an
+external gateway/model-serving outage, not code and not the #623 thinking behavior (thinking would
+emit reasoning tokens; completion=1 = just EOS). Confirmed on 2 samples.
+- **#623 logic is unit-verified** (`test_custom_openai_thinking.py`, 5 green: default OFF, env toggles,
+  extra_body shape). The LIVE text-quality A/B is deferred until the gateway serves again.
+- Harness ready: `MIT/tools/_thinking_ab.py` (re-run when the gateway is up).
+- **#623 default = thinking OFF** is the safe ship (matches perf prod, which works; avoids the
+  content=None 500). Flip via `CUSTOM_OPENAI_ENABLE_THINKING=true` for the A/B when live.
