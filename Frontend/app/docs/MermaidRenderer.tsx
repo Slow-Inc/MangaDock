@@ -5,38 +5,44 @@ import React, { useEffect, useRef, useState } from 'react';
 let mermaidIdCounter = 0;
 let mermaidInitialized = false;
 
+export const MERMAID_CONFIG = {
+  startOnLoad: false,
+  theme: 'dark',
+  // SECURITY: 'strict' keeps mermaid's built-in DOMPurify sanitization on and
+  // disables `click`/HTML-label directives. Diagram sources can come from
+  // attacker-controlled GitHub issue/PR/comment bodies (see plan 2026-07-11
+  // Vuln 2) — never 'loose'.
+  securityLevel: 'strict' as const,
+  flowchart: {
+    curve: 'step',
+    useMaxWidth: false,
+  },
+  themeVariables: {
+    background: '#0f1118',
+    mainBkg: '#1c1f2e',
+    nodeBorder: '#4a90d9',
+    clusterBkg: '#1a1d2b',
+    clusterBorder: '#3a4060',
+    titleColor: '#e8eaf6',
+    edgeLabelBackground: '#1c1f2e',
+    lineColor: '#6baed6',
+    fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+    fontSize: '14px',
+    primaryColor: '#1c2a3e',
+    primaryTextColor: '#e8eaf6',
+    primaryBorderColor: '#4a90d9',
+    secondaryColor: '#1a2030',
+    tertiaryColor: '#141824',
+    labelBackground: '#1c1f2e',
+    textColor: '#c9d1e0',
+    nodeTextColor: '#e8eaf6',
+  },
+};
+
 async function getMermaid() {
   const mermaid = (await import('mermaid')).default;
   if (!mermaidInitialized) {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'dark',
-      securityLevel: 'loose',
-      flowchart: {
-        curve: 'step',
-        useMaxWidth: false,
-      },
-      themeVariables: {
-        background: '#0f1118',
-        mainBkg: '#1c1f2e',
-        nodeBorder: '#4a90d9',
-        clusterBkg: '#1a1d2b',
-        clusterBorder: '#3a4060',
-        titleColor: '#e8eaf6',
-        edgeLabelBackground: '#1c1f2e',
-        lineColor: '#6baed6',
-        fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
-        fontSize: '14px',
-        primaryColor: '#1c2a3e',
-        primaryTextColor: '#e8eaf6',
-        primaryBorderColor: '#4a90d9',
-        secondaryColor: '#1a2030',
-        tertiaryColor: '#141824',
-        labelBackground: '#1c1f2e',
-        textColor: '#c9d1e0',
-        nodeTextColor: '#e8eaf6',
-      }
-    });
+    mermaid.initialize(MERMAID_CONFIG);
     mermaidInitialized = true;
   }
   return mermaid;
