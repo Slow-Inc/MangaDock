@@ -207,11 +207,13 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
         from_sfx = any(getattr(txtln, 'is_sfx', False) for txtln in txtlns)
         region = TextBlock(lines, texts, font_size=font_size, angle=angle, prob=np.exp(total_logprobs),
                            fg_color=fg_color, bg_color=bg_color, from_sfx_detection=from_sfx)
-        # #278: expose the same det_sfx provenance as BOTH attrs — the SFX-rescue gate
-        # (manga_translator) reads region.from_sfx_detection, while main's display-SFX sizing
-        # arm (rendering.display_sfx) reads region.is_sfx. Populating only from_sfx_detection
-        # (as main did) left the display-SFX arm dead. Both derive from one from_sfx value.
-        # (Unifying the two attrs into one is_display_sfx_region helper is a tracked follow-up.)
+        # #278: det_sfx provenance. The ACTIVE consumer is the SFX-rescue gate in
+        # manga_translator, which reads region.from_sfx_detection (set above). `is_sfx` is
+        # also set for parity with `sfx_merge.should_sfx_rescue` (currently NOT wired in this
+        # tree — the rescue path uses `should_rescue_sfx(from_sfx_detection, ...)`), and the
+        # landing render reads `sfx_rescued` (set on VLM rescue), NOT `is_sfx`. So `is_sfx` is
+        # inert for the render/rescue path here — kept only as provenance. Unify to one
+        # is_display_sfx_region helper: tracked in #629.
         region.is_sfx = from_sfx
         text_regions.append(region)
     return text_regions

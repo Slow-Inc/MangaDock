@@ -168,3 +168,22 @@ Verdict: **SHIP** (dev-gated merge to main). Key checks:
   final confirmation (gateway-flaky; #623 A/B passed when it responded).
 - **Tracked debt not blocking:** #628 (telemetry), #629 (is_sfx helper), #630 (shelved render-campaign
   code removal). Branch/git tech-debt cleaned (#627 closed).
+
+## Formal /scrutinize + clink-brainstorm (2026-07-11)
+Ran the full scrutinize workflow (Intent→Trace→Verify→Report) + a multi-agent pass (codex codereviewer
+returned; antigravity timed out at 313s). Verdict: **FIX-THEN-SHIP** (fixes were doc/comment-level; no code bug).
+- **MAJOR (scope correction):** "render == baseline byte-identical" is exact for the RENDER STAGE given
+  identical regions (proven: 7 render files byte-identical + dump-replay 0%). It does NOT prove full-page
+  equivalence — the UPSTREAM (detection/OCR/rescue/filter) is main's, not landing's, so a real translate
+  may differ from the landing baseline page. By design (keeps main #278/#623/#359); the E2E translate
+  closes this (gateway-pending). Documented in ADR 030 §Scope. DEV to confirm main-upstream is acceptable
+  vs "baseline for ALL quality".
+- **MEDIUM (codex, confirmed):** landing render uses `sfx_rescued` only, never `is_sfx`; a det_sfx region
+  not VLM-rescued lays out as normal text (landing's baseline behavior — correct for the constraint, a
+  change from main's `display_sfx`). `region.is_sfx` is inert in the live path (only the un-wired
+  `sfx_merge.should_sfx_rescue` reads it). FIXED the misleading comment in textline_merge; unify tracked #629.
+- **VERIFIED OK (codex + trace):** `_run_text_rendering → stages.run_text_rendering → rendering.dispatch`
+  signature-compatible (stages passes exactly the knobs landing's dispatch accepts); #623 thinking wired
+  right (default OFF, extra_body only when disabled); landing render pkg exports all main-imported symbols
+  (ballon_extractor, dispatch, dispatch_eng_render); `sfx_rescued` survives translate via restore_sfx_translations.
+- **NOT verified (external):** full E2E translate (gateway flaky) — the only thing that closes the MAJOR scope gap.
