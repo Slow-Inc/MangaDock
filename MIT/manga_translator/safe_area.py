@@ -8,6 +8,7 @@ bounding box), plus an anchor that avoids a conjoined balloon's narrow neck.
 Dependency-light (cv2/numpy only, no ML/PIL) so it unit-tests with synthetic
 masks in <1s.
 """
+import time
 from typing import Tuple
 
 import cv2
@@ -15,16 +16,33 @@ import numpy as np
 
 Anchor = Tuple[float, float]
 
+# #speed-study Phase 0 (2026-07-03): _ray_len is a pure-Python per-pixel while
+# loop over numpy scalar indexing — suspected O(mask extent) hotspot behind the
+# bubble_fit_sole branch's 6-9s/region cost. Logging-only, no behavior change.
+_SAFE_AREA_STATS = {"calls": 0, "dt_s": 0.0, "ray_s": 0.0, "ray_steps": 0, "mask_px": 0}
+
+
+def reset_safe_area_stats():
+    for k, v in _SAFE_AREA_STATS.items():
+        _SAFE_AREA_STATS[k] = 0.0 if isinstance(v, float) else 0
+
+
+def get_safe_area_stats():
+    return dict(_SAFE_AREA_STATS)
+
 
 def _ray_len(inside: np.ndarray, x: int, y: int, dx: int, dy: int) -> int:
     """Number of consecutive inside pixels from (x,y) along (dx,dy), inclusive."""
     h, w = inside.shape
     d = 0
+    _t = time.perf_counter()
     while True:
         nx, ny = x + dx * (d + 1), y + dy * (d + 1)
         if nx < 0 or ny < 0 or nx >= w or ny >= h or inside[ny, nx] == 0:
             break
         d += 1
+    _SAFE_AREA_STATS["ray_s"] += time.perf_counter() - _t
+    _SAFE_AREA_STATS["ray_steps"] += d
     return d + 1  # include the anchor pixel itself
 
 
@@ -40,11 +58,15 @@ def safe_area_box(mask: np.ndarray, padding: int = 5,
     fall back to the deepest pixel (pole of inaccessibility) so conjoined
     balloons don't center text in the join.
     """
+    _SAFE_AREA_STATS["calls"] += 1
+    _SAFE_AREA_STATS["mask_px"] += int(mask.shape[0]) * int(mask.shape[1])
     inside = (mask > 0).astype(np.uint8)
     if int(inside.sum()) == 0:
         return 0, 0, (0.0, 0.0)
 
+    _t = time.perf_counter()
     dist = cv2.distanceTransform(inside, cv2.DIST_L2, 5)
+    _SAFE_AREA_STATS["dt_s"] += time.perf_counter() - _t
     max_dist = float(dist.max())
 
     safe = (dist >= padding).astype(np.uint8)

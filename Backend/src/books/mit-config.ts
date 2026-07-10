@@ -226,6 +226,10 @@ export function buildMitConfig(
       // prompt so the model knows which manga it is translating. Absent →
       // prompt identical to the context-free behavior.
       ...(seriesContext ? { series_context: seriesContext } : {}),
+      // Concise-bubbles (P7, #526): append a bubble-length constraint to the translator prompt so
+      // translations don't overflow tight balloons (measured #1 narrow-bubble cause = translation
+      // ~2x too tall for the bubble). Absent → prompt byte-identical.
+      ...(flagEnv('MIT_CONCISE_BUBBLES') ? { concise_bubbles: true } : {}),
     },
     detector: {
       // #247: match MIT's own tuned Config default (2560). 2048 silently
@@ -282,6 +286,14 @@ export function buildMitConfig(
       ...(flagEnv('MIT_MASK_TIGHTEN') ? { mask_tighten: true } : {}),
       // #268: Poisson seamless-clone the inpaint into the original (escalation lever).
       ...(flagEnv('MIT_SEAMLESS_CLONE') ? { seamless_clone: true } : {}),
+      // #421: route text-over-textured-art regions (LaMa smears hair) to a Flux Klein
+      // repair pass; #540: keep the text mask from swallowing an enclosed figure;
+      // restrict the full-page mask to the textlines; adaptive-dilate on flat bg.
+      // All opt-in; absent → the worker's gates default off, byte-identical (LaMa only).
+      ...(flagEnv('MIT_SELECTIVE_FLUX') ? { selective_flux: true } : {}),
+      ...(flagEnv('MIT_PROTECT_FIGURES') ? { protect_figures: true } : {}),
+      ...(flagEnv('MIT_RESTRICT_FULLPAGE_MASK') ? { restrict_fullpage_mask: true } : {}),
+      ...(flagEnv('MIT_ADAPTIVE_DILATE') ? { adaptive_dilate: true } : {}),
     },
     render: {
       direction: 'auto',
@@ -308,6 +320,9 @@ export function buildMitConfig(
       // warping it onto the original vertical-JP quad (which stretches it oversized).
       // Absent → byte-identical.
       ...(flagEnv('MIT_CLEAN_LAYOUT') ? { clean_layout: true } : {}),
+      // #180 P8: Knuth-Plass holistic line-breaking (balanced columns, no mid-word/name split) instead
+      // of the greedy packer. Enabling changes wrap width/line count → render-parity change. Absent → greedy, byte-identical.
+      ...(flagEnv('MIT_KNUTH_PLASS') ? { knuth_plass: true } : {}),
       // #176: render Latin/EN targets in the bundled comic font instead of the
       // worker's Prompt-Bold (a Thai face). Absent → byte-identical.
       ...(flagEnv('MIT_EN_COMIC_FONT') ? { en_comic_font: true } : {}),

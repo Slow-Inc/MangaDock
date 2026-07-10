@@ -8,7 +8,6 @@
     "start": "next start --hostname 0.0.0.0 --port 4000",
     "lint": "eslint"
   },
-
   "dependencies": {
     "@marsidev/react-turnstile": "^1.4.2",
     "@supabase/ssr": "^0.9.0",
@@ -25,6 +24,7 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -37,6 +37,10 @@ const ENV_KEYS = [
   'MIT_INPAINTING_SIZE',
   'MIT_INPAINTER',
   'MIT_INPAINTING_PRECISION',
+  'MIT_SELECTIVE_FLUX',
+  'MIT_PROTECT_FIGURES',
+  'MIT_RESTRICT_FULLPAGE_MASK',
+  'MIT_ADAPTIVE_DILATE',
   'MIT_OCR_PROB',
   'MIT_TEXT_THRESHOLD',
   'MIT_DET_INVERT',
@@ -112,6 +116,28 @@ describe('BooksService.buildMitConfig', () => {
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.detector.detection_size).toBe(2560);
     expect(cfg.inpainter.inpainting_size).toBe(2048);
+  });
+
+  /** #421/#540 render-quality levers — all opt-in; absent env keeps the inpainter
+   *  config byte-identical, so the worker's gates default off (LaMa only). */
+  it('exposes selective-Flux / figure-protect / restrict / adaptive-dilate gates', () => {
+    process.env.MIT_SELECTIVE_FLUX = '1';
+    process.env.MIT_PROTECT_FIGURES = '1';
+    process.env.MIT_RESTRICT_FULLPAGE_MASK = '1';
+    process.env.MIT_ADAPTIVE_DILATE = '1';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'JPN', 'THA', 'ja'));
+    expect(cfg.inpainter.selective_flux).toBe(true);
+    expect(cfg.inpainter.protect_figures).toBe(true);
+    expect(cfg.inpainter.restrict_fullpage_mask).toBe(true);
+    expect(cfg.inpainter.adaptive_dilate).toBe(true);
+  });
+
+  it('omits the new inpainter gates when their env is absent (byte-identical off)', () => {
+    const cfg = JSON.parse(buildMitConfig(process.env, 'JPN', 'THA', 'ja'));
+    expect(cfg.inpainter.selective_flux).toBeUndefined();
+    expect(cfg.inpainter.protect_figures).toBeUndefined();
+    expect(cfg.inpainter.restrict_fullpage_mask).toBeUndefined();
+    expect(cfg.inpainter.adaptive_dilate).toBeUndefined();
   });
 
   it('omits source_lang when srcMIT is ANY', () => {

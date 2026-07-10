@@ -10,7 +10,7 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 > [!info] วิธีใช้
 > - เปิด **Graph View** เพื่อเห็นความสัมพันธ์ระหว่าง memory (ลิงก์ที่ยังไม่มีไฟล์ = จุดที่ควรเขียนเพิ่ม)
 > - แต่ละ note = ข้อเท็จจริงเดียว มี frontmatter (`type`, `description`) + `[[wikilinks]]` เชื่อมเรื่องที่เกี่ยวข้อง
-> - **type**: `feedback` (วิธีทำงานที่ user กำหนด) · `project` (สถานะงาน/ข้อจำกัด) · `reference` (ตัวชี้ทรัพยากรภายนอก)
+> - **type**: `feedback` (วิธีทำงานที่ user กำหนด) · `project` (สถานะงาน/ข้อจำกัด) · `concept` (hub ความรู้เชิงหัวข้อ ที่ compile จากหลายโน้ตให้ค้นทีเดียวเจอ) · `reference` (ตัวชี้ทรัพยากรภายนอก)
 
 ## 🧭 Feedback — วิธีทำงาน (กฎที่ต้องตามทุก task)
 
@@ -31,6 +31,10 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[feedback-verify-before-claiming]] — ห้ามเคลม "แก้แล้ว" จนกว่าจะ eyeball render จริงเทียบ target + SendUserFile ให้ user confirm; test/replay ผ่าน ≠ verified; metric ต้องครอบทั้ง over/under
 - [[feedback-update-readme-on-command-change]] — แก้อะไรที่กระทบ command/script หรือเพิ่ม tool ใหม่ ต้องอัปเดต README.md ด้วยทุกครั้ง
 
+## 🧠 Concept — hub ความรู้เชิงหัวข้อ (compile จากหลายโน้ต/ADR/report ให้ค้นทีเดียวเจอ)
+
+- [[concept-mit-render-pipeline]] — Everything about MIT render/inpaint: pipeline stages, the `MIT_*` knob set that gates quality, the lama↔flux inpainter tradeoff, parity direction, and the open render defects — with links out to every scattered note/ADR/benchmark
+
 ## 🚧 Project — สถานะงาน & ข้อจำกัด
 
 - [[project-animetext-approved]] — User approved downloading the AnimeText YOLO model (deepghs/AnimeText_yolo) for #168 SFX detection on 2026-06-09 — the .pt security gate is cleared for this model
@@ -45,6 +49,7 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[project-mit-refactor-resume]] — The MIT god-object decomposition (#187/#188) is tracked in docs/reports/mit-refactor-progress.md — the single resume point. Read it first to continue without re-exploring.
 - [[project-render-knob-gating]] — In-app translation render quality depends on the FULL set of MIT_* env knobs on the backend; MIT_BUBBLE_AREA_FIT gates the #166/#179 anti-overflow + narrow-column path
 - [[project-render-parity-direction]] — ทิศทางที่ตัดสินแล้ว (2026-06-08) ให้ MIT render เหมือน MangaTranslator — narrow-column + supersampling + vertical จริง + SFX
+- [[project-mit-translate-nondeterministic]] — MIT translate ไม่ deterministic (OCR-VLM/LLM sampling) → รัน 2 ครั้งได้ text+geometry ต่างกัน; in-app render A/B confounded — วัด pixel ด้วย offline dump, in-app E2E ใช้ verify wiring เท่านั้น
 
 
 ## 📚 Reference — ตัวชี้ทรัพยากรภายนอก
@@ -55,4 +60,13 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 
 ## Definition of Done (gate ทุก task)
 
-ดู [[feedback-impact-report]] · [[feedback-test-every-round]] · [[feedback-review-merge-policy]] — code+test+E2E+scrutinize+DONE.md+impact-report+ADR+notify ครบทุกครั้ง ไม่งั้นยังไม่ done.
+ดู [[feedback-impact-report]] · [[feedback-test-every-round]] · [[feedback-review-merge-policy]] · [[feedback-issue-ownership-scope]] — code+test+E2E+scrutinize+DONE.md+impact-report+ADR+notify ครบทุกครั้ง ไม่งั้นยังไม่ done.
+
+**GitHub Issues = ระบบกำกับ task (source of truth):** งานทุกชิ้นที่แตะ code map กับ issue หนึ่งใบ (`Slow-Inc/MangaDock`) — issue บอก *จะทำอะไร* (pick เฉพาะ author เรา/`ready-for-agent` — [[feedback-issue-ownership-scope]]) + *สถานะ* (open/closed+reason). local todo = session working-memory เท่านั้น ต้อง reconcile กลับเข้า issue ก่อนจบ session. **Why (ทีมหลายคน):** โอน task ให้คนอื่นได้ทันที (todo ตายไปกับ session) + กัน code ชนกัน (ทุกคนเห็นว่าใครถือ task ไหน จึงไม่แตะงานที่คนอื่นกำลังทำ).
+
+**Issue lifecycle (bookend — ล้มบ่อยเพราะกฎซ่อนใน `/to-prd` skill ที่ load เฉพาะตอน invoke):**
+- **ก่อนเปิด PR:** งานแตะ code ต้องมี issue tracking ก่อน — ordering **PRD → issues → PR** (ห้าม PR ไม่มี issue อ้างอิง); body bilingual EN+Thai; label `ready-for-agent`.
+- **ระหว่างทำ:** งานคืบหน้า (scope/สถานะ/decision เปลี่ยน) → **update body ของ issue ให้ current** (ไม่ใช่แค่ comment) เพื่อโอนงานไร้รอยต่อ — อ่าน body ใบเดียวรู้สถานะล่าสุด; body ที่ update ต้อง bilingual EN+Thai เหมือนกัน. comment=event/หลักฐาน, body=สถานะปัจจุบัน (source of truth).
+- **หลัง merge/เสร็จ:** ปิด issue (`gh issue close <n> --comment`) พร้อม impact-report — งานเสร็จแต่ issue ยังเปิด = **ยังไม่ done**.
+- **ปิดทุกครั้งต้องระบุ REASON** (ห้ามปิดเงียบ): completed (+หลักฐาน) / cancelled-superseded (โดยอะไร) / duplicate (#NNN) / wontfix / stale — คนอ่านย้อนต้องเข้าใจทันทีโดยไม่เดา.
+- ต้นเหตุที่ลืม: ordering rule อยู่ใน `/to-prd` skill (on-demand) + "close" อยู่ใน `docs/agents/issue-tracker.md` เป็นแค่คำสั่ง ไม่ใช่ gate → ย้ายขึ้น DoD ที่ always-loaded (2026-07-05, user ทัก 2 ครั้ง).

@@ -1,0 +1,32 @@
+{
+  "client": {
+    "hl": "en",
+    "gl": "US",
+    "remoteHost": "74.125.218.40",
+    "deviceMake": "",
+    "deviceModel": "",
+    "visitorData": "Cgs0anVWS3p1UG1hWSi0zLbSBmLfAgrcAjE5LllUPVRVWXZTc1J3Ui12UnlNem1OWHJZcGVMZEdfaFpPMHhZUmFtanBjV0piMGdka2FuSm9fT0FxVXFRSEkyTXduRXowbk83VndBalBIMjJObXY1SWNuakh1dXpPeFhsQ015c1lqN3lyR0N5dzVvLWpjaDQyWEhNVExPamJESjBpcFFqSnRGZnlXc0N1dDdYeWF4MGhQSWF1WHU2RzBRcURmY2FYTld2ZldfbWNtRkVTbi1saXlTdmpyRkxkUmxHeU03UEJ4SWxtdkROMFdqWC1ENGs1NlJ4U1I5TFpPOUFKQnhKSFVaejhSaElsSEF3dnVrTzBEeG5nM3FHSUpTVlVidE0wdWo5dzFNY0dkQmFsVnRUeUQtQ2M3NXpoQk9SWFFzNHZIQ28wSWo3M3dnZUVPSDhqZGVEYWd4Mnp6RmxYRnhHUUpJVkFhbXBRSXNSOFFjRDJnNnBrUQ%3D%3D",
+    "userAgent": "Google-Jetski-Antigravity,gzip(gfe)",
+    "clientName": "WEB",
+    "clientVersion": "2.20260706.00.00",
+    "osVersion": "",
+    "originalUrl": "https://www.youtube.com/watch?v=9t__mPFkpoQ",
+    "platform": "DESKTOP",
+    "clientFormFactor": "UNKNOWN_FORM_FACTOR",
+    "configInfo": {
+      "appInstallData": "CLTMttIGELjkzhwQrZHRHBDgzbEFEIOHuCIQ4LfRHBC9tq4FEI6Q0RwQs83RHBDq5tEcELOQzxwQ8MzPHBC34K4FEMvRsQUQ4tSuBRD8ss4cELb4gBMQ9quwBRCK89EcEMOR0BwQrNDRHBC-irAFEIv3zxwQn8-AExCkqdEcEM3RsQUQwY_QHBDGyNEcEK7WzxwQr4bPHBC3hs8cEL6E0RwQsubRHBDa984cENvv0BwQ8bTQHBD299EcENK90BwQieiuBRC9wtEcEJ7QsAUQvKTQHBCWh9EcEIiQ0RwQtMHQHBDnpdEcELfJ0RwQzN-uBRCHrM4cEJ2GuCIQmY2xBRCBzc4cEKH40BwQppqwBRCJsM4cEJ3n0RwQ3rzOHBC9mbAFENeL0RwQm8LQHBCCj88cEMn2gBMQqMLRHBCV9NEcENX2gBMQw_eAExDK8tEcKoQBQ0FNU1h4VmMtWnEtRExpVUVwUUNuQTc1RlhLa0J1QVdxTlVQM0FPVURnZmx4dDhMOExFU2gwd3lvS3dFQTgzX0JjdTNCdnNtdHVRR2hSVDdvQVRwRTU1TGdpak0wZ0RMU3J5VEJMeHVCWnd4LXl6RTBnYjRPTXM5aTZvRmswSGNMQjBIMAA%3D"
+    },
+    "userInterfaceTheme": "USER_INTERFACE_THEME_LIGHT",
+    "deviceExperimentId": "ChxOelkxT1RrMk1USTRNemM0TnprMk1UUXhNQT09ELTMttIGGLTMttIG",
+    "rolloutToken": "CKDygrfjnPjVExCgq9yq9cGVAxigq9yq9cGVAw%3D%3D"
+  },
+  "user": {
+    "lockedSafetyMode": false
+  },
+  "request": {
+    "useSsl": true
+  },
+  "clickTracking": {
+    "clickTrackingParams": "IhMIyJTcqvXBlQMVsnhsBR2qlhlZ"
+  }
+}

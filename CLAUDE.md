@@ -23,13 +23,13 @@ When two designs are equally correct, choose the one a future maintainer (human 
 
 ## Project Memory (Team Shared)
 
-Memory files live at `.claude/memory/` in this repo — committed so all team members and agents start with full context.
+Team memory lives as an **Obsidian vault** at `Obsidian-MangaDock/` in this repo — committed so all team members and agents start with full context. (It used to be flat files under `.claude/memory/`; that folder now holds only a pointer README.)
 
-**At the start of every session, read all files in `.claude/memory/` before doing anything else.**
+**At the start of every session, read `Obsidian-MangaDock/Home.md` (the Map-of-Content index) first — then read only the linked notes relevant to the current task, not the whole graph.** (Home.md is small; the ~30 notes it links are not — loading all of them every session defeats the point. Skim Home's one-line descriptions, open the few that matter.)
 
-`MEMORY.md` is the index. Each linked file is a memory record (user, feedback, project, or reference type).
+`Home.md` is the index — memories grouped by `type` (`feedback`, `project`, `reference`). Each note is one memory record with `type` / `description` frontmatter and `[[wikilinks]]` to related notes; open Graph View to see the relationships (unresolved links = memories worth writing).
 
-If you write new memories during a session, update both `.claude/memory/` (for the team) and your local `~/.claude/projects/.../memory/` (for your own continuity).
+If you write a new team memory, create a note in `Obsidian-MangaDock/` (filename = its hyphen-kebab slug, matching the `name:` frontmatter so `[[wikilinks]]` resolve) and add a line to `Home.md`. Keep your own local `~/.claude/projects/.../memory/` in sync for personal continuity.
 
 ---
 
@@ -51,6 +51,10 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 
 GitHub Issues on `Slow-Inc/MangaDock` via the `gh` CLI. Issue **and PRD bodies must be bilingual (English + a full Thai mirror — same depth, not a summary)**; review-reply comments may be English-only. External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
 
+**GitHub Issues govern the work — they are the task source of truth, not a formality.** Every code change maps to one issue on `Slow-Inc/MangaDock`: the issue is the record of *what to do* (pick only issues authored by us or labeled `ready-for-agent`) and *its state* (open = outstanding, closed-with-reason = done). Local todos / task-lists are session-scoped working memory only — they must reconcile back to issues (new work surfaced → open an issue; work finished → close it) before the session ends; a task that exists only in a todo with no backing issue is untracked. **Why this is load-bearing (multi-dev team):** work on an issue can be *handed off* to another person instantly (a session-local todo dies with the session), and it *prevents code collisions* — every dev and agent can see who holds which task and stays off files/features someone else is mid-change on. An incomplete or unclosed issue makes the team blind to real state → botched handoffs and clashing edits.
+
+**Issue lifecycle is a Definition-of-Done gate, not optional (both bookends are forgotten because the ordering rule lives only in the on-demand `/to-prd` skill):** any code change must have issue tracking **before a PR** — ordering is **PRD → issues → PR**, never a PR without a referenced issue (PRD per epic, issue per deliverable). **Keep the issue body current as work progresses** — when scope, status, decisions, or what's-done/what's-left change, edit the *body* (not just add a comment) so the next person or agent can take over seamlessly by reading one up-to-date description instead of replaying every comment; the updated body stays **bilingual (EN + full Thai mirror)** like the original. Comments record events/evidence; the body is the current-state single source of truth. And **close the issue when the work is merged/done** (`gh issue close <n> --comment "<impact report>"`) — work finished but the issue left open is **not done**. **Every close must state a REASON in the comment** — never close silently: *completed* (with evidence: commit/test/impact-report), *cancelled/superseded* (by what & why), *duplicate* (of #NNN), *wontfix* (why), or *stale/obsolete* — so a later reader knows why it closed without guessing.
+
 ### Triage labels
 
 The five canonical triage states (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) map 1:1 to same-named repo labels, alongside component/type/severity/lifecycle labels. See `docs/agents/triage-labels.md`.
@@ -58,6 +62,10 @@ The five canonical triage states (`needs-triage`, `needs-info`, `ready-for-agent
 ### Domain docs
 
 Single-context: one `CONTEXT.md` + `docs/adr/` (20 ADRs) at the repo root. See `docs/agents/domain.md`.
+
+### Qwen delegation (claude-9arm)
+
+Offload mechanical, self-contained tasks (bulk renames, boilerplate scaffolding, log/stack-trace summarizing, grep-and-report sweeps) to `claude-9arm` via the `qwen-agent` skill. Never delegate anything touching `auth`/`wallet`/`unlock`, MIT core-pipeline seam work, bilingual issue/PR body authoring, or render-quality/benchmark verdicts — those need judgment a small model doesn't have. See `docs/agents/qwen-delegation.md`.
 
 ---
 
@@ -184,13 +192,13 @@ const safe = /^\s*(javascript|data|vbscript|file):/i.test(url.trim()) ? '#' : ur
 
 ## Project Memory (ทีมใช้ร่วมกัน)
 
-ไฟล์ memory อยู่ที่ `.claude/memory/` ใน repo นี้ — commit ไว้เพื่อให้สมาชิกทีมและ agent ทุกคนเริ่มด้วย context ครบ
+memory ของทีมอยู่เป็น **Obsidian vault** ที่ `Obsidian-MangaDock/` ใน repo นี้ — commit ไว้เพื่อให้สมาชิกทีมและ agent ทุกคนเริ่มด้วย context ครบ (เดิมเป็นไฟล์ flat ใน `.claude/memory/`; ตอนนี้โฟลเดอร์นั้นเหลือแค่ README ชี้ทาง)
 
-**ต้องอ่านทุกไฟล์ใน `.claude/memory/` ก่อนทำอะไรทุกครั้งที่เริ่ม session**
+**ทุกครั้งที่เริ่ม session ต้องอ่าน `Obsidian-MangaDock/Home.md` (Map-of-Content index) ก่อน — แล้วอ่านเฉพาะ note ที่ link ซึ่งเกี่ยวกับงานที่กำลังทำ ไม่ใช่ทั้งกราฟ** (Home.md เล็ก แต่ ~30 note ที่มัน link ไม่เล็ก — โหลดทั้งหมดทุก session เสียเปล่า; อ่าน one-line description ใน Home แล้วเปิดเฉพาะอันที่เกี่ยว)
 
-`MEMORY.md` คือ index; แต่ละไฟล์ที่ link ไปคือ memory record (ประเภท user, feedback, project หรือ reference)
+`Home.md` คือ index — จัดกลุ่ม memory ตาม `type` (`feedback`, `project`, `reference`) แต่ละ note = memory เดียว มี frontmatter `type` / `description` + `[[wikilinks]]` เชื่อมเรื่องที่เกี่ยวข้อง; เปิด Graph View เพื่อเห็นความสัมพันธ์ (link ที่ยังไม่มีไฟล์ = memory ที่ควรเขียนเพิ่ม)
 
-ถ้าเขียน memory ใหม่ระหว่าง session ให้อัปเดตทั้ง `.claude/memory/` (สำหรับทีม) และ `~/.claude/projects/.../memory/` ของตัวเอง (สำหรับความต่อเนื่องส่วนตัว)
+ถ้าเขียน memory ใหม่ของทีม ให้สร้าง note ใน `Obsidian-MangaDock/` (ชื่อไฟล์ = slug แบบ hyphen-kebab ให้ตรงกับ `name:` ใน frontmatter เพื่อให้ `[[wikilinks]]` resolve) แล้วเพิ่มบรรทัดใน `Home.md`; และ sync `~/.claude/projects/.../memory/` ของตัวเองไว้เพื่อความต่อเนื่องส่วนตัว
 
 ---
 

@@ -124,6 +124,9 @@ function filterLangBlocks(raw: string, lang: Lang): string {
     if (t === '<!-- lang:th -->') { active = 'th'; continue; }
     if (t === '<!-- lang:en -->') { active = 'en'; continue; }
     if (t === '<!-- lang:end -->') { active = 'all'; continue; }
+    // Drop single-line HTML comments (e.g. machine markers like <!-- REDIRECT: … -->,
+    // <!-- status: archived -->) so they never render as literal text on the site.
+    if (t.startsWith('<!--') && t.endsWith('-->')) continue;
     if (active === 'all' || active === lang) out.push(line);
   }
   return out.join('\n');
@@ -150,12 +153,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
       
       if (codeLang === 'mermaid') {
         nodes.push(
-          <div key={k++} className="my-5 rounded-xl overflow-hidden border border-black/[0.08] bg-[#0f1118]">
-            <div className="px-4 py-2 border-b border-black/[0.08] bg-white/[0.02]">
-              <span className="text-[11px] font-mono text-[#86868b]">mermaid</span>
-            </div>
-            <MermaidRenderer chart={code.join('\n')} />
-          </div>
+          <MermaidRenderer key={k++} chart={code.join('\n')} />
         );
         continue;
       }

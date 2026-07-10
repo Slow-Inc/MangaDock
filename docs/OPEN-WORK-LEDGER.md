@@ -21,6 +21,8 @@ Most render/translation-quality work is **code-complete on `landing/render-phase
 - **Stage C** = later `perf ↔ main` divergence (123 behind / 27 ahead).
 - Refs: `RESUME-HERE.md` Queue #1/#5, `2026-07-05-phase3-convergence-plan.md`. **Now tracked as process epic #548.**
 
+> **⚠️ 2026-07-10 CORRECTION — read `docs/RECONCILIATION-PLAN.md` (the full, current plan).** Deep audit (git merge-tree + 291/118 commit read + 2 code deep-dives + clink) found the premise above is incomplete: **`main` is the true trunk** (all app work + its OWN render campaign v2: #178/#180/#183 + observability), and `main`+`landing` hold **two COMPLEMENTARY render campaigns**, not one. So the direction is **not** `landing → perf`; it is a **main-based integration** (`integrate/render-reconcile` off main ← merge landing, feature-merge the ~23-conflict render set). `landing → perf` is clean (1 conflict) but wrong base (perf is app-frozen). **New dev hard-gate: translation quality must not regress vs baseline** (RECONCILIATION-PLAN §3).
+
 ---
 
 ## Track 1 — Render / Translation Quality (Master Plan 2, epic #528)

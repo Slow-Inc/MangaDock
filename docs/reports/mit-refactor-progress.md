@@ -1,8 +1,15 @@
-# MIT Refactor — Progress Tracker & Resume Point
+<!-- REDIRECT: docs/OPEN-WORK-LEDGER.md -->
+<!-- status: archived -->
 
-> **Single entry point** for the MIT tech-debt decomposition. If context was lost, READ THIS FIRST,
-> then the linked docs. It tracks exactly which decomposition seams are done, which is next, and the
-> landmines that must be preserved — so no one has to re-explore or re-analyze. Last updated 2026-06-10. **S1–S12 on `main` (PR #195).** On the `refactor/mit-seam-s17…` stack (pushed, PR-to-main pending): **S20 + S13 + S16 + S19 + S21 + S17 + S18** — the high-risk async-orchestration core through S18 now landed, each E2E-validated where it touches output (S17/S21/S18 via the production tunnel: Kouchuugun p0 = 2 patches 649×1492+451×1489, byte-identical). A pre-existing `sys.modules` test-pollution bug (test_precision/test_qwen3_translator) was fixed so the **full** suite is a reliable 18 async-only baseline (was masking 8 failures); current totals **18 baseline + 295 passed**.
+# MIT Refactor — Progress Tracker (HISTORICAL)
+
+> [!warning] ⚠️ HISTORICAL — NOT the current resume point (last updated 2026-06-10).
+> The #187/#188 decomposition this file tracks is **COMPLETE**. For current open work and the live
+> resume point, read **`docs/OPEN-WORK-LEDGER.md`**. This file is retained for the seam-by-seam
+> (S1–S26) decomposition history only.
+
+> **Decomposition history:** tracks exactly which decomposition seams were done and the
+> landmines that had to be preserved. Last updated 2026-06-10. **S1–S12 on `main` (PR #195).** On the `refactor/mit-seam-s17…` stack (pushed, PR-to-main pending): **S20 + S13 + S16 + S19 + S21 + S17 + S18** — the high-risk async-orchestration core through S18 now landed, each E2E-validated where it touches output (S17/S21/S18 via the production tunnel: Kouchuugun p0 = 2 patches 649×1492+451×1489, byte-identical). A pre-existing `sys.modules` test-pollution bug (test_precision/test_qwen3_translator) was fixed so the **full** suite is a reliable 18 async-only baseline (was masking 8 failures); current totals **18 baseline + 295 passed**.
 >
 > **Remaining = the high-risk async-orchestration core (tail):** S23/S24/S25/S26 all **landed + validated ✅** (S26b `35390fa` boot-validated on a fresh MIT). **ALL seams S1-S26 landed → #187/#188 decomposition COMPLETE.** Final seam **S12 `PipelineParams` value-object** landed 2026-06-11 (extracted `parse_init_params`' device/using_gpu/raise + field parsing; 8 characterization tests; suite 365 / 0 new fail). S22 DispatchRegistry + global-MODEL removal landed earlier (342 pass; full-stack E2E byte-exact, Kouchuugun p0 2 patches). S23→S26a landed 2026-06-10 (stage_runner + patch_geometry/patch_renderer + `_run_until_translation_stages` + batch_orchestration; **driver 2235→1934 lines**, 16 new unit cases). **E2E batched (one MIT restart): Kouchuugun ch1 p0 EN→TH via the production tunnel, cache cleared + fresh L1, new-code MIT → 2 patches `649×1492` + `451×1489` = byte-exact to baseline; page rendered correct Thai (narrow-column #179 preserved).**
 

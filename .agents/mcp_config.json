@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "pal": {
+      "command": "C:/Users/xenod/AppData/Local/Programs/Python/Python311/Scripts/uvx.exe",
+      "args": [
+        "--from",
+        "git+https://github.com/BeehiveInnovations/pal-mcp-server.git",
+        "pal-mcp-server"
+      ],
+      "env": {
+        "CUSTOM_API_URL": "https://gateway.9arm.co/v1",
+        "CUSTOM_API_KEY": "sk-UcCnIrDJB2LIsdOSbI6V6g",
+        "CUSTOM_MODEL_NAME": "qwen3.6-35b-a3b",
+        "CUSTOM_MODELS_CONFIG_PATH": "D:/Github/MangaDock/.agents/custom_models.json"
+      }
+    }
+  }
+}

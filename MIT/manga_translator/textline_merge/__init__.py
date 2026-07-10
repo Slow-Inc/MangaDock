@@ -1,11 +1,15 @@
 import itertools
+import time
+import logging
 import numpy as np
 from typing import List, Set
 from collections import Counter
 import networkx as nx
 from shapely.geometry import Polygon
 
-from ..utils import TextBlock, Quadrilateral, quadrilateral_can_merge_region
+from ..utils import TextBlock, Quadrilateral, quadrilateral_can_merge_region, reset_qcmr_calls, get_qcmr_calls
+
+logger = logging.getLogger('manga_translator')
 
 def split_text_region(
         bboxes: List[Quadrilateral],
@@ -124,6 +128,12 @@ def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height):
     #             v += 1
     #     u += 1
 
+    # #speed-study Phase 0 (2026-07-03): time step-1 (all-pairs merge graph) vs step-2
+    # (split_text_region) separately, to attribute the measured 0.7-10.2s merge cost.
+    # Logging-only, no behavior change.
+    reset_qcmr_calls()
+    _t_step1 = time.perf_counter()
+
     # step 1: divide into multiple text region candidates
     G = nx.Graph()
     for i, box in enumerate(bboxes):
@@ -135,10 +145,19 @@ def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height):
                                           char_gap_tolerance=1, char_gap_tolerance2=3):
             G.add_edge(u, v)
 
+    _step1_s = time.perf_counter() - _t_step1
+    _t_step2 = time.perf_counter()
+
     # step 2: postprocess - further split each region
     region_indices: List[Set[int]] = []
     for node_set in nx.algorithms.components.connected_components(G):
          region_indices.extend(split_text_region(bboxes, node_set, width, height))
+
+    _step2_s = time.perf_counter() - _t_step2
+    logger.info(
+        f"[timing-merge] step1_ms={_step1_s * 1000:.1f} split_ms={_step2_s * 1000:.1f} "
+        f"n_boxes={len(bboxes)} pairs={get_qcmr_calls()}"
+    )
 
     # step 3: return regions
     for node_set in region_indices:
@@ -202,7 +221,10 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
             angle = 0
         lines = [txtln.pts for txtln in txtlns]
         texts = [txtln.text for txtln in txtlns]
+        # #278: a merged region is det_sfx-provenance if ANY of its textlines came from the
+        # det_sfx pass — propagate so the SFX rescue gates on provenance, not a length heuristic.
+        from_sfx = any(getattr(txtln, 'is_sfx', False) for txtln in txtlns)
         region = TextBlock(lines, texts, font_size=font_size, angle=angle, prob=np.exp(total_logprobs),
-                           fg_color=fg_color, bg_color=bg_color)
+                           fg_color=fg_color, bg_color=bg_color, from_sfx_detection=from_sfx)
         text_regions.append(region)
     return text_regions

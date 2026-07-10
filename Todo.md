@@ -1,3 +1,8 @@
+<!-- REDIRECT: docs/OPEN-WORK-LEDGER.md -->
+<!-- status: archived -->
+
+> ⚠️ **SUPERSEDED** — historical checklist, kept for the completed-phase record only. Current open work → `docs/OPEN-WORK-LEDGER.md`; the phase roadmap → `Roadmap.md`. · เอกสารนี้ถูกแทนที่แล้ว — เก็บไว้เป็นบันทึกงานที่ทำเสร็จ; งานค้างปัจจุบันดูที่ `docs/OPEN-WORK-LEDGER.md`, roadmap ดูที่ `Roadmap.md`
+
 <!-- lang:en -->
 # MangaDock — Granular Todo List (V5 Master)
 

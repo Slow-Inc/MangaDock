@@ -1,0 +1,39 @@
+{
+  "ENG": {
+    "out": "GOGOGO",
+    "codepoints": [
+      "0x47",
+      "0x4f",
+      "0x47",
+      "0x4f",
+      "0x47",
+      "0x4f"
+    ]
+  },
+  "THA": {
+    "out": "กริ๊ก",
+    "codepoints": [
+      "0xe01",
+      "0xe23",
+      "0xe34",
+      "0xe4a",
+      "0xe01"
+    ]
+  },
+  "CHS": {
+    "out": "ずしん",
+    "codepoints": [
+      "0x305a",
+      "0x3057",
+      "0x3093"
+    ]
+  },
+  "KOR": {
+    "out": "으르르",
+    "codepoints": [
+      "0xc73c",
+      "0xb974",
+      "0xb974"
+    ]
+  }
+}

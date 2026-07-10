@@ -61,6 +61,43 @@ def build_sfx_prompt(target_lang: str = 'ENG') -> str:
     )
 
 
+def ocr_read_real_text(stripped_text: str) -> bool:
+    """True when the 48px line-OCR returned readable ASCII letters/digits.
+
+    The stylized SFX the rescue is FOR are the ones the line-OCR DROPS — they come back as
+    non-ASCII garbage/CJK ('ぬ', 'サ', 'ぎい'). A clean ASCII read ('W', 'THE', 'M', '8') is
+    proof the OCR succeeded on real characters: a dialogue fragment or a det_sfx false-positive
+    sitting on a speech bubble — NOT a dropped glyph. Used to (a) skip the vision rescue and
+    (b) drop the det_sfx false-positive so its literal fragment ('W'→'ว') is not translated and
+    rendered over the dialogue bubble (#278). Pure."""
+    return bool(re.search(r'[A-Za-z0-9]', stripped_text or ''))
+
+
+def should_rescue_sfx(stripped_text: str, from_sfx_detection: bool, box_w: float, box_h: float,
+                      vlm_rescue: bool, area_min: int = 3600, side_min: int = 24) -> bool:
+    """#278: gate the vision-gateway SFX rescue on det_sfx PROVENANCE, not a bare length heuristic.
+
+    A region is a stylized-SFX candidate when it came from the det_sfx second pass
+    (``merge_sfx_detections`` → ``TextBlock.from_sfx_detection``) — there a short OCR read (≤4 chars)
+    is a *misread* SFX worth localizing to the target language. WITHOUT that provenance, fall back to
+    a TIGHT ≤2-char rule so a short dialogue line ('HUH?', 'おい', 'は？') sitting in a large bubble is
+    not misread as SFX and shipped to the gateway (the bug: any ≤4-char region was rescued, mangling
+    short dialogue + adding a ~1-2 s round-trip per region). The box must also be reasonably large
+    (area + min side) — a real SFX glyph, not a stray mark. Pure."""
+    if not vlm_rescue:
+        return False
+    # If the line-OCR read real ASCII text it did NOT drop a stylized glyph — rescuing it makes
+    # the vision model hallucinate a phantom target-language SFX over the dialogue (#278).
+    if ocr_read_real_text(stripped_text):
+        return False
+    n = len(stripped_text.strip())
+    if n > (4 if from_sfx_detection else 2):
+        return False
+    if box_w * box_h < area_min or min(box_w, box_h) < side_min:
+        return False
+    return True
+
+
 def _to_data_url(crop_rgb: np.ndarray) -> str:
     """HWC RGB uint8 array → `data:image/png;base64,...`."""
     buf = io.BytesIO()
@@ -90,7 +127,10 @@ def sanitize_sfx(raw: str, target_lang: str = 'ENG') -> str:
             for c in line
         )
         line = re.sub(r'\s+', ' ', line).strip()
-        if not line:
+        # #278: refusal guard for the non-Latin branch — a model that declines often replies in
+        # Latin ('NONE'/'NA') even for a Thai/Chinese/Korean target; drop it so it isn't kept as a
+        # SFX token (the Latin branch already guards this above).
+        if not line or line.upper() in ('NONE', 'N A', 'NA', 'EMPTY'):
             return ''
     return line[:24]
 

@@ -23,4 +23,12 @@ export const CATEGORY_LABELS: Record<string, string> = {
   docs: 'เอกสาร',
   'docs/agents': 'Agent Guides',
   'docs/prd': 'Product Requirements',
+  'docs/adr': 'Architecture Decisions',
+  'docs/research': 'Research',
+  'docs/reports': 'Reports',
+  'docs/reports/benchmarks': 'Benchmarks',
+  'docs/superpowers': 'Plans & Specs',
+  'docs/superpowers/plans': 'Plans',
+  'docs/superpowers/specs': 'Specs',
+  'docs/deploy': 'Deployment',
 };

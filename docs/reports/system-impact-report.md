@@ -118,7 +118,7 @@
 
 **Open follow-ups:** open the epic #228 PR → main; close issues #229/#230/#232/#233/#234 on merge; cosmetic — `PatchEntry` type declared in 3 files, `persistPage` param type duplicated (mit-translation + orchestrator), `books-mit-config.spec` describe "BooksService.buildMitConfig" now tests via `.batch`; confirmatory frontend E2E parity pass.
 
-**Links:** #228 (parent), #229/#230/#232/#233/#234 · ADR-002 (`docs/adr/002-drop-batch-redis-pubsub.md`) · commits `a941a4c e0f6add 4f04c51 42b4e90 7bdc118 4a155d7 c1daa07 c29dbc1`.
+**Links:** #228 (parent), #229/#230/#232/#233/#234 · ADR-020 (`docs/adr/020-drop-batch-redis-pubsub.md`, renumbered from 002) · commits `a941a4c e0f6add 4f04c51 42b4e90 7bdc118 4a155d7 c1daa07 c29dbc1`.
 
 ---
 
