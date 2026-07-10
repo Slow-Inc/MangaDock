@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { ROLE } from "../lib/types/user";
 import { errMessage } from "@/lib/errMessage";
 import { formReducer, initialFormState } from "./account/formReducer";
 import PasswordTab from "./account/PasswordTab";
@@ -448,7 +449,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, asPage = fal
                   <p className="text-sm font-semibold text-white">{user.displayName || "ผู้ใช้"}</p>
                   {isTranslator && (
                     <span className="rounded-full bg-indigo-600/30 px-2 py-0.5 text-[10px] font-semibold text-indigo-300 ring-1 ring-indigo-500/30">
-                      {userRole === "admin" ? "Admin" : userRole === "creator" ? "Creator" : "นักแปล"}
+                      {userRole === ROLE.ADMIN ? "Admin" : userRole === ROLE.CREATOR ? "Creator" : "นักแปล"}
                     </span>
                   )}
                 </div>

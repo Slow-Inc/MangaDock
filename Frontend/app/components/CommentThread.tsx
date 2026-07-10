@@ -158,8 +158,8 @@ export default function CommentThread({
               <Link
                 href={`/community/profile/${comment.authorUid}`}
                 className={`font-bold hover:underline underline-offset-2 transition-opacity hover:opacity-80 ${
-                  comment.authorRole === 'translator' ? "text-indigo-400" :
-                  comment.authorRole === 'creator' ? "text-orange-400" : "text-white/80"
+                  comment.authorRole === 1 ? "text-indigo-400" :
+                  comment.authorRole === 2 ? "text-orange-400" : "text-white/80"
                 }`}
               >
                 {comment.authorName || 'Unknown User'}

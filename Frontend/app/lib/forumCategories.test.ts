@@ -1,39 +1,41 @@
 /**
  * availableCategories — role-gated forum categories.
  *
- * ประกาศ (announcement) และ อัปเดตมังงะ (manga_update)
- * ใช้ได้เฉพาะ translator / creator / admin เท่านั้น
+ * announcement: admin(8)/dev(9) เท่านั้น
+ * manga_update: translator(1) ขึ้นไป
  */
 import { expect, test } from "bun:test";
 import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "./forumCategories";
 
-// ── privileged roles ────────────────────────────────────────────────────
+// ── announcement: admin-only (>= 8) ────────────────────────────────────
 
-test("translator gets all four categories", () => {
-  expect(availableCategories("translator")).toEqual([
+test("admin (8) sees all four categories including announcement", () => {
+  expect(availableCategories(8)).toEqual([
     "general", "announcement", "spoiler", "manga_update",
   ]);
 });
 
-test("admin gets all four categories", () => {
-  expect(availableCategories("admin")).toEqual([
+test("dev (9) sees all four categories including announcement", () => {
+  expect(availableCategories(9)).toEqual([
     "general", "announcement", "spoiler", "manga_update",
   ]);
 });
 
-test("creator gets all four categories", () => {
-  expect(availableCategories("creator")).toEqual([
-    "general", "announcement", "spoiler", "manga_update",
-  ]);
+test("creator (2) does NOT see announcement", () => {
+  expect(availableCategories(2)).toEqual(["general", "spoiler", "manga_update"]);
 });
 
-// ── unprivileged ────────────────────────────────────────────────────────
-
-test("regular user gets only general and spoiler", () => {
-  expect(availableCategories("user")).toEqual(["general", "spoiler"]);
+test("translator (1) does NOT see announcement", () => {
+  expect(availableCategories(1)).toEqual(["general", "spoiler", "manga_update"]);
 });
 
-test("unauthenticated (null) gets only general and spoiler", () => {
+// ── manga_update: translator+ (>= 1) ───────────────────────────────────
+
+test("regular user (0) sees only general and spoiler", () => {
+  expect(availableCategories(0)).toEqual(["general", "spoiler"]);
+});
+
+test("unauthenticated (null) sees only general and spoiler", () => {
   expect(availableCategories(null)).toEqual(["general", "spoiler"]);
 });
 

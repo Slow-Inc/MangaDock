@@ -5,7 +5,7 @@ export interface ForumPost {
   authorUid: string;
   authorName: string | null;
   authorPhotoUrl: string | null;
-  authorRole: string;
+  authorRole: number;
   title: string;
   content: string;
   category: ForumCategory;
@@ -28,7 +28,7 @@ export interface ForumComment {
   authorUid: string;
   authorName: string | null;
   authorPhotoUrl: string | null;
-  authorRole: string;
+  authorRole: number;
   content: string;
   upvotes: number;
   downvotes: number;

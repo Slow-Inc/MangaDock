@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { ROLE } from "../lib/types/user";
 import Link from "next/link";
 import { listPosts, createPost } from "../lib/communityApi";
 import { useAuth } from "../contexts/AuthContext";
@@ -49,7 +50,7 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
       authorUid: user?.uid ?? '',
       authorName: user?.displayName ?? null,
       authorPhotoUrl: user?.photoURL ?? null,
-      authorRole: user?.role ?? 'user',
+      authorRole: user?.role ?? ROLE.USER,
       upvotes: 0,
       downvotes: 0,
       userVote: 0,

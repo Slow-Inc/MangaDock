@@ -21,18 +21,18 @@ const LANG_LABEL: Record<string, string> = {
   zh: "จีน",
 };
 
-function RoleBadge({ role }: { role: string }) {
-  if (role === "user") return null;
-  const map: Record<string, { cls: string; label: string }> = {
-    translator: { cls: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30", label: "Translator" },
-    creator:    { cls: "bg-orange-500/15 text-orange-400 border-orange-500/30", label: "Creator" },
-    admin:      { cls: "bg-red-500/15 text-red-400 border-red-500/30", label: "Admin" },
-    moderator:  { cls: "bg-purple-500/15 text-purple-400 border-purple-500/30", label: "Moderator" },
+function RoleBadge({ role }: { role: number | null | undefined }) {
+  if (role == null || role === 0) return null;
+  const map: Record<number, { cls: string; label: string }> = {
+    1: { cls: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30", label: "Translator" },
+    2: { cls: "bg-orange-500/15 text-orange-400 border-orange-500/30", label: "Creator" },
+    8: { cls: "bg-red-500/15 text-red-400 border-red-500/30", label: "Admin" },
+    9: { cls: "bg-purple-500/15 text-purple-400 border-purple-500/30", label: "Dev" },
   };
-  const { cls, label } = map[role] ?? { cls: "bg-white/10 text-white/60 border-white/20", label: role };
+  const entry = map[role] ?? { cls: "bg-white/10 text-white/60 border-white/20", label: `Role ${role}` };
   return (
-    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${cls}`}>
-      {label}
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${entry.cls}`}>
+      {entry.label}
     </span>
   );
 }
@@ -167,7 +167,7 @@ export default function PublicProfilePage() {
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const { profile, posts, comments, likedPosts, translatedTitles, earnings } = data;
-  const isCreator = profile.role === "translator" || profile.role === "creator";
+  const isCreator = profile.role >= 1;
   const isOwnProfile = user?.uid === profile.uid;
 
   const tabs: { id: Tab; label: string; count: number }[] = [
@@ -178,9 +178,9 @@ export default function PublicProfilePage() {
   ];
 
   const gradientClass =
-    profile.role === "translator"
+    profile.role === 1
       ? "bg-gradient-to-br from-indigo-950/80 via-indigo-900/30 to-[#141414]"
-      : profile.role === "creator"
+      : profile.role === 2
       ? "bg-gradient-to-br from-orange-950/70 via-orange-900/25 to-[#141414]"
       : "bg-gradient-to-br from-white/[0.06] to-[#141414]";
 
