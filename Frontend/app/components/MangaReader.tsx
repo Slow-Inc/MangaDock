@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { addToHistory, getHistory } from "../lib/readingHistory";
+import { resolveReaderPages, buildOtherLangNextMap } from "../lib/readerPages";
 import { useChapterTranslation, TARGET_LANG_OPTIONS } from "../hooks/useChapterTranslation";
 import { buildTranslationSources } from "../lib/translationSources";
 import { buildTranslateMenu } from "../lib/translateMenu";
@@ -37,6 +38,7 @@ type Props = {
 };
 
 const API_BASE = "/api/proxy";
+const LANG_LABEL: Record<string, string> = { th: "ภาษาไทย", en: "English", ja: "日本語" };
 
 export default function MangaReader({ chapterId: initialChapterId, chapterNumber: initialChapterNumber, chapterTitle: initialChapterTitle, mangaTitle, mangaId, onClose }: Props) {
   // Cloudflare Turnstile state (#582: extracted to useReaderCaptcha).
@@ -67,19 +69,10 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   // Only include chapters with a strictly higher chapter number (avoid showing
   // the same chapter number translated into another language as "next").
   const currentChapterNum = chapterList[currentIdx]?.chapterNumber ?? null;
-  const otherLangNextMap = (() => {
-    if (currentIdx < 0) return new Map<string, ChapterPageItem>();
-    const map = new Map<string, ChapterPageItem>();
-    for (const ch of chapterList.slice(currentIdx + 1)) {
-      // Skip if same or lower chapter number
-      if (currentChapterNum !== null && ch.chapterNumber !== null) {
-        if (parseFloat(ch.chapterNumber) <= parseFloat(currentChapterNum)) continue;
-      }
-      if (!map.has(ch.translatedLanguage)) map.set(ch.translatedLanguage, ch);
-    }
-    if (currentLang) map.delete(currentLang);
-    return map;
-  })();
+  const otherLangNextMap = useMemo(
+    () => buildOtherLangNextMap(chapterList, currentIdx, currentChapterNum, currentLang),
+    [chapterList, currentIdx, currentChapterNum, currentLang],
+  );
 
   const hasPrev = prevSameLang !== null;
   const hasNext = nextSameLang !== null;
@@ -100,8 +93,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const hasNextSameLang = nextSameLang !== null;
   const hasNextOtherLang = otherLangNextMap.size > 0;
 
-  const LANG_LABEL: Record<string, string> = { th: "ภาษาไทย", en: "English", ja: "日本語" };
-  const langLabel = (l: string) => LANG_LABEL[l] ?? l.toUpperCase();
+  const langLabel = useCallback((l: string) => LANG_LABEL[l] ?? l.toUpperCase(), []);
 
   // Use currentChapterId as the operative chapter id
   const chapterId = currentChapterId;
@@ -272,11 +264,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     }, 80);
   }, [page]);
 
-  const goToChapter = (ch: ChapterPageItem) => {
+  const goToChapter = useCallback((ch: ChapterPageItem) => {
     setCurrentChapterId(ch.id);
     setCurrentChapterNumber(ch.chapterNumber);
     setCurrentChapterTitle(ch.title);
-  };
+  }, []);
 
   // Chapter picker row selection: navigate then close the picker.
   const handleSelectChapter = (ch: ChapterPageItem) => {
@@ -382,19 +374,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   // Non-cached pages are routed through the img-proxy so the browser never hits
   // MangaDex CDN directly — a direct request sends the VPS URL as Referer which
   // MangaDex blocks with their "You can read this at mangadex.org" banner image.
-  const resolvePages = (originals: string[], locals?: string[]) => {
-    return originals.map((orig, i) => {
-      // Already proxied URLs (user-uploaded versions) — don't double-wrap
-      if (orig.startsWith("/api/")) return orig;
-      const local = locals?.[i];
-      if (local && local.startsWith("/img-cache")) return `${API_BASE}${local}`;
-      return `/api/img-proxy?url=${encodeURIComponent(orig)}`;
-    });
-  };
-
-  const pages = useSaver
-    ? resolvePages(data?.dataSaverPages ?? [], data?.localDataSaverPages)
-    : resolvePages(data?.pages ?? [], data?.localPages);
+  // Prefer locally-cached paths when available; non-cached pages route through
+  // the img-proxy. Memoized so translation-timer ticks / scroll setPage don't
+  // re-encode every URL and churn the array identity (plan 2026-07-11 Perf 2).
+  const pages = useMemo(
+    () => useSaver
+      ? resolveReaderPages(data?.dataSaverPages ?? [], data?.localDataSaverPages, API_BASE)
+      : resolveReaderPages(data?.pages ?? [], data?.localPages, API_BASE),
+    [data, useSaver],
+  );
   const totalPages = pages.length;
   const hasAnyTranslation = translatedPages.size > 0 || patchedPages.size > 0 || completedTranslatedPages.size > 0;
   const hasFullTranslation = totalPages > 0 && completedTranslatedPages.size >= totalPages;
