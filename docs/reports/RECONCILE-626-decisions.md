@@ -143,3 +143,13 @@ emit reasoning tokens; completion=1 = just EOS). Confirmed on 2 samples.
 - Harness ready: `MIT/tools/_thinking_ab.py` (re-run when the gateway is up).
 - **#623 default = thinking OFF** is the safe ship (matches perf prod, which works; avoids the
   content=None 500). Flip via `CUSTOM_OPENAI_ENABLE_THINKING=true` for the A/B when live.
+
+## Translation gate — RESOLVED: thinking-off == baseline quality (2026-07-10, gateway recovered)
+Gateway `gateway.9arm.co` recovered enough to run the #623 A/B. Same 6 dense JPN→ENG segments,
+thinking OFF vs ON: **both 6/6, 0 empty, equivalent quality** (minor wording only; ON marginally
+better on [3] "one punch"). completion_tokens LOW both ways → #623 budget-exhaustion did NOT trigger.
+**Gate PASS: thinking-off does NOT regress vs baseline** (disproves "thinking-off felt worse"). #623
+stays configurable, default OFF = dense-safe. PNG+MD: docs/reports/benchmarks/2026-07-10-626-translation-thinking-ab.*.
+CAVEAT: gateway is FLAKY — intermittent empty content (completion=1) on the complex numbered prompt,
+affecting BOTH thinking modes equally = infra reliability issue (not a thinking-off regression, not
+blocking; watch in prod). Harness MIT/tools/_thinking_ab.py.
