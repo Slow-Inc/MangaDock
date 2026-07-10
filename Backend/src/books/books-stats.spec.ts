@@ -3,9 +3,9 @@ import { StatsIncrementService } from '../cache/stats-increment.service';
 
 function makeBooks(pages: string[] | null = ['url1']) {
   return {
-    getMangaChapterPages: jest.fn().mockResolvedValue(
-      pages ? { pages, dataSaverPages: [] } : null,
-    ),
+    getMangaChapterPages: jest
+      .fn()
+      .mockResolvedValue(pages ? { pages, dataSaverPages: [] } : null),
   };
 }
 
@@ -17,9 +17,17 @@ function makeBiz() {
   return { recordRead: jest.fn() };
 }
 
-function makeController(books = makeBooks(), stats = makeStats(), biz = makeBiz()) {
+function makeController(
+  books = makeBooks(),
+  stats = makeStats(),
+  biz = makeBiz(),
+) {
   return {
-    ctrl: new BooksController(books as any, stats as unknown as StatsIncrementService, biz as any),
+    ctrl: new BooksController(
+      books as any,
+      stats as unknown as StatsIncrementService,
+      biz as any,
+    ),
     books,
     stats,
     biz,
@@ -49,7 +57,9 @@ describe('BooksController — stats wiring', () => {
     const { ctrl, stats } = makeController(makeBooks(null));
     const req = { headers: { 'x-hardware-id': 'hw-abc' } };
 
-    await expect(ctrl.getMangaChapterPages('ch:1', 'manga:A', req as any)).rejects.toThrow();
+    await expect(
+      ctrl.getMangaChapterPages('ch:1', 'manga:A', req as any),
+    ).rejects.toThrow();
     expect(stats.recordChapterView).not.toHaveBeenCalled();
   });
 
@@ -60,6 +70,11 @@ describe('BooksController — stats wiring', () => {
 
     await ctrl.getMangaChapterPages('ch:1', 'manga:A', req as any);
 
-    expect(stats.recordChapterView).toHaveBeenCalledWith('ch:1', 'manga:A', 'anon', expect.any(String));
+    expect(stats.recordChapterView).toHaveBeenCalledWith(
+      'ch:1',
+      'manga:A',
+      'anon',
+      expect.any(String),
+    );
   });
 });

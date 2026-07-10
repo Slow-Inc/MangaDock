@@ -382,11 +382,11 @@ export class BooksController {
   }
 
   @Get(':id/related')
-  getRelated(
-    @Param('id') id: string,
-    @Query('limit') limit?: string,
-  ) {
-    return this.booksService.getRelated(id, limit ? Math.min(parseInt(limit, 10), 50) : 10);
+  getRelated(@Param('id') id: string, @Query('limit') limit?: string) {
+    return this.booksService.getRelated(
+      id,
+      limit ? Math.min(parseInt(limit, 10), 50) : 10,
+    );
   }
 
   /** Proxy external images (e.g. MangaDex CDN) to avoid hotlink blocking. */

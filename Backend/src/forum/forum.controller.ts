@@ -26,13 +26,30 @@ import { ForumService } from './forum.service';
 import { ForumEventsService } from './forum-events.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard';
-import { CreatePostDto, CreateCommentDto, UpdatePostDto, UpdateCommentDto, UpdateBannerPositionDto, VoteDto } from './forum.dto';
+import {
+  CreatePostDto,
+  CreateCommentDto,
+  UpdatePostDto,
+  UpdateCommentDto,
+  UpdateBannerPositionDto,
+  VoteDto,
+} from './forum.dto';
 import type { ForumCategory } from './forum.types';
-import type { AuthenticatedRequest, MaybeAuthenticatedRequest } from '../auth/authenticated-request';
+import type {
+  AuthenticatedRequest,
+  MaybeAuthenticatedRequest,
+} from '../auth/authenticated-request';
 
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const ALLOWED_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
 
-interface MessageEvent { data: object }
+interface MessageEvent {
+  data: object;
+}
 
 @Controller('forum')
 export class ForumController {
@@ -71,8 +88,8 @@ export class ForumController {
       category,
       mangaId,
       sort,
-      Math.min(100, limit ? (parseInt(limit, 10) || 20) : 20),
-      offset ? (parseInt(offset, 10) || 0) : 0,
+      Math.min(100, limit ? parseInt(limit, 10) || 20 : 20),
+      offset ? parseInt(offset, 10) || 0 : 0,
       req.uid,
     );
   }
@@ -84,20 +101,31 @@ export class ForumController {
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
-          return cb(new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed'), false);
+          return cb(
+            new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed'),
+            false,
+          );
         }
         cb(null, true);
       },
       storage: diskStorage({
         destination: (_req, _file, cb) => cb(null, os.tmpdir()),
-        filename: (_req, _file, cb) => cb(null, `banner_${crypto.randomUUID()}`),
+        filename: (_req, _file, cb) =>
+          cb(null, `banner_${crypto.randomUUID()}`),
       }),
     }),
   )
-  async uploadBanner(@Req() req: AuthenticatedRequest, @UploadedFile() file: Express.Multer.File) {
+  async uploadBanner(
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     if (!file) throw new BadRequestException('No file provided');
     try {
-      return await this.forumService.uploadBanner(req.uid, file.path, file.mimetype);
+      return await this.forumService.uploadBanner(
+        req.uid,
+        file.path,
+        file.mimetype,
+      );
     } finally {
       fs.unlink(file.path, () => undefined);
     }
@@ -105,30 +133,44 @@ export class ForumController {
 
   @Patch('profile/banner-position')
   @UseGuards(AuthGuard)
-  async updateBannerPosition(@Req() req: AuthenticatedRequest, @Body() dto: UpdateBannerPositionDto) {
+  async updateBannerPosition(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: UpdateBannerPositionDto,
+  ) {
     return this.forumService.updateBannerPosition(req.uid, dto.position);
   }
 
   @Get('profile/:uid')
   @UseGuards(OptionalAuthGuard)
-  async getPublicProfile(@Req() req: MaybeAuthenticatedRequest, @Param('uid') uid: string) {
+  async getPublicProfile(
+    @Req() req: MaybeAuthenticatedRequest,
+    @Param('uid') uid: string,
+  ) {
     return this.forumService.getPublicProfile(uid, req.uid);
   }
 
   @Get('trending-manga')
   async getTrendingManga(@Query('limit') limit?: string) {
-    return this.forumService.getTrendingManga(Math.min(20, limit ? (parseInt(limit, 10) || 5) : 5));
+    return this.forumService.getTrendingManga(
+      Math.min(20, limit ? parseInt(limit, 10) || 5 : 5),
+    );
   }
 
   @Get('posts/:id')
   @UseGuards(OptionalAuthGuard)
-  async getPost(@Req() req: MaybeAuthenticatedRequest, @Param('id') id: string) {
+  async getPost(
+    @Req() req: MaybeAuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
     return this.forumService.getPost(id, req.uid);
   }
 
   @Post('posts')
   @UseGuards(AuthGuard)
-  async createPost(@Req() req: AuthenticatedRequest, @Body() dto: CreatePostDto) {
+  async createPost(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreatePostDto,
+  ) {
     return this.forumService.createPost(req.uid, dto);
   }
 
@@ -142,31 +184,48 @@ export class ForumController {
   @Delete('comments/:id')
   @UseGuards(AuthGuard)
   @HttpCode(204)
-  async deleteComment(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+  async deleteComment(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
     await this.forumService.deleteComment(req.uid, id);
   }
 
   @Patch('posts/:id')
   @UseGuards(AuthGuard)
-  async updatePost(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdatePostDto) {
+  async updatePost(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdatePostDto,
+  ) {
     return this.forumService.updatePost(req.uid, id, dto);
   }
 
   @Patch('comments/:id')
   @UseGuards(AuthGuard)
-  async updateComment(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdateCommentDto) {
+  async updateComment(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateCommentDto,
+  ) {
     return this.forumService.updateComment(req.uid, id, dto);
   }
 
   @Get('posts/:id/comments')
   @UseGuards(OptionalAuthGuard)
-  async listComments(@Req() req: MaybeAuthenticatedRequest, @Param('id') id: string) {
+  async listComments(
+    @Req() req: MaybeAuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
     return this.forumService.listComments(id, req.uid);
   }
 
   @Post('comments')
   @UseGuards(AuthGuard)
-  async createComment(@Req() req: AuthenticatedRequest, @Body() dto: CreateCommentDto) {
+  async createComment(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateCommentDto,
+  ) {
     return this.forumService.createComment(req.uid, dto);
   }
 
@@ -183,20 +242,31 @@ export class ForumController {
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
-          return cb(new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed'), false);
+          return cb(
+            new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed'),
+            false,
+          );
         }
         cb(null, true);
       },
       storage: diskStorage({
         destination: (_req, _file, cb) => cb(null, os.tmpdir()),
-        filename: (_req, _file, cb) => cb(null, `forum_img_${crypto.randomUUID()}`),
+        filename: (_req, _file, cb) =>
+          cb(null, `forum_img_${crypto.randomUUID()}`),
       }),
     }),
   )
-  async uploadImage(@Req() req: AuthenticatedRequest, @UploadedFile() file: Express.Multer.File) {
+  async uploadImage(
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     if (!file) throw new BadRequestException('No file provided');
     try {
-      return await this.forumService.uploadImage(req.uid, file.path, file.mimetype);
+      return await this.forumService.uploadImage(
+        req.uid,
+        file.path,
+        file.mimetype,
+      );
     } finally {
       fs.unlink(file.path, () => undefined);
     }

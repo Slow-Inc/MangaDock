@@ -27,7 +27,9 @@ export class SupabaseService implements OnModuleInit {
     const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim();
 
     if (!url || !serviceRoleKey) {
-      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+      throw new Error(
+        'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required',
+      );
     }
 
     this.supabaseClient = createClient(url, serviceRoleKey, {
@@ -73,7 +75,7 @@ export class SupabaseService implements OnModuleInit {
       if (ttl > 0) {
         if (this.tokenCache.size >= VERIFY_CACHE_MAX) {
           // Evict oldest entry (Map preserves insertion order).
-          this.tokenCache.delete(this.tokenCache.keys().next().value!);
+          this.tokenCache.delete(this.tokenCache.keys().next().value);
         }
         this.tokenCache.set(key, { user, expiresAt: Date.now() + ttl });
       }

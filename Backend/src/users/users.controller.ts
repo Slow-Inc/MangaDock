@@ -21,7 +21,10 @@ import * as path from 'path';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UsersService } from './users.service';
 import type { SupabaseAuthUser } from '../auth/auth.types';
-import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import {
+  STORAGE_PROVIDER,
+  type StorageProvider,
+} from '../common/storage/storage-provider.interface';
 
 @Controller('users')
 @UseGuards(AuthGuard)
@@ -72,10 +75,17 @@ export class UsersController {
   @Post('me/favorites')
   addFavorite(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: {
-      id: string; title: string; thumbnail: string;
-      authors?: string[]; description?: string; categories?: string[];
-      publishedDate?: string; averageRating?: number; ratingsCount?: number;
+    @Body()
+    body: {
+      id: string;
+      title: string;
+      thumbnail: string;
+      authors?: string[];
+      description?: string;
+      categories?: string[];
+      publishedDate?: string;
+      averageRating?: number;
+      ratingsCount?: number;
     },
   ) {
     return this.users.addFavorite(req[USER_KEY].uid, body);
@@ -111,7 +121,10 @@ export class UsersController {
       limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.startsWith('image/')) {
-          return cb(new BadRequestException('Only image files are allowed'), false);
+          return cb(
+            new BadRequestException('Only image files are allowed'),
+            false,
+          );
         }
         cb(null, true);
       },
@@ -166,7 +179,10 @@ export class UsersController {
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Body() body: Record<string, unknown>,
   ) {
-    return this.users.upsertHistoryItem(req[USER_KEY].uid, body as Parameters<typeof this.users.upsertHistoryItem>[1]);
+    return this.users.upsertHistoryItem(
+      req[USER_KEY].uid,
+      body as Parameters<typeof this.users.upsertHistoryItem>[1],
+    );
   }
 
   @Delete('me/history')
@@ -195,11 +211,15 @@ export class UsersController {
   }
 
   @Post('me/mark-email-verified')
-  async markEmailVerified(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
+  async markEmailVerified(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+  ) {
     const token = req[USER_KEY];
     // Only mark verified when the account has a social provider that guarantees
     // the email — never for pure email/password accounts without social login
-    const hasSocialProvider = token.providers.includes('google') || token.providers.includes('facebook');
+    const hasSocialProvider =
+      token.providers.includes('google') ||
+      token.providers.includes('facebook');
     if (!hasSocialProvider) {
       return { ok: false, reason: 'no_social_provider' };
     }
@@ -218,7 +238,8 @@ export class UsersController {
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Body() body: { photos: string[] },
   ) {
-    if (!Array.isArray(body?.photos)) throw new BadRequestException('photos must be an array');
+    if (!Array.isArray(body?.photos))
+      throw new BadRequestException('photos must be an array');
     return this.users.updatePhotoHistory(req[USER_KEY].uid, body.photos);
   }
 
@@ -238,7 +259,13 @@ export class UsersController {
   @Patch('me/translator-profile')
   async updateTranslatorProfile(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { bio?: string; translatorLanguages?: string[]; country?: string; preferredLanguage?: string },
+    @Body()
+    body: {
+      bio?: string;
+      translatorLanguages?: string[];
+      country?: string;
+      preferredLanguage?: string;
+    },
   ) {
     await this.users.updateTranslatorProfile(req[USER_KEY].uid, body ?? {});
     return { ok: true };

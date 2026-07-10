@@ -8,7 +8,11 @@ import { WalletEventsService } from './wallet-events.service';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { TopupThrottleGuard } from './topup-throttle.guard';
 
-const TEST_USER = { uid: 'test-uid', email: 'test@test.com', name: 'Test User' };
+const TEST_USER = {
+  uid: 'test-uid',
+  email: 'test@test.com',
+  name: 'Test User',
+};
 
 const mockWalletService = {
   getBalance: jest.fn(),
@@ -58,14 +62,18 @@ describe('WalletController', () => {
   describe('GET /wallet/balance', () => {
     it('should return the authenticated user balance', async () => {
       mockWalletService.getBalance.mockResolvedValue(250);
-      const res = await request(app.getHttpServer()).get('/wallet/balance').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/wallet/balance')
+        .expect(200);
       expect(res.body).toEqual({ balance: 250 });
       expect(mockWalletService.getBalance).toHaveBeenCalledWith(TEST_USER.uid);
     });
 
     it('should return zero balance for a new user', async () => {
       mockWalletService.getBalance.mockResolvedValue(0);
-      const res = await request(app.getHttpServer()).get('/wallet/balance').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/wallet/balance')
+        .expect(200);
       expect(res.body).toEqual({ balance: 0 });
     });
   });
@@ -84,7 +92,10 @@ describe('WalletController', () => {
     });
 
     it('should top up coins and return updated wallet', async () => {
-      mockWalletService.addCoins.mockResolvedValue({ uid: TEST_USER.uid, balance: 350 });
+      mockWalletService.addCoins.mockResolvedValue({
+        uid: TEST_USER.uid,
+        balance: 350,
+      });
       const res = await request(app.getHttpServer())
         .post('/wallet/topup')
         .send({ amount: 100 })
@@ -116,7 +127,9 @@ describe('WalletController', () => {
         { id: 't2', amount: -30, type: 'buy', created_at: '2025-01-02' },
       ];
       mockWalletService.getTransactions.mockResolvedValue(txList);
-      const res = await request(app.getHttpServer()).get('/wallet/transactions').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/wallet/transactions')
+        .expect(200);
       expect(res.body).toHaveLength(2);
       expect(res.body[0].type).toBe('topup');
       expect(res.body[1].amount).toBe(-30);
@@ -124,7 +137,9 @@ describe('WalletController', () => {
 
     it('should return an empty array when no transactions exist', async () => {
       mockWalletService.getTransactions.mockResolvedValue([]);
-      const res = await request(app.getHttpServer()).get('/wallet/transactions').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/wallet/transactions')
+        .expect(200);
       expect(res.body).toEqual([]);
     });
   });
@@ -139,7 +154,9 @@ describe('WalletController', () => {
         titlesSold: 2,
         uniqueBuyers: 4,
       });
-      const res = await request(app.getHttpServer()).get('/wallet/earnings').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/wallet/earnings')
+        .expect(200);
       expect(res.body.totalSales).toBe(5);
       expect(res.body.totalEarned).toBe(350);
       expect(res.body.titlesSold).toBe(2);
@@ -153,8 +170,15 @@ describe('WalletController', () => {
         titlesSold: 0,
         uniqueBuyers: 0,
       });
-      const res = await request(app.getHttpServer()).get('/wallet/earnings').expect(200);
-      expect(res.body).toEqual({ totalSales: 0, totalEarned: 0, titlesSold: 0, uniqueBuyers: 0 });
+      const res = await request(app.getHttpServer())
+        .get('/wallet/earnings')
+        .expect(200);
+      expect(res.body).toEqual({
+        totalSales: 0,
+        totalEarned: 0,
+        titlesSold: 0,
+        uniqueBuyers: 0,
+      });
     });
   });
 
@@ -172,7 +196,11 @@ describe('WalletController', () => {
         ],
       })
         .overrideGuard(AuthGuard)
-        .useValue({ canActivate: () => { throw new UnauthorizedException(); } })
+        .useValue({
+          canActivate: () => {
+            throw new UnauthorizedException();
+          },
+        })
         .overrideGuard(TopupThrottleGuard)
         .useValue({ canActivate: () => true })
         .compile();
@@ -188,14 +216,18 @@ describe('WalletController', () => {
       ['GET', '/wallet/transactions'],
       ['GET', '/wallet/earnings'],
     ])('%s %s → 401 without token', async (method, path) => {
-      const req = method === 'GET'
-        ? request(unauthApp.getHttpServer()).get(path)
-        : request(unauthApp.getHttpServer()).post(path);
+      const req =
+        method === 'GET'
+          ? request(unauthApp.getHttpServer()).get(path)
+          : request(unauthApp.getHttpServer()).post(path);
       await req.expect(401);
     });
 
     it('POST /wallet/topup → 401 without token', async () => {
-      await request(unauthApp.getHttpServer()).post('/wallet/topup').send({ amount: 100 }).expect(401);
+      await request(unauthApp.getHttpServer())
+        .post('/wallet/topup')
+        .send({ amount: 100 })
+        .expect(401);
     });
   });
 });

@@ -35,8 +35,10 @@ function row(versionId: string, pages: string[]) {
  *  yields { data, error } — mirrors the supabase-js fluent API. */
 function fakeDb(data: unknown[]) {
   const chain: any = {};
-  for (const m of ['from', 'select', 'eq', 'order', 'is', 'in']) chain[m] = jest.fn().mockReturnValue(chain);
-  chain.then = (resolve: (v: unknown) => void) => resolve({ data, error: null });
+  for (const m of ['from', 'select', 'eq', 'order', 'is', 'in'])
+    chain[m] = jest.fn().mockReturnValue(chain);
+  chain.then = (resolve: (v: unknown) => void) =>
+    resolve({ data, error: null });
   return { client: chain } as unknown as SupabaseService;
 }
 
@@ -57,12 +59,23 @@ function fakeStorage(filesByDir: Record<string, string[]>, isRemote = false) {
   } as unknown as StorageProvider & { list: jest.Mock; exists: jest.Mock };
 }
 
-const pageUrl = (ver: string, n: number) => `/uploads/chapters/${ver}/page-${n}.png`;
+const pageUrl = (ver: string, n: number) =>
+  `/uploads/chapters/${ver}/page-${n}.png`;
 
 describe('VersionsService — backendAvailable via one list() per version (#149)', () => {
   it('checks all pages with a single storage.list call — never per-page exists()', async () => {
-    const storage = fakeStorage({ 'uploads/chapters/v1': ['page-1.png', 'page-2.png', 'page-3.png'] });
-    const svc = new VersionsService(fakeDb([row('v1', [1, 2, 3].map((n) => pageUrl('v1', n)))]) , storage);
+    const storage = fakeStorage({
+      'uploads/chapters/v1': ['page-1.png', 'page-2.png', 'page-3.png'],
+    });
+    const svc = new VersionsService(
+      fakeDb([
+        row(
+          'v1',
+          [1, 2, 3].map((n) => pageUrl('v1', n)),
+        ),
+      ]),
+      storage,
+    );
 
     const versions = await svc.listVersionsByChapter('ch1');
 
@@ -74,7 +87,15 @@ describe('VersionsService — backendAvailable via one list() per version (#149)
 
   it('a missing page file makes the version unavailable', async () => {
     const storage = fakeStorage({ 'uploads/chapters/v1': ['page-1.png'] }); // page-2 missing
-    const svc = new VersionsService(fakeDb([row('v1', [1, 2].map((n) => pageUrl('v1', n)))]), storage);
+    const svc = new VersionsService(
+      fakeDb([
+        row(
+          'v1',
+          [1, 2].map((n) => pageUrl('v1', n)),
+        ),
+      ]),
+      storage,
+    );
 
     const versions = await svc.listVersionsByChapter('ch1');
 
@@ -83,7 +104,10 @@ describe('VersionsService — backendAvailable via one list() per version (#149)
 
   it('a version whose directory does not exist is unavailable, not an exception', async () => {
     const storage = fakeStorage({}); // list() rejects for any dir
-    const svc = new VersionsService(fakeDb([row('v1', [pageUrl('v1', 1)])]), storage);
+    const svc = new VersionsService(
+      fakeDb([row('v1', [pageUrl('v1', 1)])]),
+      storage,
+    );
 
     const versions = await svc.listVersionsByChapter('ch1');
 
@@ -118,7 +142,10 @@ describe('VersionsService — backendAvailable short-circuits on remote storage 
   it('remote provider (isRemote: true): backendAvailable is true and storage.list is never called', async () => {
     // With remote/R2 storage, files are globally available — the local-presence
     // check is pointless and would cost ~100ms per network round-trip.
-    const storage = fakeStorage({ 'uploads/chapters/v1': ['page-1.png'] }, true);
+    const storage = fakeStorage(
+      { 'uploads/chapters/v1': ['page-1.png'] },
+      true,
+    );
     const svc = new VersionsService(
       fakeDb([row('v1', [pageUrl('v1', 1)])]),
       storage,
@@ -131,7 +158,10 @@ describe('VersionsService — backendAvailable short-circuits on remote storage 
   });
 
   it('local provider (isRemote: false): storage.list IS called and result determines availability', async () => {
-    const storage = fakeStorage({ 'uploads/chapters/v1': ['page-1.png'] }, false);
+    const storage = fakeStorage(
+      { 'uploads/chapters/v1': ['page-1.png'] },
+      false,
+    );
     const svc = new VersionsService(
       fakeDb([row('v1', [pageUrl('v1', 1)])]),
       storage,

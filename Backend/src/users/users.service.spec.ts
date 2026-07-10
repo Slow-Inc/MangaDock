@@ -47,11 +47,15 @@ describe('UsersService.exportHistory', () => {
 
   it('row contains correct title, chapter, and ISO date', async () => {
     const ts = 1718000000000;
-    await build([{ title: 'One Punch Man', subtitle: 'Chapter 180', last_read_at: ts }]);
+    await build([
+      { title: 'One Punch Man', subtitle: 'Chapter 180', last_read_at: ts },
+    ]);
     const csv = await service.exportHistory('uid-1');
     const lines = csv.split('\r\n');
     expect(lines).toHaveLength(2);
-    expect(lines[1]).toBe(`"One Punch Man","Chapter 180","${new Date(ts).toISOString()}"`);
+    expect(lines[1]).toBe(
+      `"One Punch Man","Chapter 180","${new Date(ts).toISOString()}"`,
+    );
   });
 
   it('escapes double-quotes in title', async () => {
@@ -75,25 +79,35 @@ describe('UsersService.exportHistory', () => {
 
   it('throws when Supabase returns an error', async () => {
     await build([], { message: 'db error' });
-    await expect(service.exportHistory('uid-1')).rejects.toThrow('Failed to export history');
+    await expect(service.exportHistory('uid-1')).rejects.toThrow(
+      'Failed to export history',
+    );
   });
 
   // ── FR-24: CSV-injection guard (prefix formula-triggering fields) ────────
   it.each(['=', '+', '-', '@'])(
     'prefixes a title starting with %s with a single quote',
     async (ch) => {
-      await build([{ title: `${ch}HYPERLINK`, subtitle: `${ch}cmd`, last_read_at: 0 }]);
+      await build([
+        { title: `${ch}HYPERLINK`, subtitle: `${ch}cmd`, last_read_at: 0 },
+      ]);
       const csv = await service.exportHistory('uid-1');
       const [, row] = csv.split('\r\n');
-      expect(row).toBe(`"'${ch}HYPERLINK","'${ch}cmd","${new Date(0).toISOString()}"`);
+      expect(row).toBe(
+        `"'${ch}HYPERLINK","'${ch}cmd","${new Date(0).toISOString()}"`,
+      );
     },
   );
 
   it('leaves a normal title unchanged (no spurious prefix)', async () => {
-    await build([{ title: 'One Punch Man', subtitle: 'Chapter 180', last_read_at: 0 }]);
+    await build([
+      { title: 'One Punch Man', subtitle: 'Chapter 180', last_read_at: 0 },
+    ]);
     const csv = await service.exportHistory('uid-1');
     const [, row] = csv.split('\r\n');
-    expect(row).toBe(`"One Punch Man","Chapter 180","${new Date(0).toISOString()}"`);
+    expect(row).toBe(
+      `"One Punch Man","Chapter 180","${new Date(0).toISOString()}"`,
+    );
   });
 });
 
@@ -151,9 +165,9 @@ describe('UsersService — reading history', () => {
 
     it('throws when Supabase returns an error', async () => {
       mockUpsert.mockResolvedValue({ error: { message: 'DB error' } });
-      await expect(
-        service.upsertHistoryItem('u1', baseItem),
-      ).rejects.toThrow('Failed to upsert history item');
+      await expect(service.upsertHistoryItem('u1', baseItem)).rejects.toThrow(
+        'Failed to upsert history item',
+      );
     });
   });
 
@@ -164,10 +178,16 @@ describe('UsersService — reading history', () => {
       mockChain.limit = jest.fn().mockResolvedValue({
         data: [
           {
-            manga_id: 'manga-1', title: 'One Piece', subtitle: '',
+            manga_id: 'manga-1',
+            title: 'One Piece',
+            subtitle: '',
             thumbnail: 'https://example.com/cover.jpg',
-            authors: [], description: '', published_date: '',
-            categories: [], average_rating: 0, ratings_count: 0,
+            authors: [],
+            description: '',
+            published_date: '',
+            categories: [],
+            average_rating: 0,
+            ratings_count: 0,
             last_read_at: 1700000000000,
             last_page: 7,
             last_chapter_id: 'ch-42',
@@ -185,10 +205,16 @@ describe('UsersService — reading history', () => {
       mockChain.limit = jest.fn().mockResolvedValue({
         data: [
           {
-            manga_id: 'manga-1', title: 'One Piece', subtitle: '',
+            manga_id: 'manga-1',
+            title: 'One Piece',
+            subtitle: '',
             thumbnail: 'https://example.com/cover.jpg',
-            authors: [], description: '', published_date: '',
-            categories: [], average_rating: 0, ratings_count: 0,
+            authors: [],
+            description: '',
+            published_date: '',
+            categories: [],
+            average_rating: 0,
+            ratings_count: 0,
             last_read_at: 1700000000000,
             last_page: null,
             last_chapter_id: null,
@@ -204,9 +230,12 @@ describe('UsersService — reading history', () => {
 
     it('throws when Supabase returns an error', async () => {
       mockChain.limit = jest.fn().mockResolvedValue({
-        data: null, error: { message: 'DB error' },
+        data: null,
+        error: { message: 'DB error' },
       });
-      await expect(service.getHistory('u1')).rejects.toThrow('Failed to fetch history');
+      await expect(service.getHistory('u1')).rejects.toThrow(
+        'Failed to fetch history',
+      );
     });
   });
 });
@@ -249,7 +278,11 @@ describe('UsersService.upsertUser — atomic upsert', () => {
   beforeEach(buildChain);
 
   it('creates via atomic upsert on conflict uid with ignoreDuplicates (no existence read)', async () => {
-    await service.upsertUser('u1', { email: 'e@x.com', displayName: 'Neo', photoURL: 'http://p/a.png' });
+    await service.upsertUser('u1', {
+      email: 'e@x.com',
+      displayName: 'Neo',
+      photoURL: 'http://p/a.png',
+    });
 
     expect(upsertMock).toHaveBeenCalledWith(
       expect.objectContaining({ uid: 'u1', email: 'e@x.com' }),
@@ -269,7 +302,11 @@ describe('UsersService.upsertUser — atomic upsert', () => {
   });
 
   it('backfills display_name / photo_url only when still null', async () => {
-    await service.upsertUser('u1', { email: 'e@x.com', displayName: 'Neo', photoURL: 'http://p/a.png' });
+    await service.upsertUser('u1', {
+      email: 'e@x.com',
+      displayName: 'Neo',
+      photoURL: 'http://p/a.png',
+    });
     expect(isMock).toHaveBeenCalledWith('display_name', null);
     expect(isMock).toHaveBeenCalledWith('photo_url', null);
   });
@@ -305,7 +342,9 @@ describe('UsersService.getProfile — parallel queries', () => {
       eq: jest.fn().mockReturnThis(),
       order: jest.fn(() => favP),
     };
-    const from = jest.fn((t: string) => (t === 'profiles' ? profilesChain : favChain));
+    const from = jest.fn((t: string) =>
+      t === 'profiles' ? profilesChain : favChain,
+    );
     const service = new UsersService({ client: { from } } as any, {} as any);
 
     const promise = service.getProfile('u1');
@@ -346,7 +385,10 @@ describe('UsersService.deleteUserAccount — parallel deletes', () => {
       list: jest.fn().mockResolvedValue([]),
       delete: jest.fn().mockResolvedValue(undefined),
     };
-    const service = new UsersService({ client: { from } } as any, storage as any);
+    const service = new UsersService(
+      { client: { from } } as any,
+      storage as any,
+    );
 
     const promise = service.deleteUserAccount('u1');
 
@@ -362,22 +404,29 @@ describe('UsersService.deleteUserAccount — parallel deletes', () => {
     expect(profileChain.delete).toHaveBeenCalled();
   });
 
-  it('deletes only this user\'s avatar files, in parallel', async () => {
+  it("deletes only this user's avatar files, in parallel", async () => {
     const from = jest.fn(() => ({
       delete: jest.fn().mockReturnThis(),
       eq: jest.fn().mockResolvedValue({ error: null }),
     }));
     const storage = {
-      list: jest.fn().mockResolvedValue(['u1_a.png', 'u1_b.png', 'other_c.png']),
+      list: jest
+        .fn()
+        .mockResolvedValue(['u1_a.png', 'u1_b.png', 'other_c.png']),
       delete: jest.fn().mockResolvedValue(undefined),
     };
-    const service = new UsersService({ client: { from } } as any, storage as any);
+    const service = new UsersService(
+      { client: { from } } as any,
+      storage as any,
+    );
 
     await service.deleteUserAccount('u1');
 
     expect(storage.delete).toHaveBeenCalledWith('uploads/avatars/u1_a.png');
     expect(storage.delete).toHaveBeenCalledWith('uploads/avatars/u1_b.png');
-    expect(storage.delete).not.toHaveBeenCalledWith('uploads/avatars/other_c.png');
+    expect(storage.delete).not.toHaveBeenCalledWith(
+      'uploads/avatars/other_c.png',
+    );
   });
 
   it('throws when a child-table delete fails', async () => {
@@ -385,9 +434,17 @@ describe('UsersService.deleteUserAccount — parallel deletes', () => {
       delete: jest.fn().mockReturnThis(),
       eq: jest.fn().mockResolvedValue({ error: { message: 'boom' } }),
     }));
-    const storage = { list: jest.fn().mockResolvedValue([]), delete: jest.fn() };
-    const service = new UsersService({ client: { from } } as any, storage as any);
+    const storage = {
+      list: jest.fn().mockResolvedValue([]),
+      delete: jest.fn(),
+    };
+    const service = new UsersService(
+      { client: { from } } as any,
+      storage as any,
+    );
 
-    await expect(service.deleteUserAccount('u1')).rejects.toThrow('Failed to delete');
+    await expect(service.deleteUserAccount('u1')).rejects.toThrow(
+      'Failed to delete',
+    );
   });
 });

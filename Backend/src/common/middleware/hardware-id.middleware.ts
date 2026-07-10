@@ -40,12 +40,16 @@ export class HardwareIdMiddleware implements NestMiddleware {
 
     if (!isValidHardwareId(hwId)) {
       this.logger.warn(`HWID missing or malformed — ${req.method} ${path}`);
-      res.status(401).json({ statusCode: 401, message: 'Missing or malformed hardware ID' });
+      res
+        .status(401)
+        .json({ statusCode: 401, message: 'Missing or malformed hardware ID' });
       return;
     }
 
     (req as any).hardwareId = hwId;
-    this.logger.debug(`HWID verified: ${String(hwId).slice(0, 8)}... — ${req.method} ${path}`);
+    this.logger.debug(
+      `HWID verified: ${String(hwId).slice(0, 8)}... — ${req.method} ${path}`,
+    );
     next();
   }
 }

@@ -19,7 +19,11 @@ function makeService() {
     set: jest.fn().mockResolvedValue(undefined),
     setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
   };
-  const storage = { put: jest.fn().mockResolvedValue(undefined), list: jest.fn().mockResolvedValue([]), delete: jest.fn().mockResolvedValue(undefined) };
+  const storage = {
+    put: jest.fn().mockResolvedValue(undefined),
+    list: jest.fn().mockResolvedValue([]),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new BooksService(
     {} as any,
     cache as any,
@@ -36,13 +40,17 @@ describe('BooksService — all-cached batch job registry lifecycle', () => {
     { pageIndex: 1, pageUrl: 'http://img/1.jpg' },
   ];
   const cachedEntry = {
-    data: { patches: [{ xPct: 0, yPct: 0, wPct: 1, hPct: 1, url: 'http://b/p.png' }] },
+    data: {
+      patches: [{ xPct: 0, yPct: 0, wPct: 1, hPct: 1, url: 'http://b/p.png' }],
+    },
   };
 
   let fetchSpy: jest.SpyInstance;
   beforeEach(() => {
     // Guard: the all-cached path must never reach MIT.
-    fetchSpy = jest.spyOn(global, 'fetch').mockRejectedValue(new Error('unexpected fetch'));
+    fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockRejectedValue(new Error('unexpected fetch'));
   });
   afterEach(() => jest.restoreAllMocks());
 
@@ -65,7 +73,13 @@ describe('BooksService — all-cached batch job registry lifecycle', () => {
     const { service, cache } = makeService();
     cache.get.mockResolvedValue(cachedEntry);
 
-    await service.startOrAttachBatchJob('ch-cached-2', pages, jest.fn(), 'ja', 'th');
+    await service.startOrAttachBatchJob(
+      'ch-cached-2',
+      pages,
+      jest.fn(),
+      'ja',
+      'th',
+    );
 
     expect((service as any).batch.activeBatchJobs.size).toBe(0);
   });

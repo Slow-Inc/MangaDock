@@ -1,6 +1,17 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, InternalServerErrorException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  InternalServerErrorException,
+  Inject,
+} from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
-import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import {
+  STORAGE_PROVIDER,
+  type StorageProvider,
+} from '../common/storage/storage-provider.interface';
 import { saveValidatedImage } from '../common/storage/save-validated-image';
 import { ForumEventsService } from './forum-events.service';
 import {
@@ -35,7 +46,11 @@ type ForumPostRow = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
-  author?: { display_name: string | null; photo_url: string | null; role: number } | null;
+  author?: {
+    display_name: string | null;
+    photo_url: string | null;
+    role: number;
+  } | null;
   comments?: Array<{ count: number }> | null;
 };
 
@@ -74,20 +89,23 @@ export class ForumService {
   }
 
   async listPosts(
-    category?: ForumCategory, 
-    mangaId?: string, 
+    category?: ForumCategory,
+    mangaId?: string,
     sort: 'new' | 'hot' = 'new',
-    limit = 20, 
+    limit = 20,
     offset = 0,
-    userUid?: string
-  ): Promise<{ items: ForumPost[], total: number }> {
+    userUid?: string,
+  ): Promise<{ items: ForumPost[]; total: number }> {
     let query = this.db
       .from('forum_posts')
-      .select(`
+      .select(
+        `
         *,
         author:profiles(display_name, photo_url, role),
         comments:forum_comments(count)
-      `, { count: 'exact' })
+      `,
+        { count: 'exact' },
+      )
       .is('deleted_at', null)
       .is('comments.deleted_at', null);
 
@@ -98,16 +116,28 @@ export class ForumService {
       query = query.order('created_at', { ascending: false });
     } else {
       // Hot: upvotes desc, recency as tiebreaker
-      query = query.order('upvotes', { ascending: false }).order('created_at', { ascending: false });
+      query = query
+        .order('upvotes', { ascending: false })
+        .order('created_at', { ascending: false });
     }
 
-    const { data, count, error } = await query.range(offset, offset + limit - 1);
+    const { data, count, error } = await query.range(
+      offset,
+      offset + limit - 1,
+    );
 
-    if (error) throw new InternalServerErrorException(`Failed to list posts: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to list posts: ${error.message}`,
+      );
 
-    const userVotes = await this.getUserVotes(userUid, 'post', (data ?? []).map(p => p.id));
+    const userVotes = await this.getUserVotes(
+      userUid,
+      'post',
+      (data ?? []).map((p) => p.id),
+    );
 
-    const items: ForumPost[] = (data ?? []).map(p => ({
+    const items: ForumPost[] = (data ?? []).map((p) => ({
       id: p.id,
       authorUid: p.author_uid,
       authorName: p.author?.display_name,
@@ -134,11 +164,13 @@ export class ForumService {
   async getPost(id: string, userUid?: string): Promise<ForumPost> {
     const { data, error } = await this.db
       .from('forum_posts')
-      .select(`
+      .select(
+        `
         *,
         author:profiles(display_name, photo_url, role),
         comments:forum_comments(count)
-      `)
+      `,
+      )
       .eq('id', id)
       .is('deleted_at', null)
       .is('comments.deleted_at', null)
@@ -182,7 +214,9 @@ export class ForumService {
       throw new ForbiddenException('Only admins can post announcements');
     }
     if (dto.category === 'manga_update' && callerRole < 1) {
-      throw new ForbiddenException('Only translators and above can post manga updates');
+      throw new ForbiddenException(
+        'Only translators and above can post manga updates',
+      );
     }
 
     const { data, error } = await this.db
@@ -200,7 +234,10 @@ export class ForumService {
       .select('*, author:profiles(display_name, photo_url, role)')
       .single();
 
-    if (error) throw new InternalServerErrorException(`Failed to create post: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to create post: ${error.message}`,
+      );
 
     const post: ForumPost = {
       id: data.id,
@@ -223,52 +260,72 @@ export class ForumService {
       updatedAt: data.updated_at,
     };
 
-    this.forumEvents.broadcastFeedEvent({
-      type: 'new_post',
-      id: post.id,
-      title: post.title,
-      authorName: post.authorName ?? null,
-      authorPhotoUrl: post.authorPhotoUrl ?? null,
-      category: post.category,
-      createdAt: post.createdAt,
-    }).catch(err => this.logger.warn(`SSE feed broadcast failed: ${String(err)}`));
+    this.forumEvents
+      .broadcastFeedEvent({
+        type: 'new_post',
+        id: post.id,
+        title: post.title,
+        authorName: post.authorName ?? null,
+        authorPhotoUrl: post.authorPhotoUrl ?? null,
+        category: post.category,
+        createdAt: post.createdAt,
+      })
+      .catch((err) =>
+        this.logger.warn(`SSE feed broadcast failed: ${String(err)}`),
+      );
 
     return post;
   }
 
-  async getPublicProfile(uid: string, viewerUid?: string): Promise<UserProfileResponse> {
-    const [profileRes, postsRes, commentsRes, likedVotesRes, versionsRes] = await Promise.all([
-      this.db.from('profiles')
-        .select('uid, display_name, photo_url, banner_url, banner_position, role, bio, country, translator_languages, rating_avg, rating_count, created_at')
-        .eq('uid', uid)
-        .single(),
-      this.db.from('forum_posts')
-        .select('*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)')
-        .eq('author_uid', uid)
-        .is('deleted_at', null)
-        .is('comments.deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(20),
-      this.db.from('forum_comments')
-        .select('id, post_id, content, upvotes, downvotes, created_at, post:forum_posts(id, title)')
-        .eq('author_uid', uid)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(30),
-      this.db.from('forum_votes')
-        .select('target_id, created_at')
-        .eq('uid', uid)
-        .eq('target_type', 'post')
-        .eq('vote_value', 1)
-        .order('created_at', { ascending: false })
-        .limit(20),
-      this.db.from('chapter_versions')
-        .select('title_id, title_name, language, status')
-        .eq('translator_uid', uid)
-        .in('status', ['published', 'approved']),
-    ]);
+  async getPublicProfile(
+    uid: string,
+    viewerUid?: string,
+  ): Promise<UserProfileResponse> {
+    const [profileRes, postsRes, commentsRes, likedVotesRes, versionsRes] =
+      await Promise.all([
+        this.db
+          .from('profiles')
+          .select(
+            'uid, display_name, photo_url, banner_url, banner_position, role, bio, country, translator_languages, rating_avg, rating_count, created_at',
+          )
+          .eq('uid', uid)
+          .single(),
+        this.db
+          .from('forum_posts')
+          .select(
+            '*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)',
+          )
+          .eq('author_uid', uid)
+          .is('deleted_at', null)
+          .is('comments.deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        this.db
+          .from('forum_comments')
+          .select(
+            'id, post_id, content, upvotes, downvotes, created_at, post:forum_posts(id, title)',
+          )
+          .eq('author_uid', uid)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(30),
+        this.db
+          .from('forum_votes')
+          .select('target_id, created_at')
+          .eq('uid', uid)
+          .eq('target_type', 'post')
+          .eq('vote_value', 1)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        this.db
+          .from('chapter_versions')
+          .select('title_id, title_name, language, status')
+          .eq('translator_uid', uid)
+          .in('status', ['published', 'approved']),
+      ]);
 
-    if (profileRes.error || !profileRes.data) throw new NotFoundException('Profile not found');
+    if (profileRes.error || !profileRes.data)
+      throw new NotFoundException('Profile not found');
 
     // Secondary sections degrade gracefully to empty on error, but a silently
     // empty section is indistinguishable from a real "no data" state. Log each
@@ -282,11 +339,16 @@ export class ForumService {
     const p = profileRes.data;
 
     // Fetch liked posts by IDs
-    const likedPostIds = (likedVotesRes.data ?? []).map((v: { target_id: string }) => v.target_id);
+    const likedPostIds = (likedVotesRes.data ?? []).map(
+      (v: { target_id: string }) => v.target_id,
+    );
     const likedPostsRaw = await this.fetchLikedPosts(likedPostIds);
 
     // Viewer votes on all shown posts
-    const allPostIds = [...(postsRes.data ?? []).map((x: any) => x.id), ...likedPostIds];
+    const allPostIds = [
+      ...(postsRes.data ?? []).map((x: any) => x.id),
+      ...likedPostIds,
+    ];
     const viewerVotes = await this.getUserVotes(viewerUid, 'post', allPostIds);
 
     const profileComments = this.mapProfileComments(commentsRes.data ?? []);
@@ -295,21 +357,30 @@ export class ForumService {
     const translatedTitles = this.groupTranslatedTitles(versionsRes.data ?? []);
 
     // Earnings: only for own creator/translator profile
-    const earnings = await this.fetchOwnEarnings(uid, viewerUid, p.role as number);
+    const earnings = await this.fetchOwnEarnings(
+      uid,
+      viewerUid,
+      p.role as number,
+    );
 
     const profile = this.mapPublicProfile(p);
 
     return {
       profile,
-      posts: (postsRes.data ?? []).map((raw: ForumPostRow) => this.mapPostRow(raw, viewerVotes)),
+      posts: (postsRes.data ?? []).map((raw: ForumPostRow) =>
+        this.mapPostRow(raw, viewerVotes),
+      ),
       comments: profileComments,
-      likedPosts: likedPostsRaw.map(raw => this.mapPostRow(raw, viewerVotes)),
+      likedPosts: likedPostsRaw.map((raw) => this.mapPostRow(raw, viewerVotes)),
       translatedTitles,
       earnings,
     };
   }
 
-  private logSecondaryProfileErrors(uid: string, sections: readonly [string, { error: unknown }][]): void {
+  private logSecondaryProfileErrors(
+    uid: string,
+    sections: readonly [string, { error: unknown }][],
+  ): void {
     for (const [name, r] of sections) {
       if (r.error) {
         this.logger.warn(
@@ -319,11 +390,15 @@ export class ForumService {
     }
   }
 
-  private async fetchLikedPosts(likedPostIds: string[]): Promise<ForumPostRow[]> {
+  private async fetchLikedPosts(
+    likedPostIds: string[],
+  ): Promise<ForumPostRow[]> {
     if (likedPostIds.length === 0) return [];
     const { data } = await this.db
       .from('forum_posts')
-      .select('*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)')
+      .select(
+        '*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)',
+      )
       .in('id', likedPostIds)
       .is('deleted_at', null)
       .is('comments.deleted_at', null);
@@ -331,7 +406,10 @@ export class ForumService {
     return likedPostsRaw;
   }
 
-  private mapPostRow(raw: ForumPostRow, viewerVotes: Map<string, number>): ForumPost {
+  private mapPostRow(
+    raw: ForumPostRow,
+    viewerVotes: Map<string, number>,
+  ): ForumPost {
     return {
       id: raw.id,
       authorUid: raw.author_uid,
@@ -370,14 +448,23 @@ export class ForumService {
     const titleMap = new Map<string, TranslatedTitle>();
     rows.forEach((v: any) => {
       if (!titleMap.has(v.title_id)) {
-        titleMap.set(v.title_id, { titleId: v.title_id, titleName: v.title_name, language: v.language, chapterCount: 0 });
+        titleMap.set(v.title_id, {
+          titleId: v.title_id,
+          titleName: v.title_name,
+          language: v.language,
+          chapterCount: 0,
+        });
       }
       titleMap.get(v.title_id)!.chapterCount++;
     });
     return Array.from(titleMap.values());
   }
 
-  private async fetchOwnEarnings(uid: string, viewerUid: string | undefined, role: number): Promise<UserProfileEarnings | null> {
+  private async fetchOwnEarnings(
+    uid: string,
+    viewerUid: string | undefined,
+    role: number,
+  ): Promise<UserProfileEarnings | null> {
     const isCreator = role >= 1;
     if (!(isCreator && viewerUid === uid)) return null;
     const { data: earningsData } = await this.db
@@ -400,7 +487,8 @@ export class ForumService {
       displayName: p.display_name,
       photoUrl: p.photo_url,
       bannerUrl: p.banner_url ?? null,
-      bannerPosition: p.banner_position != null ? Number(p.banner_position) : 50,
+      bannerPosition:
+        p.banner_position != null ? Number(p.banner_position) : 50,
       role: p.role,
       bio: p.bio,
       country: p.country,
@@ -419,17 +507,22 @@ export class ForumService {
       .single();
 
     if (fetchErr || !existing) throw new NotFoundException('Post not found');
-    if (existing.author_uid !== uid) throw new ForbiddenException('Not authorized to delete this post');
+    if (existing.author_uid !== uid)
+      throw new ForbiddenException('Not authorized to delete this post');
 
     const { error } = await this.db
       .from('forum_posts')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (error) throw new InternalServerErrorException(`Failed to delete post: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to delete post: ${error.message}`,
+      );
 
-    this.forumEvents.broadcastPostEvent({ type: 'post_deleted', postId: id })
-      .catch(err => this.logger.warn(`SSE broadcast failed: ${String(err)}`));
+    this.forumEvents
+      .broadcastPostEvent({ type: 'post_deleted', postId: id })
+      .catch((err) => this.logger.warn(`SSE broadcast failed: ${String(err)}`));
   }
 
   async deleteComment(uid: string, id: string): Promise<void> {
@@ -440,23 +533,33 @@ export class ForumService {
       .single();
 
     if (fetchErr || !existing) throw new NotFoundException('Comment not found');
-    if (existing.author_uid !== uid) throw new ForbiddenException('Not authorized to delete this comment');
+    if (existing.author_uid !== uid)
+      throw new ForbiddenException('Not authorized to delete this comment');
 
     const { error } = await this.db
       .from('forum_comments')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (error) throw new InternalServerErrorException(`Failed to delete comment: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to delete comment: ${error.message}`,
+      );
 
-    this.forumEvents.broadcastPostEvent({
-      type: 'comment_deleted',
-      postId: existing.post_id,
-      commentId: id,
-    }).catch(err => this.logger.warn(`SSE broadcast failed: ${String(err)}`));
+    this.forumEvents
+      .broadcastPostEvent({
+        type: 'comment_deleted',
+        postId: existing.post_id,
+        commentId: id,
+      })
+      .catch((err) => this.logger.warn(`SSE broadcast failed: ${String(err)}`));
   }
 
-  async updatePost(uid: string, id: string, dto: UpdatePostDto): Promise<ForumPost> {
+  async updatePost(
+    uid: string,
+    id: string,
+    dto: UpdatePostDto,
+  ): Promise<ForumPost> {
     const { data: existing, error: fetchErr } = await this.db
       .from('forum_posts')
       .select('author_uid')
@@ -464,7 +567,8 @@ export class ForumService {
       .single();
 
     if (fetchErr || !existing) throw new NotFoundException('Post not found');
-    if (existing.author_uid !== uid) throw new ForbiddenException('Not authorized to edit this post');
+    if (existing.author_uid !== uid)
+      throw new ForbiddenException('Not authorized to edit this post');
 
     const updates: Record<string, unknown> = {};
     if (dto.title !== undefined) updates.title = dto.title;
@@ -475,21 +579,30 @@ export class ForumService {
       .update(updates)
       .eq('id', id);
 
-    if (error) throw new InternalServerErrorException(`Failed to update post: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to update post: ${error.message}`,
+      );
     const updated = await this.getPost(id, uid);
 
-    this.forumEvents.broadcastPostEvent({
-      type: 'post_edited',
-      postId: id,
-      title: updated.title,
-      content: updated.content,
-      updatedAt: updated.updatedAt,
-    }).catch(err => this.logger.warn(`SSE broadcast failed: ${String(err)}`));
+    this.forumEvents
+      .broadcastPostEvent({
+        type: 'post_edited',
+        postId: id,
+        title: updated.title,
+        content: updated.content,
+        updatedAt: updated.updatedAt,
+      })
+      .catch((err) => this.logger.warn(`SSE broadcast failed: ${String(err)}`));
 
     return updated;
   }
 
-  async updateComment(uid: string, id: string, dto: UpdateCommentDto): Promise<ForumComment> {
+  async updateComment(
+    uid: string,
+    id: string,
+    dto: UpdateCommentDto,
+  ): Promise<ForumComment> {
     const { data: existing, error: fetchErr } = await this.db
       .from('forum_comments')
       .select('author_uid')
@@ -497,7 +610,8 @@ export class ForumService {
       .single();
 
     if (fetchErr || !existing) throw new NotFoundException('Comment not found');
-    if (existing.author_uid !== uid) throw new ForbiddenException('Not authorized to edit this comment');
+    if (existing.author_uid !== uid)
+      throw new ForbiddenException('Not authorized to edit this comment');
 
     const { data, error } = await this.db
       .from('forum_comments')
@@ -506,7 +620,10 @@ export class ForumService {
       .select('*, author:profiles(display_name, photo_url, role)')
       .single();
 
-    if (error) throw new InternalServerErrorException(`Failed to update comment: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to update comment: ${error.message}`,
+      );
 
     return {
       id: data.id,
@@ -525,54 +642,93 @@ export class ForumService {
     };
   }
 
-  async uploadBanner(uid: string, tempFilePath: string, _clientMime: string): Promise<{ bannerUrl: string }> {
-    const { url: bannerUrl } = await saveValidatedImage(this.storage, tempFilePath, 'uploads/banners', {
-      storageErrorMessage: 'Failed to upload banner',
-    });
+  async uploadBanner(
+    uid: string,
+    tempFilePath: string,
+    _clientMime: string,
+  ): Promise<{ bannerUrl: string }> {
+    const { url: bannerUrl } = await saveValidatedImage(
+      this.storage,
+      tempFilePath,
+      'uploads/banners',
+      {
+        storageErrorMessage: 'Failed to upload banner',
+      },
+    );
 
     const { error } = await this.db
       .from('profiles')
       .update({ banner_url: bannerUrl })
       .eq('uid', uid);
-    if (error) throw new InternalServerErrorException(`Failed to update profile banner: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to update profile banner: ${error.message}`,
+      );
 
     return { bannerUrl };
   }
 
-  async updateBannerPosition(uid: string, position: number): Promise<{ bannerPosition: number }> {
+  async updateBannerPosition(
+    uid: string,
+    position: number,
+  ): Promise<{ bannerPosition: number }> {
     const clamped = Math.max(0, Math.min(100, position));
     const { error } = await this.db
       .from('profiles')
       .update({ banner_position: clamped })
       .eq('uid', uid);
-    if (error) throw new InternalServerErrorException(`Failed to update banner position: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to update banner position: ${error.message}`,
+      );
     return { bannerPosition: clamped };
   }
 
-  async uploadImage(uid: string, tempFilePath: string, _clientMime: string): Promise<{ imageUrl: string }> {
-    const { url } = await saveValidatedImage(this.storage, tempFilePath, 'uploads/forum', {
-      storageErrorMessage: 'Failed to upload image',
-    });
+  async uploadImage(
+    uid: string,
+    tempFilePath: string,
+    _clientMime: string,
+  ): Promise<{ imageUrl: string }> {
+    const { url } = await saveValidatedImage(
+      this.storage,
+      tempFilePath,
+      'uploads/forum',
+      {
+        storageErrorMessage: 'Failed to upload image',
+      },
+    );
     return { imageUrl: url };
   }
 
-  async listComments(postId: string, userUid?: string): Promise<ForumComment[]> {
+  async listComments(
+    postId: string,
+    userUid?: string,
+  ): Promise<ForumComment[]> {
     const { data, error } = await this.db
       .from('forum_comments')
-      .select(`
+      .select(
+        `
         *,
         author:profiles(display_name, photo_url, role)
-      `)
+      `,
+      )
       .eq('post_id', postId)
       .is('deleted_at', null)
       .order('created_at', { ascending: true })
       .limit(500);
 
-    if (error) throw new InternalServerErrorException(`Failed to list comments: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to list comments: ${error.message}`,
+      );
 
-    const userVotes = await this.getUserVotes(userUid, 'comment', (data ?? []).map(c => c.id));
+    const userVotes = await this.getUserVotes(
+      userUid,
+      'comment',
+      (data ?? []).map((c) => c.id),
+    );
 
-    const allComments: ForumComment[] = (data ?? []).map(c => ({
+    const allComments: ForumComment[] = (data ?? []).map((c) => ({
       id: c.id,
       postId: c.post_id,
       parentId: c.parent_id,
@@ -592,12 +748,12 @@ export class ForumService {
     const commentMap = new Map<string, ForumComment>();
     const rootComments: ForumComment[] = [];
 
-    allComments.forEach(c => {
+    allComments.forEach((c) => {
       c.replies = [];
       commentMap.set(c.id, c);
     });
 
-    allComments.forEach(c => {
+    allComments.forEach((c) => {
       if (c.parentId && commentMap.has(c.parentId)) {
         commentMap.get(c.parentId)!.replies!.push(c);
       } else {
@@ -625,7 +781,7 @@ export class ForumService {
       }
 
       // post_count arrives as a bigint string over PostgREST — coerce to number.
-      return ((data ?? []) as any[]).map(row => ({
+      return ((data ?? []) as any[]).map((row) => ({
         mangaId: row.manga_id,
         mangaTitle: row.manga_title || 'Unknown',
         mangaCover: row.manga_cover,
@@ -637,7 +793,10 @@ export class ForumService {
     }
   }
 
-  async createComment(uid: string, dto: CreateCommentDto): Promise<ForumComment> {
+  async createComment(
+    uid: string,
+    dto: CreateCommentDto,
+  ): Promise<ForumComment> {
     if (dto.parentId) {
       const { data: parentComment, error: parentError } = await this.db
         .from('forum_comments')
@@ -651,10 +810,13 @@ export class ForumService {
           `Failed to validate parent comment: ${parentError.message}`,
         );
       }
-      if (!parentComment) throw new NotFoundException('Parent comment not found');
+      if (!parentComment)
+        throw new NotFoundException('Parent comment not found');
       // Supabase row keys mirror DB column names (snake_case).
       if (parentComment.post_id !== dto.postId) {
-        throw new BadRequestException('Parent comment must belong to the same post');
+        throw new BadRequestException(
+          'Parent comment must belong to the same post',
+        );
       }
     }
 
@@ -669,7 +831,10 @@ export class ForumService {
       .select('*, author:profiles(display_name, photo_url, role)')
       .single();
 
-    if (error) throw new InternalServerErrorException(`Failed to create comment: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to create comment: ${error.message}`,
+      );
 
     const comment: ForumComment = {
       ...data,
@@ -684,13 +849,17 @@ export class ForumService {
       updatedAt: data.updated_at,
     };
 
-    this.forumEvents.broadcastPostEvent({ type: 'comment', postId: comment.postId, comment })
-      .catch(err => this.logger.warn(`SSE broadcast failed: ${String(err)}`));
+    this.forumEvents
+      .broadcastPostEvent({ type: 'comment', postId: comment.postId, comment })
+      .catch((err) => this.logger.warn(`SSE broadcast failed: ${String(err)}`));
 
     return comment;
   }
 
-  async vote(uid: string, dto: VoteDto): Promise<{ upvotes: number, downvotes: number }> {
+  async vote(
+    uid: string,
+    dto: VoteDto,
+  ): Promise<{ upvotes: number; downvotes: number }> {
     // Atomic upsert/toggle + recalculate in a single transaction. Replaces the old
     // select-then-write, which let concurrent votes 500 on the PK or interleave
     // delete/update/insert into an inconsistent state (FR-9).
@@ -700,11 +869,15 @@ export class ForumService {
       p_target_id: dto.targetId,
       p_vote_value: dto.voteValue,
     });
-    if (error) throw new InternalServerErrorException(`Vote failed: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(`Vote failed: ${error.message}`);
 
-    const row = Array.isArray(data) ? data[0] : (data as any);
+    const row = Array.isArray(data) ? data[0] : data;
     // Postgres bigint may arrive as a string over PostgREST — coerce to number.
-    const result = { upvotes: Number(row?.upvotes ?? 0), downvotes: Number(row?.downvotes ?? 0) };
+    const result = {
+      upvotes: Number(row?.upvotes ?? 0),
+      downvotes: Number(row?.downvotes ?? 0),
+    };
 
     // Resolve postId for the broadcast (comment votes need a lookup)
     let postId: string | null = null;
@@ -720,20 +893,28 @@ export class ForumService {
     }
 
     if (postId) {
-      this.forumEvents.broadcastPostEvent({
-        type: 'vote',
-        postId,
-        targetType: dto.targetType,
-        targetId: dto.targetId,
-        upvotes: result.upvotes,
-        downvotes: result.downvotes,
-      }).catch(err => this.logger.warn(`SSE broadcast failed: ${String(err)}`));
+      this.forumEvents
+        .broadcastPostEvent({
+          type: 'vote',
+          postId,
+          targetType: dto.targetType,
+          targetId: dto.targetId,
+          upvotes: result.upvotes,
+          downvotes: result.downvotes,
+        })
+        .catch((err) =>
+          this.logger.warn(`SSE broadcast failed: ${String(err)}`),
+        );
     }
 
     return result;
   }
 
-  private async getUserVotes(uid: string | undefined, type: 'post' | 'comment', ids: string[]): Promise<Map<string, number>> {
+  private async getUserVotes(
+    uid: string | undefined,
+    type: 'post' | 'comment',
+    ids: string[],
+  ): Promise<Map<string, number>> {
     const votes = new Map<string, number>();
     if (!uid || ids.length === 0) return votes;
 
@@ -744,7 +925,7 @@ export class ForumService {
       .eq('target_type', type)
       .in('target_id', ids);
 
-    (data ?? []).forEach(v => votes.set(v.target_id, v.vote_value));
+    (data ?? []).forEach((v) => votes.set(v.target_id, v.vote_value));
     return votes;
   }
 }

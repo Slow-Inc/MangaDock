@@ -16,7 +16,9 @@ describe('BusinessMetricsService', () => {
     (Counter as jest.Mock).mockClear();
     service = new BusinessMetricsService();
     // mock.results captures the returned object from each new Counter() call
-    [reads, unlocks, spent, added] = (Counter as jest.Mock).mock.results.map((r) => r.value);
+    [reads, unlocks, spent, added] = (Counter as jest.Mock).mock.results.map(
+      (r) => r.value,
+    );
   });
 
   it('recordRead() calls chapterReadsTotal.inc(1)', () => {

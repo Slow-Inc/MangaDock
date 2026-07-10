@@ -15,17 +15,22 @@ describe('UploadsController streaming errors (FR-22 review)', () => {
   let loggerError: jest.SpyInstance;
 
   beforeEach(() => {
-    loggerError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    loggerError = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     loggerError.mockRestore();
   });
 
-  const makeReq = () => ({ path: '/uploads/foo/bar.png' }) as unknown as Request;
+  const makeReq = () =>
+    ({ path: '/uploads/foo/bar.png' }) as unknown as Request;
 
   const makeRes = () => {
-    const res = new Writable({ write: (_c, _e, cb) => cb() }) as unknown as Response & {
+    const res = new Writable({
+      write: (_c, _e, cb) => cb(),
+    }) as unknown as Response & {
       headersSent: boolean;
     };
     res.setHeader = jest.fn() as unknown as Response['setHeader'];
@@ -122,13 +127,20 @@ describe('UploadsController path traversal guard (FR-23)', () => {
     '/uploads/../src/main.ts',
   ];
 
-  it.each(traversalPaths)('rejects traversal payload %s without reading storage', async (p) => {
-    const { controller, storage } = makeController();
-    const req = { path: p } as unknown as Request;
+  it.each(traversalPaths)(
+    'rejects traversal payload %s without reading storage',
+    async (p) => {
+      const { controller, storage } = makeController();
+      const req = { path: p } as unknown as Request;
 
-    await expect(controller.serve(req, makeRes())).rejects.toBeInstanceOf(NotFoundException);
-    expect((storage as unknown as { get: jest.Mock }).get).not.toHaveBeenCalled();
-  });
+      await expect(controller.serve(req, makeRes())).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(
+        (storage as unknown as { get: jest.Mock }).get,
+      ).not.toHaveBeenCalled();
+    },
+  );
 
   it('serves a legitimate key within the uploads root (no regression)', async () => {
     const { controller, storage } = makeController();

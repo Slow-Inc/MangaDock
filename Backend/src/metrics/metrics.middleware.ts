@@ -10,8 +10,9 @@ export class MetricsMiddleware implements NestMiddleware {
 
     res.on('finish', () => {
       // Normalise dynamic segments to reduce cardinality
-      const route = (req.route?.path as string | undefined)
-        ?? req.path.replace(/\/[0-9a-f-]{8,}/g, '/:id').replace(/\/\d+/g, '/:id');
+      const route =
+        (req.route?.path as string | undefined) ??
+        req.path.replace(/\/[0-9a-f-]{8,}/g, '/:id').replace(/\/\d+/g, '/:id');
       const duration = Date.now() - t0;
       httpRequestsTotal.inc({
         service: 'backend',
@@ -19,7 +20,10 @@ export class MetricsMiddleware implements NestMiddleware {
         route,
         status_code: String(res.statusCode),
       });
-      httpRequestDuration.observe({ service: 'backend', method, route }, duration);
+      httpRequestDuration.observe(
+        { service: 'backend', method, route },
+        duration,
+      );
     });
 
     next();

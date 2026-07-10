@@ -44,10 +44,13 @@ describe('loadPageBytes', () => {
       get: jest.fn().mockResolvedValue(Buffer.from('r2-bytes')),
     } as unknown as Pick<StorageProvider, 'get'>;
 
-    const buf = await loadPageBytes('/img-cache/_chapters/chapters/ch1/p0.jpg', {
-      imgCacheRoot: root,
-      storage,
-    });
+    const buf = await loadPageBytes(
+      '/img-cache/_chapters/chapters/ch1/p0.jpg',
+      {
+        imgCacheRoot: root,
+        storage,
+      },
+    );
 
     expect((storage as unknown as { get: jest.Mock }).get).toHaveBeenCalledWith(
       'img-cache/_chapters/chapters/ch1/p0.jpg',
@@ -73,18 +76,21 @@ describe('loadPageBytes', () => {
   it.each([
     '/uploads/chapters/ch1/p0.jpg',
     '/api/proxy/uploads/chapters/ch1/p0.jpg', // the Reader's proxy-prefixed src
-  ])('reads an uploaded chapter page from the uploads root on disk: %s', async (url) => {
-    const dir = path.join(root, 'chapters', 'ch1');
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(path.join(dir, 'p0.jpg'), Buffer.from('upload-bytes'));
+  ])(
+    'reads an uploaded chapter page from the uploads root on disk: %s',
+    async (url) => {
+      const dir = path.join(root, 'chapters', 'ch1');
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(path.join(dir, 'p0.jpg'), Buffer.from('upload-bytes'));
 
-    const buf = await loadPageBytes(url, {
-      imgCacheRoot: path.join(root, '_nope'),
-      uploadsRoot: root,
-    });
+      const buf = await loadPageBytes(url, {
+        imgCacheRoot: path.join(root, '_nope'),
+        uploadsRoot: root,
+      });
 
-    expect(buf.toString()).toBe('upload-bytes');
-  });
+      expect(buf.toString()).toBe('upload-bytes');
+    },
+  );
 
   it.each([
     '/uploads/../secrets.txt',
