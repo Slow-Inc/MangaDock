@@ -1322,3 +1322,15 @@ safe). Every benchmark now ships a committed PNG per the benchmark rule.
 **Risk.** Very low — additive eval/docs only, no runtime code. Cleanup in this PR: dropped a 1396-line worker
 log that had leaked in (+ gitignore), relocated the proactive-clink-brainstorm memory to the canonical Obsidian
 vault. **Remaining = user-gated:** merge #533 + prod-enable of the proven-good flags.
+
+## 2026-07-10 — Tech-debt batch (6 PRs: #542/#544/#616/#617/#618/#620)
+
+**Change.** Agent-owned tech-debt batch merged to `main`: two latent-bug fixes (`translation_store` utf-8 encoding #542; `readWithTimeout` dangling-timer leak #544), three test-suite fixes greening the report-only heavy-ML pytest job (#616/#617/#618), and a process-doc rule (#620). All TDD (RED demonstrated the concrete defect before GREEN) + `/scrutinize` (verdict ship, findings posted bilingual; one real finding — a self-wikilink in #621 — caught and fixed).
+
+**Before → after.** heavy-ML CI: 3 pre-existing failures → 0. Windows Thai/CJK save-text: crash → round-trips. Batch NDJSON stream: ~90s timer leaked per chunk → released in `finally`. Pre-merge discipline: implicit → documented rule + dogfooded (#612 rebased onto post-#619 main before merge).
+
+**Validation.** Per-PR logic-gate + heavy-ML CI green; #612 heavy-ML re-verified green after rebase. No production runtime behaviour changed (the one prod-file touch, #619's `flux_embed_cache` import relocation, is import-timing only, cached in `sys.modules`).
+
+**Risk.** Low — five of six PRs are test/docs/IO-hardening; the encoding + timer fixes are additive-safe (no legacy non-ASCII files existed pre-fix; timer cleanup is a no-op when unset). Base-staleness verified disjoint for every merge (no clobber possible).
+
+**Remaining.** #614 (load_dotenv extraction) + #615 (BaseGPTTranslator) filed as focused leftovers; CLAUDE.md copy of the #620 rule deferred to Stage B.

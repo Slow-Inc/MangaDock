@@ -2749,3 +2749,14 @@ The logic gate's green status was validated end-to-end by PR #427's own `mit-ci`
 2. **test/testdata blanket-ignored** — `test_patch_png`'s `dotgain20.icc` fixture was never committed. Tracked via `testdata/*` + re-include.
 3. **chatgpt → manga_translator circular import** — `translators/chatgpt.py` did `from .. import manga_translator` at module top; lazy init no longer pre-loads the impl module, so it cycled through `manga_translator.py → translators.dispatch` (partially-init). Moved to a runtime-local import. Regression-tested.
 Also: `asyncio_mode = auto` made the bare `async def` suites (textline_merge etc.) actually run+pass in CI; heavy-API characterization tests are `skipif(not torch)`. Heavy job stays report-only (needs models/GPU).
+
+## 2026-07-10 — Tech-debt batch: latent-bug fixes + heavy-ML suite green + pre-merge rule (#542/#544/#616/#617/#618/#620)
+
+Six-PR agent-owned tech-debt batch, all TDD + `/scrutinize` (posted bilingual) + merged to `main` this session:
+- **#542** (PR #612) — `translation_store` pinned `encoding="utf-8"` on read+write; Thai/CJK `--save-text`/`--load-text` no longer raises `UnicodeEncodeError` on a cp1252-default (Windows) host. RED (forced cp1252) → GREEN (round-trip + real UTF-8 bytes).
+- **#544** (PR #613) — extracted `readWithTimeout(read, timeoutMs)` helper + `clearTimeout` in `finally`; kills a ~90s dangling timer leaked per NDJSON chunk under batch load. RED (`getTimerCount()===1`) → GREEN (0 on both resolve/timeout paths); jest 11/11.
+- **#616/#617/#618** (PR #619) — greened the report-only heavy-ML pytest suite (3 fail → 0): registry pin gained `flux_klein` + a method-local `flux_embed_cache` import that breaks a PEP-562 circular import surfacing on isolated collection; `test_stages` render fixture gained `reference_layout`+`knuth_plass`; `test_online_translators` got `skipif(CI)` (network-dependent, `.group()` on None offline).
+- **#620** (PR #621) — documented the pre-merge base-staleness/rebase rule (the human half of the #553 clobber defense) in the Obsidian merge-policy note + `scripts/README.md`; CLAUDE.md deferred to Stage B (dev decision).
+- Also: closed **#543** obsolete (already fixed by #106 `1de61ffe`); filed leftovers **#614** (load_dotenv extraction, ex-#192) + **#615** (BaseGPTTranslator, ex-#188).
+
+Dogfooded #620 the same session: after #619 landed, #612 was rebased onto post-#619 `main` (disjoint → clean) before merge, which also greened its heavy-ML job; #613/#621 were verified disjoint from main's new commits and squash-merged. Missing dev dep `pytest-asyncio` installed in the MIT venv (local async tests were silently failing "async def not natively supported").
