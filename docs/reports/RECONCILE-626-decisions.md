@@ -112,3 +112,21 @@ point, verified they were overlapping-name (take superset) not complementary.
   side). Net: **193 passed, 0 skipped** (first run saved goldens as `sss`, second asserts green).
   4 goldens now: bubble_fit/clean_layout/legacy + new `resize_regions_thai.npz`. Green = source
   coherent + deterministic; render QUALITY vs baseline = Phase-D GPU benchmark (pending).
+
+## Phase D + PIVOT (2026-07-10) — render == baseline, per dev hard constraint
+Render gate (deterministic CPU dump-replay, Gal Yome EN→TH) first showed reconciled (main render
+spine) differed **3.96%** from landing baseline — filled balloons larger. Dev constraint:
+**"คุณภาพต้องเหมือน baseline เท่านั้น"** → **baseline is authority for all quality**.
+- **PIVOTED render-geometry subsystem to landing's exact code**: rendering/__init__.py, render_overlap.py,
+  rendering/text_render.py, patch_geometry.py, patch_renderer.py, text_layer.py, stages.py + their
+  render tests + goldens regenerated from landing. Render A/B now **0.0000% diff (byte-identical)**.
+- **Consequence:** main's render campaign (reference_layout #178 / KP #180 / width-squeeze #183) is
+  NOT in the default output — shelved. Inert leftovers: config `reference_layout` field +
+  MIT_REFERENCE_LAYOUT mapping (do nothing), orphaned reference_layout.py / render_replay.py /
+  sizing_trace.py. These can be cleaned up (follow-up).
+- **Kept from main (non-render):** translators + #623 thinking fold, tolerant numbered-parse,
+  Backend/Frontend, config additions, CI-infra (#359 lazy-import / ADR 029), textline_merge is_sfx.
+- **Bonus:** landing's crux sets `render_branch`/`render_font_px`/`render_dst_box` natively → the
+  deferred telemetry gap (#628) is resolved for the render path (landing already wired it).
+- Net: **159 passed** (landing render suite is smaller than main's superset; all green).
+- **Translation gate** (#623 A/B + detect/ocr text == baseline) still needs a GPU translate run.

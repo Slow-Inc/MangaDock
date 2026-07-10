@@ -37,10 +37,6 @@ try:
         pass
 except ImportError:
     _HAS_JIEBA = False
-# #278 nit: jieba builds its prefix dict (~1 s) lazily on the FIRST `_jieba.cut` — i.e. the first
-# Chinese render per worker carries that one-time cost, not import. We deliberately do NOT call
-# `_jieba.initialize()` here so a worker that never renders Chinese pays nothing at startup
-# (lazy-cost by design); the ~1 s is amortised on the first CHS/CHT page only.
 
 
 def _insert_cjk_word_breaks(text: str) -> str:
@@ -698,8 +694,7 @@ def longest_token_width(font_size: int, text: str, language: str = 'en_US') -> i
     not drop below, or words with no hyphenation point (especially spaceless Thai/CJK) get
     force-split mid-word ("ข้างนอก"→"ข้า"/"งนอก"). Word boundaries come from the same ZWSP
     segmentation ``calc_horizontal`` uses (pythainlp/jieba), so a spaceless Thai line is
-    measured per word, not as one giant token. ``language`` is accepted for call-site symmetry
-    with ``calc_horizontal`` (segmentation auto-detects script, so it is not needed here)."""
+    measured per word, not as one giant token."""
     seg = _insert_cjk_word_breaks(_insert_thai_word_breaks(text or ''))
     words = [w for w in re.split(rf'[\s{_ZWSP}]+', seg) if w]
     if not words:
