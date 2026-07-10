@@ -6,6 +6,33 @@ import { type MitBatchDeps, type PageResult } from './mit-batch-types';
 import { patchCacheKey, buildMitConfig, imageModelKey } from './mit-config';
 
 /**
+ * Race a single stream `read()` against a `timeoutMs` deadline, ALWAYS clearing
+ * the loser timer in a `finally` so a fast read (the common case, every chunk)
+ * does not leave a dangling ~90s timer pending. Those accumulated across a long
+ * NDJSON stream and delayed event-loop settling / process exit (#544).
+ */
+export async function readWithTimeout<T>(
+  read: () => Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      read(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(new Error(`MIT stream read timeout after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * MIT batch transport + NDJSON stream driver (#294).
  *
  * Carved out of MitBatchOrchestrator so the HTTP-to-MIT submit and the stream
@@ -198,28 +225,14 @@ export class MitBatchStream {
       30_000,
       Number(process.env.MIT_BATCH_STREAM_READ_TIMEOUT_MS ?? 90_000),
     );
-    const readWithTimeout = async () => {
-      return await Promise.race([
-        reader.read(),
-        new Promise<never>((_, reject) => {
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `MIT stream read timeout after ${streamReadTimeoutMs}ms`,
-                ),
-              ),
-            streamReadTimeoutMs,
-          );
-        }),
-      ]);
-    };
-
     let streamFailedError: string | null = null;
 
     try {
       outer: while (true) {
-        const { done, value } = await readWithTimeout();
+        const { done, value } = await readWithTimeout(
+          () => reader.read(),
+          streamReadTimeoutMs,
+        );
         if (done) break;
         const { events, carry: nextCarry } = parseNdjsonChunk(
           decoder.decode(value, { stream: true }),
