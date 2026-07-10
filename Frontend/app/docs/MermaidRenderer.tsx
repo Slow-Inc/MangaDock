@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import type { MermaidConfig } from 'mermaid';
 
 let mermaidIdCounter = 0;
 let mermaidInitialized = false;
@@ -37,7 +38,7 @@ export const MERMAID_CONFIG = {
     textColor: '#c9d1e0',
     nodeTextColor: '#e8eaf6',
   },
-};
+} satisfies MermaidConfig;
 
 async function getMermaid() {
   const mermaid = (await import('mermaid')).default;
