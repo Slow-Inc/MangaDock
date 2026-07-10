@@ -22,6 +22,7 @@ import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData
 import { clearAllApiCache } from "../lib/apiCache";
 import { reloadPage, redirectToHome } from "../lib/browserActions";
 import { resolveAvatarUrl } from "../lib/avatarUpload";
+import { isTrustedOAuthCallbackMessage } from "../lib/oauthCallback";
 import { useToast } from "./ToastContext";
 
 const API_BASE = "/api/proxy";
@@ -343,7 +344,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The callback page postMessages the session tokens (or error) back to us.
       // This works even if the popup callback and opener are on different origins.
       const onMessage = async (event: MessageEvent) => {
-        if (event.data?.type !== "supabase:oauth:callback") return;
+        if (!isTrustedOAuthCallbackMessage(event, window.location.origin)) return;
         window.removeEventListener("message", onMessage);
         clearInterval(closedPoll);
         try { popup.close(); } catch { /* ignore */ }
