@@ -153,3 +153,18 @@ stays configurable, default OFF = dense-safe. PNG+MD: docs/reports/benchmarks/20
 CAVEAT: gateway is FLAKY — intermittent empty content (completion=1) on the complex numbered prompt,
 affecting BOTH thinking modes equally = infra reliability issue (not a thinking-off regression, not
 blocking; watch in prod). Harness MIT/tools/_thinking_ab.py.
+
+## Scrutinize (pre-Phase-E) — 2026-07-10
+Verdict: **SHIP** (dev-gated merge to main). Key checks:
+- **Render == baseline PROVEN for ALL inputs:** all 7 render-geometry files (rendering/__init__.py,
+  render_overlap, text_render, patch_geometry, patch_renderer, text_layer, stages) + their tests +
+  goldens are **byte-identical to `origin/landing`** (`git diff origin/landing HEAD` empty). The
+  0.0000% dump-replay A/B was a spot-check; the identical CODE is the real proof — every render path
+  (dialogue/SFX/narration/vertical/clean-layout) matches baseline, not just the sampled Gal Yome page.
+- **Non-render seam intact:** #623 thinking present in custom_openai; textline_merge sets `is_sfx`
+  (feeds landing render's display-SFX path); `MIT_SELECTIVE_FLUX` backend mapping present. Net 159 green.
+- **Residual risk (covered):** main detection/OCR feeding landing render — the unit net covers the
+  interfaces (standard region attrs: translation/is_sfx/bubble_box/xyxy). A full E2E translate is the
+  final confirmation (gateway-flaky; #623 A/B passed when it responded).
+- **Tracked debt not blocking:** #628 (telemetry), #629 (is_sfx helper), #630 (shelved render-campaign
+  code removal). Branch/git tech-debt cleaned (#627 closed).
