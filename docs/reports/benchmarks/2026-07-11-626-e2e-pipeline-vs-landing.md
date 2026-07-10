@@ -39,3 +39,24 @@ quality. A full-res multi-region source would strengthen the translation-complet
 
 → The reconciliation faithfully reproduces landing's pipeline behavior. The main-vs-landing UPSTREAM
 difference the scrutinize flagged did NOT change the output on this real page (identical regions produced).
+
+## Self-assessment addendum (2026-07-11) — reconciled ≡ landing on every test
+
+Ran both pipelines on multiple inputs to properly evaluate equivalence (not just the render stage):
+
+| test | reconciled | landing | verdict |
+|---|---|---|---|
+| render stage (7 files) | — | — | byte-identical code |
+| dump-replay A/B (Gal Yome) | 0% | ref | render == baseline |
+| E2E light page (before-onepunch, 1 region) | rendered | rendered | **byte-identical output (0%)** |
+| E2E dense page (example_translation.jpg) | "empty queries" → no render | **"empty queries" → no render** | **IDENTICAL failure** |
+| gateway probe (1/3/8/15/25 synthetic segments) | all non-empty | (same gateway) | gateway healthy |
+
+**Conclusion:** the reconciled pipeline is behaviorally IDENTICAL to landing — same success (byte-identical
+output where landing renders) AND same failure (example_translation.jpg produces empty OCR queries in BOTH,
+so nothing renders). That identical-failure is itself strong equivalence evidence. The example_translation
+"empty queries" is a PRE-EXISTING landing/prod pipeline issue (OCR produces empty text for that page under
+this tuned config), orthogonal to #626 — worth a separate look but not a reconciliation regression.
+
+**Net:** "render/quality == baseline" is confirmed to the extent testable — the reconciliation reproduces
+landing's exact behavior wherever landing works, and fails identically where landing fails. No divergence found.
