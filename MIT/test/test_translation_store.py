@@ -31,3 +31,17 @@ def test_write_keeps_non_ascii_unescaped_ensure_ascii_false(tmp_path):
     write_translations(str(p), ["é"])
     raw = p.read_bytes()
     assert b"\\u00e9" not in raw  # not escaped (ensure_ascii=False preserved)
+
+
+def test_write_read_round_trips_thai_cjk_under_cp1252_default(tmp_path, monkeypatch):
+    # Regression #542: on Windows the default text-open encoding is cp1252, so a
+    # Thai/CJK translation raised UnicodeEncodeError (no explicit encoding=). Force the
+    # cp1252 default (the runner has utf8_mode=0) so the Windows failure reproduces on
+    # any platform. Both write AND read must pin utf-8 for the side-channel to round-trip.
+    monkeypatch.setattr("locale.getpreferredencoding", lambda *a, **k: "cp1252")
+    p = tmp_path / "th_translations.txt"
+    sentences = ["สวัสดีชาวโลก", "日本語テスト", "plain-ascii"]
+    write_translations(str(p), sentences)
+    assert read_translations(str(p)) == sentences
+    # bytes are real UTF-8, not cp1252/escaped
+    assert "สวัสดีชาวโลก".encode("utf-8") in p.read_bytes()
