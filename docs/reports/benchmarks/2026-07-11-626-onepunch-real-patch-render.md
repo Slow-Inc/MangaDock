@@ -50,3 +50,21 @@ EITHER branch — a gateway-era difference, not a code seam difference.
   block verbatim). Remaining output differences vs the historical baseline are translator
   non-determinism + the gateway's current VLM behavior (external, affects landing identically).
 - Dialogue quality vs target: complete, legible, in-bubble, no defects on the 8-point checklist.
+
+## vs YOUR tuned baseline (`after-onepunch-eng.png`) — 2026-07-11, VERIFIED not claimed
+
+![reconciled vs your baseline vs target](./2026-07-11-626-onepunch-recon-vs-baseline.png)
+
+Eyeballed reconciled real /patches render vs the dev's tuned baseline (same One-Punch ぬ page):
+- **Dialogue: EQUIVALENT to baseline** — same anime_ace uppercase font, in-bubble sizing, clean LaMa
+  inpaint, no defects. This is the "== baseline" the constraint asked for, on dialogue.
+- **ONE real difference: the ぬ display-SFX** — baseline renders "SLURP", reconciled leaves raw ぬ.
+  **VERIFIED cause (not asserted):** called `vlm_localize_sfx` directly on the ぬ crop 3× →
+  returns `''` every time. The configured model `qwen3.6-35b-a3b` is a TEXT MoE; the SFX rescue sends
+  an IMAGE (vision) → the gateway returns blank. This uses the SAME `vlm_localize_sfx` as landing, so
+  **landing today would render the SAME raw ぬ** — it is NOT a reconciled regression. The baseline's
+  SLURP came from an era with a vision-capable model/gateway config that is no longer active.
+- **To restore SFX** (separate from #626): configure a vision-capable model for the VLM rescue path.
+
+**Net:** reconciled dialogue render == baseline; the only divergence (SFX) is an external
+model/gateway-config issue that affects landing identically.
