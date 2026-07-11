@@ -16,6 +16,7 @@ import { usePostStream } from "../../../hooks/useForumStream";
 
 const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 import type { ForumPost, ForumComment } from "../../../lib/types";
+import { isDisplayedVoteEvent } from "../../../lib/voteEvents";
 
 function MarqueeText({ text, textClassName, active }: { text: string; textClassName?: string; active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,6 +92,7 @@ export default function PostDetailPage() {
     onEvent: useCallback((event) => {
       switch (event.type) {
         case "vote":
+          if (!isDisplayedVoteEvent(event.targetType)) break;
           setVoteCounts(prev => new Map(prev).set(
             `${event.targetType}:${event.targetId}`,
             { upvotes: event.upvotes, downvotes: event.downvotes },
@@ -169,6 +171,10 @@ export default function PostDetailPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Stable identity so the React.memo'd CommentThread items are not invalidated
+  // on every post re-render (plan 2026-07-11 Perf 3).
+  const handleCommentAdded = useCallback(() => fetchData(true), [fetchData]);
 
   const handleDeletePost = async () => {
     if (!post || deletingPost) return;
@@ -582,7 +588,7 @@ export default function PostDetailPage() {
             <CommentThread
               key={comment.id}
               comment={comment}
-              onCommentAdded={() => fetchData(true)}
+              onCommentAdded={handleCommentAdded}
             />
           ))
         ) : (

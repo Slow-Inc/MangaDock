@@ -87,7 +87,7 @@ interface GHComment {
 
 // ─── Utilities ─────────────────────────────────────────────────────────────
 
-import { relativeDate, labelFg } from './utils';
+import { relativeDate, labelFg, sanitizeDocsUrl } from './utils';
 import { cacheOrFetch, TTL } from '../lib/apiCache';
 
 async function ghFetch<T>(type: string, params: Record<string, string | number> = {}): Promise<T> {
@@ -120,8 +120,9 @@ function renderInline(text: string): React.ReactNode {
       return <code key={i} className="px-1.5 py-0.5 rounded text-[0.85em] font-mono bg-[#f0f4ff] text-[#0071e3] border border-[#0071e3]/[0.15]">{part.slice(1, -1)}</code>;
     const lm = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (lm) {
-      const ext = lm[2].startsWith('http');
-      return <a key={i} href={lm[2]} className="text-[#0071e3] underline underline-offset-2 hover:text-[#0058b0] transition-colors duration-150" target={ext ? '_blank' : undefined} rel={ext ? 'noreferrer' : undefined}>{lm[1]}</a>;
+      const href = sanitizeDocsUrl(lm[2]);
+      const ext = href.startsWith('http');
+      return <a key={i} href={href} className="text-[#0071e3] underline underline-offset-2 hover:text-[#0058b0] transition-colors duration-150" target={ext ? '_blank' : undefined} rel={ext ? 'noreferrer' : undefined}>{lm[1]}</a>;
     }
     return <React.Fragment key={i}>{part}</React.Fragment>;
   });

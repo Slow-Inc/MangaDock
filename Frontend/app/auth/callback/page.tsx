@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { supabase } from "../../lib/supabase";
+import { postOAuthCallbackMessage } from "../../lib/oauthCallback";
 
 /**
  * OAuth popup callback page.
@@ -22,9 +23,10 @@ export default function AuthCallbackPage() {
 
     if (error || errorCode) {
       if (window.opener) {
-        window.opener.postMessage(
-          { type: "supabase:oauth:callback", error_code: errorCode, error: errorDesc || error },
-          "*"
+        postOAuthCallbackMessage(
+          window.opener,
+          { error_code: errorCode ?? undefined, error: (errorDesc || error) ?? undefined },
+          window.location.origin,
         );
       }
       setTimeout(() => window.close(), 300);
@@ -36,13 +38,10 @@ export default function AuthCallbackPage() {
       if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session) {
         subscription.unsubscribe();
         if (window.opener) {
-          window.opener.postMessage(
-            {
-              type: "supabase:oauth:callback",
-              access_token: session.access_token,
-              refresh_token: session.refresh_token,
-            },
-            "*"
+          postOAuthCallbackMessage(
+            window.opener,
+            { access_token: session.access_token, refresh_token: session.refresh_token },
+            window.location.origin,
           );
         }
         setTimeout(() => window.close(), 300);
