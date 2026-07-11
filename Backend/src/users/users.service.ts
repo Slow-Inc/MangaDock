@@ -128,7 +128,7 @@ export class UsersService {
       email: row.email ?? null,
       displayName: row.display_name ?? null,
       photoURL: row.photo_url ?? null,
-      role: row.role ?? 'user',
+      role: row.role ?? ROLE.USER,
       plan: row.plan ?? 'free',
       trustScore: row.trust_score ?? 0,
       ratingAvg: row.rating_avg ?? 0,
