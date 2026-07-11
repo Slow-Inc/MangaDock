@@ -187,3 +187,17 @@ returned; antigravity timed out at 313s). Verdict: **FIX-THEN-SHIP** (fixes were
   right (default OFF, extra_body only when disabled); landing render pkg exports all main-imported symbols
   (ballon_extractor, dispatch, dispatch_eng_render); `sfx_rescued` survives translate via restore_sfx_translations.
 - **NOT verified (external):** full E2E translate (gateway flaky) — the only thing that closes the MAJOR scope gap.
+
+## Post-benchmark seam corrections (2026-07-11) — real /patches render achieved
+Real production-path render (live worker + /translate/with-form/patches + prod config) succeeded after:
+- **#631 fix** (custom_openai): EmptyContentError guard + retry; completion cap 2048→4096
+  (qwen3.6 ignores ALL thinking-disable levers — measured 6-8k chars reasoning regardless — so the
+  cap must fit reasoning+content). TDD 14 green. NOTE: this means the earlier "thinking OFF vs ON A/B"
+  compared two effectively-thinking-ON configs — its "equivalent" verdict still stands but for a
+  different reason (the lever is inert on qwen3.6).
+- **SFX seam → landing verbatim** (manga_translator H2 REVERSAL of the slice-3 decision): main's #278
+  FP-drop measurably changed output vs baseline (ぬ OCR'd as "X" dropped before VLM rescue → no SLURP).
+  Landing's gate (should_sfx_rescue on is_sfx + size, no FP-drop) restored → is_sfx setter now LIVE.
+  main's should_rescue_sfx/ocr_read_real_text remain as tested pure fns (unused by the pipeline).
+- Result: 7/7 dialogue translated+rendered, 8-point checklist clean; ぬ SFX not rendered because the
+  gateway's VLM call currently returns blank (external — same on landing today).
