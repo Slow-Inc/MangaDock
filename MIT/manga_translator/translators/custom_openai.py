@@ -15,6 +15,14 @@ from .common import CommonTranslator, VALID_LANGUAGES
 from .keys import CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL, CUSTOM_OPENAI_MODEL_CONF
 
 
+class EmptyContentError(Exception):
+    """#631: the gateway returned a completion whose ``message.content`` is ``None``
+    (the #623 dense-page failure mode — a qwen3-style model can emit only EOS/reasoning
+    and no content; thinking-off reduces but does not eliminate it). Raised instead of
+    returning ``None`` so the ``_translate`` retry loop treats it as a retryable server
+    fault — ``extract_capture_groups(None)`` would ``TypeError`` and 500 the whole page."""
+
+
 def resolve_enable_thinking(env=None) -> bool:
     """Whether to leave the LLM's native thinking/reasoning mode on. Default OFF:
     a qwen3-style reasoning model can spend the whole ``max_tokens`` budget on
@@ -35,6 +43,24 @@ def thinking_extra_body(enable_thinking: bool):
     if enable_thinking:
         return None
     return {'chat_template_kwargs': {'enable_thinking': False}}
+
+
+def resolve_max_completion_tokens(env=None, default: int = 4096) -> int:
+    """#631: the completion-token cap for the translate call. qwen3.6 via the 9arm gateway
+    IGNORES every thinking-disable lever (chat_template_kwargs.enable_thinking / reasoning_effort
+    / '/no_think' — measured: ~6-8k chars of reasoning emitted regardless), so the completion
+    budget must fit reasoning + content. The old cap (``_MAX_TOKENS // 2`` = 2048) hit
+    ``finish=length`` with ``content=None`` on dense pages (#623's root, resurfaced). Default
+    4096 (measured dense page: reasoning+content ≈ 2.7k). Override via
+    ``CUSTOM_OPENAI_MAX_COMPLETION_TOKENS``."""
+    if env is None:
+        env = os.environ
+    raw = env.get('CUSTOM_OPENAI_MAX_COMPLETION_TOKENS', '')
+    try:
+        v = int(str(raw).strip())
+        return v if v > 0 else default
+    except (TypeError, ValueError):
+        return default
 
 
 def parse_numbered_translations(response: str, query_size: int):
@@ -215,6 +241,15 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
                         raise
                     self.logger.warning(f'Restarting request due to a server error. Attempt: {server_error_attempt}')
                     await asyncio.sleep(1)
+                except EmptyContentError:  # #631: gateway returned content=None (dense-page mode)
+                    server_error_attempt += 1
+                    if server_error_attempt >= self._RETRY_ATTEMPTS:
+                        self.logger.error(
+                            'Translator returned empty content (content=None) on every attempt — '
+                            'gateway/model dense-request failure (#623/#631).')
+                        raise
+                    self.logger.warning(f'Restarting request due to empty content (content=None). Attempt: {server_error_attempt}')
+                    await asyncio.sleep(1)
 
             # self.logger.debug('-- GPT Response --\n' + response)
             
@@ -251,7 +286,10 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         create_kwargs = dict(
             model=self.model or CUSTOM_OPENAI_MODEL,
             messages=messages,
-            max_tokens=self._MAX_TOKENS // 2,
+            # #631: was `self._MAX_TOKENS // 2` (=2048) — not enough for qwen3.6's
+            # un-disableable reasoning (~2k tokens) + content on dense pages → finish=length,
+            # content=None, whole-page 500. See resolve_max_completion_tokens.
+            max_tokens=resolve_max_completion_tokens(),
             temperature=self.temperature,
             top_p=self.top_p,
         )
@@ -284,4 +322,14 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             f'completion={completion_tokens if completion_tokens is not None else "n/a"}'
         )
 
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        if content is None:
+            # #631: the gateway sometimes returns finish=stop with content=None on dense
+            # requests (#623 root; thinking-off reduces but does not eliminate it). Raise a
+            # retryable error — returning None would TypeError in extract_capture_groups
+            # and 500 the whole page.
+            raise EmptyContentError(
+                f'translator returned empty content (content=None, finish='
+                f'{getattr(response.choices[0], "finish_reason", "?")}, '
+                f'completion_tokens={completion_tokens})')
+        return content
