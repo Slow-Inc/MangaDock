@@ -3,6 +3,14 @@
 
 ---
 
+## #630 — remove shelved reference_layout render-campaign dead code (2026-07-11)
+
+**Goal:** after the #626 render==landing pivot, delete main's shelved render campaign left DEAD/BROKEN on the branch (render_replay imported the landing-absent `clean_layout_font_size`; 4 test files errored on collection).
+
+**Done (`a8b64f69`):** deleted `reference_layout.py` / `render_replay.py` / `rendering/sizing_trace.py` + 4 orphaned tests; removed the `MIT_DUMP_REGIONS` dump block, `config.RenderConfig.reference_layout` (0 readers), and the `MIT_REFERENCE_LAYOUT` mapping in `mit-config.ts` + its 2 spec cases + ENV_KEYS entry. Verified: MIT collection **4 errors → 0** (743 clean), render-path net **75 passed**, imports clean, 0 dangling refs, Backend diff a clean deletion (jest in CI). Recoverable via `archive/mit-180-kp-425` / `archive/mit-183-squeeze-424` / PR #423. Also this session: git tech-debt (temp+bench-545 worktrees pruned, local main ff'd, `.gemini/.env` gitignored `4538be17`), branch pushed to origin.
+
+---
+
 ## Guard #4 — append-only log-header guard (#610, 2026-07-09)
 
 **Goal:** prevent the stale-base clobber class (#553 → #608) at PR time — a PR off an old base silently dropping newer `## ` entries from `DONE.md` / `system-impact-report.md`.
