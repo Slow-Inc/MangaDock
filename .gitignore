@@ -33,3 +33,6 @@ Backend/prd_*.txt
 .mcp.json
 # Git worktrees
 .worktrees/
+
+# Gemini CLI secret — untracked API key, must never be committed (#625)
+.gemini/.env
