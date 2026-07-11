@@ -68,3 +68,27 @@ Eyeballed reconciled real /patches render vs the dev's tuned baseline (same One-
 
 **Net:** reconciled dialogue render == baseline; the only divergence (SFX) is an external
 model/gateway-config issue that affects landing identically.
+
+## DECISIVE (2026-07-11) — reconciled ≡ landing current code; BOTH < baseline PNG (not a #626 regression)
+
+The dev flagged real render defects in reconciled vs the baseline PNG: (1) "BUT THIS KID ISN'T CUTE"
+crowds the "...HUH?" bubble; (2) text renders as a horizontal BLOCK, not the narrow vertical-referenced
+column of the baseline/target. Verified the cause by running LANDING's OWN code on the SAME image (temp
+#631 patch, reverted after):
+
+| region | reconciled rendered | landing rendered | baseline PNG |
+|---|---|---|---|
+| でも可愛くない (orig 61×158) | 100×144 (widened, crowds HUH) | **114×120 (widened MORE, crowds HUH)** | narrow, no crowd |
+| all 7 regions | clean_layout | clean_layout | (narrow columns + SLURP SFX) |
+
+**Conclusion (verified, not claimed):** reconciled ≡ landing's CURRENT code — both produce the same
+crowd/block/no-SFX on this page. The defects are NOT a reconciliation regression; they are landing's
+own current behavior. The baseline PNG (`after-onepunch-eng.png`) is BETTER than BOTH branches' current
+output — it is not reproducible by landing's own code today (narrower columns, no crowd, SLURP SFX). So
+"quality == baseline PNG" is currently unachievable by ANY branch: it is a LANDING/config/gateway drift
+(English translation length driving clean_layout width + the vision-SFX model returning blank +
+possibly config differences from the baseline-PNG era), independent of #626.
+
+**Honest verdict:** #626 does NOT regress render vs landing (equivalence proven on the exact flagged
+defects). It does NOT reach the tuned baseline PNG — but neither does landing. Restoring the baseline-PNG
+quality is a separate MIT investigation (translation length / clean_layout width tuning / vision-SFX model).
