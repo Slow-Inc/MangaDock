@@ -330,10 +330,6 @@ export function buildMitConfig(
       // warping it onto the original vertical-JP quad (which stretches it oversized).
       // Absent → byte-identical.
       ...(flagEnv('MIT_CLEAN_LAYOUT') ? { clean_layout: true } : {}),
-      // #178 P3: MangaTranslator-parity fit for clean-layout regions — binary-search the font from the
-      // flat cap DOWN to the largest fitting BOTH balloon axes (narration/caption oversize fix). Needs
-      // MIT_CLEAN_LAYOUT. Gated on the polygon-spill harness (#525) staying green. Absent → byte-identical.
-      ...(flagEnv('MIT_REFERENCE_LAYOUT') ? { reference_layout: true } : {}),
       // #180 P8: Knuth-Plass holistic line-breaking (balanced columns, no mid-word/name split) instead of
       // the greedy packer. Enabling changes wrap width/line count → render-parity change. Absent → greedy, byte-identical.
       ...(flagEnv('MIT_KNUTH_PLASS') ? { knuth_plass: true } : {}),

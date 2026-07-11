@@ -190,11 +190,6 @@ class RenderConfig(BaseModel):
     small absolute font instead of warping it onto the original (often tall/vertical)
     detection quad — the warp stretches English oversized and overflowing. Pairs with
     font_size_max as the absolute font. Off → byte-identical."""
-    reference_layout: bool = False
-    """#178 Phase-4: size clean-layout regions with the MangaTranslator-parity fit — binary-search
-    the font from the flat cap DOWN to the largest that fits BOTH axes of the balloon safe interior
-    (or the detection box for narration), keeping words whole. Replaces the source-column-referenced
-    clean_layout sizing for these regions. Requires clean_layout. Off → byte-identical."""
     knuth_plass: bool = False
     """#180 P8: use the Knuth-Plass holistic line-breaker (balanced columns, no mid-word/name splits)
     instead of the greedy packer, for every calc_horizontal call in the render pass. Off → the greedy

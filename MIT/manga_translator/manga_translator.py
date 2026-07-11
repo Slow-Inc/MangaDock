@@ -1545,17 +1545,6 @@ class MangaTranslator:
             except Exception:
                 logger.warning(f"[BubbleSeg] tagging failed:\n{traceback.format_exc()}")
 
-        # #462 render replay: dump the post-translate/post-tag region state so the render sizing can be
-        # replayed offline & deterministically (the live translator is non-deterministic). Off → no-op.
-        _dump = os.environ.get('MIT_DUMP_REGIONS')
-        if _dump:
-            try:
-                from .render_replay import dump_fixture
-                dump_fixture(regions, (img_h, img_w), _dump)
-                logger.info(f'[replay] dumped {len(regions)} regions → {_dump}')
-            except Exception:
-                logger.warning(f"[replay] region dump failed:\n{traceback.format_exc()}")
-
         await self._report_progress('mask-generation')
         await self._report_progress('inpainting')
         await self._report_progress('rendering')
