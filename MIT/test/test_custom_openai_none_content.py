@@ -74,3 +74,28 @@ def test_max_completion_tokens_env_override():
     from manga_translator.translators.custom_openai import resolve_max_completion_tokens
     assert resolve_max_completion_tokens({'CUSTOM_OPENAI_MAX_COMPLETION_TOKENS': '6144'}) == 6144
     assert resolve_max_completion_tokens({'CUSTOM_OPENAI_MAX_COMPLETION_TOKENS': 'junk'}) == 4096
+
+
+# When thinking is ON the reasoning eats far MORE of the budget (measured on the 9arm gateway:
+# ~2k reasoning tokens even for a 2-line translate, and the disable levers are no-ops), so a
+# SEPARATE, larger cap applies — CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS (default 8192).
+def test_thinking_budget_default_larger_than_base():
+    from manga_translator.translators.custom_openai import resolve_max_completion_tokens
+    assert resolve_max_completion_tokens({}, thinking=True) == 8192
+    assert resolve_max_completion_tokens({}, thinking=True) > resolve_max_completion_tokens({}, thinking=False)
+
+
+def test_thinking_budget_env_override():
+    from manga_translator.translators.custom_openai import resolve_max_completion_tokens
+    env = {'CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS': '12000'}
+    assert resolve_max_completion_tokens(env, thinking=True) == 12000
+    assert resolve_max_completion_tokens({'CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS': 'junk'}, thinking=True) == 8192
+
+
+def test_thinking_flag_selects_the_right_env():
+    # thinking=False must NOT read the thinking env (uses base); thinking=True must NOT read the base env.
+    from manga_translator.translators.custom_openai import resolve_max_completion_tokens
+    both = {'CUSTOM_OPENAI_MAX_COMPLETION_TOKENS': '6144',
+            'CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS': '12000'}
+    assert resolve_max_completion_tokens(both, thinking=False) == 6144
+    assert resolve_max_completion_tokens(both, thinking=True) == 12000

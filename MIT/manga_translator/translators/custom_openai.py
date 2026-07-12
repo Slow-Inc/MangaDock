@@ -36,28 +36,45 @@ def resolve_enable_thinking(env=None) -> bool:
 
 
 def thinking_extra_body(enable_thinking: bool):
-    """``extra_body`` for ``chat.completions.create`` that suppresses qwen3-style
-    thinking when disabled (``chat_template_kwargs.enable_thinking=false`` — the
-    lever the 9arm/vLLM gateway honours; a top-level ``enable_thinking`` is
-    ignored). Returns ``None`` when thinking is enabled so the call is unchanged."""
+    """``extra_body`` for ``chat.completions.create`` intended to suppress qwen3-style
+    thinking when disabled (``chat_template_kwargs.enable_thinking=false``). Returns
+    ``None`` when thinking is enabled so the call is unchanged.
+
+    NOTE (measured 2026-07-12, qwen3.6-35b-a3b via 9arm): this lever is a NO-OP on that
+    gateway — enable_thinking=false / reasoning_effort=none / '/no_think' all still emit
+    ~4.3–6.4k chars of reasoning. It is kept for a genuinely toggleable model; on 9arm the
+    real mitigation is the reasoning-sized token budget (see resolve_max_completion_tokens),
+    NOT this lever."""
     if enable_thinking:
         return None
     return {'chat_template_kwargs': {'enable_thinking': False}}
 
 
-def resolve_max_completion_tokens(env=None, default: int = 4096) -> int:
+def resolve_max_completion_tokens(env=None, default: int = 4096, *, thinking: bool = False) -> int:
     """#631: the completion-token cap for the translate call. qwen3.6 via the 9arm gateway
     IGNORES every thinking-disable lever (chat_template_kwargs.enable_thinking / reasoning_effort
     / '/no_think' — measured: ~6-8k chars of reasoning emitted regardless), so the completion
     budget must fit reasoning + content. The old cap (``_MAX_TOKENS // 2`` = 2048) hit
-    ``finish=length`` with ``content=None`` on dense pages (#623's root, resurfaced). Default
-    4096 (measured dense page: reasoning+content ≈ 2.7k). Override via
-    ``CUSTOM_OPENAI_MAX_COMPLETION_TOKENS``."""
+    ``finish=length`` with ``content=None`` on dense pages (#623's root, resurfaced).
+
+    Two SEPARATE caps so the reasoning overhead is budgeted explicitly:
+    - thinking OFF → ``CUSTOM_OPENAI_MAX_COMPLETION_TOKENS`` (default 4096; measured dense
+      page reasoning+content ≈ 2.7k even though we *ask* the gateway to stop thinking — it
+      won't, but 4096 still fits).
+    - thinking ON → ``CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS`` (default 8192), a larger
+      dedicated cap because an explicitly-thinking model reasons more/longer before it emits
+      content, so it needs extra headroom or the content is truncated to ``None``."""
     if env is None:
         env = os.environ
-    raw = env.get('CUSTOM_OPENAI_MAX_COMPLETION_TOKENS', '')
+    if thinking:
+        return _positive_int_env(env, 'CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS', 8192)
+    return _positive_int_env(env, 'CUSTOM_OPENAI_MAX_COMPLETION_TOKENS', default)
+
+
+def _positive_int_env(env, key: str, default: int) -> int:
+    """Parse ``env[key]`` as a positive int, falling back to ``default`` on missing/invalid/≤0."""
     try:
-        v = int(str(raw).strip())
+        v = int(str(env.get(key, '')).strip())
         return v if v > 0 else default
     except (TypeError, ValueError):
         return default
@@ -289,7 +306,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             # #631: was `self._MAX_TOKENS // 2` (=2048) — not enough for qwen3.6's
             # un-disableable reasoning (~2k tokens) + content on dense pages → finish=length,
             # content=None, whole-page 500. See resolve_max_completion_tokens.
-            max_tokens=resolve_max_completion_tokens(),
+            max_tokens=resolve_max_completion_tokens(thinking=resolve_enable_thinking()),
             temperature=self.temperature,
             top_p=self.top_p,
         )

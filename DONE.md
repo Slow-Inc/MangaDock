@@ -3,6 +3,14 @@
 
 ---
 
+## #631 — separate thinking token-budget (prevent qwen3.6 reasoning truncation) (2026-07-12)
+
+**Trigger:** measured the 9arm gateway live — `chat_template_kwargs.enable_thinking=false`, `reasoning_effort=none`, `/no_think`, top-level `enable_thinking=false` ALL still emit 4.3–6.4k chars of reasoning (a 2-line translate burns ~1.3–1.9k completion tokens on reasoning alone). The thinking-disable levers are a confirmed NO-OP → the only real defense against `finish=length`→`content=None` truncation is a reasoning-sized token budget.
+
+**Done (TDD, 8 green):** `resolve_max_completion_tokens(env, default=4096, *, thinking=False)` now returns a SEPARATE cap when thinking is on — `CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS` (default **8192**) vs the base `CUSTOM_OPENAI_MAX_COMPLETION_TOKENS` (default 4096). Wired: `max_tokens=resolve_max_completion_tokens(thinking=resolve_enable_thinking())` — default behavior unchanged (4096); set `CUSTOM_OPENAI_ENABLE_THINKING=true` to use the 8192 headroom (honest, since the gateway thinks regardless). Also corrected the `thinking_extra_body` docstring lie ("the lever the 9arm gateway honours" → NO-OP, measured). Follow-up: the SFX vision call still hardcodes `max_tokens=24` — same truncation bug, route it through this resolver next.
+
+---
+
 ## #630 — remove shelved reference_layout render-campaign dead code (2026-07-11)
 
 **Goal:** after the #626 render==landing pivot, delete main's shelved render campaign left DEAD/BROKEN on the branch (render_replay imported the landing-absent `clean_layout_font_size`; 4 test files errored on collection).
