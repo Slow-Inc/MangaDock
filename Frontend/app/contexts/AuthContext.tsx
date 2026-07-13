@@ -23,6 +23,11 @@ import { clearAllApiCache } from "../lib/apiCache";
 import { reloadPage, redirectToHome } from "../lib/browserActions";
 import { resolveAvatarUrl } from "../lib/avatarUpload";
 import { useToast } from "./ToastContext";
+import {
+  OAuthProvider,
+  parseNativeToWebMessage,
+  WebToNativeMessage,
+} from "@mangadock/mobile-bridge";
 
 const API_BASE = "/api/proxy";
 const DEFAULT_PUBLIC_SITE_URL = "http://localhost:4000";
@@ -271,7 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isNativeWebView = () =>
     typeof window !== "undefined" && !!window.ReactNativeWebView;
 
-  const startNativeOAuth = (provider: "google" | "facebook"): Promise<void> => {
+  const startNativeOAuth = (provider: OAuthProvider): Promise<void> => {
     if (!isNativeWebView()) {
       return Promise.reject(new Error("Native auth bridge is not available"));
     }
@@ -285,10 +290,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }, NATIVE_AUTH_TIMEOUT_MS);
 
       pendingNativeAuthRef.current = { resolve, reject, timer };
-      window.ReactNativeWebView?.postMessage(JSON.stringify({
+      const message: WebToNativeMessage = {
         type: "mangadock:oauth:start",
         provider,
-      }));
+      };
+      window.ReactNativeWebView?.postMessage(JSON.stringify(message));
     });
   };
 
@@ -350,18 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onNativeAuthMessage = async (event: MessageEvent) => {
-      const payload = (() => {
-        if (typeof event.data === "string") {
-          try {
-            return JSON.parse(event.data) as Record<string, unknown>;
-          } catch {
-            return null;
-          }
-        }
-        return event.data && typeof event.data === "object"
-          ? event.data as Record<string, unknown>
-          : null;
-      })();
+      const payload = parseNativeToWebMessage(event.data);
 
       if (!payload || payload.type !== "mangadock:native-auth:session") return;
 
@@ -369,23 +364,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       pendingNativeAuthRef.current = null;
       if (pending) clearTimeout(pending.timer);
 
-      const error = typeof payload.error === "string" ? payload.error : null;
-      if (error) {
-        pending?.reject(Object.assign(new Error(error), { code: "auth/native-oauth-failed" }));
-        return;
-      }
-
-      const accessToken = typeof payload.access_token === "string" ? payload.access_token : null;
-      const refreshToken = typeof payload.refresh_token === "string" ? payload.refresh_token : null;
-
-      if (!accessToken || !refreshToken) {
-        pending?.reject(Object.assign(new Error("Native login did not return a session"), { code: "auth/native-no-session" }));
+      if ("error" in payload) {
+        pending?.reject(Object.assign(new Error(payload.error), { code: "auth/native-oauth-failed" }));
         return;
       }
 
       const { error: setSessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
+        access_token: payload.access_token,
+        refresh_token: payload.refresh_token,
       });
 
       if (setSessionError) {

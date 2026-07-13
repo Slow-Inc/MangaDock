@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
 import * as Application from "expo-application";
 import * as AuthSession from "expo-auth-session";
+import * as MediaLibrary from "expo-media-library";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -11,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   BackHandler,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -19,10 +21,13 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { WebView, WebViewMessageEvent, WebViewNavigation } from "react-native-webview";
+import {
+  NativeToWebMessage,
+  OAuthProvider,
+  parseWebToNativeMessage,
+} from "./shared/mobileBridge";
 
 WebBrowser.maybeCompleteAuthSession();
-
-type OAuthProvider = "google" | "facebook";
 
 const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "http://localhost:4000";
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -115,7 +120,7 @@ export default function App() {
     return () => sub.remove();
   }, [canGoBack]);
 
-  const postAuthResultToWeb = useCallback((payload: unknown) => {
+  const postMessageToWeb = useCallback((payload: NativeToWebMessage) => {
     webViewRef.current?.injectJavaScript(webMessageScript(payload));
   }, []);
 
@@ -126,7 +131,7 @@ export default function App() {
 
   const startOAuth = useCallback(async (provider: OAuthProvider) => {
     if (!supabase) {
-      postAuthResultToWeb({
+      postMessageToWeb({
         type: "mangadock:native-auth:session",
         error: "Missing Supabase env in Mobile/.env",
       });
@@ -154,7 +159,7 @@ export default function App() {
 
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
       if (result.type !== "success") {
-        postAuthResultToWeb({
+        postMessageToWeb({
           type: "mangadock:native-auth:session",
           error: "Login was cancelled",
         });
@@ -173,7 +178,7 @@ export default function App() {
           throw exchangeError ?? new Error("OAuth code did not return a session");
         }
 
-        postAuthResultToWeb({
+        postMessageToWeb({
           type: "mangadock:native-auth:session",
           access_token: sessionData.session.access_token,
           refresh_token: sessionData.session.refresh_token,
@@ -196,14 +201,14 @@ export default function App() {
         throw setSessionError ?? new Error("OAuth token was rejected");
       }
 
-      postAuthResultToWeb({
+      postMessageToWeb({
         type: "mangadock:native-auth:session",
         access_token: sessionData.session.access_token,
         refresh_token: sessionData.session.refresh_token,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Native OAuth failed";
-      postAuthResultToWeb({
+      postMessageToWeb({
         type: "mangadock:native-auth:session",
         error: message,
       });
@@ -211,22 +216,56 @@ export default function App() {
     } finally {
       setAuthBusy(null);
     }
-  }, [postAuthResultToWeb, supabase]);
+  }, [postMessageToWeb, supabase]);
+
+  const requestMediaLibraryPermission = useCallback(async (requestId: string) => {
+    let status: "granted" | "denied" | "blocked" = "denied";
+    try {
+      const current = await MediaLibrary.getPermissionsAsync(false, ["photo"]);
+      const result = current.granted
+        ? current
+        : await MediaLibrary.requestPermissionsAsync(false, ["photo"]);
+      status = result.granted
+        ? "granted"
+        : result.canAskAgain
+          ? "denied"
+          : "blocked";
+    } catch {
+      // Keep denied as the fail-closed result when the native API is unavailable.
+    }
+
+    postMessageToWeb({
+      type: "mangadock:permission:result",
+      permission: "media-library",
+      requestId,
+      status,
+    });
+
+    if (status === "blocked") {
+      Alert.alert(
+        "Photo access is disabled",
+        "Allow photo access in system settings to upload manga images.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open settings", onPress: () => void Linking.openSettings() },
+        ],
+      );
+    }
+  }, [postMessageToWeb]);
 
   const onMessage = useCallback(async (event: WebViewMessageEvent) => {
-    let payload: { type?: string; provider?: OAuthProvider };
-    try {
-      payload = JSON.parse(event.nativeEvent.data);
-    } catch {
+    const payload = parseWebToNativeMessage(event.nativeEvent.data);
+    if (!payload) return;
+
+    if (payload.type === "mangadock:oauth:start") {
+      await startOAuth(payload.provider);
       return;
     }
 
-    if (payload.type === "mangadock:oauth:start") {
-      if (payload.provider === "google" || payload.provider === "facebook") {
-        await startOAuth(payload.provider);
-      }
+    if (payload.type === "mangadock:permission:request") {
+      await requestMediaLibraryPermission(payload.requestId);
     }
-  }, [startOAuth]);
+  }, [requestMediaLibraryPermission, startOAuth]);
 
   const onNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     setCanGoBack(navState.canGoBack);

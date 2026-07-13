@@ -15,6 +15,16 @@
       "permissions": ["INTERNET"],
       "usesCleartextTraffic": true
     },
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow MangaDock to select manga images for upload.",
+          "savePhotosPermission": false,
+          "granularPermissions": ["photo"]
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": ""
