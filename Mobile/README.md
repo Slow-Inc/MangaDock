@@ -7,7 +7,7 @@ Hybrid mobile shell for MangaDock. The app renders the existing Next.js frontend
 The web app asks native to start OAuth:
 
 ```json
-{ "type": "mangadock:oauth:start", "provider": "google" }
+{ "type": "mangadock:oauth:start", "provider": "google", "requestId": "one-time-nonce" }
 ```
 
 After OAuth completes, native injects the Supabase session back into the WebView:
@@ -15,6 +15,7 @@ After OAuth completes, native injects the Supabase session back into the WebView
 ```json
 {
   "type": "mangadock:native-auth:session",
+  "requestId": "one-time-nonce",
   "access_token": "...",
   "refresh_token": "..."
 }

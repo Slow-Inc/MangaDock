@@ -129,10 +129,11 @@ export default function App() {
     webViewRef.current?.injectJavaScript(localStorageScript(WEB_DEVICE_ID_KEY, deviceId));
   }, [deviceId]);
 
-  const startOAuth = useCallback(async (provider: OAuthProvider) => {
+  const startOAuth = useCallback(async (provider: OAuthProvider, requestId: string) => {
     if (!supabase) {
       postMessageToWeb({
         type: "mangadock:native-auth:session",
+        requestId,
         error: "Missing Supabase env in Mobile/.env",
       });
       return;
@@ -160,8 +161,9 @@ export default function App() {
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
       if (result.type !== "success") {
         postMessageToWeb({
-          type: "mangadock:native-auth:session",
-          error: "Login was cancelled",
+            type: "mangadock:native-auth:session",
+            requestId,
+            error: "Login was cancelled",
         });
         return;
       }
@@ -180,6 +182,7 @@ export default function App() {
 
         postMessageToWeb({
           type: "mangadock:native-auth:session",
+          requestId,
           access_token: sessionData.session.access_token,
           refresh_token: sessionData.session.refresh_token,
         });
@@ -203,6 +206,7 @@ export default function App() {
 
       postMessageToWeb({
         type: "mangadock:native-auth:session",
+        requestId,
         access_token: sessionData.session.access_token,
         refresh_token: sessionData.session.refresh_token,
       });
@@ -210,6 +214,7 @@ export default function App() {
       const message = error instanceof Error ? error.message : "Native OAuth failed";
       postMessageToWeb({
         type: "mangadock:native-auth:session",
+        requestId,
         error: message,
       });
       Alert.alert("Login failed", message);
@@ -258,7 +263,7 @@ export default function App() {
     if (!payload) return;
 
     if (payload.type === "mangadock:oauth:start") {
-      await startOAuth(payload.provider);
+      await startOAuth(payload.provider, payload.requestId);
       return;
     }
 

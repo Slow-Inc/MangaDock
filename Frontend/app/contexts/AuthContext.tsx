@@ -24,6 +24,7 @@ import { reloadPage, redirectToHome } from "../lib/browserActions";
 import { resolveAvatarUrl } from "../lib/avatarUpload";
 import { useToast } from "./ToastContext";
 import {
+  isExpectedNativeAuthMessage,
   OAuthProvider,
   parseNativeToWebMessage,
   WebToNativeMessage,
@@ -213,6 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabaseUserRef = useRef<SupabaseUser | null>(null);
   const lastUidRef = useRef<string | null>(null);
   const pendingNativeAuthRef = useRef<{
+    requestId: string;
     resolve: () => void;
     reject: (error: Error) => void;
     timer: ReturnType<typeof setTimeout>;
@@ -281,18 +283,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return Promise.reject(new Error("Native auth bridge is not available"));
     }
 
-    pendingNativeAuthRef.current?.reject(new Error("Native auth request was replaced"));
+    const previous = pendingNativeAuthRef.current;
+    if (previous) {
+      clearTimeout(previous.timer);
+      pendingNativeAuthRef.current = null;
+      previous.reject(new Error("Native auth request was replaced"));
+    }
 
     return new Promise((resolve, reject) => {
+      const requestId = crypto.randomUUID();
       const timer = setTimeout(() => {
-        pendingNativeAuthRef.current = null;
+        if (pendingNativeAuthRef.current?.requestId === requestId) {
+          pendingNativeAuthRef.current = null;
+        }
         reject(Object.assign(new Error("Native login timed out"), { code: "auth/native-timeout" }));
       }, NATIVE_AUTH_TIMEOUT_MS);
 
-      pendingNativeAuthRef.current = { resolve, reject, timer };
+      pendingNativeAuthRef.current = { requestId, resolve, reject, timer };
       const message: WebToNativeMessage = {
         type: "mangadock:oauth:start",
         provider,
+        requestId,
       };
       window.ReactNativeWebView?.postMessage(JSON.stringify(message));
     });
@@ -358,14 +369,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const onNativeAuthMessage = async (event: MessageEvent) => {
       const payload = parseNativeToWebMessage(event.data);
 
-      if (!payload || payload.type !== "mangadock:native-auth:session") return;
-
       const pending = pendingNativeAuthRef.current;
+      if (!pending || !isExpectedNativeAuthMessage(payload, pending.requestId)) return;
+
       pendingNativeAuthRef.current = null;
-      if (pending) clearTimeout(pending.timer);
+      clearTimeout(pending.timer);
 
       if ("error" in payload) {
-        pending?.reject(Object.assign(new Error(payload.error), { code: "auth/native-oauth-failed" }));
+        pending.reject(Object.assign(new Error(payload.error), { code: "auth/native-oauth-failed" }));
         return;
       }
 
@@ -375,11 +386,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (setSessionError) {
-        pending?.reject(setSessionError);
+        pending.reject(setSessionError);
         return;
       }
 
-      pending?.resolve();
+      pending.resolve();
     };
 
     window.addEventListener("message", onNativeAuthMessage);

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  isExpectedNativeAuthMessage,
   parseNativeToWebMessage,
   parseWebToNativeMessage,
 } from "@mangadock/mobile-bridge";
@@ -9,7 +10,12 @@ describe("mobile bridge messages", () => {
     expect(parseWebToNativeMessage(JSON.stringify({
       type: "mangadock:oauth:start",
       provider: "google",
-    }))).toEqual({ type: "mangadock:oauth:start", provider: "google" });
+      requestId: "oauth-1",
+    }))).toEqual({
+      type: "mangadock:oauth:start",
+      provider: "google",
+      requestId: "oauth-1",
+    });
   });
 
   test("rejects malformed and unsupported web messages", () => {
@@ -52,16 +58,33 @@ describe("mobile bridge messages", () => {
   test("requires complete native auth sessions", () => {
     expect(parseNativeToWebMessage({
       type: "mangadock:native-auth:session",
+      requestId: "oauth-1",
       access_token: "access",
       refresh_token: "refresh",
     })).toEqual({
       type: "mangadock:native-auth:session",
+      requestId: "oauth-1",
       access_token: "access",
       refresh_token: "refresh",
     });
     expect(parseNativeToWebMessage({
       type: "mangadock:native-auth:session",
+      requestId: "oauth-1",
       access_token: "access",
     })).toBeNull();
+  });
+
+  test("accepts auth results only for the live OAuth request", () => {
+    const message = parseNativeToWebMessage({
+      type: "mangadock:native-auth:session",
+      requestId: "oauth-1",
+      access_token: "access",
+      refresh_token: "refresh",
+    });
+
+    expect(isExpectedNativeAuthMessage(message, null)).toBeFalse();
+    expect(isExpectedNativeAuthMessage(message, "oauth-2")).toBeFalse();
+    expect(isExpectedNativeAuthMessage(message, "oauth-1")).toBeTrue();
+    expect(isExpectedNativeAuthMessage(message, null)).toBeFalse();
   });
 });

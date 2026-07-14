@@ -6,6 +6,7 @@ export type WebToNativeMessage =
   | {
       type: "mangadock:oauth:start";
       provider: OAuthProvider;
+      requestId: string;
     }
   | {
       type: "mangadock:permission:request";
@@ -13,16 +14,21 @@ export type WebToNativeMessage =
       requestId: string;
     };
 
-export type NativeToWebMessage =
+export type NativeAuthSessionMessage =
   | {
       type: "mangadock:native-auth:session";
+      requestId: string;
       access_token: string;
       refresh_token: string;
     }
   | {
       type: "mangadock:native-auth:session";
+      requestId: string;
       error: string;
-    }
+    };
+
+export type NativeToWebMessage =
+  | NativeAuthSessionMessage
   | {
       type: "mangadock:permission:result";
       permission: MobilePermission;
@@ -49,9 +55,15 @@ export function parseWebToNativeMessage(value: unknown): WebToNativeMessage | nu
 
   if (
     message.type === "mangadock:oauth:start" &&
-    (message.provider === "google" || message.provider === "facebook")
+    (message.provider === "google" || message.provider === "facebook") &&
+    typeof message.requestId === "string" &&
+    message.requestId.length > 0
   ) {
-    return { type: message.type, provider: message.provider };
+    return {
+      type: message.type,
+      provider: message.provider,
+      requestId: message.requestId,
+    };
   }
 
   if (
@@ -75,8 +87,15 @@ export function parseNativeToWebMessage(value: unknown): NativeToWebMessage | nu
   if (!isRecord(message)) return null;
 
   if (message.type === "mangadock:native-auth:session") {
+    if (typeof message.requestId !== "string" || message.requestId.length === 0) {
+      return null;
+    }
     if (typeof message.error === "string") {
-      return { type: message.type, error: message.error };
+      return {
+        type: message.type,
+        requestId: message.requestId,
+        error: message.error,
+      };
     }
     if (
       typeof message.access_token === "string" &&
@@ -84,6 +103,7 @@ export function parseNativeToWebMessage(value: unknown): NativeToWebMessage | nu
     ) {
       return {
         type: message.type,
+        requestId: message.requestId,
         access_token: message.access_token,
         refresh_token: message.refresh_token,
       };
@@ -107,4 +127,13 @@ export function parseNativeToWebMessage(value: unknown): NativeToWebMessage | nu
   }
 
   return null;
+}
+
+export function isExpectedNativeAuthMessage(
+  message: NativeToWebMessage | null,
+  pendingRequestId: string | null,
+): message is NativeAuthSessionMessage {
+  return !!pendingRequestId &&
+    message?.type === "mangadock:native-auth:session" &&
+    message.requestId === pendingRequestId;
 }
