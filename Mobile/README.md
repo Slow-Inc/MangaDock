@@ -25,6 +25,8 @@ The shell also writes the native device id into WebView localStorage as `mangado
 
 OAuth and permission messages are defined once in `Mobile/shared/mobileBridge.ts` and imported by both the frontend and mobile shell.
 
+The WebView is restricted to the origin configured by `EXPO_PUBLIC_WEB_URL`. Normal `http` or `https` links to other origins open in the device browser, and other schemes are rejected so external pages cannot access the native bridge.
+
 The web app can request photo-library access when an upload flow needs it:
 
 ```json

@@ -127,9 +127,9 @@
 
 ## Phase 3: Hybrid Mobile Framework (ขั้นตอนถัดไป)
 - [X]  [Mobile] สร้าง React Native WebViewer Shell
-- [ ]  [Mobile] ชั้นแชร์โค้ดเชิงกลยุทธ์ (Types/Logic ร่วมกัน)
+- [X]  [Mobile] ชั้นแชร์โค้ดเชิงกลยุทธ์ (Types/Logic ร่วมกัน)
 - [X]  [Mobile] Native Authentication Bridge (ซิงค์ Device Token)
-- [ ]  [Mobile] จัดการ OS Permission หลัก (Storage/Network)
+- [X]  [Mobile] จัดการ OS Permission หลัก (Storage/Network)
 
 ---
 

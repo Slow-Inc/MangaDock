@@ -49,6 +49,23 @@ function decodeMessage(value: unknown): unknown {
   }
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+export function isAllowedWebViewUrl(candidateUrl: string, applicationUrl: string): boolean {
+  if (candidateUrl === "about:blank") return true;
+
+  try {
+    const candidate = new URL(candidateUrl);
+    const application = new URL(applicationUrl);
+    return (candidate.protocol === "http:" || candidate.protocol === "https:") &&
+      candidate.origin === application.origin;
+  } catch {
+    return false;
+  }
+}
+
 export function parseWebToNativeMessage(value: unknown): WebToNativeMessage | null {
   const message = decodeMessage(value);
   if (!isRecord(message)) return null;
@@ -56,8 +73,7 @@ export function parseWebToNativeMessage(value: unknown): WebToNativeMessage | nu
   if (
     message.type === "mangadock:oauth:start" &&
     (message.provider === "google" || message.provider === "facebook") &&
-    typeof message.requestId === "string" &&
-    message.requestId.length > 0
+    isNonEmptyString(message.requestId)
   ) {
     return {
       type: message.type,
@@ -69,8 +85,7 @@ export function parseWebToNativeMessage(value: unknown): WebToNativeMessage | nu
   if (
     message.type === "mangadock:permission:request" &&
     message.permission === "media-library" &&
-    typeof message.requestId === "string" &&
-    message.requestId.length > 0
+    isNonEmptyString(message.requestId)
   ) {
     return {
       type: message.type,
@@ -87,10 +102,10 @@ export function parseNativeToWebMessage(value: unknown): NativeToWebMessage | nu
   if (!isRecord(message)) return null;
 
   if (message.type === "mangadock:native-auth:session") {
-    if (typeof message.requestId !== "string" || message.requestId.length === 0) {
+    if (!isNonEmptyString(message.requestId)) {
       return null;
     }
-    if (typeof message.error === "string") {
+    if (isNonEmptyString(message.error)) {
       return {
         type: message.type,
         requestId: message.requestId,
@@ -98,8 +113,8 @@ export function parseNativeToWebMessage(value: unknown): NativeToWebMessage | nu
       };
     }
     if (
-      typeof message.access_token === "string" &&
-      typeof message.refresh_token === "string"
+      isNonEmptyString(message.access_token) &&
+      isNonEmptyString(message.refresh_token)
     ) {
       return {
         type: message.type,
@@ -113,7 +128,7 @@ export function parseNativeToWebMessage(value: unknown): NativeToWebMessage | nu
   if (
     message.type === "mangadock:permission:result" &&
     message.permission === "media-library" &&
-    typeof message.requestId === "string" &&
+    isNonEmptyString(message.requestId) &&
     (message.status === "granted" ||
       message.status === "denied" ||
       message.status === "blocked")

@@ -16,6 +16,7 @@
     "expo": "~56.0.15",
     "expo-application": "~56.0.3",
     "expo-auth-session": "~56.0.15",
+    "expo-build-properties": "~56.0.22",
     "expo-constants": "~56.0.20",
     "expo-linking": "~56.0.15",
     "expo-media-library": "~56.0.9",

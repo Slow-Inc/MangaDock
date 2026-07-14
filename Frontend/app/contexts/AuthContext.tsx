@@ -264,11 +264,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoginOpen(true);
   }, []);
 
-  const getIdToken = async (): Promise<string | null> => {
+  const getIdToken = useCallback(async (): Promise<string | null> => {
     const { data } = await supabase.auth.getSession();
     sessionRef.current = data.session;
     return data.session?.access_token ?? null;
-  };
+  }, []);
 
   // Sync user profile to backend on sign-in
   const syncToBackend = async (token: string) => {
@@ -387,7 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [getIdToken]);
 
   useEffect(() => {
     const onNativeAuthMessage = async (event: MessageEvent) => {
@@ -418,7 +418,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     window.addEventListener("message", onNativeAuthMessage);
-    return () => window.removeEventListener("message", onNativeAuthMessage);
+    return () => {
+      window.removeEventListener("message", onNativeAuthMessage);
+      const pending = pendingNativeAuthRef.current;
+      if (pending) {
+        clearTimeout(pending.timer);
+        pendingNativeAuthRef.current = null;
+        pending.reject(new Error("Native auth bridge was closed"));
+      }
+    };
   }, []);
 
   /**
@@ -867,6 +875,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const switchToConflictingAccount = async (_credential: unknown): Promise<void> => {
+    void _credential;
     // Not needed in Supabase model — kept for API compatibility
     showToast({ type: "info", message: "กรุณาลงชื่อเข้าใช้ด้วยบัญชีอื่น", duration: 3000 });
   };

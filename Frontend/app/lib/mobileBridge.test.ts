@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  isAllowedWebViewUrl,
   isExpectedNativeAuthMessage,
   parseNativeToWebMessage,
   parseWebToNativeMessage,
@@ -25,10 +26,30 @@ describe("mobile bridge messages", () => {
       provider: "github",
     })).toBeNull();
     expect(parseWebToNativeMessage({
+      type: "mangadock:oauth:start",
+      provider: "google",
+    })).toBeNull();
+    expect(parseWebToNativeMessage({
+      type: "mangadock:oauth:start",
+      provider: "google",
+      requestId: "   ",
+    })).toBeNull();
+    expect(parseWebToNativeMessage({
       type: "mangadock:permission:request",
       permission: "media-library",
       requestId: "",
     })).toBeNull();
+  });
+
+  test("keeps the WebView on the configured application origin", () => {
+    const appUrl = "https://app.mangadock.example/mobile";
+
+    expect(isAllowedWebViewUrl("https://app.mangadock.example/book/1", appUrl)).toBeTrue();
+    expect(isAllowedWebViewUrl("about:blank", appUrl)).toBeTrue();
+    expect(isAllowedWebViewUrl("https://accounts.google.com/login", appUrl)).toBeFalse();
+    expect(isAllowedWebViewUrl("https://app.mangadock.example.evil.test", appUrl)).toBeFalse();
+    expect(isAllowedWebViewUrl("javascript:alert(1)", appUrl)).toBeFalse();
+    expect(isAllowedWebViewUrl("not-a-url", appUrl)).toBeFalse();
   });
 
   test("accepts permission requests and results", () => {
@@ -71,6 +92,17 @@ describe("mobile bridge messages", () => {
       type: "mangadock:native-auth:session",
       requestId: "oauth-1",
       access_token: "access",
+    })).toBeNull();
+    expect(parseNativeToWebMessage({
+      type: "mangadock:native-auth:session",
+      requestId: "   ",
+      error: "cancelled",
+    })).toBeNull();
+    expect(parseNativeToWebMessage({
+      type: "mangadock:native-auth:session",
+      requestId: "oauth-1",
+      access_token: "",
+      refresh_token: "refresh",
     })).toBeNull();
   });
 

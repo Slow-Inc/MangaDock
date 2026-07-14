@@ -12,8 +12,9 @@
     },
     "android": {
       "package": "com.mangadock.mobile",
-      "permissions": ["INTERNET"],
-      "usesCleartextTraffic": true
+      "permissions": [
+        "INTERNET"
+      ]
     },
     "plugins": [
       [
@@ -21,7 +22,17 @@
         {
           "photosPermission": "Allow MangaDock to select manga images for upload.",
           "savePhotosPermission": false,
-          "granularPermissions": ["photo"]
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
         }
       ]
     ],

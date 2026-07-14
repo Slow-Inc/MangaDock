@@ -24,6 +24,7 @@ import { WebView, WebViewMessageEvent, WebViewNavigation } from "react-native-we
 import {
   NativeToWebMessage,
   OAuthProvider,
+  isAllowedWebViewUrl,
   parseWebToNativeMessage,
 } from "./shared/mobileBridge";
 
@@ -276,6 +277,17 @@ export default function App() {
     setCanGoBack(navState.canGoBack);
   }, []);
 
+  const onShouldStartLoadWithRequest = useCallback((request: WebViewNavigation) => {
+    if (isAllowedWebViewUrl(request.url, WEB_URL)) return true;
+
+    if (/^https?:\/\//i.test(request.url)) {
+      void Linking.openURL(request.url).catch(() => {
+        Alert.alert("Cannot open link", "The external link could not be opened.");
+      });
+    }
+    return false;
+  }, []);
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
@@ -285,6 +297,7 @@ export default function App() {
           source={{ uri: WEB_URL }}
           originWhitelist={["http://*", "https://*"]}
           onMessage={onMessage}
+          onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
           onLoadStart={() => setLoadError(null)}
           onLoadEnd={() => {
             setWebReady(true);
@@ -299,6 +312,7 @@ export default function App() {
           thirdPartyCookiesEnabled
           javaScriptEnabled
           domStorageEnabled
+          setSupportMultipleWindows={false}
           startInLoadingState
           renderLoading={() => (
             <View style={styles.loading}>
