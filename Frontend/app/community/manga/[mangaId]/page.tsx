@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { ROLE } from "../../../lib/types/user";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import PostCard from "../../../components/PostCard";
@@ -10,8 +11,13 @@ import { useAuth } from "../../../contexts/AuthContext";
 import PostImageUploader from "../../../components/PostImageUploader";
 import { useLocalLenis } from "../../../hooks/useLocalLenis";
 import { useIsMobile } from "../../../hooks/useIsMobile";
-import type { LandingBook, ForumPost, ForumCategory } from "../../../lib/types";
+import type { ForumPost, ForumCategory } from "../../../lib/types";
 import { CATEGORY_LIST } from "../../../lib/forumCategories";
+import { cacheOrFetch, TTL } from "../../../lib/apiCache";
+import { proxyImageUrl } from "../../../lib/imgUrl";
+
+/** Minimal shape read from the manga-detail endpoint (title + first cover). */
+type MangaMeta = { title?: string; covers?: { url: string; localUrl?: string }[] };
 
 export default function MangaCommunityPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
@@ -35,11 +41,22 @@ export default function MangaCommunityPage() {
 
   const fetchMangaMeta = useCallback(async () => {
     try {
-      const res = await fetch(`/api/proxy/books/${mangaId}`);
-      if (!res.ok) return;
-      const book: LandingBook = await res.json();
+      const book = await cacheOrFetch<MangaMeta | null>(
+        `manga:${mangaId}:detail`,
+        async () => {
+          const res = await fetch(`/api/proxy/books/manga/${mangaId}`);
+          if (!res.ok) return null;
+          return res.json();
+        },
+        TTL.LONG,
+      );
+      if (!book) return;
       setMangaTitle((prev) => prev ?? book.title ?? null);
-      setMangaCover((prev) => prev ?? book.thumbnail ?? null);
+      const cover = book.covers?.[0];
+      const coverUrl = cover
+        ? (cover.localUrl ? `/api/proxy${cover.localUrl}` : proxyImageUrl(cover.url))
+        : null;
+      setMangaCover((prev) => prev ?? coverUrl);
     } catch {
       // non-critical, header just stays empty
     }
@@ -91,7 +108,7 @@ export default function MangaCommunityPage() {
       authorUid: user?.uid ?? "",
       authorName: user?.displayName ?? null,
       authorPhotoUrl: user?.photoURL ?? null,
-      authorRole: user?.role ?? "user",
+      authorRole: user?.role ?? ROLE.USER,
       upvotes: 0,
       downvotes: 0,
       userVote: 0,

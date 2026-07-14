@@ -11,7 +11,7 @@ jest.mock('./page-source', () => ({
 }));
 
 import { Logger } from '@nestjs/common';
-import { MitBatchStream } from './mit-batch-stream';
+import { MitBatchStream, readWithTimeout } from './mit-batch-stream';
 
 function makeStream() {
   const mitClient = {
@@ -356,5 +356,38 @@ describe('MitBatchStream._retryMissingPagesIndividually (#82, relocated from #29
         mangaId: undefined,
       },
     );
+  });
+});
+
+describe('readWithTimeout (#544) — no dangling race-loser timer', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it('clears the timeout timer when the read wins (resolve-first)', async () => {
+    const result = await readWithTimeout(
+      () => Promise.resolve('chunk'),
+      90_000,
+    );
+
+    expect(result).toBe('chunk');
+    // The loser (timeout) timer must be cleared — none left pending. Before the
+    // fix every fast read leaked a ~90s timer that accumulated across the stream.
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('rejects and clears the timer when the timeout wins (timeout-first)', async () => {
+    const neverResolves = new Promise<never>(() => {});
+    const raced = readWithTimeout(() => neverResolves, 90_000);
+    const assertion = expect(raced).rejects.toThrow(
+      'MIT stream read timeout after 90000ms',
+    );
+
+    await jest.advanceTimersByTimeAsync(90_000);
+    await assertion;
+
+    expect(jest.getTimerCount()).toBe(0);
   });
 });

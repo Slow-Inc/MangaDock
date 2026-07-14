@@ -11,9 +11,8 @@ import MangaReader from "./MangaReader";
 import { useBookActions } from "../hooks/useBookActions";
 import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
 import { getHistory } from "../lib/readingHistory";
+import { translateDescription } from "../lib/translateDescription";
 import type { LandingBook } from "../lib/types";
-
-const API_BASE = "/api/proxy";
 
 type BookRowProps = {
   rowId: string;
@@ -80,10 +79,9 @@ function BookCard({
     if (translateFetched.current || !book.description) return;
     translateFetched.current = true;
     setTranslatingDesc(true);
-    fetch(`${API_BASE}/books/translate?text=${encodeURIComponent(book.description)}`)
-      .then((r) => r.json())
-      .then((d: { translatedText: string; translated: boolean }) => {
-        if (d.translated) setTranslatedDesc(d.translatedText);
+    translateDescription(book.description)
+      .then((translated) => {
+        setTranslatedDesc(translated);
         setTranslatingDesc(false);
       })
       .catch(() => setTranslatingDesc(false));

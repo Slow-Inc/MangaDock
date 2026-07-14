@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { ROLE } from "../lib/types/user";
 import { useSearchParams, useRouter } from "next/navigation";
 import PostCard from "../components/PostCard";
 import { PostSkeleton } from "../components/ForumSkeleton";
@@ -10,6 +11,7 @@ import type { ForumPost, ForumCategory, LandingBook } from "../lib/types";
 import MangaSearchSelector from "../components/MangaSearchSelector";
 import PostImageUploader from "../components/PostImageUploader";
 import { useLocalLenis } from "../hooks/useLocalLenis";
+import { useModalTransition } from "../hooks/useModalTransition";
 import { useFeedStream } from "../hooks/useForumStream";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "../lib/forumCategories";
@@ -35,27 +37,26 @@ function CommunityContent() {
   const [viewMode, setViewMode] = useState<'card' | 'compact'>('card');
   const isMobile = useIsMobile();
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [isModalVisible, setIsModalVisible] = useState(false);
   const [newPost, setNewPost] = useState({ title: "", content: "", category: "general" as ForumCategory });
   const [selectedManga, setSelectedManga] = useState<LandingBook | null>(null);
   const [postImages, setPostImages] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const openModal = useCallback(() => {
-    setShowCreateModal(true);
-    requestAnimationFrame(() => requestAnimationFrame(() => setIsModalVisible(true)));
-  }, []);
-
-  const closeModal = useCallback(() => {
-    setIsModalVisible(false);
-    setTimeout(() => {
-      setShowCreateModal(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const {
+    mounted: showCreateModal,
+    visible: isModalVisible,
+  } = useModalTransition(createOpen, {
+    duration: 220,
+    onClosed: () => {
       setPostImages([]);
       setNewPost({ title: "", content: "", category: "general" as ForumCategory });
       setSelectedManga(null);
-    }, 220);
-  }, []);
+    },
+  });
+
+  const openModal = useCallback(() => setCreateOpen(true), []);
+  const closeModal = useCallback(() => setCreateOpen(false), []);
 
   // Reset to 'general' when role changes and current category becomes restricted
   useEffect(() => {
@@ -132,7 +133,7 @@ function CommunityContent() {
       authorUid: user?.uid ?? '',
       authorName: user?.displayName ?? null,
       authorPhotoUrl: user?.photoURL ?? null,
-      authorRole: user?.role ?? 'user',
+      authorRole: user?.role ?? ROLE.USER,
       upvotes: 0,
       downvotes: 0,
       userVote: 0,
@@ -147,8 +148,7 @@ function CommunityContent() {
     setSelectedManga(null);
     setPostImages([]);
     setSubmitting(true);
-    setIsModalVisible(false);
-    setTimeout(() => setShowCreateModal(false), 220);
+    setCreateOpen(false);
 
     try {
       const realPost = await createPost({
@@ -167,8 +167,7 @@ function CommunityContent() {
       setNewPost(postData);
       setSelectedManga(manga);
       setPostImages(images);
-      setShowCreateModal(true);
-      requestAnimationFrame(() => requestAnimationFrame(() => setIsModalVisible(true)));
+      setCreateOpen(true);
     } finally {
       setSubmitting(false);
     }

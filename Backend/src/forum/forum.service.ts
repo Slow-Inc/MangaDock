@@ -1,9 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, InternalServerErrorException, Inject } from '@nestjs/common';
-import * as fs from 'fs';
-import * as crypto from 'crypto';
-import { fileTypeFromFile } from 'file-type';
 import { SupabaseService } from '../supabase/supabase.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import { saveValidatedImage } from '../common/storage/save-validated-image';
 import { ForumEventsService } from './forum-events.service';
 import {
   ForumPost,
@@ -22,14 +20,6 @@ import {
   UserProfileResponse,
 } from './forum.types';
 
-const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const MIME_TO_EXT: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-};
-
 type ForumPostRow = {
   id: string;
   author_uid: string;
@@ -45,8 +35,28 @@ type ForumPostRow = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
-  author?: { display_name: string | null; photo_url: string | null; role: string } | null;
+  author?: { display_name: string | null; photo_url: string | null; role: number } | null;
   comments?: Array<{ count: number }> | null;
+};
+
+// Untyped Supabase client (`SupabaseClient` without a Database generic) resolves
+// `.select(...)` results structurally by column name, but each column's value type
+// is `any`. This mirrors that shape (not a bare `any`) so member access on named
+// fields stays out of no-unsafe-member-access while unsafe values are still
+// caught at their point of use (matches the pre-refactor lint profile exactly).
+type ProfileRow = {
+  uid: any;
+  display_name: any;
+  photo_url: any;
+  banner_url: any;
+  banner_position: any;
+  role: any;
+  bio: any;
+  country: any;
+  translator_languages: any;
+  rating_avg: any;
+  rating_count: any;
+  created_at: any;
 };
 
 @Injectable()
@@ -102,7 +112,7 @@ export class ForumService {
       authorUid: p.author_uid,
       authorName: p.author?.display_name,
       authorPhotoUrl: p.author?.photo_url,
-      authorRole: p.author?.role,
+      authorRole: p.author?.role ?? 0,
       title: p.title,
       content: p.content,
       category: p.category as ForumCategory,
@@ -143,7 +153,7 @@ export class ForumService {
       authorUid: data.author_uid,
       authorName: data.author?.display_name,
       authorPhotoUrl: data.author?.photo_url,
-      authorRole: data.author?.role,
+      authorRole: data.author?.role ?? 0,
       title: data.title,
       content: data.content,
       category: data.category as ForumCategory,
@@ -161,6 +171,20 @@ export class ForumService {
   }
 
   async createPost(uid: string, dto: CreatePostDto): Promise<ForumPost> {
+    const { data: callerProfile } = await this.db
+      .from('profiles')
+      .select('role')
+      .eq('uid', uid)
+      .maybeSingle<{ role: number | null }>();
+    const callerRole = callerProfile?.role ?? 0;
+
+    if (dto.category === 'announcement' && callerRole < 8) {
+      throw new ForbiddenException('Only admins can post announcements');
+    }
+    if (dto.category === 'manga_update' && callerRole < 1) {
+      throw new ForbiddenException('Only translators and above can post manga updates');
+    }
+
     const { data, error } = await this.db
       .from('forum_posts')
       .insert({
@@ -183,7 +207,7 @@ export class ForumService {
       authorUid: data.author_uid,
       authorName: data.author?.display_name,
       authorPhotoUrl: data.author?.photo_url,
-      authorRole: data.author?.role,
+      authorRole: data.author?.role ?? 0,
       title: data.title,
       content: data.content,
       category: data.category as ForumCategory,
@@ -249,43 +273,71 @@ export class ForumService {
     // Secondary sections degrade gracefully to empty on error, but a silently
     // empty section is indistinguishable from a real "no data" state. Log each
     // failure so a transient query error is observable instead of masked.
-    for (const [name, r] of [
+    this.logSecondaryProfileErrors(uid, [
       ['posts', postsRes],
       ['comments', commentsRes],
       ['likedVotes', likedVotesRes],
       ['versions', versionsRes],
-    ] as const) {
+    ] as const);
+    const p = profileRes.data;
+
+    // Fetch liked posts by IDs
+    const likedPostIds = (likedVotesRes.data ?? []).map((v: { target_id: string }) => v.target_id);
+    const likedPostsRaw = await this.fetchLikedPosts(likedPostIds);
+
+    // Viewer votes on all shown posts
+    const allPostIds = [...(postsRes.data ?? []).map((x: any) => x.id), ...likedPostIds];
+    const viewerVotes = await this.getUserVotes(viewerUid, 'post', allPostIds);
+
+    const profileComments = this.mapProfileComments(commentsRes.data ?? []);
+
+    // Group chapter_versions by title
+    const translatedTitles = this.groupTranslatedTitles(versionsRes.data ?? []);
+
+    // Earnings: only for own creator/translator profile
+    const earnings = await this.fetchOwnEarnings(uid, viewerUid, p.role as number);
+
+    const profile = this.mapPublicProfile(p);
+
+    return {
+      profile,
+      posts: (postsRes.data ?? []).map((raw: ForumPostRow) => this.mapPostRow(raw, viewerVotes)),
+      comments: profileComments,
+      likedPosts: likedPostsRaw.map(raw => this.mapPostRow(raw, viewerVotes)),
+      translatedTitles,
+      earnings,
+    };
+  }
+
+  private logSecondaryProfileErrors(uid: string, sections: readonly [string, { error: unknown }][]): void {
+    for (const [name, r] of sections) {
       if (r.error) {
         this.logger.warn(
           `getPublicProfile: ${name} query failed for uid=${uid}: ${JSON.stringify(r.error)}`,
         );
       }
     }
-    const p = profileRes.data;
+  }
 
-    // Fetch liked posts by IDs
-    const likedPostIds = (likedVotesRes.data ?? []).map((v: { target_id: string }) => v.target_id);
-    let likedPostsRaw: ForumPostRow[] = [];
-    if (likedPostIds.length > 0) {
-      const { data } = await this.db
-        .from('forum_posts')
-        .select('*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)')
-        .in('id', likedPostIds)
-        .is('deleted_at', null)
-        .is('comments.deleted_at', null);
-      likedPostsRaw = data ?? [];
-    }
+  private async fetchLikedPosts(likedPostIds: string[]): Promise<ForumPostRow[]> {
+    if (likedPostIds.length === 0) return [];
+    const { data } = await this.db
+      .from('forum_posts')
+      .select('*, author:profiles(display_name, photo_url, role), comments:forum_comments(count)')
+      .in('id', likedPostIds)
+      .is('deleted_at', null)
+      .is('comments.deleted_at', null);
+    const likedPostsRaw: ForumPostRow[] = data ?? [];
+    return likedPostsRaw;
+  }
 
-    // Viewer votes on all shown posts
-    const allPostIds = [...(postsRes.data ?? []).map((x: any) => x.id), ...likedPostIds];
-    const viewerVotes = await this.getUserVotes(viewerUid, 'post', allPostIds);
-
-    const mapPost = (raw: ForumPostRow): ForumPost => ({
+  private mapPostRow(raw: ForumPostRow, viewerVotes: Map<string, number>): ForumPost {
+    return {
       id: raw.id,
       authorUid: raw.author_uid,
       authorName: raw.author?.display_name ?? null,
       authorPhotoUrl: raw.author?.photo_url ?? null,
-      authorRole: raw.author?.role ?? 'user',
+      authorRole: raw.author?.role ?? 0,
       title: raw.title,
       content: raw.content,
       category: raw.category as ForumCategory,
@@ -299,9 +351,11 @@ export class ForumService {
       commentCount: raw.comments?.[0]?.count ?? 0,
       createdAt: raw.created_at,
       updatedAt: raw.updated_at,
-    });
+    };
+  }
 
-    const profileComments: ProfileComment[] = (commentsRes.data ?? []).map((c: any) => ({
+  private mapProfileComments(rows: any[]): ProfileComment[] {
+    return rows.map((c: any) => ({
       id: c.id,
       postId: c.post_id,
       postTitle: c.post?.title ?? 'ไม่พบโพสต์',
@@ -310,36 +364,38 @@ export class ForumService {
       downvotes: c.downvotes,
       createdAt: c.created_at,
     }));
+  }
 
-    // Group chapter_versions by title
+  private groupTranslatedTitles(rows: any[]): TranslatedTitle[] {
     const titleMap = new Map<string, TranslatedTitle>();
-    (versionsRes.data ?? []).forEach((v: any) => {
+    rows.forEach((v: any) => {
       if (!titleMap.has(v.title_id)) {
         titleMap.set(v.title_id, { titleId: v.title_id, titleName: v.title_name, language: v.language, chapterCount: 0 });
       }
       titleMap.get(v.title_id)!.chapterCount++;
     });
+    return Array.from(titleMap.values());
+  }
 
-    // Earnings: only for own creator/translator profile
-    let earnings: UserProfileEarnings | null = null;
-    const isCreator = p.role === 'translator' || p.role === 'creator';
-    if (isCreator && viewerUid === uid) {
-      const { data: earningsData } = await this.db
-        .from('translator_earnings')
-        .select('*')
-        .eq('translator_uid', uid)
-        .maybeSingle();
-      if (earningsData) {
-        earnings = {
-          totalSales: earningsData.total_sales ?? 0,
-          totalEarned: earningsData.total_earned ?? 0,
-          titlesSold: earningsData.titles_sold ?? 0,
-          uniqueBuyers: earningsData.unique_buyers ?? 0,
-        };
-      }
-    }
+  private async fetchOwnEarnings(uid: string, viewerUid: string | undefined, role: number): Promise<UserProfileEarnings | null> {
+    const isCreator = role >= 1;
+    if (!(isCreator && viewerUid === uid)) return null;
+    const { data: earningsData } = await this.db
+      .from('translator_earnings')
+      .select('*')
+      .eq('translator_uid', uid)
+      .maybeSingle();
+    if (!earningsData) return null;
+    return {
+      totalSales: earningsData.total_sales ?? 0,
+      totalEarned: earningsData.total_earned ?? 0,
+      titlesSold: earningsData.titles_sold ?? 0,
+      uniqueBuyers: earningsData.unique_buyers ?? 0,
+    };
+  }
 
-    const profile: PublicUserProfile = {
+  private mapPublicProfile(p: ProfileRow): PublicUserProfile {
+    return {
       uid: p.uid,
       displayName: p.display_name,
       photoUrl: p.photo_url,
@@ -352,15 +408,6 @@ export class ForumService {
       ratingAvg: p.rating_avg ?? 0,
       ratingCount: p.rating_count ?? 0,
       createdAt: p.created_at,
-    };
-
-    return {
-      profile,
-      posts: (postsRes.data ?? []).map(mapPost),
-      comments: profileComments,
-      likedPosts: likedPostsRaw.map(mapPost),
-      translatedTitles: Array.from(titleMap.values()),
-      earnings,
     };
   }
 
@@ -468,7 +515,7 @@ export class ForumService {
       authorUid: data.author_uid,
       authorName: data.author?.display_name,
       authorPhotoUrl: data.author?.photo_url,
-      authorRole: data.author?.role,
+      authorRole: data.author?.role ?? 0,
       content: data.content,
       upvotes: data.upvotes,
       downvotes: data.downvotes,
@@ -479,35 +526,14 @@ export class ForumService {
   }
 
   async uploadBanner(uid: string, tempFilePath: string, _clientMime: string): Promise<{ bannerUrl: string }> {
-    // Validate by magic bytes, not the client-supplied Content-Type header
-    const detected = await fileTypeFromFile(tempFilePath);
-    if (!detected || !ALLOWED_IMAGE_MIME.has(detected.mime)) {
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed');
-    }
-    const mimeType = detected.mime;
-
-    const ext = MIME_TO_EXT[mimeType];
-    const filename = `${crypto.randomUUID()}${ext}`;
-    const key = `uploads/banners/${filename}`;
-
-    try {
-      const fileData = fs.readFileSync(tempFilePath);
-      await this.storage.put(key, fileData, { contentType: mimeType });
-      fs.unlinkSync(tempFilePath);
-    } catch (err) {
-      this.logger.error(`Banner upload failed: ${String(err)}`);
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new InternalServerErrorException('Failed to upload banner');
-    }
-
-    const bannerUrl = `/${key}`;
+    const { url: bannerUrl } = await saveValidatedImage(this.storage, tempFilePath, 'uploads/banners', {
+      storageErrorMessage: 'Failed to upload banner',
+    });
 
     const { error } = await this.db
       .from('profiles')
       .update({ banner_url: bannerUrl })
       .eq('uid', uid);
-
     if (error) throw new InternalServerErrorException(`Failed to update profile banner: ${error.message}`);
 
     return { bannerUrl };
@@ -524,29 +550,10 @@ export class ForumService {
   }
 
   async uploadImage(uid: string, tempFilePath: string, _clientMime: string): Promise<{ imageUrl: string }> {
-    // Validate by magic bytes, not the client-supplied Content-Type header
-    const detected = await fileTypeFromFile(tempFilePath);
-    if (!detected || !ALLOWED_IMAGE_MIME.has(detected.mime)) {
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed');
-    }
-    const mimeType = detected.mime;
-
-    const ext = MIME_TO_EXT[mimeType];
-    const filename = `${crypto.randomUUID()}${ext}`;
-    const key = `uploads/forum/${filename}`;
-
-    try {
-      const fileData = fs.readFileSync(tempFilePath);
-      await this.storage.put(key, fileData, { contentType: mimeType });
-      fs.unlinkSync(tempFilePath);
-    } catch (err) {
-      this.logger.error(`Forum image upload failed: ${String(err)}`);
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      throw new InternalServerErrorException('Failed to upload image');
-    }
-
-    return { imageUrl: `/${key}` };
+    const { url } = await saveValidatedImage(this.storage, tempFilePath, 'uploads/forum', {
+      storageErrorMessage: 'Failed to upload image',
+    });
+    return { imageUrl: url };
   }
 
   async listComments(postId: string, userUid?: string): Promise<ForumComment[]> {
@@ -572,7 +579,7 @@ export class ForumService {
       authorUid: c.author_uid,
       authorName: c.author?.display_name,
       authorPhotoUrl: c.author?.photo_url,
-      authorRole: c.author?.role,
+      authorRole: c.author?.role ?? 0,
       content: c.content,
       upvotes: c.upvotes,
       downvotes: c.downvotes,
@@ -671,7 +678,7 @@ export class ForumService {
       authorUid: data.author_uid,
       authorName: data.author?.display_name,
       authorPhotoUrl: data.author?.photo_url,
-      authorRole: data.author?.role,
+      authorRole: data.author?.role ?? 0,
       userVote: 0,
       createdAt: data.created_at,
       updatedAt: data.updated_at,

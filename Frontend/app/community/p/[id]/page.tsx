@@ -13,7 +13,10 @@ import VoteButtons from "../../../components/VoteButtons";
 import CommentThread from "../../../components/CommentThread";
 import { useAuth } from "../../../contexts/AuthContext";
 import { usePostStream } from "../../../hooks/useForumStream";
+
+const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 import type { ForumPost, ForumComment } from "../../../lib/types";
+import { isDisplayedVoteEvent } from "../../../lib/voteEvents";
 
 function MarqueeText({ text, textClassName, active }: { text: string; textClassName?: string; active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -89,6 +92,7 @@ export default function PostDetailPage() {
     onEvent: useCallback((event) => {
       switch (event.type) {
         case "vote":
+          if (!isDisplayedVoteEvent(event.targetType)) break;
           setVoteCounts(prev => new Map(prev).set(
             `${event.targetType}:${event.targetId}`,
             { upvotes: event.upvotes, downvotes: event.downvotes },
@@ -167,6 +171,10 @@ export default function PostDetailPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Stable identity so the React.memo'd CommentThread items are not invalidated
+  // on every post re-render (plan 2026-07-11 Perf 3).
+  const handleCommentAdded = useCallback(() => fetchData(true), [fetchData]);
 
   const handleDeletePost = async () => {
     if (!post || deletingPost) return;
@@ -308,14 +316,14 @@ export default function PostDetailPage() {
               <Link
                 href={`/community/profile/${post.authorUid}`}
                 className={`font-bold text-sm hover:underline underline-offset-2 transition-opacity hover:opacity-80 ${
-                  post.authorRole === 'translator' ? "text-indigo-400" :
-                  post.authorRole === 'creator' ? "text-orange-400" : "text-white/80"
+                  post.authorRole === 1 ? "text-indigo-400" :
+                  post.authorRole === 2 ? "text-orange-400" : "text-white/80"
                 }`}
               >
                 {post.authorName || 'Unknown User'}
-                {post.authorRole !== 'user' && (
+                {post.authorRole > 0 && (
                   <span className="ml-1.5 px-1 bg-white/10 rounded text-[9px] uppercase tracking-tighter text-white/70">
-                    {post.authorRole}
+                    {ROLE_LABEL[post.authorRole] ?? String(post.authorRole)}
                   </span>
                 )}
               </Link>
@@ -580,7 +588,7 @@ export default function PostDetailPage() {
             <CommentThread
               key={comment.id}
               comment={comment}
-              onCommentAdded={() => fetchData(true)}
+              onCommentAdded={handleCommentAdded}
             />
           ))
         ) : (

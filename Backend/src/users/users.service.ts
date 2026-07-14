@@ -10,7 +10,8 @@ import * as path from 'path';
 import { SupabaseService } from '../supabase/supabase.service';
 import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
 
-export type UserRole = 'user' | 'translator' | 'creator' | 'admin';
+export const ROLE = { USER: 0, TRANSLATOR: 1, CREATOR: 2, ADMIN: 8, DEV: 9 } as const;
+export type UserRole = typeof ROLE[keyof typeof ROLE]; // 0 | 1 | 2 | 8 | 9
 export type UserPlan = 'free' | 'premium' | 'pro';
 
 export type FavoriteItem = {
@@ -127,7 +128,7 @@ export class UsersService {
       email: row.email ?? null,
       displayName: row.display_name ?? null,
       photoURL: row.photo_url ?? null,
-      role: row.role ?? 'user',
+      role: row.role ?? ROLE.USER,
       plan: row.plan ?? 'free',
       trustScore: row.trust_score ?? 0,
       ratingAvg: row.rating_avg ?? 0,
@@ -567,8 +568,8 @@ export class UsersService {
     }
     if (!existing) throw new NotFoundException('User not found');
 
-    const currentRole = existing.role ?? 'user';
-    const newRole: UserRole = currentRole === 'user' ? 'translator' : currentRole;
+    const currentRole = existing.role ?? 0;
+    const newRole: UserRole = currentRole === 0 ? 1 : currentRole;
 
     const update: Record<string, unknown> = {
       role: newRole,
@@ -602,8 +603,8 @@ export class UsersService {
     }
     if (!existing) throw new NotFoundException('User not found');
 
-    const currentRole = existing.role ?? 'user';
-    if (currentRole === 'user') {
+    const currentRole = existing.role ?? 0;
+    if (currentRole === 0) {
       throw new ForbiddenException('Only translators or creators can update translator profile');
     }
 
@@ -639,8 +640,8 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    const role = data.role ?? 'user';
-    if (role !== 'translator' && role !== 'creator' && role !== 'admin') {
+    const role = data.role ?? 0;
+    if (role < 1) {
       throw new NotFoundException('Translator not found');
     }
 

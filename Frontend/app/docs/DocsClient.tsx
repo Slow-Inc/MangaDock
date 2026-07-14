@@ -87,13 +87,24 @@ interface GHComment {
 
 // ─── Utilities ─────────────────────────────────────────────────────────────
 
-import { relativeDate, labelFg } from './utils';
+import { relativeDate, labelFg, sanitizeDocsUrl } from './utils';
+import { cacheOrFetch, TTL } from '../lib/apiCache';
 
 async function ghFetch<T>(type: string, params: Record<string, string | number> = {}): Promise<T> {
   const qs = new URLSearchParams({ type, ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) });
-  const res = await fetch(`/api/docs/github?${qs}`);
-  if (!res.ok) throw new Error(`GitHub ${res.status}`);
-  return res.json() as Promise<T>;
+  // Cache read-only GitHub GETs by their full query string (F7) — the qs encodes
+  // type + all params, so distinct requests get distinct keys. TTL.MEDIUM keeps
+  // us off GitHub's rate limit while staying fresh enough for docs/issue lists.
+  // cacheOrFetch never caches a throw, so the !ok error path is unchanged.
+  return cacheOrFetch<T>(
+    `docs:${qs.toString()}`,
+    async () => {
+      const res = await fetch(`/api/docs/github?${qs}`);
+      if (!res.ok) throw new Error(`GitHub ${res.status}`);
+      return res.json() as Promise<T>;
+    },
+    TTL.MEDIUM,
+  );
 }
 
 // ─── Markdown Renderer ─────────────────────────────────────────────────────
@@ -109,8 +120,9 @@ function renderInline(text: string): React.ReactNode {
       return <code key={i} className="px-1.5 py-0.5 rounded text-[0.85em] font-mono bg-[#f0f4ff] text-[#0071e3] border border-[#0071e3]/[0.15]">{part.slice(1, -1)}</code>;
     const lm = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (lm) {
-      const ext = lm[2].startsWith('http');
-      return <a key={i} href={lm[2]} className="text-[#0071e3] underline underline-offset-2 hover:text-[#0058b0] transition-colors duration-150" target={ext ? '_blank' : undefined} rel={ext ? 'noreferrer' : undefined}>{lm[1]}</a>;
+      const href = sanitizeDocsUrl(lm[2]);
+      const ext = href.startsWith('http');
+      return <a key={i} href={href} className="text-[#0071e3] underline underline-offset-2 hover:text-[#0058b0] transition-colors duration-150" target={ext ? '_blank' : undefined} rel={ext ? 'noreferrer' : undefined}>{lm[1]}</a>;
     }
     return <React.Fragment key={i}>{part}</React.Fragment>;
   });
