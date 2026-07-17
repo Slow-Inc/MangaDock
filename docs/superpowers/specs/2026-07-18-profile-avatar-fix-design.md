@@ -36,12 +36,17 @@ if (data.photoURL) {
 Logic:
 ```
 if incoming photoURL is social CDN URL:
-    UPDATE profiles SET photo_url = photoURL WHERE uid = uid
-    (ไม่มี .is('photo_url', null) — อัปเดตเสมอ)
+    UPDATE profiles SET photo_url = photoURL
+    WHERE uid = uid
+      AND (photo_url IS NULL OR photo_url isSocialCDN)
+    → อัปเดตเฉพาะเมื่อ existing URL เป็น social CDN หรือ null
+    → ถ้า user เคย upload avatar เอง (/uploads/avatars/) จะไม่ถูกทับ
 elif existing photo_url IS NULL:
     UPDATE profiles SET photo_url = photoURL WHERE uid = uid AND photo_url IS NULL
     (keep uploaded avatar untouched)
 ```
+
+**Critical guard:** ต้องดึง `photo_url` ปัจจุบันก่อน update ด้วย `SELECT photo_url WHERE uid = uid` เพื่อตัดสินว่าควร overwrite หรือไม่ — ป้องกัน race ไม่ได้ แต่ acceptable เพราะ login event ไม่ concurrent
 
 **Why:** Facebook CDN URL (scontent-*.fbcdn.net) มี signed token ใน path ที่หมดอายุ ทุก login OAuth จะได้ URL ใหม่ที่ valid — ต้อง persist ทันที
 
@@ -78,7 +83,7 @@ export function isSocialCdnUrl(url: string): boolean {
 />
 ```
 
-`onError` ซ่อน `<Image>` ที่โหลดไม่ได้ → parent container จะ fallback แสดง initial letter แทน (pattern ที่มีอยู่แล้วใน NavbarActions)
+`onError` ซ่อน `<Image>` ที่โหลดไม่ได้ → parent container (`div` ที่มี `bg-white/10`) จะแสดงเป็น empty placeholder circle (ไม่มี initial letter — community components ไม่มี pattern นั้น แต่ดีกว่า broken image icon) NavbarActions มี initial letter อยู่แล้วและไม่ต้องแก้
 
 **Note:** `NavbarActions.tsx` มี `unoptimized` สำหรับ Facebook แล้ว (บรรทัด 103) — ไม่ต้องแก้
 
