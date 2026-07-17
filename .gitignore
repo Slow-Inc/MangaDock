@@ -13,9 +13,6 @@ Frontend.rar
 # VS Code (machine-specific)
 .vscode/
 
-# Mobile — Phase 3 (not started)
-Mobile/
-
 # Personal / academic docs
 Email.md
 ADVISOR_REQUEST.txt
@@ -31,5 +28,6 @@ Backend/prd_*.txt
 /MangaTranslator
 
 .mcp.json
+
 # Git worktrees
 .worktrees/

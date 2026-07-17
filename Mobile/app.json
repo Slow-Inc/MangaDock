@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "MangaDock",
+    "slug": "mangadock",
+    "scheme": "mangadock",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "bundleIdentifier": "com.mangadock.mobile",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.mangadock.mobile",
+      "permissions": [
+        "INTERNET"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow MangaDock to select manga images for upload.",
+          "savePhotosPermission": false,
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}

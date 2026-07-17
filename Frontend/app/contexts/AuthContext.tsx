@@ -25,9 +25,24 @@ import { resolveAvatarUrl } from "../lib/avatarUpload";
 import { ROLE, type UserRole } from "../lib/types/user";
 import { isTrustedOAuthCallbackMessage } from "../lib/oauthCallback";
 import { useToast } from "./ToastContext";
+import {
+  isExpectedNativeAuthMessage,
+  OAuthProvider,
+  parseNativeToWebMessage,
+  WebToNativeMessage,
+} from "@mangadock/mobile-bridge";
 
 const API_BASE = "/api/proxy";
 const DEFAULT_PUBLIC_SITE_URL = "http://localhost:4000";
+const NATIVE_AUTH_TIMEOUT_MS = 120_000;
+
+declare global {
+  interface Window {
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void;
+    };
+  }
+}
 
 // ─── AppUser — Unified user interface for UI components ───────────────
 export interface AppUser {
@@ -222,6 +237,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<Session | null>(null);
   const supabaseUserRef = useRef<SupabaseUser | null>(null);
   const lastUidRef = useRef<string | null>(null);
+  const pendingNativeAuthRef = useRef<{
+    requestId: string;
+    resolve: () => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
 
   const showLoginPrompt = useCallback(() => {
     showToast({
@@ -243,11 +264,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoginOpen(true);
   }, []);
 
-  const getIdToken = async (): Promise<string | null> => {
+  const getIdToken = useCallback(async (): Promise<string | null> => {
     const { data } = await supabase.auth.getSession();
     sessionRef.current = data.session;
     return data.session?.access_token ?? null;
-  };
+  }, []);
 
   // Sync user profile to backend on sign-in
   const syncToBackend = async (token: string) => {
@@ -276,6 +297,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return null;
     }
+  };
+
+  const isNativeWebView = () =>
+    typeof window !== "undefined" && !!window.ReactNativeWebView;
+
+  const startNativeOAuth = (provider: OAuthProvider): Promise<void> => {
+    if (!isNativeWebView()) {
+      return Promise.reject(new Error("Native auth bridge is not available"));
+    }
+
+    const previous = pendingNativeAuthRef.current;
+    if (previous) {
+      clearTimeout(previous.timer);
+      pendingNativeAuthRef.current = null;
+      previous.reject(new Error("Native auth request was replaced"));
+    }
+
+    return new Promise((resolve, reject) => {
+      const requestId = crypto.randomUUID();
+      const timer = setTimeout(() => {
+        if (pendingNativeAuthRef.current?.requestId === requestId) {
+          pendingNativeAuthRef.current = null;
+        }
+        reject(Object.assign(new Error("Native login timed out"), { code: "auth/native-timeout" }));
+      }, NATIVE_AUTH_TIMEOUT_MS);
+
+      pendingNativeAuthRef.current = { requestId, resolve, reject, timer };
+      const message: WebToNativeMessage = {
+        type: "mangadock:oauth:start",
+        provider,
+        requestId,
+      };
+      window.ReactNativeWebView?.postMessage(JSON.stringify(message));
+    });
   };
 
   useEffect(() => {
@@ -331,6 +386,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       subscription.unsubscribe();
+    };
+  }, [getIdToken]);
+
+  useEffect(() => {
+    const onNativeAuthMessage = async (event: MessageEvent) => {
+      const payload = parseNativeToWebMessage(event.data);
+
+      const pending = pendingNativeAuthRef.current;
+      if (!pending || !isExpectedNativeAuthMessage(payload, pending.requestId)) return;
+
+      pendingNativeAuthRef.current = null;
+      clearTimeout(pending.timer);
+
+      if ("error" in payload) {
+        pending.reject(Object.assign(new Error(payload.error), { code: "auth/native-oauth-failed" }));
+        return;
+      }
+
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: payload.access_token,
+        refresh_token: payload.refresh_token,
+      });
+
+      if (setSessionError) {
+        pending.reject(setSessionError);
+        return;
+      }
+
+      pending.resolve();
+    };
+
+    window.addEventListener("message", onNativeAuthMessage);
+    return () => {
+      window.removeEventListener("message", onNativeAuthMessage);
+      const pending = pendingNativeAuthRef.current;
+      if (pending) {
+        clearTimeout(pending.timer);
+        pendingNativeAuthRef.current = null;
+        pending.reject(new Error("Native auth bridge was closed"));
+      }
     };
   }, []);
 
@@ -423,6 +518,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    if (isNativeWebView()) {
+      await startNativeOAuth("google");
+      reloadPage();
+      return;
+    }
+
     const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -434,6 +535,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithFacebook = async () => {
+    if (isNativeWebView()) {
+      await startNativeOAuth("facebook");
+      reloadPage();
+      return;
+    }
+
     const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "facebook",
@@ -768,6 +875,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const switchToConflictingAccount = async (_credential: unknown): Promise<void> => {
+    void _credential;
     // Not needed in Supabase model — kept for API compatibility
     showToast({ type: "info", message: "กรุณาลงชื่อเข้าใช้ด้วยบัญชีอื่น", duration: 3000 });
   };
