@@ -1,7 +1,37 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UsersService } from './users.service';
+import { UsersService, isSocialCdnUrl } from './users.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { STORAGE_PROVIDER } from '../common/storage/storage-provider.interface';
+
+describe('isSocialCdnUrl', () => {
+  it('returns true for Google photo URL', () => {
+    expect(isSocialCdnUrl('https://lh3.googleusercontent.com/a/abc=s96-c')).toBe(true);
+  });
+
+  it('returns true for fbcdn URL (scontent-region.fbcdn.net)', () => {
+    expect(isSocialCdnUrl('https://scontent-bkk1-1.fbcdn.net/v/photo.jpg')).toBe(true);
+  });
+
+  it('returns true for fbsbx URL', () => {
+    expect(isSocialCdnUrl('https://platform-lookaside.fbsbx.com/photo.jpg')).toBe(true);
+  });
+
+  it('returns true for graph.facebook.com URL', () => {
+    expect(isSocialCdnUrl('https://graph.facebook.com/1234/picture')).toBe(true);
+  });
+
+  it('returns false for uploaded avatar path', () => {
+    expect(isSocialCdnUrl('/uploads/avatars/uid_abc123.jpg')).toBe(false);
+  });
+
+  it('returns false for full uploaded avatar URL', () => {
+    expect(isSocialCdnUrl('https://api.hayateotsu.space/uploads/avatars/uid_abc123.jpg')).toBe(false);
+  });
+
+  it('returns false for empty string', () => {
+    expect(isSocialCdnUrl('')).toBe(false);
+  });
+});
 
 function makeSupabaseMock(rows: unknown[], error: unknown = null) {
   const chain = {

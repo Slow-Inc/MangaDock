@@ -86,6 +86,18 @@ type FavoriteRow = {
   ratings_count: number | null;
 };
 
+/** Returns true if the URL is from a social OAuth CDN (Google, Facebook).
+ *  These URLs carry signed tokens that expire — they must be refreshed on
+ *  every login rather than written once and cached forever. */
+export function isSocialCdnUrl(url: string): boolean {
+  return (
+    url.includes('lh3.googleusercontent.com') ||
+    url.includes('fbcdn.net') ||
+    url.includes('fbsbx.com') ||
+    url.includes('graph.facebook.com')
+  );
+}
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -184,13 +196,36 @@ export class UsersService {
       }
     }
     if (data.photoURL) {
-      const { error } = await this.db
-        .from('profiles')
-        .update({ photo_url: data.photoURL })
-        .eq('uid', uid)
-        .is('photo_url', null);
-      if (error) {
-        throw new Error(`Failed to backfill photo URL: ${error.message}`);
+      if (isSocialCdnUrl(data.photoURL)) {
+        // Social CDN URLs (Google lh3, Facebook fbcdn) carry signed tokens that
+        // expire. Refresh on every login — but only when the stored URL is also
+        // social CDN or null; never overwrite a custom uploaded avatar.
+        const { data: existing } = await this.db
+          .from('profiles')
+          .select('photo_url')
+          .eq('uid', uid)
+          .maybeSingle<{ photo_url: string | null }>();
+
+        const currentUrl = existing?.photo_url ?? null;
+        if (currentUrl === null || isSocialCdnUrl(currentUrl)) {
+          const { error } = await this.db
+            .from('profiles')
+            .update({ photo_url: data.photoURL })
+            .eq('uid', uid);
+          if (error) {
+            throw new Error(`Failed to refresh photo URL: ${error.message}`);
+          }
+        }
+      } else {
+        // Non-social URL (uploaded avatar): original behavior — only write when null.
+        const { error } = await this.db
+          .from('profiles')
+          .update({ photo_url: data.photoURL })
+          .eq('uid', uid)
+          .is('photo_url', null);
+        if (error) {
+          throw new Error(`Failed to backfill photo URL: ${error.message}`);
+        }
       }
     }
 
