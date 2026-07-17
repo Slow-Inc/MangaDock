@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   email        TEXT,
   display_name TEXT,
   photo_url    TEXT,
-  role         TEXT NOT NULL DEFAULT 'user',
+  role         INTEGER NOT NULL DEFAULT 0, -- 0=user 1=translator 2=creator 8=admin 9=dev
   plan         TEXT NOT NULL DEFAULT 'free',
   trust_score  INTEGER NOT NULL DEFAULT 0,
   rating_avg   NUMERIC NOT NULL DEFAULT 0,

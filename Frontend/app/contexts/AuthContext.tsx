@@ -22,10 +22,27 @@ import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData
 import { clearAllApiCache } from "../lib/apiCache";
 import { reloadPage, redirectToHome } from "../lib/browserActions";
 import { resolveAvatarUrl } from "../lib/avatarUpload";
+import { ROLE, type UserRole } from "../lib/types/user";
+import { isTrustedOAuthCallbackMessage } from "../lib/oauthCallback";
 import { useToast } from "./ToastContext";
+import {
+  isExpectedNativeAuthMessage,
+  OAuthProvider,
+  parseNativeToWebMessage,
+  WebToNativeMessage,
+} from "@mangadock/mobile-bridge";
 
 const API_BASE = "/api/proxy";
 const DEFAULT_PUBLIC_SITE_URL = "http://localhost:4000";
+const NATIVE_AUTH_TIMEOUT_MS = 120_000;
+
+declare global {
+  interface Window {
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void;
+    };
+  }
+}
 
 // ─── AppUser — Unified user interface for UI components ───────────────
 export interface AppUser {
@@ -35,7 +52,7 @@ export interface AppUser {
   displayName: string | null;
   photoURL: string | null;
   emailVerified: boolean;
-  role?: string | null;
+  role?: UserRole | null;
   providerData: Array<{
     providerId: string;
     photoURL?: string | null;
@@ -51,12 +68,33 @@ function mapProviderId(provider: string): string {
   return provider;
 }
 
+/** Coerce a role value (numeric, or numeric string from a JWT/metadata claim)
+ *  to a known numeric UserRole, or null. Roles are numeric end-to-end (#606);
+ *  anything not matching a known ROLE value is treated as unknown. */
+const VALID_ROLES = new Set<number>(Object.values(ROLE));
+function coerceRole(v: unknown): UserRole | null {
+  const n =
+    typeof v === "number"
+      ? v
+      : typeof v === "string" && v.trim() !== ""
+        ? Number(v)
+        : NaN;
+  return VALID_ROLES.has(n) ? (n as UserRole) : null;
+}
+
 /** Adapt a Supabase User to the AppUser interface used by UI components. */
 function adaptUser(u: SupabaseUser): AppUser {
-  const meta = (u.user_metadata ?? {}) as Record<string, string | null | undefined>;
-  const displayName = meta.display_name ?? meta.full_name ?? meta.name ?? null;
-  const photoURL = meta.avatar_url ?? meta.picture ?? null;
-  const role = meta.role ?? null;
+  const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+  const displayName =
+    (meta.display_name as string | null | undefined) ??
+    (meta.full_name as string | null | undefined) ??
+    (meta.name as string | null | undefined) ??
+    null;
+  const photoURL =
+    (meta.avatar_url as string | null | undefined) ??
+    (meta.picture as string | null | undefined) ??
+    null;
+  const role = coerceRole(meta.role);
 
   const providerData = (u.identities ?? []).map((identity) => {
     const idata = (identity.identity_data ?? {}) as Record<string, string | null | undefined>;
@@ -82,7 +120,7 @@ function adaptUser(u: SupabaseUser): AppUser {
 type BackendProfile = {
   displayName: string | null;
   photoURL: string | null;
-  role: string | null;
+  role: UserRole | null;
 };
 
 function extractBackendProfile(payload: unknown): BackendProfile | null {
@@ -104,15 +142,16 @@ function extractBackendProfile(payload: unknown): BackendProfile | null {
       read(obj.photoUrl) ??
       read(obj.avatarUrl) ??
       read(obj.avatar_url);
-    const role = read(obj.role);
-    if (displayName || photoURL || role) return { displayName, photoURL, role };
+    const role = coerceRole(obj.role);
+    if (displayName || photoURL || role !== null)
+      return { displayName, photoURL, role };
   }
   return null;
 }
 
 type AuthContextType = {
   user: AppUser | null;
-  userRole: string | null;
+  userRole: UserRole | null;
   isTranslator: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
@@ -198,6 +237,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<Session | null>(null);
   const supabaseUserRef = useRef<SupabaseUser | null>(null);
   const lastUidRef = useRef<string | null>(null);
+  const pendingNativeAuthRef = useRef<{
+    requestId: string;
+    resolve: () => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
 
   const showLoginPrompt = useCallback(() => {
     showToast({
@@ -219,11 +264,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoginOpen(true);
   }, []);
 
-  const getIdToken = async (): Promise<string | null> => {
+  const getIdToken = useCallback(async (): Promise<string | null> => {
     const { data } = await supabase.auth.getSession();
     sessionRef.current = data.session;
     return data.session?.access_token ?? null;
-  };
+  }, []);
 
   // Sync user profile to backend on sign-in
   const syncToBackend = async (token: string) => {
@@ -252,6 +297,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return null;
     }
+  };
+
+  const isNativeWebView = () =>
+    typeof window !== "undefined" && !!window.ReactNativeWebView;
+
+  const startNativeOAuth = (provider: OAuthProvider): Promise<void> => {
+    if (!isNativeWebView()) {
+      return Promise.reject(new Error("Native auth bridge is not available"));
+    }
+
+    const previous = pendingNativeAuthRef.current;
+    if (previous) {
+      clearTimeout(previous.timer);
+      pendingNativeAuthRef.current = null;
+      previous.reject(new Error("Native auth request was replaced"));
+    }
+
+    return new Promise((resolve, reject) => {
+      const requestId = crypto.randomUUID();
+      const timer = setTimeout(() => {
+        if (pendingNativeAuthRef.current?.requestId === requestId) {
+          pendingNativeAuthRef.current = null;
+        }
+        reject(Object.assign(new Error("Native login timed out"), { code: "auth/native-timeout" }));
+      }, NATIVE_AUTH_TIMEOUT_MS);
+
+      pendingNativeAuthRef.current = { requestId, resolve, reject, timer };
+      const message: WebToNativeMessage = {
+        type: "mangadock:oauth:start",
+        provider,
+        requestId,
+      };
+      window.ReactNativeWebView?.postMessage(JSON.stringify(message));
+    });
   };
 
   useEffect(() => {
@@ -308,6 +387,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
+  }, [getIdToken]);
+
+  useEffect(() => {
+    const onNativeAuthMessage = async (event: MessageEvent) => {
+      const payload = parseNativeToWebMessage(event.data);
+
+      const pending = pendingNativeAuthRef.current;
+      if (!pending || !isExpectedNativeAuthMessage(payload, pending.requestId)) return;
+
+      pendingNativeAuthRef.current = null;
+      clearTimeout(pending.timer);
+
+      if ("error" in payload) {
+        pending.reject(Object.assign(new Error(payload.error), { code: "auth/native-oauth-failed" }));
+        return;
+      }
+
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: payload.access_token,
+        refresh_token: payload.refresh_token,
+      });
+
+      if (setSessionError) {
+        pending.reject(setSessionError);
+        return;
+      }
+
+      pending.resolve();
+    };
+
+    window.addEventListener("message", onNativeAuthMessage);
+    return () => {
+      window.removeEventListener("message", onNativeAuthMessage);
+      const pending = pendingNativeAuthRef.current;
+      if (pending) {
+        clearTimeout(pending.timer);
+        pendingNativeAuthRef.current = null;
+        pending.reject(new Error("Native auth bridge was closed"));
+      }
+    };
   }, []);
 
   /**
@@ -340,7 +459,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The callback page postMessages the session tokens (or error) back to us.
       // This works even if the popup callback and opener are on different origins.
       const onMessage = async (event: MessageEvent) => {
-        if (event.data?.type !== "supabase:oauth:callback") return;
+        if (!isTrustedOAuthCallbackMessage(event, window.location.origin)) return;
         window.removeEventListener("message", onMessage);
         clearInterval(closedPoll);
         try { popup.close(); } catch { /* ignore */ }
@@ -399,6 +518,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    if (isNativeWebView()) {
+      await startNativeOAuth("google");
+      reloadPage();
+      return;
+    }
+
     const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -410,6 +535,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithFacebook = async () => {
+    if (isNativeWebView()) {
+      await startNativeOAuth("facebook");
+      reloadPage();
+      return;
+    }
+
     const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "facebook",
@@ -744,12 +875,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const switchToConflictingAccount = async (_credential: unknown): Promise<void> => {
+    void _credential;
     // Not needed in Supabase model — kept for API compatibility
     showToast({ type: "info", message: "กรุณาลงชื่อเข้าใช้ด้วยบัญชีอื่น", duration: 3000 });
   };
 
   const userRole = user?.role ?? null;
-  const isTranslator = userRole === "translator" || userRole === "creator" || userRole === "admin";
+  const isTranslator =
+    userRole === ROLE.TRANSLATOR ||
+    userRole === ROLE.CREATOR ||
+    userRole === ROLE.ADMIN;
 
   // Memoized provider value (#152): without this, any provider state change
   // (including loginOpen open/close) re-rendered every useAuth() consumer.

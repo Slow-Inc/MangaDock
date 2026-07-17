@@ -52,10 +52,10 @@
 ---
 
 ## Phase 3: Hybrid Mobile Framework (NEXT STEP)
-- [ ]  [Mobile] React Native WebViewer Shell Initialization
-- [ ]  [Mobile] Strategic Code Sharing Layer (Shared Types/Logic)
-- [ ]  [Mobile] Native Authentication Bridge (Device Token Sync)
-- [ ]  [Mobile] Core OS Permission Handling (Storage/Network)
+- [X]  [Mobile] React Native WebViewer Shell Initialization
+- [X]  [Mobile] Strategic Code Sharing Layer (Shared Types/Logic)
+- [X]  [Mobile] Native Authentication Bridge (Device Token Sync)
+- [X]  [Mobile] Core OS Permission Handling (Storage/Network)
 
 ---
 
@@ -126,10 +126,10 @@
 ---
 
 ## Phase 3: Hybrid Mobile Framework (ขั้นตอนถัดไป)
-- [ ]  [Mobile] สร้าง React Native WebViewer Shell
-- [ ]  [Mobile] ชั้นแชร์โค้ดเชิงกลยุทธ์ (Types/Logic ร่วมกัน)
-- [ ]  [Mobile] Native Authentication Bridge (ซิงค์ Device Token)
-- [ ]  [Mobile] จัดการ OS Permission หลัก (Storage/Network)
+- [X]  [Mobile] สร้าง React Native WebViewer Shell
+- [X]  [Mobile] ชั้นแชร์โค้ดเชิงกลยุทธ์ (Types/Logic ร่วมกัน)
+- [X]  [Mobile] Native Authentication Bridge (ซิงค์ Device Token)
+- [X]  [Mobile] จัดการ OS Permission หลัก (Storage/Network)
 
 ---
 

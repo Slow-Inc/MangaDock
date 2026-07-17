@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { ROLE } from "../lib/types/user";
 import { useSearchParams, useRouter } from "next/navigation";
 import PostCard from "../components/PostCard";
 import { PostSkeleton } from "../components/ForumSkeleton";
@@ -132,7 +133,7 @@ function CommunityContent() {
       authorUid: user?.uid ?? '',
       authorName: user?.displayName ?? null,
       authorPhotoUrl: user?.photoURL ?? null,
-      authorRole: user?.role ?? 'user',
+      authorRole: user?.role ?? ROLE.USER,
       upvotes: 0,
       downvotes: 0,
       userVote: 0,

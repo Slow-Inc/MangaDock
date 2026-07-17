@@ -24,3 +24,14 @@ export const CATEGORY_LABELS: Record<string, string> = {
   'docs/agents': 'Agent Guides',
   'docs/prd': 'Product Requirements',
 };
+
+/**
+ * Neutralize dangerous URL schemes before placing a user/API-supplied URL in an
+ * <a href>. Docs render GitHub issue/PR/comment bodies (attacker-controlled),
+ * and React does not strip `javascript:` hrefs. Mirrors the repo convention at
+ * community/p/[id]/page.tsx. See plan 2026-07-11 Vuln 3.
+ */
+export function sanitizeDocsUrl(url: string): string {
+  const trimmed = url.trim();
+  return /^\s*(javascript|data|vbscript|file):/i.test(trimmed) ? '#' : trimmed;
+}

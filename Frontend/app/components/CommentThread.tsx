@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, memo } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,7 +12,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useModalTransition } from "../hooks/useModalTransition";
 import type { ForumComment } from "../lib/types";
 
-export default function CommentThread({
+function CommentThreadImpl({
   comment,
   depth = 0,
   onCommentAdded
@@ -158,8 +158,8 @@ export default function CommentThread({
               <Link
                 href={`/community/profile/${comment.authorUid}`}
                 className={`font-bold hover:underline underline-offset-2 transition-opacity hover:opacity-80 ${
-                  comment.authorRole === 'translator' ? "text-indigo-400" :
-                  comment.authorRole === 'creator' ? "text-orange-400" : "text-white/80"
+                  comment.authorRole === 1 ? "text-indigo-400" :
+                  comment.authorRole === 2 ? "text-orange-400" : "text-white/80"
                 }`}
               >
                 {comment.authorName || 'Unknown User'}
@@ -396,3 +396,12 @@ export default function CommentThread({
     </div>
   );
 }
+
+/**
+ * Memoized: PostDetailPage re-renders on post-vote / comment-add SSE events.
+ * With a stable onCommentAdded (parent useCallback) memo skips reconciling
+ * unchanged comment subtrees (plan 2026-07-11 Perf 3). The recursive reference
+ * above resolves to this memoized component at render time.
+ */
+const CommentThread = memo(CommentThreadImpl);
+export default CommentThread;

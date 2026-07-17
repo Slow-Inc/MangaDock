@@ -9,13 +9,15 @@ export const CATEGORY_LIST: readonly ForumCategory[] = [
 
 const RESTRICTED: ReadonlySet<ForumCategory> = new Set(["announcement", "manga_update"]);
 
-const PRIVILEGED_ROLES = new Set(["translator", "creator", "admin"]);
-
 export function isRestrictedCategory(cat: ForumCategory): boolean {
   return RESTRICTED.has(cat);
 }
 
-export function availableCategories(role: string | null | undefined): ForumCategory[] {
-  if (PRIVILEGED_ROLES.has(role ?? "")) return [...CATEGORY_LIST];
-  return CATEGORY_LIST.filter((cat) => !RESTRICTED.has(cat));
+export function availableCategories(role: number | null | undefined): ForumCategory[] {
+  const r = role ?? 0;
+  return CATEGORY_LIST.filter(cat => {
+    if (cat === 'announcement') return r >= 8;   // admin/dev only
+    if (cat === 'manga_update') return r >= 1;   // translator+
+    return true;
+  });
 }
