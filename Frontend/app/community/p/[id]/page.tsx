@@ -17,6 +17,7 @@ import { usePostStream } from "../../../hooks/useForumStream";
 const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 import type { ForumPost, ForumComment } from "../../../lib/types";
 import { isDisplayedVoteEvent } from "../../../lib/voteEvents";
+import { isSocialCdnUrl } from '../../../lib/avatarUpload';
 
 function MarqueeText({ text, textClassName, active }: { text: string; textClassName?: string; active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -304,12 +305,14 @@ export default function PostDetailPage() {
             <header className="flex items-center flex-wrap gap-3 mb-3 sm:mb-4 text-xs text-white/40 relative">
               <div className="w-6 h-6 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/5">
                 {post.authorPhotoUrl && (
-                  <Image 
-                    src={post.authorPhotoUrl} 
-                    alt={post.authorName || 'user'} 
-                    width={24} 
+                  <Image
+                    src={post.authorPhotoUrl}
+                    alt={post.authorName || 'user'}
+                    width={24}
                     height={24}
                     className="object-cover"
+                    unoptimized={isSocialCdnUrl(post.authorPhotoUrl)}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   />
                 )}
               </div>

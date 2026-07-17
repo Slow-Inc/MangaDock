@@ -10,6 +10,7 @@ import { getProfile, uploadProfileBanner, updateBannerPosition } from "../../../
 import PostCard from "../../../components/PostCard";
 import { useAuth } from "../../../contexts/AuthContext";
 import type { UserProfileResponse } from "../../../lib/types";
+import { isSocialCdnUrl } from '../../../lib/avatarUpload';
 
 type Tab = "posts" | "comments" | "liked" | "translated";
 
@@ -363,6 +364,8 @@ export default function PublicProfilePage() {
                   width={96}
                   height={96}
                   className="object-cover w-full h-full"
+                  unoptimized={isSocialCdnUrl(profile.photoUrl)}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-2xl sm:text-3xl font-black text-white/30">
