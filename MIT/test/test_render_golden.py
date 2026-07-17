@@ -61,3 +61,22 @@ def test_render_dispatch_byte_identical():
         pytest.skip(f'generated golden snapshot at {GOLDEN}; re-run to assert')
     golden = np.load(GOLDEN)
     assert np.array_equal(out, golden['img']), 'render dispatch pixel drift'
+
+
+def test_render_dispatch_skips_blanked_region_without_crash():
+    # dedup/suppressed regions carry translation='' — put_text returns None on empty
+    # text and render() crashes on None.shape, failing the WHOLE group. The render
+    # loop must SKIP them (regression: SFX dedup blanked a region and blanked the page).
+    real = TextBlock(
+        [[[20, 20], [300, 20], [20, 120], [300, 120]]],
+        texts=['x'], translation='Hello', direction='h', target_lang='ENG', font_size=40,
+    )
+    blank = TextBlock(
+        [[[350, 20], [500, 20], [350, 180], [500, 180]]],
+        texts=['y'], translation='', direction='v', target_lang='JPN', font_size=40,
+    )
+    for r in (real, blank):
+        r.set_font_colors([255, 255, 255], [0, 0, 0])
+    img = np.zeros((200, 700, 3), dtype=np.uint8)
+    out = asyncio.run(dispatch_rendering(img, [real, blank], hyphenate=False))  # must not raise
+    assert out is not None

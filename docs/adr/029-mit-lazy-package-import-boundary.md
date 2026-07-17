@@ -1,4 +1,4 @@
-# ADR 023 — Lazy package-import boundary so logic tests/CI run torch-free
+# ADR 029 — Lazy package-import boundary so logic tests/CI run torch-free
 
 - **Status:** Accepted (2026-06-29) — implemented. `manga_translator/__init__.py` and
   `manga_translator/utils/__init__.py` use PEP 562 `__getattr__`; `test/conftest.py` skips

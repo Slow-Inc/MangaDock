@@ -18,7 +18,11 @@ import re
 from typing import Dict, List, Optional
 
 OCR_FAILED = '[OCR FAILED]'
-_BLOCK_RE = re.compile(r'<\|(\d+)\|>')
+# Tolerant delimiter: the model sometimes emits a marker with a missing/loose closing
+# ('<|10|' or '<|10>') — live full-page Otome. Accept an optional closing so a malformed
+# marker still SPLITS (no leaked '<|10|' in the text, no index shift for later blocks).
+_BLOCK_RE = re.compile(r'<\|\s*(\d+)\s*\|?>?')
+_STRAY_MARKER_RE = re.compile(r'<\|\s*\d*\s*\|?>?\s*$')
 
 
 def parse_numbered_blocks(raw: str) -> Dict[int, str]:
@@ -32,7 +36,7 @@ def parse_numbered_blocks(raw: str) -> Dict[int, str]:
         idx = int(m.group(1))
         start = m.end()
         end = matches[k + 1].start() if k + 1 < len(matches) else len(raw)
-        out[idx] = raw[start:end].strip()
+        out[idx] = _STRAY_MARKER_RE.sub('', raw[start:end]).strip()
     return out
 
 

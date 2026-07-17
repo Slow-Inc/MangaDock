@@ -1,3 +1,4 @@
+import os
 import re
 
 from ..config import TranslatorConfig
@@ -12,6 +13,92 @@ import time
 from typing import List
 from .common import CommonTranslator, VALID_LANGUAGES
 from .keys import CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL, CUSTOM_OPENAI_MODEL_CONF
+
+
+class EmptyContentError(Exception):
+    """#631: the gateway returned a completion whose ``message.content`` is ``None``
+    (the #623 dense-page failure mode — a qwen3-style model can emit only EOS/reasoning
+    and no content; thinking-off reduces but does not eliminate it). Raised instead of
+    returning ``None`` so the ``_translate`` retry loop treats it as a retryable server
+    fault — ``extract_capture_groups(None)`` would ``TypeError`` and 500 the whole page."""
+
+
+def resolve_enable_thinking(env=None) -> bool:
+    """Whether to leave the LLM's native thinking/reasoning mode on. Default OFF:
+    a qwen3-style reasoning model can spend the whole ``max_tokens`` budget on
+    ``<think>`` output and return empty ``content`` on dense pages (#623 — the
+    One-Punch narration group: 6502 chars of reasoning → completion cap hit →
+    ``content=None`` → the translate 500s the whole page). Set
+    ``CUSTOM_OPENAI_ENABLE_THINKING=true`` to re-enable for a non-thinking model."""
+    if env is None:
+        env = os.environ
+    return str(env.get('CUSTOM_OPENAI_ENABLE_THINKING', 'false')).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def thinking_extra_body(enable_thinking: bool):
+    """``extra_body`` for ``chat.completions.create`` intended to suppress qwen3-style
+    thinking when disabled (``chat_template_kwargs.enable_thinking=false``). Returns
+    ``None`` when thinking is enabled so the call is unchanged.
+
+    NOTE (measured 2026-07-12, qwen3.6-35b-a3b via 9arm): this lever is a NO-OP on that
+    gateway — enable_thinking=false / reasoning_effort=none / '/no_think' all still emit
+    ~4.3–6.4k chars of reasoning. It is kept for a genuinely toggleable model; on 9arm the
+    real mitigation is the reasoning-sized token budget (see resolve_max_completion_tokens),
+    NOT this lever."""
+    if enable_thinking:
+        return None
+    return {'chat_template_kwargs': {'enable_thinking': False}}
+
+
+def resolve_max_completion_tokens(env=None, default: int = 4096, *, thinking: bool = False) -> int:
+    """#631: the completion-token cap for the translate call. qwen3.6 via the 9arm gateway
+    IGNORES every thinking-disable lever (chat_template_kwargs.enable_thinking / reasoning_effort
+    / '/no_think' — measured: ~6-8k chars of reasoning emitted regardless), so the completion
+    budget must fit reasoning + content. The old cap (``_MAX_TOKENS // 2`` = 2048) hit
+    ``finish=length`` with ``content=None`` on dense pages (#623's root, resurfaced).
+
+    Two SEPARATE caps so the reasoning overhead is budgeted explicitly:
+    - thinking OFF → ``CUSTOM_OPENAI_MAX_COMPLETION_TOKENS`` (default 4096; measured dense
+      page reasoning+content ≈ 2.7k even though we *ask* the gateway to stop thinking — it
+      won't, but 4096 still fits).
+    - thinking ON → ``CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS`` (default 8192), a larger
+      dedicated cap because an explicitly-thinking model reasons more/longer before it emits
+      content, so it needs extra headroom or the content is truncated to ``None``."""
+    if env is None:
+        env = os.environ
+    if thinking:
+        return _positive_int_env(env, 'CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS', 8192)
+    return _positive_int_env(env, 'CUSTOM_OPENAI_MAX_COMPLETION_TOKENS', default)
+
+
+def _positive_int_env(env, key: str, default: int) -> int:
+    """Parse ``env[key]`` as a positive int, falling back to ``default`` on missing/invalid/≤0."""
+    try:
+        v = int(str(env.get(key, '')).strip())
+        return v if v > 0 else default
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_numbered_translations(response: str, query_size: int):
+    """Map a ``<|i|>text`` response to EXACTLY ``query_size`` translations, BY INDEX.
+
+    #535 root: the former inline ``re.split(r'<\\|\\d+\\|>', ...)`` was positional (a dropped
+    index shifted every later bubble) and strict (a malformed ``<|10|`` with no closing ``>``
+    leaked into the text). Delegates to ``numbered_contract`` (index-based + malformed-marker
+    tolerant); falls back to a whole-body / newline split only when there is no marker at all."""
+    from .numbered_contract import normalize_numbered_output, _BLOCK_RE
+    if _BLOCK_RE.search(response or ''):
+        return [('' if t.startswith('[Missing item') else t)
+                for t in normalize_numbered_output(response, query_size)]
+    if query_size == 1:
+        return [(response or '').strip()]
+    parts = [t.strip() for t in re.split(r'\n', response or '') if t.strip()]
+    if len(parts) > query_size:
+        parts = parts[:query_size]
+    elif len(parts) < query_size:
+        parts = parts + [''] * (query_size - len(parts))
+    return parts
 
 
 class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
@@ -171,6 +258,15 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
                         raise
                     self.logger.warning(f'Restarting request due to a server error. Attempt: {server_error_attempt}')
                     await asyncio.sleep(1)
+                except EmptyContentError:  # #631: gateway returned content=None (dense-page mode)
+                    server_error_attempt += 1
+                    if server_error_attempt >= self._RETRY_ATTEMPTS:
+                        self.logger.error(
+                            'Translator returned empty content (content=None) on every attempt — '
+                            'gateway/model dense-request failure (#623/#631).')
+                        raise
+                    self.logger.warning(f'Restarting request due to empty content (content=None). Attempt: {server_error_attempt}')
+                    await asyncio.sleep(1)
 
             # self.logger.debug('-- GPT Response --\n' + response)
             
@@ -179,41 +275,9 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             response=self.extract_capture_groups(response, rf"{self.rgx_capture}")
 
 
-            # Sometimes it will return line like "<|9>demo", and we need to fix it.
-            def add_pipe(match):
-                number = match.group(1)
-                return f"<|{number}|>"
-            response = re.sub(r"<\|?(\d+)\|?>", add_pipe, response)
-            
-
-            # self.logger.debug('-- GPT Response (filtered) --\n' + response)
-
-            # @NOTE: This should *should* be superflous now, due to `extract_capture_groups`:
-            # 
-            # Remove any text preceeding the first translation.
-            new_translations = re.split(r'<\|\d+\|>', 'pre_1\n' + response)[1:]
-            # new_translations = re.split(r'<\|\d+\|>', response)
-
-            # When there is only one query LLMs likes to exclude the <|1|>
-            if not new_translations:
-                new_translations = [response]
-
-            # Immediately clean leading and trailing whitespace from each translation text
-            new_translations = [t.strip() for t in new_translations]
-
-            # When there is only one query LLMs likes to exclude the <|1|> # Maybe it can be removed, but it causes no errors
-            if not new_translations[0].strip():
-                new_translations = new_translations[1:]
-
-            if len(new_translations) <= 1 and query_size > 1:
-                # Try splitting by newlines instead
-                new_translations = re.split(r'\n', response)
-
-            if len(new_translations) > query_size:
-                new_translations = new_translations[: query_size]
-            elif len(new_translations) < query_size:
-                new_translations = new_translations + [''] * (query_size - len(new_translations))
-
+            # #535: index-based, malformed-marker-tolerant parse (was a positional
+            # re.split that shifted on a dropped index and leaked '<|10|' fragments).
+            new_translations = parse_numbered_translations(response, query_size)
             translations.extend([t.strip() for t in new_translations])
 
         for t in translations:
@@ -236,13 +300,24 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
 
         messages.append({'role': 'user', 'content': prompt})
 
-        response = await self.client.chat.completions.create(
+        create_kwargs = dict(
             model=self.model or CUSTOM_OPENAI_MODEL,
             messages=messages,
-            max_tokens=self._MAX_TOKENS // 2,
+            # #631: was `self._MAX_TOKENS // 2` (=2048) — not enough for qwen3.6's
+            # un-disableable reasoning (~2k tokens) + content on dense pages → finish=length,
+            # content=None, whole-page 500. See resolve_max_completion_tokens.
+            max_tokens=resolve_max_completion_tokens(thinking=resolve_enable_thinking()),
             temperature=self.temperature,
             top_p=self.top_p,
         )
+        # #623: disable the model's native thinking (qwen3-style) unless the operator
+        # opts back in via CUSTOM_OPENAI_ENABLE_THINKING — otherwise a reasoning model
+        # burns the whole max_tokens budget on <think> and returns empty content on
+        # dense pages (verified: dense group 2048-tok exhausted → None; thinking off → 86 tok).
+        _extra = thinking_extra_body(resolve_enable_thinking())
+        if _extra is not None:
+            create_kwargs['extra_body'] = _extra
+        response = await self.client.chat.completions.create(**create_kwargs)
 
         self.logger.debug('\n-- GPT Response (raw) --')
         self.logger.debug(response.choices[0].message.content)
@@ -264,4 +339,14 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             f'completion={completion_tokens if completion_tokens is not None else "n/a"}'
         )
 
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        if content is None:
+            # #631: the gateway sometimes returns finish=stop with content=None on dense
+            # requests (#623 root; thinking-off reduces but does not eliminate it). Raise a
+            # retryable error — returning None would TypeError in extract_capture_groups
+            # and 500 the whole page.
+            raise EmptyContentError(
+                f'translator returned empty content (content=None, finish='
+                f'{getattr(response.choices[0], "finish_reason", "?")}, '
+                f'completion_tokens={completion_tokens})')
+        return content

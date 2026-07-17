@@ -3,6 +3,22 @@
 
 ---
 
+## #631 — separate thinking token-budget (prevent qwen3.6 reasoning truncation) (2026-07-12)
+
+**Trigger:** measured the 9arm gateway live — `chat_template_kwargs.enable_thinking=false`, `reasoning_effort=none`, `/no_think`, top-level `enable_thinking=false` ALL still emit 4.3–6.4k chars of reasoning (a 2-line translate burns ~1.3–1.9k completion tokens on reasoning alone). The thinking-disable levers are a confirmed NO-OP → the only real defense against `finish=length`→`content=None` truncation is a reasoning-sized token budget.
+
+**Done (TDD, 8 green):** `resolve_max_completion_tokens(env, default=4096, *, thinking=False)` now returns a SEPARATE cap when thinking is on — `CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS` (default **8192**) vs the base `CUSTOM_OPENAI_MAX_COMPLETION_TOKENS` (default 4096). Wired: `max_tokens=resolve_max_completion_tokens(thinking=resolve_enable_thinking())` — default behavior unchanged (4096); set `CUSTOM_OPENAI_ENABLE_THINKING=true` to use the 8192 headroom (honest, since the gateway thinks regardless). Also corrected the `thinking_extra_body` docstring lie ("the lever the 9arm gateway honours" → NO-OP, measured). Follow-up: the SFX vision call still hardcodes `max_tokens=24` — same truncation bug, route it through this resolver next.
+
+---
+
+## #630 — remove shelved reference_layout render-campaign dead code (2026-07-11)
+
+**Goal:** after the #626 render==landing pivot, delete main's shelved render campaign left DEAD/BROKEN on the branch (render_replay imported the landing-absent `clean_layout_font_size`; 4 test files errored on collection).
+
+**Done (`a8b64f69`):** deleted `reference_layout.py` / `render_replay.py` / `rendering/sizing_trace.py` + 4 orphaned tests; removed the `MIT_DUMP_REGIONS` dump block, `config.RenderConfig.reference_layout` (0 readers), and the `MIT_REFERENCE_LAYOUT` mapping in `mit-config.ts` + its 2 spec cases + ENV_KEYS entry. Verified: MIT collection **4 errors → 0** (743 clean), render-path net **75 passed**, imports clean, 0 dangling refs, Backend diff a clean deletion (jest in CI). Recoverable via `archive/mit-180-kp-425` / `archive/mit-183-squeeze-424` / PR #423. Also this session: git tech-debt (temp+bench-545 worktrees pruned, local main ff'd, `.gemini/.env` gitignored `4538be17`), branch pushed to origin.
+
+---
+
 ## Guard #4 — append-only log-header guard (#610, 2026-07-09)
 
 **Goal:** prevent the stale-base clobber class (#553 → #608) at PR time — a PR off an old base silently dropping newer `## ` entries from `DONE.md` / `system-impact-report.md`.
@@ -2760,3 +2776,15 @@ Six-PR agent-owned tech-debt batch, all TDD + `/scrutinize` (posted bilingual) +
 - Also: closed **#543** obsolete (already fixed by #106 `1de61ffe`); filed leftovers **#614** (load_dotenv extraction, ex-#192) + **#615** (BaseGPTTranslator, ex-#188).
 
 Dogfooded #620 the same session: after #619 landed, #612 was rebased onto post-#619 `main` (disjoint → clean) before merge, which also greened its heavy-ML job; #613/#621 were verified disjoint from main's new commits and squash-merged. Missing dev dep `pytest-asyncio` installed in the MIT venv (local async tests were silently failing "async def not natively supported").
+
+## 2026-07-11 — #626 branch reconciliation: render == landing baseline + main non-render (integration)
+
+Converged the 3-way divergence (`main`/`landing`/`perf`) onto `integrate/render-reconcile` (off `main` ← merged `landing`, 25 conflicts, 6 slices). Full per-slice record: `docs/reports/RECONCILE-626-decisions.md`; decision: **ADR 030**.
+- **Render == landing baseline, byte-identical.** First merge kept main's render spine → deterministic dump-replay A/B (Gal Yome EN→TH) showed dialogue 3.96% larger than the tuned baseline. Per the dev hard constraint *"คุณภาพต้องเหมือน baseline เท่านั้น"*, the render subsystem (rendering/__init__.py, render_overlap, text_render, patch_geometry, patch_renderer, text_layer, stages + tests + goldens) was reset to landing's EXACT code. Verified `git diff origin/landing HEAD` empty on all 7 files → render == baseline for ALL inputs; A/B 0.0000% pixel diff. main render campaign (#178/#180/#183) shelved (archived as tags + PR #423).
+- **Translation gate PASS:** #623 thinking-off vs on A/B == baseline quality (no regression); #623 folded into `custom_openai` (default OFF, TDD 5 green) + landing's tolerant numbered-parse. Caveat: 9arm gateway intermittently returns empty (both modes = infra, not a regression).
+- **Kept from main (non-render):** translators+#623, Backend/Frontend, config, CI-infra (#359/ADR 029), textline_merge is_sfx. Landmine #1 fixed (is_sfx populated). #421 selective_flux wired + `MIT_SELECTIVE_FLUX` (OFF). ADR-023 collision split (render 023 / lazy-import 029).
+- **Net 159 green** (torch-free); goldens regenerated from landing code. Scrutinize: **SHIP**.
+- **Git tech-debt (§6 / #627 closed):** 4 abandoned worktrees + local branches removed; 3 closed-superseded origin branches archived as tags + deleted; kept #423/baselines/#360/not-ours.
+- **Benchmarks (committed PNG+MD):** `docs/reports/benchmarks/2026-07-10-626-render-recon-vs-landing.*` (render 0%), `2026-07-10-626-translation-thinking-ab.*` (translation A/B).
+- **Follow-ups filed:** #628 (telemetry unify), #629 (is_sfx helper), #630 (remove shelved render-campaign code — render_replay broken post-pivot).
+- **REMAINING (dev-gated):** Phase A perf-WIP freeze (#625) + Phase E merge integrate→main + ff→perf + bump MIT_RENDER_VERSION + enforce lama_large/selective_flux-off/KP-gate. Agent self-merge to main is classifier-blocked. Full E2E translate verify pending stable gateway + GPU (render E2E is proven by byte-identical code).

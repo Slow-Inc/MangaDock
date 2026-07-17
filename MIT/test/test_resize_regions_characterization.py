@@ -13,17 +13,13 @@ generates + skips; later runs assert exact equality. Delete an npz to
 regenerate when a change is expected and reviewed.
 """
 import os
-import sys
 
 import numpy as np
-import PIL.features
 import pytest
 
 from manga_translator.rendering import resize_regions_to_font_size
 from manga_translator.rendering import text_render
 from manga_translator.utils import TextBlock
-
-from _golden_compare import golden_verdict
 
 GOLDEN_DIR = os.path.join(os.path.dirname(__file__), 'golden')
 _FONT = os.path.join(os.path.dirname(__file__), '..', 'fonts', 'Arial-Unicode-Regular.ttf')
@@ -33,14 +29,7 @@ def _set_font():
     text_render.set_font(_FONT)
 
 
-def _text_metric_env():
-    """The two things a byte-identical freetype-metric golden is tied to: the freetype build
-    (glyph advances) and the OS. A golden only asserts strictly where both match what it recorded."""
-    return PIL.features.version('freetype2') or 'unknown', sys.platform
-
-
 def _save_or_assert(golden_path, dst_points_list, regions):
-    ft, plat = _text_metric_env()
     if not os.path.exists(golden_path):
         os.makedirs(os.path.dirname(golden_path), exist_ok=True)
         payload = {}
@@ -48,29 +37,10 @@ def _save_or_assert(golden_path, dst_points_list, regions):
             payload[f'dst_{i}'] = np.asarray(dp)
         payload['font_sizes'] = np.array([r.font_size for r in regions], dtype=np.int64)
         payload['translations'] = '|'.join(r.translation for r in regions)
-        payload['freetype_version'] = ft
-        payload['platform'] = plat
         np.savez_compressed(golden_path, **payload)
         pytest.skip(f'generated golden snapshot at {golden_path}; re-run to assert')
 
     golden = np.load(golden_path)
-    equal = (
-        all(np.array_equal(np.asarray(dp), golden[f'dst_{i}']) for i, dp in enumerate(dst_points_list))
-        and np.array_equal(np.array([r.font_size for r in regions], dtype=np.int64), golden['font_sizes'])
-        and '|'.join(r.translation for r in regions) == str(golden['translations'])
-    )
-    golden_ft = str(golden['freetype_version']) if 'freetype_version' in golden else None
-    golden_plat = str(golden['platform']) if 'platform' in golden else None
-    same_env = (golden_ft == ft and golden_plat == plat)
-
-    verdict = golden_verdict(equal, same_env)
-    if verdict == 'skip':
-        pytest.skip(
-            f'golden recorded on {golden_plat}/freetype-{golden_ft}; running {plat}/freetype-{ft} — '
-            'freetype-metric geometry drift, not a logic change. Regenerate on this platform to assert.'
-        )
-    # verdict is 'pass' (equal → the asserts below all hold) or 'fail' (mismatch on the SAME env →
-    # a real regression); run the strict asserts so a failure names exactly which array drifted.
     for i, dp in enumerate(dst_points_list):
         assert np.array_equal(np.asarray(dp), golden[f'dst_{i}']), f'region {i} dst_points drift'
     assert np.array_equal(
@@ -158,3 +128,35 @@ def test_resize_regions_clean_layout_byte_identical():
         bubble_fit=False, clean_layout=True, font_size_max=24, page_shape=img.shape,
     )
     _save_or_assert(os.path.join(GOLDEN_DIR, 'resize_regions_clean_layout.npz'), dst_points_list, regions)
+
+
+def test_resize_regions_thai_byte_identical():
+    """#499: the production hot path is EN->TH, but the cases above only use
+    ENG/JPN. target_lang='THA' normalizes to hyphenator tag 'th' — a DIFFERENT
+    key than the 'th_TH' -> 'th-TH' case in test_calc_horizontal_characterization,
+    so nothing else locks the exact select_hyphenator('THA')->None path the
+    @lru_cache fix optimizes. Exercise both a bubble-fit and a legacy Thai region
+    (real Thai dialogue long enough to wrap) so a change to HYPHENATOR_LANGUAGES
+    or the fallback loop can't silently regress the Thai render geometry."""
+    _set_font()
+    img = np.zeros((720, 1000, 3), dtype=np.uint8)
+    thai_balloon = TextBlock(
+        [[[100, 100], [340, 100], [100, 280], [340, 280]]],
+        texts=['x'], translation='ไฮมิยะเซนไพน่ากลัวและก็น่ารักในเวลาเดียวกันเลยนะ',
+        direction='h', target_lang='THA', font_size=30,
+    )
+    thai_balloon.bubble_box = (90, 90, 350, 290)
+    thai_legacy = TextBlock(
+        [[[400, 400], [640, 400], [400, 470], [640, 470]]],
+        texts=['y'], translation='เจ้าจะไม่ใส่ชุดเกราะเลยหรือไงกัน',
+        direction='h', target_lang='THA', font_size=30,
+    )
+    regions = [thai_balloon, thai_legacy]
+    for r in regions:
+        r.set_font_colors([255, 255, 255], [0, 0, 0])
+
+    dst_points_list = resize_regions_to_font_size(
+        img, regions, font_size_fixed=None, font_size_offset=0, font_size_minimum=8,
+        bubble_fit=True, anti_overlap=True, clean_layout=False,
+    )
+    _save_or_assert(os.path.join(GOLDEN_DIR, 'resize_regions_thai.npz'), dst_points_list, regions)

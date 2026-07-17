@@ -28,12 +28,15 @@ _CJK_RE = re.compile(r'[一-鿿㐀-䶿]')   # CJK Unified Ideographs (Simplified
 try:
     import jieba as _jieba
     _HAS_JIEBA = True
+    # #278: jieba lazily builds its ~1s prefix dict on the FIRST cut() call — which would
+    # otherwise land on a user's first Chinese render. Build it once at module import
+    # (worker load) so the cost is off the request path.
+    try:
+        _jieba.initialize()
+    except Exception:
+        pass
 except ImportError:
     _HAS_JIEBA = False
-# #278 nit: jieba builds its prefix dict (~1 s) lazily on the FIRST `_jieba.cut` — i.e. the first
-# Chinese render per worker carries that one-time cost, not import. We deliberately do NOT call
-# `_jieba.initialize()` here so a worker that never renders Chinese pays nothing at startup
-# (lazy-cost by design); the ~1 s is amortised on the first CHS/CHT page only.
 
 
 def _insert_cjk_word_breaks(text: str) -> str:
@@ -691,8 +694,7 @@ def longest_token_width(font_size: int, text: str, language: str = 'en_US') -> i
     not drop below, or words with no hyphenation point (especially spaceless Thai/CJK) get
     force-split mid-word ("ข้างนอก"→"ข้า"/"งนอก"). Word boundaries come from the same ZWSP
     segmentation ``calc_horizontal`` uses (pythainlp/jieba), so a spaceless Thai line is
-    measured per word, not as one giant token. ``language`` is accepted for call-site symmetry
-    with ``calc_horizontal`` (segmentation auto-detects script, so it is not needed here)."""
+    measured per word, not as one giant token."""
     seg = _insert_cjk_word_breaks(_insert_thai_word_breaks(text or ''))
     words = [w for w in re.split(rf'[\s{_ZWSP}]+', seg) if w]
     if not words:
@@ -1227,7 +1229,6 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
     # calc
     # print(width)
     line_text_list, line_width_list = calc_horizontal(font_size, text, width, height, lang, hyphenate)
-    # print(line_text_list, line_width_list)
 
     # make large canvas
     canvas_w = max(line_width_list) + (font_size + bg_size) * 2
