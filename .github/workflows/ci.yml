@@ -30,6 +30,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       mit: ${{ steps.filter.outputs.mit }}
+      mobile: ${{ steps.filter.outputs.mobile }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -44,6 +45,9 @@ jobs:
               - '.github/workflows/ci.yml'
             mit:
               - 'MIT/**'
+              - '.github/workflows/ci.yml'
+            mobile:
+              - 'Mobile/**'
               - '.github/workflows/ci.yml'
 
   backend:
@@ -110,6 +114,28 @@ jobs:
           echo "Running: $files"
           bun test $files
 
+  mobile:
+    name: mobile (typecheck)
+    needs: changes
+    if: ${{ needs.changes.outputs.mobile == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Mobile is an Expo/React Native project; package-lock.json is its maintained
+      # lockfile (no bun.lock here, unlike Backend/Frontend). npm ci also fails the
+      # build if the lockfile drifts out of sync with package.json — a free extra check.
+      - run: npm ci
+      # tsc --noEmit (strict, expo/tsconfig.base). No device/emulator build in CI; the
+      # @mangadock/mobile-bridge unit suite runs in the frontend job, not duplicated here.
+      - name: Typecheck (tsc --noEmit, strict)
+        run: npm run typecheck
+
   # MIT is two jobs since #359 lazy-imported torch (job ids use underscores — a hyphen in a
   # job id breaks `${{ needs.mit-logic }}` expression parsing, which reads `-` as subtraction):
   #   • mit_logic — BLOCKING gate. Lightweight deps only (no torch); test/conftest.py auto-skips
@@ -171,16 +197,16 @@ jobs:
   gate:
     name: gate
     if: ${{ always() }}
-    needs: [backend, frontend, mit_logic, mit_heavy]
+    needs: [backend, frontend, mit_logic, mit_heavy, mobile]
     runs-on: ubuntu-latest
     steps:
       # Mark ONLY this job as the required check. Skipped service jobs are fine; the gate fails
-      # only when a *required* job (backend/frontend/mit_logic) actually failed. mit_heavy is
+      # only when a *required* job (backend/frontend/mit_logic/mobile) actually failed. mit_heavy is
       # report-only (continue-on-error) and never blocks.
       - name: Verify required jobs
         run: |
-          echo "backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }} mit_logic=${{ needs.mit_logic.result }} mit_heavy=${{ needs.mit_heavy.result }}"
-          if [ "${{ needs.backend.result }}" = "failure" ] || [ "${{ needs.frontend.result }}" = "failure" ] || [ "${{ needs.mit_logic.result }}" = "failure" ]; then
+          echo "backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }} mit_logic=${{ needs.mit_logic.result }} mit_heavy=${{ needs.mit_heavy.result }} mobile=${{ needs.mobile.result }}"
+          if [ "${{ needs.backend.result }}" = "failure" ] || [ "${{ needs.frontend.result }}" = "failure" ] || [ "${{ needs.mit_logic.result }}" = "failure" ] || [ "${{ needs.mobile.result }}" = "failure" ]; then
             echo "::error::A required CI job failed"
             exit 1
           fi
