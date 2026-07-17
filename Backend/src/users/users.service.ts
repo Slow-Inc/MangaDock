@@ -200,11 +200,12 @@ export class UsersService {
         // Social CDN URLs (Google lh3, Facebook fbcdn) carry signed tokens that
         // expire. Refresh on every login — but only when the stored URL is also
         // social CDN or null; never overwrite a custom uploaded avatar.
-        const { data: existing } = await this.db
+        const { data: existing, error: readError } = await this.db
           .from('profiles')
           .select('photo_url')
           .eq('uid', uid)
           .maybeSingle<{ photo_url: string | null }>();
+        if (readError) throw new Error(`Failed to read photo URL: ${readError.message}`);
 
         const currentUrl = existing?.photo_url ?? null;
         if (currentUrl === null || isSocialCdnUrl(currentUrl)) {
