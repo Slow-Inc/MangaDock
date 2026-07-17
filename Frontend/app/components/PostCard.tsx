@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import VoteButtons from "./VoteButtons";
 import type { ForumPost } from "../lib/types";
+import { isSocialCdnUrl } from "../lib/avatarUpload";
 
 const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 
@@ -87,7 +88,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
           <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] text-white/35">
             <div className="w-4 h-4 rounded-full bg-white/10 overflow-hidden shrink-0">
               {post.authorPhotoUrl && (
-                <Image src={post.authorPhotoUrl} alt={post.authorName || 'user'} width={16} height={16} className="object-cover" />
+                <Image src={post.authorPhotoUrl} alt={post.authorName || 'user'} width={16} height={16} className="object-cover" unoptimized={isSocialCdnUrl(post.authorPhotoUrl)} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
               )}
             </div>
             <Link
@@ -165,12 +166,14 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
       <header className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/5">
           {post.authorPhotoUrl && (
-            <Image 
-              src={post.authorPhotoUrl} 
-              alt={post.authorName || 'user'} 
-              width={40} 
+            <Image
+              src={post.authorPhotoUrl}
+              alt={post.authorName || 'user'}
+              width={40}
               height={40}
               className="object-cover"
+              unoptimized={isSocialCdnUrl(post.authorPhotoUrl)}
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
           )}
         </div>
