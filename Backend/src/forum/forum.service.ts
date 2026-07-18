@@ -74,12 +74,13 @@ export class ForumService {
   }
 
   async listPosts(
-    category?: ForumCategory, 
-    mangaId?: string, 
+    category?: ForumCategory,
+    mangaId?: string,
     sort: 'new' | 'hot' = 'new',
-    limit = 20, 
+    limit = 20,
     offset = 0,
-    userUid?: string
+    userUid?: string,
+    authorUid?: string,
   ): Promise<{ items: ForumPost[], total: number }> {
     let query = this.db
       .from('forum_posts')
@@ -93,6 +94,7 @@ export class ForumService {
 
     if (category) query = query.eq('category', category);
     if (mangaId) query = query.eq('target_manga_id', mangaId);
+    if (authorUid) query = query.eq('author_uid', authorUid);
 
     if (sort === 'new') {
       query = query.order('created_at', { ascending: false });
