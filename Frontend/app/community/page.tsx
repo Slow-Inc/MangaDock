@@ -26,6 +26,10 @@ function CommunityContent() {
   
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const LIMIT = 20;
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   
   const [category, setCategory] = useState<ForumCategory | undefined>(
     (searchParams.get('category') as ForumCategory) || undefined
@@ -89,15 +93,33 @@ function CommunityContent() {
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
+    setOffset(0);
     try {
-      const res = await listPosts({ category, mangaId, sort });
+      const res = await listPosts({ category, mangaId, sort, offset: 0, limit: LIMIT });
       setPosts(res.items);
+      setTotal(res.total);
+      setOffset(res.items.length);
     } catch {
       showToast({ type: "error", message: "โหลดโพสต์ไม่สำเร็จ กรุณาลองใหม่", duration: 4000 });
     } finally {
       setLoading(false);
     }
   }, [category, mangaId, sort, showToast]);
+
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await listPosts({ category, mangaId, sort, offset, limit: LIMIT });
+      setPosts(prev => [...prev, ...res.items]);
+      setOffset(prev => prev + res.items.length);
+      setTotal(res.total);
+    } catch {
+      showToast({ type: "error", message: "โหลดโพสต์เพิ่มไม่สำเร็จ กรุณาลองใหม่", duration: 4000 });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     fetchPosts();
@@ -201,7 +223,7 @@ function CommunityContent() {
             onClick={() => handleMobileCategorySelect(undefined)}
             className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${!category ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white/50'}`}
           >ทั้งหมด</button>
-          {CATEGORY_LIST.map(cat => (
+          {availableCategories(userRole).map(cat => (
             <button
               key={cat}
               onClick={() => handleMobileCategorySelect(category === cat ? undefined : cat)}
@@ -315,11 +337,39 @@ function CommunityContent() {
         ) : posts.length > 0 ? (
           posts.map(post => <PostCard key={post.id} post={post} viewMode={viewMode} />)
         ) : (
-          <div className="bg-[#1a1a1a] border border-dashed border-white/10 rounded-2xl py-20 text-center">
+          <div className="bg-[#1a1a1a] border border-dashed border-white/10 rounded-2xl py-16 text-center space-y-3">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-white/5 flex items-center justify-center">
+              <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
             <p className="text-white/40 font-medium">ยังไม่มีโพสต์ในหมวดหมู่นี้</p>
+            {user && (
+              <button onClick={openModal} className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-500 smooth-hover">
+                สร้างโพสต์แรก
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Load More */}
+      {!loading && posts.length < total && (
+        <div className="mt-4">
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-sm font-bold text-white/50 hover:bg-white/[0.08] hover:text-white/80 disabled:opacity-40 smooth-hover flex items-center justify-center gap-2"
+          >
+            {loadingMore ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                กำลังโหลด...
+              </>
+            ) : 'โหลดโพสต์เพิ่ม'}
+          </button>
+        </div>
+      )}
 
       {/* Create Post Modal — bottom sheet on mobile, centered dialog on desktop */}
       {showCreateModal && (
