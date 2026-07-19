@@ -83,14 +83,14 @@ export async function probeRedisExporter(exporterUrl: string): Promise<ProbeResu
 }
 
 const SERVICES: Array<{ name: string; probe: () => Promise<ProbeResult> }> = [
-  { name: "frontend",   probe: () => probeStatusEndpoint(`${config.FRONTEND_STATUS_URL}/status`) },
-  { name: "backend",    probe: () => probeStatusEndpoint(`${config.BACKEND_STATUS_URL}/status`) },
-  { name: "supabase",   probe: probeSupabase },
-  { name: "cf-worker",  probe: probeCfWorker },
+  { name: "Frontend",   probe: () => probeStatusEndpoint(`${config.FRONTEND_STATUS_URL}/status`) },
+  { name: "Backend",    probe: () => probeStatusEndpoint(`${config.BACKEND_STATUS_URL}/status`) },
+  { name: "Supabase",   probe: probeSupabase },
+  { name: "CF Worker",  probe: probeCfWorker },
   // TODO: replace with real probe when AI gateway / MIT health endpoints are available
-  { name: "ai-gateway", probe: probeMock() },
-  { name: "mit",        probe: probeMock() },
-  { name: "redis",      probe: () => probeRedisExporter(config.REDIS_EXPORTER_URL) },
+  { name: "AI Gateway", probe: probeMock() },
+  { name: "MIT",        probe: probeMock() },
+  { name: "Redis",      probe: probeMock() },
 ];
 
 export function startProbeLoop(): void {
