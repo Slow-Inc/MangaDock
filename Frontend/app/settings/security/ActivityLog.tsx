@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface Device {
   hwid: string;
@@ -20,20 +21,23 @@ function parseUA(ua: string | null): string {
 }
 
 export default function ActivityLog() {
+  const { user } = useAuth();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) return;
     supabase
       .from("user_known_devices")
       .select("hwid, user_agent, first_seen, last_seen")
+      .eq("uid", user.id)
       .order("last_seen", { ascending: false })
       .limit(10)
       .then(({ data }) => {
         setDevices((data as Device[]) ?? []);
         setLoading(false);
       });
-  }, []);
+  }, [user]);
 
   if (loading) return <div className="h-24 animate-pulse rounded-xl bg-white/5" />;
 

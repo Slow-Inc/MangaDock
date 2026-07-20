@@ -69,7 +69,7 @@ class PinPostDto {
 }
 
 class AdminAuditLogsQueryDto {
-  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(200) limit?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) offset?: number;
   @IsOptional() @IsString() action?: string;
   @IsOptional() @IsString() actorUid?: string;

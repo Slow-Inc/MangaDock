@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface Device {
   id: string;
@@ -21,20 +22,23 @@ function parseUA(ua: string | null): string {
 }
 
 export default function SessionList() {
+  const { user } = useAuth();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
     supabase
       .from("user_known_devices")
       .select("id, hwid, user_agent, first_seen, last_seen")
+      .eq("uid", user.id)
       .order("last_seen", { ascending: false })
       .then(({ data }) => {
         setDevices((data as Device[]) ?? []);
         setLoading(false);
       });
-  }, []);
+  }, [user]);
 
   const handleSignOutOthers = async () => {
     setSigningOut(true);

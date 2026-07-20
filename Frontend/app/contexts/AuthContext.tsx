@@ -325,6 +325,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastUidRef.current = suUser.id;
 
         if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+          // Security invariant #7: on page-refresh session restore, enforce AAL2
+          // if the user has a verified TOTP factor but hasn't reached it yet.
+          // (signInWithEmail already performs this check for fresh password logins.)
+          if (event === "INITIAL_SESSION") {
+            const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            if (aal && aal.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+              const { data: factors } = await supabase.auth.mfa.listFactors();
+              const factor = factors?.totp.find((f) => f.status === "verified");
+              if (factor) {
+                setPendingMfaFactorId(factor.id);
+                setMfaRequired(true);
+                return; // halt — MfaVerifyScreen will complete
+              }
+            }
+          }
           const token = session.access_token;
           await syncToBackend(token);
           const profile = await fetchBackendProfile(token);
