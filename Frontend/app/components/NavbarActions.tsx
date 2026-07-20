@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import SearchBar from "./SearchBar";
 import LoginModal from "./LoginModal";
-import AccountModal from "./AccountModal";
 import { useAuth } from "../contexts/AuthContext";
 import TopupModal from "./TopupModal";
 import { getWalletBalance } from "../lib/studioApi";
@@ -13,15 +12,11 @@ import { getWalletBalance } from "../lib/studioApi";
 export default function NavbarActions() {
   const router = useRouter();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [accountInitialTab, setAccountInitialTab] = useState<string | undefined>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
   const [topupOpen, setTopupOpen] = useState(false);
   const [coinBalance, setCoinBalance] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, loading, signOut, getIdToken } = useAuth();
-
-  const handleAccountClose = useCallback(() => setIsAccountOpen(false), []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -32,17 +27,6 @@ export default function NavbarActions() {
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  // Listen for programmatic open requests (e.g. provider-loss warning toast)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const tab = (e as CustomEvent<{ tab?: string }>).detail?.tab;
-      setAccountInitialTab(tab);
-      setIsAccountOpen(true);
-    };
-    window.addEventListener("mb:open-account-modal", handler);
-    return () => window.removeEventListener("mb:open-account-modal", handler);
   }, []);
 
   // Fetch coin balance when user logs in / out
@@ -125,10 +109,7 @@ export default function NavbarActions() {
                   <p className="truncate text-[11px] text-white/40">{user.email}</p>
                 </div>
                 <button
-                  onClick={() => { 
-                    setMenuOpen(false); 
-                    setIsAccountOpen(true);
-                  }}
+                  onClick={() => { setMenuOpen(false); router.push("/settings"); }}
                   className="flex w-full items-center gap-2 px-4 py-3 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
@@ -202,7 +183,6 @@ export default function NavbarActions() {
       </div>
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
-      <AccountModal isOpen={isAccountOpen} onClose={handleAccountClose} initialTab={accountInitialTab} />
       <TopupModal isOpen={topupOpen} onClose={() => setTopupOpen(false)} />
     </>
   );
