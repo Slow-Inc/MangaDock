@@ -27,6 +27,22 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     <div className="min-h-dvh bg-[#141414] pb-20">
       <div className="mx-auto max-w-4xl px-4 py-8">
         <h1 className="mb-6 text-lg font-bold text-white">การตั้งค่า</h1>
+        {/* Mobile tab nav */}
+        <div className="mb-4 flex gap-1 overflow-x-auto pb-1 md:hidden">
+          {NAV.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                pathname === item.href
+                  ? item.danger ? "bg-red-500/15 text-red-300" : "bg-white/10 text-white"
+                  : item.danger ? "text-red-400/60" : "text-white/50"
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
         <div className="flex gap-6">
           <aside className="hidden w-48 shrink-0 md:block">
             <nav className="space-y-0.5">

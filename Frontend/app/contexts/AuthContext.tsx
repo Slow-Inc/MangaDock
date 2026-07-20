@@ -587,7 +587,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     showToast({ type: "success", message: "ออกจากระบบแล้ว", duration: 3000 });
-    reloadPage();
   };
 
   const updateUserProfile = async (displayName: string) => {
