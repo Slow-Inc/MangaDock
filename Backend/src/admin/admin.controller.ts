@@ -11,7 +11,17 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { AuthGuard } from '../auth/auth.guard';
 import type { AuthenticatedRequest } from '../auth/authenticated-request';
@@ -56,6 +66,26 @@ class ChangeRoleDto {
 class PinPostDto {
   @IsBoolean()
   pinned: boolean;
+}
+
+class AdminAuditLogsQueryDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(200) limit?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) offset?: number;
+  @IsOptional() @IsString() action?: string;
+  @IsOptional() @IsString() actorUid?: string;
+}
+
+class AdjustWalletDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(-1_000_000)
+  @Max(1_000_000)
+  delta: number;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  reason: string;
 }
 
 // ── Controller ────────────────────────────────────────────────────────────────
@@ -105,6 +135,20 @@ export class AdminController {
     return this.adminService.unbanUser(req.uid, uid);
   }
 
+  @Patch('users/:uid/wallet')
+  adjustWallet(
+    @Req() req: AuthenticatedRequest,
+    @Param('uid') uid: string,
+    @Body() body: AdjustWalletDto,
+  ) {
+    return this.adminService.adjustWallet(
+      req.uid,
+      uid,
+      body.delta,
+      body.reason,
+    );
+  }
+
   // ── Content ──────────────────────────────────────────────────────────────────
 
   @Get('content/posts')
@@ -133,5 +177,17 @@ export class AdminController {
   @Get('transactions/:id')
   getTransaction(@Param('id') id: string) {
     return this.adminService.getTransaction(id);
+  }
+
+  // ── Audit log ─────────────────────────────────────────────────────────────
+
+  @Get('audit')
+  getAuditLogs(@Query() query: AdminAuditLogsQueryDto) {
+    return this.adminService.getAuditLogs({
+      limit: Math.min(query.limit ?? 50, 200),
+      offset: query.offset ?? 0,
+      action: query.action || undefined,
+      actorUid: query.actorUid || undefined,
+    });
   }
 }

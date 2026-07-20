@@ -242,6 +242,8 @@ export class AdminService {
       );
     }
 
+    const fromRole = target.role;
+
     const { error } = await this.db
       .from('profiles')
       .update({ role })
@@ -254,6 +256,10 @@ export class AdminService {
     this.logger.warn(
       `Admin ${adminUid} changed role of ${targetUid} to ${role}`,
     );
+    void this.logAudit(adminUid, 'change_role', 'user', targetUid, undefined, {
+      from: fromRole,
+      to: role,
+    });
   }
 
   async banUser(adminUid: string, targetUid: string): Promise<void> {
@@ -289,6 +295,7 @@ export class AdminService {
       );
 
     this.logger.warn(`Admin ${adminUid} banned user ${targetUid}`);
+    void this.logAudit(adminUid, 'ban_user', 'user', targetUid);
   }
 
   async unbanUser(adminUid: string, targetUid: string): Promise<void> {
@@ -311,6 +318,7 @@ export class AdminService {
       );
 
     this.logger.warn(`Admin ${adminUid} unbanned user ${targetUid}`);
+    void this.logAudit(adminUid, 'unban_user', 'user', targetUid);
   }
 
   async adjustWallet(
@@ -415,6 +423,7 @@ export class AdminService {
         `Failed to delete post: ${error.message}`,
       );
     this.logger.warn(`Admin ${adminUid} deleted post ${id}`);
+    void this.logAudit(adminUid, 'delete_post', 'post', id);
   }
 
   async pinPost(id: string, pinned: boolean): Promise<void> {
@@ -480,6 +489,29 @@ export class AdminService {
   }
 
   // ── Audit log ────────────────────────────────────────────────────────────────
+
+  async getAuditLogs(opts: {
+    limit: number;
+    offset: number;
+    action?: string;
+    actorUid?: string;
+  }) {
+    let query = this.db
+      .from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(opts.offset, opts.offset + opts.limit - 1);
+
+    if (opts.action) query = query.eq('action', opts.action);
+    if (opts.actorUid) query = query.eq('actor_uid', opts.actorUid);
+
+    const { data, error } = await query;
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to fetch audit logs: ${error.message}`,
+      );
+    return data ?? [];
+  }
 
   /**
    * Insert an entry into audit_logs.
