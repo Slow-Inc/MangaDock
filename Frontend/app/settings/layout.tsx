@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import Navbar from "../components/Navbar";
 import { useAuth } from "../contexts/AuthContext";
 
 const NAV = [
@@ -25,6 +26,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="min-h-dvh bg-[#141414] pb-20">
+      <Navbar />
       <div className="mx-auto max-w-4xl px-4 py-8">
         <h1 className="mb-6 text-lg font-bold text-white">การตั้งค่า</h1>
         {/* Mobile tab nav */}
