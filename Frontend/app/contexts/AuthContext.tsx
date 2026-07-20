@@ -181,6 +181,20 @@ type AuthContextType = {
   resendVerificationEmail: () => Promise<void>;
   /** Refresh the current session to update JWT claims (e.g. roles) */
   refreshSession: () => Promise<void>;
+  /** Enroll a new TOTP factor — returns QR code, secret, and factorId */
+  enrollTotp: () => Promise<{ qr_code: string; secret: string; factorId: string }>;
+  /** Verify a TOTP code to complete enrollment */
+  verifyTotpEnrollment: (factorId: string, code: string) => Promise<void>;
+  /** Unenroll (remove) an existing TOTP factor */
+  unenrollTotp: (factorId: string) => Promise<void>;
+  /** Return the first verified TOTP factor, or null */
+  getActiveTotpFactor: () => Promise<{ id: string; friendly_name: string } | null>;
+  /** Verify TOTP code after password login (AAL2 upgrade) */
+  verifyTotpForLogin: (factorId: string, code: string) => Promise<void>;
+  /** True when password login succeeded but AAL2 is still required */
+  mfaRequired: boolean;
+  /** The factor ID waiting for TOTP verification during login */
+  pendingMfaFactorId: string | null;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -212,12 +226,21 @@ export const AuthContext = createContext<AuthContextType>({
   deleteAccount: async () => {},
   resendVerificationEmail: async () => {},
   refreshSession: async () => {},
+  enrollTotp: async () => ({ qr_code: "", secret: "", factorId: "" }),
+  verifyTotpEnrollment: async () => {},
+  unenrollTotp: async () => {},
+  getActiveTotpFactor: async () => null,
+  verifyTotpForLogin: async () => {},
+  mfaRequired: false,
+  pendingMfaFactorId: null,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [pendingMfaFactorId, setPendingMfaFactorId] = useState<string | null>(null);
   const { showToast, dismissToast } = useToast();
   const sessionRef = useRef<Session | null>(null);
   const supabaseUserRef = useRef<SupabaseUser | null>(null);
@@ -484,6 +507,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       e.code = "auth/invalid-credential";
       throw e;
     }
+
+    // Security invariant #1: check AAL after successful password login.
+    // If the user has a verified TOTP factor and hasn't reached AAL2 yet,
+    // pause login and require TOTP verification before completing sign-in.
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const factor = factors?.totp.find((f) => f.status === "verified");
+      if (factor) {
+        setPendingMfaFactorId(factor.id);
+        setMfaRequired(true);
+        return; // halt — MfaVerifyScreen will complete the login
+      }
+    }
+
     if (!data.user?.email_confirmed_at) {
       showToast({
         type: "warning",
@@ -736,6 +774,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ─── TOTP / MFA ───────────────────────────────────────────────────────────
+
+  const enrollTotp = async (): Promise<{ qr_code: string; secret: string; factorId: string }> => {
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: "totp",
+      friendlyName: "MangaDock Authenticator",
+    });
+    if (error) throw error;
+    return {
+      qr_code: data.totp.qr_code,
+      secret: data.totp.secret,
+      factorId: data.id,
+    };
+  };
+
+  // Security invariant #6: challenge then verify to complete enrollment.
+  const verifyTotpEnrollment = async (factorId: string, code: string): Promise<void> => {
+    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+    if (challengeError) throw challengeError;
+    const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code });
+    if (error) throw Object.assign(error, { code: "auth/invalid-totp-code" });
+  };
+
+  // Security invariant #3: unenroll — UI in Task 5 enforces prior re-auth.
+  const unenrollTotp = async (factorId: string): Promise<void> => {
+    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    if (error) throw error;
+  };
+
+  const getActiveTotpFactor = async (): Promise<{ id: string; friendly_name: string } | null> => {
+    const { data, error } = await supabase.auth.mfa.listFactors();
+    if (error || !data) return null;
+    const verified = data.totp.find((f) => f.status === "verified");
+    return verified
+      ? { id: verified.id, friendly_name: verified.friendly_name ?? "Authenticator" }
+      : null;
+  };
+
+  // Security invariant #2: challenge then verify to upgrade to AAL2.
+  // On success: clear mfaRequired + pendingMfaFactorId so the overlay dismisses.
+  const verifyTotpForLogin = async (factorId: string, code: string): Promise<void> => {
+    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+    if (challengeError) throw challengeError;
+    const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code });
+    if (error) throw Object.assign(new Error("รหัส OTP ไม่ถูกต้อง กรุณาลองอีกครั้ง"), { code: "auth/invalid-totp-code" });
+    setMfaRequired(false);
+    setPendingMfaFactorId(null);
+    reloadPage();
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+
   const getPhotoHistory = useCallback(async (): Promise<string[]> => {
     if (!user) return [];
     try {
@@ -814,10 +904,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     deleteAccount,
     resendVerificationEmail,
     refreshSession,
+    enrollTotp,
+    verifyTotpEnrollment,
+    unenrollTotp,
+    getActiveTotpFactor,
+    verifyTotpForLogin,
+    mfaRequired,
+    pendingMfaFactorId,
+    // mfaRequired + pendingMfaFactorId are exposed state values — must be deps.
     // Functions are recreated every render; capturing them once per
-    // [user, loading] is the point of the memo (audit above: `user` only).
+    // [user, loading, mfaRequired, pendingMfaFactorId] is the point of the memo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [user, loading]);
+  }), [user, loading, mfaRequired, pendingMfaFactorId]);
 
   return (
     <AuthContext.Provider value={value}>
@@ -825,6 +923,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       {/* Login modal triggered by showLoginPrompt */}
       {loginOpen && <LoginModalLazy isOpen={loginOpen} onClose={() => setLoginOpen(false)} />}
+
+      {/* MFA verify overlay — shown when password login requires AAL2 upgrade */}
+      {mfaRequired && pendingMfaFactorId && (
+        <MfaVerifyScreenLazy
+          factorId={pendingMfaFactorId}
+          onClose={() => {
+            setMfaRequired(false);
+            setPendingMfaFactorId(null);
+          }}
+        />
+      )}
     </AuthContext.Provider>
   );
 }
@@ -834,6 +943,12 @@ function LoginModalLazy({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const LoginModal = require("../components/LoginModal").default as (props: { isOpen: boolean; onClose: () => void }) => React.ReactElement;
   return <LoginModal isOpen={isOpen} onClose={onClose} />;
+}
+
+function MfaVerifyScreenLazy({ factorId, onClose }: { factorId: string; onClose: () => void }) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const MfaVerifyScreen = require("../components/MfaVerifyScreen").default as (props: { factorId: string; onClose: () => void }) => React.ReactElement;
+  return <MfaVerifyScreen factorId={factorId} onClose={onClose} />;
 }
 
 export const useAuth = () => useContext(AuthContext);
