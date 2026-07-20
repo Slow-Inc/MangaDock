@@ -3,6 +3,19 @@
 
 ---
 
+## UI Polish — Settings mobile nav, admin prefetch, no-reload sign-out, dropdown reorder (#645, 2026-07-21)
+
+**Goal:** 4 small UX improvements to navbar dropdown and /settings page.
+
+**Changes (1 commit, 9800bbd5):**
+- `Frontend/app/settings/layout.tsx`: mobile horizontal scrollable tab nav (`md:hidden`) above content — sidebar stays for desktop
+- `Frontend/app/components/NavbarActions.tsx`: `<button router.push("/admin")>` → `<Link href="/admin">` for Next.js hover prefetch; reorder dropdown → โปรไฟล์ของฉัน / Studio / จัดการบัญชี / Admin Dashboard / ออกจากระบบ
+- `Frontend/app/contexts/AuthContext.tsx`: remove `reloadPage()` from `signOut()` — auth guard in `/settings` layout (`router.replace("/")` when `!user`) handles redirect
+
+**Validation:** `bun lint` 63 problems (identical to pre-change baseline — 0 new errors). All changes ≤ ~20 lines each.
+
+---
+
 ## Security & Settings Page — /settings + 2FA + Audit Log (2026-07-21)
 
 **Goal:** Replace AccountModal with a full `/settings` page, add TOTP 2FA, re-auth gating, new-device detection, session management, and admin audit log.
