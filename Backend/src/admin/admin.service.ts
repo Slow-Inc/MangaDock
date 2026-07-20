@@ -104,18 +104,29 @@ export class AdminService {
     today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
 
-    const [totalRes, newTodayRes, postsRes, txRes, bansRes] = await Promise.all([
-      this.db.from('profiles').select('*', { count: 'exact', head: true }),
-      this.db.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', todayIso),
-      this.db.from('forum_posts').select('*', { count: 'exact', head: true }).is('deleted_at', null),
-      this.db.from('wallet_transactions').select('amount').gte('created_at', todayIso),
-      this.db
-        .from('profiles')
-        .select('uid, display_name, banned_at')
-        .not('banned_at', 'is', null)
-        .order('banned_at', { ascending: false })
-        .limit(10),
-    ]);
+    const [totalRes, newTodayRes, postsRes, txRes, bansRes] = await Promise.all(
+      [
+        this.db.from('profiles').select('*', { count: 'exact', head: true }),
+        this.db
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', todayIso),
+        this.db
+          .from('forum_posts')
+          .select('*', { count: 'exact', head: true })
+          .is('deleted_at', null),
+        this.db
+          .from('wallet_transactions')
+          .select('amount')
+          .gte('created_at', todayIso),
+        this.db
+          .from('profiles')
+          .select('uid, display_name, banned_at')
+          .not('banned_at', 'is', null)
+          .order('banned_at', { ascending: false })
+          .limit(10),
+      ],
+    );
 
     const txData: Array<{ amount: number }> = txRes.data ?? [];
 
@@ -137,7 +148,9 @@ export class AdminService {
 
   // ── Users ────────────────────────────────────────────────────────────────────
 
-  async listUsers(q: AdminListUsersQuery): Promise<{ users: AdminUser[]; total: number }> {
+  async listUsers(
+    q: AdminListUsersQuery,
+  ): Promise<{ users: AdminUser[]; total: number }> {
     const page = Math.max(1, q.page ?? 1);
     const limit = Math.min(100, Math.max(1, q.limit ?? 20));
     const from = (page - 1) * limit;
@@ -145,12 +158,17 @@ export class AdminService {
 
     let query = this.db
       .from('profiles')
-      .select('uid, email, display_name, role, plan, trust_score, created_at, banned_at', { count: 'exact' })
+      .select(
+        'uid, email, display_name, role, plan, trust_score, created_at, banned_at',
+        { count: 'exact' },
+      )
       .order('created_at', { ascending: false })
       .range(from, to);
 
     if (q.search) {
-      query = query.or(`email.ilike.%${q.search}%,display_name.ilike.%${q.search}%`);
+      query = query.or(
+        `email.ilike.%${q.search}%,display_name.ilike.%${q.search}%`,
+      );
     }
     if (q.role !== undefined) query = query.eq('role', q.role);
     if (q.plan) query = query.eq('plan', q.plan);
@@ -158,7 +176,10 @@ export class AdminService {
     if (q.banned === false) query = query.is('banned_at', null);
 
     const { data, count, error } = await query;
-    if (error) throw new InternalServerErrorException(`Failed to list users: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to list users: ${error.message}`,
+      );
 
     return {
       users: (data ?? []).map((r: any) => this.mapUser(r)),
@@ -170,10 +191,16 @@ export class AdminService {
     const [profileRes, walletRes, postCountRes] = await Promise.all([
       this.db
         .from('profiles')
-        .select('uid, email, display_name, role, plan, trust_score, rating_avg, created_at, banned_at')
+        .select(
+          'uid, email, display_name, role, plan, trust_score, rating_avg, created_at, banned_at',
+        )
         .eq('uid', uid)
         .maybeSingle<any>(),
-      this.db.from('wallets').select('balance').eq('uid', uid).maybeSingle<{ balance: number }>(),
+      this.db
+        .from('wallets')
+        .select('balance')
+        .eq('uid', uid)
+        .maybeSingle<{ balance: number }>(),
       this.db
         .from('forum_posts')
         .select('*', { count: 'exact', head: true })
@@ -191,9 +218,15 @@ export class AdminService {
     };
   }
 
-  async changeRole(adminUid: string, targetUid: string, role: number): Promise<void> {
+  async changeRole(
+    adminUid: string,
+    targetUid: string,
+    role: number,
+  ): Promise<void> {
     if (role >= ROLE.ADMIN) {
-      throw new BadRequestException('Cannot set role to ADMIN or higher via this endpoint');
+      throw new BadRequestException(
+        'Cannot set role to ADMIN or higher via this endpoint',
+      );
     }
 
     const { data: target } = await this.db
@@ -204,13 +237,23 @@ export class AdminService {
 
     if (!target) throw new NotFoundException('User not found');
     if (target.role >= ROLE.ADMIN) {
-      throw new ForbiddenException('Cannot modify users with ADMIN role or higher');
+      throw new ForbiddenException(
+        'Cannot modify users with ADMIN role or higher',
+      );
     }
 
-    const { error } = await this.db.from('profiles').update({ role }).eq('uid', targetUid);
-    if (error) throw new InternalServerErrorException(`Failed to change role: ${error.message}`);
+    const { error } = await this.db
+      .from('profiles')
+      .update({ role })
+      .eq('uid', targetUid);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to change role: ${error.message}`,
+      );
 
-    this.logger.warn(`Admin ${adminUid} changed role of ${targetUid} to ${role}`);
+    this.logger.warn(
+      `Admin ${adminUid} changed role of ${targetUid} to ${role}`,
+    );
   }
 
   async banUser(adminUid: string, targetUid: string): Promise<void> {
@@ -222,41 +265,93 @@ export class AdminService {
 
     if (!target) throw new NotFoundException('User not found');
     if (target.role >= ROLE.ADMIN) {
-      throw new ForbiddenException('Cannot ban users with ADMIN role or higher');
+      throw new ForbiddenException(
+        'Cannot ban users with ADMIN role or higher',
+      );
     }
 
-    const { error: authError } = await this.supabase.client.auth.admin.updateUserById(targetUid, {
-      ban_duration: '876600h',
-    });
-    if (authError) throw new InternalServerErrorException(`Failed to ban user: ${authError.message}`);
+    const { error: authError } =
+      await this.supabase.client.auth.admin.updateUserById(targetUid, {
+        ban_duration: '876600h',
+      });
+    if (authError)
+      throw new InternalServerErrorException(
+        `Failed to ban user: ${authError.message}`,
+      );
 
     const { error } = await this.db
       .from('profiles')
       .update({ banned_at: new Date().toISOString() })
       .eq('uid', targetUid);
-    if (error) throw new InternalServerErrorException(`Failed to record ban: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to record ban: ${error.message}`,
+      );
 
     this.logger.warn(`Admin ${adminUid} banned user ${targetUid}`);
   }
 
   async unbanUser(adminUid: string, targetUid: string): Promise<void> {
-    const { error: authError } = await this.supabase.client.auth.admin.updateUserById(targetUid, {
-      ban_duration: 'none',
-    });
-    if (authError) throw new InternalServerErrorException(`Failed to unban user: ${authError.message}`);
+    const { error: authError } =
+      await this.supabase.client.auth.admin.updateUserById(targetUid, {
+        ban_duration: 'none',
+      });
+    if (authError)
+      throw new InternalServerErrorException(
+        `Failed to unban user: ${authError.message}`,
+      );
 
     const { error } = await this.db
       .from('profiles')
       .update({ banned_at: null })
       .eq('uid', targetUid);
-    if (error) throw new InternalServerErrorException(`Failed to clear ban: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to clear ban: ${error.message}`,
+      );
 
     this.logger.warn(`Admin ${adminUid} unbanned user ${targetUid}`);
   }
 
+  async adjustWallet(
+    adminUid: string,
+    targetUid: string,
+    delta: number,
+    reason: string,
+  ): Promise<{ balance: number }> {
+    if (delta === 0) throw new BadRequestException('Delta must be non-zero');
+
+    const rpcName = delta > 0 ? 'add_coins_atomic' : 'spend_coins_atomic';
+
+    const { data, error } = await this.db.rpc(rpcName, {
+      p_uid: targetUid,
+      p_amount: Math.abs(delta),
+      p_type: delta > 0 ? 'topup' : 'purchase',
+      p_description: reason,
+      p_reference_id: null,
+    });
+
+    if (error) {
+      if (error.message?.includes('INSUFFICIENT_FUNDS')) {
+        throw new BadRequestException('Insufficient funds');
+      }
+      throw new InternalServerErrorException(
+        `Failed to adjust wallet: ${error.message}`,
+      );
+    }
+
+    const balance: number = data?.balance ?? 0;
+    this.logger.warn(
+      `Admin ${adminUid} adjusted wallet of ${targetUid} by ${delta > 0 ? '+' : ''}${delta}: "${reason}" → balance ${balance}`,
+    );
+    return { balance };
+  }
+
   // ── Content ──────────────────────────────────────────────────────────────────
 
-  async listPosts(q: AdminListPostsQuery): Promise<{ posts: AdminPost[]; total: number }> {
+  async listPosts(
+    q: AdminListPostsQuery,
+  ): Promise<{ posts: AdminPost[]; total: number }> {
     const page = Math.max(1, q.page ?? 1);
     const limit = Math.min(100, Math.max(1, q.limit ?? 20));
     const from = (page - 1) * limit;
@@ -280,14 +375,17 @@ export class AdminService {
     if (q.authorUid) query = query.eq('author_uid', q.authorUid);
 
     const { data, count, error } = await query;
-    if (error) throw new InternalServerErrorException(`Failed to list posts: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to list posts: ${error.message}`,
+      );
 
     return {
       posts: (data ?? []).map((p: any) => ({
         id: p.id,
         title: p.title,
         authorUid: p.author_uid,
-        authorName: (p.author as any)?.display_name ?? '',
+        authorName: p.author?.display_name ?? '',
         category: p.category,
         createdAt: p.created_at,
         pinned: p.pinned ?? false,
@@ -312,7 +410,10 @@ export class AdminService {
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (error) throw new InternalServerErrorException(`Failed to delete post: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to delete post: ${error.message}`,
+      );
     this.logger.warn(`Admin ${adminUid} deleted post ${id}`);
   }
 
@@ -323,12 +424,17 @@ export class AdminService {
       .eq('id', id)
       .is('deleted_at', null);
 
-    if (error) throw new InternalServerErrorException(`Failed to update pin: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to update pin: ${error.message}`,
+      );
   }
 
   // ── Transactions ─────────────────────────────────────────────────────────────
 
-  async listTransactions(q: AdminListTxQuery): Promise<{ transactions: AdminTransaction[]; total: number }> {
+  async listTransactions(
+    q: AdminListTxQuery,
+  ): Promise<{ transactions: AdminTransaction[]; total: number }> {
     const page = Math.max(1, q.page ?? 1);
     const limit = Math.min(100, Math.max(1, q.limit ?? 20));
     const from = (page - 1) * limit;
@@ -346,7 +452,10 @@ export class AdminService {
     if (q.to) query = query.lte('created_at', q.to);
 
     const { data, count, error } = await query;
-    if (error) throw new InternalServerErrorException(`Failed to list transactions: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to list transactions: ${error.message}`,
+      );
 
     return {
       transactions: (data ?? []).map((r: any) => this.mapTransaction(r)),
@@ -361,10 +470,46 @@ export class AdminService {
       .eq('id', id)
       .maybeSingle<any>();
 
-    if (error) throw new InternalServerErrorException(`Failed to get transaction: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to get transaction: ${error.message}`,
+      );
     if (!data) throw new NotFoundException('Transaction not found');
 
     return this.mapTransaction(data);
+  }
+
+  // ── Audit log ────────────────────────────────────────────────────────────────
+
+  /**
+   * Insert an entry into audit_logs.
+   * Signature matches UsersService.logAuditEvent so callers can use either.
+   * Errors are swallowed — a logging failure must never break the caller.
+   */
+  async logAudit(
+    actorUid: string,
+    action: string,
+    targetType?: string,
+    targetId?: string,
+    ip?: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const { error } = await this.db.from('audit_logs').insert({
+        actor_uid: actorUid,
+        action,
+        target_type: targetType ?? null,
+        target_id: targetId ?? null,
+        ip: ip ?? null,
+        metadata: metadata ?? null,
+      });
+      if (error) {
+        this.logger.warn(`[AuditLog] insert failed: ${error.message}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`[AuditLog] unexpected error: ${msg}`);
+    }
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────
