@@ -3,6 +3,20 @@
 
 ---
 
+## Security: record device on login for /settings/security (2026-07-21)
+
+**Goal:** `/settings/security` แสดง "ไม่พบข้อมูลอุปกรณ์" เพราะ `user_known_devices` ว่างเสมอ
+
+**Root cause:** `HardwareIdMiddleware` เขียน device เฉพาะ chapter/upload routes — ไม่ fire ตอน login
+
+**Changes (1 commit, 3517e89):**
+- `Backend/src/users/users.controller.ts`: เพิ่ม `POST /users/me/record-device` endpoint (AuthGuard + `isValidHardwareId` validation) — เรียก `recordDeviceAndAlert` แล้ว return `{ ok }`
+- `Frontend/app/contexts/AuthContext.tsx`: import `getHardwareId`; ใน `onAuthStateChange` block (`SIGNED_IN`/`INITIAL_SESSION`) fire-and-forget `fetch` ไป endpoint นี้หลัง `syncToBackend`
+
+**Result:** device ถูกบันทึกใน `user_known_devices` ทันทีที่ login ทุก provider (email, Google, Facebook) — `/settings/security` แสดงรายการอุปกรณ์ได้ทันที
+
+---
+
 ## UI Polish — Settings mobile nav, admin prefetch, no-reload sign-out, dropdown reorder (#645, 2026-07-21)
 
 **Goal:** 4 small UX improvements to navbar dropdown and /settings page.
