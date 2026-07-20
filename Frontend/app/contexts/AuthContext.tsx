@@ -928,7 +928,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {mfaRequired && pendingMfaFactorId && (
         <MfaVerifyScreenLazy
           factorId={pendingMfaFactorId}
-          onClose={() => {
+          onClose={async () => {
+            await supabase.auth.signOut();
             setMfaRequired(false);
             setPendingMfaFactorId(null);
           }}
