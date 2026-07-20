@@ -21,6 +21,7 @@ import { setTokenSupplier, loadUserData, clearUserCache, flushNow } from "../lib
 import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData } from "../lib/readingHistory";
 import { clearAllApiCache } from "../lib/apiCache";
 import { reloadPage, redirectToHome } from "../lib/browserActions";
+import { getHardwareId } from "../lib/fingerprint";
 import { resolveAvatarUrl } from "../lib/avatarUpload";
 import { ROLE, type UserRole } from "../lib/types/user";
 import { isTrustedOAuthCallbackMessage } from "../lib/oauthCallback";
@@ -342,6 +343,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           const token = session.access_token;
           await syncToBackend(token);
+          // Fire-and-forget: record this device so /settings/security shows it immediately
+          const hwid = getHardwareId();
+          if (hwid) {
+            fetch(`${API_BASE}/users/me/record-device`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}`, "X-Hardware-Id": hwid },
+            }).catch(() => {});
+          }
           const profile = await fetchBackendProfile(token);
           if (profile) {
             setUser((prev) => {
