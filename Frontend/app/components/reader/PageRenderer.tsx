@@ -94,6 +94,7 @@ function PageRendererImpl({
                 src={showTranslation && translatedPages.has(i) ? translatedPages.get(i)! : src}
                 alt={`หน้า ${i + 1}`}
                 draggable={false}
+                onContextMenu={(e) => e.preventDefault()}
                 loading="lazy"
                 className="w-full select-none"
               />
@@ -188,6 +189,7 @@ function PageRendererImpl({
             src={showTranslation && translatedPages.has(page) ? translatedPages.get(page)! : pages[page]}
             alt={`หน้า ${page + 1}`}
             draggable={false}
+            onContextMenu={(e) => e.preventDefault()}
             className={`block max-h-[calc(100vh-120px)] max-w-full transition-opacity duration-200 ${imgLoading ? "opacity-0" : "opacity-100"}`}
             onLoad={() => setImgLoading(false)}
             onLoadStart={() => setImgLoading(true)}
