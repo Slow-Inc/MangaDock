@@ -7,8 +7,9 @@ const SECRET = process.env.IMAGE_TOKEN_SECRET;
 @Injectable()
 export class ImageTokenGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    if (!SECRET) return true;
     const req = context.switchToHttp().getRequest<Request>();
+    if (req.headers['sec-fetch-mode'] === 'navigate') return false;
+    if (!SECRET) return true;
     const token = req.query['t'] as string | undefined;
     const chapterId = req.query['cid'] as string | undefined;
     if (!token || !chapterId) return false;
