@@ -38,6 +38,11 @@ const nextConfig: NextConfig = {
   // from other devices on the local network (e.g. 192.168.x.x, 10.x.x.x, Radmin VPN)
   // or via Cloudflare Tunnel (add hostname to NEXT_DEV_EXTRA_ORIGINS in .env.local).
   allowedDevOrigins: [...getLocalIPv4Addresses(), ...getExtraDevOrigins()],
+  turbopack: {
+    resolveAlias: {
+      '@mangadock/mobile-bridge': path.resolve(__dirname, '../Mobile/shared/mobileBridge.ts'),
+    },
+  },
   webpack(config) {
     config.resolve.alias['@mangadock/mobile-bridge'] = path.resolve(__dirname, '../Mobile/shared/mobileBridge.ts');
     return config;
