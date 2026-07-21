@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as crypto from 'crypto';
 import { resolveTurnstileConfig } from './turnstile.config';
 
@@ -12,12 +17,16 @@ export function generateClearanceToken(secret: string, hwid: string): string {
 }
 
 // Helper to verify the clearance token against a specific hardware ID
-export function verifyClearanceToken(token: string, secret: string, currentHwid: string): boolean {
+export function verifyClearanceToken(
+  token: string,
+  secret: string,
+  currentHwid: string,
+): boolean {
   if (!token || !token.includes('.')) return false;
   const [data, signature] = token.split('.');
-  
+
   const [expiresAtStr, tokenHwid] = data.split(':');
-  
+
   // 1. Check expiration
   if (parseInt(expiresAtStr, 10) < Date.now()) {
     return false;
@@ -27,11 +36,17 @@ export function verifyClearanceToken(token: string, secret: string, currentHwid:
   if (tokenHwid !== currentHwid) {
     return false;
   }
-  
+
   // 3. Verify HMAC signature
-  const expectedHmac = crypto.createHmac('sha256', secret).update(data).digest('hex');
+  const expectedHmac = crypto
+    .createHmac('sha256', secret)
+    .update(data)
+    .digest('hex');
   try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedHmac));
+    return crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(expectedHmac),
+    );
   } catch (e) {
     return false;
   }
@@ -65,7 +80,8 @@ export class TurnstileGuard implements CanActivate {
       return true;
     }
 
-    throw new UnauthorizedException('Captcha clearance token is invalid, expired, or bound to another device.');
+    throw new UnauthorizedException(
+      'Captcha clearance token is invalid, expired, or bound to another device.',
+    );
+  }
 }
-}
-

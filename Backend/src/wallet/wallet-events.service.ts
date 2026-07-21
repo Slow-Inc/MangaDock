@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { Observable, Subject } from 'rxjs';
 import { RedisService } from '../cache/redis.service';
 
@@ -16,19 +21,22 @@ export class WalletEventsService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly redis: RedisService) {}
 
   onModuleInit() {
-    this.unsubscribe = this.redis.subscribe(REDIS_WALLET_CHANNEL, (data: unknown) => {
-      if (!data || typeof data !== 'object') return;
-      const rec = data as Record<string, unknown>;
-      // Skip events we published — they were already delivered locally in emit().
-      if (rec['_src'] === this.instanceId) return;
-      const paymentId = rec['paymentId'];
-      const balance = rec['balance'];
-      if (typeof paymentId === 'string' && typeof balance === 'number') {
-        // Relay a remote event into the local Subject ONLY — never re-publish,
-        // or two instances would echo each other's events forever.
-        this.emitLocal(paymentId, { balance });
-      }
-    });
+    this.unsubscribe = this.redis.subscribe(
+      REDIS_WALLET_CHANNEL,
+      (data: unknown) => {
+        if (!data || typeof data !== 'object') return;
+        const rec = data as Record<string, unknown>;
+        // Skip events we published — they were already delivered locally in emit().
+        if (rec['_src'] === this.instanceId) return;
+        const paymentId = rec['paymentId'];
+        const balance = rec['balance'];
+        if (typeof paymentId === 'string' && typeof balance === 'number') {
+          // Relay a remote event into the local Subject ONLY — never re-publish,
+          // or two instances would echo each other's events forever.
+          this.emitLocal(paymentId, { balance });
+        }
+      },
+    );
   }
 
   onModuleDestroy() {
@@ -74,8 +82,16 @@ export class WalletEventsService implements OnModuleInit, OnModuleDestroy {
     this.emitLocal(paymentId, data);
     if (this.redis.available) {
       this.redis
-        .publish(REDIS_WALLET_CHANNEL, { paymentId, ...data, _src: this.instanceId })
-        .catch((err) => this.logger.warn(`Redis publish failed for wallet event: ${String(err)}`));
+        .publish(REDIS_WALLET_CHANNEL, {
+          paymentId,
+          ...data,
+          _src: this.instanceId,
+        })
+        .catch((err) =>
+          this.logger.warn(
+            `Redis publish failed for wallet event: ${String(err)}`,
+          ),
+        );
     }
   }
 

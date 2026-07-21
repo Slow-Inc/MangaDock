@@ -11,7 +11,11 @@ import {
   type MangaPreview,
 } from './books.types';
 
-type MangaOrder = 'followedCount' | 'rating' | 'latestUploadedChapter' | 'createdAt';
+type MangaOrder =
+  | 'followedCount'
+  | 'rating'
+  | 'latestUploadedChapter'
+  | 'createdAt';
 
 type MangaDexManga = {
   id: string;
@@ -21,7 +25,11 @@ type MangaDexManga = {
     year?: number;
     tags?: Array<{ attributes?: { name?: Record<string, string> } }>;
   };
-  relationships?: Array<{ type?: string; id?: string; attributes?: { fileName?: string; name?: string } }>;
+  relationships?: Array<{
+    type?: string;
+    id?: string;
+    attributes?: { fileName?: string; name?: string };
+  }>;
 };
 
 type MangaDexCoverResponse = {
@@ -41,24 +49,24 @@ type MangaDexResponse = {
 
 /** MangaDex tag slug → UUID map. */
 const MANGA_GENRE_TAGS: Record<string, string> = {
-  action:          '391b0423-d847-456f-aff0-8b0cfc03066b',
-  adventure:       '87cc87cd-a395-47af-b27a-93258283bbc6',
-  comedy:          '4d32cc48-9f00-4cbe-9bc4-f38aa0f8e2ac',
-  romance:         '423e2eae-a7a2-4a8b-ac03-a8351462d71d',
-  fantasy:         'cdc58593-87dd-415e-bbc0-2ec27bf404cc',
-  drama:           'b9af3a63-f058-46de-a9a0-e0c13906197a',
-  horror:          'cdad7e68-1419-41dd-bdce-27753074a640',
-  'sci-fi':        '256c8bd9-4904-4360-bf4f-508a76d67183',
+  action: '391b0423-d847-456f-aff0-8b0cfc03066b',
+  adventure: '87cc87cd-a395-47af-b27a-93258283bbc6',
+  comedy: '4d32cc48-9f00-4cbe-9bc4-f38aa0f8e2ac',
+  romance: '423e2eae-a7a2-4a8b-ac03-a8351462d71d',
+  fantasy: 'cdc58593-87dd-415e-bbc0-2ec27bf404cc',
+  drama: 'b9af3a63-f058-46de-a9a0-e0c13906197a',
+  horror: 'cdad7e68-1419-41dd-bdce-27753074a640',
+  'sci-fi': '256c8bd9-4904-4360-bf4f-508a76d67183',
   'slice-of-life': 'e5301a23-ebd9-49dd-a0cb-2add944c7fe9',
-  sports:          '69964a64-2f90-4d33-beeb-f3ed2875eb4c',
-  mystery:         'ee968100-4191-4968-93d3-f82d72be7e46',
-  psychological:   '3b60b75c-a2d7-4860-ab56-05f391bb889c',
-  supernatural:    'eabc5b4c-6aff-42f3-b657-3e90cbd00b75',
-  historical:      '33771934-028e-4cb3-8744-691e866a923e',
-  isekai:          'ace04997-f6bd-436e-b261-779182193d3d',
-  mecha:           '50880a9d-5440-4732-9afb-8f457127e836',
-  'school-life':   'caaa44eb-cd40-4177-b930-79d3ef2aeeb2',
-  thriller:        '07251805-a27e-4d59-b488-f0bfbec15168',
+  sports: '69964a64-2f90-4d33-beeb-f3ed2875eb4c',
+  mystery: 'ee968100-4191-4968-93d3-f82d72be7e46',
+  psychological: '3b60b75c-a2d7-4860-ab56-05f391bb889c',
+  supernatural: 'eabc5b4c-6aff-42f3-b657-3e90cbd00b75',
+  historical: '33771934-028e-4cb3-8744-691e866a923e',
+  isekai: 'ace04997-f6bd-436e-b261-779182193d3d',
+  mecha: '50880a9d-5440-4732-9afb-8f457127e836',
+  'school-life': 'caaa44eb-cd40-4177-b930-79d3ef2aeeb2',
+  thriller: '07251805-a27e-4d59-b488-f0bfbec15168',
 };
 
 import { StatusService } from '../status/status.service';
@@ -67,11 +75,21 @@ import { StatusService } from '../status/status.service';
 export class MangaDexService {
   private readonly logger = new Logger(MangaDexService.name);
 
-  readonly mangaRowDefs: Array<{ id: string; title: string; order: MangaOrder; limit?: number }> = [
-    { id: 'popular',   title: 'มังงะยอดนิยม',     order: 'followedCount',         limit: 20 },
-    { id: 'top-rated', title: 'มังงะเรตติ้งสูง', order: 'rating',                limit: 20 },
-    { id: 'latest',    title: 'อัปเดตล่าสุด',     order: 'latestUploadedChapter', limit: 20 },
-    { id: 'new',       title: 'มังงะมาใหม่',     order: 'createdAt',             limit: 20 },
+  readonly mangaRowDefs: Array<{
+    id: string;
+    title: string;
+    order: MangaOrder;
+    limit?: number;
+  }> = [
+    { id: 'popular', title: 'มังงะยอดนิยม', order: 'followedCount', limit: 20 },
+    { id: 'top-rated', title: 'มังงะเรตติ้งสูง', order: 'rating', limit: 20 },
+    {
+      id: 'latest',
+      title: 'อัปเดตล่าสุด',
+      order: 'latestUploadedChapter',
+      limit: 20,
+    },
+    { id: 'new', title: 'มังงะมาใหม่', order: 'createdAt', limit: 20 },
   ];
 
   constructor(
@@ -92,7 +110,8 @@ export class MangaDexService {
   }
 
   // Tests can override: (service as any).fetchFn = mockFetch
-  private fetchFn: typeof fetch = (...args: Parameters<typeof fetch>) => fetch(...args);
+  private fetchFn: typeof fetch = (...args: Parameters<typeof fetch>) =>
+    fetch(...args);
 
   private mangadexFetch(url: string): Promise<Response> {
     return this.fetchFn(url, {
@@ -104,7 +123,10 @@ export class MangaDexService {
     });
   }
 
-  async getMangaChapters(mangaId: string, forceLocal = false): Promise<MangaChapter[]> {
+  async getMangaChapters(
+    mangaId: string,
+    forceLocal = false,
+  ): Promise<MangaChapter[]> {
     // v3: uses pagination to fetch ALL chapters (supports decimal sub-chapters like 13.1, 13.2)
     const cacheKey = `manga:chapters:v3:${mangaId}`;
     const cached = await this.cache.get<MangaChapter[]>(cacheKey);
@@ -146,7 +168,10 @@ export class MangaDexService {
         );
         if (!res.ok) break;
 
-        const data = (await res.json()) as { total?: number; data?: MdChapter[] };
+        const data = (await res.json()) as {
+          total?: number;
+          data?: MdChapter[];
+        };
         const items = data.data ?? [];
         allItems.push(...items);
 
@@ -155,7 +180,7 @@ export class MangaDexService {
         if (items.length < PAGE_SIZE) break; // no more pages
       }
 
-      let chapters: MangaChapter[] = allItems.map((c) => ({
+      const chapters: MangaChapter[] = allItems.map((c) => ({
         id: c.id,
         chapterNumber: c.attributes.chapter ?? null,
         title: c.attributes.title ?? null,
@@ -167,10 +192,14 @@ export class MangaDexService {
       if (chapters.length > 0) {
         await this.cache.set(cacheKey, chapters, CACHE_TTL_MS);
       } else {
-        this.logger.warn('[MangaDex] Chapters empty — attempting stale cache fallback');
+        this.logger.warn(
+          '[MangaDex] Chapters empty — attempting stale cache fallback',
+        );
         const stale = this.cache.getStale<MangaChapter[]>(cacheKey);
         if (stale) {
-          this.logger.log(`[MangaDex] Serving stale chapters cache (updatedAt=${stale.updatedAt})`);
+          this.logger.log(
+            `[MangaDex] Serving stale chapters cache (updatedAt=${stale.updatedAt})`,
+          );
           return this.attachLocalStatus(stale.data, true, forceLocal);
         }
       }
@@ -180,14 +209,19 @@ export class MangaDexService {
       this.logger.error(`[MangaDex] Chapters fetch error: ${String(err)}`);
       const stale = this.cache.getStale<MangaChapter[]>(cacheKey);
       if (stale) {
-        this.logger.log(`[MangaDex] Serving stale chapters cache (updatedAt=${stale.updatedAt})`);
+        this.logger.log(
+          `[MangaDex] Serving stale chapters cache (updatedAt=${stale.updatedAt})`,
+        );
         return this.attachLocalStatus(stale.data, true, forceLocal);
       }
       return [];
     }
   }
 
-  async getMangaChapterPages(chapterId: string, forceLocal = false): Promise<MangaChapterPages | null> {
+  async getMangaChapterPages(
+    chapterId: string,
+    forceLocal = false,
+  ): Promise<MangaChapterPages | null> {
     const cacheKey = `manga:chapter-pages:${chapterId}`;
     const cached = await this.cache.get<MangaChapterPages>(cacheKey);
     if (cached) {
@@ -205,9 +239,16 @@ export class MangaDexService {
       if (!res.ok) {
         const stale = this.cache.getStale<MangaChapterPages>(cacheKey);
         if (stale) {
-          this.logger.log(`[MangaDex] Serving stale chapter-pages cache chapter=${chapterId} updatedAt=${stale.updatedAt}`);
-          const enhanced = await this.enhanceChapterPages(chapterId, stale.data);
-          return forceLocal ? this.applyForceLocalChapterPages(enhanced) : enhanced;
+          this.logger.log(
+            `[MangaDex] Serving stale chapter-pages cache chapter=${chapterId} updatedAt=${stale.updatedAt}`,
+          );
+          const enhanced = await this.enhanceChapterPages(
+            chapterId,
+            stale.data,
+          );
+          return forceLocal
+            ? this.applyForceLocalChapterPages(enhanced)
+            : enhanced;
         }
         return null;
       }
@@ -220,19 +261,27 @@ export class MangaDexService {
       const { baseUrl, chapter } = data;
       const result: MangaChapterPages = {
         pages: chapter.data.map((f) => `${baseUrl}/data/${chapter.hash}/${f}`),
-        dataSaverPages: chapter.dataSaver.map((f) => `${baseUrl}/data-saver/${chapter.hash}/${f}`),
+        dataSaverPages: chapter.dataSaver.map(
+          (f) => `${baseUrl}/data-saver/${chapter.hash}/${f}`,
+        ),
       };
 
       await this.cache.set(cacheKey, result, CACHE_TTL_MS);
       const chapterEnhanced = await this.enhanceChapterPages(chapterId, result);
-      return forceLocal ? this.applyForceLocalChapterPages(chapterEnhanced) : chapterEnhanced;
+      return forceLocal
+        ? this.applyForceLocalChapterPages(chapterEnhanced)
+        : chapterEnhanced;
     } catch (err) {
       this.logger.error(`[MangaDex] Chapter pages fetch error: ${String(err)}`);
       const stale = this.cache.getStale<MangaChapterPages>(cacheKey);
       if (stale) {
-        this.logger.log(`[MangaDex] Serving stale chapter-pages cache chapter=${chapterId} updatedAt=${stale.updatedAt}`);
+        this.logger.log(
+          `[MangaDex] Serving stale chapter-pages cache chapter=${chapterId} updatedAt=${stale.updatedAt}`,
+        );
         const enhanced = await this.enhanceChapterPages(chapterId, stale.data);
-        return forceLocal ? this.applyForceLocalChapterPages(enhanced) : enhanced;
+        return forceLocal
+          ? this.applyForceLocalChapterPages(enhanced)
+          : enhanced;
       }
       return null;
     }
@@ -264,13 +313,18 @@ export class MangaDexService {
       const feedData = (await feedRes.json()) as {
         data?: Array<{
           id: string;
-          attributes: { chapter?: string | null; title?: string | null; translatedLanguage?: string };
+          attributes: {
+            chapter?: string | null;
+            title?: string | null;
+            translatedLanguage?: string;
+          };
         }>;
       };
 
       const chapters = feedData.data ?? [];
       const preferredChapter =
-        chapters.find((c) => c.attributes.translatedLanguage === lang) ?? chapters[0];
+        chapters.find((c) => c.attributes.translatedLanguage === lang) ??
+        chapters[0];
 
       if (!preferredChapter) {
         await this.cache.set(cacheKey, null, CACHE_TTL_MS);
@@ -291,7 +345,9 @@ export class MangaDexService {
       };
 
       const { baseUrl, chapter } = atHomeData;
-      const pages = chapter.data.map((f) => `${baseUrl}/data/${chapter.hash}/${f}`);
+      const pages = chapter.data.map(
+        (f) => `${baseUrl}/data/${chapter.hash}/${f}`,
+      );
       const dataSaverPages = chapter.dataSaver.map(
         (f) => `${baseUrl}/data-saver/${chapter.hash}/${f}`,
       );
@@ -312,7 +368,10 @@ export class MangaDexService {
     }
   }
 
-  async getMangaDetail(mangaId: string, forceLocal = false): Promise<MangaDetail> {
+  async getMangaDetail(
+    mangaId: string,
+    forceLocal = false,
+  ): Promise<MangaDetail> {
     const cacheKey = `manga:detail:${mangaId}`;
     const cached = await this.cache.get<MangaDetail>(cacheKey);
     if (cached) {
@@ -329,11 +388,20 @@ export class MangaDexService {
     ]);
 
     const covers = coversData.status === 'fulfilled' ? coversData.value : [];
-    const { title, authors, artists, genres, description } = authorsData.status === 'fulfilled'
-      ? authorsData.value
-      : { title: '', authors: [], artists: [], genres: [], description: '' };
+    const { title, authors, artists, genres, description } =
+      authorsData.status === 'fulfilled'
+        ? authorsData.value
+        : { title: '', authors: [], artists: [], genres: [], description: '' };
 
-    const detail: MangaDetail = { id: mangaId, ...(title ? { title } : {}), authors, artists, covers, genres, description };
+    const detail: MangaDetail = {
+      id: mangaId,
+      ...(title ? { title } : {}),
+      authors,
+      artists,
+      covers,
+      genres,
+      description,
+    };
 
     const hasUsefulData =
       detail.covers.length > 0 ||
@@ -348,10 +416,14 @@ export class MangaDexService {
       return forceLocal ? this.applyForceLocalMangaDetail(enhanced) : enhanced;
     }
 
-    this.logger.warn('[MangaDex] Manga detail empty — attempting stale cache fallback');
+    this.logger.warn(
+      '[MangaDex] Manga detail empty — attempting stale cache fallback',
+    );
     const stale = this.cache.getStale<MangaDetail>(cacheKey);
     if (stale) {
-      this.logger.log(`[MangaDex] Serving stale manga-detail cache (updatedAt=${stale.updatedAt})`);
+      this.logger.log(
+        `[MangaDex] Serving stale manga-detail cache (updatedAt=${stale.updatedAt})`,
+      );
       const enhanced = await this.enhanceMangaDetail(mangaId, stale.data);
       return forceLocal ? this.applyForceLocalMangaDetail(enhanced) : enhanced;
     }
@@ -359,7 +431,11 @@ export class MangaDexService {
     return detail;
   }
 
-  async getNewReleases(page = 1, limit = 28, tag?: string): Promise<{
+  async getNewReleases(
+    page = 1,
+    limit = 28,
+    tag?: string,
+  ): Promise<{
     new: { items: LandingBook[]; total: number };
     latest: { items: LandingBook[]; total: number };
     popular: { items: LandingBook[]; total: number };
@@ -376,12 +452,13 @@ export class MangaDexService {
     }>(cacheKey);
     if (cached) return cached.data;
 
-    const [newResult, latestResult, popularResult, topRatedResult] = await Promise.all([
-      this.fetchMangaForRow('createdAt', limit, offset, tagId),
-      this.fetchMangaForRow('latestUploadedChapter', limit, offset, tagId),
-      this.fetchMangaForRow('followedCount', limit, offset, tagId),
-      this.fetchMangaForRow('rating', limit, offset, tagId),
-    ]);
+    const [newResult, latestResult, popularResult, topRatedResult] =
+      await Promise.all([
+        this.fetchMangaForRow('createdAt', limit, offset, tagId),
+        this.fetchMangaForRow('latestUploadedChapter', limit, offset, tagId),
+        this.fetchMangaForRow('followedCount', limit, offset, tagId),
+        this.fetchMangaForRow('rating', limit, offset, tagId),
+      ]);
 
     const result = {
       new: newResult,
@@ -395,13 +472,21 @@ export class MangaDexService {
     return result;
   }
 
-  async getGenreManga(slug: string, page = 1, limit = 28): Promise<{ items: LandingBook[]; total: number; slug: string }> {
+  async getGenreManga(
+    slug: string,
+    page = 1,
+    limit = 28,
+  ): Promise<{ items: LandingBook[]; total: number; slug: string }> {
     const tagId = MANGA_GENRE_TAGS[slug];
     if (!tagId) return { items: [], total: 0, slug };
 
     const offset = (page - 1) * limit;
     const cacheKey = `genre:${slug}:${page}:${limit}`;
-    const cached = await this.cache.get<{ items: LandingBook[]; total: number; slug: string }>(cacheKey);
+    const cached = await this.cache.get<{
+      items: LandingBook[];
+      total: number;
+      slug: string;
+    }>(cacheKey);
     if (cached) return cached.data;
 
     const params = new URLSearchParams();
@@ -415,21 +500,33 @@ export class MangaDexService {
     params.set('order[followedCount]', 'desc');
 
     try {
-      const response = await this.mangadexFetch(`https://api.mangadex.org/manga?${params.toString()}`);
+      const response = await this.mangadexFetch(
+        `https://api.mangadex.org/manga?${params.toString()}`,
+      );
       if (!response.ok) return { items: [], total: 0, slug };
-      const data = (await response.json()) as MangaDexResponse & { total?: number };
+      const data = (await response.json()) as MangaDexResponse & {
+        total?: number;
+      };
       const items = this.mapManga(data);
       const total = (data as any).total ?? items.length;
       const result = { items, total, slug };
       await this.cache.set(cacheKey, result, 1000 * 60 * 15);
       return result;
     } catch (err) {
-      this.logger.warn(`[MangaDex] Genre fetch error (${slug}): ${String(err)}`);
+      this.logger.warn(
+        `[MangaDex] Genre fetch error (${slug}): ${String(err)}`,
+      );
       return { items: [], total: 0, slug };
     }
   }
 
-  async searchManga(query: string, lang?: string, limit = 100, offset = 0, status?: 'ongoing' | 'completed' | 'hiatus'): Promise<{ items: LandingBook[]; total: number }> {
+  async searchManga(
+    query: string,
+    lang?: string,
+    limit = 100,
+    offset = 0,
+    status?: 'ongoing' | 'completed' | 'hiatus',
+  ): Promise<{ items: LandingBook[]; total: number }> {
     const params = new URLSearchParams();
     params.set('limit', String(Math.min(limit, 100))); // MangaDex API max is 100
     params.set('offset', String(offset));
@@ -440,7 +537,10 @@ export class MangaDexService {
     params.append('contentRating[]', 'suggestive');
     if (status) params.append('status[]', status);
 
-    return this.fetchMangaWithParamsPaged(params, `search:${query}${lang ? `:${lang}` : ''}${status ? `:${status}` : ''}`);
+    return this.fetchMangaWithParamsPaged(
+      params,
+      `search:${query}${lang ? `:${lang}` : ''}${status ? `:${status}` : ''}`,
+    );
   }
 
   /** Fetch specific manga by IDs and return as LandingBook[]. */
@@ -453,11 +553,19 @@ export class MangaDexService {
     params.append('contentRating[]', 'safe');
     params.append('contentRating[]', 'suggestive');
     params.append('contentRating[]', 'erotica');
-    const { items } = await this.fetchMangaWithParamsPaged(params, `byIds:${ids.length}`);
+    const { items } = await this.fetchMangaWithParamsPaged(
+      params,
+      `byIds:${ids.length}`,
+    );
     return items;
   }
 
-  async fetchMangaForRow(order: MangaOrder, limit = 10, offset = 0, tagId?: string): Promise<{ items: LandingBook[]; total: number }> {
+  async fetchMangaForRow(
+    order: MangaOrder,
+    limit = 10,
+    offset = 0,
+    tagId?: string,
+  ): Promise<{ items: LandingBook[]; total: number }> {
     const params = new URLSearchParams();
     params.set('limit', String(limit));
     if (offset > 0) params.set('offset', String(offset));
@@ -468,7 +576,10 @@ export class MangaDexService {
     params.set(`order[${order}]`, 'desc');
     if (tagId) params.append('includedTags[]', tagId);
 
-    return this.fetchMangaWithParamsPaged(params, `row:${order}${tagId ? `:tag:${tagId}` : ''}`);
+    return this.fetchMangaWithParamsPaged(
+      params,
+      `row:${order}${tagId ? `:tag:${tagId}` : ''}`,
+    );
   }
 
   async getMangaTagId(tagName: string): Promise<string | undefined> {
@@ -477,9 +588,13 @@ export class MangaDexService {
     if (cached) return cached.data[tagName];
 
     try {
-      const res = await this.mangadexFetch('https://api.mangadex.org/manga/tag');
+      const res = await this.mangadexFetch(
+        'https://api.mangadex.org/manga/tag',
+      );
       if (!res.ok) return undefined;
-      const json = await res.json() as { data: { id: string; attributes: { name: { en?: string } } }[] };
+      const json = (await res.json()) as {
+        data: { id: string; attributes: { name: { en?: string } } }[];
+      };
       const map: Record<string, string> = {};
       for (const tag of json.data) {
         const name = tag.attributes?.name?.en;
@@ -500,31 +615,49 @@ export class MangaDexService {
       params.set('limit', '100');
       params.set('order[volume]', 'asc');
 
-      const res = await this.mangadexFetch(`https://api.mangadex.org/cover?${params.toString()}`);
+      const res = await this.mangadexFetch(
+        `https://api.mangadex.org/cover?${params.toString()}`,
+      );
       if (!res.ok) return [];
 
       const data = (await res.json()) as MangaDexCoverResponse;
       return (
-        data.data
-          ?.map((cover) => ({
-            volume: cover.attributes.volume ?? null,
-            url: `https://uploads.mangadex.org/covers/${mangaId}/${cover.attributes.fileName}.512.jpg`,
-          })) ?? []
+        data.data?.map((cover) => ({
+          volume: cover.attributes.volume ?? null,
+          url: `https://uploads.mangadex.org/covers/${mangaId}/${cover.attributes.fileName}.512.jpg`,
+        })) ?? []
       );
     } catch (err) {
-      this.logger.warn(`[MangaDex] Covers fetch error (${mangaId}): ${String(err)}`);
+      this.logger.warn(
+        `[MangaDex] Covers fetch error (${mangaId}): ${String(err)}`,
+      );
       return [];
     }
   }
 
-  private async fetchMangaAuthors(mangaId: string): Promise<{ title: string; authors: string[]; artists: string[]; genres: string[]; description: string }> {
+  private async fetchMangaAuthors(mangaId: string): Promise<{
+    title: string;
+    authors: string[];
+    artists: string[];
+    genres: string[];
+    description: string;
+  }> {
     try {
       const params = new URLSearchParams();
       params.append('includes[]', 'author');
       params.append('includes[]', 'artist');
 
-      const res = await this.mangadexFetch(`https://api.mangadex.org/manga/${mangaId}?${params.toString()}`);
-      if (!res.ok) return { title: '', authors: [], artists: [], genres: [], description: '' };
+      const res = await this.mangadexFetch(
+        `https://api.mangadex.org/manga/${mangaId}?${params.toString()}`,
+      );
+      if (!res.ok)
+        return {
+          title: '',
+          authors: [],
+          artists: [],
+          genres: [],
+          description: '',
+        };
 
       const data = (await res.json()) as { data?: MangaDexManga };
       const rels = data.data?.relationships ?? [];
@@ -542,25 +675,49 @@ export class MangaDexService {
         .slice(0, 5);
 
       const lang = this.getMangaLanguage();
-      const description = this.pickLocalized(data.data?.attributes?.description, lang);
+      const description = this.pickLocalized(
+        data.data?.attributes?.description,
+        lang,
+      );
       // Series title anchors the translator's series context (#157).
       const title = this.pickLocalized(data.data?.attributes?.title, lang);
 
-      return { title, authors, artists, genres, description: description || '' };
+      return {
+        title,
+        authors,
+        artists,
+        genres,
+        description: description || '',
+      };
     } catch (err) {
-      this.logger.warn(`[MangaDex] Authors fetch error (${mangaId}): ${String(err)}`);
-      return { title: '', authors: [], artists: [], genres: [], description: '' };
+      this.logger.warn(
+        `[MangaDex] Authors fetch error (${mangaId}): ${String(err)}`,
+      );
+      return {
+        title: '',
+        authors: [],
+        artists: [],
+        genres: [],
+        description: '',
+      };
     }
   }
 
-  private async fetchMangaWithParamsPaged(params: URLSearchParams, label: string): Promise<{ items: LandingBook[]; total: number }> {
+  private async fetchMangaWithParamsPaged(
+    params: URLSearchParams,
+    label: string,
+  ): Promise<{ items: LandingBook[]; total: number }> {
     const lang = this.getMangaLanguage();
     this.logger.log(`[MangaDex] Fetching: ${label} | lang=${lang}`);
 
     try {
-      const response = await this.mangadexFetch(`https://api.mangadex.org/manga?${params.toString()}`);
+      const response = await this.mangadexFetch(
+        `https://api.mangadex.org/manga?${params.toString()}`,
+      );
 
-      this.logger.log(`[MangaDex] ${response.status} ${response.statusText} | ${label}`);
+      this.logger.log(
+        `[MangaDex] ${response.status} ${response.statusText} | ${label}`,
+      );
 
       if (!response.ok) {
         const text = await response.text().catch(() => '');
@@ -574,13 +731,17 @@ export class MangaDexService {
         return { items: [], total: 0 };
       }
 
-      const data = (await response.json()) as MangaDexResponse & { total?: number };
+      const data = (await response.json()) as MangaDexResponse & {
+        total?: number;
+      };
       const items = this.mapManga(data);
       const total = (data as any).total ?? items.length;
-      this.logger.log(`[MangaDex] Found ${items.length}/${total} manga for ${label}`);
-      
+      this.logger.log(
+        `[MangaDex] Found ${items.length}/${total} manga for ${label}`,
+      );
+
       this.statusService.broadcastStatus('mangadex', 'online');
-      
+
       return { items, total };
     } catch (err) {
       this.logger.error(`[MangaDex] Fetch error: ${String(err)}`);
@@ -595,13 +756,17 @@ export class MangaDexService {
       data.data
         ?.map((manga) => {
           const title = this.pickLocalized(manga.attributes?.title, lang);
-          const description = this.pickLocalized(manga.attributes?.description, lang);
+          const description = this.pickLocalized(
+            manga.attributes?.description,
+            lang,
+          );
           const tags =
             manga.attributes?.tags
               ?.map((tag) => this.pickLocalized(tag.attributes?.name, lang))
               .filter((tag): tag is string => Boolean(tag)) ?? [];
-          const coverFile = manga.relationships?.find((rel) => rel.type === 'cover_art')
-            ?.attributes?.fileName;
+          const coverFile = manga.relationships?.find(
+            (rel) => rel.type === 'cover_art',
+          )?.attributes?.fileName;
 
           if (!manga.id || !title || !coverFile) return null;
 
@@ -614,7 +779,9 @@ export class MangaDexService {
             authors: [] as string[],
             description: description ?? '',
             thumbnail,
-            publishedDate: manga.attributes?.year ? String(manga.attributes.year) : '',
+            publishedDate: manga.attributes?.year
+              ? String(manga.attributes.year)
+              : '',
             categories: tags.slice(0, 3),
             averageRating: 0,
             ratingsCount: 0,
@@ -624,14 +791,21 @@ export class MangaDexService {
     );
   }
 
-  private pickLocalized(value: Record<string, string> | undefined, lang: string): string {
+  private pickLocalized(
+    value: Record<string, string> | undefined,
+    lang: string,
+  ): string {
     if (!value || Object.keys(value).length === 0) return '';
     return value[lang] ?? value.en ?? Object.values(value)[0] ?? '';
   }
 
   // ─── Image cache enhancement ─────────────────────────────────────────────────
 
-  private async attachLocalStatus(chapters: MangaChapter[], isOfflineFallback = false, forceLocal = false): Promise<MangaChapter[]> {
+  private async attachLocalStatus(
+    chapters: MangaChapter[],
+    isOfflineFallback = false,
+    forceLocal = false,
+  ): Promise<MangaChapter[]> {
     // readerAvailable is only consumed by the UI under forceLocal (offline toggle) or
     // isOfflineFallback (stale cache served while MangaDex is down) — see
     // HeroDetailButton.tsx:33 and BookDetailModal's chapterNeedsBackup === isOfflineFallback.
@@ -639,15 +813,22 @@ export class MangaDexService {
     // N-chapter manga cost N Class-A R2 list ops on EVERY chapter-list load (incl. cache
     // hits). Skip the fan-out unless the result will actually be read.
     if (!this.imageCache.enabled || (!forceLocal && !isOfflineFallback)) {
-      return chapters.map((ch) => ({ ...ch, readerAvailable: false, isOfflineFallback }));
+      return chapters.map((ch) => ({
+        ...ch,
+        readerAvailable: false,
+        isOfflineFallback,
+      }));
     }
 
     return await Promise.all(
       chapters.map(async (ch) => ({
         ...ch,
-        readerAvailable: await this.imageCache.hasChapterCache('_chapters', ch.id),
-        isOfflineFallback
-      }))
+        readerAvailable: await this.imageCache.hasChapterCache(
+          '_chapters',
+          ch.id,
+        ),
+        isOfflineFallback,
+      })),
     );
   }
 
@@ -663,7 +844,10 @@ export class MangaDexService {
     };
   }
 
-  private async enhanceMangaDetail(mangaId: string, detail: MangaDetail): Promise<MangaDetail> {
+  private async enhanceMangaDetail(
+    mangaId: string,
+    detail: MangaDetail,
+  ): Promise<MangaDetail> {
     if (!this.imageCache.enabled || detail.covers.length === 0) return detail;
 
     // Don't trust cached localUrls blindly — files may have been wiped on
@@ -672,12 +856,17 @@ export class MangaDexService {
     // re-triggers downloads for missing ones), so always re-resolve from the
     // original external urls.
     const coverUrls = detail.covers.map((c) => c.url);
-    const localPaths = await this.imageCache.localCoverPaths(mangaId, coverUrls);
+    const localPaths = await this.imageCache.localCoverPaths(
+      mangaId,
+      coverUrls,
+    );
     return {
       ...detail,
       covers: detail.covers.map((c, i) => ({
         ...c,
-        localUrl: localPaths[i].startsWith('/img-cache') ? localPaths[i] : undefined,
+        localUrl: localPaths[i].startsWith('/img-cache')
+          ? localPaths[i]
+          : undefined,
       })),
     };
   }
@@ -696,11 +885,15 @@ export class MangaDexService {
     this.cache
       .set(cacheKey, enhanced, CACHE_TTL_MS)
       .catch((err) =>
-        this.logger.warn(`[ImageCache] Manga-detail cache patch failed: ${String(err)}`),
+        this.logger.warn(
+          `[ImageCache] Manga-detail cache patch failed: ${String(err)}`,
+        ),
       );
   }
 
-  private applyForceLocalChapterPages(data: MangaChapterPages): MangaChapterPages {
+  private applyForceLocalChapterPages(
+    data: MangaChapterPages,
+  ): MangaChapterPages {
     if (!this.imageCache.enabled) return data;
     const origin = this.backendOrigin;
     const resolve = (locals: string[] | undefined, originals: string[]) => {
@@ -710,7 +903,10 @@ export class MangaDexService {
       );
     };
     const resolvedPages = resolve(data.localPages, data.pages);
-    const resolvedDataSaver = resolve(data.localDataSaverPages, data.dataSaverPages);
+    const resolvedDataSaver = resolve(
+      data.localDataSaverPages,
+      data.dataSaverPages,
+    );
     const localCacheAvailable =
       resolvedPages.some((p) => p.startsWith(origin)) ||
       resolvedDataSaver.some((p) => p.startsWith(origin));
@@ -731,9 +927,11 @@ export class MangaDexService {
       (arr ?? []).filter((p) => p.startsWith('/img-cache')).length;
 
     const origLocal =
-      countLocal(original.localPages) + countLocal(original.localDataSaverPages);
+      countLocal(original.localPages) +
+      countLocal(original.localDataSaverPages);
     const newLocal =
-      countLocal(enhanced.localPages) + countLocal(enhanced.localDataSaverPages);
+      countLocal(enhanced.localPages) +
+      countLocal(enhanced.localDataSaverPages);
 
     if (newLocal <= origLocal) return;
 
@@ -744,7 +942,9 @@ export class MangaDexService {
     this.cache
       .set(cacheKey, enhanced, CACHE_TTL_MS)
       .catch((err) =>
-        this.logger.warn(`[ImageCache] Chapter cache patch failed: ${String(err)}`),
+        this.logger.warn(
+          `[ImageCache] Chapter cache patch failed: ${String(err)}`,
+        ),
       );
   }
 
@@ -760,12 +960,7 @@ export class MangaDexService {
     // per chapter, and re-triggers downloads for missing ones), so always
     // re-resolve.
     const [localPages, localDataSaverPages] = await Promise.all([
-      this.imageCache.localPagePaths(
-        '_chapters',
-        chapterId,
-        data.pages,
-        'p',
-      ),
+      this.imageCache.localPagePaths('_chapters', chapterId, data.pages, 'p'),
       this.imageCache.localPagePaths(
         '_chapters',
         chapterId,

@@ -58,7 +58,9 @@ describe('StatusController', () => {
       mockAuthGuard.canActivate.mockReturnValue(true);
       mockCacheHealth.getHealth.mockResolvedValue(MOCK_HEALTH);
 
-      const res = await request(app.getHttpServer()).get('/status/cache').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/status/cache')
+        .expect(200);
 
       expect(res.body.dirtyQueueDepth).toBe(3);
       expect(res.body.processingQueueDepth).toBe(1);
@@ -99,7 +101,9 @@ describe('StatusController', () => {
       mockCacheHealth.getHealth.mockRejectedValue(new Error('ECONNREFUSED'));
       const res = await request(app.getHttpServer()).get('/status').expect(200);
       expect(res.body.status).toBe('down');
-      const redis = res.body.checks.find((c: { id: string }) => c.id === 'redis');
+      const redis = res.body.checks.find(
+        (c: { id: string }) => c.id === 'redis',
+      );
       expect(redis.status).toBe('down');
       expect(redis.latencyMs).toBeNull();
     });

@@ -4,14 +4,23 @@ import { parseJobKey, renderConfigHash, buildMitConfig } from './mit-config';
 describe('parseJobKey', () => {
   it('round-trips a plain chapterId', () => {
     expect(parseJobKey('abc123:JPN:THA:default:hd')).toEqual({
-      chapterId: 'abc123', srcMIT: 'JPN', tgtMIT: 'THA', model: 'default', derivative: 'hd',
+      chapterId: 'abc123',
+      srcMIT: 'JPN',
+      tgtMIT: 'THA',
+      model: 'default',
+      derivative: 'hd',
     });
   });
 
   it('keeps the colon in a "ver:<uuid>" chapterId (right-split, #bug-hunt)', () => {
-    expect(parseJobKey('ver:752fc515-72ce-4890:ANY:ENG:gemini-2.5-pro:saver')).toEqual({
+    expect(
+      parseJobKey('ver:752fc515-72ce-4890:ANY:ENG:gemini-2.5-pro:saver'),
+    ).toEqual({
       chapterId: 'ver:752fc515-72ce-4890',
-      srcMIT: 'ANY', tgtMIT: 'ENG', model: 'gemini-2.5-pro', derivative: 'saver',
+      srcMIT: 'ANY',
+      tgtMIT: 'ENG',
+      model: 'gemini-2.5-pro',
+      derivative: 'saver',
     });
   });
 });
@@ -28,8 +37,18 @@ function makeService() {
     set: jest.fn().mockResolvedValue(undefined),
     setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
   };
-  const storage = { put: jest.fn().mockResolvedValue(undefined), list: jest.fn().mockResolvedValue([]), delete: jest.fn().mockResolvedValue(undefined) };
-  return new BooksService({} as any, cache as any, { enabled: false } as any, {} as any, storage as any);
+  const storage = {
+    put: jest.fn().mockResolvedValue(undefined),
+    list: jest.fn().mockResolvedValue([]),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
+  return new BooksService(
+    {} as any,
+    cache as any,
+    { enabled: false } as any,
+    {} as any,
+    storage as any,
+  );
 }
 
 const ENV_KEYS = [
@@ -64,8 +83,18 @@ const ENV_KEYS = [
 
 describe('BooksService.buildMitConfig', () => {
   const saved: Record<string, string | undefined> = {};
-  beforeEach(() => ENV_KEYS.forEach((k) => { saved[k] = process.env[k]; delete process.env[k]; }));
-  afterEach(() => ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }));
+  beforeEach(() =>
+    ENV_KEYS.forEach((k) => {
+      saved[k] = process.env[k];
+      delete process.env[k];
+    }),
+  );
+  afterEach(() =>
+    ENV_KEYS.forEach((k) => {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }),
+  );
 
   it("uses MIT's tuned detection/inpainting sizes + bf16 + lama_large by default (#247)", () => {
     const svc = makeService();
@@ -378,14 +407,30 @@ describe('BooksService.buildMitConfig', () => {
   it('carries series_context to the translator when provided (#157)', () => {
     const svc = makeService();
     const cfg = JSON.parse(
-      buildMitConfig(process.env, 'ANY', 'THA', '', undefined, 'You are translating the manga series "Mob Seka".'),
+      buildMitConfig(
+        process.env,
+        'ANY',
+        'THA',
+        '',
+        undefined,
+        'You are translating the manga series "Mob Seka".',
+      ),
     );
-    expect(cfg.translator.series_context).toBe('You are translating the manga series "Mob Seka".');
+    expect(cfg.translator.series_context).toBe(
+      'You are translating the manga series "Mob Seka".',
+    );
   });
 
   it('produces a byte-identical config when series_context is absent (local-first rule)', () => {
     const svc = makeService();
-    const withUndefined = buildMitConfig(process.env, 'JPN', 'THA', 'ja', undefined, undefined);
+    const withUndefined = buildMitConfig(
+      process.env,
+      'JPN',
+      'THA',
+      'ja',
+      undefined,
+      undefined,
+    );
     const legacyCall = buildMitConfig(process.env, 'JPN', 'THA', 'ja');
     expect(withUndefined).toBe(legacyCall);
     expect(withUndefined).not.toContain('series_context');

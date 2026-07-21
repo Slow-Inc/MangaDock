@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationShutdown,
+  OnModuleInit,
+} from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
 import { BatchSyncWorker } from './batch-sync.worker';
@@ -10,7 +15,9 @@ const DEFAULT_TTL_MS = 1000 * 60 * 20; // 20 minutes
 const INVALIDATE_CHANNEL = 'cache:invalidate';
 
 @Injectable()
-export class CacheOrchestratorService implements OnModuleInit, OnApplicationShutdown {
+export class CacheOrchestratorService
+  implements OnModuleInit, OnApplicationShutdown
+{
   private readonly logger = new Logger(CacheOrchestratorService.name);
 
   constructor(
@@ -24,13 +31,16 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
   onModuleInit(): void {
     const handler = (raw: unknown) => {
       if (typeof raw !== 'string') {
-        this.logger.warn(`cache:invalidate: unexpected message type ${typeof raw}`);
+        this.logger.warn(
+          `cache:invalidate: unexpected message type ${typeof raw}`,
+        );
         return;
       }
       try {
         const parsed = JSON.parse(raw) as unknown;
         if (
-          typeof parsed !== 'object' || parsed === null ||
+          typeof parsed !== 'object' ||
+          parsed === null ||
           typeof (parsed as Record<string, unknown>).key !== 'string' ||
           typeof (parsed as Record<string, unknown>).nodeId !== 'string'
         ) {
@@ -56,7 +66,9 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
    * Get data from cache (L1 JSON → L2 Redis fallback).
    * Returns null if not found in any cache.
    */
-  async get<T>(key: string): Promise<{ data: T; source: 'redis' | 'json' } | null> {
+  async get<T>(
+    key: string,
+  ): Promise<{ data: T; source: 'redis' | 'json' } | null> {
     // 1. Try L1 (JSON cache) first — fastest, in-process
     const jsonEntry = this.jsonCache.get<T>(key);
     if (jsonEntry) {
@@ -75,9 +87,11 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
         try {
           const entry = JSON.parse(raw) as CacheEntry<T>;
           this.logger.debug(`Cache HIT [redis] key=${key}`);
-          const ttlRemainingMs = entry.ttlMs <= 0
-            ? entry.ttlMs
-            : entry.ttlMs - (Date.now() - new Date(entry.updatedAt).getTime());
+          const ttlRemainingMs =
+            entry.ttlMs <= 0
+              ? entry.ttlMs
+              : entry.ttlMs -
+                (Date.now() - new Date(entry.updatedAt).getTime());
           // A finite TTL that has already elapsed must not be written into L1:
           // JsonCacheService.isExpired() treats ttlMs <= 0 as "permanent", so
           // writing a lapsed remainder would make the entry immortal in L1.
@@ -109,14 +123,23 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
 
     // L2: write to Redis (source of truth at runtime)
     if (this.redis.available) {
-      await this.redis.set(key, JSON.stringify(entry), Math.floor(ttlMs / 1000));
-      await this.redis.publish(INVALIDATE_CHANNEL, JSON.stringify({ key, nodeId: this.metrics.nodeId }));
+      await this.redis.set(
+        key,
+        JSON.stringify(entry),
+        Math.floor(ttlMs / 1000),
+      );
+      await this.redis.publish(
+        INVALIDATE_CHANNEL,
+        JSON.stringify({ key, nodeId: this.metrics.nodeId }),
+      );
       await this.batchSync.markDirty(key);
     } else {
       this.l3.appendDirtyFallback(key);
     }
 
-    this.logger.debug(`Cache SET key=${key} ttl=${Math.floor(ttlMs / 1000)}s redis=${this.redis.available}`);
+    this.logger.debug(
+      `Cache SET key=${key} ttl=${Math.floor(ttlMs / 1000)}s redis=${this.redis.available}`,
+    );
   }
 
   /**
@@ -127,7 +150,9 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
   getStale<T>(key: string): { data: T; updatedAt: string } | null {
     const entry = this.jsonCache.get<T>(key);
     if (!entry) return null;
-    this.logger.debug(`Stale cache HIT [json] key=${key} updatedAt=${entry.updatedAt}`);
+    this.logger.debug(
+      `Stale cache HIT [json] key=${key} updatedAt=${entry.updatedAt}`,
+    );
     return { data: entry.data, updatedAt: entry.updatedAt };
   }
 
@@ -148,8 +173,15 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
     this.jsonCache.set(key, data, -1);
 
     if (this.redis.available) {
-      await this.redis.set(key, JSON.stringify(jsonEntry), Math.floor(redisTtlMs / 1000));
-      await this.redis.publish(INVALIDATE_CHANNEL, JSON.stringify({ key, nodeId: this.metrics.nodeId }));
+      await this.redis.set(
+        key,
+        JSON.stringify(jsonEntry),
+        Math.floor(redisTtlMs / 1000),
+      );
+      await this.redis.publish(
+        INVALIDATE_CHANNEL,
+        JSON.stringify({ key, nodeId: this.metrics.nodeId }),
+      );
       // No markDirty — manga entries are permanent (ttlMs=-1); L3 is already the source of truth on disk.
     }
 
@@ -159,6 +191,8 @@ export class CacheOrchestratorService implements OnModuleInit, OnApplicationShut
   }
 
   onApplicationShutdown(signal?: string) {
-    this.logger.log(`Graceful shutdown (signal=${signal ?? 'none'}) — L3 flush handled by L3BatchWriter.onModuleDestroy()`);
+    this.logger.log(
+      `Graceful shutdown (signal=${signal ?? 'none'}) — L3 flush handled by L3BatchWriter.onModuleDestroy()`,
+    );
   }
 }

@@ -288,19 +288,7 @@ export default function PostDetailPage() {
       </div>
 
       <article className="bg-[#1a1a1a] border border-white/10 rounded-2xl overflow-hidden mb-8 shadow-xl">
-        <div className="flex">
-          <div className="hidden sm:flex flex-col items-center p-4 bg-white/2 border-r border-white/5">
-             <VoteButtons
-                targetType="post"
-                targetId={post.id}
-                initialUpvotes={post.upvotes}
-                initialDownvotes={post.downvotes}
-                initialUserVote={post.userVote}
-                externalCounts={voteCounts.get(`post:${post.id}`)}
-              />
-          </div>
-
-          <div className="flex-1 p-4 sm:p-8">
+          <div className="p-4 sm:p-8">
             <header className="flex items-center flex-wrap gap-3 mb-3 sm:mb-4 text-xs text-white/40 relative">
               <div className="w-6 h-6 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/5">
                 {post.authorPhotoUrl && (
@@ -535,22 +523,19 @@ export default function PostDetailPage() {
             )}
 
             <footer className="pt-4 sm:pt-6 border-t border-white/5 flex items-center gap-6">
-               <div className="sm:hidden">
-                  <VoteButtons
-                    targetType="post"
-                    targetId={post.id}
-                    initialUpvotes={post.upvotes}
-                    initialDownvotes={post.downvotes}
-                    initialUserVote={post.userVote}
-                    externalCounts={voteCounts.get(`post:${post.id}`)}
-                  />
-               </div>
-               <div className="text-sm font-bold text-white/30">
-                 {post.commentCount} ความคิดเห็น
-               </div>
+              <VoteButtons
+                targetType="post"
+                targetId={post.id}
+                initialUpvotes={post.upvotes}
+                initialDownvotes={post.downvotes}
+                initialUserVote={post.userVote}
+                externalCounts={voteCounts.get(`post:${post.id}`)}
+              />
+              <div className="text-sm font-bold text-white/30">
+                {post.commentCount} ความคิดเห็น
+              </div>
             </footer>
           </div>
-        </div>
       </article>
 
       {/* Comment Input */}

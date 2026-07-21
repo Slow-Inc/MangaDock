@@ -10,7 +10,12 @@ const SUPABASE_BATCH_SIZE = 100;
 const SEVEN_DAYS_S = 7 * 24 * 60 * 60;
 const MAX_JITTER_MS = 5_000;
 
-type CacheRow = { key: string; data: unknown; updated_at: string; ttl_ms: number };
+type CacheRow = {
+  key: string;
+  data: unknown;
+  updated_at: string;
+  ttl_ms: number;
+};
 type WinnerEntry = { entry: CacheEntry<unknown>; source: 'l3' | 'supabase' };
 
 @Injectable()
@@ -36,13 +41,17 @@ export class CatastrophicRecoveryService implements OnModuleInit {
       `CatastrophicRecovery: Redis down at boot — comparing ${l3Entries.size} L3 key(s) against Supabase`,
     );
     const winners = await this.buildWinnerBuffer(l3Entries);
-    this.logger.log(`CatastrophicRecovery: buffered ${winners.size} winner key(s) for L2 push on reconnect`);
+    this.logger.log(
+      `CatastrophicRecovery: buffered ${winners.size} winner key(s) for L2 push on reconnect`,
+    );
 
     const unregister = this.redis.onReconnect(() =>
       this.pushToL2(winners)
         .then(() => unregister())
-        .catch(err =>
-          this.logger.warn(`CatastrophicRecovery: reconnect push failed: ${String(err)}`),
+        .catch((err) =>
+          this.logger.warn(
+            `CatastrophicRecovery: reconnect push failed: ${String(err)}`,
+          ),
         ),
     );
   }
@@ -51,25 +60,35 @@ export class CatastrophicRecoveryService implements OnModuleInit {
     l3Entries: Map<string, CacheEntry<unknown>>,
   ): Promise<Map<string, WinnerEntry>> {
     const winners = new Map<string, WinnerEntry>(
-      [...l3Entries.entries()].map(([key, entry]) => [key, { entry, source: 'l3' }]),
+      [...l3Entries.entries()].map(([key, entry]) => [
+        key,
+        { entry, source: 'l3' },
+      ]),
     );
     const keys = [...l3Entries.keys()];
 
     try {
       for (let i = 0; i < keys.length; i += SUPABASE_BATCH_SIZE) {
         const batch = keys.slice(i, i + SUPABASE_BATCH_SIZE);
-        const { data, error } = await this.supabase.client
+        const { data, error } = (await this.supabase.client
           .from('cache_entries')
           .select('key, data, updated_at, ttl_ms')
-          .in('key', batch) as { data: CacheRow[] | null; error: any };
+          .in('key', batch)) as { data: CacheRow[] | null; error: any };
 
         if (error) throw error;
 
         for (const row of data ?? []) {
           const l3Entry = l3Entries.get(row.key);
-          if (l3Entry && new Date(row.updated_at) > new Date(l3Entry.updatedAt)) {
+          if (
+            l3Entry &&
+            new Date(row.updated_at) > new Date(l3Entry.updatedAt)
+          ) {
             winners.set(row.key, {
-              entry: { data: row.data, updatedAt: row.updated_at, ttlMs: row.ttl_ms },
+              entry: {
+                data: row.data,
+                updatedAt: row.updated_at,
+                ttlMs: row.ttl_ms,
+              },
               source: 'supabase',
             });
           }
@@ -86,11 +105,15 @@ export class CatastrophicRecoveryService implements OnModuleInit {
 
   private async pushToL2(entries: Map<string, WinnerEntry>): Promise<void> {
     // Jitter: prevents thundering herd when all nodes reconnect simultaneously
-    await new Promise<void>(resolve => setTimeout(resolve, Math.random() * MAX_JITTER_MS));
+    await new Promise<void>((resolve) =>
+      setTimeout(resolve, Math.random() * MAX_JITTER_MS),
+    );
 
     const client = await this.redis.getClient();
     if (!client) {
-      this.logger.warn('CatastrophicRecovery: reconnect fired but Redis client unavailable — skipping');
+      this.logger.warn(
+        'CatastrophicRecovery: reconnect fired but Redis client unavailable — skipping',
+      );
       return;
     }
 
@@ -99,7 +122,11 @@ export class CatastrophicRecoveryService implements OnModuleInit {
         entry.ttlMs <= 0
           ? SEVEN_DAYS_S
           : Math.max(
-              Math.floor((entry.ttlMs - (Date.now() - new Date(entry.updatedAt).getTime())) / 1000),
+              Math.floor(
+                (entry.ttlMs -
+                  (Date.now() - new Date(entry.updatedAt).getTime())) /
+                  1000,
+              ),
               1,
             );
       return { key, value: JSON.stringify(entry), ttlSeconds, source };

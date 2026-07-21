@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { ROLE } from '../users/users.service';
 
@@ -17,7 +22,8 @@ export class AdminGuard implements CanActivate {
       .eq('uid', uid)
       .maybeSingle<{ role: number }>();
 
-    if (!data || data.role < ROLE.ADMIN) throw new ForbiddenException('Admin access required');
+    if (!data || data.role < ROLE.ADMIN)
+      throw new ForbiddenException('Admin access required');
     return true;
   }
 }

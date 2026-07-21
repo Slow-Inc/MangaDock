@@ -115,9 +115,30 @@ describe('RedisService — keys() uses a SCAN cursor loop', () => {
 
     expect(result.sort()).toEqual(['a', 'b', 'c', 'd']);
     expect(scan).toHaveBeenCalledTimes(3);
-    expect(scan).toHaveBeenNthCalledWith(1, '0', 'MATCH', 'translate:*', 'COUNT', expect.any(Number));
-    expect(scan).toHaveBeenNthCalledWith(2, '42', 'MATCH', 'translate:*', 'COUNT', expect.any(Number));
-    expect(scan).toHaveBeenNthCalledWith(3, '7', 'MATCH', 'translate:*', 'COUNT', expect.any(Number));
+    expect(scan).toHaveBeenNthCalledWith(
+      1,
+      '0',
+      'MATCH',
+      'translate:*',
+      'COUNT',
+      expect.any(Number),
+    );
+    expect(scan).toHaveBeenNthCalledWith(
+      2,
+      '42',
+      'MATCH',
+      'translate:*',
+      'COUNT',
+      expect.any(Number),
+    );
+    expect(scan).toHaveBeenNthCalledWith(
+      3,
+      '7',
+      'MATCH',
+      'translate:*',
+      'COUNT',
+      expect.any(Number),
+    );
   });
 
   it('de-duplicates keys returned across iterations (SCAN can repeat keys)', async () => {

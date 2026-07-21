@@ -18,7 +18,9 @@ export class L3DiskService {
     try {
       fs.mkdirSync(this.cacheDir, { recursive: true });
     } catch (err) {
-      this.logger.warn(`L3DiskService: could not create cache dir ${this.cacheDir}: ${String(err)}`);
+      this.logger.warn(
+        `L3DiskService: could not create cache dir ${this.cacheDir}: ${String(err)}`,
+      );
     }
   }
 
@@ -26,12 +28,16 @@ export class L3DiskService {
     const map = new Map<string, CacheEntry<unknown>>();
     try {
       if (!fs.existsSync(this.cacheDir)) return map;
-      const files = fs.readdirSync(this.cacheDir).filter((f) => f.endsWith('.json'));
+      const files = fs
+        .readdirSync(this.cacheDir)
+        .filter((f) => f.endsWith('.json'));
       for (const file of files) {
         const filePath = path.join(this.cacheDir, file);
         try {
           const raw = fs.readFileSync(filePath, 'utf-8');
-          const entry = JSON.parse(raw) as CacheEntry<unknown> & { key?: string };
+          const entry = JSON.parse(raw) as CacheEntry<unknown> & {
+            key?: string;
+          };
           const memKey = entry.key ?? file.replace('.json', '');
           map.set(memKey, entry);
         } catch {
@@ -46,7 +52,10 @@ export class L3DiskService {
 
   async write<T>(key: string, entry: CacheEntry<T>): Promise<void> {
     try {
-      const filePath = path.join(this.cacheDir, `${this.fileNameForKey(key)}.json`);
+      const filePath = path.join(
+        this.cacheDir,
+        `${this.fileNameForKey(key)}.json`,
+      );
       // Compact — these files are machine-read only; pretty-print cost ~25%
       // extra bytes on every periodic flush (#147)
       await this.writeFile(filePath, JSON.stringify({ ...entry, key }));
@@ -55,7 +64,10 @@ export class L3DiskService {
     } catch (err) {
       this.consecutiveWriteFailures++;
       this.logger.warn(`Failed to write L3 cache [${key}]: ${String(err)}`);
-      if (this.consecutiveWriteFailures >= CONSECUTIVE_FAIL_THRESHOLD && !this.criticalAlertFired) {
+      if (
+        this.consecutiveWriteFailures >= CONSECUTIVE_FAIL_THRESHOLD &&
+        !this.criticalAlertFired
+      ) {
         this.criticalAlertFired = true;
         this.logger.error(
           `CRITICAL: L3 disk write has failed ${this.consecutiveWriteFailures} consecutive times — possible disk full or permission error`,
@@ -69,7 +81,9 @@ export class L3DiskService {
     try {
       fs.appendFileSync(fallbackPath, key + '\n', 'utf-8');
     } catch (err) {
-      this.logger.warn(`appendDirtyFallback: failed for key=${key}: ${String(err)}`);
+      this.logger.warn(
+        `appendDirtyFallback: failed for key=${key}: ${String(err)}`,
+      );
     }
   }
 
@@ -79,7 +93,7 @@ export class L3DiskService {
       if (!fs.existsSync(fallbackPath)) return [];
       const raw = fs.readFileSync(fallbackPath, 'utf-8');
       fs.unlinkSync(fallbackPath);
-      return [...new Set(raw.split('\n').filter(k => k.length > 0))];
+      return [...new Set(raw.split('\n').filter((k) => k.length > 0))];
     } catch (err) {
       this.logger.warn(`drainDirtyFallback: failed: ${String(err)}`);
       return [];
@@ -89,7 +103,8 @@ export class L3DiskService {
   keyCount(): number {
     try {
       if (!fs.existsSync(this.cacheDir)) return 0;
-      return fs.readdirSync(this.cacheDir).filter(f => f.endsWith('.json')).length;
+      return fs.readdirSync(this.cacheDir).filter((f) => f.endsWith('.json'))
+        .length;
     } catch {
       return 0;
     }

@@ -98,7 +98,11 @@ export function imageModelKey(imageModel?: string): string | undefined {
  * translate instead of replaying stale patches. */
 export function renderConfigHash(env: NodeJS.ProcessEnv): string {
   const knobs = Object.keys(env)
-    .filter((k) => k.startsWith('MIT_') || (k.startsWith('LLM_') && k !== 'LLM_API_KEY' && k !== 'LLM_BASE_URL'))
+    .filter(
+      (k) =>
+        k.startsWith('MIT_') ||
+        (k.startsWith('LLM_') && k !== 'LLM_API_KEY' && k !== 'LLM_BASE_URL'),
+    )
     .sort()
     .map((k) => `${k}=${env[k] ?? ''}`)
     .join('\n');
@@ -289,7 +293,9 @@ export function buildMitConfig(
       // #268: re-ground the inpaint's luminance inside the erase mask to the local
       // original surround (per-pixel, pure CPU) → kill the faint "painted band" over
       // dark hair. Strength 0–1. Absent → off, byte-identical.
-      ...(lamaReground !== undefined ? { lama_lum_reground: lamaReground } : {}),
+      ...(lamaReground !== undefined
+        ? { lama_lum_reground: lamaReground }
+        : {}),
       // #268: shrink the erase mask to the ink strokes so LaMa repaints less art.
       ...(flagEnv('MIT_MASK_TIGHTEN') ? { mask_tighten: true } : {}),
       // #268: Poisson seamless-clone the inpaint into the original (escalation lever).
@@ -298,7 +304,9 @@ export function buildMitConfig(
       // swept in; clip the CRF mask to the textlines (boy-ghost); dilate wider on FLAT bg
       // (kills LaMa stroke-stub ghosts). Absent → byte-identical.
       ...(flagEnv('MIT_PROTECT_FIGURES') ? { protect_figures: true } : {}),
-      ...(flagEnv('MIT_RESTRICT_FULLPAGE_MASK') ? { restrict_fullpage_mask: true } : {}),
+      ...(flagEnv('MIT_RESTRICT_FULLPAGE_MASK')
+        ? { restrict_fullpage_mask: true }
+        : {}),
       ...(flagEnv('MIT_ADAPTIVE_DILATE') ? { adaptive_dilate: true } : {}),
     },
     render: {
@@ -361,7 +369,9 @@ export function buildMitConfig(
       // (feathered) patch, byte-identical. (Distinct from the #266 luminance-band attempt
       // that reused this name and was rolled back; this impl is content-footprint based
       // and verified not to fade text on dark backgrounds.)
-      ...(flagEnv('MIT_PATCH_CONTENT_ALPHA') ? { patch_content_alpha: true } : {}),
+      ...(flagEnv('MIT_PATCH_CONTENT_ALPHA')
+        ? { patch_content_alpha: true }
+        : {}),
     },
   });
 }

@@ -57,7 +57,11 @@ describe('L3DiskService', () => {
 
   it('readAll() still parses legacy pretty-printed files', () => {
     const legacy = { ...makeEntry('old-style'), key: 'manga:legacy' };
-    fs.writeFileSync(path.join(tmpDir, 'manga_legacy.json'), JSON.stringify(legacy, null, 2), 'utf-8');
+    fs.writeFileSync(
+      path.join(tmpDir, 'manga_legacy.json'),
+      JSON.stringify(legacy, null, 2),
+      'utf-8',
+    );
 
     expect(service.readAll().get('manga:legacy')?.data).toBe('old-style');
   });
@@ -115,7 +119,10 @@ describe('L3DiskService', () => {
     const renameSpy = jest
       .spyOn(service as any, 'renameFile')
       .mockRejectedValue(new Error('simulated crash during rename'));
-    await service.write('atomic:key', makeEntry('new-value-that-must-not-corrupt'));
+    await service.write(
+      'atomic:key',
+      makeEntry('new-value-that-must-not-corrupt'),
+    );
     renameSpy.mockRestore();
 
     // Final path still holds the complete old content — never a partial write.
@@ -207,7 +214,9 @@ describe('L3DiskService — write watchdog (#45)', () => {
 
   // Cycle W1 — successful write resets the failure counter
   it('write() resets consecutive failure counter on success — no CRITICAL after reset', async () => {
-    const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    const errorSpy = jest
+      .spyOn((svc as any).logger, 'error')
+      .mockImplementation(() => {});
     let shouldFail = false;
     jest.spyOn(svc as any, 'writeFile').mockImplementation(async () => {
       if (shouldFail) throw new Error('disk full');
@@ -231,7 +240,9 @@ describe('L3DiskService — write watchdog (#45)', () => {
 
   // Cycle W2 — CRITICAL log emitted when threshold reached
   it('write() emits a CRITICAL-level log when consecutive failures reach the threshold', async () => {
-    const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    const errorSpy = jest
+      .spyOn((svc as any).logger, 'error')
+      .mockImplementation(() => {});
     jest.spyOn(svc as any, 'writeFile').mockRejectedValue(new Error('ENOSPC'));
 
     for (let i = 0; i < CONSECUTIVE_FAIL_THRESHOLD; i++) {
@@ -243,7 +254,9 @@ describe('L3DiskService — write watchdog (#45)', () => {
 
   // Cycle W3 — CRITICAL log fires exactly once even with many extra failures
   it('write() emits the CRITICAL log exactly once per failure run, not on every failure after threshold', async () => {
-    const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    const errorSpy = jest
+      .spyOn((svc as any).logger, 'error')
+      .mockImplementation(() => {});
     jest.spyOn(svc as any, 'writeFile').mockRejectedValue(new Error('ENOSPC'));
 
     for (let i = 0; i < CONSECUTIVE_FAIL_THRESHOLD + 5; i++) {
@@ -255,7 +268,9 @@ describe('L3DiskService — write watchdog (#45)', () => {
 
   // Cycle W4 — CRITICAL can fire again after successful reset
   it('write() emits CRITICAL again after a successful write resets the consecutive counter', async () => {
-    const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    const errorSpy = jest
+      .spyOn((svc as any).logger, 'error')
+      .mockImplementation(() => {});
     let shouldFail = true;
     jest.spyOn(svc as any, 'writeFile').mockImplementation(async () => {
       if (shouldFail) throw new Error('ENOSPC');

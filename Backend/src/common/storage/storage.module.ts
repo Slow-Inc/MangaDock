@@ -51,7 +51,10 @@ export function createStorageProvider(
       );
     }
     logger.log(`storage backend: Cloudflare R2 (driver=${driver ?? 'auto'})`);
-    return new CloudflareR2StorageProvider(workerUrl as string, workerSecret as string);
+    return new CloudflareR2StorageProvider(
+      workerUrl as string,
+      workerSecret as string,
+    );
   }
 
   logger.log(`storage backend: local disk (driver=${driver ?? 'auto'})`);
