@@ -67,7 +67,7 @@ export default function SecuritySettingsPage() {
     if (!setupCompletedRef.current) {
       try {
         const { data } = await supabase.auth.mfa.listFactors();
-        const unverified = data?.totp?.filter((f) => f.status === "unverified") ?? [];
+        const unverified = data?.totp?.filter((f) => f.status !== "verified") ?? [];
         await Promise.all(unverified.map((f) => unenrollTotp(f.id)));
       } catch {
         // non-critical — Supabase auto-expires unverified factors eventually
