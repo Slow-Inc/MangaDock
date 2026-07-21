@@ -72,7 +72,8 @@ export class MitWebhookController {
     // _runMitBatch reads the same flat shape). Adapt it here into the structured `result`
     // object that handleMitCallback expects — this controller is the anti-corruption layer
     // between MIT's wire format and the service's domain shape.
-    const { taskId, pageIndex, imgWidth, imgHeight, patches, regions, error } = body;
+    const { taskId, pageIndex, imgWidth, imgHeight, patches, regions, error } =
+      body;
 
     if (!taskId) {
       throw new HttpException(

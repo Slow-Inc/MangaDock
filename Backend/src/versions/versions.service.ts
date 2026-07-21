@@ -9,7 +9,10 @@ import * as crypto from 'crypto';
 import * as path from 'path';
 import { SupabaseService } from '../supabase/supabase.service';
 import type { ChapterVersion, VersionStatus } from './versions.types';
-import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import {
+  STORAGE_PROVIDER,
+  type StorageProvider,
+} from '../common/storage/storage-provider.interface';
 
 type ChapterVersionRow = {
   version_id: string;
@@ -53,7 +56,9 @@ export class VersionsService {
    * During local multi-machine development, DB rows may exist without the
    * uploaded files being present on this backend instance yet.
    */
-  private async isVersionAvailableOnBackend(row: ChapterVersionRow): Promise<boolean> {
+  private async isVersionAvailableOnBackend(
+    row: ChapterVersionRow,
+  ): Promise<boolean> {
     // Remote/shared storage (R2): files are globally available; the local-presence
     // check is meaningless and would cost one network round-trip per version row.
     if (this.storage.isRemote) return true;
@@ -78,7 +83,9 @@ export class VersionsService {
     // list endpoint maps every row, so per-page round-trips multiply fast
     // (and would be ~100ms each on the planned R2 adapter).
     try {
-      const present = new Set(await this.storage.list(this.versionDir(row.version_id)));
+      const present = new Set(
+        await this.storage.list(this.versionDir(row.version_id)),
+      );
       return localNames.every((name) => present.has(name));
     } catch {
       return false; // directory missing on this node
@@ -123,7 +130,9 @@ export class VersionsService {
     priceCoins?: number;
   }): Promise<ChapterVersion> {
     if (!data.titleId || !data.language || !data.translatorUid) {
-      throw new BadRequestException('titleId, language, and translatorUid are required');
+      throw new BadRequestException(
+        'titleId, language, and translatorUid are required',
+      );
     }
 
     const chapterId = data.chapterId || crypto.randomUUID();
@@ -154,10 +163,14 @@ export class VersionsService {
       .single<ChapterVersionRow>();
 
     if (error || !inserted) {
-      throw new Error(`Failed to create chapter version: ${error?.message ?? 'unknown error'}`);
+      throw new Error(
+        `Failed to create chapter version: ${error?.message ?? 'unknown error'}`,
+      );
     }
 
-    this.logger.log(`Created chapter version ${inserted.version_id} for translator ${data.translatorUid}`);
+    this.logger.log(
+      `Created chapter version ${inserted.version_id} for translator ${data.translatorUid}`,
+    );
     return await this.mapRow(inserted);
   }
 
@@ -171,7 +184,8 @@ export class VersionsService {
     if (error) {
       throw new Error(`Failed to fetch chapter version: ${error.message}`);
     }
-    if (!data) throw new NotFoundException(`Chapter version ${versionId} not found`);
+    if (!data)
+      throw new NotFoundException(`Chapter version ${versionId} not found`);
     return await this.mapRow(data);
   }
 
@@ -187,7 +201,9 @@ export class VersionsService {
       throw new Error(`Failed to list chapter versions: ${error.message}`);
     }
 
-    return await Promise.all((data ?? []).map((row) => this.mapRow(row as ChapterVersionRow)));
+    return await Promise.all(
+      (data ?? []).map((row) => this.mapRow(row as ChapterVersionRow)),
+    );
   }
 
   async listVersionsByTitle(titleId: string): Promise<ChapterVersion[]> {
@@ -201,11 +217,18 @@ export class VersionsService {
       throw new Error(`Failed to list title versions: ${error.message}`);
     }
 
-    const versions = await Promise.all((data ?? []).map((row) => this.mapRow(row as ChapterVersionRow)));
-    return versions.sort((a, b) => (parseFloat(a.chapterNumber) || 0) - (parseFloat(b.chapterNumber) || 0));
+    const versions = await Promise.all(
+      (data ?? []).map((row) => this.mapRow(row as ChapterVersionRow)),
+    );
+    return versions.sort(
+      (a, b) =>
+        (parseFloat(a.chapterNumber) || 0) - (parseFloat(b.chapterNumber) || 0),
+    );
   }
 
-  async listVersionsByTranslator(translatorUid: string): Promise<ChapterVersion[]> {
+  async listVersionsByTranslator(
+    translatorUid: string,
+  ): Promise<ChapterVersion[]> {
     const { data, error } = await this.db
       .from('chapter_versions')
       .select('*')
@@ -214,13 +237,19 @@ export class VersionsService {
       .limit(50);
 
     if (error) {
-      throw new Error(`Failed to list versions by translator: ${error.message}`);
+      throw new Error(
+        `Failed to list versions by translator: ${error.message}`,
+      );
     }
 
-    return await Promise.all((data ?? []).map((row) => this.mapRow(row as ChapterVersionRow)));
+    return await Promise.all(
+      (data ?? []).map((row) => this.mapRow(row as ChapterVersionRow)),
+    );
   }
 
-  async listPublishedVersionsByTranslator(translatorUid: string): Promise<Omit<ChapterVersion, 'pages'>[]> {
+  async listPublishedVersionsByTranslator(
+    translatorUid: string,
+  ): Promise<Omit<ChapterVersion, 'pages'>[]> {
     const { data, error } = await this.db
       .from('chapter_versions')
       .select('*')
@@ -230,23 +259,33 @@ export class VersionsService {
       .limit(50);
 
     if (error) {
-      throw new Error(`Failed to list published versions by translator: ${error.message}`);
+      throw new Error(
+        `Failed to list published versions by translator: ${error.message}`,
+      );
     }
 
-    return await Promise.all((data ?? []).map(async (row) => {
-      const version = await this.mapRow(row as ChapterVersionRow);
-      const { pages: _pages, ...rest } = version;
-      return rest;
-    }));
+    return await Promise.all(
+      (data ?? []).map(async (row) => {
+        const version = await this.mapRow(row as ChapterVersionRow);
+        const { pages: _pages, ...rest } = version;
+        return rest;
+      }),
+    );
   }
 
-  async setPages(versionId: string, translatorUid: string, pages: string[]): Promise<void> {
+  async setPages(
+    versionId: string,
+    translatorUid: string,
+    pages: string[],
+  ): Promise<void> {
     const version = await this.getVersion(versionId);
     if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
     if (version.status !== 'draft' && version.status !== 'published') {
-      throw new BadRequestException('Pages can only be updated on draft or published versions');
+      throw new BadRequestException(
+        'Pages can only be updated on draft or published versions',
+      );
     }
 
     const { error } = await this.db
@@ -262,20 +301,27 @@ export class VersionsService {
     }
   }
 
-  async updateStatus(versionId: string, translatorUid: string, status: VersionStatus): Promise<void> {
+  async updateStatus(
+    versionId: string,
+    translatorUid: string,
+    status: VersionStatus,
+  ): Promise<void> {
     const version = await this.getVersion(versionId);
     if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
 
-    const allowedTransitions: Partial<Record<VersionStatus, VersionStatus[]>> = {
-      draft: ['pending_moderation', 'published'],
-      rejected: ['draft'],
-      published: ['draft'],
-    };
+    const allowedTransitions: Partial<Record<VersionStatus, VersionStatus[]>> =
+      {
+        draft: ['pending_moderation', 'published'],
+        rejected: ['draft'],
+        published: ['draft'],
+      };
 
     if (!allowedTransitions[version.status]?.includes(status)) {
-      throw new BadRequestException(`Cannot transition from ${version.status} to ${status}`);
+      throw new BadRequestException(
+        `Cannot transition from ${version.status} to ${status}`,
+      );
     }
     if (status === 'pending_moderation' && version.pages.length === 0) {
       throw new BadRequestException('Cannot submit a version with no pages');
@@ -299,25 +345,38 @@ export class VersionsService {
   async updateMetadata(
     versionId: string,
     translatorUid: string,
-    data: { description?: string; priceCoins?: number; titleAltName?: string; chapterTitle?: string; chapterNumber?: string; },
+    data: {
+      description?: string;
+      priceCoins?: number;
+      titleAltName?: string;
+      chapterTitle?: string;
+      chapterNumber?: string;
+    },
   ): Promise<void> {
     const version = await this.getVersion(versionId);
     if (version.translatorUid !== translatorUid) {
       throw new BadRequestException('You do not own this chapter version');
     }
     if (version.status !== 'draft' && version.status !== 'published') {
-      throw new BadRequestException('Metadata can only be updated on draft or published versions');
+      throw new BadRequestException(
+        'Metadata can only be updated on draft or published versions',
+      );
     }
 
     const update: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
-    if (data.description !== undefined) update['description'] = data.description.trim().slice(0, 1000);
-    if (data.titleAltName !== undefined) update['title_alt_name'] = data.titleAltName;
-    if (data.chapterTitle !== undefined) update['chapter_title'] = data.chapterTitle;
-    if (data.chapterNumber !== undefined) update['chapter_number'] = data.chapterNumber;
+    if (data.description !== undefined)
+      update['description'] = data.description.trim().slice(0, 1000);
+    if (data.titleAltName !== undefined)
+      update['title_alt_name'] = data.titleAltName;
+    if (data.chapterTitle !== undefined)
+      update['chapter_title'] = data.chapterTitle;
+    if (data.chapterNumber !== undefined)
+      update['chapter_number'] = data.chapterNumber;
     if (data.priceCoins !== undefined) {
-      if (data.priceCoins < 0) throw new BadRequestException('priceCoins cannot be negative');
+      if (data.priceCoins < 0)
+        throw new BadRequestException('priceCoins cannot be negative');
       update['price_coins'] = Math.floor(data.priceCoins);
     }
 

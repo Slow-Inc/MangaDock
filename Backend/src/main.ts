@@ -20,7 +20,10 @@ function setupFileLogging(): void {
 
   const today = () => new Date().toISOString().split('T')[0]; // YYYY-MM-DD
   const openStream = (date: string) =>
-    fs.createWriteStream(path.join(logsDir, `backend-${date}.log`), { flags: 'a', encoding: 'utf8' });
+    fs.createWriteStream(path.join(logsDir, `backend-${date}.log`), {
+      flags: 'a',
+      encoding: 'utf8',
+    });
 
   // The target file follows the calendar date (#139): long-running dev servers
   // used to keep writing to the boot-day file after midnight.
@@ -28,7 +31,9 @@ function setupFileLogging(): void {
   let stream = openStream(currentDate);
 
   // Write session separator so multiple restarts are distinguishable in the file
-  stream.write(`\n${'='.repeat(72)}\n[session start] ${new Date().toISOString()}\n${'='.repeat(72)}\n`);
+  stream.write(
+    `\n${'='.repeat(72)}\n[session start] ${new Date().toISOString()}\n${'='.repeat(72)}\n`,
+  );
 
   const stripAnsi = (s: string) => s.replace(/\x1b\[[\d;]*[A-Za-z]/g, '');
   const writeLog = (text: string) => {
@@ -44,7 +49,9 @@ function setupFileLogging(): void {
   for (const pipe of [process.stdout, process.stderr] as NodeJS.WriteStream[]) {
     const orig = pipe.write.bind(pipe);
     (pipe as any).write = (chunk: any, ...args: any[]): boolean => {
-      const text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+      const text = Buffer.isBuffer(chunk)
+        ? chunk.toString('utf8')
+        : String(chunk);
       writeLog(text);
       return orig(chunk, ...args);
     };
@@ -64,7 +71,9 @@ async function bootstrap() {
   resolveXenditWebhookConfig(process.env, new Logger('XenditWebhook'));
 
   // Disable built-in 100KB body-parser limit; MIT webhook bodies contain base64 PNG patches (~1-3MB).
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
   // verify hook captures the raw request bytes so the MIT webhook controller can
   // check the HMAC over exactly what MIT signed (#95 S1) — re-serializing the
   // parsed body is not byte-stable across JSON implementations.
@@ -77,7 +86,7 @@ async function bootstrap() {
     }),
   );
   app.use(urlencoded({ extended: true, limit: '50mb' }));
-  
+
   const httpAdapterHost = app.get(HttpAdapterHost);
   app.useGlobalFilters(new AllExceptionsFilter(httpAdapterHost));
   app.useGlobalInterceptors(new StructuredLoggingInterceptor());

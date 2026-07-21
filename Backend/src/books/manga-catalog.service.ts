@@ -30,11 +30,17 @@ export class MangaCatalogService {
     private readonly cache: CacheOrchestratorService,
   ) {}
 
-  getMangaChapters(mangaId: string, forceLocal = false): Promise<MangaChapter[]> {
+  getMangaChapters(
+    mangaId: string,
+    forceLocal = false,
+  ): Promise<MangaChapter[]> {
     return this.mangaDex.getMangaChapters(mangaId, forceLocal);
   }
 
-  getMangaChapterPages(chapterId: string, forceLocal = false): Promise<MangaChapterPages | null> {
+  getMangaChapterPages(
+    chapterId: string,
+    forceLocal = false,
+  ): Promise<MangaChapterPages | null> {
     return this.mangaDex.getMangaChapterPages(chapterId, forceLocal);
   }
 
@@ -67,7 +73,12 @@ export class MangaCatalogService {
     const tagId = await this.mangaDex.getMangaTagId(genres[0]);
     if (!tagId) return [];
 
-    const { items } = await this.mangaDex.fetchMangaForRow('rating', limit + 1, 0, tagId);
+    const { items } = await this.mangaDex.fetchMangaForRow(
+      'rating',
+      limit + 1,
+      0,
+      tagId,
+    );
     return items.filter((b) => b.id !== id).slice(0, limit);
   }
 
@@ -82,15 +93,29 @@ export class MangaCatalogService {
   ): Promise<{ items: LandingBook[]; total: number }> {
     const cacheKey = `${QUERY_CACHE_PREFIX}${query
       .toLowerCase()
-      .replace(/\s+/g, '_')}${lang ? `:${lang}` : ''}${status ? `:${status}` : ''}${yearFrom != null ? `:y${yearFrom}` : ''}${yearTo != null ? `:y${yearTo}` : ''}:${offset}:${limit}`;
+      .replace(
+        /\s+/g,
+        '_',
+      )}${lang ? `:${lang}` : ''}${status ? `:${status}` : ''}${yearFrom != null ? `:y${yearFrom}` : ''}${yearTo != null ? `:y${yearTo}` : ''}:${offset}:${limit}`;
 
-    const cached = await this.cache.get<{ items: LandingBook[]; total: number }>(cacheKey);
+    const cached = await this.cache.get<{
+      items: LandingBook[];
+      total: number;
+    }>(cacheKey);
     if (cached) {
-      this.logger.log(`Search served from [${cached.source}] cache: "${query}" offset=${offset}`);
+      this.logger.log(
+        `Search served from [${cached.source}] cache: "${query}" offset=${offset}`,
+      );
       return cached.data;
     }
 
-    const result = await this.mangaDex.searchManga(query, lang, limit, offset, status);
+    const result = await this.mangaDex.searchManga(
+      query,
+      lang,
+      limit,
+      offset,
+      status,
+    );
 
     // Enhance: also match user-uploaded alt names in chapter_versions
     try {
@@ -101,7 +126,9 @@ export class MangaCatalogService {
         const extra = await this.mangaDex.fetchMangaByIds(newIds);
         result.items.push(...extra);
         result.total += extra.length;
-        this.logger.log(`Alt-name search added ${extra.length} extra manga for "${query}"`);
+        this.logger.log(
+          `Alt-name search added ${extra.length} extra manga for "${query}"`,
+        );
       }
     } catch (err) {
       this.logger.warn(`Alt-name lookup failed: ${String(err)}`);

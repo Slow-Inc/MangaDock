@@ -11,7 +11,10 @@
  */
 import { MangaDexService } from './mangadex.service';
 
-function makeService(opts: { enabled: boolean; chapters?: Array<{ id: string; pageCount: number }> }) {
+function makeService(opts: {
+  enabled: boolean;
+  chapters?: Array<{ id: string; pageCount: number }>;
+}) {
   const chapters = opts.chapters ?? [
     { id: 'c1', pageCount: 1 },
     { id: 'c2', pageCount: 1 },
@@ -35,7 +38,9 @@ describe('MangaDexService readerAvailable — R2 /v1/list gating (hotfix)', () =
   });
 
   it('fans out one hasChapterCache per chapter only when forceLocal=true', async () => {
-    const { service, hasChapterCache, chapters } = makeService({ enabled: true });
+    const { service, hasChapterCache, chapters } = makeService({
+      enabled: true,
+    });
     const out = await service.getMangaChapters('manga-1', true);
     expect(hasChapterCache).toHaveBeenCalledTimes(chapters.length);
     expect(out.every((c: any) => c.readerAvailable === true)).toBe(true);

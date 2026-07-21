@@ -2,14 +2,20 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { Readable } from 'stream';
-import { Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Logger,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { fileTypeFromFile } from 'file-type';
 import { saveValidatedImage } from './save-validated-image';
 import type { StorageProvider } from './storage-provider.interface';
 
 const mockFileType = fileTypeFromFile as jest.Mock;
 
-function makeStorage(overrides: Partial<StorageProvider> = {}): StorageProvider {
+function makeStorage(
+  overrides: Partial<StorageProvider> = {},
+): StorageProvider {
   return {
     isRemote: false,
     put: jest.fn().mockResolvedValue(undefined),
@@ -26,7 +32,10 @@ describe('saveValidatedImage', () => {
   let tempFilePath: string;
 
   beforeEach(() => {
-    tempFilePath = path.join(os.tmpdir(), `save-validated-image-${Date.now()}-${Math.random()}.tmp`);
+    tempFilePath = path.join(
+      os.tmpdir(),
+      `save-validated-image-${Date.now()}-${Math.random()}.tmp`,
+    );
     fs.writeFileSync(tempFilePath, 'fake-image-bytes');
     mockFileType.mockReset();
   });
@@ -64,7 +73,11 @@ describe('saveValidatedImage', () => {
     mockFileType.mockResolvedValueOnce({ mime: 'image/webp', ext: 'jpg' });
     const storage = makeStorage();
 
-    const result = await saveValidatedImage(storage, tempFilePath, 'uploads/covers');
+    const result = await saveValidatedImage(
+      storage,
+      tempFilePath,
+      'uploads/covers',
+    );
 
     expect(storage.put).toHaveBeenCalledTimes(1);
     const [key, data, options] = (storage.put as jest.Mock).mock.calls[0];
@@ -79,8 +92,12 @@ describe('saveValidatedImage', () => {
 
   it('throws InternalServerErrorException, logs, and deletes the temp file when storage.put rejects', async () => {
     mockFileType.mockResolvedValueOnce({ mime: 'image/png', ext: 'png' });
-    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    const storage = makeStorage({ put: jest.fn().mockRejectedValue(new Error('disk full')) });
+    const errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    const storage = makeStorage({
+      put: jest.fn().mockRejectedValue(new Error('disk full')),
+    });
 
     await expect(
       saveValidatedImage(storage, tempFilePath, 'uploads'),
@@ -97,17 +114,25 @@ describe('saveValidatedImage', () => {
     const storage = makeStorage();
 
     await expect(
-      saveValidatedImage(storage, tempFilePath, 'uploads', { rejectMessage: 'nope' }),
+      saveValidatedImage(storage, tempFilePath, 'uploads', {
+        rejectMessage: 'nope',
+      }),
     ).rejects.toThrow('nope');
   });
 
   it('uses opts.storageErrorMessage to override the default InternalServerErrorException message', async () => {
     mockFileType.mockResolvedValueOnce({ mime: 'image/gif', ext: 'gif' });
-    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    const storage = makeStorage({ put: jest.fn().mockRejectedValue(new Error('boom')) });
+    const errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    const storage = makeStorage({
+      put: jest.fn().mockRejectedValue(new Error('boom')),
+    });
 
     await expect(
-      saveValidatedImage(storage, tempFilePath, 'uploads', { storageErrorMessage: 'custom failure' }),
+      saveValidatedImage(storage, tempFilePath, 'uploads', {
+        storageErrorMessage: 'custom failure',
+      }),
     ).rejects.toThrow('custom failure');
 
     errorSpy.mockRestore();
@@ -115,8 +140,12 @@ describe('saveValidatedImage', () => {
 
   it('throws a plain Error (not InternalServerErrorException) when storageErrorAsPlainError is true, and still deletes the temp file', async () => {
     mockFileType.mockResolvedValueOnce({ mime: 'image/png', ext: 'png' });
-    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    const storage = makeStorage({ put: jest.fn().mockRejectedValue(new Error('disk full')) });
+    const errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    const storage = makeStorage({
+      put: jest.fn().mockRejectedValue(new Error('disk full')),
+    });
 
     let caught: unknown;
     try {
@@ -138,7 +167,9 @@ describe('saveValidatedImage', () => {
 
   it('guards the orphaned read stream when storage.put throws synchronously without consuming it (missing temp path never crashes the process)', async () => {
     mockFileType.mockResolvedValueOnce({ mime: 'image/png', ext: 'png' });
-    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
     // storage.put throws BEFORE consuming its stream argument, simulating a provider
     // that never attaches its own error handler to the (now orphaned) ReadStream.
     const storage = makeStorage({
@@ -149,7 +180,10 @@ describe('saveValidatedImage', () => {
     // Non-existent path: fs.createReadStream(...) will asynchronously emit ENOENT
     // on the orphaned stream. Without the guard this is an unhandled 'error' event
     // that crashes the test process.
-    const missingPath = path.join(os.tmpdir(), `save-validated-image-missing-${Date.now()}-${Math.random()}.tmp`);
+    const missingPath = path.join(
+      os.tmpdir(),
+      `save-validated-image-missing-${Date.now()}-${Math.random()}.tmp`,
+    );
 
     await expect(
       saveValidatedImage(storage, missingPath, 'uploads'),

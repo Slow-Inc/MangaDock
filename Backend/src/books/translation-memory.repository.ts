@@ -43,12 +43,16 @@ export class TranslationMemoryRepository {
           { onConflict: 'chapter_id,page_index,target_lang' },
         );
       if (error) {
-        this.logger.warn(`savePageText failed (${chapterId} p${pageIndex}): ${error.message}`);
+        this.logger.warn(
+          `savePageText failed (${chapterId} p${pageIndex}): ${error.message}`,
+        );
         return false;
       }
       return true;
     } catch (e) {
-      this.logger.warn(`savePageText threw (${chapterId} p${pageIndex}): ${String(e)}`);
+      this.logger.warn(
+        `savePageText threw (${chapterId} p${pageIndex}): ${String(e)}`,
+      );
       return false;
     }
   }
@@ -85,12 +89,16 @@ export class TranslationMemoryRepository {
           { onConflict: 'manga_id,target_lang' },
         );
       if (error) {
-        this.logger.warn(`upsertGlossary failed (${mangaId}/${targetLang}): ${error.message}`);
+        this.logger.warn(
+          `upsertGlossary failed (${mangaId}/${targetLang}): ${error.message}`,
+        );
         return false;
       }
       return true;
     } catch (e) {
-      this.logger.warn(`upsertGlossary threw (${mangaId}/${targetLang}): ${String(e)}`);
+      this.logger.warn(
+        `upsertGlossary threw (${mangaId}/${targetLang}): ${String(e)}`,
+      );
       return false;
     }
   }

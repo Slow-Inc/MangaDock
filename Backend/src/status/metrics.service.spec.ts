@@ -1,7 +1,9 @@
 import { MetricsService } from './metrics.service';
 import { RedisService } from '../cache/redis.service';
 
-const drainMicrotasks = async (n = 10) => { for (let i = 0; i < n; i++) await Promise.resolve(); };
+const drainMicrotasks = async (n = 10) => {
+  for (let i = 0; i < n; i++) await Promise.resolve();
+};
 
 function makeRedis(): jest.Mocked<Pick<RedisService, 'set'>> {
   return { set: jest.fn().mockResolvedValue(undefined) };
@@ -20,7 +22,8 @@ function makeService(redis: ReturnType<typeof makeRedis>): MetricsService {
   return svc;
 }
 
-const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_V4_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 describe('MetricsService — nodeId (#42)', () => {
   // Cycle 1 — nodeId embeds a UUID v4 segment for global uniqueness across containers
@@ -57,14 +60,31 @@ describe('MetricsService', () => {
 
       // Never-resolving stub: first call hangs indefinitely
       let resolveFirst!: () => void;
-      const firstDone = new Promise<void>(r => { resolveFirst = r; });
-      jest.spyOn(svc, 'gatherMetrics')
-        .mockImplementationOnce(() => firstDone.then(() => ({ nodeId: svc.nodeId, cpu: 0, freeMem: 0, latency: 0, timestamp: 0 })))
-        .mockResolvedValue({ nodeId: svc.nodeId, cpu: 0, freeMem: 0, latency: 0, timestamp: 0 });
+      const firstDone = new Promise<void>((r) => {
+        resolveFirst = r;
+      });
+      jest
+        .spyOn(svc, 'gatherMetrics')
+        .mockImplementationOnce(() =>
+          firstDone.then(() => ({
+            nodeId: svc.nodeId,
+            cpu: 0,
+            freeMem: 0,
+            latency: 0,
+            timestamp: 0,
+          })),
+        )
+        .mockResolvedValue({
+          nodeId: svc.nodeId,
+          cpu: 0,
+          freeMem: 0,
+          latency: 0,
+          timestamp: 0,
+        });
 
       const p1 = svc.publishMetrics(); // first call — hangs
       const p2 = svc.publishMetrics(); // second call — should be skipped
-      await p2;                        // skipped call resolves immediately
+      await p2; // skipped call resolves immediately
 
       expect(redis.set).not.toHaveBeenCalled(); // first still in flight, second skipped
 

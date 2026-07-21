@@ -29,7 +29,12 @@ describe('JsonCacheService — L1 in-memory only', () => {
 
   // Cycle 8 — onModuleInit() warms L1 from L3
   it('onModuleInit() loads entries written to L3 into L1 memory', async () => {
-    const entry = { key: 'disk:key', data: 'from disk', updatedAt: new Date().toISOString(), ttlMs: 60_000 };
+    const entry = {
+      key: 'disk:key',
+      data: 'from disk',
+      updatedAt: new Date().toISOString(),
+      ttlMs: 60_000,
+    };
     await l3.write('disk:key', entry);
 
     const freshJc = new JsonCacheService(l3);

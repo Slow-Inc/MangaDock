@@ -1,4 +1,7 @@
-import { generateClearanceToken, verifyClearanceToken } from './turnstile.guard';
+import {
+  generateClearanceToken,
+  verifyClearanceToken,
+} from './turnstile.guard';
 
 const SECRET = 'test-secret-key';
 const HWID = 'device-abc123';
@@ -39,7 +42,10 @@ describe('TurnstileGuard — token helpers', () => {
       const expiredTime = Date.now() - 1000;
       const data = `${expiredTime}:${HWID}`;
       const crypto = require('crypto');
-      const hmac = crypto.createHmac('sha256', SECRET).update(data).digest('hex');
+      const hmac = crypto
+        .createHmac('sha256', SECRET)
+        .update(data)
+        .digest('hex');
       const token = `${data}.${hmac}`;
       expect(verifyClearanceToken(token, SECRET, HWID)).toBe(false);
     });

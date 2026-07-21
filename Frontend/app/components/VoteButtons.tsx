@@ -88,41 +88,39 @@ export default function VoteButtons({
   };
 
   return (
-    <div className="flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10 smooth-hover">
+    <div className="flex items-center gap-1">
       <button
         onClick={() => handleVote(1)}
         disabled={loading}
         aria-label="โหวตขึ้น"
-        className={`p-3 rounded-full smooth-hover-fast ${
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border smooth-hover-fast transition-colors ${
           userVote === 1
-            ? "text-amber-400 bg-amber-400/10"
-            : "text-white/60 hover:text-white hover:bg-white/10"
+            ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
+            : "text-white/40 border-transparent hover:text-white/70 hover:bg-white/[0.06] hover:border-white/10"
         }`}
       >
-        <svg aria-hidden="true" className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <svg aria-hidden="true" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
         </svg>
+        <span>{upvotes}</span>
       </button>
 
-      <span className={`text-xs font-bold min-w-[1.5rem] text-center smooth-hover-fast ${
-        userVote === 1 ? "text-amber-400" : userVote === -1 ? "text-indigo-400" : "text-white/80"
-      }`}>
-        {upvotes - downvotes}
-      </span>
+      <div className="w-px h-3.5 bg-white/10 shrink-0" />
 
       <button
         onClick={() => handleVote(-1)}
         disabled={loading}
         aria-label="โหวตลง"
-        className={`p-3 rounded-full smooth-hover-fast ${
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border smooth-hover-fast transition-colors ${
           userVote === -1
-            ? "text-indigo-400 bg-indigo-400/10"
-            : "text-white/60 hover:text-white hover:bg-white/10"
+            ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/25"
+            : "text-white/40 border-transparent hover:text-white/70 hover:bg-white/[0.06] hover:border-white/10"
         }`}
       >
-        <svg aria-hidden="true" className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <svg aria-hidden="true" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
         </svg>
+        <span>{downvotes}</span>
       </button>
     </div>
   );

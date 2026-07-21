@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ElectionService } from '../status/election.service';
 import { RedisService } from './redis.service';
 import { L3DiskService } from './l3-disk.service';
@@ -41,7 +46,10 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     this.timer = setInterval(
-      () => this.flush().catch(err => this.logger.warn(`Flush error: ${String(err)}`)),
+      () =>
+        this.flush().catch((err) =>
+          this.logger.warn(`Flush error: ${String(err)}`),
+        ),
       FLUSH_INTERVAL_MS,
     ).unref();
   }
@@ -64,9 +72,16 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     const client = await this.redis.getClient();
     if (!client) return;
     try {
-      const count = await (client as any).eval(RECOVER_SCRIPT, 2, PROCESSING_QUEUE, DIRTY_QUEUE) as number;
+      const count = (await (client as any).eval(
+        RECOVER_SCRIPT,
+        2,
+        PROCESSING_QUEUE,
+        DIRTY_QUEUE,
+      )) as number;
       if (count > 0) {
-        this.logger.warn(`Crash recovery: atomically re-queued ${count} orphaned key(s) → ${DIRTY_QUEUE}`);
+        this.logger.warn(
+          `Crash recovery: atomically re-queued ${count} orphaned key(s) → ${DIRTY_QUEUE}`,
+        );
       }
     } catch (err) {
       this.logger.warn(`Crash recovery failed: ${String(err)}`);
@@ -89,7 +104,10 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
 
     const seen = new Set<string>();
     for (let i = 0; i < MAX_BATCH_SIZE; i++) {
-      const key: string | null = await (client as any).rpoplpush(DIRTY_QUEUE, PROCESSING_QUEUE);
+      const key: string | null = await (client as any).rpoplpush(
+        DIRTY_QUEUE,
+        PROCESSING_QUEUE,
+      );
       if (!key) break;
       if (seen.has(key)) {
         // Duplicate in queue — remove extra processing entry immediately to avoid orphan on crash
@@ -112,7 +130,7 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     const raw = await this.redis.get(key);
     if (!raw) {
       await client.lrem(PROCESSING_QUEUE, 1, key); // expired — ack to prevent permanent orphan
-      await client.hdel(RETRY_COUNTS_KEY, key);    // cleanup stale retry counter
+      await client.hdel(RETRY_COUNTS_KEY, key); // cleanup stale retry counter
       return;
     }
 
@@ -120,7 +138,9 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     try {
       entry = JSON.parse(raw) as CacheEntry<unknown>;
     } catch {
-      this.logger.warn(`BatchSync: corrupt Redis entry key=${key} — acking to prevent orphan`);
+      this.logger.warn(
+        `BatchSync: corrupt Redis entry key=${key} — acking to prevent orphan`,
+      );
       await client.lrem(PROCESSING_QUEUE, 1, key);
       return;
     }
@@ -128,17 +148,21 @@ export class BatchSyncWorker implements OnModuleInit, OnModuleDestroy {
     await this.l3.write(key, entry);
 
     try {
-      const { error } = await this.supabase.client.rpc(CACHE_SYNC_RPC, {
+      const { error } = (await this.supabase.client.rpc(CACHE_SYNC_RPC, {
         p_key: key,
         p_data: entry.data,
         p_updated_at: entry.updatedAt,
         p_ttl_ms: entry.ttlMs,
-      }) as { error: Error | null };
+      })) as { error: Error | null };
       if (error) throw error;
       await client.hdel(RETRY_COUNTS_KEY, key); // reset consecutive-failure counter on success
       await client.lrem(PROCESSING_QUEUE, 1, key);
     } catch (err) {
-      const retryCount = await client.hincrby(RETRY_COUNTS_KEY, key, 1) as number;
+      const retryCount = (await client.hincrby(
+        RETRY_COUNTS_KEY,
+        key,
+        1,
+      )) as number;
       if (retryCount >= MAX_RETRIES) {
         await client.sadd(DEAD_LETTER_SET, key);
         await client.lrem(PROCESSING_QUEUE, 1, key);

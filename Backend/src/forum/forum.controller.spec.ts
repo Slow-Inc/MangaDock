@@ -8,7 +8,11 @@ import { ForumEventsService } from './forum-events.service';
 import { AuthGuard, USER_KEY, UID_KEY } from '../auth/auth.guard';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard';
 
-const TEST_USER = { uid: 'test-uid', email: 'test@test.com', name: 'Test User' };
+const TEST_USER = {
+  uid: 'test-uid',
+  email: 'test@test.com',
+  name: 'Test User',
+};
 
 const MOCK_POST = {
   id: 'p1',
@@ -93,8 +97,13 @@ describe('ForumController', () => {
 
   describe('GET /forum/posts', () => {
     it('should return a list of posts with total count', async () => {
-      mockForumService.listPosts.mockResolvedValue({ items: [MOCK_POST], total: 1 });
-      const res = await request(app.getHttpServer()).get('/forum/posts').expect(200);
+      mockForumService.listPosts.mockResolvedValue({
+        items: [MOCK_POST],
+        total: 1,
+      });
+      const res = await request(app.getHttpServer())
+        .get('/forum/posts')
+        .expect(200);
       expect(res.body.items).toHaveLength(1);
       expect(res.body.items[0].id).toBe('p1');
       expect(res.body.total).toBe(1);
@@ -106,7 +115,13 @@ describe('ForumController', () => {
         .get('/forum/posts?category=general&sort=new&limit=10&offset=20')
         .expect(200);
       expect(mockForumService.listPosts).toHaveBeenCalledWith(
-        'general', undefined, 'new', 10, 20, TEST_USER.uid, undefined,
+        'general',
+        undefined,
+        'new',
+        10,
+        20,
+        TEST_USER.uid,
+        undefined,
       );
     });
 
@@ -114,7 +129,13 @@ describe('ForumController', () => {
       mockForumService.listPosts.mockResolvedValue({ items: [], total: 0 });
       await request(app.getHttpServer()).get('/forum/posts').expect(200);
       expect(mockForumService.listPosts).toHaveBeenCalledWith(
-        undefined, undefined, 'hot', 20, 0, TEST_USER.uid, undefined,
+        undefined,
+        undefined,
+        'hot',
+        20,
+        0,
+        TEST_USER.uid,
+        undefined,
       );
     });
 
@@ -124,7 +145,13 @@ describe('ForumController', () => {
         .get('/forum/posts?authorUid=some-author-uid')
         .expect(200);
       expect(mockForumService.listPosts).toHaveBeenCalledWith(
-        undefined, undefined, 'hot', 20, 0, TEST_USER.uid, 'some-author-uid',
+        undefined,
+        undefined,
+        'hot',
+        20,
+        0,
+        TEST_USER.uid,
+        'some-author-uid',
       );
     });
   });
@@ -137,14 +164,18 @@ describe('ForumController', () => {
         { mangaId: 'm1', mangaTitle: 'One Piece', postCount: 42 },
         { mangaId: 'm2', mangaTitle: 'Naruto', postCount: 30 },
       ]);
-      const res = await request(app.getHttpServer()).get('/forum/trending-manga').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/forum/trending-manga')
+        .expect(200);
       expect(res.body).toHaveLength(2);
       expect(mockForumService.getTrendingManga).toHaveBeenCalledWith(5);
     });
 
     it('should respect custom limit query param', async () => {
       mockForumService.getTrendingManga.mockResolvedValue([]);
-      await request(app.getHttpServer()).get('/forum/trending-manga?limit=3').expect(200);
+      await request(app.getHttpServer())
+        .get('/forum/trending-manga?limit=3')
+        .expect(200);
       expect(mockForumService.getTrendingManga).toHaveBeenCalledWith(3);
     });
   });
@@ -154,7 +185,9 @@ describe('ForumController', () => {
   describe('GET /forum/posts/:id', () => {
     it('should return a single post by ID', async () => {
       mockForumService.getPost.mockResolvedValue(MOCK_POST);
-      const res = await request(app.getHttpServer()).get('/forum/posts/p1').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/forum/posts/p1')
+        .expect(200);
       expect(res.body.id).toBe('p1');
       expect(res.body.title).toBe(MOCK_POST.title);
     });
@@ -165,7 +198,11 @@ describe('ForumController', () => {
   describe('POST /forum/posts', () => {
     it('should create a new post and return it', async () => {
       mockForumService.createPost.mockResolvedValue(MOCK_POST);
-      const dto = { title: 'Favourite arc in One Piece?', content: 'Mine is Marineford.', category: 'general' };
+      const dto = {
+        title: 'Favourite arc in One Piece?',
+        content: 'Mine is Marineford.',
+        category: 'general',
+      };
       const res = await request(app.getHttpServer())
         .post('/forum/posts')
         .send(dto)
@@ -178,13 +215,17 @@ describe('ForumController', () => {
     });
 
     it('should create a manga-linked post with targetMangaId', async () => {
-      const mangaPost = { ...MOCK_POST, targetMangaId: 'm1', targetMangaTitle: 'One Piece' };
+      const mangaPost = {
+        ...MOCK_POST,
+        targetMangaId: 'm1',
+        targetMangaTitle: 'One Piece',
+      };
       mockForumService.createPost.mockResolvedValue(mangaPost);
       const res = await request(app.getHttpServer())
         .post('/forum/posts')
         .send({
           title: 'One Piece discussion',
-          content: 'Let\'s talk!',
+          content: "Let's talk!",
           category: 'manga_update',
           targetMangaId: 'm1',
           targetMangaTitle: 'One Piece',
@@ -199,14 +240,18 @@ describe('ForumController', () => {
   describe('GET /forum/posts/:id/comments', () => {
     it('should return comments for a post', async () => {
       mockForumService.listComments.mockResolvedValue([MOCK_COMMENT]);
-      const res = await request(app.getHttpServer()).get('/forum/posts/p1/comments').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/forum/posts/p1/comments')
+        .expect(200);
       expect(res.body).toHaveLength(1);
       expect(res.body[0].content).toBe('Wano is better!');
     });
 
     it('should return an empty array when a post has no comments', async () => {
       mockForumService.listComments.mockResolvedValue([]);
-      const res = await request(app.getHttpServer()).get('/forum/posts/p1/comments').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/forum/posts/p1/comments')
+        .expect(200);
       expect(res.body).toEqual([]);
     });
   });
@@ -228,7 +273,12 @@ describe('ForumController', () => {
     });
 
     it('should create a reply by including parentId', async () => {
-      const replyComment = { ...MOCK_COMMENT, id: 'c2', parentId: 'c1', content: 'I agree!' };
+      const replyComment = {
+        ...MOCK_COMMENT,
+        id: 'c2',
+        parentId: 'c1',
+        content: 'I agree!',
+      };
       mockForumService.createComment.mockResolvedValue(replyComment);
       const res = await request(app.getHttpServer())
         .post('/forum/comments')
@@ -293,7 +343,9 @@ describe('ForumController', () => {
       mockForumService.vote.mockResolvedValue({ upvotes: 1, downvotes: 0 });
 
       // 1. Browse public feed
-      const feed = await request(app.getHttpServer()).get('/forum/posts').expect(200);
+      const feed = await request(app.getHttpServer())
+        .get('/forum/posts')
+        .expect(200);
       expect(Array.isArray(feed.body.items)).toBe(true);
 
       // 2. Create a new post
@@ -333,7 +385,11 @@ describe('ForumController', () => {
         ],
       })
         .overrideGuard(AuthGuard)
-        .useValue({ canActivate: () => { throw new UnauthorizedException(); } })
+        .useValue({
+          canActivate: () => {
+            throw new UnauthorizedException();
+          },
+        })
         .overrideGuard(OptionalAuthGuard)
         .useValue({ canActivate: () => true })
         .compile();
@@ -349,7 +405,10 @@ describe('ForumController', () => {
       ['/forum/comments', { postId: 'p1', content: 'hi' }],
       ['/forum/vote', { targetType: 'post', targetId: 'p1', voteValue: 1 }],
     ])('POST %s → 401 without token', async (path, body) => {
-      await request(unauthApp.getHttpServer()).post(path).send(body).expect(401);
+      await request(unauthApp.getHttpServer())
+        .post(path)
+        .send(body)
+        .expect(401);
     });
 
     it('GET /forum/posts → 200 without token (public route)', async () => {
@@ -359,7 +418,9 @@ describe('ForumController', () => {
 
     it('GET /forum/trending-manga → 200 without token (public route)', async () => {
       mockForumService.getTrendingManga.mockResolvedValue([]);
-      await request(unauthApp.getHttpServer()).get('/forum/trending-manga').expect(200);
+      await request(unauthApp.getHttpServer())
+        .get('/forum/trending-manga')
+        .expect(200);
     });
   });
 });

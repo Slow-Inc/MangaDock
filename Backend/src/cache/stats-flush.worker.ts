@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { ElectionService } from '../status/election.service';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -18,7 +23,10 @@ export class StatsFlushWorker implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     this.timer = setInterval(
-      () => this.flush().catch(err => this.logger.warn(`Stats flush error: ${String(err)}`)),
+      () =>
+        this.flush().catch((err) =>
+          this.logger.warn(`Stats flush error: ${String(err)}`),
+        ),
       FLUSH_INTERVAL_MS,
     ).unref();
   }
@@ -31,7 +39,9 @@ export class StatsFlushWorker implements OnModuleInit, OnModuleDestroy {
     if (!this.election.isLeader) return;
     await this.flushDate(date);
     // Drain yesterday's trailing window — views between the last pre-midnight tick and 23:59:59 UTC
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86_400_000)
+      .toISOString()
+      .slice(0, 10);
     if (yesterday !== date) await this.flushDate(yesterday);
   }
 
@@ -39,7 +49,9 @@ export class StatsFlushWorker implements OnModuleInit, OnModuleDestroy {
     const chapterIds = await this.redis.smembers(`stats:active:${date}`);
     if (chapterIds.length === 0) return;
 
-    this.logger.log(`StatsFlush: flushing ${chapterIds.length} active chapter(s) for ${date}`);
+    this.logger.log(
+      `StatsFlush: flushing ${chapterIds.length} active chapter(s) for ${date}`,
+    );
 
     for (const chapterId of chapterIds) {
       await this.flushChapter(chapterId, date);
@@ -59,19 +71,36 @@ export class StatsFlushWorker implements OnModuleInit, OnModuleDestroy {
 
       const { error } = await this.supabase.client
         .from('chapter_daily_stats')
-        .upsert({ chapter_id: chapterId, manga_id: mangaId, date, views, unique_readers: uniqueReaders },
-          { onConflict: 'chapter_id,date' });
+        .upsert(
+          {
+            chapter_id: chapterId,
+            manga_id: mangaId,
+            date,
+            views,
+            unique_readers: uniqueReaders,
+          },
+          { onConflict: 'chapter_id,date' },
+        );
 
       if (error) {
-        this.logger.warn(`StatsFlush: upsert failed chapter=${chapterId} date=${date}: ${error.message}`);
+        this.logger.warn(
+          `StatsFlush: upsert failed chapter=${chapterId} date=${date}: ${error.message}`,
+        );
       }
     } catch (err) {
-      this.logger.warn(`StatsFlush: error for chapter=${chapterId}: ${String(err)}`);
+      this.logger.warn(
+        `StatsFlush: error for chapter=${chapterId}: ${String(err)}`,
+      );
     }
   }
 
-  private async resolveMangaId(chapterId: string, date: string): Promise<string> {
-    const raw = await this.redis.get(`stats:chapter:${chapterId}:manga:${date}`);
+  private async resolveMangaId(
+    chapterId: string,
+    date: string,
+  ): Promise<string> {
+    const raw = await this.redis.get(
+      `stats:chapter:${chapterId}:manga:${date}`,
+    );
     return raw ?? '';
   }
 }

@@ -61,7 +61,9 @@ export class EmailValidationService {
 
     const existingUser = await this.findUserByEmail(normalizedEmail);
     if (existingUser) {
-      this.logger.log(`Email already exists in profiles: ${this.maskEmail(normalizedEmail)}`);
+      this.logger.log(
+        `Email already exists in profiles: ${this.maskEmail(normalizedEmail)}`,
+      );
       return {
         ok: false,
         decision: 'block',
@@ -91,12 +93,15 @@ export class EmailValidationService {
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Email validation provider error for ${this.maskEmail(normalizedEmail)}: ${message}`);
+      this.logger.warn(
+        `Email validation provider error for ${this.maskEmail(normalizedEmail)}: ${message}`,
+      );
 
       if (this.failOpen) {
         return {
           ...this.allowResult(normalizedEmail, 'provider-error'),
-          warning: 'ขณะนี้ระบบตรวจสอบอีเมลภายนอกไม่พร้อมใช้งาน ระบบจะข้ามขั้นตอนนี้ชั่วคราว',
+          warning:
+            'ขณะนี้ระบบตรวจสอบอีเมลภายนอกไม่พร้อมใช้งาน ระบบจะข้ามขั้นตอนนี้ชั่วคราว',
         };
       }
 
@@ -114,7 +119,9 @@ export class EmailValidationService {
     }
   }
 
-  private async validateWithAbstract(normalizedEmail: string): Promise<EmailValidationResult> {
+  private async validateWithAbstract(
+    normalizedEmail: string,
+  ): Promise<EmailValidationResult> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -169,27 +176,57 @@ export class EmailValidationService {
     };
 
     if (formatValid === false) {
-      return this.blockResult(normalizedEmail, checks, 'invalid_format', 'รูปแบบอีเมลไม่ถูกต้อง');
+      return this.blockResult(
+        normalizedEmail,
+        checks,
+        'invalid_format',
+        'รูปแบบอีเมลไม่ถูกต้อง',
+      );
     }
 
     if (disposable === true) {
-      return this.blockResult(normalizedEmail, checks, 'disposable_email', 'ไม่อนุญาตให้ใช้อีเมลชั่วคราวหรืออีเมลปลอมในการสมัครสมาชิก');
+      return this.blockResult(
+        normalizedEmail,
+        checks,
+        'disposable_email',
+        'ไม่อนุญาตให้ใช้อีเมลชั่วคราวหรืออีเมลปลอมในการสมัครสมาชิก',
+      );
     }
 
     if (mxValid === false) {
-      return this.blockResult(normalizedEmail, checks, 'no_mx_records', 'โดเมนอีเมลนี้ไม่พร้อมรับอีเมลจริง');
+      return this.blockResult(
+        normalizedEmail,
+        checks,
+        'no_mx_records',
+        'โดเมนอีเมลนี้ไม่พร้อมรับอีเมลจริง',
+      );
     }
 
     if (status === 'undeliverable' || smtpValid === false) {
-      return this.blockResult(normalizedEmail, checks, 'undeliverable', 'อีเมลนี้ไม่สามารถรับข้อความได้ กรุณาใช้อีเมลอื่น');
+      return this.blockResult(
+        normalizedEmail,
+        checks,
+        'undeliverable',
+        'อีเมลนี้ไม่สามารถรับข้อความได้ กรุณาใช้อีเมลอื่น',
+      );
     }
 
     if (role === true) {
-      return this.warnResult(normalizedEmail, checks, 'role_email', 'อีเมลนี้เป็นอีเมลแบบกลุ่ม/องค์กร เช่น support@ หรือ admin@ แต่ยังสามารถใช้งานได้');
+      return this.warnResult(
+        normalizedEmail,
+        checks,
+        'role_email',
+        'อีเมลนี้เป็นอีเมลแบบกลุ่ม/องค์กร เช่น support@ หรือ admin@ แต่ยังสามารถใช้งานได้',
+      );
     }
 
     if (catchAll === true || status === 'risky' || status === 'unknown') {
-      return this.warnResult(normalizedEmail, checks, 'risky_or_unknown', 'อีเมลนี้ตรวจสอบได้ไม่สมบูรณ์ แต่ระบบยังอนุญาตให้สมัครได้');
+      return this.warnResult(
+        normalizedEmail,
+        checks,
+        'risky_or_unknown',
+        'อีเมลนี้ตรวจสอบได้ไม่สมบูรณ์ แต่ระบบยังอนุญาตให้สมัครได้',
+      );
     }
 
     return {
@@ -265,7 +302,9 @@ export class EmailValidationService {
   }
 
   private get provider(): string | null {
-    const value = (process.env.EMAIL_VALIDATION_PROVIDER ?? '').trim().toLowerCase();
+    const value = (process.env.EMAIL_VALIDATION_PROVIDER ?? '')
+      .trim()
+      .toLowerCase();
     return value || null;
   }
 
@@ -275,15 +314,27 @@ export class EmailValidationService {
   }
 
   private get timeoutMs(): number {
-    return Math.max(1000, Number(process.env.EMAIL_VALIDATION_TIMEOUT_MS ?? 5000));
+    return Math.max(
+      1000,
+      Number(process.env.EMAIL_VALIDATION_TIMEOUT_MS ?? 5000),
+    );
   }
 
   private get cacheTtlMs(): number {
-    return Math.max(60, Number(process.env.EMAIL_VALIDATION_CACHE_TTL_SEC ?? 21600)) * 1000;
+    return (
+      Math.max(
+        60,
+        Number(process.env.EMAIL_VALIDATION_CACHE_TTL_SEC ?? 21600),
+      ) * 1000
+    );
   }
 
   private get failOpen(): boolean {
-    return (process.env.EMAIL_VALIDATION_FAIL_OPEN ?? 'true').trim().toLowerCase() !== 'false';
+    return (
+      (process.env.EMAIL_VALIDATION_FAIL_OPEN ?? 'true')
+        .trim()
+        .toLowerCase() !== 'false'
+    );
   }
 
   private emptyChecks(): EmailValidationResult['checks'] {
@@ -300,7 +351,9 @@ export class EmailValidationService {
   }
 
   private toNullableString(value: unknown): string | null {
-    return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : null;
+    return typeof value === 'string' && value.trim()
+      ? value.trim().toLowerCase()
+      : null;
   }
 
   private toNullableBoolean(value: unknown): boolean | null {
@@ -310,9 +363,10 @@ export class EmailValidationService {
   private maskEmail(email: string): string {
     const [localPart, domain] = email.split('@');
     if (!localPart || !domain) return 'invalid-email';
-    const maskedLocal = localPart.length <= 2
-      ? `${localPart[0] ?? '*'}*`
-      : `${localPart.slice(0, 2)}***`;
+    const maskedLocal =
+      localPart.length <= 2
+        ? `${localPart[0] ?? '*'}*`
+        : `${localPart.slice(0, 2)}***`;
     return `${maskedLocal}@${domain}`;
   }
 

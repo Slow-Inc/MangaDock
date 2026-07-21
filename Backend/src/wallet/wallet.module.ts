@@ -7,7 +7,12 @@ import { TopupThrottleGuard } from './topup-throttle.guard';
 
 @Module({
   controllers: [WalletController],
-  providers: [WalletService, XenditService, WalletEventsService, TopupThrottleGuard],
+  providers: [
+    WalletService,
+    XenditService,
+    WalletEventsService,
+    TopupThrottleGuard,
+  ],
   exports: [WalletService],
 })
 export class WalletModule {}

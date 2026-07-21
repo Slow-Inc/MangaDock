@@ -1,8 +1,18 @@
-import { Controller, Get, Inject, Logger, NotFoundException, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  Logger,
+  NotFoundException,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import * as path from 'path';
 import { STORAGE_PROVIDER } from './storage-provider.interface';
 import type { StorageProvider } from './storage-provider.interface';
+import { ImageTokenGuard } from '../../books/image-token.guard';
 
 const EXT_TO_MIME: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -26,6 +36,7 @@ export class ImgCacheController {
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
   ) {}
 
+  @UseGuards(ImageTokenGuard)
   @Get('*')
   async serve(@Req() req: Request, @Res() res: Response): Promise<void> {
     const filePath = req.path.replace(/^\/img-cache\//, '');
@@ -33,7 +44,10 @@ export class ImgCacheController {
     const key = `img-cache/${filePath}`;
     const imgCacheRoot = path.resolve(process.cwd(), 'img-cache');
     const resolved = path.resolve(process.cwd(), key);
-    if (resolved !== imgCacheRoot && !resolved.startsWith(imgCacheRoot + path.sep)) {
+    if (
+      resolved !== imgCacheRoot &&
+      !resolved.startsWith(imgCacheRoot + path.sep)
+    ) {
       throw new NotFoundException();
     }
     const ext = path.extname(filePath).toLowerCase();
@@ -42,7 +56,10 @@ export class ImgCacheController {
       if (this.storage.getStream) {
         const stream = await this.storage.getStream(key);
         res.setHeader('content-type', contentType);
-        res.setHeader('cache-control', 'public, max-age=3600, stale-while-revalidate=86400');
+        res.setHeader(
+          'cache-control',
+          'public, max-age=3600, stale-while-revalidate=86400',
+        );
         stream.on('error', (err) => {
           this.logger.error(
             `img-cache stream failed mid-download for ${key}`,
@@ -57,7 +74,10 @@ export class ImgCacheController {
       }
       const buf = await this.storage.get(key);
       res.setHeader('content-type', contentType);
-      res.setHeader('cache-control', 'public, max-age=3600, stale-while-revalidate=86400');
+      res.setHeader(
+        'cache-control',
+        'public, max-age=3600, stale-while-revalidate=86400',
+      );
       res.send(buf);
     } catch {
       throw new NotFoundException(`not found: ${key}`);

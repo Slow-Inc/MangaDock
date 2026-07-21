@@ -23,7 +23,11 @@ function makeRedis() {
 
 function makeService() {
   const { redis, client } = makeRedis();
-  return { svc: new StatsIncrementService(redis as unknown as RedisService), redis, client };
+  return {
+    svc: new StatsIncrementService(redis as unknown as RedisService),
+    redis,
+    client,
+  };
 }
 
 describe('StatsIncrementService', () => {
@@ -87,7 +91,9 @@ describe('StatsIncrementService', () => {
 
   it('floors the seconds-until-midnight base at 60s, then adds the flush grace period', async () => {
     const { svc, client } = makeService();
-    jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-28T23:59:59.000Z'));
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(Date.parse('2026-05-28T23:59:59.000Z'));
 
     await svc.recordChapterView('ch:1', 'manga:A', 'uid:x', '2026-05-28');
 
@@ -97,7 +103,9 @@ describe('StatsIncrementService', () => {
 
   it('computes true remaining seconds until midnight for a normal time of day', async () => {
     const { svc, client } = makeService();
-    jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-28T12:00:00.000Z'));
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(Date.parse('2026-05-28T12:00:00.000Z'));
 
     await svc.recordChapterView('ch:1', 'manga:A', 'uid:x', '2026-05-28');
 
