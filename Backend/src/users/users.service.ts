@@ -8,10 +8,19 @@ import {
 } from '@nestjs/common';
 import * as path from 'path';
 import { SupabaseService } from '../supabase/supabase.service';
-import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import {
+  STORAGE_PROVIDER,
+  type StorageProvider,
+} from '../common/storage/storage-provider.interface';
 
-export const ROLE = { USER: 0, TRANSLATOR: 1, CREATOR: 2, ADMIN: 8, DEV: 9 } as const;
-export type UserRole = typeof ROLE[keyof typeof ROLE]; // 0 | 1 | 2 | 8 | 9
+export const ROLE = {
+  USER: 0,
+  TRANSLATOR: 1,
+  CREATOR: 2,
+  ADMIN: 8,
+  DEV: 9,
+} as const;
+export type UserRole = (typeof ROLE)[keyof typeof ROLE]; // 0 | 1 | 2 | 8 | 9
 export type UserPlan = 'free' | 'premium' | 'pro';
 
 export type FavoriteItem = {
@@ -86,6 +95,18 @@ type FavoriteRow = {
   ratings_count: number | null;
 };
 
+/** Returns true if the URL is from a social OAuth CDN (Google, Facebook).
+ *  These URLs carry signed tokens that expire — they must be refreshed on
+ *  every login rather than written once and cached forever. */
+export function isSocialCdnUrl(url: string): boolean {
+  return (
+    url.includes('lh3.googleusercontent.com') ||
+    url.includes('fbcdn.net') ||
+    url.includes('fbsbx.com') ||
+    url.includes('graph.facebook.com')
+  );
+}
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -141,7 +162,14 @@ export class UsersService {
     };
   }
 
-  async upsertUser(uid: string, data: { email?: string | null; displayName?: string | null; photoURL?: string | null }) {
+  async upsertUser(
+    uid: string,
+    data: {
+      email?: string | null;
+      displayName?: string | null;
+      photoURL?: string | null;
+    },
+  ) {
     const now = new Date().toISOString();
 
     // Atomic create-if-missing (INSERT ... ON CONFLICT (uid) DO NOTHING). Removes the
@@ -184,27 +212,59 @@ export class UsersService {
       }
     }
     if (data.photoURL) {
-      const { error } = await this.db
-        .from('profiles')
-        .update({ photo_url: data.photoURL })
-        .eq('uid', uid)
-        .is('photo_url', null);
-      if (error) {
-        throw new Error(`Failed to backfill photo URL: ${error.message}`);
+      if (isSocialCdnUrl(data.photoURL)) {
+        // Social CDN URLs (Google lh3, Facebook fbcdn) carry signed tokens that
+        // expire. Refresh on every login — but only when the stored URL is also
+        // social CDN or null; never overwrite a custom uploaded avatar.
+        const { data: existing, error: readError } = await this.db
+          .from('profiles')
+          .select('photo_url')
+          .eq('uid', uid)
+          .maybeSingle<{ photo_url: string | null }>();
+        if (readError)
+          throw new Error(`Failed to read photo URL: ${readError.message}`);
+
+        const currentUrl = existing?.photo_url ?? null;
+        if (currentUrl === null || isSocialCdnUrl(currentUrl)) {
+          const { error } = await this.db
+            .from('profiles')
+            .update({ photo_url: data.photoURL })
+            .eq('uid', uid);
+          if (error) {
+            throw new Error(`Failed to refresh photo URL: ${error.message}`);
+          }
+        }
+      } else {
+        // Non-social URL (uploaded avatar): original behavior — only write when null.
+        const { error } = await this.db
+          .from('profiles')
+          .update({ photo_url: data.photoURL })
+          .eq('uid', uid)
+          .is('photo_url', null);
+        if (error) {
+          throw new Error(`Failed to backfill photo URL: ${error.message}`);
+        }
       }
     }
 
     this.logger.log(`Upserted user (profile preserved): ${uid}`);
   }
 
-  async updateUserProfile(uid: string, data: { displayName?: string; photoURL?: string }) {
+  async updateUserProfile(
+    uid: string,
+    data: { displayName?: string; photoURL?: string },
+  ) {
     const update: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
-    if (data.displayName !== undefined) update['display_name'] = data.displayName;
+    if (data.displayName !== undefined)
+      update['display_name'] = data.displayName;
     if (data.photoURL !== undefined) update['photo_url'] = data.photoURL;
 
-    const { error } = await this.db.from('profiles').update(update).eq('uid', uid);
+    const { error } = await this.db
+      .from('profiles')
+      .update(update)
+      .eq('uid', uid);
     if (error) {
       throw new Error(`Failed to update user profile: ${error.message}`);
     }
@@ -217,8 +277,16 @@ export class UsersService {
       { data: profile, error: profileError },
       { data: favoritesRows, error: favoritesError },
     ] = await Promise.all([
-      this.db.from('profiles').select('*').eq('uid', uid).maybeSingle<ProfileRow>(),
-      this.db.from('user_favorites').select('*').eq('uid', uid).order('added_at', { ascending: false }),
+      this.db
+        .from('profiles')
+        .select('*')
+        .eq('uid', uid)
+        .maybeSingle<ProfileRow>(),
+      this.db
+        .from('user_favorites')
+        .select('*')
+        .eq('uid', uid)
+        .order('added_at', { ascending: false }),
     ]);
 
     if (profileError && !this.isNotFound(profileError)) {
@@ -231,32 +299,46 @@ export class UsersService {
       throw new Error(`Failed to fetch favorites: ${favoritesError.message}`);
     }
 
-    const favorites = (favoritesRows ?? []).map((row) => this.mapFavorite(row as FavoriteRow));
+    const favorites = (favoritesRows ?? []).map((row) =>
+      this.mapFavorite(row as FavoriteRow),
+    );
     return this.mapProfile(profile, favorites);
   }
 
-  async addFavorite(uid: string, item: {
-    id: string; title: string; thumbnail: string;
-    authors?: string[]; description?: string; categories?: string[];
-    publishedDate?: string; averageRating?: number; ratingsCount?: number;
-  }) {
+  async addFavorite(
+    uid: string,
+    item: {
+      id: string;
+      title: string;
+      thumbnail: string;
+      authors?: string[];
+      description?: string;
+      categories?: string[];
+      publishedDate?: string;
+      averageRating?: number;
+      ratingsCount?: number;
+    },
+  ) {
     if (!item.id) throw new BadRequestException('id is required');
 
-    const { error } = await this.db.from('user_favorites').upsert({
-      uid,
-      manga_id: item.id,
-      title: item.title,
-      thumbnail: item.thumbnail ?? '',
-      authors: item.authors ?? [],
-      description: item.description ?? '',
-      categories: item.categories ?? [],
-      published_date: item.publishedDate ?? '',
-      average_rating: item.averageRating ?? 0,
-      ratings_count: item.ratingsCount ?? 0,
-      added_at: new Date().toISOString(),
-    }, {
-      onConflict: 'uid,manga_id',
-    });
+    const { error } = await this.db.from('user_favorites').upsert(
+      {
+        uid,
+        manga_id: item.id,
+        title: item.title,
+        thumbnail: item.thumbnail ?? '',
+        authors: item.authors ?? [],
+        description: item.description ?? '',
+        categories: item.categories ?? [],
+        published_date: item.publishedDate ?? '',
+        average_rating: item.averageRating ?? 0,
+        ratings_count: item.ratingsCount ?? 0,
+        added_at: new Date().toISOString(),
+      },
+      {
+        onConflict: 'uid,manga_id',
+      },
+    );
 
     if (error) {
       throw new Error(`Failed to add favorite: ${error.message}`);
@@ -294,13 +376,16 @@ export class UsersService {
   async addLiked(uid: string, itemId: string) {
     if (!itemId) throw new BadRequestException('id is required');
 
-    const { error } = await this.db.from('user_liked').upsert({
-      uid,
-      manga_id: itemId,
-      liked_at: new Date().toISOString(),
-    }, {
-      onConflict: 'uid,manga_id',
-    });
+    const { error } = await this.db.from('user_liked').upsert(
+      {
+        uid,
+        manga_id: itemId,
+        liked_at: new Date().toISOString(),
+      },
+      {
+        onConflict: 'uid,manga_id',
+      },
+    );
 
     if (error) {
       throw new Error(`Failed to add liked item: ${error.message}`);
@@ -331,38 +416,50 @@ export class UsersService {
       throw new Error(`Failed to fetch liked items: ${error.message}`);
     }
 
-    return (data ?? []).map((row) => String((row as { manga_id: string }).manga_id));
+    return (data ?? []).map((row) =>
+      String((row as { manga_id: string }).manga_id),
+    );
   }
 
   async upsertHistoryItem(
     uid: string,
     item: {
-      id: string; title: string; subtitle?: string; thumbnail: string;
-      authors?: string[]; description?: string; publishedDate?: string;
-      categories?: string[]; averageRating?: number; ratingsCount?: number;
+      id: string;
+      title: string;
+      subtitle?: string;
+      thumbnail: string;
+      authors?: string[];
+      description?: string;
+      publishedDate?: string;
+      categories?: string[];
+      averageRating?: number;
+      ratingsCount?: number;
       lastReadAt: number;
       lastPage?: number | null;
       lastChapterId?: string | null;
     },
   ) {
-    const { error } = await this.db.from('user_history').upsert({
-      uid,
-      manga_id: item.id,
-      title: item.title ?? '',
-      subtitle: item.subtitle ?? '',
-      thumbnail: item.thumbnail ?? '',
-      authors: item.authors ?? [],
-      description: item.description ?? '',
-      published_date: item.publishedDate ?? '',
-      categories: item.categories ?? [],
-      average_rating: item.averageRating ?? 0,
-      ratings_count: item.ratingsCount ?? 0,
-      last_read_at: item.lastReadAt ?? Date.now(),
-      last_page: item.lastPage ?? null,
-      last_chapter_id: item.lastChapterId ?? null,
-    }, {
-      onConflict: 'uid,manga_id',
-    });
+    const { error } = await this.db.from('user_history').upsert(
+      {
+        uid,
+        manga_id: item.id,
+        title: item.title ?? '',
+        subtitle: item.subtitle ?? '',
+        thumbnail: item.thumbnail ?? '',
+        authors: item.authors ?? [],
+        description: item.description ?? '',
+        published_date: item.publishedDate ?? '',
+        categories: item.categories ?? [],
+        average_rating: item.averageRating ?? 0,
+        ratings_count: item.ratingsCount ?? 0,
+        last_read_at: item.lastReadAt ?? Date.now(),
+        last_page: item.lastPage ?? null,
+        last_chapter_id: item.lastChapterId ?? null,
+      },
+      {
+        onConflict: 'uid,manga_id',
+      },
+    );
 
     if (error) {
       throw new Error(`Failed to upsert history item: ${error.message}`);
@@ -420,7 +517,10 @@ export class UsersService {
         ratingsCount: Number(item['ratings_count'] ?? 0),
         lastReadAt: Number(item['last_read_at'] ?? 0),
         lastPage: item['last_page'] != null ? Number(item['last_page']) : null,
-        lastChapterId: item['last_chapter_id'] != null ? String(item['last_chapter_id']) : null,
+        lastChapterId:
+          item['last_chapter_id'] != null
+            ? String(item['last_chapter_id'])
+            : null,
       };
     });
   }
@@ -512,7 +612,10 @@ export class UsersService {
       }
     });
 
-    const { error: profileError } = await this.db.from('profiles').delete().eq('uid', uid);
+    const { error: profileError } = await this.db
+      .from('profiles')
+      .delete()
+      .eq('uid', uid);
     if (profileError) {
       throw new Error(`Failed to delete profile: ${profileError.message}`);
     }
@@ -520,13 +623,18 @@ export class UsersService {
     const files = await this.storage.list(this.avatarsDir);
     const userFiles = files.filter((f) => f.startsWith(`${uid}_`));
     await Promise.all(
-      userFiles.map((file) => this.storage.delete(`${this.avatarsDir}/${file}`)),
+      userFiles.map((file) =>
+        this.storage.delete(`${this.avatarsDir}/${file}`),
+      ),
     );
 
     this.logger.log(`Deleted all data for user: ${uid}`);
   }
 
-  private async gcAvatars(uid: string, referencedUrls: string[]): Promise<void> {
+  private async gcAvatars(
+    uid: string,
+    referencedUrls: string[],
+  ): Promise<void> {
     const { data } = await this.db
       .from('profiles')
       .select('photo_url')
@@ -550,6 +658,97 @@ export class UsersService {
         await this.storage.delete(`${this.avatarsDir}/${file}`);
         this.logger.log(`GC: deleted orphaned avatar ${file}`);
       }
+    }
+  }
+
+  // ── Device tracking + audit ───────────────────────────────────────────────
+
+  /**
+   * Upsert the device into user_known_devices.
+   * Returns true if this is the first time this hwid is seen for this uid.
+   */
+  private async recordDevice(
+    uid: string,
+    hwid: string,
+    userAgent: string,
+  ): Promise<boolean> {
+    const { data: existing } = await this.db
+      .from('user_known_devices')
+      .select('id')
+      .eq('uid', uid)
+      .eq('hwid', hwid)
+      .maybeSingle();
+
+    if (existing) {
+      await this.db
+        .from('user_known_devices')
+        .update({
+          last_seen: new Date().toISOString(),
+          user_agent: userAgent,
+        })
+        .eq('uid', uid)
+        .eq('hwid', hwid);
+      return false;
+    }
+
+    await this.db.from('user_known_devices').insert({
+      uid,
+      hwid,
+      user_agent: userAgent,
+    });
+    return true;
+  }
+
+  /**
+   * Record the device and, if it is new, emit a warning-level alert.
+   * Called fire-and-forget from HardwareIdMiddleware.
+   */
+  async recordDeviceAndAlert(
+    uid: string,
+    hwid: string,
+    userAgent: string,
+  ): Promise<void> {
+    try {
+      const isNew = await this.recordDevice(uid, hwid, userAgent);
+      if (isNew) {
+        // TODO: replace with real email service when available
+        this.logger.warn(
+          `[LoginAlert] new device for uid=${uid} hwid=${hwid.slice(0, 8)}… — email alert not sent (no email service configured)`,
+        );
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`[DeviceTracking] failed for uid=${uid}: ${msg}`);
+    }
+  }
+
+  /**
+   * Insert a row into audit_logs.
+   * Errors are swallowed so a logging failure never breaks the caller.
+   */
+  async logAuditEvent(
+    actorUid: string,
+    action: string,
+    targetType?: string,
+    targetId?: string,
+    ip?: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const { error } = await this.db.from('audit_logs').insert({
+        actor_uid: actorUid,
+        action,
+        target_type: targetType ?? null,
+        target_id: targetId ?? null,
+        ip: ip ?? null,
+        metadata: metadata ?? null,
+      });
+      if (error) {
+        this.logger.warn(`[AuditLog] insert failed: ${error.message}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`[AuditLog] unexpected error: ${msg}`);
     }
   }
 
@@ -580,7 +779,10 @@ export class UsersService {
       update['translator_languages'] = data.translatorLanguages.slice(0, 10);
     }
 
-    const { error } = await this.db.from('profiles').update(update).eq('uid', uid);
+    const { error } = await this.db
+      .from('profiles')
+      .update(update)
+      .eq('uid', uid);
     if (error) {
       throw new Error(`Failed to update translator role: ${error.message}`);
     }
@@ -590,7 +792,12 @@ export class UsersService {
 
   async updateTranslatorProfile(
     uid: string,
-    data: { bio?: string; translatorLanguages?: string[]; country?: string; preferredLanguage?: string },
+    data: {
+      bio?: string;
+      translatorLanguages?: string[];
+      country?: string;
+      preferredLanguage?: string;
+    },
   ): Promise<void> {
     const { data: existing, error: existingError } = await this.db
       .from('profiles')
@@ -605,7 +812,9 @@ export class UsersService {
 
     const currentRole = existing.role ?? 0;
     if (currentRole === 0) {
-      throw new ForbiddenException('Only translators or creators can update translator profile');
+      throw new ForbiddenException(
+        'Only translators or creators can update translator profile',
+      );
     }
 
     const update: Record<string, unknown> = {
@@ -616,9 +825,13 @@ export class UsersService {
       update['translator_languages'] = data.translatorLanguages.slice(0, 10);
     }
     if (data.country !== undefined) update['country'] = data.country;
-    if (data.preferredLanguage !== undefined) update['preferred_language'] = data.preferredLanguage;
+    if (data.preferredLanguage !== undefined)
+      update['preferred_language'] = data.preferredLanguage;
 
-    const { error } = await this.db.from('profiles').update(update).eq('uid', uid);
+    const { error } = await this.db
+      .from('profiles')
+      .update(update)
+      .eq('uid', uid);
     if (error) {
       throw new Error(`Failed to update translator profile: ${error.message}`);
     }
@@ -626,7 +839,9 @@ export class UsersService {
     this.logger.log(`Translator profile updated for user: ${uid}`);
   }
 
-  async getPublicTranslatorProfile(uid: string): Promise<PublicTranslatorProfile> {
+  async getPublicTranslatorProfile(
+    uid: string,
+  ): Promise<PublicTranslatorProfile> {
     const { data, error } = await this.db
       .from('profiles')
       .select('*')
@@ -634,7 +849,9 @@ export class UsersService {
       .maybeSingle<ProfileRow>();
 
     if (error && !this.isNotFound(error)) {
-      throw new Error(`Failed to fetch public translator profile: ${error.message}`);
+      throw new Error(
+        `Failed to fetch public translator profile: ${error.message}`,
+      );
     }
     if (!data) {
       throw new NotFoundException('User not found');

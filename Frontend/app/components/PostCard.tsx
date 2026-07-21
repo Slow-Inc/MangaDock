@@ -8,8 +8,10 @@ import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import VoteButtons from "./VoteButtons";
 import type { ForumPost } from "../lib/types";
+import { isSocialCdnUrl } from "../lib/avatarUpload";
 
 const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
+const CAT_LABEL: Record<string, string> = { announcement: 'ประกาศ', spoiler: 'สปอยล์', manga_update: 'อัปเดต' };
 
 function MarqueeMangaTag({ title, maxWidth }: { title: string; maxWidth: number }) {
   const containerRef = useRef<HTMLSpanElement>(null);
@@ -87,7 +89,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
           <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] text-white/35">
             <div className="w-4 h-4 rounded-full bg-white/10 overflow-hidden shrink-0">
               {post.authorPhotoUrl && (
-                <Image src={post.authorPhotoUrl} alt={post.authorName || 'user'} width={16} height={16} className="object-cover" />
+                <Image src={post.authorPhotoUrl} alt={post.authorName || 'user'} width={16} height={16} className="object-cover" unoptimized={isSocialCdnUrl(post.authorPhotoUrl)} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
               )}
             </div>
             <Link
@@ -161,16 +163,18 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
 
   // ── NEW CARD LAYOUT (Almost square grid block, like Facebook post) ──
   return (
-    <article className="bg-[--surface-raised] border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 smooth-hover flex flex-col group p-5 min-h-[260px] shadow-lg">
+    <article className="bg-[--surface-raised] border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 hover:shadow-2xl hover:shadow-black/30 smooth-hover flex flex-col group p-5 min-h-[260px] shadow-lg">
       <header className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/5">
+        <div className="w-11 h-11 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/5 ring-1 ring-white/10">
           {post.authorPhotoUrl && (
-            <Image 
-              src={post.authorPhotoUrl} 
-              alt={post.authorName || 'user'} 
-              width={40} 
+            <Image
+              src={post.authorPhotoUrl}
+              alt={post.authorName || 'user'}
+              width={40}
               height={40}
               className="object-cover"
+              unoptimized={isSocialCdnUrl(post.authorPhotoUrl)}
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
           )}
         </div>
@@ -185,7 +189,11 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
           >
             {post.authorName || 'Unknown User'}
             {post.authorRole > 0 && (
-              <span className="ml-1.5 px-1 bg-white/10 rounded text-[9px] uppercase tracking-tighter text-white/70">
+              <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter ${
+                post.authorRole === 1 ? 'bg-indigo-500/15 text-indigo-400' :
+                post.authorRole === 2 ? 'bg-orange-500/15 text-orange-400' :
+                'bg-red-500/15 text-red-400'
+              }`}>
                 {ROLE_LABEL[post.authorRole] ?? String(post.authorRole)}
               </span>
             )}
@@ -225,7 +233,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
         {post.imageUrls?.length > 0 && (
           <Link
             href={`/community/p/${post.id}`}
-            className={`relative mb-3 rounded-xl overflow-hidden grid gap-1 ${
+            className={`relative mb-3 rounded-xl overflow-hidden grid gap-1.5 ${
               post.imageUrls.length === 1 ? 'grid-cols-1' :
               post.imageUrls.length === 2 ? 'grid-cols-2' :
               'grid-cols-2'
@@ -235,7 +243,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
             {post.imageUrls.slice(0, 4).map((url, i) => (
               <div
                 key={i}
-                className={`relative overflow-hidden bg-white/5 ${
+                className={`relative overflow-hidden rounded-lg bg-white/5 ${
                   post.imageUrls.length === 1 ? 'aspect-video' : 'aspect-square'
                 } ${post.imageUrls.length === 3 && i === 0 ? 'col-span-2' : ''}`}
               >
@@ -254,7 +262,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
         <div className="mt-auto pt-3 flex flex-wrap items-center gap-2">
           {post.category !== 'general' && (
             <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-bold uppercase tracking-wider smooth-hover border border-indigo-500/20">
-              {post.category}
+              {CAT_LABEL[post.category] ?? post.category}
             </span>
           )}
           {post.targetMangaTitle && (

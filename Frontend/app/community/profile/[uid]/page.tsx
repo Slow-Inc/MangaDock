@@ -6,10 +6,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
-import { getProfile, uploadProfileBanner, updateBannerPosition } from "../../../lib/communityApi";
+import { getProfile, uploadProfileBanner, updateBannerPosition, listPostsByUser } from "../../../lib/communityApi";
 import PostCard from "../../../components/PostCard";
 import { useAuth } from "../../../contexts/AuthContext";
-import type { UserProfileResponse } from "../../../lib/types";
+import type { UserProfileResponse, ForumPost } from "../../../lib/types";
+import { isSocialCdnUrl } from '../../../lib/avatarUpload';
 
 type Tab = "posts" | "comments" | "liked" | "translated";
 
@@ -45,6 +46,8 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+const POSTS_PAGE_SIZE = 20;
+
 export default function PublicProfilePage() {
   const { uid } = useParams<{ uid: string }>();
   const { user } = useAuth();
@@ -52,6 +55,9 @@ export default function PublicProfilePage() {
   const [data, setData] = useState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("posts");
+  const [extraPosts, setExtraPosts] = useState<ForumPost[]>([]);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [loadingMorePosts, setLoadingMorePosts] = useState(false);
 
   // Banner upload
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -72,10 +78,14 @@ export default function PublicProfilePage() {
   useEffect(() => {
     if (!uid) return;
     setLoading(true);
+    setExtraPosts([]);
+    setHasMorePosts(true);
+    setLoadingMorePosts(false);
     getProfile(uid)
       .then((d) => {
         setData(d);
         setBannerYPos(d.profile.bannerPosition ?? 50);
+        if (d.posts.length < POSTS_PAGE_SIZE) setHasMorePosts(false);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -164,6 +174,21 @@ export default function PublicProfilePage() {
     closeReposition();
   };
 
+  const handleLoadMorePosts = async () => {
+    if (!uid || loadingMorePosts) return;
+    setLoadingMorePosts(true);
+    try {
+      const loaded = posts.length + extraPosts.length;
+      const result = await listPostsByUser(uid, loaded, POSTS_PAGE_SIZE);
+      setExtraPosts((prev) => [...prev, ...result.items]);
+      if (result.items.length < POSTS_PAGE_SIZE) setHasMorePosts(false);
+    } catch {
+      // silent — user can retry by clicking again
+    } finally {
+      setLoadingMorePosts(false);
+    }
+  };
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const { profile, posts, comments, likedPosts, translatedTitles, earnings } = data;
@@ -171,7 +196,7 @@ export default function PublicProfilePage() {
   const isOwnProfile = user?.uid === profile.uid;
 
   const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: "posts",      label: "โพสต์",         count: posts.length },
+    { id: "posts",      label: "โพสต์",         count: posts.length + extraPosts.length },
     { id: "comments",   label: "ความคิดเห็น",   count: comments.length },
     { id: "liked",      label: "ถูกใจ",          count: likedPosts.length },
     ...(isCreator ? [{ id: "translated" as Tab, label: "มังงะที่แปล", count: translatedTitles.length }] : []),
@@ -363,6 +388,8 @@ export default function PublicProfilePage() {
                   width={96}
                   height={96}
                   className="object-cover w-full h-full"
+                  unoptimized={isSocialCdnUrl(profile.photoUrl)}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-2xl sm:text-3xl font-black text-white/30">
@@ -417,7 +444,7 @@ export default function PublicProfilePage() {
           {/* Stats */}
           <div className="grid grid-cols-4 gap-1 sm:flex sm:gap-10 pt-3 sm:pt-4 border-t border-white/5">
             {[
-              { label: "โพสต์",         value: posts.length },
+              { label: "โพสต์",         value: posts.length + extraPosts.length },
               { label: "คอมเมนต์",      value: comments.length },
               { label: "ถูกใจ",         value: likedPosts.length },
               ...(isCreator ? [{ label: "แปลแล้ว", value: translatedTitles.length }] : []),
@@ -486,11 +513,27 @@ export default function PublicProfilePage() {
           <div key={tab} className="tab-fade-in">
             {/* Posts */}
             {tab === "posts" && (
-              posts.length > 0 ? (
+              posts.length > 0 || extraPosts.length > 0 ? (
                 <div className="space-y-3">
-                  {posts.map((p) => (
+                  {[...posts, ...extraPosts].map((p) => (
                     <PostCard key={p.id} post={p} viewMode="compact" />
                   ))}
+                  {hasMorePosts && (
+                    <button
+                      onClick={handleLoadMorePosts}
+                      disabled={loadingMorePosts}
+                      className="w-full py-3 rounded-xl border border-white/10 text-sm text-white/50 hover:text-white/80 hover:bg-white/5 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {loadingMorePosts ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                          กำลังโหลด...
+                        </>
+                      ) : (
+                        'โหลดโพสต์เพิ่ม'
+                      )}
+                    </button>
+                  )}
                 </div>
               ) : <EmptyState text="ยังไม่มีโพสต์" />
             )}

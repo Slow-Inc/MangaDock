@@ -3,6 +3,53 @@
 
 ---
 
+## Security: record device on login for /settings/security (2026-07-21)
+
+**Goal:** `/settings/security` แสดง "ไม่พบข้อมูลอุปกรณ์" เพราะ `user_known_devices` ว่างเสมอ
+
+**Root cause:** `HardwareIdMiddleware` เขียน device เฉพาะ chapter/upload routes — ไม่ fire ตอน login
+
+**Changes (1 commit, 3517e89):**
+- `Backend/src/users/users.controller.ts`: เพิ่ม `POST /users/me/record-device` endpoint (AuthGuard + `isValidHardwareId` validation) — เรียก `recordDeviceAndAlert` แล้ว return `{ ok }`
+- `Frontend/app/contexts/AuthContext.tsx`: import `getHardwareId`; ใน `onAuthStateChange` block (`SIGNED_IN`/`INITIAL_SESSION`) fire-and-forget `fetch` ไป endpoint นี้หลัง `syncToBackend`
+
+**Result:** device ถูกบันทึกใน `user_known_devices` ทันทีที่ login ทุก provider (email, Google, Facebook) — `/settings/security` แสดงรายการอุปกรณ์ได้ทันที
+
+---
+
+## UI Polish — Settings mobile nav, admin prefetch, no-reload sign-out, dropdown reorder (#645, 2026-07-21)
+
+**Goal:** 4 small UX improvements to navbar dropdown and /settings page.
+
+**Changes (1 commit, 9800bbd5):**
+- `Frontend/app/settings/layout.tsx`: mobile horizontal scrollable tab nav (`md:hidden`) above content — sidebar stays for desktop
+- `Frontend/app/components/NavbarActions.tsx`: `<button router.push("/admin")>` → `<Link href="/admin">` for Next.js hover prefetch; reorder dropdown → โปรไฟล์ของฉัน / Studio / จัดการบัญชี / Admin Dashboard / ออกจากระบบ
+- `Frontend/app/contexts/AuthContext.tsx`: remove `reloadPage()` from `signOut()` — auth guard in `/settings` layout (`router.replace("/")` when `!user`) handles redirect
+
+**Validation:** `bun lint` 63 problems (identical to pre-change baseline — 0 new errors). All changes ≤ ~20 lines each.
+
+---
+
+## Security & Settings Page — /settings + 2FA + Audit Log (2026-07-21)
+
+**Goal:** Replace AccountModal with a full `/settings` page, add TOTP 2FA, re-auth gating, new-device detection, session management, and admin audit log.
+
+**Changes (9 commits, baseline 19082ac9..HEAD 7f83ab1c):**
+- `/settings/{profile,password,accounts,security,danger}` pages replacing AccountModal tabs; NavbarActions routes to `/settings`; `/account` redirects
+- Supabase migrations: `user_known_devices (uid, hwid, user_agent, first_seen, last_seen)` + `audit_logs (actor_uid, action, target_type, target_id, ip, metadata, created_at)` — both with RLS
+- Backend: `HardwareIdMiddleware` now fire-and-forgets `UsersService.recordDeviceAndAlert()` for new-device logging; `UsersService.logAuditEvent()` + `AdminService.logAudit()` for audit trail
+- `ReauthModal` + `useReauth(actionLabel)` hook — 5-min TTL window, password + Google + Facebook provider detection
+- TOTP 2FA: `AuthContext` gains `enrollTotp`, `verifyTotpEnrollment`, `unenrollTotp`, `getActiveTotpFactor`, `verifyTotpForLogin`; `signInWithEmail` checks AAL post-login; `INITIAL_SESSION` also checks AAL to close page-refresh bypass; `MfaVerifyScreen` overlay (cancel calls `signOut()`); `TotpSetupModal` with QR + cleanup on abandon
+- `/settings/security`: 2FA toggle (email-only users), session list with per-device logout + "sign out all others", device activity log; direct Supabase client + RLS
+- `GET /admin/audit` endpoint + `/admin/audit` page: action filter, actor UID filter, paginated table, colour-coded badges; `logAudit` wired into `banUser`, `unbanUser`, `changeRole`, `adminDeletePost`
+- Final review fixes: `.eq("uid", user.id)` defense-in-depth on device queries, orphaned `AccountModal.tsx` deleted, `@Min(1)` on audit DTO
+
+**Known limitation (documented):** TOTP gate is not enforced server-side (backend `AuthGuard` validates JWT validity, not AAL level). OAuth login bypasses TOTP by design (Google/Facebook provide their own 2FA). Treat current 2FA as an advisory deterrent until server-side AAL enforcement is added.
+
+**Validation:** per-task reviewer approved all 6 tasks; final whole-branch review (Opus) found C1 (uid filter) + I2 (INITIAL_SESSION) fixed in final commit. Backend 8/8 admin tests green. Frontend lint 0 new errors.
+
+---
+
 ## Guard #4 — append-only log-header guard (#610, 2026-07-09)
 
 **Goal:** prevent the stale-base clobber class (#553 → #608) at PR time — a PR off an old base silently dropping newer `## ` entries from `DONE.md` / `system-impact-report.md`.

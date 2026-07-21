@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import SearchBar from "./SearchBar";
 import LoginModal from "./LoginModal";
-import AccountModal from "./AccountModal";
 import { useAuth } from "../contexts/AuthContext";
 import TopupModal from "./TopupModal";
 import { getWalletBalance } from "../lib/studioApi";
@@ -13,15 +13,11 @@ import { getWalletBalance } from "../lib/studioApi";
 export default function NavbarActions() {
   const router = useRouter();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [accountInitialTab, setAccountInitialTab] = useState<string | undefined>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
   const [topupOpen, setTopupOpen] = useState(false);
   const [coinBalance, setCoinBalance] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, loading, signOut, getIdToken } = useAuth();
-
-  const handleAccountClose = useCallback(() => setIsAccountOpen(false), []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -32,17 +28,6 @@ export default function NavbarActions() {
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  // Listen for programmatic open requests (e.g. provider-loss warning toast)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const tab = (e as CustomEvent<{ tab?: string }>).detail?.tab;
-      setAccountInitialTab(tab);
-      setIsAccountOpen(true);
-    };
-    window.addEventListener("mb:open-account-modal", handler);
-    return () => window.removeEventListener("mb:open-account-modal", handler);
   }, []);
 
   // Fetch coin balance when user logs in / out
@@ -125,22 +110,16 @@ export default function NavbarActions() {
                   <p className="truncate text-[11px] text-white/40">{user.email}</p>
                 </div>
                 <button
-                  onClick={() => { 
-                    setMenuOpen(false); 
-                    setIsAccountOpen(true);
-                  }}
+                  onClick={() => { setMenuOpen(false); router.push(`/community/profile/${user.uid}`); }}
                   className="flex w-full items-center gap-2 px-4 py-3 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  จัดการบัญชี
+                  โปรไฟล์ของฉัน
                 </button>
                 <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    router.push("/studio");
-                  }}
+                  onClick={() => { setMenuOpen(false); router.push("/studio"); }}
                   className="flex w-full items-center gap-2 px-4 py-3 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
@@ -148,6 +127,27 @@ export default function NavbarActions() {
                   </svg>
                   Studio
                 </button>
+                <button
+                  onClick={() => { setMenuOpen(false); router.push("/settings"); }}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  จัดการบัญชี
+                </button>
+                {user.role != null && user.role >= 8 && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-sm text-red-400/80 transition hover:bg-red-500/10 hover:text-red-300"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    Admin Dashboard
+                  </Link>
+                )}
                 <button
                   onClick={async () => {
                     setMenuOpen(false);
@@ -176,7 +176,6 @@ export default function NavbarActions() {
       </div>
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
-      <AccountModal isOpen={isAccountOpen} onClose={handleAccountClose} initialTab={accountInitialTab} />
       <TopupModal isOpen={topupOpen} onClose={() => setTopupOpen(false)} />
     </>
   );

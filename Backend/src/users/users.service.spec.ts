@@ -1,7 +1,108 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UsersService } from './users.service';
+import { UsersService, isSocialCdnUrl } from './users.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { STORAGE_PROVIDER } from '../common/storage/storage-provider.interface';
+
+describe('isSocialCdnUrl', () => {
+  it('returns true for Google photo URL', () => {
+    expect(isSocialCdnUrl('https://lh3.googleusercontent.com/a/abc=s96-c')).toBe(true);
+  });
+
+  it('returns true for fbcdn URL (scontent-region.fbcdn.net)', () => {
+    expect(isSocialCdnUrl('https://scontent-bkk1-1.fbcdn.net/v/photo.jpg')).toBe(true);
+  });
+
+  it('returns true for fbsbx URL', () => {
+    expect(isSocialCdnUrl('https://platform-lookaside.fbsbx.com/photo.jpg')).toBe(true);
+  });
+
+  it('returns true for graph.facebook.com URL', () => {
+    expect(isSocialCdnUrl('https://graph.facebook.com/1234/picture')).toBe(true);
+  });
+
+  it('returns false for uploaded avatar path', () => {
+    expect(isSocialCdnUrl('/uploads/avatars/uid_abc123.jpg')).toBe(false);
+  });
+
+  it('returns false for full uploaded avatar URL', () => {
+    expect(isSocialCdnUrl('https://api.hayateotsu.space/uploads/avatars/uid_abc123.jpg')).toBe(false);
+  });
+
+  it('returns false for empty string', () => {
+    expect(isSocialCdnUrl('')).toBe(false);
+  });
+});
+
+describe('upsertUser – photo_url refresh', () => {
+  const GOOGLE_URL = 'https://lh3.googleusercontent.com/a/abc=s96-c';
+  const UPLOADED_URL = '/uploads/avatars/uid_abc.jpg';
+
+  function makeUpsertServiceWith(existingPhotoUrl: string | null) {
+    // Track whether a photo_url update was attempted
+    let photoUpdateAttempted = false;
+
+    const makeChain = () => {
+      // Two-phase init: declare first so callbacks can close over `chain`.
+      const chain: Record<string, jest.Mock> = {} as Record<string, jest.Mock>;
+      chain.upsert = jest.fn().mockResolvedValue({ error: null });
+      chain.update = jest.fn().mockImplementation((data: Record<string, unknown>) => {
+        if ('photo_url' in data) photoUpdateAttempted = true;
+        return chain;
+      });
+      chain.select = jest.fn().mockReturnValue(chain);
+      chain.eq = jest.fn().mockImplementation(() => {
+        // Make eq() resolve as a promise (terminal) AND support further chaining
+        const p = Promise.resolve({ error: null });
+        Object.assign(p, chain);
+        return p;
+      });
+      chain.is = jest.fn().mockResolvedValue({ error: null });
+      chain.maybeSingle = jest.fn().mockResolvedValue({
+        data: { photo_url: existingPhotoUrl },
+        error: null,
+      });
+      return chain;
+    };
+
+    const chain = makeChain();
+    const supabaseMock = { client: { from: jest.fn().mockReturnValue(chain) } };
+
+    return {
+      supabaseMock,
+      getPhotoUpdateAttempted: () => photoUpdateAttempted,
+    };
+  }
+
+  async function buildService(existingPhotoUrl: string | null) {
+    const { supabaseMock, getPhotoUpdateAttempted } = makeUpsertServiceWith(existingPhotoUrl);
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        { provide: SupabaseService, useValue: supabaseMock },
+        { provide: STORAGE_PROVIDER, useValue: {} },
+      ],
+    }).compile();
+    return { service: module.get(UsersService), getPhotoUpdateAttempted };
+  }
+
+  it('writes photo_url when incoming is social CDN and stored is null', async () => {
+    const { service, getPhotoUpdateAttempted } = await buildService(null);
+    await service.upsertUser('uid-1', { email: 'a@b.com', displayName: 'A', photoURL: GOOGLE_URL });
+    expect(getPhotoUpdateAttempted()).toBe(true);
+  });
+
+  it('writes photo_url when incoming is social CDN and stored is also social CDN', async () => {
+    const { service, getPhotoUpdateAttempted } = await buildService(GOOGLE_URL);
+    await service.upsertUser('uid-1', { email: 'a@b.com', displayName: 'A', photoURL: GOOGLE_URL });
+    expect(getPhotoUpdateAttempted()).toBe(true);
+  });
+
+  it('does NOT write photo_url when incoming is social CDN and stored is an uploaded avatar', async () => {
+    const { service, getPhotoUpdateAttempted } = await buildService(UPLOADED_URL);
+    await service.upsertUser('uid-1', { email: 'a@b.com', displayName: 'A', photoURL: GOOGLE_URL });
+    expect(getPhotoUpdateAttempted()).toBe(false);
+  });
+});
 
 function makeSupabaseMock(rows: unknown[], error: unknown = null) {
   const chain = {

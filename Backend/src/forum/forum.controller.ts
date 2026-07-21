@@ -66,6 +66,7 @@ export class ForumController {
     @Query('sort') sort: 'new' | 'hot' = 'hot',
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('authorUid') authorUid?: string,
   ) {
     return this.forumService.listPosts(
       category,
@@ -74,6 +75,7 @@ export class ForumController {
       Math.min(100, limit ? (parseInt(limit, 10) || 20) : 20),
       offset ? (parseInt(offset, 10) || 0) : 0,
       req.uid,
+      authorUid,
     );
   }
 

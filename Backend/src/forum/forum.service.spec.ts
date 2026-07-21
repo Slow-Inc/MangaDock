@@ -459,6 +459,52 @@ describe('ForumService.uploadImage — MIME validation', () => {
   });
 });
 
+// ── listPosts authorUid filter ────────────────────────────────────────────────
+
+describe('ForumService.listPosts — authorUid filter', () => {
+  const baseRow = {
+    id: 'p1',
+    author_uid: 'user-abc',
+    title: 'T',
+    content: 'C',
+    category: 'general',
+    target_manga_id: null,
+    target_manga_title: null,
+    image_urls: [],
+    upvotes: 0,
+    downvotes: 0,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    deleted_at: null,
+    pinned: false,
+    author: { display_name: 'Alice', photo_url: null, role: 'user' },
+    comments: [{ count: 0 }] as Array<{ count: number }>,
+  };
+
+  it('applies eq(author_uid) filter when authorUid is provided', async () => {
+    const chain = buildMockChain({
+      range: jest.fn().mockResolvedValue({ data: [baseRow], count: 1, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    await service.listPosts(undefined, undefined, 'new', 20, 0, undefined, 'user-abc');
+
+    expect(chain.eq).toHaveBeenCalledWith('author_uid', 'user-abc');
+  });
+
+  it('does not apply eq(author_uid) filter when authorUid is omitted', async () => {
+    const chain = buildMockChain({
+      range: jest.fn().mockResolvedValue({ data: [], count: 0, error: null }),
+    });
+    const service = makeService(() => chain);
+
+    await service.listPosts();
+
+    const eqCalls = (chain.eq as jest.Mock).mock.calls;
+    expect(eqCalls.some(([col]: [string]) => col === 'author_uid')).toBe(false);
+  });
+});
+
 describe('ForumService.getPublicProfile', () => {
   it('logs a warning when a secondary query returns an error instead of masking it', async () => {
     // A query builder that is both chainable and awaitable, resolving to {data, error}.

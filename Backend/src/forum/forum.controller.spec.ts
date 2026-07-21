@@ -106,7 +106,7 @@ describe('ForumController', () => {
         .get('/forum/posts?category=general&sort=new&limit=10&offset=20')
         .expect(200);
       expect(mockForumService.listPosts).toHaveBeenCalledWith(
-        'general', undefined, 'new', 10, 20, TEST_USER.uid,
+        'general', undefined, 'new', 10, 20, TEST_USER.uid, undefined,
       );
     });
 
@@ -114,7 +114,17 @@ describe('ForumController', () => {
       mockForumService.listPosts.mockResolvedValue({ items: [], total: 0 });
       await request(app.getHttpServer()).get('/forum/posts').expect(200);
       expect(mockForumService.listPosts).toHaveBeenCalledWith(
-        undefined, undefined, 'hot', 20, 0, TEST_USER.uid,
+        undefined, undefined, 'hot', 20, 0, TEST_USER.uid, undefined,
+      );
+    });
+
+    it('should forward authorUid query param to service', async () => {
+      mockForumService.listPosts.mockResolvedValue({ items: [], total: 0 });
+      await request(app.getHttpServer())
+        .get('/forum/posts?authorUid=some-author-uid')
+        .expect(200);
+      expect(mockForumService.listPosts).toHaveBeenCalledWith(
+        undefined, undefined, 'hot', 20, 0, TEST_USER.uid, 'some-author-uid',
       );
     });
   });
