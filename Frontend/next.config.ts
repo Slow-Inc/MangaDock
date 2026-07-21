@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 import os from "os";
-import path from "path";
 
 /**
  * Dynamically collect ALL IPv4 addresses of the machine so that Next.js dev
@@ -38,15 +37,6 @@ const nextConfig: NextConfig = {
   // from other devices on the local network (e.g. 192.168.x.x, 10.x.x.x, Radmin VPN)
   // or via Cloudflare Tunnel (add hostname to NEXT_DEV_EXTRA_ORIGINS in .env.local).
   allowedDevOrigins: [...getLocalIPv4Addresses(), ...getExtraDevOrigins()],
-  turbopack: {
-    resolveAlias: {
-      '@mangadock/mobile-bridge': path.resolve(__dirname, '../Mobile/shared/mobileBridge.ts'),
-    },
-  },
-  webpack(config) {
-    config.resolve.alias['@mangadock/mobile-bridge'] = path.resolve(__dirname, '../Mobile/shared/mobileBridge.ts');
-    return config;
-  },
   async rewrites() {
     const backendUrl = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
     return [
