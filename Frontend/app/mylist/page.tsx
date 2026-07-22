@@ -439,7 +439,7 @@ function MyListContent() {
                 {tab.label}
                 {count > 0 && (
                   <span
-                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                    className={`rounded-full px-1.5 py-0.5 text-xs font-semibold transition-colors ${
                       activeTab === tab.key
                         ? "bg-white/20 text-white"
                         : "bg-white/8 text-white/40"
