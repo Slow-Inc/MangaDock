@@ -9,6 +9,7 @@ import LoginModal from "./LoginModal";
 import { useAuth } from "../contexts/AuthContext";
 import TopupModal from "./TopupModal";
 import { getWalletBalance } from "../lib/studioApi";
+import NotificationBell from "./NotificationBell";
 
 export default function NavbarActions() {
   const router = useRouter();
@@ -62,6 +63,7 @@ export default function NavbarActions() {
         ) : user ? (
           /* ── Coin chip + User avatar + dropdown ── */
           <>
+          <NotificationBell />
           {coinBalance !== null && (
             <button
               onClick={() => setTopupOpen(true)}
@@ -107,7 +109,7 @@ export default function NavbarActions() {
                   <p className="truncate text-xs font-semibold text-white">
                     {user.displayName}
                   </p>
-                  <p className="truncate text-[11px] text-white/40">{user.email}</p>
+                  <p className="truncate text-xs text-white/40">{user.email}</p>
                 </div>
                 <button
                   onClick={() => { setMenuOpen(false); router.push(`/community/profile/${user.uid}`); }}

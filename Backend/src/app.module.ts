@@ -19,6 +19,7 @@ import { HardwareIdMiddleware } from './common/middleware/hardware-id.middleware
 import { ForumModule } from './forum/forum.module';
 import { AdminModule } from './admin/admin.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 import { validate } from './common/env.validation';
 
@@ -41,6 +42,7 @@ import { validate } from './common/env.validation';
     ForumModule,
     AdminModule,
     ReviewsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule implements NestModule {
