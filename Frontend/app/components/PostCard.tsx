@@ -7,6 +7,7 @@ import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import VoteButtons from "./VoteButtons";
+import ReportButton from "./ReportButton";
 import type { ForumPost } from "../lib/types";
 import { isSocialCdnUrl } from "../lib/avatarUpload";
 
@@ -77,7 +78,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
                 <svg className="w-2.5 h-2.5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="text-[9px] font-black text-white">{post.imageUrls.length}</span>
+                <span className="text-xs font-black text-white">{post.imageUrls.length}</span>
               </div>
             )}
           </Link>
@@ -86,7 +87,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
         {/* Content */}
         <div className="flex-1 px-3 py-2.5 min-w-0 flex flex-col justify-center gap-1">
           {/* Meta row */}
-          <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] text-white/35">
+          <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-xs text-white/35">
             <div className="w-4 h-4 rounded-full bg-white/10 overflow-hidden shrink-0">
               {post.authorPhotoUrl && (
                 <Image src={post.authorPhotoUrl} alt={post.authorName || 'user'} width={16} height={16} className="object-cover" unoptimized={isSocialCdnUrl(post.authorPhotoUrl)} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
@@ -140,17 +141,18 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
             />
             <Link
               href={`/community/p/${post.id}#comments`}
-              className="flex items-center gap-1 text-[10px] font-bold text-white/30 hover:text-white/60 smooth-hover"
+              className="flex items-center gap-1 text-xs font-bold text-white/30 hover:text-white/60 smooth-hover"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
               {post.commentCount}
             </Link>
+            <ReportButton contentType="post" contentId={post.id} />
             {isSpoiler && (
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSpoilerRevealed(true); }}
-                className={`text-[10px] font-bold text-amber-400 hover:text-amber-300 smooth-hover-fast ml-auto transition-opacity duration-500 ${spoilerRevealed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                className={`text-xs font-bold text-amber-400 hover:text-amber-300 smooth-hover-fast ml-auto transition-opacity duration-500 ${spoilerRevealed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
               >
                 ดูสปอยล์
               </button>
@@ -189,7 +191,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
           >
             {post.authorName || 'Unknown User'}
             {post.authorRole > 0 && (
-              <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter ${
+              <span className={`ml-1.5 px-1.5 py-0.5 rounded text-xs font-bold uppercase tracking-tighter ${
                 post.authorRole === 1 ? 'bg-indigo-500/15 text-indigo-400' :
                 post.authorRole === 2 ? 'bg-orange-500/15 text-orange-400' :
                 'bg-red-500/15 text-red-400'
@@ -198,7 +200,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
               </span>
             )}
           </Link>
-          <span className="text-[10px] text-white/40 font-medium">
+          <span className="text-xs text-white/40 font-medium">
             {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: th })}
           </span>
         </div>
@@ -261,14 +263,14 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
         {/* Tags area positioned at the bottom of the content area */}
         <div className="mt-auto pt-3 flex flex-wrap items-center gap-2">
           {post.category !== 'general' && (
-            <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-bold uppercase tracking-wider smooth-hover border border-indigo-500/20">
+            <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-bold uppercase tracking-wider smooth-hover border border-indigo-500/20">
               {CAT_LABEL[post.category] ?? post.category}
             </span>
           )}
           {post.targetMangaTitle && (
             <Link
               href={`/community/manga/${post.targetMangaId}`}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold hover:bg-amber-500/20 smooth-hover border border-amber-500/20"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 text-xs font-bold hover:bg-amber-500/20 smooth-hover border border-amber-500/20"
             >
               {post.targetMangaCover && (
                 <div className="w-3.5 h-3.5 rounded-sm overflow-hidden relative border border-amber-500/20 shrink-0">
@@ -290,8 +292,8 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
           initialUserVote={post.userVote}
         />
 
-        <div className="flex gap-2">
-          <Link 
+        <div className="flex items-center gap-2">
+          <Link
             href={`/community/p/${post.id}#comments`}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 text-white/50 hover:bg-white/10 hover:text-white smooth-hover font-bold text-xs"
           >
@@ -300,6 +302,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
             </svg>
             {post.commentCount} <span className="hidden sm:inline">ความคิดเห็น</span>
           </Link>
+          <ReportButton contentType="post" contentId={post.id} />
         </div>
       </footer>
     </article>

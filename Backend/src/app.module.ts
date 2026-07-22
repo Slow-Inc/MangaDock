@@ -23,6 +23,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { TranslationFeedbackModule } from './translation-feedback/translation-feedback.module';
 import { ReaderCommentsModule } from './reader-comments/reader-comments.module';
 import { UserFollowsModule } from './user-follows/user-follows.module';
+import { ContentReportsModule } from './content-reports/content-reports.module';
 
 import { validate } from './common/env.validation';
 
@@ -49,6 +50,7 @@ import { validate } from './common/env.validation';
     TranslationFeedbackModule,
     ReaderCommentsModule,
     UserFollowsModule,
+    ContentReportsModule,
   ],
 })
 export class AppModule implements NestModule {
