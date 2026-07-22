@@ -112,6 +112,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [visible, setVisible] = useState(false);
   const [useSaver, setUseSaver] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
+  const [sideBySide, setSideBySide] = useState(false);
   const [translateMenuOpen, setTranslateMenuOpen] = useState(false);
   const translateMenuRef = useRef<HTMLDivElement | null>(null);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -743,6 +744,20 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                           </button>
                         </>
                       )}
+                      {showTranslation && !continuousMode && (
+                        <>
+                          <div className="my-1 border-t border-white/10" />
+                          <button
+                            onClick={() => { setSideBySide((s) => !s); setTranslateMenuOpen(false); }}
+                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors duration-150 hover:bg-white/10 ${sideBySide ? "text-blue-300" : "text-white/65 hover:text-white"}`}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0">
+                              <rect x="2" y="3" width="9" height="18" rx="1" /><rect x="13" y="3" width="9" height="18" rx="1" />
+                            </svg>
+                            {sideBySide ? "ปิดเปรียบเทียบ" : "เปรียบเทียบ ต้นฉบับ / แปล"}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -973,6 +988,17 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                             {translateMenu.viewToggleLabel}
                           </button>
                         )}
+                        {showTranslation && !continuousMode && (
+                          <button
+                            onClick={() => { setSideBySide((s) => !s); setMoreMenuOpen(false); }}
+                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition hover:bg-white/10 ${sideBySide ? "text-blue-300" : "text-white/65 hover:text-white"}`}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0">
+                              <rect x="2" y="3" width="9" height="18" rx="1" /><rect x="13" y="3" width="9" height="18" rx="1" />
+                            </svg>
+                            {sideBySide ? "ปิดเปรียบเทียบ" : "เปรียบเทียบ ต้นฉบับ / แปล"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -1099,32 +1125,97 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             )}
             {data && (
               <>
-                <PageRenderer
-                  viewport={viewport}
-                  data={data}
-                  page={page}
-                  setPage={setPage}
-                  continuousMode={continuousMode}
-                  pages={pages}
-                  totalPages={totalPages}
-                  showTranslation={showTranslation}
-                  translatedPages={translatedPages}
-                  patchedPages={patchedPages}
-                  completedTranslatedPages={completedTranslatedPages}
-                  translating={translating}
-                  translatingCurrentPageIndex={translatingCurrentPageIndex}
-                  currentStage={currentStage}
-                  translateDetail={translateDetail}
-                  imgLoading={imgLoading}
-                  setImgLoading={setImgLoading}
-                  hasNextSameLang={hasNextSameLang}
-                  hasNextOtherLang={hasNextOtherLang}
-                  nextSameLang={nextSameLang}
-                  otherLangNextMap={otherLangNextMap}
-                  currentLang={currentLang}
-                  langLabel={langLabel}
-                  goToChapter={goToChapter}
-                />
+                {sideBySide && showTranslation && !continuousMode ? (
+                  <div className="flex h-full w-full gap-0.5 overflow-hidden">
+                    {/* Original */}
+                    <div className="relative flex flex-1 flex-col overflow-hidden">
+                      <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-2.5 py-0.5 text-xs text-white/50 backdrop-blur-sm">ต้นฉบับ</div>
+                      <PageRenderer
+                        viewport={viewport}
+                        data={data}
+                        page={page}
+                        setPage={setPage}
+                        continuousMode={false}
+                        pages={pages}
+                        totalPages={totalPages}
+                        showTranslation={false}
+                        translatedPages={translatedPages}
+                        patchedPages={patchedPages}
+                        completedTranslatedPages={completedTranslatedPages}
+                        translating={translating}
+                        translatingCurrentPageIndex={translatingCurrentPageIndex}
+                        currentStage={currentStage}
+                        translateDetail={translateDetail}
+                        imgLoading={imgLoading}
+                        setImgLoading={setImgLoading}
+                        hasNextSameLang={hasNextSameLang}
+                        hasNextOtherLang={hasNextOtherLang}
+                        nextSameLang={nextSameLang}
+                        otherLangNextMap={otherLangNextMap}
+                        currentLang={currentLang}
+                        langLabel={langLabel}
+                        goToChapter={goToChapter}
+                      />
+                    </div>
+                    {/* Translated */}
+                    <div className="relative flex flex-1 flex-col overflow-hidden">
+                      <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-blue-500/30 px-2.5 py-0.5 text-xs text-blue-300 backdrop-blur-sm">แปล</div>
+                      <PageRenderer
+                        viewport={viewport}
+                        data={data}
+                        page={page}
+                        setPage={setPage}
+                        continuousMode={false}
+                        pages={pages}
+                        totalPages={totalPages}
+                        showTranslation={true}
+                        translatedPages={translatedPages}
+                        patchedPages={patchedPages}
+                        completedTranslatedPages={completedTranslatedPages}
+                        translating={translating}
+                        translatingCurrentPageIndex={translatingCurrentPageIndex}
+                        currentStage={currentStage}
+                        translateDetail={translateDetail}
+                        imgLoading={imgLoading}
+                        setImgLoading={setImgLoading}
+                        hasNextSameLang={hasNextSameLang}
+                        hasNextOtherLang={hasNextOtherLang}
+                        nextSameLang={nextSameLang}
+                        otherLangNextMap={otherLangNextMap}
+                        currentLang={currentLang}
+                        langLabel={langLabel}
+                        goToChapter={goToChapter}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <PageRenderer
+                    viewport={viewport}
+                    data={data}
+                    page={page}
+                    setPage={setPage}
+                    continuousMode={continuousMode}
+                    pages={pages}
+                    totalPages={totalPages}
+                    showTranslation={showTranslation}
+                    translatedPages={translatedPages}
+                    patchedPages={patchedPages}
+                    completedTranslatedPages={completedTranslatedPages}
+                    translating={translating}
+                    translatingCurrentPageIndex={translatingCurrentPageIndex}
+                    currentStage={currentStage}
+                    translateDetail={translateDetail}
+                    imgLoading={imgLoading}
+                    setImgLoading={setImgLoading}
+                    hasNextSameLang={hasNextSameLang}
+                    hasNextOtherLang={hasNextOtherLang}
+                    nextSameLang={nextSameLang}
+                    otherLangNextMap={otherLangNextMap}
+                    currentLang={currentLang}
+                    langLabel={langLabel}
+                    goToChapter={goToChapter}
+                  />
+                )}
                 {showTranslation && mangaId && (
                   <div className="absolute bottom-20 left-1/2 z-10 -translate-x-1/2">
                     <TranslationFeedback mangaId={mangaId} chapterId={chapterId} pageNumber={page + 1} />
