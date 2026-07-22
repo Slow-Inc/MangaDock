@@ -495,9 +495,9 @@ describe('UsersService.getProfile — parallel queries', () => {
 
 // ── FR-21: deleteUserAccount parallel deletes ───────────────────────────────
 describe('UsersService.deleteUserAccount — parallel deletes', () => {
-  it('dispatches the three child-table deletes in parallel, profile only after', async () => {
+  it('dispatches the four child-table deletes in parallel, profile only after', async () => {
     const resolvers: Record<string, (v: unknown) => void> = {};
-    const childTables = ['user_favorites', 'user_liked', 'user_history'];
+    const childTables = ['user_favorites', 'user_liked', 'user_history', 'series_follows'];
     const childChains: Record<string, any> = {};
     for (const t of childTables) {
       childChains[t] = {
@@ -521,10 +521,11 @@ describe('UsersService.deleteUserAccount — parallel deletes', () => {
 
     const promise = service.deleteUserAccount('u1');
 
-    // All three child deletes issued before any resolves; profile delete not yet reached.
+    // All four child deletes issued before any resolves; profile delete not yet reached.
     expect(from).toHaveBeenCalledWith('user_favorites');
     expect(from).toHaveBeenCalledWith('user_liked');
     expect(from).toHaveBeenCalledWith('user_history');
+    expect(from).toHaveBeenCalledWith('series_follows');
     expect(profileChain.delete).not.toHaveBeenCalled();
 
     childTables.forEach((t) => resolvers[t]({ error: null }));
