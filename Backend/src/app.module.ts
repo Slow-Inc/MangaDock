@@ -18,6 +18,7 @@ import { UnlockModule } from './unlock/unlock.module';
 import { HardwareIdMiddleware } from './common/middleware/hardware-id.middleware';
 import { ForumModule } from './forum/forum.module';
 import { AdminModule } from './admin/admin.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 import { validate } from './common/env.validation';
 
@@ -39,6 +40,7 @@ import { validate } from './common/env.validation';
     UnlockModule,
     ForumModule,
     AdminModule,
+    ReviewsModule,
   ],
 })
 export class AppModule implements NestModule {
