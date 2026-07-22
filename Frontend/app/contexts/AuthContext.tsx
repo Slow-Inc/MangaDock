@@ -18,6 +18,7 @@ import {
   validateEmailBeforeSignup,
 } from "../lib/emailValidation";
 import { setTokenSupplier, loadUserData, clearUserCache, flushNow } from "../lib/userCache";
+import { clearFollowCache } from "../hooks/useSeriesFollow";
 import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData } from "../lib/readingHistory";
 import { clearAllApiCache } from "../lib/apiCache";
 import { reloadPage, redirectToHome } from "../lib/browserActions";
@@ -376,6 +377,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (lastUidRef.current && lastUidRef.current !== suUser.id) {
           clearUserCache();
           clearHistory();
+          clearFollowCache();
           clearAllApiCache();
         }
         lastUidRef.current = suUser.id;
@@ -427,6 +429,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastUidRef.current = null;
         clearUserCache();
         clearHistory();
+        clearFollowCache();
         clearAllApiCache();
       }
     });
@@ -699,6 +702,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
     clearHistory();
+    clearFollowCache();
     clearAllApiCache();
     await supabase.auth.signOut();
     setUser(null);
@@ -877,6 +881,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
     clearHistory();
+    clearFollowCache();
     clearAllApiCache();
     await supabase.auth.signOut();
     setUser(null);

@@ -11,6 +11,12 @@ import {
   type CachedBook,
 } from "../lib/userCache";
 import {
+  getFollows,
+  loadFollows,
+  FOLLOW_EVENT,
+  type FollowedSeries,
+} from "../hooks/useSeriesFollow";
+import {
   getHistory,
   HISTORY_EVENT,
   type HistoryBook,
@@ -18,17 +24,32 @@ import {
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 
-type TabKey = "favorites" | "liked" | "history";
+type TabKey = "favorites" | "follows" | "liked" | "history";
 
 const PAGE_SIZE = 28;
 const TRANSITION_MS = 300;
 
 const TABS: { key: TabKey; label: string }[] = [
-
   { key: "favorites", label: "รายการของฉัน" },
+  { key: "follows",   label: "ติดตาม" },
   { key: "liked",     label: "ถูกใจ" },
   { key: "history",   label: "อ่านต่อ" },
 ];
+
+function followToGrid(item: FollowedSeries): GridBook {
+  return {
+    id:            item.id,
+    title:         item.title,
+    subtitle:      "",
+    authors:       [],
+    description:   "",
+    thumbnail:     item.thumbnail,
+    publishedDate: "",
+    categories:    [],
+    averageRating: 0,
+    ratingsCount:  0,
+  };
+}
 
 function cachedToGrid(book: CachedBook): GridBook {
   return {
@@ -258,6 +279,7 @@ function MyListContent() {
   const [page, setPage]             = useState(1);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [favorites, setFavorites]   = useState<GridBook[]>([]);
+  const [follows, setFollows]       = useState<GridBook[]>([]);
   const [likedBooks, setLikedBooks] = useState<GridBook[]>([]);
   const [history, setHistory]       = useState<GridBook[]>([]);
   const [visible, setVisible] = useState(true);
@@ -266,7 +288,7 @@ function MyListContent() {
 
   useEffect(() => {
     const requestedTab = searchParams.get("tab");
-    if (requestedTab === "favorites" || requestedTab === "liked" || requestedTab === "history") {
+    if (requestedTab === "favorites" || requestedTab === "follows" || requestedTab === "liked" || requestedTab === "history") {
       setActiveTab(requestedTab);
     }
   }, [searchParams]);
@@ -298,6 +320,7 @@ function MyListContent() {
 
       setFavorites(favs);
       setHistory(hist);
+      setFollows(getFollows().map(followToGrid));
 
       // Liked = books in favs OR hist whose ID is liked
       const seen = new Set<string>();
@@ -314,14 +337,21 @@ function MyListContent() {
     refresh();
     window.addEventListener(CACHE_EVENT, refresh);
     window.addEventListener(HISTORY_EVENT, refresh);
+    window.addEventListener(FOLLOW_EVENT, refresh);
     return () => {
       window.removeEventListener(CACHE_EVENT, refresh);
       window.removeEventListener(HISTORY_EVENT, refresh);
+      window.removeEventListener(FOLLOW_EVENT, refresh);
     };
   }, []);
 
+  useEffect(() => {
+    if (user) loadFollows();
+  }, [user]);
+
   const tabBooks: Record<TabKey, GridBook[]> = {
     favorites: favorites,
+    follows:   follows,
     liked:     likedBooks,
     history:   history,
   };
@@ -341,6 +371,7 @@ function MyListContent() {
 
   const emptyMessages: Record<TabKey, string> = {
     favorites: "ยังไม่มีรายการที่บันทึกไว้",
+    follows:   "ยังไม่มี series ที่ติดตาม",
     liked:     "ยังไม่มีรายการที่ถูกใจ",
     history:   "ยังไม่มีประวัติการอ่าน",
   };

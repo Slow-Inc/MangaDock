@@ -9,6 +9,7 @@ import MangaReader from "./MangaReader";
 import ChapterList from "./ChapterList";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { useBookActions } from "../hooks/useBookActions";
+import FollowSeriesButton from "./FollowSeriesButton";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
@@ -513,6 +514,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         </svg>
                       )}
                     </button>
+                    <FollowSeriesButton book={book} variant="icon-square" />
                     <button
                       title={liked ? "เอาออก" : "ถูกใจ"}
                       onClick={handleToggleLiked}
@@ -639,6 +641,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         </svg>
                       )}
                     </button>
+                    <FollowSeriesButton book={book} />
                     <button
                       title={liked ? "เอาออก" : "ถูกใจ"}
                       onClick={handleToggleLiked}
