@@ -18,6 +18,13 @@ import { UnlockModule } from './unlock/unlock.module';
 import { HardwareIdMiddleware } from './common/middleware/hardware-id.middleware';
 import { ForumModule } from './forum/forum.module';
 import { AdminModule } from './admin/admin.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { TranslationFeedbackModule } from './translation-feedback/translation-feedback.module';
+import { ReaderCommentsModule } from './reader-comments/reader-comments.module';
+import { UserFollowsModule } from './user-follows/user-follows.module';
+import { ContentReportsModule } from './content-reports/content-reports.module';
+import { CheckinModule } from './checkin/checkin.module';
 
 import { validate } from './common/env.validation';
 
@@ -39,6 +46,13 @@ import { validate } from './common/env.validation';
     UnlockModule,
     ForumModule,
     AdminModule,
+    ReviewsModule,
+    NotificationsModule,
+    TranslationFeedbackModule,
+    ReaderCommentsModule,
+    UserFollowsModule,
+    ContentReportsModule,
+    CheckinModule,
   ],
 })
 export class AppModule implements NestModule {

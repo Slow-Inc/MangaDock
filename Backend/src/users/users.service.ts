@@ -36,6 +36,13 @@ export type FavoriteItem = {
   ratingsCount?: number;
 };
 
+export type FollowItem = {
+  id: string;
+  title: string;
+  thumbnail: string;
+  followedAt: string;
+};
+
 export type UserProfile = {
   uid: string;
   email: string | null;
@@ -93,6 +100,13 @@ type FavoriteRow = {
   published_date: string | null;
   average_rating: number | null;
   ratings_count: number | null;
+};
+
+type FollowRow = {
+  manga_id: string;
+  manga_title: string;
+  thumbnail: string;
+  followed_at: string;
 };
 
 /** Returns true if the URL is from a social OAuth CDN (Google, Facebook).
@@ -406,6 +420,54 @@ export class UsersService {
     this.logger.log(`User ${uid} unliked: ${itemId}`);
   }
 
+  private mapFollow(row: FollowRow): FollowItem {
+    return {
+      id: row.manga_id,
+      title: row.manga_title ?? '',
+      thumbnail: row.thumbnail ?? '',
+      followedAt: row.followed_at,
+    };
+  }
+
+  async followSeries(
+    uid: string,
+    item: { id: string; title: string; thumbnail: string },
+  ) {
+    if (!item.id) throw new BadRequestException('id is required');
+    const { error } = await this.db.from('series_follows').upsert(
+      {
+        uid,
+        manga_id: item.id,
+        manga_title: item.title ?? '',
+        thumbnail: item.thumbnail ?? '',
+        followed_at: new Date().toISOString(),
+      },
+      { onConflict: 'uid,manga_id' },
+    );
+    if (error) throw new Error(`Failed to follow series: ${error.message}`);
+    this.logger.log(`User ${uid} followed series: ${item.id}`);
+  }
+
+  async unfollowSeries(uid: string, mangaId: string) {
+    const { error } = await this.db
+      .from('series_follows')
+      .delete()
+      .eq('uid', uid)
+      .eq('manga_id', mangaId);
+    if (error) throw new Error(`Failed to unfollow series: ${error.message}`);
+    this.logger.log(`User ${uid} unfollowed series: ${mangaId}`);
+  }
+
+  async getFollows(uid: string): Promise<FollowItem[]> {
+    const { data, error } = await this.db
+      .from('series_follows')
+      .select('*')
+      .eq('uid', uid)
+      .order('followed_at', { ascending: false });
+    if (error) throw new Error(`Failed to fetch follows: ${error.message}`);
+    return (data ?? []).map((row) => this.mapFollow(row as FollowRow));
+  }
+
   async getLiked(uid: string): Promise<string[]> {
     const { data, error } = await this.db
       .from('user_liked')
@@ -602,7 +664,7 @@ export class UsersService {
   async deleteUserAccount(uid: string): Promise<void> {
     // Child tables are independent of each other — delete them in parallel.
     // They FK-reference profiles(uid), so the parent row must be deleted AFTER them.
-    const tables = ['user_favorites', 'user_liked', 'user_history'];
+    const tables = ['user_favorites', 'user_liked', 'user_history', 'series_follows'];
     const results = await Promise.all(
       tables.map((table) => this.db.from(table).delete().eq('uid', uid)),
     );

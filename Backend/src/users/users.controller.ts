@@ -149,6 +149,27 @@ export class UsersController {
     return { url: `/${key}` };
   }
 
+  @Get('me/follows')
+  getFollows(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
+    return this.users.getFollows(req[USER_KEY].uid);
+  }
+
+  @Post('me/follows')
+  followSeries(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+    @Body() body: { id: string; title: string; thumbnail: string },
+  ) {
+    return this.users.followSeries(req[USER_KEY].uid, body);
+  }
+
+  @Delete('me/follows/:id')
+  unfollowSeries(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+    @Param('id') id: string,
+  ) {
+    return this.users.unfollowSeries(req[USER_KEY].uid, id);
+  }
+
   @Get('me/liked')
   getLiked(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
     return this.users.getLiked(req[USER_KEY].uid);
