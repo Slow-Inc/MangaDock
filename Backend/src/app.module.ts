@@ -20,6 +20,7 @@ import { ForumModule } from './forum/forum.module';
 import { AdminModule } from './admin/admin.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { TranslationFeedbackModule } from './translation-feedback/translation-feedback.module';
 
 import { validate } from './common/env.validation';
 
@@ -43,6 +44,7 @@ import { validate } from './common/env.validation';
     AdminModule,
     ReviewsModule,
     NotificationsModule,
+    TranslationFeedbackModule,
   ],
 })
 export class AppModule implements NestModule {

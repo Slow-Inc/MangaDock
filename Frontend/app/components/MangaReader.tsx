@@ -17,6 +17,7 @@ import { useReaderCaptcha } from "../hooks/useReaderCaptcha";
 import ReaderCaptchaGate from "./reader/ReaderCaptchaGate";
 import ChapterPicker from "./reader/ChapterPicker";
 import PageRenderer from "./reader/PageRenderer";
+import TranslationFeedback from "./TranslationFeedback";
 
 export type ChapterPages = {
   pages: string[];
@@ -539,7 +540,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                 <button
                   onClick={() => pickerMounted ? closePicker() : openPicker(currentLang ?? "all")}
                   title="เลือกตอน"
-                  className="flex h-8 items-center px-3 text-[11px] text-white/60 select-none whitespace-nowrap transition hover:text-white hover:bg-white/10"
+                  className="flex h-8 items-center px-3 text-xs text-white/60 select-none whitespace-nowrap transition hover:text-white hover:bg-white/10"
                 >
                   {chapterNumDisplay !== null && maxMainChapter !== null
                       ? `ตอน ${chapterNumDisplay} / ${maxMainChapter}`
@@ -631,14 +632,14 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   >
                     {/* Header */}
                     <div className="border-b border-white/10 px-4 py-2.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/40">การแปล AI</p>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-white/40">การแปล AI</p>
                     </div>
 
                     <div className="p-2">
                       {/* Language selector */}
                       {LANGS.length > 0 && (
                         <div className="mb-1">
-                          <div className="mb-1.5 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-white/35">ภาษาที่แปลออกมา</div>
+                          <div className="mb-1.5 px-2 pt-1 text-xs font-semibold uppercase tracking-widest text-white/35">ภาษาที่แปลออกมา</div>
                           <div className="flex flex-wrap gap-1 px-1 pb-1">
                             {LANGS.map((l) => (
                               <button
@@ -660,7 +661,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       {/* Image-translation model selector (#87) — Gemini deployments only (#134) */}
                       {showModelSelector && availableModels.length > 0 && (
                         <div className="mb-1">
-                          <div className="mb-1.5 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-white/35">โมเดล AI</div>
+                          <div className="mb-1.5 px-2 pt-1 text-xs font-semibold uppercase tracking-widest text-white/35">โมเดล AI</div>
                           <div className="flex flex-wrap gap-1 px-1 pb-1">
                             <button
                               onClick={() => selectImageModel(null)}
@@ -746,7 +747,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             })()}
 
             {/* Read mode toggle — hidden on mobile, shown in more menu */}
-            <div className="hidden sm:flex overflow-hidden rounded-lg border border-white/15 bg-white/5 text-[11px]">
+            <div className="hidden sm:flex overflow-hidden rounded-lg border border-white/15 bg-white/5 text-xs">
               <button
                 onClick={() => setContinuousMode(false)}
                 className={`px-2.5 py-1.5 transition ${!continuousMode ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
@@ -772,7 +773,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} title="ย่อ" className="flex h-6 w-6 items-center justify-center rounded text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-30">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5"><path d="M5 12h14" /></svg>
               </button>
-              <button onClick={zoomReset} title="รีเซ็ต" className="min-w-10 rounded px-1 py-0.5 text-center text-[11px] text-white/70 transition hover:bg-white/10 hover:text-white">
+              <button onClick={zoomReset} title="รีเซ็ต" className="min-w-10 rounded px-1 py-0.5 text-center text-xs text-white/70 transition hover:bg-white/10 hover:text-white">
                 {Math.round(zoom * 100)}%
               </button>
               <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} title="ขยาย" className="flex h-6 w-6 items-center justify-center rounded text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-30">
@@ -806,7 +807,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               >
                 {/* Zoom section */}
                 <div className="border-b border-white/10 px-4 py-3">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">ซูม</p>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/40">ซูม</p>
                   <div className="flex items-center gap-2">
                     <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white disabled:opacity-30">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M5 12h14" /></svg>
@@ -822,7 +823,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
                 {/* Read mode section */}
                 <div className="border-b border-white/10 px-4 py-3">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">โหมดอ่าน</p>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/40">โหมดอ่าน</p>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setContinuousMode(false)}
@@ -847,13 +848,13 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
                 {/* Data saver section */}
                 <div className={`${data && pages.length > 0 ? "border-b border-white/10" : ""} px-4 py-3`}>
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">คุณภาพ</p>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/40">คุณภาพ</p>
                   <button
                     onClick={() => setUseSaver((s) => !s)}
                     className="flex w-full items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"
                   >
                     <span>{useSaver ? "Data Saver" : "HD"}</span>
-                    <span className={`rounded px-2 py-0.5 text-[10px] ${
+                    <span className={`rounded px-2 py-0.5 text-xs ${
                       useSaver ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"
                     }`}>
                       {useSaver ? "ประหยัดข้อมูล" : "คุณภาพสูง"}
@@ -869,7 +870,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   return (
                     <div className="px-4 py-3">
                       <div className="mb-2 flex items-center gap-2">
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/40">การแปล AI</p>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-white/40">การแปล AI</p>
                         <span className={`h-1.5 w-1.5 rounded-full ${
                           mitStatus === "online" ? "bg-green-400" : mitStatus === "offline" ? "bg-red-500" : "bg-white/30"
                         }`} />
@@ -1084,32 +1085,39 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               </div>
             )}
             {data && (
-              <PageRenderer
-                viewport={viewport}
-                data={data}
-                page={page}
-                setPage={setPage}
-                continuousMode={continuousMode}
-                pages={pages}
-                totalPages={totalPages}
-                showTranslation={showTranslation}
-                translatedPages={translatedPages}
-                patchedPages={patchedPages}
-                completedTranslatedPages={completedTranslatedPages}
-                translating={translating}
-                translatingCurrentPageIndex={translatingCurrentPageIndex}
-                currentStage={currentStage}
-                translateDetail={translateDetail}
-                imgLoading={imgLoading}
-                setImgLoading={setImgLoading}
-                hasNextSameLang={hasNextSameLang}
-                hasNextOtherLang={hasNextOtherLang}
-                nextSameLang={nextSameLang}
-                otherLangNextMap={otherLangNextMap}
-                currentLang={currentLang}
-                langLabel={langLabel}
-                goToChapter={goToChapter}
-              />
+              <>
+                <PageRenderer
+                  viewport={viewport}
+                  data={data}
+                  page={page}
+                  setPage={setPage}
+                  continuousMode={continuousMode}
+                  pages={pages}
+                  totalPages={totalPages}
+                  showTranslation={showTranslation}
+                  translatedPages={translatedPages}
+                  patchedPages={patchedPages}
+                  completedTranslatedPages={completedTranslatedPages}
+                  translating={translating}
+                  translatingCurrentPageIndex={translatingCurrentPageIndex}
+                  currentStage={currentStage}
+                  translateDetail={translateDetail}
+                  imgLoading={imgLoading}
+                  setImgLoading={setImgLoading}
+                  hasNextSameLang={hasNextSameLang}
+                  hasNextOtherLang={hasNextOtherLang}
+                  nextSameLang={nextSameLang}
+                  otherLangNextMap={otherLangNextMap}
+                  currentLang={currentLang}
+                  langLabel={langLabel}
+                  goToChapter={goToChapter}
+                />
+                {showTranslation && mangaId && (
+                  <div className="absolute bottom-20 left-1/2 z-10 -translate-x-1/2">
+                    <TranslationFeedback mangaId={mangaId} chapterId={chapterId} pageNumber={page + 1} />
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -1132,7 +1140,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                 )}
               </div>
               {translateSubline && (
-                <span className="text-[10px] text-white/40">{translateSubline}</span>
+                <span className="text-xs text-white/40">{translateSubline}</span>
               )}
             </div>
           </div>
@@ -1152,7 +1160,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   key={i}
                   ref={i === page ? activeStripBtnRef : undefined}
                   onClick={() => continuousMode ? scrollToPage(i) : setPage(i)}
-                  className={`relative flex h-7 min-w-9 shrink-0 items-center justify-center rounded-md text-[10px] font-medium transition-[background-color,color,box-shadow,transform] duration-700 ease-out ${
+                  className={`relative flex h-7 min-w-9 shrink-0 items-center justify-center rounded-md text-xs font-medium transition-[background-color,color,box-shadow,transform] duration-700 ease-out ${
                     i === page
                       ? "bg-white/90 text-black shadow-[0_0_0_1px_rgba(255,255,255,0.52),0_0_14px_rgba(255,255,255,0.12)]"
                       : "bg-white/8 text-white/55 shadow-[0_0_0_1px_rgba(255,255,255,0)] hover:bg-white/14"
