@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
+import { quoteFilterValue } from '../common/query-params';
 import { SupabaseService } from '../supabase/supabase.service';
 import { MangaDexService } from './mangadex.service';
 import {
@@ -156,7 +157,9 @@ export class MangaCatalogService {
 
   /** Query chapter_versions for title_name / title_alt_name matching the search query. */
   private async findTitleIdsByAltName(query: string): Promise<string[]> {
-    const pattern = `%${query}%`;
+    // Quoted so a query like `a,title_id.not.is.null` is matched literally
+    // instead of injecting an extra top-level OR clause (#660).
+    const pattern = quoteFilterValue(`%${query}%`);
     const { data, error } = await this.supabase.client
       .from('chapter_versions')
       .select('title_id')
