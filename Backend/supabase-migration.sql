@@ -755,4 +755,89 @@ AS $$
   LIMIT p_limit;
 $$;
 
+-- ─── 10. CHECK-IN + REVIEW/ADMIN AGGREGATE RPCs (audit 2026-07-25) ────────────
+
+-- Atomic daily check-in: gates the insert on daily_checkins_uid_check_date_key
+-- and credits the reward in the SAME transaction. Replaces the non-atomic
+-- check-then-INSERT-then-addCoins path in CheckinService (a partial-failure
+-- window recorded the day but never credited the coins). Concurrent/duplicate
+-- claims collapse to ALREADY_CHECKED_IN. SECURITY DEFINER; backend-only.
+CREATE OR REPLACE FUNCTION claim_checkin_atomic(
+  p_uid  uuid,
+  p_date date
+)
+RETURNS TABLE(streak_day integer, coins integer, balance integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_prev_streak integer;
+  v_streak      integer;
+  v_coins       integer;
+  v_balance     integer;
+  v_rowcount    integer;
+BEGIN
+  SELECT dc.streak_day INTO v_prev_streak
+  FROM daily_checkins dc
+  WHERE dc.uid = p_uid AND dc.check_date = p_date - 1;
+
+  v_streak := COALESCE(v_prev_streak, 0) + 1;
+  v_coins  := LEAST(5 + v_streak - 1, 20);  -- BASE_COINS=5, MAX_COINS=20
+
+  INSERT INTO daily_checkins (uid, check_date, coins, streak_day)
+  VALUES (p_uid, p_date, v_coins, v_streak)
+  ON CONFLICT (uid, check_date) DO NOTHING;
+
+  GET DIAGNOSTICS v_rowcount = ROW_COUNT;
+  IF v_rowcount = 0 THEN
+    RAISE EXCEPTION 'ALREADY_CHECKED_IN';
+  END IF;
+
+  INSERT INTO wallets (uid, balance) VALUES (p_uid, 0)
+  ON CONFLICT (uid) DO NOTHING;
+
+  -- Qualify wallets.balance on the RHS: the OUT column `balance` (RETURNS TABLE)
+  -- is otherwise ambiguous with the table column here (ERROR 42702).
+  UPDATE wallets
+  SET balance = wallets.balance + v_coins, updated_at = now()
+  WHERE wallets.uid = p_uid
+  RETURNING wallets.balance INTO v_balance;
+
+  INSERT INTO wallet_transactions (uid, amount, type, balance_after, description, reference_id)
+  VALUES (p_uid, v_coins, 'reward', v_balance,
+          'เช็คอินวันที่ ' || v_streak || ' ติดต่อกัน',
+          'checkin:' || p_uid || ':' || p_date);
+
+  RETURN QUERY SELECT v_streak, v_coins, v_balance;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION claim_checkin_atomic(uuid, date) FROM anon, authenticated, PUBLIC;
+
+-- Review summary aggregate: avg/count over ALL rows (PostgREST caps unbounded
+-- selects at ~1000, which skewed ReviewsService.getReviewSummary). Read-only.
+CREATE OR REPLACE FUNCTION get_review_summary(p_manga_id text)
+RETURNS TABLE(average_rating numeric, review_count bigint)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT COALESCE(ROUND(AVG(rating)::numeric, 1), 0) AS average_rating,
+         COUNT(*)                                     AS review_count
+  FROM manga_reviews
+  WHERE manga_id = p_manga_id;
+$$;
+
+-- Admin "Transactions Today" aggregate: count/sum over ALL rows (same ~1000-row
+-- cap skewed AdminService.getStats). Read-only.
+CREATE OR REPLACE FUNCTION get_tx_stats_since(p_since timestamptz)
+RETURNS TABLE(tx_count bigint, coin_sum bigint)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT COUNT(*)                 AS tx_count,
+         COALESCE(SUM(amount), 0) AS coin_sum
+  FROM wallet_transactions
+  WHERE created_at >= p_since;
+$$;
+
 COMMIT;

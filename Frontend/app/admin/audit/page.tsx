@@ -21,6 +21,7 @@ const ACTION_LABELS: Record<string, string> = {
   change_role: 'เปลี่ยน Role',
   approve_content: 'อนุมัติเนื้อหา',
   reject_content: 'ปฏิเสธเนื้อหา',
+  adjust_wallet: 'ปรับยอดเหรียญ',
 };
 
 const ACTION_COLOR: Record<string, string> = {
@@ -31,6 +32,7 @@ const ACTION_COLOR: Record<string, string> = {
   change_role: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
   approve_content: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   reject_content: 'bg-red-500/10 text-red-400 border-red-500/20',
+  adjust_wallet: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
 };
 
 const LIMIT = 20;
