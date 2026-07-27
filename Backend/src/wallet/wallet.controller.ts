@@ -44,9 +44,16 @@ export class WalletController {
     @Body(new ValidationPipe({ whitelist: true })) body: CreateTopupDto,
   ) {
     if (process.env.XENDIT_ALLOW_SIMULATE !== 'true') {
-      throw new ForbiddenException('Direct topup is not available. Please use the payment gateway.');
+      throw new ForbiddenException(
+        'Direct topup is not available. Please use the payment gateway.',
+      );
     }
-    return this.wallet.addCoins(req[USER_KEY].uid, body.amount, 'topup', 'เติมเหรียญ (ทดสอบ)');
+    return this.wallet.addCoins(
+      req[USER_KEY].uid,
+      body.amount,
+      'topup',
+      'เติมเหรียญ (ทดสอบ)',
+    );
   }
 
   @Post('topup/create')
@@ -133,18 +140,27 @@ export class WalletController {
     @Headers('x-callback-token') token: string,
     @Headers('x-xendit-webhook-signature') signature: string,
   ) {
-    return this.wallet.processXenditWebhook(body, token, (req as any).rawBody, signature);
+    return this.wallet.processXenditWebhook(
+      body,
+      token,
+      (req as any).rawBody,
+      signature,
+    );
   }
 
   @Get('transactions')
   @UseGuards(AuthGuard)
-  async getTransactions(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
+  async getTransactions(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+  ) {
     return this.wallet.getTransactions(req[USER_KEY].uid);
   }
 
   @Get('earnings')
   @UseGuards(AuthGuard)
-  async getCreatorEarnings(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
+  async getCreatorEarnings(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+  ) {
     return this.wallet.getCreatorEarnings(req[USER_KEY].uid);
   }
 }

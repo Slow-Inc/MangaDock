@@ -20,7 +20,7 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@mangadock/mobile-bridge": ["../Mobile/shared/mobileBridge.ts"]
+      "@mangadock/mobile-bridge": ["./app/lib/mobileBridge.ts"]
     }
   },
   "include": [

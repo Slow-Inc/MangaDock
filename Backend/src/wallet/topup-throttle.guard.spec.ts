@@ -3,7 +3,9 @@ import { USER_KEY } from '../auth/auth.guard';
 import { HttpException } from '@nestjs/common';
 
 const ctx = (uid: string) =>
-  ({ switchToHttp: () => ({ getRequest: () => ({ [USER_KEY]: { uid } }) }) }) as any;
+  ({
+    switchToHttp: () => ({ getRequest: () => ({ [USER_KEY]: { uid } }) }),
+  }) as any;
 
 describe('TopupThrottleGuard', () => {
   it('allows requests under the limit', async () => {

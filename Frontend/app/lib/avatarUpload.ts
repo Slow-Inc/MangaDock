@@ -22,3 +22,15 @@ export async function resolveAvatarUrl(res: Response): Promise<string> {
   }
   return url.startsWith("/") ? `/api/proxy${url}` : url;
 }
+
+/** Returns true if the URL is from a social OAuth CDN (Google, Facebook).
+ *  Used to decide whether to skip Next.js image optimization (social CDN
+ *  URLs may redirect through domains not in remotePatterns). */
+export function isSocialCdnUrl(url: string): boolean {
+  return (
+    url.includes('lh3.googleusercontent.com') ||
+    url.includes('fbcdn.net') ||
+    url.includes('fbsbx.com') ||
+    url.includes('graph.facebook.com')
+  );
+}

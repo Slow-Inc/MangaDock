@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   translator_languages TEXT[] NOT NULL DEFAULT '{}',
   photo_history        TEXT[] NOT NULL DEFAULT '{}',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  banned_at    TIMESTAMPTZ NULL     -- set by admin ban; NULL = active
 );
 
 -- user_favorites (PK: uid + manga_id)
@@ -170,6 +171,7 @@ CREATE TABLE IF NOT EXISTS forum_posts (
   target_manga_cover TEXT, -- Cached cover for display tags
   upvotes       INTEGER NOT NULL DEFAULT 0,
   downvotes     INTEGER NOT NULL DEFAULT 0,
+  pinned        BOOLEAN NOT NULL DEFAULT false,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );

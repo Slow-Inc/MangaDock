@@ -8,15 +8,22 @@ describe('ImgCacheController streaming errors', () => {
   let loggerError: jest.SpyInstance;
 
   beforeEach(() => {
-    loggerError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    loggerError = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
   });
 
-  afterEach(() => { loggerError.mockRestore(); });
+  afterEach(() => {
+    loggerError.mockRestore();
+  });
 
-  const makeReq = () => ({ path: '/img-cache/uuid/covers/c0.jpg' }) as unknown as Request;
+  const makeReq = () =>
+    ({ path: '/img-cache/uuid/covers/c0.jpg' }) as unknown as Request;
 
   const makeRes = () => {
-    const res = new Writable({ write: (_c, _e, cb) => cb() }) as unknown as Response & { headersSent: boolean };
+    const res = new Writable({
+      write: (_c, _e, cb) => cb(),
+    }) as unknown as Response & { headersSent: boolean };
     res.setHeader = jest.fn() as unknown as Response['setHeader'];
     res.status = jest.fn(() => res) as unknown as Response['status'];
     (res as unknown as { headersSent: boolean }).headersSent = false;
@@ -87,12 +94,17 @@ describe('ImgCacheController path traversal guard', () => {
     '/img-cache/../src/main.ts',
   ];
 
-  it.each(traversalPaths)('rejects traversal payload %s without reading storage', async (p) => {
-    const { controller, storage } = makeController();
-    const req = { path: p } as unknown as Request;
-    await expect(controller.serve(req, makeRes())).rejects.toBeInstanceOf(NotFoundException);
-    expect(storage.get).not.toHaveBeenCalled();
-  });
+  it.each(traversalPaths)(
+    'rejects traversal payload %s without reading storage',
+    async (p) => {
+      const { controller, storage } = makeController();
+      const req = { path: p } as unknown as Request;
+      await expect(controller.serve(req, makeRes())).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(storage.get).not.toHaveBeenCalled();
+    },
+  );
 
   it('serves a legitimate key within img-cache root', async () => {
     const { controller, storage } = makeController();

@@ -31,7 +31,10 @@ export class TopupThrottleGuard implements CanActivate {
     const count = await this.redis.incrWithTtl(key, TOPUP_RL_WINDOW_SEC);
     if (count === 0) return true; // Redis unavailable → fail open
     if (count > TOPUP_RL_MAX) {
-      throw new HttpException('Too many topup requests. Please wait a minute.', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        'Too many topup requests. Please wait a minute.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
     return true;
   }

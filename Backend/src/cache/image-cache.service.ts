@@ -23,7 +23,10 @@
 
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as path from 'path';
-import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import {
+  STORAGE_PROVIDER,
+  type StorageProvider,
+} from '../common/storage/storage-provider.interface';
 
 @Injectable()
 export class ImageCacheService implements OnModuleInit {
@@ -62,7 +65,10 @@ export class ImageCacheService implements OnModuleInit {
    * otherwise triggers a background download and returns null (caller keeps
    * using the external URL for this request).
    */
-  async localThumbnailPath(bookId: string, externalUrl: string): Promise<string | null> {
+  async localThumbnailPath(
+    bookId: string,
+    externalUrl: string,
+  ): Promise<string | null> {
     if (!this.enabled) return null;
     const ext = this.extFrom(externalUrl);
     const rel = `${bookId}/thumbnail.${ext}`;
@@ -122,7 +128,10 @@ export class ImageCacheService implements OnModuleInit {
    * Already-downloaded covers → local path; others → external URL + background download.
    * Storage: {mangaId}/covers/c{idx}.{ext}
    */
-  async localCoverPaths(mangaId: string, coverUrls: string[]): Promise<string[]> {
+  async localCoverPaths(
+    mangaId: string,
+    coverUrls: string[],
+  ): Promise<string[]> {
     if (!this.enabled || coverUrls.length === 0) return coverUrls;
 
     const dir = `${this.imageDir}/${mangaId}/covers`;

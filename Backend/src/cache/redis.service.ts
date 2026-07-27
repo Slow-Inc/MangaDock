@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import Redis from 'ioredis';
 
 // Atomic INCR + first-hit EXPIRE in one round-trip (same named-Lua pattern as
@@ -18,7 +23,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: Redis | null = null;
   private subscriber: Redis | null = null;
   private isConnected = false;
-  private readonly subscriptions = new Map<string, Set<(data: unknown) => void>>();
+  private readonly subscriptions = new Map<
+    string,
+    Set<(data: unknown) => void>
+  >();
   private readonly reconnectCallbacks = new Set<() => void>();
 
   onReconnect(cb: () => void): () => void {
@@ -42,7 +50,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       lazyConnect: true,
       retryStrategy: (times) => {
         if (times >= 3) {
-          this.logger.warn('Redis unavailable — falling back to JSON cache only');
+          this.logger.warn(
+            'Redis unavailable — falling back to JSON cache only',
+          );
           this.isConnected = false;
           return null;
         }
@@ -54,8 +64,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.client.on('connect', () => {
       this.isConnected = true;
       this.logger.log('Redis connected');
-      this.reconnectCallbacks.forEach(cb => {
-        try { cb(); } catch (err) {
+      this.reconnectCallbacks.forEach((cb) => {
+        try {
+          cb();
+        } catch (err) {
           this.logger.warn(`onReconnect callback error: ${String(err)}`);
         }
       });
@@ -122,7 +134,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       const found = new Set<string>();
       let cursor = '0';
       do {
-        const [next, batch] = await this.client!.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        const [next, batch] = await this.client!.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          100,
+        );
         cursor = next;
         for (const key of batch) found.add(key);
       } while (cursor !== '0');
@@ -155,7 +173,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async incrWithTtl(key: string, ttlSeconds: number): Promise<number> {
     if (!this.available) return 0;
     try {
-      return (await (this.client as any).eval(INCR_EXPIRE_SCRIPT, 1, key, String(ttlSeconds))) as number;
+      return (await (this.client as any).eval(
+        INCR_EXPIRE_SCRIPT,
+        1,
+        key,
+        String(ttlSeconds),
+      )) as number;
     } catch {
       this.isConnected = false;
       return 0;
@@ -236,12 +259,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         try {
           data = JSON.parse(message);
         } catch (err) {
-          this.logger.warn(`Redis message parse failed on "${channel}": ${String(err)}`);
+          this.logger.warn(
+            `Redis message parse failed on "${channel}": ${String(err)}`,
+          );
           return;
         }
-        this.subscriptions.get(channel)?.forEach(h => {
-          try { h(data); } catch (err) {
-            this.logger.warn(`Redis subscriber handler error on "${channel}": ${String(err)}`);
+        this.subscriptions.get(channel)?.forEach((h) => {
+          try {
+            h(data);
+          } catch (err) {
+            this.logger.warn(
+              `Redis subscriber handler error on "${channel}": ${String(err)}`,
+            );
           }
         });
       });
@@ -272,9 +301,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       existing.add(handler);
     } else {
       this.subscriptions.set(channel, new Set([handler]));
-      sub.subscribe(channel).catch(err =>
-        this.logger.warn(`Redis SUBSCRIBE "${channel}" failed: ${String(err)}`),
-      );
+      sub
+        .subscribe(channel)
+        .catch((err) =>
+          this.logger.warn(
+            `Redis SUBSCRIBE "${channel}" failed: ${String(err)}`,
+          ),
+        );
     }
 
     return () => {

@@ -9,20 +9,31 @@ import { TranslationMemoryRepository } from './translation-memory.repository';
  */
 type UpsertCall = { table: string; row: any; opts: any };
 
-function fakeSupabase(opts?: { glossarySource?: string | null; upsertError?: string }) {
+function fakeSupabase(opts?: {
+  glossarySource?: string | null;
+  upsertError?: string;
+}) {
   const calls: { upserts: UpsertCall[] } = { upserts: [] };
   const client = {
     from(table: string) {
       return {
         upsert: (row: any, o: any) => {
           calls.upserts.push({ table, row, opts: o });
-          return Promise.resolve({ error: opts?.upsertError ? { message: opts.upsertError } : null });
+          return Promise.resolve({
+            error: opts?.upsertError ? { message: opts.upsertError } : null,
+          });
         },
         select: () => {
           const chain: any = {
             eq: () => chain,
             maybeSingle: () =>
-              Promise.resolve({ data: opts?.glossarySource !== undefined ? { source: opts.glossarySource } : null, error: null }),
+              Promise.resolve({
+                data:
+                  opts?.glossarySource !== undefined
+                    ? { source: opts.glossarySource }
+                    : null,
+                error: null,
+              }),
           };
           return chain;
         },
@@ -37,17 +48,27 @@ describe('TranslationMemoryRepository', () => {
     const { service, calls } = fakeSupabase();
     const repo = new TranslationMemoryRepository(service);
 
-    const ok = await repo.savePageText('ch1', 3, 'THA',
-      [{ src: 'Hello', dst: 'สวัสดี' }], 'default');
+    const ok = await repo.savePageText(
+      'ch1',
+      3,
+      'THA',
+      [{ src: 'Hello', dst: 'สวัสดี' }],
+      'default',
+    );
 
     expect(ok).toBe(true);
     expect(calls.upserts).toHaveLength(1);
     expect(calls.upserts[0].table).toBe('chapter_page_texts');
     expect(calls.upserts[0].row).toMatchObject({
-      chapter_id: 'ch1', page_index: 3, target_lang: 'THA',
-      regions: [{ src: 'Hello', dst: 'สวัสดี' }], model: 'default',
+      chapter_id: 'ch1',
+      page_index: 3,
+      target_lang: 'THA',
+      regions: [{ src: 'Hello', dst: 'สวัสดี' }],
+      model: 'default',
     });
-    expect(calls.upserts[0].opts.onConflict).toBe('chapter_id,page_index,target_lang');
+    expect(calls.upserts[0].opts.onConflict).toBe(
+      'chapter_id,page_index,target_lang',
+    );
   });
 
   it('returns false and never throws when the upsert errors (local-first)', async () => {
@@ -63,7 +84,12 @@ describe('TranslationMemoryRepository', () => {
     const { service, calls } = fakeSupabase({ glossarySource: 'edited' });
     const repo = new TranslationMemoryRepository(service);
 
-    const ok = await repo.upsertGlossary('manga1', 'THA', { Vesta: 'เวสตา' }, 'auto');
+    const ok = await repo.upsertGlossary(
+      'manga1',
+      'THA',
+      { Vesta: 'เวสตา' },
+      'auto',
+    );
 
     expect(ok).toBe(false);
     expect(calls.upserts).toHaveLength(0); // protected — no overwrite
@@ -73,19 +99,33 @@ describe('TranslationMemoryRepository', () => {
     const { service, calls } = fakeSupabase({ glossarySource: null });
     const repo = new TranslationMemoryRepository(service);
 
-    const ok = await repo.upsertGlossary('manga1', 'THA', { Vesta: 'เวสตา' }, 'auto');
+    const ok = await repo.upsertGlossary(
+      'manga1',
+      'THA',
+      { Vesta: 'เวสตา' },
+      'auto',
+    );
 
     expect(ok).toBe(true);
     expect(calls.upserts).toHaveLength(1);
     expect(calls.upserts[0].table).toBe('manga_glossaries');
-    expect(calls.upserts[0].row).toMatchObject({ manga_id: 'manga1', target_lang: 'THA', source: 'auto' });
+    expect(calls.upserts[0].row).toMatchObject({
+      manga_id: 'manga1',
+      target_lang: 'THA',
+      source: 'auto',
+    });
   });
 
   it('an explicit edited glossary always writes (human override)', async () => {
     const { service, calls } = fakeSupabase({ glossarySource: 'edited' });
     const repo = new TranslationMemoryRepository(service);
 
-    const ok = await repo.upsertGlossary('manga1', 'THA', { Vesta: 'เวสต้า' }, 'edited');
+    const ok = await repo.upsertGlossary(
+      'manga1',
+      'THA',
+      { Vesta: 'เวสต้า' },
+      'edited',
+    );
 
     expect(ok).toBe(true);
     expect(calls.upserts[0].row.source).toBe('edited');

@@ -13,7 +13,12 @@ import {
 import { Type } from 'class-transformer';
 import type { ForumCategory } from './forum.types';
 
-const FORUM_CATEGORIES = ['general', 'announcement', 'spoiler', 'manga_update'] as const;
+const FORUM_CATEGORIES = [
+  'general',
+  'announcement',
+  'spoiler',
+  'manga_update',
+] as const;
 
 export class CreatePostDto {
   @IsString()

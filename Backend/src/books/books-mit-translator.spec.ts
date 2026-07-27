@@ -6,7 +6,11 @@ function makeService() {
     set: jest.fn().mockResolvedValue(undefined),
     setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
   };
-  const storage = { put: jest.fn().mockResolvedValue(undefined), list: jest.fn().mockResolvedValue([]), delete: jest.fn().mockResolvedValue(undefined) };
+  const storage = {
+    put: jest.fn().mockResolvedValue(undefined),
+    list: jest.fn().mockResolvedValue([]),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new BooksService(
     {} as any,
     cache as any,
@@ -19,18 +23,21 @@ function makeService() {
 
 function mockFetchCapturingMitConfig(): { getConfig: () => any } {
   let capturedConfig: any = null;
-  jest.spyOn(global, 'fetch').mockImplementation(async (url: any, options?: any) => {
-    if (String(url).includes('/batch')) {
-      const form: FormData = options?.body;
-      capturedConfig = JSON.parse(form?.get('config') as string ?? 'null');
-      return {
-        ok: true, status: 202,
-        headers: { get: () => 'application/json' },
-        json: async () => ({ status: 'accepted' }),
-      } as any;
-    }
-    return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) } as any;
-  });
+  jest
+    .spyOn(global, 'fetch')
+    .mockImplementation(async (url: any, options?: any) => {
+      if (String(url).includes('/batch')) {
+        const form: FormData = options?.body;
+        capturedConfig = JSON.parse((form?.get('config') as string) ?? 'null');
+        return {
+          ok: true,
+          status: 202,
+          headers: { get: () => 'application/json' },
+          json: async () => ({ status: 'accepted' }),
+        } as any;
+      }
+      return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) } as any;
+    });
   return { getConfig: () => capturedConfig };
 }
 
@@ -40,7 +47,9 @@ async function runBatch(service: BooksService) {
     [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }],
     jest.fn(),
     new AbortController().signal,
-    'ANY', 'THA', 'ch1:ANY:THA',
+    'ANY',
+    'THA',
+    'ch1:ANY:THA',
   );
 }
 

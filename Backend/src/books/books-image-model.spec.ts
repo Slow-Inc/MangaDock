@@ -16,7 +16,11 @@ function makeService() {
     set: jest.fn().mockResolvedValue(undefined),
     setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
   };
-  const storage = { put: jest.fn().mockResolvedValue(undefined), list: jest.fn().mockResolvedValue([]), delete: jest.fn().mockResolvedValue(undefined) };
+  const storage = {
+    put: jest.fn().mockResolvedValue(undefined),
+    list: jest.fn().mockResolvedValue([]),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new BooksService(
     {} as any,
     cache as any,
@@ -28,13 +32,17 @@ function makeService() {
 }
 
 const cachedEntry = {
-  data: { patches: [{ xPct: 0, yPct: 0, wPct: 1, hPct: 1, url: 'http://b/p.png' }] },
+  data: {
+    patches: [{ xPct: 0, yPct: 0, wPct: 1, hPct: 1, url: 'http://b/p.png' }],
+  },
 };
 
 describe('BooksService — per-request image translation model (#87)', () => {
   it('buildMitConfig includes translator.model when an image model is given', () => {
     const { service } = makeService();
-    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', '', 'gemini-2.5-pro'));
+    const cfg = JSON.parse(
+      buildMitConfig(process.env, 'ANY', 'THA', '', 'gemini-2.5-pro'),
+    );
     expect(cfg.translator.model).toBe('gemini-2.5-pro');
   });
 
@@ -43,11 +51,15 @@ describe('BooksService — per-request image translation model (#87)', () => {
     const noModel = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(noModel.translator.model).toBeUndefined();
 
-    const unsafe = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', '', 'evil name!:{}'));
+    const unsafe = JSON.parse(
+      buildMitConfig(process.env, 'ANY', 'THA', '', 'evil name!:{}'),
+    );
     expect(unsafe.translator.model).toBeUndefined();
 
     // "models/" prefix from the Gemini catalog is normalized away
-    const prefixed = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', '', 'models/gemini-2.5-flash'));
+    const prefixed = JSON.parse(
+      buildMitConfig(process.env, 'ANY', 'THA', '', 'models/gemini-2.5-flash'),
+    );
     expect(prefixed.translator.model).toBe('gemini-2.5-flash');
   });
 
@@ -55,10 +67,23 @@ describe('BooksService — per-request image translation model (#87)', () => {
     const { service, cache } = makeService();
     cache.get.mockResolvedValue(cachedEntry);
 
-    await service.translateMangaPagePatches('ch1', 0, 'http://img/0.jpg', 'ja', 'th', {
-      imageModel: 'gemini-2.5-pro',
-    });
-    await service.translateMangaPagePatches('ch1', 0, 'http://img/0.jpg', 'ja', 'th');
+    await service.translateMangaPagePatches(
+      'ch1',
+      0,
+      'http://img/0.jpg',
+      'ja',
+      'th',
+      {
+        imageModel: 'gemini-2.5-pro',
+      },
+    );
+    await service.translateMangaPagePatches(
+      'ch1',
+      0,
+      'http://img/0.jpg',
+      'ja',
+      'th',
+    );
 
     const [keyWithModel] = cache.get.mock.calls[0];
     const [keyDefault] = cache.get.mock.calls[1];
@@ -72,7 +97,12 @@ describe('BooksService — per-request image translation model (#87)', () => {
   it('partitions the batch job registry by model', () => {
     const { service } = makeService();
     const defaultKey = (service as any).batch.buildJobKey('ch1', 'ja', 'th');
-    const modelKey = (service as any).batch.buildJobKey('ch1', 'ja', 'th', 'gemini-2.5-pro');
+    const modelKey = (service as any).batch.buildJobKey(
+      'ch1',
+      'ja',
+      'th',
+      'gemini-2.5-pro',
+    );
     expect(modelKey).not.toBe(defaultKey);
   });
 
@@ -81,12 +111,37 @@ describe('BooksService — per-request image translation model (#87)', () => {
   it('partitions jobKey and patch cache key by derivative, defaulting to hd', () => {
     const { service } = makeService();
     const hdJob = (service as any).batch.buildJobKey('ch1', 'ja', 'th');
-    const saverJob = (service as any).batch.buildJobKey('ch1', 'ja', 'th', undefined, 'saver');
+    const saverJob = (service as any).batch.buildJobKey(
+      'ch1',
+      'ja',
+      'th',
+      undefined,
+      'saver',
+    );
     expect(saverJob).not.toBe(hdJob);
 
-    const hdKey = (service as any).batch.patchCacheKey('ch1', 0, 'JPN', 'THA', undefined, 'hd');
-    const defaultKey = (service as any).batch.patchCacheKey('ch1', 0, 'JPN', 'THA');
-    const saverKey = (service as any).batch.patchCacheKey('ch1', 0, 'JPN', 'THA', undefined, 'saver');
+    const hdKey = (service as any).batch.patchCacheKey(
+      'ch1',
+      0,
+      'JPN',
+      'THA',
+      undefined,
+      'hd',
+    );
+    const defaultKey = (service as any).batch.patchCacheKey(
+      'ch1',
+      0,
+      'JPN',
+      'THA',
+    );
+    const saverKey = (service as any).batch.patchCacheKey(
+      'ch1',
+      0,
+      'JPN',
+      'THA',
+      undefined,
+      'saver',
+    );
     expect(defaultKey).toBe(hdKey);
     expect(saverKey).not.toBe(hdKey);
   });
@@ -95,11 +150,25 @@ describe('BooksService — per-request image translation model (#87)', () => {
   // visible on the next translate instead of replaying stale patches.
   it('partitions the patch cache key by the MIT render config', () => {
     const { service } = makeService();
-    const before = (service as any).batch.patchCacheKey('ch1', 0, 'JPN', 'THA', undefined, 'hd');
+    const before = (service as any).batch.patchCacheKey(
+      'ch1',
+      0,
+      'JPN',
+      'THA',
+      undefined,
+      'hd',
+    );
     const saved = process.env.MIT_FONT_SIZE_MAX;
     try {
       process.env.MIT_FONT_SIZE_MAX = '20';
-      const after = (service as any).batch.patchCacheKey('ch1', 0, 'JPN', 'THA', undefined, 'hd');
+      const after = (service as any).batch.patchCacheKey(
+        'ch1',
+        0,
+        'JPN',
+        'THA',
+        undefined,
+        'hd',
+      );
       expect(after).not.toBe(before); // config change → different key → cache miss
     } finally {
       if (saved === undefined) delete process.env.MIT_FONT_SIZE_MAX;
@@ -111,7 +180,13 @@ describe('BooksService — per-request image translation model (#87)', () => {
   // segment: the webhook path re-derives the cache key from the jobKey.
   it('caches webhook results for a saver job under the saver cache key', async () => {
     const { service, cache } = makeService();
-    const jobKey = (service as any).batch.buildJobKey('ch1', 'ja', 'th', undefined, 'saver');
+    const jobKey = (service as any).batch.buildJobKey(
+      'ch1',
+      'ja',
+      'th',
+      undefined,
+      'saver',
+    );
     (service as any).batch.activeBatchJobs.set(jobKey, {
       completedPages: new Map(),
       processingPages: new Set(),
@@ -126,11 +201,26 @@ describe('BooksService — per-request image translation model (#87)', () => {
     await service.handleMitCallback(jobKey, 0, {
       imgWidth: 100,
       imgHeight: 200,
-      patches: [{ x: 1, y: 2, w: 3, h: 4, img_b64: Buffer.from('png').toString('base64') }],
+      patches: [
+        {
+          x: 1,
+          y: 2,
+          w: 3,
+          h: 4,
+          img_b64: Buffer.from('png').toString('base64'),
+        },
+      ],
     });
 
     const { srcMIT, tgtMIT } = (service as any).batch.mitLangPair('ja', 'th');
-    const expectedKey = (service as any).batch.patchCacheKey('ch1', 0, srcMIT, tgtMIT, undefined, 'saver');
+    const expectedKey = (service as any).batch.patchCacheKey(
+      'ch1',
+      0,
+      srcMIT,
+      tgtMIT,
+      undefined,
+      'saver',
+    );
     const writtenKeys = cache.set.mock.calls.map((c: unknown[]) => c[0]);
     expect(writtenKeys).toContain(expectedKey);
   });
@@ -140,7 +230,12 @@ describe('BooksService — per-request image translation model (#87)', () => {
   // cache again, so every re-translate hit MIT.
   it('caches webhook results under the same key the batch pre-check reads', async () => {
     const { service, cache } = makeService();
-    const jobKey = (service as any).batch.buildJobKey('ch1', 'ja', 'th', 'gemini-2.5-pro');
+    const jobKey = (service as any).batch.buildJobKey(
+      'ch1',
+      'ja',
+      'th',
+      'gemini-2.5-pro',
+    );
     (service as any).batch.activeBatchJobs.set(jobKey, {
       completedPages: new Map(),
       processingPages: new Set(),
@@ -155,11 +250,25 @@ describe('BooksService — per-request image translation model (#87)', () => {
     await service.handleMitCallback(jobKey, 0, {
       imgWidth: 100,
       imgHeight: 200,
-      patches: [{ x: 1, y: 2, w: 3, h: 4, img_b64: Buffer.from('png').toString('base64') }],
+      patches: [
+        {
+          x: 1,
+          y: 2,
+          w: 3,
+          h: 4,
+          img_b64: Buffer.from('png').toString('base64'),
+        },
+      ],
     });
 
     const { srcMIT, tgtMIT } = (service as any).batch.mitLangPair('ja', 'th');
-    const expectedKey = (service as any).batch.patchCacheKey('ch1', 0, srcMIT, tgtMIT, 'gemini-2.5-pro');
+    const expectedKey = (service as any).batch.patchCacheKey(
+      'ch1',
+      0,
+      srcMIT,
+      tgtMIT,
+      'gemini-2.5-pro',
+    );
     const writtenKeys = cache.set.mock.calls.map((c: unknown[]) => c[0]);
     expect(writtenKeys).toContain(expectedKey);
   });
@@ -175,7 +284,10 @@ describe('BooksService — per-request image translation model (#87)', () => {
       delete: jest.fn().mockResolvedValue(undefined),
     };
     (service as any).storage = storage;
-    (service as any).patchStore = new (require('./patch-store').PatchStore)(storage, () => 'http://b');
+    (service as any).patchStore = new (require('./patch-store').PatchStore)(
+      storage,
+      () => 'http://b',
+    );
 
     const jobKey = (service as any).batch.buildJobKey('ch1', 'ja', 'th');
     const job = {
@@ -193,7 +305,15 @@ describe('BooksService — per-request image translation model (#87)', () => {
     await service.handleMitCallback(jobKey, 0, {
       imgWidth: 100,
       imgHeight: 200,
-      patches: [{ x: 1, y: 2, w: 3, h: 4, img_b64: Buffer.from('png').toString('base64') }],
+      patches: [
+        {
+          x: 1,
+          y: 2,
+          w: 3,
+          h: 4,
+          img_b64: Buffer.from('png').toString('base64'),
+        },
+      ],
     });
 
     expect(job.processingPages.has(0)).toBe(false); // unlocked

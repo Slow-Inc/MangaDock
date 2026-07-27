@@ -3,6 +3,94 @@
 
 ---
 
+## #643 — CI gates that actually gate: unit-test selection + torch-free collection (2026-07-28)
+
+**Trigger:** draft PR #642 put `integrate/render-reconcile` through the pipeline for the first time
+ever and it went red. #626's *"integration branch green"* acceptance had been **assumed, never
+CI-verified** — an acceptance criterion no job enforces is a note, not a gate.
+
+**Failure 1 (PR #678 → main).** `mermaid.e2e.test.ts` (Playwright) was collected by the bun **unit**
+gate: the selection was an inline `find` blacklist in `ci.yml` that only knew `*.integration.test.ts`.
+TDD'd it into `scripts/lib/frontend-unit-tests.mjs` — `selectUnitTestFiles()`, 5 tests, red→green per
+slice. The regression test pins the trap: the tempting `-not -name '*.*.test.ts'` one-liner would have
+silently dropped `PageRenderer.memo.test.ts`, a real unit test whose extra dot is descriptive. Plus
+`scripts/list-frontend-unit-tests.mjs` (CLI, exit 1 on empty selection) and a **`scripts (node --test)`
+CI job** — nothing in CI ran the guard suites before, so `issue-ref` / `worktree-budget` /
+`pr-bilingual` / `append-only` could all break and stay green. All checks green on #678 incl. `gate`.
+
+**Failure 2 (this branch).** The torch-free logic gate aborted collection on
+`test_custom_openai_{thinking,none_content,parse}.py` + `test_source_lang_filter.py` — module-level
+`custom_openai` / `MangaTranslator` imports reach torch via `translators/__init__` → `.common` →
+`from ..utils import InfererModule` (`utils/__init__.__getattr__` loads `.inference`).
+**Corrected the original diagnosis: not architectural.** conftest's #359 mechanism is right and its own
+comment says a new heavy test *"surfaces as a collection error in the logic job, which is the signal to
+add it here"* — the signal never fired because the branch never ran CI. Added the 4 modules, plus
+`test/heavy_imports.py` + `test/test_heavy_test_list.py`: a pure-`ast`, torch-free drift guard scanning
+module-level imports against a short list of heavy **packages** (stable) not test **files** (churn). It
+went RED naming exactly those 4 files before the fix. Verified with the ML stack hidden from the import
+system: **collection 638 tests, 0 errors** (was 4 collection errors).
+
+**Spillover → #679.** With collection fixed, the MIT suite ran on this branch for the first time and
+immediately surfaced a real regression: `test_278_sfx_provenance_gate_is_called_by_the_driver` fails
+here (*with* torch, so not an env artifact) and passes on `main` — the driver reverted to the pre-#278
+`<=4-char` SFX heuristic. Render-quality, not CI infra; filed separately, user-in-the-loop.
+
+**Also this session:** the `integrate` worktree lost 1381 tracked files to Windows Storage Sense
+(it lives under `%TEMP%`) — restored with `git restore .`, no commits lost; new worktrees now go to
+`D:/Github/worktrees/`. Caught up to `main` (63 commits, DONE.md the only conflict, resolved
+append-only). **`MIT/manga_translator` tree byte-identical `1a073c0c` across the merge** — the
+render==baseline invariant holds without a GPU re-verify.
+
+---
+
+
+## Security: record device on login for /settings/security (2026-07-21)
+
+**Goal:** `/settings/security` แสดง "ไม่พบข้อมูลอุปกรณ์" เพราะ `user_known_devices` ว่างเสมอ
+
+**Root cause:** `HardwareIdMiddleware` เขียน device เฉพาะ chapter/upload routes — ไม่ fire ตอน login
+
+**Changes (1 commit, 3517e89):**
+- `Backend/src/users/users.controller.ts`: เพิ่ม `POST /users/me/record-device` endpoint (AuthGuard + `isValidHardwareId` validation) — เรียก `recordDeviceAndAlert` แล้ว return `{ ok }`
+- `Frontend/app/contexts/AuthContext.tsx`: import `getHardwareId`; ใน `onAuthStateChange` block (`SIGNED_IN`/`INITIAL_SESSION`) fire-and-forget `fetch` ไป endpoint นี้หลัง `syncToBackend`
+
+**Result:** device ถูกบันทึกใน `user_known_devices` ทันทีที่ login ทุก provider (email, Google, Facebook) — `/settings/security` แสดงรายการอุปกรณ์ได้ทันที
+
+---
+
+## UI Polish — Settings mobile nav, admin prefetch, no-reload sign-out, dropdown reorder (#645, 2026-07-21)
+
+**Goal:** 4 small UX improvements to navbar dropdown and /settings page.
+
+**Changes (1 commit, 9800bbd5):**
+- `Frontend/app/settings/layout.tsx`: mobile horizontal scrollable tab nav (`md:hidden`) above content — sidebar stays for desktop
+- `Frontend/app/components/NavbarActions.tsx`: `<button router.push("/admin")>` → `<Link href="/admin">` for Next.js hover prefetch; reorder dropdown → โปรไฟล์ของฉัน / Studio / จัดการบัญชี / Admin Dashboard / ออกจากระบบ
+- `Frontend/app/contexts/AuthContext.tsx`: remove `reloadPage()` from `signOut()` — auth guard in `/settings` layout (`router.replace("/")` when `!user`) handles redirect
+
+**Validation:** `bun lint` 63 problems (identical to pre-change baseline — 0 new errors). All changes ≤ ~20 lines each.
+
+---
+
+## Security & Settings Page — /settings + 2FA + Audit Log (2026-07-21)
+
+**Goal:** Replace AccountModal with a full `/settings` page, add TOTP 2FA, re-auth gating, new-device detection, session management, and admin audit log.
+
+**Changes (9 commits, baseline 19082ac9..HEAD 7f83ab1c):**
+- `/settings/{profile,password,accounts,security,danger}` pages replacing AccountModal tabs; NavbarActions routes to `/settings`; `/account` redirects
+- Supabase migrations: `user_known_devices (uid, hwid, user_agent, first_seen, last_seen)` + `audit_logs (actor_uid, action, target_type, target_id, ip, metadata, created_at)` — both with RLS
+- Backend: `HardwareIdMiddleware` now fire-and-forgets `UsersService.recordDeviceAndAlert()` for new-device logging; `UsersService.logAuditEvent()` + `AdminService.logAudit()` for audit trail
+- `ReauthModal` + `useReauth(actionLabel)` hook — 5-min TTL window, password + Google + Facebook provider detection
+- TOTP 2FA: `AuthContext` gains `enrollTotp`, `verifyTotpEnrollment`, `unenrollTotp`, `getActiveTotpFactor`, `verifyTotpForLogin`; `signInWithEmail` checks AAL post-login; `INITIAL_SESSION` also checks AAL to close page-refresh bypass; `MfaVerifyScreen` overlay (cancel calls `signOut()`); `TotpSetupModal` with QR + cleanup on abandon
+- `/settings/security`: 2FA toggle (email-only users), session list with per-device logout + "sign out all others", device activity log; direct Supabase client + RLS
+- `GET /admin/audit` endpoint + `/admin/audit` page: action filter, actor UID filter, paginated table, colour-coded badges; `logAudit` wired into `banUser`, `unbanUser`, `changeRole`, `adminDeletePost`
+- Final review fixes: `.eq("uid", user.id)` defense-in-depth on device queries, orphaned `AccountModal.tsx` deleted, `@Min(1)` on audit DTO
+
+**Known limitation (documented):** TOTP gate is not enforced server-side (backend `AuthGuard` validates JWT validity, not AAL level). OAuth login bypasses TOTP by design (Google/Facebook provide their own 2FA). Treat current 2FA as an advisory deterrent until server-side AAL enforcement is added.
+
+**Validation:** per-task reviewer approved all 6 tasks; final whole-branch review (Opus) found C1 (uid filter) + I2 (INITIAL_SESSION) fixed in final commit. Backend 8/8 admin tests green. Frontend lint 0 new errors.
+
+---
+
 ## #631 — separate thinking token-budget (prevent qwen3.6 reasoning truncation) (2026-07-12)
 
 **Trigger:** measured the 9arm gateway live — `chat_template_kwargs.enable_thinking=false`, `reasoning_effort=none`, `/no_think`, top-level `enable_thinking=false` ALL still emit 4.3–6.4k chars of reasoning (a 2-line translate burns ~1.3–1.9k completion tokens on reasoning alone). The thinking-disable levers are a confirmed NO-OP → the only real defense against `finish=length`→`content=None` truncation is a reasoning-sized token budget.
@@ -16,6 +104,7 @@
 **Goal:** after the #626 render==landing pivot, delete main's shelved render campaign left DEAD/BROKEN on the branch (render_replay imported the landing-absent `clean_layout_font_size`; 4 test files errored on collection).
 
 **Done (`a8b64f69`):** deleted `reference_layout.py` / `render_replay.py` / `rendering/sizing_trace.py` + 4 orphaned tests; removed the `MIT_DUMP_REGIONS` dump block, `config.RenderConfig.reference_layout` (0 readers), and the `MIT_REFERENCE_LAYOUT` mapping in `mit-config.ts` + its 2 spec cases + ENV_KEYS entry. Verified: MIT collection **4 errors → 0** (743 clean), render-path net **75 passed**, imports clean, 0 dangling refs, Backend diff a clean deletion (jest in CI). Recoverable via `archive/mit-180-kp-425` / `archive/mit-183-squeeze-424` / PR #423. Also this session: git tech-debt (temp+bench-545 worktrees pruned, local main ff'd, `.gemini/.env` gitignored `4538be17`), branch pushed to origin.
+
 
 ---
 

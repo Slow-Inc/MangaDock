@@ -8,7 +8,9 @@ import { DIRTY_QUEUE } from './batch-sync.worker';
 const SEVEN_DAYS_S = 7 * 24 * 60 * 60;
 const PIPELINE_CHUNK_SIZE = 500;
 
-function makeEntry(overrides: Partial<CacheEntry<unknown>> = {}): CacheEntry<unknown> {
+function makeEntry(
+  overrides: Partial<CacheEntry<unknown>> = {},
+): CacheEntry<unknown> {
   return {
     data: { value: 'test' },
     updatedAt: new Date().toISOString(),
@@ -33,17 +35,23 @@ function makeRedis(available = true) {
       created.push(p);
       return p;
     }),
-    get created() { return created; },
+    get created() {
+      return created;
+    },
   };
   return {
     available,
     onReconnect: jest.fn().mockReturnValue(() => {}),
     getClient: jest.fn().mockResolvedValue(available ? client : null),
-    get _client() { return client; },
+    get _client() {
+      return client;
+    },
   } as any;
 }
 
-function makeJsonCache(entries: Map<string, CacheEntry<unknown>> = new Map()): jest.Mocked<Pick<JsonCacheService, 'keys' | 'peek' | 'isExpired'>> {
+function makeJsonCache(
+  entries: Map<string, CacheEntry<unknown>> = new Map(),
+): jest.Mocked<Pick<JsonCacheService, 'keys' | 'peek' | 'isExpired'>> {
   return {
     keys: jest.fn().mockImplementation(() => entries.keys()),
     peek: jest.fn().mockImplementation((k: string) => entries.get(k) ?? null),
@@ -54,18 +62,25 @@ function makeJsonCache(entries: Map<string, CacheEntry<unknown>> = new Map()): j
   } as any;
 }
 
-function makeL3(entries: Map<string, CacheEntry<unknown>> = new Map(), fallbackKeys: string[] = []): jest.Mocked<Pick<L3DiskService, 'readAll' | 'drainDirtyFallback'>> {
+function makeL3(
+  entries: Map<string, CacheEntry<unknown>> = new Map(),
+  fallbackKeys: string[] = [],
+): jest.Mocked<Pick<L3DiskService, 'readAll' | 'drainDirtyFallback'>> {
   return {
     readAll: jest.fn().mockReturnValue(entries),
     drainDirtyFallback: jest.fn().mockReturnValue(fallbackKeys),
   } as any;
 }
 
-function makeElection(isLeader = true): jest.Mocked<Pick<ElectionService, 'isLeader' | 'onBecomeLeader'>> {
+function makeElection(
+  isLeader = true,
+): jest.Mocked<Pick<ElectionService, 'isLeader' | 'onBecomeLeader'>> {
   return { isLeader, onBecomeLeader: jest.fn() } as any;
 }
 
-function makeService(overrides: { redis?: any; jsonCache?: any; l3?: any; election?: any } = {}) {
+function makeService(
+  overrides: { redis?: any; jsonCache?: any; l3?: any; election?: any } = {},
+) {
   const redis = overrides.redis ?? makeRedis();
   const jsonCache = overrides.jsonCache ?? makeJsonCache();
   const l3 = overrides.l3 ?? makeL3();
@@ -92,7 +107,12 @@ describe('L2RecoveryService', () => {
     await svc.recover();
 
     const pipe = redis._client.created[0];
-    expect(pipe.set).toHaveBeenCalledWith('key:1', JSON.stringify(entry), 'EX', expect.any(Number));
+    expect(pipe.set).toHaveBeenCalledWith(
+      'key:1',
+      JSON.stringify(entry),
+      'EX',
+      expect.any(Number),
+    );
   });
 
   // FR-5 regression — a key present at keys()-snapshot time may be evicted from L1
@@ -100,10 +120,17 @@ describe('L2RecoveryService', () => {
   // recover() must skip it, not throw (the old getAll() snapshot was immune).
   it('recover() skips (does not throw) a key evicted from L1 after the keys snapshot', async () => {
     const jsonCache = {
-      keys: jest.fn().mockImplementation(() => ['evicted:key'][Symbol.iterator]()),
+      keys: jest
+        .fn()
+        .mockImplementation(() => ['evicted:key'][Symbol.iterator]()),
       peek: jest.fn().mockReturnValue(null), // evicted between snapshot and read
-      isExpired: jest.fn().mockImplementation((e: CacheEntry<unknown>) =>
-        e.ttlMs > 0 && Date.now() - new Date(e.updatedAt).getTime() > e.ttlMs),
+      isExpired: jest
+        .fn()
+        .mockImplementation(
+          (e: CacheEntry<unknown>) =>
+            e.ttlMs > 0 &&
+            Date.now() - new Date(e.updatedAt).getTime() > e.ttlMs,
+        ),
     };
     const { svc } = makeService({ jsonCache, l3: makeL3(new Map()) });
 
@@ -112,7 +139,10 @@ describe('L2RecoveryService', () => {
 
   // Cycle 2 — skips expired entries — no pipeline created
   it('recover() does not create a pipeline for expired-only L1 entries', async () => {
-    const expired = makeEntry({ ttlMs: 1, updatedAt: new Date(Date.now() - 5000).toISOString() });
+    const expired = makeEntry({
+      ttlMs: 1,
+      updatedAt: new Date(Date.now() - 5000).toISOString(),
+    });
     const { svc, redis } = makeService({
       jsonCache: makeJsonCache(new Map([['key:old', expired]])),
     });
@@ -138,9 +168,17 @@ describe('L2RecoveryService', () => {
   // Cycle 4 — returns { synced, skipped } counts
   it('recover() returns synced and skipped counts', async () => {
     const fresh = makeEntry({ ttlMs: 60_000 });
-    const expired = makeEntry({ ttlMs: 1, updatedAt: new Date(Date.now() - 5000).toISOString() });
+    const expired = makeEntry({
+      ttlMs: 1,
+      updatedAt: new Date(Date.now() - 5000).toISOString(),
+    });
     const { svc } = makeService({
-      jsonCache: makeJsonCache(new Map([['key:a', fresh], ['key:b', expired]])),
+      jsonCache: makeJsonCache(
+        new Map([
+          ['key:a', fresh],
+          ['key:b', expired],
+        ]),
+      ),
     });
 
     const result = await svc.recover();
@@ -166,7 +204,7 @@ describe('L2RecoveryService', () => {
 
     const result = await svc.recover();
 
-    expect(result.synced).toBe(100);               // second chunk succeeded
+    expect(result.synced).toBe(100); // second chunk succeeded
     expect(redis._client.pipeline).toHaveBeenCalledTimes(2); // both chunks attempted
   });
 
@@ -192,18 +230,27 @@ describe('L2RecoveryService', () => {
     await svc.recover();
 
     const pipe = redis._client.created[0];
-    expect(pipe.set).toHaveBeenCalledWith('key:perm', JSON.stringify(permanent), 'EX', SEVEN_DAYS_S);
+    expect(pipe.set).toHaveBeenCalledWith(
+      'key:perm',
+      JSON.stringify(permanent),
+      'EX',
+      SEVEN_DAYS_S,
+    );
   });
 
   // Cycle 8 — onBecomeLeader callback triggers recover()
   it('onModuleInit() registers onBecomeLeader; when the callback fires, recover() is called', async () => {
     let capturedCb: (() => void) | null = null;
     const election = makeElection(false);
-    (election.onBecomeLeader as jest.Mock).mockImplementation((cb: () => void) => {
-      capturedCb = cb;
-    });
+    (election.onBecomeLeader as jest.Mock).mockImplementation(
+      (cb: () => void) => {
+        capturedCb = cb;
+      },
+    );
     const { svc } = makeService({ election });
-    const spy = jest.spyOn(svc, 'recover').mockResolvedValue({ synced: 0, skipped: 0 });
+    const spy = jest
+      .spyOn(svc, 'recover')
+      .mockResolvedValue({ synced: 0, skipped: 0 });
 
     await svc.onModuleInit();
     capturedCb!();
@@ -220,7 +267,9 @@ describe('L2RecoveryService', () => {
       return () => {};
     });
     const { svc } = makeService({ redis });
-    const spy = jest.spyOn(svc, 'recover').mockResolvedValue({ synced: 0, skipped: 0 });
+    const spy = jest
+      .spyOn(svc, 'recover')
+      .mockResolvedValue({ synced: 0, skipped: 0 });
 
     await svc.onModuleInit();
     capturedCb!();
@@ -230,8 +279,12 @@ describe('L2RecoveryService', () => {
 
   // Cycle 10 — L3-wins when L3 entry is newer than L1
   it('recover() writes L3 entry when L3 has a newer updatedAt than L1 for the same key', async () => {
-    const older = makeEntry({ updatedAt: new Date(Date.now() - 10_000).toISOString() });
-    const newer = makeEntry({ updatedAt: new Date(Date.now() - 1_000).toISOString() });
+    const older = makeEntry({
+      updatedAt: new Date(Date.now() - 10_000).toISOString(),
+    });
+    const newer = makeEntry({
+      updatedAt: new Date(Date.now() - 1_000).toISOString(),
+    });
     const { svc, redis } = makeService({
       jsonCache: makeJsonCache(new Map([['key:1', older]])),
       l3: makeL3(new Map([['key:1', newer]])),
@@ -240,13 +293,22 @@ describe('L2RecoveryService', () => {
     await svc.recover();
 
     const pipe = redis._client.created[0];
-    expect(pipe.set).toHaveBeenCalledWith('key:1', JSON.stringify(newer), 'EX', expect.any(Number));
+    expect(pipe.set).toHaveBeenCalledWith(
+      'key:1',
+      JSON.stringify(newer),
+      'EX',
+      expect.any(Number),
+    );
   });
 
   // Cycle 11 — L1-wins when L1 entry is newer than L3
   it('recover() writes L1 entry when L1 has a newer updatedAt than L3 for the same key', async () => {
-    const newer = makeEntry({ updatedAt: new Date(Date.now() - 1_000).toISOString() });
-    const older = makeEntry({ updatedAt: new Date(Date.now() - 10_000).toISOString() });
+    const newer = makeEntry({
+      updatedAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    const older = makeEntry({
+      updatedAt: new Date(Date.now() - 10_000).toISOString(),
+    });
     const { svc, redis } = makeService({
       jsonCache: makeJsonCache(new Map([['key:1', newer]])),
       l3: makeL3(new Map([['key:1', older]])),
@@ -255,7 +317,12 @@ describe('L2RecoveryService', () => {
     await svc.recover();
 
     const pipe = redis._client.created[0];
-    expect(pipe.set).toHaveBeenCalledWith('key:1', JSON.stringify(newer), 'EX', expect.any(Number));
+    expect(pipe.set).toHaveBeenCalledWith(
+      'key:1',
+      JSON.stringify(newer),
+      'EX',
+      expect.any(Number),
+    );
   });
 
   // Cycle 12 — L3-only key (not in L1) is written to L2
@@ -269,12 +336,20 @@ describe('L2RecoveryService', () => {
     await svc.recover();
 
     const pipe = redis._client.created[0];
-    expect(pipe.set).toHaveBeenCalledWith('key:l3only', JSON.stringify(entry), 'EX', expect.any(Number));
+    expect(pipe.set).toHaveBeenCalledWith(
+      'key:l3only',
+      JSON.stringify(entry),
+      'EX',
+      expect.any(Number),
+    );
   });
 
   // Cycle 13 — L3-only expired entry is skipped
   it('recover() skips a key that exists only in L3 when that entry is expired', async () => {
-    const expired = makeEntry({ ttlMs: 1, updatedAt: new Date(Date.now() - 5000).toISOString() });
+    const expired = makeEntry({
+      ttlMs: 1,
+      updatedAt: new Date(Date.now() - 5000).toISOString(),
+    });
     const { svc, redis } = makeService({
       jsonCache: makeJsonCache(new Map()),
       l3: makeL3(new Map([['key:l3exp', expired]])),
@@ -287,8 +362,14 @@ describe('L2RecoveryService', () => {
 
   // Cycle 14 — same key in both L1 and L3, both expired → skip
   it('recover() skips a key when both L1 and L3 entries are expired', async () => {
-    const expiredL1 = makeEntry({ ttlMs: 1, updatedAt: new Date(Date.now() - 5000).toISOString() });
-    const expiredL3 = makeEntry({ ttlMs: 1, updatedAt: new Date(Date.now() - 3000).toISOString() });
+    const expiredL1 = makeEntry({
+      ttlMs: 1,
+      updatedAt: new Date(Date.now() - 5000).toISOString(),
+    });
+    const expiredL3 = makeEntry({
+      ttlMs: 1,
+      updatedAt: new Date(Date.now() - 3000).toISOString(),
+    });
     const { svc, redis } = makeService({
       jsonCache: makeJsonCache(new Map([['key:1', expiredL1]])),
       l3: makeL3(new Map([['key:1', expiredL3]])),
@@ -312,13 +393,23 @@ describe('L2RecoveryService', () => {
     await svc.recover();
 
     const pipe = redis._client.created[0];
-    expect(pipe.set).toHaveBeenCalledWith('key:1', JSON.stringify(l1Entry), 'EX', expect.any(Number));
+    expect(pipe.set).toHaveBeenCalledWith(
+      'key:1',
+      JSON.stringify(l1Entry),
+      'EX',
+      expect.any(Number),
+    );
   });
 
   // Cycle 16 — onModuleInit never calls recover() directly
   it('onModuleInit() does not call recover() directly — recovery is deferred to onBecomeLeader event', async () => {
-    const { svc } = makeService({ redis: makeRedis(true), election: makeElection(true) });
-    const spy = jest.spyOn(svc, 'recover').mockResolvedValue({ synced: 0, skipped: 0 });
+    const { svc } = makeService({
+      redis: makeRedis(true),
+      election: makeElection(true),
+    });
+    const spy = jest
+      .spyOn(svc, 'recover')
+      .mockResolvedValue({ synced: 0, skipped: 0 });
 
     await svc.onModuleInit();
 
@@ -334,7 +425,9 @@ describe('L2RecoveryService', () => {
       return () => {};
     });
     const { svc } = makeService({ redis, election: makeElection(false) });
-    const spy = jest.spyOn(svc, 'recover').mockResolvedValue({ synced: 0, skipped: 0 });
+    const spy = jest
+      .spyOn(svc, 'recover')
+      .mockResolvedValue({ synced: 0, skipped: 0 });
 
     await svc.onModuleInit();
     capturedCb!();

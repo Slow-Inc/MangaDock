@@ -13,7 +13,12 @@ interface MessageEvent {
 }
 
 type ServiceStatus = 'up' | 'degraded' | 'down';
-interface StatusCheck { id: string; status: ServiceStatus; latencyMs: number | null; detail?: string }
+interface StatusCheck {
+  id: string;
+  status: ServiceStatus;
+  latencyMs: number | null;
+  detail?: string;
+}
 interface StatusSnapshot {
   schemaVersion: 1;
   service: string;
@@ -51,14 +56,19 @@ export class StatusController {
       });
       if (s === 'degraded' && worst === 'up') worst = 'degraded';
     } catch {
-      checks.push({ id: 'redis', status: 'down', latencyMs: null, detail: 'redis unreachable' });
+      checks.push({
+        id: 'redis',
+        status: 'down',
+        latencyMs: null,
+        detail: 'redis unreachable',
+      });
       worst = 'down';
     }
 
     const reason =
       worst === 'up'
         ? 'all checks passed'
-        : checks.find((c) => c.status !== 'up')?.detail ?? 'check failed';
+        : (checks.find((c) => c.status !== 'up')?.detail ?? 'check failed');
 
     return {
       schemaVersion: 1,
@@ -77,7 +87,7 @@ export class StatusController {
     return this.statusService.getStatusStream().pipe(
       map((event: SystemStatusEvent) => ({
         data: event,
-      }))
+      })),
     );
   }
 

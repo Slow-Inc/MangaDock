@@ -88,8 +88,8 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
         </div>
         <div>
           <p className="line-clamp-2 text-xs font-semibold leading-snug text-white">{book.title}</p>
-          {book.authors.length > 0 && <p className="mt-0.5 truncate text-[11px] text-white/45">{book.authors[0]}</p>}
-          {book.categories.length > 0 && <p className="mt-1 truncate text-[10px] text-indigo-400/70">{book.categories[0]}</p>}
+          {book.authors.length > 0 && <p className="mt-0.5 truncate text-xs text-white/45">{book.authors[0]}</p>}
+          {book.categories.length > 0 && <p className="mt-1 truncate text-xs text-indigo-400/70">{book.categories[0]}</p>}
         </div>
       </div>
       {showCover && <CoverLightbox src={thumb} alt={book.title} onClose={() => setShowCover(false)} />}
@@ -211,6 +211,8 @@ function SearchResults() {
   const [statusFilter, setStatusFilter]   = useState<'ongoing' | 'completed' | 'hiatus' | 'all'>('all');
   const [yearFrom, setYearFrom]           = useState('');
   const [yearTo, setYearTo]               = useState('');
+  const [ratingMin, setRatingMin]         = useState(0);
+  const [showAdvanced, setShowAdvanced]   = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   const [apiResults, setApiResults] = useState<LandingBook[]>([]);
@@ -226,8 +228,8 @@ function SearchResults() {
   // sync input when URL changes
   useEffect(() => { setInputValue(query); }, [query]);
 
-  // reset page when query / lang / status / year / source changes
-  useEffect(() => { setPage(1); }, [query, langFilter, statusFilter, yearFrom, yearTo, source]);
+  // reset page when query / lang / status / year / rating / source changes
+  useEffect(() => { setPage(1); }, [query, langFilter, statusFilter, yearFrom, yearTo, ratingMin, source]);
 
   // fetch from API
   useEffect(() => {
@@ -272,7 +274,7 @@ function SearchResults() {
   }, [query, langFilter, statusFilter, yearFrom, yearTo, source, page]);
 
   // reset category when base changes
-  useEffect(() => { setCategoryFilter("all"); }, [query, langFilter, statusFilter, yearFrom, yearTo, source]);
+  useEffect(() => { setCategoryFilter("all"); }, [query, langFilter, statusFilter, yearFrom, yearTo, ratingMin, source]);
 
   // local books (favorites + history) — must be client-only to avoid hydration mismatch
   const [localBooks, setLocalBooks] = useState<LandingBook[]>([]);
@@ -295,11 +297,12 @@ function SearchResults() {
     return [...cats].sort();
   }, [sourceResults]);
 
-  // final displayed (category filter)
-  const displayed = useMemo(() =>
-    categoryFilter === "all" ? sourceResults : sourceResults.filter((b) => b.categories.includes(categoryFilter)),
-    [sourceResults, categoryFilter],
-  );
+  // final displayed (category + rating filter)
+  const displayed = useMemo(() => {
+    let r = categoryFilter === "all" ? sourceResults : sourceResults.filter((b) => b.categories.includes(categoryFilter));
+    if (ratingMin > 0) r = r.filter((b) => (b.averageRating ?? 0) >= ratingMin);
+    return r;
+  }, [sourceResults, categoryFilter, ratingMin]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -338,22 +341,22 @@ function SearchResults() {
 
         {/* ── Filter bar ────────────────────────────────────────────── */}
         <div className="mb-7 space-y-3">
-          {/* Row 1: แหล่งข้อมูล + ภาษา */}
+          {/* Row 1: แหล่งข้อมูล + ภาษา + advanced toggle */}
           <div className="space-y-2 sm:space-y-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="shrink-0 text-[11px] font-medium text-white/30">แหล่งข้อมูล</span>
+              <span className="shrink-0 text-xs font-medium text-white/30">แหล่งข้อมูล</span>
               <FilterChip active={source === "all"} onClick={() => setSource("all")}>ทั้งหมด</FilterChip>
               <FilterChip active={source === "mylist"} onClick={() => setSource("mylist")}>
                 รายการของฉัน
                 {localBooks.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-px text-[9px]">{localBooks.length}</span>
+                  <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-px text-xs">{localBooks.length}</span>
                 )}
               </FilterChip>
 
               {!isMyList && (
                 <>
                   <span className="mx-1 hidden h-4 w-px shrink-0 bg-white/15 sm:block" />
-                  <span className="hidden shrink-0 text-[11px] font-medium text-white/30 sm:block">ภาษา</span>
+                  <span className="hidden shrink-0 text-xs font-medium text-white/30 sm:block">ภาษา</span>
                   <div className="hidden flex-wrap items-center gap-2 sm:flex">
                     {LANG_OPTIONS.map((opt) => (
                       <FilterChip key={opt.value} active={langFilter === opt.value} onClick={() => setLangFilter(opt.value)}>
@@ -361,13 +364,31 @@ function SearchResults() {
                       </FilterChip>
                     ))}
                   </div>
+                  <button
+                    onClick={() => setShowAdvanced((s) => !s)}
+                    className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                      showAdvanced || statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0
+                        ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-300"
+                        : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
+                    }`}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                      <path strokeLinecap="round" d="M3 6h18M7 12h10M11 18h2" />
+                    </svg>
+                    ตัวกรองขั้นสูง
+                    {(statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0) && (
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
+                        {[statusFilter !== 'all', !!yearFrom || !!yearTo, ratingMin > 0].filter(Boolean).length}
+                      </span>
+                    )}
+                  </button>
                 </>
               )}
             </div>
 
             {!isMyList && (
               <div className="flex flex-wrap items-center gap-2 sm:hidden">
-                <span className="shrink-0 text-[11px] font-medium text-white/30">ภาษา</span>
+                <span className="shrink-0 text-xs font-medium text-white/30">ภาษา</span>
                 {LANG_OPTIONS.map((opt) => (
                   <FilterChip key={opt.value} active={langFilter === opt.value} onClick={() => setLangFilter(opt.value)}>
                     {opt.label}
@@ -377,53 +398,71 @@ function SearchResults() {
             )}
           </div>
 
-          {/* Row 2: สถานะ + ปี */}
-          {!isMyList && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <div className="flex items-center gap-2">
-                <span className="shrink-0 text-[11px] font-medium text-white/30">สถานะ</span>
-                {(['ongoing', 'completed', 'hiatus'] as const).map((s) => {
-                  const label = s === 'ongoing' ? 'กำลังดำเนินการ' : s === 'completed' ? 'จบแล้ว' : 'หยุดพัก';
-                  return (
-                    <FilterChip
-                      key={s}
-                      active={statusFilter === s}
-                      onClick={() => setStatusFilter((prev) => (prev === s ? 'all' : s))}
-                    >
-                      {label}
-                    </FilterChip>
-                  );
-                })}
+          {/* Advanced filter panel */}
+          {!isMyList && showAdvanced && (
+            <div className="rounded-2xl border border-white/8 bg-white/3 p-4 space-y-4">
+              {/* สถานะ */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-14 shrink-0 text-xs font-medium text-white/35">สถานะ</span>
+                <FilterChip active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>ทั้งหมด</FilterChip>
+                {(['ongoing', 'completed', 'hiatus'] as const).map((s) => (
+                  <FilterChip key={s} active={statusFilter === s} onClick={() => setStatusFilter((prev) => prev === s ? 'all' : s)}>
+                    {s === 'ongoing' ? 'กำลังดำเนินการ' : s === 'completed' ? 'จบแล้ว' : 'หยุดพัก'}
+                  </FilterChip>
+                ))}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="shrink-0 text-[11px] font-medium text-white/30">ปี</span>
+
+              {/* ปี */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-14 shrink-0 text-xs font-medium text-white/35">ปี</span>
                 <input
                   type="number"
                   value={yearFrom}
                   onChange={(e) => setYearFrom(e.target.value)}
                   placeholder="จาก"
-                  min={1900}
-                  max={2100}
-                  className="w-20 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white placeholder-white/30 outline-none transition focus:border-white/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  min={1900} max={2100}
+                  className="w-20 rounded-xl border border-white/15 bg-white/5 px-2 py-1.5 text-xs text-white placeholder-white/30 outline-none transition focus:border-white/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
-                <span className="text-[11px] text-white/30">–</span>
+                <span className="text-xs text-white/30">–</span>
                 <input
                   type="number"
                   value={yearTo}
                   onChange={(e) => setYearTo(e.target.value)}
                   placeholder="ถึง"
-                  min={1900}
-                  max={2100}
-                  className="w-20 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white placeholder-white/30 outline-none transition focus:border-white/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  min={1900} max={2100}
+                  className="w-20 rounded-xl border border-white/15 bg-white/5 px-2 py-1.5 text-xs text-white placeholder-white/30 outline-none transition focus:border-white/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
+                {(yearFrom || yearTo) && (
+                  <button onClick={() => { setYearFrom(''); setYearTo(''); }} className="text-xs text-white/30 hover:text-white/60 transition">ล้าง</button>
+                )}
               </div>
+
+              {/* คะแนน */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-14 shrink-0 text-xs font-medium text-white/35">คะแนน</span>
+                {([0, 3, 4, 4.5] as const).map((r) => (
+                  <FilterChip key={r} active={ratingMin === r} onClick={() => setRatingMin(r)}>
+                    {r === 0 ? 'ทั้งหมด' : `≥ ${r}★`}
+                  </FilterChip>
+                ))}
+              </div>
+
+              {/* Reset all */}
+              {(statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0) && (
+                <button
+                  onClick={() => { setStatusFilter('all'); setYearFrom(''); setYearTo(''); setRatingMin(0); }}
+                  className="text-xs text-white/30 underline underline-offset-2 hover:text-white/60 transition"
+                >
+                  ล้างตัวกรองทั้งหมด
+                </button>
+              )}
             </div>
           )}
 
           {/* Row 3: หมวดหมู่ (dynamic from results) */}
           {availableCategories.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="shrink-0 text-[11px] font-medium text-white/30">หมวดหมู่</span>
+              <span className="shrink-0 text-xs font-medium text-white/30">หมวดหมู่</span>
               <ChipBar
                 categories={["all", ...availableCategories]}
                 active={categoryFilter}

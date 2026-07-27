@@ -1,5 +1,46 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-07-28 — #643/#678: CI gates made real (frontend unit selection + torch-free collection)
+
+**What & where:** `.github/workflows/ci.yml` (frontend job, new `scripts` job, `gate`),
+`scripts/lib/frontend-unit-tests.mjs` + `scripts/list-frontend-unit-tests.mjs` + tests,
+`scripts/README.md`; `MIT/test/conftest.py`, `MIT/test/heavy_imports.py`,
+`MIT/test/test_heavy_test_list.py`.
+
+**Why:** `integrate/render-reconcile` failed CI the first time it was ever run through the pipeline
+(draft PR #642), blocking Phase E of #626/#548. Both failures were pre-existing and invisible because
+the branch had never been CI-verified — and, at the repo level, because no job ran the guard suites.
+
+**Before → After:** unit-test selection was an inline `find` blacklist extended by hand per qualifier
+→ a pure function with 5 tests and a CLI that fails closed on an empty selection. Guard suites
+(`issue-ref`, `worktree-budget`, `pr-bilingual`, `append-only`) ran **nowhere** in CI → a required
+`scripts (node --test)` job. MIT torch-free gate: **4 collection errors → 0** (638 tests collected);
+`_HEAVY_TESTS` drift was detectable only via an after-the-fact CI collection error → a local,
+torch-free AST guard that names the offenders.
+
+**Performance Δ:** none (test-infra only). New `scripts` job ≈ 11s, unfiltered by design.
+
+**Quality:** no product-behavior change. Render/translation paths untouched —
+`MIT/manga_translator` tree byte-identical (`1a073c0c`) across both the fix and the `main` catch-up
+merge, so the #626 render==baseline claim is unaffected.
+
+**Validation:** PR #678 green on every check including the required `gate` (`scripts` 11s,
+`frontend` 17s, `mit_logic` 2m16s, `mit_heavy` 4m18s, `backend` 52s). Locally: 58/58 script tests;
+MIT collection 638/0 with the ML stack hidden from the import system; real-tree selector check
+35 `*.test.ts` → 33 selected, 2 integration excluded, `PageRenderer.memo.test.ts` kept.
+
+**Risk / rollback:** low — additive test-infra. Rollback = revert #678 and `4e4f3c88`. Residual: the
+heavy-package list in `heavy_imports.py` is declared, not inferred (a static scan cannot follow the
+lazy `__getattr__` hop); the CI collection error remains the backstop.
+
+**Follow-up surfaced:** **#679** — `#278` SFX provenance gate not called by the driver on
+`integrate/render-reconcile` (passes on `main`). Render-quality regression, now the remaining Phase E
+blocker; verdict is user-in-the-loop on real rendered images.
+
+**Links:** #643, #678, #679, #642, #626, #548, #359, #609, #278.
+
+---
+
 ## 2026-07-10 — #626: landing→main render+translation feature-merge (integration branch)
 
 **What & where:** Hand-merged `origin/landing/render-phase0` onto `integrate/render-reconcile`

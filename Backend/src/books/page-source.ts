@@ -28,7 +28,12 @@ export function isLocalUploadPath(pageUrl: string): boolean {
 /** Read a backend-local page from disk under `root`, decoding percent-encoding
  *  and normalizing separators BEFORE resolving so encoded ("..%2e") and
  *  backslash ("..\\") traversal can't escape the root. */
-async function readLocalPage(root: string, rel: string, kind: string, original: string): Promise<Buffer> {
+async function readLocalPage(
+  root: string,
+  rel: string,
+  kind: string,
+  original: string,
+): Promise<Buffer> {
   let decoded: string;
   try {
     decoded = decodeURIComponent(rel);

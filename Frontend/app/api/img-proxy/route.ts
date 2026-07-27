@@ -18,8 +18,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const t = req.nextUrl.searchParams.get('t');
+    const cid = req.nextUrl.searchParams.get('cid');
+    const extra = [t && `t=${t}`, cid && `cid=${cid}`].filter(Boolean).join('&');
     const upstream = await fetch(
-      `${API_BASE}/books/img-proxy?url=${encodeURIComponent(url)}`,
+      `${API_BASE}/books/img-proxy?url=${encodeURIComponent(url)}${extra ? `&${extra}` : ''}`,
       // MangaDex at-home CDN URLs contain a rotating token — do not cache
       // at the Next.js layer; the backend caches the raw bytes via img-proxy.
       { cache: 'no-store' },

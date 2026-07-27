@@ -5,17 +5,29 @@ import type { ChapterPageItem } from "../hooks/useChapters";
  * Already-proxied /api/ URLs pass through; locally-cached /img-cache paths are
  * prefixed with the backend base; everything else is routed through the
  * img-proxy (encoded) so the browser never hits the MangaDex CDN directly.
+ *
+ * When imageToken + chapterId are provided, `?t=&cid=` are appended so the
+ * backend ImageTokenGuard can validate the request before serving bytes.
  */
 export function resolveReaderPages(
   originals: string[],
   locals: string[] | undefined,
   apiBase: string,
+  chapterId?: string,
+  imageToken?: string,
 ): string[] {
+  const tSuffix =
+    imageToken && chapterId
+      ? `t=${encodeURIComponent(imageToken)}&cid=${encodeURIComponent(chapterId)}`
+      : '';
   return originals.map((orig, i) => {
     if (orig.startsWith("/api/")) return orig;
     const local = locals?.[i];
-    if (local && local.startsWith("/img-cache")) return `${apiBase}${local}`;
-    return `/api/img-proxy?url=${encodeURIComponent(orig)}`;
+    if (local && local.startsWith("/img-cache")) {
+      return tSuffix ? `${apiBase}${local}?${tSuffix}` : `${apiBase}${local}`;
+    }
+    const proxyUrl = `/api/img-proxy?url=${encodeURIComponent(orig)}`;
+    return tSuffix ? `${proxyUrl}&${tSuffix}` : proxyUrl;
   });
 }
 

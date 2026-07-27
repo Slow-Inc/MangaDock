@@ -23,15 +23,24 @@ describe('LlmService — gemini provider', () => {
   });
 
   it('isConfigured() true with GEMINI_API_KEY only (backward compat)', () => {
-    expect(make({ LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'gkey' }).isConfigured()).toBe(true);
+    expect(
+      make({ LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'gkey' }).isConfigured(),
+    ).toBe(true);
   });
 
   it('getDescriptionModel() falls back to default when set to empty string', () => {
-    expect(make({ ...env, LLM_DESCRIPTION_MODEL: '' }).getDescriptionModel()).toBe('gemini-2.5-flash');
+    expect(
+      make({ ...env, LLM_DESCRIPTION_MODEL: '' }).getDescriptionModel(),
+    ).toBe('gemini-2.5-flash');
   });
 
   it('getDescriptionModel() returns LLM_DESCRIPTION_MODEL when set', () => {
-    expect(make({ ...env, LLM_DESCRIPTION_MODEL: 'gemini-custom' }).getDescriptionModel()).toBe('gemini-custom');
+    expect(
+      make({
+        ...env,
+        LLM_DESCRIPTION_MODEL: 'gemini-custom',
+      }).getDescriptionModel(),
+    ).toBe('gemini-custom');
   });
 
   it('getDescriptionModel() falls back to gemini-2.5-flash', () => {
@@ -39,7 +48,9 @@ describe('LlmService — gemini provider', () => {
   });
 
   it('getMangaModel() returns LLM_MANGA_MODEL when set', () => {
-    expect(make({ ...env, LLM_MANGA_MODEL: 'gemini-lite' }).getMangaModel()).toBe('gemini-lite');
+    expect(
+      make({ ...env, LLM_MANGA_MODEL: 'gemini-lite' }).getMangaModel(),
+    ).toBe('gemini-lite');
   });
 
   it('getMangaModel() falls back to gemini-2.5-flash-lite', () => {
@@ -47,7 +58,9 @@ describe('LlmService — gemini provider', () => {
   });
 
   it('complete() calls GoogleGenerativeAI.generateContent and returns text', async () => {
-    const mockGenContent = jest.fn().mockResolvedValue({ response: { text: () => 'แปลแล้ว' } });
+    const mockGenContent = jest
+      .fn()
+      .mockResolvedValue({ response: { text: () => 'แปลแล้ว' } });
     (GoogleGenerativeAI as jest.Mock).mockImplementation(() => ({
       getGenerativeModel: () => ({ generateContent: mockGenContent }),
     }));
@@ -77,7 +90,9 @@ describe('LlmService — openai provider', () => {
   });
 
   it('getDescriptionModel() returns LLM_DESCRIPTION_MODEL when set', () => {
-    expect(make({ ...env, LLM_DESCRIPTION_MODEL: 'gpt-4o' }).getDescriptionModel()).toBe('gpt-4o');
+    expect(
+      make({ ...env, LLM_DESCRIPTION_MODEL: 'gpt-4o' }).getDescriptionModel(),
+    ).toBe('gpt-4o');
   });
 
   it('getDescriptionModel() falls back to gpt-4o-mini', () => {
@@ -85,7 +100,9 @@ describe('LlmService — openai provider', () => {
   });
 
   it('getMangaModel() returns LLM_MANGA_MODEL when set', () => {
-    expect(make({ ...env, LLM_MANGA_MODEL: 'gpt-4.1-mini' }).getMangaModel()).toBe('gpt-4.1-mini');
+    expect(
+      make({ ...env, LLM_MANGA_MODEL: 'gpt-4.1-mini' }).getMangaModel(),
+    ).toBe('gpt-4.1-mini');
   });
 
   it('getMangaModel() falls back to gpt-4o-mini', () => {
@@ -93,8 +110,12 @@ describe('LlmService — openai provider', () => {
   });
 
   it('complete() calls OpenAI without baseURL for openai provider', async () => {
-    const mockCreate = jest.fn().mockResolvedValue({ choices: [{ message: { content: 'แปลแล้ว' } }] });
-    (OpenAI as jest.Mock).mockImplementation(() => ({ chat: { completions: { create: mockCreate } } }));
+    const mockCreate = jest
+      .fn()
+      .mockResolvedValue({ choices: [{ message: { content: 'แปลแล้ว' } }] });
+    (OpenAI as jest.Mock).mockImplementation(() => ({
+      chat: { completions: { create: mockCreate } },
+    }));
 
     const result = await make(env).complete('Hello', 'gpt-4o-mini');
 
@@ -111,12 +132,21 @@ describe('LlmService — custom provider', () => {
   afterEach(() => jest.resetAllMocks());
 
   it('isConfigured() false when LLM_API_KEY absent', () => {
-    expect(make({ LLM_PROVIDER: 'custom', LLM_BASE_URL: 'http://localhost:11434/v1' }).isConfigured()).toBe(false);
+    expect(
+      make({
+        LLM_PROVIDER: 'custom',
+        LLM_BASE_URL: 'http://localhost:11434/v1',
+      }).isConfigured(),
+    ).toBe(false);
   });
 
   it('complete() passes baseURL to OpenAI constructor', async () => {
-    const mockCreate = jest.fn().mockResolvedValue({ choices: [{ message: { content: 'x' } }] });
-    (OpenAI as jest.Mock).mockImplementation(() => ({ chat: { completions: { create: mockCreate } } }));
+    const mockCreate = jest
+      .fn()
+      .mockResolvedValue({ choices: [{ message: { content: 'x' } }] });
+    (OpenAI as jest.Mock).mockImplementation(() => ({
+      chat: { completions: { create: mockCreate } },
+    }));
 
     await make({
       LLM_PROVIDER: 'custom',

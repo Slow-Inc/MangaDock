@@ -18,7 +18,9 @@ export class AuthGuard implements CanActivate {
     const authHeader: string | undefined = req.headers['authorization'];
 
     if (!authHeader?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing or invalid Authorization header');
+      throw new UnauthorizedException(
+        'Missing or invalid Authorization header',
+      );
     }
 
     const idToken = authHeader.slice(7);
@@ -32,4 +34,3 @@ export class AuthGuard implements CanActivate {
     }
   }
 }
-

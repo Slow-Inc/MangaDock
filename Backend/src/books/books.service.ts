@@ -5,12 +5,21 @@ import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
 import { ImageCacheService } from '../cache/image-cache.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { MangaDexService } from './mangadex.service';
-import { STORAGE_PROVIDER, type StorageProvider } from '../common/storage/storage-provider.interface';
+import {
+  STORAGE_PROVIDER,
+  type StorageProvider,
+} from '../common/storage/storage-provider.interface';
 import { PatchStore } from './patch-store';
-import { TranslationMemoryRepository, type TextLayerRegion } from './translation-memory.repository';
+import {
+  TranslationMemoryRepository,
+  type TextLayerRegion,
+} from './translation-memory.repository';
 import { MitClient } from './mit-client';
 import { MitTranslationService } from './mit-translation.service';
-import { MitBatchOrchestrator, type BatchPageListener } from './mit-batch-orchestrator.service';
+import {
+  MitBatchOrchestrator,
+  type BatchPageListener,
+} from './mit-batch-orchestrator.service';
 import { loadPageBytes } from './page-source';
 import { composeSeriesContext } from './series-context';
 import { GeminiModelCatalog, type GeminiModel } from './gemini-model-catalog';
@@ -37,7 +46,13 @@ export type {
 } from './books.types';
 
 // ─── Patch geometry ───────────────────────────────────────────────────────────
-type PatchEntry = { xPct: number; yPct: number; wPct: number; hPct: number; url: string };
+type PatchEntry = {
+  xPct: number;
+  yPct: number;
+  wPct: number;
+  hPct: number;
+  url: string;
+};
 
 /** Map raw MIT patch rects (px) + their already-stored URLs into percent-geometry
  *  patch entries. Pure — the single source of truth for the percent math that was
@@ -103,7 +118,11 @@ export class BooksService {
     private readonly llmService: LlmService = new LlmService(),
   ) {
     this.geminiCatalog = new GeminiModelCatalog(this.cache);
-    this.catalog = new MangaCatalogService(this.mangaDex, this.supabase, this.cache);
+    this.catalog = new MangaCatalogService(
+      this.mangaDex,
+      this.supabase,
+      this.cache,
+    );
     this.landing = new LandingService(
       this.cache,
       this.imageCache,
@@ -120,18 +139,36 @@ export class BooksService {
     // #233: single-page MIT path delegates here. persistPage (#232) + seriesContextFor
     // (#157) stay in BooksService — shared with the batch/webhook path — and are
     // injected as callbacks so the dependency stays one-way (no circular DI).
-    this.mitTranslation = new MitTranslationService(this.mitClient, this.cache, {
-      persistPage: (p) => this.persistPage(p),
-      seriesContextFor: (mangaId) => this.seriesContextFor(mangaId),
-    });
+    this.mitTranslation = new MitTranslationService(
+      this.mitClient,
+      this.cache,
+      {
+        persistPage: (p) => this.persistPage(p),
+        seriesContextFor: (mangaId) => this.seriesContextFor(mangaId),
+      },
+    );
     // #234: batch state machine delegates here. Same shared callbacks, plus the
     // single-page translate (the per-page fallback) — late-bound so a test spy on
     // translateMangaPagePatches is still observed by the batch retry path.
     this.batch = new MitBatchOrchestrator(this.mitClient, this.cache, {
       persistPage: (p) => this.persistPage(p),
       seriesContextFor: (mangaId) => this.seriesContextFor(mangaId),
-      translateSinglePage: (chapterId, pageIndex, pageUrl, sourceLang, targetLang, opts) =>
-        this.translateMangaPagePatches(chapterId, pageIndex, pageUrl, sourceLang, targetLang, opts),
+      translateSinglePage: (
+        chapterId,
+        pageIndex,
+        pageUrl,
+        sourceLang,
+        targetLang,
+        opts,
+      ) =>
+        this.translateMangaPagePatches(
+          chapterId,
+          pageIndex,
+          pageUrl,
+          sourceLang,
+          targetLang,
+          opts,
+        ),
     });
   }
 
@@ -139,7 +176,8 @@ export class BooksService {
     // Clean the pre-#137 random-named patch backlog on boot, then daily.
     this.patchStore.startSweeping(
       (removed) => {
-        if (removed > 0) this.logger.log(`[PatchStore] swept ${removed} legacy patch files`);
+        if (removed > 0)
+          this.logger.log(`[PatchStore] swept ${removed} legacy patch files`);
       },
       (err) => this.logger.warn(`[PatchStore] sweep failed: ${String(err)}`),
     );
@@ -174,7 +212,13 @@ export class BooksService {
     recoverIfEmpty?: () => Promise<PatchEntry[]>;
   }): Promise<PatchEntry[]> {
     const urls = await this.patchStore.put(
-      { chapterId: p.chapterId, pageIndex: p.pageIndex, srcMIT: p.srcMIT, tgtMIT: p.tgtMIT, model: p.storeModel },
+      {
+        chapterId: p.chapterId,
+        pageIndex: p.pageIndex,
+        srcMIT: p.srcMIT,
+        tgtMIT: p.tgtMIT,
+        model: p.storeModel,
+      },
       p.buffers,
     );
     let patches = toPatchEntries(p.rects, urls, p.imgW, p.imgH);
@@ -190,12 +234,23 @@ export class BooksService {
     // Fire-and-forget — the repository swallows its own errors, so persistence
     // never adds latency to or fails page delivery (local-first).
     if (Array.isArray(p.regions) && p.regions.length > 0) {
-      void this.translationMemory.savePageText(p.chapterId, p.pageIndex, p.tgtMIT, p.regions, p.tmModel);
+      void this.translationMemory.savePageText(
+        p.chapterId,
+        p.pageIndex,
+        p.tgtMIT,
+        p.regions,
+        p.tmModel,
+      );
     }
     return patches;
   }
 
-  async handleMitCallback(jobKey: string, pageIndex: number, result: any, error?: string): Promise<void> {
+  async handleMitCallback(
+    jobKey: string,
+    pageIndex: number,
+    result: any,
+    error?: string,
+  ): Promise<void> {
     return this.batch.handleMitCallback(jobKey, pageIndex, result, error);
   }
 
@@ -216,7 +271,8 @@ export class BooksService {
 
   private async getMangaModels(requested?: string): Promise<string[]> {
     const provider = this.env.LLM_PROVIDER ?? 'gemini';
-    if (provider === 'gemini') return this.geminiCatalog.getMangaModels(requested);
+    if (provider === 'gemini')
+      return this.geminiCatalog.getMangaModels(requested);
     return [this.llmService.getMangaModel()];
   }
 
@@ -231,7 +287,10 @@ export class BooksService {
   /** Payload for GET /books/models (#133): the Gemini catalog the Reader can
    *  offer, plus the translator MIT actually runs so the Reader knows whether
    *  offering Gemini models makes sense at all. */
-  async getMangaModelsInfo(): Promise<{ models: GeminiModel[]; imageTranslator: string | null }> {
+  async getMangaModelsInfo(): Promise<{
+    models: GeminiModel[];
+    imageTranslator: string | null;
+  }> {
     const [models, imageTranslator] = await Promise.all([
       this.getMangaModels(),
       this.getImageTranslator(),
@@ -243,13 +302,17 @@ export class BooksService {
    *  translated into the prompt-context string. Catalog failure or missing id
    *  degrades to undefined — translate must never break because metadata is
    *  unavailable (local-first rule). */
-  private async seriesContextFor(mangaId?: string): Promise<string | undefined> {
+  private async seriesContextFor(
+    mangaId?: string,
+  ): Promise<string | undefined> {
     if (!mangaId) return undefined;
     try {
       const detail = await this.mangaDex.getMangaDetail(mangaId);
       return composeSeriesContext(detail);
     } catch (err) {
-      this.logger.warn(`[SeriesContext] catalog lookup failed manga=${mangaId}: ${String(err)}`);
+      this.logger.warn(
+        `[SeriesContext] catalog lookup failed manga=${mangaId}: ${String(err)}`,
+      );
       return undefined;
     }
   }
@@ -276,11 +339,13 @@ export class BooksService {
   // ─── Manga page image translation (manga-image-translator) ──────────────────
 
   // #233: delegated to MitTranslationService (signature unchanged for callers).
-  async checkMitHealth(): Promise<{ available: boolean; url: string; message?: string }> {
+  async checkMitHealth(): Promise<{
+    available: boolean;
+    url: string;
+    message?: string;
+  }> {
     return this.mitTranslation.checkMitHealth();
   }
-
-  
 
   async translateMangaPagePatches(
     chapterId: string,
@@ -288,8 +353,21 @@ export class BooksService {
     pageUrl: string,
     sourceLang?: string,
     targetLang?: string,
-    opts?: { maxStartupRetries?: number; imageModel?: string; derivative?: 'hd' | 'saver'; mangaId?: string },
-  ): Promise<{ patches: Array<{ xPct: number; yPct: number; wPct: number; hPct: number; url: string }> }> {
+    opts?: {
+      maxStartupRetries?: number;
+      imageModel?: string;
+      derivative?: 'hd' | 'saver';
+      mangaId?: string;
+    },
+  ): Promise<{
+    patches: Array<{
+      xPct: number;
+      yPct: number;
+      wPct: number;
+      hPct: number;
+      url: string;
+    }>;
+  }> {
     // #233: single-page flow lives in MitTranslationService. Kept as a delegator so
     // the controller and the internal batch/retry callers (which spy on this method)
     // are byte-identical.
@@ -311,7 +389,14 @@ export class BooksService {
     imageModel?: string,
     derivative: 'hd' | 'saver' = 'hd',
   ): void {
-    this.batch.removeBatchListener(chapterId, sourceLang, targetLang, listener, imageModel, derivative);
+    this.batch.removeBatchListener(
+      chapterId,
+      sourceLang,
+      targetLang,
+      listener,
+      imageModel,
+      derivative,
+    );
   }
 
   async startOrAttachBatchJob(
@@ -324,27 +409,50 @@ export class BooksService {
     derivative: 'hd' | 'saver' = 'hd',
     mangaId?: string,
   ): Promise<void> {
-    return this.batch.startOrAttachBatchJob(chapterId, pages, listener, sourceLang, targetLang, imageModel, derivative, mangaId);
+    return this.batch.startOrAttachBatchJob(
+      chapterId,
+      pages,
+      listener,
+      sourceLang,
+      targetLang,
+      imageModel,
+      derivative,
+      mangaId,
+    );
   }
 
   /** @deprecated Use startOrAttachBatchJob instead */
   async translateMangaChapterBatchPatches(
     chapterId: string,
     pages: Array<{ pageIndex: number; pageUrl: string }>,
-    onPage: (data: { pageIndex: number; patches: PatchEntry[]; error?: string }) => void,
+    onPage: (data: {
+      pageIndex: number;
+      patches: PatchEntry[];
+      error?: string;
+    }) => void,
   ): Promise<void> {
-    return this.batch.translateMangaChapterBatchPatches(chapterId, pages, onPage);
+    return this.batch.translateMangaChapterBatchPatches(
+      chapterId,
+      pages,
+      onPage,
+    );
   }
 
   // ─── Delegated MangaDex methods ───────────────────────────────────────────────
 
   // #231: MangaDex catalog passthrough + search live in MangaCatalogService.
   // These delegators keep the controller call sites byte-identical.
-  getMangaChapters(mangaId: string, forceLocal = false): Promise<MangaChapter[]> {
+  getMangaChapters(
+    mangaId: string,
+    forceLocal = false,
+  ): Promise<MangaChapter[]> {
     return this.catalog.getMangaChapters(mangaId, forceLocal);
   }
 
-  getMangaChapterPages(chapterId: string, forceLocal = false): Promise<MangaChapterPages | null> {
+  getMangaChapterPages(
+    chapterId: string,
+    forceLocal = false,
+  ): Promise<MangaChapterPages | null> {
     return this.catalog.getMangaChapterPages(chapterId, forceLocal);
   }
 
@@ -366,7 +474,9 @@ export class BooksService {
 
   // ─── Orchestrated methods ─────────────────────────────────────────────────────
 
-  translateDescription(text: string): Promise<{ translatedText: string; translated: boolean }> {
+  translateDescription(
+    text: string,
+  ): Promise<{ translatedText: string; translated: boolean }> {
     return this.landing.translateDescription(text);
   }
 
@@ -376,13 +486,27 @@ export class BooksService {
 
   // #231: search + alt-name lookup live in MangaCatalogService. Delegator keeps the
   // controller call site byte-identical.
-  searchBooks(query: string, lang?: string, limit = 100, offset = 0, status?: 'ongoing' | 'completed' | 'hiatus', yearFrom?: number, yearTo?: number): Promise<{ items: LandingBook[]; total: number }> {
-    return this.catalog.searchBooks(query, lang, limit, offset, status, yearFrom, yearTo);
+  searchBooks(
+    query: string,
+    lang?: string,
+    limit = 100,
+    offset = 0,
+    status?: 'ongoing' | 'completed' | 'hiatus',
+    yearFrom?: number,
+    yearTo?: number,
+  ): Promise<{ items: LandingBook[]; total: number }> {
+    return this.catalog.searchBooks(
+      query,
+      lang,
+      limit,
+      offset,
+      status,
+      yearFrom,
+      yearTo,
+    );
   }
 
   getRelated(id: string, limit = 10): Promise<LandingBook[]> {
     return this.catalog.getRelated(id, limit);
   }
-
 }
-

@@ -6,6 +6,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import SupabaseGuard from "./components/SupabaseGuard";
 import DevImageCacheToggle from "./components/DevImageCacheToggle";
 import SmoothScrolling from "./components/SmoothScrolling";
+import DailyCheckinModal from "./components/DailyCheckinModal";
 
 const notoSansThai = Noto_Sans_Thai({
   variable: "--font-noto-sans-thai",
@@ -30,6 +31,7 @@ export default function RootLayout({
             <AuthProvider>
               <SupabaseGuard />
               {children}
+              <DailyCheckinModal />
               <DevImageCacheToggle />
             </AuthProvider>
           </ToastProvider>

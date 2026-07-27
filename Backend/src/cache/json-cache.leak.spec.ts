@@ -14,9 +14,13 @@ describe('JsonCacheService Memory Leak Repro', () => {
 
   it('should grow memoryStore indefinitely without limits', () => {
     const ITERATIONS = 10000;
-    
+
     for (let i = 0; i < ITERATIONS; i++) {
-      service.set(`key-${i}`, { data: 'some large data string '.repeat(10) }, 10000);
+      service.set(
+        `key-${i}`,
+        { data: 'some large data string '.repeat(10) },
+        10000,
+      );
     }
 
     const size = [...service.keys()].length;

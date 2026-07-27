@@ -6,7 +6,11 @@ function makeService() {
     set: jest.fn().mockResolvedValue(undefined),
     setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
   };
-  const storage = { put: jest.fn().mockResolvedValue(undefined), list: jest.fn().mockResolvedValue([]), delete: jest.fn().mockResolvedValue(undefined) };
+  const storage = {
+    put: jest.fn().mockResolvedValue(undefined),
+    list: jest.fn().mockResolvedValue([]),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new BooksService(
     {} as any,
     cache as any,
@@ -23,7 +27,8 @@ describe('BooksService — retry fallback (#82)', () => {
   // Cycle 1 — aborted signal stops retry calls immediately
   it('stops retrying pages when AbortSignal is aborted', async () => {
     const { service } = makeService();
-    const patchesSpy = jest.spyOn(service as any, 'translateMangaPagePatches')
+    const patchesSpy = jest
+      .spyOn(service as any, 'translateMangaPagePatches')
       .mockResolvedValue({ patches: [] });
 
     const controller = new AbortController();
@@ -36,7 +41,14 @@ describe('BooksService — retry fallback (#82)', () => {
     ];
 
     await (service as any).batch.stream._retryMissingPagesIndividually(
-      'ch1', pages, new Set<number>(), notify, undefined, undefined, undefined, controller.signal,
+      'ch1',
+      pages,
+      new Set<number>(),
+      notify,
+      undefined,
+      undefined,
+      undefined,
+      controller.signal,
     );
 
     expect(patchesSpy).not.toHaveBeenCalled();
@@ -45,7 +57,8 @@ describe('BooksService — retry fallback (#82)', () => {
   // Cycle 2 — fallback passes maxStartupRetries:3 to translateMangaPagePatches
   it('calls translateMangaPagePatches with maxStartupRetries:3 in fallback path', async () => {
     const { service } = makeService();
-    const patchesSpy = jest.spyOn(service as any, 'translateMangaPagePatches')
+    const patchesSpy = jest
+      .spyOn(service as any, 'translateMangaPagePatches')
       .mockResolvedValue({ patches: [] });
 
     const notify = jest.fn();
@@ -57,7 +70,11 @@ describe('BooksService — retry fallback (#82)', () => {
     );
 
     expect(patchesSpy).toHaveBeenCalledWith(
-      'ch2', 0, 'http://example.com/0.jpg', undefined, undefined,
+      'ch2',
+      0,
+      'http://example.com/0.jpg',
+      undefined,
+      undefined,
       { maxStartupRetries: 3, imageModel: undefined, derivative: 'hd' },
     );
   });

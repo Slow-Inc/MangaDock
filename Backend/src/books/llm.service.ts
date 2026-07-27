@@ -10,13 +10,16 @@ export class LlmService {
   private readonly openAiClient: OpenAI | undefined;
   private readonly genAI: GoogleGenerativeAI | undefined;
 
-  constructor(@Optional() private readonly env: NodeJS.ProcessEnv = process.env) {
+  constructor(
+    @Optional() private readonly env: NodeJS.ProcessEnv = process.env,
+  ) {
     this.provider = (env.LLM_PROVIDER as LlmProvider) ?? 'gemini';
     if (this.provider === 'gemini') {
       const key = env.LLM_API_KEY ?? env.GEMINI_API_KEY;
       if (env.GEMINI_API_KEY && !env.LLM_API_KEY) {
-        // eslint-disable-next-line no-console
-        console.warn('[LlmService] GEMINI_API_KEY is deprecated — rename to LLM_API_KEY in your .env');
+        console.warn(
+          '[LlmService] GEMINI_API_KEY is deprecated — rename to LLM_API_KEY in your .env',
+        );
       }
       if (key) this.genAI = new GoogleGenerativeAI(key);
     } else {

@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
 import { L3DiskService } from './l3-disk.service';
@@ -9,7 +14,9 @@ export const FLUSH_CONFIG: Array<{ prefix: string; intervalMs: number }> = [
   { prefix: '', intervalMs: 60_000 }, // '' = all remaining keys not matched above
 ];
 
-const SPECIFIC_PREFIXES = FLUSH_CONFIG.filter((c) => c.prefix !== '').map((c) => c.prefix);
+const SPECIFIC_PREFIXES = FLUSH_CONFIG.filter((c) => c.prefix !== '').map(
+  (c) => c.prefix,
+);
 
 @Injectable()
 export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
@@ -59,7 +66,8 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
     // Prune high-water marks for keys evicted from L1 — without this the map
     // grows forever under key churn (manga chapters rotate through the LRU).
     for (const key of this.lastWritten.keys()) {
-      if (matchesPrefix(key) && !this.jsonCache.has(key)) this.lastWritten.delete(key);
+      if (matchesPrefix(key) && !this.jsonCache.has(key))
+        this.lastWritten.delete(key);
     }
 
     // One MGET round-trip instead of one GET per key (#147) — these timers
@@ -77,7 +85,9 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
         await this.l3.write(key, entry);
         this.lastWritten.set(key, entry.updatedAt);
       } catch (err) {
-        this.logger.warn(`L3BatchWriter: corrupt L2 data for key=${key}: ${String(err)}`);
+        this.logger.warn(
+          `L3BatchWriter: corrupt L2 data for key=${key}: ${String(err)}`,
+        );
       }
     }
   }

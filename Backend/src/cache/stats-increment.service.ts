@@ -33,7 +33,12 @@ export class StatsIncrementService {
 
   constructor(private readonly redis: RedisService) {}
 
-  async recordChapterView(chapterId: string, mangaId: string, uid: string, date: string): Promise<void> {
+  async recordChapterView(
+    chapterId: string,
+    mangaId: string,
+    uid: string,
+    date: string,
+  ): Promise<void> {
     if (!this.redis.available) return;
 
     const viewsKey = `stats:chapter:${chapterId}:views:${date}`;
@@ -57,7 +62,9 @@ export class StatsIncrementService {
         String(ttl),
       );
     } catch (err) {
-      this.logger.warn(`recordChapterView failed chapter=${chapterId}: ${String(err)}`);
+      this.logger.warn(
+        `recordChapterView failed chapter=${chapterId}: ${String(err)}`,
+      );
     }
   }
 

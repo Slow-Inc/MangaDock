@@ -13,7 +13,9 @@ describe('validate()', () => {
     });
 
     it('accepts explicit LLM_PROVIDER=gemini with GEMINI_API_KEY', () => {
-      expect(() => validate({ ...BASE, LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'key' })).not.toThrow();
+      expect(() =>
+        validate({ ...BASE, LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'key' }),
+      ).not.toThrow();
     });
 
     it('allows GEMINI_API_KEY to be absent (no longer required)', () => {
@@ -49,7 +51,11 @@ describe('validate()', () => {
 
     it('rejects custom without LLM_API_KEY', () => {
       expect(() =>
-        validate({ ...BASE, LLM_PROVIDER: 'custom', LLM_BASE_URL: 'http://x/v1' }),
+        validate({
+          ...BASE,
+          LLM_PROVIDER: 'custom',
+          LLM_BASE_URL: 'http://x/v1',
+        }),
       ).toThrow('LLM_API_KEY is required');
     });
 

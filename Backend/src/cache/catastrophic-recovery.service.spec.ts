@@ -9,7 +9,9 @@ const SUPABASE_BATCH_SIZE = 100;
 
 const PIPELINE_CHUNK_SIZE = 500;
 
-function makeEntry(overrides: Partial<CacheEntry<unknown>> = {}): CacheEntry<unknown> {
+function makeEntry(
+  overrides: Partial<CacheEntry<unknown>> = {},
+): CacheEntry<unknown> {
   return {
     data: { value: 'test' },
     updatedAt: new Date().toISOString(),
@@ -34,28 +36,47 @@ function makeRedis(available = false) {
       createdPipelines.push(p);
       return p;
     }),
-    get created() { return createdPipelines; },
+    get created() {
+      return createdPipelines;
+    },
   };
   return {
     available,
     onReconnect: jest.fn().mockReturnValue(() => {}),
     getClient: jest.fn().mockResolvedValue(client),
-    get _client() { return client; },
+    get _client() {
+      return client;
+    },
   } as any;
 }
 
-function makeL3(entries: Map<string, CacheEntry<unknown>> = new Map()): jest.Mocked<Pick<L3DiskService, 'readAll'>> {
+function makeL3(
+  entries: Map<string, CacheEntry<unknown>> = new Map(),
+): jest.Mocked<Pick<L3DiskService, 'readAll'>> {
   return { readAll: jest.fn().mockReturnValue(entries) } as any;
 }
 
-type SupabaseRow = { key: string; data: unknown; updated_at: string; ttl_ms: number };
+type SupabaseRow = {
+  key: string;
+  data: unknown;
+  updated_at: string;
+  ttl_ms: number;
+};
 
 function makeSupabase(
-  rowsOrCallbacks: Array<{ data: SupabaseRow[]; error: any }> | { data: SupabaseRow[]; error: any } = { data: [], error: null },
+  rowsOrCallbacks:
+    | Array<{ data: SupabaseRow[]; error: any }>
+    | { data: SupabaseRow[]; error: any } = { data: [], error: null },
 ) {
-  const responses = Array.isArray(rowsOrCallbacks) ? rowsOrCallbacks : [rowsOrCallbacks];
+  const responses = Array.isArray(rowsOrCallbacks)
+    ? rowsOrCallbacks
+    : [rowsOrCallbacks];
   let callIdx = 0;
-  const inFn = jest.fn().mockImplementation(() => Promise.resolve(responses[callIdx++] ?? { data: [], error: null }));
+  const inFn = jest
+    .fn()
+    .mockImplementation(() =>
+      Promise.resolve(responses[callIdx++] ?? { data: [], error: null }),
+    );
   return {
     client: {
       from: jest.fn().mockReturnValue({
@@ -68,7 +89,9 @@ function makeSupabase(
 
 type ReconnectCb = () => Promise<void>;
 
-function makeService(overrides: { redis?: any; l3?: any; supabase?: any } = {}) {
+function makeService(
+  overrides: { redis?: any; l3?: any; supabase?: any } = {},
+) {
   const redis = overrides.redis ?? makeRedis(false);
   const l3 = overrides.l3 ?? makeL3();
   const supabase = overrides.supabase ?? makeSupabase();
@@ -119,7 +142,10 @@ describe('CatastrophicRecoveryService', () => {
   // T4 — Non-empty L3: registers reconnect callback
   it('registers a reconnect callback when L3 has entries and Redis is unavailable', async () => {
     const redis = makeRedis(false);
-    const { svc } = makeService({ redis, l3: makeL3(new Map([['key:1', makeEntry()]])) });
+    const { svc } = makeService({
+      redis,
+      l3: makeL3(new Map([['key:1', makeEntry()]])),
+    });
 
     await svc.onModuleInit();
 
@@ -136,13 +162,21 @@ describe('CatastrophicRecoveryService', () => {
       reconnectCb = cb;
       return () => {};
     });
-    const { svc } = makeService({ redis, l3: makeL3(new Map([['key:1', entry]])) });
+    const { svc } = makeService({
+      redis,
+      l3: makeL3(new Map([['key:1', entry]])),
+    });
 
     await svc.onModuleInit();
     await reconnectCb();
 
     const pipe = redis._client.created[0];
-    expect(pipe.set).toHaveBeenCalledWith('key:1', expect.any(String), 'EX', expect.any(Number));
+    expect(pipe.set).toHaveBeenCalledWith(
+      'key:1',
+      expect.any(String),
+      'EX',
+      expect.any(Number),
+    );
     expect(pipe.exec).toHaveBeenCalled();
   });
 
@@ -155,7 +189,10 @@ describe('CatastrophicRecoveryService', () => {
       reconnectCb = cb;
       return () => {};
     });
-    const { svc } = makeService({ redis, l3: makeL3(new Map([['key:1', makeEntry()]])) });
+    const { svc } = makeService({
+      redis,
+      l3: makeL3(new Map([['key:1', makeEntry()]])),
+    });
 
     await svc.onModuleInit();
     await reconnectCb();
@@ -174,7 +211,10 @@ describe('CatastrophicRecoveryService', () => {
       reconnectCb = cb;
       return () => {};
     });
-    const { svc } = makeService({ redis, l3: makeL3(new Map([['key:1', makeEntry()]])) });
+    const { svc } = makeService({
+      redis,
+      l3: makeL3(new Map([['key:1', makeEntry()]])),
+    });
 
     await svc.onModuleInit();
     const cbPromise = reconnectCb();
@@ -192,7 +232,8 @@ describe('CatastrophicRecoveryService', () => {
   it(`creates a new pipeline for every ${PIPELINE_CHUNK_SIZE} entries (chunked batching)`, async () => {
     jest.spyOn(Math, 'random').mockReturnValue(0);
     const entries = new Map<string, CacheEntry<unknown>>();
-    for (let i = 0; i < PIPELINE_CHUNK_SIZE + 1; i++) entries.set(`key:${i}`, makeEntry());
+    for (let i = 0; i < PIPELINE_CHUNK_SIZE + 1; i++)
+      entries.set(`key:${i}`, makeEntry());
     const redis = makeRedis(false);
     let reconnectCb!: ReconnectCb;
     (redis.onReconnect as jest.Mock).mockImplementation((cb: ReconnectCb) => {
@@ -217,7 +258,10 @@ describe('CatastrophicRecoveryService', () => {
       reconnectCb = cb;
       return () => {};
     });
-    const { svc } = makeService({ redis, l3: makeL3(new Map([['key:1', makeEntry()]])) });
+    const { svc } = makeService({
+      redis,
+      l3: makeL3(new Map([['key:1', makeEntry()]])),
+    });
 
     await svc.onModuleInit();
 
@@ -234,7 +278,10 @@ describe('CatastrophicRecoveryService', () => {
       reconnectCb = cb;
       return unregister;
     });
-    const { svc } = makeService({ redis, l3: makeL3(new Map([['key:1', makeEntry()]])) });
+    const { svc } = makeService({
+      redis,
+      l3: makeL3(new Map([['key:1', makeEntry()]])),
+    });
 
     await svc.onModuleInit();
     await reconnectCb();
@@ -251,7 +298,10 @@ describe('CatastrophicRecoveryService — Supabase comparison (#58)', () => {
 
   function captureReconnect(redis: any): { getReconnectCb: () => ReconnectCb } {
     let cb!: ReconnectCb;
-    (redis.onReconnect as jest.Mock).mockImplementation((fn: ReconnectCb) => { cb = fn; return () => {}; });
+    (redis.onReconnect as jest.Mock).mockImplementation((fn: ReconnectCb) => {
+      cb = fn;
+      return () => {};
+    });
     return { getReconnectCb: () => cb };
   }
 
@@ -272,7 +322,11 @@ describe('CatastrophicRecoveryService — Supabase comparison (#58)', () => {
   // S2 — Supabase newer: Supabase data pushed to L2
   it('pushes Supabase data to L2 when Supabase row has a newer updatedAt than L3', async () => {
     jest.spyOn(Math, 'random').mockReturnValue(0);
-    const l3Entry = makeEntry({ updatedAt: '2026-01-01T00:00:00Z', data: { source: 'l3' }, ttlMs: 60_000 });
+    const l3Entry = makeEntry({
+      updatedAt: '2026-01-01T00:00:00Z',
+      data: { source: 'l3' },
+      ttlMs: 60_000,
+    });
     const supabaseRow: SupabaseRow = {
       key: 'key:1',
       data: { source: 'supabase' },
@@ -298,7 +352,11 @@ describe('CatastrophicRecoveryService — Supabase comparison (#58)', () => {
   // S3 — L3 newer: L3 data pushed to L2
   it('pushes L3 data to L2 when L3 entry has a newer updatedAt than Supabase', async () => {
     jest.spyOn(Math, 'random').mockReturnValue(0);
-    const l3Entry = makeEntry({ updatedAt: '2026-06-01T00:00:00Z', data: { source: 'l3' }, ttlMs: 60_000 });
+    const l3Entry = makeEntry({
+      updatedAt: '2026-06-01T00:00:00Z',
+      data: { source: 'l3' },
+      ttlMs: 60_000,
+    });
     const supabaseRow: SupabaseRow = {
       key: 'key:1',
       data: { source: 'supabase' },
@@ -327,7 +385,10 @@ describe('CatastrophicRecoveryService — Supabase comparison (#58)', () => {
     const l3Entry = makeEntry({ data: { source: 'l3' } });
     const redis = makeRedis(false);
     const { getReconnectCb } = captureReconnect(redis);
-    const supabase = makeSupabase({ data: [], error: new Error('connection refused') });
+    const supabase = makeSupabase({
+      data: [],
+      error: new Error('connection refused'),
+    });
     const { svc } = makeService({
       redis,
       l3: makeL3(new Map([['key:1', l3Entry]])),
@@ -347,7 +408,8 @@ describe('CatastrophicRecoveryService — Supabase comparison (#58)', () => {
   // S5 — 101 keys: 2 Supabase batch queries
   it(`batches Supabase queries at ${SUPABASE_BATCH_SIZE} keys — 101 L3 keys → 2 queries`, async () => {
     const entries = new Map<string, CacheEntry<unknown>>();
-    for (let i = 0; i < SUPABASE_BATCH_SIZE + 1; i++) entries.set(`key:${i}`, makeEntry());
+    for (let i = 0; i < SUPABASE_BATCH_SIZE + 1; i++)
+      entries.set(`key:${i}`, makeEntry());
     const supabase = makeSupabase([
       { data: [], error: null },
       { data: [], error: null },
@@ -372,7 +434,10 @@ describe('CatastrophicRecoveryService — smart dirty queuing (#62)', () => {
 
   function captureReconnect(redis: any): { getReconnectCb: () => ReconnectCb } {
     let cb!: ReconnectCb;
-    (redis.onReconnect as jest.Mock).mockImplementation((fn: ReconnectCb) => { cb = fn; return () => {}; });
+    (redis.onReconnect as jest.Mock).mockImplementation((fn: ReconnectCb) => {
+      cb = fn;
+      return () => {};
+    });
     return { getReconnectCb: () => cb };
   }
 
@@ -381,7 +446,10 @@ describe('CatastrophicRecoveryService — smart dirty queuing (#62)', () => {
     jest.spyOn(Math, 'random').mockReturnValue(0);
     const l3Entry = makeEntry({ updatedAt: '2026-01-01T00:00:00Z' });
     const supabaseRow: SupabaseRow = {
-      key: 'key:1', data: {}, updated_at: '2026-06-01T00:00:00Z', ttl_ms: 60_000,
+      key: 'key:1',
+      data: {},
+      updated_at: '2026-06-01T00:00:00Z',
+      ttl_ms: 60_000,
     };
     const redis = makeRedis(false);
     const { getReconnectCb } = captureReconnect(redis);
@@ -403,7 +471,10 @@ describe('CatastrophicRecoveryService — smart dirty queuing (#62)', () => {
     jest.spyOn(Math, 'random').mockReturnValue(0);
     const l3Entry = makeEntry({ updatedAt: '2026-06-01T00:00:00Z' });
     const supabaseRow: SupabaseRow = {
-      key: 'key:1', data: {}, updated_at: '2026-01-01T00:00:00Z', ttl_ms: 60_000,
+      key: 'key:1',
+      data: {},
+      updated_at: '2026-01-01T00:00:00Z',
+      ttl_ms: 60_000,
     };
     const redis = makeRedis(false);
     const { getReconnectCb } = captureReconnect(redis);

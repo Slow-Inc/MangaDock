@@ -6,12 +6,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
-import { getProfile, uploadProfileBanner, updateBannerPosition } from "../../../lib/communityApi";
+import { getProfile, uploadProfileBanner, updateBannerPosition, listPostsByUser } from "../../../lib/communityApi";
 import PostCard from "../../../components/PostCard";
 import { useAuth } from "../../../contexts/AuthContext";
-import type { UserProfileResponse } from "../../../lib/types";
+import type { UserProfileResponse, ForumPost } from "../../../lib/types";
+import { isSocialCdnUrl } from '../../../lib/avatarUpload';
+import FollowUserButton from '../../../components/FollowUserButton';
 
-type Tab = "posts" | "comments" | "liked" | "translated";
+type Tab = "posts" | "comments" | "liked" | "translated" | "following";
+type FollowProfile = { uid: string; displayName: string | null; photoUrl: string | null };
 
 const LANG_LABEL: Record<string, string> = {
   th: "ไทย",
@@ -31,7 +34,7 @@ function RoleBadge({ role }: { role: number | null | undefined }) {
   };
   const entry = map[role] ?? { cls: "bg-white/10 text-white/60 border-white/20", label: `Role ${role}` };
   return (
-    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${entry.cls}`}>
+    <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${entry.cls}`}>
       {entry.label}
     </span>
   );
@@ -45,6 +48,8 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+const POSTS_PAGE_SIZE = 20;
+
 export default function PublicProfilePage() {
   const { uid } = useParams<{ uid: string }>();
   const { user } = useAuth();
@@ -52,6 +57,11 @@ export default function PublicProfilePage() {
   const [data, setData] = useState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("posts");
+  const [extraPosts, setExtraPosts] = useState<ForumPost[]>([]);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [loadingMorePosts, setLoadingMorePosts] = useState(false);
+  const [followingUsers, setFollowingUsers] = useState<FollowProfile[]>([]);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
 
   // Banner upload
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -66,16 +76,30 @@ export default function PublicProfilePage() {
   const bannerContainerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startY: number; startPos: number } | null>(null);
 
+  useEffect(() => {
+    if (tab !== "following" || !uid) return;
+    setLoadingFollowing(true);
+    fetch(`/api/proxy/user-follows/${encodeURIComponent(uid)}/following`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setFollowingUsers)
+      .catch(() => {})
+      .finally(() => setLoadingFollowing(false));
+  }, [tab, uid]);
+
   const openReposition = () => { setRepositioning(true);  setRepoAnim("entering"); };
   const closeReposition = () => { setRepositioning(false); setRepoAnim("exiting"); };
 
   useEffect(() => {
     if (!uid) return;
     setLoading(true);
+    setExtraPosts([]);
+    setHasMorePosts(true);
+    setLoadingMorePosts(false);
     getProfile(uid)
       .then((d) => {
         setData(d);
         setBannerYPos(d.profile.bannerPosition ?? 50);
+        if (d.posts.length < POSTS_PAGE_SIZE) setHasMorePosts(false);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -164,6 +188,21 @@ export default function PublicProfilePage() {
     closeReposition();
   };
 
+  const handleLoadMorePosts = async () => {
+    if (!uid || loadingMorePosts) return;
+    setLoadingMorePosts(true);
+    try {
+      const loaded = posts.length + extraPosts.length;
+      const result = await listPostsByUser(uid, loaded, POSTS_PAGE_SIZE);
+      setExtraPosts((prev) => [...prev, ...result.items]);
+      if (result.items.length < POSTS_PAGE_SIZE) setHasMorePosts(false);
+    } catch {
+      // silent — user can retry by clicking again
+    } finally {
+      setLoadingMorePosts(false);
+    }
+  };
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const { profile, posts, comments, likedPosts, translatedTitles, earnings } = data;
@@ -171,10 +210,11 @@ export default function PublicProfilePage() {
   const isOwnProfile = user?.uid === profile.uid;
 
   const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: "posts",      label: "โพสต์",         count: posts.length },
+    { id: "posts",      label: "โพสต์",         count: posts.length + extraPosts.length },
     { id: "comments",   label: "ความคิดเห็น",   count: comments.length },
     { id: "liked",      label: "ถูกใจ",          count: likedPosts.length },
     ...(isCreator ? [{ id: "translated" as Tab, label: "มังงะที่แปล", count: translatedTitles.length }] : []),
+    ...(!isOwnProfile ? [{ id: "following" as Tab, label: "ติดตาม", count: 0 }] : []),
   ];
 
   const gradientClass =
@@ -294,7 +334,7 @@ export default function PublicProfilePage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
                           </div>
-                          <span className="text-white text-[11px] font-semibold drop-shadow-lg">อัปโหลด</span>
+                          <span className="text-white text-xs font-semibold drop-shadow-lg">อัปโหลด</span>
                         </button>
                         {profile.bannerUrl && (
                           <button
@@ -307,7 +347,7 @@ export default function PublicProfilePage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
                               </svg>
                             </div>
-                            <span className="text-white text-[11px] font-semibold drop-shadow-lg">ปรับตำแหน่ง</span>
+                            <span className="text-white text-xs font-semibold drop-shadow-lg">ปรับตำแหน่ง</span>
                           </button>
                         )}
                       </div>
@@ -363,6 +403,8 @@ export default function PublicProfilePage() {
                   width={96}
                   height={96}
                   className="object-cover w-full h-full"
+                  unoptimized={isSocialCdnUrl(profile.photoUrl)}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-2xl sm:text-3xl font-black text-white/30">
@@ -377,6 +419,11 @@ export default function PublicProfilePage() {
                 </h1>
                 <RoleBadge role={profile.role} />
               </div>
+              {!isOwnProfile && (
+                <div className="mt-2">
+                  <FollowUserButton targetUid={profile.uid} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -417,14 +464,14 @@ export default function PublicProfilePage() {
           {/* Stats */}
           <div className="grid grid-cols-4 gap-1 sm:flex sm:gap-10 pt-3 sm:pt-4 border-t border-white/5">
             {[
-              { label: "โพสต์",         value: posts.length },
+              { label: "โพสต์",         value: posts.length + extraPosts.length },
               { label: "คอมเมนต์",      value: comments.length },
               { label: "ถูกใจ",         value: likedPosts.length },
               ...(isCreator ? [{ label: "แปลแล้ว", value: translatedTitles.length }] : []),
             ].map(({ label, value }) => (
               <div key={label} className="text-center sm:text-left">
                 <div className="text-xl sm:text-2xl font-black text-white">{value}</div>
-                <div className="text-[10px] sm:text-[11px] text-white/35 font-medium mt-0.5 leading-tight">{label}</div>
+                <div className="text-xs sm:text-xs text-white/35 font-medium mt-0.5 leading-tight">{label}</div>
               </div>
             ))}
           </div>
@@ -449,8 +496,8 @@ export default function PublicProfilePage() {
             ].map((item) => (
               <div key={item.label} className="text-center p-3 rounded-xl bg-white/3 border border-white/5">
                 <div className="text-2xl font-black text-white">{item.value}</div>
-                <div className="text-[10px] text-indigo-400/70 font-semibold">{item.unit}</div>
-                <div className="text-[10px] text-white/30 font-medium mt-0.5">{item.label}</div>
+                <div className="text-xs text-indigo-400/70 font-semibold">{item.unit}</div>
+                <div className="text-xs text-white/30 font-medium mt-0.5">{item.label}</div>
               </div>
             ))}
           </div>
@@ -472,7 +519,7 @@ export default function PublicProfilePage() {
             >
               {t.label}
               <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                className={`px-1.5 py-0.5 rounded-full text-xs font-black ${
                   tab === t.id ? "bg-indigo-500/20 text-indigo-400" : "bg-white/5 text-white/30"
                 }`}
               >
@@ -486,11 +533,27 @@ export default function PublicProfilePage() {
           <div key={tab} className="tab-fade-in">
             {/* Posts */}
             {tab === "posts" && (
-              posts.length > 0 ? (
+              posts.length > 0 || extraPosts.length > 0 ? (
                 <div className="space-y-3">
-                  {posts.map((p) => (
+                  {[...posts, ...extraPosts].map((p) => (
                     <PostCard key={p.id} post={p} viewMode="compact" />
                   ))}
+                  {hasMorePosts && (
+                    <button
+                      onClick={handleLoadMorePosts}
+                      disabled={loadingMorePosts}
+                      className="w-full py-3 rounded-xl border border-white/10 text-sm text-white/50 hover:text-white/80 hover:bg-white/5 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {loadingMorePosts ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                          กำลังโหลด...
+                        </>
+                      ) : (
+                        'โหลดโพสต์เพิ่ม'
+                      )}
+                    </button>
+                  )}
                 </div>
               ) : <EmptyState text="ยังไม่มีโพสต์" />
             )}
@@ -505,7 +568,7 @@ export default function PublicProfilePage() {
                       href={`/community/p/${c.postId}`}
                       className="block bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 rounded-xl p-4 transition-colors group"
                     >
-                      <p className="flex items-center gap-1.5 text-[11px] text-white/30 font-semibold mb-2">
+                      <p className="flex items-center gap-1.5 text-xs text-white/30 font-semibold mb-2">
                         <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                         </svg>
@@ -516,7 +579,7 @@ export default function PublicProfilePage() {
                       <p className="text-white/80 text-sm leading-relaxed line-clamp-3 whitespace-pre-wrap">
                         {c.content}
                       </p>
-                      <div className="flex items-center gap-3 mt-2.5 text-[11px] text-white/25">
+                      <div className="flex items-center gap-3 mt-2.5 text-xs text-white/25">
                         <span>{formatDistanceToNow(new Date(c.createdAt), { addSuffix: true, locale: th })}</span>
                         <span className="flex items-center gap-0.5">
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
@@ -562,10 +625,10 @@ export default function PublicProfilePage() {
                           {t.titleName}
                         </p>
                         <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-bold border border-indigo-500/20">
+                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-bold border border-indigo-500/20">
                             {LANG_LABEL[t.language] ?? t.language}
                           </span>
-                          <span className="text-[11px] text-white/30 font-medium">
+                          <span className="text-xs text-white/30 font-medium">
                             {t.chapterCount} ตอน
                           </span>
                         </div>
@@ -577,6 +640,38 @@ export default function PublicProfilePage() {
                   ))}
                 </div>
               ) : <EmptyState text="ยังไม่มีมังงะที่แปล" />
+            )}
+
+            {/* Following */}
+            {tab === "following" && (
+              loadingFollowing ? (
+                <p className="py-10 text-center text-sm text-white/30">กำลังโหลด...</p>
+              ) : followingUsers.length === 0 ? (
+                <EmptyState text="ยังไม่ได้ติดตามใคร" />
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {followingUsers.map((u) => (
+                    <Link
+                      key={u.uid}
+                      href={`/community/profile/${u.uid}`}
+                      className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/3 p-3 transition hover:bg-white/8"
+                    >
+                      {u.photoUrl ? (
+                        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full">
+                          <Image src={u.photoUrl} alt="" fill className="object-cover" sizes="36px" />
+                        </div>
+                      ) : (
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-bold text-white/50">
+                          {(u.displayName ?? "?")[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      <span className="truncate text-sm font-medium text-white/80">
+                        {u.displayName ?? "ผู้ใช้ไม่ระบุชื่อ"}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )
             )}
           </div>
         </div>

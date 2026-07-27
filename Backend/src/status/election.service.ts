@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { RedisService } from '../cache/redis.service';
 import { MetricsService } from './metrics.service';
 
@@ -48,9 +53,14 @@ export class ElectionService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
-    this.runElection().catch(err => this.logger.warn(`Initial election error: ${String(err)}`));
+    this.runElection().catch((err) =>
+      this.logger.warn(`Initial election error: ${String(err)}`),
+    );
     this.electionTimer = setInterval(
-      () => this.runElection().catch(err => this.logger.warn(`Election error: ${String(err)}`)),
+      () =>
+        this.runElection().catch((err) =>
+          this.logger.warn(`Election error: ${String(err)}`),
+        ),
       ELECTION_INTERVAL_MS,
     );
   }
@@ -62,11 +72,18 @@ export class ElectionService implements OnModuleInit, OnModuleDestroy {
     if (!client) return;
     try {
       const nodeId = this.metrics.nodeId;
-      const deleted = await (client as any).eval(DELETE_SCRIPT, 1, LEADER_KEY, nodeId) as number;
+      const deleted = (await (client as any).eval(
+        DELETE_SCRIPT,
+        1,
+        LEADER_KEY,
+        nodeId,
+      )) as number;
       if (deleted === 1) {
         this.logger.log('Leader lock released on shutdown');
       } else {
-        this.logger.warn('Leader lock already taken by another node — skipped DEL');
+        this.logger.warn(
+          'Leader lock already taken by another node — skipped DEL',
+        );
       }
     } catch (err) {
       this.logger.warn(`Failed to release leader lock: ${String(err)}`);
@@ -82,22 +99,32 @@ export class ElectionService implements OnModuleInit, OnModuleDestroy {
 
     if (this._isLeader) {
       // Renewal: Lua CAS — only renew if we still hold the lock value
-      const renewed = await (client as any).eval(
-        RENEW_SCRIPT, 1, LEADER_KEY, nodeId, String(LEADER_TTL_MS),
-      ) as string | null;
+      const renewed = (await (client as any).eval(
+        RENEW_SCRIPT,
+        1,
+        LEADER_KEY,
+        nodeId,
+        String(LEADER_TTL_MS),
+      )) as string | null;
       this._isLeader = renewed === 'OK';
     } else {
       // Acquisition: SET NX (only set if key does not exist)
-      const acquired = await (client as any).set(
-        LEADER_KEY, nodeId, 'NX', 'PX', LEADER_TTL_MS,
-      ) as string | null;
+      const acquired = (await (client as any).set(
+        LEADER_KEY,
+        nodeId,
+        'NX',
+        'PX',
+        LEADER_TTL_MS,
+      )) as string | null;
       this._isLeader = acquired === 'OK';
     }
 
     if (this._isLeader !== wasLeader) {
-      this.logger.log(`Leadership ${this._isLeader ? 'acquired' : 'lost'} (nodeId=${nodeId})`);
+      this.logger.log(
+        `Leadership ${this._isLeader ? 'acquired' : 'lost'} (nodeId=${nodeId})`,
+      );
       if (this._isLeader) {
-        this.becomeLeaderCallbacks.forEach(cb => cb());
+        this.becomeLeaderCallbacks.forEach((cb) => cb());
       }
     }
   }

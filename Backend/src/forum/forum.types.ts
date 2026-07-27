@@ -1,4 +1,8 @@
-export type ForumCategory = 'general' | 'announcement' | 'spoiler' | 'manga_update';
+export type ForumCategory =
+  | 'general'
+  | 'announcement'
+  | 'spoiler'
+  | 'manga_update';
 
 export interface ForumPost {
   id: string;

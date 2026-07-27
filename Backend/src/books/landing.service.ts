@@ -58,7 +58,9 @@ export class LandingService {
       .filter((line) => line.length > 0)
       .slice(0, 60);
 
-    const modelCandidates = await this.geminiCatalog.getMangaModels(payload.model);
+    const modelCandidates = await this.geminiCatalog.getMangaModels(
+      payload.model,
+    );
     const preferredModel = modelCandidates[0];
 
     if (lines.length === 0) {
@@ -83,8 +85,12 @@ export class LandingService {
 
     const targetLang = (payload.targetLang ?? 'th').toLowerCase();
     const contextHint = (payload.contextHint ?? '').trim().slice(0, 280);
-    const chapterTag = payload.chapterId ? `chapter:${payload.chapterId}` : 'chapter:unknown';
-    const pageTag = Number.isFinite(payload.page) ? `page:${payload.page}` : 'page:unknown';
+    const chapterTag = payload.chapterId
+      ? `chapter:${payload.chapterId}`
+      : 'chapter:unknown';
+    const pageTag = Number.isFinite(payload.page)
+      ? `page:${payload.page}`
+      : 'page:unknown';
     const cacheScope = `${chapterTag}|${pageTag}|lang:${targetLang}|ctx:${contextHint}`;
 
     const uniqueLineMap = new Map<string, number[]>();
@@ -101,7 +107,10 @@ export class LandingService {
     // Lines in parallel; model fallback order preserved within each line (#148)
     await Promise.all(
       uniqueLines.map(async (line) => {
-        const hash = createHash('sha1').update(`${line}|${cacheScope}`).digest('hex').slice(0, 24);
+        const hash = createHash('sha1')
+          .update(`${line}|${cacheScope}`)
+          .digest('hex')
+          .slice(0, 24);
         for (const modelName of modelCandidates) {
           const cacheKey = `translate:manga:v1:${modelName}:${hash}`;
           const cached = await this.cache.get<{ text: string }>(cacheKey);
@@ -113,12 +122,16 @@ export class LandingService {
       }),
     );
 
-    const missingLines = uniqueLines.filter((line) => !translatedByUnique.has(line));
+    const missingLines = uniqueLines.filter(
+      (line) => !translatedByUnique.has(line),
+    );
 
     let usedModel: GeminiModel = preferredModel;
 
     if (missingLines.length > 0) {
-      const numberedLines = missingLines.map((line, idx) => `${idx + 1}. ${line}`).join('\n');
+      const numberedLines = missingLines
+        .map((line, idx) => `${idx + 1}. ${line}`)
+        .join('\n');
       const prompt = [
         `Translate manga dialogue/narration to ${geminiLangName(targetLang)} with natural tone and context consistency.`,
         'Output ONLY valid JSON array of strings in the same order and same length as input.',
@@ -127,11 +140,15 @@ export class LandingService {
         '',
         'Input lines:',
         numberedLines,
-      ].filter(Boolean).join('\n');
+      ]
+        .filter(Boolean)
+        .join('\n');
 
       for (const modelName of modelCandidates) {
         try {
-          const raw = (await this.llmService.complete(prompt, modelName)).trim();
+          const raw = (
+            await this.llmService.complete(prompt, modelName)
+          ).trim();
           const normalized = raw
             .replace(/^```json\s*/i, '')
             .replace(/^```\s*/i, '')
@@ -157,21 +174,30 @@ export class LandingService {
             const translated = (parsed[idx] ?? source).trim() || source;
             translatedByUnique.set(source, translated);
 
-            const hash = createHash('sha1').update(`${source}|${cacheScope}`).digest('hex').slice(0, 24);
+            const hash = createHash('sha1')
+              .update(`${source}|${cacheScope}`)
+              .digest('hex')
+              .slice(0, 24);
             const cacheKey = `translate:manga:v1:${modelName}:${hash}`;
-            cacheWrites.push(this.cache.setMangaCacheWithTiers(cacheKey, { text: translated }));
+            cacheWrites.push(
+              this.cache.setMangaCacheWithTiers(cacheKey, { text: translated }),
+            );
           }
           await Promise.all(cacheWrites); // parallel writes (#148)
 
           usedModel = modelName;
           break;
         } catch (err) {
-          this.logger.warn(`[LLM] Manga translation failed on ${modelName}: ${String(err)}`);
+          this.logger.warn(
+            `[LLM] Manga translation failed on ${modelName}: ${String(err)}`,
+          );
         }
       }
     }
 
-    const translatedLines = lines.map((line) => translatedByUnique.get(line) ?? line);
+    const translatedLines = lines.map(
+      (line) => translatedByUnique.get(line) ?? line,
+    );
     const generated = missingLines.length;
     const translated = translatedLines.some((line, idx) => line !== lines[idx]);
     return {
@@ -183,43 +209,62 @@ export class LandingService {
     };
   }
 
-  async translateDescription(text: string): Promise<{ translatedText: string; translated: boolean }> {
-    if (!this.llmService.isConfigured()) return { translatedText: text, translated: false };
+  async translateDescription(
+    text: string,
+  ): Promise<{ translatedText: string; translated: boolean }> {
+    if (!this.llmService.isConfigured())
+      return { translatedText: text, translated: false };
     if (!text?.trim()) return { translatedText: text, translated: false };
 
     // Detect if already Thai — skip if >25% Thai chars
     const thaiChars = (text.match(/[\u0E00-\u0E7F]/g) ?? []).length;
-    if (thaiChars / text.length > 0.25) return { translatedText: text, translated: false };
+    if (thaiChars / text.length > 0.25)
+      return { translatedText: text, translated: false };
 
     const provider = this.env.LLM_PROVIDER ?? 'gemini';
     const models =
       provider === 'gemini'
         ? await this.geminiCatalog.getDescriptionModels()
         : [this.llmService.getDescriptionModel()];
-    const fingerprint = Buffer.from(text.slice(0, 512)).toString('base64').slice(0, 64);
+    const fingerprint = Buffer.from(text.slice(0, 512))
+      .toString('base64')
+      .slice(0, 64);
     const cacheKey = `translate:th:v3:${models.join('|')}:${fingerprint}`;
-    const cached = await this.cache.get<{ translatedText: string; translated: boolean }>(cacheKey);
+    const cached = await this.cache.get<{
+      translatedText: string;
+      translated: boolean;
+    }>(cacheKey);
     if (cached) return cached.data;
 
     const prompt = `Translate the following manga/book description to Thai. Output ONLY the Thai translation. Do not include any reasoning, explanations, thoughts, or notes. Just the translated text:\n\n${text}`;
 
     for (const modelName of models) {
       try {
-        let translatedText = (await this.llmService.complete(prompt, modelName)).trim();
+        let translatedText = (
+          await this.llmService.complete(prompt, modelName)
+        ).trim();
         // Strip THOUGHTS section if model still outputs it (fallback)
-        if (translatedText.includes('THOUGHTS:') || translatedText.includes('* **')) {
+        if (
+          translatedText.includes('THOUGHTS:') ||
+          translatedText.includes('* **')
+        ) {
           const lines = translatedText.split('\n');
           const thaiLines = lines.filter((l) => {
             const thaiCount = (l.match(/[\u0E00-\u0E7F]/g) || []).length;
-            return thaiCount > 0 && thaiCount / Math.max(l.trim().length, 1) > 0.2;
+            return (
+              thaiCount > 0 && thaiCount / Math.max(l.trim().length, 1) > 0.2
+            );
           });
-          if (thaiLines.length > 0) translatedText = thaiLines.join('\n').trim();
+          if (thaiLines.length > 0)
+            translatedText = thaiLines.join('\n').trim();
         }
         const payload = { translatedText, translated: true };
         await this.cache.setMangaCacheWithTiers(cacheKey, payload);
         return payload;
       } catch (err) {
-        this.logger.warn(`[LLM] Description translation failed on ${modelName}: ${String(err)}`);
+        this.logger.warn(
+          `[LLM] Description translation failed on ${modelName}: ${String(err)}`,
+        );
       }
     }
 
@@ -247,12 +292,17 @@ export class LandingService {
       // matching the previous all-or-nothing sequential behaviour (#397).
       rows = await Promise.all(
         this.mangaDex.mangaRowDefs.map(async (def) => {
-          const { items } = await this.mangaDex.fetchMangaForRow(def.order, def.limit ?? 10);
+          const { items } = await this.mangaDex.fetchMangaForRow(
+            def.order,
+            def.limit ?? 10,
+          );
           return { id: def.id, title: def.title, query: def.order, items };
         }),
       );
     } catch (err) {
-      this.logger.warn(`API fetch error: ${String(err)} — attempting stale cache fallback`);
+      this.logger.warn(
+        `API fetch error: ${String(err)} — attempting stale cache fallback`,
+      );
       return this.serveStale(cacheKey, forceLocal);
     }
 
@@ -271,16 +321,23 @@ export class LandingService {
     }
 
     const landingEnhanced = await this.enhanceLanding(payload);
-    return forceLocal ? this.applyForceLocalLanding(landingEnhanced) : landingEnhanced;
+    return forceLocal
+      ? this.applyForceLocalLanding(landingEnhanced)
+      : landingEnhanced;
   }
 
   /** Stale-cache fallback shared by the two landing failure paths (#231): serve the
    *  last good landing payload (flagged stale + enhanced) if present, else the API
    *  offline payload. Previously duplicated verbatim at both call sites. */
-  private async serveStale(cacheKey: string, forceLocal: boolean): Promise<LandingPayload> {
+  private async serveStale(
+    cacheKey: string,
+    forceLocal: boolean,
+  ): Promise<LandingPayload> {
     const stale = this.cache.getStale<LandingPayload>(cacheKey);
     if (stale) {
-      this.logger.log(`Serving stale landing cache (updatedAt=${stale.updatedAt})`);
+      this.logger.log(
+        `Serving stale landing cache (updatedAt=${stale.updatedAt})`,
+      );
       const stalePayload: LandingPayload = {
         ...stale.data,
         fromStaleCache: true,
@@ -289,8 +346,15 @@ export class LandingService {
       const enhanced = await this.enhanceLanding(stalePayload);
       return forceLocal ? this.applyForceLocalLanding(enhanced) : enhanced;
     }
-    this.logger.warn('No stale cache available — returning API offline payload');
-    return { hero: null, rows: [], updatedAt: new Date().toISOString(), apiOffline: true };
+    this.logger.warn(
+      'No stale cache available — returning API offline payload',
+    );
+    return {
+      hero: null,
+      rows: [],
+      updatedAt: new Date().toISOString(),
+      apiOffline: true,
+    };
   }
 
   // ─── Image cache enhancement (landing-level) ──────────────────────────────────
@@ -339,11 +403,15 @@ export class LandingService {
     this.cache
       .set(cacheKey, enhanced, CACHE_TTL_MS)
       .catch((err) =>
-        this.logger.warn(`[ImageCache] Landing cache patch failed: ${String(err)}`),
+        this.logger.warn(
+          `[ImageCache] Landing cache patch failed: ${String(err)}`,
+        ),
       );
   }
 
-  private async enhanceLanding(payload: LandingPayload): Promise<LandingPayload> {
+  private async enhanceLanding(
+    payload: LandingPayload,
+  ): Promise<LandingPayload> {
     if (!this.imageCache.enabled) return payload;
 
     const enhanceBook = async (book: LandingBook): Promise<LandingBook> => {
@@ -360,7 +428,8 @@ export class LandingService {
         ...book,
         thumbnailLocal:
           stillCached ??
-          ((await this.imageCache.localThumbnailPath(book.id, book.thumbnail)) ?? undefined),
+          (await this.imageCache.localThumbnailPath(book.id, book.thumbnail)) ??
+          undefined,
       };
     };
 

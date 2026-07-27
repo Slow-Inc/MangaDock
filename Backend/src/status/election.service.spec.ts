@@ -2,14 +2,16 @@ import { ElectionService } from './election.service';
 import { MetricsService } from './metrics.service';
 import { RedisService } from '../cache/redis.service';
 
-function makeMetricsSvc(nodeId = 'node-1'): jest.Mocked<Pick<MetricsService, 'nodeId'>> {
+function makeMetricsSvc(
+  nodeId = 'node-1',
+): jest.Mocked<Pick<MetricsService, 'nodeId'>> {
   return { nodeId } as jest.Mocked<Pick<MetricsService, 'nodeId'>>;
 }
 
 interface RedisClientStub {
-  set: jest.Mock;   // NX acquisition
-  eval: jest.Mock;  // Lua CAS renewal
-  del: jest.Mock;   // lock release on destroy
+  set: jest.Mock; // NX acquisition
+  eval: jest.Mock; // Lua CAS renewal
+  del: jest.Mock; // lock release on destroy
   get: jest.Mock;
 }
 
@@ -23,7 +25,10 @@ function makeClient(overrides: Partial<RedisClientStub> = {}): RedisClientStub {
   };
 }
 
-function makeElection(nodeId: string, clientStub: RedisClientStub): ElectionService {
+function makeElection(
+  nodeId: string,
+  clientStub: RedisClientStub,
+): ElectionService {
   const redis = {
     getClient: jest.fn().mockResolvedValue(clientStub),
   } as unknown as RedisService;
@@ -82,8 +87,8 @@ describe('ElectionService — Redis NX Lock', () => {
   describe('lock renewal (Lua CAS)', () => {
     it('retains leadership across multiple election cycles when renewal succeeds', async () => {
       const client = makeClient({
-        set: jest.fn().mockResolvedValue('OK'),   // NX acquisition
-        eval: jest.fn().mockResolvedValue('OK'),  // Lua renewal
+        set: jest.fn().mockResolvedValue('OK'), // NX acquisition
+        eval: jest.fn().mockResolvedValue('OK'), // Lua renewal
       });
       const svc = makeElection('node-1', client);
 
@@ -202,8 +207,9 @@ describe('ElectionService — Redis NX Lock', () => {
     });
 
     it('fires callback again when leadership is re-acquired after loss', async () => {
-      const setMock = jest.fn()
-        .mockResolvedValueOnce('OK')  // acquisition
+      const setMock = jest
+        .fn()
+        .mockResolvedValueOnce('OK') // acquisition
         .mockResolvedValueOnce('OK'); // re-acquisition
       const evalMock = jest.fn().mockResolvedValue(null); // renewal always fails → loses
       const client = makeClient({ set: setMock, eval: evalMock });
@@ -276,7 +282,7 @@ describe('ElectionService — failover latency (#54)', () => {
     // We acquire first, then renew
     jest.useRealTimers();
 
-    const evalMock = client.eval as jest.Mock;
+    const evalMock = client.eval;
     // Trigger runElection twice: first acquires (set NX), second renews (eval)
     return svc.runElection().then(() =>
       svc.runElection().then(() => {
@@ -284,7 +290,7 @@ describe('ElectionService — failover latency (#54)', () => {
           const ttlArg = Number(evalMock.mock.calls[0][4]); // ARGV[2] = ttl string
           expect(ttlArg).toBeGreaterThanOrEqual(2 * 5_000);
         }
-      })
+      }),
     );
   });
 });

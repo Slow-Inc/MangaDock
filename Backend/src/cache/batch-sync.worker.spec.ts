@@ -1,4 +1,11 @@
-import { BatchSyncWorker, DIRTY_QUEUE, PROCESSING_QUEUE, MAX_RETRIES, RETRY_COUNTS_KEY, DEAD_LETTER_SET } from './batch-sync.worker';
+import {
+  BatchSyncWorker,
+  DIRTY_QUEUE,
+  PROCESSING_QUEUE,
+  MAX_RETRIES,
+  RETRY_COUNTS_KEY,
+  DEAD_LETTER_SET,
+} from './batch-sync.worker';
 import { RedisService } from './redis.service';
 import { ElectionService } from '../status/election.service';
 import { L3DiskService } from './l3-disk.service';
@@ -9,9 +16,16 @@ function makeEntry<T>(data: T): CacheEntry<T> {
   return { data, updatedAt: new Date().toISOString(), ttlMs: 60_000 };
 }
 
-function makeClient(dirtyQueue: string[], store: Record<string, string> = {}, processingQueue: string[] = [], hincrbyResult = 1) {
+function makeClient(
+  dirtyQueue: string[],
+  store: Record<string, string> = {},
+  processingQueue: string[] = [],
+  hincrbyResult = 1,
+) {
   return {
-    rpoplpush: jest.fn().mockImplementation(() => Promise.resolve(dirtyQueue.shift() ?? null)),
+    rpoplpush: jest
+      .fn()
+      .mockImplementation(() => Promise.resolve(dirtyQueue.shift() ?? null)),
     rpush: jest.fn().mockResolvedValue(1),
     lrem: jest.fn().mockResolvedValue(1),
     lrange: jest.fn().mockResolvedValue(processingQueue),
@@ -23,11 +37,18 @@ function makeClient(dirtyQueue: string[], store: Record<string, string> = {}, pr
   };
 }
 
-function makeRedis(dirtyQueue: string[], store: Record<string, string> = {}, processingQueue: string[] = [], hincrbyResult = 1) {
+function makeRedis(
+  dirtyQueue: string[],
+  store: Record<string, string> = {},
+  processingQueue: string[] = [],
+  hincrbyResult = 1,
+) {
   const client = makeClient(dirtyQueue, store, processingQueue, hincrbyResult);
   return {
     getClient: jest.fn().mockResolvedValue(client),
-    get: jest.fn().mockImplementation((key: string) => Promise.resolve(store[key] ?? null)),
+    get: jest
+      .fn()
+      .mockImplementation((key: string) => Promise.resolve(store[key] ?? null)),
     _client: client,
   } as unknown as RedisService;
 }
@@ -40,7 +61,9 @@ function makeL3() {
   return { write: jest.fn() } as unknown as L3DiskService;
 }
 
-function makeSupabase(rpcError: Error | null = null): { client: { rpc: jest.Mock }; _rpc: jest.Mock } & SupabaseService {
+function makeSupabase(
+  rpcError: Error | null = null,
+): { client: { rpc: jest.Mock }; _rpc: jest.Mock } & SupabaseService {
   const rpc = rpcError
     ? jest.fn().mockResolvedValue({ data: null, error: rpcError })
     : jest.fn().mockResolvedValue({ data: {}, error: null });
@@ -58,7 +81,12 @@ function makeWorker(
   const redis = makeRedis(dirtyQueue, store, processingQueue, hincrbyResult);
   const l3 = makeL3();
   return {
-    worker: new BatchSyncWorker(redis, makeElection(isLeader), l3, supabase as unknown as SupabaseService),
+    worker: new BatchSyncWorker(
+      redis,
+      makeElection(isLeader),
+      l3,
+      supabase as unknown as SupabaseService,
+    ),
     redis,
     l3,
     supabase,
@@ -69,11 +97,16 @@ describe('BatchSyncWorker — Reliable Queue', () => {
   describe('uses RPOPLPUSH instead of LPOP', () => {
     it('calls rpoplpush to atomically move key from dirty to processing queue', async () => {
       const entry = makeEntry('hello');
-      const { worker, redis } = makeWorker(['key-1'], { 'key-1': JSON.stringify(entry) });
+      const { worker, redis } = makeWorker(['key-1'], {
+        'key-1': JSON.stringify(entry),
+      });
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.rpoplpush).toHaveBeenCalledWith(DIRTY_QUEUE, PROCESSING_QUEUE);
+      expect((redis as any)._client.rpoplpush).toHaveBeenCalledWith(
+        DIRTY_QUEUE,
+        PROCESSING_QUEUE,
+      );
     });
 
     it('does not flush when not leader', async () => {
@@ -88,11 +121,16 @@ describe('BatchSyncWorker — Reliable Queue', () => {
   describe('Leader re-syncs L2 → L3 via L3DiskService', () => {
     it('calls l3.write with entry from L2 after pulling key from dirty queue', async () => {
       const entry = makeEntry(42);
-      const { worker, l3 } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
+      const { worker, l3 } = makeWorker(['key-a'], {
+        'key-a': JSON.stringify(entry),
+      });
 
       await (worker as any).flush();
 
-      expect(l3.write).toHaveBeenCalledWith('key-a', expect.objectContaining({ data: 42 }));
+      expect(l3.write).toHaveBeenCalledWith(
+        'key-a',
+        expect.objectContaining({ data: 42 }),
+      );
     });
 
     it('does not call l3.write when key is missing from L2 (expired)', async () => {
@@ -108,7 +146,9 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     // Cycle S1 — RPC is called with key and parsed entry after L3 write
     it('calls supabase.client.rpc with key and entry after writing to L3', async () => {
       const entry = makeEntry(42);
-      const { worker, supabase } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
+      const { worker, supabase } = makeWorker(['key-a'], {
+        'key-a': JSON.stringify(entry),
+      });
 
       await (worker as any).flush();
 
@@ -122,21 +162,37 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     it('calls lrem to remove key from processing after requeueing to dirty on retryable RPC error', async () => {
       const entry = makeEntry(42);
       const supabase = makeSupabase(new Error('DB timeout'));
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase);
+      const { worker, redis } = makeWorker(
+        ['key-a'],
+        { 'key-a': JSON.stringify(entry) },
+        true,
+        [],
+        supabase,
+      );
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(
+        PROCESSING_QUEUE,
+        1,
+        'key-a',
+      );
     });
 
     // Cycle S3 — lrem called only after RPC succeeds
     it('calls lrem on processing queue only after Supabase RPC succeeds', async () => {
       const entry = makeEntry(42);
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
+      const { worker, redis } = makeWorker(['key-a'], {
+        'key-a': JSON.stringify(entry),
+      });
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(
+        PROCESSING_QUEUE,
+        1,
+        'key-a',
+      );
     });
 
     // Cycle S4 — expired key: lrem without RPC (no data to sync)
@@ -145,7 +201,11 @@ describe('BatchSyncWorker — Reliable Queue', () => {
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'ghost-key');
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(
+        PROCESSING_QUEUE,
+        1,
+        'ghost-key',
+      );
       expect(supabase._rpc).not.toHaveBeenCalled();
     });
   });
@@ -153,11 +213,17 @@ describe('BatchSyncWorker — Reliable Queue', () => {
   describe('acknowledges successful sync with LREM', () => {
     it('calls lrem on processing queue after successful L3 write and RPC', async () => {
       const entry = makeEntry(42);
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
+      const { worker, redis } = makeWorker(['key-a'], {
+        'key-a': JSON.stringify(entry),
+      });
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(
+        PROCESSING_QUEUE,
+        1,
+        'key-a',
+      );
     });
 
     it('calls lrem to ack even when key is expired in L2 — prevents permanent orphan in cache:processing', async () => {
@@ -165,13 +231,20 @@ describe('BatchSyncWorker — Reliable Queue', () => {
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'ghost-key');
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(
+        PROCESSING_QUEUE,
+        1,
+        'ghost-key',
+      );
     });
   });
 
   describe('crash recovery — leader-only, on first flush as leader', () => {
     it('calls EVAL to atomically move orphans from processing to dirty queue on first flush as leader', async () => {
-      const { worker, redis } = makeWorker([], {}, true, ['orphan-1', 'orphan-2']);
+      const { worker, redis } = makeWorker([], {}, true, [
+        'orphan-1',
+        'orphan-2',
+      ]);
 
       await (worker as any).flush();
 
@@ -202,7 +275,10 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     });
 
     it('does not call DEL or RPUSH directly during recovery — Lua handles it atomically', async () => {
-      const { worker, redis } = makeWorker([], {}, true, ['orphan-1', 'orphan-2']);
+      const { worker, redis } = makeWorker([], {}, true, [
+        'orphan-1',
+        'orphan-2',
+      ]);
 
       await (worker as any).flush();
 
@@ -212,9 +288,18 @@ describe('BatchSyncWorker — Reliable Queue', () => {
 
     it('runs orphan recovery again when node re-acquires leadership after losing it', async () => {
       let leaderState = true;
-      const election = { get isLeader() { return leaderState; } } as unknown as ElectionService;
+      const election = {
+        get isLeader() {
+          return leaderState;
+        },
+      } as unknown as ElectionService;
       const redis = makeRedis([], {}, ['orphan-1']);
-      const worker = new BatchSyncWorker(redis, election, makeL3(), makeSupabase() as any);
+      const worker = new BatchSyncWorker(
+        redis,
+        election,
+        makeL3(),
+        makeSupabase() as any,
+      );
 
       await (worker as any).flush(); // leader → recovers
       (redis as any)._client.eval.mockClear();
@@ -238,7 +323,10 @@ describe('BatchSyncWorker — Reliable Queue', () => {
 
       await worker.markDirty('some-key');
 
-      expect((redis as any)._client.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'some-key');
+      expect((redis as any)._client.rpush).toHaveBeenCalledWith(
+        DIRTY_QUEUE,
+        'some-key',
+      );
     });
   });
 
@@ -255,43 +343,78 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     it('increments retry counter in cache:retry_counts on Supabase RPC failure', async () => {
       const entry = makeEntry(42);
       const supabase = makeSupabase(new Error('DB timeout'));
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase);
+      const { worker, redis } = makeWorker(
+        ['key-a'],
+        { 'key-a': JSON.stringify(entry) },
+        true,
+        [],
+        supabase,
+      );
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.hincrby).toHaveBeenCalledWith(RETRY_COUNTS_KEY, 'key-a', 1);
+      expect((redis as any)._client.hincrby).toHaveBeenCalledWith(
+        RETRY_COUNTS_KEY,
+        'key-a',
+        1,
+      );
     });
 
     // R2 — Dead-letter: sadd called when count reaches MAX_RETRIES
     it('moves key to dead_letter set when retry count reaches MAX_RETRIES', async () => {
       const entry = makeEntry(42);
       const supabase = makeSupabase(new Error('DB timeout'));
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase, MAX_RETRIES);
+      const { worker, redis } = makeWorker(
+        ['key-a'],
+        { 'key-a': JSON.stringify(entry) },
+        true,
+        [],
+        supabase,
+        MAX_RETRIES,
+      );
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.sadd).toHaveBeenCalledWith(DEAD_LETTER_SET, 'key-a');
+      expect((redis as any)._client.sadd).toHaveBeenCalledWith(
+        DEAD_LETTER_SET,
+        'key-a',
+      );
     });
 
     // R3 — No dead-letter when count < MAX_RETRIES
     it('does NOT move key to dead_letter set when retry count is below MAX_RETRIES', async () => {
       const entry = makeEntry(42);
       const supabase = makeSupabase(new Error('DB timeout'));
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase, MAX_RETRIES - 1);
+      const { worker, redis } = makeWorker(
+        ['key-a'],
+        { 'key-a': JSON.stringify(entry) },
+        true,
+        [],
+        supabase,
+        MAX_RETRIES - 1,
+      );
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.sadd).not.toHaveBeenCalledWith(DEAD_LETTER_SET, 'key-a');
+      expect((redis as any)._client.sadd).not.toHaveBeenCalledWith(
+        DEAD_LETTER_SET,
+        'key-a',
+      );
     });
 
     // R4 — HDEL on success: reset counter
     it('resets retry counter with HDEL when Supabase RPC succeeds', async () => {
       const entry = makeEntry(42);
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
+      const { worker, redis } = makeWorker(['key-a'], {
+        'key-a': JSON.stringify(entry),
+      });
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.hdel).toHaveBeenCalledWith(RETRY_COUNTS_KEY, 'key-a');
+      expect((redis as any)._client.hdel).toHaveBeenCalledWith(
+        RETRY_COUNTS_KEY,
+        'key-a',
+      );
     });
 
     // R5 — HDEL on L2 expiry: cleanup stale counter
@@ -300,18 +423,32 @@ describe('BatchSyncWorker — Reliable Queue', () => {
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.hdel).toHaveBeenCalledWith(RETRY_COUNTS_KEY, 'ghost-key');
+      expect((redis as any)._client.hdel).toHaveBeenCalledWith(
+        RETRY_COUNTS_KEY,
+        'ghost-key',
+      );
     });
 
     // R6 — LREM after dead-letter: key exits processing queue
     it('removes dead-lettered key from cache:processing with LREM', async () => {
       const entry = makeEntry(42);
       const supabase = makeSupabase(new Error('DB timeout'));
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase, MAX_RETRIES);
+      const { worker, redis } = makeWorker(
+        ['key-a'],
+        { 'key-a': JSON.stringify(entry) },
+        true,
+        [],
+        supabase,
+        MAX_RETRIES,
+      );
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(
+        PROCESSING_QUEUE,
+        1,
+        'key-a',
+      );
     });
   });
 
@@ -319,7 +456,9 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     // U1 — RPC called with p_data, p_updated_at, p_ttl_ms (not p_entry)
     it('calls upsert_cache_entry with p_data, p_updated_at, and p_ttl_ms from the cache entry', async () => {
       const entry = makeEntry({ title: 'One Piece' });
-      const { worker, supabase } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) });
+      const { worker, supabase } = makeWorker(['key-a'], {
+        'key-a': JSON.stringify(entry),
+      });
 
       await (worker as any).flush();
 
@@ -337,7 +476,9 @@ describe('BatchSyncWorker — Reliable Queue', () => {
     // U2 — p_entry not passed (legacy param removed)
     it('does not pass the legacy p_entry param to the RPC', async () => {
       const entry = makeEntry({ title: 'Naruto' });
-      const { worker, supabase } = makeWorker(['key-b'], { 'key-b': JSON.stringify(entry) });
+      const { worker, supabase } = makeWorker(['key-b'], {
+        'key-b': JSON.stringify(entry),
+      });
 
       await (worker as any).flush();
 
@@ -352,45 +493,86 @@ describe('BatchSyncWorker — Reliable Queue', () => {
       const entry = makeEntry(42);
       const supabase = makeSupabase(new Error('DB timeout'));
       // hincrbyResult defaults to 1, which is < MAX_RETRIES (5) — retryable path
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase);
+      const { worker, redis } = makeWorker(
+        ['key-a'],
+        { 'key-a': JSON.stringify(entry) },
+        true,
+        [],
+        supabase,
+      );
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.rpush).toHaveBeenCalledWith(DIRTY_QUEUE, 'key-a');
+      expect((redis as any)._client.rpush).toHaveBeenCalledWith(
+        DIRTY_QUEUE,
+        'key-a',
+      );
     });
 
     // F2 — lrem(PROCESSING_QUEUE, 1, key) called on below-MAX_RETRIES failure (removes from processing after dirty push)
     it('calls lrem(PROCESSING_QUEUE, 1, key) when RPC fails below MAX_RETRIES — removes from processing after dirty push', async () => {
       const entry = makeEntry(42);
       const supabase = makeSupabase(new Error('DB timeout'));
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase);
+      const { worker, redis } = makeWorker(
+        ['key-a'],
+        { 'key-a': JSON.stringify(entry) },
+        true,
+        [],
+        supabase,
+      );
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.lrem).toHaveBeenCalledWith(PROCESSING_QUEUE, 1, 'key-a');
+      expect((redis as any)._client.lrem).toHaveBeenCalledWith(
+        PROCESSING_QUEUE,
+        1,
+        'key-a',
+      );
     });
 
     // F3 — sadd(DEAD_LETTER_SET) NOT called on below-MAX_RETRIES failure
     it('does NOT add key to dead_letter set when retry count is below MAX_RETRIES', async () => {
       const entry = makeEntry(42);
       const supabase = makeSupabase(new Error('DB timeout'));
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase);
+      const { worker, redis } = makeWorker(
+        ['key-a'],
+        { 'key-a': JSON.stringify(entry) },
+        true,
+        [],
+        supabase,
+      );
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.sadd).not.toHaveBeenCalledWith(DEAD_LETTER_SET, 'key-a');
+      expect((redis as any)._client.sadd).not.toHaveBeenCalledWith(
+        DEAD_LETTER_SET,
+        'key-a',
+      );
     });
 
     // F4 — rpush(DIRTY_QUEUE) NOT called when at MAX_RETRIES (dead-letter path stays distinct)
     it('does NOT call rpush(DIRTY_QUEUE) when retry count reaches MAX_RETRIES — dead-letters instead', async () => {
       const entry = makeEntry(42);
       const supabase = makeSupabase(new Error('DB timeout'));
-      const { worker, redis } = makeWorker(['key-a'], { 'key-a': JSON.stringify(entry) }, true, [], supabase, MAX_RETRIES);
+      const { worker, redis } = makeWorker(
+        ['key-a'],
+        { 'key-a': JSON.stringify(entry) },
+        true,
+        [],
+        supabase,
+        MAX_RETRIES,
+      );
 
       await (worker as any).flush();
 
-      expect((redis as any)._client.rpush).not.toHaveBeenCalledWith(DIRTY_QUEUE, 'key-a');
-      expect((redis as any)._client.sadd).toHaveBeenCalledWith(DEAD_LETTER_SET, 'key-a');
+      expect((redis as any)._client.rpush).not.toHaveBeenCalledWith(
+        DIRTY_QUEUE,
+        'key-a',
+      );
+      expect((redis as any)._client.sadd).toHaveBeenCalledWith(
+        DEAD_LETTER_SET,
+        'key-a',
+      );
     });
   });
 });

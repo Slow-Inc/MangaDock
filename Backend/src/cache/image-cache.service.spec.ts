@@ -47,7 +47,12 @@ describe('ImageCacheService — batched exists on cache hit (FR-19)', () => {
       'https://x/c2.jpg',
       'https://x/c3.jpg',
     ];
-    const storage = new CountingStorage(['c0.jpg', 'c1.jpg', 'c2.jpg', 'c3.jpg']);
+    const storage = new CountingStorage([
+      'c0.jpg',
+      'c1.jpg',
+      'c2.jpg',
+      'c3.jpg',
+    ]);
     const svc = new ImageCacheService(storage);
 
     const result = await svc.localCoverPaths('manga1', urls);

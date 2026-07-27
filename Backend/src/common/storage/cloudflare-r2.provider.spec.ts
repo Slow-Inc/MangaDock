@@ -12,7 +12,10 @@ describe('CloudflareR2StorageProvider streaming (FR-22)', () => {
   const realFetch = global.fetch;
 
   beforeEach(() => {
-    provider = new CloudflareR2StorageProvider('https://worker.example', 'secret');
+    provider = new CloudflareR2StorageProvider(
+      'https://worker.example',
+      'secret',
+    );
     fetchMock = jest.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
   });
@@ -30,7 +33,9 @@ describe('CloudflareR2StorageProvider streaming (FR-22)', () => {
 
     await provider.put('uploads/x.bin', source, { contentType: 'image/png' });
 
-    const init = fetchMock.mock.calls[0][1] as RequestInit & { duplex?: string };
+    const init = fetchMock.mock.calls[0][1] as RequestInit & {
+      duplex?: string;
+    };
     // The exact stream instance is handed to fetch — not a materialized Buffer.
     expect(init.body).toBe(source);
     expect(init.body).not.toBeInstanceOf(Uint8Array);
@@ -46,7 +51,9 @@ describe('CloudflareR2StorageProvider streaming (FR-22)', () => {
 
     await provider.put('uploads/y.bin', buf);
 
-    const init = fetchMock.mock.calls[0][1] as RequestInit & { duplex?: string };
+    const init = fetchMock.mock.calls[0][1] as RequestInit & {
+      duplex?: string;
+    };
     expect(init.body).toBe(buf);
     expect(init.duplex).toBeUndefined();
   });
@@ -58,13 +65,15 @@ describe('CloudflareR2StorageProvider streaming (FR-22)', () => {
       text: async () => 'boom',
     } as unknown as Response);
 
-    await expect(provider.put('uploads/z.bin', Buffer.from('x'))).rejects.toThrow(
-      'R2 put failed [500]',
-    );
+    await expect(
+      provider.put('uploads/z.bin', Buffer.from('x')),
+    ).rejects.toThrow('R2 put failed [500]');
   });
 
   it('getStream returns a live Readable over the response body', async () => {
-    const webBody = Readable.toWeb(Readable.from([Buffer.from('hello '), Buffer.from('world')]));
+    const webBody = Readable.toWeb(
+      Readable.from([Buffer.from('hello '), Buffer.from('world')]),
+    );
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,

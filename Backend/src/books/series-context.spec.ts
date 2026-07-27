@@ -24,14 +24,19 @@ describe('composeSeriesContext', () => {
   });
 
   it('returns undefined when there is no title (synopsis alone is not anchorable)', () => {
-    expect(composeSeriesContext({ description: 'some synopsis' })).toBeUndefined();
+    expect(
+      composeSeriesContext({ description: 'some synopsis' }),
+    ).toBeUndefined();
     expect(composeSeriesContext({})).toBeUndefined();
     expect(composeSeriesContext(undefined)).toBeUndefined();
   });
 
   it('treats whitespace-only fields as absent', () => {
     expect(composeSeriesContext({ title: '   ' })).toBeUndefined();
-    const ctx = composeSeriesContext({ title: 'Mob Seka', description: '  \n ' });
+    const ctx = composeSeriesContext({
+      title: 'Mob Seka',
+      description: '  \n ',
+    });
     expect(ctx).toContain('Mob Seka');
     expect(ctx).not.toContain('Synopsis');
   });
@@ -57,7 +62,11 @@ describe('getMangaDetail — series title for the translate context', () => {
       set: jest.fn().mockResolvedValue(undefined),
       getStale: jest.fn().mockReturnValue(null),
     };
-    const svc = new MangaDexService(cache as any, { enabled: false } as any, {} as any);
+    const svc = new MangaDexService(
+      cache as any,
+      { enabled: false } as any,
+      {} as any,
+    );
 
     jest.spyOn(global, 'fetch').mockImplementation(async (url: any) => {
       if (String(url).includes('/cover')) {
@@ -105,7 +114,11 @@ describe('series context plumbing — translate paths', () => {
       set: jest.fn().mockResolvedValue(undefined),
       setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
     };
-    const storage = { put: jest.fn().mockResolvedValue(undefined), list: jest.fn().mockResolvedValue([]), delete: jest.fn().mockResolvedValue(undefined) };
+    const storage = {
+      put: jest.fn().mockResolvedValue(undefined),
+      list: jest.fn().mockResolvedValue([]),
+      delete: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new BooksService(
       mangaDex as any,
       cache as any,
@@ -122,18 +135,20 @@ describe('series context plumbing — translate paths', () => {
    *  captured (config form field) and answered 202-accepted, so the batch
    *  path runs for real up to the wire. */
   function mockMitFetch(onConfig: (cfg: string) => void) {
-    jest.spyOn(global, 'fetch').mockImplementation(async (url: any, init?: any) => {
-      if (String(url).includes('/translate/with-form/patches')) {
-        onConfig(String((init.body as FormData).get('config')));
-        return {
-          ok: true,
-          status: 202,
-          headers: { get: () => 'application/json' },
-          json: async () => ({ status: 'accepted' }),
-        } as any;
-      }
-      return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) } as any;
-    });
+    jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (url: any, init?: any) => {
+        if (String(url).includes('/translate/with-form/patches')) {
+          onConfig(String((init.body as FormData).get('config')));
+          return {
+            ok: true,
+            status: 202,
+            headers: { get: () => 'application/json' },
+            json: async () => ({ status: 'accepted' }),
+          } as any;
+        }
+        return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) } as any;
+      });
   }
 
   async function runBatchJob(service: BooksService) {
@@ -150,14 +165,28 @@ describe('series context plumbing — translate paths', () => {
     );
     const config = await submitted;
     // Deliver the webhook so the job promise resolves.
-    const jobKey = (service as any).batch.buildJobKey('ch1', 'ja', 'th', undefined, 'hd');
-    await service.handleMitCallback(jobKey, 0, { imgWidth: 1, imgHeight: 1, patches: [] }, undefined);
+    const jobKey = (service as any).batch.buildJobKey(
+      'ch1',
+      'ja',
+      'th',
+      undefined,
+      'hd',
+    );
+    await service.handleMitCallback(
+      jobKey,
+      0,
+      { imgWidth: 1, imgHeight: 1, patches: [] },
+      undefined,
+    );
     await jobPromise;
     return JSON.parse(config);
   }
 
   it('batch job composes series context from the catalog and sends it to MIT', async () => {
-    const { service, mangaDex } = makeService({ title: 'Mob Seka', description: 'Otome game world.' });
+    const { service, mangaDex } = makeService({
+      title: 'Mob Seka',
+      description: 'Otome game world.',
+    });
     const cfg = await runBatchJob(service);
     expect(mangaDex.getMangaDetail).toHaveBeenCalledWith('manga-123');
     expect(cfg.translator.series_context).toContain('Mob Seka');
@@ -170,24 +199,36 @@ describe('series context plumbing — translate paths', () => {
   });
 
   it('single-page translate sends series_context inside the MIT config form', async () => {
-    const { service } = makeService({ title: 'Mob Seka', description: 'Otome game world.' });
+    const { service } = makeService({
+      title: 'Mob Seka',
+      description: 'Otome game world.',
+    });
 
     let mitConfig = '';
-    jest.spyOn(global, 'fetch').mockImplementation(async (url: any, init?: any) => {
-      if (String(url).includes('/translate/with-form/patches')) {
-        mitConfig = String((init.body as FormData).get('config'));
-        return {
-          ok: true,
-          json: async () => ({ img_width: 1, img_height: 1, patches: [] }),
-        } as any;
-      }
-      // The page image fetch.
-      return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) } as any;
-    });
+    jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (url: any, init?: any) => {
+        if (String(url).includes('/translate/with-form/patches')) {
+          mitConfig = String((init.body as FormData).get('config'));
+          return {
+            ok: true,
+            json: async () => ({ img_width: 1, img_height: 1, patches: [] }),
+          } as any;
+        }
+        // The page image fetch.
+        return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) } as any;
+      });
 
-    await service.translateMangaPagePatches('ch1', 0, 'http://example.com/0.jpg', 'ja', 'th', {
-      mangaId: 'manga-123',
-    });
+    await service.translateMangaPagePatches(
+      'ch1',
+      0,
+      'http://example.com/0.jpg',
+      'ja',
+      'th',
+      {
+        mangaId: 'manga-123',
+      },
+    );
 
     const cfg = JSON.parse(mitConfig);
     expect(cfg.translator.series_context).toContain('Mob Seka');

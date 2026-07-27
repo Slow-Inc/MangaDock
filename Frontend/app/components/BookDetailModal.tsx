@@ -9,11 +9,13 @@ import MangaReader from "./MangaReader";
 import ChapterList from "./ChapterList";
 import { addToHistory, getHistory } from "../lib/readingHistory";
 import { useBookActions } from "../hooks/useBookActions";
+import FollowSeriesButton from "./FollowSeriesButton";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import { translateDescription } from "../lib/translateDescription";
 import MangaDiscussion from "./MangaDiscussion";
+import ReviewSection from "./ReviewSection";
 import RelatedManga from "./RelatedManga";
 import type { LandingBook, MangaDetail, MangaChapter, ActiveChapter } from "../lib/types";
 
@@ -513,6 +515,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         </svg>
                       )}
                     </button>
+                    <FollowSeriesButton book={book} variant="icon-square" />
                     <button
                       title={liked ? "เอาออก" : "ถูกใจ"}
                       onClick={handleToggleLiked}
@@ -639,6 +642,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         </svg>
                       )}
                     </button>
+                    <FollowSeriesButton book={book} />
                     <button
                       title={liked ? "เอาออก" : "ถูกใจ"}
                       onClick={handleToggleLiked}
@@ -663,14 +667,14 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                 {(translatedDesc && !showOriginalDesc) ? translatedDesc : (book.description || detail?.description || "ไม่มีคำอธิบายสำหรับเรื่องนี้")}
               </p>
               {translatingDesc && (
-                <p className="text-[10px] text-white/30">กำลังแปล...</p>
+                <p className="text-xs text-white/30">กำลังแปล...</p>
               )}
               {translatedDesc && !translatingDesc && (
                 <div className="flex items-center gap-2">
                   <GeminiBadge small />
                   <button
                     onClick={() => setShowOriginalDesc((v) => !v)}
-                    className="text-[10px] text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"
+                    className="text-xs text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"
                   >
                     {showOriginalDesc ? "แสดงคำแปล" : "ต้นฉบับ"}
                   </button>
@@ -829,7 +833,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         sizes="96px"
                       />
                       {cover.volume && (
-                        <div className="absolute inset-x-0 bottom-0 bg-black/75 py-0.5 text-center text-[10px] font-semibold text-white">
+                        <div className="absolute inset-x-0 bottom-0 bg-black/75 py-0.5 text-center text-xs font-semibold text-white">
                           เล่ม {cover.volume}
                         </div>
                       )}
@@ -863,6 +867,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               sectionRef={chaptersRef}
               onReadyState={handleChapterReadyState}
             />
+          )}
+
+          {/* Rating & Review */}
+          {isManga && (
+            <ReviewSection mangaId={book.id} mangaTitle={book.title} />
           )}
 
           {/* Manga-specific discussion threads (Phase 2 Community) */}

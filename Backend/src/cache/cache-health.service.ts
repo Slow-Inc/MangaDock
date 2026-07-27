@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { L3DiskService } from './l3-disk.service';
 import { ElectionService } from '../status/election.service';
-import { DIRTY_QUEUE, PROCESSING_QUEUE, DEAD_LETTER_SET } from './batch-sync.worker';
+import {
+  DIRTY_QUEUE,
+  PROCESSING_QUEUE,
+  DEAD_LETTER_SET,
+} from './batch-sync.worker';
 
 export interface CacheHealthSnapshot {
   dirtyQueueDepth: number;
@@ -21,7 +25,8 @@ export class CacheHealthService {
   ) {}
 
   async getHealth(): Promise<CacheHealthSnapshot> {
-    const [dirtyQueueDepth, processingQueueDepth, deadLetterCount] = this.redis.available
+    const [dirtyQueueDepth, processingQueueDepth, deadLetterCount] = this.redis
+      .available
       ? await Promise.all([
           this.redis.llen(DIRTY_QUEUE),
           this.redis.llen(PROCESSING_QUEUE),

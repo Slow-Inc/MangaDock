@@ -20,15 +20,17 @@ class FakeRedisBus {
     return Promise.resolve(true);
   });
 
-  subscribe = jest.fn((channel: string, handler: (d: unknown) => void): (() => void) => {
-    let set = this.handlers.get(channel);
-    if (!set) {
-      set = new Set();
-      this.handlers.set(channel, set);
-    }
-    set.add(handler);
-    return () => set!.delete(handler);
-  });
+  subscribe = jest.fn(
+    (channel: string, handler: (d: unknown) => void): (() => void) => {
+      let set = this.handlers.get(channel);
+      if (!set) {
+        set = new Set();
+        this.handlers.set(channel, set);
+      }
+      set.add(handler);
+      return () => set.delete(handler);
+    },
+  );
 }
 
 /** Redis stub that is present but reports unavailable — exercises local-only path. */

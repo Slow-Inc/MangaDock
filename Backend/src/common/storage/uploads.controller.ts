@@ -1,4 +1,12 @@
-import { Controller, Get, Inject, Logger, NotFoundException, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  Logger,
+  NotFoundException,
+  Req,
+  Res,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import * as path from 'path';
 import { STORAGE_PROVIDER } from './storage-provider.interface';
@@ -38,7 +46,10 @@ export class UploadsController {
     // lands outside root — a string-prefix check on the raw input is bypassable.
     const uploadsRoot = path.resolve(process.cwd(), 'uploads');
     const resolved = path.resolve(process.cwd(), key);
-    if (resolved !== uploadsRoot && !resolved.startsWith(uploadsRoot + path.sep)) {
+    if (
+      resolved !== uploadsRoot &&
+      !resolved.startsWith(uploadsRoot + path.sep)
+    ) {
       throw new NotFoundException();
     }
     const ext = path.extname(filePath).toLowerCase();
@@ -51,14 +62,20 @@ export class UploadsController {
       if (this.storage.getStream) {
         const stream = await this.storage.getStream(key);
         res.setHeader('content-type', contentType);
-        res.setHeader('cache-control', 'public, max-age=3600, stale-while-revalidate=86400');
+        res.setHeader(
+          'cache-control',
+          'public, max-age=3600, stale-while-revalidate=86400',
+        );
         // getStream's pre-check only guards the initial response status, so a
         // missing key already threw above. But the R2/undici body can still
         // error MID-download (worker connection drops after a 200); that emits
         // 'error' AFTER pipe() — outside this try/catch. Without a listener Node
         // throws it as unhandled and can crash the process, so handle it here.
         stream.on('error', (err) => {
-          this.logger.error(`uploads stream failed mid-download for ${key}`, err instanceof Error ? err.stack : String(err));
+          this.logger.error(
+            `uploads stream failed mid-download for ${key}`,
+            err instanceof Error ? err.stack : String(err),
+          );
           // Headers may already be flushed once bytes flow — we can't change the
           // status then, only tear the response down (destroy() with no error so
           // we don't re-emit onto the response socket; we've already logged). If
@@ -74,7 +91,10 @@ export class UploadsController {
       }
       const buf = await this.storage.get(key);
       res.setHeader('content-type', contentType);
-      res.setHeader('cache-control', 'public, max-age=3600, stale-while-revalidate=86400');
+      res.setHeader(
+        'cache-control',
+        'public, max-age=3600, stale-while-revalidate=86400',
+      );
       res.send(buf);
     } catch {
       throw new NotFoundException(`not found: ${key}`);

@@ -18,7 +18,8 @@ import { TURNSTILE_TEST_SECRET } from '../src/auth/turnstile.config';
 describe('MIT translation endpoints — TurnstileGuard (e2e)', () => {
   let app: INestApplication;
   const HWID = 'device-e2e-1234567';
-  const validClearance = () => generateClearanceToken(TURNSTILE_TEST_SECRET, HWID);
+  const validClearance = () =>
+    generateClearanceToken(TURNSTILE_TEST_SECRET, HWID);
 
   const booksServiceMock: Partial<Record<keyof BooksService, jest.Mock>> = {
     translateMangaEpisode: jest.fn().mockResolvedValue({ translations: [] }),
@@ -53,7 +54,10 @@ describe('MIT translation endpoints — TurnstileGuard (e2e)', () => {
   const guarded = [
     {
       name: 'manga text translation',
-      send: () => request(app.getHttpServer()).post('/books/translate/manga').send({ lines: ['x'] }),
+      send: () =>
+        request(app.getHttpServer())
+          .post('/books/translate/manga')
+          .send({ lines: ['x'] }),
     },
     {
       name: 'single-page patch translation',
@@ -87,7 +91,9 @@ describe('MIT translation endpoints — TurnstileGuard (e2e)', () => {
   });
 
   it('keeps the cheap description-translation endpoint open (no captcha)', async () => {
-    const res = await request(app.getHttpServer()).get('/books/translate').query({ text: 'hi' });
+    const res = await request(app.getHttpServer())
+      .get('/books/translate')
+      .query({ text: 'hi' });
     expect(res.status).toBe(200);
   });
 });

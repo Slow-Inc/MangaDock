@@ -29,17 +29,26 @@ export class CloudflareR2StorageProvider implements StorageProvider {
     });
   }
 
-  async put(key: string, data: Buffer | string | Readable, options?: { contentType?: string }): Promise<void> {
+  async put(
+    key: string,
+    data: Buffer | string | Readable,
+    options?: { contentType?: string },
+  ): Promise<void> {
     // Hand the body straight to fetch — a Readable is streamed to the worker
     // (never drained into a Buffer first), and Buffer/string pass through
     // without an extra copy. Avoids double-buffering the whole object.
     const isStream = data instanceof Readable;
-    const res = await this.workerFetch(`/v1/object?key=${encodeURIComponent(key)}`, {
-      method: 'PUT',
-      headers: { 'content-type': options?.contentType ?? 'application/octet-stream' },
-      body: data as BodyInit,
-      ...(isStream ? { duplex: 'half' } : {}),
-    });
+    const res = await this.workerFetch(
+      `/v1/object?key=${encodeURIComponent(key)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'content-type': options?.contentType ?? 'application/octet-stream',
+        },
+        body: data as BodyInit,
+        ...(isStream ? { duplex: 'half' } : {}),
+      },
+    );
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new Error(`R2 put failed [${res.status}] ${key}: ${text}`);
@@ -47,21 +56,29 @@ export class CloudflareR2StorageProvider implements StorageProvider {
   }
 
   async get(key: string): Promise<Buffer> {
-    const res = await this.workerFetch(`/v1/object?key=${encodeURIComponent(key)}`);
+    const res = await this.workerFetch(
+      `/v1/object?key=${encodeURIComponent(key)}`,
+    );
     if (!res.ok) throw new Error(`R2 get failed [${res.status}] ${key}`);
     return Buffer.from(await res.arrayBuffer());
   }
 
   async getStream(key: string): Promise<Readable> {
-    const res = await this.workerFetch(`/v1/object?key=${encodeURIComponent(key)}`);
-    if (!res.ok || !res.body) throw new Error(`R2 get failed [${res.status}] ${key}`);
+    const res = await this.workerFetch(
+      `/v1/object?key=${encodeURIComponent(key)}`,
+    );
+    if (!res.ok || !res.body)
+      throw new Error(`R2 get failed [${res.status}] ${key}`);
     // Stream the worker response body through instead of buffering it all in
     // memory; the caller pipes it directly to the HTTP response.
     return Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]);
   }
 
   async delete(key: string): Promise<void> {
-    const res = await this.workerFetch(`/v1/object?key=${encodeURIComponent(key)}`, { method: 'DELETE' });
+    const res = await this.workerFetch(
+      `/v1/object?key=${encodeURIComponent(key)}`,
+      { method: 'DELETE' },
+    );
     if (!res.ok && res.status !== 404) {
       throw new Error(`R2 delete failed [${res.status}] ${key}`);
     }
@@ -80,7 +97,9 @@ export class CloudflareR2StorageProvider implements StorageProvider {
   }
 
   async exists(key: string): Promise<boolean> {
-    const res = await this.workerFetch(`/v1/exists?key=${encodeURIComponent(key)}`);
+    const res = await this.workerFetch(
+      `/v1/exists?key=${encodeURIComponent(key)}`,
+    );
     if (!res.ok) return false;
     const body = (await res.json()) as { exists?: boolean };
     return body.exists ?? false;
