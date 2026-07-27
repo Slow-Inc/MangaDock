@@ -3,6 +3,45 @@
 
 ---
 
+## CI gates made real — tested unit-test selection, guard suites, mobile typecheck (#643/#678, #639/#640, 2026-07-28)
+
+**Trigger:** draft PR #642 ran `integrate/render-reconcile` through the pipeline for the first time
+ever and it went red. #626's *"integration branch green"* acceptance had been assumed, never
+CI-verified. An acceptance criterion that no job enforces is a note, not a gate.
+
+**#678 (#643 Failure 1).** The bun **unit** gate was collecting `mermaid.e2e.test.ts`, a Playwright
+spec, because file selection was an inline `find` blacklist in `ci.yml` that only knew
+`*.integration.test.ts`. TDD'd into `scripts/lib/frontend-unit-tests.mjs` — `selectUnitTestFiles()`,
+5 tests, red→green per slice — with `scripts/list-frontend-unit-tests.mjs` as the CLI (exits 1 on an
+empty selection so the gate can never run nothing). A regression test pins the trap: the tempting
+`-not -name '*.*.test.ts'` one-liner would silently drop `PageRenderer.memo.test.ts`, a real unit
+test whose extra dot is descriptive. Also added the **`scripts (node --test)` job** — nothing in CI
+ran the guard suites before, so `issue-ref` / `worktree-budget` / `pr-bilingual` / `append-only`
+could all break and stay green. `/scrutinize` caught one real defect pre-merge: the `frontend` job
+called `node` while only setting up bun, i.e. it depended on an undeclared runtime that the runner
+image happened to provide — fixed by declaring `actions/setup-node@v4`, matching what the `backend`
+job in the same file already did.
+
+**#640 (#639).** Mobile CI: `npm ci` + `npm run typecheck` (`tsc --noEmit`, strict), path-filtered on
+`Mobile/**`, wired into the required `gate`. It was **64 commits stale** — its earlier green run was
+against a base that no longer existed — so it was rebased onto `main`, and the `gate` conflict with
+#678 resolved as a union (`[backend, frontend, mit_logic, mit_heavy, mobile, scripts]`).
+
+**Verification — the point of the whole batch was gates that actually gate, so nothing was taken on
+a green checkmark:** `scripts` job log shows `# tests 58 / # pass 58 / # fail 0`; `frontend` shows
+`Ran 226 tests across 33 files` (exactly the 33 the selector picks); `mobile` runs `tsc` over 3 real
+files, and #639's never-demonstrated acceptance criterion was finally proven — injecting a type
+error into `App.tsx` yields `error TS2322` and `npm run typecheck` exit **2**, so the step and the
+gate fail. A job that resolves to zero files would have passed forever.
+
+**Not fixed by this batch:** #643 Failure 2 (torch-free collection) is fixed on
+`integrate/render-reconcile`, not here — the four offending test modules only exist there. With
+collection unblocked, that branch's suite ran for the first time and surfaced **#679** (the #278 SFX
+provenance gate is not called by the driver) and **#680** (4 characterization goldens red: the merge
+reverted the #541 portability fix, plus one genuine glyph-advance drift). Both block Phase E.
+
+---
+
 ## Security: record device on login for /settings/security (2026-07-21)
 
 **Goal:** `/settings/security` แสดง "ไม่พบข้อมูลอุปกรณ์" เพราะ `user_known_devices` ว่างเสมอ
