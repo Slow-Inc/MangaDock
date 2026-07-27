@@ -30,6 +30,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       mit: ${{ steps.filter.outputs.mit }}
+      mobile: ${{ steps.filter.outputs.mobile }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -44,6 +45,9 @@ jobs:
               - '.github/workflows/ci.yml'
             mit:
               - 'MIT/**'
+              - '.github/workflows/ci.yml'
+            mobile:
+              - 'Mobile/**'
               - '.github/workflows/ci.yml'
 
   backend:
@@ -100,15 +104,42 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3.14'
+      # The selector below runs on node, so declare it (same pattern as the backend job)
+      # instead of relying on whatever the runner image happens to preinstall.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - run: bun install --frozen-lockfile
-      # Exclude *.integration.test.ts (needs a live :4000 server). Guard the
-      # empty case so we never fall back to running ALL tests.
+      # Which files are unit tests is a rule with a test suite behind it (#643) — an inline
+      # `find` blacklist here silently swept a Playwright `*.e2e.test.ts` into the unit run.
+      # The selector exits 1 on an empty selection, so the gate can never run nothing.
       - name: Run unit tests
         run: |
-          files=$(find app lib -name '*.test.ts' -not -name '*.integration.test.ts')
-          if [ -z "$files" ]; then echo "No unit test files found"; exit 1; fi
+          files=$(node ../scripts/list-frontend-unit-tests.mjs app lib)
           echo "Running: $files"
           bun test $files
+
+  mobile:
+    name: mobile (typecheck)
+    needs: changes
+    if: ${{ needs.changes.outputs.mobile == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Mobile is an Expo/React Native project; package-lock.json is its maintained
+      # lockfile (no bun.lock here, unlike Backend/Frontend). npm ci also fails the
+      # build if the lockfile drifts out of sync with package.json — a free extra check.
+      - run: npm ci
+      # tsc --noEmit (strict, expo/tsconfig.base). No device/emulator build in CI; the
+      # @mangadock/mobile-bridge unit suite runs in the frontend job, not duplicated here.
+      - name: Typecheck (tsc --noEmit, strict)
+        run: npm run typecheck
 
   # MIT is two jobs since #359 lazy-imported torch (job ids use underscores — a hyphen in a
   # job id breaks `${{ needs.mit-logic }}` expression parsing, which reads `-` as subtraction):
@@ -168,19 +199,33 @@ jobs:
       - name: Run full suite
         run: pytest test/ -q
 
+  # The repo-tooling guards (issue-ref, worktree-budget, pr-bilingual, append-only, and the
+  # frontend unit-test selector) all ship with `node --test` suites that nothing ran in CI
+  # until #643 — a guard whose own tests never run is not a guard. Unfiltered on purpose:
+  # it takes seconds, and these scripts gate every branch regardless of which service changed.
+  scripts:
+    name: scripts (node --test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test "scripts/**/*.test.mjs"
+
   gate:
     name: gate
     if: ${{ always() }}
-    needs: [backend, frontend, mit_logic, mit_heavy]
+    needs: [backend, frontend, mit_logic, mit_heavy, mobile, scripts]
     runs-on: ubuntu-latest
     steps:
       # Mark ONLY this job as the required check. Skipped service jobs are fine; the gate fails
-      # only when a *required* job (backend/frontend/mit_logic) actually failed. mit_heavy is
+      # only when a *required* job (backend/frontend/mit_logic/mobile) actually failed. mit_heavy is
       # report-only (continue-on-error) and never blocks.
       - name: Verify required jobs
         run: |
-          echo "backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }} mit_logic=${{ needs.mit_logic.result }} mit_heavy=${{ needs.mit_heavy.result }}"
-          if [ "${{ needs.backend.result }}" = "failure" ] || [ "${{ needs.frontend.result }}" = "failure" ] || [ "${{ needs.mit_logic.result }}" = "failure" ]; then
+          echo "backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }} mit_logic=${{ needs.mit_logic.result }} mit_heavy=${{ needs.mit_heavy.result }} mobile=${{ needs.mobile.result }} scripts=${{ needs.scripts.result }}"
+          if [ "${{ needs.backend.result }}" = "failure" ] || [ "${{ needs.frontend.result }}" = "failure" ] || [ "${{ needs.mit_logic.result }}" = "failure" ] || [ "${{ needs.mobile.result }}" = "failure" ] || [ "${{ needs.scripts.result }}" = "failure" ]; then
             echo "::error::A required CI job failed"
             exit 1
           fi

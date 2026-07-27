@@ -1,5 +1,40 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+
+## 2026-07-28 — #678/#640: CI gates made real (unit-test selection, guard suites, mobile typecheck)
+
+**What & where:** `.github/workflows/ci.yml` (frontend job, new `scripts` job, new `mobile` job,
+`gate`), `scripts/lib/frontend-unit-tests.mjs` + `scripts/list-frontend-unit-tests.mjs` + tests,
+`scripts/README.md`.
+
+**Why:** `integrate/render-reconcile` failed CI the first time it was ever run through the pipeline,
+blocking Phase E of #626/#548 — and at the repo level no job ran the guard suites at all, so a guard
+could be broken and stay green. #534 also landed `Mobile/` with no CI covering it (#639).
+
+**Before → After:** unit-test selection was an inline `find` blacklist extended by hand per qualifier
+→ a pure function with 5 tests plus a CLI that fails closed on an empty selection. Guard suites ran
+**nowhere** in CI → a required `scripts (node --test)` job. `Mobile/` had no CI → a path-filtered
+strict typecheck wired into `gate`. The `frontend` job depended on an undeclared `node` → declared.
+
+**Performance Δ:** none (test-infra). `scripts` ≈ 10–25s, unfiltered by design; `mobile` ≈ 25s,
+path-filtered.
+
+**Quality:** no product-behavior change; no application code touched.
+
+**Validation:** every claim checked against job logs rather than the green checkmark —
+`scripts` `# tests 58 / # pass 58 / # fail 0`; `frontend` `Ran 226 tests across 33 files`; `mobile`
+typechecks 3 real files, and a deliberate `error TS2322` was shown to exit 2 and fail the step,
+finally demonstrating #639's stated acceptance criterion. Both PRs green on the required `gate`;
+#640 was rebased off a 64-commit-stale base before merging (the #553 lesson).
+
+**Risk / rollback:** low, additive. Rollback = revert #678 / #640. Residual: `gate` still treats only
+`result == 'failure'` as failing, so a cancelled/timed-out job does not block — pre-existing for every
+job, now inherited by `scripts` and `mobile` too; worth a follow-up.
+
+**Links:** #643, #678, #639, #640, #642, #626, #548, #679, #680.
+
+---
+
 ## 2026-07-28 — #643/#678: CI gates made real (frontend unit selection + torch-free collection)
 
 **What & where:** `.github/workflows/ci.yml` (frontend job, new `scripts` job, `gate`),
@@ -76,6 +111,7 @@ dev-gated. Rollback = discard the branch. Deferred (tracked follow-up): unify MI
 (main `_emit_trace` vs landing region-attrs); unify is_sfx/from_sfx_detection into one helper.
 
 **Links:** #626, #548, #625, #627; `docs/RECONCILIATION-PLAN.md`, `docs/reports/RECONCILE-626-decisions.md`.
+
 
 ---
 

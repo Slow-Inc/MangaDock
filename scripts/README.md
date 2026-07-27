@@ -16,11 +16,13 @@ invariant is:
 | `check-issue-ref.mjs` | work with no GitHub issue (MD-only work agents miss) | fail if no `#NNN` in the branch name (`fix/358-…`), PR body, or any commit. `wip/*` branches are exempt. |
 | `check-scrutinize.mjs` | merging a PR whose `/scrutinize` pass no longer covers its final state (the #550 lapse: reviewed once, then the PR grew) | fail unless the PR body carries `<!-- scrutinize verdict=ship commit=<sha> -->` with an accepted verdict (`ship`/`fix-then-ship`, not `rework`/`reject`) **and** the recorded commit matches current HEAD (a verdict against an older commit is stale). `wip/*` branches are exempt. |
 | `check-append-only.mjs` | a stale-base clobber silently dropping merged entries from the shared changelogs (the #553 clobber → #608) | fail if a PR **removes an existing `## ` section header** from `DONE.md` or `docs/reports/system-impact-report.md`. Compares the base-blob vs HEAD-blob header **multiset** (not a diff) so moves/edits/code-fences/CRLF don't false-positive. `[log-trim]` in the PR title exempts intentional curation. |
+| `list-frontend-unit-tests.mjs` | a non-unit suite sneaking into the frontend unit gate (#643: a Playwright `mermaid.e2e.test.ts` got collected by `bun test` and broke the gate on `integrate/render-reconcile`) | a `*.test.ts` is a unit test unless its filename carries a known non-unit qualifier (`.e2e.` / `.integration.`). A merely descriptive extra dot — `PageRenderer.memo.test.ts` — stays in. Exits 1 on an empty selection so the gate never silently runs nothing. |
 
-Run the unit tests:
+Run the unit tests (the `scripts (node --test)` CI job runs exactly this — before #643 nothing
+in CI ran them at all, so a guard could be broken and stay green):
 
 ```bash
-node --test scripts/lib/*.test.mjs
+node --test "scripts/**/*.test.mjs"
 ```
 
 ## Enabling enforcement
