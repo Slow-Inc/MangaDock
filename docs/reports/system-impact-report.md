@@ -1,5 +1,45 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-07-28 — #679: SFX wiring guard tested at the behaviour, and an ADR-026 gap surfaced
+
+**What & where:** `MIT/test/sfx_gate_scan.py` (new, pure `ast`), `MIT/test/test_sfx_gate_scan.py`
+(new, 7 tests), `MIT/test/test_stage_c_wiring.py` (the #278 assertion rewritten + one new
+assertion), `docs/adr/026-mit-sfx-rescue-provenance-gate.md` (Amendment).
+
+**Why:** the guard asserted the literal symbol `should_rescue_sfx`, so a deliberate, benchmarked
+swap to landing's equivalent gate made it fire with a message that misdescribed the cause. A guard
+that cannot be tested itself, and that pins an implementation rather than a behaviour, produces
+false alarms and — as here — hides the requirement it is not checking.
+
+**Before → After:** one implementation-coupled assertion → a pure rule exercised against synthetic
+drivers, plus **two separate assertions** matching ADR 026's two requirements (provenance gating;
+the Addendum's real-text guard). The gate-less driver case the guard exists for is now actually
+covered, which it never was.
+
+**Performance Δ:** none (test-infra).
+
+**Quality:** no production code changed. The change is in what CI can see: on
+`integrate/render-reconcile` the rescue path never consults the line-OCR read, so the phantom
+target-language onomatopoeia over real dialogue that ADR 026's Addendum closed is reachable there.
+That now fails a test instead of passing silently.
+
+**Validation:** 10 tests over both files; full torch-free suite 646 passed, 0 failed on `main`.
+Both checks were run over both real drivers: `main` = provenance `should_rescue_sfx` + guard yes;
+`integrate/render-reconcile` = provenance `should_sfx_rescue` + guard no.
+
+**Risk / rollback:** test-infra only; rollback = revert. Deliberate consequence: the branch's
+`mit_logic` stays red until the trade-off is decided — that is the intended signal, not breakage.
+
+**Tech-debt register:** (1) the SFX-gate trade-off is **open** — ADR 026's Amendment records it and
+requires a superseding benchmark covering both the stylized SFX case and an ASCII det_sfx
+false-positive; (2) whichever gate loses becomes dead code to remove, together with
+`textline_merge/__init__.py`'s comment that still names `should_rescue_sfx` as *the* rescue path;
+(3) `ocr_vlm.should_rescue_sfx` currently has passing tests and no caller on the branch.
+
+**Links:** #679, #278, #609, #626, #642, ADR 026.
+
+---
+
 ## 2026-07-28 — #680: glyph cache ignored font switches (render correctness)
 
 **What & where:** `MIT/manga_translator/rendering/text_render.py` (`set_font`, new
