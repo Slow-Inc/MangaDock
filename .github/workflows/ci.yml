@@ -100,6 +100,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3.14'
+      # The selector below runs on node, so declare it (same pattern as the backend job)
+      # instead of relying on whatever the runner image happens to preinstall.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - run: bun install --frozen-lockfile
       # Which files are unit tests is a rule with a test suite behind it (#643) — an inline
       # `find` blacklist here silently swept a Playwright `*.e2e.test.ts` into the unit run.
