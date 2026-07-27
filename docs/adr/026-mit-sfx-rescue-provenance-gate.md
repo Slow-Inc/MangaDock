@@ -81,7 +81,10 @@ and probed the gateway directly. Two results change the picture:
 - **Gate scoring on the documented defect set: this ADR's gate 11/12, landing's 5/12.** Landing's only
   win is the `ぬ` row; it loses all seven phantom rows.
 - **The rescue produces nothing on the current gateway/model, so neither gate has visible effect
-  today.** `vlm_localize_sfx` always returns `''` — its hardcoded `max_tokens=24` is far below the
+  today — but the feature is unserved, not dead.** It rendered `SQUELCH` over the inpainted `ぬ` on
+  2026-07-04 through this same code path (`2026-07-04-sfx-rescue-fix.md`, committed render
+  `2026-07-04-sfx-rescue-vs-target.jpg`), at the same `max_tokens=24`. What regressed is the model
+  behind `gateway.9arm.co`, which today lists only `qwen3.6-35b-a3b`. `vlm_localize_sfx` always returns `''` — its hardcoded `max_tokens=24` is far below the
   model's reasoning floor, so every call ends `finish_reason: length` with `content: None`. That is a
   real defect (`ocr_vlm.py` never adopted the `thinking_extra_body()` / `resolve_max_completion_tokens()`
   helpers #623/#631 added for the translator path).
@@ -92,6 +95,11 @@ once returned `สวัสดี` ("hello"), and the same crop never returns th
 truncation would convert a safe empty result into random target-language words rendered over artwork.
 Reviving the feature requires a model whose answer demonstrably varies with the image; the benchmark's
 B3 probe is the check for that.
+
+The genuine code defect exposed here is that the failure is **silent**: a truncated reply collapses to
+`''`, indistinguishable from "this region has no SFX" — which is why 2026-07-11 concluded "text MoE"
+and moved on. Making `finish_reason: length` / `content: None` observable is worth doing on its own,
+independently of which model is configured.
 
 Consequence for this ADR: keeping the Addendum guard costs nothing measurable while the rescue is inert,
 and prevents the 2026-06-30 corruption from returning the moment the configuration changes — which is
