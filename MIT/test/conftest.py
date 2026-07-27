@@ -23,6 +23,9 @@ _HEAVY_TESTS = [
     'test_async_correctness.py',     # test bodies import the pipeline (torch) at runtime
     'test_batch_preprocess.py',
     'test_concise_bubbles.py',       # imports translators.config_gpt -> translators/__init__ (torch)
+    'test_custom_openai_none_content.py',  # imports translators.custom_openai -> translators/__init__ (torch)
+    'test_custom_openai_parse.py',
+    'test_custom_openai_thinking.py',
     'test_numbered_contract.py',     # imports translators.numbered_contract -> translators/__init__ (torch)
     'test_det_forward_default.py',
     'test_flux_klein_inpainter.py',
@@ -32,6 +35,7 @@ _HEAVY_TESTS = [
     'test_pipeline_params.py',
     'test_prev_context_prompt.py',   # test body imports translators.config_gpt -> translators/__init__ (torch)
     'test_registry_trim.py',
+    'test_source_lang_filter.py',    # imports MangaTranslator (torch)
     'test_stages.py',
     'test_timed_stage.py',           # imports MangaTranslator (torch) to check _run_* __name__
     'test_translation.py',
