@@ -289,6 +289,8 @@ FALLBACK_FONTS = [
     os.path.join(BASE_PATH, 'fonts/msgothic.ttc'),
 ]
 FONT_SELECTION: List[freetype.Face] = []
+# The font paths behind the current FONT_SELECTION — see set_font (#680).
+_SELECTED_FONT_PATHS: Tuple[str, ...] = ()
 font_cache = {}
 def get_cached_font(path: str) -> freetype.Face:
     path = path.replace('\\', '/')
@@ -299,11 +301,21 @@ def get_cached_font(path: str) -> freetype.Face:
     return font_cache[path]
 
 def set_font(font_path: str):
-    global FONT_SELECTION
+    global FONT_SELECTION, _SELECTED_FONT_PATHS
     if font_path:
         selection = [font_path] + FALLBACK_FONTS
     else:
         selection = FALLBACK_FONTS
+    # #680: get_char_glyph is memoised on (cdpt, font_size, direction) — a key that says nothing
+    # about which font is loaded — so a swap here would keep serving the previous font's glyphs
+    # (wrong letterform AND wrong advance) for every char/size already cached. This is the
+    # "font-cache landmine" the select_hyphenator comment refers to, and why get_char_border /
+    # get_char_offset_x have their caches commented out. Drop the memo when, and only when, the
+    # selection actually changes: dispatch_render calls set_font() on EVERY request, so clearing
+    # unconditionally would throw the glyph cache away once per page.
+    if tuple(selection) != _SELECTED_FONT_PATHS:
+        get_char_glyph.cache_clear()
+        _SELECTED_FONT_PATHS = tuple(selection)
     FONT_SELECTION = [get_cached_font(p) for p in selection]
 
 class namespace:

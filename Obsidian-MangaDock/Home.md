@@ -30,6 +30,7 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[feedback-proactive-clink-brainstorm]] — In goal-mode, invoke /clink-brainstorm WITHOUT asking for technical forks multiple agents can enrich (Claude picks how many/which); always verify "external prereq/blocked" claims against the real repo first
 - [[feedback-techdebt-all-scenarios]] — When refactoring tech debt in shared/core modules, enumerate and characterization-test EVERY scenario you can imagine BEFORE touching code — a refactor error there breaks the whole system.
 - [[feedback-test-every-round]] — ทำงานเสร็จทุกครั้งต้อง test ครบทุกรอบ รวม frontend E2E (Playwright ผ่าน tunnel) ไม่ใช่แค่ unit
+- [[feedback-root-cause-before-fix]] — **พื้นฐาน**: ห้ามเดาสาเหตุ ห้ามเสนอวิธีแก้ก่อนพิสูจน์ root cause ด้วยหลักฐานที่แยกแยะสมมติฐานได้; error/assert message ไม่ใช่ข้อเท็จจริง (เปิดโค้ดจริงเสมอ); ต้องมี minimal repro ที่โชว์กลไก; แก้ก่อนรู้สาเหตุเสี่ยงกลบสาเหตุ (บทเรียน #679/#680)
 - [[feedback-verify-before-claiming]] — ห้ามเคลม "แก้แล้ว" จนกว่าจะ eyeball render จริงเทียบ target + SendUserFile ให้ user confirm; test/replay ผ่าน ≠ verified; metric ต้องครอบทั้ง over/under
 - [[feedback-update-readme-on-command-change]] — แก้อะไรที่กระทบ command/script หรือเพิ่ม tool ใหม่ ต้องอัปเดต README.md ด้วยทุกครั้ง
 - [[feedback-benchmark-defect-checklist]] — ทุก MIT render benchmark ต้องประเมินภาพเทียบ original ตาม checklist ข้อบกพร่อง 12 ข้อที่ user เคย flag — living document

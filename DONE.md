@@ -4,6 +4,50 @@
 ---
 
 
+## #680 — glyph cache ignored font switches (real render bug, found by root-causing 4 red goldens) (2026-07-28)
+
+**Symptom that started it:** four characterization goldens red on `integrate/render-reconcile`
+(`put_char` advance drift + 3 × `resize_regions`). First diagnosis — "the branch's render code
+produces different glyph advances than main" — was **wrong**: identical test + identical golden +
+different result is not evidence of a code difference. The discriminating fact was already in hand
+and unused: **the tests pass alone and fail in the suite**. Order dependence ⇒ shared state.
+
+**Root cause:** `text_render.get_char_glyph` is `@lru_cache(cdpt, font_size, direction)` — the key
+carries no font — while `set_font()` swaps the module-global `FONT_SELECTION`. Anything already
+cached keeps rendering with the previous font: wrong letterform *and* wrong advance (so wrong wrap
+widths). Proven minimally: `'A'@48` = 38 with Prompt-Bold, **still 38** after `set_font('')`, 32
+after `cache_clear()`. The polluter in the suite was `test_clean_layout_fit.py` (renders with
+`anime_ace_3.ttf`); that file is byte-identical on both branches — the variable is
+`rendering/__init__.py`, so `_clean_layout_dst` caches a different set of glyph keys and only on
+`integrate` do they collide with the goldens'.
+
+**Production reach:** `set_font()` is called from `dispatch_render` (configured font),
+`dispatch_eng_render` (`comic shanns 2.ttf`) and `dispatch_eng_render_pillow`
+(`NotoSansMonoCJK-VF.ttf.ttc`) inside one long-lived worker — so any request after one with a
+different font got stale glyphs. The hazard was known: `select_hyphenator`'s comment names "the
+font-cache landmine that gates other render caches", and it is why `get_char_border` /
+`get_char_offset_x` have their caches commented out. `get_char_glyph` was the one left memoised.
+
+**Fix (TDD, 2 tests at the public seam):** invalidate in `set_font()` **only when the selection
+actually changes**. Unconditional `cache_clear()` is the tempting wrong fix — `dispatch_render`
+calls `set_font()` every request, so it would rebuild the entire glyph cache once per page; the
+second test pins that.
+
+**Measured, same worktree + interpreter, only the source change differing:** without the fix
+`1 failed, 635 passed` (`test_resize_regions_bubble_fit_byte_identical`); with it `636 passed,
+0 failed`. **That failure was already live on `main`** and had been attributed to cross-platform
+freetype drift (#541) and converted to a skip — which masked it. Same-env evidence here points at
+the cache. Falsifiable follow-up: if #541's Linux-CI mismatch had the same cause, that golden
+should now assert instead of skip in CI.
+
+**Process note:** logged as [[feedback-root-cause-before-fix]] — two wrong causes were published to
+issues before checking (#679 too, where the test's own failure message was taken as fact). Rule now
+in CLAUDE.md: prove the root cause with evidence that discriminates between explanations before
+proposing any fix, because a fix applied first can mask the cause.
+
+---
+
+
 ## CI gates made real — tested unit-test selection, guard suites, mobile typecheck (#643/#678, #639/#640, 2026-07-28)
 
 **Trigger:** draft PR #642 ran `integrate/render-reconcile` through the pipeline for the first time

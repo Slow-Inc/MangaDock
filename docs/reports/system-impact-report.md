@@ -1,6 +1,49 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
 
+## 2026-07-28 — #680: glyph cache ignored font switches (render correctness)
+
+**What & where:** `MIT/manga_translator/rendering/text_render.py` (`set_font`, new
+`_SELECTED_FONT_PATHS`), `MIT/test/test_font_switch_cache.py` (new, 2 tests).
+
+**Why:** `get_char_glyph` is memoised on `(cdpt, font_size, direction)`, a key with no font in it,
+while `set_font()` swaps the global `FONT_SELECTION`. Cached characters kept rendering with the
+previous font — wrong glyph bitmaps and wrong advances, therefore wrong line-wrap widths.
+
+**Before → After:** a font switch inside a live worker silently reused the prior font's glyphs for
+every char/size in the 1024-entry cache → the memo is dropped exactly when the font selection
+changes. Same-font `set_font()` (the per-request `dispatch_render` case) still keeps the cache, so
+there is no per-page rebuild.
+
+**Performance Δ:** none on the hot path (same-font calls unchanged); one cache rebuild per actual
+font switch, which is rare.
+
+**Quality:** render correctness — this is a real defect fix, not a refactor. Wherever the bug was
+live the output changes to the *correct* glyphs. Deployments that only ever use one font were
+unaffected, which is why it went unnoticed.
+
+**Validation:** TDD at the public seam (`set_font` in, rendered advance out) — RED `38 == 38`,
+GREEN `32`. Deterministic before/after with only this source change differing: `1 failed, 635
+passed` → `636 passed, 0 failed`. The pre-existing failure it clears
+(`test_resize_regions_bubble_fit_byte_identical`) had been attributed to cross-platform freetype
+drift (#541) and turned into a skip; same-env evidence points at this cache instead, and whether
+the Linux-CI mismatch shares the cause is now falsifiable by whether that golden starts asserting.
+
+**Risk / rollback:** low and contained — one conditional in `set_font()`. Rollback = revert. Residual:
+`_SELECTED_FONT_PATHS` tracks paths, so a font file mutated in place under the same path would not
+invalidate (not a real workflow here).
+
+**Tech-debt register:** the four goldens that exposed this were only reachable because collection
+errors (#643) had been hiding the MIT suite on `integrate`. Still open: #680 Cause A (the merge
+reverted #541's portability verdict on `integrate` — restore **after** this fix, or it converts
+these failures back into skips) and #679 (a call-graph test asserting a symbol name rather than
+behaviour).
+
+**Links:** #680, #679, #643, #541, #503, #626, #642.
+
+---
+
+
 ## 2026-07-28 — #678/#640: CI gates made real (unit-test selection, guard suites, mobile typecheck)
 
 **What & where:** `.github/workflows/ci.yml` (frontend job, new `scripts` job, new `mobile` job,
