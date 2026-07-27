@@ -72,5 +72,30 @@ that satisfies both is findable; neither branch has one today. Until it is decid
   `textline_merge/__init__.py`'s comment pointing at `should_rescue_sfx` as *the* rescue path needs
   updating with it.
 
+
+### Benchmark 2026-07-28 — the trade-off is not live, and the rescue is not working
+
+`docs/reports/benchmarks/2026-07-28-679-sfx-gate.md` replayed both gates over the recorded telemetry
+and probed the gateway directly. Two results change the picture:
+
+- **Gate scoring on the documented defect set: this ADR's gate 11/12, landing's 5/12.** Landing's only
+  win is the `ぬ` row; it loses all seven phantom rows.
+- **The rescue produces nothing on the current gateway/model, so neither gate has visible effect
+  today.** `vlm_localize_sfx` always returns `''` — its hardcoded `max_tokens=24` is far below the
+  model's reasoning floor, so every call ends `finish_reason: length` with `content: None`. That is a
+  real defect (`ocr_vlm.py` never adopted the `thinking_extra_body()` / `resolve_max_completion_tokens()`
+  helpers #623/#631 added for the translator path).
+
+**Do not repair it by disabling thinking or raising the budget.** With thinking off the call answers in
+3–4 tokens, but the answer is unrelated to the image: a pure-white crop returns `วูบ`, a pure-black crop
+once returned `สวัสดี` ("hello"), and the same crop never returns the same word twice. Fixing the
+truncation would convert a safe empty result into random target-language words rendered over artwork.
+Reviving the feature requires a model whose answer demonstrably varies with the image; the benchmark's
+B3 probe is the check for that.
+
+Consequence for this ADR: keeping the Addendum guard costs nothing measurable while the rescue is inert,
+and prevents the 2026-06-30 corruption from returning the moment the configuration changes — which is
+the likeliest way it would return, since a config change carries no reason to re-run a render benchmark.
+
 Tracked in #679. Superseding this ADR requires a benchmark that covers **both** cases: the `ぬ`
 stylized SFX is still localized, and an ASCII det_sfx false-positive on a bubble is still not.
