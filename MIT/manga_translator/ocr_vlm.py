@@ -34,6 +34,12 @@ _SFX_LANG_NAMES = {
     'ENG': 'English', 'THA': 'Thai', 'CHS': 'Chinese', 'CHT': 'Chinese', 'KOR': 'Korean',
     'JPN': 'Japanese', 'FRA': 'French', 'DEU': 'German', 'ESP': 'Spanish', 'VIE': 'Vietnamese',
 }
+# #278: refusal phrases a vision model returns when it can't read a SFX. English variants are
+# compared upper-cased; target-language phrases (Thai/Chinese/Korean/Japanese) compared as-is.
+_SFX_REFUSALS = {
+    'NONE', 'NA', 'N A', 'EMPTY', 'NO SFX', 'NO TEXT', 'UNKNOWN',
+    'ไม่มี', 'ไม่ทราบ', 'ไม่รู้', '无', '無', '没有', '沒有', '없음', '없다', 'なし',
+}
 # Explicit script instruction so the vision model writes the TARGET script, not the Japanese kana
 # of the source SFX (qwen-VL tends to echo Japanese onomatopoeia for a Chinese/Korean request).
 _SFX_SCRIPT_HINT = {
@@ -132,6 +138,11 @@ def sanitize_sfx(raw: str, target_lang: str = 'ENG') -> str:
         # SFX token (the Latin branch already guards this above).
         if not line or line.upper() in ('NONE', 'N A', 'NA', 'EMPTY'):
             return ''
+    # #278: refusal guard for BOTH branches — the non-Latin branch keeps L-category letters
+    # so an English 'None'/'N A' or a target-language refusal ('ไม่มี'/'没有'/'없음') would
+    # otherwise pass as a SFX token.
+    if line.strip().upper() in _SFX_REFUSALS or line.strip() in _SFX_REFUSALS:
+        return ''
     return line[:24]
 
 

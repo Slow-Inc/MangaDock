@@ -3,6 +3,7 @@
 
 ---
 
+
 ## #680 — glyph cache ignored font switches (real render bug, found by root-causing 4 red goldens) (2026-07-28)
 
 **Symptom that started it:** four characterization goldens red on `integrate/render-reconcile`
@@ -46,6 +47,7 @@ proposing any fix, because a fix applied first can mask the cause.
 
 ---
 
+
 ## CI gates made real — tested unit-test selection, guard suites, mobile typecheck (#643/#678, #639/#640, 2026-07-28)
 
 **Trigger:** draft PR #642 ran `integrate/render-reconcile` through the pipeline for the first time
@@ -82,6 +84,48 @@ gate fail. A job that resolves to zero files would have passed forever.
 collection unblocked, that branch's suite ran for the first time and surfaced **#679** (the #278 SFX
 provenance gate is not called by the driver) and **#680** (4 characterization goldens red: the merge
 reverted the #541 portability fix, plus one genuine glyph-advance drift). Both block Phase E.
+
+---
+
+---
+
+## #643 — CI gates that actually gate: unit-test selection + torch-free collection (2026-07-28)
+
+**Trigger:** draft PR #642 put `integrate/render-reconcile` through the pipeline for the first time
+ever and it went red. #626's *"integration branch green"* acceptance had been **assumed, never
+CI-verified** — an acceptance criterion no job enforces is a note, not a gate.
+
+**Failure 1 (PR #678 → main).** `mermaid.e2e.test.ts` (Playwright) was collected by the bun **unit**
+gate: the selection was an inline `find` blacklist in `ci.yml` that only knew `*.integration.test.ts`.
+TDD'd it into `scripts/lib/frontend-unit-tests.mjs` — `selectUnitTestFiles()`, 5 tests, red→green per
+slice. The regression test pins the trap: the tempting `-not -name '*.*.test.ts'` one-liner would have
+silently dropped `PageRenderer.memo.test.ts`, a real unit test whose extra dot is descriptive. Plus
+`scripts/list-frontend-unit-tests.mjs` (CLI, exit 1 on empty selection) and a **`scripts (node --test)`
+CI job** — nothing in CI ran the guard suites before, so `issue-ref` / `worktree-budget` /
+`pr-bilingual` / `append-only` could all break and stay green. All checks green on #678 incl. `gate`.
+
+**Failure 2 (this branch).** The torch-free logic gate aborted collection on
+`test_custom_openai_{thinking,none_content,parse}.py` + `test_source_lang_filter.py` — module-level
+`custom_openai` / `MangaTranslator` imports reach torch via `translators/__init__` → `.common` →
+`from ..utils import InfererModule` (`utils/__init__.__getattr__` loads `.inference`).
+**Corrected the original diagnosis: not architectural.** conftest's #359 mechanism is right and its own
+comment says a new heavy test *"surfaces as a collection error in the logic job, which is the signal to
+add it here"* — the signal never fired because the branch never ran CI. Added the 4 modules, plus
+`test/heavy_imports.py` + `test/test_heavy_test_list.py`: a pure-`ast`, torch-free drift guard scanning
+module-level imports against a short list of heavy **packages** (stable) not test **files** (churn). It
+went RED naming exactly those 4 files before the fix. Verified with the ML stack hidden from the import
+system: **collection 638 tests, 0 errors** (was 4 collection errors).
+
+**Spillover → #679.** With collection fixed, the MIT suite ran on this branch for the first time and
+immediately surfaced a real regression: `test_278_sfx_provenance_gate_is_called_by_the_driver` fails
+here (*with* torch, so not an env artifact) and passes on `main` — the driver reverted to the pre-#278
+`<=4-char` SFX heuristic. Render-quality, not CI infra; filed separately, user-in-the-loop.
+
+**Also this session:** the `integrate` worktree lost 1381 tracked files to Windows Storage Sense
+(it lives under `%TEMP%`) — restored with `git restore .`, no commits lost; new worktrees now go to
+`D:/Github/worktrees/`. Caught up to `main` (63 commits, DONE.md the only conflict, resolved
+append-only). **`MIT/manga_translator` tree byte-identical `1a073c0c` across the merge** — the
+render==baseline invariant holds without a GPU re-verify.
 
 ---
 
@@ -129,6 +173,23 @@ reverted the #541 portability fix, plus one genuine glyph-advance drift). Both b
 **Known limitation (documented):** TOTP gate is not enforced server-side (backend `AuthGuard` validates JWT validity, not AAL level). OAuth login bypasses TOTP by design (Google/Facebook provide their own 2FA). Treat current 2FA as an advisory deterrent until server-side AAL enforcement is added.
 
 **Validation:** per-task reviewer approved all 6 tasks; final whole-branch review (Opus) found C1 (uid filter) + I2 (INITIAL_SESSION) fixed in final commit. Backend 8/8 admin tests green. Frontend lint 0 new errors.
+
+---
+
+## #631 — separate thinking token-budget (prevent qwen3.6 reasoning truncation) (2026-07-12)
+
+**Trigger:** measured the 9arm gateway live — `chat_template_kwargs.enable_thinking=false`, `reasoning_effort=none`, `/no_think`, top-level `enable_thinking=false` ALL still emit 4.3–6.4k chars of reasoning (a 2-line translate burns ~1.3–1.9k completion tokens on reasoning alone). The thinking-disable levers are a confirmed NO-OP → the only real defense against `finish=length`→`content=None` truncation is a reasoning-sized token budget.
+
+**Done (TDD, 8 green):** `resolve_max_completion_tokens(env, default=4096, *, thinking=False)` now returns a SEPARATE cap when thinking is on — `CUSTOM_OPENAI_THINKING_MAX_COMPLETION_TOKENS` (default **8192**) vs the base `CUSTOM_OPENAI_MAX_COMPLETION_TOKENS` (default 4096). Wired: `max_tokens=resolve_max_completion_tokens(thinking=resolve_enable_thinking())` — default behavior unchanged (4096); set `CUSTOM_OPENAI_ENABLE_THINKING=true` to use the 8192 headroom (honest, since the gateway thinks regardless). Also corrected the `thinking_extra_body` docstring lie ("the lever the 9arm gateway honours" → NO-OP, measured). Follow-up: the SFX vision call still hardcodes `max_tokens=24` — same truncation bug, route it through this resolver next.
+
+---
+
+## #630 — remove shelved reference_layout render-campaign dead code (2026-07-11)
+
+**Goal:** after the #626 render==landing pivot, delete main's shelved render campaign left DEAD/BROKEN on the branch (render_replay imported the landing-absent `clean_layout_font_size`; 4 test files errored on collection).
+
+**Done (`a8b64f69`):** deleted `reference_layout.py` / `render_replay.py` / `rendering/sizing_trace.py` + 4 orphaned tests; removed the `MIT_DUMP_REGIONS` dump block, `config.RenderConfig.reference_layout` (0 readers), and the `MIT_REFERENCE_LAYOUT` mapping in `mit-config.ts` + its 2 spec cases + ENV_KEYS entry. Verified: MIT collection **4 errors → 0** (743 clean), render-path net **75 passed**, imports clean, 0 dangling refs, Backend diff a clean deletion (jest in CI). Recoverable via `archive/mit-180-kp-425` / `archive/mit-183-squeeze-424` / PR #423. Also this session: git tech-debt (temp+bench-545 worktrees pruned, local main ff'd, `.gemini/.env` gitignored `4538be17`), branch pushed to origin.
+
 
 ---
 
@@ -2889,3 +2950,15 @@ Six-PR agent-owned tech-debt batch, all TDD + `/scrutinize` (posted bilingual) +
 - Also: closed **#543** obsolete (already fixed by #106 `1de61ffe`); filed leftovers **#614** (load_dotenv extraction, ex-#192) + **#615** (BaseGPTTranslator, ex-#188).
 
 Dogfooded #620 the same session: after #619 landed, #612 was rebased onto post-#619 `main` (disjoint → clean) before merge, which also greened its heavy-ML job; #613/#621 were verified disjoint from main's new commits and squash-merged. Missing dev dep `pytest-asyncio` installed in the MIT venv (local async tests were silently failing "async def not natively supported").
+
+## 2026-07-11 — #626 branch reconciliation: render == landing baseline + main non-render (integration)
+
+Converged the 3-way divergence (`main`/`landing`/`perf`) onto `integrate/render-reconcile` (off `main` ← merged `landing`, 25 conflicts, 6 slices). Full per-slice record: `docs/reports/RECONCILE-626-decisions.md`; decision: **ADR 030**.
+- **Render == landing baseline, byte-identical.** First merge kept main's render spine → deterministic dump-replay A/B (Gal Yome EN→TH) showed dialogue 3.96% larger than the tuned baseline. Per the dev hard constraint *"คุณภาพต้องเหมือน baseline เท่านั้น"*, the render subsystem (rendering/__init__.py, render_overlap, text_render, patch_geometry, patch_renderer, text_layer, stages + tests + goldens) was reset to landing's EXACT code. Verified `git diff origin/landing HEAD` empty on all 7 files → render == baseline for ALL inputs; A/B 0.0000% pixel diff. main render campaign (#178/#180/#183) shelved (archived as tags + PR #423).
+- **Translation gate PASS:** #623 thinking-off vs on A/B == baseline quality (no regression); #623 folded into `custom_openai` (default OFF, TDD 5 green) + landing's tolerant numbered-parse. Caveat: 9arm gateway intermittently returns empty (both modes = infra, not a regression).
+- **Kept from main (non-render):** translators+#623, Backend/Frontend, config, CI-infra (#359/ADR 029), textline_merge is_sfx. Landmine #1 fixed (is_sfx populated). #421 selective_flux wired + `MIT_SELECTIVE_FLUX` (OFF). ADR-023 collision split (render 023 / lazy-import 029).
+- **Net 159 green** (torch-free); goldens regenerated from landing code. Scrutinize: **SHIP**.
+- **Git tech-debt (§6 / #627 closed):** 4 abandoned worktrees + local branches removed; 3 closed-superseded origin branches archived as tags + deleted; kept #423/baselines/#360/not-ours.
+- **Benchmarks (committed PNG+MD):** `docs/reports/benchmarks/2026-07-10-626-render-recon-vs-landing.*` (render 0%), `2026-07-10-626-translation-thinking-ab.*` (translation A/B).
+- **Follow-ups filed:** #628 (telemetry unify), #629 (is_sfx helper), #630 (remove shelved render-campaign code — render_replay broken post-pivot).
+- **REMAINING (dev-gated):** Phase A perf-WIP freeze (#625) + Phase E merge integrate→main + ff→perf + bump MIT_RENDER_VERSION + enforce lama_large/selective_flux-off/KP-gate. Agent self-merge to main is classifier-blocked. Full E2E translate verify pending stable gateway + GPU (render E2E is proven by byte-identical code).

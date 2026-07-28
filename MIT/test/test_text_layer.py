@@ -43,3 +43,56 @@ def test_translate_patches_returns_the_text_layer():
     fn = re.search(r'async def translate_patches\(self.*?(?=\n    async def )', src, re.S)
     assert fn, 'translate_patches not found'
     assert "'regions': regions_payload(" in fn.group(0)
+
+
+# ---- #535 Phase-0c: telemetry enrichment (keys appear only when the attr exists) ----
+
+def test_render_telemetry_keys_included_when_present():
+    r = _Region("こんにちは", "สวัสดี")
+    r.xyxy = (10, 20, 110, 80)
+    r.bubble_box = (5, 10, 120, 90)
+    r.font_size = 32                 # src lettering (OCR)
+    r.render_branch = "bubble_fit_sole"
+    r.render_font_px = 26            # final chosen font
+    r.render_dst_box = (12, 22, 108, 78)
+    out = regions_payload([r])[0]
+    assert out["src"] == "こんにちは" and out["dst"] == "สวัสดี"
+    assert out["xyxy"] == [10, 20, 110, 80]
+    assert out["bubble_box"] == [5, 10, 120, 90]
+    assert out["font_src_px"] == 32
+    assert out["branch"] == "bubble_fit_sole"
+    assert out["font_final_px"] == 26
+    assert out["dst_box"] == [12, 22, 108, 78]
+    assert out["rendered"] is True
+
+
+def test_bare_region_payload_stays_backward_compatible():
+    # no telemetry attrs → exactly the legacy {src,dst} shape (old consumers safe)
+    assert regions_payload([_Region("a", "b")]) == [{"src": "a", "dst": "b"}]
+
+
+def test_dropped_regions_payload_reports_reason_and_not_rendered():
+    from manga_translator.text_layer import dropped_regions_payload
+    r = _Region("123", "42")
+    r.xyxy = (1, 2, 3, 4)
+    out = dropped_regions_payload([(r, "Numeric translation")])
+    assert out == [{"src": "123", "dst": "42", "xyxy": [1, 2, 3, 4],
+                    "rendered": False, "drop_reason": "Numeric translation"}]
+
+
+def test_numpy_values_serialize_to_plain_python():
+    # live bug: region.xyxy carries numpy int32 → pydantic "Unable to serialize
+    # unknown type numpy.int32" → HTTP 500. Payload must coerce to plain Python.
+    import json
+    import numpy as np
+    r = _Region("a", "b")
+    r.xyxy = np.array([1, 2, 3, 4], dtype=np.int32)
+    r.bubble_box = (np.int32(5), np.int32(6), np.int32(7), np.int32(8))
+    r.font_size = np.int32(24)
+    r.render_font_px = np.int64(20)
+    r.render_dst_box = (np.float32(1.5), 2.0, 3.0, np.float64(4.5))
+    r.render_branch = "clean_layout"
+    out = regions_payload([r])[0]
+    json.dumps(out)                       # must not raise
+    assert all(type(x) in (int, float) for x in out["xyxy"] + out["dst_box"])
+    assert type(out["font_src_px"]) is int and type(out["font_final_px"]) is int

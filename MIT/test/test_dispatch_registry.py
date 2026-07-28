@@ -73,3 +73,31 @@ def test_unload_pops_cache_so_next_get_reinstantiates():
 def test_unload_unknown_key_is_a_noop():
     reg = _registry()
     _run(reg.unload('zzz'))               # pop(default) — no error
+
+
+# ---- unload: run the model's own cleanup (frees VRAM) before popping ----------
+
+def test_unload_awaits_the_instance_unload_before_popping():
+    # #421 VRAM leak: FluxKleinInpainter._unload dels the pipeline + empty_cache,
+    # but the registry only popped the cache ref (never awaited unload) → VRAM leaked.
+    events = []
+    class Model:
+        def __init__(self, *a, **k):
+            pass
+        async def unload(self):
+            events.append('cleanup')
+    reg = dr.DispatchRegistry({'m': Model}, 'widget')
+    inst = reg.get('m')
+    _run(reg.unload('m'))
+    assert events == ['cleanup']              # the model's own VRAM cleanup ran
+    assert reg.get('m') is not inst           # and the cache was popped (new instance)
+
+
+def test_unload_tolerates_instance_without_unload_method():
+    # models with no unload() (the Fake) are still popped, no error
+    reg = _registry()
+    reg.get('a')
+    _run(reg.unload('a'))
+    assert Fake.instances == 1                # popped; re-get would re-instantiate
+    reg.get('a')
+    assert Fake.instances == 2

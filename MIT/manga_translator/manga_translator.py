@@ -15,7 +15,7 @@ import traceback
 import numpy as np
 from PIL import Image
 from typing import Optional, Any, List
-from .region_filter import filter_translated_regions
+from .region_filter import filter_translated_regions, filter_translated_regions_with_drops
 from .region_apply import apply_original_as_translation, apply_render_casing, apply_translations
 from .model_usage_tracker import ModelUsageTracker
 from .model_unloader import ModelUnloader
@@ -37,7 +37,7 @@ from .model_lifecycle import ModelLifecycle
 from .text_translation_dispatcher import build_chatgpt_translator, dispatch_translate
 from .punctuation import correct_punctuation
 from .stage_runner import run_stage
-from .patch_geometry import build_local_region, create_text_only_mask, crop_mask_for_patch, union_refined_with_fallback
+from .patch_geometry import build_local_region, create_text_only_mask, crop_mask_for_patch
 from .patch_renderer import PatchRenderer
 from .batch_orchestration import placeholder_context, build_page_translation_record
 from .stages import (
@@ -79,7 +79,7 @@ from .utils import (
     sort_regions,
 )
 from .utils.lang_ratio import target_script_ratio
-from .text_layer import regions_payload
+from .text_layer import regions_payload, dropped_regions_payload
 
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
@@ -195,6 +195,9 @@ class MangaTranslator:
             vram_tracker=self._vram_tracker,
         )
         self._model_reaper = ModelReaper(self._model_usage_tracker, self._model_unloader, lambda: self.models_ttl)
+        # #421: serialise the selective-Flux repair pass so two concurrent pages
+        # (batch_concurrent) never load Flux Klein at once → 12GB OOM.
+        self._flux_lock = asyncio.Lock()
         self._model_lifecycle = ModelLifecycle(self._model_reaper, {
             'upscaling': prepare_upscaling, 'detection': prepare_detection,
             'ocr': prepare_ocr, 'inpainting': prepare_inpainting,
@@ -647,7 +650,6 @@ class MangaTranslator:
             return {}
         return {**g, "models": self._vram_tracker.models()}
 
-
     @_timed_stage("ocr")
     async def _run_ocr(self, config: Config, ctx: Context):
         current_time = time.time()
@@ -796,41 +798,34 @@ class MangaTranslator:
             # custom_openai/9arm vision gateway and keep it. (The old code nested the rescue inside
             # the filter, which only caught SFX when the misread happened to match the target script
             # — i.e. English — so SFX were dropped, leaving the raw JP glyph, for TH/ZH/KO.)
-            # #278: gate the rescue on det_sfx PROVENANCE (region.from_sfx_detection), not a bare
-            # ≤4-char heuristic — so a short dialogue line ('HUH?', 'おい') in a large bubble is not
-            # misread as SFX (and doesn't add a vision-gateway round-trip). Tight ≤2-char fallback
-            # only when provenance is unavailable (det_sfx off).
-            from .ocr_vlm import should_rescue_sfx, ocr_read_real_text
-            _x1, _y1, _x2, _y2 = (int(v) for v in region.xyxy)
-            if should_rescue_sfx(region.text, getattr(region, 'from_sfx_detection', False),
-                                 _x2 - _x1, _y2 - _y1, config.ocr.vlm_rescue):
-                x1, y1, x2, y2 = _x1, _y1, _x2, _y2
-                from .ocr_vlm import vlm_localize_sfx
-                from .translators.keys import (CUSTOM_OPENAI_API_BASE,
-                                               CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
-                crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
-                if crop.size:
-                    rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
-                                               api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
-                                               target_lang=config.translator.target_lang)
-                    if rescued:
-                        logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
-                        # The rescue produced the FINAL SFX in the target language. Pre-setting
-                        # text+translation makes source_lang auto-derive as the target so the
-                        # translate stage skips it, and filter_translated_regions keeps it.
-                        region.text = rescued
-                        region.translation = rescued
-                        region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
-                        new_text_regions.append(region)
-                        continue
-
-            # #278: a det_sfx-provenance region whose line-OCR read real ASCII text is a detector
-            # false-positive duplicating/overlapping a dialogue bubble (the det_sfx box landed on
-            # speech, not art). Drop it — otherwise its literal fragment ('W'→'ว', 'THE'→'ที') is
-            # translated and rendered on top of the real dialogue (empty/garbled bubbles).
-            if getattr(region, 'from_sfx_detection', False) and ocr_read_real_text(region.text):
-                logger.info(f'Dropped det_sfx false-positive (real-text read): "{region.text}"')
-                continue
+            # #626 baseline-parity: LANDING's rescue gate (sfx_merge.should_sfx_rescue reads
+            # region.is_sfx provenance; size-gated). main's variant added a det_sfx
+            # false-positive DROP (ocr_read_real_text) that changed output vs the landing
+            # baseline — measured: the One-Punch ぬ SFX OCR'd as "X" was dropped before the
+            # VLM rescue, so no SLURP/LOOM rendered (baseline renders it). Per the dev hard
+            # constraint (quality == baseline), landing's behavior is restored verbatim.
+            from .sfx_merge import should_sfx_rescue
+            if config.ocr.vlm_rescue and should_sfx_rescue(region):
+                x1, y1, x2, y2 = (int(v) for v in region.xyxy)
+                if (x2 - x1) * (y2 - y1) >= 3600 and min(x2 - x1, y2 - y1) >= 24:
+                    from .ocr_vlm import vlm_localize_sfx
+                    from .translators.keys import (CUSTOM_OPENAI_API_BASE,
+                                                   CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
+                    crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
+                    if crop.size:
+                        rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
+                                                   api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
+                                                   target_lang=config.translator.target_lang)
+                        if rescued:
+                            logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
+                            # The rescue produced the FINAL SFX in the target language. Pre-setting
+                            # text+translation makes source_lang auto-derive as the target so the
+                            # translate stage skips it, and filter_translated_regions keeps it.
+                            region.text = rescued
+                            region.translation = rescued
+                            region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
+                            new_text_regions.append(region)
+                            continue
 
             if len(region.text) < config.ocr.min_text_length \
                     or not is_valuable_text(region.text) \
@@ -996,7 +991,9 @@ class MangaTranslator:
         )
 
         # 过滤逻辑（简化版本，保留主要过滤条件）
-        new_text_regions = filter_translated_regions(ctx.text_regions, config)
+        new_text_regions, _drops = filter_translated_regions_with_drops(ctx.text_regions, config)
+        ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+        ctx.dropped_regions.extend(_drops)  # #535 Phase-0c
 
         return new_text_regions
 
@@ -1342,6 +1339,8 @@ class MangaTranslator:
         except Exception:
             return 'UNKNOWN'
 
+    _LATIN_SOURCE_LANGS = {'ENG', 'ESP', 'FRA', 'DEU', 'ITA', 'PLK', 'PTB', 'ROM', 'IND', 'FIL', 'VIN', 'CSY', 'NLD', 'HUN', 'TRK'}
+
     def _filter_regions_by_source_lang(self, regions: List[Any], config: Config) -> List[Any]:
         source_lang_only = bool(getattr(config.translator, 'source_lang_only', False))
         requested_source_lang = str(getattr(config.translator, 'source_lang', '') or '').strip().upper()
@@ -1352,6 +1351,21 @@ class MangaTranslator:
         filtered_regions = []
         dropped_texts = []
         for region in regions:
+            # #168/#535: a vision-rescued SFX carries text ALREADY localized to the
+            # target language ("SQUELCH") — lang-detect sees EN != JPN and would drop
+            # it here even though the post-translation filter deliberately kept it
+            # (the ぬ-stays-untranslated bug: rescued but never rendered).
+            if getattr(region, 'sfx_rescued', False):
+                filtered_regions.append(region)
+                continue
+            # #535: langdetect misfires on short/all-caps Latin text ("STARTING WITH
+            # THE HEROINE…"→Maltese, "SiEg…"→Danish — live Otome p10) and is
+            # non-deterministic. Pure-ASCII text cannot be a non-Latin source: when
+            # the requested source lang is Latin-script, keep it deterministically.
+            _txt = str(getattr(region, 'text', '') or '')
+            if requested_source_lang in self._LATIN_SOURCE_LANGS and _txt.strip() and                     all(ord(c) < 128 or c in '…♥' for c in _txt):
+                filtered_regions.append(region)
+                continue
             region_source_lang = self._detect_region_source_lang(region, requested_source_lang)
             text_preview = str(getattr(region, 'text', '') or '').strip()[:60]
 
@@ -1406,11 +1420,20 @@ class MangaTranslator:
         """
         from .bubble_detector import detect_bubbles
         from .bubble_association import associate_regions_to_bubbles, acceptable_synth_bubble
+        from .bubble_association import associate_regions_to_bubbles
+        from .detection_postproc import expand_balloons_with_white_boxes, white_box_candidates
 
         polygons = detect_bubbles(ctx.img_rgb, device=str(self.device or 'cuda'))
         if not polygons:
             logger.info('[BubbleSeg] no balloons detected — proximity grouping')
             return
+        # #535: the YOLO box for a square caption stops short of the true white box
+        # (live: y=1182 vs 1247) — the own-balloon erase then misses the caption's
+        # last line ("ME OFF!" ghost). Grow tagged boxes to the containing white box.
+        try:
+            _whites = white_box_candidates(ctx.img_rgb.mean(axis=2).astype('uint8'))
+        except Exception:
+            _whites = []
         boxes = [tuple(map(float, r.xyxy)) for r in regions]
         assoc = associate_regions_to_bubbles(boxes, polygons)
         tagged = 0
@@ -1423,6 +1446,9 @@ class MangaTranslator:
                 xs = [p[0] for p in poly]
                 ys = [p[1] for p in poly]
                 r.bubble_box = (min(xs), min(ys), max(xs), max(ys))
+                if _whites:
+                    r.bubble_box = expand_balloons_with_white_boxes(
+                        [r.bubble_box], _whites)[0]
                 # #179: carry the balloon polygon so the renderer can wrap to the
                 # mask's true interior (narrow column), not the bounding box.
                 r.bubble_polygon = [(float(p[0]), float(p[1])) for p in poly]
@@ -1519,17 +1545,6 @@ class MangaTranslator:
             except Exception:
                 logger.warning(f"[BubbleSeg] tagging failed:\n{traceback.format_exc()}")
 
-        # #462 render replay: dump the post-translate/post-tag region state so the render sizing can be
-        # replayed offline & deterministically (the live translator is non-deterministic). Off → no-op.
-        _dump = os.environ.get('MIT_DUMP_REGIONS')
-        if _dump:
-            try:
-                from .render_replay import dump_fixture
-                dump_fixture(regions, (img_h, img_w), _dump)
-                logger.info(f'[replay] dumped {len(regions)} regions → {_dump}')
-            except Exception:
-                logger.warning(f"[replay] region dump failed:\n{traceback.format_exc()}")
-
         await self._report_progress('mask-generation')
         await self._report_progress('inpainting')
         await self._report_progress('rendering')
@@ -1600,10 +1615,32 @@ class MangaTranslator:
                 full_inpainted = await self._run_inpainting(config, ctx)
                 # LaMa-ghost fix (user-diagnosed): on flat white caption boxes LaMa
                 # reconstructs faint text from the stroke stubs around a tight mask —
-                # replace caption ink with the box's own paper colour directly (art-gated,
-                # so a page with no white caption box is a no-op).
+                # replace caption ink with the box's own paper colour directly.
                 from .detection_postproc import flatten_white_captions
                 full_inpainted = flatten_white_captions(full_inpainted, ctx.img_rgb)
+                # #421: selective-Flux repair — route text-over-textured-art regions (LaMa
+                # smears hair it can't synthesise) to Flux Klein, pasted mask-only into the
+                # LaMa result. LaMa is unloaded first (VRAM), the pass is lock-serialised
+                # (batch OOM), and any failure keeps the LaMa result. Runs AFTER flatten so
+                # the two disjoint repairs (white captions vs textured art) don't clobber.
+                if getattr(config.inpainter, 'selective_flux', False):
+                    from .selective_flux import apply_selective_flux_repair
+                    from .inpainting import dispatch as dispatch_inpainting
+                    from .config import Inpainter
+                    async with self._flux_lock:
+                        try:
+                            await self._model_unloader.unload('inpainting', config.inpainter.inpainter)
+                            async def _flux(crop, mcrop):
+                                return await dispatch_inpainting(
+                                    Inpainter.flux_klein, crop, mcrop, config.inpainter,
+                                    config.inpainter.inpainting_size, self.device, self.verbose)
+                            full_inpainted, _nrep = await apply_selective_flux_repair(
+                                full_inpainted, ctx.img_rgb, ctx.mask, text_only, _flux, logger=logger)
+                            logger.info(f'[SelectiveFlux] repaired {_nrep} text-over-art region(s)')
+                        except Exception:
+                            logger.warning(f'[SelectiveFlux] pass failed, LaMa result stands:\n{traceback.format_exc()}')
+                        finally:
+                            await self._model_unloader.unload('inpainting', Inpainter.flux_klein)
                 logger.info('[PatchTranslate] full-page inpaint done — patches reuse it')
             except Exception:
                 logger.warning(f"[PatchTranslate] full-page inpaint failed, per-crop fallback:\n{traceback.format_exc()}")
@@ -1627,7 +1664,8 @@ class MangaTranslator:
         await self._report_progress('finished', True)
         # Text layer (#158): what each rendered region said — the enabler for
         # rolling context (#159) and translation memory (#160).
-        return {'img_width': img_w, 'img_height': img_h, 'patches': patches, 'regions': regions_payload(regions)}
+        return {'img_width': img_w, 'img_height': img_h, 'patches': patches,
+                'regions': regions_payload(regions) + dropped_regions_payload(getattr(ctx, 'dropped_regions', None) or [])}
 
     async def _batch_translate_contexts(self, contexts_with_configs: List[tuple], batch_size: int) -> List[tuple]:
         """
@@ -1693,7 +1731,9 @@ class MangaTranslator:
                 # 过滤逻辑（简化版本，保留主要过滤条件）
                 for ctx, config in batch:
                     if ctx.text_regions:
-                        new_text_regions = filter_translated_regions(ctx.text_regions, config)
+                        new_text_regions, _drops = filter_translated_regions_with_drops(ctx.text_regions, config)
+                        ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+                        ctx.dropped_regions.extend(_drops)  # #535 Phase-0c
                         ctx.text_regions = new_text_regions
                         
                 results.extend(batch)
@@ -1778,7 +1818,9 @@ class MangaTranslator:
                 
                 # 过滤逻辑
                 if ctx.text_regions:
-                    new_text_regions = filter_translated_regions(ctx.text_regions, config)
+                    new_text_regions, _drops = filter_translated_regions_with_drops(ctx.text_regions, config)
+                    ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+                    ctx.dropped_regions.extend(_drops)  # #535 Phase-0c
                     ctx.text_regions = new_text_regions
                 
                 return ctx, config

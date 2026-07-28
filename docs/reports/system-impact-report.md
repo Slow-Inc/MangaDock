@@ -1,5 +1,6 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+
 ## 2026-07-28 — #680: glyph cache ignored font switches (render correctness)
 
 **What & where:** `MIT/manga_translator/rendering/text_render.py` (`set_font`, new
@@ -42,6 +43,7 @@ behaviour).
 
 ---
 
+
 ## 2026-07-28 — #678/#640: CI gates made real (unit-test selection, guard suites, mobile typecheck)
 
 **What & where:** `.github/workflows/ci.yml` (frontend job, new `scripts` job, new `mobile` job,
@@ -73,6 +75,86 @@ finally demonstrating #639's stated acceptance criterion. Both PRs green on the 
 job, now inherited by `scripts` and `mobile` too; worth a follow-up.
 
 **Links:** #643, #678, #639, #640, #642, #626, #548, #679, #680.
+
+---
+
+## 2026-07-28 — #643/#678: CI gates made real (frontend unit selection + torch-free collection)
+
+**What & where:** `.github/workflows/ci.yml` (frontend job, new `scripts` job, `gate`),
+`scripts/lib/frontend-unit-tests.mjs` + `scripts/list-frontend-unit-tests.mjs` + tests,
+`scripts/README.md`; `MIT/test/conftest.py`, `MIT/test/heavy_imports.py`,
+`MIT/test/test_heavy_test_list.py`.
+
+**Why:** `integrate/render-reconcile` failed CI the first time it was ever run through the pipeline
+(draft PR #642), blocking Phase E of #626/#548. Both failures were pre-existing and invisible because
+the branch had never been CI-verified — and, at the repo level, because no job ran the guard suites.
+
+**Before → After:** unit-test selection was an inline `find` blacklist extended by hand per qualifier
+→ a pure function with 5 tests and a CLI that fails closed on an empty selection. Guard suites
+(`issue-ref`, `worktree-budget`, `pr-bilingual`, `append-only`) ran **nowhere** in CI → a required
+`scripts (node --test)` job. MIT torch-free gate: **4 collection errors → 0** (638 tests collected);
+`_HEAVY_TESTS` drift was detectable only via an after-the-fact CI collection error → a local,
+torch-free AST guard that names the offenders.
+
+**Performance Δ:** none (test-infra only). New `scripts` job ≈ 11s, unfiltered by design.
+
+**Quality:** no product-behavior change. Render/translation paths untouched —
+`MIT/manga_translator` tree byte-identical (`1a073c0c`) across both the fix and the `main` catch-up
+merge, so the #626 render==baseline claim is unaffected.
+
+**Validation:** PR #678 green on every check including the required `gate` (`scripts` 11s,
+`frontend` 17s, `mit_logic` 2m16s, `mit_heavy` 4m18s, `backend` 52s). Locally: 58/58 script tests;
+MIT collection 638/0 with the ML stack hidden from the import system; real-tree selector check
+35 `*.test.ts` → 33 selected, 2 integration excluded, `PageRenderer.memo.test.ts` kept.
+
+**Risk / rollback:** low — additive test-infra. Rollback = revert #678 and `4e4f3c88`. Residual: the
+heavy-package list in `heavy_imports.py` is declared, not inferred (a static scan cannot follow the
+lazy `__getattr__` hop); the CI collection error remains the backstop.
+
+**Follow-up surfaced:** **#679** — `#278` SFX provenance gate not called by the driver on
+`integrate/render-reconcile` (passes on `main`). Render-quality regression, now the remaining Phase E
+blocker; verdict is user-in-the-loop on real rendered images.
+
+**Links:** #643, #678, #679, #642, #626, #548, #359, #609, #278.
+
+---
+
+## 2026-07-10 — #626: landing→main render+translation feature-merge (integration branch)
+
+**What & where:** Hand-merged `origin/landing/render-phase0` onto `integrate/render-reconcile`
+(off `origin/main`) at function granularity — 25 conflicts across MIT render/translate + Backend
+config + tests + goldens + docs. Full per-slice rationale in `docs/reports/RECONCILE-626-decisions.md`.
+
+**Why:** Converge the two complementary render campaigns (main = layout/fit + reference_layout;
+landing = wired inpaint/erase/rescue) into one trunk without regressing the confirmed-best render or
+translation (dev hard-gate). See `docs/RECONCILIATION-PLAN.md`.
+
+**Before → After:** Two diverged branches (landing→main = ~23-conflict set) → one reconciled
+integration branch. Crux `resize_regions_to_font_size` resolved to main's port-verified spine +
+grafted landing's #436 dedup refinements (equal-translation / onomatopoeia); dropped redundant
+`bubble_fit_tall` (main's `_bubble_fit_layout` supersedes); landmine #1 fixed (is_sfx now populated →
+main's #431 display-SFX arm live); selective_flux (#421) wired + Backend `MIT_SELECTIVE_FLUX` added
+(OFF default); #623 thinking control folded into custom_openai (default OFF); numbered_contract
+tolerant parse adopted.
+
+**Performance Δ:** N/A at merge (behavior-gated flags OFF by default). #623 thinking-off cuts dense
+translate completion tokens ~24× when a qwen3 model is used.
+
+**Quality:** Render/translation quality vs baseline NOT yet asserted — pending Phase-D GPU benchmark
+(render dump/replay + translation text diff on One-Punch). Merge validated for COHERENCE +
+DETERMINISM only so far.
+
+**Validation:** Characterization net **193 passed, 0 skipped** (torch-free), up from 175 baseline
+(+#623 thinking/parse, tolerant-parse, EN→TH Thai golden). 4 goldens regenerated from reconciled code.
+Full crux import chain resolves. AST-clean every slice. Render + translation benchmark gates = Phase D
+(BLOCKING, before Phase E dev merge-to-main).
+
+**Risk / rollback:** Integration branch isolated from prod (perf); Phase E (merge to main) is
+dev-gated. Rollback = discard the branch. Deferred (tracked follow-up): unify MIT render telemetry
+(main `_emit_trace` vs landing region-attrs); unify is_sfx/from_sfx_detection into one helper.
+
+**Links:** #626, #548, #625, #627; `docs/RECONCILIATION-PLAN.md`, `docs/reports/RECONCILE-626-decisions.md`.
+
 
 ---
 
@@ -114,7 +196,7 @@ job, now inherited by `scripts` and `mobile` too; worth a follow-up.
 ## 2026-07-03 — MIT CI: torch-free blocking gate landed + baseline rot repair (ci / tech-debt)
 
 **What & where:** Landed the long-stalled #359 (PR #427) making `mit-ci`'s `pytest (logic gate,
-torch-free)` a **blocking** required check (lazy package import boundary — ADR 023 — + committed the
+torch-free)` a **blocking** required check (lazy package import boundary — ADR 029 — + committed the
 gitignored Kumiko `panel/lib` source). To get a green baseline for it, shipped a prerequisite repair
 (PR #504) to `main`: `MIT/requirements.txt` pin `opencv-python>=4.8,<5.0`, and reverted
 `test_resize_regions_characterization.py` + its 3 `resize_regions_*.npz` goldens.
@@ -145,7 +227,7 @@ re-land **atomically with their impl** — tracked in #503.
 tracked for atomic reland (#503). Follow-up debt: the render-layout impl (page_shape/clean_layout/
 `_bubble_fit_layout`) remains uncommitted in an entangled working tree — lands with #503.
 
-**Links:** #359 (closed), PR #427 / #504 / #502, ADR 023, reland #503.
+**Links:** #359 (closed), PR #427 / #504 / #502, ADR 029, reland #503.
 
 ---
 
@@ -1308,7 +1390,7 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 - **Risk / rollback:** pure additions + gating; mock path unchanged. **Links:** PR #414, ADR 022, PRD #304.
 ## 2026-06-29 — MIT: lazy package-import boundary → torch-free logic tests + blocking CI gate (#359)
 
-**1. Type.** Tech-debt / perf + CI. Lazy-imports torch at the package boundary so pure-logic tests and the CI logic gate run without the multi-GB ML stack. ADR 023.
+**1. Type.** Tech-debt / perf + CI. Lazy-imports torch at the package boundary so pure-logic tests and the CI logic gate run without the multi-GB ML stack. ADR 029.
 
 **2. Trigger.** `manga_translator/__init__.py` ran `from .manga_translator import *` and `utils/__init__.py` ran `from .inference import *`; both pull torch. So ANY import (even `from manga_translator.config import Config`) dragged in torch+cv2+transformers+diffusers — `mit-ci` had to install the full ML stack for a font-fit unit test and stayed `continue-on-error` (report-only), letting real breakage show green.
 
@@ -1332,7 +1414,7 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 
 **11. KPI.** #359 · lazy package boundary · 27→12 heavy files / 338→413 torch-free tests · 0 new failures · mit-ci logic gate torch-free + blocking-capable.
 
-*Validation:* `pytest test/test_lazy_import.py` 5/0; full suite 0-new-fail; torch-absent blocker → 413 collect / 0 collection errors / torch never imported. *Links:* #359, #355, ADR 023, branch `worktree-ci-mit-lazy-torch`. CI dep-filter + flip validated by the PR's mit-ci run.
+*Validation:* `pytest test/test_lazy_import.py` 5/0; full suite 0-new-fail; torch-absent blocker → 413 collect / 0 collection errors / torch never imported. *Links:* #359, #355, ADR 029, branch `worktree-ci-mit-lazy-torch`. CI dep-filter + flip validated by the PR's mit-ci run.
 
 ---
 ## 2026-07-04 — Master Plan 2 (Phase 0–3 autonomous) + deterministic real-page benchmark harness

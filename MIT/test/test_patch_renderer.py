@@ -256,3 +256,72 @@ def test_patch_renderer_keeps_a_larger_explicit_font_min():
         sem=asyncio.Semaphore(3), logger=__import__('logging').getLogger('test'),
     )
     assert renderer.config.render.font_size_minimum == 40    # 40 > page floor 17 → kept
+
+
+# ---- #535 Phase-0b wiring: the erase mask is guarded to the group's own regions ----
+# The refined mask hunts ALL text-like strokes in the crop — including a dropped
+# region's text or a neighbouring group's bubble. Erasing those without re-rendering
+# = the empty-white-bubble defect. After refinement the mask must be restricted to
+# the regions this patch actually renders.
+
+def test_refined_mask_strokes_outside_group_regions_are_guarded_away():
+    seen = {}
+
+    def refined(patch_ctx):
+        m = np.zeros(patch_ctx.img_rgb.shape[:2], np.uint8)
+        m[60:90, 60:90] = 255       # strokes inside the group's region → erased (ok)
+        m[150:170, 150:170] = 255   # foreign strokes (dropped/other-group text) → must NOT be erased
+        return m
+
+    def inpaint(patch_ctx):
+        seen['mask'] = patch_ctx.mask.copy()
+        return patch_ctx.img_rgb
+
+    driver = FakeDriver(mask=refined, inpaint=inpaint)
+    asyncio.run(_renderer(driver).process_group(_group()))
+
+    assert seen['mask'][75, 75] == 255      # in-region erase survives
+    assert seen['mask'][160, 160] == 0      # foreign strokes protected (no erase-without-render)
+
+
+# ---- #535 Phase-0c: render telemetry stamped on LOCAL copies flows back to originals ----
+# resize_regions runs on build_local_region deepcopies inside the patch group; the
+# /patches payload reads the ORIGINAL regions — so telemetry must be copied back.
+
+def test_render_telemetry_copied_back_to_original_regions():
+    def render(patch_ctx):
+        for lr in patch_ctx.text_regions:      # simulate dispatch stamping the local copy
+            lr.render_branch = 'clean_layout'
+            lr.render_font_px = 20
+            lr.render_dst_box = (1.0, 2.0, 3.0, 4.0)
+        return patch_ctx.img_rgb
+
+    group = _group()
+    asyncio.run(_renderer(FakeDriver(render=render)).process_group(group))
+
+    assert getattr(group[0], 'render_branch', None) == 'clean_layout'
+    assert getattr(group[0], 'render_font_px', None) == 20
+    assert getattr(group[0], 'render_dst_box', None) == (1.0, 2.0, 3.0, 4.0)
+
+
+def test_copied_back_dst_box_is_in_page_coordinates():
+    # metric coord bug (Otome p10, multi-group): dst_box stamped in CROP coords made
+    # boxes from different patch groups false-intersect (overlaps=35 on a clean page).
+    # The copy-back must offset local dst_box/render boxes by the crop origin.
+    def render(patch_ctx):
+        for lr in patch_ctx.text_regions:
+            lr.render_branch = 'clean_layout'
+            lr.render_font_px = 20
+            lr.render_dst_box = (10.0, 20.0, 30.0, 40.0)   # CROP coords
+        return patch_ctx.img_rgb
+
+    group = [FakeRegion(
+        xyxy=(150, 150, 190, 190),
+        lines=[[[150, 150], [190, 150], [190, 190], [150, 190]]],
+        font_size=20,
+    )]
+    # pad=40 + render_extra=80 clamped at page edge → crop origin (30, 30) for a 200px page
+    asyncio.run(_renderer(FakeDriver(render=render)).process_group(group))
+    x1, y1, x2, y2 = group[0].render_dst_box
+    assert (x1, y1) == (40.0, 50.0)        # 10+30, 20+30 — page coords
+    assert (x2, y2) == (60.0, 70.0)

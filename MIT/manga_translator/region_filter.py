@@ -18,9 +18,20 @@ logger = logging.getLogger('manga_translator')
 
 
 def filter_translated_regions(text_regions: List, config) -> list:
-    """Return the regions to keep after translation; logs each filtered one (when its
-    translation is non-blank) with the reason, exactly as the inline block did."""
+    """Return the regions to keep after translation. Kept behavior byte-identical;
+    delegates to :func:`filter_translated_regions_with_drops` (#535 Phase-0a)."""
+    kept, _ = filter_translated_regions_with_drops(text_regions, config)
+    return kept
+
+
+def filter_translated_regions_with_drops(text_regions: List, config):
+    """#535 Phase-0a drop telemetry: like :func:`filter_translated_regions` but also
+    returns ``dropped`` as ``[(region, reason), …]`` and logs EVERY drop — including
+    blank translations, which the legacy logger silently skipped. A dropped region's
+    text can still be erased by a patch's refined inpaint mask (the empty-white-bubble
+    defect), so downstream needs the full drop list, not just the survivors."""
     new_text_regions = []
+    dropped = []
     for region in text_regions:
         should_filter = False
         filter_reason = ""
@@ -32,6 +43,10 @@ def filter_translated_regions(text_regions: List, config) -> list:
         if getattr(region, 'sfx_rescued', False):
             if region.translation.strip():
                 new_text_regions.append(region)
+            else:
+                filter_reason = "Translation contain blank areas"
+                dropped.append((region, filter_reason))
+                _log_drop(region, filter_reason)
             continue
 
         if not region.translation.strip():
@@ -51,10 +66,17 @@ def filter_translated_regions(text_regions: List, config) -> list:
                     filter_reason = "Translation identical to original"
 
         if should_filter:
-            if region.translation.strip():
-                logger.info(f'Filtered out: {region.translation}')
-                logger.info(f'Reason: {filter_reason}')
+            dropped.append((region, filter_reason))
+            _log_drop(region, filter_reason)
         else:
             new_text_regions.append(region)
 
-    return new_text_regions
+    return new_text_regions, dropped
+
+
+def _log_drop(region, reason: str) -> None:
+    """One diagnosable line per dropped region: reason + box + source-text head."""
+    xyxy = getattr(region, 'xyxy', None)
+    src = (getattr(region, 'text', '') or '')[:40]
+    dst = (region.translation or '')[:40]
+    logger.info(f"[RegionDrop] reason={reason!r} xyxy={xyxy} src={src!r} dst={dst!r}")
