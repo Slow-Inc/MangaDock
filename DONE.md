@@ -3,6 +3,44 @@
 
 ---
 
+## #686 — Pipeline Doctor core: probe registry + runner, two renderings from one walk (2026-08-31)
+
+**What:** `MIT/tools/pipeline_doctor/` — the seam every other #685 deliverable plugs into.
+`StageReport` (stage id, `OK`/`WARN`/`FAIL`, metrics, evidence), a `ProbeRegistry` probes attach to
+by decorator, and two renderers over the same data: an aligned text table for a terminal and JSON
+for an agent.
+
+**The design constraint that shapes it:** the core must not know what a pipeline stage *is*. Probes
+register themselves on import, so the core never holds a stage list it would have to keep current —
+which is what keeps it from importing the pipeline, and therefore torch-free and runnable in the
+`mit_logic` gate. Registration order is pipeline order deliberately; sorting would print `render`
+before `vlm-send` and describe a pipeline that does not exist.
+
+**A probe that raises becomes a `FAIL` row carrying the exception, and the walk continues** — a
+diagnostic that aborts on the first broken stage says nothing about the remaining ones, which is
+exactly when it is most needed.
+
+**Found by /scrutinize, not by the tests:** `to_table` broke a promise it makes in its own docstring.
+Evidence containing a newline rendered 2 stages as 3 lines and destroyed the aligned status column,
+and a control byte reached the terminal verbatim. The evidence a probe carries for the LLM stages is
+a string the *model* wrote, so `[2J` clears the developer's screen and `[31m` recolours
+everything after it — a `FAIL` row could be dressed up as anything. `_one_line` escapes rather than
+strips (which bytes came back *is* the diagnosis); `to_json` stays verbatim, since JSON already
+escapes them and an agent should get exactly what the model sent.
+
+**Validation:** TDD, red first (`ImportError: cannot import name 'ProbeRegistry'`). That red proves
+only absence, so each assertion was mutation-checked against the finished code — all four mutations
+redden exactly the test naming the behaviour and nothing else. 13 tests. `mit_logic` gate in CI:
+**651 passed, 3 skipped, 0 failed**; the fuller local run (full deps) is **740 passed, 2 skipped, 0
+failed**. Benchmark + PNG: `docs/reports/benchmarks/2026-08-31-686-pipeline-doctor-core.md`.
+
+**Known and not fixed here:** a run where every probe declines reports `ok=True`/`exit_code=0` with
+zero stages, so a CI gate wired to it would go green having inspected nothing. The core cannot know
+which stages *should* have reported, so that assertion belongs to #690 (the CI-wiring deliverable),
+where it is recorded.
+
+PR #692. Refs #686 #685.
+
 ## #680 — glyph cache ignored font switches (real render bug, found by root-causing 4 red goldens) (2026-07-28)
 
 **Symptom that started it:** four characterization goldens red on `integrate/render-reconcile`
@@ -949,6 +987,37 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 # DONE — Claude Code Review Fix Session (2026-05-27)
 
 ---
+
+## #686 — แกน Pipeline Doctor: probe registry + runner, เดินรอบเดียวได้ผลสองแบบ (2026-08-31)
+
+**อะไร:** `MIT/tools/pipeline_doctor/` — รอยต่อที่งานอื่นทุกชิ้นของ #685 จะเสียบเข้ามา
+`StageReport` (id ของ stage, `OK`/`WARN`/`FAIL`, metrics, evidence), `ProbeRegistry` ที่ probe เกาะเข้ามาด้วย
+decorator และตัวเรนเดอร์สองแบบจากข้อมูลชุดเดียว: ตารางจัดคอลัมน์สำหรับ terminal และ JSON สำหรับ agent
+
+**ข้อจำกัดที่กำหนดรูปร่างของมัน:** core ต้องไม่รู้ว่า stage ของไปป์ไลน์*คืออะไร* · probe ลงทะเบียนตัวเองตอน import
+core จึงไม่เคยถือรายชื่อ stage ที่ต้องคอยตามแก้ — ซึ่งเป็นสิ่งที่ทำให้มันไม่ต้อง import ไปป์ไลน์ จึง torch-free
+และรันใน gate `mit_logic` ได้ · ลำดับการลงทะเบียนคือลำดับไปป์ไลน์โดยตั้งใจ ถ้า sort จะพิมพ์ `render` ก่อน
+`vlm-send` แล้วบรรยายไปป์ไลน์ที่ไม่มีอยู่จริง
+
+**probe ที่ crash กลายเป็นแถว `FAIL` ที่พก exception มาด้วย แล้วเดินต่อ** — เครื่องมือวินิจฉัยที่หยุดตรง stage แรกที่พัง
+ไม่บอกอะไรเลยเกี่ยวกับ stage ที่เหลือ ซึ่งเป็นตอนที่ต้องการมันที่สุดพอดี
+
+**เจอโดย /scrutinize ไม่ใช่โดยเทสต์:** `to_table` ผิดคำสัญญาที่ตัวเองเขียนไว้ใน docstring · evidence ที่มี newline
+ทำให้ 2 stage ออกมาเป็น 3 บรรทัดและพังคอลัมน์สถานะที่จัดไว้ และ control byte หลุดถึง terminal ดิบ ๆ ·
+evidence ที่ probe พกมาสำหรับ stage ฝั่ง LLM คือสตริงที่ *โมเดล* เขียน ดังนั้น `[2J` ล้างจอ developer และ
+`[31m` เปลี่ยนสีทุกอย่างที่ตามมา — แถว `FAIL` จะถูกแต่งให้เป็นอะไรก็ได้ · `_one_line` จึง escape ไม่ใช่ strip
+(ไบต์ไหนกลับมา *คือ* ตัวการวินิจฉัย) ส่วน `to_json` เก็บดิบไว้ เพราะ JSON escape ให้อยู่แล้วและ agent ควรได้สิ่งที่โมเดลส่งมาจริง ๆ
+
+**การตรวจสอบ:** TDD แดงก่อน (`ImportError: cannot import name 'ProbeRegistry'`) · แดงนั้นพิสูจน์แค่ว่า "ยังไม่มี"
+จึง mutation-check ทุก assertion กับโค้ดที่เสร็จแล้ว — mutation ทั้งสี่ทำให้แดงตรงเทสต์ที่ระบุพฤติกรรมนั้นพอดี ไม่เกินไปกว่านั้น ·
+13 เทสต์ · gate `mit_logic` ใน CI: **651 passed, 3 skipped, 0 failed** ส่วนการรันในเครื่องแบบ deps ครบคือ
+**740 passed, 2 skipped, 0 failed** · benchmark + PNG: `docs/reports/benchmarks/2026-08-31-686-pipeline-doctor-core.md`
+
+**รู้อยู่และไม่ได้แก้ที่นี่:** ถ้าทุก probe ไม่รับงาน run นั้นจะรายงาน `ok=True`/`exit_code=0` โดยมี 0 stage
+ดังนั้น CI gate ที่ต่อกับมันจะเขียวทั้งที่ไม่ได้ตรวจอะไรเลย · core ไม่มีทางรู้ว่า stage ไหน*ควร*จะรายงาน
+assertion ข้อนี้จึงเป็นของ #690 (งานต่อ CI) ซึ่งบันทึกไว้แล้ว
+
+PR #692 · Refs #686 #685
 
 ## ✅ LEAK SWEEP — #136 #137 #139 (+#138 falsified) — 2026-06-06, /improve-codebase-architecture → /to-issues → /tdd
 
