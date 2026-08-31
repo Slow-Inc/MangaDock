@@ -1,5 +1,45 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-08-31 — #686: Pipeline Doctor core — report model + probe registry (feature / test-infra)
+
+**What & where:** `MIT/tools/pipeline_doctor/` (new package — `report.py`, `runner.py`,
+`__init__.py`, 188 lines), `MIT/test/test_pipeline_doctor_core.py` (new, 13 tests). No pipeline code
+touched.
+
+**Why:** #685's other five deliverables each need somewhere to report *to*. Without a shared model
+every probe would invent its own output, and the Doctor would decay into another `tools/diag_*.py`
+nobody runs. This is the seam, built first and deliberately empty of pipeline knowledge.
+
+**Before → After:** no package → a `StageReport`/`DoctorRun` model, a `ProbeRegistry` that probes
+attach to by decorator, and two renderers (aligned text table, JSON) driven from one walk. Probes
+register themselves on import, so the core holds no stage list; registration order is pipeline
+order. A probe that raises becomes a `FAIL` row and the walk continues.
+
+**Performance Δ:** none — the package is not on any request path; it is a developer/CI tool. Import
+cost is `dataclasses` + `typing` only, which is what keeps it inside the torch-free `mit_logic` gate.
+
+**Quality:** additive; no existing behaviour changes. The one hardening decision worth recording is
+that `to_table` escapes control characters rather than stripping them — probe evidence for the LLM
+stages is text the *model* wrote, so a raw `[2J`/`[31m` would clear or recolour the
+developer's terminal and let a `FAIL` row be dressed up as anything. Escaping keeps the bytes
+legible as evidence; `to_json` stays verbatim because JSON already escapes them and an agent should
+receive exactly what the model sent.
+
+**Validation:** TDD, RED first (`ImportError: cannot import name 'ProbeRegistry'`). Because an
+ImportError red only proves absence, each assertion was additionally mutation-checked: four
+mutations (`sorted(self._probes)`, dropping the `is not None` guard, letting a probe crash
+propagate, `_one_line` as identity) each redden exactly the test naming that behaviour. CI
+`mit_logic` gate **651 passed, 3 skipped, 0 failed** (run 33361709801); local full-deps run **740
+passed, 2 skipped, 0 failed**. Benchmark + committed PNG:
+`docs/reports/benchmarks/2026-08-31-686-pipeline-doctor-core.md`.
+
+**Tech debt created (tracked, not silent):** a run in which every probe declines reports
+`ok=True`/`exit_code=0` with zero stages — a CI gate wired to it would go green having inspected
+nothing. The core cannot know which stages *should* have reported, so the "expected stage set"
+assertion belongs to **#690**, where it is recorded rather than left to be rediscovered.
+
+---
+
 ## 2026-07-28 — #679: SFX wiring guard tested at the behaviour, and an ADR-026 gap surfaced
 
 **What & where:** `MIT/test/sfx_gate_scan.py` (new, pure `ast`), `MIT/test/test_sfx_gate_scan.py`
