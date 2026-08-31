@@ -1,6 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
-import { WalletService } from '../wallet/wallet.service';
 
 const BASE_COINS = 5;
 const MAX_COINS = 20;
@@ -17,10 +16,7 @@ export type CheckinStatus = {
 
 @Injectable()
 export class CheckinService {
-  constructor(
-    private readonly supabase: SupabaseService,
-    private readonly wallet: WalletService,
-  ) {}
+  constructor(private readonly supabase: SupabaseService) {}
 
   private get db() {
     return this.supabase.client;
@@ -37,39 +33,52 @@ export class CheckinService {
       .maybeSingle();
 
     if (todayRow) {
-      return { checkedInToday: true, streakDay: todayRow.streak_day, coinsToday: todayRow.coins };
+      return {
+        checkedInToday: true,
+        streakDay: todayRow.streak_day,
+        coinsToday: todayRow.coins,
+      };
     }
 
     const streakDay = await this.computeNextStreak(uid);
-    return { checkedInToday: false, streakDay, coinsToday: coinsForStreak(streakDay) };
+    return {
+      checkedInToday: false,
+      streakDay,
+      coinsToday: coinsForStreak(streakDay),
+    };
   }
 
   async claimCheckin(uid: string): Promise<CheckinStatus> {
     const today = new Date().toISOString().slice(0, 10);
 
-    const existing = await this.db
-      .from('daily_checkins')
-      .select('id')
-      .eq('uid', uid)
-      .eq('check_date', today)
-      .maybeSingle();
+    // Single atomic RPC: gates on the (uid, check_date) unique constraint and
+    // credits the reward in the SAME transaction — no double-claim, and no
+    // partial-failure window where the row is recorded but coins never land.
+    const { data, error } = (await this.db.rpc('claim_checkin_atomic', {
+      p_uid: uid,
+      p_date: today,
+    })) as {
+      data: Array<{
+        streak_day: number;
+        coins: number;
+        balance: number;
+      }> | null;
+      error: { message: string } | null;
+    };
 
-    if (existing.data) throw new ConflictException('Already checked in today');
+    if (error) {
+      if (error.message?.includes('ALREADY_CHECKED_IN')) {
+        throw new ConflictException('Already checked in today');
+      }
+      throw new Error(`Checkin failed: ${error.message}`);
+    }
 
-    const streakDay = await this.computeNextStreak(uid);
-    const coins = coinsForStreak(streakDay);
-
-    const { error } = await this.db.from('daily_checkins').insert({
-      uid,
-      check_date: today,
-      coins,
-      streak_day: streakDay,
-    });
-    if (error) throw new Error(`Checkin failed: ${error.message}`);
-
-    await this.wallet.addCoins(uid, coins, 'reward', `เช็คอินวันที่ ${streakDay} ติดต่อกัน`);
-
-    return { checkedInToday: true, streakDay, coinsToday: coins };
+    const row = data?.[0];
+    return {
+      checkedInToday: true,
+      streakDay: row?.streak_day ?? 1,
+      coinsToday: row?.coins ?? 0,
+    };
   }
 
   private async computeNextStreak(uid: string): Promise<number> {

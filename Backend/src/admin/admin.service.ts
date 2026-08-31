@@ -115,10 +115,7 @@ export class AdminService {
           .from('forum_posts')
           .select('*', { count: 'exact', head: true })
           .is('deleted_at', null),
-        this.db
-          .from('wallet_transactions')
-          .select('amount')
-          .gte('created_at', todayIso),
+        this.db.rpc('get_tx_stats_since', { p_since: todayIso }),
         this.db
           .from('profiles')
           .select('uid, display_name, banned_at')
@@ -128,15 +125,23 @@ export class AdminService {
       ],
     );
 
-    const txData: Array<{ amount: number }> = txRes.data ?? [];
+    // DB-side aggregate: count/sum over ALL rows, not the ~1000-row PostgREST cap.
+    const txStats = (
+      txRes as {
+        data: Array<{
+          tx_count: number | string;
+          coin_sum: number | string;
+        }> | null;
+      }
+    ).data?.[0];
 
     return {
       totalUsers: totalRes.count ?? 0,
       newUsersToday: newTodayRes.count ?? 0,
       activePosts: postsRes.count ?? 0,
       transactionsToday: {
-        count: txData.length,
-        coinSum: txData.reduce((s, t) => s + (t.amount ?? 0), 0),
+        count: Number(txStats?.tx_count ?? 0),
+        coinSum: Number(txStats?.coin_sum ?? 0),
       },
       recentBans: (bansRes.data ?? []).map((r: any) => ({
         uid: r.uid,
@@ -330,14 +335,20 @@ export class AdminService {
     if (delta === 0) throw new BadRequestException('Delta must be non-zero');
 
     const rpcName = delta > 0 ? 'add_coins_atomic' : 'spend_coins_atomic';
+    // Traceable ledger reference so an admin adjustment is distinguishable from
+    // ordinary user topup/purchase activity in wallet_transactions.
+    const referenceId = `admin_adjust:${adminUid}:${targetUid}:${Date.now()}`;
 
-    const { data, error } = await this.db.rpc(rpcName, {
+    const { data, error } = (await this.db.rpc(rpcName, {
       p_uid: targetUid,
       p_amount: Math.abs(delta),
       p_type: delta > 0 ? 'topup' : 'purchase',
       p_description: reason,
-      p_reference_id: null,
-    });
+      p_reference_id: referenceId,
+    })) as {
+      data: Array<{ balance: number }> | null;
+      error: { message: string } | null;
+    };
 
     if (error) {
       if (error.message?.includes('INSUFFICIENT_FUNDS')) {
@@ -348,9 +359,23 @@ export class AdminService {
       );
     }
 
-    const balance: number = data?.balance ?? 0;
+    const balance: number = data?.[0]?.balance ?? 0;
     this.logger.warn(
       `Admin ${adminUid} adjusted wallet of ${targetUid} by ${delta > 0 ? '+' : ''}${delta}: "${reason}" → balance ${balance}`,
+    );
+    // Persistent audit trail for a money-mutating admin action (was logger-only).
+    void this.logAudit(
+      adminUid,
+      'adjust_wallet',
+      'user',
+      targetUid,
+      undefined,
+      {
+        delta,
+        reason,
+        balance,
+        referenceId,
+      },
     );
     return { balance };
   }
