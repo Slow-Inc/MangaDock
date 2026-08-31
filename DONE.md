@@ -41,6 +41,53 @@ where it is recorded.
 
 PR #692. Refs #686 #685.
 
+---
+
+## #679 — the SFX wiring guard was asserting a symbol name; fixing it uncovered a real gap (2026-07-28)
+
+**What #679 said:** the driver on `integrate/render-reconcile` "reverted to the pre-#278 4-char SFX
+heuristic". **That was wrong** — I filed it by repeating the test's own failure message without
+opening the driver. The driver does gate on provenance, via landing's `sfx_merge.should_sfx_rescue`
+(`region.is_sfx`), swapped in deliberately and with a benchmark in `7e78341e`. No length heuristic
+exists in that file.
+
+**The guard's actual defect:** `test_stage_c_wiring.py` asserted the literal symbol
+`should_rescue_sfx` appeared as a call. That pins an implementation, not the behaviour it protects,
+so a deliberate swap to an equivalent gate fired it — and the failure message accused the driver of
+something that had not happened. Fixed by moving the rule into `test/sfx_gate_scan.py`, a pure
+`ast` module tested against **synthetic** drivers, including the gate-less one no real file in the
+tree exhibits, which is the case the guard exists for and could never previously be exercised.
+
+**What fixing it uncovered — this is the part that matters.** ADR 026 has two independent
+requirements and the guard only ever checked one. The Decision is "gate on provenance". The
+**Addendum** is "provenance alone was insufficient": det_sfx itself false-positives on speech
+bubbles, and without a real-text guard the vision gateway is handed a dialogue fragment, told it is
+an SFX, and returns a phantom onomatopoeia rendered over the real line — benchmarked across 5 pages
+on 2026-06-30.
+
+Landing's gate is provenance-only. Verified by running both checks over both drivers:
+
+| | provenance gate | Addendum real-text guard |
+|---|---|---|
+| `main` | `should_rescue_sfx` | **yes** |
+| `integrate/render-reconcile` | `should_sfx_rescue` | **no** |
+
+So the branch satisfies the #278 Decision and reintroduces the defect class its Addendum closed.
+`ocr_read_real_text` still runs *inside* `ocr_vlm.should_rescue_sfx`, but nothing on that branch
+calls that helper — live code with passing tests and no caller, which reads as coverage it no longer
+provides.
+
+**Deliberately not papered over.** The obvious move — make the guard accept either gate and go green —
+would have turned a true signal into silence. `test_stage_c_wiring.py` now asserts the two
+requirements **separately**: `main` passes both, the branch passes the first and fails the second.
+The trade-off is recorded as **open** in ADR 026's new Amendment, with the note that the two aims are
+not in conflict in principle — the Addendum's rule and the stylized-SFX case collide only because the
+rule is a heuristic, so a gate satisfying both is findable. Neither branch has one today.
+
+**Validated:** 10 tests across the two files; full torch-free suite 646 passed, 0 failed on `main`.
+
+---
+
 ## #680 — glyph cache ignored font switches (real render bug, found by root-causing 4 red goldens) (2026-07-28)
 
 **Symptom that started it:** four characterization goldens red on `integrate/render-reconcile`
