@@ -20,7 +20,7 @@ Nothing here calls a GPU, the gateway, or the pipeline. Reproduce with:
 
 ```sh
 cd MIT && pytest test/test_pipeline_doctor_core.py -q   # 13 passed
-cd MIT && CI=1 pytest test/ -q                          # the mit_logic gate: 740 passed, 2 skipped
+cd MIT && CI=1 pytest test/ -q                          # 740 passed, 2 skipped (superset of the gate)
 ```
 
 ## Before → After
@@ -43,7 +43,8 @@ registration**, and this change adds the seam the rest of #685 plugs into.
 | one row per stage when the evidence has a newline | n/a | no (the row wraps) | yes |
 | control bytes from model output reach the terminal | n/a | yes (raw `\x1b`) | no (escaped, still legible) |
 | tests in `test_pipeline_doctor_core.py` | 0 (no file) | 6 | 13 |
-| `mit_logic` suite | *not measured* | 733 passed, 1 failed (network test, no `CI` env) | **740 passed, 0 failed** (`CI=1`, 2 skipped) |
+| local suite (full deps, `CI=1`) | *not measured* | 733 passed, 1 failed (no `CI` env) | **740 passed, 0 failed** (2 skipped) |
+| `mit_logic` in CI (lightweight deps) | *not measured* | *not measured* | **651 passed, 0 failed** (3 skipped) |
 
 `HEAD`'s renderers were already correct; what was missing is the half of the issue title that reads
 **"runner"**. Its own docstring claimed it (*"The Doctor's report model and runner"*) while `probe`,
@@ -57,8 +58,15 @@ report.py:6:    #: A probe's verdict ...                     # comment
 report.py:13:   """One pipeline stage as a probe saw it."""  # docstring
 ```
 
-The `mit_logic` row's `HEAD` and `this change` cells were run under different `CI` settings, which is
-why the failure count moves: `test_online_translators` is `skipif(os.environ.get('CI'))`
+Two suite rows, because they are two different runs and conflating them would overstate what the
+gate checked. The **local** venv has MIT's full dependency set installed, so it collects more than
+the gate does; the real `mit_logic` job installs `requirements.txt` minus the ML stack and
+`test/conftest.py` auto-skips the torch-only modules, so it runs a smaller set — 651 rather than 740.
+Both are green; the local run is a superset, not a stricter check. The CI figure is from
+[run 33361709801](https://github.com/Slow-Inc/MangaDock/actions/runs/33361709801) on PR #692.
+
+The `HEAD` and `this change` local cells were also run under different `CI` settings, which is why the
+failure count moves: `test_online_translators` is `skipif(os.environ.get('CI'))`
 (`test/test_translation.py:42-46`, #618) and exercises live online translators, so it fails locally
 without keys and is skipped in CI. `origin/main`'s suite was **not** run — the honest cell is empty
 rather than back-computed.
@@ -119,8 +127,9 @@ is `torch`, `cv2`, `transformers`, `numpy`, or `manga_translator`. The core impo
   `@doctor.probe('<stage>')`; nothing about them requires the core to learn what a stage is, which is
   what keeps it torch-free.
 - **no-regression:** additive. The diff touches only `MIT/tools/pipeline_doctor/`, its test file, and
-  this report — no pipeline code, matching #686's stated scope. `CI=1 pytest test/ -q` is
-  740 passed / 2 skipped / **0 failed**.
+  this report — no pipeline code, matching #686's stated scope. The `mit_logic` gate is
+  **651 passed / 3 skipped / 0 failed** in CI; the fuller local run is 740 passed / 2 skipped /
+  0 failed.
 - **completeness:** every #686 acceptance clause is exercised by a test, including the one that was
   previously unmet ("a fake probe set produces both renderings from one run").
 - **limitation — a run where every probe declines reports `ok: True, exit_code: 0` with zero stages.**
