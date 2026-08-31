@@ -58,12 +58,11 @@ export class ReviewsService {
   async upsertReview(
     uid: string,
     mangaId: string,
-    data: { mangaTitle: string; rating: number; body: string },
+    data: { mangaTitle?: string; rating: number; body?: string },
   ): Promise<void> {
     if (!mangaId) throw new BadRequestException('mangaId is required');
-    if (data.rating < 1 || data.rating > 5) {
-      throw new BadRequestException('rating must be between 1 and 5');
-    }
+    // rating bounds/integer-ness are enforced by UpsertReviewDto (#656) — the
+    // old `rating < 1 || rating > 5` guard let `undefined`/`null`/floats pass.
 
     const now = new Date().toISOString();
     const { error } = await this.db.from('manga_reviews').upsert(
@@ -118,7 +117,7 @@ export class ReviewsService {
       .range(offset, offset + limit - 1);
 
     if (error) throw new Error(`Failed to fetch reviews: ${error.message}`);
-    return (data ?? []).map((row) => this.mapReview(row as ReviewRow));
+    return (data ?? []).map((row) => this.mapReview(row as unknown as ReviewRow));
   }
 
   async getReviewSummary(mangaId: string): Promise<ReviewSummary> {

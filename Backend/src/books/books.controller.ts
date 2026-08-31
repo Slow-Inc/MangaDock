@@ -24,6 +24,7 @@ import {
 } from '../auth/turnstile.guard';
 import { resolveTurnstileConfig } from '../auth/turnstile.config';
 import { verifyTurnstileToken } from '../auth/turnstile.verify';
+import { clampInt } from '../common/query-params';
 
 @Controller('books')
 export class BooksController {
@@ -370,8 +371,8 @@ export class BooksController {
     return this.booksService.searchBooks(
       query ?? '',
       lang,
-      limit ? Math.min(parseInt(limit, 10), 100) : 100,
-      offset ? parseInt(offset, 10) : 0,
+      clampInt(limit, 100, 1, 100),
+      clampInt(offset, 0, 0, Number.MAX_SAFE_INTEGER),
       status,
       yearFrom ? parseInt(yearFrom, 10) : undefined,
       yearTo ? parseInt(yearTo, 10) : undefined,
@@ -379,11 +380,8 @@ export class BooksController {
   }
 
   @Get(':id/related')
-  getRelated(
-    @Param('id') id: string,
-    @Query('limit') limit?: string,
-  ) {
-    return this.booksService.getRelated(id, limit ? Math.min(parseInt(limit, 10), 50) : 10);
+  getRelated(@Param('id') id: string, @Query('limit') limit?: string) {
+    return this.booksService.getRelated(id, clampInt(limit, 10, 1, 50));
   }
 
   /** Proxy external images (e.g. MangaDex CDN) to avoid hotlink blocking. */

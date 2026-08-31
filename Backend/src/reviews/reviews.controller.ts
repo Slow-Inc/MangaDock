@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import type { SupabaseAuthUser } from '../auth/auth.types';
+import { clampInt } from '../common/query-params';
+import { UpsertReviewDto } from './reviews.dto';
 import { ReviewsService } from './reviews.service';
 
 @Controller('reviews')
@@ -30,8 +32,8 @@ export class ReviewsController {
   ) {
     return this.reviews.getReviews(
       mangaId,
-      limit ? Math.min(Number(limit), 50) : 20,
-      offset ? Number(offset) : 0,
+      clampInt(limit, 20, 1, 50),
+      clampInt(offset, 0, 0, Number.MAX_SAFE_INTEGER),
     );
   }
 
@@ -49,7 +51,7 @@ export class ReviewsController {
   upsertReview(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('mangaId') mangaId: string,
-    @Body() body: { mangaTitle: string; rating: number; body: string },
+    @Body() body: UpsertReviewDto,
   ) {
     return this.reviews.upsertReview(req[USER_KEY].uid, mangaId, body);
   }
