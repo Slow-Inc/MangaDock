@@ -21,7 +21,7 @@ Importing the pipeline is this module's business, not the core's: `ocr_vlm` is t
 import base64
 import io
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 from PIL import Image
@@ -121,7 +121,6 @@ class DoctorPage:
     can share one registry without either inventing rows about a stage it never saw."""
 
     sfx_call: Optional[SfxCall] = None
-    dump: Any = field(default=None)
 
 
 def capture_sfx_call(crop_rgb, *, response: Dict[str, Any], target_lang: str = 'ENG',

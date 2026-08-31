@@ -10,6 +10,8 @@ is what makes them torch-free and runnable in the `mit_logic` gate: `capture_sfx
 real `vlm_localize_sfx` with the HTTP call injected, so a probe reports on production code rather
 than on a copy of it that can drift.
 """
+import pathlib
+
 import numpy as np
 
 from tools.pipeline_doctor import FAIL, OK, WARN, doctor
@@ -20,6 +22,9 @@ from tools.pipeline_doctor.llm_contracts import (
     DoctorPage,
     capture_sfx_call,
 )
+
+#: `MIT/` — where `pythonpath = .` puts the `tools` and `manga_translator` packages.
+MIT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # The `ぬ` display-SFX crop of the 2026-07-28 investigation, at the size the pipeline sends it.
 CROP_W, CROP_H = 220, 130
@@ -223,8 +228,16 @@ def test_the_json_view_carries_the_same_verdicts_for_an_agent():
 
 
 def test_the_contracts_import_without_torch():
-    """They belong to the `mit_logic` gate, which installs no ML stack at all."""
+    """They belong to the `mit_logic` gate, which installs no ML stack at all.
+
+    Checked in a subprocess on purpose. Asserting `'torch' not in sys.modules` inline passes in
+    CI (where torch is not installed) and fails locally the moment any earlier test module has
+    already imported the pipeline — it would measure the suite's import order, not this module's
+    import graph, and would be green in exactly the environment that cannot detect a regression.
+    """
+    import subprocess
     import sys
 
-    import tools.pipeline_doctor.llm_contracts  # noqa: F401
-    assert 'torch' not in sys.modules
+    probe = ('import sys; import tools.pipeline_doctor.llm_contracts; '
+             "sys.exit(1 if 'torch' in sys.modules else 0)")
+    assert subprocess.run([sys.executable, '-c', probe], cwd=MIT_ROOT).returncode == 0
