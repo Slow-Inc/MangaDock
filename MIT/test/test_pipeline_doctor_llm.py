@@ -196,21 +196,27 @@ def test_response_fails_on_a_truncated_reply_that_still_carries_content():
 
 # --------------------------------------------------------------------------- 4. sanitise
 
-def test_sanitise_fails_naming_every_refusal_that_survived():
-    """Defect 3. `sanitize_sfx` filters only NONE/N A/NA/EMPTY, so the prompt's own refusal
-    wording — 'reply with an empty line' — comes back as a rendered SFX token."""
+def test_sanitise_passes_now_that_refusals_are_rejected():
+    """Defect 3 fixed by #697: every refusal in the corpus now sanitises to ''."""
+    row = _stage(doctor.run(_page()), 'sanitize')
+    assert row.status == OK
+    assert row.metrics['leaked'] == 0
+
+
+def test_sanitise_still_names_every_refusal_a_leaky_sanitiser_lets_through(monkeypatch):
+    """The detector must still find a leak: swap in the pre-#697 behaviour (echo the reply)."""
+    import tools.pipeline_doctor.llm_contracts as lc
+    monkeypatch.setattr(lc, 'sanitize_sfx', lambda raw, lang='ENG': raw.upper())
     row = _stage(doctor.run(_page()), 'sanitize')
     assert row.status == FAIL
     assert 'EMPTY LINE' in row.evidence
-    assert 'NO SOUND EFFECT' in row.evidence
     assert row.metrics['leaked'] >= 2
 
 
 def test_sanitise_checks_localized_refusals_for_a_non_latin_target():
     """B3 recorded these from the live model; the non-Latin branch guards only Latin forms."""
     row = _stage(doctor.run(_page(target_lang='THA')), 'sanitize')
-    assert row.status == FAIL
-    assert 'ไม่พบเสียง' in row.evidence
+    assert row.status == OK   # #697 rejects parenthesised and ไม่-negation replies
 
 
 # --------------------------------------------------------------------------- coexistence
@@ -234,7 +240,7 @@ def test_one_run_surfaces_all_three_defects_of_2026_07_28():
     assert run.ok is False
     assert 'vlm-send' in run.failures      # truncating budget, thinking unset
     assert 'vlm-recv' in run.failures      # finish_reason=length, content=None
-    assert 'sanitize' in run.failures      # 'EMPTY LINE' survived
+    assert 'sanitize' not in run.failures  # fixed by #697; row still rendered below
     assert 'vlm-image' in run.warnings     # undersized crop, provisional threshold
 
     for stage in ('vlm-send', 'vlm-image', 'vlm-recv', 'sanitize'):
