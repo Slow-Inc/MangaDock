@@ -94,8 +94,8 @@ class SfxCall:
 
     @property
     def thinking(self) -> str:
-        """`unset` is itself the finding: `ocr_vlm` never calls the thinking helpers the
-        translator path uses, so the model reasons by default and spends the budget doing it."""
+        """`unset` is itself the finding: `ocr_vlm` never sends `chat_template_kwargs.enable_thinking`,
+        so the model reasons by default and spends the budget doing it."""
         kwargs = self.request.get('chat_template_kwargs') or {}
         if 'enable_thinking' not in kwargs:
             return 'unset'

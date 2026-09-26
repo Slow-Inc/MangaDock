@@ -20,6 +20,7 @@ from tools.pipeline_doctor.llm_contracts import (
     BUDGET_MEASURED_TRUNCATING,
     VISION_TOKENS_MEASURED_ANSWERING,
     DoctorPage,
+    SfxCall,
     capture_sfx_call,
 )
 
@@ -149,6 +150,17 @@ def test_image_fails_on_a_blank_canvas():
     assert 'blank' in row.evidence.lower()
 
 
+def test_image_fails_when_the_sent_image_is_not_rgb():
+    """`_to_data_url` always converts the crop to RGB before encoding, so a non-RGB image can
+    never reach the probe through `capture_sfx_call` — the mode check is only reachable by
+    building the call directly."""
+    call = SfxCall(request={}, response=HEALTHY_RESPONSE, result='SQUELCH',
+                   image_size=(CROP_W * 3, CROP_H * 3), image_mode='L')
+    row = _stage(doctor.run(DoctorPage(sfx_call=call)), 'vlm-image')
+    assert row.status == FAIL
+    assert row.metrics['mode'] == 'L'
+
+
 # --------------------------------------------------------------------------- 3. response
 
 def test_response_fails_loudly_on_the_truncation_that_was_silent():
@@ -169,6 +181,17 @@ def test_response_passes_on_a_completed_reply():
 def test_response_fails_on_a_malformed_payload_rather_than_crashing_the_walk():
     row = _stage(doctor.run(_page(response={})), 'vlm-recv')
     assert row.status == FAIL
+
+
+def test_response_fails_on_a_truncated_reply_that_still_carries_content():
+    """`finish_reason='length'` with content present is still a truncation — the reply was cut
+    off mid-answer. Deleting `or finish != 'stop'` would let this through as OK."""
+    row = _stage(doctor.run(_page(response={'choices': [{'finish_reason': 'length',
+                                                        'message': {'content': 'BAM'}}]})),
+                 'vlm-recv')
+    assert row.status == FAIL
+    assert row.metrics['finish_reason'] == 'length'
+    assert row.metrics['content'] == 'BAM'
 
 
 # --------------------------------------------------------------------------- 4. sanitise
