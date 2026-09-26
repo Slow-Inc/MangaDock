@@ -1,5 +1,49 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-08-31 — #688: Pipeline Doctor LLM/gateway contracts (feature / test-infra)
+
+**What & where:** `MIT/tools/pipeline_doctor/llm_contracts.py` (new, ~245 lines — four probes plus
+`capture_sfx_call` / `SfxCall` / `DoctorPage`), `MIT/test/test_pipeline_doctor_llm.py` (new, 20
+tests). **No pipeline code touched** — `manga_translator/ocr_vlm.py` is imported and exercised, not
+modified.
+
+**Why:** the LLM/gateway layer had no observability of any kind. The three defects found on
+2026-07-28 took ~10 hand-written probes to locate, and all three were invisible to the 111 MIT test
+files, the `mit_logic` gate, and every `tools/diag_*.py` script — those cover the GPU half and stop
+before the LLM call.
+
+**Before → after:** a truncated reply collapsed to `''`, indistinguishable from "this region has no
+SFX" (the silence that made the 2026-07-11 investigation conclude "text MoE" and move on). Now one
+walk emits four rows: `vlm-send` FAIL (budget 24 ≤ 2048 measured to truncate; thinking unset),
+`vlm-image` WARN (~40 visual tokens vs 336 measured answerable), `vlm-recv` FAIL
+(`finish_reason=length, content=None`), `sanitize` FAIL (`'EMPTY LINE'` survives sanitising).
+`exit_code=1`.
+
+**Perf Δ:** none on any production path — nothing here runs in the pipeline. The probes add ~0.3 s
+to the `mit_logic` gate (20 tests), no GPU, no network.
+
+**Quality:** the contracts capture the request from the **real** `vlm_localize_sfx` through its
+`post_fn` seam, so they track production code rather than a copy of it. Every threshold is a cited
+measurement; two bands ship as WARN because their boundary is unmeasured (vision floor = one
+measurement; budget 2048–4096 = untested).
+
+**Validation:** 20 new tests green; mutation-tested 6/6 (each mutation reverted in isolation — the
+strongest being "capture a hand-written body instead of the real call", which reds 9 of 20). Full
+MIT suite 768 passed / 1 pre-existing failure (`test_online_translators`, live Papago endpoint,
+excluded from the gate). Benchmark + PNG: `docs/reports/benchmarks/2026-08-31-688-doctor-llm-contracts.md`.
+
+**Risk / debt carried forward:**
+- **#688 D1 not done, premise void on this base.** The five thinking/budget helpers the issue asks
+  to extract from `custom_openai` do not exist on `main` — they arrived with #623 on `perf`. The
+  translator path therefore stays outside the gate; revisit after Phase E.
+- **The vision floor is one measurement.** 336 is a size that worked, not a located boundary.
+  #689's sweep is what turns it into a threshold. Until then it must never be a FAIL.
+- **The refusal corpus is observational**, not an enumeration. New refusal wording leaks until added.
+- **Production is still silent.** These probes only speak inside a Doctor run; `ocr_vlm` itself
+  still swallows `finish_reason: length`. That is the benchmark's verdict #4 and is filed separately.
+
+---
+
 ## 2026-08-31 — #686: Pipeline Doctor core — report model + probe registry (feature / test-infra)
 
 **What & where:** `MIT/tools/pipeline_doctor/` (new package — `report.py`, `runner.py`,
