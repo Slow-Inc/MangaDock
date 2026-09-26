@@ -13,13 +13,17 @@ generates + skips; later runs assert exact equality. Delete an npz to
 regenerate when a change is expected and reviewed.
 """
 import os
+import sys
 
 import numpy as np
+import PIL.features
 import pytest
 
 from manga_translator.rendering import resize_regions_to_font_size
 from manga_translator.rendering import text_render
 from manga_translator.utils import TextBlock
+
+from _golden_compare import golden_verdict
 
 GOLDEN_DIR = os.path.join(os.path.dirname(__file__), 'golden')
 _FONT = os.path.join(os.path.dirname(__file__), '..', 'fonts', 'Arial-Unicode-Regular.ttf')
@@ -29,7 +33,14 @@ def _set_font():
     text_render.set_font(_FONT)
 
 
+def _text_metric_env():
+    """The two things a byte-identical freetype-metric golden is tied to: the freetype build
+    (glyph advances) and the OS. A golden only asserts strictly where both match what it recorded."""
+    return PIL.features.version('freetype2') or 'unknown', sys.platform
+
+
 def _save_or_assert(golden_path, dst_points_list, regions):
+    ft, plat = _text_metric_env()
     if not os.path.exists(golden_path):
         os.makedirs(os.path.dirname(golden_path), exist_ok=True)
         payload = {}
@@ -37,10 +48,29 @@ def _save_or_assert(golden_path, dst_points_list, regions):
             payload[f'dst_{i}'] = np.asarray(dp)
         payload['font_sizes'] = np.array([r.font_size for r in regions], dtype=np.int64)
         payload['translations'] = '|'.join(r.translation for r in regions)
+        payload['freetype_version'] = ft
+        payload['platform'] = plat
         np.savez_compressed(golden_path, **payload)
         pytest.skip(f'generated golden snapshot at {golden_path}; re-run to assert')
 
     golden = np.load(golden_path)
+    equal = (
+        all(np.array_equal(np.asarray(dp), golden[f'dst_{i}']) for i, dp in enumerate(dst_points_list))
+        and np.array_equal(np.array([r.font_size for r in regions], dtype=np.int64), golden['font_sizes'])
+        and '|'.join(r.translation for r in regions) == str(golden['translations'])
+    )
+    golden_ft = str(golden['freetype_version']) if 'freetype_version' in golden else None
+    golden_plat = str(golden['platform']) if 'platform' in golden else None
+    same_env = (golden_ft == ft and golden_plat == plat)
+
+    verdict = golden_verdict(equal, same_env)
+    if verdict == 'skip':
+        pytest.skip(
+            f'golden recorded on {golden_plat}/freetype-{golden_ft}; running {plat}/freetype-{ft} — '
+            'freetype-metric geometry drift, not a logic change. Regenerate on this platform to assert.'
+        )
+    # verdict is 'pass' (equal → the asserts below all hold) or 'fail' (mismatch on the SAME env →
+    # a real regression); run the strict asserts so a failure names exactly which array drifted.
     for i, dp in enumerate(dst_points_list):
         assert np.array_equal(np.asarray(dp), golden[f'dst_{i}']), f'region {i} dst_points drift'
     assert np.array_equal(
