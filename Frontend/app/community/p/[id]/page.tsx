@@ -306,7 +306,7 @@ export default function PostDetailPage() {
               <Link
                 href={`/community/profile/${post.authorUid}`}
                 className={`font-bold text-sm hover:underline underline-offset-2 transition-opacity hover:opacity-80 ${
-                  post.authorRole === 1 ? "text-indigo-400" :
+                  post.authorRole === 1 ? "text-amber-400" :
                   post.authorRole === 2 ? "text-orange-400" : "text-white/80"
                 }`}
               >
@@ -324,7 +324,7 @@ export default function PostDetailPage() {
               {post.category !== 'general' && (
                 <>
                   <span>•</span>
-                  <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 font-bold uppercase tracking-wider text-[10px] border border-indigo-500/20">
+                  <span className="px-2.5 py-1 rounded-full bg-white/10 text-amber-400 font-bold uppercase tracking-wider text-[10px] border border-amber-500/20">
                     {post.category}
                   </span>
                 </>
@@ -346,7 +346,7 @@ export default function PostDetailPage() {
                 <div ref={menuRef} className="ml-auto relative shrink-0">
                   <button
                     onClick={() => menuOpen ? closeMenu() : openMenu()}
-                    className="w-8 h-8 flex items-center justify-center rounded-full text-white/30 hover:text-white/70 hover:bg-white/8 active:bg-white/12 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-black/30 hover:text-white/70 hover:bg-white/8 active:bg-white/12 transition-colors"
                     aria-label="ตัวเลือกโพสต์"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -356,7 +356,7 @@ export default function PostDetailPage() {
 
                   {menuOpen && (
                     <div
-                      className={`absolute right-0 top-full mt-1 z-30 w-44 bg-[#202020] border border-white/10 rounded-2xl shadow-2xl overflow-hidden origin-top-right transition-[opacity,transform] duration-150 ease-out ${
+                      className={`absolute right-0 top-full mt-1 z-30 w-44 bg-[#202020] border border-white/10 rounded-2xl overflow-hidden origin-top-right transition-[opacity,transform] duration-150 ease-out ${
                         menuVisible
                           ? "opacity-100 scale-100 translate-y-0"
                           : "opacity-0 scale-95 -translate-y-1"
@@ -364,11 +364,11 @@ export default function PostDetailPage() {
                     >
                       {confirmDeletePost ? (
                         <div key="confirm" className="p-3 space-y-2.5 animate-in fade-in slide-in-from-right-2 duration-150">
-                          <p className="text-xs text-white/40 text-center font-medium">ลบโพสต์นี้ใช่ไหม?</p>
+                          <p className="text-xs text-black/40 text-center font-medium">ลบโพสต์นี้ใช่ไหม?</p>
                           <div className="flex gap-2">
                             <button
                               onClick={() => setConfirmDeletePost(false)}
-                              className="flex-1 py-2 rounded-xl text-xs font-bold text-white/50 hover:bg-white/8 active:bg-white/12 transition-colors"
+                              className="flex-1 py-2 rounded-xl text-xs font-bold text-black/50 hover:bg-white/8 active:bg-white/12 transition-colors"
                             >
                               ยกเลิก
                             </button>
@@ -386,7 +386,7 @@ export default function PostDetailPage() {
                         <div key="menu" className="animate-in fade-in slide-in-from-left-2 duration-150">
                           <button
                             onClick={() => { handleEditPostStart(); closeMenu(); }}
-                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/5 active:bg-white/8 transition-colors"
+                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold text-black/70 hover:bg-white/5 active:bg-white/8 transition-colors"
                           >
                             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -418,27 +418,27 @@ export default function PostDetailPage() {
                 <input
                   value={editPostTitle}
                   onChange={(e) => setEditPostTitle(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xl sm:text-2xl font-black text-white focus:outline-none focus:border-indigo-500 transition-colors mb-3"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xl sm:text-2xl font-black text-black focus:outline-none focus:border-amber-500 transition-colors mb-3"
                   placeholder="หัวข้อกระทู้"
                 />
                 <textarea
                   value={editPostContent}
                   onChange={(e) => setEditPostContent(e.target.value)}
                   rows={8}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm sm:text-base text-white/90 focus:outline-none focus:border-indigo-500 transition-colors resize-none leading-relaxed"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm sm:text-base text-black/90 focus:outline-none focus:border-amber-500 transition-colors resize-none leading-relaxed"
                   placeholder="เนื้อหากระทู้"
                 />
                 <div className="flex justify-end gap-2 mt-3">
                   <button
                     onClick={() => setIsEditingPost(false)}
-                    className="px-4 py-2 rounded-xl text-sm font-bold text-white/50 hover:bg-white/5 transition-colors"
+                    className="px-4 py-2 rounded-xl text-sm font-bold text-black/50 hover:bg-white/5 transition-colors"
                   >
                     ยกเลิก
                   </button>
                   <button
                     onClick={handleSavePost}
                     disabled={savingPost || !editPostTitle.trim() || !editPostContent.trim()}
-                    className="px-6 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-6 py-2 rounded-xl bg-white text-black text-sm font-bold hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {savingPost ? "กำลังบันทึก..." : "บันทึก"}
                   </button>
@@ -446,7 +446,7 @@ export default function PostDetailPage() {
               </div>
             ) : (
               <>
-                <h1 className="text-xl sm:text-3xl font-black text-white mb-3 sm:mb-6 leading-tight tracking-tight">
+                <h1 className="text-xl sm:text-3xl font-black text-black mb-3 sm:mb-6 leading-tight tracking-tight">
                   {post.title}
                 </h1>
 
@@ -561,13 +561,13 @@ export default function PostDetailPage() {
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="ร่วมแสดงความคิดเห็นของคุณ..."
                   rows={3}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500 transition-all resize-none mb-3"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-amber-500 transition-all resize-none mb-3"
                 />
                 <div className="flex justify-end">
                   <button
                     onClick={handlePostComment}
                     disabled={!newComment.trim() || submitting}
-                    className="px-6 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-500 disabled:opacity-50 transition-all flex items-center gap-2"
+                    className="px-6 py-2 rounded-xl bg-white text-black font-bold text-sm hover:bg-white/90 disabled:opacity-50 transition-all flex items-center gap-2"
                   >
                     {submitting && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                     {submitting ? "กำลังส่ง..." : "ส่งความคิดเห็น"}
@@ -584,7 +584,7 @@ export default function PostDetailPage() {
               </svg>
             </div>
             <p className="text-white/40 text-sm font-medium">เข้าสู่ระบบเพื่อร่วมแสดงความคิดเห็น</p>
-            <button onClick={showLoginPrompt} className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-500 smooth-hover">
+            <button onClick={showLoginPrompt} className="px-5 py-2 rounded-xl bg-white text-black text-sm font-bold hover:bg-white/90 smooth-hover">
               เข้าสู่ระบบ
             </button>
           </div>

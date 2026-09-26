@@ -27,10 +27,10 @@ const LANG_LABEL: Record<string, string> = {
 function RoleBadge({ role }: { role: number | null | undefined }) {
   if (role == null || role === 0) return null;
   const map: Record<number, { cls: string; label: string }> = {
-    1: { cls: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30", label: "Translator" },
+    1: { cls: "bg-white/15 text-amber-400 border-amber-500/30", label: "Translator" },
     2: { cls: "bg-orange-500/15 text-orange-400 border-orange-500/30", label: "Creator" },
     8: { cls: "bg-red-500/15 text-red-400 border-red-500/30", label: "Admin" },
-    9: { cls: "bg-purple-500/15 text-purple-400 border-purple-500/30", label: "Dev" },
+    9: { cls: "bg-white/15 text-amber-400 border-amber-500/30", label: "Dev" },
   };
   const entry = map[role] ?? { cls: "bg-white/10 text-white/60 border-white/20", label: `Role ${role}` };
   return (
@@ -219,7 +219,7 @@ export default function PublicProfilePage() {
 
   const gradientClass =
     profile.role === 1
-      ? "bg-gradient-to-br from-indigo-950/80 via-indigo-900/30 to-[#141414]"
+      ? "bg-gradient-to-br from-amber-950/80 via-amber-900/30 to-[#141414]"
       : profile.role === 2
       ? "bg-gradient-to-br from-orange-950/70 via-orange-900/25 to-[#141414]"
       : "bg-gradient-to-br from-white/[0.06] to-[#141414]";
@@ -376,7 +376,7 @@ export default function PublicProfilePage() {
             <button
               onClick={handleSavePosition}
               disabled={savingPos}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-white/90 disabled:opacity-50 text-black transition-colors flex items-center gap-1.5"
             >
               {savingPos && (
                 <div className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
@@ -480,12 +480,12 @@ export default function PublicProfilePage() {
 
       {/* ── Creator Earnings (own profile only) ── */}
       {isOwnProfile && isCreator && earnings && (
-        <div className="bg-gradient-to-br from-indigo-950/40 to-[#181818] border border-indigo-500/20 rounded-2xl p-4 sm:p-6">
+        <div className="bg-gradient-to-br from-amber-950/40 to-[#181818] border border-amber-500/20 rounded-2xl p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
-            <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest">รายได้ของคุณ</h3>
+            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-widest">รายได้ของคุณ</h3>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
@@ -496,7 +496,7 @@ export default function PublicProfilePage() {
             ].map((item) => (
               <div key={item.label} className="text-center p-3 rounded-xl bg-white/3 border border-white/5">
                 <div className="text-2xl font-black text-white">{item.value}</div>
-                <div className="text-xs text-indigo-400/70 font-semibold">{item.unit}</div>
+                <div className="text-xs text-amber-400/70 font-semibold">{item.unit}</div>
                 <div className="text-xs text-white/30 font-medium mt-0.5">{item.label}</div>
               </div>
             ))}
@@ -513,14 +513,14 @@ export default function PublicProfilePage() {
               onClick={() => setTab(t.id)}
               className={`flex items-center gap-1.5 px-4 sm:px-5 py-3 sm:py-3.5 text-xs sm:text-sm font-bold whitespace-nowrap transition-colors shrink-0 ${
                 tab === t.id
-                  ? "text-white border-b-2 border-indigo-500 -mb-px bg-indigo-500/5"
-                  : "text-white/40 hover:text-white/70"
+                  ? "text-black border-b-2 border-amber-500 -mb-px bg-white/5"
+                  : "text-black/40 hover:text-white/70"
               }`}
             >
               {t.label}
               <span
                 className={`px-1.5 py-0.5 rounded-full text-xs font-black ${
-                  tab === t.id ? "bg-indigo-500/20 text-indigo-400" : "bg-white/5 text-white/30"
+                  tab === t.id ? "bg-white/20 text-amber-400" : "bg-white/5 text-black/30"
                 }`}
               >
                 {t.count}
@@ -572,7 +572,7 @@ export default function PublicProfilePage() {
                         <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                         </svg>
-                        <span className="truncate group-hover:text-indigo-400 transition-colors">
+                        <span className="truncate group-hover:text-amber-400 transition-colors">
                           {c.postTitle}
                         </span>
                       </p>
@@ -621,11 +621,11 @@ export default function PublicProfilePage() {
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-white text-sm truncate mb-1.5 group-hover:text-indigo-300 transition-colors">
+                        <p className="font-bold text-white text-sm truncate mb-1.5 group-hover:text-amber-300 transition-colors">
                           {t.titleName}
                         </p>
                         <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-bold border border-indigo-500/20">
+                          <span className="px-1.5 py-0.5 rounded-full bg-white/10 text-amber-400 text-xs font-bold border border-amber-500/20">
                             {LANG_LABEL[t.language] ?? t.language}
                           </span>
                           <span className="text-xs text-white/30 font-medium">

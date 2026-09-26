@@ -135,7 +135,7 @@ export default function CommunityLayout({ children }: { children: React.ReactNod
   return (
     <Suspense fallback={
         <div className="min-h-screen bg-[--surface-base] flex items-center justify-center">
-            <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+            <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
         </div>
     }>
       <CommunityLayoutContent>{children}</CommunityLayoutContent>
