@@ -3,6 +3,31 @@
 
 ---
 
+## #694 — SFX rescue says why it returned nothing (2026-09-26)
+
+**What:** `MIT/manga_translator/ocr_vlm.py` `vlm_localize_sfx` now logs one `WARNING` when the
+vision reply yields no usable SFX: `SFX reply unusable: finish_reason=… content=… max_tokens=24
+crop=WxH` for a truncated or `None` reply, and `SFX reply sanitised to empty: '…'` when a reply
+arrived but `sanitize_sfx` reduced it to nothing. The return value is unchanged in every case — the
+degrade-to-`''` behaviour is deliberate and safe (the region renders the raw SFX).
+
+**Why:** `''` from this function reads downstream as "this region has no SFX". A truncation looked
+exactly like an empty region, which is why 2026-07-11 concluded "text MoE" and why 2026-07-28 needed
+~10 hand-written probes to find three defects (verdict #4 of
+`docs/reports/benchmarks/2026-07-28-679-sfx-gate.md`). The Doctor (#688) can name it, but only
+inside a Doctor run; production stayed silent.
+
+**Not in scope:** raising the token budget or disabling thinking (verdict #3: on the served model
+those ship confident nonsense). The function has no region id, so the crop size stands in for "the
+region".
+
+**Found while writing the tests:** `'(no sound effect)!!'` survives `sanitize_sfx` as
+`NO SOUND EFFECT !!` — the refusal-leak the #688 `sanitize` probe reports. Left for its own issue.
+
+**Validation:** TDD — 4 new tests, 3 red first (no warning emitted), then green. Each branch
+mutation-checked: dropping the `finish_reason` check, the sanitised-empty check, or the budget in the
+message each fails exactly one test. 47 passed across `test_ocr_vlm`, `test_sfx_gate_scan`,
+`test_lazy_import`, `test_stage_c_wiring`. MIT not booted (torch-free tests only).
 ## #688 — Doctor LLM contracts: four checks that turn a silent `''` into named failures (2026-08-31)
 
 **What:** `MIT/tools/pipeline_doctor/llm_contracts.py` — four probes over one SFX rescue call,
@@ -1078,6 +1103,27 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 
 ---
 
+## #694 — SFX rescue บอกเหตุผลเมื่อคืนค่าว่าง (2026-09-26)
+
+**อะไร:** `vlm_localize_sfx` ใน `MIT/manga_translator/ocr_vlm.py` ตอนนี้ log `WARNING` หนึ่งบรรทัดเมื่อคำตอบจาก
+vision model ใช้เป็น SFX ไม่ได้: `SFX reply unusable: finish_reason=… content=… max_tokens=24 crop=WxH`
+เมื่อคำตอบถูกตัดหรือเป็น `None` และ `SFX reply sanitised to empty: '…'` เมื่อได้คำตอบมาแต่ `sanitize_sfx`
+ตัดจนว่าง ค่าที่ return ไม่เปลี่ยนในทุกกรณี — การถอยกลับเป็น `''` ตั้งใจและปลอดภัย (region จะแสดง SFX ดิบ)
+
+**ทำไม:** `''` จากฟังก์ชันนี้ถูกอ่านต่อว่า "region นี้ไม่มี SFX" คำตอบที่ถูกตัดจึงดูเหมือน region ว่างทุกประการ
+เป็นเหตุที่ 2026-07-11 สรุปว่า "text MoE" และ 2026-07-28 ต้องเขียน probe เองราว 10 ตัวกว่าจะเจอ defect สามตัว
+(verdict #4 ใน `docs/reports/benchmarks/2026-07-28-679-sfx-gate.md`) Doctor (#688) ระบุได้ แต่เฉพาะตอนรัน
+Doctor เท่านั้น production ยังเงียบ
+
+**ไม่อยู่ใน scope:** เพิ่ม token budget หรือปิด thinking (verdict #3: บน model ที่ใช้อยู่ จะได้ผลมั่วที่ดูมั่นใจ)
+ฟังก์ชันไม่รู้ id ของ region จึงใช้ขนาด crop แทน
+
+**เจอระหว่างเขียนเทสต์:** `'(no sound effect)!!'` ผ่าน `sanitize_sfx` ออกมาเป็น `NO SOUND EFFECT !!` —
+คือ refusal ที่หลุดตามที่ probe `sanitize` ของ #688 รายงาน แยกไว้เป็น issue ของมันเอง
+
+**Validation:** TDD — เทสต์ใหม่ 4 ตัว แดงก่อน 3 ตัว (ไม่มี warning) แล้วเขียว mutation ทุก branch: ลบเช็ค
+`finish_reason`, ลบเช็ค sanitise-ว่าง หรือลบ budget ออกจากข้อความ แต่ละอย่างทำให้เทสต์แดงหนึ่งตัวพอดี
+ผ่าน 47 ตัวใน `test_ocr_vlm`, `test_sfx_gate_scan`, `test_lazy_import`, `test_stage_c_wiring` ไม่ได้ boot MIT
 ## #688 — Doctor LLM contracts: สี่ด่านที่เปลี่ยน `''` เงียบ ๆ ให้เป็น failure ที่มีชื่อ (2026-08-31)
 
 **อะไร:** `MIT/tools/pipeline_doctor/llm_contracts.py` — probe สี่ตัวบนการเรียก SFX rescue ครั้งเดียว
