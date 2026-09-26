@@ -357,8 +357,11 @@ class Quadrilateral(object):
     """
     Helper for storing textlines that contains various helper functions.
     """
-    def __init__(self, pts: np.ndarray, text: str, prob: float, fg_r: int = 0, fg_g: int = 0, fg_b: int = 0, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0):    
+    def __init__(self, pts: np.ndarray, text: str, prob: float, fg_r: int = 0, fg_g: int = 0, fg_b: int = 0, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0, is_sfx: bool = False):
         self.pts, is_vertical = sort_pnts(pts)
+        # #278: provenance — True when appended by the det_sfx second pass (merge_sfx_detections),
+        # so the SFX rescue can fire on provenance instead of a bare ≤4-char length heuristic.
+        self.is_sfx = is_sfx
         if is_vertical:
             self.direction = 'v'
         else:

@@ -195,6 +195,13 @@ class RenderConfig(BaseModel):
     alpha (distance-transform ramp) so the rectangular patch edge blends into the
     page instead of showing a seam. The crop has a ≥120px content margin, so the
     fade never touches rendered text. 0 → hard-alpha patch (byte-identical)."""
+    patch_content_alpha: bool = False
+    """#436: make each patch opaque only over the pixels it actually CHANGED (original ink the
+    inpaint erased + the new glyphs), transparent over the rest of its rectangle. Two overlapping
+    speech balloons each emit a rectangular patch; without this the one composited last repaints
+    its whole opaque rectangle of clean background over the other balloon's text (it renders
+    empty). With it the rectangular margins are transparent so the neighbour's text survives.
+    Off → full-rectangle (feathered) patch, byte-identical."""
     direction: Direction = Direction.auto
     """Force text to be rendered horizontally/vertically/none"""
     uppercase: bool = False

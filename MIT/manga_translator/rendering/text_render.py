@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import cv2
 import numpy as np
 import freetype
@@ -30,6 +31,10 @@ try:
     _HAS_JIEBA = True
 except ImportError:
     _HAS_JIEBA = False
+# #278 nit: jieba builds its prefix dict (~1 s) lazily on the FIRST `_jieba.cut` — i.e. the first
+# Chinese render per worker carries that one-time cost, not import. We deliberately do NOT call
+# `_jieba.initialize()` here so a worker that never renders Chinese pays nothing at startup
+# (lazy-cost by design); the ~1 s is amortised on the first CHS/CHT page only.
 
 
 def _insert_cjk_word_breaks(text: str) -> str:
@@ -367,6 +372,15 @@ def get_char_border(cdpt: str, font_size: int, direction: int):
 #         return face.get_kerning(face.get_char_index(prev), face.get_char_index(cdpt))
 
 def calc_vertical(font_size: int, text: str, max_height: int):
+    _CALC_H_STATS["calls_vertical"] += 1
+    _CALC_H_STATS["vertical_chars"] += len(text)
+    _t_vert = time.perf_counter()
+    result = _calc_vertical_impl(font_size, text, max_height)
+    _CALC_H_STATS["vertical_s"] += time.perf_counter() - _t_vert
+    return result
+
+
+def _calc_vertical_impl(font_size: int, text: str, max_height: int):
     line_text_list = []
     # line_width_list = []
     line_height_list = []
@@ -673,6 +687,7 @@ def get_char_offset_x(font_size: int, cdpt: str):
     return char_offset_x
 
 def get_string_width(font_size: int, text: str):
+    _CALC_H_STATS["gsw_calls"] += 1
     return sum([get_char_offset_x(font_size, c) for c in text])
 
 def _split_words_and_widths(text: str, font_size: int) -> Tuple[List[str], List[int]]:
@@ -865,13 +880,37 @@ class KnuthPlassLineBreaker:
         return line_words_list, line_width_list, hyphenation_idx_list
 
 
+# #speed-study Phase 0 (2026-07-03): per-call-site accumulator for calc_horizontal's
+# internal sub-steps, to attribute the measured 12-14s/region layout_fit cost to a
+# specific sub-step instead of guessing. Logging-only — no behavior change. Reset by
+# the caller (rendering/__init__.py) around each region's layout work; read via
+# get_calc_h_stats() and logged as one [timing-render] line.
+_CALC_H_STATS = {
+    "calls": 0, "autogrow_iters": 0,
+    "seg_s": 0.0, "words_s": 0.0, "autogrow_s": 0.0, "syll_s": 0.0,
+    "hyph_s": 0.0, "pack_s": 0.0, "post_s": 0.0, "gsw_calls": 0,
+    "calls_vertical": 0, "vertical_chars": 0, "vertical_s": 0.0,
+}
+
+
+def reset_calc_h_stats():
+    for k, v in _CALC_H_STATS.items():
+        _CALC_H_STATS[k] = 0.0 if isinstance(v, float) else 0
+
+
+def get_calc_h_stats():
+    return dict(_CALC_H_STATS)
+
+
 def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, language: str = 'en_US', hyphenate: bool = True, line_breaker: Optional[LineBreaker] = None) -> Tuple[List[str], List[int]]:
     """
     Splits up a string of text into lines. Returns list of lines and their widths.
     Will go over max_height if too much text is present.
     """
+    _CALC_H_STATS["calls"] += 1
     # Pre-segment Thai text with zero-width spaces so wrapping can occur on
     # word boundaries without adding visible spaces to final rendered output.
+    _t = time.perf_counter()
     text = _insert_thai_word_breaks(text)
     text = _insert_cjk_word_breaks(text)
     has_zwsp_breaks = _ZWSP in text
@@ -879,12 +918,17 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
 
     whitespace_offset_x = 0 if has_zwsp_breaks else get_char_offset_x(font_size, ' ')
     hyphen_offset_x = get_char_offset_x(font_size, '-')
+    _CALC_H_STATS["seg_s"] += time.perf_counter() - _t
 
     # Split text into words and precalculate each word width (#186: helper)
+    _t = time.perf_counter()
     words, word_widths = _split_words_and_widths(text, font_size)
+    _CALC_H_STATS["words_s"] += time.perf_counter() - _t
 
     # Try to increase width usage if a height overflow is unavoidable
+    _t = time.perf_counter()
     while True:
+        _CALC_H_STATS["autogrow_iters"] += 1
         max_lines = max_height // font_size + 1
         expected_size = sum(word_widths) + max((len(word_widths) - 1) * whitespace_offset_x - (max_lines - 1) * hyphen_offset_x, 0)
         max_size = max_width * max_lines
@@ -894,20 +938,28 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
             max_height *= multiplier
         else:
             break
+    _CALC_H_STATS["autogrow_s"] += time.perf_counter() - _t
 
     # Split words into syllables (#186: extracted to _split_into_syllables)
+    _t = time.perf_counter()
     syllables = _split_into_syllables(words, font_size, max_width, language)
+    _CALC_H_STATS["syll_s"] += time.perf_counter() - _t
     # Step 2/4 below still consult the hyphenator for backward-hyphenation decisions.
+    _t = time.perf_counter()
     hyphenator = select_hyphenator(language)
+    _CALC_H_STATS["hyph_s"] += time.perf_counter() - _t
 
     # Step 1: line packing via the pluggable LineBreaker seam (#186). Default is
     # GreedyLineBreaker — byte-identical to the original greedy Step 1; #180 step 2
     # selects KnuthPlassLineBreaker behind render.bubble_area_fit. Steps 2-4 below
     # post-process greedy output; a holistic strategy opts out via greedy_postprocess.
+    _t = time.perf_counter()
     breaker = line_breaker if line_breaker is not None else GreedyLineBreaker()
     line_words_list, line_width_list, hyphenation_idx_list = breaker.pack(
         words, word_widths, syllables, font_size, max_width,
         whitespace_offset_x, hyphen_offset_x)
+    _CALC_H_STATS["pack_s"] += time.perf_counter() - _t
+    _t_post = time.perf_counter()
 
     def get_present_syllables_range(line_idx, word_pos):
         while word_pos < 0:
@@ -1061,6 +1113,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
         line_width_list[i] = get_string_width(font_size, line_text)
         line_text_list.append(line_text)
 
+    _CALC_H_STATS["post_s"] += time.perf_counter() - _t_post
     return line_text_list, line_width_list
 
 

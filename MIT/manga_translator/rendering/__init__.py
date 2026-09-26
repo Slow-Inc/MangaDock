@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import cv2
 import numpy as np
@@ -11,8 +12,8 @@ from tqdm import tqdm
 from . import text_render
 from ..font_fit import fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
-from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width
-from ..safe_area import safe_area_box
+from ..render_overlap import clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, processing_scale, font_bounds, clean_layout_font_size, clean_layout_target_fs, region_territory_box, display_sfx, bubble_fit_bounds, fills_bubble_width, squeeze_width, box_containment
+from ..safe_area import safe_area_box, reset_safe_area_stats, get_safe_area_stats
 from .text_render_eng import render_textblock_list_eng
 from .text_render_pillow_eng import render_textblock_list_eng as render_textblock_list_eng_pillow
 from ..utils import (
@@ -56,6 +57,11 @@ def count_text_length(text: str) -> float:
 # box so rounding/glyph slack can't touch the edge; _MAX_FONT_BOX_RATIO caps the
 # font at half the box height so a short line in a big balloon isn't a giant.
 _LINE_HEIGHT = 1.2
+# #175 follow-up: a display caption may render taller than its original footprint once the font
+# tracks the original size (the translation often needs more lines). Allow it to grow to this ×
+# the source box height before shrinking the font, so big captions stay prominent without
+# spilling far past where the original lettering sat.
+_CLEAN_DISPLAY_H_TOL = 1.6
 _FIT_MARGIN = 0.92
 _MAX_FONT_BOX_RATIO = 0.5
 
@@ -68,34 +74,92 @@ _FONT_SIZE_SCALE_GAIN = 0.4
 _MAX_BBOX_SCALE = 1.1
 
 
-def _bubble_fit_font_size(region, bubble_wh, max_box_ratio: float = _MAX_FONT_BOX_RATIO) -> int:
-    """#166/#175: largest font whose wrapped translation fits the balloon box,
-    measured with the renderer's own wrapper so the prediction matches the actual
-    render — with a real line-height estimate, a fit margin, and a relative cap so
-    the text fills the balloon without overflowing it. Render-parity C: a higher
-    ``max_box_ratio`` lets short lines fill a tall balloon (MangaTranslator has no
-    cap); the default reproduces the #175 0.5 cap byte-for-byte."""
+# #speed-study Phase 0 (2026-07-03): calc_horizontal's OWN internals proved cheap
+# (~35ms total vs a measured 12-40s/region layout_fit) — so the cost must be in the
+# code that CALLS it. This accumulator isolates _bubble_fit_layout's four phases so
+# the caller isn't guessing which one dominates. Logging-only, no behavior change.
+_BUBBLE_FIT_STATS = {"calls": 0, "preseg_s": 0.0, "bounds_s": 0.0, "fit_s": 0.0, "squeeze_s": 0.0, "final_s": 0.0}
+
+
+def reset_bubble_fit_stats():
+    for k, v in _BUBBLE_FIT_STATS.items():
+        _BUBBLE_FIT_STATS[k] = 0.0 if isinstance(v, float) else 0
+
+
+def get_bubble_fit_stats():
+    return dict(_BUBBLE_FIT_STATS)
+
+
+def _bubble_fit_layout(region, bubble_wh, img_shape, font_size_minimum: int = 8):
+    """#175/#183: choose the font AND wrap-column for a region that fills a balloon. (1) binary-
+    search the largest font whose word-wrapped translation fits the balloon safe-area, bounded
+    by the interior height (:func:`bubble_fit_bounds`) and never force-breaking a word. (2) width-
+    SQUEEZE the column (:func:`squeeze_width`) so the text uses more lines and fills the box
+    HEIGHT — a tall balloon gets a narrow tall column (like the original) instead of a few wide
+    lines with empty space below. Returns ``(font_size, block_w, block_h)`` — the squeezed block
+    the caller centres in the balloon."""
+    _BUBBLE_FIT_STATS["calls"] += 1
     w_box, h_box = bubble_wh
     lang = getattr(region, 'target_lang', 'en_US')
     text = region.translation
-
-    # Wrap to the *margin'd* width so the lines calc_horizontal produces are
-    # never wider than the fit-test (which compares against w_box * margin) —
-    # otherwise every size fails the margin check and the search floors at `low`
-    # (#175 self-bug).
     mw, mh = int(w_box * _FIT_MARGIN), int(h_box * _FIT_MARGIN)
+
+    # Segment Thai/Chinese into words first (region.translation is raw — the ZWSP word breaks
+    # are inserted inside calc_horizontal, not here), so the longest-token checks below are
+    # word-aware in every language instead of treating a whole spaceless Thai line as one word.
+    _t = time.perf_counter()
+    _seg = text_render._insert_cjk_word_breaks(
+        text_render._insert_thai_word_breaks(text or ''))
+    _toks = [t for t in re.split(r'[\s​]+', _seg) if t]
+    _longest = max(_toks, key=len) if _toks else ''
+    _BUBBLE_FIT_STATS["preseg_s"] += time.perf_counter() - _t
+
+    def _longest_word_w(size):
+        if not _longest:
+            return 0.0
+        _, lww = text_render.calc_horizontal(
+            size, _longest, max_width=10 ** 7, max_height=10 ** 7, language=lang)
+        return max(lww) if lww else 0.0
 
     def measure(size):
         lines, widths = text_render.calc_horizontal(
             size, text, max_width=mw, max_height=mh, language=lang)
-        # Empty widths means nothing measurable wrapped — treat as "does not fit"
-        # so the search floors at `low` instead of picking the max font (#bug-hunt).
         block_w = max(widths) if widths else float('inf')
         block_h = len(lines) * size * _LINE_HEIGHT
+        # reject a size that force-breaks a single WORD wider than the column ("HMPH"→"HM/PH").
+        if _longest and _longest_word_w(size) > mw:
+            return float('inf'), float('inf')
         return block_w, block_h
 
-    high = font_high_cap(h_box, max_box_ratio, floor=8)
-    return fit_font_size((w_box, h_box), measure, low=8, high=high, margin=_FIT_MARGIN)
+    # Fill the balloon — bound the search by the interior BOX HEIGHT, not page-area scale (the
+    # per-crop patch path makes processing_scale meaningless; see bubble_fit_bounds).
+    _t = time.perf_counter()
+    low, high = bubble_fit_bounds(h_box, font_size_minimum)
+    _BUBBLE_FIT_STATS["bounds_s"] += time.perf_counter() - _t
+    _t = time.perf_counter()
+    font = fit_font_size((w_box, h_box), measure, low=low, high=high, margin=_FIT_MARGIN)
+    _BUBBLE_FIT_STATS["fit_s"] += time.perf_counter() - _t
+
+    # #183 width-squeeze: narrow the column so the block fills the box HEIGHT (more lines) like
+    # the original, instead of a few wide lines. Floor = the longest token's width at `font`,
+    # so squeezing never force-breaks a word.
+    min_w = max(1.0, min(_longest_word_w(font) + 4.0, float(mw)))
+
+    def measure_h(w):
+        lines, _ = text_render.calc_horizontal(
+            font, text, max_width=int(w), max_height=10 ** 7, language=lang)
+        return len(lines) * font * _LINE_HEIGHT
+
+    _t = time.perf_counter()
+    used_w = squeeze_width(measure_h, mw, min_w, mh)
+    _BUBBLE_FIT_STATS["squeeze_s"] += time.perf_counter() - _t
+    _t = time.perf_counter()
+    lines, widths = text_render.calc_horizontal(
+        font, text, max_width=int(used_w), max_height=10 ** 7, language=lang)
+    block_w = max(widths) if widths else used_w
+    block_h = len(lines) * font * _LINE_HEIGHT
+    _BUBBLE_FIT_STATS["final_s"] += time.perf_counter() - _t
+    return font, float(block_w), float(block_h)
 
 
 def _bubble_interior_box(region, bubble_box, crop_shape):
@@ -147,16 +211,17 @@ def _expand_single_axis(region, needed_count: int, used_count: int, horizontal_a
 
 
 def _region_territory(region):
-    """The box a region 'owns' for anti-overlap: its balloon (#170) if known, else its
-    detection box. Returns None when neither is available."""
-    bb = getattr(region, 'bubble_box', None)
-    if bb is not None:
-        return (float(bb[0]), float(bb[1]), float(bb[2]), float(bb[3]))
+    """The box a region 'owns' for anti-overlap: its balloon (#170) when its text FILLS it,
+    else just its narrow detection/text box (#436 — a narration column must not reserve the
+    whole balloon and over-clamp an overlapping neighbour). Returns None when no box is known."""
     xy = getattr(region, 'xyxy', None)
-    return (float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3])) if xy is not None else None
+    if xy is None:
+        return None
+    bb = getattr(region, 'bubble_box', None)
+    return region_territory_box(float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3]), bb)
 
 
-def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int):
+def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None):
     """Render-layout rework: lay the translated text out as an upright horizontal block
     at a *small absolute* font, wrapped to a compact width, ready to be placed on the
     region's centre. Returns ``(font_size, block_w, block_h)`` — or ``None`` when the
@@ -170,24 +235,48 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     if xy is None:
         return None
     x1f, y1f, x2f, y2f = (float(v) for v in xy)
-    clean_fs = font_size_max if (font_size_max and font_size_max > 0) else \
-        max(font_size_minimum, round((img_shape[0] + img_shape[1]) / 130))
+    # #175 patch-path fix: these three quantities are PAGE-relative — the font's
+    # processing_scale (area→resolution), the wrap-width clamp (% of page width) and the
+    # generous max-wrap-height. In the per-region patch path ``img_shape`` is the small CROP
+    # (full-res but tiny area), which collapses processing_scale to its 0.5 floor → narration
+    # rendered ~3× too small while balloon dialogue (box-driven) stayed normal. Use the PAGE
+    # shape when the caller threads it; fall back to img_shape (full-page render → identical).
+    ps_shape = page_shape if page_shape is not None else img_shape
+    # #175: scale the clean-layout font by processing_scale so it tracks page resolution
+    # (same look on the benchmark, larger on higher-res pages where the fixed px was too small).
+    clean_fs_flat = clean_layout_font_size(font_size_max, ps_shape[0], ps_shape[1], font_size_minimum)
+    # #175 follow-up: a big stylized DISPLAY caption ("LOVE IS FORBIDDEN" lettered at 96px) was
+    # collapsing to the same flat ~26px as a 21px narration line. Size it near its ORIGINAL
+    # lettering instead so it keeps its prominence; narration (orig <= flat) is byte-identical.
+    clean_fs = clean_layout_target_fs(getattr(region, 'font_size', 0), clean_fs_flat)
     # Footprint width = the region's own (source-text) bbox width, so the English breaks
     # where the source columns did — a narration stays a narrow tall block, not a wide
     # paragraph. (The balloon box is deliberately NOT used: narration boxes also get a
     # wide bubble_box from segmentation, which would re-widen them.)
-    wrap_w = clean_wrap_width(x2f - x1f, img_shape[1])
+    wrap_w = clean_wrap_width(x2f - x1f, ps_shape[1])
+    # A sized-up display caption wraps to its own (wider) source footprint, not the narrowed
+    # narration column — otherwise the big glyphs break into a too-narrow column (mid-word
+    # breaks). Narration keeps the narrow clean wrap.
+    if clean_fs > clean_fs_flat:
+        wrap_w = max(wrap_w, int(x2f - x1f))
+    lang = getattr(region, 'target_lang', 'en_US')
     # max_height is generous (full page) so wrapping is governed by width and the block
     # grows vertically — we place it on the centre regardless of the source box height.
-    lines, widths = text_render.calc_horizontal(
-        clean_fs, region.translation, wrap_w, int(img_shape[0]),
-        language=getattr(region, 'target_lang', 'en_US'))
+    lines, widths = text_render.calc_horizontal(clean_fs, region.translation, wrap_w, int(ps_shape[0]), language=lang)
+    # When a display caption was sized up, shrink it just enough that the wrapped block stays
+    # within ~its original vertical footprint — keeps the caption prominent without spilling far
+    # past where the source lettering sat. Never below the flat size (narration unaffected).
+    if clean_fs > clean_fs_flat:
+        max_h = (y2f - y1f) * _CLEAN_DISPLAY_H_TOL
+        while clean_fs > clean_fs_flat and max(1, len(lines)) * clean_fs * _LINE_HEIGHT > max_h:
+            clean_fs -= 2
+            lines, widths = text_render.calc_horizontal(clean_fs, region.translation, wrap_w, int(ps_shape[0]), language=lang)
     block_w = max(widths) if widths else wrap_w
     block_h = max(1, len(lines)) * clean_fs * _LINE_HEIGHT
     return int(clean_fs), float(block_w), float(block_h)
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False):
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -214,8 +303,37 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
     occupancy = (balloon_occupancy([getattr(r, 'bubble_box', None) for r in text_regions])
                  if bubble_fit else None)
 
+    # #436 de-dup: the SFX detector can re-detect a stylized word the line detector already
+    # captured (e.g. "ปาร์ตี้" sitting inside "…จัดปาร์ตี้ดื่ม…"), yielding a small duplicate
+    # region mostly inside the full-sentence region — it then renders on top of the sentence.
+    # Blank the shorter duplicate when its text is a substring AND its box is ≥60% inside the
+    # other's (containment + substring, never length alone, so a legitimate repeat survives).
+    _orig_tr = [(r.translation or '').strip() for r in text_regions]
+    for i, ri in enumerate(text_regions):
+        ti = _orig_tr[i]
+        if not ti:
+            continue
+        for j in range(len(text_regions)):
+            if i == j:
+                continue
+            tj = _orig_tr[j]
+            if tj and len(ti) < len(tj) and ti in tj \
+                    and box_containment(ri.xyxy, text_regions[j].xyxy) >= 0.6:
+                ri.translation = ''
+                break
+
     dst_points_list = []
     for i, region in enumerate(text_regions):
+        # #speed-study Phase 0 (2026-07-03): diagnostic-only — correlate region shape
+        # with the layout_fit cost (translation length, orientation) since
+        # calc_horizontal's internal breakdown proved NOT to account for the
+        # measured 12-14s/region. No behavior change.
+        logger.info(
+            f"[timing-render] phase=layout_fit_region i={i} "
+            f"translation_len={len(region.translation or '')} "
+            f"horizontal={region.horizontal} vertical={region.vertical}"
+        )
+        _t_region = time.perf_counter()
 
         # #166 binary-search fit: when this region is the sole occupant of a known
         # balloon, size the font to fill the balloon box and render into that box.
@@ -224,7 +342,16 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # Only for horizontal targets (the wrapper measures horizontally); vertical,
         # balloon-less, and balloon-sharing regions fall through to legacy unchanged.
         bubble_box = getattr(region, 'bubble_box', None) if bubble_fit else None
-        if (bubble_box is not None and region.horizontal and occupancy[i] == 1
+        # #175 residual #2: only FILL the balloon for dialogue — a region whose own text
+        # footprint spans most of the balloon width. A caption/narration loosely placed in a
+        # large detected box (rw/bw low, e.g. One-Punch "THIS BRAT…") must fall through to
+        # clean-layout's narrow source-referenced column instead of ballooning up to fill.
+        _fills = True
+        if bubble_box is not None:
+            _rx = region.xyxy
+            _fills = fills_bubble_width(float(_rx[2]) - float(_rx[0]),
+                                        float(bubble_box[2]) - float(bubble_box[0]))
+        if (bubble_box is not None and _fills and region.horizontal and occupancy[i] == 1
                 and region.translation and region.translation.strip()):
             # #179: wrap to the balloon's safe *interior* (narrow column) centered
             # on the safe anchor, not the full bounding box.
@@ -242,11 +369,41 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 if cw >= 6 and ch >= 6:
                     fit_w, fit_h = cw, ch
                     acx, acy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
-            region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), font_max_box_ratio)
-            hw, hh = fit_w / 2.0, fit_h / 2.0
+            region.font_size, _bw, _bh = _bubble_fit_layout(region, (fit_w, fit_h), img.shape, font_size_minimum)
+            hw, hh = _bw / 2.0, _bh / 2.0
             dst_points_list.append(
                 np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
                            [acx + hw, acy + hh], [acx - hw, acy + hh]]], dtype=np.int64))
+            logger.info(f"[timing-render] phase=layout_fit_region_exit i={i} branch=bubble_fit_sole elapsed_ms={(time.perf_counter() - _t_region) * 1000:.1f}")
+            continue
+
+        # #436: regions that SHARE one (often over-merged) balloon — occupancy > 1 — are not
+        # the sole occupant, so the bubble-fit block above skipped them and they would render
+        # tiny via clean-layout. Fill each to its OWN detection footprint instead, so
+        # multi-balloon dialogue matches the source text size; each stays inside its own box,
+        # clamped against its siblings, so they don't collide.
+        if (bubble_box is not None and occupancy[i] > 1 and region.horizontal
+                and region.translation and region.translation.strip()):
+            x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
+            fit_w, fit_h = (x2f - x1f), (y2f - y1f)
+            acx, acy = (x1f + x2f) / 2.0, (y1f + y2f) / 2.0
+            if anti_overlap:
+                territories = [t for j, r in enumerate(text_regions) if j != i
+                               and (r.translation or '').strip()
+                               for t in (_region_territory(r),) if t is not None]
+                cb = clamp_box_to_neighbors(
+                    (acx - fit_w / 2.0, acy - fit_h / 2.0, acx + fit_w / 2.0, acy + fit_h / 2.0),
+                    territories, margin=2)
+                cw, ch = cb[2] - cb[0], cb[3] - cb[1]
+                if cw >= 6 and ch >= 6:
+                    fit_w, fit_h = cw, ch
+                    acx, acy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
+            region.font_size, _bw, _bh = _bubble_fit_layout(region, (fit_w, fit_h), img.shape, font_size_minimum)
+            hw, hh = _bw / 2.0, _bh / 2.0
+            dst_points_list.append(
+                np.array([[[acx - hw, acy - hh], [acx + hw, acy - hh],
+                           [acx + hw, acy + hh], [acx - hw, acy + hh]]], dtype=np.int64))
+            logger.info(f"[timing-render] phase=layout_fit_region_exit i={i} branch=bubble_fit_shared elapsed_ms={(time.perf_counter() - _t_region) * 1000:.1f}")
             continue
 
         # Clean horizontal layout (render-layout rework): for the regions the bubble-fit
@@ -257,7 +414,9 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # stylized legacy path). Off → byte-identical.
         sfx = getattr(region, 'sfx_rescued', False)
         if clean_layout and not sfx and region.translation and region.translation.strip():
-            laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max)
+            _t_cld = time.perf_counter()
+            laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max, page_shape)
+            logger.info(f"[timing-render] phase=clean_layout_dst_call i={i} elapsed_ms={(time.perf_counter() - _t_cld) * 1000:.1f}")
             if laid is not None:
                 clean_fs, block_w, block_h = laid
                 x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
@@ -275,6 +434,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 region._direction = 'h'
                 dst_points_list.append(
                     np.array([centered_box(cx, cy, block_w, block_h)], dtype=np.int64))
+                logger.info(f"[timing-render] phase=layout_fit_region_exit i={i} branch=clean_layout elapsed_ms={(time.perf_counter() - _t_region) * 1000:.1f}")
                 continue
 
         # Store and validate original font size
@@ -343,8 +503,14 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             # Cap narration/caption font (SFX exempt) BEFORE the box scaling, so the
             # box scales to the capped font instead of an oversized block overflowing
             # the panel. 0 → no cap (byte-identical).
+            # #431: only a FREE-FLOATING SFX (no balloon) is exempt from the cap / box-scale
+            # clamp. A balloon-associated region flagged sfx_rescued by the length heuristic
+            # is dialogue ("DRINKING PARTY") — cap it so it can't oversize and overflow.
+            disp = display_sfx(getattr(region, 'sfx_rescued', False),
+                               getattr(region, 'is_sfx', False),
+                               getattr(region, 'bubble_box', None) is not None)
             target_font_size = apply_font_cap(
-                target_font_size, font_size_max, getattr(region, 'sfx_rescued', False))
+                target_font_size, font_size_max, disp)
 
             # Calculate final scaling factor
             font_size_scale = (((target_font_size - original_region_font_size) / original_region_font_size) * _FONT_SIZE_SCALE_GAIN + 1) if original_region_font_size > 0 else 1.0
@@ -354,7 +520,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             # enlarging a non-SFX region's box (the homography would warp the capped
             # font back up to fill it). The longer translation then wraps inside the
             # source box (narrow-column) instead of overflowing the panel.
-            if font_size_max and font_size_max > 0 and not getattr(region, 'sfx_rescued', False):
+            if font_size_max and font_size_max > 0 and not disp:
                 final_scale = 1.0
 
             # Scale bounding box if needed
@@ -409,6 +575,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # Store results and update font size
         dst_points_list.append(dst_points)
         region.font_size = int(target_font_size)
+        logger.info(f"[timing-render] phase=layout_fit_region_exit i={i} branch=legacy elapsed_ms={(time.perf_counter() - _t_region) * 1000:.1f}")
 
     return dst_points_list
 
@@ -428,20 +595,49 @@ async def dispatch(
     font_max_box_ratio: float = _MAX_FONT_BOX_RATIO,
     anti_overlap: bool = False,
     font_size_max: int = 0,
-    clean_layout: bool = False
+    clean_layout: bool = False,
+    page_shape=None
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
-    # Resize regions that are too small
+    # Resize regions that are too small. `page_shape` (full-page H,W) is threaded so clean-layout
+    # narration scales by page resolution even when `img` is a per-region crop (#175 patch-path).
     # #speed-study (2026-07-02): split the two sync phases of the render stage to
     # locate where the render wall-clock goes. Both blocks are pure synchronous CPU
     # (no `await`), so perf_counter here measures true compute — comparing their sum
     # to the async-wrapper's stage total isolates any async/suspension overhead.
+    text_render.reset_calc_h_stats()
+    reset_bubble_fit_stats()
+    reset_safe_area_stats()
     _t_layout = time.perf_counter()
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape)
     logger.info(f"[timing-render] phase=layout_fit elapsed_ms={(time.perf_counter() - _t_layout) * 1000:.1f} regions={len(text_regions)}")
+    _stats = text_render.get_calc_h_stats()
+    logger.info(
+        "[timing-render] phase=layout_fit_breakdown "
+        + " ".join(
+            f"{k}={v:.1f}" if isinstance(v, float) else f"{k}={v}"
+            for k, v in _stats.items()
+        )
+    )
+    _bstats = get_bubble_fit_stats()
+    logger.info(
+        "[timing-render] phase=bubble_fit_breakdown "
+        + " ".join(
+            f"{k}={v:.1f}" if isinstance(v, float) else f"{k}={v}"
+            for k, v in _bstats.items()
+        )
+    )
+    _sstats = get_safe_area_stats()
+    logger.info(
+        "[timing-render] phase=safe_area_breakdown "
+        + " ".join(
+            f"{k}={v:.1f}" if isinstance(v, float) else f"{k}={v}"
+            for k, v in _sstats.items()
+        )
+    )
 
     # TODO: Maybe remove intersections
 
@@ -541,6 +737,12 @@ def render(
             bg,
             line_spacing,
         )
+    # #436 de-dup: a region the pre-pass blanked (its translation was a duplicate substring of a
+    # neighbour, e.g. the SFX-detected "ปาร์ตี้" inside "…จัดปาร์ตี้…") survives the line-529 filter
+    # (it ran before the blanking) and still reaches here with empty text — put_text returns None.
+    # Render nothing for it (the duplicate is meant to be dropped) instead of crashing on .shape.
+    if temp_box is None:
+        return img
     if ss > 1:
         temp_box = cv2.resize(
             temp_box,

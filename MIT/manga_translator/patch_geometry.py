@@ -209,6 +209,36 @@ def feather_alpha(content_mask: np.ndarray, radius: int) -> np.ndarray:
     return (ramp * 255.0).astype(np.uint8)
 
 
+def content_alpha_inner(rendered_rgb: np.ndarray, inpainted_rgb: np.ndarray,
+                        own_mask: np.ndarray = None, threshold: int = 12, dilate: int = 8) -> np.ndarray:
+    """Content-footprint mask for a patch (#436): 255 only over what *this* patch contributes —
+    its newly-drawn glyphs **and** the area of its own original text it must hide — else 0.
+
+    Fed to :func:`feather_alpha` instead of a full rectangle so the patch is opaque only over its
+    own content and **transparent everywhere else**. Two overlapping speech balloons each emit a
+    rectangular patch; the one composited last used to repaint its whole opaque rectangle over the
+    other's text. A content alpha makes the margins transparent so the neighbour's text survives.
+
+    Crucially it must NOT key off ``rendered != original``: with full-page inpaint each patch's
+    crop already has *every* balloon's original text erased, so that diff would also mark the
+    neighbour-text it erased and re-occlude it. Instead:
+      * new glyphs  = ``|rendered - inpainted|`` (the inpaint has no text, so this is only the
+        glyphs this patch drew), and
+      * own erase   = ``own_mask`` (this group's text-only mask — its own original ink), if given.
+    Their union, dilated by ``dilate`` px to cover anti-aliasing. ``None`` on a rendered/inpaint
+    shape mismatch → caller falls back to the rectangle. Pure numpy/cv2."""
+    if rendered_rgb.shape[:2] != inpainted_rgb.shape[:2]:
+        return None
+    diff = np.abs(rendered_rgb.astype(np.int16) - inpainted_rgb.astype(np.int16)).max(axis=2)
+    inner = (diff > threshold).astype(np.uint8) * np.uint8(255)
+    if own_mask is not None and own_mask.shape[:2] == rendered_rgb.shape[:2]:
+        inner = np.maximum(inner, (own_mask > 0).astype(np.uint8) * np.uint8(255))
+    if dilate > 0:
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * dilate + 1, 2 * dilate + 1))
+        inner = cv2.dilate(inner, k)
+    return inner
+
+
 def seamless_blend_inpaint(inpainted_rgb: np.ndarray, original_rgb: np.ndarray,
                            mask: np.ndarray, *, erode: int = 2) -> np.ndarray:
     """Poisson seamless-clone the inpainted region into the original (PRD #268 escalation lever).
