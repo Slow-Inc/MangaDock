@@ -3,6 +3,74 @@
 
 ---
 
+## #694 — SFX rescue says why it returned nothing (2026-09-26)
+
+**What:** `MIT/manga_translator/ocr_vlm.py` `vlm_localize_sfx` now logs one `WARNING` when the
+vision reply yields no usable SFX: `SFX reply unusable: finish_reason=… content=… max_tokens=24
+crop=WxH` for a truncated or `None` reply, and `SFX reply sanitised to empty: '…'` when a reply
+arrived but `sanitize_sfx` reduced it to nothing. The return value is unchanged in every case — the
+degrade-to-`''` behaviour is deliberate and safe (the region renders the raw SFX).
+
+**Why:** `''` from this function reads downstream as "this region has no SFX". A truncation looked
+exactly like an empty region, which is why 2026-07-11 concluded "text MoE" and why 2026-07-28 needed
+~10 hand-written probes to find three defects (verdict #4 of
+`docs/reports/benchmarks/2026-07-28-679-sfx-gate.md`). The Doctor (#688) can name it, but only
+inside a Doctor run; production stayed silent.
+
+**Not in scope:** raising the token budget or disabling thinking (verdict #3: on the served model
+those ship confident nonsense). The function has no region id, so the crop size stands in for "the
+region".
+
+**Found while writing the tests:** `'(no sound effect)!!'` survives `sanitize_sfx` as
+`NO SOUND EFFECT !!` — the refusal-leak the #688 `sanitize` probe reports. Left for its own issue.
+
+**Validation:** TDD — 4 new tests, 3 red first (no warning emitted), then green. Each branch
+mutation-checked: dropping the `finish_reason` check, the sanitised-empty check, or the budget in the
+message each fails exactly one test. 47 passed across `test_ocr_vlm`, `test_sfx_gate_scan`,
+`test_lazy_import`, `test_stage_c_wiring`. MIT not booted (torch-free tests only).
+## #688 — Doctor LLM contracts: four checks that turn a silent `''` into named failures (2026-08-31)
+
+**What:** `MIT/tools/pipeline_doctor/llm_contracts.py` — four probes over one SFX rescue call,
+covering the LLM/gateway layer that nothing in the repo looked at. `vlm-send` (model set, budget
+above the reasoning floor, thinking flag applied), `vlm-image` (decodes, RGB, not blank, above the
+vision-resolution floor), `vlm-recv` (`finish_reason`, `content` not `None`), `sanitize` (a corpus
+of refusal forms the model actually emitted). 20 tests in `test/test_pipeline_doctor_llm.py`.
+
+**The design choice that carries the value:** `capture_sfx_call` runs the **real**
+`vlm_localize_sfx` with its `post_fn` seam filled by a recorder, so the contracts report on
+production code. A probe reading a hand-written copy of the payload would stay green through
+exactly the edit it exists to catch — mutating the capture to a hand-written body reds 9 of 20.
+
+**Acceptance (#685's falsifiable bar) is met:** all three 2026-07-28 defects surface in one walk,
+each on its own row with its own evidence — `vlm-send` FAIL (`budget 24 <= 2048 measured to
+truncate`), `vlm-recv` FAIL (`finish_reason=length, content=None`), `sanitize` FAIL (`'EMPTY LINE'
+-> 'EMPTY LINE'`), plus `vlm-image` WARN (≈40 visual tokens vs the 336 measured to be answered).
+
+**Every threshold is a measurement, cited at the constant that uses it** (`2026-07-28-679-sfx-gate.md`).
+Two bands stay WARN because nobody located their boundary: the vision floor rests on a single
+measurement, and the 2048–4096 budget band is unmeasured. The Doctor **fixes nothing** — it makes
+the defects nameable. Deliberately so: that benchmark's verdict is that raising the budget on the
+current model ships confident nonsense into renders.
+
+**A defect in this work's own tests, found and fixed:** `test_the_contracts_import_without_torch`
+first asserted `'torch' not in sys.modules` inline — green in CI (no torch installed), red locally
+the moment an earlier module imports the pipeline. It measured the suite's import order, not the
+import graph, and would have been green in exactly the environment that cannot detect a regression.
+Rewritten as a subprocess check with a negative control.
+
+**Scope held:** #688's D1 (extract five thinking/budget helpers from `custom_openai`) was **not**
+done — those helpers do not exist on `main` (they arrived with #623 on `perf`), so the premise is
+void on this base. The SFX half, which the issue names as the priority, is what shipped. The
+production-side gap the benchmark asked for (log `finish_reason: length` in `ocr_vlm` itself) is
+new work and was filed rather than absorbed.
+
+Benchmark: `docs/reports/benchmarks/2026-08-31-688-doctor-llm-contracts.md` (+ PNG).
+Tests: 20 new, mutation-tested 6/6; full MIT suite 768 passed / 1 pre-existing network failure.
+
+Refs #688 #685.
+
+---
+
 ## #686 — Pipeline Doctor core: probe registry + runner, two renderings from one walk (2026-08-31)
 
 **What:** `MIT/tools/pipeline_doctor/` — the seam every other #685 deliverable plugs into.
@@ -1032,6 +1100,66 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 
 <!-- lang:th -->
 # DONE — Claude Code Review Fix Session (2026-05-27)
+
+---
+
+## #694 — SFX rescue บอกเหตุผลเมื่อคืนค่าว่าง (2026-09-26)
+
+**อะไร:** `vlm_localize_sfx` ใน `MIT/manga_translator/ocr_vlm.py` ตอนนี้ log `WARNING` หนึ่งบรรทัดเมื่อคำตอบจาก
+vision model ใช้เป็น SFX ไม่ได้: `SFX reply unusable: finish_reason=… content=… max_tokens=24 crop=WxH`
+เมื่อคำตอบถูกตัดหรือเป็น `None` และ `SFX reply sanitised to empty: '…'` เมื่อได้คำตอบมาแต่ `sanitize_sfx`
+ตัดจนว่าง ค่าที่ return ไม่เปลี่ยนในทุกกรณี — การถอยกลับเป็น `''` ตั้งใจและปลอดภัย (region จะแสดง SFX ดิบ)
+
+**ทำไม:** `''` จากฟังก์ชันนี้ถูกอ่านต่อว่า "region นี้ไม่มี SFX" คำตอบที่ถูกตัดจึงดูเหมือน region ว่างทุกประการ
+เป็นเหตุที่ 2026-07-11 สรุปว่า "text MoE" และ 2026-07-28 ต้องเขียน probe เองราว 10 ตัวกว่าจะเจอ defect สามตัว
+(verdict #4 ใน `docs/reports/benchmarks/2026-07-28-679-sfx-gate.md`) Doctor (#688) ระบุได้ แต่เฉพาะตอนรัน
+Doctor เท่านั้น production ยังเงียบ
+
+**ไม่อยู่ใน scope:** เพิ่ม token budget หรือปิด thinking (verdict #3: บน model ที่ใช้อยู่ จะได้ผลมั่วที่ดูมั่นใจ)
+ฟังก์ชันไม่รู้ id ของ region จึงใช้ขนาด crop แทน
+
+**เจอระหว่างเขียนเทสต์:** `'(no sound effect)!!'` ผ่าน `sanitize_sfx` ออกมาเป็น `NO SOUND EFFECT !!` —
+คือ refusal ที่หลุดตามที่ probe `sanitize` ของ #688 รายงาน แยกไว้เป็น issue ของมันเอง
+
+**Validation:** TDD — เทสต์ใหม่ 4 ตัว แดงก่อน 3 ตัว (ไม่มี warning) แล้วเขียว mutation ทุก branch: ลบเช็ค
+`finish_reason`, ลบเช็ค sanitise-ว่าง หรือลบ budget ออกจากข้อความ แต่ละอย่างทำให้เทสต์แดงหนึ่งตัวพอดี
+ผ่าน 47 ตัวใน `test_ocr_vlm`, `test_sfx_gate_scan`, `test_lazy_import`, `test_stage_c_wiring` ไม่ได้ boot MIT
+## #688 — Doctor LLM contracts: สี่ด่านที่เปลี่ยน `''` เงียบ ๆ ให้เป็น failure ที่มีชื่อ (2026-08-31)
+
+**อะไร:** `MIT/tools/pipeline_doctor/llm_contracts.py` — probe สี่ตัวบนการเรียก SFX rescue ครั้งเดียว
+ครอบชั้น LLM/gateway ที่ไม่มีอะไรใน repo มองเลย · `vlm-send` (ตั้ง model, budget สูงกว่าพื้น reasoning,
+ใส่ flag thinking), `vlm-image` (ถอดรหัสได้, RGB, ไม่ว่างเปล่า, ไม่ต่ำกว่าพื้นความละเอียด vision),
+`vlm-recv` (`finish_reason`, `content` ไม่เป็น `None`), `sanitize` (คลังรูปแบบการปฏิเสธที่โมเดลพ่นออกมาจริง)
+· 20 เทสต์ใน `test/test_pipeline_doctor_llm.py`
+
+**จุดออกแบบที่เป็นหัวใจ:** `capture_sfx_call` รัน `vlm_localize_sfx` **ตัวจริง** โดยเสียบ recorder เข้าที่รอยต่อ
+`post_fn` ดังนั้น contract ตรวจโค้ด production จริง ๆ · probe ที่อ่าน payload ฉบับเขียนมือจะเขียวผ่านการแก้ที่มัน
+มีไว้จับพอดี — ลองเปลี่ยน capture เป็น body เขียนมือแล้วเทสต์แดง 9 จาก 20
+
+**ผ่านเกณฑ์ของ #685 (เกณฑ์ที่พิสูจน์ผิดได้):** บั๊กทั้งสามของ 2026-07-28 โผล่ในการเดินรอบเดียว แต่ละตัวมีบรรทัด
+และหลักฐานของตัวเอง — `vlm-send` FAIL (`budget 24 <= 2048 measured to truncate`), `vlm-recv` FAIL
+(`finish_reason=length, content=None`), `sanitize` FAIL (`'EMPTY LINE' -> 'EMPTY LINE'`) และ
+`vlm-image` WARN (~40 visual token เทียบกับ 336 ที่วัดว่าโมเดลตอบ)
+
+**ทุก threshold คือค่าที่วัดมา และอ้างอิงไว้ตรงค่าคงที่ที่ใช้มัน** (`2026-07-28-679-sfx-gate.md`) ·
+สองช่วงยังเป็น WARN เพราะไม่มีใครหาขอบเขตจริงเจอ: พื้นความละเอียด vision มาจากการวัดครั้งเดียว และช่วง budget
+2048–4096 ยังไม่มีใครวัด · Doctor **ไม่แก้อะไรเลย** — มันแค่ทำให้บั๊กเรียกชื่อได้ · ตั้งใจแบบนั้น เพราะคำตัดสินของ
+benchmark นั้นคือการเพิ่ม budget บนโมเดลปัจจุบันจะพ่นคำมั่ว ๆ ที่ดูมั่นใจลงไปบนภาพ
+
+**บั๊กในเทสต์ของงานนี้เอง ที่เจอและแก้แล้ว:** `test_the_contracts_import_without_torch` ตอนแรก assert
+`'torch' not in sys.modules` ตรง ๆ — เขียวใน CI (ไม่ได้ลง torch) แต่แดงบนเครื่อง local ทันทีที่มีโมดูลก่อนหน้า
+import pipeline · มันวัดลำดับการ import ของ suite ไม่ใช่กราฟ import ของโมดูล และจะเขียวพอดีในสภาพแวดล้อมที่
+ตรวจ regression ไม่ได้ · เขียนใหม่เป็นการเช็คใน subprocess พร้อม negative control
+
+**คุมขอบเขต:** D1 ของ #688 (แยกฟังก์ชัน thinking/budget ห้าตัวออกจาก `custom_openai`) **ไม่ได้ทำ** —
+ฟังก์ชันพวกนั้นไม่มีอยู่บน `main` (มากับ #623 บน `perf`) ข้อตั้งต้นจึงเป็นโมฆะบนฐานนี้ · สิ่งที่ส่งคือครึ่ง SFX
+ซึ่ง issue ระบุเองว่าเป็นลำดับแรก · ส่วนช่องว่างฝั่ง production ที่ benchmark ขอไว้ (log `finish_reason: length`
+ใน `ocr_vlm` เอง) เป็นงานใหม่ และเปิด issue แยกแทนที่จะกลืนเข้ามา
+
+Benchmark: `docs/reports/benchmarks/2026-08-31-688-doctor-llm-contracts.md` (+ PNG)
+เทสต์: ใหม่ 20 ตัว, mutation-test ผ่าน 6/6, suite MIT เต็ม 768 ผ่าน / 1 fail ที่ค้างมาก่อน (network)
+
+Refs #688 #685
 
 ---
 
