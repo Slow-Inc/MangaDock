@@ -28,6 +28,7 @@ _MIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SERVER_MAIN = os.path.join(_MIT_ROOT, 'server', 'main.py')
 _CLI_MAIN = os.path.join(_MIT_ROOT, 'manga_translator', '__main__.py')
 _KEYS = os.path.join(_MIT_ROOT, 'manga_translator', 'translators', 'keys.py')
+_BENCH_TUNED = os.path.join(_MIT_ROOT, 'tools', 'bench_render_tuned.py')
 
 
 def _result(code: str) -> str:
@@ -116,8 +117,14 @@ def test_no_module_scope_load_dotenv_remains():
 def test_both_entrypoints_initialize_before_importing_keys():
     """Ordering is the whole risk: `initialize()` after the first keys import is a no-op that
     silently leaves every API key empty. Assert the call precedes the first
-    `manga_translator`/`server` import in each entry point."""
-    for path in (_SERVER_MAIN, _CLI_MAIN):
+    `manga_translator`/`server` import in each entry point.
+
+    `tools/bench_render_tuned.py` is in the list because it builds a real `MangaTranslator`. It
+    used to receive `.env` for free via the import side-effect, so it is exactly the caller
+    that regresses when the load becomes explicit — and a benchmark tool falling back to default
+    keys produces a reference image that gets blamed on a render change.
+    """
+    for path in (_SERVER_MAIN, _CLI_MAIN, _BENCH_TUNED):
         with open(path, encoding='utf-8') as fh:
             lines = fh.read().splitlines()
         init_at = next((i for i, ln in enumerate(lines) if '_initialize_env()' in ln), None)
