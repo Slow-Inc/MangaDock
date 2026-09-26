@@ -219,10 +219,10 @@ export default function PublicProfilePage() {
 
   const gradientClass =
     profile.role === 1
-      ? "bg-gradient-to-br from-amber-950/80 via-amber-900/30 to-[#141414]"
+      ? "bg-white/[0.03] border-t-2 border-amber-500/70"
       : profile.role === 2
-      ? "bg-gradient-to-br from-orange-950/70 via-orange-900/25 to-[#141414]"
-      : "bg-gradient-to-br from-white/[0.06] to-[#141414]";
+      ? "bg-white/[0.03] border-t-2 border-orange-500/60"
+      : "bg-white/[0.03]";
 
   return (
     <div className="space-y-5">

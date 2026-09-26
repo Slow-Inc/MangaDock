@@ -121,13 +121,12 @@ export default function ForumSideMenu({
     <aside className="space-y-8 w-full pb-10">
       {/* Sidebar Search - Premium Search Bar */}
       <div className="relative group px-1">
-        <div className="absolute inset-0 bg-white/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="ค้นหาชุมชนมังงะ..."
-          className="relative w-full bg-white/3 border border-white/10 rounded-2xl px-4 py-3 pl-11 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-500/50 focus:bg-white/5 transition-all shadow-xl backdrop-blur-xl smooth-hover"
+          className="relative w-full bg-white/3 border border-white/10 rounded-2xl px-4 py-3 pl-11 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-500/50 focus:bg-white/5 transition-all smooth-hover"
         />
         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-hover:text-amber-400 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -228,7 +227,7 @@ export default function ForumSideMenu({
       <div>
         <div className="flex items-center justify-between px-4 mb-3">
           <h3 className="text-xs font-semibold text-white/40">คอมมูนิตี้มังงะ</h3>
-          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
         </div>
 
         <div className="space-y-0.5">

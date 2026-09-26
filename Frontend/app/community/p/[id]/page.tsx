@@ -260,15 +260,10 @@ export default function PostDetailPage() {
           className="group relative flex items-center gap-2 h-9 px-3 sm:px-5 rounded-full overflow-hidden shrink-0
             bg-white/[0.07] hover:bg-white/[0.13]
             border border-white/[0.13] hover:border-white/25
-            backdrop-blur-xl
-            shadow-[0_2px_10px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.10)]
-            hover:shadow-[0_4px_20px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.18)]
             text-white/70 hover:text-white
             transition-all duration-200"
           aria-label="ย้อนกลับ"
         >
-          {/* Liquid Glass top shimmer */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
           <svg
             className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:-translate-x-0.5"
             fill="none" stroke="currentColor" viewBox="0 0 24 24"

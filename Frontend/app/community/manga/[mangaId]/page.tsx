@@ -148,14 +148,14 @@ export default function MangaCommunityPage() {
       {/* ── Subreddit-style header ── */}
       <div className="relative mb-8 rounded-2xl overflow-hidden">
         {/* Banner */}
-        <div className="h-32 sm:h-40 relative bg-gradient-to-br from-amber-900/40 via-amber-900/30 to-[#1a1a2e] overflow-hidden">
+        <div className="h-32 sm:h-40 relative bg-white/[0.03] overflow-hidden">
           {mangaCover && (
             <Image
               src={mangaCover}
               alt=""
               fill
               sizes="100vw"
-              className="object-cover opacity-20 blur-xl scale-110"
+              className="object-cover opacity-15"
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/60 to-transparent" />
