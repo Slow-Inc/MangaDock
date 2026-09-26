@@ -73,7 +73,7 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
           placeholder={placeholder}
           className={`w-full rounded-xl border px-3 py-2.5 text-sm transition-all duration-200 ${
             isOpen
-              ? "border-white/20 bg-white/12 text-white shadow-[0_18px_40px_-18px_rgba(0,0,0,0.75)] ring-1 ring-white/8 backdrop-blur-xl"
+              ? "border-white/20 bg-white/12 text-white ring-1 ring-white/8 backdrop-blur-xl"
               : "border-white/10 bg-white/5 text-white placeholder-white/30 hover:border-white/20 hover:bg-white/8 hover:text-white"
           }`}
         />
@@ -110,12 +110,12 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
                       closeDropdown(country.label);
                     }}
                     className={`flex w-full items-center justify-between px-4 py-3 text-sm transition hover:bg-white/10 ${
-                      isSelected ? "text-indigo-400" : "text-white/70 hover:text-white"
+                      isSelected ? "text-amber-400" : "text-white/70 hover:text-white"
                     }`}
                   >
                     <span>{country.label}</span>
                     {isSelected ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : null}
@@ -131,7 +131,7 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
                     onChange(search);
                     closeDropdown(search);
                   }}
-                  className="block mx-auto mt-2 text-indigo-400 font-bold hover:underline"
+                  className="block mx-auto mt-2 text-amber-400 font-bold hover:underline"
                 >
                   ใช้ค่านี้แทน
                 </button>

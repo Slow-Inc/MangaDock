@@ -178,13 +178,13 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
                   <button
                     key={t}
                     onClick={() => { setSelectedAmount(t); setUseCustom(false); }}
-                    className={`rounded-xl border py-2.5 text-sm font-semibold transition ${
+                    className={`rounded-xl border py-2.5 text-sm font-semibold tabular-nums transition ${
                       !useCustom && selectedAmount === t
                         ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
                         : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
                     }`}
                   >
-                    🪙 {t}
+                    {t}
                   </button>
                 ))}
               </div>

@@ -213,7 +213,7 @@ function StudioUploadContent() {
                   className={`group relative flex aspect-[2/3] w-full max-w-[200px] flex-col overflow-hidden rounded-xl border bg-white/5 transition ${
                     titleThumbnail
                       ? "border-white/10 hover:border-white/30"
-                      : "border-dashed border-white/20 hover:border-indigo-300/50"
+                      : "border-dashed border-white/20 hover:border-amber-300/50"
                   } disabled:cursor-default disabled:hover:border-white/10`}
                 >
                   {titleThumbnail ? (
@@ -247,7 +247,7 @@ function StudioUploadContent() {
                 onChange={(e) => setChapterNumber(e.target.value)}
                 disabled={hasVersion}
                 placeholder="เช่น 1, 2, 1.5"
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-indigo-400/60 focus:ring-1 focus:ring-indigo-400/30 disabled:opacity-40"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/30 disabled:opacity-40"
               />
             </div>
             <div className="space-y-1">
@@ -257,7 +257,7 @@ function StudioUploadContent() {
                 onChange={(e) => setChapterTitle(e.target.value)}
                 disabled={hasVersion}
                 placeholder="ชื่อตอน"
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-indigo-400/60 focus:ring-1 focus:ring-indigo-400/30 disabled:opacity-40"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/30 disabled:opacity-40"
               />
             </div>
             <div className="space-y-1">
@@ -282,7 +282,7 @@ function StudioUploadContent() {
               rows={3}
               maxLength={1000}
               placeholder="บันทึกเพิ่มเติมจากนักแปล..."
-              className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-indigo-400/60 focus:ring-1 focus:ring-indigo-400/30"
+              className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/30"
             />
           </div>
 
@@ -294,7 +294,7 @@ function StudioUploadContent() {
                 min={0}
                 value={priceCoins}
                 onChange={(e) => setPriceCoins(e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-indigo-400/60 focus:ring-1 focus:ring-indigo-400/30"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/30"
               />
             </div>
             {hasVersion && (
@@ -318,7 +318,7 @@ function StudioUploadContent() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500 active:scale-95 disabled:opacity-50"
+              className="rounded-xl bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-white/90 active:scale-95 disabled:opacity-50"
             >
               {uploading ? "กำลังอัปโหลด..." : "+ เพิ่มหน้า"}
             </button>
@@ -340,7 +340,7 @@ function StudioUploadContent() {
             onDrop={handleDrop}
             onClick={() => pages.length === 0 && fileInputRef.current?.click()}
             className={`min-h-32 rounded-xl border border-dashed border-white/15 transition ${
-              pages.length === 0 ? "flex cursor-pointer items-center justify-center hover:border-indigo-400/50 hover:bg-indigo-950/10" : ""
+              pages.length === 0 ? "flex cursor-pointer items-center justify-center hover:border-amber-400/50 hover:bg-amber-950/10" : ""
             }`}
           >
             {pages.length === 0 ? (

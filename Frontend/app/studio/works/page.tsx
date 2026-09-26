@@ -15,7 +15,7 @@ import type { ChapterVersion, VersionStatus } from "../../lib/types";
 import { getCached, setCache } from "../../lib/studioCache";
 import StudioNav from "../components/StudioNav";
 import { StudioWorksSkeleton } from "../components/StudioSkeleton";
-import { MetricCard, StudioAnnouncement, StudioSection } from "../components/StudioDashboardWidgets";
+import { MetricCard, StudioSection } from "../components/StudioDashboardWidgets";
 import {
   StudioMobileHeader,
   StudioMobileHero,
@@ -47,12 +47,12 @@ const STATUS_OPTIONS: { value: "" | VersionStatus; label: string }[] = [
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-white/15 py-16">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600/20 text-3xl">📚</div>
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-3xl">📚</div>
       <div className="text-center">
         <p className="text-sm font-semibold text-white">ยังไม่มีงานแปล</p>
         <p className="mt-1 text-xs text-white/40">เริ่มต้นด้วยการอัปโหลดงานแปลชิ้นแรกของคุณ</p>
       </div>
-      <Link href="/studio/upload" className="mt-1 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95">
+      <Link href="/studio/upload" className="mt-1 rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90 active:scale-95">
         อัปโหลดงานแปลใหม่
       </Link>
     </div>
@@ -79,7 +79,7 @@ function MangaListCard({ group }: { group: MangaGroup }) {
         <CoverImage src={group.coverUrl} alt={group.titleName} className="absolute inset-0 h-full w-full object-cover" fallbackSize={24} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-white transition-colors group-hover:text-indigo-300">{group.titleName || "ไม่ระบุชื่อเรื่อง"}</p>
+        <p className="truncate text-sm font-semibold text-white transition-colors group-hover:text-amber-300">{group.titleName || "ไม่ระบุชื่อเรื่อง"}</p>
         <p className="mt-0.5 text-xs text-white/40">{group.versions.length} ตอน</p>
         <div className="mt-2"><StatusDots versions={group.versions} /></div>
       </div>
@@ -202,7 +202,7 @@ export default function WorksPage() {
         return (
           <div className="py-12 text-center">
             <p className="text-sm text-white/40">ไม่พบผลงานที่ตรงกับตัวกรอง</p>
-            <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-indigo-400">ล้างตัวกรอง</button>
+            <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-amber-400">ล้างตัวกรอง</button>
           </div>
         );
       }
@@ -234,7 +234,7 @@ export default function WorksPage() {
                     placeholder="ชื่อเรื่อง..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-indigo-500"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-amber-500"
                   />
                   <StudioSelect
                     value={statusFilter}
@@ -252,13 +252,13 @@ export default function WorksPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => setViewMode("list")}
-                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "list" ? "border-indigo-500 bg-indigo-600/20 text-indigo-300" : "border-white/10 bg-white/5 text-white/60"}`}
+                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "list" ? "border-amber-500 bg-white/20 text-amber-300" : "border-white/10 bg-white/5 text-black/60"}`}
                     >
                       แบบรายการ
                     </button>
                     <button
                       onClick={() => setViewMode("card")}
-                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "card" ? "border-indigo-500 bg-indigo-600/20 text-indigo-300" : "border-white/10 bg-white/5 text-white/60"}`}
+                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "card" ? "border-amber-500 bg-white/20 text-amber-300" : "border-white/10 bg-white/5 text-black/60"}`}
                     >
                       แบบการ์ด
                     </button>
@@ -272,7 +272,7 @@ export default function WorksPage() {
                     </button>
                     <button
                       onClick={() => setMobileView("browse")}
-                      className="rounded-2xl bg-indigo-600 px-3 py-3 text-sm font-semibold text-white"
+                      className="rounded-2xl bg-white px-3 py-3 text-sm font-semibold text-black"
                     >
                       ดูผลลัพธ์
                     </button>
@@ -282,9 +282,7 @@ export default function WorksPage() {
             </div>
           ) : (
             <div className="space-y-4 px-4 py-4">
-              <StudioAnnouncement />
               <StudioMobileHero
-                eyebrow="Works Manager"
                 title="ผลงานของฉัน"
                 description="จัดการงานแปลและบทของคุณทั้งหมดในที่เดียว"
               />
@@ -300,7 +298,7 @@ export default function WorksPage() {
                   placeholder="ค้นหาชื่อเรื่อง..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-indigo-500"
+                  className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-amber-500"
                 />
                 <button
                   onClick={() => setMobileView("filters")}
@@ -311,7 +309,7 @@ export default function WorksPage() {
               </div>
               <div className="flex items-center justify-between">
                 <p className="text-xs text-white/35">แสดง {mangaGroups.length} เรื่อง</p>
-                <Link href="/studio/upload" className="rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white">
+                <Link href="/studio/upload" className="rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-black">
                   + อัปโหลด
                 </Link>
               </div>
@@ -328,18 +326,16 @@ export default function WorksPage() {
       <Navbar />
       <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
         <div className="space-y-5">
-          <StudioAnnouncement />
 
-          <div className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(129,140,248,0.16),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.8)]">
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.02] p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.32em] text-white/35">Works Manager</p>
                 <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">ผลงานของฉัน</h1>
                 <p className="mt-2 text-sm text-white/45">จัดการ chapter/version ทั้งหมด พร้อมตัวกรองและภาพรวมแบบใกล้ dashboard นักเขียน</p>
               </div>
               <div className="flex items-center gap-2">
                 <ViewToggle mode={viewMode} onChange={handleSetViewMode} />
-                <Link href="/studio/upload" className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95">
+                <Link href="/studio/upload" className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90 active:scale-95">
                   + อัปโหลดใหม่
                 </Link>
               </div>
@@ -367,7 +363,7 @@ export default function WorksPage() {
                   placeholder="ชื่อเรื่อง..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none transition focus:border-indigo-500"
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none transition focus:border-amber-500"
                 />
                 {/* Status filter */}
                 <div className="flex gap-2">
@@ -413,7 +409,7 @@ export default function WorksPage() {
             ) : mangaGroups.length === 0 ? (
               <div className="py-12 text-center">
                 <p className="text-sm text-white/40">ไม่พบผลงานที่ตรงกับตัวกรอง</p>
-                <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-indigo-400 transition hover:text-indigo-300">ล้างตัวกรอง</button>
+                <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-amber-400 transition hover:text-amber-300">ล้างตัวกรอง</button>
               </div>
             ) : viewMode === "list" ? (
               <div className="space-y-3">

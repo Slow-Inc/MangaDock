@@ -77,14 +77,14 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
         <main className="pt-32 pb-20 px-4 max-w-4xl mx-auto text-center">
           {/* Onboarding Header with Liquid Glass effect */}
           <div className="relative p-10 rounded-[2.5rem] border border-white/10 bg-white/2 backdrop-blur-xl overflow-hidden mb-12 animate-in fade-in zoom-in-95 duration-700">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent_50%)]" />
+            <div className="absolute inset-0 bg-white/[0.02]" />
             
-            <span className="relative inline-block px-4 py-1.5 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-bold uppercase tracking-widest mb-6">
+            <span className="relative inline-block px-4 py-1.5 rounded-full bg-white/10 text-amber-400 text-xs font-bold uppercase tracking-widest mb-6">
               Welcome to MangaDock Studio
             </span>
             
             <h1 className="relative text-4xl sm:text-5xl font-black mb-6 leading-tight tracking-tighter">
-              เริ่มต้นเส้นทาง <br/><span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-400 to-violet-400">Content Creator</span> ของคุณ
+              เริ่มต้นเส้นทาง <br/><span className="text-transparent bg-clip-text bg-linear-to-r from-amber-400 to-amber-400">Content Creator</span> ของคุณ
             </h1>
             
             <p className="relative text-white/50 text-lg max-w-2xl mx-auto leading-relaxed mb-10">
@@ -94,7 +94,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
             <button
               onClick={handleBecomeCreator}
               disabled={upgrading}
-              className="relative group px-10 py-4 rounded-2xl bg-indigo-600 text-white font-black text-lg hover:bg-indigo-500 active:scale-95 smooth-hover shadow-2xl shadow-indigo-500/30 disabled:opacity-50"
+              className="relative group px-10 py-4 rounded-2xl bg-white text-black font-black text-lg hover:bg-white/90 active:scale-95 smooth-hover disabled:opacity-50"
             >
               {upgrading ? "กำลังเตรียมพื้นที่สตูดิโอ..." : "สมัครเป็นนักแปล / Creator"}
               <div className="absolute inset-0 rounded-2xl bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
@@ -103,10 +103,10 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
           {/* Feature Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
-            <div className="group p-8 rounded-[2rem] border border-white/5 bg-white/2 backdrop-blur-md smooth-hover hover:border-indigo-500/30 hover:bg-white/4 hover:-translate-y-1">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center mb-6 relative overflow-hidden">
-                <div className="absolute inset-0 bg-indigo-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                <svg className="w-7 h-7 text-indigo-400 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="group p-8 rounded-[2rem] border border-white/5 bg-white/2 backdrop-blur-md smooth-hover hover:border-amber-500/30 hover:bg-white/4 hover:-translate-y-1">
+              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center mb-6 relative overflow-hidden">
+                <div className="absolute inset-0 bg-white/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                <svg className="w-7 h-7 text-amber-400 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
