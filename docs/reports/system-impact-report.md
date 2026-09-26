@@ -26,6 +26,9 @@ ocr_vlm-related suites.
 as lettered text (seen here, measured by #688's `sanitize` probe) — needs its own issue.
 
 **Links:** #694, #688, #679, #631.
+
+---
+
 ## 2026-08-31 — #688: Pipeline Doctor LLM/gateway contracts (feature / test-infra)
 
 **What & where:** `MIT/tools/pipeline_doctor/llm_contracts.py` (new, ~245 lines — four probes plus
