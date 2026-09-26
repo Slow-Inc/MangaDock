@@ -254,3 +254,53 @@ def test_sanitize_real_sfx_still_pass():
     # THA
     assert sanitize_sfx('ตึง', 'THA') == 'ตึง'
     assert sanitize_sfx('ปัง', 'THA') == 'ปัง'
+
+
+# ── #694: a reply that yields no SFX must say why, not go quiet ───────────────
+
+import logging  # noqa: E402
+
+
+class _Completion:
+    """A chat completion carrying `finish_reason`, which `_Resp` leaves out."""
+    def __init__(self, content, finish_reason):
+        self._c, self._f = content, finish_reason
+    def json(self):
+        return {"choices": [{"message": {"content": self._c}, "finish_reason": self._f}]}
+
+
+def _localize(resp, caplog):
+    with caplog.at_level(logging.WARNING, logger='manga_translator'):
+        return vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m',
+                                post_fn=lambda *a, **k: resp)
+
+
+def _warnings(caplog):
+    return [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+
+
+def test_truncated_none_reply_is_logged_with_reason_budget_and_region(caplog):
+    assert _localize(_Completion(None, 'length'), caplog) == ''   # render behaviour unchanged
+    [msg] = _warnings(caplog)
+    assert 'finish_reason=length' in msg
+    assert 'content=None' in msg
+    assert 'max_tokens=24' in msg
+    assert 'crop=80x40' in msg
+
+
+def test_truncated_reply_with_partial_content_is_still_logged(caplog):
+    assert _localize(_Completion('LOO', 'length'), caplog) == 'LOO'   # value unchanged
+    [msg] = _warnings(caplog)
+    assert 'finish_reason=length' in msg
+
+
+def test_reply_that_sanitises_to_nothing_is_logged(caplog):
+    assert _localize(_Completion('NONE', 'stop'), caplog) == ''
+    [msg] = _warnings(caplog)
+    assert 'sanitised to empty' in msg
+    assert "'NONE'" in msg
+
+
+def test_a_completed_reply_logs_nothing(caplog):
+    assert _localize(_Completion('LOOM', 'stop'), caplog) == 'LOOM'
+    assert _warnings(caplog) == []

@@ -202,8 +202,19 @@ def vlm_localize_sfx(
             timeout=timeout,
         )
         data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        return sanitize_sfx(content if isinstance(content, str) else '', target_lang)
+        choice = data["choices"][0]
+        content = choice["message"]["content"]
+        result = sanitize_sfx(content if isinstance(content, str) else '', target_lang)
+        # #694: '' here reads downstream as "no SFX in this region". Say why instead, so a
+        # truncated reply is visible without a Doctor run. Degrade-to-'' itself is unchanged.
+        finish = choice.get("finish_reason")
+        where = f"max_tokens={body['max_tokens']} crop={crop_rgb.shape[1]}x{crop_rgb.shape[0]}"
+        if content is None or (finish is not None and finish != 'stop'):
+            logger.warning("[OcrVLM] SFX reply unusable: finish_reason=%s content=%s %s",
+                           finish, 'None' if content is None else repr(content), where)
+        elif not result:
+            logger.warning("[OcrVLM] SFX reply sanitised to empty: %r %s", content, where)
+        return result
     except Exception:
         logger.warning("[OcrVLM] SFX localize failed — region will drop as before", exc_info=True)
         return ''
