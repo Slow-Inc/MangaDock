@@ -224,3 +224,33 @@ def test_sanitize_non_latin_drops_latin_refusal():
     assert sanitize_sfx('NA', target_lang='THA') == ''
     # a real Thai SFX still passes
     assert sanitize_sfx('ตูม', target_lang='THA') == 'ตูม'
+
+
+# ── #697: reject the refusal replies the vision model actually sends ──────────
+
+def test_sanitize_eng_rejects_empty_line_restatement():
+    # the model echoes the prompt's own "reply with an empty line" instruction
+    assert sanitize_sfx('EMPTY LINE') == ''
+
+def test_sanitize_eng_rejects_parenthesized_refusal():
+    # meta-commentary wrapped in parens (trailing punctuation allowed)
+    assert sanitize_sfx('(no sound effect)') == ''
+    assert sanitize_sfx('(no sound effect)!!') == ''
+
+def test_sanitize_tha_rejects_negation():
+    # explicit Thai negation: ไม่พบเสียง ("no sound found"), ไม่เกี่ยว ("unrelated")
+    assert sanitize_sfx('ไม่พบเสียง', 'THA') == ''
+    assert sanitize_sfx('ไม่เกี่ยว', 'THA') == ''
+
+def test_sanitize_tha_rejects_parenthesized_refusal():
+    assert sanitize_sfx('(เสียงพูด)', 'THA') == ''
+
+def test_sanitize_real_sfx_still_pass():
+    # ENG
+    assert sanitize_sfx('LOOM') == 'LOOM'
+    assert sanitize_sfx('SQUELCH') == 'SQUELCH'
+    assert sanitize_sfx('BAM!') == 'BAM!'
+    assert sanitize_sfx('KA-BOOM') == 'KA-BOOM'
+    # THA
+    assert sanitize_sfx('ตึง', 'THA') == 'ตึง'
+    assert sanitize_sfx('ปัง', 'THA') == 'ปัง'
