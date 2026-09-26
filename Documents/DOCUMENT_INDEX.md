@@ -1,5 +1,8 @@
 # MangaDock Documentation Index
 
+> [!important] Academic / SE-course deliverables — **NOT the engineering source of truth.**
+> This `Documents/` tree is human/examiner-facing (SRS, Gantt, UAT, UML). For the **current** architecture and decisions an AI agent or engineer should trust, use root **`CONTEXT.md`**, **`UBIQUITOUS_LANGUAGE.md`**, and **`docs/adr/`** — not this tree. Some files here freeze an earlier snapshot: **`Plan/Plan.md` and `Software Engineer/SE_PHASE1_*` still describe a Firebase/Firestore stack and exclude payment/mobile — the system has since migrated to Supabase + wallet + a mobile shell.** Treat those as historical.
+
 เอกสารชุดนี้เป็นสารบัญกลางของเอกสารทั้งหมดในโครงการ MangaDock เพื่อให้ผู้อ่านสามารถเริ่มจากจุดเดียวแล้วไปยังเอกสารของแต่ละส่วนได้อย่างชัดเจน
 
 ## System Documentation

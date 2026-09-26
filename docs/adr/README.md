@@ -10,6 +10,7 @@ overturns an earlier one marks the old ADR **Superseded**.
 |---|-------|------|--------|
 | [001](001-cloudflare-r2-storage.md) | Cloudflare R2 storage backend (`StorageProvider`, `STORAGE_DRIVER`) | Backend | Accepted |
 | [002](002-mit-inpaint-luminance-reground.md) | Per-pixel luminance re-grounding for clean text erasure | MIT | **Superseded by 003** (band) / folded into 005 (family) |
+| [020](020-drop-batch-redis-pubsub.md) | Drop the batch-translate Redis pub/sub (single-node) — *renumbered from a colliding 002* | Backend | Accepted |
 | [003](003-mit-flux-klein-optional-inpainter.md) | Flux.2 Klein-4B (GGUF Q4) optional VRAM-neutral inpainter | MIT | Accepted — **impl pending** (#272) |
 | [004](004-mit-patch-based-rendering-pipeline.md) | Patch-based render pipeline over a byte-identical composite contract (#156) | MIT | Accepted |
 | [005](005-mit-classical-cpu-inpaint-refinement-levers.md) | Classical CPU inpaint-refinement lever family (tighten/reground/seamless/feather/…) | MIT | Accepted (opt-in) |
@@ -29,7 +30,7 @@ overturns an earlier one marks the old ADR **Superseded**.
 
 ## Conventions
 
-- Filename: `NNN-kebab-title.md`, zero-padded number.
+- Filename: `NNN-kebab-title.md`, zero-padded number. **Numbers must be unique** — a colliding number (two `002-*` files) was resolved 2026-07-08 by renumbering the accepted batch-pubsub ADR to 020. Pick the next free number across *all* branches before reusing one (018–019, 022–028 are claimed on `main`).
 - Body: a title line, a status/context bullet block, then `## Context`, `## Decision`,
   `## Alternatives considered`, `## Consequences` (see [ADR 003](003-mit-flux-klein-optional-inpainter.md)).
 - Ground every claim in the code as it is **now**; cite `file:line`.

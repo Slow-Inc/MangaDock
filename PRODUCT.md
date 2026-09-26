@@ -1,5 +1,7 @@
 # Product
 
+> This is the product brief (users, purpose, brand). The **visual design system** — color tokens, typography, components, do/don'ts — is canonical in **`DESIGN.md`**; the brand/principles below are the "why", DESIGN.md is the "how".
+
 ## Register
 
 product

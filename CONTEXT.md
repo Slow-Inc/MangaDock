@@ -3,6 +3,8 @@
 
 ## Language
 
+> **Canonical glossary = `UBIQUITOUS_LANGUAGE.md`** (root). The terms below are a local quick-reference for this document; if they ever disagree, `UBIQUITOUS_LANGUAGE.md` wins.
+
 **L1 Cache**:
 In-process cache optimized for latency — backed by `JsonCacheService` (in-memory + disk). Fast because no network hop. Warm-start optimization only; not authoritative for durability.
 _Avoid_: local cache, memory cache, JSON cache
