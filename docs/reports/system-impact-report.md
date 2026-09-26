@@ -1,5 +1,34 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-09-26 — #694: SFX rescue logs why a reply produced no SFX (observability)
+
+**What & where:** `MIT/manga_translator/ocr_vlm.py` (`vlm_localize_sfx`, ~10 lines),
+`MIT/test/test_ocr_vlm.py` (4 tests).
+
+**Why:** a truncated or `None` vision reply collapsed to `''`, indistinguishable from "no SFX here";
+two past investigations were misdirected by that silence.
+
+**Before → After:** silent `''` → the same `''` plus one `WARNING` naming `finish_reason`, the
+content, `max_tokens`, and the crop size (or the raw reply, when sanitising emptied it).
+
+**Performance Δ:** none measurable — one dict lookup and, on the failure path only, one log line.
+
+**Quality:** no render change; return values identical on every path (asserted by the tests).
+Side effect: on the currently served thinking model, where every SFX call truncates at
+`max_tokens=24`, each rescue attempt now emits a warning — that volume *is* the signal.
+
+**Validation:** 3 red → green; 3 mutations each killed by exactly one test; 47 passed on the
+ocr_vlm-related suites.
+
+**Risk / rollback:** log-only; rollback = revert.
+
+**Tech-debt register:** `sanitize_sfx` lets `(no sound effect)` / `EMPTY LINE` style refusals through
+as lettered text (seen here, measured by #688's `sanitize` probe) — needs its own issue.
+
+**Links:** #694, #688, #679, #631.
+
+---
+
 ## 2026-08-31 — #686: Pipeline Doctor core — report model + probe registry (feature / test-infra)
 
 **What & where:** `MIT/tools/pipeline_doctor/` (new package — `report.py`, `runner.py`,
