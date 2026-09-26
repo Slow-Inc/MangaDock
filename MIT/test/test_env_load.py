@@ -62,15 +62,25 @@ def test_importing_package_does_not_load_dotenv():
 def test_importing_keys_does_not_load_dotenv():
     """The landmine the issue names: `translators/keys.py` also used to call `load_dotenv()`.
     Importing it must be inert too — otherwise `initialize()` in the entry point is pointless
-    for every consumer that reaches keys first."""
+    for every consumer that reaches keys first.
+
+    Loaded BY FILE PATH, not as `manga_translator.translators.keys`: importing it as a package
+    submodule runs the `translators` package init, which reaches the impl module and imports
+    torch — and this file belongs in the torch-free logic gate. `keys.py` imports only `os`,
+    so a standalone load exercises exactly the module-scope behaviour under test. (CI caught
+    this: the first version of this test did the package import and failed the gate with
+    `ModuleNotFoundError: No module named 'torch'`.)
+    """
     got = _result(
-        "import dotenv\n"
+        "import importlib.util, dotenv\n"
         "calls = []\n"
         "dotenv.load_dotenv = lambda *a, **k: calls.append(1)\n"
-        "import manga_translator.translators.keys\n"
-        "print('RESULT=%s' % (len(calls),))"
+        f"spec = importlib.util.spec_from_file_location('keys_under_test', {_KEYS!r})\n"
+        "m = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(m)\n"
+        "print('RESULT={} {}'.format(len(calls), bool(m.CUSTOM_OPENAI_API_KEY is not None)))"
     )
-    assert got == '0', f"importing translators.keys loaded .env {got!r} time(s)"
+    assert got == '0 True', f"importing translators.keys loaded .env (got {got!r})"
 
 
 def test_initialize_is_idempotent():
@@ -123,8 +133,11 @@ def test_both_entrypoints_initialize_before_importing_keys():
 
 
 def test_package_still_exposes_initialize():
-    """The lazy PEP 562 `__getattr__` forwards unknown names to the implementation module, so a
-    missing `initialize` would not raise — it would forward and still fail. Pin the export."""
+    """The lazy PEP 562 `__getattr__`/`__dir__` forward unknown names to the implementation
+    module, so a missing `initialize` would be masked rather than raised — and checking it via
+    `dir()` or `getattr()` on an unknown name would pull torch in. `vars()` is the module's own
+    `__dict__`: it sees a real export and costs nothing. (CI caught this too — the first version
+    used `dir()` and failed the torch-free gate.)"""
     import manga_translator
-    assert callable(getattr(manga_translator, 'initialize'))
-    assert 'initialize' in dir(manga_translator)
+    assert callable(vars(manga_translator).get('initialize')), \
+        'manga_translator.initialize is not a real module export'
