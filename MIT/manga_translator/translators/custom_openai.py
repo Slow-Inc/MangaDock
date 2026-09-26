@@ -5,6 +5,7 @@ from .config_gpt import ConfigGPT  # Import the `gpt_config` parsing parent clas
 
 try:
     import openai
+    import httpx
 except ImportError:
     openai = None
 import asyncio
@@ -244,6 +245,23 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             top_p=self.top_p,
         )
 
+        # #631: the gateway can return message.content = None (e.g. the model spent its
+        # token budget on a dense page). A None/non-string content must be a failed
+        # attempt through the existing retry/error handling (the `except openai.APIError`
+        # branch in _translate), not a TypeError from extract_capture_groups downstream.
+        content = response.choices[0].message.content
+        if not isinstance(content, str):
+            # finish_reason lives on the choice, not the message (openai SDK)
+            finish_reason = getattr(response.choices[0], 'finish_reason', None)
+            self.logger.warning(
+                f'API returned no usable text content (finish_reason={finish_reason}); '
+                f'treating as a failed attempt')
+            raise openai.APIError(
+                'translator returned no usable text content (message.content is not a string)',
+                request=httpx.Request('POST', str(self.client.base_url or 'unknown')),
+                body=None,
+            )
+
         self.logger.debug('\n-- GPT Response (raw) --')
         self.logger.debug(response.choices[0].message.content)
         self.logger.debug('------------------------\n')
@@ -264,4 +282,4 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
             f'completion={completion_tokens if completion_tokens is not None else "n/a"}'
         )
 
-        return response.choices[0].message.content
+        return content
