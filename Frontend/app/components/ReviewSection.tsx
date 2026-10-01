@@ -3,6 +3,7 @@
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { parseJsonOrNull } from "../lib/safeJson";
 import StarRating from "./StarRating";
 import ReviewCard from "./ReviewCard";
 import type { ReviewItem, ReviewSummary } from "../lib/reviewTypes";
@@ -50,7 +51,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
-      const data = await res.json();
+      const data = await parseJsonOrNull<ReviewItem>(res);
       setMyReview(data);
       if (data) {
         setRating(data.rating);

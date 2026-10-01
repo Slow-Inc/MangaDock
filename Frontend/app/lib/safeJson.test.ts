@@ -1,5 +1,27 @@
 import { describe, expect, test } from "bun:test";
-import { parseJsonArray } from "./safeJson";
+import { parseJsonArray, parseJsonOrNull } from "./safeJson";
+
+describe("parseJsonOrNull", () => {
+  test("returns the parsed object for a valid JSON body", async () => {
+    const res = new Response(JSON.stringify({ rating: 4 }), { status: 200 });
+    expect(await parseJsonOrNull<{ rating: number }>(res)).toEqual({ rating: 4 });
+  });
+
+  test("returns null for an empty body (NestJS serialises a returned null as 200 + empty body)", async () => {
+    const res = new Response("", { status: 200 });
+    expect(await parseJsonOrNull(res)).toBeNull();
+  });
+
+  test("returns null for a non-JSON body", async () => {
+    const res = new Response("<html>oops</html>", { status: 200 });
+    expect(await parseJsonOrNull(res)).toBeNull();
+  });
+
+  test("returns null for a literal null body", async () => {
+    const res = new Response("null", { status: 200 });
+    expect(await parseJsonOrNull(res)).toBeNull();
+  });
+});
 
 describe("parseJsonArray", () => {
   test("returns the array for a valid JSON array body", async () => {
