@@ -3141,3 +3141,10 @@ Dogfooded #620 the same session: after #619 landed, #612 was rebased onto post-#
 - Added 12 auth/MFA/cache regressions and a dedicated CI workflow. Canonical frontend suite: 226 passed; TypeScript and targeted lint passed.
 - Local placeholder-config build passed. Playwright checked URL errors, timeout and a preexisting synthetic session; production baseline error URL still showed pending text. Screenshots and limitations: docs/reports/phase3-auth-20261001/README.md.
 - Independent review findings fixed. Real provider/MFA/device E2E and Vercel production deployment are not claimed by this source validation.
+
+## CLI OAuth protocol compatibility — 2026-10-01
+
+- Diagnosed pending Google login: current main sends the Expo native protocol while the installed CLI APK listens for URL-based oauth_start messages.
+- Added Frontend/app/lib/cliNativeAuth.ts and integrated it with AuthContext.tsx and supabase.ts; PKCE/nonce binding, ACK, timeout during exchange and cancel cleanup preserve Expo/MFA behavior.
+- Updated auth workflow paths and the existing regression harness. 23 auth/cache tests, TypeScript, targeted ESLint and QA-config Next build passed. Review also addressed late exchange mutation and account linking; SDK CLI auth fetch bounds session commit at 20 seconds.
+- Root cause, live custom-domain dev-server discrepancy and rollout limits: docs/reports/phase3-cli-auth-20261001/README.md.

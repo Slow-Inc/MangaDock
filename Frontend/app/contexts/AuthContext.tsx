@@ -26,6 +26,8 @@ import { getHardwareId } from "../lib/fingerprint";
 import { resolveAvatarUrl } from "../lib/avatarUpload";
 import { ROLE, type UserRole } from "../lib/types/user";
 import { isTrustedOAuthCallbackMessage } from "../lib/oauthCallback";
+import {cancelCliNativeOAuth, getCliOAuthCallbackUrl, isCliNativeShell, openCliNativeOAuth} from "../lib/cliNativeAuth";
+import {exchangeCliPkceCode} from "../lib/cliPkceExchange";
 import { useToast } from "./ToastContext";
 import {
   isExpectedNativeAuthMessage,
@@ -492,6 +494,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener("message", onNativeAuthMessage);
     return () => {
       window.removeEventListener("message", onNativeAuthMessage);
+      cancelCliNativeOAuth();
       const pending = pendingNativeAuthRef.current;
       if (pending) {
         clearTimeout(pending.timer);
@@ -506,13 +509,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * the exact host/IP the user is currently visiting.
    */
   const getOAuthCallbackUrl = () =>
+    isCliNativeShell() ? getCliOAuthCallbackUrl() :
     (typeof window !== "undefined"
       ? window.location.origin
       : (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_URL)) +
     "/auth/callback";
 
   /** Open an OAuth URL in a centred popup and resolve when the callback postMessages the session back. */
-  const openOAuthPopup = (url: string): Promise<void> => {
+  const openOAuthPopup = (url: string, provider: OAuthProvider, redirectTo: string): Promise<void> => {
+    if (isCliNativeShell()) {
+      return openCliNativeOAuth(url, provider, redirectTo, exchangeCliPkceCode, session => supabase.auth.setSession(session));
+    }
     return new Promise((resolve, reject) => {
       const w = 500, h = 650;
       const left = Math.max(0, (window.screen.width - w) / 2);
@@ -590,7 +597,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    if (isNativeWebView()) {
+    if (isNativeWebView() && !isCliNativeShell()) {
       await startNativeOAuth("google");
       reloadPage();
       return;
@@ -602,12 +609,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
-    await openOAuthPopup(data.url);
+    await openOAuthPopup(data.url, "google", redirectTo);
     reloadPage();
   };
 
   const signInWithFacebook = async () => {
-    if (isNativeWebView()) {
+    if (isNativeWebView() && !isCliNativeShell()) {
       await startNativeOAuth("facebook");
       reloadPage();
       return;
@@ -619,7 +626,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
-    await openOAuthPopup(data.url);
+    await openOAuthPopup(data.url, "facebook", redirectTo);
     reloadPage();
   };
 
@@ -778,7 +785,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data?.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
-    await openOAuthPopup(data.url);
+    await openOAuthPopup(data.url, "google", redirectTo);
   };
 
   const linkFacebookAccount = async () => {
@@ -788,7 +795,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data?.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
-    await openOAuthPopup(data.url);
+    await openOAuthPopup(data.url, "facebook", redirectTo);
   };
 
   const unlinkAccount = async (providerId: string) => {
@@ -886,7 +893,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: { redirectTo, skipBrowserRedirect: true },
       });
       if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
-      await openOAuthPopup(data.url);
+      await openOAuthPopup(data.url, method, redirectTo);
     }
   };
 
