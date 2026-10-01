@@ -66,3 +66,14 @@ def test_first_glyph_always_placed_even_if_taller_than_box():
     # a single glyph taller than the box still gets placed at origin (no infinite wrap)
     pos = vertical_layout([100], box_h=20, col_width=12, tracking=0.90)
     assert pos == [(0, 0)]
+
+
+def test_char_count_exactly_at_limit_is_vertical():
+    # the 12-char limit is inclusive: 12 stays vertical, 13 flips to horizontal
+    assert auto_orientation(box_h=100, box_w=40, char_count=12, word_count=1) is True
+    assert auto_orientation(box_h=100, box_w=40, char_count=13, word_count=1) is False
+
+
+def test_glyph_that_exactly_fills_the_column_stays_in_it():
+    # tracking=1.0: the second glyph ends exactly at box_h (10 + 10 == 20), so no wrap
+    assert vertical_layout([10, 10], box_h=20, col_width=15, tracking=1.0) == [(0, 0), (0, 10)]
