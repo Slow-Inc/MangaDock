@@ -1,6 +1,25 @@
 import {createMobileShellInjectionScript} from '../src/webViewBridge';
 
 describe('Mobile Shell WebView bridge', () => {
+  it('signals native logout only after a successful logout at the configured Supabase project', async () => {
+    const postMessage = jest.fn();
+    const fetch = jest.fn().mockResolvedValue({ok: true});
+    const stub = {
+      location: {href: 'https://hayateotsu.space/', origin: 'https://hayateotsu.space'},
+      localStorage: {setItem: jest.fn()}, fetch, ReactNativeWebView: {postMessage},
+    };
+    // eslint-disable-next-line no-new-func
+    Function('window', createMobileShellInjectionScript('qa-id', {url: 'https://qa.supabase.co', publicKey: 'qa-public'}))(stub);
+    await stub.fetch('https://other.supabase.co/auth/v1/logout', {method: 'POST'});
+    expect(postMessage).not.toHaveBeenCalled();
+    await stub.fetch('https://qa.supabase.co/auth/v1/logout?scope=others', {method: 'POST'});
+    expect(postMessage).not.toHaveBeenCalled();
+    fetch.mockResolvedValueOnce({ok: false});
+    await stub.fetch('https://qa.supabase.co/auth/v1/logout', {method: 'POST'});
+    expect(postMessage).not.toHaveBeenCalled();
+    await stub.fetch('https://qa.supabase.co/auth/v1/logout?scope=global', {method: 'POST'});
+    expect(JSON.parse(postMessage.mock.calls[0][0])).toEqual({source: 'mangadock-web', type: 'native_sdk_sign_out'});
+  });
   it('seeds the web hardware ID and injects Mobile Shell headers into protected fetches', async () => {
     const calls: Array<[string, RequestInit | undefined]> = [];
     const windowStub = {

@@ -596,3 +596,5 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 - Native handler checks metadata against redirect nonce when present; direct provider URLs require explicit requestId, trusted frontend origin and the matching Google/Facebook host.
 - 56 tests, lint and TypeScript passed. Matching frontend fix is on fix/cli-native-auth-compat-20261001.
 2026-10-01: Added browser OAuth compatibility adapter, bound PKCE callback/session handoff, public Android config, and URL ponyfill. 61 mobile tests, lint, TypeScript and release QA APK build pass. End-to-end callback blocked by Supabase redirect allowlist (returns localhost); awaiting config correction and real login QA.
+
+2026-10-01: Implemented Google Credential Manager + Meta SDK login on feat/android-native-sdk-login-20261001. 70 tests/lint/tsc and QA APK build/install pass. Google SDK UI and cancellation observed; real session acceptance and Facebook Client Token/provider registration remain pending. PR #713 stays closed.

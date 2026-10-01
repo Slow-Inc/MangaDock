@@ -533,6 +533,34 @@ npx react-native run-android --no-packager --port 8081
 
 ## Browser OAuth compatibility (2026-10-01)
 
+### Native SDK branch
+
+`feat/android-native-sdk-login-20261001` routes the deployed web's login command
+to Google Credential Manager and Meta Login SDK instead of the browser adapter.
+The native module exchanges an ID token with Supabase and sends the verified
+session to the matching WebView request. Google/Meta provider state is cleared
+after a successful Supabase logout; the WebView still owns session persistence.
+
+External public configuration adds `MANGADOCK_GOOGLE_WEB_CLIENT_ID`,
+`MANGADOCK_FACEBOOK_APP_ID`, and `MANGADOCK_FACEBOOK_CLIENT_TOKEN` to the native
+auth properties file. Configure Android package `com.mobile` and the signing
+certificate in the corresponding provider consoles. Google QA certificate SHA-1:
+`5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`.
+Do not embed Google Client Secret, Facebook App Secret or service-role keys.
+
+The tested emulator opens Google Play Services' sign-in/account-addition UI and
+Back returns a cancellation error to the web. Real ID-token/session acceptance
+is pending account addition and provider registration validation. Facebook's
+Client Token is absent in the QA build, so Facebook reports missing SDK config.
+Meta SDK may use its own web fallback if Facebook is not installed. It must
+return an AuthenticationToken with a matching nonce; a Graph access token is
+not passed to Supabase as an ID token.
+
+See the [SDK design](../docs/superpowers/specs/2026-10-01-native-sdk-login-design.md)
+and [QA record](../docs/reports/native-sdk-login-20261001/README.md).
+
+### Prior browser adapter
+
 The APK accepts the deployed web's `mangadock:oauth:start` message as well as the CLI URL protocol. It opens the system browser with S256 PKCE and a request-bound `mangadock://auth/callback?request_id=...` redirect. The WebView exchanges the returned code and sends the session through the deployed web's existing session handler. Cancellation, stale callbacks and exchange deadlines are covered by regressions.
 
 Supply public `MANGADOCK_SUPABASE_URL` and `MANGADOCK_SUPABASE_PUBLIC_KEY` through environment/Gradle properties, or a properties file outside the checkout using `-PmangadockNativeAuthProperties=<absolute-path>`. Use the project's anon/publishable key; never a service-role key. Missing configuration produces a readable login error.

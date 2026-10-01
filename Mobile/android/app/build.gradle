@@ -120,6 +120,12 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 4
         versionName "1.0.1-beta.3"
+        buildConfigField "String", "MANGADOCK_GOOGLE_WEB_CLIENT_ID", groovy.json.JsonOutput.toJson(nativeAuthValue('MANGADOCK_GOOGLE_WEB_CLIENT_ID'))
+        buildConfigField "String", "MANGADOCK_FACEBOOK_APP_ID", groovy.json.JsonOutput.toJson(nativeAuthValue('MANGADOCK_FACEBOOK_APP_ID'))
+        buildConfigField "String", "MANGADOCK_FACEBOOK_CLIENT_TOKEN", groovy.json.JsonOutput.toJson(nativeAuthValue('MANGADOCK_FACEBOOK_CLIENT_TOKEN'))
+        resValue "string", "facebook_app_id", nativeAuthValue('MANGADOCK_FACEBOOK_APP_ID') ?: '0'
+        resValue "string", "facebook_client_token", nativeAuthValue('MANGADOCK_FACEBOOK_CLIENT_TOKEN') ?: 'unset'
+        resValue "string", "fb_login_protocol_scheme", 'fb' + (nativeAuthValue('MANGADOCK_FACEBOOK_APP_ID') ?: '0')
         buildConfigField "String", "MANGADOCK_SUPABASE_URL", groovy.json.JsonOutput.toJson(nativeAuthValue('MANGADOCK_SUPABASE_URL'))
         buildConfigField "String", "MANGADOCK_SUPABASE_PUBLIC_KEY", groovy.json.JsonOutput.toJson(nativeAuthValue('MANGADOCK_SUPABASE_PUBLIC_KEY'))
         externalNativeBuild {
@@ -161,6 +167,12 @@ android {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-base:18.5.0")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    // 1.2.x requires Kotlin 2.4 metadata; the RN build uses Kotlin 2.1.
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    implementation("com.facebook.android:facebook-login:18.3.0")
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
