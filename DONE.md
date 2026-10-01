@@ -3133,3 +3133,11 @@ Six-PR agent-owned tech-debt batch, all TDD + `/scrutinize` (posted bilingual) +
 - Also: closed **#543** obsolete (already fixed by #106 `1de61ffe`); filed leftovers **#614** (load_dotenv extraction, ex-#192) + **#615** (BaseGPTTranslator, ex-#188).
 
 Dogfooded #620 the same session: after #619 landed, #612 was rebased onto post-#619 `main` (disjoint → clean) before merge, which also greened its heavy-ML job; #613/#621 were verified disjoint from main's new commits and squash-merged. Missing dev dep `pytest-asyncio` installed in the MIT venv (local async tests were silently failing "async def not natively supported").
+
+## Phase 3 auth delivery on current main ? 2026-10-01
+
+- Ported callback completion/timeout and synchronous auth-notification fixes without replacing current MFA, trusted callback envelope or native protocol.
+- Added identity/generation guards for deferred profile and cache work, including cache flush/backfill completion; auth cache clearing no longer schedules remote history deletion for the next account.
+- Added 12 auth/MFA/cache regressions and a dedicated CI workflow. Canonical frontend suite: 226 passed; TypeScript and targeted lint passed.
+- Local placeholder-config build passed. Playwright checked URL errors, timeout and a preexisting synthetic session; production baseline error URL still showed pending text. Screenshots and limitations: docs/reports/phase3-auth-20261001/README.md.
+- Independent review findings fixed. Real provider/MFA/device E2E and Vercel production deployment are not claimed by this source validation.

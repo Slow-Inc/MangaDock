@@ -359,14 +359,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let active = true;
+    let authRevision = 0;
+    const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
     // Wire token suppliers for userCache and readingHistory
     setTokenSupplier(getIdToken);
     setHistoryTokenSupplier(getIdToken);
 
     // Set up Supabase auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       sessionRef.current = session;
       const suUser = session?.user ?? null;
+      // Same-user token refresh must not cancel an in-flight MFA check.
+      if (suUser?.id !== supabaseUserRef.current?.id) authRevision++;
+      const revision = authRevision;
       supabaseUserRef.current = suUser;
       const appUser = suUser ? adaptUser(suUser) : null;
       setUser(appUser);
@@ -376,65 +382,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // User switched: clear local-first caches to prevent cross-account bleed
         if (lastUidRef.current && lastUidRef.current !== suUser.id) {
           clearUserCache();
-          clearHistory();
+          clearHistory({syncRemote: false});
           clearFollowCache();
           clearAllApiCache();
         }
         lastUidRef.current = suUser.id;
 
         if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
-          // Security invariant #7: on page-refresh session restore, enforce AAL2
-          // if the user has a verified TOTP factor but hasn't reached it yet.
-          // (signInWithEmail already performs this check for fresh password logins.)
-          if (event === "INITIAL_SESSION") {
-            const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-            if (aal && aal.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
-              const { data: factors } = await supabase.auth.mfa.listFactors();
-              const factor = factors?.totp.find((f) => f.status === "verified");
-              if (factor) {
-                setPendingMfaFactorId(factor.id);
-                setMfaRequired(true);
-                return; // halt — MfaVerifyScreen will complete
+          // Release Supabase auth notification before MFA/network/cache work.
+          const timer = setTimeout(() => {
+            pendingTimers.delete(timer);
+            void (async () => {
+              if (!active || revision !== authRevision) return;
+              // Security invariant #7: on page-refresh session restore, enforce AAL2
+              // if the user has a verified TOTP factor but hasn't reached it yet.
+              // (signInWithEmail already performs this check for fresh password logins.)
+              if (event === "INITIAL_SESSION") {
+                const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+                if (!active || revision !== authRevision) return;
+                if (aal && aal.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+                  const { data: factors } = await supabase.auth.mfa.listFactors();
+                  if (!active || revision !== authRevision) return;
+                  const factor = factors?.totp.find((f) => f.status === "verified");
+                  if (factor) {
+                    setPendingMfaFactorId(factor.id);
+                    setMfaRequired(true);
+                    return; // halt — MfaVerifyScreen will complete
+                  }
+                }
               }
-            }
-          }
-          const token = session.access_token;
-          await syncToBackend(token);
-          // Fire-and-forget: record this device so /settings/security shows it immediately
-          const hwid = getHardwareId();
-          if (hwid) {
-            fetch(`${API_BASE}/users/me/record-device`, {
-              method: "POST",
-              headers: { Authorization: `Bearer ${token}`, "X-Hardware-Id": hwid },
-            }).catch(() => {});
-          }
-          const profile = await fetchBackendProfile(token);
-          if (profile) {
-            setUser((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                displayName: profile.displayName ?? prev.displayName,
-                photoURL: profile.photoURL ?? prev.photoURL,
-                role: profile.role ?? prev.role,
-              };
+              const token = session.access_token;
+              await syncToBackend(token);
+              if (!active || revision !== authRevision) return;
+              // Fire-and-forget: record this device so /settings/security shows it immediately
+              const hwid = getHardwareId();
+              if (hwid) {
+                fetch(`${API_BASE}/users/me/record-device`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${token}`, "X-Hardware-Id": hwid },
+                }).catch(() => {});
+              }
+              const profile = await fetchBackendProfile(token);
+              if (!active || revision !== authRevision) return;
+              if (profile) {
+                setUser((prev) => {
+                  if (!prev || prev.uid !== suUser.id) return prev;
+                  return {
+                    ...prev,
+                    displayName: profile.displayName ?? prev.displayName,
+                    photoURL: profile.photoURL ?? prev.photoURL,
+                    role: profile.role ?? prev.role,
+                  };
+                });
+              }
+              await Promise.all([
+                loadUserData(token),
+                loadHistoryData(token),
+              ]);
+            })().catch(() => {
+              // Hydration errors must not stall Supabase auth notifications.
             });
-          }
-          await Promise.all([
-            loadUserData(token),
-            loadHistoryData(token),
-          ]);
+          }, 0);
+          pendingTimers.add(timer);
         }
       } else if (event === "SIGNED_OUT") {
         lastUidRef.current = null;
         clearUserCache();
-        clearHistory();
+        clearHistory({syncRemote: false});
         clearFollowCache();
         clearAllApiCache();
       }
     });
 
     return () => {
+      active = false;
+      pendingTimers.forEach(clearTimeout);
       subscription.unsubscribe();
     };
   }, [getIdToken]);
@@ -701,7 +723,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
-    clearHistory();
+    clearHistory({syncRemote: false});
     clearFollowCache();
     clearAllApiCache();
     await supabase.auth.signOut();
@@ -880,7 +902,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error(`ลบข้อมูลไม่สำเร็จ (${res.status})`);
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
-    clearHistory();
+    clearHistory({syncRemote: false});
     clearFollowCache();
     clearAllApiCache();
     await supabase.auth.signOut();
