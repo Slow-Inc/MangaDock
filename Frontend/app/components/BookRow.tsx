@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
 import BookDetailModal from "./BookDetailModal";
 import CoverLightbox from "./CoverLightbox";
-import GeminiBadge from "./GeminiBadge";
+import ModelBadge from "./ModelBadge";
 import MangaReader from "./MangaReader";
 import { useBookActions } from "../hooks/useBookActions";
 import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
@@ -39,6 +39,7 @@ function BookCard({
   const [showModal, setShowModal] = useState(false);
   const [showCover, setShowCover] = useState(false);
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
+  const [descModel, setDescModel] = useState<string | undefined>();
   const [translatingDesc, setTranslatingDesc] = useState(false);
   const [showOriginalDesc, setShowOriginalDesc] = useState(false);
   const translateFetched = useRef(false);
@@ -80,8 +81,9 @@ function BookCard({
     translateFetched.current = true;
     setTranslatingDesc(true);
     translateDescription(book.description)
-      .then((translated) => {
-        setTranslatedDesc(translated);
+      .then(({ text, model }) => {
+        setTranslatedDesc(text);
+        setDescModel(model);
         setTranslatingDesc(false);
       })
       .catch(() => setTranslatingDesc(false));
@@ -207,7 +209,7 @@ function BookCard({
             {translatingDesc && <p className="text-[9px] text-white/30">กำลังแปล...</p>}
             {translatedDesc && !translatingDesc && (
               <div className="flex items-center gap-2">
-                <GeminiBadge small />
+                <ModelBadge model={descModel} small />
                 <button
                   onClick={() => setShowOriginalDesc((v) => !v)}
                   className="text-[9px] text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import CoverLightbox from "./CoverLightbox";
-import GeminiBadge from "./GeminiBadge";
+import ModelBadge from "./ModelBadge";
 import MangaReader from "./MangaReader";
 import ChapterList from "./ChapterList";
 import { addToHistory, getHistory } from "../lib/readingHistory";
@@ -97,6 +97,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [chaptersEmpty, setChaptersEmpty] = useState(false);
   const [activeChapter, setActiveChapter] = useState<ActiveChapter | null>(null);
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
+  const [descModel, setDescModel] = useState<string | undefined>();
   const [translatingDesc, setTranslatingDesc] = useState(false);
   const [showOriginalDesc, setShowOriginalDesc] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
@@ -191,8 +192,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     const translateDesc = (text: string) => {
       setTranslatingDesc(true);
       translateDescription(text)
-        .then((t) => {
+        .then(({ text: t, model }) => {
           setTranslatedDesc(t);
+          setDescModel(model);
           setTranslatingDesc(false);
         })
         .catch(() => setTranslatingDesc(false));
@@ -671,7 +673,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               )}
               {translatedDesc && !translatingDesc && (
                 <div className="flex items-center gap-2">
-                  <GeminiBadge small />
+                  <ModelBadge model={descModel} small />
                   <button
                     onClick={() => setShowOriginalDesc((v) => !v)}
                     className="text-xs text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import GeminiBadge from "./GeminiBadge";
+import ModelBadge from "./ModelBadge";
 import { translateDescription } from "../lib/translateDescription";
 
 const truncate = (text: string, length: number) =>
@@ -9,6 +9,7 @@ const truncate = (text: string, length: number) =>
 
 export default function HeroDescription({ description }: { description: string }) {
   const [translated, setTranslated] = useState<string | null>(null);
+  const [model, setModel] = useState<string | undefined>();
   const [translating, setTranslating] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
 
@@ -16,8 +17,9 @@ export default function HeroDescription({ description }: { description: string }
     if (!description) return;
     setTranslating(true);
     translateDescription(description)
-      .then((text) => {
+      .then(({ text, model }) => {
         setTranslated(text);
+        setModel(model);
         setTranslating(false);
       })
       .catch(() => setTranslating(false));
@@ -36,7 +38,7 @@ export default function HeroDescription({ description }: { description: string }
         )}
         {translated && !translating && (
           <>
-            <GeminiBadge small />
+            <ModelBadge model={model} small />
             <button
               onClick={() => setShowOriginal((v) => !v)}
               className="text-[10px] text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"

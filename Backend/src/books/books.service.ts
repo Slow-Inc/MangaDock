@@ -476,7 +476,7 @@ export class BooksService {
 
   translateDescription(
     text: string,
-  ): Promise<{ translatedText: string; translated: boolean }> {
+  ): Promise<{ translatedText: string; translated: boolean; model?: string }> {
     return this.landing.translateDescription(text);
   }
 

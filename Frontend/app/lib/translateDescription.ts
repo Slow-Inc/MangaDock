@@ -4,7 +4,13 @@ import { cacheOrFetch, TTL } from "./apiCache";
 
 const API_BASE = "/api/proxy";
 
-type TranslateResponse = { translatedText: string; translated: boolean };
+type TranslateResponse = { translatedText: string; translated: boolean; model?: string };
+
+export type DescriptionTranslation = {
+  text: string;
+  /** Model that produced `text`; undefined for translations cached before the backend reported it. */
+  model?: string;
+};
 
 /**
  * Translate a manga description via the backend MT service, cached by exact
@@ -13,15 +19,16 @@ type TranslateResponse = { translatedText: string; translated: boolean };
  * was performed (`translated: false`) — callers should `.catch()` and treat
  * that identically to a failed translation (leave the original text shown).
  */
-export function translateDescription(text: string): Promise<string> {
+export function translateDescription(text: string): Promise<DescriptionTranslation> {
   return cacheOrFetch(
-    `translate:${text}`,
+    // v2: the cached value is an object now; a pre-existing string entry must not be reused.
+    `translate:v2:${text}`,
     async () => {
       const res = await fetch(`${API_BASE}/books/translate?text=${encodeURIComponent(text)}`);
       if (!res.ok) throw new Error("translate failed");
       const data: TranslateResponse = await res.json();
       if (!data.translated) throw new Error("not translated");
-      return data.translatedText;
+      return { text: data.translatedText, model: data.model };
     },
     TTL.LONG,
   );
