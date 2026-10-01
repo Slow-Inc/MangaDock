@@ -8,9 +8,8 @@ failed with HTTP 500. After the fix, a None (or non-string) content raises
 (`custom_openai.py`, the `except openai.APIError` branch) treats like any other server
 error: retried `_RETRY_ATTEMPTS` times, then re-raised.
 
-Torch-free: the `translators` package `__init__` and `manga_translator.utils.inference`
-are the two torch entry points in this import chain; both are stubbed in sys.modules
-before importing the module under test (same rationale as conftest.py #359).
+Torch-free: the module under test is loaded through `_torch_free_import.load_custom_openai`
+(same rationale as conftest.py #359).
 """
 import asyncio
 from types import SimpleNamespace
