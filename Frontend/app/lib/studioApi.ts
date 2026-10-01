@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import type { ChapterVersion } from "./types";
 import { cacheOrFetch, TTL } from "./apiCache";
 import { createAuthHeaders, parseErrorResponse } from "./apiUtils";
+import { getHardwareId } from "./fingerprint";
 
 const API_BASE = "/api/proxy";
 
@@ -45,7 +46,17 @@ function normalizeProxyUrl(url: string): string {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, init);
+  // Studio version/upload routes are HWID-gated (backend HardwareIdMiddleware:
+  // /versions/:id, /upload/*). Attach the device id to every studioApi call from
+  // this single choke point. Harmless on non-gated routes (wallet/users/unlock) —
+  // the backend only enforces the header where HWID_REQUIRED matches.
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      "x-hardware-id": getHardwareId(),
+      ...(init?.headers as Record<string, string> | undefined),
+    },
+  });
   if (!res.ok) {
     const message = await parseErrorResponse(res);
     throw new Error(message);

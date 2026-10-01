@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { Readable } from 'stream';
 import { UploadService } from './upload.service';
 import type { SupabaseService } from '../supabase/supabase.service';
 import type { VersionsService } from '../versions/versions.service';
@@ -24,11 +25,13 @@ type Chain = {
   then: (resolve: (v: { data: unknown; error: null }) => void) => void;
 };
 
-function makeService(overrides: {
-  put?: jest.Mock;
-  storageDel?: jest.Mock;
-  versionRow?: Record<string, unknown> | null;
-} = {}) {
+function makeService(
+  overrides: {
+    put?: jest.Mock;
+    storageDel?: jest.Mock;
+    versionRow?: Record<string, unknown> | null;
+  } = {},
+) {
   const storage = {
     put: overrides.put ?? jest.fn().mockResolvedValue(undefined),
     delete: overrides.storageDel ?? jest.fn().mockResolvedValue(undefined),
@@ -42,7 +45,12 @@ function makeService(overrides: {
     data:
       'versionRow' in overrides
         ? overrides.versionRow
-        : { translator_uid: 'owner', status: 'draft', pages: [], updated_at: null },
+        : {
+            translator_uid: 'owner',
+            status: 'draft',
+            pages: [],
+            updated_at: null,
+          },
     error: null,
   });
   chain.then = (resolve) =>
@@ -140,6 +148,21 @@ describe('UploadService.addPage - magic-byte MIME validation (#303)', () => {
     );
   });
 
+  it('streams the temp file to storage instead of buffering it in memory (FR-4)', async () => {
+    const put = jest.fn().mockResolvedValue(undefined);
+    const { service } = makeService({ put });
+    const tmp = writeTempFile(Buffer.from([0x01, 0x02, 0x03]));
+    mockFileType.mockResolvedValueOnce({ mime: 'image/png', ext: 'png' });
+
+    await service.addPage('v1', 'owner', tmp);
+
+    expect(put).toHaveBeenCalledWith(expect.any(String), expect.any(Readable), {
+      contentType: 'image/png',
+    });
+    // temp file is still cleaned up after a successful streamed upload
+    expect(fs.existsSync(tmp)).toBe(false);
+  });
+
   it('rejects image/svg+xml even though it is in the image/* family (inline JS attack vector)', async () => {
     const { service, storage } = makeService();
     mockFileType.mockResolvedValueOnce({ mime: 'image/svg+xml', ext: 'svg' });
@@ -166,7 +189,12 @@ describe('UploadService.addPage - magic-byte MIME validation (#303)', () => {
     const storageDel = jest.fn().mockResolvedValue(undefined);
     const { service } = makeService({
       storageDel,
-      versionRow: { translator_uid: 'attacker', status: 'draft', pages: [], updated_at: null },
+      versionRow: {
+        translator_uid: 'attacker',
+        status: 'draft',
+        pages: [],
+        updated_at: null,
+      },
     });
     const tmp = writeTempFile(Buffer.from([0x01, 0x02, 0x03]));
     mockFileType.mockResolvedValueOnce({ mime: 'image/jpeg', ext: 'jpg' });

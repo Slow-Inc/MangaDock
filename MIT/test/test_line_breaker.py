@@ -66,3 +66,20 @@ def test_knuth_plass_selectable_via_calc_horizontal_balances_lines():
     assert kp_lines != greedy_lines
     assert min(kp_w) > min(greedy_w)                                  # no lone short line
     assert (max(kp_w) - min(kp_w)) < (max(greedy_w) - min(greedy_w))  # tighter spread
+
+
+def test_default_line_breaker_switches_calc_horizontal_globally():
+    # P8 (#180): a module-level default breaker (set once from config, like set_font) flips ALL
+    # calc_horizontal calls between greedy (default/byte-identical) and Knuth-Plass — no per-caller threading.
+    from manga_translator.rendering.text_render import (
+        KnuthPlassLineBreaker, GreedyLineBreaker, set_default_line_breaker)
+    tr.set_font(_FONT)
+    phrase = 'the quick brown fox jumps over the lazy dog again'
+    g = tr.calc_horizontal(20, phrase, 150, 500, line_breaker=GreedyLineBreaker())[0]
+    k = tr.calc_horizontal(20, phrase, 150, 500, line_breaker=KnuthPlassLineBreaker())[0]
+    assert g != k, 'need a phrase where greedy and KP differ for a meaningful test'
+    set_default_line_breaker(None)                       # default → greedy (byte-identical)
+    assert tr.calc_horizontal(20, phrase, 150, 500)[0] == g
+    set_default_line_breaker(KnuthPlassLineBreaker())    # default → KP, no explicit arg
+    assert tr.calc_horizontal(20, phrase, 150, 500)[0] == k
+    set_default_line_breaker(None)                       # reset (don't leak into other tests)

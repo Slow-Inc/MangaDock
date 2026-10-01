@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Navbar from "../components/Navbar";
 import ForumSideMenu from "../components/ForumSideMenu";
@@ -12,6 +12,7 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   // Derive active states from URL to keep sidebar in sync across pages
   const category = (searchParams.get('category') as ForumCategory) || undefined;
@@ -26,6 +27,25 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
     window.addEventListener('toggleMobileMenu', handleToggle);
     return () => window.removeEventListener('toggleMobileMenu', handleToggle);
   }, []);
+
+  // Focus trap: move focus to first focusable element when drawer opens
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      const firstFocusable = drawerRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      firstFocusable?.focus();
+    }
+  }, [isMobileMenuOpen]);
+
+  // Escape key handler: close drawer when Escape is pressed
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isMobileMenuOpen) setIsMobileMenuOpen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isMobileMenuOpen]);
 
   const handleMobileSelect = () => {
     setIsMobileMenuOpen(false);
@@ -53,6 +73,10 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
         onClick={() => setIsMobileMenuOpen(false)}
       >
         <div
+          ref={drawerRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="เมนู"
           className={`absolute top-0 left-0 w-[300px] h-full bg-[--surface-overlay] shadow-2xl border-r border-white/10 transition-transform duration-300 ease-out overflow-y-auto custom-scrollbar p-6 ${
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}

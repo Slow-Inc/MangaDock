@@ -1,3 +1,4 @@
+import time
 from asyncio import Event, Lock
 from typing import List
 
@@ -11,6 +12,10 @@ class ExecutorInstance(BaseModel):
     ip: str
     port: int
     busy: bool = False
+    # Dev console (#279): worker reports its os.getpid() at registration; the parent
+    # stamps registered_at so the /status snapshot can show real worker PID + uptime.
+    pid: int | None = None
+    registered_at: float | None = None
 
     def free_executor(self):
         self.busy = False
@@ -32,7 +37,13 @@ class Executors:
         self.event = Event()
 
     def register(self, instance: ExecutorInstance):
+        instance.registered_at = time.monotonic()
         self.list.append(instance)
+
+    def detail_raws(self) -> List[dict]:
+        """Plain dicts for server.worker_view (keeps the pure transform import-light)."""
+        return [{"ip": i.ip, "port": i.port, "pid": i.pid, "busy": i.busy,
+                 "registered_at": i.registered_at} for i in self.list]
 
     def free_executors(self) -> int:
         return len([item for item in self.list if not item.busy])

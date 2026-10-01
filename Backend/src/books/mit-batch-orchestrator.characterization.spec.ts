@@ -449,3 +449,108 @@ describe('MitBatchOrchestrator characterization (#294) — webhook (202-async) l
     expect(p0?.result.error).toContain('persistence failed');
   });
 });
+
+describe('MitBatchOrchestrator — FR-8: cached-page replay for latecomers', () => {
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it('latecomer receives cached pages replayed on attach (regression for FR-8)', async () => {
+    const { orch, mitClient, cache } = makeOrchestrator();
+    // page 0 cached, page 1 not — so uncachedPages = [page1], job stays open
+    const CACHED_PATCHES = [{ x: 0, y: 0, w: 10, h: 10, url: 'p0.png' }];
+    cache.get.mockImplementation((key: string) =>
+      key.includes(':ch1:0:')
+        ? Promise.resolve({ data: { patches: CACHED_PATCHES } })
+        : Promise.resolve(null),
+    );
+    // 202 so the job stays in the registry until handleMitCallback fires
+    mitClient.submitBatch.mockResolvedValue(acceptedResponse());
+
+    const a = recorder();
+    const original = orch
+      .startOrAttachBatchJob('ch1', TWO_PAGES, a.listener, undefined, 'th')
+      .catch(() => {});
+    await flush(); // cache checked; page 0 → a.listener; stream started (202 returned)
+
+    // original caller receives page 0 immediately from cache
+    expect(a.received.find((r) => r.pageIndex === 0)).toBeDefined();
+
+    // Latecomer attaches while page 1 is still in-flight
+    const b = recorder();
+    const latecomer = orch
+      .startOrAttachBatchJob('ch1', TWO_PAGES, b.listener, undefined, 'th')
+      .catch(() => {});
+    await flush(); // attach path replays existing.completedPages
+
+    // FR-8: latecomer MUST receive cached page 0 via completedPages replay
+    expect(b.received.find((r) => r.pageIndex === 0)).toBeDefined();
+    // page 1 not yet done — webhook hasn't fired
+    expect(b.received.find((r) => r.pageIndex === 1)).toBeUndefined();
+
+    // MIT delivers page 1 via webhook — both listeners receive it
+    await orch.handleMitCallback(JOB_KEY, 1, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [],
+    });
+
+    await original;
+    await latecomer;
+
+    expect(a.received.map((r) => r.pageIndex).sort()).toEqual([0, 1]);
+    expect(b.received.map((r) => r.pageIndex).sort()).toEqual([0, 1]);
+    expect((orch as any).activeBatchJobs.size).toBe(0);
+  });
+
+  it('expectedCount alignment: job does not resolve prematurely when cached pages fill completedPages early', async () => {
+    // Guards the partial-fix regression: adding cached pages to completedPages but
+    // leaving expectedCount = uncachedPages.length (old line 469) would make
+    // maybeComplete fire too early — the cached entries alone could satisfy it.
+    // With the full fix, expectedCount stays at pages.length so maybeComplete fires
+    // only when cached + all streamed/webhook pages are present.
+    const { orch, mitClient, cache } = makeOrchestrator();
+    // 3 pages: 0 and 2 cached, 1 not — uncachedPages.length = 1; pages.length = 3
+    const CACHED_PATCHES = [{ x: 1, y: 1, w: 5, h: 5, url: 'p.png' }];
+    const THREE_PAGES = [
+      { pageIndex: 0, pageUrl: 'http://example.com/0.jpg' },
+      { pageIndex: 1, pageUrl: 'http://example.com/1.jpg' },
+      { pageIndex: 2, pageUrl: 'http://example.com/2.jpg' },
+    ];
+    cache.get.mockImplementation((key: string) =>
+      key.includes(':ch1:0:') || key.includes(':ch1:2:')
+        ? Promise.resolve({ data: { patches: CACHED_PATCHES } })
+        : Promise.resolve(null),
+    );
+    mitClient.submitBatch.mockResolvedValue(acceptedResponse());
+
+    const a = recorder();
+    const original = orch
+      .startOrAttachBatchJob('ch1', THREE_PAGES, a.listener, undefined, 'th')
+      .catch(() => {});
+    await flush(); // pages 0 and 2 served from cache; page 1 in-flight
+
+    // pages 0 and 2 delivered immediately; page 1 still pending
+    expect(a.received.find((r) => r.pageIndex === 0)).toBeDefined();
+    expect(a.received.find((r) => r.pageIndex === 2)).toBeDefined();
+    expect(a.received.find((r) => r.pageIndex === 1)).toBeUndefined();
+    // job must NOT have resolved yet (page 1 still in-flight)
+    expect((orch as any).activeBatchJobs.size).toBe(1);
+
+    // MIT delivers page 1 via webhook — job should NOW resolve
+    await orch.handleMitCallback(JOB_KEY, 1, {
+      imgWidth: 100,
+      imgHeight: 200,
+      patches: [],
+    });
+
+    await original;
+
+    expect(a.received.map((r) => r.pageIndex).sort()).toEqual([0, 1, 2]);
+    expect((orch as any).activeBatchJobs.size).toBe(0);
+  });
+});

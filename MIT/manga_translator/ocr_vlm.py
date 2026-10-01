@@ -61,11 +61,65 @@ def build_sfx_prompt(target_lang: str = 'ENG') -> str:
     )
 
 
+def ocr_read_real_text(stripped_text: str) -> bool:
+    """True when the 48px line-OCR returned readable ASCII letters/digits.
+
+    The stylized SFX the rescue is FOR are the ones the line-OCR DROPS — they come back as
+    non-ASCII garbage/CJK ('ぬ', 'サ', 'ぎい'). A clean ASCII read ('W', 'THE', 'M', '8') is
+    proof the OCR succeeded on real characters: a dialogue fragment or a det_sfx false-positive
+    sitting on a speech bubble — NOT a dropped glyph. Used to (a) skip the vision rescue and
+    (b) drop the det_sfx false-positive so its literal fragment ('W'→'ว') is not translated and
+    rendered over the dialogue bubble (#278). Pure."""
+    return bool(re.search(r'[A-Za-z0-9]', stripped_text or ''))
+
+
+def should_rescue_sfx(stripped_text: str, from_sfx_detection: bool, box_w: float, box_h: float,
+                      vlm_rescue: bool, area_min: int = 3600, side_min: int = 24) -> bool:
+    """#278: gate the vision-gateway SFX rescue on det_sfx PROVENANCE, not a bare length heuristic.
+
+    A region is a stylized-SFX candidate when it came from the det_sfx second pass
+    (``merge_sfx_detections`` → ``TextBlock.from_sfx_detection``) — there a short OCR read (≤4 chars)
+    is a *misread* SFX worth localizing to the target language. WITHOUT that provenance, fall back to
+    a TIGHT ≤2-char rule so a short dialogue line ('HUH?', 'おい', 'は？') sitting in a large bubble is
+    not misread as SFX and shipped to the gateway (the bug: any ≤4-char region was rescued, mangling
+    short dialogue + adding a ~1-2 s round-trip per region). The box must also be reasonably large
+    (area + min side) — a real SFX glyph, not a stray mark. Pure."""
+    if not vlm_rescue:
+        return False
+    # If the line-OCR read real ASCII text it did NOT drop a stylized glyph — rescuing it makes
+    # the vision model hallucinate a phantom target-language SFX over the dialogue (#278).
+    if ocr_read_real_text(stripped_text):
+        return False
+    n = len(stripped_text.strip())
+    if n > (4 if from_sfx_detection else 2):
+        return False
+    if box_w * box_h < area_min or min(box_w, box_h) < side_min:
+        return False
+    return True
+
+
 def _to_data_url(crop_rgb: np.ndarray) -> str:
     """HWC RGB uint8 array → `data:image/png;base64,...`."""
     buf = io.BytesIO()
     Image.fromarray(crop_rgb).convert("RGB").save(buf, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def _is_sfx_refusal(line: str, target_lang: str) -> bool:
+    """True when a model reply is a refusal (not a sound effect), so it is dropped rather than
+    rendered. A real SFX is never (a) wrapped in parentheses — the model uses parens for
+    meta-commentary, e.g. '(no sound effect)' — (b) a restatement of the prompt's own "reply with
+    an empty line" instruction, or (c) an explicit negation in the target language (Thai 'ไม่').
+    Pure."""
+    s = line.strip()
+    if s.startswith('(') and ')' in s:
+        return True
+    letters = re.sub(r'[^a-z]', '', s.lower())
+    if 'empty' in letters and 'line' in letters:
+        return True
+    if target_lang == 'THA' and 'ไม่' in s:
+        return True
+    return False
 
 
 def sanitize_sfx(raw: str, target_lang: str = 'ENG') -> str:
@@ -77,6 +131,8 @@ def sanitize_sfx(raw: str, target_lang: str = 'ENG') -> str:
     if not raw:
         return ''
     line = next((l.strip() for l in raw.splitlines() if l.strip()), '')
+    if _is_sfx_refusal(line, target_lang):
+        return ''
     if target_lang in _LATIN_SFX_LANGS:
         line = re.sub(r'[^A-Za-zÀ-ɏ !\-]', ' ', line)   # letters (incl. accented) + space/!/-
         line = re.sub(r'\s+', ' ', line).strip().upper()
@@ -90,7 +146,10 @@ def sanitize_sfx(raw: str, target_lang: str = 'ENG') -> str:
             for c in line
         )
         line = re.sub(r'\s+', ' ', line).strip()
-        if not line:
+        # #278: refusal guard for the non-Latin branch — a model that declines often replies in
+        # Latin ('NONE'/'NA') even for a Thai/Chinese/Korean target; drop it so it isn't kept as a
+        # SFX token (the Latin branch already guards this above).
+        if not line or line.upper() in ('NONE', 'N A', 'NA', 'EMPTY'):
             return ''
     return line[:24]
 
@@ -143,8 +202,19 @@ def vlm_localize_sfx(
             timeout=timeout,
         )
         data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        return sanitize_sfx(content if isinstance(content, str) else '', target_lang)
+        choice = data["choices"][0]
+        content = choice["message"]["content"]
+        result = sanitize_sfx(content if isinstance(content, str) else '', target_lang)
+        # #694: '' here reads downstream as "no SFX in this region". Say why instead, so a
+        # truncated reply is visible without a Doctor run. Degrade-to-'' itself is unchanged.
+        finish = choice.get("finish_reason")
+        where = f"max_tokens={body['max_tokens']} crop={crop_rgb.shape[1]}x{crop_rgb.shape[0]}"
+        if content is None or (finish is not None and finish != 'stop'):
+            logger.warning("[OcrVLM] SFX reply unusable: finish_reason=%s content=%s %s",
+                           finish, 'None' if content is None else repr(content), where)
+        elif not result:
+            logger.warning("[OcrVLM] SFX reply sanitised to empty: %r %s", content, where)
+        return result
     except Exception:
         logger.warning("[OcrVLM] SFX localize failed — region will drop as before", exc_info=True)
         return ''

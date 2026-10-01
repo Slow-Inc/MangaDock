@@ -70,13 +70,25 @@ describe('BooksService — translateMangaEpisode targetLang (#85)', () => {
   it('uses different cache keys for different targetLang values', async () => {
     const { service, cache } = makeService();
 
-    await service.translateMangaEpisode({ lines: ['hello'], chapterId: 'ch1', page: 0, targetLang: 'th' });
-    const thKey = (cache.setMangaCacheWithTiers.mock.calls[0]?.[0] as string) ?? '';
+    await service.translateMangaEpisode({
+      lines: ['hello'],
+      chapterId: 'ch1',
+      page: 0,
+      targetLang: 'th',
+    });
+    const thKey =
+      (cache.setMangaCacheWithTiers.mock.calls[0]?.[0] as string) ?? '';
 
     cache.setMangaCacheWithTiers.mockClear();
 
-    await service.translateMangaEpisode({ lines: ['hello'], chapterId: 'ch1', page: 0, targetLang: 'en' });
-    const enKey = (cache.setMangaCacheWithTiers.mock.calls[0]?.[0] as string) ?? '';
+    await service.translateMangaEpisode({
+      lines: ['hello'],
+      chapterId: 'ch1',
+      page: 0,
+      targetLang: 'en',
+    });
+    const enKey =
+      (cache.setMangaCacheWithTiers.mock.calls[0]?.[0] as string) ?? '';
 
     expect(thKey).toBeTruthy();
     expect(enKey).toBeTruthy();
@@ -90,22 +102,39 @@ describe('BooksService — translateMangaEpisode targetLang (#85)', () => {
     // Stateful cache so writes become readable by subsequent reads
     const store = new Map<string, any>();
     cache.get.mockImplementation(async (key: string) => store.get(key) ?? null);
-    cache.setMangaCacheWithTiers.mockImplementation(async (key: string, value: any) => {
-      store.set(key, { data: value });
-    });
+    cache.setMangaCacheWithTiers.mockImplementation(
+      async (key: string, value: any) => {
+        store.set(key, { data: value });
+      },
+    );
 
     // First call: English, fills cache
-    await service.translateMangaEpisode({ lines: ['hello'], chapterId: 'ch1', page: 0, targetLang: 'en' });
+    await service.translateMangaEpisode({
+      lines: ['hello'],
+      chapterId: 'ch1',
+      page: 0,
+      targetLang: 'en',
+    });
     const callsAfterFirst = generateContentMock.mock.calls.length;
     expect(callsAfterFirst).toBe(1);
 
     // Second call: same English → cache hit → no new Gemini call
-    const second = await service.translateMangaEpisode({ lines: ['hello'], chapterId: 'ch1', page: 0, targetLang: 'en' });
+    const second = await service.translateMangaEpisode({
+      lines: ['hello'],
+      chapterId: 'ch1',
+      page: 0,
+      targetLang: 'en',
+    });
     expect(generateContentMock.mock.calls.length).toBe(1);
     expect(second.fromCache).toBe(1);
 
     // Third call: Korean → different cache key → Gemini called again
-    await service.translateMangaEpisode({ lines: ['hello'], chapterId: 'ch1', page: 0, targetLang: 'ko' });
+    await service.translateMangaEpisode({
+      lines: ['hello'],
+      chapterId: 'ch1',
+      page: 0,
+      targetLang: 'ko',
+    });
     expect(generateContentMock.mock.calls.length).toBe(2);
   });
 });

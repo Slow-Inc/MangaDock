@@ -1,0 +1,34 @@
+name: mangadock.service_health
+interval: 1m
+rules:
+  - alert: ServiceDown
+    expr: mangadock_service_up{service!~"ai-gateway|mit|redis"} == 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "{{ $labels.service }} is down"
+      description: "{{ $labels.service }} has been unreachable for more than 2 minutes"
+
+  - alert: HighErrorRate
+    expr: |
+      (
+        sum by (service) (rate(mangadock_http_requests_total{status_code=~"5.."}[5m]))
+        /
+        sum by (service) (rate(mangadock_http_requests_total[5m]))
+      ) * 100 > 5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High error rate on {{ $labels.service }}"
+      description: "{{ $labels.service }} 5xx error rate is {{ $value | printf \"%.1f\" }}% (threshold: 5%)"
+
+  - alert: HighLatency
+    expr: mangadock_service_latency_ms{service!~"ai-gateway|mit|redis"} > 1000
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High latency on {{ $labels.service }}"
+      description: "{{ $labels.service }} probe latency is {{ $value | printf \"%.0f\" }}ms (threshold: 1000ms)"

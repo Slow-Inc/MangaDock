@@ -1,5 +1,234 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-09-26 — #694: SFX rescue logs why a reply produced no SFX (observability)
+
+**What & where:** `MIT/manga_translator/ocr_vlm.py` (`vlm_localize_sfx`, ~10 lines),
+`MIT/test/test_ocr_vlm.py` (4 tests).
+
+**Why:** a truncated or `None` vision reply collapsed to `''`, indistinguishable from "no SFX here";
+two past investigations were misdirected by that silence.
+
+**Before → After:** silent `''` → the same `''` plus one `WARNING` naming `finish_reason`, the
+content, `max_tokens`, and the crop size (or the raw reply, when sanitising emptied it).
+
+**Performance Δ:** none measurable — one dict lookup and, on the failure path only, one log line.
+
+**Quality:** no render change; return values identical on every path (asserted by the tests).
+Side effect: on the currently served thinking model, where every SFX call truncates at
+`max_tokens=24`, each rescue attempt now emits a warning — that volume *is* the signal.
+
+**Validation:** 3 red → green; 3 mutations each killed by exactly one test; 47 passed on the
+ocr_vlm-related suites.
+
+**Risk / rollback:** log-only; rollback = revert.
+
+**Tech-debt register:** `sanitize_sfx` lets `(no sound effect)` / `EMPTY LINE` style refusals through
+as lettered text (seen here, measured by #688's `sanitize` probe) — needs its own issue.
+
+**Links:** #694, #688, #679, #631.
+
+---
+
+## 2026-08-31 — #688: Pipeline Doctor LLM/gateway contracts (feature / test-infra)
+
+**What & where:** `MIT/tools/pipeline_doctor/llm_contracts.py` (new, ~245 lines — four probes plus
+`capture_sfx_call` / `SfxCall` / `DoctorPage`), `MIT/test/test_pipeline_doctor_llm.py` (new, 20
+tests). **No pipeline code touched** — `manga_translator/ocr_vlm.py` is imported and exercised, not
+modified.
+
+**Why:** the LLM/gateway layer had no observability of any kind. The three defects found on
+2026-07-28 took ~10 hand-written probes to locate, and all three were invisible to the 111 MIT test
+files, the `mit_logic` gate, and every `tools/diag_*.py` script — those cover the GPU half and stop
+before the LLM call.
+
+**Before → after:** a truncated reply collapsed to `''`, indistinguishable from "this region has no
+SFX" (the silence that made the 2026-07-11 investigation conclude "text MoE" and move on). Now one
+walk emits four rows: `vlm-send` FAIL (budget 24 ≤ 2048 measured to truncate; thinking unset),
+`vlm-image` WARN (~40 visual tokens vs 336 measured answerable), `vlm-recv` FAIL
+(`finish_reason=length, content=None`), `sanitize` FAIL (`'EMPTY LINE'` survives sanitising).
+`exit_code=1`.
+
+**Perf Δ:** none on any production path — nothing here runs in the pipeline. The probes add ~0.3 s
+to the `mit_logic` gate (20 tests), no GPU, no network.
+
+**Quality:** the contracts capture the request from the **real** `vlm_localize_sfx` through its
+`post_fn` seam, so they track production code rather than a copy of it. Every threshold is a cited
+measurement; two bands ship as WARN because their boundary is unmeasured (vision floor = one
+measurement; budget 2048–4096 = untested).
+
+**Validation:** 20 new tests green; mutation-tested 6/6 (each mutation reverted in isolation — the
+strongest being "capture a hand-written body instead of the real call", which reds 9 of 20). Full
+MIT suite 768 passed / 1 pre-existing failure (`test_online_translators`, live Papago endpoint,
+excluded from the gate). Benchmark + PNG: `docs/reports/benchmarks/2026-08-31-688-doctor-llm-contracts.md`.
+
+**Risk / debt carried forward:**
+- **#688 D1 not done, premise void on this base.** The five thinking/budget helpers the issue asks
+  to extract from `custom_openai` do not exist on `main` — they arrived with #623 on `perf`. The
+  translator path therefore stays outside the gate; revisit after Phase E.
+- **The vision floor is one measurement.** 336 is a size that worked, not a located boundary.
+  #689's sweep is what turns it into a threshold. Until then it must never be a FAIL.
+- **The refusal corpus is observational**, not an enumeration. New refusal wording leaks until added.
+- **Production is still silent.** These probes only speak inside a Doctor run; `ocr_vlm` itself
+  still swallows `finish_reason: length`. That is the benchmark's verdict #4 and is filed separately.
+
+---
+
+## 2026-08-31 — #686: Pipeline Doctor core — report model + probe registry (feature / test-infra)
+
+**What & where:** `MIT/tools/pipeline_doctor/` (new package — `report.py`, `runner.py`,
+`__init__.py`, 188 lines), `MIT/test/test_pipeline_doctor_core.py` (new, 13 tests). No pipeline code
+touched.
+
+**Why:** #685's other five deliverables each need somewhere to report *to*. Without a shared model
+every probe would invent its own output, and the Doctor would decay into another `tools/diag_*.py`
+nobody runs. This is the seam, built first and deliberately empty of pipeline knowledge.
+
+**Before → After:** no package → a `StageReport`/`DoctorRun` model, a `ProbeRegistry` that probes
+attach to by decorator, and two renderers (aligned text table, JSON) driven from one walk. Probes
+register themselves on import, so the core holds no stage list; registration order is pipeline
+order. A probe that raises becomes a `FAIL` row and the walk continues.
+
+**Performance Δ:** none — the package is not on any request path; it is a developer/CI tool. Import
+cost is `dataclasses` + `typing` only, which is what keeps it inside the torch-free `mit_logic` gate.
+
+**Quality:** additive; no existing behaviour changes. The one hardening decision worth recording is
+that `to_table` escapes control characters rather than stripping them — probe evidence for the LLM
+stages is text the *model* wrote, so a raw `[2J`/`[31m` would clear or recolour the
+developer's terminal and let a `FAIL` row be dressed up as anything. Escaping keeps the bytes
+legible as evidence; `to_json` stays verbatim because JSON already escapes them and an agent should
+receive exactly what the model sent.
+
+**Validation:** TDD, RED first (`ImportError: cannot import name 'ProbeRegistry'`). Because an
+ImportError red only proves absence, each assertion was additionally mutation-checked: four
+mutations (`sorted(self._probes)`, dropping the `is not None` guard, letting a probe crash
+propagate, `_one_line` as identity) each redden exactly the test naming that behaviour. CI
+`mit_logic` gate **651 passed, 3 skipped, 0 failed** (run 33361709801); local full-deps run **740
+passed, 2 skipped, 0 failed**. Benchmark + committed PNG:
+`docs/reports/benchmarks/2026-08-31-686-pipeline-doctor-core.md`.
+
+**Tech debt created (tracked, not silent):** a run in which every probe declines reports
+`ok=True`/`exit_code=0` with zero stages — a CI gate wired to it would go green having inspected
+nothing. The core cannot know which stages *should* have reported, so the "expected stage set"
+assertion belongs to **#690**, where it is recorded rather than left to be rediscovered.
+
+---
+
+## 2026-07-28 — #679: SFX wiring guard tested at the behaviour, and an ADR-026 gap surfaced
+
+**What & where:** `MIT/test/sfx_gate_scan.py` (new, pure `ast`), `MIT/test/test_sfx_gate_scan.py`
+(new, 7 tests), `MIT/test/test_stage_c_wiring.py` (the #278 assertion rewritten + one new
+assertion), `docs/adr/026-mit-sfx-rescue-provenance-gate.md` (Amendment).
+
+**Why:** the guard asserted the literal symbol `should_rescue_sfx`, so a deliberate, benchmarked
+swap to landing's equivalent gate made it fire with a message that misdescribed the cause. A guard
+that cannot be tested itself, and that pins an implementation rather than a behaviour, produces
+false alarms and — as here — hides the requirement it is not checking.
+
+**Before → After:** one implementation-coupled assertion → a pure rule exercised against synthetic
+drivers, plus **two separate assertions** matching ADR 026's two requirements (provenance gating;
+the Addendum's real-text guard). The gate-less driver case the guard exists for is now actually
+covered, which it never was.
+
+**Performance Δ:** none (test-infra).
+
+**Quality:** no production code changed. The change is in what CI can see: on
+`integrate/render-reconcile` the rescue path never consults the line-OCR read, so the phantom
+target-language onomatopoeia over real dialogue that ADR 026's Addendum closed is reachable there.
+That now fails a test instead of passing silently.
+
+**Validation:** 10 tests over both files; full torch-free suite 646 passed, 0 failed on `main`.
+Both checks were run over both real drivers: `main` = provenance `should_rescue_sfx` + guard yes;
+`integrate/render-reconcile` = provenance `should_sfx_rescue` + guard no.
+
+**Risk / rollback:** test-infra only; rollback = revert. Deliberate consequence: the branch's
+`mit_logic` stays red until the trade-off is decided — that is the intended signal, not breakage.
+
+**Tech-debt register:** (1) the SFX-gate trade-off is **open** — ADR 026's Amendment records it and
+requires a superseding benchmark covering both the stylized SFX case and an ASCII det_sfx
+false-positive; (2) whichever gate loses becomes dead code to remove, together with
+`textline_merge/__init__.py`'s comment that still names `should_rescue_sfx` as *the* rescue path;
+(3) `ocr_vlm.should_rescue_sfx` currently has passing tests and no caller on the branch.
+
+**Links:** #679, #278, #609, #626, #642, ADR 026.
+
+---
+
+## 2026-07-28 — #680: glyph cache ignored font switches (render correctness)
+
+**What & where:** `MIT/manga_translator/rendering/text_render.py` (`set_font`, new
+`_SELECTED_FONT_PATHS`), `MIT/test/test_font_switch_cache.py` (new, 2 tests).
+
+**Why:** `get_char_glyph` is memoised on `(cdpt, font_size, direction)`, a key with no font in it,
+while `set_font()` swaps the global `FONT_SELECTION`. Cached characters kept rendering with the
+previous font — wrong glyph bitmaps and wrong advances, therefore wrong line-wrap widths.
+
+**Before → After:** a font switch inside a live worker silently reused the prior font's glyphs for
+every char/size in the 1024-entry cache → the memo is dropped exactly when the font selection
+changes. Same-font `set_font()` (the per-request `dispatch_render` case) still keeps the cache, so
+there is no per-page rebuild.
+
+**Performance Δ:** none on the hot path (same-font calls unchanged); one cache rebuild per actual
+font switch, which is rare.
+
+**Quality:** render correctness — this is a real defect fix, not a refactor. Wherever the bug was
+live the output changes to the *correct* glyphs. Deployments that only ever use one font were
+unaffected, which is why it went unnoticed.
+
+**Validation:** TDD at the public seam (`set_font` in, rendered advance out) — RED `38 == 38`,
+GREEN `32`. Deterministic before/after with only this source change differing: `1 failed, 635
+passed` → `636 passed, 0 failed`. The pre-existing failure it clears
+(`test_resize_regions_bubble_fit_byte_identical`) had been attributed to cross-platform freetype
+drift (#541) and turned into a skip; same-env evidence points at this cache instead, and whether
+the Linux-CI mismatch shares the cause is now falsifiable by whether that golden starts asserting.
+
+**Risk / rollback:** low and contained — one conditional in `set_font()`. Rollback = revert. Residual:
+`_SELECTED_FONT_PATHS` tracks paths, so a font file mutated in place under the same path would not
+invalidate (not a real workflow here).
+
+**Tech-debt register:** the four goldens that exposed this were only reachable because collection
+errors (#643) had been hiding the MIT suite on `integrate`. Still open: #680 Cause A (the merge
+reverted #541's portability verdict on `integrate` — restore **after** this fix, or it converts
+these failures back into skips) and #679 (a call-graph test asserting a symbol name rather than
+behaviour).
+
+**Links:** #680, #679, #643, #541, #503, #626, #642.
+
+---
+
+## 2026-07-28 — #678/#640: CI gates made real (unit-test selection, guard suites, mobile typecheck)
+
+**What & where:** `.github/workflows/ci.yml` (frontend job, new `scripts` job, new `mobile` job,
+`gate`), `scripts/lib/frontend-unit-tests.mjs` + `scripts/list-frontend-unit-tests.mjs` + tests,
+`scripts/README.md`.
+
+**Why:** `integrate/render-reconcile` failed CI the first time it was ever run through the pipeline,
+blocking Phase E of #626/#548 — and at the repo level no job ran the guard suites at all, so a guard
+could be broken and stay green. #534 also landed `Mobile/` with no CI covering it (#639).
+
+**Before → After:** unit-test selection was an inline `find` blacklist extended by hand per qualifier
+→ a pure function with 5 tests plus a CLI that fails closed on an empty selection. Guard suites ran
+**nowhere** in CI → a required `scripts (node --test)` job. `Mobile/` had no CI → a path-filtered
+strict typecheck wired into `gate`. The `frontend` job depended on an undeclared `node` → declared.
+
+**Performance Δ:** none (test-infra). `scripts` ≈ 10–25s, unfiltered by design; `mobile` ≈ 25s,
+path-filtered.
+
+**Quality:** no product-behavior change; no application code touched.
+
+**Validation:** every claim checked against job logs rather than the green checkmark —
+`scripts` `# tests 58 / # pass 58 / # fail 0`; `frontend` `Ran 226 tests across 33 files`; `mobile`
+typechecks 3 real files, and a deliberate `error TS2322` was shown to exit 2 and fail the step,
+finally demonstrating #639's stated acceptance criterion. Both PRs green on the required `gate`;
+#640 was rebased off a 64-commit-stale base before merging (the #553 lesson).
+
+**Risk / rollback:** low, additive. Rollback = revert #678 / #640. Residual: `gate` still treats only
+`result == 'failure'` as failing, so a cancelled/timed-out job does not block — pre-existing for every
+job, now inherited by `scripts` and `mobile` too; worth a follow-up.
+
+**Links:** #643, #678, #639, #640, #642, #626, #548, #679, #680.
+
+---
+
 > Curated, report-level record of changes that **affect the running system** plus the **tech-debt
 > register**. Audience: team / stakeholders / status reports. The chronological dev log lives in
 > `DONE.md` (and `MIT/PIPELINE.md §5` for MIT internals); this file is the higher-level summary you
@@ -14,6 +243,103 @@
 > detail for headline changes.
 
 ---
+
+## 2026-07-07 — MIT #503/#541: resize_regions golden portable across freetype builds (ci / test-infra)
+
+**What & where:** `MIT/test/test_resize_regions_characterization.py` + new pure `MIT/test/_golden_compare.py` (`golden_verdict`) + `MIT/test/test_golden_compare.py`; the 3 `resize_regions_*.npz` goldens regenerated with `freetype_version`/`platform` metadata. Follow-up to the #359 torch-free blocking gate + the #503 resize reland.
+
+**Why:** the now-blocking `pytest (logic gate, torch-free)` gate was **red on Linux CI** — `test_resize_regions_bubble_fit_byte_identical` drifted. The bubble_fit golden encodes freetype-metric geometry (font binary-search + width-squeeze over real glyph advances); it was recorded on Windows/freetype-2.14.3 (Pillow 12.2.0) but CI installs Linux/Pillow-12.3.0 (Pillow unpinned) → different advances → `dst_points` drift. Environment drift, not a logic change.
+
+**Before → After:** before — Linux logic gate `1 failed, 586 passed`, bubble_fit red on every non-dev platform, blocking #541. After — golden records its authoring env; a mismatch is a `skip` only on a *different* env and still a `fail` on the golden's own env. Logic gate `0 failed` (bubble_fit skips on CI's foreign freetype; legacy/clean_layout still assert — box-derived, portable).
+
+**Performance Δ:** N/A (test-only).
+
+**Quality:** production render output unchanged — `git diff MIT/manga_translator/` is empty (byte-untouched). Strict byte-identical coverage retained on the dev platform where refactors are developed; CI keeps real coverage of the portable resize paths.
+
+**Validation:** 3 `golden_verdict` unit tests (RED→GREEN); skip/fail/pass wiring exercised on crafted goldens; logic gate green on Linux CI (runs/28834510488). Benchmark PNG+MD: `docs/reports/benchmarks/2026-07-07-541-golden-portability.md`.
+
+**Risk / rollback:** low — test-only, no dependency pinned, no production code touched. Limitation (documented): only the golden's authoring platform asserts bubble_fit strictly; a deliberate Pillow bump on dev regenerates the golden. Scrutinized: ship.
+
+**Links:** #503, #541 (commit `ef69dd26`); builds on #359.
+
+---
+
+## 2026-07-03 — MIT CI: torch-free blocking gate landed + baseline rot repair (ci / tech-debt)
+
+**What & where:** Landed the long-stalled #359 (PR #427) making `mit-ci`'s `pytest (logic gate,
+torch-free)` a **blocking** required check (lazy package import boundary — ADR 023 — + committed the
+gitignored Kumiko `panel/lib` source). To get a green baseline for it, shipped a prerequisite repair
+(PR #504) to `main`: `MIT/requirements.txt` pin `opencv-python>=4.8,<5.0`, and reverted
+`test_resize_regions_characterization.py` + its 3 `resize_regions_*.npz` goldens.
+
+**Why:** Flipping the gate to blocking surfaced ~15 pre-existing failures that the previous
+report-only job had masked: (a) unpinned opencv drifted to 5.0.0 in CI, whose `cv2.putText` now
+requires CV_8U depth → broke the `utils/sort.py` debug-viz + render goldens (~13 tests); (b) the
+resize characterization tests were committed **ahead of their implementation** (via the a6980f00
+dashboard-sync) — they assert `page_shape` / `_bubble_fit_layout` that never landed on `main`, so they
+tested nothing real and only failed.
+
+**Before → After:** MIT pytest CI was uncollectable/red and report-only (ignored, masking rot) →
+torch-free logic gate is a real blocking check, **green on main**. `import manga_translator` now works
+in CI/fresh-clones/worktrees (panel/lib tracked). opencv is reproducibly pinned.
+
+**Performance Δ:** N/A (CI infra). The MIT render perf hotfix it accompanies (select_hyphenator
+lru_cache + textline_merge M1/M2, already on main via #414) is byte-identical.
+
+**Quality:** No production code change. Decision recorded: characterization tests that assert
+un-shipped behavior are **reverted (not xfail'd)** to keep the branch internally consistent, and
+re-land **atomically with their impl** — tracked in #503.
+
+**Validation:** logic gate green on PR #427, #504, #502 and on `main` HEAD; opencv 4.13 locally makes
+`test_render_golden` pass (proving the pin fixes the drift); 3-round multi-agent scrutinize
+(codex/antigravity/claude-9arm) drove the revert-vs-xfail + sequencing decisions.
+
+**Risk / rollback:** low — each change is its own PR/commit (revertable); the reverted tests are
+tracked for atomic reland (#503). Follow-up debt: the render-layout impl (page_shape/clean_layout/
+`_bubble_fit_layout`) remains uncommitted in an entangled working tree — lands with #503.
+
+**Links:** #359 (closed), PR #427 / #504 / #502, ADR 023, reland #503.
+
+---
+
+## 2026-07-02 — Wallet Security Hardening V1–V9: DB layer (feature / security)
+
+**Scope:** Backend (`wallet`, `unlock` modules) + Supabase DB · **Type:** Security hardening — DB layer completion · **Tests:** 78/78 backend unit tests green (unlock×7, wallet×63, controller×8); 0 new failures.
+
+**What & where:**
+- `Backend/migrations/2026-06-22-wallet-security-hardening.sql` — `wallet_tx_topup_ref_uidx` unique partial index on `wallet_transactions(reference_id) WHERE type='topup'`; drop dead numeric overloads of `add_coins_atomic`/`spend_coins_atomic`; 4-arg `purchase_unlock_atomic` (self-contained: reads price/status/creator inside txn)
+- `Backend/supabase-migration.sql` — mirrors the same DDL (reference file)
+- `Backend/src/unlock/unlock.service.spec.ts` — 7 unit tests covering all RPC paths
+- `Backend/src/wallet/wallet.service.spec.ts` — 3 SECURITY tests (amount mismatch, currency mismatch, non-SUCCEEDED status)
+- `Backend/src/wallet/wallet.controller.ts` — `@UseGuards(AuthGuard, TopupThrottleGuard)` on `POST /topup/create`
+
+**Why:** Core runtime security code (Xendit webhook HMAC, throttle guard, coin bounds) already in main. This PR adds the DB-level idempotency index and the atomic RPC that closes the TOCTOU window at the purchase step.
+
+**Before → After:**
+- Duplicate Xendit webhook → double topup credit possible / → DB-level unique index rejects second credit
+- `purchase_unlock_atomic` trusted caller-supplied `p_price`/`p_creator_uid` (TOCTOU) / → self-contained: reads from `chapter_versions` inside the transaction; raises `VERSION_NOT_FOUND`, `NOT_PUBLISHED`, `CREATOR_MISSING` before touching the ledger
+
+**Performance Δ:** not measured (additive DB index; no hot-path code changed).
+
+**Quality:** All error paths (INSUFFICIENT_FUNDS, VERSION_NOT_FOUND, NOT_PUBLISHED, CREATOR_MISSING) confirmed by unit tests via RPC error strings.
+
+**Validation:** 78 unit tests pass; `/scrutinize` review cleared 3 blockers before merge (duplicate TS import, stale pre-SELECT mocks, wrong SQL signature). Migration SQL pre-check query confirms 0 duplicate reference_ids before index creation.
+
+**Risk / rollback:** Additive — `IF NOT EXISTS` guards index; `CREATE OR REPLACE FUNCTION` is idempotent. Rollback: `DROP INDEX IF EXISTS wallet_tx_topup_ref_uidx; DROP FUNCTION IF EXISTS purchase_unlock_atomic(uuid,uuid,numeric,text)`. Old 6-arg overload dropped first by migration.
+
+**Links:** PR #463 (`feat/wallet-security-hardening → main`), commit `72502dd`.
+
+## 2026-07-01 — Captcha re-prompt on translate 401 (bugfix / hotfix)
+
+**Scope:** Frontend (`MangaReader.tsx`, `useChapterTranslation.ts`, `mangaTranslatePage.ts` + test) · **Type:** Bug hotfix · **Tests:** frontend 138/138 green (+4); typecheck clean; live E2E screenshot.
+
+**What & where:** `mangaTranslatePage.ts` new pure `isCaptchaExpiredError()`; `useChapterTranslation.ts` new `onCaptchaExpired` option — both `startTranslate` (batch) + `translateCurrentPage` route a `401` to it and skip the same-token retry; `MangaReader.tsx` extracted shared `resetCaptcha()` used by the page-fetch 401 path and the new translate 401 path.
+
+**Why:** when the 1-hour HWID-bound captcha token (#227) expired mid-session, pressing translate `401`'d and only toasted — translation dead-ended until a full page reload.
+
+**Before → After:** translate on expired token → `401` + error toast, permanently stuck / → Turnstile "ยืนยันตัวตน" modal re-appears, user re-verifies and retries in place.
+
+**Performance Δ:** N/A. **Quality:** removes a hard dead-end in the translate UX. **Validation:** unit (`isCaptchaExpiredError`) + full suite green + live E2E (inject bogus token → `401` → modal re-prompt, screenshot). **Risk / rollback:** additive; reuses the proven page-fetch recovery path; no backend change. **Links:** post-mortem `docs/reports/2026-07-01-captcha-reprompt-hotfix.md`, PR (hotfix/captcha-reprompt-on-translate-401).
 
 ## 2026-06-28 — CI test gates: GitHub Actions, first CI in the repo (infra / tech-debt)
 
@@ -819,6 +1145,124 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 
 *Validation:* TDD red→green; `test_pipeline_params.py` 11 pass (3 globals + 8 value-object) + full suite (365 / 0 new fail). *Risk/rollback:* byte-identical; revert = drop the branch. *Cosmetic delta:* the batch_concurrent warning logs under the `pipeline_params` logger name (same message/level/effect). *Links:* #187, #188, resume `docs/reports/mit-refactor-progress.md`.
 
+## 2026-06-12 — `STORAGE_DRIVER` env: choose local-disk vs Cloudflare-R2 storage · PR #222
+
+**1. What Changed.** `Backend/src/common/storage/storage.module.ts` — added a `STORAGE_DRIVER` env var that selects the storage backend explicitly, and extracted the selection into a pure, env-injectable `createStorageProvider(env, logger)`. New `storage.module.spec.ts`. `.env.example` documents the flag.
+
+**2. Why.** The factory only auto-detected the backend from the presence of `WORKER_URL`/`WORKER_SECRET`, so a developer who keeps R2 creds in their env had **no way to force local disk** — and so hit the R2-only read path of #214 (`loadPageBytes` ENOENT on R2-stored uploaded pages) during local E2E.
+
+**3. How.** `disk`|`local` → `DiskStorageProvider` (forced, even with R2 creds present); `r2`|`cloudflare` → `CloudflareR2StorageProvider` (clear error if creds missing); unset/empty → original auto-detect (R2 when both creds set, else disk). Case-insensitive + trimmed; unknown value throws listing the valid options.
+
+**4. Scope.** One Backend module + its new spec + `.env.example`. No runtime path touched; no other module reads `WORKER_URL` independently (verified by grep across `src/`).
+
+**5. Results / Perf.** Pure config-selection change; **0% runtime impact** on the request path. Existing deployments with no `STORAGE_DRIVER` are byte-for-byte unchanged (auto-detect branch preserved).
+
+**6. Tests.** `storage.module.spec.ts` **11/11** — explicit-wins, aliases, case-insensitive, missing-creds error, unknown-driver error, and the backward-compatible auto-detect matrix. `page-source.spec.ts` still green. `tsc --noEmit` clean. Not user-facing (server config) → unit tests suffice, no Playwright.
+
+**7. Backward Compatibility.** Fully preserved: unset `STORAGE_DRIVER` ⇒ identical auto-detect behaviour.
+
+**8. Security.** No creds in logs (only the driver name is logged). Traversal/abuse surface unchanged (provider implementations untouched).
+
+**9. Quality Gate.** CodeQL `Analyze (javascript-typescript)` + `Analyze (python)` both green. `/scrutinize` bilingual review, verdict **ship**.
+
+**10. Review findings (`/scrutinize`).** One forward-looking coordination item (not a blocker for this PR): the `/r2-patches` URL-builder on @akkanop-x's unmerged storage-refactor branch must derive routing from the *selected provider* / `STORAGE_DRIVER`, not from raw `WORKER_URL` presence — otherwise `STORAGE_DRIVER=disk` + `WORKER_URL` set = split-brain (builds R2 URLs but stores to disk). Nothing on `main` does this yet.
+
+**11. Ownership / Coordination.** `storage.module.ts` is in @akkanop-x's Cloudflare-R2/storage domain and he is about to rewrite it; the change is small + additive + backward-compatible so it folds in easily. Flagged in the PR for him to preserve `STORAGE_DRIVER` (or rename to his convention) during the refactor.
+
+**12. Live verification.** With `STORAGE_DRIVER=disk` set in dev `.env`, boot logs `[StorageModule] storage backend: local disk (driver=disk)` and the One Punch-Man benchmark chapter (an R2-only uploaded chapter, normally #214-ENOENT) translates end-to-end through the tunnel with patches served from local disk.
+
+**13. Benefits.** Unblocks local E2E of uploaded-version chapters without R2 creds/Worker; self-documenting intent in `.env`; a clean seam for the upcoming storage refactor.
+
+**14. Risk Reduction.** Selection logic is now a pure function with 11 cases instead of an inline factory closure exercised only at boot.
+
+**15. Developer Experience.** A dev can force local disk in one line; the chosen backend is logged on boot.
+
+**16. Future Opportunities.** Graduating to a committed default + adding `STORAGE_DRIVER` to `env.validation.ts` for boot-time fail-fast (the factory already throws on unknown values).
+
+**17. Lessons Learned.** "Force local in dev" had a 90% zero-code answer (unset the two creds); the explicit toggle is the 10% for ergonomics — worth it because the dev keeps R2 creds in their env.
+
+**18. KPI.** PR #222 MERGED (main a7e7b3d→e9083ec) · 11/11 new tests · 0 runtime impact · backward-compatible · CodeQL green · /scrutinize ship.
+
+*Links:* PR #222, #214 (R2 read-path bug it unblocks). Full session narrative incl. the render-parity dev-enablement + #168 SFX-OCR investigation (PaddleOCR-VL-1.5 / transformers-5.9 blocker) is in `DONE.md` 2026-06-12 and `MIT/BENCHMARK.md` (2026-06-12 scorecard).
+
+---
+
+## 2026-06-15 — Connect MIT to the Dashboard (live telemetry) + Dashboard OAuth (PRD #279 / ADR 018, ADR 019)
+
+**1. What changed.** Exposed MIT's already-built observability primitives over HTTP and wired the standalone Dashboard to them with a real OAuth login. MIT: 4 new import-light modules (`status_snapshot`, `auth`, `status_hub`, `status_stream`) + `GET /status` / `GET /status/stream` (SSE) on the parent server, gated by a forwarded Supabase JWT; `myqueue.add_task` + `/register` push events. Dashboard: Supabase Google OAuth gate, an authenticated `/api/live` SSE proxy, `useLiveSnapshot` hook, and live telemetry on the overview (GPU util/temp/VRAM/power, CPU/disk, RAM) with a live/offline badge + MIT-status chip; mock fallback throughout.
+
+**2. Results / outcome.** Live GPU/host/gateway/queue/worker telemetry reaches the Dashboard when a staff dev is signed in. Zero-trust verified end-to-end against **production Supabase**: no-token and garbage-token both 401 at MIT (MIT really calls Supabase `/auth/v1/user`), forwarded through the `/api/live` proxy. Real metrics confirmed on the dev box (`util/temp/VRAM/power`, RAM, disk 99.1%).
+
+**3. Expected performance gain %.** N/A (new capability, not an optimization). Added load is bounded: one metric sample/3 s per open stream + a gateway probe throttled to ≤1/30 s; one Supabase round-trip per verification, re-validated only every 60 s on a stream. No effect on the translate pipeline (events come from parent-process seams; the worker pool is untouched).
+
+**4. Benefits.** An incident is diagnosable from live data, not mock. Independent per-service verification with **no shared secret** (a Dashboard leak grants nothing reusable). **Zero new dependency** (httpx/psutil/nvidia-smi/@supabase/supabase-js — the last already used by the app Frontend). Event **push** with no event-tier loop. Graceful degradation to mock.
+
+**5. Purpose.** Realize Phase-1 (1d metrics + 1f transport) of the Dev console for MIT — the "window into the box" when production can't be inspected, per ADR 018's production motivation.
+
+**6. Why + architectural impact.** ADR 018 set the architecture (out-of-band aggregator, per-service streams, forward-JWT, no shared secret). This slice implements it for MIT and **refines one detail**: MIT verifies via Supabase `getUser` rather than local PyJWT — zero new dep, no JWT secret distributed to MIT, and robust to Supabase's new asymmetric `sb_publishable_…` keys (local HMAC could not verify them). The Dashboard's `/api/live` is the authenticated proxy that lets a browser (which can't set an `EventSource` auth header) reach MIT. ADR 019 records it.
+
+**7. Problems before.** MIT's metrics/diagnostics modules were committed but unexposed; the Dashboard was 100% mock; there was no way for a dev to authenticate and pull live data.
+
+**8. Goals.** SSE event-push (operator requirement) + sampled metrics; independent per-service auth surviving a Dashboard leak; MIT only (Backend/Frontend mid-refactor). All met.
+
+**9. Architecture before.** Dashboard → `lib/services.ts` mock. MIT parent server: `/health` `/ready` `/queue-size` `/translate/*`; `metrics.py`/`diagnostics.py`/`translate_error.py` present but not routed; no auth for a console.
+
+**10. Architecture after.** Browser ──OAuth──> session JWT ──fetch `/api/live`──> Next proxy ──forward JWT──> MIT `/status/stream`; MIT verifies independently (Supabase `getUser`) + gates to staff; SSE frames fold through `lib/snapshot.ts`; UI live-or-mock. Metric sampler loop lives at the source (MIT); events push via `StatusHub`.
+
+**11. Change list.** MIT new: `server/status_snapshot.py`, `server/auth.py`, `server/status_hub.py`, `server/status_stream.py`. MIT modified: `server/main.py` (routes + `require_staff` + throttled probe + worker-up event), `server/myqueue.py` (enqueue event). Dashboard new: `lib/live.ts`, `lib/live-map.ts`, `lib/supabase.ts`, `components/auth-gate.tsx`, `components/use-live-snapshot.ts`, `app/api/live/route.ts`, `README.md`. Dashboard modified: `app/layout.tsx`, `app/page.tsx`, `components/shell.tsx`, `.env.example`/`.env.local`, `package.json`. Docs: ADR 019 (+ index), DONE.md, PIPELINE.md §5, MIT README.
+
+**12. Metrics.** New tests: MIT 24 (snapshot 6 / auth 8 / hub 5 / stream 5), Dashboard 11 (live 6 / live-map 5). Suites green: MIT new 24/24, sibling import-light server 20/20, Dashboard 91/91. ~10 new files, ~6 edited, 1 dep added.
+
+**13. Technical debt removed.** None removed; debt avoided — no PyJWT/JWT-secret plumbing in MIT; reused the committed `snapshot.ts` reducer and the existing metrics/diagnostics modules rather than new surface; events attach at parent-process seams (no god-object growth).
+
+**14. Risk reduction.** Auth fails **closed** (None/unreachable → deny). The console lives on the parent server only — never the RCE-by-design worker. The SSE hub drops on a full queue so a stuck consumer can't block the translate path. Stream re-validates + closes on token expiry.
+
+**15. Developer experience.** A dev signs in with Google and sees live GPU/host/gateway during an incident; offline/connecting/live is explicit on a badge; mock fallback means the dashboard never hard-fails.
+
+**16. Future opportunities.** Supabase `staffLevel` claim hook to retire the id allowlist; Backend (#282) + Frontend (#283) `/status/stream` reusing the same forward-JWT proxy; per-stage worker event push; VRAM-per-model live attribution.
+
+**17. Lessons learned.** Supabase's new asymmetric publishable keys make local-HMAC JWT verify a dead end — verifying via `getUser` is both simpler and the only scheme-agnostic option (and matches the Backend). The Supabase JS `getSession()` can stall in a headless context (navigator.locks) — the gate needs a splash timeout to never hang.
+
+**18. KPI.** Branch pending review/commit · MIT 24/24 + Dashboard 91/91 + sibling 20/20 new/regression tests green · 0 translate-pipeline impact · zero-trust 401/403 verified against production Supabase · live metrics verified on-box · OAuth gate rendered. Remaining: a valid-token 200 needs a human Google sign-in + the dev's id in `MIT_STAFF_USER_IDS`.
+
+*Links:* PRD #279, ADR 018, ADR 019. Provenance: PIPELINE.md §5, DONE.md 2026-06-15.
+
+### Increment (2026-06-16) — `/service/mit` real-data wiring + `control_ms` + unified debug console
+
+**1. What changed.** Finished the MIT↔Dashboard connection so the MIT *detail* page (`/service/mit`) reads live data instead of mock where MIT reports it. (a) MIT's gateway probe now times the `GET /models` control-plane call (`control_ms`) separately from the chat data-plane call (`latency_ms`) — `server/diagnostics.py` + `server/status_snapshot.py::_gateway_dict`. (b) New pure mapper `Dashboard/lib/live-panels.ts::liveGatewayProbe` turns the live gateway frame into the `GatewayDiagnosis` `GatewayProbe` (real control-vs-data split). (c) `app/service/[id]/page.tsx` overrides — only for `id==='mit'` and only when signed-in + live — the header status badge, the GPU/VRAM/queue telemetry cards, the VRAM-panel host total, and the GatewayDiagnosis probe; everything MIT doesn't instrument stays mock. (d) Unified debug console (`components/debug-console.tsx`, `lib/debug-log.ts`) aggregating Dashboard/Frontend/Backend/MIT log lines; GitHub auto-link (`components/github-auto-link.tsx`); recharts duplicate-key fix (`components/metric-card.tsx`).
+
+**2. Results / perf.** No translate-pipeline impact (additive seams; the probe is throttled by `MIT_DIAG_INTERVAL_S`). The stream connects only on the MIT detail page (`useLiveSnapshot(id==='mit' ? token : null)`), so the other service pages open no extra SSE connection.
+
+**3. Honesty boundary.** Live: status, GPU util/temp/power, VRAM used/total, queue depth + worker count, host VRAM total, gateway control/data split. Mock (MIT reports current values, not a history / doesn't instrument): GPU history charts, per-card sparklines, stage timing, quality, per-model VRAM breakdown, translate-queue job list, worker-lifecycle internals.
+
+**4. Validation.** Dashboard `bun test` 101→**115** green (`liveGatewayProbe` +4); MIT `test_diagnostics` + `test_status_snapshot` **13** green (control_ms pinned at every hop: diagnostics → snapshot frame → `mapMitSnapshot` → `liveGatewayProbe`); touched files typecheck clean; `/service/mit` SSR 200 with no error overlay. Stack restarted clean — MIT :5013 (parent-only, 9arm gateway probe), Frontend :4000, Backend :4001.
+
+**5. KPI.** Branch `feat/mit-dashboard`, pending review/commit · 115 + 13 tests green · 0 translate-pipeline impact · `control_ms` lights up the GatewayDiagnosis control-latency on this MIT restart.
+
+### Increment (2026-06-16) — MIT-side telemetry instrumentation (queue · stage timing · worker lifecycle · per-model VRAM leak monitoring)
+
+**1. What changed.** Made MIT *emit* real data for the `/service/mit` panels (Dashboard wiring that reads it is a later step). Per panel, instrumented the real source where one exists; removed what has none. New seams, all worker-reported via a new internal channel.
+
+**2. Real sources added.** (a) **Queue jobs** — `TaskQueue.jobs_snapshot()` → `queue.jobs[]` (parent-side, real now). (b) **Stage timing** — `webhook.make_telemetry_hook` times each pipeline stage (gap between consecutive stage starts) → `POST /internal/telemetry` (`X-Nonce`) → `stages[]`. (c) **Worker lifecycle** — worker sends `os.getpid()` at registration, parent stamps `registered_at` → `workers.detail[]` (pid/uptime). (d) **Per-model VRAM leak monitoring** — Tier 1: worker's `torch.cuda.memory_allocated/reserved` → `vram.{allocated_mb,reserved_mb}` (reserved climbing while allocated flat = leak); Tier 2: `ModelUnloader` (the #188 unload seam) measures freed-per-unload, `VramTracker` learns each model's footprint from its largest clean release and flags an unload that frees far less → `vram.models[].{footprint_mb,freed_mb,leaked}`.
+
+**3. Design choices (Karpathy-reviewed).** (i) Quality/run-summary **removed** — the marquee fields (parity %, tokens) have no real source; kept the dashboard honest rather than fake them. (ii) Per-model VRAM footprint is **learned from unloads, not measured at load** — touch sites are pre-load and post-load deltas are activation-noisy, so the unload-learned footprint is simpler and robust (zero load-site instrumentation). (iii) Surfaced + corrected a wrong push-back: per-model VRAM *is* worth it because the use case is leak detection (a model not releasing VRAM), not nominal-size display.
+
+**4. Architecture / risk.** All worker→parent over `POST /internal/telemetry` (fire-and-forget, same `X-Nonce` auth as `/register`); `telemetry_store.apply()` dispatches `stage`/`vram`; `build_snapshot` carries the new sections only when non-empty (lean; the Dashboard reducer ignores unknown keys). Zero translate-pipeline impact — additive seams, never raise. Worker data → empty in the parent-only dashboard MIT until a GPU worker runs + translates. Hooking the #188 `ModelUnloader` cleanly is the direct payoff of the ~3.4k-line god-object decomposition.
+
+**5. Validation / KPI.** Full MIT suite **519 passed / 0 new failures** (19 pre-existing: 18 async-config + `test_registry_trim` from flux-inpainter PR #277); ~25 new import-light tests (<1s). New modules: `server/{telemetry_store,queue_view,worker_view}` + `manga_translator/{vram_tracker,vram_probe}`. Pending: Dashboard wiring to render `vram`/`stages`/`queue.jobs`/`workers.detail`. Provenance: PIPELINE.md §5, DONE.md 2026-06-16.
+
+### Increment (2026-06-17) — Dashboard wiring: `/service/mit` real data on every graph/panel (or "No Data")
+
+**1. What changed.** The MIT detail page graphs were still mock (only GPU util/VRAM/queue *numbers* were live). Wired the Dashboard half so every graph/panel reads real MIT telemetry or shows an explicit "No Data". (a) `lib/live-series.ts` — a pure rolling per-metric accumulator (MIT sends current values per SSE frame; the dashboard buffers each frame → live charts). (b) `lib/live-map.ts` exposes `stages`/`vram`/`queueJobs`/`workersDetail`; `use-live-snapshot.ts` keeps the rolling `series` + stamps event arrival time. (c) 8 components gained a live prop + a "No Data" placeholder (mock path kept for the shared cards/log-stream). (d) `page.tsx` maps the live telemetry into each panel's shape.
+
+**2. Approach (ultracode).** Foundation (accumulator + live-map + use-live-snapshot) done inline by the main loop — the coupled core. A workflow then fanned out the 8 component edits in parallel (each isolated, returning its exact prop signature); the main loop integrated `page.tsx` to match + verified the build. 1 of 8 agents hit a transient 500 → redone by hand.
+
+**3. Honesty boundary.** Live now: GPU util/VRAM/temp/power/fan + CPU usage sparklines, GpuDetail (4 of 7 charts), worker pid/uptime, gateway. Live after a translate: stage timing, VRAM-by-model(+leak badge), queue jobs, logs (real timestamps). No Data (no MIT source): pages/min, CPU temp, Graphics/CPU clock, quality panel.
+
+**4. Ops.** Killed a stale 14-Jun full MIT worker (orphaned `python3.11.exe` on :5004 holding ~3.9 GB VRAM — the worker-restart-gotcha); relaunched a full GPU worker on :5013 so the worker telemetry flows. No translate-pipeline change.
+
+**5. Validation / KPI.** Dashboard typecheck clean (touched files), `bun test` **130 pass / 0 fail**, `/service/mit` SSR 200 no error overlay. New modules: `lib/live-series.ts` (+5 tests), `lib/mit-console.ts` (+10 tests). Same-day follow-ups: real wall-clock x-axis on the graphs (`seriesT` → `times` prop); `mit@console` made a functional read-only live console (`runMitCommand` over the status snapshot — no shell, no mutating control). Provenance: DONE.md 2026-06-17.
+
 ---
 
 # 2026-06-14 — refactor(Backend): split MangaCatalog/Landing/GeminiModelCatalog out of books.service (#231, PRD #228 step 6)
@@ -908,3 +1352,239 @@ test_pipeline_params.py: 8 char cases (torch availability mocked) + 3 existing g
 **11. KPI.** #302 slice 1 · two god-components −81 LOC combined · chapterAccess + zoomLevel pure + 22 tests · byte-identical · 0 regressions (bun 77/0, tsc clean).
 
 *Validation:* `bun test app/lib` 77/0 + `npx tsc --noEmit` clean per commit; manual walkthrough passed before merge. *Links:* #302, #292, branch `refactor/302-frontend-decompose`.
+
+---
+
+# 2026-06-30 — feat(MIT): width-squeeze fills tall balloon height (#183/#175; builds on #430/#431, ADR 023→024)
+
+**1. Type.** Render-quality behaviour change in the MIT bubble-fit sizing path; opt-in via `MIT_BUBBLE_AREA_FIT` (already on per ADR 023). Targeted stopgap of the source-agnostic wrap (PRD #434).
+
+**2. Trigger.** After ADR 023 made balloon dialogue fill its balloon, a **tall, not-wide** balloon still rendered as 2 wide lines + a vertical gap: the fit picked the largest font that wraps without force-breaking a word, then rendered at full balloon width, and the font could not grow further (the no-mid-word-break guard caps it). Surfaced on Gal Yome no Himitsu EN ch1 p4 ("PEOPLE FROM OTHER DEPARTMENTS…"); user-flagged the same on Thai targets ("ตัวเล็กแค่ 2 บรรทัด ทั้งๆ ที่ประโยคยาว").
+
+**3. Change (before → after).**
+- before: `_bubble_fit_font_size(region, bubble_wh, …) → font`; the caller rendered the wrapped block at the full balloon width.
+- after: pure `squeeze_width(measure_h, full_w, min_w, box_h, factor=0.9)` (MangaTranslator `layout_engine.py` ×0.90 step) narrows the wrap column until the block would exceed the box height or hit the longest-token floor; `_bubble_fit_font_size` → `_bubble_fit_layout` returns `(font, block_w, block_h)`; both bubble-fit callers (occ==1, occ>1) centre the squeezed block. Font is unchanged — width is traded for line count.
+
+**4. Seam / commit.** One pure helper in `render_overlap.py` + one call site in `_bubble_fit_layout`. TDD: `squeeze_width` tests RED→GREEN first. Commit 94bab61 on `worktree-feat-mit-font-s1` (PR #433).
+
+**5. Byte-identical proof.** `squeeze_width` is invoked only inside `_bubble_fit_layout`; `clean_layout` and legacy paths untouched → render golden/guard suites **byte-identical**. No-op by design when text already fills the height or the longest word ≈ balloon width.
+
+**6. Performance.** Negligible — the squeeze loop is ≤ ~30 `calc_horizontal` re-wraps per bubble-fit region at constant font (log-bounded by factor 0.9 from full width to floor), only on the bubble-fit path.
+
+**7. Quality / metrics.** Gal Yome EN p4 tall balloon 2 wide → **6 narrow lines** filling height; One-Punch JA→EN dialogue/narration/SFX **unchanged**. `test_render_overlap.py` 33 → **36** (+3: narrows-a-tall-box / noop-when-full / stops-at-floor).
+
+**8. Tech debt.** The fill-height layout decision is now a pure, unit-tested function rather than implicit in the render loop. Residual: scoped to dialogue-in-balloon; narration/captions + horizontal-source wrap generally stay in the flag-gated, A/B-decided source-agnostic path (PRD #434 / research #435), which reuses `squeeze_width` as-is.
+
+**9. Risk / rollback.** Revert the call in `_bubble_fit_layout` → ADR-023 full-width rendering; paths outside bubble-fit are byte-identical. No money/auth surface.
+
+**10. KPI.** #183/#175 residual closed · tall balloon 2 → 6 lines · +3 unit tests (36/0) · golden byte-identical · 0 regressions (One-Punch unchanged) · ADR 024.
+
+*Validation:* TDD; `pytest test/test_render_overlap.py` 36/0; render golden/guard byte-identical; benchmark via real backend config (MIT_BUBBLE_AREA_FIT=1) Gal Yome + One-Punch. *Risk/rollback:* revert the squeeze call. *Links:* #183, #175, #434, #435, ADR 023, ADR 024, branch `worktree-feat-mit-font-s1`.
+
+---
+
+# 2026-06-30 — fix(MIT): clean-layout narration scales by page resolution, not per-region crop (#175)
+
+**1. Type.** Render-quality bug fix in the MIT clean-layout sizing path; patch-path crop-vs-page (same class as #175 bubble-fit, but the clean-layout branch).
+
+**2. Trigger.** Full-chapter Gal Yome EN→Thai benchmark: narration/caption rendered tiny while dialogue in the same panel was normal-sized (user: "ทำไมตัวเล็กทั้งที่มีตัวขนาดปกติอยู่ด้วย").
+
+**3. Change (before → after).**
+- before: `_clean_layout_dst` used the per-region **crop** `img.shape` for `clean_layout_font_size`'s `processing_scale` (+ wrap-width clamp + max wrap height). Crop = full-res but tiny area → `processing_scale` floored at 0.5 → narration ≈17px (3× under the designed 35px).
+- after: thread the full-**page** shape (`PatchRenderer.img_w/img_h`) via `patch_ctx.page_shape` → `stages` → `dispatch` → `resize_regions_to_font_size` → `_clean_layout_dst`; use it for the three page-relative quantities. `page_shape=None` (full-page path) → falls back to `img.shape` → byte-identical.
+
+**4. Seam / commit.** One value (`page_shape`) threaded with `=None` defaults through 4 functions + set once on the patch Context. Commit 70c6bf1 on `worktree-feat-mit-font-s1`.
+
+**5. Byte-identical proof.** Full-page render path never sets `ctx.page_shape` → `None` → `_clean_layout_dst` uses `img.shape` (= the page) exactly as before. Render golden/guard suites byte-identical. Bubble-fit + legacy paths untouched.
+
+**6. Performance.** Neutral — same call count; one extra tuple on the Context.
+
+**7. Quality / metrics.** Narration ~17px → ~35px on a 3 MP page (≈2×, the designed size). `test_render_overlap.py` 37 → **38** (+1 page-vs-crop pin); stages kwargs characterization updated for the new kwarg.
+
+**8. Tech debt.** Closes the clean-layout half of the patch-path crop-vs-page bug (#175 fixed the bubble-fit half via box height). Residual: the rw/bw discriminator still *routes* some narration-in-large-bubble to clean-layout — separate concern.
+
+**9. Risk / rollback.** Pass `page_shape=None` (or revert the thread) → crop-scaled clean-layout; all other paths byte-identical. No money/auth surface.
+
+**10. KPI.** #175 clean-layout sizing fixed · narration ~2× (designed size) · +1 unit pin (38/0) · golden byte-identical · 0 regressions · ADR 025.
+
+*Validation:* TDD pin + stages characterization; `pytest test/test_render_overlap.py test/test_render_golden.py test/test_stages.py test/test_patch_renderer.py` green; E2E Gal Yome EN ch1 p14 → Thai (narration readable, no crash/oversize). *Risk/rollback:* `page_shape=None`. *Links:* #175, ADR 023/024/025, branch `worktree-feat-mit-font-s1`.
+
+---
+
+# 2026-06-30 — fix(MIT): gate SFX rescue on det_sfx provenance, not a ≤4-char heuristic (#278)
+
+**1. Type.** Correctness + perf fix in the MIT SFX vision-rescue gate (PR #277 review follow-up).
+
+**2. Trigger.** User-flagged: normal short text detected/rescued as SFX. The rescue fired for ANY ≤4-char region in a ≥60×60 box → short dialogue ("HUH?", "おい") misread as onomatopoeia + a ~1–2 s gateway round-trip per such region on every translate.
+
+**3. Change (before → after).**
+- before: `if vlm_rescue and len(region.text.strip()) <= 4:` then area/min-side check → rescue.
+- after: pure `should_rescue_sfx(text, from_sfx_detection, w, h, vlm_rescue)` — gate on **det_sfx provenance** (`region.from_sfx_detection`, ≤4 chars), tight ≤2-char fallback when det_sfx is off. Provenance threaded: `Quadrilateral.is_sfx` (set by `merge_sfx_detections`) → `textline_merge` (any SFX textline → region) → `TextBlock.from_sfx_detection`. Plus: ENG prompt `==` byte-identity; `sanitize_sfx` non-Latin refusal guard; jieba lazy-dict documented.
+
+**4. Seam / commit.** One pure gate (`should_rescue_sfx`) + a boolean flag threaded through 3 classes with `False` defaults. Commit 8cbd930.
+
+**5. Byte-identical proof.** `is_sfx`/`from_sfx_detection` default `False` → when det_sfx never fires the flag is absent and the tight ≤2 fallback is the only change to the gate; render golden untouched. ENG prompt pinned byte-identical with `==`.
+
+**6. Performance.** Positive — removes the per-region vision-gateway round-trip (~1–2 s) for every short non-SFX region (previously on every translate).
+
+**7. Quality / metrics.** Deterministic benchmark: OLD rescued 5/7 representative regions, NEW 3 → 2 false-positive gateway calls eliminated, real SFX kept. `test_ocr_vlm` +9 (24/0).
+
+**8. Tech debt.** Replaces a length proxy with the correct provenance signal; closes the major item of the #277 review follow-up (+ its 3 nits).
+
+**9. Risk / rollback.** Loosen `should_rescue_sfx` back to `len ≤ 4` (ignore provenance) to restore old behaviour; flags default False → byte-identical when det_sfx off and no SFX detected. No money/auth surface.
+
+**10. KPI.** #278 done (major + 3 nits) · 2 false-SFX/page-class eliminated · per-translate gateway latency reduced · +9 tests (24/0) · golden byte-identical · ADR 026 + benchmark report.
+
+*Validation:* TDD `should_rescue_sfx`; `pytest test/test_ocr_vlm.py` 24/0; affected suites green; deterministic gate benchmark. *Risk/rollback:* revert the gate to length-only. *Links:* #278, #277, ADR 026, `docs/reports/benchmarks/2026-06-30-sfx-rescue-provenance-gate.md`, branch `worktree-feat-mit-font-s1`.
+
+---
+
+# 2026-07-02 — feat(MIT): reference_layout render engine (opt-in) + deterministic replay harness (#178/#462/#430)
+
+**1. Type.** Render engine + test-harness feature; opt-in, production default byte-identical.
+
+**2. Trigger.** Editing the shared MIT render kept regressing already-good targets (Thai fill ↔ One-Punch narration size), and the non-deterministic translator made worker A/B unreliable. A user-flagged demo defect: One-Punch narration blocks rendering far too big.
+
+**3. Change (before → after).**
+- *Harness:* `render_replay.py` (`serialize_regions`/`replay_clean_layout`) + `MIT_DUMP_REGIONS` dump hook → the clean-layout sizing is replayed offline & deterministically from committed fixtures; a parameterized safety-envelope test asserts every region stays in a two-sided box (spill ≤1.35×det, narration ≥0.6×flat, fill ≥0.9×flat).
+- *Engine (`render.reference_layout`, default OFF):* `_reference_layout_intent` resolves box+anchor+fill+cap from one discriminator (`should_fill_demoted_bubble`: fill only if `interior_w/det_w ≤ 1.4`); `fit_to_box` = binary search + bounded upward re-scan (defeats word-wrap non-monotonicity that returned a tiny branch).
+
+**4. Seam / commits.** New modules `reference_layout.py`, `render_replay.py`; `render.reference_layout` + `detector.det_bubble_synth` config flags; `~15` commits on `worktree-feat-mit-font-s1` (PR #433).
+
+**5. Byte-identical proof.** `reference_layout` default OFF → dispatch golden byte-identical (in isolation); `MIT_DUMP_REGIONS`/`MIT_SIZING_TRACE` off → no-op.
+
+**6. Performance.** N/A for production (flag off). Harness replay is calc_horizontal-bound (~minutes for the corpus) → the corpus envelope test is `slow`-marked.
+
+**7. Quality / metrics.** Deterministic replay + live: One-Punch narration 32–44px spill ~2.3× → readable narrow columns (~flat), Thai dialogue still fills (69/28/50px). Discriminator ratio across 17 bubble regions / 4 fixtures cleanly separates (Thai 1.07–1.20 | 1.4 | One-Punch 1.61–3.43). Corrected finding: production render is in good shape; a "garble" was actually an LLM translation token ("JDB"), not render.
+
+**8. Tech debt.** Merged `_reference_fit_box`+`_reference_cap` → one intent resolver; named constants. Remaining: promote decision (needs bigger corpus + multi-run flip check), calc_horizontal font-cache (test speed), Knuth-Plass line-break (#180).
+
+**9. Risk / rollback.** Opt-in flag OFF → production unchanged. Discriminator threshold stability is the main risk before promotion (mitigated: 0.2 margin across the corpus + envelope guard). Drop the flag → zero effect.
+
+**10. KPI.** narration-oversize cluster fixed + guarded · deterministic harness + 4-fixture corpus · two-sided envelope guard green · benchmark-endpoint + verify-before-claiming rules recorded · ADR 028 + 4 benchmark reports (`docs/reports/benchmarks/2026-07-02-*`).
+
+*Validation:* TDD each increment; render golden byte-identical (flag off); reference_layout/replay suites green; live patch-path renders verified vs target. *Risk/rollback:* flag OFF default. *Links:* #178, #462, #430, ADR 028, `docs/prd/mit-render-defect-master-plan.md`, benchmarks `2026-07-02-*`, PR #433, branch `worktree-feat-mit-font-s1`.
+## 2026-06-28 — Dashboard V2: Track A close-out + live-native leak fixes (PR #414)
+
+### Track A review nits (#352, #353, #354) — closed
+
+- **What & where:** `dashboardv2/components/dashboard.tsx` + `lib/{download,snapshot-export}.ts`. Commits `54182e0` (Track A base) / `f49cda2` (#354). Branch `feat/dashboard`.
+- **Why / Before → After:**
+  - **#352** focus-trap re-armed every 1s clock tick (`onClose` re-created each render) → keyboard focus snapped to Close every second. Fix: `closeNode = useCallback(…, [])` → stable identity → focus-trap effect runs only on open/close. *(Already implemented in Track A; verified + closed.)*
+  - **#353** Export anchor `click()`'d without DOM-attach + synchronous `revokeObjectURL` → fragile across browsers. Fix: `lib/download.ts:triggerDownload` DOM-attach → click → remove → deferred revoke (`setTimeout 0`). *(Already implemented; verified + closed.)*
+  - **#354** three nits: MIT-tab-on-nav = **remember last tab** (documented); skeletons unreachable in mock = **deferred to B4** (annotated); queue-depth chart **moved out of host-metrics** (`HOST_CHARTS`, queue ≠ host metric).
+- **Validation:** `bun test` 74 pass, `tsc --noEmit` clean.
+- **Risk / rollback:** mock-mode only; realtime (Track B/B4) deferred. **Links:** #352, #353, #354.
+
+### Live-native leak fixes (PR #414, `/scrutinize` findings) — ADR 022
+
+- **What & where:** new `dashboardv2/lib/overview-signals.ts` (`pipelineHeaderSummary`, `pctDelta`) + `dashboard.tsx`. Commit `fa64c90`. Branch `feat/dashboard` → **PR #414**.
+- **Why:** a 3-agent `/scrutinize` pass found the live-native contract (ADR 022) breached — 4 hardcoded mock values rendered on the **live** path (the cardinal sin the epic forbids), invisible to the green unit suite.
+- **Before → After:** (1) pipeline `total 95.0s · translate stalled` → derived from real `m.stages` or hidden; (2) GPU-util `−11.4%` delta → real first→last `pctDelta(series)`, badge hidden when no series; (3) hero `94%` success ring → gated behind `mock`; (4) vitals GPU/VRAM `0%` → `—` (No-Data) when `m.gpu` null.
+- **Quality:** live console no longer fabricates incident state / success rate on real MIT.
+- **Validation:** +8 golden tests for the derive libs → **82 pass / 0 fail**, `tsc --noEmit` clean. Full E2E via tunnel = **not run** (Track B realtime not wired; mock-mode only) — honest gap.
+- **Risk / rollback:** pure additions + gating; mock path unchanged. **Links:** PR #414, ADR 022, PRD #304.
+## 2026-06-29 — MIT: lazy package-import boundary → torch-free logic tests + blocking CI gate (#359)
+
+**1. Type.** Tech-debt / perf + CI. Lazy-imports torch at the package boundary so pure-logic tests and the CI logic gate run without the multi-GB ML stack. ADR 023.
+
+**2. Trigger.** `manga_translator/__init__.py` ran `from .manga_translator import *` and `utils/__init__.py` ran `from .inference import *`; both pull torch. So ANY import (even `from manga_translator.config import Config`) dragged in torch+cv2+transformers+diffusers — `mit-ci` had to install the full ML stack for a font-fit unit test and stayed `continue-on-error` (report-only), letting real breakage show green.
+
+**3. Change (before → after).**
+- before: eager `from .manga_translator import *` (package) + `from .inference import *` (utils); single `mit-ci` job installing torch + full requirements, `continue-on-error: true`, async tests failing (strict pytest-asyncio).
+- after: PEP 562 `__getattr__` forwards public names lazily in both `__init__`s (importlib.import_module to avoid self-name recursion); `test/conftest.py` `collect_ignore`s the 12 torch-only modules when torch is absent; `asyncio_mode = auto`; `mit-ci.yml` = blocking `logic` job (lightweight install via a grep dep-filter, torch-free suite) + report-only `heavy` job (full ML).
+
+**4. Seams / commits.** c1 package `__init__` lazy (+ characterization tests); c2 `utils/__init__` lazy; c3 CI split (conftest + pyproject + mit-ci.yml). Characterization-first; one concern per commit.
+
+**5. Byte-identical proof.** Both `__getattr__`s are additive — no public name removed; `test_lazy_import.py` asserts (in a child interpreter) the consumed API resolves to the same objects as before. No star-import of either package exists, so dropping `*` is safe. Full suite 0 new failures vs baseline.
+
+**6. Performance.** Logic tests/CI skip the ~20 s ML import + the multi-GB install. First attribute access (not import) now pays the ML cost — invisible to real runs, eliminated for logic runs.
+
+**7. Quality / metrics.** torch-needing test files **27 → 12**; torch-free collection **338 → 413** tests; logic gate collects with **0 errors**, torch never imported (validated under a torch-absent import blocker). +5 characterization/torch-free tests. Full MIT suite 0 new failures (21 pre-existing).
+
+**8. Tech debt removed.** Heavy deps now sit behind a lazy boundary instead of an eager package `__init__`; `mit-ci` can become a real blocking gate; the long-standing async-test config gap (`asyncio_mode`) is fixed.
+
+**9. Risk / rollback.** Additive `__getattr__`s → rollback = restore the eager `import *`. **AFK-unvalidatable parts** (by design, validated by the PR's own `mit-ci` run): the grep dep-filter completeness + the logic gate's green status + `asyncio_mode=auto` making the async suites pass with pytest-asyncio installed. If the logic job goes red, drop the offending grep line / add the test to conftest's list.
+
+**10. Notes.** Residual 12 heavy files = genuine model/translator tests + deeper transitive chains (`pipeline_params → ModelWrapper` top-import, dispatch registries) — a follow-up slice. The `heavy` job stays report-only until reliably green on a GPU-less runner.
+
+**11. KPI.** #359 · lazy package boundary · 27→12 heavy files / 338→413 torch-free tests · 0 new failures · mit-ci logic gate torch-free + blocking-capable.
+
+*Validation:* `pytest test/test_lazy_import.py` 5/0; full suite 0-new-fail; torch-absent blocker → 413 collect / 0 collection errors / torch never imported. *Links:* #359, #355, ADR 023, branch `worktree-ci-mit-lazy-torch`. CI dep-filter + flip validated by the PR's mit-ci run.
+
+---
+## 2026-07-04 — Master Plan 2 (Phase 0–3 autonomous) + deterministic real-page benchmark harness
+
+**What / where.** `PR #532` (`fix/mit-mp2-p2-p5`): P2 cache-safety (`mit-batch-orchestrator.service.ts`), P5
+config verify, P0 eval harness (`MIT/eval/translation_eval.py`), P7 contract+determinism gates
+(`translators/numbered_contract.py`) + P7 concise-bubbles directive (`translators/config_gpt.py` +
+`Backend MIT_CONCISE_BUBBLES`), and the deterministic render A/B harness (`MIT/tools/render_dump_ab.py`).
+
+**Why.** Round-2 push toward human-level translation quality (epic #528). The load-bearing blocker was that
+**every prior render comparison was confounded by translator non-determinism** — so no fix could be trusted.
+
+**Before → after.**
+- Render benchmark method: live 2-call A/B (non-deterministic, untrustworthy) → **dump-once + re-render-N-configs
+  offline** (identical text, only the knob differs). Enabled by `MIT_DEBUG_RENDER_DUMP` + `render_dump_ab.py`.
+- P2 cross-page context: enabling it cached a context-free page under a context-on key (#524) → orchestrator now
+  sends the full ordered chapter when context on (byte-identical off).
+- P7: no reproducibility gate → `is_deterministic_decode` + finding that prod runs `temp=0.5` (non-reproducible);
+  numbered-contract normalizer (7/8→8/8 alignment on a dropped index).
+
+**Perf Δ.** None on the default path (all changes flag-gated / byte-identical off). Harness runs offline (font
+only, no ML) in <1s/config.
+
+**Quality (benchmark-proven, the key outcome).** The user's narrow-bubble defect was deterministically
+diagnosed as a **fundamental bubble-size × text-length limit**: neither `reference_layout` (P3, regresses the
+narrow column) nor `bubble_area_fit` toggling nor P7 conciseness (measured 112 vs 110 chars — no help) fixes it;
+**P1 readable-floor (already live) is the least-bad option.** The general narrow-bubble class is handled by P1.
+So P3/P4 are correctly NOT promoted — an evidence-based decision, not a gap.
+
+**Validation.** 195 tests green (129 MIT + 66 Backend); 4 committed real-page deterministic A/B benchmarks
+(`docs/reports/benchmarks/2026-07-04-*`); root-cause diagnosis committed.
+
+**Risk.** Low — all default-off/additive/docs/tools. The only production-logic change (#524 orchestrator) is
+gated + characterization-net-green. **Remaining MP2 work is external-only** (merge #532 [security-gated for the
+agent], ML models for P6/P11, human grading for P7-accuracy via #526, a repro fixture for P9, prod-enable
+decisions) — documented in `docs/reports/mit-master-plan-2-status.md`.
+
+## 2026-07-04 (b) — MP2 P7-accuracy LLM-judge + brainstorm-unblocked clusters (PR #533)
+
+**What / where.** `PR #533` (`fix/mit-mp2-p2-p5`): `MIT/eval/llm_judge.py` + `run_llm_judge.py` (torch-free
+LLM-judge over the #526 harness, reusing the `CUSTOM_OPENAI_*` endpoint) and 3 committed benchmarks
+(`docs/reports/benchmarks/2026-07-04-{translation-eval-llmjudged,p7-conciseness-quality-ab,brainstorm-unblocked-clusters}.{md,png}`).
+
+**Why.** The reviewers' #1 gap — translation *accuracy* — was previously "unmeasurable". A `/clink-brainstorm`
+round found the first measurement was NOT blocked on a human: the endpoint + cached EN references already exist.
+
+**Before → after.**
+- Translation quality: "unmeasurable / asserted" → **measurable**. First real LLM-judged scorecard: baseline
+  **1.70/2** over 35 bubbles (faithfulness 1.63 / cohesion 1.83 / style 1.63).
+- **Refines the (a)-entry claim** that P7 conciseness is "no help": that was a *length* finding (112≈110 chars).
+  A clean quality A/B shows `concise_bubbles` ON **improves LLM-judged quality** (overall 1.47→1.60,
+  faithfulness 1.41→1.59) — it doesn't shorten, it phrases more faithfully → proven-good enable candidate
+  (alongside P8 Knuth-Plass), still default-off.
+- P6 SFX (model cached, `detect_sfx_boxes` verified, 4 boxes) and P9 (0-drop audit = terminal state) confirmed
+  autonomously advanceable, not blocked.
+
+**Perf Δ.** None — eval/benchmarks are offline tools; no production path touched.
+
+**Quality / validation.** LLM-judged (lower-confidence than blind human grading — the gold standard remains
+~100 bubbles + human). `translation_eval` suite 9/9 green; `llm_judge` import verified torch-free (logic-gate
+safe). Every benchmark now ships a committed PNG per the benchmark rule.
+
+**Risk.** Very low — additive eval/docs only, no runtime code. Cleanup in this PR: dropped a 1396-line worker
+log that had leaked in (+ gitignore), relocated the proactive-clink-brainstorm memory to the canonical Obsidian
+vault. **Remaining = user-gated:** merge #533 + prod-enable of the proven-good flags.
+
+## 2026-07-10 — Tech-debt batch (6 PRs: #542/#544/#616/#617/#618/#620)
+
+**Change.** Agent-owned tech-debt batch merged to `main`: two latent-bug fixes (`translation_store` utf-8 encoding #542; `readWithTimeout` dangling-timer leak #544), three test-suite fixes greening the report-only heavy-ML pytest job (#616/#617/#618), and a process-doc rule (#620). All TDD (RED demonstrated the concrete defect before GREEN) + `/scrutinize` (verdict ship, findings posted bilingual; one real finding — a self-wikilink in #621 — caught and fixed).
+
+**Before → after.** heavy-ML CI: 3 pre-existing failures → 0. Windows Thai/CJK save-text: crash → round-trips. Batch NDJSON stream: ~90s timer leaked per chunk → released in `finally`. Pre-merge discipline: implicit → documented rule + dogfooded (#612 rebased onto post-#619 main before merge).
+
+**Validation.** Per-PR logic-gate + heavy-ML CI green; #612 heavy-ML re-verified green after rebase. No production runtime behaviour changed (the one prod-file touch, #619's `flux_embed_cache` import relocation, is import-timing only, cached in `sys.modules`).
+
+**Risk.** Low — five of six PRs are test/docs/IO-hardening; the encoding + timer fixes are additive-safe (no legacy non-ASCII files existed pre-fix; timer cleanup is a no-op when unset). Base-staleness verified disjoint for every merge (no clobber possible).
+
+**Remaining.** #614 (load_dotenv extraction) + #615 (BaseGPTTranslator) filed as focused leftovers; CLAUDE.md copy of the #620 rule deferred to Stage B.

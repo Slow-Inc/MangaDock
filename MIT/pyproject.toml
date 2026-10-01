@@ -27,3 +27,8 @@ generated-members = ["torch.*", "cv2.*"]
 addopts = "-ra -v -p no:faulthandler"
 minversion = "6.0"
 testpaths = ["test"]
+# #359 — pytest-asyncio (a dev dep) defaults to strict mode, which needs an explicit
+# @pytest.mark.asyncio on every `async def` test; without it they fail with "async def
+# not natively supported". `auto` runs bare async tests, so the async suites (textline_merge,
+# translation, async_correctness, ...) actually execute — required for mit-ci to be green/blocking.
+asyncio_mode = "auto"

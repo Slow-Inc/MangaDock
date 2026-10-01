@@ -6,6 +6,33 @@ import { type MitBatchDeps, type PageResult } from './mit-batch-types';
 import { patchCacheKey, buildMitConfig, imageModelKey } from './mit-config';
 
 /**
+ * Race a single stream `read()` against a `timeoutMs` deadline, ALWAYS clearing
+ * the loser timer in a `finally` so a fast read (the common case, every chunk)
+ * does not leave a dangling ~90s timer pending. Those accumulated across a long
+ * NDJSON stream and delayed event-loop settling / process exit (#544).
+ */
+export async function readWithTimeout<T>(
+  read: () => Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      read(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(new Error(`MIT stream read timeout after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * MIT batch transport + NDJSON stream driver (#294).
  *
  * Carved out of MitBatchOrchestrator so the HTTP-to-MIT submit and the stream
@@ -142,7 +169,7 @@ export class MitBatchStream {
         sourceLangIso,
         targetLangIso,
         imageModel,
-        undefined,
+        signal,
         derivative,
         mangaId,
       );
@@ -176,7 +203,7 @@ export class MitBatchStream {
         sourceLangIso,
         targetLangIso,
         imageModel,
-        undefined,
+        signal,
         derivative,
         mangaId,
       );
@@ -198,28 +225,14 @@ export class MitBatchStream {
       30_000,
       Number(process.env.MIT_BATCH_STREAM_READ_TIMEOUT_MS ?? 90_000),
     );
-    const readWithTimeout = async () => {
-      return await Promise.race([
-        reader.read(),
-        new Promise<never>((_, reject) => {
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `MIT stream read timeout after ${streamReadTimeoutMs}ms`,
-                ),
-              ),
-            streamReadTimeoutMs,
-          );
-        }),
-      ]);
-    };
-
     let streamFailedError: string | null = null;
 
     try {
       outer: while (true) {
-        const { done, value } = await readWithTimeout();
+        const { done, value } = await readWithTimeout(
+          () => reader.read(),
+          streamReadTimeoutMs,
+        );
         if (done) break;
         const { events, carry: nextCarry } = parseNdjsonChunk(
           decoder.decode(value, { stream: true }),
@@ -363,7 +376,7 @@ export class MitBatchStream {
       sourceLangIso,
       targetLangIso,
       imageModel,
-      undefined,
+      signal,
       derivative,
       mangaId,
     );
@@ -393,28 +406,44 @@ export class MitBatchStream {
     let recovered = 0;
     let failed = 0;
 
-    for (const missing of missingPages) {
-      if (signal?.aborted) break;
-      try {
-        const single = await this.deps.translateSinglePage(
-          chapterId,
-          missing.pageIndex,
-          missing.pageUrl,
-          sourceLangIso,
-          targetLangIso,
-          { maxStartupRetries: 3, imageModel, derivative, mangaId },
-        );
-        notify(missing.pageIndex, { patches: single.patches });
-        recovered += 1;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `[BatchPatches] fallback failed chapter=${chapterId} page=${missing.pageIndex}: ${msg}`,
-        );
-        notify(missing.pageIndex, { patches: [], error: msg });
-        failed += 1;
+    // Bounded worker pool (FR-20): recover missing pages a few at a time instead
+    // of one serial `for await`. Workers share a cursor into `missingPages`; each
+    // re-checks `signal?.aborted` before pulling the next page, so an abort
+    // mid-recovery stops the whole pool from issuing further MIT calls (not just
+    // the next serial iteration). JS is single-threaded, so `cursor++` and the
+    // recovered/failed counters need no locking.
+    const POOL_SIZE = 4;
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+      while (cursor < missingPages.length) {
+        if (signal?.aborted) return;
+        const missing = missingPages[cursor++];
+        try {
+          const single = await this.deps.translateSinglePage(
+            chapterId,
+            missing.pageIndex,
+            missing.pageUrl,
+            sourceLangIso,
+            targetLangIso,
+            { maxStartupRetries: 3, imageModel, derivative, mangaId },
+          );
+          notify(missing.pageIndex, { patches: single.patches });
+          recovered += 1;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `[BatchPatches] fallback failed chapter=${chapterId} page=${missing.pageIndex}: ${msg}`,
+          );
+          notify(missing.pageIndex, { patches: [], error: msg });
+          failed += 1;
+        }
       }
-    }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(POOL_SIZE, missingPages.length) }, () =>
+        worker(),
+      ),
+    );
 
     if (missingPages.length > 0) {
       this.logger.log(

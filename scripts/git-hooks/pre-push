@@ -1,0 +1,15 @@
+#!/bin/sh
+# Workflow guard pre-push hook (2026-07-05 brainstorm — Fix 1: kill the dirty-WIP surface).
+# Enable once per clone:  git config core.hooksPath scripts/git-hooks
+#
+# Blocks a push when the working tree is over budget or carries build artifacts, so a large
+# dirty WIP can never silently re-accumulate on a shared branch. Use a `wip/*` branch to
+# push a deliberate one-time freeze (bypasses the count gate, not the artifact gate).
+node "$(dirname "$0")/../check-worktree-budget.mjs" || {
+  echo ""
+  echo "pre-push blocked by worktree-budget guard. Fix the above, or:"
+  echo "  - commit the changes to an issue-scoped branch, or"
+  echo "  - push from a wip/ branch for a one-time freeze, or"
+  echo "  - bypass once (discouraged) with:  git push --no-verify"
+  exit 1
+}

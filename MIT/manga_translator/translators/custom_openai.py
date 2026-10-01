@@ -1,3 +1,4 @@
+import os
 import re
 
 from ..config import TranslatorConfig
@@ -5,6 +6,7 @@ from .config_gpt import ConfigGPT  # Import the `gpt_config` parsing parent clas
 
 try:
     import openai
+    import httpx
 except ImportError:
     openai = None
 import asyncio
@@ -12,6 +14,28 @@ import time
 from typing import List
 from .common import CommonTranslator, VALID_LANGUAGES
 from .keys import CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL, CUSTOM_OPENAI_MODEL_CONF
+
+
+def resolve_enable_thinking(env=None) -> bool:
+    """Whether to leave the LLM's native thinking/reasoning mode on. Default OFF:
+    a qwen3-style reasoning model can spend the whole ``max_tokens`` budget on
+    ``<think>`` output and return empty ``content`` on dense pages (#623 — the
+    One-Punch narration group: 6502 chars of reasoning → completion cap hit →
+    ``content=None`` → the translate 500s the whole page). Set
+    ``CUSTOM_OPENAI_ENABLE_THINKING=true`` to re-enable for a non-thinking model."""
+    if env is None:
+        env = os.environ
+    return str(env.get('CUSTOM_OPENAI_ENABLE_THINKING', 'false')).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def thinking_extra_body(enable_thinking: bool):
+    """``extra_body`` for ``chat.completions.create`` that suppresses qwen3-style
+    thinking when disabled (``chat_template_kwargs.enable_thinking=false`` — the
+    lever the 9arm/vLLM gateway honours; a top-level ``enable_thinking`` is
+    ignored). Returns ``None`` when thinking is enabled so the call is unchanged."""
+    if enable_thinking:
+        return None
+    return {'chat_template_kwargs': {'enable_thinking': False}}
 
 
 class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
@@ -136,7 +160,18 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
                     if time.time() - started > self._TIMEOUT + (timeout_attempt * self._TIMEOUT / 2):
                         # Server takes too long to respond
                         if timeout_attempt >= self._TIMEOUT_RETRY_ATTEMPTS:
-                            raise Exception('ollama servers did not respond quickly enough.')
+                            # Surface a structured, actionable failure (PRD #279, slice 1e)
+                            # instead of an opaque string — names the translator/endpoint/
+                            # model + cause + hint for the worker log and backend response.
+                            from server.translate_error import classify_translate_error
+                            failure = classify_translate_error(
+                                TimeoutError('translator did not respond quickly enough'),
+                                translator='custom_openai',
+                                endpoint=CUSTOM_OPENAI_API_BASE or '',
+                                model=self.model or CUSTOM_OPENAI_MODEL,
+                            )
+                            self.logger.error(failure.message())
+                            raise Exception(failure.message())
                         timeout_attempt += 1
                         self.logger.warning(f'Restarting request due to timeout. Attempt: {timeout_attempt}')
                         request_task.cancel()
@@ -225,13 +260,36 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
 
         messages.append({'role': 'user', 'content': prompt})
 
+        # #623: a reasoning model spends the whole completion budget on <think> and
+        # returns content=None, which #631 now turns into a retryable APIError. This is
+        # the root cause — opt out of thinking unless the deploy explicitly wants it.
+        extra_body = thinking_extra_body(resolve_enable_thinking())
+
         response = await self.client.chat.completions.create(
             model=self.model or CUSTOM_OPENAI_MODEL,
             messages=messages,
             max_tokens=self._MAX_TOKENS // 2,
             temperature=self.temperature,
             top_p=self.top_p,
+            extra_body=extra_body,
         )
+
+        # #631: the gateway can return message.content = None (e.g. the model spent its
+        # token budget on a dense page). A None/non-string content must be a failed
+        # attempt through the existing retry/error handling (the `except openai.APIError`
+        # branch in _translate), not a TypeError from extract_capture_groups downstream.
+        content = response.choices[0].message.content
+        if not isinstance(content, str):
+            # finish_reason lives on the choice, not the message (openai SDK)
+            finish_reason = getattr(response.choices[0], 'finish_reason', None)
+            self.logger.warning(
+                f'API returned no usable text content (finish_reason={finish_reason}); '
+                f'treating as a failed attempt')
+            raise openai.APIError(
+                'translator returned no usable text content (message.content is not a string)',
+                request=httpx.Request('POST', str(self.client.base_url or 'unknown')),
+                body=None,
+            )
 
         self.logger.debug('\n-- GPT Response (raw) --')
         self.logger.debug(response.choices[0].message.content)
@@ -241,4 +299,16 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         self.token_count += response.usage.total_tokens
         self.token_count_last = response.usage.total_tokens
 
-        return response.choices[0].message.content
+        # #speed-study Phase 2c (T1, OPTIMIZATION.md): de-confound prompt vs
+        # completion tokens — total_tokens alone can't tell whether a slow
+        # translation call is prompt-bound (context/system-prompt size) or
+        # completion-bound (verbose output). The 9arm/ollama-compat gateway may
+        # not populate these fields; log 'n/a' rather than raise if absent.
+        prompt_tokens = getattr(response.usage, 'prompt_tokens', None)
+        completion_tokens = getattr(response.usage, 'completion_tokens', None)
+        self.logger.info(
+            f'Token split: prompt={prompt_tokens if prompt_tokens is not None else "n/a"} '
+            f'completion={completion_tokens if completion_tokens is not None else "n/a"}'
+        )
+
+        return content

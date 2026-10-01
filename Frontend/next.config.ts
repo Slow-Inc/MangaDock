@@ -58,6 +58,8 @@ const nextConfig: NextConfig = {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     localPatterns: [
       { pathname: "/api/**" },
+      { pathname: "/uploads/**" },
+      { pathname: "/img-cache/**" },
     ],
     remotePatterns: [
       {

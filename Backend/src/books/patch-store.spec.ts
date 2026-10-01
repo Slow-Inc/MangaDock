@@ -26,7 +26,8 @@ function fakeStorage(): StorageProvider & { files: Map<string, Buffer> } {
       files.delete(key);
     },
     async deleteDir(prefix) {
-      for (const k of [...files.keys()]) if (k.startsWith(prefix)) files.delete(k);
+      for (const k of [...files.keys()])
+        if (k.startsWith(prefix)) files.delete(k);
     },
     async exists(key) {
       return files.has(key);
@@ -45,7 +46,13 @@ function fakeStorage(): StorageProvider & { files: Map<string, Buffer> } {
   };
 }
 
-const loc = { chapterId: 'ch1', pageIndex: 3, srcMIT: 'ANY', tgtMIT: 'THA', model: 'default' };
+const loc = {
+  chapterId: 'ch1',
+  pageIndex: 3,
+  srcMIT: 'ANY',
+  tgtMIT: 'THA',
+  model: 'default',
+};
 const png = (s: string) => Buffer.from(s);
 
 function makeStore() {
@@ -67,6 +74,44 @@ describe('PatchStore', () => {
       'https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r1.png',
     ]);
     expect(storage.files.size).toBe(2);
+  });
+
+  it('writes all region PNGs concurrently, preserving input order (FR-29)', async () => {
+    const { storage, store } = makeStore();
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const realPut = storage.put.bind(storage);
+    storage.put = async (key, data, opts) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((r) => setTimeout(r, 10));
+      inFlight -= 1;
+      return realPut(key, data, opts);
+    };
+
+    const urls = await store.put(loc, [png('a'), png('b'), png('c')]);
+
+    // All three writes overlap — a sequential for-await loop would peak at 1.
+    expect(maxInFlight).toBe(3);
+    // Promise.all preserves input order regardless of resolve order.
+    expect(urls.map((u) => u.split('?')[0])).toEqual([
+      'https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r0.png',
+      'https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r1.png',
+      'https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r2.png',
+    ]);
+  });
+
+  it('rejects if any single region write fails (all-or-nothing, unchanged) (FR-29)', async () => {
+    const { storage, store } = makeStore();
+    const realPut = storage.put.bind(storage);
+    storage.put = async (key, data, opts) => {
+      if (key.endsWith('__r1.png')) throw new Error('disk full');
+      return realPut(key, data, opts);
+    };
+
+    await expect(
+      store.put(loc, [png('a'), png('b'), png('c')]),
+    ).rejects.toThrow('disk full');
   });
 
   it('appends a content-version query param to each url (#cache-bust)', async () => {
@@ -107,7 +152,11 @@ describe('PatchStore', () => {
     await store.put(loc, [png('c'), png('d')]);
 
     expect(storage.files.size).toBe(2);
-    expect(storage.files.get('uploads/patches/ch1/ANY__THA__default__p3__r0.png')!.toString()).toBe('c');
+    expect(
+      storage.files
+        .get('uploads/patches/ch1/ANY__THA__default__p3__r0.png')!
+        .toString(),
+    ).toBe('c');
   });
 
   it('removes stale region files when the page shrinks', async () => {
@@ -158,9 +207,15 @@ describe('PatchStore', () => {
   it('rejects path-traversal segments before touching storage', async () => {
     const { storage, store } = makeStore();
 
-    await expect(store.put({ ...loc, chapterId: '../../etc' }, [png('a')])).rejects.toThrow();
-    await expect(store.put({ ...loc, srcMIT: 'a/b' }, [png('a')])).rejects.toThrow();
-    await expect(store.put({ ...loc, model: 'evil\\model' }, [png('a')])).rejects.toThrow();
+    await expect(
+      store.put({ ...loc, chapterId: '../../etc' }, [png('a')]),
+    ).rejects.toThrow();
+    await expect(
+      store.put({ ...loc, srcMIT: 'a/b' }, [png('a')]),
+    ).rejects.toThrow();
+    await expect(
+      store.put({ ...loc, model: 'evil\\model' }, [png('a')]),
+    ).rejects.toThrow();
     expect(storage.files.size).toBe(0);
   });
 
@@ -170,13 +225,18 @@ describe('PatchStore', () => {
 
     const urls = await store.put(loc, [png('a')]);
 
-    expect(urls[0].split('?')[0]).toBe('https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r0.png');
+    expect(urls[0].split('?')[0]).toBe(
+      'https://api.example/uploads/patches/ch1/ANY__THA__default__p3__r0.png',
+    );
   });
 
   it('sweepLegacy keeps going when one delete fails (e.g. a stray directory)', async () => {
     const { storage, store } = makeStore();
     storage.files.set('uploads/patches/ch1/3_0_aaaa.png', png('legacy1'));
-    storage.files.set('uploads/patches/ch1/stray-dir', png('pretend-directory'));
+    storage.files.set(
+      'uploads/patches/ch1/stray-dir',
+      png('pretend-directory'),
+    );
     storage.files.set('uploads/patches/ch1/3_1_bbbb.png', png('legacy2'));
     const realDelete = storage.delete.bind(storage);
     storage.delete = async (key: string) => {
@@ -195,8 +255,14 @@ describe('PatchStore', () => {
     const { storage, store } = makeStore();
     await store.put(loc, [png('a')]);
     // legacy formats from the three old call sites
-    storage.files.set('uploads/patches/ch1/3_0_ab12cd34.png', png('old-webhook'));
-    storage.files.set('uploads/patches/ch1/ch1-ANY-THA-p3-r0.png', png('old-single'));
+    storage.files.set(
+      'uploads/patches/ch1/3_0_ab12cd34.png',
+      png('old-webhook'),
+    );
+    storage.files.set(
+      'uploads/patches/ch1/ch1-ANY-THA-p3-r0.png',
+      png('old-single'),
+    );
 
     const removed = await store.sweepLegacy();
 

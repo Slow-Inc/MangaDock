@@ -10,7 +10,9 @@
  *  4. On login, AuthContext calls loadHistoryData() to restore history.
  */
 
+import { apiFetch } from "./apiFetch";
 import { createAuthHeaders } from "./apiUtils";
+import { parseJsonArray } from "./safeJson";
 
 const API_BASE = "/api/proxy";
 const STORAGE_KEY = "mangadock_reading_history";
@@ -41,10 +43,11 @@ export type HistoryBook = {
 // ─── In-memory state ────────────────────────────────────────────────────────
 let books: HistoryBook[] = [];
 let syncedIds: Set<string> = new Set();     // IDs currently synced to server
-let pendingUpserts: Map<string, HistoryBook> = new Map();  // to add/update
-let pendingDeletes: Set<string> = new Set(); // to remove from database
+const pendingUpserts: Map<string, HistoryBook> = new Map();  // to add/update
+const pendingDeletes: Set<string> = new Set(); // to remove from database
 let clearAll = false;                        // flag: DELETE /users/me/history
 let initialized = false;
+let cacheGeneration = 0;
 let backfillDone = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let getTokenFn: (() => Promise<string | null>) | null = null;
@@ -83,6 +86,7 @@ function notify() {
 // lastChapterNumber. This runs once after history loads, fetching chapters for
 // each affected manga and patching the in-memory + localStorage entries.
 async function backfillChapterNumbers() {
+  const generation = cacheGeneration;
   if (backfillDone) return;
   backfillDone = true;
 
@@ -100,10 +104,15 @@ async function backfillChapterNumbers() {
   await Promise.allSettled(
     uniqueMangaIds.map(async (mangaId) => {
       try {
-        const res = await fetch(`${API_BASE}/books/manga/${mangaId}/chapters`);
+        const res = await apiFetch(`${API_BASE}/books/manga/${mangaId}/chapters`);
         if (!res.ok) return;
-        const chapters: { id: string; chapterNumber: string | null }[] = await res.json();
+        const chapters = await parseJsonArray<{ id: string; chapterNumber: string | null }>(res);
+        if (!chapters) {
+          console.warn(`[readingHistory] chapter backfill skipped for ${mangaId}: response body was not a JSON array`);
+          return;
+        }
 
+        if (generation !== cacheGeneration) return;
         let changed = false;
         for (const b of books) {
           if (b.id !== mangaId || !b.lastChapterId || b.lastChapterNumber !== undefined) continue;
@@ -129,9 +138,10 @@ function scheduleFlush() {
 }
 
 async function flushToServer() {
+  const generation = cacheGeneration;
   flushTimer = null;
   const token = await getTokenFn?.();
-  if (!token) return;
+  if (!token || generation !== cacheGeneration) return;
 
   const headers = createAuthHeaders(token, { "Content-Type": "application/json" });
 
@@ -139,6 +149,7 @@ async function flushToServer() {
     if (clearAll) {
       // Delete entire collection in one call
       await fetch(`${API_BASE}/users/me/history`, { method: "DELETE", headers });
+      if (generation !== cacheGeneration) return;
       syncedIds = new Set();
       clearAll = false;
     } else {
@@ -155,10 +166,12 @@ async function flushToServer() {
           fetch(`${API_BASE}/users/me/history/${id}`, { method: "DELETE", headers })
         ),
       ]);
+      if (generation !== cacheGeneration) return;
       for (const id of pendingUpserts.keys()) syncedIds.add(id);
       for (const id of pendingDeletes) syncedIds.delete(id);
     }
 
+    if (generation !== cacheGeneration) return;
     pendingUpserts.clear();
     pendingDeletes.clear();
     localStorage.setItem(SYNCED_KEY, JSON.stringify([...syncedIds]));
@@ -167,13 +180,17 @@ async function flushToServer() {
 
 // ─── Load from server on login ──────────────────────────────────────────────
 export async function loadHistoryData(token: string) {
+  const generation = cacheGeneration;
   loadFromLS();
   try {
     const res = await fetch(`${API_BASE}/users/me/history`, {
       headers: createAuthHeaders(token),
     });
     if (!res.ok) return;
-    const remote: HistoryBook[] = await res.json();
+    const remote = await parseJsonArray<HistoryBook>(res);
+    if (!remote) return;
+
+    if (generation !== cacheGeneration) return;
 
     // Merge: keep local entries not in remote, then prepend remote sorted by lastReadAt
     const localOnly = books.filter((b) => !remote.find((r) => r.id === b.id));
@@ -238,14 +255,17 @@ export function patchThumbnailLocal(bookId: string): void {
   scheduleFlush();
 }
 
-export function clearHistory(): void {
+export function clearHistory({syncRemote = true}: {syncRemote?: boolean} = {}): void {
+  cacheGeneration++;
+  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+  backfillDone = false;
   if (typeof window === "undefined") return;
   loadFromLS();
   const hadItems = books.length > 0;
   books = [];
   pendingUpserts.clear();
   pendingDeletes.clear();
-  clearAll = hadItems && syncedIds.size > 0;
+  clearAll = syncRemote && hadItems && syncedIds.size > 0;
   syncedIds = new Set();
   initialized = false; // reset so next loadFromLS starts fresh
   [STORAGE_KEY, SYNCED_KEY].forEach((k) => localStorage.removeItem(k));

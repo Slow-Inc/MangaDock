@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getTrendingManga, type TrendingManga } from "../../lib/communityApi";
+import { useToast } from "../../contexts/ToastContext";
+import { cacheGet, cacheSet, TTL } from "../../lib/apiCache";
 
 function TrendingMangaCard({ item, rank }: { item: TrendingManga; rank: number }) {
   const router = useRouter();
@@ -77,13 +79,31 @@ function SkeletonCard() {
 export default function TrendingPage() {
   const [trending, setTrending] = useState<TrendingManga[]>([]);
   const [loading, setLoading] = useState(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
+    const cached = cacheGet<TrendingManga[]>("community:trending");
+    if (cached) { setTrending(cached); setLoading(false); return; }
+
+    let mounted = true;
+    setLoading(true);
+
     getTrendingManga(20)
-      .then(setTrending)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+      .then((items) => {
+        if (!mounted) return;
+        cacheSet("community:trending", items, TTL.MEDIUM);
+        setTrending(items);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        showToast({ type: "error", message: "โหลดมังงะ trending ไม่สำเร็จ", duration: 4000 });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => { mounted = false; };
+  }, [showToast]);
 
   return (
     <div>

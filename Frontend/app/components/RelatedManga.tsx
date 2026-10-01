@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import BookDetailModal from "./BookDetailModal";
 import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
+import { cacheOrFetch, TTL } from "../lib/apiCache";
 import type { LandingBook } from "../lib/types";
 
 const API_BASE = "/api/proxy";
@@ -50,9 +51,15 @@ export default function RelatedManga({ mangaId }: { mangaId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/books/${mangaId}/related?limit=10`)
-      .then((r) => r.json())
-      .then((data: LandingBook[]) => {
+    cacheOrFetch<LandingBook[]>(
+      `related:${mangaId}`,
+      async () => {
+        const r = await fetch(`${API_BASE}/books/${mangaId}/related?limit=10`);
+        return r.json();
+      },
+      TTL.LONG,
+    )
+      .then((data) => {
         if (!cancelled) {
           setItems(Array.isArray(data) ? data : []);
           setLoading(false);

@@ -3,12 +3,18 @@ import { RedisService } from './redis.service';
 import { ElectionService } from '../status/election.service';
 import { SupabaseService } from '../supabase/supabase.service';
 
-function makeRedis(activeChapters: string[] = [], viewCounts: Record<string, number> = {}, hllCounts: Record<string, number> = {}): jest.Mocked<Pick<RedisService, 'smembers' | 'get' | 'pfcount'>> {
+function makeRedis(
+  activeChapters: string[] = [],
+  viewCounts: Record<string, number> = {},
+  hllCounts: Record<string, number> = {},
+): jest.Mocked<Pick<RedisService, 'smembers' | 'get' | 'pfcount'>> {
   return {
     smembers: jest.fn().mockResolvedValue(activeChapters),
     get: jest.fn().mockImplementation((key: string) => {
       const chapterId = key.split(':views:')[0].replace('stats:chapter:', '');
-      return Promise.resolve(viewCounts[chapterId] != null ? String(viewCounts[chapterId]) : null);
+      return Promise.resolve(
+        viewCounts[chapterId] != null ? String(viewCounts[chapterId]) : null,
+      );
     }),
     pfcount: jest.fn().mockImplementation((key: string) => {
       const chapterId = key.split(':hll:')[0].replace('stats:chapter:', '');
@@ -17,7 +23,9 @@ function makeRedis(activeChapters: string[] = [], viewCounts: Record<string, num
   } as any;
 }
 
-function makeElection(isLeader = true): jest.Mocked<Pick<ElectionService, 'isLeader'>> {
+function makeElection(
+  isLeader = true,
+): jest.Mocked<Pick<ElectionService, 'isLeader'>> {
   return { isLeader } as any;
 }
 
@@ -27,17 +35,27 @@ function makeSupabase(): { client: any } {
   return { client: { from } };
 }
 
-function makeWorker(overrides: {
-  isLeader?: boolean;
-  activeChapters?: string[];
-  viewCounts?: Record<string, number>;
-  hllCounts?: Record<string, number>;
-  supabase?: any;
-} = {}) {
-  const redis = makeRedis(overrides.activeChapters ?? [], overrides.viewCounts ?? {}, overrides.hllCounts ?? {});
+function makeWorker(
+  overrides: {
+    isLeader?: boolean;
+    activeChapters?: string[];
+    viewCounts?: Record<string, number>;
+    hllCounts?: Record<string, number>;
+    supabase?: any;
+  } = {},
+) {
+  const redis = makeRedis(
+    overrides.activeChapters ?? [],
+    overrides.viewCounts ?? {},
+    overrides.hllCounts ?? {},
+  );
   const election = makeElection(overrides.isLeader ?? true);
   const supabase = overrides.supabase ?? makeSupabase();
-  const worker = new StatsFlushWorker(redis as unknown as RedisService, election as unknown as ElectionService, supabase as unknown as SupabaseService);
+  const worker = new StatsFlushWorker(
+    redis as unknown as RedisService,
+    election as unknown as ElectionService,
+    supabase as unknown as SupabaseService,
+  );
   return { worker, redis, election, supabase };
 }
 
@@ -61,9 +79,11 @@ describe('StatsFlushWorker', () => {
     const today = new Date().toISOString().slice(0, 10);
     const supabase = makeSupabase();
     const redis = {
-      smembers: jest.fn().mockImplementation((key: string) =>
-        Promise.resolve(key === `stats:active:${today}` ? ['ch:1'] : []),
-      ),
+      smembers: jest
+        .fn()
+        .mockImplementation((key: string) =>
+          Promise.resolve(key === `stats:active:${today}` ? ['ch:1'] : []),
+        ),
       get: jest.fn().mockResolvedValue('42'),
       pfcount: jest.fn().mockResolvedValue(7),
     };
@@ -77,9 +97,14 @@ describe('StatsFlushWorker', () => {
     await worker.flush();
 
     expect(supabase.client.from).toHaveBeenCalledWith('chapter_daily_stats');
-    const upsertFn = supabase.client.from('chapter_daily_stats').upsert as jest.Mock;
+    const upsertFn = supabase.client.from('chapter_daily_stats')
+      .upsert as jest.Mock;
     expect(upsertFn).toHaveBeenCalledTimes(1);
-    expect(upsertFn.mock.calls[0][0]).toMatchObject({ chapter_id: 'ch:1', views: 42, unique_readers: 7 });
+    expect(upsertFn.mock.calls[0][0]).toMatchObject({
+      chapter_id: 'ch:1',
+      views: 42,
+      unique_readers: 7,
+    });
   });
 
   // Cycle 3 — empty active set: no Supabase call
@@ -94,22 +119,32 @@ describe('StatsFlushWorker', () => {
 
   // Cycle 4 — Supabase error: swallowed, no throw
   it('flush() does not throw when Supabase upsert returns an error', async () => {
-    const upsert = jest.fn().mockResolvedValue({ error: { message: 'DB down' } });
+    const upsert = jest
+      .fn()
+      .mockResolvedValue({ error: { message: 'DB down' } });
     const from = jest.fn().mockReturnValue({ upsert });
     const supabase = { client: { from } };
-    const { worker } = makeWorker({ activeChapters: ['ch:1'], viewCounts: { 'ch:1': 1 }, supabase });
+    const { worker } = makeWorker({
+      activeChapters: ['ch:1'],
+      viewCounts: { 'ch:1': 1 },
+      supabase,
+    });
 
     await expect(worker.flush()).resolves.not.toThrow();
   });
 
   // Cycle 6 — also drains yesterday's trailing window
-  it('flush() also processes yesterday\'s active set when called with no argument', async () => {
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  it("flush() also processes yesterday's active set when called with no argument", async () => {
+    const yesterday = new Date(Date.now() - 86_400_000)
+      .toISOString()
+      .slice(0, 10);
     const supabase = makeSupabase();
     const redis = {
-      smembers: jest.fn().mockImplementation((key: string) =>
-        Promise.resolve(key === `stats:active:${yesterday}` ? ['ch:1'] : []),
-      ),
+      smembers: jest
+        .fn()
+        .mockImplementation((key: string) =>
+          Promise.resolve(key === `stats:active:${yesterday}` ? ['ch:1'] : []),
+        ),
       get: jest.fn().mockResolvedValue(null),
       pfcount: jest.fn().mockResolvedValue(0),
     };
@@ -122,7 +157,7 @@ describe('StatsFlushWorker', () => {
 
     await worker.flush();
 
-    const queriedKeys = (redis.smembers as jest.Mock).mock.calls.map(([k]: [string]) => k);
+    const queriedKeys = redis.smembers.mock.calls.map(([k]: [string]) => k);
     expect(queriedKeys).toContain(`stats:active:${yesterday}`);
     expect(supabase.client.from).toHaveBeenCalledWith('chapter_daily_stats');
   });
@@ -130,7 +165,10 @@ describe('StatsFlushWorker', () => {
   // Cycle 5 — onModuleDestroy stops interval
   it('onModuleDestroy clears the flush interval — no further flushes fire', async () => {
     jest.useFakeTimers();
-    const { worker, redis } = makeWorker({ isLeader: true, activeChapters: [] });
+    const { worker, redis } = makeWorker({
+      isLeader: true,
+      activeChapters: [],
+    });
 
     worker.onModuleInit();
     worker.onModuleDestroy();

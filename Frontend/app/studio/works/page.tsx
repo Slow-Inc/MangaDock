@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
+
 import LoadingScreen from "../../components/LoadingScreen";
 import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
@@ -23,6 +24,7 @@ import {
 import { StudioSelect } from "../components/StudioSelect";
 import { formatCurrency, getOverviewStats } from "../lib/dashboardAnalytics";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { CoverImage } from "../components/CoverImage";
 
 type MangaGroup = {
   titleId: string;
@@ -67,19 +69,6 @@ function StatusDots({ versions }: { versions: ChapterVersion[] }) {
   );
 }
 
-function CoverImage({ src, alt, className, fallbackClass, fallbackSize }: { src: string; alt: string; className: string; fallbackClass: string; fallbackSize: string }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    const img = new window.Image();
-    img.onload = () => { if (img.naturalWidth === 0) setFailed(true); };
-    img.onerror = () => setFailed(true);
-    img.src = src;
-  }, [src]);
-  if (failed) return <div className={`flex items-center justify-center ${fallbackClass}`}><span className={fallbackSize}>📖</span></div>;
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setFailed(true)} />;
-}
-
 function MangaListCard({ group }: { group: MangaGroup }) {
   return (
     <Link
@@ -87,7 +76,7 @@ function MangaListCard({ group }: { group: MangaGroup }) {
       className="group flex gap-4 rounded-2xl border border-white/10 bg-white/3 p-4 transition hover:border-white/20 hover:bg-white/5 active:scale-[0.99]"
     >
       <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-white/8">
-        <CoverImage src={group.coverUrl} alt={group.titleName} className="absolute inset-0 h-full w-full object-cover" fallbackClass="h-full w-full" fallbackSize="text-2xl" />
+        <CoverImage src={group.coverUrl} alt={group.titleName} className="absolute inset-0 h-full w-full object-cover" fallbackSize={24} />
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-white transition-colors group-hover:text-indigo-300">{group.titleName || "ไม่ระบุชื่อเรื่อง"}</p>
@@ -105,7 +94,7 @@ function MangaThumbnailCard({ group }: { group: MangaGroup }) {
   return (
     <Link href={`/studio/manga/${encodeURIComponent(group.titleId)}?titleName=${encodeURIComponent(group.titleName)}`} className="group cursor-pointer">
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-white/10 bg-white/5 transition-all duration-300 group-hover:scale-[1.03] group-hover:border-white/25 group-hover:shadow-xl group-hover:shadow-black/50">
-        <CoverImage src={group.coverUrl} alt={group.titleName} className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105" fallbackClass="h-full w-full" fallbackSize="text-4xl" />
+        <CoverImage src={group.coverUrl} alt={group.titleName} className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105" fallbackSize={36} />
         <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/80 via-transparent to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
           <StatusDots versions={group.versions} />
         </div>
@@ -138,8 +127,8 @@ export default function WorksPage() {
   const { showToast } = useToast();
   const isMobile = useIsMobile();
 
-  const [versions, setVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("works:versions") ?? []);
-  const [loadingVersions, setLoadingVersions] = useState(() => getCached("works:versions") === null);
+  const [versions, setVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("studio:versions") ?? []);
+  const [loadingVersions, setLoadingVersions] = useState(() => getCached("studio:versions") === null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | VersionStatus>("");
@@ -161,7 +150,7 @@ export default function WorksPage() {
       if (!token) throw new Error("ไม่พบ token");
       const data = await getMyVersions(token);
       setVersions(data);
-      setCache("works:versions", data);
+      setCache("studio:versions", data);
     } catch { showToast({ type: "error", message: "ไม่สามารถโหลดรายการเวอร์ชันได้", duration: 3000 }); }
     finally { setLoadingVersions(false); }
   }, [user, getIdToken, showToast]);
@@ -297,7 +286,7 @@ export default function WorksPage() {
               <StudioMobileHero
                 eyebrow="Works Manager"
                 title="ผลงานของฉัน"
-                description="มือถือจะโฟกัสที่รายการงานก่อน ส่วนตัวกรองและมุมมองจะถูกแยกเป็นหน้าจอย่อย"
+                description="จัดการงานแปลและบทของคุณทั้งหมดในที่เดียว"
               />
               <div className="grid grid-cols-2 gap-3">
                 <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="title ที่มีเวอร์ชัน" tone="indigo" />

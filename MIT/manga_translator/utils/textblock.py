@@ -70,8 +70,12 @@ class TextBlock(object):
                  shadow_color: Tuple = (0, 0, 0),
                  shadow_offset: List = None,
                  prob: float = 1,
+                 from_sfx_detection: bool = False,
                  **kwargs) -> None:
         self.lines = np.array(lines, dtype=np.int32)
+        # #278: True when this region originated from the det_sfx second pass — the SFX rescue
+        # gates on this provenance instead of a bare ≤4-char length heuristic.
+        self.from_sfx_detection = from_sfx_detection
         # self.lines.sort()
         self.language = language
         self.font_size = round(font_size)

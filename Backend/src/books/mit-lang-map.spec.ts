@@ -8,15 +8,42 @@ import { MIT_LANG_MAP, mitLangCode } from './mit-lang-map';
  * both together.
  */
 const MIT_VALID_LANGUAGES = [
-  'CHS', 'CHT', 'CSY', 'NLD', 'ENG', 'FRA', 'DEU', 'HUN', 'ITA', 'JPN',
-  'KOR', 'POL', 'PTB', 'ROM', 'RUS', 'ESP', 'TRK', 'UKR', 'VIN', 'ARA',
-  'CNR', 'SRP', 'HRV', 'THA', 'IND', 'FIL',
+  'CHS',
+  'CHT',
+  'CSY',
+  'NLD',
+  'ENG',
+  'FRA',
+  'DEU',
+  'HUN',
+  'ITA',
+  'JPN',
+  'KOR',
+  'POL',
+  'PTB',
+  'ROM',
+  'RUS',
+  'ESP',
+  'TRK',
+  'UKR',
+  'VIN',
+  'ARA',
+  'CNR',
+  'SRP',
+  'HRV',
+  'THA',
+  'IND',
+  'FIL',
 ];
 
 describe('MIT_LANG_MAP (#165)', () => {
   it('maps every entry to a code MIT recognizes — no silent drift', () => {
     for (const [iso, mit] of Object.entries(MIT_LANG_MAP)) {
-      expect({ iso, mit, valid: MIT_VALID_LANGUAGES.includes(mit) }).toEqual({ iso, mit, valid: true });
+      expect({ iso, mit, valid: MIT_VALID_LANGUAGES.includes(mit) }).toEqual({
+        iso,
+        mit,
+        valid: true,
+      });
     }
   });
 

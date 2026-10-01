@@ -7,6 +7,8 @@ MangaDock is split into 3 main parts:
 2. Backend: NestJS API and orchestration layer
 3. MIT: Manga Image Translator microservice for image translation
 
+The repository also includes `Mobile/`, a React Native WebView shell for the existing web app. It keeps the web UI as the main experience while handling Google/Facebook OAuth through the native auth session, which avoids WebView popup/login limitations.
+
 The root of this repository contains a `docker-compose.yml` for running the Redis instance used by the backend.
 
 ## Services and Default Ports
@@ -16,6 +18,7 @@ The root of this repository contains a `docker-compose.yml` for running the Redi
 | Frontend | `Frontend/` | `http://localhost:4000` |
 | Backend | `Backend/` | `http://localhost:4001` |
 | MIT | `MIT/` | `http://localhost:5003` |
+| Mobile | `Mobile/` | Expo/Android development build |
 | Redis | root `docker-compose.yml` | `localhost:6379` |
 
 ## Prerequisites
@@ -142,6 +145,38 @@ Frontend runs at `http://localhost:4000`
 
 For more details see [Frontend/README.md](Frontend/README.md)
 
+### 5. Setup and Start Mobile
+
+Go to the `Mobile/` folder.
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create `.env` from template and point it at the running frontend:
+
+```bash
+cp .env.example .env
+```
+
+For Android emulator use:
+
+```env
+EXPO_PUBLIC_WEB_URL=http://10.0.2.2:4000
+```
+
+For a physical device, use your LAN IP instead of `localhost`.
+
+Run the Android development build:
+
+```bash
+npm run android
+```
+
+For OAuth, add `mangadock://auth/callback` to Supabase Auth redirect URLs. For more details see [Mobile/README.md](Mobile/README.md).
+
 ## Verification Checklist
 
 After starting all services, verify at minimum:
@@ -151,16 +186,21 @@ After starting all services, verify at minimum:
 3. MIT health check passes at `http://localhost:5003/health`
 4. Backend connected to Redis at `localhost:6379`
 5. Backend connected to Supabase (verify `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`)
+6. Mobile development build opens the frontend WebView and native OAuth returns to `mangadock://auth/callback`
 
 ## Continuous Integration
 
-GitHub Actions runs the existing unit suites on every PR, path-filtered per service (`.github/workflows/`). See [ADR 020](docs/adr/020-ci-test-gates.md).
+GitHub Actions runs the unit suites on every PR from one workflow, `.github/workflows/ci.yml`, whose jobs are path-filtered and which ends in a single required `gate` check. [ADR 020](docs/adr/020-ci-test-gates.md) records the original decision (partly superseded, see its status line); `DONE.md` ("CI gates made real") records what replaced it.
 
-| Workflow | Triggers on | What it runs |
-|---|---|---|
-| `backend-ci` | `Backend/**` | `bun install` + `jest` on **Node 22** + a Redis service (`jest.ci.config.js`) |
-| `frontend-ci` | `Frontend/**` | `bun test` (excludes `*.integration.test.ts` — those need a live `:4000`) |
-| `mit-ci` | `MIT/**` | `pytest` — **report-only** until torch is lazy-imported (#359) |
+| Job | What it runs |
+|---|---|
+| `backend (jest)` | `bun install` + `jest` on **Node 22** + a Redis service (`jest.ci.config.js`) |
+| `frontend (bun test)` | `bun test` |
+| `mobile (typecheck)` | mobile typecheck |
+| `pytest (logic gate, torch-free)` | MIT logic suite without torch — **blocking**; heavy modules are skipped by `MIT/test/conftest.py` (#359) |
+| `pytest (heavy ML, report-only)` | MIT suites that need the ML stack — `continue-on-error`, never blocks |
+| `scripts (node --test)` | repo scripts |
+| `gate` | the one required check: fails if any blocking job above failed |
 
 **Run Backend tests locally on Node 22** (Jest 30 does not support Node 26):
 
@@ -181,6 +221,8 @@ MangaDock เป็นระบบที่แยกออกเป็น 3 ส�
 2. Backend: NestJS API และ orchestration layer
 3. MIT: Manga Image Translator microservice สำหรับงานแปลภาพ
 
+Repository นี้มี `Mobile/` เพิ่มเติม เป็น React Native WebView shell สำหรับหุ้ม web app เดิม โดยยังใช้ UI เว็บเป็นหลัก แต่ให้ Google/Facebook OAuth ทำงานผ่าน native auth session เพื่อเลี่ยงข้อจำกัด popup/login ใน WebView
+
 ที่ root ของ repository นี้มี `docker-compose.yml` สำหรับรัน Redis ที่ backend ใช้งานเป็น cache
 
 ## Services และ Port เริ่มต้น
@@ -190,6 +232,7 @@ MangaDock เป็นระบบที่แยกออกเป็น 3 ส�
 | Frontend | `Frontend/` | `http://localhost:4000` |
 | Backend | `Backend/` | `http://localhost:4001` |
 | MIT | `MIT/` | `http://localhost:5003` |
+| Mobile | `Mobile/` | Expo/Android development build |
 | Redis | root `docker-compose.yml` | `localhost:6379` |
 
 ## ข้อกำหนดเบื้องต้น
@@ -316,6 +359,38 @@ Frontend ของ repo นี้รันที่ `http://localhost:4000`
 
 รายละเอียดเพิ่มเติมดู [Frontend/README.md](Frontend/README.md)
 
+### 5. ตั้งค่าและเริ่ม Mobile
+
+เข้าโฟลเดอร์ `Mobile/`
+
+ติดตั้ง dependencies:
+
+```bash
+npm install
+```
+
+สร้าง `.env` จาก template แล้วชี้ไปที่ frontend ที่กำลังรัน:
+
+```bash
+cp .env.example .env
+```
+
+สำหรับ Android emulator ใช้:
+
+```env
+EXPO_PUBLIC_WEB_URL=http://10.0.2.2:4000
+```
+
+สำหรับเครื่องจริง ให้ใช้ LAN IP แทน `localhost`
+
+รัน Android development build:
+
+```bash
+npm run android
+```
+
+สำหรับ OAuth ให้เพิ่ม `mangadock://auth/callback` ใน Supabase Auth redirect URLs รายละเอียดเพิ่มเติมดู [Mobile/README.md](Mobile/README.md)
+
 ## Checklist ตรวจสอบ
 
 หลังจาก start ครบทุก service แล้ว ควรตรวจสอบขั้นต่ำดังนี้:
@@ -325,4 +400,5 @@ Frontend ของ repo นี้รันที่ `http://localhost:4000`
 3. MIT health check ผ่านที่ `http://localhost:5003/health`
 4. Backend เชื่อม Redis ได้ที่ `localhost:6379`
 5. Backend เชื่อม Supabase ได้ (ตรวจสอบ `SUPABASE_URL` และ `SUPABASE_SERVICE_ROLE_KEY`)
+6. Mobile development build เปิด frontend WebView ได้ และ native OAuth กลับมาที่ `mangadock://auth/callback`
 <!-- lang:end -->

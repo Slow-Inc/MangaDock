@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ROLE } from "../../lib/types/user";
 import Navbar from "../../components/Navbar";
+
 import LoadingScreen from "../../components/LoadingScreen";
 import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
@@ -159,7 +161,7 @@ export default function WalletPage() {
   const [earnings, setEarnings] = useState<CreatorEarnings | null>(null);
   const hasFetched = useRef(false);
 
-  const isCreator = userRole === "translator" || userRole === "creator";
+  const isCreator = userRole === ROLE.TRANSLATOR || userRole === ROLE.CREATOR;
 
   const fetchData = useCallback(async () => {
     if (!user) return;

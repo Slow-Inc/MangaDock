@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UnlockService } from './unlock.service';
 import type { SupabaseAuthUser } from '../auth/auth.types';

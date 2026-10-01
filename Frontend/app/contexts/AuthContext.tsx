@@ -18,13 +18,33 @@ import {
   validateEmailBeforeSignup,
 } from "../lib/emailValidation";
 import { setTokenSupplier, loadUserData, clearUserCache, flushNow } from "../lib/userCache";
+import { clearFollowCache } from "../hooks/useSeriesFollow";
 import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData } from "../lib/readingHistory";
 import { clearAllApiCache } from "../lib/apiCache";
 import { reloadPage, redirectToHome } from "../lib/browserActions";
+import { getHardwareId } from "../lib/fingerprint";
+import { resolveAvatarUrl } from "../lib/avatarUpload";
+import { ROLE, type UserRole } from "../lib/types/user";
+import { isTrustedOAuthCallbackMessage } from "../lib/oauthCallback";
 import { useToast } from "./ToastContext";
+import {
+  isExpectedNativeAuthMessage,
+  OAuthProvider,
+  parseNativeToWebMessage,
+  WebToNativeMessage,
+} from "@mangadock/mobile-bridge";
 
 const API_BASE = "/api/proxy";
 const DEFAULT_PUBLIC_SITE_URL = "http://localhost:4000";
+const NATIVE_AUTH_TIMEOUT_MS = 120_000;
+
+declare global {
+  interface Window {
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void;
+    };
+  }
+}
 
 // ─── AppUser — Unified user interface for UI components ───────────────
 export interface AppUser {
@@ -34,7 +54,7 @@ export interface AppUser {
   displayName: string | null;
   photoURL: string | null;
   emailVerified: boolean;
-  role?: string | null;
+  role?: UserRole | null;
   providerData: Array<{
     providerId: string;
     photoURL?: string | null;
@@ -50,12 +70,33 @@ function mapProviderId(provider: string): string {
   return provider;
 }
 
+/** Coerce a role value (numeric, or numeric string from a JWT/metadata claim)
+ *  to a known numeric UserRole, or null. Roles are numeric end-to-end (#606);
+ *  anything not matching a known ROLE value is treated as unknown. */
+const VALID_ROLES = new Set<number>(Object.values(ROLE));
+function coerceRole(v: unknown): UserRole | null {
+  const n =
+    typeof v === "number"
+      ? v
+      : typeof v === "string" && v.trim() !== ""
+        ? Number(v)
+        : NaN;
+  return VALID_ROLES.has(n) ? (n as UserRole) : null;
+}
+
 /** Adapt a Supabase User to the AppUser interface used by UI components. */
 function adaptUser(u: SupabaseUser): AppUser {
-  const meta = (u.user_metadata ?? {}) as Record<string, string | null | undefined>;
-  const displayName = meta.display_name ?? meta.full_name ?? meta.name ?? null;
-  const photoURL = meta.avatar_url ?? meta.picture ?? null;
-  const role = meta.role ?? null;
+  const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+  const displayName =
+    (meta.display_name as string | null | undefined) ??
+    (meta.full_name as string | null | undefined) ??
+    (meta.name as string | null | undefined) ??
+    null;
+  const photoURL =
+    (meta.avatar_url as string | null | undefined) ??
+    (meta.picture as string | null | undefined) ??
+    null;
+  const role = coerceRole(meta.role);
 
   const providerData = (u.identities ?? []).map((identity) => {
     const idata = (identity.identity_data ?? {}) as Record<string, string | null | undefined>;
@@ -81,7 +122,7 @@ function adaptUser(u: SupabaseUser): AppUser {
 type BackendProfile = {
   displayName: string | null;
   photoURL: string | null;
-  role: string | null;
+  role: UserRole | null;
 };
 
 function extractBackendProfile(payload: unknown): BackendProfile | null {
@@ -103,15 +144,16 @@ function extractBackendProfile(payload: unknown): BackendProfile | null {
       read(obj.photoUrl) ??
       read(obj.avatarUrl) ??
       read(obj.avatar_url);
-    const role = read(obj.role);
-    if (displayName || photoURL || role) return { displayName, photoURL, role };
+    const role = coerceRole(obj.role);
+    if (displayName || photoURL || role !== null)
+      return { displayName, photoURL, role };
   }
   return null;
 }
 
 type AuthContextType = {
   user: AppUser | null;
-  userRole: string | null;
+  userRole: UserRole | null;
   isTranslator: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
@@ -156,6 +198,20 @@ type AuthContextType = {
   resendVerificationEmail: () => Promise<void>;
   /** Refresh the current session to update JWT claims (e.g. roles) */
   refreshSession: () => Promise<void>;
+  /** Enroll a new TOTP factor — returns QR code, secret, and factorId */
+  enrollTotp: () => Promise<{ qr_code: string; secret: string; factorId: string }>;
+  /** Verify a TOTP code to complete enrollment */
+  verifyTotpEnrollment: (factorId: string, code: string) => Promise<void>;
+  /** Unenroll (remove) an existing TOTP factor */
+  unenrollTotp: (factorId: string) => Promise<void>;
+  /** Return the first verified TOTP factor, or null */
+  getActiveTotpFactor: () => Promise<{ id: string; friendly_name: string } | null>;
+  /** Verify TOTP code after password login (AAL2 upgrade) */
+  verifyTotpForLogin: (factorId: string, code: string) => Promise<void>;
+  /** True when password login succeeded but AAL2 is still required */
+  mfaRequired: boolean;
+  /** The factor ID waiting for TOTP verification during login */
+  pendingMfaFactorId: string | null;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -187,16 +243,31 @@ export const AuthContext = createContext<AuthContextType>({
   deleteAccount: async () => {},
   resendVerificationEmail: async () => {},
   refreshSession: async () => {},
+  enrollTotp: async () => ({ qr_code: "", secret: "", factorId: "" }),
+  verifyTotpEnrollment: async () => {},
+  unenrollTotp: async () => {},
+  getActiveTotpFactor: async () => null,
+  verifyTotpForLogin: async () => {},
+  mfaRequired: false,
+  pendingMfaFactorId: null,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [pendingMfaFactorId, setPendingMfaFactorId] = useState<string | null>(null);
   const { showToast, dismissToast } = useToast();
   const sessionRef = useRef<Session | null>(null);
   const supabaseUserRef = useRef<SupabaseUser | null>(null);
   const lastUidRef = useRef<string | null>(null);
+  const pendingNativeAuthRef = useRef<{
+    requestId: string;
+    resolve: () => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
 
   const showLoginPrompt = useCallback(() => {
     showToast({
@@ -218,11 +289,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoginOpen(true);
   }, []);
 
-  const getIdToken = async (): Promise<string | null> => {
+  const getIdToken = useCallback(async (): Promise<string | null> => {
     const { data } = await supabase.auth.getSession();
     sessionRef.current = data.session;
     return data.session?.access_token ?? null;
-  };
+  }, []);
 
   // Sync user profile to backend on sign-in
   const syncToBackend = async (token: string) => {
@@ -253,15 +324,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isNativeWebView = () =>
+    typeof window !== "undefined" && !!window.ReactNativeWebView;
+
+  const startNativeOAuth = (provider: OAuthProvider): Promise<void> => {
+    if (!isNativeWebView()) {
+      return Promise.reject(new Error("Native auth bridge is not available"));
+    }
+
+    const previous = pendingNativeAuthRef.current;
+    if (previous) {
+      clearTimeout(previous.timer);
+      pendingNativeAuthRef.current = null;
+      previous.reject(new Error("Native auth request was replaced"));
+    }
+
+    return new Promise((resolve, reject) => {
+      const requestId = crypto.randomUUID();
+      const timer = setTimeout(() => {
+        if (pendingNativeAuthRef.current?.requestId === requestId) {
+          pendingNativeAuthRef.current = null;
+        }
+        reject(Object.assign(new Error("Native login timed out"), { code: "auth/native-timeout" }));
+      }, NATIVE_AUTH_TIMEOUT_MS);
+
+      pendingNativeAuthRef.current = { requestId, resolve, reject, timer };
+      const message: WebToNativeMessage = {
+        type: "mangadock:oauth:start",
+        provider,
+        requestId,
+      };
+      window.ReactNativeWebView?.postMessage(JSON.stringify(message));
+    });
+  };
+
   useEffect(() => {
+    let active = true;
+    let authRevision = 0;
+    const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
     // Wire token suppliers for userCache and readingHistory
     setTokenSupplier(getIdToken);
     setHistoryTokenSupplier(getIdToken);
 
     // Set up Supabase auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       sessionRef.current = session;
       const suUser = session?.user ?? null;
+      // Same-user token refresh must not cancel an in-flight MFA check.
+      if (suUser?.id !== supabaseUserRef.current?.id) authRevision++;
+      const revision = authRevision;
       supabaseUserRef.current = suUser;
       const appUser = suUser ? adaptUser(suUser) : null;
       setUser(appUser);
@@ -271,41 +382,122 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // User switched: clear local-first caches to prevent cross-account bleed
         if (lastUidRef.current && lastUidRef.current !== suUser.id) {
           clearUserCache();
-          clearHistory();
+          clearHistory({syncRemote: false});
+          clearFollowCache();
           clearAllApiCache();
         }
         lastUidRef.current = suUser.id;
 
         if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
-          const token = session.access_token;
-          await syncToBackend(token);
-          const profile = await fetchBackendProfile(token);
-          if (profile) {
-            setUser((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                displayName: profile.displayName ?? prev.displayName,
-                photoURL: profile.photoURL ?? prev.photoURL,
-                role: profile.role ?? prev.role,
-              };
+          // Release Supabase auth notification before MFA/network/cache work.
+          const timer = setTimeout(() => {
+            pendingTimers.delete(timer);
+            void (async () => {
+              if (!active || revision !== authRevision) return;
+              // Security invariant #7: on page-refresh session restore, enforce AAL2
+              // if the user has a verified TOTP factor but hasn't reached it yet.
+              // (signInWithEmail already performs this check for fresh password logins.)
+              if (event === "INITIAL_SESSION") {
+                const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+                if (!active || revision !== authRevision) return;
+                if (aal && aal.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+                  const { data: factors } = await supabase.auth.mfa.listFactors();
+                  if (!active || revision !== authRevision) return;
+                  const factor = factors?.totp.find((f) => f.status === "verified");
+                  if (factor) {
+                    setPendingMfaFactorId(factor.id);
+                    setMfaRequired(true);
+                    return; // halt — MfaVerifyScreen will complete
+                  }
+                }
+              }
+              const token = session.access_token;
+              await syncToBackend(token);
+              if (!active || revision !== authRevision) return;
+              // Fire-and-forget: record this device so /settings/security shows it immediately
+              const hwid = getHardwareId();
+              if (hwid) {
+                fetch(`${API_BASE}/users/me/record-device`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${token}`, "X-Hardware-Id": hwid },
+                }).catch(() => {});
+              }
+              const profile = await fetchBackendProfile(token);
+              if (!active || revision !== authRevision) return;
+              if (profile) {
+                setUser((prev) => {
+                  if (!prev || prev.uid !== suUser.id) return prev;
+                  return {
+                    ...prev,
+                    displayName: profile.displayName ?? prev.displayName,
+                    photoURL: profile.photoURL ?? prev.photoURL,
+                    role: profile.role ?? prev.role,
+                  };
+                });
+              }
+              await Promise.all([
+                loadUserData(token),
+                loadHistoryData(token),
+              ]);
+            })().catch(() => {
+              // Hydration errors must not stall Supabase auth notifications.
             });
-          }
-          await Promise.all([
-            loadUserData(token),
-            loadHistoryData(token),
-          ]);
+          }, 0);
+          pendingTimers.add(timer);
         }
       } else if (event === "SIGNED_OUT") {
         lastUidRef.current = null;
         clearUserCache();
-        clearHistory();
+        clearHistory({syncRemote: false});
+        clearFollowCache();
         clearAllApiCache();
       }
     });
 
     return () => {
+      active = false;
+      pendingTimers.forEach(clearTimeout);
       subscription.unsubscribe();
+    };
+  }, [getIdToken]);
+
+  useEffect(() => {
+    const onNativeAuthMessage = async (event: MessageEvent) => {
+      const payload = parseNativeToWebMessage(event.data);
+
+      const pending = pendingNativeAuthRef.current;
+      if (!pending || !isExpectedNativeAuthMessage(payload, pending.requestId)) return;
+
+      pendingNativeAuthRef.current = null;
+      clearTimeout(pending.timer);
+
+      if ("error" in payload) {
+        pending.reject(Object.assign(new Error(payload.error), { code: "auth/native-oauth-failed" }));
+        return;
+      }
+
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: payload.access_token,
+        refresh_token: payload.refresh_token,
+      });
+
+      if (setSessionError) {
+        pending.reject(setSessionError);
+        return;
+      }
+
+      pending.resolve();
+    };
+
+    window.addEventListener("message", onNativeAuthMessage);
+    return () => {
+      window.removeEventListener("message", onNativeAuthMessage);
+      const pending = pendingNativeAuthRef.current;
+      if (pending) {
+        clearTimeout(pending.timer);
+        pendingNativeAuthRef.current = null;
+        pending.reject(new Error("Native auth bridge was closed"));
+      }
     };
   }, []);
 
@@ -339,7 +531,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The callback page postMessages the session tokens (or error) back to us.
       // This works even if the popup callback and opener are on different origins.
       const onMessage = async (event: MessageEvent) => {
-        if (event.data?.type !== "supabase:oauth:callback") return;
+        if (!isTrustedOAuthCallbackMessage(event, window.location.origin)) return;
         window.removeEventListener("message", onMessage);
         clearInterval(closedPoll);
         try { popup.close(); } catch { /* ignore */ }
@@ -398,6 +590,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    if (isNativeWebView()) {
+      await startNativeOAuth("google");
+      reloadPage();
+      return;
+    }
+
     const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -409,6 +607,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithFacebook = async () => {
+    if (isNativeWebView()) {
+      await startNativeOAuth("facebook");
+      reloadPage();
+      return;
+    }
+
     const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "facebook",
@@ -459,6 +663,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       e.code = "auth/invalid-credential";
       throw e;
     }
+
+    // Security invariant #1: check AAL after successful password login.
+    // If the user has a verified TOTP factor and hasn't reached AAL2 yet,
+    // pause login and require TOTP verification before completing sign-in.
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const factor = factors?.totp.find((f) => f.status === "verified");
+      if (factor) {
+        setPendingMfaFactorId(factor.id);
+        setMfaRequired(true);
+        return; // halt — MfaVerifyScreen will complete the login
+      }
+    }
+
     if (!data.user?.email_confirmed_at) {
       showToast({
         type: "warning",
@@ -504,12 +723,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
-    clearHistory();
+    clearHistory({syncRemote: false});
+    clearFollowCache();
     clearAllApiCache();
     await supabase.auth.signOut();
     setUser(null);
     showToast({ type: "success", message: "ออกจากระบบแล้ว", duration: 3000 });
-    reloadPage();
   };
 
   const updateUserProfile = async (displayName: string) => {
@@ -620,13 +839,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.message || `อัพโหลดไม่สำเร็จ (${res.status})`);
-    }
-    const data = await res.json();
-    const url = data.url as string;
-    return url.startsWith("/") ? `/api/proxy${url}` : url;
+    return resolveAvatarUrl(res);
   };
 
   const updateUserPhotoURL = async (photoURL: string): Promise<void> => {
@@ -689,7 +902,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error(`ลบข้อมูลไม่สำเร็จ (${res.status})`);
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
-    clearHistory();
+    clearHistory({syncRemote: false});
+    clearFollowCache();
     clearAllApiCache();
     await supabase.auth.signOut();
     setUser(null);
@@ -717,7 +931,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const getPhotoHistory = async (): Promise<string[]> => {
+  // ─── TOTP / MFA ───────────────────────────────────────────────────────────
+
+  const enrollTotp = async (): Promise<{ qr_code: string; secret: string; factorId: string }> => {
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: "totp",
+      friendlyName: "MangaDock Authenticator",
+    });
+    if (error) throw error;
+    return {
+      qr_code: data.totp.qr_code,
+      secret: data.totp.secret,
+      factorId: data.id,
+    };
+  };
+
+  // Security invariant #6: challenge then verify to complete enrollment.
+  const verifyTotpEnrollment = async (factorId: string, code: string): Promise<void> => {
+    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+    if (challengeError) throw challengeError;
+    const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code });
+    if (error) throw Object.assign(error, { code: "auth/invalid-totp-code" });
+  };
+
+  // Security invariant #3: unenroll — UI in Task 5 enforces prior re-auth.
+  const unenrollTotp = async (factorId: string): Promise<void> => {
+    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    if (error) throw error;
+  };
+
+  const getActiveTotpFactor = async (): Promise<{ id: string; friendly_name: string } | null> => {
+    const { data, error } = await supabase.auth.mfa.listFactors();
+    if (error || !data) return null;
+    const verified = data.totp.find((f) => f.status === "verified");
+    return verified
+      ? { id: verified.id, friendly_name: verified.friendly_name ?? "Authenticator" }
+      : null;
+  };
+
+  // Security invariant #2: challenge then verify to upgrade to AAL2.
+  // On success: clear mfaRequired + pendingMfaFactorId so the overlay dismisses.
+  const verifyTotpForLogin = async (factorId: string, code: string): Promise<void> => {
+    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+    if (challengeError) throw challengeError;
+    const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code });
+    if (error) throw Object.assign(new Error("รหัส OTP ไม่ถูกต้อง กรุณาลองอีกครั้ง"), { code: "auth/invalid-totp-code" });
+    setMfaRequired(false);
+    setPendingMfaFactorId(null);
+    reloadPage();
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const getPhotoHistory = useCallback(async (): Promise<string[]> => {
     if (!user) return [];
     try {
       const token = await getIdToken();
@@ -731,7 +997,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return [];
     }
-  };
+  }, [user, getIdToken]);
 
   const savePhotoHistory = async (photos: string[]): Promise<void> => {
     if (!user) return;
@@ -749,12 +1015,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const switchToConflictingAccount = async (_credential: unknown): Promise<void> => {
+    void _credential;
     // Not needed in Supabase model — kept for API compatibility
     showToast({ type: "info", message: "กรุณาลงชื่อเข้าใช้ด้วยบัญชีอื่น", duration: 3000 });
   };
 
   const userRole = user?.role ?? null;
-  const isTranslator = userRole === "translator" || userRole === "creator" || userRole === "admin";
+  const isTranslator =
+    userRole === ROLE.TRANSLATOR ||
+    userRole === ROLE.CREATOR ||
+    userRole === ROLE.ADMIN;
 
   // Memoized provider value (#152): without this, any provider state change
   // (including loginOpen open/close) re-rendered every useAuth() consumer.
@@ -792,10 +1062,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     deleteAccount,
     resendVerificationEmail,
     refreshSession,
+    enrollTotp,
+    verifyTotpEnrollment,
+    unenrollTotp,
+    getActiveTotpFactor,
+    verifyTotpForLogin,
+    mfaRequired,
+    pendingMfaFactorId,
+    // mfaRequired + pendingMfaFactorId are exposed state values — must be deps.
     // Functions are recreated every render; capturing them once per
-    // [user, loading] is the point of the memo (audit above: `user` only).
+    // [user, loading, mfaRequired, pendingMfaFactorId] is the point of the memo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [user, loading]);
+  }), [user, loading, mfaRequired, pendingMfaFactorId]);
 
   return (
     <AuthContext.Provider value={value}>
@@ -803,6 +1081,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       {/* Login modal triggered by showLoginPrompt */}
       {loginOpen && <LoginModalLazy isOpen={loginOpen} onClose={() => setLoginOpen(false)} />}
+
+      {/* MFA verify overlay — shown when password login requires AAL2 upgrade */}
+      {mfaRequired && pendingMfaFactorId && (
+        <MfaVerifyScreenLazy
+          factorId={pendingMfaFactorId}
+          onClose={async () => {
+            await supabase.auth.signOut();
+            setMfaRequired(false);
+            setPendingMfaFactorId(null);
+          }}
+        />
+      )}
     </AuthContext.Provider>
   );
 }
@@ -812,6 +1102,12 @@ function LoginModalLazy({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const LoginModal = require("../components/LoginModal").default as (props: { isOpen: boolean; onClose: () => void }) => React.ReactElement;
   return <LoginModal isOpen={isOpen} onClose={onClose} />;
+}
+
+function MfaVerifyScreenLazy({ factorId, onClose }: { factorId: string; onClose: () => void }) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const MfaVerifyScreen = require("../components/MfaVerifyScreen").default as (props: { factorId: string; onClose: () => void }) => React.ReactElement;
+  return <MfaVerifyScreen factorId={factorId} onClose={onClose} />;
 }
 
 export const useAuth = () => useContext(AuthContext);

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { COUNTRIES } from "../lib/countries";
+import { useModalTransition } from "../../hooks/useModalTransition";
 
 interface CountrySelectProps {
   value: string;
@@ -10,8 +11,8 @@ interface CountrySelectProps {
 }
 
 export function CountrySelect({ value, onChange, placeholder = "ค้นหาหรือเลือกประเทศ..." }: CountrySelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [renderPanel, setRenderPanel] = useState(false);
+  const [open, setOpen] = useState(false);
+  const { mounted: renderPanel, visible: isOpen } = useModalTransition(open, { duration: 200 });
   const [dropUp, setDropUp] = useState(false);
 
   const labelForValue = useCallback((v: string) => {
@@ -22,8 +23,6 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
   const [search, setSearch] = useState(() => labelForValue(value));
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const closeTimerRef = useRef<number | null>(null);
-  const openFrameRef = useRef<number | null>(null);
 
   const filtered = COUNTRIES.filter(c => 
     c.label.toLowerCase().includes(search.toLowerCase()) || 
@@ -40,21 +39,12 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
 
   const openDropdown = useCallback(() => {
     checkFlip();
-    setRenderPanel(true);
-    openFrameRef.current = window.requestAnimationFrame(() => {
-      setIsOpen(true);
-      openFrameRef.current = null;
-    });
+    setOpen(true);
   }, [checkFlip]);
 
   const closeDropdown = useCallback((label?: string) => {
-    setIsOpen(false);
     setSearch(label ?? labelForValue(value));
-    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = window.setTimeout(() => {
-      setRenderPanel(false);
-      closeTimerRef.current = null;
-    }, 200);
+    setOpen(false);
   }, [labelForValue, value]);
 
   useEffect(() => {
@@ -66,13 +56,6 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [closeDropdown]);
-
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
-      if (openFrameRef.current) window.cancelAnimationFrame(openFrameRef.current);
-    };
-  }, []);
 
   return (
     <div ref={containerRef} className="relative w-full">

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useModalTransition } from "../hooks/useModalTransition";
 
 interface Props {
   src: string;
@@ -10,48 +11,29 @@ interface Props {
 }
 
 export default function CoverLightbox({ src, alt, onClose }: Props) {
-  const [visible, setVisible] = useState(false);
-  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleClose = useCallback(() => {
-    setVisible(false);
-    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
-    closeTimeoutRef.current = setTimeout(onClose, 300);
-  }, [onClose]);
+  const { visible, close } = useModalTransition(true, { duration: 300, onClosed: onClose });
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", handleKey);
-
-    // Double rAF: one committed paint with opacity-0 before entering
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => setVisible(true));
-    });
-
-    return () => {
-      window.removeEventListener("keydown", handleKey);
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
-    };
-  }, [handleClose]);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [close]);
 
   const content = (
     <div
       className={`fixed inset-0 z-300 flex items-center justify-center p-6 backdrop-blur-md transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
-      onClick={handleClose}
+      onClick={close}
     >
       {/* Dark backdrop */}
       <div className="absolute inset-0 bg-black/90" />
 
       {/* Close button */}
       <button
-        onClick={handleClose}
+        onClick={close}
         title="ปิด"
         className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white/70 backdrop-blur-sm transition hover:bg-white/20 hover:text-white"
       >

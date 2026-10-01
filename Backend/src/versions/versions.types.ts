@@ -1,4 +1,8 @@
-export type VersionStatus = 'draft' | 'pending_moderation' | 'published' | 'rejected';
+export type VersionStatus =
+  | 'draft'
+  | 'pending_moderation'
+  | 'published'
+  | 'rejected';
 
 export type ChapterVersion = {
   versionId: string;

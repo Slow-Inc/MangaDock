@@ -1,6 +1,6 @@
 # ADR 020 — CI test gates: GitHub Actions per-service, Node 22 + bun, green-from-day-one skip-list
 
-- **Status:** Accepted (2026-06-28) — implemented (#355). First CI in the repo; the 176 existing test files (Backend 70 · MIT 88 · Frontend 18) previously ran only when a dev remembered to.
+- **Status:** Accepted (2026-06-28) — implemented (#355). **Partly superseded:** the three per-service workflows were later consolidated into one `.github/workflows/ci.yml` ending in a required `gate` job, and MIT gained a blocking torch-free logic gate (#359) beside the report-only heavy job (#643/#678, #639/#640; see `DONE.md` "CI gates made real"). The jest-config inheritance, Node 22 + bun and skip-list decisions below still stand. First CI in the repo; the 176 existing test files (Backend 70 · MIT 88 · Frontend 18) previously ran only when a dev remembered to.
 - **Context:** the team is now two active self-merging devs (xenodeve + akkanop-x, who self-`/scrutinize`s and self-merges) with no automated gate. CodeQL was the only check. Follow-ups split out: dispatcher for safe required-checks (#356), CI hardening (#357), shrink the skip-list (#358), MIT torch lazy-import (#359).
 
 ## Context

@@ -105,7 +105,14 @@ export class VersionsController {
   updateMetadata(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('versionId') versionId: string,
-    @Body() body: { description?: string; priceCoins?: number; titleAltName?: string; chapterTitle?: string; chapterNumber?: string; },
+    @Body()
+    body: {
+      description?: string;
+      priceCoins?: number;
+      titleAltName?: string;
+      chapterTitle?: string;
+      chapterNumber?: string;
+    },
   ) {
     return this.versions.updateMetadata(versionId, req[USER_KEY].uid, body);
   }
@@ -118,7 +125,11 @@ export class VersionsController {
     @Param('versionId') versionId: string,
     @Body() body: { status: VersionStatus },
   ) {
-    return this.versions.updateStatus(versionId, req[USER_KEY].uid, body.status);
+    return this.versions.updateStatus(
+      versionId,
+      req[USER_KEY].uid,
+      body.status,
+    );
   }
 
   /** Delete a draft or rejected version. */

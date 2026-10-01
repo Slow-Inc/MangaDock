@@ -5,9 +5,42 @@ import { MangaCatalogService } from './manga-catalog.service';
  * MangaDex + cache are fully stubbed — no network, no Redis.
  */
 
-const BOOK_A = { id: 'a', title: 'A', subtitle: '', authors: [], description: '', thumbnail: '', publishedDate: '', categories: ['Action'], averageRating: 0, ratingsCount: 10 };
-const BOOK_B = { id: 'b', title: 'B', subtitle: '', authors: [], description: '', thumbnail: '', publishedDate: '', categories: ['Action'], averageRating: 0, ratingsCount: 8 };
-const BOOK_C = { id: 'c', title: 'C', subtitle: '', authors: [], description: '', thumbnail: '', publishedDate: '', categories: ['Action'], averageRating: 0, ratingsCount: 6 };
+const BOOK_A = {
+  id: 'a',
+  title: 'A',
+  subtitle: '',
+  authors: [],
+  description: '',
+  thumbnail: '',
+  publishedDate: '',
+  categories: ['Action'],
+  averageRating: 0,
+  ratingsCount: 10,
+};
+const BOOK_B = {
+  id: 'b',
+  title: 'B',
+  subtitle: '',
+  authors: [],
+  description: '',
+  thumbnail: '',
+  publishedDate: '',
+  categories: ['Action'],
+  averageRating: 0,
+  ratingsCount: 8,
+};
+const BOOK_C = {
+  id: 'c',
+  title: 'C',
+  subtitle: '',
+  authors: [],
+  description: '',
+  thumbnail: '',
+  publishedDate: '',
+  categories: ['Action'],
+  averageRating: 0,
+  ratingsCount: 6,
+};
 
 function makeCache() {
   return {
@@ -25,15 +58,21 @@ function makeSupabase() {
   return { client: { from: jest.fn(() => builder) } };
 }
 
-function makeMangaDex(overrides: Partial<{
-  getMangaDetail: jest.Mock;
-  getMangaTagId: jest.Mock;
-  fetchMangaForRow: jest.Mock;
-}> = {}) {
+function makeMangaDex(
+  overrides: Partial<{
+    getMangaDetail: jest.Mock;
+    getMangaTagId: jest.Mock;
+    fetchMangaForRow: jest.Mock;
+  }> = {},
+) {
   return {
-    getMangaDetail: jest.fn().mockResolvedValue({ id: 'src', genres: ['Action'] }),
+    getMangaDetail: jest
+      .fn()
+      .mockResolvedValue({ id: 'src', genres: ['Action'] }),
     getMangaTagId: jest.fn().mockResolvedValue('tag-uuid-action'),
-    fetchMangaForRow: jest.fn().mockResolvedValue({ items: [BOOK_A, BOOK_B, BOOK_C], total: 3 }),
+    fetchMangaForRow: jest
+      .fn()
+      .mockResolvedValue({ items: [BOOK_A, BOOK_B, BOOK_C], total: 3 }),
     searchManga: jest.fn().mockResolvedValue({ items: [], total: 0 }),
     fetchMangaByIds: jest.fn().mockResolvedValue([]),
     ...overrides,
@@ -45,7 +84,11 @@ describe('MangaCatalogService.getRelated (#325)', () => {
     const mangaDex = makeMangaDex({
       getMangaDetail: jest.fn().mockRejectedValue(new Error('not found')),
     });
-    const svc = new MangaCatalogService(mangaDex as any, makeSupabase() as any, makeCache() as any);
+    const svc = new MangaCatalogService(
+      mangaDex as any,
+      makeSupabase() as any,
+      makeCache() as any,
+    );
 
     await expect(svc.getRelated('unknown-id')).resolves.toEqual([]);
     expect(mangaDex.fetchMangaForRow).not.toHaveBeenCalled();
@@ -55,7 +98,11 @@ describe('MangaCatalogService.getRelated (#325)', () => {
     const mangaDex = makeMangaDex({
       getMangaDetail: jest.fn().mockResolvedValue({ id: 'src', genres: [] }),
     });
-    const svc = new MangaCatalogService(mangaDex as any, makeSupabase() as any, makeCache() as any);
+    const svc = new MangaCatalogService(
+      mangaDex as any,
+      makeSupabase() as any,
+      makeCache() as any,
+    );
 
     await expect(svc.getRelated('src')).resolves.toEqual([]);
     expect(mangaDex.getMangaTagId).not.toHaveBeenCalled();
@@ -68,7 +115,11 @@ describe('MangaCatalogService.getRelated (#325)', () => {
         total: 3,
       }),
     });
-    const svc = new MangaCatalogService(mangaDex as any, makeSupabase() as any, makeCache() as any);
+    const svc = new MangaCatalogService(
+      mangaDex as any,
+      makeSupabase() as any,
+      makeCache() as any,
+    );
 
     const result = await svc.getRelated('src', 10);
     expect(result.map((b) => b.id)).not.toContain('src');
@@ -82,7 +133,11 @@ describe('MangaCatalogService.getRelated (#325)', () => {
         total: 3,
       }),
     });
-    const svc = new MangaCatalogService(mangaDex as any, makeSupabase() as any, makeCache() as any);
+    const svc = new MangaCatalogService(
+      mangaDex as any,
+      makeSupabase() as any,
+      makeCache() as any,
+    );
 
     const result = await svc.getRelated('other', 2);
     expect(result.length).toBeLessThanOrEqual(2);
@@ -90,11 +145,20 @@ describe('MangaCatalogService.getRelated (#325)', () => {
 
   it('queries MangaDex by rating order with the resolved tag ID', async () => {
     const mangaDex = makeMangaDex();
-    const svc = new MangaCatalogService(mangaDex as any, makeSupabase() as any, makeCache() as any);
+    const svc = new MangaCatalogService(
+      mangaDex as any,
+      makeSupabase() as any,
+      makeCache() as any,
+    );
 
     await svc.getRelated('src', 10);
 
     expect(mangaDex.getMangaTagId).toHaveBeenCalledWith('Action');
-    expect(mangaDex.fetchMangaForRow).toHaveBeenCalledWith('rating', 11, 0, 'tag-uuid-action');
+    expect(mangaDex.fetchMangaForRow).toHaveBeenCalledWith(
+      'rating',
+      11,
+      0,
+      'tag-uuid-action',
+    );
   });
 });

@@ -7,7 +7,11 @@ function makeService() {
     setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
   };
   const service = new BooksService(
-    {} as any, cache as any, { enabled: false } as any, {} as any, {} as any,
+    {} as any,
+    cache as any,
+    { enabled: false } as any,
+    {} as any,
+    {} as any,
   );
   return { service };
 }
@@ -44,9 +48,10 @@ describe('BooksService — health check (#83)', () => {
   // Cycle 2 — /ready returning 503 means not available
   it('reports unavailable when /ready returns 503', async () => {
     const { service } = makeService();
-    global.fetch = jest
-      .fn()
-      .mockResolvedValue({ ok: false, status: 503 } as Response) as unknown as typeof fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+    } as Response) as unknown as typeof fetch;
 
     const result = await service.checkMitHealth();
 

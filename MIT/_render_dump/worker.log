@@ -1,0 +1,889 @@
+[31m‚ö†Ô∏è  Warning: You are using the experimental Python version of this project.[0m
+[33mThis version is unstable and may break frequently. Please switch to the Rust rewrite for reliability! The rust version is an early release so it might still have some issues. https://github.com/frederik-uni/manga-image-translator-rust[0m
+MIT worker started: pid=40060 on 127.0.0.1:5014 (front pid=69024 on 127.0.0.1:5013)
+Nonce: 
+INFO:     Started server process [69024]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5013 (Press CTRL+C to quit)
+[31m‚ö†Ô∏è  Warning: You are using the experimental Python version of this project.[0m
+[33mThis version is unstable and may break frequently. Please switch to the Rust rewrite for reliability! The rust version is an early release so it might still have some issues. https://github.com/frederik-uni/manga-image-translator-rust[0m
+[shared] Running in shared mode
+[shared] Log file created: D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\result\log_20260704080938.txt
+INFO:     Started server process [47268]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5014 (Press CTRL+C to quit)
+INFO:     127.0.0.1:64761 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53600 - "GET /ready HTTP/1.1" 200 OK
+
+Downloading models into D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\models\detection
+
+ -- Downloading: "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/detect-20241225.ckpt"
+detect-20241225.ckpt.part:   0%|          | 0.00/294M [00:00<?, ?iB/s]detect-20241225.ckpt.part:   0%|          | 511k/294M [00:00<00:59, 5.19MiB/s]detect-20241225.ckpt.part:   0%|          | 0.98M/294M [00:00<00:59, 5.19MiB/s]
+detect-20241225.ckpt.part:   1%|          | 1.95M/294M [00:00<00:59, 5.19MiB/s]
+detect-20241225.ckpt.part:   1%|          | 2.93M/294M [00:00<00:58, 5.19MiB/s]
+detect-20241225.ckpt.part:   1%|1         | 3.01M/294M [00:00<00:17, 17.6MiB/s]detect-20241225.ckpt.part:   1%|1         | 3.91M/294M [00:00<00:17, 17.6MiB/s]
+detect-20241225.ckpt.part:   2%|1         | 4.88M/294M [00:00<00:17, 17.6MiB/s]
+detect-20241225.ckpt.part:   2%|1         | 5.86M/294M [00:00<00:17, 17.6MiB/s]
+detect-20241225.ckpt.part:   2%|2         | 6.01M/294M [00:00<00:12, 23.7MiB/s]detect-20241225.ckpt.part:   2%|2         | 6.84M/294M [00:00<00:12, 23.7MiB/s]
+detect-20241225.ckpt.part:   3%|2         | 7.81M/294M [00:00<00:12, 23.7MiB/s]
+detect-20241225.ckpt.part:   3%|2         | 8.79M/294M [00:00<00:12, 23.7MiB/s]
+detect-20241225.ckpt.part:   3%|3         | 8.83M/294M [00:00<00:11, 25.1MiB/s]detect-20241225.ckpt.part:   3%|3         | 9.77M/294M [00:00<00:11, 25.1MiB/s]
+detect-20241225.ckpt.part:   4%|3         | 10.7M/294M [00:00<00:11, 25.1MiB/s]
+detect-20241225.ckpt.part:   4%|3         | 11.2M/294M [00:00<00:18, 16.1MiB/s]detect-20241225.ckpt.part:   4%|3         | 11.7M/294M [00:00<00:18, 16.1MiB/s]
+detect-20241225.ckpt.part:   4%|4         | 12.7M/294M [00:00<00:18, 16.1MiB/s]
+detect-20241225.ckpt.part:   5%|4         | 13.7M/294M [00:00<00:18, 16.1MiB/s]
+detect-20241225.ckpt.part:   5%|4         | 14.6M/294M [00:00<00:18, 16.1MiB/s]
+detect-20241225.ckpt.part:   5%|5         | 15.0M/294M [00:00<00:13, 21.8MiB/s]detect-20241225.ckpt.part:   5%|5         | 15.6M/294M [00:00<00:13, 21.8MiB/s]
+detect-20241225.ckpt.part:   6%|5         | 16.6M/294M [00:00<00:13, 21.8MiB/s]
+detect-20241225.ckpt.part:   6%|5         | 17.6M/294M [00:00<00:13, 21.8MiB/s]
+detect-20241225.ckpt.part:   6%|6         | 18.6M/294M [00:00<00:13, 21.8MiB/s]
+detect-20241225.ckpt.part:   6%|6         | 18.6M/294M [00:00<00:11, 25.9MiB/s]detect-20241225.ckpt.part:   7%|6         | 19.5M/294M [00:00<00:11, 25.9MiB/s]
+detect-20241225.ckpt.part:   7%|6         | 20.5M/294M [00:01<00:11, 25.9MiB/s]
+detect-20241225.ckpt.part:   7%|7         | 21.5M/294M [00:01<00:11, 25.9MiB/s]
+detect-20241225.ckpt.part:   7%|7         | 21.5M/294M [00:01<00:15, 18.0MiB/s]detect-20241225.ckpt.part:   8%|7         | 22.5M/294M [00:01<00:15, 18.0MiB/s]
+detect-20241225.ckpt.part:   8%|7         | 23.4M/294M [00:01<00:15, 18.0MiB/s]
+detect-20241225.ckpt.part:   8%|8         | 24.1M/294M [00:01<00:14, 19.9MiB/s]detect-20241225.ckpt.part:   8%|8         | 24.4M/294M [00:01<00:14, 19.9MiB/s]
+detect-20241225.ckpt.part:   9%|8         | 25.4M/294M [00:01<00:14, 19.9MiB/s]
+detect-20241225.ckpt.part:   9%|8         | 26.4M/294M [00:01<00:14, 19.9MiB/s]
+detect-20241225.ckpt.part:   9%|9         | 27.1M/294M [00:01<00:12, 22.3MiB/s]detect-20241225.ckpt.part:   9%|9         | 27.3M/294M [00:01<00:12, 22.3MiB/s]
+detect-20241225.ckpt.part:  10%|9         | 28.3M/294M [00:01<00:12, 22.3MiB/s]
+detect-20241225.ckpt.part:  10%|9         | 29.3M/294M [00:01<00:12, 22.3MiB/s]
+detect-20241225.ckpt.part:  10%|#         | 30.0M/294M [00:01<00:16, 17.0MiB/s]detect-20241225.ckpt.part:  10%|#         | 30.3M/294M [00:01<00:16, 17.0MiB/s]
+detect-20241225.ckpt.part:  11%|#         | 31.2M/294M [00:01<00:16, 17.0MiB/s]
+detect-20241225.ckpt.part:  11%|#         | 32.2M/294M [00:01<00:16, 17.0MiB/s]
+detect-20241225.ckpt.part:  11%|#1        | 33.2M/294M [00:01<00:16, 17.0MiB/s]
+detect-20241225.ckpt.part:  12%|#1        | 34.2M/294M [00:01<00:16, 17.0MiB/s]
+detect-20241225.ckpt.part:  12%|#1        | 34.7M/294M [00:01<00:11, 23.2MiB/s]detect-20241225.ckpt.part:  12%|#1        | 35.2M/294M [00:01<00:11, 23.2MiB/s]
+detect-20241225.ckpt.part:  12%|#2        | 36.1M/294M [00:01<00:11, 23.2MiB/s]
+detect-20241225.ckpt.part:  13%|#2        | 37.1M/294M [00:01<00:11, 23.2MiB/s]
+detect-20241225.ckpt.part:  13%|#2        | 38.1M/294M [00:01<00:11, 23.2MiB/s]
+detect-20241225.ckpt.part:  13%|#3        | 39.1M/294M [00:01<00:11, 23.2MiB/s]
+detect-20241225.ckpt.part:  13%|#3        | 39.1M/294M [00:01<00:09, 28.3MiB/s]detect-20241225.ckpt.part:  14%|#3        | 40.0M/294M [00:02<00:09, 28.3MiB/s]
+detect-20241225.ckpt.part:  14%|#3        | 41.0M/294M [00:02<00:09, 28.3MiB/s]
+detect-20241225.ckpt.part:  14%|#4        | 42.0M/294M [00:02<00:09, 28.3MiB/s]
+detect-20241225.ckpt.part:  14%|#4        | 42.5M/294M [00:02<00:13, 19.7MiB/s]detect-20241225.ckpt.part:  15%|#4        | 43.0M/294M [00:02<00:13, 19.7MiB/s]
+detect-20241225.ckpt.part:  15%|#4        | 43.9M/294M [00:02<00:13, 19.7MiB/s]
+detect-20241225.ckpt.part:  15%|#5        | 44.9M/294M [00:02<00:13, 19.7MiB/s]
+detect-20241225.ckpt.part:  16%|#5        | 45.9M/294M [00:02<00:13, 19.7MiB/s]
+detect-20241225.ckpt.part:  16%|#5        | 46.9M/294M [00:02<00:13, 19.7MiB/s]
+detect-20241225.ckpt.part:  16%|#6        | 47.4M/294M [00:02<00:10, 25.6MiB/s]detect-20241225.ckpt.part:  16%|#6        | 47.9M/294M [00:02<00:10, 25.6MiB/s]
+detect-20241225.ckpt.part:  17%|#6        | 48.8M/294M [00:02<00:10, 25.6MiB/s]
+detect-20241225.ckpt.part:  17%|#6        | 49.8M/294M [00:02<00:10, 25.6MiB/s]
+detect-20241225.ckpt.part:  17%|#7        | 50.8M/294M [00:02<00:12, 20.3MiB/s]detect-20241225.ckpt.part:  17%|#7        | 50.8M/294M [00:02<00:12, 20.3MiB/s]
+detect-20241225.ckpt.part:  18%|#7        | 51.8M/294M [00:02<00:12, 20.3MiB/s]
+detect-20241225.ckpt.part:  18%|#7        | 52.7M/294M [00:02<00:12, 20.3MiB/s]
+detect-20241225.ckpt.part:  18%|#8        | 53.7M/294M [00:02<00:12, 20.3MiB/s]
+detect-20241225.ckpt.part:  19%|#8        | 54.7M/294M [00:02<00:12, 20.3MiB/s]
+detect-20241225.ckpt.part:  19%|#8        | 54.8M/294M [00:02<00:10, 23.7MiB/s]detect-20241225.ckpt.part:  19%|#8        | 55.7M/294M [00:02<00:10, 23.7MiB/s]
+detect-20241225.ckpt.part:  19%|#9        | 56.6M/294M [00:02<00:10, 23.7MiB/s]
+detect-20241225.ckpt.part:  20%|#9        | 57.6M/294M [00:02<00:10, 23.7MiB/s]
+detect-20241225.ckpt.part:  20%|#9        | 57.8M/294M [00:02<00:11, 21.3MiB/s]detect-20241225.ckpt.part:  20%|#9        | 58.6M/294M [00:02<00:11, 21.3MiB/s]
+detect-20241225.ckpt.part:  20%|##        | 59.6M/294M [00:02<00:11, 21.3MiB/s]
+detect-20241225.ckpt.part:  21%|##        | 60.3M/294M [00:03<00:12, 18.9MiB/s]detect-20241225.ckpt.part:  21%|##        | 60.5M/294M [00:03<00:12, 18.9MiB/s]
+detect-20241225.ckpt.part:  21%|##        | 61.5M/294M [00:03<00:12, 18.9MiB/s]
+detect-20241225.ckpt.part:  21%|##1       | 62.5M/294M [00:03<00:12, 18.9MiB/s]
+detect-20241225.ckpt.part:  21%|##1       | 62.5M/294M [00:03<00:13, 17.6MiB/s]detect-20241225.ckpt.part:  22%|##1       | 63.5M/294M [00:03<00:13, 17.6MiB/s]
+detect-20241225.ckpt.part:  22%|##1       | 64.5M/294M [00:03<00:13, 17.6MiB/s]
+detect-20241225.ckpt.part:  22%|##1       | 64.5M/294M [00:03<00:14, 16.2MiB/s]detect-20241225.ckpt.part:  22%|##2       | 65.4M/294M [00:03<00:14, 16.2MiB/s]
+detect-20241225.ckpt.part:  22%|##2       | 66.2M/294M [00:03<00:15, 15.2MiB/s]detect-20241225.ckpt.part:  23%|##2       | 66.4M/294M [00:03<00:15, 15.2MiB/s]
+detect-20241225.ckpt.part:  23%|##2       | 67.4M/294M [00:03<00:15, 15.2MiB/s]
+detect-20241225.ckpt.part:  23%|##3       | 67.7M/294M [00:03<00:15, 14.9MiB/s]detect-20241225.ckpt.part:  23%|##3       | 68.4M/294M [00:03<00:15, 14.9MiB/s]
+detect-20241225.ckpt.part:  24%|##3       | 69.2M/294M [00:03<00:15, 14.8MiB/s]detect-20241225.ckpt.part:  24%|##3       | 69.3M/294M [00:03<00:15, 14.8MiB/s]
+detect-20241225.ckpt.part:  24%|##3       | 70.3M/294M [00:03<00:15, 14.8MiB/s]
+detect-20241225.ckpt.part:  24%|##4       | 70.8M/294M [00:03<00:15, 15.1MiB/s]detect-20241225.ckpt.part:  24%|##4       | 71.3M/294M [00:03<00:15, 15.1MiB/s]
+detect-20241225.ckpt.part:  25%|##4       | 72.3M/294M [00:03<00:15, 15.1MiB/s]
+detect-20241225.ckpt.part:  25%|##4       | 72.3M/294M [00:03<00:15, 15.2MiB/s]detect-20241225.ckpt.part:  25%|##4       | 73.2M/294M [00:04<00:15, 15.2MiB/s]
+detect-20241225.ckpt.part:  25%|##5       | 73.8M/294M [00:04<00:15, 14.6MiB/s]detect-20241225.ckpt.part:  25%|##5       | 74.2M/294M [00:04<00:15, 14.6MiB/s]
+detect-20241225.ckpt.part:  26%|##5       | 75.2M/294M [00:04<00:15, 14.6MiB/s]detect-20241225.ckpt.part:  26%|##5       | 75.2M/294M [00:04<00:15, 14.6MiB/s]
+detect-20241225.ckpt.part:  26%|##5       | 76.2M/294M [00:04<00:15, 14.6MiB/s]
+detect-20241225.ckpt.part:  26%|##6       | 76.6M/294M [00:04<00:15, 14.7MiB/s]detect-20241225.ckpt.part:  26%|##6       | 77.1M/294M [00:04<00:15, 14.7MiB/s]
+detect-20241225.ckpt.part:  27%|##6       | 78.0M/294M [00:04<00:16, 13.8MiB/s]detect-20241225.ckpt.part:  27%|##6       | 78.1M/294M [00:04<00:16, 13.8MiB/s]
+detect-20241225.ckpt.part:  27%|##6       | 79.1M/294M [00:04<00:16, 13.8MiB/s]
+detect-20241225.ckpt.part:  27%|##6       | 79.3M/294M [00:04<00:16, 13.5MiB/s]detect-20241225.ckpt.part:  27%|##7       | 80.1M/294M [00:04<00:16, 13.5MiB/s]
+detect-20241225.ckpt.part:  27%|##7       | 80.7M/294M [00:04<00:16, 13.6MiB/s]detect-20241225.ckpt.part:  28%|##7       | 81.1M/294M [00:04<00:16, 13.6MiB/s]
+detect-20241225.ckpt.part:  28%|##7       | 82.0M/294M [00:04<00:16, 13.6MiB/s]detect-20241225.ckpt.part:  28%|##7       | 82.0M/294M [00:04<00:16, 13.6MiB/s]
+detect-20241225.ckpt.part:  28%|##8       | 83.0M/294M [00:04<00:16, 13.6MiB/s]
+detect-20241225.ckpt.part:  28%|##8       | 83.5M/294M [00:04<00:15, 14.2MiB/s]detect-20241225.ckpt.part:  29%|##8       | 84.0M/294M [00:04<00:15, 14.2MiB/s]
+detect-20241225.ckpt.part:  29%|##8       | 85.0M/294M [00:04<00:15, 14.2MiB/s]
+detect-20241225.ckpt.part:  29%|##8       | 85.0M/294M [00:04<00:14, 14.6MiB/s]detect-20241225.ckpt.part:  29%|##9       | 85.9M/294M [00:04<00:14, 14.6MiB/s]
+detect-20241225.ckpt.part:  29%|##9       | 86.4M/294M [00:05<00:16, 13.3MiB/s]detect-20241225.ckpt.part:  30%|##9       | 86.9M/294M [00:05<00:16, 13.3MiB/s]
+detect-20241225.ckpt.part:  30%|##9       | 87.7M/294M [00:05<00:16, 12.7MiB/s]detect-20241225.ckpt.part:  30%|##9       | 87.9M/294M [00:05<00:16, 12.7MiB/s]
+detect-20241225.ckpt.part:  30%|###       | 88.9M/294M [00:05<00:16, 12.7MiB/s]
+detect-20241225.ckpt.part:  30%|###       | 89.0M/294M [00:05<00:17, 12.5MiB/s]detect-20241225.ckpt.part:  31%|###       | 89.8M/294M [00:05<00:17, 12.5MiB/s]
+detect-20241225.ckpt.part:  31%|###       | 90.4M/294M [00:05<00:16, 13.2MiB/s]detect-20241225.ckpt.part:  31%|###       | 90.8M/294M [00:05<00:16, 13.2MiB/s]
+detect-20241225.ckpt.part:  31%|###1      | 91.8M/294M [00:05<00:16, 13.2MiB/s]
+detect-20241225.ckpt.part:  31%|###1      | 92.0M/294M [00:05<00:15, 14.0MiB/s]detect-20241225.ckpt.part:  32%|###1      | 92.8M/294M [00:05<00:15, 14.0MiB/s]
+detect-20241225.ckpt.part:  32%|###1      | 93.7M/294M [00:05<00:13, 15.1MiB/s]detect-20241225.ckpt.part:  32%|###1      | 93.8M/294M [00:05<00:13, 15.1MiB/s]
+detect-20241225.ckpt.part:  32%|###2      | 94.7M/294M [00:05<00:13, 15.1MiB/s]
+detect-20241225.ckpt.part:  32%|###2      | 95.3M/294M [00:05<00:13, 15.6MiB/s]detect-20241225.ckpt.part:  33%|###2      | 95.7M/294M [00:05<00:13, 15.6MiB/s]
+detect-20241225.ckpt.part:  33%|###2      | 96.7M/294M [00:05<00:13, 15.6MiB/s]
+detect-20241225.ckpt.part:  33%|###2      | 96.8M/294M [00:05<00:13, 15.2MiB/s]detect-20241225.ckpt.part:  33%|###3      | 97.7M/294M [00:05<00:13, 15.2MiB/s]
+detect-20241225.ckpt.part:  33%|###3      | 98.3M/294M [00:05<00:14, 13.9MiB/s]detect-20241225.ckpt.part:  34%|###3      | 98.6M/294M [00:05<00:14, 13.9MiB/s]
+detect-20241225.ckpt.part:  34%|###3      | 99.6M/294M [00:06<00:14, 13.9MiB/s]
+detect-20241225.ckpt.part:  34%|###3      | 99.6M/294M [00:06<00:15, 13.4MiB/s]detect-20241225.ckpt.part:  34%|###4      | 101M/294M [00:06<00:15, 13.4MiB/s]
+detect-20241225.ckpt.part:  34%|###4      | 101M/294M [00:06<00:15, 13.2MiB/s] detect-20241225.ckpt.part:  35%|###4      | 102M/294M [00:06<00:15, 13.2MiB/s]
+detect-20241225.ckpt.part:  35%|###4      | 102M/294M [00:06<00:16, 12.3MiB/s]detect-20241225.ckpt.part:  35%|###4      | 103M/294M [00:06<00:16, 12.3MiB/s]
+detect-20241225.ckpt.part:  35%|###5      | 103M/294M [00:06<00:16, 12.4MiB/s]detect-20241225.ckpt.part:  35%|###5      | 104M/294M [00:06<00:16, 12.4MiB/s]
+detect-20241225.ckpt.part:  36%|###5      | 104M/294M [00:06<00:15, 12.4MiB/s]
+detect-20241225.ckpt.part:  36%|###5      | 105M/294M [00:06<00:15, 13.0MiB/s]detect-20241225.ckpt.part:  36%|###5      | 105M/294M [00:06<00:15, 13.0MiB/s]
+detect-20241225.ckpt.part:  36%|###6      | 106M/294M [00:06<00:14, 14.0MiB/s]detect-20241225.ckpt.part:  36%|###6      | 106M/294M [00:06<00:14, 14.0MiB/s]
+detect-20241225.ckpt.part:  37%|###6      | 107M/294M [00:06<00:14, 14.0MiB/s]
+detect-20241225.ckpt.part:  37%|###6      | 108M/294M [00:06<00:12, 15.2MiB/s]detect-20241225.ckpt.part:  37%|###6      | 108M/294M [00:06<00:12, 15.2MiB/s]
+detect-20241225.ckpt.part:  37%|###7      | 109M/294M [00:06<00:12, 15.2MiB/s]
+detect-20241225.ckpt.part:  37%|###7      | 110M/294M [00:06<00:12, 16.1MiB/s]detect-20241225.ckpt.part:  38%|###7      | 110M/294M [00:06<00:11, 16.1MiB/s]
+detect-20241225.ckpt.part:  38%|###7      | 111M/294M [00:06<00:11, 16.1MiB/s]
+detect-20241225.ckpt.part:  38%|###7      | 111M/294M [00:06<00:12, 15.6MiB/s]detect-20241225.ckpt.part:  38%|###8      | 112M/294M [00:06<00:12, 15.6MiB/s]
+detect-20241225.ckpt.part:  38%|###8      | 113M/294M [00:06<00:12, 15.0MiB/s]detect-20241225.ckpt.part:  39%|###8      | 113M/294M [00:07<00:12, 15.0MiB/s]
+detect-20241225.ckpt.part:  39%|###8      | 114M/294M [00:07<00:12, 15.0MiB/s]
+detect-20241225.ckpt.part:  39%|###8      | 114M/294M [00:07<00:13, 13.8MiB/s]detect-20241225.ckpt.part:  39%|###9      | 115M/294M [00:07<00:13, 13.8MiB/s]
+detect-20241225.ckpt.part:  39%|###9      | 116M/294M [00:07<00:13, 13.6MiB/s]detect-20241225.ckpt.part:  40%|###9      | 116M/294M [00:07<00:13, 13.6MiB/s]
+detect-20241225.ckpt.part:  40%|###9      | 117M/294M [00:07<00:13, 13.6MiB/s]detect-20241225.ckpt.part:  40%|###9      | 117M/294M [00:07<00:13, 13.6MiB/s]
+detect-20241225.ckpt.part:  40%|####      | 118M/294M [00:07<00:13, 13.6MiB/s]
+detect-20241225.ckpt.part:  40%|####      | 118M/294M [00:07<00:13, 13.9MiB/s]detect-20241225.ckpt.part:  41%|####      | 119M/294M [00:07<00:13, 13.9MiB/s]
+detect-20241225.ckpt.part:  41%|####      | 120M/294M [00:07<00:12, 14.5MiB/s]detect-20241225.ckpt.part:  41%|####      | 120M/294M [00:07<00:12, 14.5MiB/s]
+detect-20241225.ckpt.part:  41%|####1     | 121M/294M [00:07<00:12, 14.5MiB/s]
+detect-20241225.ckpt.part:  41%|####1     | 122M/294M [00:07<00:12, 14.9MiB/s]detect-20241225.ckpt.part:  42%|####1     | 122M/294M [00:07<00:12, 14.9MiB/s]
+detect-20241225.ckpt.part:  42%|####1     | 123M/294M [00:07<00:12, 14.2MiB/s]detect-20241225.ckpt.part:  42%|####1     | 123M/294M [00:07<00:12, 14.2MiB/s]
+detect-20241225.ckpt.part:  42%|####2     | 124M/294M [00:07<00:12, 14.2MiB/s]
+detect-20241225.ckpt.part:  42%|####2     | 124M/294M [00:07<00:12, 14.1MiB/s]detect-20241225.ckpt.part:  43%|####2     | 125M/294M [00:07<00:12, 14.1MiB/s]
+detect-20241225.ckpt.part:  43%|####2     | 126M/294M [00:07<00:12, 14.3MiB/s]detect-20241225.ckpt.part:  43%|####2     | 126M/294M [00:07<00:12, 14.3MiB/s]
+detect-20241225.ckpt.part:  43%|####3     | 127M/294M [00:08<00:12, 14.3MiB/s]
+detect-20241225.ckpt.part:  43%|####3     | 127M/294M [00:08<00:12, 14.2MiB/s]detect-20241225.ckpt.part:  43%|####3     | 128M/294M [00:08<00:12, 14.2MiB/s]
+detect-20241225.ckpt.part:  44%|####3     | 128M/294M [00:08<00:13, 12.5MiB/s]detect-20241225.ckpt.part:  44%|####3     | 129M/294M [00:08<00:13, 12.5MiB/s]
+detect-20241225.ckpt.part:  44%|####4     | 130M/294M [00:08<00:14, 12.0MiB/s]detect-20241225.ckpt.part:  44%|####4     | 130M/294M [00:08<00:14, 12.0MiB/s]
+detect-20241225.ckpt.part:  44%|####4     | 131M/294M [00:08<00:14, 12.0MiB/s]
+detect-20241225.ckpt.part:  45%|####4     | 131M/294M [00:08<00:14, 11.9MiB/s]detect-20241225.ckpt.part:  45%|####4     | 132M/294M [00:08<00:14, 11.9MiB/s]
+detect-20241225.ckpt.part:  45%|####4     | 132M/294M [00:08<00:13, 12.2MiB/s]detect-20241225.ckpt.part:  45%|####5     | 133M/294M [00:08<00:13, 12.2MiB/s]
+detect-20241225.ckpt.part:  45%|####5     | 133M/294M [00:08<00:13, 12.8MiB/s]detect-20241225.ckpt.part:  45%|####5     | 134M/294M [00:08<00:13, 12.8MiB/s]
+detect-20241225.ckpt.part:  46%|####5     | 135M/294M [00:08<00:13, 12.8MiB/s]
+detect-20241225.ckpt.part:  46%|####5     | 135M/294M [00:08<00:12, 13.6MiB/s]detect-20241225.ckpt.part:  46%|####6     | 136M/294M [00:08<00:12, 13.6MiB/s]
+detect-20241225.ckpt.part:  46%|####6     | 137M/294M [00:08<00:11, 14.2MiB/s]detect-20241225.ckpt.part:  46%|####6     | 137M/294M [00:08<00:11, 14.2MiB/s]
+detect-20241225.ckpt.part:  47%|####6     | 138M/294M [00:08<00:11, 14.2MiB/s]
+detect-20241225.ckpt.part:  47%|####6     | 138M/294M [00:08<00:10, 15.1MiB/s]detect-20241225.ckpt.part:  47%|####7     | 139M/294M [00:08<00:10, 15.1MiB/s]
+detect-20241225.ckpt.part:  47%|####7     | 140M/294M [00:09<00:10, 15.1MiB/s]
+detect-20241225.ckpt.part:  48%|####7     | 140M/294M [00:09<00:10, 16.1MiB/s]detect-20241225.ckpt.part:  48%|####7     | 141M/294M [00:09<00:10, 16.1MiB/s]
+detect-20241225.ckpt.part:  48%|####8     | 142M/294M [00:09<00:09, 16.2MiB/s]detect-20241225.ckpt.part:  48%|####8     | 142M/294M [00:09<00:09, 16.2MiB/s]
+detect-20241225.ckpt.part:  48%|####8     | 143M/294M [00:09<00:09, 16.2MiB/s]
+detect-20241225.ckpt.part:  49%|####8     | 143M/294M [00:09<00:10, 14.6MiB/s]detect-20241225.ckpt.part:  49%|####8     | 144M/294M [00:09<00:10, 14.6MiB/s]
+detect-20241225.ckpt.part:  49%|####9     | 144M/294M [00:09<00:11, 13.7MiB/s]detect-20241225.ckpt.part:  49%|####9     | 145M/294M [00:09<00:11, 13.7MiB/s]
+detect-20241225.ckpt.part:  49%|####9     | 146M/294M [00:09<00:11, 13.7MiB/s]
+detect-20241225.ckpt.part:  50%|####9     | 146M/294M [00:09<00:11, 13.6MiB/s]detect-20241225.ckpt.part:  50%|####9     | 146M/294M [00:09<00:11, 13.6MiB/s]
+detect-20241225.ckpt.part:  50%|#####     | 147M/294M [00:09<00:11, 13.7MiB/s]detect-20241225.ckpt.part:  50%|#####     | 147M/294M [00:09<00:11, 13.7MiB/s]
+detect-20241225.ckpt.part:  50%|#####     | 148M/294M [00:09<00:11, 13.7MiB/s]
+detect-20241225.ckpt.part:  51%|#####     | 149M/294M [00:09<00:10, 14.0MiB/s]detect-20241225.ckpt.part:  51%|#####     | 149M/294M [00:09<00:10, 14.0MiB/s]
+detect-20241225.ckpt.part:  51%|#####1    | 150M/294M [00:09<00:10, 14.5MiB/s]detect-20241225.ckpt.part:  51%|#####1    | 150M/294M [00:09<00:10, 14.5MiB/s]
+detect-20241225.ckpt.part:  51%|#####1    | 151M/294M [00:09<00:10, 14.5MiB/s]
+detect-20241225.ckpt.part:  52%|#####1    | 152M/294M [00:09<00:09, 15.2MiB/s]detect-20241225.ckpt.part:  52%|#####1    | 152M/294M [00:09<00:09, 15.2MiB/s]
+detect-20241225.ckpt.part:  52%|#####2    | 153M/294M [00:10<00:09, 14.9MiB/s]detect-20241225.ckpt.part:  52%|#####2    | 153M/294M [00:10<00:09, 14.9MiB/s]
+detect-20241225.ckpt.part:  52%|#####2    | 154M/294M [00:10<00:09, 14.9MiB/s]
+detect-20241225.ckpt.part:  53%|#####2    | 155M/294M [00:10<00:10, 14.6MiB/s]detect-20241225.ckpt.part:  53%|#####2    | 155M/294M [00:10<00:09, 14.6MiB/s]
+detect-20241225.ckpt.part:  53%|#####3    | 156M/294M [00:10<00:10, 14.4MiB/s]detect-20241225.ckpt.part:  53%|#####3    | 156M/294M [00:10<00:10, 14.4MiB/s]
+detect-20241225.ckpt.part:  53%|#####3    | 157M/294M [00:10<00:09, 14.4MiB/s]
+detect-20241225.ckpt.part:  54%|#####3    | 157M/294M [00:10<00:09, 14.4MiB/s]detect-20241225.ckpt.part:  54%|#####3    | 158M/294M [00:10<00:09, 14.4MiB/s]
+detect-20241225.ckpt.part:  54%|#####3    | 159M/294M [00:10<00:10, 13.9MiB/s]detect-20241225.ckpt.part:  54%|#####4    | 159M/294M [00:10<00:10, 13.9MiB/s]
+detect-20241225.ckpt.part:  54%|#####4    | 160M/294M [00:10<00:10, 13.5MiB/s]detect-20241225.ckpt.part:  54%|#####4    | 160M/294M [00:10<00:10, 13.5MiB/s]
+detect-20241225.ckpt.part:  55%|#####4    | 161M/294M [00:10<00:10, 13.5MiB/s]
+detect-20241225.ckpt.part:  55%|#####4    | 162M/294M [00:10<00:10, 13.9MiB/s]detect-20241225.ckpt.part:  55%|#####5    | 162M/294M [00:10<00:09, 13.9MiB/s]
+detect-20241225.ckpt.part:  55%|#####5    | 163M/294M [00:10<00:09, 14.3MiB/s]detect-20241225.ckpt.part:  55%|#####5    | 163M/294M [00:10<00:09, 14.3MiB/s]
+detect-20241225.ckpt.part:  56%|#####5    | 164M/294M [00:10<00:09, 14.3MiB/s]
+detect-20241225.ckpt.part:  56%|#####5    | 164M/294M [00:10<00:09, 14.3MiB/s]detect-20241225.ckpt.part:  56%|#####6    | 165M/294M [00:10<00:09, 14.3MiB/s]
+detect-20241225.ckpt.part:  56%|#####6    | 166M/294M [00:10<00:09, 13.7MiB/s]detect-20241225.ckpt.part:  56%|#####6    | 166M/294M [00:10<00:09, 13.7MiB/s]
+detect-20241225.ckpt.part:  57%|#####6    | 167M/294M [00:11<00:09, 13.7MiB/s]
+detect-20241225.ckpt.part:  57%|#####6    | 167M/294M [00:11<00:09, 13.5MiB/s]detect-20241225.ckpt.part:  57%|#####7    | 168M/294M [00:11<00:09, 13.5MiB/s]
+detect-20241225.ckpt.part:  57%|#####7    | 168M/294M [00:11<00:09, 13.5MiB/s]detect-20241225.ckpt.part:  57%|#####7    | 169M/294M [00:11<00:09, 13.5MiB/s]
+detect-20241225.ckpt.part:  58%|#####7    | 170M/294M [00:11<00:10, 13.0MiB/s]detect-20241225.ckpt.part:  58%|#####7    | 170M/294M [00:11<00:10, 13.0MiB/s]
+detect-20241225.ckpt.part:  58%|#####8    | 171M/294M [00:11<00:10, 12.2MiB/s]detect-20241225.ckpt.part:  58%|#####8    | 171M/294M [00:11<00:10, 12.2MiB/s]
+detect-20241225.ckpt.part:  58%|#####8    | 172M/294M [00:11<00:10, 12.2MiB/s]
+detect-20241225.ckpt.part:  58%|#####8    | 172M/294M [00:11<00:10, 12.1MiB/s]detect-20241225.ckpt.part:  59%|#####8    | 173M/294M [00:11<00:10, 12.1MiB/s]
+detect-20241225.ckpt.part:  59%|#####8    | 173M/294M [00:11<00:09, 13.0MiB/s]detect-20241225.ckpt.part:  59%|#####9    | 174M/294M [00:11<00:09, 13.0MiB/s]
+detect-20241225.ckpt.part:  59%|#####9    | 175M/294M [00:11<00:09, 13.0MiB/s]
+detect-20241225.ckpt.part:  60%|#####9    | 175M/294M [00:11<00:09, 13.9MiB/s]detect-20241225.ckpt.part:  60%|#####9    | 176M/294M [00:11<00:08, 13.9MiB/s]
+detect-20241225.ckpt.part:  60%|######    | 177M/294M [00:11<00:08, 14.5MiB/s]detect-20241225.ckpt.part:  60%|######    | 177M/294M [00:11<00:08, 14.5MiB/s]
+detect-20241225.ckpt.part:  60%|######    | 178M/294M [00:11<00:08, 14.5MiB/s]
+detect-20241225.ckpt.part:  61%|######    | 178M/294M [00:11<00:07, 15.6MiB/s]detect-20241225.ckpt.part:  61%|######    | 179M/294M [00:11<00:07, 15.6MiB/s]
+detect-20241225.ckpt.part:  61%|######1   | 180M/294M [00:11<00:07, 15.6MiB/s]
+detect-20241225.ckpt.part:  61%|######1   | 180M/294M [00:12<00:07, 15.1MiB/s]detect-20241225.ckpt.part:  61%|######1   | 181M/294M [00:12<00:07, 15.1MiB/s]
+detect-20241225.ckpt.part:  62%|######1   | 181M/294M [00:12<00:09, 12.7MiB/s]detect-20241225.ckpt.part:  62%|######1   | 182M/294M [00:12<00:09, 12.7MiB/s]
+detect-20241225.ckpt.part:  62%|######2   | 183M/294M [00:12<00:09, 12.0MiB/s]detect-20241225.ckpt.part:  62%|######2   | 183M/294M [00:12<00:09, 12.0MiB/s]
+detect-20241225.ckpt.part:  62%|######2   | 184M/294M [00:12<00:09, 12.0MiB/s]
+detect-20241225.ckpt.part:  63%|######2   | 184M/294M [00:12<00:09, 12.3MiB/s]detect-20241225.ckpt.part:  63%|######2   | 185M/294M [00:12<00:09, 12.3MiB/s]
+detect-20241225.ckpt.part:  63%|######2   | 185M/294M [00:12<00:09, 12.4MiB/s]detect-20241225.ckpt.part:  63%|######3   | 186M/294M [00:12<00:09, 12.4MiB/s]
+detect-20241225.ckpt.part:  63%|######3   | 187M/294M [00:12<00:09, 12.4MiB/s]
+detect-20241225.ckpt.part:  63%|######3   | 187M/294M [00:12<00:08, 13.1MiB/s]detect-20241225.ckpt.part:  64%|######3   | 188M/294M [00:12<00:08, 13.1MiB/s]
+detect-20241225.ckpt.part:  64%|######3   | 188M/294M [00:12<00:07, 14.0MiB/s]detect-20241225.ckpt.part:  64%|######4   | 188M/294M [00:12<00:07, 14.0MiB/s]
+detect-20241225.ckpt.part:  64%|######4   | 189M/294M [00:12<00:07, 14.0MiB/s]
+detect-20241225.ckpt.part:  65%|######4   | 190M/294M [00:12<00:07, 15.0MiB/s]detect-20241225.ckpt.part:  65%|######4   | 190M/294M [00:12<00:07, 15.0MiB/s]
+detect-20241225.ckpt.part:  65%|######5   | 191M/294M [00:12<00:07, 15.3MiB/s]detect-20241225.ckpt.part:  65%|######5   | 191M/294M [00:12<00:07, 15.3MiB/s]
+detect-20241225.ckpt.part:  65%|######5   | 192M/294M [00:12<00:06, 15.3MiB/s]
+detect-20241225.ckpt.part:  66%|######5   | 193M/294M [00:13<00:06, 16.4MiB/s]detect-20241225.ckpt.part:  66%|######5   | 193M/294M [00:13<00:06, 16.4MiB/s]
+detect-20241225.ckpt.part:  66%|######6   | 194M/294M [00:13<00:06, 16.4MiB/s]
+detect-20241225.ckpt.part:  66%|######6   | 195M/294M [00:13<00:06, 16.6MiB/s]detect-20241225.ckpt.part:  66%|######6   | 195M/294M [00:13<00:06, 16.6MiB/s]
+detect-20241225.ckpt.part:  67%|######6   | 196M/294M [00:13<00:06, 16.6MiB/s]
+detect-20241225.ckpt.part:  67%|######6   | 196M/294M [00:13<00:07, 14.6MiB/s]detect-20241225.ckpt.part:  67%|######7   | 197M/294M [00:13<00:06, 14.6MiB/s]
+detect-20241225.ckpt.part:  67%|######7   | 198M/294M [00:13<00:07, 14.1MiB/s]detect-20241225.ckpt.part:  67%|######7   | 198M/294M [00:13<00:07, 14.1MiB/s]
+detect-20241225.ckpt.part:  68%|######7   | 199M/294M [00:13<00:07, 13.8MiB/s]detect-20241225.ckpt.part:  68%|######7   | 199M/294M [00:13<00:07, 13.8MiB/s]
+detect-20241225.ckpt.part:  68%|######8   | 200M/294M [00:13<00:07, 13.8MiB/s]
+detect-20241225.ckpt.part:  68%|######8   | 201M/294M [00:13<00:06, 14.1MiB/s]detect-20241225.ckpt.part:  68%|######8   | 201M/294M [00:13<00:06, 14.1MiB/s]
+detect-20241225.ckpt.part:  69%|######8   | 202M/294M [00:13<00:06, 14.4MiB/s]detect-20241225.ckpt.part:  69%|######8   | 202M/294M [00:13<00:06, 14.4MiB/s]
+detect-20241225.ckpt.part:  69%|######9   | 203M/294M [00:13<00:06, 14.4MiB/s]
+detect-20241225.ckpt.part:  69%|######9   | 204M/294M [00:13<00:06, 15.1MiB/s]detect-20241225.ckpt.part:  69%|######9   | 204M/294M [00:13<00:06, 15.1MiB/s]
+detect-20241225.ckpt.part:  70%|######9   | 205M/294M [00:13<00:06, 15.1MiB/s]
+detect-20241225.ckpt.part:  70%|######9   | 205M/294M [00:13<00:06, 15.0MiB/s]detect-20241225.ckpt.part:  70%|#######   | 206M/294M [00:13<00:06, 15.0MiB/s]
+detect-20241225.ckpt.part:  70%|#######   | 207M/294M [00:14<00:06, 14.4MiB/s]detect-20241225.ckpt.part:  70%|#######   | 207M/294M [00:14<00:06, 14.4MiB/s]
+detect-20241225.ckpt.part:  71%|#######   | 208M/294M [00:14<00:06, 14.6MiB/s]detect-20241225.ckpt.part:  71%|#######   | 208M/294M [00:14<00:06, 14.6MiB/s]
+detect-20241225.ckpt.part:  71%|#######1  | 209M/294M [00:14<00:06, 14.6MiB/s]
+detect-20241225.ckpt.part:  71%|#######1  | 209M/294M [00:14<00:06, 14.1MiB/s]detect-20241225.ckpt.part:  71%|#######1  | 210M/294M [00:14<00:06, 14.1MiB/s]
+detect-20241225.ckpt.part:  72%|#######1  | 211M/294M [00:14<00:06, 13.0MiB/s]detect-20241225.ckpt.part:  72%|#######1  | 211M/294M [00:14<00:06, 13.0MiB/s]
+detect-20241225.ckpt.part:  72%|#######2  | 212M/294M [00:14<00:06, 13.0MiB/s]
+detect-20241225.ckpt.part:  72%|#######2  | 212M/294M [00:14<00:06, 13.0MiB/s]detect-20241225.ckpt.part:  72%|#######2  | 213M/294M [00:14<00:06, 13.0MiB/s]
+detect-20241225.ckpt.part:  73%|#######2  | 213M/294M [00:14<00:06, 12.6MiB/s]detect-20241225.ckpt.part:  73%|#######2  | 214M/294M [00:14<00:06, 12.6MiB/s]
+detect-20241225.ckpt.part:  73%|#######2  | 215M/294M [00:14<00:06, 13.1MiB/s]detect-20241225.ckpt.part:  73%|#######3  | 215M/294M [00:14<00:06, 13.1MiB/s]
+detect-20241225.ckpt.part:  73%|#######3  | 216M/294M [00:14<00:06, 13.1MiB/s]
+detect-20241225.ckpt.part:  74%|#######3  | 216M/294M [00:14<00:05, 14.0MiB/s]detect-20241225.ckpt.part:  74%|#######3  | 217M/294M [00:14<00:05, 14.0MiB/s]
+detect-20241225.ckpt.part:  74%|#######4  | 218M/294M [00:14<00:05, 14.6MiB/s]detect-20241225.ckpt.part:  74%|#######4  | 218M/294M [00:14<00:05, 14.6MiB/s]
+detect-20241225.ckpt.part:  74%|#######4  | 219M/294M [00:14<00:05, 14.6MiB/s]
+detect-20241225.ckpt.part:  75%|#######4  | 219M/294M [00:14<00:05, 15.6MiB/s]detect-20241225.ckpt.part:  75%|#######4  | 220M/294M [00:14<00:05, 15.6MiB/s]
+detect-20241225.ckpt.part:  75%|#######5  | 221M/294M [00:15<00:04, 15.6MiB/s]
+detect-20241225.ckpt.part:  75%|#######5  | 221M/294M [00:15<00:05, 15.0MiB/s]detect-20241225.ckpt.part:  75%|#######5  | 222M/294M [00:15<00:05, 15.0MiB/s]
+detect-20241225.ckpt.part:  76%|#######5  | 222M/294M [00:15<00:05, 14.8MiB/s]detect-20241225.ckpt.part:  76%|#######5  | 223M/294M [00:15<00:05, 14.8MiB/s]
+detect-20241225.ckpt.part:  76%|#######6  | 224M/294M [00:15<00:05, 14.8MiB/s]
+detect-20241225.ckpt.part:  76%|#######6  | 224M/294M [00:15<00:05, 12.7MiB/s]detect-20241225.ckpt.part:  76%|#######6  | 225M/294M [00:15<00:05, 12.7MiB/s]
+detect-20241225.ckpt.part:  77%|#######6  | 225M/294M [00:15<00:06, 12.0MiB/s]detect-20241225.ckpt.part:  77%|#######6  | 226M/294M [00:15<00:05, 12.0MiB/s]
+detect-20241225.ckpt.part:  77%|#######6  | 226M/294M [00:15<00:06, 11.8MiB/s]detect-20241225.ckpt.part:  77%|#######7  | 227M/294M [00:15<00:06, 11.8MiB/s]
+detect-20241225.ckpt.part:  77%|#######7  | 227M/294M [00:15<00:05, 11.7MiB/s]detect-20241225.ckpt.part:  77%|#######7  | 228M/294M [00:15<00:05, 11.7MiB/s]
+detect-20241225.ckpt.part:  78%|#######7  | 229M/294M [00:15<00:05, 11.7MiB/s]
+detect-20241225.ckpt.part:  78%|#######7  | 229M/294M [00:15<00:05, 12.1MiB/s]detect-20241225.ckpt.part:  78%|#######8  | 229M/294M [00:15<00:05, 12.1MiB/s]
+detect-20241225.ckpt.part:  78%|#######8  | 230M/294M [00:15<00:05, 12.5MiB/s]detect-20241225.ckpt.part:  78%|#######8  | 230M/294M [00:15<00:05, 12.5MiB/s]
+detect-20241225.ckpt.part:  79%|#######8  | 231M/294M [00:15<00:04, 13.2MiB/s]detect-20241225.ckpt.part:  79%|#######8  | 231M/294M [00:15<00:04, 13.2MiB/s]
+detect-20241225.ckpt.part:  79%|#######9  | 232M/294M [00:16<00:04, 13.2MiB/s]
+detect-20241225.ckpt.part:  79%|#######9  | 233M/294M [00:16<00:04, 14.3MiB/s]detect-20241225.ckpt.part:  79%|#######9  | 233M/294M [00:16<00:04, 14.3MiB/s]
+detect-20241225.ckpt.part:  80%|#######9  | 234M/294M [00:16<00:04, 14.3MiB/s]
+detect-20241225.ckpt.part:  80%|#######9  | 235M/294M [00:16<00:04, 15.5MiB/s]detect-20241225.ckpt.part:  80%|########  | 235M/294M [00:16<00:03, 15.5MiB/s]
+detect-20241225.ckpt.part:  80%|########  | 236M/294M [00:16<00:04, 14.5MiB/s]detect-20241225.ckpt.part:  80%|########  | 236M/294M [00:16<00:04, 14.5MiB/s]
+detect-20241225.ckpt.part:  81%|########  | 237M/294M [00:16<00:04, 14.5MiB/s]
+detect-20241225.ckpt.part:  81%|########  | 238M/294M [00:16<00:04, 14.1MiB/s]detect-20241225.ckpt.part:  81%|########1 | 238M/294M [00:16<00:04, 14.1MiB/s]
+detect-20241225.ckpt.part:  81%|########1 | 239M/294M [00:16<00:04, 13.3MiB/s]detect-20241225.ckpt.part:  81%|########1 | 239M/294M [00:16<00:04, 13.3MiB/s]
+detect-20241225.ckpt.part:  82%|########1 | 240M/294M [00:16<00:04, 13.3MiB/s]
+detect-20241225.ckpt.part:  82%|########1 | 241M/294M [00:16<00:03, 15.4MiB/s]detect-20241225.ckpt.part:  82%|########2 | 241M/294M [00:16<00:03, 15.4MiB/s]
+detect-20241225.ckpt.part:  82%|########2 | 242M/294M [00:16<00:03, 15.4MiB/s]
+detect-20241225.ckpt.part:  83%|########2 | 243M/294M [00:16<00:03, 17.1MiB/s]detect-20241225.ckpt.part:  83%|########2 | 243M/294M [00:16<00:03, 17.1MiB/s]
+detect-20241225.ckpt.part:  83%|########3 | 244M/294M [00:16<00:03, 17.1MiB/s]
+detect-20241225.ckpt.part:  83%|########3 | 245M/294M [00:16<00:03, 15.9MiB/s]detect-20241225.ckpt.part:  83%|########3 | 245M/294M [00:16<00:03, 15.9MiB/s]
+detect-20241225.ckpt.part:  84%|########3 | 246M/294M [00:16<00:03, 15.9MiB/s]
+detect-20241225.ckpt.part:  84%|########3 | 246M/294M [00:16<00:03, 15.3MiB/s]detect-20241225.ckpt.part:  84%|########4 | 247M/294M [00:17<00:03, 15.3MiB/s]
+detect-20241225.ckpt.part:  84%|########4 | 248M/294M [00:17<00:03, 15.0MiB/s]detect-20241225.ckpt.part:  84%|########4 | 248M/294M [00:17<00:03, 15.0MiB/s]
+detect-20241225.ckpt.part:  85%|########4 | 249M/294M [00:17<00:03, 15.0MiB/s]
+detect-20241225.ckpt.part:  85%|########4 | 249M/294M [00:17<00:03, 14.4MiB/s]detect-20241225.ckpt.part:  85%|########5 | 250M/294M [00:17<00:03, 14.4MiB/s]
+detect-20241225.ckpt.part:  85%|########5 | 251M/294M [00:17<00:03, 13.9MiB/s]detect-20241225.ckpt.part:  85%|########5 | 251M/294M [00:17<00:03, 13.9MiB/s]
+detect-20241225.ckpt.part:  86%|########5 | 252M/294M [00:17<00:03, 13.9MiB/s]
+detect-20241225.ckpt.part:  86%|########5 | 252M/294M [00:17<00:03, 14.0MiB/s]detect-20241225.ckpt.part:  86%|########6 | 253M/294M [00:17<00:03, 14.0MiB/s]
+detect-20241225.ckpt.part:  86%|########6 | 253M/294M [00:17<00:02, 14.3MiB/s]detect-20241225.ckpt.part:  86%|########6 | 254M/294M [00:17<00:02, 14.3MiB/s]
+detect-20241225.ckpt.part:  87%|########6 | 255M/294M [00:17<00:02, 14.3MiB/s]
+detect-20241225.ckpt.part:  87%|########6 | 255M/294M [00:17<00:02, 14.7MiB/s]detect-20241225.ckpt.part:  87%|########6 | 256M/294M [00:17<00:02, 14.7MiB/s]
+detect-20241225.ckpt.part:  87%|########7 | 256M/294M [00:17<00:02, 14.4MiB/s]detect-20241225.ckpt.part:  87%|########7 | 257M/294M [00:17<00:02, 14.4MiB/s]
+detect-20241225.ckpt.part:  88%|########7 | 258M/294M [00:17<00:02, 14.3MiB/s]detect-20241225.ckpt.part:  88%|########7 | 258M/294M [00:17<00:02, 14.3MiB/s]
+detect-20241225.ckpt.part:  88%|########7 | 259M/294M [00:17<00:02, 14.3MiB/s]
+detect-20241225.ckpt.part:  88%|########8 | 259M/294M [00:17<00:02, 13.9MiB/s]detect-20241225.ckpt.part:  88%|########8 | 260M/294M [00:18<00:02, 13.9MiB/s]
+detect-20241225.ckpt.part:  89%|########8 | 260M/294M [00:18<00:02, 13.6MiB/s]detect-20241225.ckpt.part:  89%|########8 | 261M/294M [00:18<00:02, 13.6MiB/s]
+detect-20241225.ckpt.part:  89%|########8 | 262M/294M [00:18<00:02, 13.6MiB/s]
+detect-20241225.ckpt.part:  89%|########9 | 262M/294M [00:18<00:02, 13.6MiB/s]detect-20241225.ckpt.part:  89%|########9 | 263M/294M [00:18<00:02, 13.6MiB/s]
+detect-20241225.ckpt.part:  89%|########9 | 263M/294M [00:18<00:02, 14.0MiB/s]detect-20241225.ckpt.part:  90%|########9 | 264M/294M [00:18<00:02, 14.0MiB/s]
+detect-20241225.ckpt.part:  90%|########9 | 265M/294M [00:18<00:02, 14.0MiB/s]
+detect-20241225.ckpt.part:  90%|######### | 265M/294M [00:18<00:02, 14.4MiB/s]detect-20241225.ckpt.part:  90%|######### | 266M/294M [00:18<00:02, 14.4MiB/s]
+detect-20241225.ckpt.part:  90%|######### | 266M/294M [00:18<00:02, 13.9MiB/s]detect-20241225.ckpt.part:  91%|######### | 267M/294M [00:18<00:02, 13.9MiB/s]
+detect-20241225.ckpt.part:  91%|######### | 267M/294M [00:18<00:02, 13.7MiB/s]detect-20241225.ckpt.part:  91%|######### | 268M/294M [00:18<00:02, 13.7MiB/s]
+detect-20241225.ckpt.part:  91%|#########1| 269M/294M [00:18<00:01, 13.7MiB/s]
+detect-20241225.ckpt.part:  91%|#########1| 269M/294M [00:18<00:01, 13.9MiB/s]detect-20241225.ckpt.part:  92%|#########1| 270M/294M [00:18<00:01, 13.9MiB/s]
+detect-20241225.ckpt.part:  92%|#########1| 270M/294M [00:18<00:01, 14.3MiB/s]detect-20241225.ckpt.part:  92%|#########1| 271M/294M [00:18<00:01, 14.3MiB/s]
+detect-20241225.ckpt.part:  92%|#########2| 271M/294M [00:18<00:01, 14.3MiB/s]
+detect-20241225.ckpt.part:  92%|#########2| 272M/294M [00:18<00:01, 13.9MiB/s]detect-20241225.ckpt.part:  93%|#########2| 272M/294M [00:18<00:01, 13.9MiB/s]
+detect-20241225.ckpt.part:  93%|#########2| 273M/294M [00:19<00:01, 13.5MiB/s]detect-20241225.ckpt.part:  93%|#########2| 273M/294M [00:19<00:01, 13.5MiB/s]
+detect-20241225.ckpt.part:  93%|#########3| 274M/294M [00:19<00:01, 13.5MiB/s]detect-20241225.ckpt.part:  93%|#########3| 274M/294M [00:19<00:01, 13.5MiB/s]
+detect-20241225.ckpt.part:  94%|#########3| 275M/294M [00:19<00:01, 13.5MiB/s]
+detect-20241225.ckpt.part:  94%|#########3| 276M/294M [00:19<00:01, 13.8MiB/s]detect-20241225.ckpt.part:  94%|#########3| 276M/294M [00:19<00:01, 13.8MiB/s]
+detect-20241225.ckpt.part:  94%|#########4| 277M/294M [00:19<00:01, 14.5MiB/s]detect-20241225.ckpt.part:  94%|#########4| 277M/294M [00:19<00:01, 14.5MiB/s]
+detect-20241225.ckpt.part:  95%|#########4| 278M/294M [00:19<00:01, 14.5MiB/s]
+detect-20241225.ckpt.part:  95%|#########4| 279M/294M [00:19<00:01, 14.3MiB/s]detect-20241225.ckpt.part:  95%|#########4| 279M/294M [00:19<00:01, 14.3MiB/s]
+detect-20241225.ckpt.part:  95%|#########5| 280M/294M [00:19<00:01, 14.2MiB/s]detect-20241225.ckpt.part:  95%|#########5| 280M/294M [00:19<00:01, 14.2MiB/s]
+detect-20241225.ckpt.part:  96%|#########5| 281M/294M [00:19<00:00, 14.2MiB/s]
+detect-20241225.ckpt.part:  96%|#########5| 281M/294M [00:19<00:00, 14.4MiB/s]detect-20241225.ckpt.part:  96%|#########5| 282M/294M [00:19<00:00, 14.4MiB/s]
+detect-20241225.ckpt.part:  96%|#########6| 283M/294M [00:19<00:00, 13.7MiB/s]detect-20241225.ckpt.part:  96%|#########6| 283M/294M [00:19<00:00, 13.7MiB/s]
+detect-20241225.ckpt.part:  97%|#########6| 284M/294M [00:19<00:00, 13.6MiB/s]detect-20241225.ckpt.part:  97%|#########6| 284M/294M [00:19<00:00, 13.6MiB/s]
+detect-20241225.ckpt.part:  97%|#########6| 285M/294M [00:19<00:00, 13.6MiB/s]
+detect-20241225.ckpt.part:  97%|#########7| 286M/294M [00:19<00:00, 13.9MiB/s]detect-20241225.ckpt.part:  97%|#########7| 286M/294M [00:19<00:00, 13.9MiB/s]
+detect-20241225.ckpt.part:  98%|#########7| 287M/294M [00:20<00:00, 14.2MiB/s]detect-20241225.ckpt.part:  98%|#########7| 287M/294M [00:20<00:00, 14.2MiB/s]
+detect-20241225.ckpt.part:  98%|#########7| 288M/294M [00:20<00:00, 14.2MiB/s]
+detect-20241225.ckpt.part:  98%|#########8| 288M/294M [00:20<00:00, 14.3MiB/s]detect-20241225.ckpt.part:  98%|#########8| 289M/294M [00:20<00:00, 14.3MiB/s]
+detect-20241225.ckpt.part:  99%|#########8| 290M/294M [00:20<00:00, 13.9MiB/s]detect-20241225.ckpt.part:  99%|#########8| 290M/294M [00:20<00:00, 13.9MiB/s]
+detect-20241225.ckpt.part:  99%|#########8| 291M/294M [00:20<00:00, 13.9MiB/s]
+detect-20241225.ckpt.part:  99%|#########8| 291M/294M [00:20<00:00, 14.0MiB/s]detect-20241225.ckpt.part:  99%|#########9| 292M/294M [00:20<00:00, 14.0MiB/s]
+detect-20241225.ckpt.part:  99%|#########9| 293M/294M [00:20<00:00, 14.1MiB/s]detect-20241225.ckpt.part: 100%|#########9| 293M/294M [00:20<00:00, 14.1MiB/s]
+detect-20241225.ckpt.part: 100%|#########9| 294M/294M [00:20<00:00, 13.8MiB/s]detect-20241225.ckpt.part: 100%|#########9| 294M/294M [00:20<00:00, 13.8MiB/s]
+detect-20241225.ckpt.part: 100%|##########| 294M/294M [00:20<00:00, 15.0MiB/s]
+ -- Verifying: "D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\models\detection\.\detect-20241225.ckpt.part"
+ -- Verifying: OK!
+
+
+Downloading models into D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\models\ocr
+
+ -- Downloading: "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/ocr_ar_48px.ckpt"
+ocr_ar_48px.ckpt.part:   0%|          | 0.00/195M [00:00<?, ?iB/s]ocr_ar_48px.ckpt.part:   0%|          | 49.0k/195M [00:00<07:19, 464kiB/s]ocr_ar_48px.ckpt.part:   1%|          | 0.98M/195M [00:00<07:17, 464kiB/s]
+ocr_ar_48px.ckpt.part:   1%|          | 1.20M/195M [00:00<00:28, 7.04MiB/s]ocr_ar_48px.ckpt.part:   1%|1         | 1.95M/195M [00:00<00:28, 7.04MiB/s]
+ocr_ar_48px.ckpt.part:   2%|1         | 2.93M/195M [00:00<00:28, 7.04MiB/s]
+ocr_ar_48px.ckpt.part:   2%|1         | 3.76M/195M [00:00<00:12, 15.8MiB/s]ocr_ar_48px.ckpt.part:   2%|2         | 3.91M/195M [00:00<00:12, 15.8MiB/s]
+ocr_ar_48px.ckpt.part:   3%|2         | 4.88M/195M [00:00<00:12, 15.8MiB/s]
+ocr_ar_48px.ckpt.part:   3%|3         | 5.86M/195M [00:00<00:12, 15.8MiB/s]
+ocr_ar_48px.ckpt.part:   4%|3         | 6.84M/195M [00:00<00:12, 15.8MiB/s]
+ocr_ar_48px.ckpt.part:   4%|3         | 6.89M/195M [00:00<00:08, 22.3MiB/s]ocr_ar_48px.ckpt.part:   4%|4         | 7.81M/195M [00:00<00:08, 22.3MiB/s]
+ocr_ar_48px.ckpt.part:   5%|4         | 8.79M/195M [00:00<00:08, 22.3MiB/s]
+ocr_ar_48px.ckpt.part:   5%|5         | 9.77M/195M [00:00<00:08, 22.3MiB/s]
+ocr_ar_48px.ckpt.part:   5%|5         | 9.89M/195M [00:00<00:07, 25.6MiB/s]ocr_ar_48px.ckpt.part:   6%|5         | 10.7M/195M [00:00<00:07, 25.6MiB/s]
+ocr_ar_48px.ckpt.part:   6%|6         | 11.7M/195M [00:00<00:07, 25.6MiB/s]
+ocr_ar_48px.ckpt.part:   6%|6         | 12.3M/195M [00:00<00:12, 15.3MiB/s]ocr_ar_48px.ckpt.part:   7%|6         | 12.7M/195M [00:00<00:12, 15.3MiB/s]
+ocr_ar_48px.ckpt.part:   7%|7         | 13.7M/195M [00:00<00:12, 15.3MiB/s]
+ocr_ar_48px.ckpt.part:   8%|7         | 14.6M/195M [00:00<00:12, 15.3MiB/s]
+ocr_ar_48px.ckpt.part:   8%|7         | 15.3M/195M [00:00<00:10, 18.8MiB/s]ocr_ar_48px.ckpt.part:   8%|8         | 15.6M/195M [00:00<00:09, 18.8MiB/s]
+ocr_ar_48px.ckpt.part:   9%|8         | 16.6M/195M [00:00<00:09, 18.8MiB/s]
+ocr_ar_48px.ckpt.part:   9%|9         | 17.6M/195M [00:00<00:09, 18.8MiB/s]
+ocr_ar_48px.ckpt.part:   9%|9         | 18.4M/195M [00:01<00:08, 22.1MiB/s]ocr_ar_48px.ckpt.part:  10%|9         | 18.6M/195M [00:01<00:08, 22.1MiB/s]
+ocr_ar_48px.ckpt.part:  10%|#         | 19.5M/195M [00:01<00:08, 22.1MiB/s]
+ocr_ar_48px.ckpt.part:  11%|#         | 20.5M/195M [00:01<00:08, 22.1MiB/s]
+ocr_ar_48px.ckpt.part:  11%|#         | 20.9M/195M [00:01<00:23, 7.92MiB/s]ocr_ar_48px.ckpt.part:  11%|#1        | 21.5M/195M [00:01<00:22, 7.92MiB/s]
+ocr_ar_48px.ckpt.part:  12%|#1        | 22.5M/195M [00:02<00:22, 7.92MiB/s]
+ocr_ar_48px.ckpt.part:  12%|#1        | 22.7M/195M [00:02<00:21, 8.41MiB/s]ocr_ar_48px.ckpt.part:  12%|#2        | 23.4M/195M [00:02<00:21, 8.41MiB/s]
+ocr_ar_48px.ckpt.part:  12%|#2        | 24.3M/195M [00:02<00:20, 8.87MiB/s]ocr_ar_48px.ckpt.part:  13%|#2        | 24.4M/195M [00:02<00:20, 8.87MiB/s]
+ocr_ar_48px.ckpt.part:  13%|#3        | 25.4M/195M [00:02<00:20, 8.87MiB/s]
+ocr_ar_48px.ckpt.part:  13%|#3        | 25.7M/195M [00:02<00:19, 9.08MiB/s]ocr_ar_48px.ckpt.part:  14%|#3        | 26.4M/195M [00:02<00:19, 9.08MiB/s]
+ocr_ar_48px.ckpt.part:  14%|#3        | 27.0M/195M [00:02<00:18, 9.54MiB/s]ocr_ar_48px.ckpt.part:  14%|#4        | 27.3M/195M [00:02<00:18, 9.54MiB/s]
+ocr_ar_48px.ckpt.part:  14%|#4        | 28.2M/195M [00:02<00:17, 10.1MiB/s]ocr_ar_48px.ckpt.part:  15%|#4        | 28.3M/195M [00:02<00:17, 10.1MiB/s]
+ocr_ar_48px.ckpt.part:  15%|#5        | 29.3M/195M [00:02<00:17, 10.1MiB/s]
+ocr_ar_48px.ckpt.part:  15%|#5        | 29.4M/195M [00:02<00:16, 10.2MiB/s]ocr_ar_48px.ckpt.part:  16%|#5        | 30.3M/195M [00:02<00:16, 10.2MiB/s]
+ocr_ar_48px.ckpt.part:  16%|#5        | 30.6M/195M [00:02<00:16, 10.4MiB/s]ocr_ar_48px.ckpt.part:  16%|#6        | 31.2M/195M [00:02<00:16, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  16%|#6        | 31.7M/195M [00:02<00:17, 10.0MiB/s]ocr_ar_48px.ckpt.part:  17%|#6        | 32.2M/195M [00:02<00:16, 10.0MiB/s]
+ocr_ar_48px.ckpt.part:  17%|#6        | 32.7M/195M [00:03<00:16, 10.3MiB/s]ocr_ar_48px.ckpt.part:  17%|#7        | 33.2M/195M [00:03<00:16, 10.3MiB/s]
+ocr_ar_48px.ckpt.part:  17%|#7        | 33.8M/195M [00:03<00:16, 10.2MiB/s]ocr_ar_48px.ckpt.part:  18%|#7        | 34.2M/195M [00:03<00:16, 10.2MiB/s]
+ocr_ar_48px.ckpt.part:  18%|#7        | 34.8M/195M [00:03<00:16, 10.1MiB/s]ocr_ar_48px.ckpt.part:  18%|#8        | 35.2M/195M [00:03<00:16, 10.1MiB/s]
+ocr_ar_48px.ckpt.part:  18%|#8        | 35.8M/195M [00:03<00:16, 10.0MiB/s]ocr_ar_48px.ckpt.part:  19%|#8        | 36.1M/195M [00:03<00:16, 10.0MiB/s]
+ocr_ar_48px.ckpt.part:  19%|#8        | 36.7M/195M [00:03<00:16, 10.1MiB/s]ocr_ar_48px.ckpt.part:  19%|#9        | 37.1M/195M [00:03<00:16, 10.1MiB/s]
+ocr_ar_48px.ckpt.part:  19%|#9        | 37.7M/195M [00:03<00:16, 10.0MiB/s]ocr_ar_48px.ckpt.part:  20%|#9        | 38.1M/195M [00:03<00:16, 10.0MiB/s]
+ocr_ar_48px.ckpt.part:  20%|#9        | 38.7M/195M [00:03<00:16, 10.2MiB/s]ocr_ar_48px.ckpt.part:  20%|##        | 39.1M/195M [00:03<00:16, 10.2MiB/s]
+ocr_ar_48px.ckpt.part:  20%|##        | 39.7M/195M [00:03<00:15, 10.2MiB/s]ocr_ar_48px.ckpt.part:  21%|##        | 40.0M/195M [00:04<00:15, 10.2MiB/s]
+ocr_ar_48px.ckpt.part:  21%|##        | 40.7M/195M [00:04<00:31, 5.09MiB/s]ocr_ar_48px.ckpt.part:  21%|##1       | 41.0M/195M [00:04<00:31, 5.09MiB/s]
+ocr_ar_48px.ckpt.part:  21%|##1       | 41.4M/195M [00:04<00:29, 5.40MiB/s]ocr_ar_48px.ckpt.part:  22%|##1       | 42.0M/195M [00:04<00:29, 5.40MiB/s]
+ocr_ar_48px.ckpt.part:  22%|##1       | 42.5M/195M [00:04<00:24, 6.49MiB/s]ocr_ar_48px.ckpt.part:  22%|##2       | 43.0M/195M [00:04<00:24, 6.49MiB/s]
+ocr_ar_48px.ckpt.part:  22%|##2       | 43.6M/195M [00:04<00:21, 7.47MiB/s]ocr_ar_48px.ckpt.part:  23%|##2       | 43.9M/195M [00:04<00:21, 7.47MiB/s]
+ocr_ar_48px.ckpt.part:  23%|##2       | 44.6M/195M [00:04<00:19, 8.23MiB/s]ocr_ar_48px.ckpt.part:  23%|##3       | 44.9M/195M [00:04<00:19, 8.23MiB/s]
+ocr_ar_48px.ckpt.part:  23%|##3       | 45.6M/195M [00:04<00:17, 8.87MiB/s]ocr_ar_48px.ckpt.part:  24%|##3       | 45.9M/195M [00:04<00:17, 8.87MiB/s]
+ocr_ar_48px.ckpt.part:  24%|##3       | 46.6M/195M [00:04<00:16, 9.19MiB/s]ocr_ar_48px.ckpt.part:  24%|##4       | 46.9M/195M [00:04<00:16, 9.19MiB/s]
+ocr_ar_48px.ckpt.part:  24%|##4       | 47.6M/195M [00:04<00:16, 9.60MiB/s]ocr_ar_48px.ckpt.part:  25%|##4       | 47.9M/195M [00:04<00:16, 9.60MiB/s]
+ocr_ar_48px.ckpt.part:  25%|##4       | 48.7M/195M [00:05<00:15, 9.99MiB/s]ocr_ar_48px.ckpt.part:  25%|##5       | 48.8M/195M [00:05<00:15, 9.99MiB/s]
+ocr_ar_48px.ckpt.part:  25%|##5       | 49.7M/195M [00:05<00:15, 10.1MiB/s]ocr_ar_48px.ckpt.part:  26%|##5       | 49.8M/195M [00:05<00:15, 10.1MiB/s]
+ocr_ar_48px.ckpt.part:  26%|##6       | 50.7M/195M [00:05<00:14, 10.2MiB/s]ocr_ar_48px.ckpt.part:  26%|##6       | 50.8M/195M [00:05<00:14, 10.2MiB/s]
+ocr_ar_48px.ckpt.part:  27%|##6       | 51.7M/195M [00:05<00:14, 10.5MiB/s]ocr_ar_48px.ckpt.part:  27%|##6       | 51.8M/195M [00:05<00:14, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  27%|##7       | 52.7M/195M [00:05<00:14, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  27%|##7       | 52.7M/195M [00:05<00:14, 10.4MiB/s]ocr_ar_48px.ckpt.part:  28%|##7       | 53.7M/195M [00:05<00:14, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  28%|##7       | 53.8M/195M [00:05<00:14, 10.5MiB/s]ocr_ar_48px.ckpt.part:  28%|##8       | 54.7M/195M [00:05<00:13, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  28%|##8       | 54.8M/195M [00:05<00:13, 10.6MiB/s]ocr_ar_48px.ckpt.part:  29%|##8       | 55.7M/195M [00:05<00:13, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  29%|##8       | 55.8M/195M [00:05<00:13, 10.5MiB/s]ocr_ar_48px.ckpt.part:  29%|##9       | 56.6M/195M [00:05<00:13, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  29%|##9       | 56.8M/195M [00:05<00:13, 10.6MiB/s]ocr_ar_48px.ckpt.part:  30%|##9       | 57.6M/195M [00:05<00:13, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  30%|##9       | 57.9M/195M [00:05<00:13, 10.6MiB/s]ocr_ar_48px.ckpt.part:  30%|###       | 58.6M/195M [00:05<00:13, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  30%|###       | 58.9M/195M [00:06<00:13, 10.6MiB/s]ocr_ar_48px.ckpt.part:  31%|###       | 59.6M/195M [00:06<00:13, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  31%|###       | 59.9M/195M [00:06<00:13, 10.6MiB/s]ocr_ar_48px.ckpt.part:  31%|###1      | 60.5M/195M [00:06<00:13, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  31%|###1      | 60.9M/195M [00:06<00:13, 10.6MiB/s]ocr_ar_48px.ckpt.part:  32%|###1      | 61.5M/195M [00:06<00:13, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  32%|###1      | 61.9M/195M [00:06<00:13, 10.6MiB/s]ocr_ar_48px.ckpt.part:  32%|###2      | 62.5M/195M [00:06<00:13, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  32%|###2      | 63.0M/195M [00:06<00:13, 10.4MiB/s]ocr_ar_48px.ckpt.part:  33%|###2      | 63.5M/195M [00:06<00:13, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  33%|###2      | 63.9M/195M [00:06<00:13, 10.4MiB/s]ocr_ar_48px.ckpt.part:  33%|###3      | 64.5M/195M [00:06<00:13, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  33%|###3      | 65.0M/195M [00:06<00:13, 10.5MiB/s]ocr_ar_48px.ckpt.part:  34%|###3      | 65.4M/195M [00:06<00:12, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  34%|###3      | 66.0M/195M [00:06<00:12, 10.4MiB/s]ocr_ar_48px.ckpt.part:  34%|###4      | 66.4M/195M [00:06<00:12, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  34%|###4      | 67.0M/195M [00:06<00:12, 10.4MiB/s]ocr_ar_48px.ckpt.part:  35%|###4      | 67.4M/195M [00:06<00:12, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  35%|###4      | 68.0M/195M [00:06<00:12, 10.5MiB/s]ocr_ar_48px.ckpt.part:  35%|###5      | 68.4M/195M [00:06<00:12, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  35%|###5      | 69.0M/195M [00:07<00:12, 10.6MiB/s]ocr_ar_48px.ckpt.part:  36%|###5      | 69.3M/195M [00:07<00:12, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  36%|###5      | 70.1M/195M [00:07<00:12, 10.6MiB/s]ocr_ar_48px.ckpt.part:  36%|###6      | 70.3M/195M [00:07<00:12, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  37%|###6      | 71.1M/195M [00:07<00:12, 10.8MiB/s]ocr_ar_48px.ckpt.part:  37%|###6      | 71.3M/195M [00:07<00:12, 10.8MiB/s]
+ocr_ar_48px.ckpt.part:  37%|###7      | 72.2M/195M [00:07<00:11, 10.8MiB/s]ocr_ar_48px.ckpt.part:  37%|###7      | 72.3M/195M [00:07<00:11, 10.8MiB/s]
+ocr_ar_48px.ckpt.part:  38%|###7      | 73.2M/195M [00:07<00:11, 10.8MiB/s]ocr_ar_48px.ckpt.part:  38%|###7      | 73.2M/195M [00:07<00:11, 10.8MiB/s]
+ocr_ar_48px.ckpt.part:  38%|###8      | 74.2M/195M [00:07<00:11, 10.8MiB/s]
+ocr_ar_48px.ckpt.part:  38%|###8      | 74.2M/195M [00:07<00:11, 10.6MiB/s]ocr_ar_48px.ckpt.part:  39%|###8      | 75.2M/195M [00:07<00:11, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  39%|###8      | 75.3M/195M [00:07<00:11, 10.7MiB/s]ocr_ar_48px.ckpt.part:  39%|###9      | 76.2M/195M [00:07<00:11, 10.7MiB/s]
+ocr_ar_48px.ckpt.part:  39%|###9      | 76.3M/195M [00:07<00:12, 10.2MiB/s]ocr_ar_48px.ckpt.part:  40%|###9      | 77.1M/195M [00:07<00:12, 10.2MiB/s]
+ocr_ar_48px.ckpt.part:  40%|###9      | 77.3M/195M [00:07<00:11, 10.5MiB/s]ocr_ar_48px.ckpt.part:  40%|####      | 78.1M/195M [00:07<00:11, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  40%|####      | 78.4M/195M [00:07<00:11, 10.6MiB/s]ocr_ar_48px.ckpt.part:  41%|####      | 79.1M/195M [00:08<00:11, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  41%|####      | 79.4M/195M [00:08<00:11, 10.5MiB/s]ocr_ar_48px.ckpt.part:  41%|####1     | 80.1M/195M [00:08<00:11, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  41%|####1     | 80.4M/195M [00:08<00:11, 10.4MiB/s]ocr_ar_48px.ckpt.part:  42%|####1     | 81.1M/195M [00:08<00:11, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  42%|####1     | 81.4M/195M [00:08<00:11, 10.3MiB/s]ocr_ar_48px.ckpt.part:  42%|####2     | 82.0M/195M [00:08<00:11, 10.3MiB/s]
+ocr_ar_48px.ckpt.part:  42%|####2     | 82.4M/195M [00:08<00:11, 10.4MiB/s]ocr_ar_48px.ckpt.part:  43%|####2     | 83.0M/195M [00:08<00:11, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  43%|####2     | 83.4M/195M [00:08<00:11, 10.5MiB/s]ocr_ar_48px.ckpt.part:  43%|####3     | 84.0M/195M [00:08<00:11, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  43%|####3     | 84.4M/195M [00:08<00:11, 10.4MiB/s]ocr_ar_48px.ckpt.part:  44%|####3     | 85.0M/195M [00:08<00:11, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  44%|####3     | 85.4M/195M [00:08<00:11, 10.4MiB/s]ocr_ar_48px.ckpt.part:  44%|####4     | 85.9M/195M [00:08<00:10, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  44%|####4     | 86.5M/195M [00:08<00:10, 10.5MiB/s]ocr_ar_48px.ckpt.part:  45%|####4     | 86.9M/195M [00:08<00:10, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  45%|####4     | 87.5M/195M [00:08<00:10, 10.6MiB/s]ocr_ar_48px.ckpt.part:  45%|####5     | 87.9M/195M [00:08<00:10, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  45%|####5     | 88.5M/195M [00:09<00:11, 9.74MiB/s]ocr_ar_48px.ckpt.part:  46%|####5     | 88.9M/195M [00:09<00:11, 9.74MiB/s]
+ocr_ar_48px.ckpt.part:  46%|####5     | 89.5M/195M [00:09<00:12, 8.82MiB/s]ocr_ar_48px.ckpt.part:  46%|####6     | 89.8M/195M [00:09<00:12, 8.82MiB/s]
+ocr_ar_48px.ckpt.part:  46%|####6     | 90.5M/195M [00:09<00:11, 9.40MiB/s]ocr_ar_48px.ckpt.part:  47%|####6     | 90.8M/195M [00:09<00:11, 9.40MiB/s]
+ocr_ar_48px.ckpt.part:  47%|####6     | 91.6M/195M [00:09<00:11, 9.75MiB/s]ocr_ar_48px.ckpt.part:  47%|####7     | 91.8M/195M [00:09<00:11, 9.75MiB/s]
+ocr_ar_48px.ckpt.part:  48%|####7     | 92.7M/195M [00:09<00:10, 10.3MiB/s]ocr_ar_48px.ckpt.part:  48%|####7     | 92.8M/195M [00:09<00:10, 10.3MiB/s]
+ocr_ar_48px.ckpt.part:  48%|####8     | 93.7M/195M [00:09<00:10, 10.4MiB/s]ocr_ar_48px.ckpt.part:  48%|####8     | 93.8M/195M [00:09<00:10, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  49%|####8     | 94.7M/195M [00:09<00:10, 10.4MiB/s]ocr_ar_48px.ckpt.part:  49%|####8     | 94.7M/195M [00:09<00:10, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  49%|####9     | 95.7M/195M [00:09<00:09, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  49%|####9     | 95.7M/195M [00:09<00:10, 10.4MiB/s]ocr_ar_48px.ckpt.part:  50%|####9     | 96.7M/195M [00:09<00:09, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  50%|####9     | 96.7M/195M [00:09<00:09, 10.4MiB/s]ocr_ar_48px.ckpt.part:  50%|#####     | 97.7M/195M [00:09<00:09, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  50%|#####     | 97.7M/195M [00:09<00:09, 10.5MiB/s]ocr_ar_48px.ckpt.part:  51%|#####     | 98.6M/195M [00:10<00:09, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  51%|#####     | 98.8M/195M [00:10<00:09, 10.6MiB/s]ocr_ar_48px.ckpt.part:  51%|#####1    | 99.6M/195M [00:10<00:09, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  51%|#####1    | 99.8M/195M [00:10<00:09, 10.6MiB/s]ocr_ar_48px.ckpt.part:  52%|#####1    | 101M/195M [00:10<00:09, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  52%|#####1    | 101M/195M [00:10<00:09, 10.5MiB/s] ocr_ar_48px.ckpt.part:  52%|#####2    | 102M/195M [00:10<00:09, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  52%|#####2    | 102M/195M [00:10<00:09, 10.5MiB/s]ocr_ar_48px.ckpt.part:  53%|#####2    | 103M/195M [00:10<00:09, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  53%|#####2    | 103M/195M [00:10<00:09, 10.4MiB/s]ocr_ar_48px.ckpt.part:  53%|#####3    | 104M/195M [00:10<00:09, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  53%|#####3    | 104M/195M [00:10<00:09, 10.4MiB/s]ocr_ar_48px.ckpt.part:  54%|#####3    | 104M/195M [00:10<00:09, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  54%|#####3    | 105M/195M [00:10<00:09, 10.4MiB/s]ocr_ar_48px.ckpt.part:  54%|#####4    | 105M/195M [00:10<00:08, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  54%|#####4    | 106M/195M [00:10<00:08, 10.4MiB/s]ocr_ar_48px.ckpt.part:  55%|#####4    | 106M/195M [00:10<00:08, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  55%|#####4    | 107M/195M [00:10<00:08, 10.5MiB/s]ocr_ar_48px.ckpt.part:  55%|#####5    | 107M/195M [00:10<00:08, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  55%|#####5    | 108M/195M [00:10<00:08, 10.4MiB/s]ocr_ar_48px.ckpt.part:  56%|#####5    | 108M/195M [00:11<00:08, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  56%|#####5    | 109M/195M [00:11<00:08, 10.6MiB/s]ocr_ar_48px.ckpt.part:  56%|#####6    | 109M/195M [00:11<00:08, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  56%|#####6    | 110M/195M [00:11<00:08, 10.6MiB/s]ocr_ar_48px.ckpt.part:  57%|#####6    | 110M/195M [00:11<00:08, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  57%|#####6    | 111M/195M [00:11<00:08, 10.7MiB/s]ocr_ar_48px.ckpt.part:  57%|#####7    | 111M/195M [00:11<00:08, 10.7MiB/s]
+ocr_ar_48px.ckpt.part:  57%|#####7    | 112M/195M [00:11<00:08, 10.6MiB/s]ocr_ar_48px.ckpt.part:  58%|#####7    | 112M/195M [00:11<00:08, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  58%|#####8    | 113M/195M [00:11<00:08, 10.6MiB/s]ocr_ar_48px.ckpt.part:  58%|#####8    | 113M/195M [00:11<00:08, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  59%|#####8    | 114M/195M [00:11<00:08, 10.5MiB/s]ocr_ar_48px.ckpt.part:  59%|#####8    | 114M/195M [00:11<00:08, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  59%|#####9    | 115M/195M [00:11<00:07, 10.5MiB/s]ocr_ar_48px.ckpt.part:  59%|#####9    | 115M/195M [00:11<00:07, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  60%|#####9    | 116M/195M [00:11<00:07, 10.5MiB/s]ocr_ar_48px.ckpt.part:  60%|#####9    | 116M/195M [00:11<00:07, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  60%|######    | 117M/195M [00:11<00:07, 10.7MiB/s]ocr_ar_48px.ckpt.part:  60%|######    | 117M/195M [00:11<00:07, 10.7MiB/s]
+ocr_ar_48px.ckpt.part:  61%|######    | 118M/195M [00:11<00:07, 10.7MiB/s]ocr_ar_48px.ckpt.part:  61%|######    | 118M/195M [00:11<00:07, 10.7MiB/s]
+ocr_ar_48px.ckpt.part:  61%|######1   | 119M/195M [00:12<00:07, 10.7MiB/s]
+ocr_ar_48px.ckpt.part:  61%|######1   | 119M/195M [00:12<00:07, 10.6MiB/s]ocr_ar_48px.ckpt.part:  62%|######1   | 120M/195M [00:12<00:07, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  62%|######1   | 120M/195M [00:12<00:07, 10.8MiB/s]ocr_ar_48px.ckpt.part:  62%|######2   | 121M/195M [00:12<00:07, 10.8MiB/s]
+ocr_ar_48px.ckpt.part:  62%|######2   | 121M/195M [00:12<00:07, 10.8MiB/s]ocr_ar_48px.ckpt.part:  63%|######2   | 122M/195M [00:12<00:07, 10.8MiB/s]
+ocr_ar_48px.ckpt.part:  63%|######2   | 122M/195M [00:12<00:07, 10.6MiB/s]ocr_ar_48px.ckpt.part:  63%|######3   | 123M/195M [00:12<00:07, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  63%|######3   | 123M/195M [00:12<00:07, 10.6MiB/s]ocr_ar_48px.ckpt.part:  64%|######3   | 124M/195M [00:12<00:06, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  64%|######3   | 124M/195M [00:12<00:06, 10.7MiB/s]ocr_ar_48px.ckpt.part:  64%|######4   | 125M/195M [00:12<00:06, 10.7MiB/s]
+ocr_ar_48px.ckpt.part:  64%|######4   | 125M/195M [00:12<00:06, 10.6MiB/s]ocr_ar_48px.ckpt.part:  65%|######4   | 126M/195M [00:12<00:06, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  65%|######4   | 126M/195M [00:12<00:06, 10.4MiB/s]ocr_ar_48px.ckpt.part:  65%|######5   | 127M/195M [00:12<00:06, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  65%|######5   | 127M/195M [00:12<00:06, 10.4MiB/s]ocr_ar_48px.ckpt.part:  66%|######5   | 128M/195M [00:12<00:06, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  66%|######5   | 128M/195M [00:13<00:06, 10.5MiB/s]ocr_ar_48px.ckpt.part:  66%|######6   | 129M/195M [00:13<00:06, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  66%|######6   | 129M/195M [00:13<00:06, 10.5MiB/s]ocr_ar_48px.ckpt.part:  67%|######6   | 130M/195M [00:13<00:06, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  67%|######6   | 130M/195M [00:13<00:06, 10.5MiB/s]ocr_ar_48px.ckpt.part:  67%|######7   | 131M/195M [00:13<00:06, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  67%|######7   | 131M/195M [00:13<00:06, 10.5MiB/s]ocr_ar_48px.ckpt.part:  68%|######7   | 132M/195M [00:13<00:06, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  68%|######8   | 133M/195M [00:13<00:06, 10.7MiB/s]ocr_ar_48px.ckpt.part:  68%|######8   | 133M/195M [00:13<00:06, 10.7MiB/s]
+ocr_ar_48px.ckpt.part:  69%|######8   | 134M/195M [00:13<00:05, 10.9MiB/s]ocr_ar_48px.ckpt.part:  69%|######8   | 134M/195M [00:13<00:05, 10.9MiB/s]
+ocr_ar_48px.ckpt.part:  69%|######9   | 135M/195M [00:13<00:05, 10.6MiB/s]ocr_ar_48px.ckpt.part:  69%|######9   | 135M/195M [00:13<00:05, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  70%|######9   | 136M/195M [00:13<00:05, 10.6MiB/s]ocr_ar_48px.ckpt.part:  70%|######9   | 136M/195M [00:13<00:05, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  70%|#######   | 137M/195M [00:13<00:05, 10.5MiB/s]ocr_ar_48px.ckpt.part:  70%|#######   | 137M/195M [00:13<00:05, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  71%|#######   | 138M/195M [00:13<00:05, 10.5MiB/s]ocr_ar_48px.ckpt.part:  71%|#######   | 138M/195M [00:13<00:05, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  71%|#######1  | 139M/195M [00:14<00:06, 9.63MiB/s]ocr_ar_48px.ckpt.part:  71%|#######1  | 139M/195M [00:14<00:06, 9.63MiB/s]
+ocr_ar_48px.ckpt.part:  72%|#######1  | 140M/195M [00:14<00:06, 8.64MiB/s]ocr_ar_48px.ckpt.part:  72%|#######1  | 140M/195M [00:14<00:06, 8.64MiB/s]
+ocr_ar_48px.ckpt.part:  72%|#######2  | 141M/195M [00:14<00:06, 9.08MiB/s]ocr_ar_48px.ckpt.part:  72%|#######2  | 141M/195M [00:14<00:06, 9.08MiB/s]
+ocr_ar_48px.ckpt.part:  73%|#######2  | 142M/195M [00:14<00:06, 9.08MiB/s]
+ocr_ar_48px.ckpt.part:  73%|#######2  | 142M/195M [00:14<00:05, 9.58MiB/s]ocr_ar_48px.ckpt.part:  73%|#######3  | 143M/195M [00:14<00:05, 9.58MiB/s]
+ocr_ar_48px.ckpt.part:  73%|#######3  | 143M/195M [00:14<00:05, 9.82MiB/s]ocr_ar_48px.ckpt.part:  74%|#######3  | 144M/195M [00:14<00:05, 9.82MiB/s]
+ocr_ar_48px.ckpt.part:  74%|#######3  | 144M/195M [00:14<00:05, 10.1MiB/s]ocr_ar_48px.ckpt.part:  74%|#######4  | 145M/195M [00:14<00:05, 10.1MiB/s]
+ocr_ar_48px.ckpt.part:  74%|#######4  | 145M/195M [00:14<00:05, 10.3MiB/s]ocr_ar_48px.ckpt.part:  75%|#######4  | 146M/195M [00:14<00:05, 10.3MiB/s]
+ocr_ar_48px.ckpt.part:  75%|#######4  | 146M/195M [00:14<00:04, 10.4MiB/s]ocr_ar_48px.ckpt.part:  75%|#######5  | 146M/195M [00:14<00:04, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  75%|#######5  | 147M/195M [00:14<00:04, 10.4MiB/s]ocr_ar_48px.ckpt.part:  76%|#######5  | 147M/195M [00:14<00:04, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  76%|#######5  | 148M/195M [00:14<00:04, 10.4MiB/s]ocr_ar_48px.ckpt.part:  76%|#######6  | 148M/195M [00:15<00:04, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  76%|#######6  | 149M/195M [00:15<00:04, 10.5MiB/s]ocr_ar_48px.ckpt.part:  77%|#######6  | 149M/195M [00:15<00:04, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  77%|#######6  | 150M/195M [00:15<00:04, 10.6MiB/s]ocr_ar_48px.ckpt.part:  77%|#######7  | 150M/195M [00:15<00:04, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  77%|#######7  | 151M/195M [00:15<00:04, 10.6MiB/s]ocr_ar_48px.ckpt.part:  78%|#######7  | 151M/195M [00:15<00:04, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  78%|#######7  | 152M/195M [00:15<00:04, 10.4MiB/s]ocr_ar_48px.ckpt.part:  78%|#######8  | 152M/195M [00:15<00:04, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  78%|#######8  | 153M/195M [00:15<00:04, 10.5MiB/s]ocr_ar_48px.ckpt.part:  79%|#######8  | 153M/195M [00:15<00:04, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  79%|#######8  | 154M/195M [00:15<00:04, 10.5MiB/s]ocr_ar_48px.ckpt.part:  79%|#######9  | 154M/195M [00:15<00:04, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  80%|#######9  | 155M/195M [00:15<00:03, 10.7MiB/s]ocr_ar_48px.ckpt.part:  80%|#######9  | 155M/195M [00:15<00:03, 10.7MiB/s]
+ocr_ar_48px.ckpt.part:  80%|########  | 156M/195M [00:15<00:03, 10.6MiB/s]ocr_ar_48px.ckpt.part:  80%|########  | 156M/195M [00:15<00:03, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  81%|########  | 157M/195M [00:15<00:03, 10.2MiB/s]ocr_ar_48px.ckpt.part:  81%|########  | 157M/195M [00:15<00:03, 10.2MiB/s]
+ocr_ar_48px.ckpt.part:  81%|########1 | 158M/195M [00:16<00:03, 10.5MiB/s]ocr_ar_48px.ckpt.part:  81%|########1 | 158M/195M [00:16<00:03, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  82%|########1 | 159M/195M [00:16<00:03, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  82%|########1 | 159M/195M [00:16<00:03, 10.9MiB/s]ocr_ar_48px.ckpt.part:  82%|########2 | 160M/195M [00:16<00:03, 10.9MiB/s]
+ocr_ar_48px.ckpt.part:  82%|########2 | 160M/195M [00:16<00:06, 5.74MiB/s]ocr_ar_48px.ckpt.part:  83%|########2 | 161M/195M [00:16<00:06, 5.74MiB/s]
+ocr_ar_48px.ckpt.part:  83%|########2 | 161M/195M [00:16<00:05, 6.60MiB/s]ocr_ar_48px.ckpt.part:  83%|########3 | 162M/195M [00:16<00:05, 6.60MiB/s]
+ocr_ar_48px.ckpt.part:  83%|########3 | 162M/195M [00:16<00:04, 7.41MiB/s]ocr_ar_48px.ckpt.part:  84%|########3 | 163M/195M [00:16<00:04, 7.41MiB/s]
+ocr_ar_48px.ckpt.part:  84%|########3 | 163M/195M [00:16<00:04, 8.16MiB/s]ocr_ar_48px.ckpt.part:  84%|########4 | 164M/195M [00:16<00:03, 8.16MiB/s]
+ocr_ar_48px.ckpt.part:  84%|########4 | 164M/195M [00:16<00:03, 8.84MiB/s]ocr_ar_48px.ckpt.part:  85%|########4 | 165M/195M [00:17<00:03, 8.84MiB/s]
+ocr_ar_48px.ckpt.part:  85%|########4 | 165M/195M [00:17<00:03, 9.26MiB/s]ocr_ar_48px.ckpt.part:  85%|########5 | 166M/195M [00:17<00:03, 9.26MiB/s]
+ocr_ar_48px.ckpt.part:  85%|########5 | 166M/195M [00:17<00:03, 9.61MiB/s]ocr_ar_48px.ckpt.part:  86%|########5 | 167M/195M [00:17<00:03, 9.61MiB/s]
+ocr_ar_48px.ckpt.part:  86%|########5 | 167M/195M [00:17<00:02, 9.89MiB/s]ocr_ar_48px.ckpt.part:  86%|########6 | 168M/195M [00:17<00:02, 9.89MiB/s]
+ocr_ar_48px.ckpt.part:  86%|########6 | 168M/195M [00:17<00:02, 10.2MiB/s]ocr_ar_48px.ckpt.part:  87%|########6 | 169M/195M [00:17<00:02, 10.2MiB/s]
+ocr_ar_48px.ckpt.part:  87%|########6 | 169M/195M [00:17<00:02, 10.3MiB/s]ocr_ar_48px.ckpt.part:  87%|########7 | 170M/195M [00:17<00:02, 10.3MiB/s]
+ocr_ar_48px.ckpt.part:  87%|########7 | 170M/195M [00:17<00:02, 10.2MiB/s]ocr_ar_48px.ckpt.part:  88%|########7 | 171M/195M [00:17<00:02, 10.2MiB/s]
+ocr_ar_48px.ckpt.part:  88%|########8 | 171M/195M [00:17<00:02, 10.1MiB/s]ocr_ar_48px.ckpt.part:  88%|########8 | 172M/195M [00:17<00:02, 10.1MiB/s]
+ocr_ar_48px.ckpt.part:  89%|########8 | 173M/195M [00:17<00:02, 10.4MiB/s]ocr_ar_48px.ckpt.part:  89%|########8 | 173M/195M [00:17<00:02, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  89%|########9 | 174M/195M [00:17<00:02, 10.3MiB/s]ocr_ar_48px.ckpt.part:  89%|########9 | 174M/195M [00:17<00:02, 10.3MiB/s]
+ocr_ar_48px.ckpt.part:  90%|########9 | 174M/195M [00:17<00:02, 10.2MiB/s]ocr_ar_48px.ckpt.part:  90%|########9 | 175M/195M [00:17<00:02, 10.2MiB/s]
+ocr_ar_48px.ckpt.part:  90%|######### | 175M/195M [00:18<00:02, 10.1MiB/s]ocr_ar_48px.ckpt.part:  90%|######### | 176M/195M [00:18<00:01, 10.1MiB/s]
+ocr_ar_48px.ckpt.part:  91%|######### | 176M/195M [00:18<00:01, 10.3MiB/s]ocr_ar_48px.ckpt.part:  91%|######### | 177M/195M [00:18<00:01, 10.3MiB/s]
+ocr_ar_48px.ckpt.part:  91%|#########1| 178M/195M [00:18<00:01, 10.4MiB/s]ocr_ar_48px.ckpt.part:  91%|#########1| 178M/195M [00:18<00:01, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  92%|#########1| 179M/195M [00:18<00:01, 10.4MiB/s]ocr_ar_48px.ckpt.part:  92%|#########1| 179M/195M [00:18<00:01, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  92%|#########2| 180M/195M [00:18<00:01, 10.4MiB/s]ocr_ar_48px.ckpt.part:  92%|#########2| 180M/195M [00:18<00:01, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  93%|#########2| 181M/195M [00:18<00:01, 10.3MiB/s]ocr_ar_48px.ckpt.part:  93%|#########2| 181M/195M [00:18<00:01, 10.3MiB/s]
+ocr_ar_48px.ckpt.part:  93%|#########3| 182M/195M [00:18<00:01, 10.4MiB/s]ocr_ar_48px.ckpt.part:  93%|#########3| 182M/195M [00:18<00:01, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  94%|#########3| 183M/195M [00:18<00:01, 10.4MiB/s]ocr_ar_48px.ckpt.part:  94%|#########3| 183M/195M [00:18<00:01, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  94%|#########4| 184M/195M [00:18<00:01, 10.4MiB/s]ocr_ar_48px.ckpt.part:  94%|#########4| 184M/195M [00:18<00:01, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  95%|#########4| 185M/195M [00:18<00:01, 10.4MiB/s]
+ocr_ar_48px.ckpt.part:  95%|#########4| 185M/195M [00:18<00:01, 10.5MiB/s]ocr_ar_48px.ckpt.part:  95%|#########5| 186M/195M [00:19<00:00, 10.5MiB/s]
+ocr_ar_48px.ckpt.part:  95%|#########5| 186M/195M [00:19<00:01, 9.00MiB/s]ocr_ar_48px.ckpt.part:  96%|#########5| 186M/195M [00:19<00:00, 8.83MiB/s]ocr_ar_48px.ckpt.part:  96%|#########5| 187M/195M [00:19<00:00, 8.83MiB/s]
+ocr_ar_48px.ckpt.part:  96%|#########6| 187M/195M [00:19<00:00, 9.32MiB/s]ocr_ar_48px.ckpt.part:  96%|#########6| 188M/195M [00:19<00:00, 9.32MiB/s]
+ocr_ar_48px.ckpt.part:  97%|#########6| 188M/195M [00:19<00:00, 9.32MiB/s]
+ocr_ar_48px.ckpt.part:  97%|#########6| 189M/195M [00:19<00:00, 9.81MiB/s]ocr_ar_48px.ckpt.part:  97%|#########7| 189M/195M [00:19<00:00, 9.81MiB/s]
+ocr_ar_48px.ckpt.part:  97%|#########7| 190M/195M [00:19<00:00, 10.1MiB/s]ocr_ar_48px.ckpt.part:  98%|#########7| 190M/195M [00:19<00:00, 10.1MiB/s]
+ocr_ar_48px.ckpt.part:  98%|#########7| 191M/195M [00:19<00:00, 10.3MiB/s]ocr_ar_48px.ckpt.part:  98%|#########8| 191M/195M [00:19<00:00, 10.3MiB/s]
+ocr_ar_48px.ckpt.part:  98%|#########8| 192M/195M [00:19<00:00, 10.3MiB/s]ocr_ar_48px.ckpt.part:  99%|#########8| 192M/195M [00:19<00:00, 10.3MiB/s]
+ocr_ar_48px.ckpt.part:  99%|#########8| 193M/195M [00:19<00:00, 10.6MiB/s]ocr_ar_48px.ckpt.part:  99%|#########9| 193M/195M [00:19<00:00, 10.6MiB/s]
+ocr_ar_48px.ckpt.part:  99%|#########9| 194M/195M [00:19<00:00, 10.6MiB/s]ocr_ar_48px.ckpt.part: 100%|#########9| 194M/195M [00:20<00:00, 10.6MiB/s]
+ocr_ar_48px.ckpt.part: 100%|#########9| 195M/195M [00:20<00:00, 10.5MiB/s]ocr_ar_48px.ckpt.part: 100%|##########| 195M/195M [00:20<00:00, 10.2MiB/s]
+ -- Verifying: "D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\models\ocr\.\ocr_ar_48px.ckpt.part"
+ -- Verifying: OK!
+
+ -- Downloading: "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/alphabet-all-v7.txt"
+alphabet-all-v7.txt.part:   0%|          | 0.00/182k [00:00<?, ?iB/s]alphabet-all-v7.txt.part: 100%|##########| 182k/182k [00:00<00:00, 2.12MiB/s]
+ -- Verifying: "D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\models\ocr\.\alphabet-all-v7.txt.part"
+ -- Verifying: OK!
+
+D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\manga_translator\ocr\model_48px.py:52: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  sd = torch.load(self._get_file_path('ocr_ar_48px.ckpt'))
+
+Downloading models into D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\models\inpainting
+
+ -- Downloading: "https://huggingface.co/dreMaz/AnimeMangaInpainting/resolve/main/lama_large_512px.ckpt"
+lama_large_512px.ckpt.part:   0%|          | 0.00/195M [00:00<?, ?iB/s]lama_large_512px.ckpt.part:   0%|          | 1.00k/195M [00:00<25:40:32, 2.21kiB/s]lama_large_512px.ckpt.part:   0%|          | 199k/195M [00:00<07:10, 474kiB/s]     lama_large_512px.ckpt.part:   1%|          | 0.98M/195M [00:00<07:08, 474kiB/s]
+lama_large_512px.ckpt.part:   1%|          | 1.15M/195M [00:00<01:11, 2.85MiB/s]lama_large_512px.ckpt.part:   1%|1         | 1.95M/195M [00:00<01:11, 2.85MiB/s]
+lama_large_512px.ckpt.part:   1%|1         | 2.13M/195M [00:00<00:42, 4.80MiB/s]lama_large_512px.ckpt.part:   2%|1         | 2.93M/195M [00:00<00:41, 4.80MiB/s]
+lama_large_512px.ckpt.part:   2%|1         | 3.11M/195M [00:00<00:31, 6.29MiB/s]lama_large_512px.ckpt.part:   2%|2         | 3.91M/195M [00:00<00:31, 6.29MiB/s]
+lama_large_512px.ckpt.part:   2%|2         | 4.13M/195M [00:00<00:26, 7.51MiB/s]lama_large_512px.ckpt.part:   3%|2         | 4.88M/195M [00:01<00:26, 7.51MiB/s]
+lama_large_512px.ckpt.part:   3%|2         | 5.16M/195M [00:01<00:23, 8.45MiB/s]lama_large_512px.ckpt.part:   3%|3         | 5.86M/195M [00:01<00:23, 8.45MiB/s]
+lama_large_512px.ckpt.part:   3%|3         | 6.13M/195M [00:01<00:22, 8.93MiB/s]lama_large_512px.ckpt.part:   4%|3         | 6.84M/195M [00:01<00:22, 8.93MiB/s]
+lama_large_512px.ckpt.part:   4%|3         | 7.13M/195M [00:01<00:21, 9.35MiB/s]lama_large_512px.ckpt.part:   4%|4         | 7.81M/195M [00:01<00:21, 9.35MiB/s]
+lama_large_512px.ckpt.part:   4%|4         | 8.16M/195M [00:01<00:20, 9.73MiB/s]lama_large_512px.ckpt.part:   5%|4         | 8.79M/195M [00:01<00:20, 9.73MiB/s]
+lama_large_512px.ckpt.part:   5%|4         | 9.13M/195M [00:01<00:19, 9.83MiB/s]lama_large_512px.ckpt.part:   5%|5         | 9.77M/195M [00:01<00:19, 9.83MiB/s]
+lama_large_512px.ckpt.part:   5%|5         | 10.1M/195M [00:01<00:19, 10.0MiB/s]lama_large_512px.ckpt.part:   6%|5         | 10.7M/195M [00:01<00:19, 10.0MiB/s]
+lama_large_512px.ckpt.part:   6%|5         | 11.1M/195M [00:01<00:19, 10.1MiB/s]lama_large_512px.ckpt.part:   6%|6         | 11.7M/195M [00:01<00:19, 10.1MiB/s]
+lama_large_512px.ckpt.part:   6%|6         | 12.1M/195M [00:01<00:18, 10.2MiB/s]lama_large_512px.ckpt.part:   7%|6         | 12.7M/195M [00:01<00:18, 10.2MiB/s]
+lama_large_512px.ckpt.part:   7%|6         | 13.1M/195M [00:01<00:18, 10.3MiB/s]lama_large_512px.ckpt.part:   7%|7         | 13.7M/195M [00:01<00:18, 10.3MiB/s]
+lama_large_512px.ckpt.part:   7%|7         | 14.2M/195M [00:01<00:18, 10.5MiB/s]lama_large_512px.ckpt.part:   8%|7         | 14.6M/195M [00:02<00:17, 10.5MiB/s]
+lama_large_512px.ckpt.part:   8%|7         | 15.2M/195M [00:02<00:17, 10.6MiB/s]lama_large_512px.ckpt.part:   8%|8         | 15.6M/195M [00:02<00:17, 10.6MiB/s]
+lama_large_512px.ckpt.part:   8%|8         | 16.2M/195M [00:02<00:17, 10.6MiB/s]lama_large_512px.ckpt.part:   9%|8         | 16.6M/195M [00:02<00:17, 10.6MiB/s]
+lama_large_512px.ckpt.part:   9%|8         | 17.3M/195M [00:02<00:17, 10.7MiB/s]lama_large_512px.ckpt.part:   9%|9         | 17.6M/195M [00:02<00:17, 10.7MiB/s]
+lama_large_512px.ckpt.part:   9%|9         | 18.3M/195M [00:02<00:17, 10.6MiB/s]lama_large_512px.ckpt.part:  10%|9         | 18.6M/195M [00:02<00:17, 10.6MiB/s]
+lama_large_512px.ckpt.part:  10%|9         | 19.3M/195M [00:02<00:17, 10.6MiB/s]lama_large_512px.ckpt.part:  10%|#         | 19.5M/195M [00:02<00:17, 10.6MiB/s]
+lama_large_512px.ckpt.part:  10%|#         | 20.3M/195M [00:02<00:17, 10.5MiB/s]lama_large_512px.ckpt.part:  11%|#         | 20.5M/195M [00:02<00:17, 10.5MiB/s]
+lama_large_512px.ckpt.part:  11%|#         | 21.3M/195M [00:02<00:17, 10.3MiB/s]lama_large_512px.ckpt.part:  11%|#1        | 21.5M/195M [00:02<00:17, 10.3MiB/s]
+lama_large_512px.ckpt.part:  11%|#1        | 22.4M/195M [00:02<00:17, 10.5MiB/s]lama_large_512px.ckpt.part:  12%|#1        | 22.5M/195M [00:02<00:17, 10.5MiB/s]
+lama_large_512px.ckpt.part:  12%|#1        | 23.4M/195M [00:02<00:17, 10.4MiB/s]lama_large_512px.ckpt.part:  12%|#2        | 23.4M/195M [00:02<00:17, 10.4MiB/s]
+lama_large_512px.ckpt.part:  13%|#2        | 24.4M/195M [00:02<00:17, 10.4MiB/s]lama_large_512px.ckpt.part:  13%|#2        | 24.4M/195M [00:02<00:17, 10.4MiB/s]
+lama_large_512px.ckpt.part:  13%|#3        | 25.4M/195M [00:03<00:17, 10.4MiB/s]
+lama_large_512px.ckpt.part:  13%|#3        | 25.4M/195M [00:03<00:17, 10.4MiB/s]lama_large_512px.ckpt.part:  14%|#3        | 26.4M/195M [00:03<00:16, 10.4MiB/s]
+lama_large_512px.ckpt.part:  14%|#3        | 26.5M/195M [00:03<00:16, 10.6MiB/s]lama_large_512px.ckpt.part:  14%|#4        | 27.3M/195M [00:03<00:16, 10.6MiB/s]
+lama_large_512px.ckpt.part:  14%|#4        | 27.5M/195M [00:03<00:16, 10.5MiB/s]lama_large_512px.ckpt.part:  15%|#4        | 28.3M/195M [00:03<00:16, 10.5MiB/s]
+lama_large_512px.ckpt.part:  15%|#4        | 28.5M/195M [00:03<00:16, 10.4MiB/s]lama_large_512px.ckpt.part:  15%|#5        | 29.3M/195M [00:03<00:16, 10.4MiB/s]
+lama_large_512px.ckpt.part:  15%|#5        | 29.5M/195M [00:03<00:16, 10.6MiB/s]lama_large_512px.ckpt.part:  16%|#5        | 30.3M/195M [00:03<00:16, 10.6MiB/s]
+lama_large_512px.ckpt.part:  16%|#5        | 30.6M/195M [00:03<00:16, 10.6MiB/s]lama_large_512px.ckpt.part:  16%|#6        | 31.2M/195M [00:03<00:16, 10.6MiB/s]
+lama_large_512px.ckpt.part:  16%|#6        | 31.6M/195M [00:03<00:15, 10.8MiB/s]lama_large_512px.ckpt.part:  17%|#6        | 32.2M/195M [00:03<00:15, 10.8MiB/s]
+lama_large_512px.ckpt.part:  17%|#6        | 32.7M/195M [00:03<00:15, 10.7MiB/s]lama_large_512px.ckpt.part:  17%|#7        | 33.2M/195M [00:03<00:15, 10.7MiB/s]
+lama_large_512px.ckpt.part:  17%|#7        | 33.8M/195M [00:03<00:15, 11.0MiB/s]lama_large_512px.ckpt.part:  18%|#7        | 34.2M/195M [00:03<00:15, 11.0MiB/s]
+lama_large_512px.ckpt.part:  18%|#7        | 34.8M/195M [00:04<00:15, 10.8MiB/s]lama_large_512px.ckpt.part:  18%|#8        | 35.2M/195M [00:04<00:15, 10.8MiB/s]
+lama_large_512px.ckpt.part:  18%|#8        | 35.9M/195M [00:04<00:15, 10.6MiB/s]lama_large_512px.ckpt.part:  19%|#8        | 36.1M/195M [00:04<00:15, 10.6MiB/s]
+lama_large_512px.ckpt.part:  19%|#8        | 36.9M/195M [00:04<00:15, 10.6MiB/s]lama_large_512px.ckpt.part:  19%|#9        | 37.1M/195M [00:04<00:15, 10.6MiB/s]
+lama_large_512px.ckpt.part:  19%|#9        | 37.9M/195M [00:04<00:15, 10.6MiB/s]lama_large_512px.ckpt.part:  20%|#9        | 38.1M/195M [00:04<00:15, 10.6MiB/s]
+lama_large_512px.ckpt.part:  20%|#9        | 38.9M/195M [00:04<00:15, 10.5MiB/s]lama_large_512px.ckpt.part:  20%|##        | 39.1M/195M [00:04<00:15, 10.5MiB/s]
+lama_large_512px.ckpt.part:  20%|##        | 39.9M/195M [00:04<00:15, 10.5MiB/s]lama_large_512px.ckpt.part:  21%|##        | 40.0M/195M [00:04<00:15, 10.5MiB/s]
+lama_large_512px.ckpt.part:  21%|##        | 40.9M/195M [00:04<00:15, 10.5MiB/s]lama_large_512px.ckpt.part:  21%|##1       | 41.0M/195M [00:04<00:15, 10.5MiB/s]
+lama_large_512px.ckpt.part:  22%|##1       | 42.0M/195M [00:04<00:15, 10.6MiB/s]lama_large_512px.ckpt.part:  22%|##1       | 42.0M/195M [00:04<00:15, 10.6MiB/s]
+lama_large_512px.ckpt.part:  22%|##2       | 43.0M/195M [00:04<00:15, 10.6MiB/s]
+lama_large_512px.ckpt.part:  22%|##2       | 43.0M/195M [00:04<00:14, 10.7MiB/s]lama_large_512px.ckpt.part:  23%|##2       | 43.9M/195M [00:04<00:14, 10.7MiB/s]
+lama_large_512px.ckpt.part:  23%|##2       | 44.0M/195M [00:04<00:15, 10.5MiB/s]lama_large_512px.ckpt.part:  23%|##3       | 44.9M/195M [00:05<00:14, 10.5MiB/s]
+lama_large_512px.ckpt.part:  23%|##3       | 45.0M/195M [00:05<00:18, 8.35MiB/s]lama_large_512px.ckpt.part:  24%|##3       | 45.9M/195M [00:05<00:18, 8.35MiB/s]
+lama_large_512px.ckpt.part:  24%|##3       | 46.0M/195M [00:05<00:17, 8.75MiB/s]lama_large_512px.ckpt.part:  24%|##4       | 46.9M/195M [00:05<00:17, 8.75MiB/s]
+lama_large_512px.ckpt.part:  24%|##4       | 47.0M/195M [00:05<00:16, 9.24MiB/s]lama_large_512px.ckpt.part:  25%|##4       | 47.9M/195M [00:05<00:16, 9.24MiB/s]
+lama_large_512px.ckpt.part:  25%|##4       | 48.0M/195M [00:05<00:16, 9.57MiB/s]lama_large_512px.ckpt.part:  25%|##5       | 48.8M/195M [00:05<00:16, 9.57MiB/s]
+lama_large_512px.ckpt.part:  25%|##5       | 49.0M/195M [00:05<00:15, 9.82MiB/s]lama_large_512px.ckpt.part:  26%|##5       | 49.8M/195M [00:05<00:15, 9.82MiB/s]
+lama_large_512px.ckpt.part:  26%|##5       | 50.0M/195M [00:05<00:15, 10.1MiB/s]lama_large_512px.ckpt.part:  26%|##6       | 50.8M/195M [00:05<00:14, 10.1MiB/s]
+lama_large_512px.ckpt.part:  26%|##6       | 51.0M/195M [00:05<00:14, 10.1MiB/s]lama_large_512px.ckpt.part:  27%|##6       | 51.8M/195M [00:05<00:14, 10.1MiB/s]
+lama_large_512px.ckpt.part:  27%|##6       | 52.0M/195M [00:05<00:14, 10.1MiB/s]lama_large_512px.ckpt.part:  27%|##7       | 52.7M/195M [00:05<00:14, 10.1MiB/s]
+lama_large_512px.ckpt.part:  27%|##7       | 53.0M/195M [00:05<00:14, 10.2MiB/s]lama_large_512px.ckpt.part:  28%|##7       | 53.7M/195M [00:06<00:14, 10.2MiB/s]
+lama_large_512px.ckpt.part:  28%|##7       | 54.0M/195M [00:06<00:14, 10.0MiB/s]lama_large_512px.ckpt.part:  28%|##8       | 54.7M/195M [00:06<00:14, 10.0MiB/s]
+lama_large_512px.ckpt.part:  28%|##8       | 55.0M/195M [00:06<00:14, 10.2MiB/s]lama_large_512px.ckpt.part:  29%|##8       | 55.7M/195M [00:06<00:14, 10.2MiB/s]
+lama_large_512px.ckpt.part:  29%|##8       | 56.0M/195M [00:06<00:14, 10.3MiB/s]lama_large_512px.ckpt.part:  29%|##9       | 56.6M/195M [00:06<00:14, 10.3MiB/s]
+lama_large_512px.ckpt.part:  29%|##9       | 57.0M/195M [00:06<00:25, 5.62MiB/s]lama_large_512px.ckpt.part:  30%|##9       | 57.6M/195M [00:06<00:25, 5.62MiB/s]
+lama_large_512px.ckpt.part:  30%|##9       | 58.0M/195M [00:06<00:32, 4.44MiB/s]lama_large_512px.ckpt.part:  30%|###       | 58.6M/195M [00:07<00:32, 4.44MiB/s]
+lama_large_512px.ckpt.part:  30%|###       | 59.0M/195M [00:07<00:26, 5.30MiB/s]lama_large_512px.ckpt.part:  31%|###       | 59.6M/195M [00:07<00:26, 5.30MiB/s]
+lama_large_512px.ckpt.part:  31%|###       | 59.7M/195M [00:07<00:34, 4.08MiB/s]lama_large_512px.ckpt.part:  31%|###       | 60.3M/195M [00:07<00:50, 2.78MiB/s]lama_large_512px.ckpt.part:  31%|###1      | 60.5M/195M [00:08<00:50, 2.78MiB/s]
+lama_large_512px.ckpt.part:  31%|###1      | 60.7M/195M [00:08<01:06, 2.11MiB/s]lama_large_512px.ckpt.part:  31%|###1      | 61.0M/195M [00:08<01:26, 1.62MiB/s]lama_large_512px.ckpt.part:  31%|###1      | 61.3M/195M [00:09<01:45, 1.33MiB/s]lama_large_512px.ckpt.part:  32%|###1      | 61.5M/195M [00:09<01:45, 1.33MiB/s]
+lama_large_512px.ckpt.part:  32%|###1      | 62.3M/195M [00:09<01:02, 2.23MiB/s]lama_large_512px.ckpt.part:  32%|###2      | 62.5M/195M [00:09<01:02, 2.23MiB/s]
+lama_large_512px.ckpt.part:  32%|###2      | 63.1M/195M [00:09<01:01, 2.25MiB/s]lama_large_512px.ckpt.part:  33%|###2      | 63.5M/195M [00:09<01:01, 2.25MiB/s]
+lama_large_512px.ckpt.part:  33%|###2      | 64.0M/195M [00:09<00:43, 3.16MiB/s]lama_large_512px.ckpt.part:  33%|###3      | 64.5M/195M [00:09<00:43, 3.16MiB/s]
+lama_large_512px.ckpt.part:  33%|###3      | 64.8M/195M [00:10<00:46, 2.95MiB/s]lama_large_512px.ckpt.part:  33%|###3      | 65.2M/195M [00:10<01:03, 2.16MiB/s]lama_large_512px.ckpt.part:  34%|###3      | 65.4M/195M [00:10<01:03, 2.16MiB/s]
+lama_large_512px.ckpt.part:  34%|###3      | 65.6M/195M [00:10<01:16, 1.77MiB/s]lama_large_512px.ckpt.part:  34%|###3      | 65.9M/195M [00:11<01:36, 1.40MiB/s]lama_large_512px.ckpt.part:  34%|###4      | 66.4M/195M [00:11<01:36, 1.40MiB/s]
+lama_large_512px.ckpt.part:  34%|###4      | 66.5M/195M [00:11<01:39, 1.36MiB/s]lama_large_512px.ckpt.part:  34%|###4      | 67.1M/195M [00:12<01:37, 1.37MiB/s]lama_large_512px.ckpt.part:  35%|###4      | 67.4M/195M [00:12<01:37, 1.37MiB/s]
+lama_large_512px.ckpt.part:  35%|###4      | 68.0M/195M [00:12<01:00, 2.21MiB/s]lama_large_512px.ckpt.part:  35%|###5      | 68.4M/195M [00:12<01:00, 2.21MiB/s]
+lama_large_512px.ckpt.part:  35%|###5      | 68.7M/195M [00:12<01:01, 2.14MiB/s]lama_large_512px.ckpt.part:  36%|###5      | 69.3M/195M [00:12<01:01, 2.14MiB/s]
+lama_large_512px.ckpt.part:  36%|###5      | 69.6M/195M [00:12<00:43, 3.00MiB/s]lama_large_512px.ckpt.part:  36%|###6      | 70.3M/195M [00:12<00:43, 3.00MiB/s]
+lama_large_512px.ckpt.part:  36%|###6      | 70.4M/195M [00:13<00:48, 2.71MiB/s]lama_large_512px.ckpt.part:  36%|###6      | 70.8M/195M [00:13<01:08, 1.92MiB/s]lama_large_512px.ckpt.part:  36%|###6      | 71.2M/195M [00:14<01:22, 1.57MiB/s]lama_large_512px.ckpt.part:  37%|###6      | 71.3M/195M [00:14<01:22, 1.57MiB/s]
+lama_large_512px.ckpt.part:  37%|###6      | 71.5M/195M [00:14<01:31, 1.42MiB/s]lama_large_512px.ckpt.part:  37%|###6      | 72.1M/195M [00:14<01:27, 1.47MiB/s]lama_large_512px.ckpt.part:  37%|###7      | 72.3M/195M [00:14<01:27, 1.47MiB/s]
+lama_large_512px.ckpt.part:  37%|###7      | 72.8M/195M [00:14<01:01, 2.07MiB/s]lama_large_512px.ckpt.part:  38%|###7      | 73.2M/195M [00:14<01:01, 2.07MiB/s]
+lama_large_512px.ckpt.part:  38%|###7      | 73.5M/195M [00:15<00:46, 2.72MiB/s]lama_large_512px.ckpt.part:  38%|###7      | 74.0M/195M [00:15<00:54, 2.34MiB/s]lama_large_512px.ckpt.part:  38%|###8      | 74.2M/195M [00:15<00:54, 2.34MiB/s]
+lama_large_512px.ckpt.part:  38%|###8      | 75.0M/195M [00:15<00:35, 3.52MiB/s]lama_large_512px.ckpt.part:  39%|###8      | 75.2M/195M [00:15<00:35, 3.52MiB/s]
+lama_large_512px.ckpt.part:  39%|###8      | 75.5M/195M [00:15<00:43, 2.90MiB/s]lama_large_512px.ckpt.part:  39%|###8      | 75.9M/195M [00:16<01:03, 1.96MiB/s]lama_large_512px.ckpt.part:  39%|###9      | 76.2M/195M [00:16<01:03, 1.96MiB/s]
+lama_large_512px.ckpt.part:  39%|###9      | 76.3M/195M [00:16<01:20, 1.55MiB/s]lama_large_512px.ckpt.part:  39%|###9      | 76.6M/195M [00:17<01:43, 1.20MiB/s]lama_large_512px.ckpt.part:  40%|###9      | 77.1M/195M [00:17<01:42, 1.20MiB/s]
+lama_large_512px.ckpt.part:  40%|###9      | 77.2M/195M [00:17<01:45, 1.18MiB/s]lama_large_512px.ckpt.part:  40%|####      | 78.1M/195M [00:17<01:04, 1.91MiB/s]lama_large_512px.ckpt.part:  40%|####      | 78.1M/195M [00:17<01:04, 1.91MiB/s]
+lama_large_512px.ckpt.part:  40%|####      | 78.9M/195M [00:18<01:04, 1.88MiB/s]lama_large_512px.ckpt.part:  41%|####      | 79.1M/195M [00:18<01:04, 1.88MiB/s]
+lama_large_512px.ckpt.part:  41%|####      | 79.9M/195M [00:18<00:43, 2.79MiB/s]lama_large_512px.ckpt.part:  41%|####1     | 80.1M/195M [00:18<00:43, 2.79MiB/s]
+lama_large_512px.ckpt.part:  41%|####1     | 80.5M/195M [00:18<00:53, 2.25MiB/s]lama_large_512px.ckpt.part:  41%|####1     | 80.9M/195M [00:19<01:12, 1.65MiB/s]lama_large_512px.ckpt.part:  42%|####1     | 81.1M/195M [00:19<01:12, 1.65MiB/s]
+lama_large_512px.ckpt.part:  42%|####1     | 81.2M/195M [00:19<01:38, 1.21MiB/s]lama_large_512px.ckpt.part:  42%|####1     | 81.7M/195M [00:20<01:47, 1.11MiB/s]lama_large_512px.ckpt.part:  42%|####2     | 82.0M/195M [00:21<02:13, 891kiB/s] lama_large_512px.ckpt.part:  42%|####2     | 82.0M/195M [00:21<02:13, 891kiB/s]
+lama_large_512px.ckpt.part:  42%|####2     | 82.5M/195M [00:21<02:11, 898kiB/s]lama_large_512px.ckpt.part:  43%|####2     | 83.0M/195M [00:21<02:10, 898kiB/s]
+lama_large_512px.ckpt.part:  43%|####2     | 83.6M/195M [00:21<01:13, 1.59MiB/s]lama_large_512px.ckpt.part:  43%|####3     | 84.0M/195M [00:21<01:13, 1.59MiB/s]
+lama_large_512px.ckpt.part:  43%|####3     | 84.2M/195M [00:22<01:16, 1.53MiB/s]lama_large_512px.ckpt.part:  44%|####3     | 85.0M/195M [00:22<01:15, 1.53MiB/s]
+lama_large_512px.ckpt.part:  44%|####3     | 85.2M/195M [00:22<00:49, 2.31MiB/s]lama_large_512px.ckpt.part:  44%|####4     | 85.9M/195M [00:22<00:49, 2.31MiB/s]
+lama_large_512px.ckpt.part:  44%|####4     | 85.9M/195M [00:22<00:55, 2.07MiB/s]lama_large_512px.ckpt.part:  44%|####4     | 86.4M/195M [00:23<01:14, 1.54MiB/s]lama_large_512px.ckpt.part:  44%|####4     | 86.8M/195M [00:24<01:26, 1.31MiB/s]lama_large_512px.ckpt.part:  45%|####4     | 86.9M/195M [00:24<01:26, 1.31MiB/s]
+lama_large_512px.ckpt.part:  45%|####4     | 87.1M/195M [00:24<01:49, 1.03MiB/s]lama_large_512px.ckpt.part:  45%|####4     | 87.7M/195M [00:25<01:49, 1.03MiB/s]lama_large_512px.ckpt.part:  45%|####5     | 87.9M/195M [00:25<01:49, 1.03MiB/s]
+lama_large_512px.ckpt.part:  45%|####5     | 88.7M/195M [00:25<01:02, 1.80MiB/s]lama_large_512px.ckpt.part:  46%|####5     | 88.9M/195M [00:25<01:01, 1.80MiB/s]
+lama_large_512px.ckpt.part:  46%|####5     | 89.3M/195M [00:25<01:07, 1.64MiB/s]lama_large_512px.ckpt.part:  46%|####6     | 89.8M/195M [00:25<01:07, 1.64MiB/s]
+lama_large_512px.ckpt.part:  47%|####6     | 90.7M/195M [00:25<00:38, 2.87MiB/s]lama_large_512px.ckpt.part:  47%|####6     | 90.8M/195M [00:25<00:38, 2.87MiB/s]
+lama_large_512px.ckpt.part:  47%|####6     | 91.4M/195M [00:26<01:05, 1.66MiB/s]lama_large_512px.ckpt.part:  47%|####7     | 91.8M/195M [00:26<01:05, 1.66MiB/s]
+lama_large_512px.ckpt.part:  47%|####7     | 91.9M/195M [00:27<01:15, 1.44MiB/s]lama_large_512px.ckpt.part:  47%|####7     | 92.3M/195M [00:27<01:32, 1.17MiB/s]lama_large_512px.ckpt.part:  48%|####7     | 92.7M/195M [00:28<01:40, 1.07MiB/s]lama_large_512px.ckpt.part:  48%|####7     | 92.8M/195M [00:28<01:40, 1.07MiB/s]
+lama_large_512px.ckpt.part:  48%|####8     | 93.8M/195M [00:28<01:39, 1.07MiB/s]
+lama_large_512px.ckpt.part:  48%|####8     | 94.1M/195M [00:28<00:50, 2.10MiB/s]lama_large_512px.ckpt.part:  49%|####8     | 94.7M/195M [00:29<00:50, 2.10MiB/s]
+lama_large_512px.ckpt.part:  49%|####8     | 94.7M/195M [00:29<00:59, 1.76MiB/s]lama_large_512px.ckpt.part:  49%|####9     | 95.7M/195M [00:29<00:59, 1.76MiB/s]
+lama_large_512px.ckpt.part:  49%|####9     | 96.1M/195M [00:29<00:49, 2.10MiB/s]lama_large_512px.ckpt.part:  49%|####9     | 96.5M/195M [00:30<01:03, 1.63MiB/s]lama_large_512px.ckpt.part:  50%|####9     | 96.7M/195M [00:30<01:03, 1.63MiB/s]
+lama_large_512px.ckpt.part:  50%|####9     | 97.0M/195M [00:30<01:12, 1.43MiB/s]lama_large_512px.ckpt.part:  50%|####9     | 97.2M/195M [00:31<01:29, 1.15MiB/s]lama_large_512px.ckpt.part:  50%|#####     | 97.7M/195M [00:31<01:28, 1.15MiB/s]
+lama_large_512px.ckpt.part:  50%|#####     | 97.8M/195M [00:31<01:29, 1.13MiB/s]lama_large_512px.ckpt.part:  51%|#####     | 98.6M/195M [00:31<01:29, 1.13MiB/s]
+lama_large_512px.ckpt.part:  51%|#####1    | 99.5M/195M [00:31<00:41, 2.42MiB/s]lama_large_512px.ckpt.part:  51%|#####1    | 99.6M/195M [00:32<00:41, 2.42MiB/s]
+lama_large_512px.ckpt.part:  51%|#####1    | 100M/195M [00:32<00:48, 2.06MiB/s] lama_large_512px.ckpt.part:  52%|#####1    | 101M/195M [00:32<00:48, 2.06MiB/s]
+lama_large_512px.ckpt.part:  52%|#####1    | 101M/195M [00:32<00:47, 2.08MiB/s]lama_large_512px.ckpt.part:  52%|#####2    | 102M/195M [00:33<00:47, 2.08MiB/s]
+lama_large_512px.ckpt.part:  52%|#####2    | 102M/195M [00:33<01:01, 1.60MiB/s]lama_large_512px.ckpt.part:  52%|#####2    | 102M/195M [00:34<01:12, 1.35MiB/s]lama_large_512px.ckpt.part:  53%|#####2    | 103M/195M [00:34<01:11, 1.35MiB/s]
+lama_large_512px.ckpt.part:  53%|#####2    | 103M/195M [00:34<01:19, 1.22MiB/s]lama_large_512px.ckpt.part:  53%|#####2    | 103M/195M [00:35<01:36, 998kiB/s] lama_large_512px.ckpt.part:  53%|#####3    | 104M/195M [00:35<01:36, 998kiB/s]
+lama_large_512px.ckpt.part:  54%|#####3    | 104M/195M [00:35<01:35, 998kiB/s]
+lama_large_512px.ckpt.part:  54%|#####3    | 105M/195M [00:35<00:56, 1.69MiB/s]lama_large_512px.ckpt.part:  54%|#####3    | 105M/195M [00:36<01:03, 1.48MiB/s]lama_large_512px.ckpt.part:  54%|#####4    | 105M/195M [00:36<01:03, 1.48MiB/s]
+lama_large_512px.ckpt.part:  55%|#####4    | 106M/195M [00:36<01:02, 1.48MiB/s]
+lama_large_512px.ckpt.part:  55%|#####4    | 107M/195M [00:36<00:46, 1.98MiB/s]lama_large_512px.ckpt.part:  55%|#####5    | 107M/195M [00:36<00:46, 1.98MiB/s]
+lama_large_512px.ckpt.part:  56%|#####5    | 108M/195M [00:36<00:45, 1.98MiB/s]
+lama_large_512px.ckpt.part:  56%|#####5    | 109M/195M [00:37<00:39, 2.28MiB/s]lama_large_512px.ckpt.part:  56%|#####5    | 109M/195M [00:37<00:48, 1.85MiB/s]lama_large_512px.ckpt.part:  56%|#####6    | 109M/195M [00:38<00:48, 1.85MiB/s]
+lama_large_512px.ckpt.part:  57%|#####6    | 110M/195M [00:38<00:47, 1.85MiB/s]
+lama_large_512px.ckpt.part:  57%|#####6    | 110M/195M [00:38<00:39, 2.27MiB/s]lama_large_512px.ckpt.part:  57%|#####6    | 111M/195M [00:39<00:46, 1.91MiB/s]lama_large_512px.ckpt.part:  57%|#####7    | 111M/195M [00:39<00:46, 1.91MiB/s]
+lama_large_512px.ckpt.part:  57%|#####7    | 111M/195M [00:39<00:59, 1.47MiB/s]lama_large_512px.ckpt.part:  57%|#####7    | 112M/195M [00:40<01:14, 1.18MiB/s]lama_large_512px.ckpt.part:  57%|#####7    | 112M/195M [00:40<01:26, 1.01MiB/s]lama_large_512px.ckpt.part:  58%|#####7    | 112M/195M [00:40<01:26, 1.01MiB/s]
+lama_large_512px.ckpt.part:  58%|#####7    | 112M/195M [00:41<01:21, 1.06MiB/s]lama_large_512px.ckpt.part:  58%|#####8    | 113M/195M [00:41<01:20, 1.06MiB/s]
+lama_large_512px.ckpt.part:  58%|#####8    | 114M/195M [00:41<00:50, 1.69MiB/s]lama_large_512px.ckpt.part:  59%|#####8    | 114M/195M [00:41<00:50, 1.69MiB/s]
+lama_large_512px.ckpt.part:  59%|#####9    | 115M/195M [00:41<00:49, 1.69MiB/s]
+lama_large_512px.ckpt.part:  59%|#####9    | 116M/195M [00:42<00:38, 2.18MiB/s]lama_large_512px.ckpt.part:  60%|#####9    | 116M/195M [00:42<00:49, 1.66MiB/s]lama_large_512px.ckpt.part:  60%|#####9    | 116M/195M [00:42<00:49, 1.66MiB/s]
+lama_large_512px.ckpt.part:  60%|#####9    | 117M/195M [00:43<00:56, 1.45MiB/s]lama_large_512px.ckpt.part:  60%|#####9    | 117M/195M [00:44<01:07, 1.21MiB/s]lama_large_512px.ckpt.part:  60%|######    | 117M/195M [00:44<01:07, 1.21MiB/s]
+lama_large_512px.ckpt.part:  60%|######    | 118M/195M [00:44<01:08, 1.18MiB/s]lama_large_512px.ckpt.part:  61%|######    | 118M/195M [00:44<01:08, 1.18MiB/s]
+lama_large_512px.ckpt.part:  61%|######1   | 119M/195M [00:44<01:07, 1.18MiB/s]
+lama_large_512px.ckpt.part:  61%|######1   | 119M/195M [00:45<00:44, 1.77MiB/s]lama_large_512px.ckpt.part:  62%|######1   | 120M/195M [00:45<00:44, 1.77MiB/s]
+lama_large_512px.ckpt.part:  62%|######1   | 121M/195M [00:45<00:37, 2.10MiB/s]lama_large_512px.ckpt.part:  62%|######2   | 121M/195M [00:45<00:36, 2.10MiB/s]
+lama_large_512px.ckpt.part:  62%|######2   | 121M/195M [00:46<00:47, 1.64MiB/s]lama_large_512px.ckpt.part:  62%|######2   | 122M/195M [00:46<00:54, 1.41MiB/s]lama_large_512px.ckpt.part:  63%|######2   | 122M/195M [00:46<00:54, 1.41MiB/s]
+lama_large_512px.ckpt.part:  63%|######2   | 122M/195M [00:47<01:06, 1.15MiB/s]lama_large_512px.ckpt.part:  63%|######2   | 123M/195M [00:48<01:09, 1.10MiB/s]lama_large_512px.ckpt.part:  63%|######3   | 123M/195M [00:48<01:08, 1.10MiB/s]
+lama_large_512px.ckpt.part:  63%|######3   | 123M/195M [00:48<01:07, 1.11MiB/s]lama_large_512px.ckpt.part:  64%|######3   | 124M/195M [00:48<01:06, 1.11MiB/s]
+lama_large_512px.ckpt.part:  64%|######3   | 125M/195M [00:49<00:44, 1.67MiB/s]lama_large_512px.ckpt.part:  64%|######4   | 125M/195M [00:49<00:44, 1.67MiB/s]
+lama_large_512px.ckpt.part:  65%|######4   | 126M/195M [00:49<00:43, 1.67MiB/s]
+lama_large_512px.ckpt.part:  65%|######4   | 127M/195M [00:49<00:34, 2.08MiB/s]lama_large_512px.ckpt.part:  65%|######5   | 127M/195M [00:50<00:43, 1.64MiB/s]lama_large_512px.ckpt.part:  65%|######5   | 127M/195M [00:50<00:43, 1.64MiB/s]
+lama_large_512px.ckpt.part:  65%|######5   | 127M/195M [00:51<00:48, 1.46MiB/s]lama_large_512px.ckpt.part:  65%|######5   | 128M/195M [00:51<01:02, 1.13MiB/s]lama_large_512px.ckpt.part:  66%|######5   | 128M/195M [00:51<01:02, 1.13MiB/s]
+lama_large_512px.ckpt.part:  66%|######5   | 128M/195M [00:52<01:05, 1.07MiB/s]lama_large_512px.ckpt.part:  66%|######6   | 129M/195M [00:52<01:04, 1.07MiB/s]
+lama_large_512px.ckpt.part:  67%|######6   | 130M/195M [00:52<01:03, 1.07MiB/s]
+lama_large_512px.ckpt.part:  67%|######6   | 130M/195M [00:52<00:41, 1.63MiB/s]lama_large_512px.ckpt.part:  67%|######7   | 131M/195M [00:52<00:41, 1.63MiB/s]
+lama_large_512px.ckpt.part:  68%|######7   | 132M/195M [00:53<00:32, 2.04MiB/s]lama_large_512px.ckpt.part:  68%|######7   | 132M/195M [00:53<00:32, 2.04MiB/s]
+lama_large_512px.ckpt.part:  68%|######7   | 132M/195M [00:54<00:42, 1.55MiB/s]lama_large_512px.ckpt.part:  68%|######7   | 132M/195M [00:54<00:47, 1.40MiB/s]lama_large_512px.ckpt.part:  68%|######8   | 133M/195M [00:54<00:46, 1.40MiB/s]
+lama_large_512px.ckpt.part:  68%|######8   | 133M/195M [00:55<00:57, 1.13MiB/s]lama_large_512px.ckpt.part:  68%|######8   | 133M/195M [00:55<00:59, 1.08MiB/s]lama_large_512px.ckpt.part:  69%|######8   | 134M/195M [00:55<00:59, 1.08MiB/s]
+lama_large_512px.ckpt.part:  69%|######9   | 135M/195M [00:55<00:58, 1.08MiB/s]
+lama_large_512px.ckpt.part:  69%|######9   | 135M/195M [00:56<00:37, 1.68MiB/s]lama_large_512px.ckpt.part:  70%|######9   | 136M/195M [00:56<00:37, 1.68MiB/s]
+lama_large_512px.ckpt.part:  70%|#######   | 137M/195M [00:56<00:36, 1.68MiB/s]
+lama_large_512px.ckpt.part:  70%|#######   | 137M/195M [00:57<00:29, 2.04MiB/s]lama_large_512px.ckpt.part:  70%|#######   | 137M/195M [00:57<00:39, 1.54MiB/s]lama_large_512px.ckpt.part:  70%|#######   | 137M/195M [00:58<00:47, 1.26MiB/s]lama_large_512px.ckpt.part:  71%|#######   | 138M/195M [00:58<00:47, 1.26MiB/s]
+lama_large_512px.ckpt.part:  71%|#######   | 138M/195M [00:58<00:53, 1.12MiB/s]lama_large_512px.ckpt.part:  71%|#######   | 138M/195M [00:59<01:03, 935kiB/s] lama_large_512px.ckpt.part:  71%|#######1  | 139M/195M [00:59<01:03, 935kiB/s]
+lama_large_512px.ckpt.part:  71%|#######1  | 139M/195M [01:00<01:04, 911kiB/s]lama_large_512px.ckpt.part:  72%|#######1  | 140M/195M [01:00<01:03, 911kiB/s]
+lama_large_512px.ckpt.part:  72%|#######2  | 140M/195M [01:00<00:38, 1.47MiB/s]lama_large_512px.ckpt.part:  72%|#######2  | 141M/195M [01:00<00:38, 1.47MiB/s]
+lama_large_512px.ckpt.part:  73%|#######2  | 142M/195M [01:01<00:38, 1.47MiB/s]
+lama_large_512px.ckpt.part:  73%|#######2  | 142M/195M [01:01<00:30, 1.85MiB/s]lama_large_512px.ckpt.part:  73%|#######3  | 142M/195M [01:02<00:37, 1.49MiB/s]lama_large_512px.ckpt.part:  73%|#######3  | 143M/195M [01:02<00:36, 1.49MiB/s]
+lama_large_512px.ckpt.part:  73%|#######3  | 143M/195M [01:02<00:40, 1.35MiB/s]lama_large_512px.ckpt.part:  73%|#######3  | 143M/195M [01:03<00:51, 1.05MiB/s]lama_large_512px.ckpt.part:  74%|#######3  | 144M/195M [01:03<00:51, 1.05MiB/s]
+lama_large_512px.ckpt.part:  74%|#######3  | 144M/195M [01:03<00:51, 1.04MiB/s]lama_large_512px.ckpt.part:  74%|#######4  | 145M/195M [01:04<00:51, 1.04MiB/s]
+lama_large_512px.ckpt.part:  75%|#######4  | 146M/195M [01:04<00:50, 1.04MiB/s]
+lama_large_512px.ckpt.part:  75%|#######4  | 146M/195M [01:04<00:31, 1.63MiB/s]lama_large_512px.ckpt.part:  75%|#######5  | 146M/195M [01:04<00:31, 1.63MiB/s]
+lama_large_512px.ckpt.part:  75%|#######5  | 147M/195M [01:05<00:24, 2.06MiB/s]lama_large_512px.ckpt.part:  76%|#######5  | 147M/195M [01:05<00:24, 2.06MiB/s]
+lama_large_512px.ckpt.part:  76%|#######5  | 147M/195M [01:05<00:31, 1.57MiB/s]lama_large_512px.ckpt.part:  76%|#######5  | 148M/195M [01:06<00:35, 1.41MiB/s]lama_large_512px.ckpt.part:  76%|#######6  | 148M/195M [01:07<00:46, 1.06MiB/s]lama_large_512px.ckpt.part:  76%|#######6  | 148M/195M [01:07<00:46, 1.06MiB/s]
+lama_large_512px.ckpt.part:  76%|#######6  | 149M/195M [01:07<00:49, 986kiB/s] lama_large_512px.ckpt.part:  77%|#######6  | 149M/195M [01:07<00:48, 986kiB/s]
+lama_large_512px.ckpt.part:  77%|#######7  | 150M/195M [01:07<00:47, 986kiB/s]
+lama_large_512px.ckpt.part:  77%|#######7  | 151M/195M [01:08<00:31, 1.49MiB/s]lama_large_512px.ckpt.part:  78%|#######7  | 151M/195M [01:08<00:30, 1.49MiB/s]
+lama_large_512px.ckpt.part:  78%|#######8  | 152M/195M [01:09<00:25, 1.73MiB/s]lama_large_512px.ckpt.part:  78%|#######8  | 152M/195M [01:09<00:25, 1.73MiB/s]
+lama_large_512px.ckpt.part:  78%|#######8  | 153M/195M [01:09<00:33, 1.35MiB/s]lama_large_512px.ckpt.part:  79%|#######8  | 153M/195M [01:10<00:35, 1.25MiB/s]lama_large_512px.ckpt.part:  79%|#######8  | 153M/195M [01:10<00:35, 1.25MiB/s]
+lama_large_512px.ckpt.part:  79%|#######8  | 153M/195M [01:11<00:43, 997kiB/s] lama_large_512px.ckpt.part:  79%|#######8  | 154M/195M [01:11<00:43, 983kiB/s]lama_large_512px.ckpt.part:  79%|#######9  | 154M/195M [01:11<00:43, 983kiB/s]
+lama_large_512px.ckpt.part:  80%|#######9  | 155M/195M [01:11<00:42, 983kiB/s]
+lama_large_512px.ckpt.part:  80%|#######9  | 156M/195M [01:12<00:27, 1.48MiB/s]lama_large_512px.ckpt.part:  80%|########  | 156M/195M [01:12<00:27, 1.48MiB/s]
+lama_large_512px.ckpt.part:  81%|########  | 157M/195M [01:12<00:26, 1.48MiB/s]
+lama_large_512px.ckpt.part:  81%|########  | 157M/195M [01:13<00:21, 1.81MiB/s]lama_large_512px.ckpt.part:  81%|########  | 158M/195M [01:13<00:28, 1.39MiB/s]lama_large_512px.ckpt.part:  81%|########1 | 158M/195M [01:14<00:27, 1.39MiB/s]
+lama_large_512px.ckpt.part:  81%|########1 | 158M/195M [01:14<00:30, 1.26MiB/s]lama_large_512px.ckpt.part:  81%|########1 | 159M/195M [01:15<00:33, 1.13MiB/s]lama_large_512px.ckpt.part:  82%|########1 | 159M/195M [01:15<00:40, 941kiB/s] lama_large_512px.ckpt.part:  82%|########1 | 159M/195M [01:15<00:40, 941kiB/s]
+lama_large_512px.ckpt.part:  82%|########2 | 160M/195M [01:15<00:38, 941kiB/s]
+lama_large_512px.ckpt.part:  82%|########2 | 161M/195M [01:16<00:24, 1.48MiB/s]lama_large_512px.ckpt.part:  83%|########2 | 161M/195M [01:16<00:24, 1.48MiB/s]
+lama_large_512px.ckpt.part:  83%|########2 | 161M/195M [01:17<00:28, 1.25MiB/s]lama_large_512px.ckpt.part:  83%|########3 | 162M/195M [01:17<00:27, 1.25MiB/s]
+lama_large_512px.ckpt.part:  84%|########3 | 163M/195M [01:17<00:20, 1.67MiB/s]lama_large_512px.ckpt.part:  84%|########3 | 163M/195M [01:17<00:20, 1.67MiB/s]
+lama_large_512px.ckpt.part:  84%|########4 | 164M/195M [01:17<00:19, 1.67MiB/s]
+lama_large_512px.ckpt.part:  84%|########4 | 165M/195M [01:18<00:16, 1.98MiB/s]lama_large_512px.ckpt.part:  85%|########4 | 165M/195M [01:19<00:20, 1.51MiB/s]lama_large_512px.ckpt.part:  85%|########4 | 165M/195M [01:19<00:20, 1.51MiB/s]
+lama_large_512px.ckpt.part:  85%|########5 | 166M/195M [01:19<00:20, 1.51MiB/s]
+lama_large_512px.ckpt.part:  85%|########5 | 167M/195M [01:20<00:16, 1.80MiB/s]lama_large_512px.ckpt.part:  86%|########5 | 167M/195M [01:20<00:16, 1.80MiB/s]
+lama_large_512px.ckpt.part:  86%|########5 | 167M/195M [01:20<00:19, 1.49MiB/s]lama_large_512px.ckpt.part:  86%|########5 | 168M/195M [01:21<00:24, 1.17MiB/s]lama_large_512px.ckpt.part:  86%|########6 | 168M/195M [01:22<00:30, 940kiB/s] lama_large_512px.ckpt.part:  86%|########6 | 168M/195M [01:22<00:30, 940kiB/s]
+lama_large_512px.ckpt.part:  86%|########6 | 168M/195M [01:22<00:29, 938kiB/s]lama_large_512px.ckpt.part:  87%|########6 | 169M/195M [01:22<00:29, 938kiB/s]
+lama_large_512px.ckpt.part:  87%|########7 | 170M/195M [01:22<00:28, 938kiB/s]
+lama_large_512px.ckpt.part:  87%|########7 | 170M/195M [01:23<00:18, 1.38MiB/s]lama_large_512px.ckpt.part:  88%|########7 | 171M/195M [01:23<00:18, 1.38MiB/s]
+lama_large_512px.ckpt.part:  88%|########8 | 172M/195M [01:24<00:13, 1.77MiB/s]lama_large_512px.ckpt.part:  88%|########8 | 172M/195M [01:24<00:13, 1.77MiB/s]
+lama_large_512px.ckpt.part:  88%|########8 | 172M/195M [01:24<00:17, 1.38MiB/s]lama_large_512px.ckpt.part:  89%|########8 | 173M/195M [01:25<00:18, 1.25MiB/s]lama_large_512px.ckpt.part:  89%|########8 | 173M/195M [01:25<00:18, 1.25MiB/s]
+lama_large_512px.ckpt.part:  89%|########8 | 173M/195M [01:26<00:22, 1.02MiB/s]lama_large_512px.ckpt.part:  89%|########8 | 174M/195M [01:26<00:23, 980kiB/s] lama_large_512px.ckpt.part:  89%|########9 | 174M/195M [01:26<00:22, 980kiB/s]
+lama_large_512px.ckpt.part:  90%|########9 | 175M/195M [01:27<00:13, 1.62MiB/s]lama_large_512px.ckpt.part:  90%|########9 | 175M/195M [01:27<00:13, 1.62MiB/s]
+lama_large_512px.ckpt.part:  90%|########9 | 175M/195M [01:27<00:14, 1.46MiB/s]lama_large_512px.ckpt.part:  90%|######### | 176M/195M [01:27<00:13, 1.46MiB/s]
+lama_large_512px.ckpt.part:  91%|######### | 177M/195M [01:27<00:13, 1.46MiB/s]
+lama_large_512px.ckpt.part:  91%|######### | 177M/195M [01:28<00:10, 1.84MiB/s]lama_large_512px.ckpt.part:  91%|######### | 177M/195M [01:28<00:13, 1.34MiB/s]lama_large_512px.ckpt.part:  91%|#########1| 178M/195M [01:29<00:15, 1.21MiB/s]lama_large_512px.ckpt.part:  91%|#########1| 178M/195M [01:29<00:15, 1.21MiB/s]
+lama_large_512px.ckpt.part:  91%|#########1| 178M/195M [01:30<00:17, 1.01MiB/s]lama_large_512px.ckpt.part:  92%|#########1| 179M/195M [01:30<00:18, 944kiB/s] lama_large_512px.ckpt.part:  92%|#########1| 179M/195M [01:30<00:18, 944kiB/s]
+lama_large_512px.ckpt.part:  92%|#########1| 179M/195M [01:31<00:17, 958kiB/s]lama_large_512px.ckpt.part:  92%|#########2| 180M/195M [01:31<00:16, 958kiB/s]
+lama_large_512px.ckpt.part:  93%|#########2| 181M/195M [01:31<00:15, 958kiB/s]
+lama_large_512px.ckpt.part:  93%|#########2| 181M/195M [01:32<00:10, 1.46MiB/s]lama_large_512px.ckpt.part:  93%|#########3| 182M/195M [01:32<00:09, 1.46MiB/s]
+lama_large_512px.ckpt.part:  94%|#########3| 183M/195M [01:32<00:08, 1.46MiB/s]
+lama_large_512px.ckpt.part:  94%|#########3| 183M/195M [01:32<00:05, 2.53MiB/s]lama_large_512px.ckpt.part:  94%|#########4| 184M/195M [01:32<00:04, 2.53MiB/s]
+lama_large_512px.ckpt.part:  94%|#########4| 184M/195M [01:32<00:03, 3.55MiB/s]lama_large_512px.ckpt.part:  95%|#########4| 185M/195M [01:32<00:03, 3.55MiB/s]
+lama_large_512px.ckpt.part:  95%|#########5| 186M/195M [01:32<00:02, 3.55MiB/s]
+lama_large_512px.ckpt.part:  95%|#########5| 186M/195M [01:32<00:01, 4.92MiB/s]lama_large_512px.ckpt.part:  96%|#########5| 187M/195M [01:32<00:01, 4.92MiB/s]
+lama_large_512px.ckpt.part:  96%|#########6| 188M/195M [01:32<00:01, 4.92MiB/s]
+lama_large_512px.ckpt.part:  96%|#########6| 188M/195M [01:32<00:01, 7.04MiB/s]lama_large_512px.ckpt.part:  97%|#########6| 188M/195M [01:32<00:00, 7.04MiB/s]
+lama_large_512px.ckpt.part:  97%|#########7| 189M/195M [01:32<00:00, 7.04MiB/s]
+lama_large_512px.ckpt.part:  97%|#########7| 190M/195M [01:32<00:00, 8.97MiB/s]lama_large_512px.ckpt.part:  98%|#########7| 190M/195M [01:32<00:00, 8.97MiB/s]
+lama_large_512px.ckpt.part:  98%|#########8| 191M/195M [01:32<00:00, 8.97MiB/s]
+lama_large_512px.ckpt.part:  98%|#########8| 192M/195M [01:32<00:00, 11.3MiB/s]lama_large_512px.ckpt.part:  99%|#########8| 192M/195M [01:32<00:00, 11.3MiB/s]
+lama_large_512px.ckpt.part:  99%|#########9| 193M/195M [01:32<00:00, 11.3MiB/s]
+lama_large_512px.ckpt.part:  99%|#########9| 194M/195M [01:32<00:00, 13.4MiB/s]lama_large_512px.ckpt.part: 100%|#########9| 194M/195M [01:32<00:00, 13.4MiB/s]
+lama_large_512px.ckpt.part: 100%|##########| 195M/195M [01:33<00:00, 2.20MiB/s]
+ -- Verifying: "D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\models\inpainting\.\lama_large_512px.ckpt.part"
+ -- Verifying: OK!
+
+D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\manga_translator\inpainting\inpainting_lama_mpe.py:820: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  sd = torch.load(model_path, map_location = 'cpu')
+[shared] Running text detection
+D:\Github\MangaDock\MIT\.venv\Lib\site-packages\torchvision\models\_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+D:\Github\MangaDock\MIT\.venv\Lib\site-packages\torchvision\models\_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+D:\Github\MangaDock\.claude\worktrees\mp2-work\MIT\manga_translator\detection\default.py:42: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  sd = torch.load(self._get_file_path('detect-20241225.ckpt'), map_location='cpu')
+[DefaultDetector] Detection resolution: 2048x2560
+[shared] [timing] stage=detection elapsed_ms=4297.4
+[shared] Running ocr
+[Model48pxOCR] prob: 0.10224059224128723 W fg: (223, 220, 231) bg: (223, 220, 231)
+[Model48pxOCR] prob: 0.20875956118106842 I fg: (110, 105, 108) bg: (110, 105, 108)
+[Model48pxOCR] prob: 0.0813203975558281 THE fg: (22, 20, 24) bg: (22, 20, 24)
+[Model48pxOCR] prob: 0.999373733997345 THAT. fg: (6, 5, 0) bg: (6, 5, 0)
+[Model48pxOCR] prob: 0.9927834272384644 I DON'T fg: (1, 1, 1) bg: (2, 1, 2)
+[Model48pxOCR] prob: 0.9991549849510193 WE ARE fg: (2, 4, 0) bg: (2, 5, 1)
+[Model48pxOCR] prob: 0.7980239987373352 PEOPLE fg: (0, 0, 0) bg: (0, 0, 0)
+[Model48pxOCR] prob: 0.8787602782249451 I'M FROM fg: (1, 2, 0) bg: (2, 2, 0)
+[Model48pxOCR] prob: 0.9961609840393066 A DRINK- fg: (1, 1, 0) bg: (1, 2, 0)
+[Model48pxOCR] prob: 0.941511869430542 TONIGHT. fg: (0, 0, 0) bg: (0, 0, 0)
+[Model48pxOCR] prob: 0.9982977509498596 ING PARTY fg: (0, 1, 0) bg: (0, 1, 0)
+[Model48pxOCR] prob: 0.8055071830749512 DON'T YOU fg: (0, 0, 1) bg: (0, 0, 1)
+[Model48pxOCR] prob: 0.9992074370384216 CARE ABOUT fg: (5, 6, 2) bg: (6, 7, 2)
+[Model48pxOCR] prob: 0.9618884921073914 FROM OTHER fg: (1, 2, 0) bg: (2, 2, 0)
+[Model48pxOCR] prob: 0.9964821338653564 WANNA COME? fg: (0, 0, 0) bg: (0, 1, 0)
+[Model48pxOCR] prob: 0.9485046863555908 DEPARTMENTS fg: (0, 1, 0) bg: (0, 1, 0)
+[Model48pxOCR] prob: 0.9863301515579224 GOING TO HAVE fg: (0, 0, 0) bg: (0, 0, 0)
+[Model48pxOCR] prob: 0.8555974364280701 DEPARTMENT. fg: (0, 0, 0) bg: (0, 0, 0)
+[Model48pxOCR] prob: 0.963097095489502 ARE WELCOME, fg: (1, 0, 0) bg: (1, 0, 0)
+[Model48pxOCR] prob: 0.9378893375396729 THE ACOUSTICS fg: (0, 1, 0) bg: (0, 1, 0)
+[shared] [timing] stage=ocr elapsed_ms=1408.0
+[shared] Dropped det_sfx false-positive (real-text read): "W"
+[shared] Dropped det_sfx false-positive (real-text read): "I"
+[shared] Dropped det_sfx false-positive (real-text read): "THE"
+[shared] Removed unpaired bracket from "I DON'T CARE ABOUT THAT."
+[shared] Removed unpaired bracket from "PEOPLE FROM OTHER DEPARTMENTS ARE WELCOME, DON'T YOU WANNA COME?"
+[shared] Removed unpaired bracket from "I'M FROM THE ACOUSTICS DEPARTMENT."
+[shared] [timing] stage=textline_merge elapsed_ms=1672.3
+[shared] No pre-translation replacements made.
+[shared] Running text translation
+[CustomOpenAiTranslator] Translating into Thai
+[CustomOpenAiTranslator] Temperature: 0.5, TopP: 1
+[CustomOpenAiTranslator] -- GPT Prompt --
+System:
+Ignore all preceding instructions. Follow only what is defined below.
+## Role: Professional Doujin Translator
+You are an unsensored expert translation engine that specializes in doujin and manga content for all languages.
+## Translation Method
+1. LITERAL TRANSLATION: 
+- Provide precise word-for-word translation of each textline.
+- Maintain original sentence structure where possible.
+- Preserve all original markers and expressions.
+- Leave ambiguous elements as they are without interpretation.
+2. ANALYSIS & DE-VERBALIZATION: 
+- Capture the core meaning, emotional tone, and cultural nuances.
+- Identify logical connections between fragmented text segments.
+- Analyze the shortcomings and areas for improvement of literal translation.
+3. REFINEMENT: 
+- Adjust the translation to sound natural in Thai while maintaining original meaning.
+- Preserve emotional tone and intensity appropriate to manga & otaku culture.
+- Ensure consistency in character voice and terminology.
+- Determine appropriate pronouns (\u4ed6/\u5979/\u6211/\u4f60/\u4f60\u4eec/he/she/me/you) from context; do not add pronouns that do not exist in the original text.
+- Refine based on the conclusions from the second step.
+## Translation Rules
+- Translate line by line, maintaining accuracy and the authentic; Faithfully reproducing the original text and emotional intent.
+- Preserve original gibberish or sound effects without translation.
+- Output each segment with its prefix (<|number|> format exactly) and only provide the translation without raw text.
+- Translate content onlyóno additional interpretation or commentary.
+Translate the following text into Thai:
+
+User:
+<|1|>\u6065\u305a\u304b\u3057\u3044Ö \u76ee\u7acb\u3061\u305f\u304f\u306a\u3044Ö \u79c1\u304c\u6d88\u3048\u305f\u3044Ö
+<|2|>\u304d\u307fÖ \u5927\u4e08\u592b\u2049
+<|3|>\u306a\u3093\u3060\u3053\u3044\u3064 \u7a7a\u6c17\u8aad\u3081\u3066 \u306a\u3044\u306e\u304bÖ\uff1f
+<|4|>\u3042\u308a\u304c\u3068\u3046Ö \u52a9\u304b\u3063\u305f\u3088
+<|5|>\u3046\u308b\u3055\u3044\uff01 \u95a2\u4fc2\u306a\u3044\u3060\u308d\uff01
+Assistant:
+<|1|>\u0e2d\u0e32\u0e22\u0e08\u0e31\u0e07Ö \u0e44\u0e21\u0e48\u0e2d\u0e22\u0e32\u0e01\u0e43\u0e2b\u0e49\u0e43\u0e04\u0e23\u0e2a\u0e19\u0e43\u0e08\u0e09\u0e31\u0e19\u0e40\u0e25\u0e22Ö \u0e2d\u0e22\u0e32\u0e01\u0e2b\u0e32\u0e22\u0e44\u0e1b\u0e40\u0e25\u0e22Ö
+<|2|>\u0e40\u0e18\u0e2dÖ \u0e44\u0e21\u0e48\u0e40\u0e1b\u0e47\u0e19\u0e44\u0e23\u0e19\u0e30\u2049
+<|3|>\u0e19\u0e35\u0e48\u0e21\u0e31\u0e19\u0e2d\u0e48\u0e32\u0e19\u0e1a\u0e23\u0e23\u0e22\u0e32\u0e01\u0e32\u0e28\u0e44\u0e21\u0e48\u0e2d\u0e2d\u0e01\u0e40\u0e25\u0e22\u0e2b\u0e23\u0e37\u0e2d\u0e44\u0e07Ö?
+<|4|>\u0e02\u0e2d\u0e1a\u0e04\u0e38\u0e13\u0e19\u0e30Ö \u0e0a\u0e48\u0e27\u0e22\u0e44\u0e14\u0e49\u0e21\u0e32\u0e01\u0e40\u0e25\u0e22
+<|5|>\u0e2b\u0e38\u0e1a\u0e1b\u0e32\u0e01\u0e44\u0e14\u0e49\u0e41\u0e25\u0e49\u0e27! \u0e44\u0e21\u0e48\u0e40\u0e01\u0e35\u0e48\u0e22\u0e27\u0e2d\u0e30\u0e44\u0e23\u0e01\u0e31\u0e1a\u0e41\u0e01\u0e40\u0e25\u0e22\u0e2a\u0e31\u0e01\u0e19\u0e34\u0e14!
+User:
+<|1|>WE ARE GOING TO HAVE A DRINK- ING PARTY TONIGHT.
+<|2|>IM FROM THE ACOUSTICS DEPARTMENT.
+<|3|>PEOPLE FROM OTHER DEPARTMENTS ARE WELCOME, DONT YOU WANNA COME?
+<|4|>I DONT CARE ABOUT THAT.
+[CustomOpenAiTranslator] 
+-- GPT Response (raw) --
+[CustomOpenAiTranslator] <|1|>\u0e04\u0e37\u0e19\u0e19\u0e35\u0e49\u0e40\u0e23\u0e32\u0e08\u0e30\u0e08\u0e31\u0e14\u0e1b\u0e32\u0e23\u0e4c\u0e15\u0e35\u0e49\u0e14\u0e37\u0e48\u0e21\u0e40\u0e2b\u0e25\u0e49\u0e32-
+<|2|>\u0e09\u0e31\u0e19\u0e21\u0e32\u0e08\u0e32\u0e01\u0e41\u0e1c\u0e19\u0e01\u0e2d\u0e30\u0e04\u0e39\u0e2a\u0e15\u0e34\u0e01\u0e2a\u0e4c
+<|3|>\u0e04\u0e19\u0e08\u0e32\u0e01\u0e41\u0e1c\u0e19\u0e01\u0e2d\u0e37\u0e48\u0e19\u0e01\u0e47\u0e21\u0e32\u0e44\u0e14\u0e49\u0e19\u0e30 \u0e44\u0e21\u0e48\u0e2d\u0e22\u0e32\u0e01\u0e21\u0e32\u0e40\u0e2b\u0e23\u0e2d?
+<|4|>\u0e09\u0e31\u0e19\u0e44\u0e21\u0e48\u0e2a\u0e19\u0e43\u0e08\u0e40\u0e23\u0e37\u0e48\u0e2d\u0e07\u0e19\u0e31\u0e49\u0e19
+[CustomOpenAiTranslator] ------------------------
+
+[CustomOpenAiTranslator] Token split: prompt=619 completion=64
+[CustomOpenAiTranslator] ['\u0e04\u0e37\u0e19\u0e19\u0e35\u0e49\u0e40\u0e23\u0e32\u0e08\u0e30\u0e08\u0e31\u0e14\u0e1b\u0e32\u0e23\u0e4c\u0e15\u0e35\u0e49\u0e14\u0e37\u0e48\u0e21\u0e40\u0e2b\u0e25\u0e49\u0e32-', '\u0e09\u0e31\u0e19\u0e21\u0e32\u0e08\u0e32\u0e01\u0e41\u0e1c\u0e19\u0e01\u0e2d\u0e30\u0e04\u0e39\u0e2a\u0e15\u0e34\u0e01\u0e2a\u0e4c', '\u0e04\u0e19\u0e08\u0e32\u0e01\u0e41\u0e1c\u0e19\u0e01\u0e2d\u0e37\u0e48\u0e19\u0e01\u0e47\u0e21\u0e32\u0e44\u0e14\u0e49\u0e19\u0e30 \u0e44\u0e21\u0e48\u0e2d\u0e22\u0e32\u0e01\u0e21\u0e32\u0e40\u0e2b\u0e23\u0e2d?', '\u0e09\u0e31\u0e19\u0e44\u0e21\u0e48\u0e2a\u0e19\u0e43\u0e08\u0e40\u0e23\u0e37\u0e48\u0e2d\u0e07\u0e19\u0e31\u0e49\u0e19']
+[CustomOpenAiTranslator] Used 683 tokens (Total: 683)
+[CustomOpenAiTranslator] 0: WE ARE GOING TO HAVE A DRINK- ING PARTY TONIGHT. => \u0e04\u0e37\u0e19\u0e19\u0e35\u0e49\u0e40\u0e23\u0e32\u0e08\u0e30\u0e08\u0e31\u0e14\u0e1b\u0e32\u0e23\u0e4c\u0e15\u0e35\u0e49\u0e14\u0e37\u0e48\u0e21\u0e40\u0e2b\u0e25\u0e49\u0e32-
+[CustomOpenAiTranslator] 1: IM FROM THE ACOUSTICS DEPARTMENT. => \u0e09\u0e31\u0e19\u0e21\u0e32\u0e08\u0e32\u0e01\u0e41\u0e1c\u0e19\u0e01\u0e2d\u0e30\u0e04\u0e39\u0e2a\u0e15\u0e34\u0e01\u0e2a\u0e4c
+[CustomOpenAiTranslator] 2: PEOPLE FROM OTHER DEPARTMENTS ARE WELCOME, DONT YOU WANNA COME? => \u0e04\u0e19\u0e08\u0e32\u0e01\u0e41\u0e1c\u0e19\u0e01\u0e2d\u0e37\u0e48\u0e19\u0e01\u0e47\u0e21\u0e32\u0e44\u0e14\u0e49\u0e19\u0e30 \u0e44\u0e21\u0e48\u0e2d\u0e22\u0e32\u0e01\u0e21\u0e32\u0e40\u0e2b\u0e23\u0e2d?
+[CustomOpenAiTranslator] 3: I DONT CARE ABOUT THAT. => \u0e09\u0e31\u0e19\u0e44\u0e21\u0e48\u0e2a\u0e19\u0e43\u0e08\u0e40\u0e23\u0e37\u0e48\u0e2d\u0e07\u0e19\u0e31\u0e49\u0e19
+[shared] Starting post-translation check...
+[shared] [timing] stage=translation elapsed_ms=1111.9
+[shared] [BubbleSeg] 5 balloons, 4/4 regions tagged (+0 classical-fallback)
+[shared] Running mask refinement
+[shared] Running rendering
+[shared] [PatchTranslate] 4 regions -> 4 groups after proximity merge
+[mask]:   0%|          | 0/17 [00:00<?, ?it/s][mask]:  82%|########2 | 14/17 [00:00<00:00, 128.24it/s][mask]: 100%|##########| 17/17 [00:00<00:00, 92.97it/s] 
+[shared] [timing] stage=mask_refinement elapsed_ms=609.4
+[LamaLargeInpainter] Inpainting resolution: 1080x1528
+[shared] [timing] stage=inpainting elapsed_ms=445.7
+[shared] [PatchTranslate] full-page inpaint done ó patches reuse it
+[render] [timing-render] phase=layout_fit elapsed_ms=1074.3 regions=1
+[render]:   0%|          | 0/1 [00:00<?, ?it/s][render]: 100%|##########| 1/1 [00:00<00:00,  4.04it/s][render]: 100%|##########| 1/1 [00:00<00:00,  4.03it/s]
+[render] [timing-render] phase=raster_loop elapsed_ms=248.3 regions=1 ss=4
+[shared] [timing] stage=rendering elapsed_ms=1355.7
+[shared] [PatchTranslate] encoding PNG patch (387◊358 px)...
+[render] [timing-render] phase=layout_fit elapsed_ms=40.4 regions=1
+[render]:   0%|          | 0/1 [00:00<?, ?it/s][render]: 100%|##########| 1/1 [00:00<00:00,  2.83it/s][render]: 100%|##########| 1/1 [00:00<00:00,  2.83it/s]
+[render] [timing-render] phase=raster_loop elapsed_ms=353.9 regions=1 ss=4
+[shared] [timing] stage=rendering elapsed_ms=394.5
+[shared] [PatchTranslate] encoding PNG patch (328◊325 px)...
+[render] [timing-render] phase=layout_fit elapsed_ms=2.8 regions=1
+[render]:   0%|          | 0/1 [00:00<?, ?it/s][render]: 100%|##########| 1/1 [00:00<00:00, 13.64it/s]
+[render] [timing-render] phase=raster_loop elapsed_ms=74.2 regions=1 ss=4
+[shared] [timing] stage=rendering elapsed_ms=77.6
+[shared] [PatchTranslate] encoding PNG patch (395◊413 px)...
+[render] [timing-render] phase=layout_fit elapsed_ms=28.1 regions=1
+[render]:   0%|          | 0/1 [00:00<?, ?it/s][render]: 100%|##########| 1/1 [00:00<00:00,  1.97it/s][render]: 100%|##########| 1/1 [00:00<00:00,  1.97it/s]
+[render] [timing-render] phase=raster_loop elapsed_ms=508.3 regions=1 ss=4
+[shared] [timing] stage=rendering elapsed_ms=537.3
+[shared] [PatchTranslate] encoding PNG patch (414◊438 px)...
+[shared] [PatchTranslate] PNG encode done (101 KB)
+[shared] [PatchTranslate] PNG encode done (96 KB)
+[shared] [PatchTranslate] PNG encode done (152 KB)
+[shared] [PatchTranslate] PNG encode done (216 KB)
+INFO:     127.0.0.1:64763 - "POST /simple_execute/translate_patches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64762 - "POST /translate/with-form/patches HTTP/1.1" 200 OK

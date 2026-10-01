@@ -30,6 +30,12 @@ import { StatusModule } from '../status/status.module';
     CatastrophicRecoveryService,
     CacheHealthService,
   ],
-  exports: [CacheOrchestratorService, ImageCacheService, RedisService, StatsIncrementService, CacheHealthService],
+  exports: [
+    CacheOrchestratorService,
+    ImageCacheService,
+    RedisService,
+    StatsIncrementService,
+    CacheHealthService,
+  ],
 })
 export class CacheModule {}

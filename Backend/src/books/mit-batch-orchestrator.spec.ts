@@ -51,6 +51,73 @@ function seedRunningJob(orch: MitBatchOrchestrator, jobKey: string) {
   return { job, reject };
 }
 
+describe('MitBatchOrchestrator — #524 rolling-context cache-safety', () => {
+  const PAGES = [
+    { pageIndex: 0, pageUrl: 'u0' },
+    { pageIndex: 1, pageUrl: 'u1' },
+  ];
+  // page 0 cached, page 1 a miss — the exact poison shape from #524.
+  const partialCache = (key: string) =>
+    key.includes(':ch1:0:') ? { data: { patches: [{ x: 1 }] } } : null;
+
+  /** Replace the transport with a stub that delivers each sent page via `notify`
+   *  (so the job completes) and lets us inspect which pages were sent to MIT. */
+  function stubStream(orch: MitBatchOrchestrator) {
+    return jest
+      .spyOn((orch as any).stream, 'run')
+      .mockImplementation(async (...args: any[]) => {
+        const [, sentPages, notify] = args;
+        for (const p of sentPages) notify(p.pageIndex, { patches: [] });
+      });
+  }
+
+  let prevCtx: string | undefined;
+  beforeEach(() => {
+    prevCtx = process.env.MIT_CONTEXT_PAGES;
+  });
+  afterEach(() => {
+    if (prevCtx === undefined) delete process.env.MIT_CONTEXT_PAGES;
+    else process.env.MIT_CONTEXT_PAGES = prevCtx;
+  });
+
+  it('with MIT_CONTEXT_PAGES>0, a partially-cached batch sends the FULL ordered chapter to MIT (not just the misses)', async () => {
+    process.env.MIT_CONTEXT_PAGES = '3';
+    const { orch, cache } = makeOrchestrator();
+    cache.get.mockImplementation(async (key: string) => partialCache(key));
+    const runSpy = stubStream(orch);
+    const { received, listener } = recorder();
+
+    await orch.startOrAttachBatchJob('ch1', PAGES, listener, undefined, 'th');
+
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    const sent = runSpy.mock.calls[0][1] as Array<{ pageIndex: number }>;
+    expect(sent.map((p) => p.pageIndex)).toEqual([0, 1]); // complete context, in order
+    // the cached page is NOT pre-served (MIT re-delivers it under full context) → not doubled.
+    expect(received.filter((r) => r.pageIndex === 0)).toHaveLength(1);
+  });
+
+  it('with context OFF (default), a partially-cached batch still sends ONLY the uncached pages (byte-identical)', async () => {
+    delete process.env.MIT_CONTEXT_PAGES;
+    const { orch, cache } = makeOrchestrator();
+    cache.get.mockImplementation(async (key: string) => partialCache(key));
+    const runSpy = stubStream(orch);
+    const { received, listener } = recorder();
+
+    await orch.startOrAttachBatchJob('ch1', PAGES, listener, undefined, 'th');
+
+    const sent = runSpy.mock.calls[0][1] as Array<{ pageIndex: number }>;
+    expect(sent.map((p) => p.pageIndex)).toEqual([1]); // only the miss goes to MIT
+    expect(received.map((r) => r.pageIndex)).toContain(0); // cached page pre-served
+  });
+});
+
+function recorder() {
+  const received: Array<{ pageIndex: number; result: any }> = [];
+  const listener = (pageIndex: number, result: any) =>
+    received.push({ pageIndex, result });
+  return { received, listener };
+}
+
 describe('MitBatchOrchestrator — listener bookkeeping (#234 S5d)', () => {
   it('drains a latecomer listener even when the job rejects (timeout/abort)', async () => {
     const { orch } = makeOrchestrator();

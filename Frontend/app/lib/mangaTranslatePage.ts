@@ -31,6 +31,18 @@ export async function checkMitHealth(): Promise<boolean> {
   }
 }
 
+/**
+ * True when a translate error was a 401 from a captcha-guarded endpoint — i.e.
+ * the short-lived HWID-bound clearance token (#227) expired mid-session. The
+ * translate endpoints are gated only by the Turnstile captcha guard, so their
+ * 401 always means "re-verify the captcha", never an auth failure. Callers use
+ * this to re-open the Turnstile modal instead of dead-ending on an error toast.
+ */
+export function isCaptchaExpiredError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : "";
+  return /\(401\)/.test(msg) || /captcha clearance token/i.test(msg);
+}
+
 // ─── Patch overlay ────────────────────────────────────────────────────────────
 
 /** A single translated region rendered as a PNG patch to overlay on the original page. */

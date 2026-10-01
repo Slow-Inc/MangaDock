@@ -27,7 +27,9 @@ const SAFE_SEGMENT = /^[\w.-]+$/;
 
 function assertSafeSegment(value: string, what: string): void {
   if (!SAFE_SEGMENT.test(value) || value.includes('..')) {
-    throw new Error(`PatchStore: unsafe ${what} segment: ${JSON.stringify(value)}`);
+    throw new Error(
+      `PatchStore: unsafe ${what} segment: ${JSON.stringify(value)}`,
+    );
   }
 }
 
@@ -83,23 +85,35 @@ export class PatchStore {
     const filePrefix = this.pageFilePrefix(loc);
     // Normalize once per call: a trailing-slash origin must not produce `//`
     const origin = this.origin().replace(/\/+$/, '');
-    const urls: string[] = [];
 
-    for (let i = 0; i < pngs.length; i += 1) {
-      const key = `${dir}/${filePrefix}${i}.png`;
-      await this.storage.put(key, pngs[i], { contentType: 'image/png' });
-      // Deterministic filenames mean a re-translate overwrites the PNG but keeps
-      // the URL — so clients keep serving the stale cached patch (max-age=14400)
-      // until it expires. A content-hash `?v=` makes the URL change iff the bytes
-      // change: identical re-translate stays cached, changed patch busts it.
-      const version = createHash('sha1').update(pngs[i]).digest('hex').slice(0, 12);
-      urls.push(`${origin}/${key}?v=${version}`);
-    }
+    // Region writes are independent (distinct deterministic keys, no shared
+    // state), so run them concurrently. Promise.all keeps the input order for
+    // the returned urls and preserves the old for-await loop's all-or-nothing
+    // contract: any single write rejecting rejects put() and skips the
+    // stale-cleanup below, exactly as before (allSettled would wrongly swallow
+    // the failure).
+    const urls = await Promise.all(
+      pngs.map(async (png, i) => {
+        const key = `${dir}/${filePrefix}${i}.png`;
+        await this.storage.put(key, png, { contentType: 'image/png' });
+        // Deterministic filenames mean a re-translate overwrites the PNG but keeps
+        // the URL — so clients keep serving the stale cached patch (max-age=14400)
+        // until it expires. A content-hash `?v=` makes the URL change iff the bytes
+        // change: identical re-translate stays cached, changed patch busts it.
+        const version = createHash('sha1')
+          .update(png)
+          .digest('hex')
+          .slice(0, 12);
+        return `${origin}/${key}?v=${version}`;
+      }),
+    );
 
     const names = await this.storage.list(dir);
     for (const name of names) {
       if (!name.startsWith(filePrefix)) continue;
-      const region = Number(name.slice(filePrefix.length).replace(/\.png$/, ''));
+      const region = Number(
+        name.slice(filePrefix.length).replace(/\.png$/, ''),
+      );
       if (Number.isFinite(region) && region >= pngs.length) {
         await this.storage.delete(`${dir}/${name}`);
       }
@@ -136,7 +150,10 @@ export class PatchStore {
   /** Sweep the legacy backlog now and once a day; timer never blocks exit.
    *  Failures surface through onError — a silently dead sweeper would let the
    *  legacy backlog grow again with no signal. */
-  startSweeping(onSwept?: (removed: number) => void, onError?: (err: unknown) => void): void {
+  startSweeping(
+    onSwept?: (removed: number) => void,
+    onError?: (err: unknown) => void,
+  ): void {
     const run = () =>
       void this.sweepLegacy()
         .then((n) => onSwept?.(n))

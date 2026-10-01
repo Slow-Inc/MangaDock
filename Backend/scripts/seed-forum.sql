@@ -5,9 +5,9 @@
 -- 1. Create a dummy system/admin profile if it doesn't exist
 INSERT INTO profiles (uid, display_name, photo_url, role, bio)
 VALUES 
-  ('00000000-0000-0000-0000-000000000001', 'MangaDock Official', 'https://api.dicebear.com/7.x/bottts/svg?seed=admin', 'admin', 'Official System Account'),
-  ('00000000-0000-0000-0000-000000000002', 'Slow-Inc Translator', 'https://api.dicebear.com/7.x/avataaars/svg?seed=translator', 'translator', 'ทีมงานแปลคุณภาพสูง'),
-  ('00000000-0000-0000-0000-000000000003', 'MangaFan99', 'https://api.dicebear.com/7.x/avataaars/svg?seed=user1', 'user', 'ชอบอ่านมังงะแนวต่างโลกครับ')
+  ('00000000-0000-0000-0000-000000000001', 'MangaDock Official', 'https://api.dicebear.com/7.x/bottts/svg?seed=admin', 8, 'Official System Account'),
+  ('00000000-0000-0000-0000-000000000002', 'Slow-Inc Translator', 'https://api.dicebear.com/7.x/avataaars/svg?seed=translator', 1, 'ทีมงานแปลคุณภาพสูง'),
+  ('00000000-0000-0000-0000-000000000003', 'MangaFan99', 'https://api.dicebear.com/7.x/avataaars/svg?seed=user1', 0, 'ชอบอ่านมังงะแนวต่างโลกครับ')
 ON CONFLICT (uid) DO NOTHING;
 
 -- 2. Add some Mock Posts (Using valid UUID hex format)
