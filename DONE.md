@@ -570,3 +570,13 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 - QA APK is still signed with the scaffold release signing config using the debug keystore.
 - `Mobile/build/` is ignored by git, so the APK is a local QA artifact rather than a committed binary.
 - Runtime endpoint defaults remain `https://hayateotsu.space` and production backend is reached through the web app at `https://api.hayateotsu.space`.
+
+## Phase 3 delivery preparation ? 2026-10-01
+
+- Ported earlier identity retry/header/Back/auth fixes into latest CLI native navigator rather than replacing newer screens.
+- Added native PKCE + request ID checks, trusted WebView origin checks and callback acknowledgement/queue handling; unsolicited and token-only callbacks are rejected.
+- Guarded cache hydration/flush/backfill against previous-account responses; auth cache clearing does not delete remote history.
+- Added private release signing with explicit QA debug-signing opt-in, Windows short CMake paths and Gregorian Java ZIP timestamps.
+- Mobile: 55 tests across 12 suites, lint and TypeScript passed. CLI frontend: 12 auth/cache regressions, TypeScript and targeted lint passed (one pre-existing unused-parameter warning). QA ARM64/x86_64 APK and AAB built; no production key available.
+- Independent review findings addressed. Existing beta.2 manual user acceptance is recorded separately from new beta.3 integration testing. Physical phone and matching frontend deployment still need external access.
+- Source workspace remains preserved; delivery uses an isolated worktree. Main retains its separate Expo/native auth protocol via a separate auth-fix PR.

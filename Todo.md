@@ -50,11 +50,18 @@
 
 ---
 
-## 📱 Phase 3: Hybrid Mobile Framework (NEXT STEP 🚀)
-- [ ]  [Mobile] React Native WebViewer Shell Initialization
-- [ ]  [Mobile] Strategic Code Sharing Layer (Shared Types/Logic)
-- [ ]  [Mobile] Native Authentication Bridge (Device Token Sync)
-- [ ]  [Mobile] Core OS Permission Handling (Storage/Network)
+## Phase 3: Android Mobile Shell ? delivery preparation
+
+- [X] Native shell, persistent identity, scoped headers, diagnostics and Android Back.
+- [X] Previous beta.2 functional QA accepted by the user: Google/Facebook, session persistence, protected reader and backend headers (2026-10-01).
+- [X] Port fixes onto latest CLI native navigation while retaining onboarding/settings/diagnostics.
+- [X] Build QA APK/AAB for ARM64 + x86_64 and install on emulator.
+- [X] Prepare release signing with private team keystore; debug signing requires explicit QA opt-in.
+- [ ] Run physical Android QA on the delivery artifact; only emulator attached.
+- [ ] Deploy matching CLI frontend and verify its new PKCE/nonce OAuth flow.
+- [ ] Supply team release keystore to build distribution-signed APK/AAB.
+
+See [delivery record](Documents/Plan/PHASE3_DELIVERY_2026-10-01.md).
 
 ---
 

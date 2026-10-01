@@ -9,8 +9,8 @@ jest.mock('react-native-safe-area-context', () => {
   const ReactMock = require('react');
 
   return {
-    SafeAreaProvider: ({children}: {children: React.ReactNode}) => children,
-    SafeAreaView: ({children}: {children: React.ReactNode}) => children,
+    SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
+    SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
     SafeAreaInsetsContext: ReactMock.createContext({
       top: 0,
       right: 0,
@@ -23,29 +23,24 @@ jest.mock('react-native-safe-area-context', () => {
       width: 390,
       height: 844,
     }),
-    useSafeAreaInsets: () => ({top: 0, right: 0, bottom: 0, left: 0}),
-    useSafeAreaFrame: () => ({x: 0, y: 0, width: 390, height: 844}),
+    useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+    useSafeAreaFrame: () => ({ x: 0, y: 0, width: 390, height: 844 }),
   };
 });
 
 jest.mock(
   'react-native-webview',
   () => {
-    const {View} = require('react-native');
+    const { View } = require('react-native');
 
     return {
       WebView: (props: {
-        source: {uri: string; headers?: Record<string, string>};
+        source: { uri: string; headers?: Record<string, string> };
         injectedJavaScriptBeforeContentLoaded?: string;
-      }) => (
-        <View
-          testID="mobile-shell-webview"
-          {...props}
-        />
-      ),
+      }) => <View testID="mobile-shell-webview" {...props} />,
     };
   },
-  {virtual: true},
+  { virtual: true },
 );
 
 jest.mock('../src/mobileIdentity', () => ({
@@ -55,7 +50,7 @@ jest.mock('../src/mobileIdentity', () => ({
 }));
 
 import App from '../App';
-import {MangaDockWebViewScreen} from '../src/screens/MangaDockWebViewScreen';
+import { MangaDockWebViewScreen } from '../src/screens/MangaDockWebViewScreen';
 
 test('starts beta sessions at Native Onboarding inside the Native Shell Router', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
@@ -65,10 +60,10 @@ test('starts beta sessions at Native Onboarding inside the Native Shell Router',
   });
 
   expect(
-    renderer!.root.findByProps({testID: 'native-shell-router'}),
+    renderer!.root.findByProps({ testID: 'native-shell-router' }),
   ).toBeTruthy();
   expect(
-    renderer!.root.findByProps({testID: 'native-onboarding-screen'}),
+    renderer!.root.findByProps({ testID: 'native-onboarding-screen' }),
   ).toBeTruthy();
 });
 
@@ -107,7 +102,7 @@ test('renders a launched MangaDock web path inside the Mobile Shell WebView', as
         route={{
           key: 'WebView',
           name: 'WebView',
-          params: {initialPath: '/search'},
+          params: { initialPath: '/search' },
         }}
       />,
     );
@@ -129,7 +124,7 @@ test('exposes beta diagnostics and logs WebView load events for QA', async () =>
   });
 
   expect(
-    renderer!.root.findByProps({testID: 'mobile-diagnostics-button'}),
+    renderer!.root.findByProps({ testID: 'mobile-diagnostics-button' }),
   ).toBeTruthy();
 
   const webview = renderer!.root.findByProps({
@@ -138,7 +133,7 @@ test('exposes beta diagnostics and logs WebView load events for QA', async () =>
 
   ReactTestRenderer.act(() => {
     webview.props.onLoadStart({
-      nativeEvent: {url: 'https://hayateotsu.space/library'},
+      nativeEvent: { url: 'https://hayateotsu.space/library' },
     });
   });
 
@@ -161,7 +156,7 @@ test('opens Native Diagnostics from the beta WebView diagnostics shortcut', asyn
 
   await ReactTestRenderer.act(async () => {
     renderer = ReactTestRenderer.create(
-      <MangaDockWebViewScreen navigation={{navigate} as never} />,
+      <MangaDockWebViewScreen navigation={{ navigate } as never} />,
     );
   });
 
@@ -196,6 +191,7 @@ test('records bridged web JavaScript errors from the WebView', async () => {
   ReactTestRenderer.act(() => {
     webview.props.onMessage({
       nativeEvent: {
+        url: 'https://hayateotsu.space',
         data: JSON.stringify({
           source: 'mangadock-web',
           type: 'console_error',

@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-01",
+  "versionName": "1.0.1-beta.3",
+  "versionCode": 4,
+  "signing": "Android Debug certificate; QA only",
+  "sourceBase": "ae327dc",
+  "branch": "fix/phase3-qa-delivery-20261001",
+  "artifacts": [
+    {
+      "file": "Mobile/build/qa/mangadock-phase3-delivery-20261001-arm64-x86_64.apk",
+      "sizeBytes": 40270500,
+      "sha256": "393d747495db2e842c3b4ced99527f23bcca26c79f2770416d2fbb43482ba7d4"
+    },
+    {
+      "file": "Mobile/build/qa/mangadock-phase3-delivery-20261001-qa.aab",
+      "sizeBytes": 28637857,
+      "sha256": "4d2f20ca53e28c6d1673b9b444789c7c881deb9294c3d467e279635f3b5a5709"
+    }
+  ]
+}

@@ -72,20 +72,61 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Keep private signing material outside the repository.
+def signingValue = { name -> providers.gradleProperty(name).orElse(providers.environmentVariable(name)).getOrNull() }
+def releaseStoreFile = signingValue('MANGADOCK_UPLOAD_STORE_FILE')
+def releaseStorePassword = signingValue('MANGADOCK_UPLOAD_STORE_PASSWORD')
+def releaseKeyAlias = signingValue('MANGADOCK_UPLOAD_KEY_ALIAS')
+def releaseKeyPassword = signingValue('MANGADOCK_UPLOAD_KEY_PASSWORD')
+def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].every { it }
+def qaSigning = providers.gradleProperty('mangadockQaSigning').getOrElse('false') == 'true'
+
+// Fail before building a distribution artifact with missing signing credentials.
+gradle.taskGraph.whenReady { graph ->
+    def requestsRelease = graph.allTasks.any { it.project == project && it.name.toLowerCase().contains('release') }
+    if (requestsRelease && !qaSigning && !hasReleaseSigning) {
+        throw new GradleException('Release signing requires all four MANGADOCK_UPLOAD_* values. For local QA only, use -PmangadockQaSigning=true.')
+    }
+    if (requestsRelease && !qaSigning && !file(releaseStoreFile).isFile()) {
+        throw new GradleException('MANGADOCK_UPLOAD_STORE_FILE does not point to a keystore file.')
+    }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.mobile"
+    // A short, checkout-specific staging directory keeps Ninja paths usable on Windows.
+    if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+        externalNativeBuild {
+            cmake {
+                buildStagingDirectory file("${System.getProperty('java.io.tmpdir')}/mangadock-cxx/${Integer.toHexString(rootDir.absolutePath.hashCode())}")
+            }
+        }
+    }
     defaultConfig {
         applicationId "com.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 4
         versionName "1.0.1-beta.3"
+        externalNativeBuild {
+            cmake {
+                arguments "-DCMAKE_OBJECT_PATH_MAX=240"
+            }
+        }
     }
     signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
         debug {
             storeFile file('debug.keystore')
             storePassword 'android'
@@ -98,9 +139,11 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (qaSigning) {
+                signingConfig signingConfigs.debug
+            } else if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

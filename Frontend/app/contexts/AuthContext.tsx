@@ -23,8 +23,21 @@ import { useToast } from "./ToastContext";
 
 const API_BASE = "/api/proxy";
 const DEFAULT_PUBLIC_SITE_URL = "http://localhost:4000";
+const MOBILE_OAUTH_CALLBACK_URL = "mangadock://auth/callback";
 
 // ─── AppUser — Unified user interface for UI components ───────────────
+declare global {
+  interface Window {
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void;
+    };
+    __MANGA_DOCK_CLIENT__?: string;
+    __MANGA_DOCK_NATIVE_AUTH__?: {
+      startOAuth: (provider: "google" | "facebook", url: string) => void;
+    };
+  }
+}
+
 export interface AppUser {
   uid: string;
   id: string;
@@ -252,14 +265,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let active = true;
+    let authRevision = 0;
+    const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
     // Wire token suppliers for userCache and readingHistory
     setTokenSupplier(getIdToken);
     setHistoryTokenSupplier(getIdToken);
 
     // Set up Supabase auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       sessionRef.current = session;
       const suUser = session?.user ?? null;
+      if (suUser?.id !== supabaseUserRef.current?.id) authRevision++;
+      const revision = authRevision;
       supabaseUserRef.current = suUser;
       const appUser = suUser ? adaptUser(suUser) : null;
       setUser(appUser);
@@ -269,43 +287,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // User switched: clear local-first caches to prevent cross-account bleed
         if (lastUidRef.current && lastUidRef.current !== suUser.id) {
           clearUserCache();
-          clearHistory();
+          clearHistory({syncRemote: false});
           clearAllApiCache();
         }
         lastUidRef.current = suUser.id;
 
         if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
           const token = session.access_token;
-          await syncToBackend(token);
-          const profile = await fetchBackendProfile(token);
-          if (profile) {
-            setUser((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                displayName: profile.displayName ?? prev.displayName,
-                photoURL: profile.photoURL ?? prev.photoURL,
-                role: profile.role ?? prev.role,
-              };
+          // Release Supabase's auth notification before network/cache work.
+          const timer = setTimeout(() => {
+            pendingTimers.delete(timer);
+            void (async () => {
+              if (!active || revision !== authRevision) return;
+              await syncToBackend(token);
+              if (!active || revision !== authRevision) return;
+              const profile = await fetchBackendProfile(token);
+              if (!active || revision !== authRevision) return;
+              if (profile) {
+                setUser((prev) => {
+                  if (!prev || prev.uid !== suUser.id) return prev;
+                  return {
+                    ...prev,
+                    displayName: profile.displayName ?? prev.displayName,
+                    photoURL: profile.photoURL ?? prev.photoURL,
+                    role: profile.role ?? prev.role,
+                  };
+                });
+              }
+              await Promise.all([loadUserData(token), loadHistoryData(token)]);
+            })().catch(() => {
+              // Profile/cache hydration must not prevent authentication.
             });
-          }
-          await Promise.all([
-            loadUserData(token),
-            loadHistoryData(token),
-          ]);
+          }, 0);
+          pendingTimers.add(timer);
         }
       } else if (event === "SIGNED_OUT") {
         lastUidRef.current = null;
         clearUserCache();
-        clearHistory();
+        clearHistory({syncRemote: false});
         clearAllApiCache();
       }
     });
 
     return () => {
+      active = false;
+      pendingTimers.forEach(clearTimeout);
       subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -313,10 +341,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * the exact host/IP the user is currently visiting.
    */
   const getOAuthCallbackUrl = () =>
-    (typeof window !== "undefined"
-      ? window.location.origin
-      : (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_URL)) +
-    "/auth/callback";
+    typeof window !== "undefined" &&
+    window.ReactNativeWebView &&
+    window.__MANGA_DOCK_CLIENT__ === "android-mobile-shell"
+      ? `${MOBILE_OAUTH_CALLBACK_URL}?request_id=${crypto.randomUUID()}`
+      : (typeof window !== "undefined"
+          ? window.location.origin
+          : (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_URL)) +
+        "/auth/callback";
+
+  const openOAuthNative = (provider: "google" | "facebook", url: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (
+        typeof window === "undefined" ||
+        !window.ReactNativeWebView ||
+        window.__MANGA_DOCK_CLIENT__ !== "android-mobile-shell"
+      ) {
+        reject(new Error("Native auth bridge is not available"));
+        return;
+      }
+
+      const requestId = new URL(new URL(url).searchParams.get("redirect_to") ?? "").searchParams.get("request_id");
+      if (!requestId || !window.__MANGA_DOCK_NATIVE_AUTH__) {
+        reject(new Error("Native auth request is invalid"));
+        return;
+      }
+      const onNativeOAuthCallback = async (event: Event) => {
+        const detail = (event as CustomEvent<{
+          request_id?: string;
+          access_token?: string;
+          code?: string;
+          error?: string;
+          error_code?: string;
+          refresh_token?: string;
+        }>).detail ?? {};
+
+        if (detail.request_id !== requestId) return;
+        clearTimeout(timeout);
+        window.removeEventListener("mangadock:native-oauth-callback", onNativeOAuthCallback);
+        window.ReactNativeWebView?.postMessage(JSON.stringify({source: "mangadock-web", type: "oauth_callback_consumed", request_id: requestId}));
+        const { code, error, error_code } = detail;
+        if (error_code || error) {
+          if (error_code === "identity_already_exists") {
+            reject(Object.assign(
+              new Error("บัญชีนี้เชื่อมต่อกับบัญชี MangaDock อื่นอยู่แล้ว"),
+              { code: "auth/credential-already-in-use" }
+            ));
+          } else if (error_code === "auth/cancelled-popup-request") {
+            reject(Object.assign(new Error(""), { code: "auth/cancelled-popup-request" }));
+          } else {
+            reject(new Error(error || "เข้าสู่ระบบไม่สำเร็จ กรุณาลองอีกครั้ง"));
+          }
+          return;
+        }
+
+        if (!code) {
+          reject(Object.assign(new Error("ไม่สามารถยืนยันผลการเข้าสู่ระบบได้ กรุณาลองอีกครั้ง"), {code: "auth/native-invalid-callback"}));
+          return;
+        }
+        try {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) reject(exchangeError);
+          else resolve();
+        } catch (exchangeError) {
+          reject(exchangeError);
+        }
+      };
+
+      const timeout = setTimeout(() => {
+        window.removeEventListener("mangadock:native-oauth-callback", onNativeOAuthCallback);
+        window.ReactNativeWebView?.postMessage(JSON.stringify({source: "mangadock-web", type: "oauth_callback_consumed", request_id: requestId}));
+        reject(Object.assign(new Error("Native login timed out"), {code: "auth/native-timeout"}));
+      }, 120_000);
+      window.addEventListener("mangadock:native-oauth-callback", onNativeOAuthCallback);
+
+      try {
+        window.__MANGA_DOCK_NATIVE_AUTH__?.startOAuth(provider, url);
+      } catch (error) {
+        clearTimeout(timeout);
+        window.removeEventListener("mangadock:native-oauth-callback", onNativeOAuthCallback);
+        reject(error);
+      }
+    });
+  };
 
   /** Open an OAuth URL in a centred popup and resolve when the callback postMessages the session back. */
   const openOAuthPopup = (url: string): Promise<void> => {
@@ -338,7 +445,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The callback page postMessages the session tokens (or error) back to us.
       // This works even if the popup callback and opener are on different origins.
       const onMessage = async (event: MessageEvent) => {
-        if (event.data?.type !== "supabase:oauth:callback") return;
+        if (event.origin !== window.location.origin || event.source !== popup || event.data?.type !== "supabase:oauth:callback") return;
         window.removeEventListener("message", onMessage);
         clearInterval(closedPoll);
         try { popup.close(); } catch { /* ignore */ }
@@ -396,6 +503,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const openOAuthFlow = (provider: "google" | "facebook", url: string): Promise<void> => {
+    if (
+      typeof window !== "undefined" &&
+      window.ReactNativeWebView &&
+      window.__MANGA_DOCK_CLIENT__ === "android-mobile-shell"
+    ) {
+      return openOAuthNative(provider, url);
+    }
+
+    return openOAuthPopup(url);
+  };
+
   const signInWithGoogle = async () => {
     const redirectTo = getOAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -403,7 +522,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
-    await openOAuthPopup(data.url);
+    await openOAuthFlow("google", data.url);
   };
 
   const signInWithFacebook = async () => {
@@ -413,7 +532,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
-    await openOAuthPopup(data.url);
+    await openOAuthFlow("facebook", data.url);
   };
 
   const signUpWithEmail = async (email: string, password: string, displayName: string) => {
@@ -500,7 +619,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
-    clearHistory();
+    clearHistory({syncRemote: false});
     clearAllApiCache();
     await supabase.auth.signOut();
     setUser(null);
@@ -554,7 +673,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data?.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
-    await openOAuthPopup(data.url);
+    await openOAuthFlow("google", data.url);
   };
 
   const linkFacebookAccount = async () => {
@@ -564,7 +683,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error || !data?.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
-    await openOAuthPopup(data.url);
+    await openOAuthFlow("facebook", data.url);
   };
 
   const unlinkAccount = async (providerId: string) => {
@@ -668,7 +787,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: { redirectTo, skipBrowserRedirect: true },
       });
       if (error || !data.url) throw error ?? new Error("ไม่สามารถเปิด popup ได้");
-      await openOAuthPopup(data.url);
+      await openOAuthFlow(method, data.url);
     }
   };
 
@@ -684,7 +803,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error(`ลบข้อมูลไม่สำเร็จ (${res.status})`);
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
-    clearHistory();
+    clearHistory({syncRemote: false});
     clearAllApiCache();
     await supabase.auth.signOut();
     setUser(null);
