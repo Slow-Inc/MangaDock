@@ -513,14 +513,14 @@ export default function PublicProfilePage() {
               onClick={() => setTab(t.id)}
               className={`flex items-center gap-1.5 px-4 sm:px-5 py-3 sm:py-3.5 text-xs sm:text-sm font-bold whitespace-nowrap transition-colors shrink-0 ${
                 tab === t.id
-                  ? "text-black border-b-2 border-amber-500 -mb-px bg-white/5"
-                  : "text-black/40 hover:text-white/70"
+                  ? "text-white border-b-2 border-amber-500 -mb-px bg-white/5"
+                  : "text-white/40 hover:text-white/70"
               }`}
             >
               {t.label}
               <span
                 className={`px-1.5 py-0.5 rounded-full text-xs font-black ${
-                  tab === t.id ? "bg-white/20 text-amber-400" : "bg-white/5 text-black/30"
+                  tab === t.id ? "bg-white/20 text-amber-400" : "bg-white/5 text-white/30"
                 }`}
               >
                 {t.count}

@@ -418,7 +418,7 @@ function CommunityContent() {
                         className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
                           newPost.category === cat
                             ? "bg-white border-amber-500 text-black"
-                            : "bg-white/5 text-black/40 border-white/5 hover:border-white/20"
+                            : "bg-white/5 text-white/40 border-white/5 hover:border-white/20"
                         }`}
                       >
                         {cat === 'general' ? 'ทั่วไป' : cat === 'announcement' ? 'ประกาศ' : cat === 'spoiler' ? 'สปอยล์' : 'อัปเดตมังงะ'}

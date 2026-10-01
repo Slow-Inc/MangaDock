@@ -341,7 +341,7 @@ export default function StudioAccountPage() {
                       className={`rounded-2xl border px-3 py-2 text-xs font-medium transition ${
                         selected
                           ? "border-amber-500 bg-white/20 text-amber-300"
-                          : "border-white/10 bg-white/5 text-black/55"
+                          : "border-white/10 bg-white/5 text-white/55"
                       }`}
                     >
                       {lang.label}
@@ -498,7 +498,7 @@ export default function StudioAccountPage() {
                       className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition ${
                         selected
                           ? "border-amber-500 bg-white/20 text-amber-300"
-                          : "border-white/10 bg-white/5 text-black/50 hover:border-white/20 hover:text-white/70"
+                          : "border-white/10 bg-white/5 text-white/50 hover:border-white/20 hover:text-white/70"
                       }`}
                     >
                       {lang.label}

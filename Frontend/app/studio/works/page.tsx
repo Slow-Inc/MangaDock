@@ -252,13 +252,13 @@ export default function WorksPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => setViewMode("list")}
-                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "list" ? "border-amber-500 bg-white/20 text-amber-300" : "border-white/10 bg-white/5 text-black/60"}`}
+                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "list" ? "border-amber-500 bg-white/20 text-amber-300" : "border-white/10 bg-white/5 text-white/60"}`}
                     >
                       แบบรายการ
                     </button>
                     <button
                       onClick={() => setViewMode("card")}
-                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "card" ? "border-amber-500 bg-white/20 text-amber-300" : "border-white/10 bg-white/5 text-black/60"}`}
+                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "card" ? "border-amber-500 bg-white/20 text-amber-300" : "border-white/10 bg-white/5 text-white/60"}`}
                     >
                       แบบการ์ด
                     </button>

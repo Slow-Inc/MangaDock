@@ -35,12 +35,10 @@ export function StudioMobileHeader({
 }
 
 export function StudioMobileHero({
-  eyebrow,
   title,
   description,
   aside,
 }: {
-  eyebrow?: string;
   title: string;
   description: string;
   aside?: ReactNode;

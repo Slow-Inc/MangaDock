@@ -84,7 +84,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
             </span>
             
             <h1 className="relative text-4xl sm:text-5xl font-black mb-6 leading-tight tracking-tighter">
-              เริ่มต้นเส้นทาง <br/><span className="text-transparent bg-clip-text bg-linear-to-r from-amber-400 to-amber-400">Content Creator</span> ของคุณ
+              เริ่มต้นเส้นทาง <br/><span className="text-amber-400">Content Creator</span> ของคุณ
             </h1>
             
             <p className="relative text-white/50 text-lg max-w-2xl mx-auto leading-relaxed mb-10">
@@ -105,7 +105,6 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
             <div className="group p-8 rounded-[2rem] border border-white/5 bg-white/2 backdrop-blur-md smooth-hover hover:border-amber-500/30 hover:bg-white/4 hover:-translate-y-1">
               <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center mb-6 relative overflow-hidden">
-                <div className="absolute inset-0 bg-white/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 <svg className="w-7 h-7 text-amber-400 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
@@ -116,7 +115,6 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
             <div className="group p-8 rounded-[2rem] border border-white/5 bg-white/2 backdrop-blur-md smooth-hover hover:border-amber-500/30 hover:bg-white/4 hover:-translate-y-1">
               <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-6 relative overflow-hidden">
-                <div className="absolute inset-0 bg-amber-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 <svg className="w-7 h-7 text-amber-400 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -127,7 +125,6 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
             <div className="group p-8 rounded-[2rem] border border-white/5 bg-white/2 backdrop-blur-md smooth-hover hover:border-emerald-500/30 hover:bg-white/4 hover:-translate-y-1">
               <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-6 relative overflow-hidden">
-                <div className="absolute inset-0 bg-emerald-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 <svg className="w-7 h-7 text-emerald-400 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2zm10 0V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
                 </svg>
