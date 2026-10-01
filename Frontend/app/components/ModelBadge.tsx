@@ -1,6 +1,8 @@
 import { modelDisplay } from "../lib/modelDisplay";
 
 // "Translated by AI" badge: short brand (e.g. DeepSeek); hover shows the full model name.
+// The marker is a neutral dot on purpose: the badge names many vendors, so it must not
+// borrow any one of their logos.
 export default function ModelBadge({
   model,
   small = false,
@@ -16,14 +18,7 @@ export default function ModelBadge({
         small ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"
       }`}
     >
-      <svg
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className={small ? "h-2.5 w-2.5" : "h-3 w-3"}
-        aria-hidden
-      >
-        <path d="M12 2C6.29 9.5 2 10.5 2 12c0 1.5 4.29 2.5 10 10 5.71-7.5 10-8.5 10-10 0-1.5-4.29-2.5-10-10z" />
-      </svg>
+      <span aria-hidden className={`rounded-full bg-current opacity-60 ${small ? "h-1 w-1" : "h-1.5 w-1.5"}`} />
       {short}
     </span>
   );

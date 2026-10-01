@@ -13,7 +13,7 @@ import { useBookActions } from "../hooks/useBookActions";
 import FollowSeriesButton from "./FollowSeriesButton";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
-import { bookPath, markModalNavigation, modalStack } from "../lib/bookModalHistory";
+import { backOwnEntry, bookPath, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
 import { loadMangaDetail } from "../lib/mangaDetail";
 import { translateDescription } from "../lib/translateDescription";
 import MangaDiscussion from "./MangaDiscussion";
@@ -41,7 +41,7 @@ function isMangaDex(book: LandingBook) {
 // Auto-scrolling title for mobile sticky header when text overflows.
 // Uses a CSS custom property (--marquee-overflow) set as inline style so the
 // keyframe can reference the real pixel distance without JS-driven animation.
-function MarqueeTitle({ title, active, className }: { title: string; active: boolean; className?: string }) {
+function MarqueeTitle({ title, active }: { title: string; active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const [overflow, setOverflow] = useState(0);
@@ -63,7 +63,7 @@ function MarqueeTitle({ title, active, className }: { title: string; active: boo
   const duration = Math.max(5, overflow / 25);
 
   return (
-    <div ref={containerRef} className={`min-w-0 flex-1 overflow-hidden${className ? ` ${className}` : ""}`}>
+    <div ref={containerRef} className="min-w-0 flex-1 overflow-hidden">
       <span
         ref={textRef}
         className="inline-block whitespace-nowrap text-sm font-semibold tracking-[0.01em] text-white/98"
@@ -120,7 +120,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const modalContentRef = useRef<HTMLDivElement>(null);
   const closingRef = useRef(false);
   const historyPushedRef = useRef(false);
-  const modalTokenRef = useRef({}); // identity in modalStack: nested popups, only the top one answers Back
 
   const [isHoveringCovers, setIsHoveringCovers] = useState(false);
   const [coverCanScrollLeft, setCoverCanScrollLeft] = useState(false);
@@ -170,8 +169,21 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     // Give the popup its own URL (/book/<id>) as a real history entry: the link is
     // shareable and Back (browser or hardware) closes it, while the page it was opened
     // over stays mounted behind. `routed` = the URL already points here, nothing to push.
-    const modalToken = modalTokenRef.current;
-    modalStack.push(modalToken);
+    const popup: Popup = {
+      // A Back press: take this popup's history entry and start closing (exit animation).
+      onBack: () => {
+        if (!historyPushedRef.current) return false; // no entry left to give: Back goes to the popup underneath
+        markModalNavigation();
+        historyPushedRef.current = false;
+        if (!closingRef.current) {
+          closingRef.current = true;
+          setVisible(false);
+          setTimeout(onClose, 300);
+        }
+        return true;
+      },
+    };
+    modalStack.push(popup);
     if (!routed && !historyPushedRef.current) { // ref guard: dev StrictMode runs this effect twice
       markModalNavigation();
       window.history.pushState({ mbModal: book.id }, "", bookPath(book.id, window.location.search));
@@ -179,21 +191,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     }
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
-    };
-    const onPop = () => {
-      if (!historyPushedRef.current) return;
-      if (!modalStack.isTop(modalToken)) return; // a popup opened over this one answers first
-      markModalNavigation();
-      historyPushedRef.current = false;
-      if (!closingRef.current) {
-        closingRef.current = true;
-        setVisible(false);
-        setTimeout(onClose, 300);
-      }
+      if (e.key === "Escape" && modalStack.isTop(popup)) handleClose(); // only the top-most popup
     };
     window.addEventListener("keydown", onKey);
-    window.addEventListener("popstate", onPop);
     document.body.style.overflow = "hidden";
 
     // Auto-translate description (#151) via the shared cached helper (F7): start
@@ -231,13 +231,12 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("popstate", onPop);
-      modalStack.remove(modalToken);
+      modalStack.remove(popup);
       document.body.style.overflow = "";
     };
   }, []);
 
-  // Scroll-aware header in mobile modal mode
+  // Scroll-aware header (mobile)
   useEffect(() => {
     if (activeChapter !== null) return;
     const scroller = modalScrollRef.current;
@@ -268,7 +267,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       if (historyPushedRef.current) {
         historyPushedRef.current = false;
         markModalNavigation();
-        window.history.back();
+        backOwnEntry();
       }
       onClose();
     }, delay);
@@ -290,7 +289,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     <div
       className={`fixed inset-0 z-200 flex items-center justify-center md:p-4 md:backdrop-blur-sm transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
     >
-      {/* Backdrop - modal mode only */}
+      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black md:bg-black/80"
         onClick={handleClose}
@@ -331,7 +330,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               <div className="h-1 w-10 rounded-full bg-white/20" />
             </div>
 
-            {/* Close button — modal mode, desktop only */}
+            {/* Close button — desktop only */}
             <button
               onClick={handleClose}
               title="ปิด"
