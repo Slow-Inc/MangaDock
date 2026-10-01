@@ -20,7 +20,6 @@ import { StudioWalletSkeleton } from "../components/StudioSkeleton";
 import {
   GroupedBarChart,
   MetricCard,
-  StudioAnnouncement,
   StudioSection,
 } from "../components/StudioDashboardWidgets";
 import {
@@ -73,7 +72,7 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
         <p className="text-[10px] text-white/20">{dateStr} {timeStr}</p>
       </div>
       <div className="shrink-0 text-right">
-        <p className={`text-sm font-semibold ${isPositive ? "text-indigo-300" : "text-rose-300"}`}>
+        <p className={`text-sm font-semibold ${isPositive ? "text-amber-300" : "text-rose-300"}`}>
           {isPositive ? "+" : "-"}{formatCurrency(Math.abs(tx.amount))}
         </p>
         <p className="text-[10px] text-white/20">คงเหลือ {formatCurrency(tx.balanceAfter)}</p>
@@ -129,7 +128,7 @@ function WalletSummaryModal({
             </div>
             <div className="flex items-center justify-between">
               <span>รายการรายรับ</span>
-              <span className="font-medium text-indigo-300">{incomeTransactionsCount}</span>
+              <span className="font-medium text-amber-300">{incomeTransactionsCount}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>รายการรายจ่าย</span>
@@ -246,10 +245,8 @@ export default function WalletPage() {
       if (mobileView === "menu") {
         return (
           <div className="space-y-4 px-4 py-4">
-            <StudioAnnouncement />
 
             <StudioMobileHero
-              eyebrow="Wallet Center"
               title="กระเป๋าเงินนักแปล"
               description="มือถือจะพาคุณดูเฉพาะยอดหลักและ action สำคัญก่อน แล้วค่อยแยกกราฟกับประวัติธุรกรรมเป็นหน้าย่อย"
               aside={(
@@ -394,14 +391,12 @@ export default function WalletPage() {
 
       <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
         <div className="space-y-5">
-          <StudioAnnouncement />
 
-          <div className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.14),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.8)]">
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.02] p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.32em] text-white/35">Wallet Center</p>
                 <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">กระเป๋าเงินนักแปล</h1>
-                <p className="mt-2 text-sm text-white/45">ดูยอดคงเหลือ แนวโน้มรายวัน รายเดือน และประวัติธุรกรรมในโครงแบบใกล้ dashboard ของ ReadRealm</p>
+                <p className="mt-2 text-sm text-white/45">ดูยอดคงเหลือ แนวโน้มรายวัน รายเดือน และประวัติธุรกรรม</p>
               </div>
               <div className="rounded-2xl border border-amber-400/15 bg-amber-400/10 px-4 py-3 text-right">
                 <p className="text-xs text-white/45">ยอดคงเหลือปัจจุบัน</p>
@@ -439,7 +434,7 @@ export default function WalletPage() {
               {isCreator && earnings !== null && (
                 <StudioSection
                   title="ยอดขาย"
-                  subtitle="สถิติการขายบทแปลสะสมทั้งหมดของคุณ — ข้อมูลจาก translator_earnings"
+                  subtitle="สถิติการขายบทแปลสะสมทั้งหมดของคุณ"
                 >
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <MetricCard label="ยอดขายทั้งหมด" value={earnings.totalSales} hint="จำนวนครั้งที่มีคนซื้อ" tone="indigo" />

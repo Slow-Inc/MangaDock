@@ -6,11 +6,11 @@ import { formatCompactNumber } from "../lib/dashboardAnalytics";
 
 const TONE_STYLES = {
   indigo: {
-    text: "text-indigo-300",
-    border: "border-indigo-500/20",
-    bg: "bg-indigo-500/10",
-    fill: "#818cf8",
-    softFill: "rgba(129,140,248,0.28)",
+    text: "text-amber-300",
+    border: "border-amber-500/20",
+    bg: "bg-amber-500/10",
+    fill: "#fbbf24",
+    softFill: "rgba(251,191,36,0.26)",
   },
   emerald: {
     text: "text-emerald-300",
@@ -34,18 +34,18 @@ const TONE_STYLES = {
     softFill: "rgba(251,113,133,0.24)",
   },
   sky: {
-    text: "text-sky-300",
-    border: "border-sky-500/20",
-    bg: "bg-sky-500/10",
-    fill: "#38bdf8",
-    softFill: "rgba(56,189,248,0.24)",
+    text: "text-white/70",
+    border: "border-white/10",
+    bg: "bg-white/5",
+    fill: "#94a3b8",
+    softFill: "rgba(148,163,184,0.22)",
   },
   violet: {
-    text: "text-violet-300",
-    border: "border-violet-500/20",
-    bg: "bg-violet-500/10",
-    fill: "#a78bfa",
-    softFill: "rgba(167,139,250,0.24)",
+    text: "text-white/70",
+    border: "border-white/10",
+    bg: "bg-white/5",
+    fill: "#94a3b8",
+    softFill: "rgba(148,163,184,0.22)",
   },
   slate: {
     text: "text-white/70",
@@ -62,23 +62,6 @@ function getToneStyles(tone: Tone = "indigo") {
   return TONE_STYLES[tone];
 }
 
-export function StudioAnnouncement() {
-  return (
-    <div className="rounded-2xl border border-indigo-400/35 bg-indigo-500/8 px-4 py-3 text-sm text-indigo-200 shadow-[0_0_0_1px_rgba(129,140,248,0.05)]">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 rounded-full bg-indigo-400/15 p-1 text-indigo-200">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-7.11 12.3A2 2 0 004.91 19h14.18a2 2 0 001.73-2.84l-7.11-12.3a2 2 0 00-3.46 0z" />
-          </svg>
-        </div>
-        <p>
-          ประกาศ: แดชบอร์ด Studio แสดงข้อมูลจากระบบจริงที่มีอยู่ใน MetaBooks แล้ว และจะขยายเพิ่มได้ทันทีเมื่อ backend analytics พร้อม
-        </p>
-      </div>
-    </div>
-  );
-}
-
 export function StudioSection({
   title,
   subtitle,
@@ -91,7 +74,7 @@ export function StudioSection({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[1.75rem] border border-white/10 bg-white/[0.035] p-5 shadow-[0_20px_60px_-35px_rgba(0,0,0,0.65)] backdrop-blur-xl">
+    <section className="rounded-[1.75rem] border border-white/10 bg-white/[0.035] p-5 backdrop-blur-xl">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-base font-semibold text-white">{title}</h2>
@@ -119,11 +102,11 @@ export function MetricCard({
 }) {
   const styles = getToneStyles(tone);
   return (
-    <div className={`rounded-2xl border ${styles.border} ${styles.bg} p-4`}>
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs text-white/45">{label}</p>
-          <div className={`mt-2 text-2xl font-semibold ${styles.text}`}>{value}</div>
+          <div className="mt-2 text-2xl font-semibold tabular-nums text-white">{value}</div>
           {hint ? <p className="mt-1 text-[11px] text-white/30">{hint}</p> : null}
         </div>
         {icon ? <div className={`shrink-0 ${styles.text}`}>{icon}</div> : null}

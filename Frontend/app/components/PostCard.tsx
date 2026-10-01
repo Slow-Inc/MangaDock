@@ -97,7 +97,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
               href={`/community/profile/${post.authorUid}`}
               onClick={(e) => e.stopPropagation()}
               className={`font-bold hover:underline underline-offset-2 truncate max-w-[80px] sm:max-w-none smooth-hover ${
-                post.authorRole === 1 ? "text-indigo-400" :
+                post.authorRole === 1 ? "text-amber-400" :
                 post.authorRole === 2 ? "text-orange-400" : "text-white/50"
               }`}
             >
@@ -108,7 +108,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
               {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: th })}
             </span>
             {post.category !== 'general' && (
-              <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 font-bold whitespace-nowrap shrink-0">
+              <span className="px-1.5 py-0.5 rounded-full bg-white/10 text-amber-400 font-bold whitespace-nowrap shrink-0">
                 {post.category === 'announcement' ? 'ประกาศ' : post.category === 'spoiler' ? 'สปอยล์' : 'อัปเดต'}
               </span>
             )}
@@ -125,7 +125,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
 
           {/* Title */}
           <Link href={`/community/p/${post.id}`} className="block group/link">
-            <h3 className="font-bold text-white group-hover/link:text-indigo-400 smooth-hover text-sm leading-snug line-clamp-2">
+            <h3 className="font-bold text-white group-hover/link:text-amber-400 smooth-hover text-sm leading-snug line-clamp-2">
               {post.title}
             </h3>
           </Link>
@@ -185,14 +185,14 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
             href={`/community/profile/${post.authorUid}`}
             onClick={(e) => e.stopPropagation()}
             className={`font-bold text-sm truncate smooth-hover hover:underline underline-offset-2 ${
-              post.authorRole === 1 ? "text-indigo-400" :
+              post.authorRole === 1 ? "text-amber-400" :
               post.authorRole === 2 ? "text-orange-400" : "text-white/80"
             }`}
           >
             {post.authorName || 'Unknown User'}
             {post.authorRole > 0 && (
               <span className={`ml-1.5 px-1.5 py-0.5 rounded text-xs font-bold uppercase tracking-tighter ${
-                post.authorRole === 1 ? 'bg-indigo-500/15 text-indigo-400' :
+                post.authorRole === 1 ? 'bg-white/15 text-amber-400' :
                 post.authorRole === 2 ? 'bg-orange-500/15 text-orange-400' :
                 'bg-red-500/15 text-red-400'
               }`}>
@@ -208,7 +208,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
 
       <div className="flex-1 flex flex-col min-h-0">
         <Link href={`/community/p/${post.id}`} className="block group/link mb-3">
-          <h3 className="text-lg font-black text-white mb-2 line-clamp-2 leading-tight tracking-tight group-hover/link:text-indigo-400 smooth-hover">
+          <h3 className="text-lg font-black text-white mb-2 line-clamp-2 leading-tight tracking-tight group-hover/link:text-amber-400 smooth-hover">
             {post.title}
           </h3>
           <div className="relative">
@@ -263,7 +263,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
         {/* Tags area positioned at the bottom of the content area */}
         <div className="mt-auto pt-3 flex flex-wrap items-center gap-2">
           {post.category !== 'general' && (
-            <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-bold uppercase tracking-wider smooth-hover border border-indigo-500/20">
+            <span className="px-2.5 py-1 rounded-full bg-white/10 text-amber-400 text-xs font-bold uppercase tracking-wider smooth-hover border border-amber-500/20">
               {CAT_LABEL[post.category] ?? post.category}
             </span>
           )}

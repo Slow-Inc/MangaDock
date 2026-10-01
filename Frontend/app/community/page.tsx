@@ -205,7 +205,7 @@ function CommunityContent() {
         
         <button
           onClick={() => user ? openModal() : showLoginPrompt()}
-          className="hidden sm:block px-8 py-3 rounded-2xl bg-indigo-600 text-white font-black text-sm hover:bg-indigo-500 shadow-xl shadow-indigo-500/20 smooth-hover shrink-0 active:scale-95"
+          className="hidden sm:block px-8 py-3 rounded-2xl bg-white text-black font-black text-sm hover:bg-white/90 smooth-hover shrink-0 active:scale-95"
         >
           + สร้างโพสต์ใหม่
         </button>
@@ -221,13 +221,13 @@ function CommunityContent() {
           <div className="w-px h-5 bg-white/10 shrink-0" />
           <button
             onClick={() => handleMobileCategorySelect(undefined)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${!category ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white/50'}`}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${!category ? 'bg-white border-amber-500 text-black' : 'bg-white/5 border-white/10 text-black/50'}`}
           >ทั้งหมด</button>
           {availableCategories(userRole).map(cat => (
             <button
               key={cat}
               onClick={() => handleMobileCategorySelect(category === cat ? undefined : cat)}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${category === cat ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white/50'}`}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${category === cat ? 'bg-white border-amber-500 text-black' : 'bg-white/5 border-white/10 text-black/50'}`}
             >
               {cat === 'general' ? 'ทั่วไป' : cat === 'announcement' ? 'ประกาศ' : cat === 'spoiler' ? 'สปอยล์' : 'อัปเดต'}
             </button>
@@ -276,7 +276,7 @@ function CommunityContent() {
             </div>
           )}
           {category && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold animate-in fade-in zoom-in-95">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-amber-500/20 text-amber-400 text-xs font-bold animate-in fade-in zoom-in-95">
               <span>หมวด: {category === 'general' ? 'ทั่วไป' : category === 'announcement' ? 'ประกาศ' : category === 'spoiler' ? 'สปอยล์' : 'อัปเดตมังงะ'}</span>
               <button onClick={() => {
                 const params = new URLSearchParams(window.location.search);
@@ -316,7 +316,7 @@ function CommunityContent() {
         <div className="sticky top-20 z-30 flex justify-center mb-4 pointer-events-none">
           <button
             onClick={() => { fetchPosts(); setNewPostCount(0); }}
-            className="pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-600 text-white text-sm font-bold shadow-xl shadow-indigo-500/30 animate-in slide-in-from-top-2 duration-300 hover:bg-indigo-500 active:scale-95 transition-transform"
+            className="pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black text-sm font-bold animate-in slide-in-from-top-2 duration-300 hover:bg-white/90 active:scale-95 transition-transform"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
@@ -345,7 +345,7 @@ function CommunityContent() {
             </div>
             <p className="text-white/40 font-medium">ยังไม่มีโพสต์ในหมวดหมู่นี้</p>
             {user && (
-              <button onClick={openModal} className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-500 smooth-hover">
+              <button onClick={openModal} className="px-5 py-2 rounded-xl bg-white text-black text-sm font-bold hover:bg-white/90 smooth-hover">
                 สร้างโพสต์แรก
               </button>
             )}
@@ -417,7 +417,7 @@ function CommunityContent() {
                         onClick={() => setNewPost({ ...newPost, category: cat })}
                         className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
                           newPost.category === cat
-                            ? "bg-indigo-600 border-indigo-500 text-white"
+                            ? "bg-white border-amber-500 text-black"
                             : "bg-white/5 text-white/40 border-white/5 hover:border-white/20"
                         }`}
                       >
@@ -440,7 +440,7 @@ function CommunityContent() {
                   value={newPost.title}
                   onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
                   placeholder="เขียนหัวข้อโพสต์ที่นี่..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all"
                 />
               </div>
 
@@ -451,7 +451,7 @@ function CommunityContent() {
                   onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
                   placeholder="รายละเอียดสิ่งที่คุณต้องการจะพูดคุย..."
                   rows={4}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all resize-none"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all resize-none"
                 />
               </div>
 
@@ -470,7 +470,7 @@ function CommunityContent() {
               <button
                 onClick={handleCreatePost}
                 disabled={!newPost.title.trim() || !newPost.content.trim() || submitting}
-                className="flex-1 sm:flex-none px-8 py-3 rounded-xl bg-indigo-600 text-white font-black text-sm hover:bg-indigo-500 shadow-lg shadow-indigo-500/20 disabled:opacity-40 transition-all active:scale-95"
+                className="flex-1 sm:flex-none px-8 py-3 rounded-xl bg-white text-black font-black text-sm hover:bg-white/90 disabled:opacity-40 transition-all active:scale-95"
               >
                 {submitting ? "กำลังโพสต์..." : "โพสต์เลย"}
               </button>
@@ -482,7 +482,7 @@ function CommunityContent() {
       {/* FAB — Mobile Create Post */}
       <button
         onClick={() => user ? openModal() : showLoginPrompt()}
-        className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-2xl shadow-indigo-500/40 sm:hidden active:scale-95 transition-transform"
+        className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-white text-black flex items-center justify-center sm:hidden active:scale-95 transition-transform"
         aria-label="สร้างโพสต์"
       >
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -498,7 +498,7 @@ export default function CommunityPage() {
     <CommunityErrorBoundary>
       <Suspense fallback={
         <div className="min-h-screen bg-[#141414] flex items-center justify-center">
-          <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+          <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
         </div>
       }>
         <CommunityContent />
