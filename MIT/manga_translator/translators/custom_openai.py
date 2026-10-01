@@ -1,3 +1,4 @@
+import os
 import re
 
 from ..config import TranslatorConfig
@@ -13,6 +14,28 @@ import time
 from typing import List
 from .common import CommonTranslator, VALID_LANGUAGES
 from .keys import CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_API_BASE, CUSTOM_OPENAI_MODEL, CUSTOM_OPENAI_MODEL_CONF
+
+
+def resolve_enable_thinking(env=None) -> bool:
+    """Whether to leave the LLM's native thinking/reasoning mode on. Default OFF:
+    a qwen3-style reasoning model can spend the whole ``max_tokens`` budget on
+    ``<think>`` output and return empty ``content`` on dense pages (#623 — the
+    One-Punch narration group: 6502 chars of reasoning → completion cap hit →
+    ``content=None`` → the translate 500s the whole page). Set
+    ``CUSTOM_OPENAI_ENABLE_THINKING=true`` to re-enable for a non-thinking model."""
+    if env is None:
+        env = os.environ
+    return str(env.get('CUSTOM_OPENAI_ENABLE_THINKING', 'false')).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def thinking_extra_body(enable_thinking: bool):
+    """``extra_body`` for ``chat.completions.create`` that suppresses qwen3-style
+    thinking when disabled (``chat_template_kwargs.enable_thinking=false`` — the
+    lever the 9arm/vLLM gateway honours; a top-level ``enable_thinking`` is
+    ignored). Returns ``None`` when thinking is enabled so the call is unchanged."""
+    if enable_thinking:
+        return None
+    return {'chat_template_kwargs': {'enable_thinking': False}}
 
 
 class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
@@ -237,12 +260,18 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
 
         messages.append({'role': 'user', 'content': prompt})
 
+        # #623: a reasoning model spends the whole completion budget on <think> and
+        # returns content=None, which #631 now turns into a retryable APIError. This is
+        # the root cause — opt out of thinking unless the deploy explicitly wants it.
+        extra_body = thinking_extra_body(resolve_enable_thinking())
+
         response = await self.client.chat.completions.create(
             model=self.model or CUSTOM_OPENAI_MODEL,
             messages=messages,
             max_tokens=self._MAX_TOKENS // 2,
             temperature=self.temperature,
             top_p=self.top_p,
+            extra_body=extra_body,
         )
 
         # #631: the gateway can return message.content = None (e.g. the model spent its
