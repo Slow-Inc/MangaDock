@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import type { SupabaseAuthUser } from '../auth/auth.types';
+import { clampInt } from '../common/query-params';
 import { NotificationsService } from './notifications.service';
 
 @Controller('notifications')
@@ -24,13 +25,15 @@ export class NotificationsController {
   ) {
     return this.notifs.getNotifications(
       req[USER_KEY].uid,
-      limit ? Math.min(Number(limit), 50) : 30,
+      clampInt(limit, 30, 1, 50),
     );
   }
 
   @Get('unread-count')
   getUnreadCount(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
-    return this.notifs.getUnreadCount(req[USER_KEY].uid).then((count) => ({ count }));
+    return this.notifs
+      .getUnreadCount(req[USER_KEY].uid)
+      .then((count) => ({ count }));
   }
 
   @Patch('read-all')

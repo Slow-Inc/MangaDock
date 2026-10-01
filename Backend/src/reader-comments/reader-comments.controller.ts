@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import type { SupabaseAuthUser } from '../auth/auth.types';
+import { AddCommentDto, GetCommentsQueryDto } from './reader-comments.dto';
 import { ReaderCommentsService } from './reader-comments.service';
 
 @Controller('reader-comments')
@@ -18,19 +19,15 @@ export class ReaderCommentsController {
   constructor(private readonly svc: ReaderCommentsService) {}
 
   @Get()
-  getComments(
-    @Query('mangaId') mangaId: string,
-    @Query('chapterId') chapterId: string,
-    @Query('page') page: string,
-  ) {
-    return this.svc.getComments(mangaId, chapterId, Number(page));
+  getComments(@Query() query: GetCommentsQueryDto) {
+    return this.svc.getComments(query.mangaId, query.chapterId, query.page);
   }
 
   @Post()
   @UseGuards(AuthGuard)
   addComment(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { mangaId: string; chapterId: string; pageNumber: number; body: string },
+    @Body() body: AddCommentDto,
   ) {
     return this.svc.addComment(
       req[USER_KEY].uid,

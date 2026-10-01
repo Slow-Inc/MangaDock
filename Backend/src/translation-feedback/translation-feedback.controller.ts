@@ -11,6 +11,11 @@ import {
 } from '@nestjs/common';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import type { SupabaseAuthUser } from '../auth/auth.types';
+import {
+  PageQueryDto,
+  SubmitVoteDto,
+  SummaryQueryDto,
+} from './translation-feedback.dto';
 import { TranslationFeedbackService } from './translation-feedback.service';
 
 @Controller('translation-feedback')
@@ -18,29 +23,29 @@ export class TranslationFeedbackController {
   constructor(private readonly svc: TranslationFeedbackService) {}
 
   @Get('summary')
-  getSummary(
-    @Query('mangaId') mangaId: string,
-    @Query('chapterId') chapterId: string,
-  ) {
-    return this.svc.getChapterSummary(mangaId, chapterId);
+  getSummary(@Query() query: SummaryQueryDto) {
+    return this.svc.getChapterSummary(query.mangaId, query.chapterId);
   }
 
   @Get('my')
   @UseGuards(AuthGuard)
   getMyVote(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Query('mangaId') mangaId: string,
-    @Query('chapterId') chapterId: string,
-    @Query('page') page: string,
+    @Query() query: PageQueryDto,
   ) {
-    return this.svc.getMyVote(req[USER_KEY].uid, mangaId, chapterId, Number(page));
+    return this.svc.getMyVote(
+      req[USER_KEY].uid,
+      query.mangaId,
+      query.chapterId,
+      query.page,
+    );
   }
 
   @Post()
   @UseGuards(AuthGuard)
   submitVote(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { mangaId: string; chapterId: string; pageNumber: number; vote: 1 | -1 },
+    @Body() body: SubmitVoteDto,
   ) {
     return this.svc.submitVote(
       req[USER_KEY].uid,
@@ -55,10 +60,13 @@ export class TranslationFeedbackController {
   @UseGuards(AuthGuard)
   deleteVote(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Query('mangaId') mangaId: string,
-    @Query('chapterId') chapterId: string,
-    @Query('page') page: string,
+    @Query() query: PageQueryDto,
   ) {
-    return this.svc.deleteVote(req[USER_KEY].uid, mangaId, chapterId, Number(page));
+    return this.svc.deleteVote(
+      req[USER_KEY].uid,
+      query.mangaId,
+      query.chapterId,
+      query.page,
+    );
   }
 }

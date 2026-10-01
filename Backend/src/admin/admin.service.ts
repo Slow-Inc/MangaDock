@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { quoteFilterValue } from '../common/query-params';
 import { SupabaseService } from '../supabase/supabase.service';
 import { ROLE } from '../users/users.service';
 
@@ -166,9 +167,8 @@ export class AdminService {
       .range(from, to);
 
     if (q.search) {
-      query = query.or(
-        `email.ilike.%${q.search}%,display_name.ilike.%${q.search}%`,
-      );
+      const pattern = quoteFilterValue(`%${q.search}%`);
+      query = query.or(`email.ilike.${pattern},display_name.ilike.${pattern}`);
     }
     if (q.role !== undefined) query = query.eq('role', q.role);
     if (q.plan) query = query.eq('plan', q.plan);
@@ -377,7 +377,8 @@ export class AdminService {
       .range(from, to);
 
     if (q.search) {
-      query = query.or(`title.ilike.%${q.search}%,content.ilike.%${q.search}%`);
+      const pattern = quoteFilterValue(`%${q.search}%`);
+      query = query.or(`title.ilike.${pattern},content.ilike.${pattern}`);
     }
     if (q.category) query = query.eq('category', q.category);
     if (q.authorUid) query = query.eq('author_uid', q.authorUid);

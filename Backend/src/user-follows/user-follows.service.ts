@@ -60,7 +60,7 @@ export class UserFollowsService {
 
     if (error) throw new Error(`Failed to get following: ${error.message}`);
     return (data ?? [])
-      .map((r) => (r as { profiles: ProfileRow | null }).profiles)
+      .map((r) => (r as unknown as { profiles: ProfileRow | null }).profiles)
       .filter(Boolean)
       .map((p) => this.mapProfile(p as ProfileRow));
   }
@@ -74,7 +74,7 @@ export class UserFollowsService {
 
     if (error) throw new Error(`Failed to get followers: ${error.message}`);
     return (data ?? [])
-      .map((r) => (r as { profiles: ProfileRow | null }).profiles)
+      .map((r) => (r as unknown as { profiles: ProfileRow | null }).profiles)
       .filter(Boolean)
       .map((p) => this.mapProfile(p as ProfileRow));
   }
