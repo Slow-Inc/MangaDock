@@ -35,7 +35,7 @@ The popup callback page `Frontend/app/auth/callback/page.tsx` runs inside the po
 - explicit `signOut()` (`:508`),
 - `deleteAccount()` (`:693`).
 
-It is always paired with `clearUserCache()` + `clearHistory()` for the local-first caches. This is the security-relevant invariant: a full clear is correct-by-construction regardless of how individual entries were tagged.
+It is always paired with the other per-user client caches — `clearUserCache()`, the reading-history reset and `clearFollowCache()`. *(Updated 2026-10-01, #722: these four calls used to be written out at each of the four sites above; they now live in one function, `resetClientStateForIdentityChange()` in `lib/identityReset.ts`, called from all four. The history reset is `resetHistoryForIdentityChange()`, local-only by design — see #720.)* This is the security-relevant invariant: a full clear is correct-by-construction regardless of how individual entries were tagged.
 
 ### 4. `showLoginPrompt()` toast, never `alert()`
 
@@ -54,7 +54,7 @@ It is always paired with `clearUserCache()` + `clearHistory()` for the local-fir
 - **Positive — single point of provider coupling.** Swapping or augmenting the auth provider is localized to `adaptUser`/`mapProviderId` and the `signInWithOAuth` calls; the rest of the UI keeps consuming `AppUser`.
 - **Positive — OAuth without SPA teardown.** Popup + `postMessage` + `reloadPage()` on success keeps in-memory state alive during the OAuth handshake and gives explicit, mapped error codes to the UI.
 - **Positive — consistent toast UX** for auth-required actions via `showLoginPrompt()` with a one-tap path into the login modal.
-- **Negative / limits — the cache-clear invariant is implicit and easy to drop.** `clearAllApiCache()` lives in the auth context, not enforced by the cache module. A cache refactor (e.g. switching to scoped/keyed caches, or introducing a second cache store) that forgets to re-wire all four call sites silently reintroduces cross-user bleed with no test or type error to catch it.
+- **Negative / limits — the cache-clear invariant is implicit and easy to drop.** `clearAllApiCache()` lives in the auth context, not enforced by the cache module. A cache refactor (e.g. switching to scoped/keyed caches, or introducing a second cache store) that forgets to re-wire `resetClientStateForIdentityChange()` (it was "all four call sites" until #722) silently reintroduces cross-user bleed with no type error to catch it; `identityReset.test.ts` now pins today's four caches, but a new per-user cache must still be added to that function by hand.
 - **Negative / limits — popup OAuth race conditions.** Correctness depends on the `closedPoll` interval, the `message` listener, and `popup.close()` all being torn down on every exit path; popup blockers reject up-front (`auth/popup-blocked`, `:334-337`); and the `postMessage` target origin is `"*"`, with safety resting on the `type` filter rather than an origin check.
 - **Negative / limits — full clear discards still-valid cross-user-safe entries** (e.g. quasi-static `TTL.LONG` catalog data), forcing a re-fetch after every sign-in/out. Accepted as the price of a provably-safe clear.
 - **Follow-ups:** consider moving the auth-change cache reset behind a single helper the cache module owns (so it can't be forgotten in a refactor); add an explicit allowed-origin check in the `postMessage` handler; if `message` delivery ever proves flaky, the `popup.closed` poll already provides a fallback resolution path.

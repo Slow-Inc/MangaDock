@@ -40,14 +40,18 @@ explorer (`AuthContext` identity-reset sites), then reproduced by running the re
 `localStorage`/`fetch`. No UI ever called `clearHistory()` — only the four identity resets — so the
 "clear everything on the server" path had no legitimate caller.
 
-**Not in scope:** the structural fix (one owner for resetting user cache + history + follow cache +
-API cache — four calls repeated at four sites; the architecture review's candidate D). Not seen in a real
-browser yet. No issue filed yet.
+**Follow-ups:** the structural fix (one owner for resetting user cache + history + follow cache + API
+cache — the architecture review's candidate D) is #722, stacked on this. Issue for this fix: #720. Not
+seen in a real browser yet. A later commit (`731e4dad`, found by `/simplify`) also makes the reset cancel
+the debounce timer it left scheduled, as `clearUserCache` does. The backend `DELETE /users/me/history`
+route is now unused by the web client (its only caller was the removed branch) and was left in place —
+the Mobile client is unchecked.
 
-**Validation:** TDD — `readingHistory.test.ts` (4 tests; first run against the old code: the
-sign-out → sign-in test red with `DELETE …/history [B]` instead of `POST`, then green after the change).
-`app/lib` 137 passed; `tsc` 0 errors; ESLint count unchanged on the two touched files (2 → 2, pre-existing).
-E2E (real sign-out/sign-in) **not run**; `/scrutinize` not run.
+**Validation:** TDD — `readingHistory.test.ts` (5 tests; first run against the old code: the
+sign-out → sign-in test red with `DELETE …/history [B]` instead of `POST`, then green after the change;
+the timer test red with one stale token lookup). `app/lib` 138 passed; `tsc` 0 errors; ESLint count
+unchanged on the touched files. Gates: `/simplify` ran, `/security-review` ran (no findings),
+`/code-review` ran. **Not run:** E2E (real sign-out/sign-in) and `/scrutinize`.
 
 ## #694 — SFX rescue says why it returned nothing (2026-09-26)
 
@@ -1185,14 +1189,17 @@ key ใน storage โดยไม่มีวันตั้งเวลาเ�
 โมดูลจริงด้วย `localStorage`/`fetch` จำลอง ไม่มี UI ไหนเรียก `clearHistory()` เลย มีแต่การรีเซ็ตตัวตน 4 จุด
 เส้นทาง "ลบทุกอย่างบนเซิร์ฟเวอร์" จึงไม่มีผู้เรียกที่ชอบธรรม
 
-**นอกขอบเขต:** การแก้เชิงโครงสร้าง (เจ้าของเดียวสำหรับรีเซ็ต user cache + history + follow cache + API cache
-ซึ่งตอนนี้เรียก 4 ครั้งซ้ำที่ 4 จุด คือ candidate D ของ architecture review) ยังไม่เคยเห็นในเบราว์เซอร์จริง
-ยังไม่ได้เปิด issue
+**งานต่อ:** การแก้เชิงโครงสร้าง (เจ้าของเดียวสำหรับรีเซ็ต user cache + history + follow cache + API cache —
+candidate D ของ architecture review) คือ #722 ซึ่งซ้อนบนอันนี้ Issue ของการแก้นี้: #720 ยังไม่เคยเห็นในเบราว์เซอร์จริง
+commit ถัดมา (`731e4dad` พบโดย `/simplify`) ทำให้การรีเซ็ตยกเลิก timer debounce ที่ค้างอยู่ด้วย เหมือนที่
+`clearUserCache` ทำ route `DELETE /users/me/history` ฝั่ง backend ตอนนี้ web client ไม่เรียกแล้ว
+(ผู้เรียกเดียวคือกิ่งที่ลบไป) และถูกทิ้งไว้ — ยังไม่ได้ตรวจ Mobile client
 
-**การตรวจสอบ:** TDD — `readingHistory.test.ts` (4 test; รันครั้งแรกกับโค้ดเก่า test ออกจากระบบ → ล็อกอินใหม่
-แดงด้วย `DELETE …/history [B]` แทนที่จะเป็น `POST` แล้วเขียวหลังแก้) `app/lib` ผ่าน 137, `tsc` 0 error,
-จำนวน ESLint ในสองไฟล์ที่แตะไม่เปลี่ยน (2 → 2 ของเดิม) E2E (ออกจากระบบ/ล็อกอินจริง) **ยังไม่ได้รัน**
-`/scrutinize` ยังไม่ได้รัน
+**การตรวจสอบ:** TDD — `readingHistory.test.ts` (5 test; รันครั้งแรกกับโค้ดเก่า test ออกจากระบบ → ล็อกอินใหม่
+แดงด้วย `DELETE …/history [B]` แทนที่จะเป็น `POST` แล้วเขียวหลังแก้; test ของ timer แดงเพราะมีการขอ token ค้างหนึ่งครั้ง)
+`app/lib` ผ่าน 138, `tsc` 0 error, จำนวน ESLint ในไฟล์ที่แตะไม่เปลี่ยน Gate: `/simplify` รันแล้ว,
+`/security-review` รันแล้ว (ไม่พบช่องโหว่), `/code-review` รันแล้ว **ยังไม่ได้รัน:** E2E (ออกจากระบบ/ล็อกอินจริง)
+และ `/scrutinize`
 
 ## #694 — SFX rescue บอกเหตุผลเมื่อคืนค่าว่าง (2026-09-26)
 
