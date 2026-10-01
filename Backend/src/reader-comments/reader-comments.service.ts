@@ -64,7 +64,7 @@ export class ReaderCommentsService {
       .limit(limit);
 
     if (error) throw new Error(`Failed to fetch comments: ${error.message}`);
-    return (data ?? []).map((r) => this.map(r as CommentRow));
+    return (data ?? []).map((r) => this.map(r as unknown as CommentRow));
   }
 
   async addComment(
@@ -84,7 +84,7 @@ export class ReaderCommentsService {
 
     if (error) throw new Error(`Failed to add comment: ${error.message}`);
     this.logger.log(`User ${uid} commented on ${mangaId}/${chapterId} p${pageNumber}`);
-    return this.map(data as CommentRow);
+    return this.map(data as unknown as CommentRow);
   }
 
   async deleteComment(uid: string, id: string): Promise<void> {
