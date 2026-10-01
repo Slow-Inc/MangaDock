@@ -19,7 +19,7 @@ import {
 } from "../lib/emailValidation";
 import { setTokenSupplier, loadUserData, clearUserCache, flushNow } from "../lib/userCache";
 import { clearFollowCache } from "../hooks/useSeriesFollow";
-import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData } from "../lib/readingHistory";
+import { resetHistoryForIdentityChange, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData } from "../lib/readingHistory";
 import { clearAllApiCache } from "../lib/apiCache";
 import { reloadPage, redirectToHome } from "../lib/browserActions";
 import { getHardwareId } from "../lib/fingerprint";
@@ -376,7 +376,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // User switched: clear local-first caches to prevent cross-account bleed
         if (lastUidRef.current && lastUidRef.current !== suUser.id) {
           clearUserCache();
-          clearHistory();
+          resetHistoryForIdentityChange();
           clearFollowCache();
           clearAllApiCache();
         }
@@ -428,7 +428,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (event === "SIGNED_OUT") {
         lastUidRef.current = null;
         clearUserCache();
-        clearHistory();
+        resetHistoryForIdentityChange();
         clearFollowCache();
         clearAllApiCache();
       }
@@ -701,7 +701,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
-    clearHistory();
+    resetHistoryForIdentityChange();
     clearFollowCache();
     clearAllApiCache();
     await supabase.auth.signOut();
@@ -880,7 +880,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error(`ลบข้อมูลไม่สำเร็จ (${res.status})`);
     await Promise.all([flushNow(), flushHistoryNow()]);
     clearUserCache();
-    clearHistory();
+    resetHistoryForIdentityChange();
     clearFollowCache();
     clearAllApiCache();
     await supabase.auth.signOut();

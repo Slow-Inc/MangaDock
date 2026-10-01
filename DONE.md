@@ -3,6 +3,31 @@
 
 ---
 
+## Reading history: an identity change can no longer delete the new user's server history (2026-10-01)
+
+**What:** `Frontend/app/lib/readingHistory.ts` — `clearHistory()` is now
+`resetHistoryForIdentityChange()` and is local-only: it forgets the list, the unflushed changes and the
+storage keys, and never schedules a server write. The `clearAll` flag and the "DELETE
+`/users/me/history`" branch of the flush are removed. `AuthContext.tsx` calls the new name at its four
+identity-change sites (account switch, sign-out, ×2).
+
+**Why:** `clearHistory()` set `clearAll = true` whenever the user had synced history, and the flag was
+only cleared by a flush that *had a token*. Sign-out → the flush runs with no token and returns early →
+the flag survives → user B signs in on the same page (no reload) → B reads one chapter → the flush sends
+`DELETE /users/me/history` with **B's token** instead of B's upsert. Found by an architecture review's
+explorer (`AuthContext` identity-reset sites), then reproduced by running the real module with stubbed
+`localStorage`/`fetch`. No UI ever called `clearHistory()` — only the four identity resets — so the
+"clear everything on the server" path had no legitimate caller.
+
+**Not in scope:** the structural fix (one owner for resetting user cache + history + follow cache +
+API cache — four calls repeated at four sites; the architecture review's candidate D). Not seen in a real
+browser yet. No issue filed yet.
+
+**Validation:** TDD — `readingHistory.test.ts` (4 tests; first run against the old code: the
+sign-out → sign-in test red with `DELETE …/history [B]` instead of `POST`, then green after the change).
+`app/lib` 137 passed; `tsc` 0 errors; ESLint count unchanged on the two touched files (2 → 2, pre-existing).
+E2E (real sign-out/sign-in) **not run**; `/scrutinize` not run.
+
 ## #694 — SFX rescue says why it returned nothing (2026-09-26)
 
 **What:** `MIT/manga_translator/ocr_vlm.py` `vlm_localize_sfx` now logs one `WARNING` when the
@@ -1102,6 +1127,30 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 # DONE — Claude Code Review Fix Session (2026-05-27)
 
 ---
+
+## ประวัติการอ่าน: การเปลี่ยนตัวตนผู้ใช้ไม่สามารถลบประวัติบนเซิร์ฟเวอร์ของผู้ใช้คนใหม่ได้อีก (2026-10-01)
+
+**ทำอะไร:** `Frontend/app/lib/readingHistory.ts` — `clearHistory()` เปลี่ยนเป็น
+`resetHistoryForIdentityChange()` และทำงานเฉพาะในเครื่อง: ลืมรายการ, การเปลี่ยนแปลงที่ยังไม่ flush และ
+key ใน storage โดยไม่มีวันตั้งเวลาเขียนไปเซิร์ฟเวอร์ ลบ flag `clearAll` และกิ่ง "DELETE
+`/users/me/history`" ใน flush ออก `AuthContext.tsx` เรียกชื่อใหม่ที่ 4 จุดที่ตัวตนเปลี่ยน
+(สลับบัญชี, ออกจากระบบ, อีก 2 จุด)
+
+**ทำไม:** `clearHistory()` ตั้ง `clearAll = true` ทุกครั้งที่ผู้ใช้มีประวัติที่ sync แล้ว และ flag นี้ถูกล้าง
+เฉพาะใน flush ที่ *มี token* ออกจากระบบ → flush รันโดยไม่มี token แล้ว return ก่อน → flag ค้าง → ผู้ใช้ B
+ล็อกอินบนหน้าเดิม (ไม่ reload) → B อ่านหนึ่งตอน → flush ส่ง `DELETE /users/me/history` ด้วย **token ของ B**
+แทนที่จะ upsert ของ B พบโดย explorer ของ architecture review (จุดรีเซ็ตตัวตนใน `AuthContext`) แล้วทำซ้ำได้โดยรัน
+โมดูลจริงด้วย `localStorage`/`fetch` จำลอง ไม่มี UI ไหนเรียก `clearHistory()` เลย มีแต่การรีเซ็ตตัวตน 4 จุด
+เส้นทาง "ลบทุกอย่างบนเซิร์ฟเวอร์" จึงไม่มีผู้เรียกที่ชอบธรรม
+
+**นอกขอบเขต:** การแก้เชิงโครงสร้าง (เจ้าของเดียวสำหรับรีเซ็ต user cache + history + follow cache + API cache
+ซึ่งตอนนี้เรียก 4 ครั้งซ้ำที่ 4 จุด คือ candidate D ของ architecture review) ยังไม่เคยเห็นในเบราว์เซอร์จริง
+ยังไม่ได้เปิด issue
+
+**การตรวจสอบ:** TDD — `readingHistory.test.ts` (4 test; รันครั้งแรกกับโค้ดเก่า test ออกจากระบบ → ล็อกอินใหม่
+แดงด้วย `DELETE …/history [B]` แทนที่จะเป็น `POST` แล้วเขียวหลังแก้) `app/lib` ผ่าน 137, `tsc` 0 error,
+จำนวน ESLint ในสองไฟล์ที่แตะไม่เปลี่ยน (2 → 2 ของเดิม) E2E (ออกจากระบบ/ล็อกอินจริง) **ยังไม่ได้รัน**
+`/scrutinize` ยังไม่ได้รัน
 
 ## #694 — SFX rescue บอกเหตุผลเมื่อคืนค่าว่าง (2026-09-26)
 

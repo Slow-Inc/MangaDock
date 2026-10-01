@@ -2,11 +2,11 @@
  * readingHistory — local-first reading history with batched sync.
  *
  * Flow:
- *  1. addToHistory / clearHistory update localStorage + in-memory immediately.
+ *  1. addToHistory updates localStorage + in-memory immediately.
  *  2. Debounce timer (5s) is reset on each change.
  *  3. After 5s idle, diffs are flushed to the backend:
  *     - upsert changed items (POST /users/me/history)
- *     - delete removed items (DELETE /users/me/history/:id or DELETE /users/me/history for clear-all)
+ *     - delete removed items (DELETE /users/me/history/:id)
  *  4. On login, AuthContext calls loadHistoryData() to restore history.
  */
 
@@ -45,7 +45,6 @@ let books: HistoryBook[] = [];
 let syncedIds: Set<string> = new Set();     // IDs currently synced to server
 let pendingUpserts: Map<string, HistoryBook> = new Map();  // to add/update
 let pendingDeletes: Set<string> = new Set(); // to remove from database
-let clearAll = false;                        // flag: DELETE /users/me/history
 let initialized = false;
 let backfillDone = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -142,28 +141,21 @@ async function flushToServer() {
   const headers = createAuthHeaders(token, { "Content-Type": "application/json" });
 
   try {
-    if (clearAll) {
-      // Delete entire collection in one call
-      await fetch(`${API_BASE}/users/me/history`, { method: "DELETE", headers });
-      syncedIds = new Set();
-      clearAll = false;
-    } else {
-      // Upsert changed items + delete removed ones in parallel
-      await Promise.all([
-        ...[...pendingUpserts.values()].map((b) =>
-          fetch(`${API_BASE}/users/me/history`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(b),
-          })
-        ),
-        ...[...pendingDeletes].map((id) =>
-          fetch(`${API_BASE}/users/me/history/${id}`, { method: "DELETE", headers })
-        ),
-      ]);
-      for (const id of pendingUpserts.keys()) syncedIds.add(id);
-      for (const id of pendingDeletes) syncedIds.delete(id);
-    }
+    // Upsert changed items + delete removed ones in parallel
+    await Promise.all([
+      ...[...pendingUpserts.values()].map((b) =>
+        fetch(`${API_BASE}/users/me/history`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(b),
+        })
+      ),
+      ...[...pendingDeletes].map((id) =>
+        fetch(`${API_BASE}/users/me/history/${id}`, { method: "DELETE", headers })
+      ),
+    ]);
+    for (const id of pendingUpserts.keys()) syncedIds.add(id);
+    for (const id of pendingDeletes) syncedIds.delete(id);
 
     pendingUpserts.clear();
     pendingDeletes.clear();
@@ -245,18 +237,21 @@ export function patchThumbnailLocal(bookId: string): void {
   scheduleFlush();
 }
 
-export function clearHistory(): void {
+/**
+ * The signed-in identity changed (sign-out, account switch, account deleted): forget this
+ * browser's copy of the previous user's history — list, unflushed changes and storage.
+ * Local only, by design: it must never reach the server, because by the time a flush runs
+ * the session may belong to someone else (a leftover "delete everything" flag once wiped a
+ * user's server history on their first read after signing back in).
+ */
+export function resetHistoryForIdentityChange(): void {
   if (typeof window === "undefined") return;
-  loadFromLS();
-  const hadItems = books.length > 0;
   books = [];
   pendingUpserts.clear();
   pendingDeletes.clear();
-  clearAll = hadItems && syncedIds.size > 0;
   syncedIds = new Set();
   initialized = false; // reset so next loadFromLS starts fresh
   [STORAGE_KEY, SYNCED_KEY].forEach((k) => localStorage.removeItem(k));
   notify();
-  if (clearAll) scheduleFlush();
 }
 
