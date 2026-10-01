@@ -4,6 +4,7 @@ import { ReactLenis } from 'lenis/react';
 import type { LenisRef } from 'lenis/react';
 import { usePathname } from 'next/navigation';
 import { ReactNode, useEffect, useRef } from 'react';
+import { isModalNavigation } from '../lib/bookModalHistory';
 
 interface SmoothScrollingProps {
   children: ReactNode;
@@ -19,6 +20,9 @@ export default function SmoothScrolling({ children }: SmoothScrollingProps) {
   const pathname = usePathname();
 
   useEffect(() => {
+    // A book popup opening/closing changes the pathname (/book/<id>) but not the page
+    // behind it; resetting to the top there would make that page jump.
+    if (isModalNavigation()) return;
     lenisRef.current?.lenis?.scrollTo(0, { immediate: true });
   }, [pathname]);
 

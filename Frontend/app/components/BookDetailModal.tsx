@@ -13,6 +13,7 @@ import { useBookActions } from "../hooks/useBookActions";
 import FollowSeriesButton from "./FollowSeriesButton";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
+import { bookPath, markModalNavigation, modalStack } from "../lib/bookModalHistory";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import { translateDescription } from "../lib/translateDescription";
 import MangaDiscussion from "./MangaDiscussion";
@@ -26,6 +27,8 @@ type Props = {
   scrollToChapters?: boolean;
   highlightChapterId?: string;
   asPage?: boolean;
+  /** The URL already is /book/<id> (opened by a direct link): don't push another history entry. */
+  routed?: boolean;
 };
 
 const API_BASE = "/api/proxy";
@@ -80,7 +83,7 @@ function MarqueeTitle({ title, active, className }: { title: string; active: boo
   );
 }
 
-export default function BookDetailModal({ book, onClose, scrollToChapters = false, highlightChapterId, asPage = false }: Props) {
+export default function BookDetailModal({ book, onClose, scrollToChapters = false, highlightChapterId, asPage = false, routed = false }: Props) {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const { favorited, liked, handleToggleFavorite, handleToggleLiked } = useBookActions(book);
@@ -118,7 +121,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const modalContentRef = useRef<HTMLDivElement>(null);
   const closingRef = useRef(false);
   const historyPushedRef = useRef(false);
-  
+  const modalTokenRef = useRef({}); // identity in modalStack: nested popups, only the top one answers Back
+
   const [isHoveringCovers, setIsHoveringCovers] = useState(false);
   const [coverCanScrollLeft, setCoverCanScrollLeft] = useState(false);
   const [coverCanScrollRight, setCoverCanScrollRight] = useState(true);
@@ -164,9 +168,14 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   useEffect(() => {
     setMounted(true);
 
-    // On mobile modal, push a history entry so the hardware back button closes
-    if (!asPage && window.innerWidth < 768) {
-      window.history.pushState({ mbModal: book.id }, "");
+    // Give the popup its own URL (/book/<id>) as a real history entry: the link is
+    // shareable and Back (browser or hardware) closes it, while the page it was opened
+    // over stays mounted behind. `routed` = the URL already points here, nothing to push.
+    const modalToken = modalTokenRef.current;
+    if (!asPage) modalStack.push(modalToken);
+    if (!asPage && !routed && !historyPushedRef.current) { // ref guard: dev StrictMode runs this effect twice
+      markModalNavigation();
+      window.history.pushState({ mbModal: book.id }, "", bookPath(book.id, window.location.search));
       historyPushedRef.current = true;
     }
 
@@ -175,6 +184,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     };
     const onPop = () => {
       if (!historyPushedRef.current) return;
+      if (!modalStack.isTop(modalToken)) return; // a popup opened over this one answers first
+      markModalNavigation();
       historyPushedRef.current = false;
       if (!closingRef.current) {
         closingRef.current = true;
@@ -243,6 +254,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("popstate", onPop);
+      modalStack.remove(modalToken);
       if (!asPage) document.body.style.overflow = "";
     };
   }, []);
@@ -289,6 +301,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     setTimeout(() => {
       if (historyPushedRef.current) {
         historyPushedRef.current = false;
+        markModalNavigation();
         window.history.back();
       }
       onClose();
