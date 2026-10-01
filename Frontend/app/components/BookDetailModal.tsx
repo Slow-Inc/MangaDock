@@ -14,7 +14,7 @@ import FollowSeriesButton from "./FollowSeriesButton";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { bookPath, markModalNavigation, modalStack } from "../lib/bookModalHistory";
-import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { loadMangaDetail } from "../lib/mangaDetail";
 import { translateDescription } from "../lib/translateDescription";
 import MangaDiscussion from "./MangaDiscussion";
 import ReviewSection from "./ReviewSection";
@@ -26,7 +26,6 @@ type Props = {
   onClose: () => void;
   scrollToChapters?: boolean;
   highlightChapterId?: string;
-  asPage?: boolean;
   /** The URL already is /book/<id> (opened by a direct link): don't push another history entry. */
   routed?: boolean;
 };
@@ -83,7 +82,7 @@ function MarqueeTitle({ title, active, className }: { title: string; active: boo
   );
 }
 
-export default function BookDetailModal({ book, onClose, scrollToChapters = false, highlightChapterId, asPage = false, routed = false }: Props) {
+export default function BookDetailModal({ book, onClose, scrollToChapters = false, highlightChapterId, routed = false }: Props) {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const { favorited, liked, handleToggleFavorite, handleToggleLiked } = useBookActions(book);
@@ -130,7 +129,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const lenisRef = useRef<any>(null);
 
   // Main modal body smooth scroll
-  useLocalLenis(modalScrollRef, "vertical", !asPage && visible && activeChapter === null, lenisRef, modalContentRef);
+  useLocalLenis(modalScrollRef, "vertical", visible && activeChapter === null, lenisRef, modalContentRef);
 
   const updateCoverScroll = () => {
     const el = coverRowRef.current;
@@ -172,8 +171,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     // shareable and Back (browser or hardware) closes it, while the page it was opened
     // over stays mounted behind. `routed` = the URL already points here, nothing to push.
     const modalToken = modalTokenRef.current;
-    if (!asPage) modalStack.push(modalToken);
-    if (!asPage && !routed && !historyPushedRef.current) { // ref guard: dev StrictMode runs this effect twice
+    modalStack.push(modalToken);
+    if (!routed && !historyPushedRef.current) { // ref guard: dev StrictMode runs this effect twice
       markModalNavigation();
       window.history.pushState({ mbModal: book.id }, "", bookPath(book.id, window.location.search));
       historyPushedRef.current = true;
@@ -195,7 +194,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("popstate", onPop);
-    if (!asPage) document.body.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
 
     // Auto-translate description (#151) via the shared cached helper (F7): start
     // from the card's description, only falling back to the detail fetch's when
@@ -215,31 +214,10 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     if (isManga) {
       setLoadingDetail(true);
 
-      const forceLocal = localStorage.getItem("imgCacheForceLocal") === "1";
-      const qs = forceLocal ? "?forceLocal=true" : "";
-
       if (book.description) translateDesc(book.description);
 
-      // Detail (covers/genres/authors) — cacheable, TTL.LONG. Distinct
-      // `modal-detail` key (not the community page's `manga:{id}:detail`): that
-      // fetcher caches null on !ok, which would poison this .then's `d.description`
-      // read. forceLocal gets its own key because it changes the cover URLs.
-      cacheOrFetch<MangaDetail>(
-        `manga:${book.id}:modal-detail${forceLocal ? ":local" : ""}`,
-        () =>
-          fetch(`${API_BASE}/books/manga/${book.id}${qs}`).then(async (r) => {
-            if (!r.ok) throw new Error("detail fetch failed");
-            const d: MangaDetail = await r.json();
-            // Guard render's `[...detail.authors, ...detail.artists]` spread — a
-            // 200-with-bad-shape must throw (not cache), else it would crash the
-            // render for the whole TTL on every reopen.
-            if (!Array.isArray(d.authors) || !Array.isArray(d.artists)) {
-              throw new Error("detail shape invalid");
-            }
-            return d;
-          }),
-        TTL.LONG,
-      )
+      // Detail (covers/genres/authors) — cached, shared with the direct-link route.
+      loadMangaDetail(book.id)
         .then((d) => {
           setDetail(d);
           setLoadingDetail(false);
@@ -255,21 +233,13 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("popstate", onPop);
       modalStack.remove(modalToken);
-      if (!asPage) document.body.style.overflow = "";
+      document.body.style.overflow = "";
     };
   }, []);
 
-  // Scroll-aware header in page mode
-  useEffect(() => {
-    if (!asPage) return;
-    const onScroll = () => setHeaderScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [asPage]);
-
   // Scroll-aware header in mobile modal mode
   useEffect(() => {
-    if (asPage || activeChapter !== null) return;
+    if (activeChapter !== null) return;
     const scroller = modalScrollRef.current;
     if (!scroller) return;
 
@@ -278,7 +248,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
     scroller.addEventListener("scroll", onScroll, { passive: true });
     return () => scroller.removeEventListener("scroll", onScroll);
-  }, [asPage, activeChapter, visible]);
+  }, [activeChapter, visible]);
 
   // Auto-scroll to chapters section when opened via "อ่านต่อ"
   useEffect(() => {
@@ -293,10 +263,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     if (closingRef.current) return;
     closingRef.current = true;
     setVisible(false);
-    if (asPage) {
-      setTimeout(onClose, 300);
-      return;
-    }
     const delay = window.innerWidth < 768 ? 300 : 400;
     setTimeout(() => {
       if (historyPushedRef.current) {
@@ -322,87 +288,59 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
   const content = (
     <div
-      className={asPage ? `relative w-full bg-[#141414] transition-[opacity,transform] duration-300 ease-out ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}` : `fixed inset-0 z-200 flex items-center justify-center md:p-4 md:backdrop-blur-sm transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`fixed inset-0 z-200 flex items-center justify-center md:p-4 md:backdrop-blur-sm transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
     >
       {/* Backdrop - modal mode only */}
-      {!asPage && (
-        <div
-          className="absolute inset-0 bg-black md:bg-black/80"
-          onClick={handleClose}
-        />
-      )}
-
-      {/* Floating back-navigation header - page mode only */}
-      {asPage && (
-        <div className={`fixed top-0 left-0 right-0 z-20 flex h-14 items-center gap-3 px-4 transition-all duration-300 ${headerScrolled ? "border-b border-white/10 bg-[#141414]/80 backdrop-blur-md" : "border-b border-transparent bg-transparent"}`}>
-          <button
-            onClick={handleClose}
-            title="กลับ"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-white/20"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
-              <path d="M19 12H5M12 5l-7 7 7 7" />
-            </svg>
-          </button>
-          <MarqueeTitle
-            title={book.title}
-            active={headerScrolled}
-            className={`transition-opacity duration-300 ${headerScrolled ? "opacity-100" : "opacity-0"}`}
-          />
-        </div>
-      )}
+      <div
+        className="absolute inset-0 bg-black md:bg-black/80"
+        onClick={handleClose}
+      />
 
       {/* Modal container */}
       <div
-        className={asPage ? "relative w-full" : `relative z-10 flex w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] flex-col overflow-hidden md:rounded-3xl bg-[#141414] shadow-2xl transition-[transform,opacity] duration-300 md:duration-400 ease-out ${visible ? "translate-y-0 md:scale-100 md:opacity-100" : "translate-y-full md:translate-y-8 md:scale-90 md:opacity-0"}`}
+        className={`relative z-10 flex w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] flex-col overflow-hidden md:rounded-3xl bg-[#141414] shadow-2xl transition-[transform,opacity] duration-300 md:duration-400 ease-out ${visible ? "translate-y-0 md:scale-100 md:opacity-100" : "translate-y-full md:translate-y-8 md:scale-90 md:opacity-0"}`}
       >
-        {!asPage && (
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-30 md:hidden">
-            <div
-              className={`flex items-center gap-2.5 border-b px-3.5 pb-[0.55rem] pt-[calc(env(safe-area-inset-top)+0.6rem)] transition-[background-color,backdrop-filter,box-shadow,border-color,opacity] duration-300 ease-out ${
-                headerScrolled
-                  ? "border-white/8 bg-[#141414]/62 opacity-100 shadow-[0_6px_18px_rgba(0,0,0,0.16)] backdrop-blur-md"
-                  : "border-transparent bg-transparent opacity-0 shadow-none backdrop-blur-none"
-              }`}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 md:hidden">
+          <div
+            className={`flex items-center gap-2.5 border-b px-3.5 pb-[0.55rem] pt-[calc(env(safe-area-inset-top)+0.6rem)] transition-[background-color,backdrop-filter,box-shadow,border-color,opacity] duration-300 ease-out ${
+              headerScrolled
+                ? "border-white/8 bg-[#141414]/62 opacity-100 shadow-[0_6px_18px_rgba(0,0,0,0.16)] backdrop-blur-md"
+                : "border-transparent bg-transparent opacity-0 shadow-none backdrop-blur-none"
+            }`}
+          >
+            <button
+              onClick={handleClose}
+              title="กลับ"
+              className="pointer-events-auto flex h-[2.2rem] w-[2.2rem] items-center justify-center rounded-full border border-white/10 bg-black/20 text-white transition hover:bg-white/10"
             >
-              <button
-                onClick={handleClose}
-                title="กลับ"
-                className="pointer-events-auto flex h-[2.2rem] w-[2.2rem] items-center justify-center rounded-full border border-white/10 bg-black/20 text-white transition hover:bg-white/10"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4.5 w-4.5">
-                  <path d="M19 12H5M12 5l-7 7 7 7" />
-                </svg>
-              </button>
-              <MarqueeTitle title={book.title} active={headerScrolled} />
-            </div>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4.5 w-4.5">
+                <path d="M19 12H5M12 5l-7 7 7 7" />
+              </svg>
+            </button>
+            <MarqueeTitle title={book.title} active={headerScrolled} />
           </div>
-        )}
+        </div>
 
         <div
           ref={modalScrollRef}
-          className={asPage ? "w-full pb-[calc(var(--mobile-nav-height)+1.5rem)]" : "flex-1 min-h-0 overflow-y-auto custom-scrollbar"}
+          className="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
         >
           <div ref={modalContentRef}>
             {/* Drag handle — mobile only */}
-            {!asPage && (
-              <div className="flex justify-center pt-3 pb-0.5 md:hidden">
-                <div className="h-1 w-10 rounded-full bg-white/20" />
-              </div>
-            )}
+            <div className="flex justify-center pt-3 pb-0.5 md:hidden">
+              <div className="h-1 w-10 rounded-full bg-white/20" />
+            </div>
 
             {/* Close button — modal mode, desktop only */}
-            {!asPage && (
-              <button
-                onClick={handleClose}
-                title="ปิด"
-                className={`absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-[opacity,transform] duration-300 hover:bg-white/20 md:opacity-100 md:pointer-events-auto ${headerScrolled ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"}`}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-            )}
+            <button
+              onClick={handleClose}
+              title="ปิด"
+              className={`absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-[opacity,transform] duration-300 hover:bg-white/20 md:opacity-100 md:pointer-events-auto ${headerScrolled ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
 
             {/* Hero */}
             <div className="relative w-full overflow-hidden">
@@ -877,7 +815,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
             <ChapterList
               book={book}
               effectiveHighlightId={effectiveHighlightId}
-              asPage={asPage}
               visible={visible && activeChapter === null}
               onChapterSelect={setActiveChapter}
               sectionRef={chaptersRef}
@@ -905,27 +842,6 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   );
 
   if (!mounted) return null;
-
-  if (asPage) {
-    return (
-      <>
-        {content}
-        {lightboxSrc && (
-          <CoverLightbox src={lightboxSrc} alt={book.title} onClose={() => setLightboxSrc(null)} />
-        )}
-        {activeChapter && (
-          <MangaReader
-            chapterId={activeChapter.id}
-            chapterNumber={activeChapter.chapterNumber}
-            chapterTitle={activeChapter.title}
-            mangaTitle={book.title}
-            mangaId={book.id}
-            onClose={() => setActiveChapter(null)}
-          />
-        )}
-      </>
-    );
-  }
 
   return (
     <>

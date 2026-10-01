@@ -10,12 +10,6 @@ export function bookPath(id: string, search = ""): string {
   return `/book/${encodeURIComponent(id)}${search}`;
 }
 
-/** The id of a /book/<id> popup path; null for any other route (incl. /book/<id>/reviews). */
-export function bookIdFromPath(pathname: string): string | null {
-  const m = /^\/book\/([^/]+)\/?$/.exec(pathname);
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
 const open: object[] = [];
 
 /** Popups can nest (a related book opened inside a book). Each pushes its own history

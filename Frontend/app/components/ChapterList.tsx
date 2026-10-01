@@ -143,7 +143,6 @@ function ChapterRowInner({
 type ChapterListProps = {
   book: LandingBook;
   effectiveHighlightId?: string;
-  asPage: boolean;
   /** Drives Lenis on/off — caller passes `visible && activeChapter === null` */
   visible: boolean;
   onChapterSelect: (ch: ActiveChapter) => void;
@@ -156,7 +155,6 @@ type ChapterListProps = {
 export default function ChapterList({
   book,
   effectiveHighlightId,
-  asPage,
   visible,
   onChapterSelect,
   sectionRef,
@@ -263,7 +261,7 @@ export default function ChapterList({
   useLocalLenis(
     chaptersListScrollRef,
     "vertical",
-    !asPage && visible && chapters.length > 0,
+    visible && chapters.length > 0,
     chaptersLenisRef,
     chaptersContentRef,
   );
@@ -347,7 +345,7 @@ export default function ChapterList({
       ) : chapters.length > 0 ? (
         <div
           ref={chaptersListScrollRef}
-          className={asPage ? "" : "max-h-[50vh] md:max-h-80 overflow-y-auto custom-scrollbar"}
+          className="max-h-[50vh] md:max-h-80 overflow-y-auto custom-scrollbar"
         >
           <div ref={chaptersContentRef} className="space-y-1.5">
             {(() => {

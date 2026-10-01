@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
-  bookIdFromPath,
   bookPath,
   isModalNavigation,
   markModalNavigation,
@@ -18,25 +17,6 @@ describe("bookPath", () => {
 
   test("encodes ids that are not url-safe", () => {
     expect(bookPath("a b/c")).toBe("/book/a%20b%2Fc");
-  });
-});
-
-describe("bookIdFromPath", () => {
-  test("reads the id from /book/<id>", () => {
-    expect(bookIdFromPath("/book/abc-123")).toBe("abc-123");
-    expect(bookIdFromPath("/book/abc-123/")).toBe("abc-123");
-  });
-
-  test("decodes an encoded id", () => {
-    expect(bookIdFromPath("/book/a%20b%2Fc")).toBe("a b/c");
-  });
-
-  test("is not a book popup path for other routes", () => {
-    expect(bookIdFromPath("/")).toBeNull();
-    expect(bookIdFromPath("/search")).toBeNull();
-    expect(bookIdFromPath("/book")).toBeNull();
-    expect(bookIdFromPath("/book/abc/reviews")).toBeNull();
-    expect(bookIdFromPath("/community/manga/abc")).toBeNull();
   });
 });
 

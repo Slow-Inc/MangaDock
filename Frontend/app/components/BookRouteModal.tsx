@@ -4,10 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BookDetailModal from "./BookDetailModal";
 import { bookFromDetail } from "../lib/bookFromDetail";
-import { parseJsonOrNull } from "../lib/safeJson";
-import type { LandingBook, MangaDetail } from "../lib/types";
-
-const API_BASE = "/api/proxy";
+import { loadMangaDetail } from "../lib/mangaDetail";
+import type { LandingBook } from "../lib/types";
 
 /**
  * The book popup for a direct /book/<id> visit (shared link, refresh, new tab): there is
@@ -20,10 +18,9 @@ export default function BookRouteModal({ id }: { id: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/books/manga/${encodeURIComponent(id)}`)
-      .then((res) => (res.ok ? parseJsonOrNull<MangaDetail>(res) : null))
+    loadMangaDetail(id)
       .then((detail) => {
-        if (!cancelled) setState((detail && bookFromDetail(detail)) || "missing");
+        if (!cancelled) setState(bookFromDetail(detail) ?? "missing");
       })
       .catch(() => {
         if (!cancelled) setState("missing");
