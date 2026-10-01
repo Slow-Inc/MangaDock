@@ -395,7 +395,11 @@ export function NativeShellNavigator({
         <Stack.Navigator initialRouteName={initialRouteName}>
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="Home" component={HomeComponent} />
-          <Stack.Screen name="WebView" component={WebViewComponent} />
+          <Stack.Screen
+            name="WebView"
+            component={WebViewComponent}
+            options={{headerShown: false}}
+          />
           <Stack.Screen name="Diagnostics" component={DiagnosticsComponent} />
           <Stack.Screen name="Settings" component={SettingsComponent} />
         </Stack.Navigator>

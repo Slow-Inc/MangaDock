@@ -71,6 +71,8 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 5.  **Advanced Identification:** เพิ่มระบบยืนยันตัวตนสองชั้น (2FA) และระบบ Device Session Pinning ผูกบัญชีกับ Hardware ID
 
 ### 📱 Phase 3: Hybrid Mobile Framework (Shortest Workflow & Code Sharing)
+
+**2026-10-01 delivery update:** beta.2 functional QA accepted by the user. Latest CLI candidate is prepared on the Phase 3 branch; physical-phone QA, matching frontend deployment and private release signing remain. See [delivery record](Documents/Plan/PHASE3_DELIVERY_2026-10-01.md).
 **สถานะ:** 🚀 Next Step (ยุทธศาสตร์ลดเวลาการพัฒนาขั้นสูงสุด)
 1.  **React Native WebViewer Shell:** ขึ้นโครง React Native เพื่อหุ้ม Web App เดิม ทำให้สามารถนำ UI พรีเมียมมาใช้งานได้ทันที
 2.  **Strategic Code Sharing:** อนุญาตให้ **แบ่งปัน Codebase บางส่วน (Shared Logic/Types) ระหว่าง Web และ Mobile ได้โดยตรง** ลดระยะเวลาการพัฒนาลงมหาศาล

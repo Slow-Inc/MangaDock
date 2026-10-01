@@ -4,6 +4,7 @@ describe('Mobile Shell WebView bridge', () => {
   it('seeds the web hardware ID and injects Mobile Shell headers into protected fetches', async () => {
     const calls: Array<[string, RequestInit | undefined]> = [];
     const windowStub = {
+      location: {href: 'https://hayateotsu.space/', origin: 'https://hayateotsu.space'},
       localStorage: {
         values: new Map<string, string>(),
         setItem(key: string, value: string) {
@@ -29,15 +30,51 @@ describe('Mobile Shell WebView bridge', () => {
     expect(windowStub.localStorage.values.get('mangadock_device_id')).toBe(
       '11111111-2222-4333-8444-555555555555',
     );
-    expect(calls[0][1]?.headers).toEqual({
-      'x-hardware-id': '11111111-2222-4333-8444-555555555555',
-      'x-manga-dock-client': 'android-mobile-shell',
+    expect(new Headers(calls[0][1]?.headers).get('x-hardware-id')).toBe(
+      '11111111-2222-4333-8444-555555555555',
+    );
+    expect(new Headers(calls[0][1]?.headers).get('x-manga-dock-client')).toBe(
+      'android-mobile-shell',
+    );
+  });
+
+  it('keeps native identity on API requests and does not send it to other origins', async () => {
+    const originalFetch = jest.fn((_input: unknown, _init?: RequestInit) =>
+      Promise.resolve({ok: true}),
+    );
+    const windowStub = {
+      location: {href: 'https://hayateotsu.space/', origin: 'https://hayateotsu.space'},
+      localStorage: {setItem: jest.fn()},
+      fetch: originalFetch,
+    };
+
+    // eslint-disable-next-line no-new-func
+    Function('window', createMobileShellInjectionScript('native-id'))(windowStub);
+
+    await windowStub.fetch('https://hayateotsu.space.evil.test/api/private');
+    expect(originalFetch.mock.calls[0]).toHaveLength(1);
+
+    await windowStub.fetch('/api/proxy/books', {
+      headers: {'X-Hardware-ID': 'web-id', Authorization: 'Bearer test'},
     });
+    const headers = new Headers(originalFetch.mock.calls[1][1]?.headers);
+    expect(headers.get('x-hardware-id')).toBe('native-id');
+    expect(headers.get('x-manga-dock-client')).toBe('android-mobile-shell');
+    expect(headers.get('authorization')).toBe('Bearer test');
+
+    await windowStub.fetch({
+      url: 'https://api.hayateotsu.space/books/chapter',
+      headers: new Headers({'x-existing': 'kept'}),
+    });
+    const requestHeaders = new Headers(originalFetch.mock.calls[2][1]?.headers);
+    expect(requestHeaders.get('x-existing')).toBe('kept');
+    expect(requestHeaders.get('x-hardware-id')).toBe('native-id');
   });
 
   it('bridges web JavaScript errors to the Mobile Shell without posting non-error console logs', () => {
     const postMessage = jest.fn();
     const windowStub: {
+      location: {href: string; origin: string};
       localStorage: {setItem: jest.Mock};
       fetch: jest.Mock;
       ReactNativeWebView: {postMessage: jest.Mock};
@@ -49,6 +86,7 @@ describe('Mobile Shell WebView bridge', () => {
         columnNumber: number,
       ) => boolean;
     } = {
+      location: {href: 'https://hayateotsu.space/', origin: 'https://hayateotsu.space'},
       localStorage: {
         setItem: jest.fn(),
       },
@@ -87,6 +125,50 @@ describe('Mobile Shell WebView bridge', () => {
       source: 'mangadock-web',
       type: 'console_error',
       message: 'bad request {"status":500}',
+    });
+  });
+
+  it('exposes a native OAuth bridge for mobile social login', () => {
+    const postMessage = jest.fn();
+    const windowStub: {
+      location: {href: string; origin: string};
+      __MANGA_DOCK_CLIENT__?: string;
+      __MANGA_DOCK_NATIVE_AUTH__?: {
+        startOAuth: (provider: 'google' | 'facebook', url: string) => void;
+      };
+      localStorage: {setItem: jest.Mock};
+      fetch: jest.Mock;
+      ReactNativeWebView: {postMessage: jest.Mock};
+    } = {
+      location: {href: 'https://hayateotsu.space/', origin: 'https://hayateotsu.space'},
+      localStorage: {
+        setItem: jest.fn(),
+      },
+      fetch: jest.fn(),
+      ReactNativeWebView: {
+        postMessage,
+      },
+    };
+
+    // eslint-disable-next-line no-new-func
+    Function(
+      'window',
+      `${createMobileShellInjectionScript(
+        '11111111-2222-4333-8444-555555555555',
+      )}`,
+    )(windowStub);
+
+    windowStub.__MANGA_DOCK_NATIVE_AUTH__?.startOAuth(
+      'google',
+      'https://supabase.example/auth/v1/authorize',
+    );
+
+    expect(windowStub.__MANGA_DOCK_CLIENT__).toBe('android-mobile-shell');
+    expect(JSON.parse(postMessage.mock.calls[0][0])).toMatchObject({
+      source: 'mangadock-web',
+      type: 'oauth_start',
+      provider: 'google',
+      url: 'https://supabase.example/auth/v1/authorize',
     });
   });
 });

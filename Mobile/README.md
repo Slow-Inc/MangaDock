@@ -139,7 +139,7 @@ From `Mobile/android`:
 
 ```powershell
 .\gradlew.bat assembleDebug
-.\gradlew.bat assembleRelease
+.\gradlew.bat assembleRelease -PmangadockQaSigning=true
 ```
 
 Use this environment in the current PowerShell session when Gradle cannot find Java or Android SDK:
@@ -239,7 +239,7 @@ $env:ANDROID_HOME='C:\Users\Cable\AppData\Local\Android\Sdk'
 $env:ANDROID_SDK_ROOT='C:\Users\Cable\AppData\Local\Android\Sdk'
 $env:PATH="$env:JAVA_HOME\bin;$env:ANDROID_HOME\platform-tools;$env:ANDROID_HOME\emulator;$env:PATH"
 
-.\gradlew.bat assembleRelease
+.\gradlew.bat assembleRelease -PmangadockQaSigning=true
 ```
 
 Release APK output:
@@ -266,7 +266,7 @@ Launch:
 C:\Users\Cable\AppData\Local\Android\Sdk\platform-tools\adb.exe shell am start -n com.mobile/.MainActivity
 ```
 
-This beta APK is signed with the scaffold release signing config, which currently uses the debug keystore. It is suitable for direct QA install, not Play Store distribution.
+This beta APK is signed with the scaffold release signing config, with explicit QA opt-in to use the debug keystore. It is suitable for direct QA install, not Play Store distribution.
 
 Runtime smoke note:
 
@@ -418,7 +418,7 @@ Then:
 
 ```powershell
 cd C:\Users\Cable\Documents\code\MangaDock\Mobile\android
-.\gradlew.bat assembleRelease
+.\gradlew.bat assembleRelease -PmangadockQaSigning=true
 ```
 
 Install the APK and verify:
@@ -530,3 +530,19 @@ npx react-native run-android --no-packager --port 8081
 - Full authenticated reader QA should still be repeated manually on a QA account.
 - Production backend is expected at `https://api.hayateotsu.space` through the web app.
 - Play Store-ready signing is not configured yet.
+
+## Browser OAuth compatibility (2026-10-01)
+
+The APK accepts the deployed web's `mangadock:oauth:start` message as well as the CLI URL protocol. It opens the system browser with S256 PKCE and a request-bound `mangadock://auth/callback?request_id=...` redirect. The WebView exchanges the returned code and sends the session through the deployed web's existing session handler. Cancellation, stale callbacks and exchange deadlines are covered by regressions.
+
+Supply public `MANGADOCK_SUPABASE_URL` and `MANGADOCK_SUPABASE_PUBLIC_KEY` through environment/Gradle properties, or a properties file outside the checkout using `-PmangadockNativeAuthProperties=<absolute-path>`. Use the project's anon/publishable key; never a service-role key. Missing configuration produces a readable login error.
+
+Supabase Authentication → URL Configuration must allow `mangadock://auth/callback**`, including the dynamic request query. The current project's callback cancellation probe instead returned `http://localhost:4000/auth/callback`; browser launch works but end-to-end login is blocked until that setting is corrected. Connected tools cannot change Auth configuration in this session.
+
+The emulator has two apps claiming the callback scheme. Select the current `Mobile` app if Android asks. WebView reload/process recreation loses the in-memory verifier; cancel and restart login.
+
+## Delivery and production signing (2026-10-01)
+
+Release builds require private `MANGADOCK_UPLOAD_STORE_FILE`, `MANGADOCK_UPLOAD_STORE_PASSWORD`, `MANGADOCK_UPLOAD_KEY_ALIAS`, and `MANGADOCK_UPLOAD_KEY_PASSWORD` environment/Gradle properties. QA builds use `-PmangadockQaSigning=true`; do not publish those debug-signed artifacts.
+
+The new CLI auth flow requires matching frontend PKCE + request ID support. Results remain queued until the frontend acknowledges them. If process recreation or reload loses the pending listener, cancel and restart login. See [delivery instructions and physical-phone checklist](../Documents/Plan/PHASE3_DELIVERY_2026-10-01.md).

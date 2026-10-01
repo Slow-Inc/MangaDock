@@ -1,10 +1,13 @@
+import {createLegacyOAuthInjectionScript, type NativeAuthPublicConfig} from './legacyOAuthBridge';
+
 const WEB_HARDWARE_ID_KEY = 'mangadock_device_id';
 
-export function createMobileShellInjectionScript(hardwareId: string) {
+export function createMobileShellInjectionScript(hardwareId: string, authConfig?: NativeAuthPublicConfig) {
   const serializedHardwareId = JSON.stringify(hardwareId);
   const serializedHardwareIdKey = JSON.stringify(WEB_HARDWARE_ID_KEY);
 
   return `
+    ${createLegacyOAuthInjectionScript(authConfig)}
     (function () {
       try {
         var postDiagnosticsEvent = function (event) {
@@ -71,39 +74,43 @@ export function createMobileShellInjectionScript(hardwareId: string) {
         }
         window.localStorage.setItem(${serializedHardwareIdKey}, ${serializedHardwareId});
         window.__MANGA_DOCK_CLIENT__ = 'android-mobile-shell';
+        window.__MANGA_DOCK_NATIVE_AUTH__ = {
+          startOAuth: function (provider, url, requestId) {
+            postDiagnosticsEvent({
+              type: 'oauth_start',
+              provider: provider,
+              request_id: requestId,
+              url: url
+            });
+          }
+        };
         var originalFetch = window.fetch;
         window.fetch = function (input, init) {
-          var url = typeof input === 'string' ? input : String(input && input.url ? input.url : input);
+          var url = typeof input === 'string' ? input : input && input.url ? input.url : String(input);
+          var target;
+          try {
+            target = new URL(url, window.location.href);
+          } catch (error) {
+            return originalFetch.apply(this, arguments);
+          }
           var shouldInjectHeaders =
-            url.indexOf('/api/') === 0 ||
-            url.indexOf('https://hayateotsu.space') === 0 ||
-            url.indexOf('https://api.hayateotsu.space') === 0;
+            (target.origin === window.location.origin && target.pathname.indexOf('/api/') === 0) ||
+            target.origin === 'https://api.hayateotsu.space';
 
           if (!shouldInjectHeaders) {
             return originalFetch.apply(this, arguments);
           }
 
-          var nextInit = init || {};
-          var nextHeaders = {};
-
-          if (nextInit.headers) {
-            if (typeof Headers !== 'undefined' && nextInit.headers instanceof Headers) {
-              nextInit.headers.forEach(function (value, key) {
-                nextHeaders[key] = value;
-              });
-            } else {
-              Object.assign(nextHeaders, nextInit.headers);
-            }
+          var nextHeaders = new Headers(input && input.headers ? input.headers : undefined);
+          if (init && init.headers) {
+            new Headers(init.headers).forEach(function (value, key) {
+              nextHeaders.set(key, value);
+            });
           }
+          nextHeaders.set('x-hardware-id', ${serializedHardwareId});
+          nextHeaders.set('x-manga-dock-client', 'android-mobile-shell');
 
-          if (!nextHeaders['x-hardware-id']) {
-            nextHeaders['x-hardware-id'] = ${serializedHardwareId};
-          }
-          if (!nextHeaders['x-manga-dock-client']) {
-            nextHeaders['x-manga-dock-client'] = 'android-mobile-shell';
-          }
-
-          return originalFetch.call(this, input, Object.assign({}, nextInit, {
+          return originalFetch.call(this, input, Object.assign({}, init, {
             headers: nextHeaders
           }));
         };
