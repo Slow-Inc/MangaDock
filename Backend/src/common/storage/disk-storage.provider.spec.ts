@@ -33,13 +33,20 @@ describe('DiskStorageProvider', () => {
 
   it('put accepts a Readable stream', async () => {
     const key = abs('streamed.txt');
-    await provider.put(key, Readable.from([Buffer.from('a'), Buffer.from('b')]));
+    await provider.put(
+      key,
+      Readable.from([Buffer.from('a'), Buffer.from('b')]),
+    );
 
     expect((await provider.get(key)).toString()).toBe('ab');
   });
 
   it('put rejects when the source stream errors', async () => {
-    const bad = new Readable({ read() { this.destroy(new Error('boom')); } });
+    const bad = new Readable({
+      read() {
+        this.destroy(new Error('boom'));
+      },
+    });
     await expect(provider.put(abs('partial.bin'), bad)).rejects.toThrow('boom');
   });
 
@@ -81,7 +88,9 @@ describe('DiskStorageProvider', () => {
     await provider.deleteDir(abs('d'));
     expect(await provider.exists(abs('d'))).toBe(false);
     // no-op (no throw) on a path that never existed
-    await expect(provider.deleteDir(abs('never-existed'))).resolves.toBeUndefined();
+    await expect(
+      provider.deleteDir(abs('never-existed')),
+    ).resolves.toBeUndefined();
   });
 
   it('ensureDir creates a directory', async () => {

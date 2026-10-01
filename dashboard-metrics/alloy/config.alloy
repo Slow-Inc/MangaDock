@@ -1,0 +1,53 @@
+prometheus.scrape "dashboard_metrics" {
+  targets         = [{ __address__ = "dashboard-metrics:9091" }]
+  metrics_path    = "/metrics"
+  scrape_interval = "15s"
+  scrape_timeout  = "5s"
+  basic_auth {
+    username = env("METRICS_BASIC_AUTH_USER")
+    password = env("METRICS_BASIC_AUTH_PASS")
+  }
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "backend" {
+  targets         = [{ __address__ = env("BACKEND_HOST") }]
+  metrics_path    = "/metrics"
+  scrape_interval = "15s"
+  scrape_timeout  = "5s"
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "frontend" {
+  targets         = [{ __address__ = env("FRONTEND_HOST") }]
+  metrics_path    = "/metrics"
+  scrape_interval = "15s"
+  scrape_timeout  = "5s"
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "redis_exporter" {
+  targets         = [{ __address__ = "redis-exporter:9121" }]
+  metrics_path    = "/metrics"
+  scrape_interval = "15s"
+  scrape_timeout  = "5s"
+  forward_to = [prometheus.relabel.redis_addr.receiver]
+}
+
+prometheus.relabel "redis_addr" {
+  rule {
+    target_label = "addr"
+    replacement  = "redis://redis:6379"
+  }
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("GRAFANA_REMOTE_WRITE_URL")
+    basic_auth {
+      username = env("GRAFANA_CLOUD_USER")
+      password = env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+}

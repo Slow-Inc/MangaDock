@@ -1,6 +1,10 @@
 import { BooksService } from './books.service';
 
-function seedJob(service: BooksService, jobKey: string, overrides: Partial<any> = {}) {
+function seedJob(
+  service: BooksService,
+  jobKey: string,
+  overrides: Partial<any> = {},
+) {
   const job = {
     completedPages: new Map(),
     processingPages: new Set<number>(),
@@ -21,7 +25,11 @@ function makeService() {
     set: jest.fn().mockResolvedValue(undefined),
     setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
   };
-  const storage = { put: jest.fn().mockResolvedValue(undefined), list: jest.fn().mockResolvedValue([]), delete: jest.fn().mockResolvedValue(undefined) };
+  const storage = {
+    put: jest.fn().mockResolvedValue(undefined),
+    list: jest.fn().mockResolvedValue([]),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new BooksService(
     {} as any,
     cache as any,
@@ -43,9 +51,11 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
-      capturedJobKey = args[6];
-    });
+    jest
+      .spyOn((service as any).batch.stream, 'run')
+      .mockImplementation(async (...args: any[]) => {
+        capturedJobKey = args[6];
+      });
 
     const pages = [
       { pageIndex: 0, pageUrl: 'http://example.com/0.jpg' },
@@ -54,16 +64,28 @@ describe('BooksService — batch webhook pipeline', () => {
     let resolved = false;
     const jobPromise = service
       .startOrAttachBatchJob('ch2', pages, jest.fn() as any)
-      .then(() => { resolved = true; });
+      .then(() => {
+        resolved = true;
+      });
 
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
 
     // Deliver page 0 only — job should still be pending
-    await service.handleMitCallback(capturedJobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+    await service.handleMitCallback(
+      capturedJobKey,
+      0,
+      { imgWidth: 800, imgHeight: 1200, patches: [] },
+      undefined,
+    );
     expect(resolved).toBe(false);
 
     // Deliver page 1 — job should now resolve
-    await service.handleMitCallback(capturedJobKey, 1, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+    await service.handleMitCallback(
+      capturedJobKey,
+      1,
+      { imgWidth: 800, imgHeight: 1200, patches: [] },
+      undefined,
+    );
     await jobPromise;
     expect(resolved).toBe(true);
   });
@@ -73,10 +95,16 @@ describe('BooksService — batch webhook pipeline', () => {
     jest.useFakeTimers();
     const { service } = makeService();
 
-    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async () => {});
+    jest
+      .spyOn((service as any).batch.stream, 'run')
+      .mockImplementation(async () => {});
 
     const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
-    const jobPromise = service.startOrAttachBatchJob('ch3', pages, jest.fn() as any);
+    const jobPromise = service.startOrAttachBatchJob(
+      'ch3',
+      pages,
+      jest.fn() as any,
+    );
 
     // Drain microtasks until the job reaches steady state (the parallel
     // cache pre-check (#148) takes a few ticks; setImmediate is faked here)
@@ -93,21 +121,29 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
-      capturedJobKey = args[6];
-    });
+    jest
+      .spyOn((service as any).batch.stream, 'run')
+      .mockImplementation(async (...args: any[]) => {
+        capturedJobKey = args[6];
+      });
 
     const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
-    const jobPromise = service.startOrAttachBatchJob('ch4', pages, jest.fn() as any);
+    const jobPromise = service.startOrAttachBatchJob(
+      'ch4',
+      pages,
+      jest.fn() as any,
+    );
 
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
 
     // Abort the job via its cancelController
     const job = (service as any).batch.activeBatchJobs.get(capturedJobKey);
     job.cancelController.abort();
 
     await expect(jobPromise).rejects.toThrow(/cancelled/);
-    expect((service as any).batch.activeBatchJobs.has(capturedJobKey)).toBe(false);
+    expect((service as any).batch.activeBatchJobs.has(capturedJobKey)).toBe(
+      false,
+    );
   });
 
   // Cycle 5 — #74: coords are normalized by image dimensions
@@ -125,13 +161,25 @@ describe('BooksService — batch webhook pipeline', () => {
     });
 
     await service.handleMitCallback(
-      jobKey, 0,
-      { imgWidth: 1000, imgHeight: 2000, patches: [{ x: 100, y: 400, w: 50, h: 80, img_b64: '' }] },
+      jobKey,
+      0,
+      {
+        imgWidth: 1000,
+        imgHeight: 2000,
+        patches: [{ x: 100, y: 400, w: 50, h: 80, img_b64: '' }],
+      },
       undefined,
     );
 
-    const cached = cache.set.mock.calls.find((c: any[]) => String(c[0]).includes('translate:manga-patches'));
-    expect(cached[1].patches[0]).toMatchObject({ xPct: 0.1, yPct: 0.2, wPct: 0.05, hPct: 0.04 });
+    const cached = cache.set.mock.calls.find((c: any[]) =>
+      String(c[0]).includes('translate:manga-patches'),
+    );
+    expect(cached[1].patches[0]).toMatchObject({
+      xPct: 0.1,
+      yPct: 0.2,
+      wPct: 0.05,
+      hPct: 0.04,
+    });
   });
 
   // Cycle 6 — #74: imgWidth or imgHeight = 0 → no NaN
@@ -149,12 +197,19 @@ describe('BooksService — batch webhook pipeline', () => {
     });
 
     await service.handleMitCallback(
-      jobKey, 0,
-      { imgWidth: 0, imgHeight: 0, patches: [{ x: 100, y: 100, w: 50, h: 50, img_b64: '' }] },
+      jobKey,
+      0,
+      {
+        imgWidth: 0,
+        imgHeight: 0,
+        patches: [{ x: 100, y: 100, w: 50, h: 50, img_b64: '' }],
+      },
       undefined,
     );
 
-    const cached = cache.set.mock.calls.find((c: any[]) => String(c[0]).includes('translate:manga-patches'));
+    const cached = cache.set.mock.calls.find((c: any[]) =>
+      String(c[0]).includes('translate:manga-patches'),
+    );
     const p = cached[1].patches[0];
     expect(Number.isNaN(p.xPct)).toBe(false);
     expect(Number.isNaN(p.yPct)).toBe(false);
@@ -176,12 +231,19 @@ describe('BooksService — batch webhook pipeline', () => {
     });
 
     await service.handleMitCallback(
-      jobKey, 0,
-      { imgWidth: 800, imgHeight: 1200, patches: [{ x: 0, y: 0, w: 100, h: 100, img_b64: '' }] },
+      jobKey,
+      0,
+      {
+        imgWidth: 800,
+        imgHeight: 1200,
+        patches: [{ x: 0, y: 0, w: 100, h: 100, img_b64: '' }],
+      },
       undefined,
     );
 
-    const cached = cache.set.mock.calls.find((c: any[]) => String(c[0]).includes('translate:manga-patches'));
+    const cached = cache.set.mock.calls.find((c: any[]) =>
+      String(c[0]).includes('translate:manga-patches'),
+    );
     expect(cached[1].patches[0].url).toMatch(/^http:\/\/localhost/);
   });
 
@@ -200,7 +262,11 @@ describe('BooksService — batch webhook pipeline', () => {
       cancelController: new AbortController(),
     });
 
-    const payload = { imgWidth: 800, imgHeight: 1200, patches: [{ x: 0, y: 0, w: 100, h: 100, img_b64: '' }] };
+    const payload = {
+      imgWidth: 800,
+      imgHeight: 1200,
+      patches: [{ x: 0, y: 0, w: 100, h: 100, img_b64: '' }],
+    };
     // Fire two concurrent calls for the same page
     await Promise.all([
       service.handleMitCallback(jobKey, 0, payload, undefined),
@@ -239,9 +305,11 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
-      capturedJobKey = args[6];
-    });
+    jest
+      .spyOn((service as any).batch.stream, 'run')
+      .mockImplementation(async (...args: any[]) => {
+        capturedJobKey = args[6];
+      });
 
     const pages = [
       { pageIndex: 0, pageUrl: 'http://example.com/0.jpg' },
@@ -250,23 +318,41 @@ describe('BooksService — batch webhook pipeline', () => {
 
     // First caller starts the job
     const firstReceived: number[] = [];
-    const firstPromise = service.startOrAttachBatchJob('ch10', pages, (idx: number) => firstReceived.push(idx) as any);
+    const firstPromise = service.startOrAttachBatchJob(
+      'ch10',
+      pages,
+      (idx: number) => firstReceived.push(idx) as any,
+    );
 
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
 
     // Deliver page 0 to the first caller
-    await service.handleMitCallback(capturedJobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+    await service.handleMitCallback(
+      capturedJobKey,
+      0,
+      { imgWidth: 800, imgHeight: 1200, patches: [] },
+      undefined,
+    );
     expect(firstReceived).toContain(0);
 
     // Latecomer attaches — should immediately receive page 0 via replay
     const lateReceived: number[] = [];
-    const latePromise = service.startOrAttachBatchJob('ch10', pages, (idx: number) => lateReceived.push(idx) as any);
-    await new Promise(resolve => setImmediate(resolve));
+    const latePromise = service.startOrAttachBatchJob(
+      'ch10',
+      pages,
+      (idx: number) => lateReceived.push(idx) as any,
+    );
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(lateReceived).toContain(0); // replayed immediately
 
     // Deliver page 1 — both should receive it
-    await service.handleMitCallback(capturedJobKey, 1, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+    await service.handleMitCallback(
+      capturedJobKey,
+      1,
+      { imgWidth: 800, imgHeight: 1200, patches: [] },
+      undefined,
+    );
     await Promise.all([firstPromise, latePromise]);
 
     expect(lateReceived).toContain(1);
@@ -277,22 +363,33 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
-      capturedJobKey = args[6];
-    });
+    jest
+      .spyOn((service as any).batch.stream, 'run')
+      .mockImplementation(async (...args: any[]) => {
+        capturedJobKey = args[6];
+      });
 
     const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
 
     // First caller
     service.startOrAttachBatchJob('ch11', pages, jest.fn() as any);
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
 
     // Latecomer attaches and immediately receives via replay+live
     const lateReceived: number[] = [];
-    const latePromise = service.startOrAttachBatchJob('ch11', pages, (idx: number) => lateReceived.push(idx) as any);
+    const latePromise = service.startOrAttachBatchJob(
+      'ch11',
+      pages,
+      (idx: number) => lateReceived.push(idx) as any,
+    );
 
     // Deliver page 0 right as latecomer is attaching
-    await service.handleMitCallback(capturedJobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+    await service.handleMitCallback(
+      capturedJobKey,
+      0,
+      { imgWidth: 800, imgHeight: 1200, patches: [] },
+      undefined,
+    );
 
     await latePromise;
     expect(lateReceived).toContain(0);
@@ -309,12 +406,19 @@ describe('BooksService — batch webhook pipeline', () => {
       return null;
     });
 
-    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
-      const jobKey = args[6];
-      // Yield until after activeBatchJobs.set() runs synchronously
-      await new Promise(resolve => setImmediate(resolve));
-      await service.handleMitCallback(jobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
-    });
+    jest
+      .spyOn((service as any).batch.stream, 'run')
+      .mockImplementation(async (...args: any[]) => {
+        const jobKey = args[6];
+        // Yield until after activeBatchJobs.set() runs synchronously
+        await new Promise((resolve) => setImmediate(resolve));
+        await service.handleMitCallback(
+          jobKey,
+          0,
+          { imgWidth: 800, imgHeight: 1200, patches: [] },
+          undefined,
+        );
+      });
 
     const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
     await service.startOrAttachBatchJob('ch12', pages, jest.fn() as any);
@@ -327,23 +431,34 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    const runMitSpy = jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
-      capturedJobKey = args[6];
-      // Do not deliver pages yet — let latecomer attach first
-    });
+    const runMitSpy = jest
+      .spyOn((service as any).batch.stream, 'run')
+      .mockImplementation(async (...args: any[]) => {
+        capturedJobKey = args[6];
+        // Do not deliver pages yet — let latecomer attach first
+      });
 
     const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
 
     // Start first job (does NOT resolve yet — no handleMitCallback called)
     service.startOrAttachBatchJob('ch13', pages, jest.fn() as any);
-    await new Promise(resolve => setImmediate(resolve)); // let _runMitBatch mock run
+    await new Promise((resolve) => setImmediate(resolve)); // let _runMitBatch mock run
 
     // Second call should find the running job and attach as latecomer
     const secondReceived: number[] = [];
-    const secondPromise = service.startOrAttachBatchJob('ch13', pages, (idx: number) => secondReceived.push(idx) as any);
+    const secondPromise = service.startOrAttachBatchJob(
+      'ch13',
+      pages,
+      (idx: number) => secondReceived.push(idx) as any,
+    );
 
     // Now deliver the page — both listeners should receive it
-    await service.handleMitCallback(capturedJobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+    await service.handleMitCallback(
+      capturedJobKey,
+      0,
+      { imgWidth: 800, imgHeight: 1200, patches: [] },
+      undefined,
+    );
     await secondPromise;
 
     expect(runMitSpy).toHaveBeenCalledTimes(1);
@@ -355,21 +470,33 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
 
     let capturedJobKey!: string;
-    jest.spyOn((service as any).batch.stream, 'run').mockImplementation(async (...args: any[]) => {
-      capturedJobKey = args[6]; // taskId = jobKey
-    });
+    jest
+      .spyOn((service as any).batch.stream, 'run')
+      .mockImplementation(async (...args: any[]) => {
+        capturedJobKey = args[6]; // taskId = jobKey
+      });
 
     const received: number[] = [];
-    const listener = (_pageIndex: number, _result: any) => received.push(_pageIndex);
+    const listener = (_pageIndex: number, _result: any) =>
+      received.push(_pageIndex);
 
     const pages = [{ pageIndex: 0, pageUrl: 'http://example.com/0.jpg' }];
-    const jobPromise = service.startOrAttachBatchJob('ch1', pages, listener as any);
+    const jobPromise = service.startOrAttachBatchJob(
+      'ch1',
+      pages,
+      listener as any,
+    );
 
     // Yield: allow _runMitBatch mock to resolve and .finally() to fire
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
 
     // Simulate webhook arriving after _runMitBatch has already returned
-    await service.handleMitCallback(capturedJobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
+    await service.handleMitCallback(
+      capturedJobKey,
+      0,
+      { imgWidth: 800, imgHeight: 1200, patches: [] },
+      undefined,
+    );
 
     expect(received).toContain(0);
 
@@ -384,8 +511,13 @@ describe('BooksService — batch webhook pipeline', () => {
 
     const oversizedB64 = 'A'.repeat(5_000_001); // > 5 MB encoded
     await service.handleMitCallback(
-      jobKey, 0,
-      { imgWidth: 800, imgHeight: 1200, patches: [{ x: 0, y: 0, w: 100, h: 100, img_b64: oversizedB64 }] },
+      jobKey,
+      0,
+      {
+        imgWidth: 800,
+        imgHeight: 1200,
+        patches: [{ x: 0, y: 0, w: 100, h: 100, img_b64: oversizedB64 }],
+      },
       undefined,
     );
 
@@ -399,13 +531,14 @@ describe('BooksService — batch webhook pipeline', () => {
 
     const oversizedB64 = 'A'.repeat(5_000_001);
     await service.handleMitCallback(
-      jobKey, 0,
+      jobKey,
+      0,
       {
         imgWidth: 800,
         imgHeight: 1200,
         patches: [
-          { x: 0, y: 0, w: 100, h: 100, img_b64: oversizedB64 },  // skip
-          { x: 10, y: 10, w: 50, h: 50, img_b64: '' },             // keep
+          { x: 0, y: 0, w: 100, h: 100, img_b64: oversizedB64 }, // skip
+          { x: 10, y: 10, w: 50, h: 50, img_b64: '' }, // keep
         ],
       },
       undefined,
@@ -420,27 +553,45 @@ describe('BooksService — batch webhook pipeline', () => {
     const { service } = makeService();
     const jobKey = 'ch-err:ANY:THA:default:hd';
     const job = seedJob(service, jobKey, { expectedCount: 2 });
-    const warnSpy = jest.spyOn((service as any).batch.logger, 'warn').mockImplementation(() => {});
-    const logSpy = jest.spyOn((service as any).batch.logger, 'log').mockImplementation(() => {});
+    const warnSpy = jest
+      .spyOn((service as any).batch.logger, 'warn')
+      .mockImplementation(() => {});
+    const logSpy = jest
+      .spyOn((service as any).batch.logger, 'log')
+      .mockImplementation(() => {});
 
-    await service.handleMitCallback(jobKey, 0, { imgWidth: 800, imgHeight: 1200, patches: [] }, undefined);
     await service.handleMitCallback(
-      jobKey, 1,
+      jobKey,
+      0,
+      { imgWidth: 800, imgHeight: 1200, patches: [] },
+      undefined,
+    );
+    await service.handleMitCallback(
+      jobKey,
+      1,
       { imgWidth: 0, imgHeight: 0, patches: [] },
       'Translation service is starting up, please wait a moment and try again.',
     );
 
     expect(job.resolve).toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('1/2 page errors'));
-    expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining('fully completed'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('1/2 page errors'),
+    );
+    expect(logSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('fully completed'),
+    );
   });
 
   it('keeps the "fully completed" log when every page succeeds', async () => {
     const { service } = makeService();
     const jobKey = 'ch-ok:ANY:THA:default:hd';
     const job = seedJob(service, jobKey, { expectedCount: 1 });
-    const warnSpy = jest.spyOn((service as any).batch.logger, 'warn').mockImplementation(() => {});
-    const logSpy = jest.spyOn((service as any).batch.logger, 'log').mockImplementation(() => {});
+    const warnSpy = jest
+      .spyOn((service as any).batch.logger, 'warn')
+      .mockImplementation(() => {});
+    const logSpy = jest
+      .spyOn((service as any).batch.logger, 'log')
+      .mockImplementation(() => {});
 
     await service.handleMitCallback(
       jobKey,

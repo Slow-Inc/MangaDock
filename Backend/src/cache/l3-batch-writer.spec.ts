@@ -14,28 +14,43 @@ function makeEntry<T>(data: T): CacheEntry<T> {
 function makeRedis(store: Record<string, string> = {}) {
   return {
     available: true,
-    get: jest.fn().mockImplementation((key: string) => Promise.resolve(store[key] ?? null)),
+    get: jest
+      .fn()
+      .mockImplementation((key: string) => Promise.resolve(store[key] ?? null)),
     // Mirrors RedisService.mget: one round-trip, null for missing keys
-    mget: jest.fn().mockImplementation((keys: string[]) =>
-      Promise.resolve(keys.map((k) => store[k] ?? null)),
-    ),
+    mget: jest
+      .fn()
+      .mockImplementation((keys: string[]) =>
+        Promise.resolve(keys.map((k) => store[k] ?? null)),
+      ),
   } as unknown as RedisService;
 }
 
 function makeJsonCache(keys: string[] = []) {
   const map = new Map(keys.map((k) => [k, makeEntry('data')]));
-  return { entries: () => map.entries(), keys: () => map.keys(), has: (k: string) => map.has(k) } as unknown as JsonCacheService;
+  return {
+    entries: () => map.entries(),
+    keys: () => map.keys(),
+    has: (k: string) => map.has(k),
+  } as unknown as JsonCacheService;
 }
 
 function makeL3() {
-  return { write: jest.fn() } as unknown as L3DiskService & { write: jest.Mock };
+  return { write: jest.fn() } as unknown as L3DiskService & {
+    write: jest.Mock;
+  };
 }
 
 function makeWriter(store: Record<string, string> = {}, l1Keys: string[] = []) {
   const redis = makeRedis(store);
   const jsonCache = makeJsonCache(l1Keys);
   const l3 = makeL3();
-  return { writer: new L3BatchWriter(redis, jsonCache, l3), redis, jsonCache, l3 };
+  return {
+    writer: new L3BatchWriter(redis, jsonCache, l3),
+    redis,
+    jsonCache,
+    l3,
+  };
 }
 
 describe('L3BatchWriter', () => {
@@ -47,12 +62,17 @@ describe('L3BatchWriter', () => {
   // Cycle 1 — Tracer Bullet: startup flush
   it('flushes all L1 keys to L3 immediately on onModuleInit before any interval fires', async () => {
     const entry = makeEntry('hello');
-    const { writer, l3 } = makeWriter({ 'manga:1': JSON.stringify(entry) }, ['manga:1']);
+    const { writer, l3 } = makeWriter({ 'manga:1': JSON.stringify(entry) }, [
+      'manga:1',
+    ]);
 
     await writer.onModuleInit();
     writer.onModuleDestroy();
 
-    expect(l3.write).toHaveBeenCalledWith('manga:1', expect.objectContaining({ data: 'hello' }));
+    expect(l3.write).toHaveBeenCalledWith(
+      'manga:1',
+      expect.objectContaining({ data: 'hello' }),
+    );
   });
 
   // Cycle 2 — skip keys missing from L2
@@ -74,12 +94,18 @@ describe('L3BatchWriter', () => {
     await writer.onModuleInit();
     l3.write.mockClear();
     // a write-behind update lands between ticks
-    store['wallet:user:1'] = JSON.stringify({ ...makeEntry(100), updatedAt: new Date(Date.now() + 500).toISOString() });
+    store['wallet:user:1'] = JSON.stringify({
+      ...makeEntry(100),
+      updatedAt: new Date(Date.now() + 500).toISOString(),
+    });
 
     jest.advanceTimersByTime(2_000);
     await drainMicrotasks();
 
-    expect(l3.write).toHaveBeenCalledWith('wallet:user:1', expect.objectContaining({ data: 100 }));
+    expect(l3.write).toHaveBeenCalledWith(
+      'wallet:user:1',
+      expect.objectContaining({ data: 100 }),
+    );
     writer.onModuleDestroy();
   });
 
@@ -91,7 +117,10 @@ describe('L3BatchWriter', () => {
 
     await writer.onModuleInit();
     l3.write.mockClear();
-    store['manga:1'] = JSON.stringify({ ...makeEntry('chapter'), updatedAt: new Date(Date.now() + 500).toISOString() });
+    store['manga:1'] = JSON.stringify({
+      ...makeEntry('chapter'),
+      updatedAt: new Date(Date.now() + 500).toISOString(),
+    });
 
     jest.advanceTimersByTime(2_000); // wallet interval — should NOT write manga:
     await drainMicrotasks();
@@ -99,7 +128,10 @@ describe('L3BatchWriter', () => {
 
     jest.advanceTimersByTime(58_000); // total 60s — default interval fires
     await drainMicrotasks();
-    expect(l3.write).toHaveBeenCalledWith('manga:1', expect.objectContaining({ data: 'chapter' }));
+    expect(l3.write).toHaveBeenCalledWith(
+      'manga:1',
+      expect.objectContaining({ data: 'chapter' }),
+    );
 
     writer.onModuleDestroy();
   });
@@ -112,21 +144,29 @@ describe('L3BatchWriter', () => {
     await writer.onModuleInit();
     l3.write.mockClear(); // clear startup flush
     // an update lands after the last periodic flush — shutdown must persist it
-    store['manga:1'] = JSON.stringify({ ...makeEntry('shutdown-data'), updatedAt: new Date(Date.now() + 500).toISOString() });
+    store['manga:1'] = JSON.stringify({
+      ...makeEntry('shutdown-data'),
+      updatedAt: new Date(Date.now() + 500).toISOString(),
+    });
 
     await writer.onModuleDestroy();
 
-    expect(l3.write).toHaveBeenCalledWith('manga:1', expect.objectContaining({ data: 'shutdown-data' }));
+    expect(l3.write).toHaveBeenCalledWith(
+      'manga:1',
+      expect.objectContaining({ data: 'shutdown-data' }),
+    );
   });
 
   it('onModuleDestroy clears all intervals — no periodic flushes fire after destroy', async () => {
     jest.useFakeTimers();
     const entry = makeEntry(1);
-    const { writer, l3 } = makeWriter({ 'wallet:x': JSON.stringify(entry) }, ['wallet:x']);
+    const { writer, l3 } = makeWriter({ 'wallet:x': JSON.stringify(entry) }, [
+      'wallet:x',
+    ]);
 
     await writer.onModuleInit();
     await writer.onModuleDestroy(); // await so the final flush completes first
-    l3.write.mockClear();           // clear AFTER destroy — now check no more fire
+    l3.write.mockClear(); // clear AFTER destroy — now check no more fire
 
     jest.advanceTimersByTime(60_000);
     await drainMicrotasks();
@@ -136,10 +176,17 @@ describe('L3BatchWriter', () => {
 
   // Cycle 6 — Redis unavailable: L1→L3 direct fallback
   it('writes L1 entries directly to L3 when Redis is unavailable — order-independent shutdown flush', async () => {
-    const redis = { available: false, get: jest.fn() } as unknown as RedisService;
+    const redis = {
+      available: false,
+      get: jest.fn(),
+    } as unknown as RedisService;
     const entry = makeEntry('important');
     const map = new Map([['manga:1', entry]]);
-    const jsonCache = { entries: () => map.entries(), keys: () => map.keys(), has: (k: string) => map.has(k) } as unknown as JsonCacheService;
+    const jsonCache = {
+      entries: () => map.entries(),
+      keys: () => map.keys(),
+      has: (k: string) => map.has(k),
+    } as unknown as JsonCacheService;
     const l3 = makeL3();
     const writer = new L3BatchWriter(redis, jsonCache, l3);
 
@@ -160,7 +207,11 @@ describe('L3BatchWriter', () => {
     await writer.flush('wallet:');
 
     expect(redis.mget).toHaveBeenCalledTimes(1);
-    expect(redis.mget).toHaveBeenCalledWith(['wallet:1', 'wallet:2', 'wallet:3']);
+    expect(redis.mget).toHaveBeenCalledWith([
+      'wallet:1',
+      'wallet:2',
+      'wallet:3',
+    ]);
     expect(redis.get).not.toHaveBeenCalled();
   });
 
@@ -176,11 +227,17 @@ describe('L3BatchWriter', () => {
     await writer.flush('wallet:'); // nothing changed — no disk write
     expect(l3.write).toHaveBeenCalledTimes(1);
 
-    const entryV2 = { ...makeEntry('coins=20'), updatedAt: new Date(Date.now() + 1000).toISOString() };
+    const entryV2 = {
+      ...makeEntry('coins=20'),
+      updatedAt: new Date(Date.now() + 1000).toISOString(),
+    };
     store['wallet:1'] = JSON.stringify(entryV2);
     await writer.flush('wallet:'); // changed — written again
     expect(l3.write).toHaveBeenCalledTimes(2);
-    expect(l3.write).toHaveBeenLastCalledWith('wallet:1', expect.objectContaining({ data: 'coins=20' }));
+    expect(l3.write).toHaveBeenLastCalledWith(
+      'wallet:1',
+      expect.objectContaining({ data: 'coins=20' }),
+    );
   });
 
   // Cycle 9 (#147, self-review) — high-water marks must not outlive their keys
@@ -191,9 +248,19 @@ describe('L3BatchWriter', () => {
     const redis = {
       available: true,
       get: jest.fn(),
-      mget: jest.fn().mockImplementation((keys: string[]) => Promise.resolve(keys.map((k) => store[k as keyof typeof store] ?? null))),
+      mget: jest
+        .fn()
+        .mockImplementation((keys: string[]) =>
+          Promise.resolve(
+            keys.map((k) => store[k as keyof typeof store] ?? null),
+          ),
+        ),
     } as unknown as RedisService;
-    const jsonCache = { entries: () => map.entries(), keys: () => map.keys(), has: (k: string) => map.has(k) } as unknown as JsonCacheService;
+    const jsonCache = {
+      entries: () => map.entries(),
+      keys: () => map.keys(),
+      has: (k: string) => map.has(k),
+    } as unknown as JsonCacheService;
     const writer = new L3BatchWriter(redis, jsonCache, makeL3());
 
     await writer.flush();
@@ -205,11 +272,21 @@ describe('L3BatchWriter', () => {
   });
 
   it('L1→L3 fallback respects prefix filter when Redis is unavailable', async () => {
-    const redis = { available: false, get: jest.fn() } as unknown as RedisService;
+    const redis = {
+      available: false,
+      get: jest.fn(),
+    } as unknown as RedisService;
     const walletEntry = makeEntry('coins');
     const mangaEntry = makeEntry('pages');
-    const map = new Map([['wallet:user:1', walletEntry], ['manga:1', mangaEntry]]);
-    const jsonCache = { entries: () => map.entries(), keys: () => map.keys(), has: (k: string) => map.has(k) } as unknown as JsonCacheService;
+    const map = new Map([
+      ['wallet:user:1', walletEntry],
+      ['manga:1', mangaEntry],
+    ]);
+    const jsonCache = {
+      entries: () => map.entries(),
+      keys: () => map.keys(),
+      has: (k: string) => map.has(k),
+    } as unknown as JsonCacheService;
     const l3 = makeL3();
     const writer = new L3BatchWriter(redis, jsonCache, l3);
 

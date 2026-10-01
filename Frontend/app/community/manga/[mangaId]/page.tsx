@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { ROLE } from "../../../lib/types/user";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import PostCard from "../../../components/PostCard";
@@ -9,7 +10,14 @@ import { listPosts, createPost } from "../../../lib/communityApi";
 import { useAuth } from "../../../contexts/AuthContext";
 import PostImageUploader from "../../../components/PostImageUploader";
 import { useLocalLenis } from "../../../hooks/useLocalLenis";
-import type { LandingBook, ForumPost, ForumCategory } from "../../../lib/types";
+import { useIsMobile } from "../../../hooks/useIsMobile";
+import type { ForumPost, ForumCategory } from "../../../lib/types";
+import { CATEGORY_LIST } from "../../../lib/forumCategories";
+import { cacheOrFetch, TTL } from "../../../lib/apiCache";
+import { proxyImageUrl } from "../../../lib/imgUrl";
+
+/** Minimal shape read from the manga-detail endpoint (title + first cover). */
+type MangaMeta = { title?: string; covers?: { url: string; localUrl?: string }[] };
 
 export default function MangaCommunityPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
@@ -19,6 +27,7 @@ export default function MangaCommunityPage() {
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<"new" | "hot">("hot");
   const [viewMode, setViewMode] = useState<'card' | 'compact'>('card');
+  const isMobile = useIsMobile();
   const [mangaTitle, setMangaTitle] = useState<string | null>(null);
   const [mangaCover, setMangaCover] = useState<string | null>(null);
 
@@ -32,11 +41,22 @@ export default function MangaCommunityPage() {
 
   const fetchMangaMeta = useCallback(async () => {
     try {
-      const res = await fetch(`/api/proxy/books/${mangaId}`);
-      if (!res.ok) return;
-      const book: LandingBook = await res.json();
+      const book = await cacheOrFetch<MangaMeta | null>(
+        `manga:${mangaId}:detail`,
+        async () => {
+          const res = await fetch(`/api/proxy/books/manga/${mangaId}`);
+          if (!res.ok) return null;
+          return res.json();
+        },
+        TTL.LONG,
+      );
+      if (!book) return;
       setMangaTitle((prev) => prev ?? book.title ?? null);
-      setMangaCover((prev) => prev ?? book.thumbnail ?? null);
+      const cover = book.covers?.[0];
+      const coverUrl = cover
+        ? (cover.localUrl ? `/api/proxy${cover.localUrl}` : proxyImageUrl(cover.url))
+        : null;
+      setMangaCover((prev) => prev ?? coverUrl);
     } catch {
       // non-critical, header just stays empty
     }
@@ -66,8 +86,8 @@ export default function MangaCommunityPage() {
   }, [fetchPosts]);
 
   useEffect(() => {
-    if (window.innerWidth < 768) setViewMode('compact');
-  }, []);
+    if (isMobile) setViewMode('compact');
+  }, [isMobile]);
 
   const handleCreatePost = async () => {
     if (!newPost.title.trim() || !newPost.content.trim() || submitting) return;
@@ -88,7 +108,7 @@ export default function MangaCommunityPage() {
       authorUid: user?.uid ?? "",
       authorName: user?.displayName ?? null,
       authorPhotoUrl: user?.photoURL ?? null,
-      authorRole: user?.role ?? "user",
+      authorRole: user?.role ?? ROLE.USER,
       upvotes: 0,
       downvotes: 0,
       userVote: 0,
@@ -228,7 +248,11 @@ export default function MangaCommunityPage() {
                 )}
               </div>
               <button
-                onClick={() => { setShowCreateModal(false); setPostImages([]); }}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setPostImages([]);
+                  setNewPost({ title: "", content: "", category: "general" as ForumCategory });
+                }}
                 className="text-white/40 hover:text-white"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,7 +265,7 @@ export default function MangaCommunityPage() {
               <div>
                 <label className="block text-xs font-bold text-white/40 uppercase mb-2">หมวดหมู่</label>
                 <div className="flex flex-wrap gap-2">
-                  {(["general", "announcement", "spoiler", "manga_update"] as const).map((cat) => (
+                  {CATEGORY_LIST.map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setNewPost({ ...newPost, category: cat })}

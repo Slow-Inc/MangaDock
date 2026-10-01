@@ -18,7 +18,8 @@ export class JsonCacheService implements OnModuleInit {
   private readonly memoryStore = new LRUCache<string, CacheEntry<unknown>>({
     max: L1_MAX_ENTRIES,
     maxSize: L1_MAX_SIZE_BYTES,
-    sizeCalculation: (value, key) => key.length + JSON.stringify(value.data).length,
+    sizeCalculation: (value, key) =>
+      key.length + JSON.stringify(value.data).length,
   });
 
   constructor(private readonly l3: L3DiskService) {}
@@ -28,7 +29,9 @@ export class JsonCacheService implements OnModuleInit {
     for (const [key, entry] of entries) {
       this.memoryStore.set(key, entry);
     }
-    this.logger.log(`Loaded ${entries.size} entries from L3 disk into L1 (max=${L1_MAX_ENTRIES})`);
+    this.logger.log(
+      `Loaded ${entries.size} entries from L3 disk into L1 (max=${L1_MAX_ENTRIES})`,
+    );
   }
 
   get<T>(key: string): CacheEntry<T> | null {
@@ -42,7 +45,12 @@ export class JsonCacheService implements OnModuleInit {
   }
 
   set<T>(key: string, data: T, ttlMs: number): void {
-    this.memoryStore.set(key, { key, data, updatedAt: new Date().toISOString(), ttlMs });
+    this.memoryStore.set(key, {
+      key,
+      data,
+      updatedAt: new Date().toISOString(),
+      ttlMs,
+    });
   }
 
   delete(key: string): void {

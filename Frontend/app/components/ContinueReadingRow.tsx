@@ -10,8 +10,7 @@ import MangaReader from "./MangaReader";
 import { useBookActions } from "../hooks/useBookActions";
 import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
 import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
-
-const API_BASE = "/api/proxy";
+import { translateDescription } from "../lib/translateDescription";
 
 const truncate = (text: string, length: number) => {
   if (!text) return "ค้นพบหนังสือใหม่ที่น่าอ่านในทุกวัน";
@@ -76,10 +75,9 @@ function HistoryCard({
     if (translateFetched.current || !book.description) return;
     translateFetched.current = true;
     setTranslatingDesc(true);
-    fetch(`${API_BASE}/books/translate?text=${encodeURIComponent(book.description)}`)
-      .then((r) => r.json())
-      .then((d: { translatedText: string; translated: boolean }) => {
-        if (d.translated) setTranslatedDesc(d.translatedText);
+    translateDescription(book.description)
+      .then((translated) => {
+        setTranslatedDesc(translated);
         setTranslatingDesc(false);
       })
       .catch(() => setTranslatingDesc(false));

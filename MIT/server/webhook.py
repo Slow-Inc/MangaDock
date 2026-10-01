@@ -14,6 +14,7 @@ import hashlib
 import hmac
 import json
 import os
+import time
 
 import httpx
 
@@ -127,4 +128,53 @@ def make_progress_hook(meta: dict):
                 "pageIndex": meta["pageIndex"],
                 "stage": state,
             })
+    return hook
+
+
+# ── Dev-console pipeline telemetry (worker → parent) ─────────────────────────
+# Per-stage durations the worker reports to the PARENT's /internal/telemetry so the
+# Dev console shows real stage timing instead of mock (#279). Fire-and-forget, same
+# discipline as send_progress — telemetry must never disturb the translation pipeline.
+
+# MangaTranslator stage name → the snapshot's canonical stage id (Dashboard StageTiming).
+_TELEMETRY_STAGE_ID = {
+    "detection": "detect", "ocr": "ocr", "translating": "translate",
+    "inpainting": "inpaint", "rendering": "render",
+}
+
+
+async def send_telemetry(parent_url: str, nonce: str, payload: dict) -> None:
+    """POST one telemetry message to the parent's /internal/telemetry. Single attempt,
+    short timeout, all failures swallowed."""
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(f"{parent_url.rstrip('/')}/internal/telemetry", json=payload,
+                              headers={"X-Nonce": nonce}, timeout=_PROGRESS_TIMEOUT_S)
+    except Exception:
+        pass  # informational only — never disturb the translation pipeline
+
+
+def make_telemetry_hook(parent_url: str, nonce: str, clock=time.monotonic):
+    """Build a progress hook that times each pipeline stage (duration = the gap between
+    consecutive stage starts) and reports it to the parent. Stateful closure over the
+    in-flight stage. No-op when `parent_url` is empty (a standalone worker with no parent).
+    `clock` is injectable for deterministic tests."""
+    if not parent_url:
+        async def _noop(state, finished=False):
+            pass
+        return _noop
+
+    last = {"id": None, "at": None}
+
+    async def hook(state, finished=False):
+        sid = _TELEMETRY_STAGE_ID.get(state)
+        now = clock()
+        # A new known stage — or the pipeline finishing — closes out the prior stage.
+        if last["id"] is not None and (sid is not None or finished):
+            await send_telemetry(parent_url, nonce,
+                                 {"kind": "stage", "stage": last["id"], "ms": (now - last["at"]) * 1000})
+            last["id"] = None
+        if sid is not None:
+            last["id"], last["at"] = sid, now
+
     return hook

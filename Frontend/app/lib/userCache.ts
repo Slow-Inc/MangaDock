@@ -11,6 +11,7 @@
  */
 
 import { createAuthHeaders } from "./apiUtils";
+import { parseJsonArray } from "./safeJson";
 
 const API_BASE = "/api/proxy";
 const LS_FAV = "mb_favorites";
@@ -40,6 +41,7 @@ let liked: Set<string> = new Set();
 let syncedFavorites: Set<string> = new Set(); // what server currently has
 let syncedLiked: Set<string> = new Set();
 let initialized = false;
+let cacheGeneration = 0;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let getTokenFn: (() => Promise<string | null>) | null = null;
 
@@ -85,9 +87,10 @@ function scheduleFlush() {
 }
 
 async function flush() {
+  const generation = cacheGeneration;
   flushTimer = null;
   const token = await getTokenFn?.();
-  if (!token) return; // not logged in — skip sync
+  if (!token || generation !== cacheGeneration) return; // not logged in — skip sync
 
   const headers = createAuthHeaders(token, { "Content-Type": "application/json" });
 
@@ -142,6 +145,7 @@ async function flush() {
       ),
     ]);
 
+    if (generation !== cacheGeneration) return;
     // Mark synced
     syncedFavorites = new Set(favorites.keys());
     syncedLiked = new Set(liked);
@@ -154,6 +158,7 @@ async function flush() {
 
 // ─── Load from server (called on login) ────────────────────────────────────
 export async function loadUserData(token: string) {
+  const generation = cacheGeneration;
   loadFromLS();
   const headers = createAuthHeaders(token);
   try {
@@ -163,8 +168,14 @@ export async function loadUserData(token: string) {
     ]);
     if (!favRes.ok || !likedRes.ok) return;
 
-    const remoteFavs: CachedBook[] = await favRes.json();
-    const remoteLiked: string[] = await likedRes.json();
+    const remoteFavs = await parseJsonArray<CachedBook>(favRes);
+    const remoteLiked = await parseJsonArray<string>(likedRes);
+    if (!remoteFavs || !remoteLiked) {
+      console.warn("[userCache] favorites/liked sync skipped: response body was not a JSON array");
+      return;
+    }
+
+    if (generation !== cacheGeneration) return;
 
     // Merge — remote is source of truth for what WAS there; keep local additions
     const remoteIds = new Set(remoteFavs.map((f) => f.id));
@@ -200,6 +211,7 @@ export async function flushNow(): Promise<void> {
 
 // ─── Clear on logout ────────────────────────────────────────────────────────
 export function clearUserCache() {
+  cacheGeneration++;
   favorites = new Map();
   liked = new Set();
   syncedFavorites = new Set();

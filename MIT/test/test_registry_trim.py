@@ -24,8 +24,9 @@ def test_ctd_detector_removed():
 
 
 def test_production_inpainters_intact():
-    # lama_large is the production default (Backend buildMitConfig)
-    kept = {'default', 'lama_large', 'lama_mpe', 'none', 'original'}
+    # lama_large is the production default (Backend buildMitConfig); flux_klein is
+    # the selective-Flux text-over-art inpainter (#277).
+    kept = {'default', 'lama_large', 'lama_mpe', 'none', 'original', 'flux_klein'}
     assert {k.value for k in INPAINTERS} == kept
 
 

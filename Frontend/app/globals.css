@@ -281,3 +281,11 @@ svg {
   93%  { transform: translateX(0); opacity: 1; }
   100% { transform: translateX(0); opacity: 1; }
 }
+
+/* Mermaid diagram full-width scaling */
+.mermaid-wrapper svg {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100% !important;
+}
+

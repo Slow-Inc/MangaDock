@@ -10,7 +10,9 @@ import { SupabaseService } from './supabase.service';
  */
 function makeJwt(expOffsetSeconds: number, sub = 'test'): string {
   const exp = Math.floor(Date.now() / 1000) + expOffsetSeconds;
-  const payload = Buffer.from(JSON.stringify({ sub, exp })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ sub, exp })).toString(
+    'base64url',
+  );
   return `eyJhbGciOiJIUzI1NiJ9.${payload}.dummysig`;
 }
 
@@ -156,10 +158,15 @@ describe('SupabaseService.verifyAccessToken (token-hash cache + single-flight)',
   it('errors not cached: failed verifyAccessToken not cached; second call re-invokes getUser', async () => {
     const token = makeJwt(3600, 'user-err');
     mockGetUser
-      .mockResolvedValueOnce({ data: { user: null }, error: { message: 'Invalid JWT' } })
+      .mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: 'Invalid JWT' },
+      })
       .mockResolvedValueOnce(getUserOk('uid-retry', 'retry@test.com'));
 
-    await expect(service.verifyAccessToken(token)).rejects.toThrow('Invalid or expired token');
+    await expect(service.verifyAccessToken(token)).rejects.toThrow(
+      'Invalid or expired token',
+    );
 
     // Second call MUST re-invoke getUser — nothing was cached from the failure.
     const user = await service.verifyAccessToken(token);

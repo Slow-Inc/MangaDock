@@ -23,13 +23,17 @@ When two designs are equally correct, choose the one a future maintainer (human 
 
 ## Project Memory (Team Shared)
 
-Memory files live at `.claude/memory/` in this repo — committed so all team members and agents start with full context.
+Team memory lives as an **Obsidian vault** at `Obsidian-MangaDock/` in this repo — committed so all team members and agents start with full context. (It used to be flat files under `.claude/memory/`; that folder now holds only a pointer README.)
 
-**At the start of every session, read all files in `.claude/memory/` before doing anything else.**
+**At the start of every session, read `Obsidian-MangaDock/Home.md` (the Map-of-Content index).** Home.md's one-liners are a **filter, not a reading list** — open only the individual notes whose description matches the subsystem/topic of the task at hand (Frontend / Backend / MIT / general process). Do **not** open all linked notes by default: the full vault is dozens of notes and mostly off-topic for any single task — measured ~26K tokens to open every note vs ~2K to read the index alone. Three rules are universal enough to promote here instead of leaving them topical:
 
-`MEMORY.md` is the index. Each linked file is a memory record (user, feedback, project, or reference type).
+- **Issue ownership scope:** only action issues authored by `xenodeve` or labeled `ready-for-agent` — other contributors' issues are their own logs, not ours to implement. Detail: `Obsidian-MangaDock/feedback-issue-ownership-scope.md`.
+- **Verify before claiming:** never say a fix/feature is "done" without eyeballing the real output (render/test/E2E) against the target — a passing test or a plausible diff alone is not verification. Detail: `Obsidian-MangaDock/feedback-verify-before-claiming.md`.
+- **Root cause before fix:** never guess a cause, and never propose or apply a fix until the root cause is proven by evidence that *discriminates* between the competing explanations. "The results differ" does not say *what* differs — design the experiment whose outcome changes with the hypothesis (run the test alone vs in the suite, reorder, remove one variable at a time). An error or assert message is what the test author *expected*, not a fact — open the real code. Produce a minimal repro that shows the *mechanism* before claiming one. And fixing before the cause is known can **mask** it. Detail: `Obsidian-MangaDock/feedback-root-cause-before-fix.md`.
 
-If you write new memories during a session, update both `.claude/memory/` (for the team) and your local `~/.claude/projects/.../memory/` (for your own continuity).
+`Home.md` groups memories by `type` (`feedback`, `project`, `reference`). Each note has `type` / `description` frontmatter and `[[wikilinks]]` to related notes; open Graph View to see the relationships (unresolved links = memories worth writing).
+
+If you write a new team memory, create a note in `Obsidian-MangaDock/` (filename = its hyphen-kebab slug, matching the `name:` frontmatter so `[[wikilinks]]` resolve) and add a line to `Home.md`. **Before writing, ask: is this universal — every task needs it, states in ≤3 bullets, high cost if missed, not already covered elsewhere in this file?** → promote a short summary here instead of (or in addition to) the vault note. Otherwise it stays a topical vault note. Keep your own local `~/.claude/projects/.../memory/` in sync for personal continuity.
 
 ---
 
@@ -45,6 +49,37 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 
 ---
 
+## Benchmarks (rule)
+
+**Every MIT change must be benchmarked to confirm the result — every time, as part of "done" (not optional).** code+tests passing is not enough; produce a benchmark (deterministic if possible, else E2E) proving the result actually improved / did not regress before calling it done.
+
+**Every time you benchmark (E2E or offline), write an MD report AND a committed PNG image — committed to the repo.** Do not just report a table in chat / MD and let the visual vanish with the session.
+
+- **A committed PNG is MANDATORY for every benchmark — including deterministic / numeric / non-render ones** (contract-repair, determinism gate, cache-safety, config-verify …). If the result isn't a render comparison, still render it to an image (a table / bar / before→after chart via matplotlib or PIL). Rationale: the developer **confirms a benchmark by opening the PNG**, and reuses it in the PR write-up and the whole-project report. An MD with only a table (no PNG) does **not** satisfy this rule (lesson 2026-07-04: the P7 benchmark shipped an MD table with no PNG → the developer couldn't view it).
+- **For a render/translation-visible defect, the PNG MUST include the actual manga page where the defect was caught — re-render the SAME page(s) before→after so the developer sees how much the defect improved on real content, not just a chart** (2026-07-04). Keep the numeric chart/table in the report **too** (both: the real-page image = eyeball proof, the chart = the numbers). Only a pure-correctness defect with nothing visible on a page (e.g. cache-safety) is exempt — if the defect shows on the page (text lost / overflow / garble / mistranslation), a real re-rendered page is required. Ties to `feedback_verify_before_claiming` (real render, not a diagnostic replay).
+- Image → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.png` (committed; never leave it only in the worktree root / scratchpad / `.playwright-mcp`, which are gitignored and lost).
+- **Also send the PNG straight to the developer (SendUserFile), don't just commit it** — especially when they're on a remote-control session with a GUI that can display images (they confirm a benchmark by viewing the image, and shouldn't have to open the repo file themselves).
+- Report → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.md`: method (what path, why deterministic), a before→after numeric table with the ratio, the embedded image (`![caption](./<image>.png)`), and a short "how good" assessment (fix-root / no-regression / completeness / limitation).
+- Prefer **deterministic** benchmarks (isolate the changed knob/code; avoid the non-deterministic translator — see memory `project_mit_translate_nondeterministic`).
+- Reference the report from DONE.md / the issue / the ADR. First example: `docs/reports/benchmarks/2026-06-30-clean-layout-page-scale.md`.
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `Slow-Inc/MangaDock` via the `gh` CLI. Issue, PR, and PRD bodies **must be bilingual (English + a full Thai mirror — same depth, not a summary)** — a `.github/pull_request_template.md` scaffolds the EN/TH sections and `pr-bilingual-check.yml` gates on a real Thai mirror being present (structure-only; a reviewer still enforces same-depth). Review-reply comments may be English-only. External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage states (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) map 1:1 to same-named repo labels, alongside component/type/severity/lifecycle labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` (20 ADRs) at the repo root. See `docs/agents/domain.md`.
+
+---
 
 ## Repository Structure
 
@@ -169,13 +204,17 @@ const safe = /^\s*(javascript|data|vbscript|file):/i.test(url.trim()) ? '#' : ur
 
 ## Project Memory (ทีมใช้ร่วมกัน)
 
-ไฟล์ memory อยู่ที่ `.claude/memory/` ใน repo นี้ — commit ไว้เพื่อให้สมาชิกทีมและ agent ทุกคนเริ่มด้วย context ครบ
+memory ของทีมอยู่เป็น **Obsidian vault** ที่ `Obsidian-MangaDock/` ใน repo นี้ — commit ไว้เพื่อให้สมาชิกทีมและ agent ทุกคนเริ่มด้วย context ครบ (เดิมเป็นไฟล์ flat ใน `.claude/memory/`; ตอนนี้โฟลเดอร์นั้นเหลือแค่ README ชี้ทาง)
 
-**ต้องอ่านทุกไฟล์ใน `.claude/memory/` ก่อนทำอะไรทุกครั้งที่เริ่ม session**
+**ทุกครั้งที่เริ่ม session ต้องอ่าน `Obsidian-MangaDock/Home.md` (Map-of-Content index)** one-liner ใน Home.md คือ **ตัวกรอง ไม่ใช่ reading list** — เปิดเฉพาะ note ที่คำอธิบายตรงกับ subsystem/หัวข้อของงานตรงหน้า (Frontend / Backend / MIT / กระบวนการทั่วไป) **ห้าม**เปิดทุก note ที่ link ไว้เป็น default — vault เต็มมีหลายสิบ note ส่วนใหญ่ไม่เกี่ยวกับงานเดียว — วัดได้ว่า ~26K token ถ้าเปิดทุก note เทียบกับ ~2K token ถ้าอ่านแค่ index มี 3 กฎที่ universal พอจะ promote มาไว้ตรงนี้แทนการปล่อยเป็น topical:
 
-`MEMORY.md` คือ index; แต่ละไฟล์ที่ link ไปคือ memory record (ประเภท user, feedback, project หรือ reference)
+- **ขอบเขต issue:** ทำเฉพาะ issue ที่ author เป็น `xenodeve` หรือ tag `ready-for-agent` — ของ contributor คนอื่นเป็น log ของเขา ไม่ใช่ของเราที่จะ implement รายละเอียด: `Obsidian-MangaDock/feedback-issue-ownership-scope.md`
+- **verify ก่อนเคลม:** ห้ามบอกว่า fix/feature "เสร็จ" จนกว่าจะ eyeball ผลจริง (render/test/E2E) เทียบ target — test ผ่านหรือ diff ที่ดูสมเหตุสมผล ไม่ใช่ verification รายละเอียด: `Obsidian-MangaDock/feedback-verify-before-claiming.md`
+- **หา root cause ก่อนแก้:** ห้ามเดาสาเหตุ และห้ามเสนอหรือลงมือแก้จนกว่า root cause จะถูกพิสูจน์ด้วยหลักฐานที่ **แยกแยะ** ระหว่างคำอธิบายที่แข่งกันได้ · "ผลต่างกัน" ไม่ได้บอกว่า *อะไร* ต่าง — ต้องออกแบบการทดลองที่ผลจะเปลี่ยนตามสมมติฐาน (รันเดี่ยว vs รวม suite, สลับลำดับ, ตัดตัวแปรทีละตัว) · ข้อความ error/assert คือสิ่งที่คนเขียนเทสต์ *คิด* ว่าจะเกิด ไม่ใช่ข้อเท็จจริง — เปิดโค้ดจริงเสมอ · ต้องมี minimal repro ที่โชว์ **กลไก** ก่อนเคลม · และการแก้ก่อนรู้สาเหตุอาจ **กลบ** สาเหตุได้ รายละเอียด: `Obsidian-MangaDock/feedback-root-cause-before-fix.md`
 
-ถ้าเขียน memory ใหม่ระหว่าง session ให้อัปเดตทั้ง `.claude/memory/` (สำหรับทีม) และ `~/.claude/projects/.../memory/` ของตัวเอง (สำหรับความต่อเนื่องส่วนตัว)
+`Home.md` คือ index — จัดกลุ่ม memory ตาม `type` (`feedback`, `project`, `reference`) แต่ละ note มี frontmatter `type` / `description` + `[[wikilinks]]` เชื่อมเรื่องที่เกี่ยวข้อง; เปิด Graph View เพื่อเห็นความสัมพันธ์ (link ที่ยังไม่มีไฟล์ = memory ที่ควรเขียนเพิ่ม)
+
+ถ้าเขียน memory ใหม่ของทีม ให้สร้าง note ใน `Obsidian-MangaDock/` (ชื่อไฟล์ = slug แบบ hyphen-kebab ให้ตรงกับ `name:` ใน frontmatter เพื่อให้ `[[wikilinks]]` resolve) แล้วเพิ่มบรรทัดใน `Home.md` **ก่อนเขียน ถามตัวเองว่า: นี่ universal ไหม — ทุก task ต้องใช้, พูดจบใน ≤3 bullet, cost สูงถ้าพลาด, ยังไม่มีที่อื่นในไฟล์นี้พูดถึง?** → promote เป็นสรุปสั้นไว้ตรงนี้แทน (หรือเพิ่มเติมจาก) vault note ถ้าไม่ใช่ ให้เป็น topical vault note ต่อไป; และ sync `~/.claude/projects/.../memory/` ของตัวเองไว้เพื่อความต่อเนื่องส่วนตัว
 
 ---
 
@@ -188,6 +227,19 @@ pwsh -NoProfile -File scripts/notify.ps1 -Message "build done: 137 tests green"
 ```
 
 `scripts/notify.ps1` ยิง Windows toast จริง (WinRT ผ่าน Windows PowerShell 5.1 → Action Center → Phone Link ส่งต่อเข้ามือถือ) tool `PushNotification` ในตัวขึ้น "sent" แต่ **ไม่เด้ง** บนเครื่อง Win11 + VS Code นี้ จึงใช้ script แทน ยิงเมื่อ: จบ task/รอบ `/tdd`, ต้อง confirm (ก่อนปิด issue / merge), หรือ AFK เสร็จ — ไม่ใช่ progress ย่อยๆ
+
+---
+
+## Benchmarks (กฎ)
+
+**งาน MIT ทุกชิ้นเมื่อเสร็จต้อง benchmark เพื่อยืนยัน result เสมอ — เป็นส่วนหนึ่งของ "done" ไม่ใช่ทางเลือก** code+test ผ่านยังไม่นับเสร็จ; ต้อง benchmark (deterministic ถ้าได้ ไม่งั้น E2E) พิสูจน์ว่าผลจริงดีขึ้น/ไม่ regress ก่อน
+
+**ทุกครั้งที่ benchmark (E2E หรือ offline) ต้องเขียน MD report พร้อมฝังภาพเปรียบเทียบ — commit ลงรีโป** ห้ามรายงานแค่ในแชตแล้วปล่อยภาพหายไปกับ session
+
+- ภาพ → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.png` (committed; อย่าทิ้งใน worktree root / scratchpad / `.playwright-mcp` ที่ถูก gitignore แล้วหาย)
+- report → `docs/reports/benchmarks/<YYYY-MM-DD>-<topic>.md`: method (ผ่าน path ไหน ทำไม deterministic), ตารางตัวเลข before→after + ratio, ฝังภาพ (`![caption](./<image>.png)`), และตารางประเมิน "ดีแค่ไหน" (fix-root / no-regression / completeness / limitation)
+- เลือก benchmark แบบ **deterministic** เมื่อทำได้ (isolate เฉพาะ knob/โค้ดที่เปลี่ยน; เลี่ยง translator ที่ไม่ deterministic — ดู memory `project_mit_translate_nondeterministic`)
+- อ้าง report จาก DONE.md / issue / ADR; ตัวอย่างแรก: `docs/reports/benchmarks/2026-06-30-clean-layout-page-scale.md`
 
 ---
 

@@ -18,7 +18,6 @@ import numpy as np
 
 from .common import OfflineInpainter
 from ..config import InpainterConfig
-from .. import flux_embed_cache
 from ..flux_image_prep import pad_to_multiple, unpad
 
 
@@ -44,7 +43,7 @@ class FluxKleinInpainter(OfflineInpainter):
 
         gguf_path = hf_hub_download(self._GGUF_REPO, self._GGUF_FILE)
         base_dir = snapshot_download(
-            self._BASE_REPO, ignore_patterns=["transformer/*", "flux-2-klein-4b.safetensors"])
+            self._BASE_REPO, ignore_patterns=["transformer/*.safetensors", "flux-2-klein-4b.safetensors"])
         transformer = Flux2Transformer2DModel.from_single_file(
             gguf_path, quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
             config=os.path.join(base_dir, "transformer"), torch_dtype=torch.bfloat16)
@@ -90,12 +89,19 @@ class FluxKleinInpainter(OfflineInpainter):
             base_dir_holder["dir"] = base_dir
             return self._encode_prompt_numpy(base_dir, prompt)
 
+        # Lazy import per this module's docstring: keep importing the module / the
+        # INPAINTERS registry free of the manga_translator core. The module-level form
+        # `from .. import flux_embed_cache` hits the package lazy __getattr__ (PEP 562),
+        # which eager-loads the core and deadlocks when `inpainting` is imported before
+        # it (circular import via stages → inpainting.dispatch) — #616.
+        from .. import flux_embed_cache
+
         embed = flux_embed_cache.get_embed(_encode, self._PROMPT, cache_dir)
         base_dir = base_dir_holder.get("dir")
         if base_dir is None:                       # embed was a cache hit → still need the base dir
             from huggingface_hub import snapshot_download
             base_dir = snapshot_download(
-                self._BASE_REPO, ignore_patterns=["transformer/*", "flux-2-klein-4b.safetensors"])
+                self._BASE_REPO, ignore_patterns=["transformer/*.safetensors", "flux-2-klein-4b.safetensors"])
 
         embed_dtype = torch.bfloat16
         embed_device = device if device.startswith("cuda") else "cpu"

@@ -11,7 +11,7 @@ jest.mock('./page-source', () => ({
 }));
 
 import { Logger } from '@nestjs/common';
-import { MitBatchStream } from './mit-batch-stream';
+import { MitBatchStream, readWithTimeout } from './mit-batch-stream';
 
 function makeStream() {
   const mitClient = {
@@ -254,6 +254,85 @@ describe('MitBatchStream._retryMissingPagesIndividually (#82, relocated from #29
     expect(deps.translateSinglePage).not.toHaveBeenCalled();
   });
 
+  it('runs recovery with bounded concurrency (pool > 1), not one page at a time (FR-20)', async () => {
+    const { stream, deps } = makeStream();
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const releases: Array<() => void> = [];
+    deps.translateSinglePage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          releases.push(() => {
+            inFlight -= 1;
+            resolve({ patches: [] });
+          });
+        }),
+    );
+
+    const SIX = Array.from({ length: 6 }, (_, i) => ({
+      pageIndex: i,
+      pageUrl: `http://example.com/${i}.jpg`,
+    }));
+
+    const done = (stream as any)._retryMissingPagesIndividually(
+      'ch',
+      SIX,
+      new Set<number>(),
+      jest.fn(),
+    );
+
+    // Let the pool spin up all its workers.
+    await new Promise((r) => setImmediate(r));
+
+    // Serial loop would keep exactly 1 retry in flight; the pool keeps 4.
+    expect(maxInFlight).toBe(4);
+    expect(deps.translateSinglePage).toHaveBeenCalledTimes(4);
+
+    // Drain: releasing each wave lets the pool pull the remaining pages.
+    for (let round = 0; round < 4 && releases.length > 0; round++) {
+      releases.splice(0).forEach((r) => r());
+      await new Promise((r) => setImmediate(r));
+    }
+    await done;
+    expect(deps.translateSinglePage).toHaveBeenCalledTimes(6);
+  });
+
+  it('stops issuing new pool work once the signal aborts mid-recovery (FR-20 preserves FR-7)', async () => {
+    const { stream, deps } = makeStream();
+    const controller = new AbortController();
+
+    let calls = 0;
+    deps.translateSinglePage.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) controller.abort(); // abort during the first wave
+      return { patches: [] };
+    });
+
+    const EIGHT = Array.from({ length: 8 }, (_, i) => ({
+      pageIndex: i,
+      pageUrl: `http://example.com/${i}.jpg`,
+    }));
+
+    await (stream as any)._retryMissingPagesIndividually(
+      'ch',
+      EIGHT,
+      new Set<number>(),
+      jest.fn(),
+      undefined,
+      undefined,
+      undefined,
+      controller.signal,
+    );
+
+    // Pool must check the signal before starting each unit: no new MIT calls
+    // are issued after the abort, so far fewer than all 8 pages are attempted.
+    expect(calls).toBeLessThanOrEqual(4);
+    expect(calls).toBeLessThan(8);
+  });
+
   it('passes maxStartupRetries:3 to translateSinglePage in the fallback path', async () => {
     const { stream, deps } = makeStream();
 
@@ -277,5 +356,38 @@ describe('MitBatchStream._retryMissingPagesIndividually (#82, relocated from #29
         mangaId: undefined,
       },
     );
+  });
+});
+
+describe('readWithTimeout (#544) — no dangling race-loser timer', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it('clears the timeout timer when the read wins (resolve-first)', async () => {
+    const result = await readWithTimeout(
+      () => Promise.resolve('chunk'),
+      90_000,
+    );
+
+    expect(result).toBe('chunk');
+    // The loser (timeout) timer must be cleared — none left pending. Before the
+    // fix every fast read leaked a ~90s timer that accumulated across the stream.
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('rejects and clears the timer when the timeout wins (timeout-first)', async () => {
+    const neverResolves = new Promise<never>(() => {});
+    const raced = readWithTimeout(() => neverResolves, 90_000);
+    const assertion = expect(raced).rejects.toThrow(
+      'MIT stream read timeout after 90000ms',
+    );
+
+    await jest.advanceTimersByTimeAsync(90_000);
+    await assertion;
+
+    expect(jest.getTimerCount()).toBe(0);
   });
 });

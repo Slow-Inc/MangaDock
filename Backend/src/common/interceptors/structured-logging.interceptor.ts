@@ -19,7 +19,7 @@ export class StructuredLoggingInterceptor implements NestInterceptor {
     const url = req.url;
     const ip = req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || 'unknown';
-    const taskId = req.headers['x-task-id'] || (req as any).hardwareId || 'none';
+    const taskId = req.headers['x-task-id'] || req.hardwareId || 'none';
 
     return next.handle().pipe(
       tap({
@@ -29,7 +29,16 @@ export class StructuredLoggingInterceptor implements NestInterceptor {
         },
         error: (err) => {
           const duration = Date.now() - now;
-          this.log(method, url, duration, taskId, 'error', ip, userAgent, err.message);
+          this.log(
+            method,
+            url,
+            duration,
+            taskId,
+            'error',
+            ip,
+            userAgent,
+            err.message,
+          );
         },
       }),
     );

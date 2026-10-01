@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "../components/Navbar";
 import MangaGrid, { GridBook } from "../components/MangaGrid";
+import { cacheOrFetch, TTL } from "../lib/apiCache";
 
 const API_BASE = "/api/proxy";
 
@@ -111,9 +112,16 @@ function useSectionPage(order: TabKey, tagFilter: string) {
     setError(false);
     const qs = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
     if (tagFilter !== "all") qs.set("tag", tagFilter);
-    fetch(`${API_BASE}/books/new-releases?${qs}`)
-      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((res: NewReleasesResponse) => setData(res[order]))
+    cacheOrFetch<NewReleasesResponse>(
+      `new-releases:${tagFilter}:${page}`,
+      async () => {
+        const r = await fetch(`${API_BASE}/books/new-releases?${qs}`);
+        if (!r.ok) throw new Error();
+        return r.json();
+      },
+      TTL.MEDIUM,
+    )
+      .then((res) => setData(res[order]))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [page, order, tagFilter]);

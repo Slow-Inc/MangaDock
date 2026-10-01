@@ -41,6 +41,25 @@ export async function listPosts(options: {
   );
 }
 
+export async function listPostsByUser(
+  uid: string,
+  offset: number,
+  limit = 20,
+): Promise<{ items: ForumPost[]; total: number }> {
+  const token = await getAuthToken();
+  const params = new URLSearchParams({
+    authorUid: uid,
+    offset: offset.toString(),
+    limit: limit.toString(),
+    sort: 'new',
+  });
+  const res = await fetch(`${API_BASE}/forum/posts?${params.toString()}`, {
+    headers: createAuthHeaders(token),
+  });
+  if (!res.ok) throw new Error('Failed to fetch user posts');
+  return res.json() as Promise<{ items: ForumPost[]; total: number }>;
+}
+
 export interface TrendingManga {
   mangaId: string;
   mangaTitle: string;

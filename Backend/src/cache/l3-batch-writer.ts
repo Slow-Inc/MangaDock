@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { JsonCacheService, CacheEntry } from './json-cache.service';
 import { L3DiskService } from './l3-disk.service';
@@ -9,7 +14,9 @@ export const FLUSH_CONFIG: Array<{ prefix: string; intervalMs: number }> = [
   { prefix: '', intervalMs: 60_000 }, // '' = all remaining keys not matched above
 ];
 
-const SPECIFIC_PREFIXES = FLUSH_CONFIG.filter((c) => c.prefix !== '').map((c) => c.prefix);
+const SPECIFIC_PREFIXES = FLUSH_CONFIG.filter((c) => c.prefix !== '').map(
+  (c) => c.prefix,
+);
 
 @Injectable()
 export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
@@ -51,7 +58,7 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
     if (!this.redis.available) {
       // L1→L3 direct path: Redis unavailable (e.g., provider destroyed before us on shutdown)
       for (const [key, entry] of this.jsonCache.entries()) {
-        if (matchesPrefix(key)) this.l3.write(key, entry);
+        if (matchesPrefix(key)) await this.l3.write(key, entry);
       }
       return;
     }
@@ -59,7 +66,8 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
     // Prune high-water marks for keys evicted from L1 — without this the map
     // grows forever under key churn (manga chapters rotate through the LRU).
     for (const key of this.lastWritten.keys()) {
-      if (matchesPrefix(key) && !this.jsonCache.has(key)) this.lastWritten.delete(key);
+      if (matchesPrefix(key) && !this.jsonCache.has(key))
+        this.lastWritten.delete(key);
     }
 
     // One MGET round-trip instead of one GET per key (#147) — these timers
@@ -74,10 +82,12 @@ export class L3BatchWriter implements OnModuleInit, OnModuleDestroy {
       try {
         const entry = JSON.parse(raw) as CacheEntry<unknown>;
         if (this.lastWritten.get(key) === entry.updatedAt) continue; // unchanged since last flush
-        this.l3.write(key, entry);
+        await this.l3.write(key, entry);
         this.lastWritten.set(key, entry.updatedAt);
       } catch (err) {
-        this.logger.warn(`L3BatchWriter: corrupt L2 data for key=${key}: ${String(err)}`);
+        this.logger.warn(
+          `L3BatchWriter: corrupt L2 data for key=${key}: ${String(err)}`,
+        );
       }
     }
   }

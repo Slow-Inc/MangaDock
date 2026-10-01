@@ -6,11 +6,16 @@ jest.mock('ioredis', () =>
   jest.fn().mockImplementation(() => {
     mockEmitter = new EventEmitter();
     return {
-      on: (event: string, cb: (...args: any[]) => void) => mockEmitter.on(event, cb),
+      on: (event: string, cb: (...args: any[]) => void) =>
+        mockEmitter.on(event, cb),
       connect: jest.fn().mockResolvedValue(undefined),
       quit: jest.fn().mockResolvedValue(undefined),
       disconnect: jest.fn(),
-      duplicate: jest.fn().mockReturnValue({ on: jest.fn(), subscribe: jest.fn(), quit: jest.fn() }),
+      duplicate: jest.fn().mockReturnValue({
+        on: jest.fn(),
+        subscribe: jest.fn(),
+        quit: jest.fn(),
+      }),
     };
   }),
 );

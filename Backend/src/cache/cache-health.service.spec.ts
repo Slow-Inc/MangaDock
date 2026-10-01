@@ -2,9 +2,15 @@ import { CacheHealthService } from './cache-health.service';
 import { RedisService } from './redis.service';
 import { L3DiskService } from './l3-disk.service';
 import { ElectionService } from '../status/election.service';
-import { DIRTY_QUEUE, PROCESSING_QUEUE, DEAD_LETTER_SET } from './batch-sync.worker';
+import {
+  DIRTY_QUEUE,
+  PROCESSING_QUEUE,
+  DEAD_LETTER_SET,
+} from './batch-sync.worker';
 
-function makeRedis(overrides: Partial<{ available: boolean; llen: number; scard: number }> = {}) {
+function makeRedis(
+  overrides: Partial<{ available: boolean; llen: number; scard: number }> = {},
+) {
   const { available = true, llen = 0, scard = 0 } = overrides;
   return {
     available,
@@ -14,18 +20,22 @@ function makeRedis(overrides: Partial<{ available: boolean; llen: number; scard:
 }
 
 function makeL3(keyCount = 0) {
-  return { keyCount: jest.fn().mockReturnValue(keyCount) } as unknown as L3DiskService;
+  return {
+    keyCount: jest.fn().mockReturnValue(keyCount),
+  } as unknown as L3DiskService;
 }
 
 function makeElection(isLeader = false) {
   return { isLeader } as unknown as ElectionService;
 }
 
-function makeService(overrides: {
-  redis?: ReturnType<typeof makeRedis>;
-  l3?: ReturnType<typeof makeL3>;
-  election?: ReturnType<typeof makeElection>;
-} = {}) {
+function makeService(
+  overrides: {
+    redis?: ReturnType<typeof makeRedis>;
+    l3?: ReturnType<typeof makeL3>;
+    election?: ReturnType<typeof makeElection>;
+  } = {},
+) {
   const redis = overrides.redis ?? makeRedis();
   const l3 = overrides.l3 ?? makeL3();
   const election = overrides.election ?? makeElection();

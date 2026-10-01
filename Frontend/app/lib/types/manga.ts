@@ -37,6 +37,12 @@ export type MangaChapter = {
   backendAvailable?: boolean;
 };
 
+export type ActiveChapter = {
+  id: string;
+  chapterNumber: string | null;
+  title: string | null;
+};
+
 export type MangaChapterPages = {
   pages: string[];
   dataSaverPages: string[];

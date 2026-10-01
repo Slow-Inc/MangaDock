@@ -51,7 +51,9 @@ export class GeminiModelCatalog {
       return new Set(this.geminiModelsCatalog);
     }
 
-    const cached = await this.cache.get<{ models: GeminiModel[] }>(GEMINI_MODELS_CACHE_KEY);
+    const cached = await this.cache.get<{ models: GeminiModel[] }>(
+      GEMINI_MODELS_CACHE_KEY,
+    );
     if (cached?.data?.models?.length) {
       this.geminiModelsCatalog = cached.data.models;
       this.geminiModelsCatalogExpiresAt = now + GEMINI_MODELS_CACHE_TTL_MS;
@@ -80,7 +82,11 @@ export class GeminiModelCatalog {
       const models = [
         ...new Set(
           (payload.models ?? [])
-            .filter((entry) => (entry.supportedGenerationMethods ?? []).includes('generateContent'))
+            .filter((entry) =>
+              (entry.supportedGenerationMethods ?? []).includes(
+                'generateContent',
+              ),
+            )
             .map((entry) => this.normalizeGeminiModelName(entry.name))
             .filter((model): model is GeminiModel => !!model),
         ),
@@ -100,13 +106,17 @@ export class GeminiModelCatalog {
         return new Set(models);
       }
     } catch (err) {
-      this.logger.warn(`[Gemini] Failed to refresh model catalog: ${String(err)}`);
+      this.logger.warn(
+        `[Gemini] Failed to refresh model catalog: ${String(err)}`,
+      );
     }
 
     return new Set();
   }
 
-  private async filterAvailableGeminiModels(candidates: Array<string | null | undefined>): Promise<GeminiModel[]> {
+  private async filterAvailableGeminiModels(
+    candidates: Array<string | null | undefined>,
+  ): Promise<GeminiModel[]> {
     const normalizedCandidates = [
       ...new Set(
         candidates
@@ -124,11 +134,17 @@ export class GeminiModelCatalog {
       return normalizedCandidates;
     }
 
-    const filtered = normalizedCandidates.filter((model) => availableModels.has(model));
-    const skipped = normalizedCandidates.filter((model) => !availableModels.has(model));
+    const filtered = normalizedCandidates.filter((model) =>
+      availableModels.has(model),
+    );
+    const skipped = normalizedCandidates.filter(
+      (model) => !availableModels.has(model),
+    );
 
     if (skipped.length > 0) {
-      this.logger.warn(`[Gemini] Skipping unavailable models: ${skipped.join(', ')}`);
+      this.logger.warn(
+        `[Gemini] Skipping unavailable models: ${skipped.join(', ')}`,
+      );
     }
 
     if (filtered.length > 0) {

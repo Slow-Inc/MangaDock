@@ -1,6 +1,7 @@
 "use client";
 
 import { errMessage } from "@/lib/errMessage";
+import { ROLE } from "../lib/types/user";
 import { useAuth } from "../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -63,7 +64,10 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   if (!user) return null;
 
   // 3. RBAC Enforcement: Onboarding for regular 'user' role
-  const isAuthorized = userRole === "translator" || userRole === "creator" || userRole === "admin";
+  const isAuthorized =
+    userRole === ROLE.TRANSLATOR ||
+    userRole === ROLE.CREATOR ||
+    userRole === ROLE.ADMIN;
 
   if (!isAuthorized) {
     return (

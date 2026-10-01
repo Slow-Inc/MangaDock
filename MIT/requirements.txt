@@ -5,7 +5,10 @@ torchvision
 torch-summary
 einops
 scikit-image
-opencv-python
+# Pin below OpenCV 5: 5.0.0 made cv2.putText strict about CV_8U image depth,
+# which breaks the debug-visualization helpers (utils/sort.py) and the render
+# goldens in CI. Unpinned, fresh installs (CI) drifted to 5.x. (#359 baseline)
+opencv-python>=4.8.0,<5.0.0
 pyclipper
 shapely
 requests

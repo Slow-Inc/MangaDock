@@ -1,6 +1,7 @@
 import { Injectable, Inject, Optional, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import type { CacheEntry } from './json-cache.service';
 
 const CONSECUTIVE_FAIL_THRESHOLD = 3;
@@ -17,7 +18,9 @@ export class L3DiskService {
     try {
       fs.mkdirSync(this.cacheDir, { recursive: true });
     } catch (err) {
-      this.logger.warn(`L3DiskService: could not create cache dir ${this.cacheDir}: ${String(err)}`);
+      this.logger.warn(
+        `L3DiskService: could not create cache dir ${this.cacheDir}: ${String(err)}`,
+      );
     }
   }
 
@@ -25,12 +28,16 @@ export class L3DiskService {
     const map = new Map<string, CacheEntry<unknown>>();
     try {
       if (!fs.existsSync(this.cacheDir)) return map;
-      const files = fs.readdirSync(this.cacheDir).filter((f) => f.endsWith('.json'));
+      const files = fs
+        .readdirSync(this.cacheDir)
+        .filter((f) => f.endsWith('.json'));
       for (const file of files) {
         const filePath = path.join(this.cacheDir, file);
         try {
           const raw = fs.readFileSync(filePath, 'utf-8');
-          const entry = JSON.parse(raw) as CacheEntry<unknown> & { key?: string };
+          const entry = JSON.parse(raw) as CacheEntry<unknown> & {
+            key?: string;
+          };
           const memKey = entry.key ?? file.replace('.json', '');
           map.set(memKey, entry);
         } catch {
@@ -43,19 +50,24 @@ export class L3DiskService {
     return map;
   }
 
-  write<T>(key: string, entry: CacheEntry<T>): void {
+  async write<T>(key: string, entry: CacheEntry<T>): Promise<void> {
     try {
-      const safeFileName = key.replace(/[:\\/*?"<>|]/g, '_');
-      const filePath = path.join(this.cacheDir, `${safeFileName}.json`);
+      const filePath = path.join(
+        this.cacheDir,
+        `${this.fileNameForKey(key)}.json`,
+      );
       // Compact — these files are machine-read only; pretty-print cost ~25%
       // extra bytes on every periodic flush (#147)
-      this.writeFile(filePath, JSON.stringify({ ...entry, key }));
+      await this.writeFile(filePath, JSON.stringify({ ...entry, key }));
       this.consecutiveWriteFailures = 0;
       this.criticalAlertFired = false;
     } catch (err) {
       this.consecutiveWriteFailures++;
       this.logger.warn(`Failed to write L3 cache [${key}]: ${String(err)}`);
-      if (this.consecutiveWriteFailures >= CONSECUTIVE_FAIL_THRESHOLD && !this.criticalAlertFired) {
+      if (
+        this.consecutiveWriteFailures >= CONSECUTIVE_FAIL_THRESHOLD &&
+        !this.criticalAlertFired
+      ) {
         this.criticalAlertFired = true;
         this.logger.error(
           `CRITICAL: L3 disk write has failed ${this.consecutiveWriteFailures} consecutive times — possible disk full or permission error`,
@@ -69,7 +81,9 @@ export class L3DiskService {
     try {
       fs.appendFileSync(fallbackPath, key + '\n', 'utf-8');
     } catch (err) {
-      this.logger.warn(`appendDirtyFallback: failed for key=${key}: ${String(err)}`);
+      this.logger.warn(
+        `appendDirtyFallback: failed for key=${key}: ${String(err)}`,
+      );
     }
   }
 
@@ -79,7 +93,7 @@ export class L3DiskService {
       if (!fs.existsSync(fallbackPath)) return [];
       const raw = fs.readFileSync(fallbackPath, 'utf-8');
       fs.unlinkSync(fallbackPath);
-      return [...new Set(raw.split('\n').filter(k => k.length > 0))];
+      return [...new Set(raw.split('\n').filter((k) => k.length > 0))];
     } catch (err) {
       this.logger.warn(`drainDirtyFallback: failed: ${String(err)}`);
       return [];
@@ -89,13 +103,49 @@ export class L3DiskService {
   keyCount(): number {
     try {
       if (!fs.existsSync(this.cacheDir)) return 0;
-      return fs.readdirSync(this.cacheDir).filter(f => f.endsWith('.json')).length;
+      return fs.readdirSync(this.cacheDir).filter((f) => f.endsWith('.json'))
+        .length;
     } catch {
       return 0;
     }
   }
 
-  protected writeFile(filePath: string, content: string): void {
-    fs.writeFileSync(filePath, content, 'utf-8');
+  /**
+   * Hash the cache key into a fixed-length, filesystem-safe filename. A plain
+   * character-strip sanitizer collided distinct keys (e.g. `a:b` and `a/b` both
+   * became `a_b`), silently overwriting one entry with another. A sha256 hex
+   * digest guarantees distinct keys map to distinct filenames. The original key
+   * is still stored inside the JSON payload, so `readAll()` recovers it verbatim
+   * regardless of the on-disk filename. (FR-31)
+   */
+  private fileNameForKey(key: string): string {
+    return createHash('sha256').update(key).digest('hex');
+  }
+
+  /**
+   * Atomic write: stage the content in a sibling `*.tmp` file, then rename it
+   * onto the final path. `rename` is atomic on the same volume, so a reader can
+   * only ever observe the complete old file or the complete new one — never a
+   * half-written file, even if the process is killed mid-write. On any failure
+   * the tmp file is removed so no orphan is left behind. (FR-31)
+   */
+  protected async writeFile(filePath: string, content: string): Promise<void> {
+    const tmpPath = `${filePath}.tmp`;
+    try {
+      await fs.promises.writeFile(tmpPath, content, 'utf-8');
+      await this.renameFile(tmpPath, filePath);
+    } catch (err) {
+      try {
+        await fs.promises.unlink(tmpPath);
+      } catch {
+        /* tmp may not exist / already cleaned — nothing to do */
+      }
+      throw err;
+    }
+  }
+
+  /** Isolated rename seam (atomic commit step) — overridable for testing. */
+  protected async renameFile(from: string, to: string): Promise<void> {
+    await fs.promises.rename(from, to);
   }
 }

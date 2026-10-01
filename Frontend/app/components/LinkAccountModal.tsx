@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useModalTransition } from "../hooks/useModalTransition";
 
 export interface LinkAccountModalProps {
   isOpen: boolean;
@@ -61,44 +62,28 @@ export default function LinkAccountModal({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-  const [visible, setVisible] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { signInWithEmail } = useAuth();
   const isPasswordMode = existingProvider === "password";
 
-  useEffect(() => setMounted(true), []);
+  const { mounted, visible, close } = useModalTransition(isOpen, { onClosed: onClose });
 
   useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => {
-        setVisible(true);
-        if (isPasswordMode) setTimeout(() => inputRef.current?.focus(), 50);
-      }, 10);
-      return () => clearTimeout(timer);
-    } else {
-      setVisible(false);
+    if (visible && isPasswordMode) {
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
     }
-  }, [isOpen, isPasswordMode]);
-
-  const handleClose = useCallback(() => {
-    setVisible(false);
-    setTimeout(() => {
-      onClose();
-      setPassword("");
-      setError(null);
-    }, 300);
-  }, [onClose]);
+  }, [visible, isPasswordMode]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key === "Escape") close();
     };
     if (isOpen) window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, handleClose]);
+  }, [isOpen, close]);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -114,7 +99,7 @@ export default function LinkAccountModal({
     setLoading(true);
     try {
       await signInWithEmail(email, password);
-      handleClose();
+      close();
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? "";
       if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
@@ -136,7 +121,7 @@ export default function LinkAccountModal({
     setLoading(true);
     try {
       await onSocialConfirm();
-      handleClose();
+      close();
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? "";
       if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
@@ -164,18 +149,17 @@ export default function LinkAccountModal({
       ? "border-white/10 bg-white/5 hover:bg-white/10"
       : "border-[#1877F2]/40 bg-[#1877F2]/20 hover:bg-[#1877F2]/30";
 
-  if (!mounted) return null;
+  if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
     <div
       ref={overlayRef}
       onClick={(e) => {
-        if (e.target === overlayRef.current) handleClose();
+        if (e.target === overlayRef.current) close();
       }}
       className={`fixed inset-0 z-400 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
-      style={{ display: isOpen || visible ? "flex" : "none" }}
     >
       <div
         className={`relative w-full max-w-sm rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
@@ -184,7 +168,7 @@ export default function LinkAccountModal({
       >
         {/* Close button */}
         <button
-          onClick={handleClose}
+          onClick={close}
           className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
           aria-label="ปิด"
         >
@@ -275,7 +259,7 @@ export default function LinkAccountModal({
 
               <button
                 type="button"
-                onClick={handleClose}
+                onClick={close}
                 className="w-full rounded-xl py-2.5 text-sm text-white/40 transition hover:text-white/70"
               >
                 ยกเลิก
@@ -313,7 +297,7 @@ export default function LinkAccountModal({
 
               <button
                 type="button"
-                onClick={handleClose}
+                onClick={close}
                 disabled={loading}
                 className="w-full rounded-xl py-2.5 text-sm text-white/40 transition hover:text-white/70 disabled:opacity-50"
               >

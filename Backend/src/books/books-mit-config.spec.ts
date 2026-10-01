@@ -4,14 +4,23 @@ import { parseJobKey, renderConfigHash, buildMitConfig } from './mit-config';
 describe('parseJobKey', () => {
   it('round-trips a plain chapterId', () => {
     expect(parseJobKey('abc123:JPN:THA:default:hd')).toEqual({
-      chapterId: 'abc123', srcMIT: 'JPN', tgtMIT: 'THA', model: 'default', derivative: 'hd',
+      chapterId: 'abc123',
+      srcMIT: 'JPN',
+      tgtMIT: 'THA',
+      model: 'default',
+      derivative: 'hd',
     });
   });
 
   it('keeps the colon in a "ver:<uuid>" chapterId (right-split, #bug-hunt)', () => {
-    expect(parseJobKey('ver:752fc515-72ce-4890:ANY:ENG:gemini-2.5-pro:saver')).toEqual({
+    expect(
+      parseJobKey('ver:752fc515-72ce-4890:ANY:ENG:gemini-2.5-pro:saver'),
+    ).toEqual({
       chapterId: 'ver:752fc515-72ce-4890',
-      srcMIT: 'ANY', tgtMIT: 'ENG', model: 'gemini-2.5-pro', derivative: 'saver',
+      srcMIT: 'ANY',
+      tgtMIT: 'ENG',
+      model: 'gemini-2.5-pro',
+      derivative: 'saver',
     });
   });
 });
@@ -28,8 +37,18 @@ function makeService() {
     set: jest.fn().mockResolvedValue(undefined),
     setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
   };
-  const storage = { put: jest.fn().mockResolvedValue(undefined), list: jest.fn().mockResolvedValue([]), delete: jest.fn().mockResolvedValue(undefined) };
-  return new BooksService({} as any, cache as any, { enabled: false } as any, {} as any, storage as any);
+  const storage = {
+    put: jest.fn().mockResolvedValue(undefined),
+    list: jest.fn().mockResolvedValue([]),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
+  return new BooksService(
+    {} as any,
+    cache as any,
+    { enabled: false } as any,
+    {} as any,
+    storage as any,
+  );
 }
 
 const ENV_KEYS = [
@@ -45,6 +64,8 @@ const ENV_KEYS = [
   'MIT_FONT_SIZE_OFFSET',
   'MIT_FONT_SIZE_MIN',
   'MIT_BUBBLE_AREA_FIT',
+  'MIT_REFERENCE_LAYOUT',
+  'MIT_KNUTH_PLASS',
   'MIT_SFX_DETECTOR',
   'MIT_OCR_VLM_RESCUE',
   'MIT_EN_COMIC_FONT',
@@ -53,13 +74,27 @@ const ENV_KEYS = [
   'MIT_FONT_MAX_BOX_RATIO',
   'MIT_EN_FONT',
   'MIT_PATCH_FEATHER',
+  'MIT_PATCH_CONTENT_ALPHA',
   'MIT_INPAINT_CONTEXT_PAD',
+  'MIT_PROTECT_FIGURES',
+  'MIT_RESTRICT_FULLPAGE_MASK',
+  'MIT_ADAPTIVE_DILATE',
 ];
 
 describe('BooksService.buildMitConfig', () => {
   const saved: Record<string, string | undefined> = {};
-  beforeEach(() => ENV_KEYS.forEach((k) => { saved[k] = process.env[k]; delete process.env[k]; }));
-  afterEach(() => ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }));
+  beforeEach(() =>
+    ENV_KEYS.forEach((k) => {
+      saved[k] = process.env[k];
+      delete process.env[k];
+    }),
+  );
+  afterEach(() =>
+    ENV_KEYS.forEach((k) => {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }),
+  );
 
   it("uses MIT's tuned detection/inpainting sizes + bf16 + lama_large by default (#247)", () => {
     const svc = makeService();
@@ -93,6 +128,25 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.inpainter.inpainter).toBe('flux_klein');
+  });
+
+  it('emits the #548 mask-quality inpainter flags from MIT_PROTECT_FIGURES / MIT_RESTRICT_FULLPAGE_MASK / MIT_ADAPTIVE_DILATE', () => {
+    process.env.MIT_PROTECT_FIGURES = '1';
+    process.env.MIT_RESTRICT_FULLPAGE_MASK = '1';
+    process.env.MIT_ADAPTIVE_DILATE = '1';
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'JPN', 'THA', 'ja'));
+    expect(cfg.inpainter.protect_figures).toBe(true);
+    expect(cfg.inpainter.restrict_fullpage_mask).toBe(true);
+    expect(cfg.inpainter.adaptive_dilate).toBe(true);
+  });
+
+  it('omits the #548 mask-quality flags when their env is unset (byte-identical default)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'JPN', 'THA', 'ja'));
+    expect(cfg.inpainter.protect_figures).toBeUndefined();
+    expect(cfg.inpainter.restrict_fullpage_mask).toBeUndefined();
+    expect(cfg.inpainter.adaptive_dilate).toBeUndefined();
   });
 
   it('folds the inpainter choice into renderConfigHash so switching busts the patch cache', () => {
@@ -258,6 +312,19 @@ describe('BooksService.buildMitConfig', () => {
     expect(cfg.render.patch_feather_radius).toBeUndefined();
   });
 
+  it('enables content-shaped patch alpha via MIT_PATCH_CONTENT_ALPHA (#436)', () => {
+    process.env.MIT_PATCH_CONTENT_ALPHA = '1';
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.patch_content_alpha).toBe(true);
+  });
+
+  it('omits patch_content_alpha when unset — patches byte-identical (#436)', () => {
+    const svc = makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.patch_content_alpha).toBeUndefined();
+  });
+
   it('enables the larger inpaint context crop via MIT_INPAINT_CONTEXT_PAD (#249)', () => {
     process.env.MIT_INPAINT_CONTEXT_PAD = '256';
     const svc = makeService();
@@ -291,6 +358,32 @@ describe('BooksService.buildMitConfig', () => {
     expect(cfg.render.bubble_area_fit).toBeUndefined();
   });
 
+  it('enables reference_layout via MIT_REFERENCE_LAYOUT (#178 P3)', () => {
+    process.env.MIT_REFERENCE_LAYOUT = '1';
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.reference_layout).toBe(true);
+  });
+
+  it('omits reference_layout unless MIT_REFERENCE_LAYOUT is "1" (#178 P3, default byte-identical)', () => {
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.reference_layout).toBeUndefined();
+  });
+
+  it('enables knuth_plass via MIT_KNUTH_PLASS (#180 P8)', () => {
+    process.env.MIT_KNUTH_PLASS = '1';
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.knuth_plass).toBe(true);
+  });
+
+  it('omits knuth_plass unless MIT_KNUTH_PLASS is "1" (#180 P8, default greedy)', () => {
+    makeService();
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.knuth_plass).toBeUndefined();
+  });
+
   it('enables the SFX detector via MIT_SFX_DETECTOR (#168)', () => {
     process.env.MIT_SFX_DETECTOR = '1';
     const svc = makeService();
@@ -314,14 +407,30 @@ describe('BooksService.buildMitConfig', () => {
   it('carries series_context to the translator when provided (#157)', () => {
     const svc = makeService();
     const cfg = JSON.parse(
-      buildMitConfig(process.env, 'ANY', 'THA', '', undefined, 'You are translating the manga series "Mob Seka".'),
+      buildMitConfig(
+        process.env,
+        'ANY',
+        'THA',
+        '',
+        undefined,
+        'You are translating the manga series "Mob Seka".',
+      ),
     );
-    expect(cfg.translator.series_context).toBe('You are translating the manga series "Mob Seka".');
+    expect(cfg.translator.series_context).toBe(
+      'You are translating the manga series "Mob Seka".',
+    );
   });
 
   it('produces a byte-identical config when series_context is absent (local-first rule)', () => {
     const svc = makeService();
-    const withUndefined = buildMitConfig(process.env, 'JPN', 'THA', 'ja', undefined, undefined);
+    const withUndefined = buildMitConfig(
+      process.env,
+      'JPN',
+      'THA',
+      'ja',
+      undefined,
+      undefined,
+    );
     const legacyCall = buildMitConfig(process.env, 'JPN', 'THA', 'ja');
     expect(withUndefined).toBe(legacyCall);
     expect(withUndefined).not.toContain('series_context');

@@ -1,0 +1,36 @@
+{
+  "name": "mangadock-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo/AppEntry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit",
+    "validate:env": "node --env-file-if-exists=.env scripts/validate-env.mjs"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/supabase-js": "^2.108.2",
+    "expo": "~56.0.15",
+    "expo-application": "~56.0.3",
+    "expo-auth-session": "~56.0.15",
+    "expo-build-properties": "~56.0.22",
+    "expo-constants": "~56.0.20",
+    "expo-linking": "~56.0.15",
+    "expo-media-library": "~56.0.9",
+    "expo-status-bar": "~56.0.4",
+    "expo-system-ui": "~56.0.5",
+    "expo-web-browser": "~56.0.5",
+    "react": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-url-polyfill": "^3.0.0",
+    "react-native-webview": "13.16.1"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.7",
+    "typescript": "~6.0.3"
+  }
+}

@@ -1,11 +1,15 @@
-export type ForumCategory = 'general' | 'announcement' | 'spoiler' | 'manga_update';
+export type ForumCategory =
+  | 'general'
+  | 'announcement'
+  | 'spoiler'
+  | 'manga_update';
 
 export interface ForumPost {
   id: string;
   authorUid: string;
   authorName: string | null;
   authorPhotoUrl: string | null;
-  authorRole: string;
+  authorRole: number;
   title: string;
   content: string;
   category: ForumCategory;
@@ -28,7 +32,7 @@ export interface ForumComment {
   authorUid: string;
   authorName: string | null;
   authorPhotoUrl: string | null;
-  authorRole: string;
+  authorRole: number;
   content: string;
   upvotes: number;
   downvotes: number;

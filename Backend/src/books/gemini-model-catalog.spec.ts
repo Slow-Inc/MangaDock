@@ -66,7 +66,9 @@ describe('GeminiModelCatalog — model selection (#231)', () => {
     const env = { GEMINI_API_KEY: 'k', GEMINI_MANGA_MODEL: 'gemini-2.5-pro' };
     jest
       .spyOn(global, 'fetch')
-      .mockResolvedValue(modelsResponse(['gemini-2.5-flash', 'gemini-2.5-flash-lite']) as any);
+      .mockResolvedValue(
+        modelsResponse(['gemini-2.5-flash', 'gemini-2.5-flash-lite']) as any,
+      );
     const catalog = new GeminiModelCatalog(cache as any, env as any, () => 0);
 
     // gemini-2.5-pro is not in the provider catalog → skipped.
@@ -79,7 +81,9 @@ describe('GeminiModelCatalog — model selection (#231)', () => {
   it('falls back to the raw candidates when none match the provider catalog', async () => {
     const cache = makeCache(null);
     const env = { GEMINI_API_KEY: 'k' };
-    jest.spyOn(global, 'fetch').mockResolvedValue(modelsResponse(['some-other-model']) as any);
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(modelsResponse(['some-other-model']) as any);
     const catalog = new GeminiModelCatalog(cache as any, env as any, () => 0);
 
     await expect(catalog.getDescriptionModels()).resolves.toEqual([
@@ -93,7 +97,11 @@ describe('GeminiModelCatalog — model selection (#231)', () => {
     const env = { GEMINI_API_KEY: 'k' };
     const fetchSpy = jest.spyOn(global, 'fetch');
     let clock = 0;
-    const catalog = new GeminiModelCatalog(cache as any, env as any, () => clock);
+    const catalog = new GeminiModelCatalog(
+      cache as any,
+      env as any,
+      () => clock,
+    );
 
     await catalog.getMangaModels(); // primes memory from the redis cache
     clock = 1000 * 60 * 30; // +30 min — still inside the 1-hour TTL
@@ -107,7 +115,11 @@ describe('GeminiModelCatalog — model selection (#231)', () => {
     const cache = makeCache({ models: ['gemini-2.5-flash'] });
     const env = { GEMINI_API_KEY: 'k' };
     let clock = 0;
-    const catalog = new GeminiModelCatalog(cache as any, env as any, () => clock);
+    const catalog = new GeminiModelCatalog(
+      cache as any,
+      env as any,
+      () => clock,
+    );
 
     await catalog.getMangaModels();
     clock = 1000 * 60 * 60 + 1; // just past the 1-hour TTL

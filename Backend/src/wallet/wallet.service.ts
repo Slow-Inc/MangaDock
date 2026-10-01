@@ -16,6 +16,18 @@ import { safeTokenEqual } from './xendit-webhook.config';
 /** Hard upper bound per single coin mutation — bounds INTEGER-column overflow and abuse. */
 export const MAX_TOPUP_COINS = 100000;
 
+/**
+ * THB charged per coin credited. Topup currency is THB-only today and the ratio
+ * is 1:1, but "THB amount settled" and "coins to credit" are distinct units —
+ * this makes the conversion explicit at the webhook-verification comparison so a
+ * future pricing change (e.g. a promo ratio) can't silently break the check by
+ * comparing two differently-unitized numbers as if they were interchangeable.
+ */
+export const THB_PER_COIN = 1;
+
+/** Currency Xendit is configured to settle in; re-asserted on webhook verify. */
+export const TOPUP_CURRENCY = 'THB';
+
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
@@ -37,7 +49,10 @@ export class WalletService {
       .eq('uid', uid)
       .maybeSingle();
 
-    if (error) throw new InternalServerErrorException(`Failed to fetch wallet: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to fetch wallet: ${error.message}`,
+      );
     return data?.balance ?? 0;
   }
 
@@ -52,7 +67,10 @@ export class WalletService {
       .eq('uid', uid)
       .maybeSingle();
 
-    if (error) throw new InternalServerErrorException(`Failed to fetch topup: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to fetch topup: ${error.message}`,
+      );
     if (!data) throw new NotFoundException('Topup not found');
     return { expiresAt: data.expires_at, status: data.status };
   }
@@ -65,7 +83,9 @@ export class WalletService {
     referenceId?: string,
   ): Promise<{ balance: number }> {
     if (!Number.isInteger(amount) || amount <= 0 || amount > MAX_TOPUP_COINS) {
-      throw new BadRequestException(`Amount must be an integer between 1 and ${MAX_TOPUP_COINS}`);
+      throw new BadRequestException(
+        `Amount must be an integer between 1 and ${MAX_TOPUP_COINS}`,
+      );
     }
 
     const { data, error } = await this.db.rpc('add_coins_atomic', {
@@ -76,10 +96,17 @@ export class WalletService {
       p_reference_id: referenceId ?? null,
     });
 
-    if (error) throw new InternalServerErrorException(`Failed to add coins: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to add coins: ${error.message}`,
+      );
 
-    const newBalance: number = Array.isArray(data) ? data[0]?.balance : (data as any)?.balance;
-    this.logger.log(`Added ${amount} coins (${type}) to user ${uid}, new balance: ${newBalance}`);
+    const newBalance: number = Array.isArray(data)
+      ? data[0]?.balance
+      : data?.balance;
+    this.logger.log(
+      `Added ${amount} coins (${type}) to user ${uid}, new balance: ${newBalance}`,
+    );
     return { balance: newBalance };
   }
 
@@ -90,7 +117,9 @@ export class WalletService {
     referenceId?: string,
   ): Promise<{ balance: number }> {
     if (!Number.isInteger(amount) || amount <= 0 || amount > MAX_TOPUP_COINS) {
-      throw new BadRequestException(`Amount must be an integer between 1 and ${MAX_TOPUP_COINS}`);
+      throw new BadRequestException(
+        `Amount must be an integer between 1 and ${MAX_TOPUP_COINS}`,
+      );
     }
 
     const { data, error } = await this.db.rpc('spend_coins_atomic', {
@@ -105,11 +134,17 @@ export class WalletService {
       if (error.message?.includes('INSUFFICIENT_FUNDS')) {
         throw new BadRequestException('Insufficient balance');
       }
-      throw new InternalServerErrorException(`Failed to spend coins: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to spend coins: ${error.message}`,
+      );
     }
 
-    const newBalance: number = Array.isArray(data) ? data[0]?.balance : (data as any)?.balance;
-    this.logger.log(`Spent ${amount} coins for user ${uid}, new balance: ${newBalance}`);
+    const newBalance: number = Array.isArray(data)
+      ? data[0]?.balance
+      : data?.balance;
+    this.logger.log(
+      `Spent ${amount} coins for user ${uid}, new balance: ${newBalance}`,
+    );
     return { balance: newBalance };
   }
 
@@ -125,7 +160,12 @@ export class WalletService {
     description: string,
     referenceId: string,
   ) {
-    const { balance } = await this.spendCoins(userUid, amount, description, referenceId);
+    const { balance } = await this.spendCoins(
+      userUid,
+      amount,
+      description,
+      referenceId,
+    );
 
     const PLATFORM_FEE_PCT = 0.3;
     const platformShare = Math.floor(amount * PLATFORM_FEE_PCT);
@@ -158,8 +198,12 @@ export class WalletService {
       .eq('translator_uid', uid)
       .maybeSingle();
 
-    if (error) throw new InternalServerErrorException(`Failed to fetch creator earnings: ${error.message}`);
-    if (!data) return { totalSales: 0, totalEarned: 0, titlesSold: 0, uniqueBuyers: 0 };
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to fetch creator earnings: ${error.message}`,
+      );
+    if (!data)
+      return { totalSales: 0, totalEarned: 0, titlesSold: 0, uniqueBuyers: 0 };
 
     return {
       totalSales: data.total_sales,
@@ -177,7 +221,10 @@ export class WalletService {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (error) throw new InternalServerErrorException(`Failed to fetch transactions: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to fetch transactions: ${error.message}`,
+      );
 
     return (data ?? []).map((row) => ({
       id: row.id,
@@ -199,7 +246,11 @@ export class WalletService {
   ): Promise<{ paymentId: string; qrString: string; expiresAt: string }> {
     const referenceId = randomUUID();
     const { payment_id, qr_string, expires_at } =
-      await this.xenditService.createPromptPayCharge(amount, referenceId, 'เติมเหรียญ MangaDock');
+      await this.xenditService.createPromptPayCharge(
+        amount,
+        referenceId,
+        'เติมเหรียญ MangaDock',
+      );
 
     const { error } = await this.db.from('coin_topups').insert({
       payment_id,
@@ -210,9 +261,16 @@ export class WalletService {
       expires_at,
     });
 
-    if (error) throw new InternalServerErrorException(`Failed to save topup: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to save topup: ${error.message}`,
+      );
 
-    return { paymentId: payment_id, qrString: qr_string, expiresAt: expires_at };
+    return {
+      paymentId: payment_id,
+      qrString: qr_string,
+      expiresAt: expires_at,
+    };
   }
 
   async getTopupStatus(
@@ -226,11 +284,18 @@ export class WalletService {
       .eq('uid', uid)
       .maybeSingle();
 
-    if (error) throw new InternalServerErrorException(`Failed to get topup status: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to get topup status: ${error.message}`,
+      );
     if (!data) throw new NotFoundException('Topup not found');
 
     if (data.status === 'pending' && new Date(data.expires_at) < new Date()) {
-      await this.db.from('coin_topups').update({ status: 'expired' }).eq('payment_id', paymentId).eq('status', 'pending');
+      await this.db
+        .from('coin_topups')
+        .update({ status: 'expired' })
+        .eq('payment_id', paymentId)
+        .eq('status', 'pending');
       return { status: 'expired' };
     }
 
@@ -253,7 +318,10 @@ export class WalletService {
       .eq('uid', uid)
       .maybeSingle();
 
-    if (error) throw new InternalServerErrorException(`Failed to fetch topup: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to fetch topup: ${error.message}`,
+      );
     if (!data) throw new NotFoundException('Topup not found');
     if (data.status !== 'pending') return { cancelled: false };
 
@@ -264,7 +332,10 @@ export class WalletService {
       .eq('uid', uid)
       .eq('status', 'pending');
 
-    if (updateError) throw new InternalServerErrorException(`Failed to cancel topup: ${updateError.message}`);
+    if (updateError)
+      throw new InternalServerErrorException(
+        `Failed to cancel topup: ${updateError.message}`,
+      );
     this.logger.log(`Topup cancelled by user ${uid}: ${paymentId}`);
     return { cancelled: true };
   }
@@ -284,12 +355,18 @@ export class WalletService {
       .eq('uid', uid)
       .maybeSingle();
 
-    if (error) throw new InternalServerErrorException(`Failed to fetch topup: ${error.message}`);
+    if (error)
+      throw new InternalServerErrorException(
+        `Failed to fetch topup: ${error.message}`,
+      );
     if (!data) throw new NotFoundException('Topup not found');
-    if (data.status !== 'pending') throw new BadRequestException('Topup is not in pending state');
+    if (data.status !== 'pending')
+      throw new BadRequestException('Topup is not in pending state');
 
     await this.xenditService.simulatePayment(paymentId, data.amount_coins);
-    this.logger.log(`Simulate payment triggered for ${paymentId} by user ${uid}`);
+    this.logger.log(
+      `Simulate payment triggered for ${paymentId} by user ${uid}`,
+    );
     return { simulated: true };
   }
 
@@ -330,7 +407,9 @@ export class WalletService {
       if (!/^[0-9a-f]+$/i.test(signature)) {
         throw new UnauthorizedException('Invalid webhook signature');
       }
-      const computed = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+      const computed = createHmac('sha256', webhookSecret)
+        .update(rawBody)
+        .digest('hex');
       let valid = false;
       try {
         const a = Buffer.from(computed, 'hex');
@@ -349,7 +428,11 @@ export class WalletService {
 
     if (event === 'payment.failed' || status === 'FAILED') {
       if (paymentRequestId) {
-        await this.db.from('coin_topups').update({ status: 'expired' }).eq('payment_id', paymentRequestId).eq('status', 'pending');
+        await this.db
+          .from('coin_topups')
+          .update({ status: 'expired' })
+          .eq('payment_id', paymentRequestId)
+          .eq('status', 'pending');
         this.logger.warn(`Xendit payment failed: ${paymentRequestId}`);
       }
       return { received: true };
@@ -371,10 +454,14 @@ export class WalletService {
       .maybeSingle();
 
     if (claimError) {
-      throw new InternalServerErrorException(`Failed to claim topup: ${claimError.message}`);
+      throw new InternalServerErrorException(
+        `Failed to claim topup: ${claimError.message}`,
+      );
     }
     if (!claimed) {
-      this.logger.warn(`Webhook: coin_topup not claimable (not found or already processed) for payment_id=${paymentId}`);
+      this.logger.warn(
+        `Webhook: coin_topup not claimable (not found or already processed) for payment_id=${paymentId}`,
+      );
       return { received: true };
     }
 
@@ -387,15 +474,25 @@ export class WalletService {
       verified = await this.xenditService.getPaymentRequest(paymentId);
     } catch (err) {
       await this.revertClaim(paymentId);
-      this.logger.error(`Webhook verify failed (Xendit unreachable) for ${paymentId}: ${String(err)}`);
+      this.logger.error(
+        `Webhook verify failed (Xendit unreachable) for ${paymentId}: ${String(err)}`,
+      );
       throw new InternalServerErrorException('Payment verification failed');
     }
 
-    if (verified.status !== 'SUCCEEDED' || Number(verified.amount) !== claimed.amount_coins) {
+    // Expected THB Xendit should have settled for this claim, derived from the coin
+    // count via the explicit THB_PER_COIN conversion (units are NOT interchangeable).
+    const expectedThb = claimed.amount_coins * THB_PER_COIN;
+    if (
+      verified.status !== 'SUCCEEDED' ||
+      verified.currency !== TOPUP_CURRENCY ||
+      Number(verified.amount) !== expectedThb
+    ) {
       await this.revertClaim(paymentId);
       this.logger.error(
         `SECURITY: webhook verification mismatch for ${paymentId} — ` +
-          `xenditStatus=${verified.status} xenditAmount=${verified.amount} expected=${claimed.amount_coins}`,
+          `xenditStatus=${verified.status} xenditCurrency=${verified.currency} ` +
+          `xenditAmount=${verified.amount} expectedCurrency=${TOPUP_CURRENCY} expectedThb=${expectedThb}`,
       );
       throw new UnauthorizedException('Payment verification failed');
     }

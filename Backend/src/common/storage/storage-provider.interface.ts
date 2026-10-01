@@ -21,9 +21,19 @@ export interface StorageProvider {
   ): Promise<void>;
 
   /**
-   * Retrieve a file from storage.
+   * Retrieve a file from storage as a Buffer.
+   * Use for callers that need the whole object in memory (hashing, image
+   * processing, JSON parsing). To serve bytes straight to an HTTP response,
+   * prefer {@link getStream} when available to avoid buffering the whole object.
    */
   get(key: string): Promise<Buffer>;
+
+  /**
+   * Retrieve a file as a readable stream, avoiding a full in-memory buffer.
+   * Optional: providers that can stream (e.g. remote R2) implement it; callers
+   * must fall back to {@link get} when it is absent.
+   */
+  getStream?(key: string): Promise<Readable>;
 
   /**
    * Delete a file from storage.

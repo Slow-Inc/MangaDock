@@ -30,3 +30,198 @@ def test_merge_identity_when_no_sfx_boxes(monkeypatch):
     result = (['textline'], 'mask_raw', 'mask')
     out = merge_sfx_detections(ctx, result, device='cpu')
     assert out is result  # identity short-circuit
+
+
+# ---- #535 empty-balloon rescue: a balloon with INK but no textline = missed text ----
+
+def test_normal_bubble_with_textline_over_its_ink_is_covered():
+    # a speech bubble's text covers only ~15% of the balloon AREA but ~all of its INK
+    # — must NOT be rescued (v6 live: duplicated every dialogue bubble).
+    from manga_translator.detection_postproc import empty_balloon_boxes
+    balloon = (0.0, 0.0, 200.0, 200.0)
+    text = (60.0, 80.0, 140.0, 120.0)          # 3200 px² of 40000 (8% area)
+    ink = lambda box: 900 if (abs(box[0]-60) < 1 and abs(box[1]-80) < 1) else (1000 if box == balloon else 0)
+    got = empty_balloon_boxes([balloon], [text], ink, min_ink=100)
+    assert got == []                            # 90% of the ink is inside the textline
+
+
+def test_caption_with_stray_sliver_over_little_ink_is_rescued():
+    from manga_translator.detection_postproc import empty_balloon_boxes
+    balloon = (0.0, 0.0, 200.0, 200.0)
+    sliver = (10.0, 10.0, 60.0, 20.0)
+    ink = lambda box: 40 if (abs(box[0]-10) < 1 and abs(box[1]-10) < 1) else (2000 if box == balloon else 0)
+    got = empty_balloon_boxes([balloon], [sliver], ink, min_ink=100)
+    assert got == [balloon]                     # sliver covers 2% of the ink → missed text
+
+
+def test_truly_empty_balloon_is_not_rescued():
+    from manga_translator.detection_postproc import empty_balloon_boxes
+    got = empty_balloon_boxes([(0.0, 0.0, 100.0, 100.0)], [], lambda box: 5, min_ink=100)
+    assert got == []
+
+
+# ---- #535 ink-cluster completeness: text ink on a LIGHT bg with no region = missed ----
+
+def _page_with(draw):
+    import numpy as np, cv2
+    img = np.full((400, 400), 240, np.uint8)
+    draw(img, cv2)
+    return img
+
+def test_uncovered_typeset_block_is_found():
+    from manga_translator.detection_postproc import uncovered_text_clusters
+    def draw(img, cv2):
+        for i, line in enumerate(['STARTING WITH', 'THE HEROINE', 'WHO IS CLEAN']):
+            cv2.putText(img, line, (60, 80 + i * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 0, 2)
+    img = _page_with(draw)
+    got = uncovered_text_clusters(img, covered_boxes=[])
+    assert len(got) == 1
+    x1, y1, x2, y2 = got[0]
+    assert x1 < 70 and y1 < 70 and x2 > 200 and y2 > 150     # covers the block
+
+
+def test_covered_block_is_skipped():
+    from manga_translator.detection_postproc import uncovered_text_clusters
+    def draw(img, cv2):
+        cv2.putText(img, 'HELLO WORLD', (60, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 0, 2)
+    img = _page_with(draw)
+    got = uncovered_text_clusters(img, covered_boxes=[(40, 60, 320, 130)])
+    assert got == []
+
+
+def test_dense_dark_art_is_rejected():
+    from manga_translator.detection_postproc import uncovered_text_clusters
+    def draw(img, cv2):
+        img[50:250, 50:250] = 40                              # solid dark art block
+    img = _page_with(draw)
+    got = uncovered_text_clusters(img, covered_boxes=[])
+    assert got == []                                          # too dense = art, not text
+
+
+# ---- #535 white caption boxes: bright rectangles are balloons the YOLO can't see ----
+
+def test_white_caption_box_detected():
+    import numpy as np, cv2
+    from manga_translator.detection_postproc import white_box_candidates
+    img = np.full((600, 600), 120, np.uint8)          # mid-gray art page
+    img[60:260, 50:300] = 245                          # big white caption box (~14% of page)
+    cv2.putText(img, 'STARTING WITH', (70, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.8, 30, 2)
+    got = white_box_candidates(img)
+    assert len(got) == 1
+    x1, y1, x2, y2 = got[0]
+    assert x1 >= 45 and y1 >= 55 and x2 <= 305 and y2 <= 265
+
+
+def test_small_or_irregular_bright_areas_ignored():
+    import numpy as np, cv2
+    from manga_translator.detection_postproc import white_box_candidates
+    img = np.full((400, 400), 120, np.uint8)
+    img[10:40, 10:40] = 245                            # too small
+    tri = np.array([[80, 300], [300, 300], [80, 80]])  # bright triangle = low fill
+    cv2.fillPoly(img, [tri], 245)
+    got = white_box_candidates(img)
+    assert got == []
+
+
+# ---- #535 round-7: YOLO balloons stop short of the true caption box ----
+
+def test_balloon_expanded_to_containing_white_box():
+    from manga_translator.detection_postproc import expand_balloons_with_white_boxes
+    balloons = [(839.0, 1002.0, 958.0, 1182.0)]       # YOLO stops at y=1182
+    white = [(839.0, 1004.0, 954.0, 1247.0)]          # the true box reaches 1247
+    got = expand_balloons_with_white_boxes(balloons, white)
+    x1, y1, x2, y2 = got[0]
+    assert y2 == 1247.0                                # grown to the union
+    assert y1 == 1002.0 and x1 == 839.0
+
+
+def test_unrelated_white_box_leaves_balloon_alone_and_is_appended():
+    from manga_translator.detection_postproc import expand_balloons_with_white_boxes
+    balloons = [(0.0, 0.0, 100.0, 100.0)]
+    white = [(500.0, 500.0, 700.0, 700.0)]            # caption YOLO missed entirely
+    got = expand_balloons_with_white_boxes(balloons, white)
+    assert got[0] == (0.0, 0.0, 100.0, 100.0)
+    assert (500.0, 500.0, 700.0, 700.0) in got        # appended as its own balloon
+
+
+# ---- A1 (leftover caption text): erase ink ONLY inside verified white caption boxes ----
+
+def test_erase_ink_in_white_caption_boxes_erases_caption_not_art():
+    import numpy as np, cv2
+    from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
+    img = np.full((600, 600), 120, np.uint8)         # mid-gray art page
+    img[60:260, 50:300] = 245                         # a distinct white caption box
+    cv2.putText(img, 'CAPTION', (70, 140), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 20, 2)
+    # a dark art figure elsewhere (NOT a white box) — must be preserved
+    img[350:520, 350:520] = 30
+    mask = np.zeros((600, 600), np.uint8)
+    out = erase_ink_in_white_caption_boxes(mask, img)
+    assert out[135, 90] == 255                        # caption stroke -> erased
+    assert out[430, 430] == 0                         # art figure -> preserved (no white box)
+
+
+def test_no_white_boxes_leaves_mask_unchanged():
+    import numpy as np
+    from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
+    img = np.full((200, 200), 120, np.uint8)          # mid-gray, no bright box
+    img[50:150, 50:150] = 30
+    mask = np.zeros((200, 200), np.uint8)
+    out = erase_ink_in_white_caption_boxes(mask, img)
+    assert (out == mask).all()
+
+
+def test_white_box_containing_line_art_character_is_skipped():
+    # One-Punch HUH panel regression #2: a bright PANEL containing a line-art
+    # character passed the white-box test (ink 8%) and the erase wiped the figure.
+    import numpy as np, cv2
+    from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
+    img = np.full((700, 700), 120, np.uint8)
+    img[60:340, 50:350] = 245                      # bright panel (~17% of page)
+    img[150:300, 150:290] = 15                     # line-art figure mass (140x150 - both dims large)
+    cv2.putText(img, 'HUH?', (80, 110), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 20, 2)
+    mask = np.zeros((600, 600), np.uint8)
+    out = erase_ink_in_white_caption_boxes(mask, img)
+    assert out[220, 270] == 0                      # figure preserved (box skipped)
+    assert out[100, 100] == 0                      # even the text near it (whole box skipped)
+
+
+def test_caption_with_long_bold_text_line_still_cleaned():
+    import numpy as np
+    from manga_translator.detection_postproc import erase_ink_in_white_caption_boxes
+    img = np.full((700, 700), 120, np.uint8)
+    img[60:340, 50:350] = 245                      # caption box (~17% of page)
+    img[100:125, 70:330] = 15                      # a joined bold text LINE: wide (260) but thin (25)
+    mask = np.zeros((600, 600), np.uint8)
+    out = erase_ink_in_white_caption_boxes(mask, img)
+    assert out[110, 200] == 255                    # thin-wide = text -> erased
+
+
+# ---- LaMa ghost in white captions: flat paper needs a direct fill, not a GAN ----
+
+def test_flatten_white_captions_replaces_lama_ghost_with_paper():
+    # User-confirmed root: the erase mask covered ALL caption ink yet lama_large
+    # reconstructed a faint squiggle of the source text ("AGAIN?") from the stroke
+    # stubs. A white caption box is UNIFORM PAPER — fill the ink pixels directly.
+    import numpy as np, cv2
+    from manga_translator.detection_postproc import flatten_white_captions
+    orig = np.full((700, 700), 120, np.uint8)
+    orig[60:340, 50:350] = 246                     # white caption box
+    cv2.putText(orig, 'AGAIN?', (80, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 20, 2)
+    inpainted = np.full((700, 700, 3), 120, np.uint8)
+    inpainted[60:340, 50:350] = 246
+    cv2.putText(inpainted, 'AGAIN?', (80, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 180, 2)  # faint LaMa ghost
+    out = flatten_white_captions(inpainted, orig)
+    ghost = out[185:205, 80:220]
+    assert int(ghost.min()) >= 235                 # ghost flattened to paper
+    assert out[400, 400, 0] == 120                 # outside boxes untouched
+
+
+def test_flatten_skips_art_boxes():
+    import numpy as np
+    from manga_translator.detection_postproc import flatten_white_captions
+    orig = np.full((700, 700), 120, np.uint8)
+    orig[60:340, 50:350] = 246
+    orig[150:300, 150:290] = 15                    # line-art figure (art gate)
+    inpainted = np.stack([orig]*3, axis=2).copy()
+    out = flatten_white_captions(inpainted, orig)
+    assert out[220, 220, 0] == 15                  # art preserved, box skipped
