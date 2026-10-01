@@ -47,7 +47,7 @@ export function createNativeSdkLoginController(
           finish(request, {access_token: session.access_token, refresh_token: session.refresh_token});
         }, error => {
           const messages: Record<string, string> = {
-            'auth/sdk-cancelled': 'ยกเลิกการเข้าสู่ระบบแล้ว',
+            'auth/sdk-cancelled': provider === 'google' ? 'Google ไม่สามารถดำเนินการเข้าสู่ระบบต่อได้ หรือหน้าล็อกอินถูกปิด กรุณาลองอีกครั้ง' : 'ยกเลิกการเข้าสู่ระบบแล้ว',
             'auth/sdk-config': 'ยังไม่ได้ตั้งค่า SDK สำหรับผู้ให้บริการนี้',
             'auth/sdk-no-credential': 'ไม่พบบัญชี Google ที่ใช้ได้ กรุณาตรวจบัญชีและการตั้งค่า Android Client ID',
             'auth/sdk-facebook-token': 'Facebook ไม่ส่ง ID token ที่รองรับ กรุณาตรวจการตั้งค่า SDK',

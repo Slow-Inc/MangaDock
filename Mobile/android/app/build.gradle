@@ -167,6 +167,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-base:18.5.0")
     implementation("androidx.credentials:credentials:1.6.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
     // 1.2.x requires Kotlin 2.4 metadata; the RN build uses Kotlin 2.1.

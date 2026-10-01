@@ -19,6 +19,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.gms.common.GoogleApiAvailabilityLight
 import com.facebook.CallbackManager
 import com.facebook.FacebookCallback
 import com.facebook.FacebookException
@@ -109,6 +110,7 @@ class NativeSdkAuthModule(private val context: ReactApplicationContext) : ReactC
   }
 
   private fun google(activity: Activity, operation: Operation) {
+    Log.i("MangaDockSdkAuth", "google play services availability: " + GoogleApiAvailabilityLight.getInstance().isGooglePlayServicesAvailable(context))
     val option = GetSignInWithGoogleOption.Builder(BuildConfig.MANGADOCK_GOOGLE_WEB_CLIENT_ID)
       .setNonce(digest(operation.nonce)).build()
     val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
@@ -125,6 +127,7 @@ class NativeSdkAuthModule(private val context: ReactApplicationContext) : ReactC
                 return@post
               }
               val token = GoogleIdTokenCredential.createFrom(credential.data).idToken
+              Log.i("MangaDockSdkAuth", "google credential acquired")
               exchange(operation, token, operation.nonce)
             } catch (_: Exception) {fail(operation, "auth/sdk-credential")}
           }

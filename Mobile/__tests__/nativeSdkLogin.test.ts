@@ -76,3 +76,13 @@ test('dispose cancels without injecting into a destroyed or untrusted WebView', 
   expect(h.module.cancel).toHaveBeenCalledWith('request-1');
   expect(h.result).not.toHaveBeenCalled();
 });
+
+test('Google SDK cancellation does not claim the user cancelled a failed reauthentication', async () => {
+  const h = setup();
+  h.module.signIn.mockImplementationOnce(() => Promise.reject({code: 'auth/sdk-cancelled', message: 'sensitive provider detail'}));
+  h.controller.start('google', 'google-reauth');
+  await Promise.resolve();
+  expect(h.result).toHaveBeenCalledWith({request_id: 'google-reauth', error: 'Google ไม่สามารถดำเนินการเข้าสู่ระบบต่อได้ หรือหน้าล็อกอินถูกปิด กรุณาลองอีกครั้ง'});
+  expect(h.module.signIn).toHaveBeenCalledTimes(1);
+  expect(h.pending).toHaveBeenLastCalledWith(null);
+});
