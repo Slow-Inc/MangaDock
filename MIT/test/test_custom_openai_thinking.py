@@ -4,10 +4,11 @@ One-Punch benchmark narration group: 6502 chars of reasoning → completion=2048
 cap hit → empty content → translate 500s the whole page). The fix disables the
 model's native thinking via `chat_template_kwargs.enable_thinking=false`, gated
 by `CUSTOM_OPENAI_ENABLE_THINKING` (.env, default OFF)."""
-from manga_translator.translators.custom_openai import (
-    resolve_enable_thinking,
-    thinking_extra_body,
-)
+from _torch_free_import import load_custom_openai
+
+_co = load_custom_openai()
+resolve_enable_thinking = _co.resolve_enable_thinking
+thinking_extra_body = _co.thinking_extra_body
 
 
 def test_thinking_disabled_by_default():
