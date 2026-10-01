@@ -24,6 +24,7 @@ import com.facebook.CallbackManager
 import com.facebook.FacebookCallback
 import com.facebook.FacebookException
 import com.facebook.FacebookSdk
+import com.facebook.login.LoginBehavior
 import com.facebook.login.LoginConfiguration
 import com.facebook.login.LoginManager
 import com.facebook.login.LoginResult
@@ -94,7 +95,10 @@ class NativeSdkAuthModule(private val context: ReactApplicationContext) : ReactC
       if (BuildConfig.MANGADOCK_SUPABASE_URL.isBlank() || BuildConfig.MANGADOCK_SUPABASE_PUBLIC_KEY.isBlank() ||
         (provider == "google" && BuildConfig.MANGADOCK_GOOGLE_WEB_CLIENT_ID.isBlank()) ||
         (provider == "facebook" && (BuildConfig.MANGADOCK_FACEBOOK_APP_ID.isBlank() || BuildConfig.MANGADOCK_FACEBOOK_CLIENT_TOKEN.isBlank()))) {
-        promise.reject("auth/sdk-config", "Native provider configuration is missing")
+        val facebookConfigMissing = provider == "facebook" && (BuildConfig.MANGADOCK_FACEBOOK_APP_ID.isBlank() || BuildConfig.MANGADOCK_FACEBOOK_CLIENT_TOKEN.isBlank())
+        val code = if (facebookConfigMissing) "auth/sdk-facebook-config" else "auth/sdk-config"
+        Log.i("MangaDockSdkAuth", provider + " failed: " + code)
+        promise.reject(code, "Native provider configuration is missing")
         return@post
       }
       val operation = Operation(requestId, provider, promise, randomNonce())
@@ -182,7 +186,11 @@ class NativeSdkAuthModule(private val context: ReactApplicationContext) : ReactC
       })
     }
     facebookOperation = operation
-    LoginManager.getInstance().logIn(activity, LoginConfiguration(listOf("public_profile", "email"), operation.nonce))
+    // Android OIDC ID tokens require the SDK web flow; native app login can return only a Graph access token.
+    val manager = LoginManager.getInstance()
+    manager.setLoginBehavior(LoginBehavior.WEB_ONLY)
+    Log.i("MangaDockSdkAuth", "facebook SDK login started: WEB_ONLY, openid")
+    manager.logIn(activity, LoginConfiguration(listOf("public_profile", "email", "openid"), operation.nonce))
   }
 
   private fun exchange(operation: Operation, token: String, nonce: String?) {

@@ -86,3 +86,15 @@ test('Google SDK cancellation does not claim the user cancelled a failed reauthe
   expect(h.module.signIn).toHaveBeenCalledTimes(1);
   expect(h.pending).toHaveBeenLastCalledWith(null);
 });
+test('Facebook missing SDK config explains Client Token and permits a new login attempt', async () => {
+  const h = setup();
+  h.module.signIn.mockImplementationOnce(() => Promise.reject({code: 'auth/sdk-facebook-config'}));
+  h.controller.start('facebook', 'facebook-config');
+  await Promise.resolve();
+  expect(h.result).toHaveBeenCalledWith({request_id: 'facebook-config', error: 'ยังไม่ได้ตั้งค่า Facebook SDK กรุณาเพิ่ม App ID และ Client Token แล้วติดตั้ง APK ใหม่'});
+  expect(h.pending).toHaveBeenLastCalledWith(null);
+  h.controller.start('facebook', 'facebook-retry');
+  h.resolve({access_token: 'qa-access', refresh_token: 'qa-refresh'});
+  await Promise.resolve();
+  expect(h.result).toHaveBeenLastCalledWith({request_id: 'facebook-retry', access_token: 'qa-access', refresh_token: 'qa-refresh'});
+});

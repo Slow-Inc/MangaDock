@@ -49,6 +49,7 @@ export function createNativeSdkLoginController(
           const messages: Record<string, string> = {
             'auth/sdk-cancelled': provider === 'google' ? 'Google ไม่สามารถดำเนินการเข้าสู่ระบบต่อได้ หรือหน้าล็อกอินถูกปิด กรุณาลองอีกครั้ง' : 'ยกเลิกการเข้าสู่ระบบแล้ว',
             'auth/sdk-config': 'ยังไม่ได้ตั้งค่า SDK สำหรับผู้ให้บริการนี้',
+            'auth/sdk-facebook-config': 'ยังไม่ได้ตั้งค่า Facebook SDK กรุณาเพิ่ม App ID และ Client Token แล้วติดตั้ง APK ใหม่',
             'auth/sdk-no-credential': 'ไม่พบบัญชี Google ที่ใช้ได้ กรุณาตรวจบัญชีและการตั้งค่า Android Client ID',
             'auth/sdk-facebook-token': 'Facebook ไม่ส่ง ID token ที่รองรับ กรุณาตรวจการตั้งค่า SDK',
             'auth/sdk-exchange': 'ไม่สามารถยืนยันบัญชีกับ Supabase ได้ กรุณาตรวจการตั้งค่าผู้ให้บริการ',
