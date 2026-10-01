@@ -52,7 +52,7 @@ jest.mock('../src/mobileIdentity', () => ({
 import App from '../App';
 import { MangaDockWebViewScreen } from '../src/screens/MangaDockWebViewScreen';
 
-test('starts beta sessions at Native Onboarding inside the Native Shell Router', async () => {
+test('starts directly at MangaDock WebView inside the Native Shell Router', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
 
   await ReactTestRenderer.act(async () => {
@@ -63,7 +63,7 @@ test('starts beta sessions at Native Onboarding inside the Native Shell Router',
     renderer!.root.findByProps({ testID: 'native-shell-router' }),
   ).toBeTruthy();
   expect(
-    renderer!.root.findByProps({ testID: 'native-onboarding-screen' }),
+    renderer!.root.findByProps({ testID: 'mobile-shell-webview' }),
   ).toBeTruthy();
 });
 
