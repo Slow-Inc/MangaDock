@@ -10,6 +10,7 @@ type Call = { method: string; url: string; token: string; body?: string };
 
 let calls: Call[];
 let activeToken: string | null;
+let tokenLookups: number;
 let remote: Record<string, HistoryBook[]>;
 const store = new Map<string, string>();
 let instance = 0;
@@ -42,7 +43,10 @@ const advanceFlushTimer = async () => {
 
 async function freshHistory() {
   const mod = await import(`./readingHistory.ts?case=${++instance}`);
-  mod.setHistoryTokenSupplier(async () => activeToken);
+  mod.setHistoryTokenSupplier(async () => {
+    tokenLookups++;
+    return activeToken;
+  });
   return mod as typeof import("./readingHistory");
 }
 
@@ -50,6 +54,7 @@ beforeEach(() => {
   store.clear();
   calls = [];
   activeToken = null;
+  tokenLookups = 0;
   remote = {};
   Object.assign(globalThis, {
     window: { addEventListener() {}, removeEventListener() {}, dispatchEvent() {} },
@@ -115,6 +120,19 @@ describe("readingHistory — a change of identity must never write to the server
     await advanceFlushTimer();
 
     expect(historyWrites().filter((c) => (c.body ?? "").includes("a-unflushed"))).toEqual([]);
+  });
+
+  test("a reset cancels the flush it left scheduled, so nothing wakes up under the next session", async () => {
+    const h = await freshHistory();
+    activeToken = "A";
+    await h.loadHistoryData("A");
+    h.addToHistory(book("a-read")); // schedules the debounced flush
+
+    h.resetHistoryForIdentityChange();
+    activeToken = "B";
+    await advanceFlushTimer();
+
+    expect(tokenLookups).toBe(0); // the stale flush would have asked for B's token
   });
 
   test("a reset leaves no local history behind", async () => {

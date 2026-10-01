@@ -251,6 +251,7 @@ export function resetHistoryForIdentityChange(): void {
   pendingDeletes.clear();
   syncedIds = new Set();
   initialized = false; // reset so next loadFromLS starts fresh
+  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; } // as clearUserCache does
   [STORAGE_KEY, SYNCED_KEY].forEach((k) => localStorage.removeItem(k));
   notify();
 }
