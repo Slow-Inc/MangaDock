@@ -14,6 +14,13 @@ import atexit
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# #614 — load `.env` HERE, explicitly, before any `manga_translator.*` import below.
+# `translators/keys.py` snapshots the API keys at ITS import time, so this call has to
+# precede the first import that reaches it; `manga_translator/__init__.py` no longer does
+# it on import. Idempotent.
+from manga_translator import initialize as _initialize_env
+
+_initialize_env()
 
 from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware

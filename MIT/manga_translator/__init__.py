@@ -4,7 +4,26 @@ import colorama
 from dotenv import load_dotenv
 
 colorama.init(autoreset=True)
-load_dotenv()
+
+# #614 — `.env` is loaded by an EXPLICIT `initialize()` call, never as an import side-effect.
+# It used to run here and again in `translators/keys.py`, which made the environment
+# non-deterministic: a test could not assert "this env var is unset", and the Backend's
+# hygienic `buildMitConfig` (env read at one controlled point) fought a package that
+# quietly loaded .env the moment anything imported it. Entry points — the server
+# (`server/main.py`) and the CLI (`manga_translator/__main__.py`) — call `initialize()`
+# before importing anything that reaches `translators.keys`, which snapshots the keys at
+# ITS import time. Idempotent, so a second call is free.
+_env_loaded = False
+
+
+def initialize() -> bool:
+    """Load `.env` into `os.environ`. Idempotent; True only on the call that loaded it."""
+    global _env_loaded
+    if _env_loaded:
+        return False
+    load_dotenv()
+    _env_loaded = True
+    return True
 
 
 # #359 — lazy public API (PEP 562). The old `from .manga_translator import *` eagerly
