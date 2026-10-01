@@ -23,11 +23,12 @@ import {
 import { createMobileShellHeaders } from '../mobileHeaders';
 import { getMobileHardwareId } from '../mobileIdentity';
 import { createMobileShellInjectionScript } from '../webViewBridge';
+import {createNativeSdkLoginController} from '../nativeSdkLogin';
 
 type NativeOAuthRequest = {
   requestId: string;
   provider: 'google' | 'facebook';
-  protocol?: 'expo';
+  protocol?: 'expo' | 'sdk';
 };
 
 export function MangaDockWebViewScreen(
@@ -40,6 +41,7 @@ export function MangaDockWebViewScreen(
   const canGoBackRef = useRef(false);
   const webViewReadyRef = useRef(false);
   const nativeOAuthRequestRef = useRef<NativeOAuthRequest | null>(null);
+  const sdkControllerRef = useRef<ReturnType<typeof createNativeSdkLoginController> | null>(null);
   const screenFocusedRef = useRef(true);
   const pendingNativeOAuthPayloadRef = useRef<Record<
     string,
@@ -112,6 +114,14 @@ export function MangaDockWebViewScreen(
       const serializedPayload = JSON.stringify(payload);
       webViewRef.current?.injectJavaScript(`
         (function () {
+          if (window.location.origin !== ${JSON.stringify(new URL(getMobileShellUrl()).origin)}) return;
+          if (${nativeOAuthRequestRef.current?.protocol === 'sdk'}) {
+            window.dispatchEvent(new MessageEvent('message', {data: Object.assign(
+              {type: 'mangadock:native-auth:session', requestId: ${JSON.stringify(payload.request_id)}},
+              ${serializedPayload}
+            )}));
+            return;
+          }
           if (${nativeOAuthRequestRef.current?.protocol === 'expo'}) {
             window.__MANGA_DOCK_LEGACY_AUTH__?.receive(${serializedPayload});
             return;
@@ -144,6 +154,35 @@ export function MangaDockWebViewScreen(
     injectNativeOAuthResultToWeb(payload);
   }, [injectNativeOAuthResultToWeb]);
 
+  useEffect(() => {
+    const module = NativeModules.MangaDockNativeSdkAuth;
+    if (!module) return;
+    const controller = createNativeSdkLoginController(module, {
+      onPending: request => {
+        if (request) {
+          const pending: NativeOAuthRequest = {...request, protocol: 'sdk'};
+          nativeOAuthRequestRef.current = pending;
+          setNativeOAuthRequest(pending);
+        } else {
+          nativeOAuthRequestRef.current = null;
+          pendingNativeOAuthPayloadRef.current = null;
+          setNativeOAuthRequest(null);
+        }
+      },
+      onResult: payload => {
+        // A valid page command proves its listener is ready, even before loadEnd.
+        // Navigation invalidates the controller; the injected origin guard also
+        // protects a result queued immediately before that navigation.
+        injectNativeOAuthResultToWeb(payload);
+      },
+    });
+    sdkControllerRef.current = controller;
+    return () => {
+      controller.dispose();
+      sdkControllerRef.current = null;
+    };
+  }, [injectNativeOAuthResultToWeb]);
+
   const handleWebViewMessage = useCallback(
     ({ nativeEvent }: { nativeEvent: { data?: string; url?: string } }) => {
       if (
@@ -157,9 +196,22 @@ export function MangaDockWebViewScreen(
       try {
         const message = JSON.parse(nativeEvent.data);
 
+        if (message.source === 'mangadock-web' && message.type === 'native_sdk_sign_out') {
+          sdkControllerRef.current?.cancel();
+          NativeModules.MangaDockNativeSdkAuth?.signOut().catch(() => {
+            recordDiagnostics({type: 'native_sdk_sign_out_error'});
+          });
+          return;
+        }
+
         if (message.type === 'mangadock:oauth:start' &&
             (message.provider === 'google' || message.provider === 'facebook') &&
             typeof message.requestId === 'string' && message.requestId && message.requestId.length <= 128) {
+          if (sdkControllerRef.current) {
+            pendingNativeOAuthPayloadRef.current = null;
+            sdkControllerRef.current.start(message.provider, message.requestId);
+            return;
+          }
           const request: NativeOAuthRequest = {provider: message.provider, requestId: message.requestId, protocol: 'expo'};
           nativeOAuthRequestRef.current = request;
           pendingNativeOAuthPayloadRef.current = null;
@@ -284,6 +336,10 @@ export function MangaDockWebViewScreen(
   }, [handleNativeOAuthUrl]);
 
   const cancelNativeOAuth = useCallback(() => {
+    if (nativeOAuthRequestRef.current?.protocol === 'sdk') {
+      sdkControllerRef.current?.cancel();
+      return;
+    }
     recordDiagnostics({
       type: 'native_oauth_cancelled',
       message: nativeOAuthRequest?.provider,
@@ -379,6 +435,7 @@ export function MangaDockWebViewScreen(
           NativeModules.MangaDockAuthConfig,
         )}
         onLoadStart={({ nativeEvent }) => {
+          sdkControllerRef.current?.dispose();
           webViewReadyRef.current = false;
           recordDiagnostics({
             type: 'webview_load_start',

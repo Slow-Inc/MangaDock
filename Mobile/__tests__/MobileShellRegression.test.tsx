@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { BackHandler, Linking } from 'react-native';
+import { BackHandler, Linking, NativeModules } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { getMobileHardwareId } from '../src/mobileIdentity';
 
@@ -88,7 +88,56 @@ test('Android Back returns through WebView history and allows exit at the root',
 });
 
 afterEach(() => {
+  delete NativeModules.MangaDockNativeSdkAuth;
   jest.restoreAllMocks();
+});
+
+test('deployed Google login calls native SDK and hands its session to the WebView', async () => {
+  NativeModules.MangaDockNativeSdkAuth = {
+    signIn: jest.fn().mockResolvedValue({access_token: 'qa-access', refresh_token: 'qa-refresh'}),
+    cancel: jest.fn(),
+  };
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+  await ReactTestRenderer.act(async () => {renderer = ReactTestRenderer.create(<App />);});
+  const webview = renderer!.root.findByProps({testID: 'mobile-shell-webview'});
+  await ReactTestRenderer.act(async () => {
+    // The page can issue a hydrated login command before every resource finishes.
+    webview.props.onMessage({nativeEvent: {
+      url: 'https://hayateotsu.space',
+      data: JSON.stringify({type: 'mangadock:oauth:start', provider: 'google', requestId: 'sdk-request'}),
+    }});
+  });
+  expect(NativeModules.MangaDockNativeSdkAuth.signIn).toHaveBeenCalledWith('google', 'sdk-request');
+  expect(Linking.openURL).not.toHaveBeenCalled();
+  expect(mockInjectJavaScript).toHaveBeenCalledWith(expect.stringContaining('mangadock:native-auth:session'));
+  expect(mockInjectJavaScript).toHaveBeenCalledWith(expect.stringContaining('"access_token":"qa-access"'));
+  const delivery = mockInjectJavaScript.mock.calls.find(([script]) => script.includes('"access_token":"qa-access"'))![0];
+  const dispatch = jest.fn();
+  require('node:vm').runInNewContext(delivery, {
+    window: {location: {origin: 'https://untrusted.example'}, dispatchEvent: dispatch},
+    MessageEvent: class {constructor(_type: string, _init: unknown) {}},
+  });
+  expect(dispatch).not.toHaveBeenCalled();
+  await ReactTestRenderer.act(async () => renderer!.unmount());
+});
+
+test('trusted Supabase logout clears native provider state; foreign origins are ignored', async () => {
+  NativeModules.MangaDockNativeSdkAuth = {
+    signIn: jest.fn(), cancel: jest.fn(), signOut: jest.fn().mockResolvedValue(null),
+  };
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+  await ReactTestRenderer.act(async () => {renderer = ReactTestRenderer.create(<App />);});
+  const webview = renderer!.root.findByProps({testID: 'mobile-shell-webview'});
+  const data = JSON.stringify({source: 'mangadock-web', type: 'native_sdk_sign_out'});
+  await ReactTestRenderer.act(async () => {
+    webview.props.onMessage({nativeEvent: {url: 'https://foreign.example', data}});
+  });
+  expect(NativeModules.MangaDockNativeSdkAuth.signOut).not.toHaveBeenCalled();
+  await ReactTestRenderer.act(async () => {
+    webview.props.onMessage({nativeEvent: {url: 'https://hayateotsu.space', data}});
+  });
+  expect(NativeModules.MangaDockNativeSdkAuth.signOut).toHaveBeenCalledTimes(1);
+  await ReactTestRenderer.act(async () => renderer!.unmount());
 });
 
 test('renders the Frontend inside the Mobile Shell WebView with Mobile Shell headers', async () => {

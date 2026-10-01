@@ -1,0 +1,17 @@
+{
+    "artifact":  "mangadock-phase3-beta3-native-sdk-20261001.apk",
+    "sha256":  "6FA1DEECA4F92F0F55DF067FDE98BDE2A56E9E51287B80209AF2D8D13DFFE224",
+    "versionName":  "1.0.1-beta.3",
+    "versionCode":  4,
+    "applicationId":  "com.mobile",
+    "architectures":  [
+                          "arm64-v8a",
+                          "x86_64"
+                      ],
+    "signing":  "QA debug",
+    "frontend":  "https://hayateotsu.space",
+    "installedOn":  "emulator-5554",
+    "tests":  70,
+    "realGoogleSessionVerified":  false,
+    "realFacebookSessionVerified":  false
+}

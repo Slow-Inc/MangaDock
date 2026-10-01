@@ -93,6 +93,17 @@ export function createMobileShellInjectionScript(hardwareId: string, authConfig?
           } catch (error) {
             return originalFetch.apply(this, arguments);
           }
+          var publicAuthUrl = ${JSON.stringify(authConfig?.url ?? '')};
+          var method = init && init.method ? init.method : input && input.method ? input.method : 'GET';
+          if (publicAuthUrl && target.origin === new URL(publicAuthUrl).origin &&
+              target.pathname === '/auth/v1/logout' && String(method).toUpperCase() === 'POST') {
+            return originalFetch.apply(this, arguments).then(function (response) {
+              if (response.ok && target.searchParams.get('scope') !== 'others') {
+                postDiagnosticsEvent({type: 'native_sdk_sign_out'});
+              }
+              return response;
+            });
+          }
           var shouldInjectHeaders =
             (target.origin === window.location.origin && target.pathname.indexOf('/api/') === 0) ||
             target.origin === 'https://api.hayateotsu.space';
