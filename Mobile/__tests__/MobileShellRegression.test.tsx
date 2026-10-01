@@ -246,6 +246,26 @@ test('opens the system browser when the web app requests mobile social login', a
   ).toBeTruthy();
 });
 
+test('adapts the deployed web command to browser preparation and routes its bound callback', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+  await ReactTestRenderer.act(async () => {renderer = ReactTestRenderer.create(<App />);});
+  const webview = renderer!.root.findByProps({testID: 'mobile-shell-webview'});
+  ReactTestRenderer.act(() => {
+    webview.props.onLoadEnd({nativeEvent: {url: 'https://hayateotsu.space'}});
+    webview.props.onMessage({nativeEvent: {url: 'https://hayateotsu.space', data: JSON.stringify({
+      type: 'mangadock:oauth:start', provider: 'google', requestId: 'qa-legacy-request',
+    })}});
+  });
+  expect(mockInjectJavaScript).toHaveBeenCalledWith(expect.stringContaining('__MANGA_DOCK_LEGACY_AUTH__?.start("google", "qa-legacy-request")'));
+  ReactTestRenderer.act(() => {
+    const listener = jest.mocked(Linking.addEventListener).mock.calls.at(-1)![1];
+    listener({url: 'mangadock://auth/callback?request_id=qa-legacy-request&code=qa-code'});
+  });
+  expect(mockInjectJavaScript).toHaveBeenCalledWith(expect.stringContaining('__MANGA_DOCK_LEGACY_AUTH__?.receive'));
+  expect(renderer!.root.findByProps({testID: 'native-oauth-pending'})).toBeTruthy();
+  await ReactTestRenderer.act(async () => renderer!.unmount());
+});
+
 test('opens account linking provider URLs only with trusted origin and explicit request metadata', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
   await ReactTestRenderer.act(async () => {

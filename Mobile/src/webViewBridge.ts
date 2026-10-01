@@ -1,10 +1,13 @@
+import {createLegacyOAuthInjectionScript, type NativeAuthPublicConfig} from './legacyOAuthBridge';
+
 const WEB_HARDWARE_ID_KEY = 'mangadock_device_id';
 
-export function createMobileShellInjectionScript(hardwareId: string) {
+export function createMobileShellInjectionScript(hardwareId: string, authConfig?: NativeAuthPublicConfig) {
   const serializedHardwareId = JSON.stringify(hardwareId);
   const serializedHardwareIdKey = JSON.stringify(WEB_HARDWARE_ID_KEY);
 
   return `
+    ${createLegacyOAuthInjectionScript(authConfig)}
     (function () {
       try {
         var postDiagnosticsEvent = function (event) {

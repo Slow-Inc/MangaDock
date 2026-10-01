@@ -92,3 +92,16 @@ automatically. Recheck the delivery artifact before publishing.
 - Emulator smoke: native onboarding/home, production WebView home and Android Back to native home were observed. Real OAuth against the matching CLI frontend and physical-device checks remain pending.
 - Independent review found cache ownership, callback binding and queue-delivery issues; fixes and regressions were added and the reviewer verified all findings resolved within the reviewed scope.
 - Artifacts/checksums: [metadata](../../docs/reports/phase3-delivery-20261001/artifacts.json); [build log](../../docs/reports/phase3-delivery-20261001/build.log); [home screenshot](../../docs/reports/phase3-delivery-20261001/home.png).
+
+## Browser callback adapter — latest artifact, 2026-10-01
+
+- Implements deployed Expo-style command compatibility inside the CLI APK; no frontend merge is required for this adapter.
+- Native public config is materialized before injection (native constants may be non-enumerable). Native URL parsing uses an explicit URL ponyfill; the emulator exposed a failure hidden by Node's complete URL implementation.
+- Verification: 61 tests / 13 suites pass; ESLint and TypeScript pass. Final APK build succeeded (19s, 248 tasks), reinstall preserves app data.
+- APK: mangadock-phase3-beta3-browser-callback-20261001.apk, version 1.0.1-beta.3/code 4, QA debug signing, arm64-v8a+x86_64. SHA256 A3848E91BA90BA1E3DE06712FD4B7E96D1A8F60032D79165382B9DE776E8BD64.
+- Runtime: native OAuth start observed, system Chrome opened. Browser landed at localhost:4000/auth/callback instead of returning to app.
+- Independent no-credential server probe: authorize returns 302/accounts.google.com; an access_denied callback with the server-issued OAuth state returns 302/http://localhost/auth/callback with no request_id. This confirms the requested deep link is not preserved by current Auth redirect configuration. No credentials or callback codes were printed.
+- Required external action: in Supabase project eqgcnoljbiwosecydjqd, Authentication → URL Configuration → Redirect URLs, add mangadock://auth/callback** and save. Re-run browser login afterwards. Auth config mutation is unavailable through connected tools and no management token is present.
+- Real successful Google/Facebook login and signed-in callback remain unverified for this artifact. Unit code-exchange/session handoff coverage does not establish provider/redirect acceptance.
+- Android currently has two apps claiming mangadock://; choose Mobile in the resolver. Do not clear app data or uninstall the other app during QA.
+- PR #713 remains unmerged; PR #711 holds native delivery changes.

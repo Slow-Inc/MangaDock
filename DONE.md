@@ -595,3 +595,4 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 - Extend the injected startOAuth capability with optional requestId for provider URL account linking; existing URL-based sign-in remains compatible.
 - Native handler checks metadata against redirect nonce when present; direct provider URLs require explicit requestId, trusted frontend origin and the matching Google/Facebook host.
 - 56 tests, lint and TypeScript passed. Matching frontend fix is on fix/cli-native-auth-compat-20261001.
+2026-10-01: Added browser OAuth compatibility adapter, bound PKCE callback/session handoff, public Android config, and URL ponyfill. 61 mobile tests, lint, TypeScript and release QA APK build pass. End-to-end callback blocked by Supabase redirect allowlist (returns localhost); awaiting config correction and real login QA.

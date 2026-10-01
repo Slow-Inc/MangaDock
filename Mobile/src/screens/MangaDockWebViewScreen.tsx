@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
   Linking,
+  NativeModules,
   Pressable,
   StyleSheet,
   Text,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { URL, URLSearchParams } from 'react-native-url-polyfill';
 import { getMobileShellUrl, MOBILE_DIAGNOSTICS_ENABLED } from '../config';
 import {
   appendMobileDiagnosticsEvent,
@@ -25,6 +27,7 @@ import { createMobileShellInjectionScript } from '../webViewBridge';
 type NativeOAuthRequest = {
   requestId: string;
   provider: 'google' | 'facebook';
+  protocol?: 'expo';
 };
 
 export function MangaDockWebViewScreen(
@@ -109,6 +112,10 @@ export function MangaDockWebViewScreen(
       const serializedPayload = JSON.stringify(payload);
       webViewRef.current?.injectJavaScript(`
         (function () {
+          if (${nativeOAuthRequestRef.current?.protocol === 'expo'}) {
+            window.__MANGA_DOCK_LEGACY_AUTH__?.receive(${serializedPayload});
+            return;
+          }
           window.dispatchEvent(new CustomEvent('mangadock:native-oauth-callback', {
             detail: ${serializedPayload}
           }));
@@ -149,6 +156,17 @@ export function MangaDockWebViewScreen(
 
       try {
         const message = JSON.parse(nativeEvent.data);
+
+        if (message.type === 'mangadock:oauth:start' &&
+            (message.provider === 'google' || message.provider === 'facebook') &&
+            typeof message.requestId === 'string' && message.requestId && message.requestId.length <= 128) {
+          const request: NativeOAuthRequest = {provider: message.provider, requestId: message.requestId, protocol: 'expo'};
+          nativeOAuthRequestRef.current = request;
+          pendingNativeOAuthPayloadRef.current = null;
+          setNativeOAuthRequest(request);
+          webViewRef.current?.injectJavaScript(`window.__MANGA_DOCK_LEGACY_AUTH__?.start(${JSON.stringify(message.provider)}, ${JSON.stringify(message.requestId)}); true;`);
+          return;
+        }
 
         if (
           message.type === 'oauth_callback_consumed' &&
@@ -205,7 +223,8 @@ export function MangaDockWebViewScreen(
             if (!allowedHost) return;
           }
           if (!requestId) return;
-          const request = { provider: message.provider, requestId };
+          if (message.protocol === 'expo' && nativeOAuthRequestRef.current?.requestId !== requestId) return;
+          const request: NativeOAuthRequest = { provider: message.provider, requestId, protocol: message.protocol === 'expo' ? 'expo' : undefined };
           nativeOAuthRequestRef.current = request;
           pendingNativeOAuthPayloadRef.current = null;
           setNativeOAuthRequest(request);
@@ -357,6 +376,7 @@ export function MangaDockWebViewScreen(
         }}
         injectedJavaScriptBeforeContentLoaded={createMobileShellInjectionScript(
           hardwareId,
+          NativeModules.MangaDockAuthConfig,
         )}
         onLoadStart={({ nativeEvent }) => {
           webViewReadyRef.current = false;

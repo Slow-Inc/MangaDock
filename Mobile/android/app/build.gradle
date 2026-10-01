@@ -81,6 +81,14 @@ def releaseKeyPassword = signingValue('MANGADOCK_UPLOAD_KEY_PASSWORD')
 def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].every { it }
 def qaSigning = providers.gradleProperty('mangadockQaSigning').getOrElse('false') == 'true'
 
+// Public Supabase client configuration, supplied outside source control.
+def nativeAuthProperties = new Properties()
+def nativeAuthPropertiesPath = providers.gradleProperty('mangadockNativeAuthProperties').getOrNull()
+if (nativeAuthPropertiesPath) {
+    file(nativeAuthPropertiesPath).withInputStream { nativeAuthProperties.load(it) }
+}
+def nativeAuthValue = { name -> signingValue(name) ?: nativeAuthProperties.getProperty(name, '') }
+
 // Fail before building a distribution artifact with missing signing credentials.
 gradle.taskGraph.whenReady { graph ->
     def requestsRelease = graph.allTasks.any { it.project == project && it.name.toLowerCase().contains('release') }
@@ -112,6 +120,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 4
         versionName "1.0.1-beta.3"
+        buildConfigField "String", "MANGADOCK_SUPABASE_URL", groovy.json.JsonOutput.toJson(nativeAuthValue('MANGADOCK_SUPABASE_URL'))
+        buildConfigField "String", "MANGADOCK_SUPABASE_PUBLIC_KEY", groovy.json.JsonOutput.toJson(nativeAuthValue('MANGADOCK_SUPABASE_PUBLIC_KEY'))
         externalNativeBuild {
             cmake {
                 arguments "-DCMAKE_OBJECT_PATH_MAX=240"

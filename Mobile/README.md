@@ -531,6 +531,16 @@ npx react-native run-android --no-packager --port 8081
 - Production backend is expected at `https://api.hayateotsu.space` through the web app.
 - Play Store-ready signing is not configured yet.
 
+## Browser OAuth compatibility (2026-10-01)
+
+The APK accepts the deployed web's `mangadock:oauth:start` message as well as the CLI URL protocol. It opens the system browser with S256 PKCE and a request-bound `mangadock://auth/callback?request_id=...` redirect. The WebView exchanges the returned code and sends the session through the deployed web's existing session handler. Cancellation, stale callbacks and exchange deadlines are covered by regressions.
+
+Supply public `MANGADOCK_SUPABASE_URL` and `MANGADOCK_SUPABASE_PUBLIC_KEY` through environment/Gradle properties, or a properties file outside the checkout using `-PmangadockNativeAuthProperties=<absolute-path>`. Use the project's anon/publishable key; never a service-role key. Missing configuration produces a readable login error.
+
+Supabase Authentication → URL Configuration must allow `mangadock://auth/callback**`, including the dynamic request query. The current project's callback cancellation probe instead returned `http://localhost:4000/auth/callback`; browser launch works but end-to-end login is blocked until that setting is corrected. Connected tools cannot change Auth configuration in this session.
+
+The emulator has two apps claiming the callback scheme. Select the current `Mobile` app if Android asks. WebView reload/process recreation loses the in-memory verifier; cancel and restart login.
+
 ## Delivery and production signing (2026-10-01)
 
 Release builds require private `MANGADOCK_UPLOAD_STORE_FILE`, `MANGADOCK_UPLOAD_STORE_PASSWORD`, `MANGADOCK_UPLOAD_KEY_ALIAS`, and `MANGADOCK_UPLOAD_KEY_PASSWORD` environment/Gradle properties. QA builds use `-PmangadockQaSigning=true`; do not publish those debug-signed artifacts.
