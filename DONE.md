@@ -3,6 +3,27 @@
 
 ---
 
+## #722 — One owner for the client-state reset on identity change (2026-10-01)
+
+**What:** new `Frontend/app/lib/identityReset.ts` exports `resetClientStateForIdentityChange()` —
+`clearUserCache`, the reading-history reset, `clearFollowCache`, `clearAllApiCache` in one place,
+local only. `AuthContext.tsx` calls it at its four identity-change sites (they each wrote the four
+calls out by hand); four unused imports removed.
+
+**Why:** nothing owned the invariant "everything this browser holds for the previous user is dropped
+together". The set had already drifted once (ADR 015 lists three clears; `clearFollowCache` was added
+later at every site by hand) and the only cache with a pending-write flag was the one that deleted a
+user's server history (#720). Architecture review candidate D; ADR 015's own follow-up.
+
+**Not in scope:** a self-registering scheme (each cache registers its reset so a new one cannot be
+forgotten) — considered, left out as more machinery than today's four caches need. The `AuthContext`
+split (candidate H). A real sign-out / sign-in in a browser was not run.
+
+**Validation:** TDD — `identityReset.test.ts` (2 tests over the real `apiCache` / `userCache` /
+`readingHistory`; only the follow cache is replaced). Mutation check: dropping any one of the four
+calls fails at least one test (4/4). `app/lib` 139 passed; `tsc` 0 errors; ESLint clean on both
+touched files. Stacked on `fix/history-identity-reset` (#720).
+
 ## Reading history: an identity change can no longer delete the new user's server history (2026-10-01)
 
 **What:** `Frontend/app/lib/readingHistory.ts` — `clearHistory()` is now
@@ -1127,6 +1148,27 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 # DONE — Claude Code Review Fix Session (2026-05-27)
 
 ---
+
+## #722 — เจ้าของเดียวสำหรับการล้างสถานะฝั่ง client เมื่อตัวตนเปลี่ยน (2026-10-01)
+
+**ทำอะไร:** ไฟล์ใหม่ `Frontend/app/lib/identityReset.ts` ส่งออก `resetClientStateForIdentityChange()` —
+`clearUserCache`, การรีเซ็ตประวัติการอ่าน, `clearFollowCache`, `clearAllApiCache` รวมในจุดเดียว
+ทำงานเฉพาะในเครื่อง `AuthContext.tsx` เรียกมันที่สี่จุดที่ตัวตนเปลี่ยน (เดิมแต่ละจุดเขียนสี่การเรียก
+ด้วยมือ) และลบ import ที่ไม่ได้ใช้สี่ตัว
+
+**ทำไม:** ไม่มีใครเป็นเจ้าของกติกา "ทุกอย่างที่เบราว์เซอร์นี้เก็บให้ผู้ใช้คนก่อนต้องถูกล้างพร้อมกัน"
+ชุดนี้คลาดเคลื่อนมาแล้วหนึ่งครั้ง (ADR 015 ระบุ clear สามตัว; `clearFollowCache` ถูกเพิ่มทีหลังด้วยมือ
+ทุกจุด) และ cache ตัวเดียวที่มี flag การเขียนค้างคือตัวที่ลบประวัติบนเซิร์ฟเวอร์ของผู้ใช้ (#720)
+architecture review candidate D; เป็นงานต่อของ ADR 015 เอง
+
+**นอกขอบเขต:** แบบลงทะเบียนตัวเอง (cache แต่ละตัวลงทะเบียน reset ของตัวเองเพื่อไม่ให้ลืมตัวใหม่) —
+พิจารณาแล้วไม่ทำ เพราะเป็นกลไกที่เกินกว่า cache สี่ตัวตอนนี้ต้องการ การแยก `AuthContext` (candidate H)
+ไม่ได้รันออกจากระบบ / ล็อกอินจริงบนเบราว์เซอร์
+
+**การตรวจสอบ:** TDD — `identityReset.test.ts` (2 test บน `apiCache` / `userCache` / `readingHistory`
+ตัวจริง จำลองเฉพาะ follow cache) Mutation check: ลบการเรียกใดการเรียกหนึ่งใน 4 แล้วอย่างน้อยหนึ่ง test
+แดง (4/4) `app/lib` ผ่าน 139, `tsc` 0 error, ESLint สะอาดทั้งสองไฟล์ที่แตะ ซ้อนบน
+`fix/history-identity-reset` (#720)
 
 ## ประวัติการอ่าน: การเปลี่ยนตัวตนผู้ใช้ไม่สามารถลบประวัติบนเซิร์ฟเวอร์ของผู้ใช้คนใหม่ได้อีก (2026-10-01)
 
