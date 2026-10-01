@@ -47,6 +47,12 @@ https://supabase.com/docs/guides/auth/sessions/pkce-flow
 
 ## Rollout
 
-Publish this frontend on the endpoint loaded by the APK, or use a clearly labeled
-QA APK targeting its matching Vercel Preview. A main merge alone does not establish
-that a separately hosted custom-domain dev server has pulled the fix.
+For Android QA, run this branch's frontend on the development computer and use
+ADB reverse with a localhost-targeted QA APK. See [local Android QA instructions](LOCAL_ANDROID_QA.md).
+This route does not use Vercel or require a main merge. The existing dev command
+already serves port 4000; the OAuth implementation has no Vercel dependency.
+
+For rollout, publish this frontend on the endpoint loaded by the APK. A main
+merge alone does not establish that a separately hosted custom-domain dev server
+has pulled the fix. Native custom-scheme URL parsing and the Supabase callback
+allowlist must also be corrected before claiming end-to-end login acceptance.
