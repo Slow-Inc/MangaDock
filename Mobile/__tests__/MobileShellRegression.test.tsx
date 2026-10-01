@@ -246,6 +246,23 @@ test('opens the system browser when the web app requests mobile social login', a
   ).toBeTruthy();
 });
 
+test('opens account linking provider URLs only with trusted origin and explicit request metadata', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+  const webview = renderer!.root.findByProps({testID: 'mobile-shell-webview'});
+  ReactTestRenderer.act(() => {
+    webview.props.onMessage({nativeEvent: {
+      url: 'https://hayateotsu.space',
+      data: JSON.stringify({source: 'mangadock-web', type: 'oauth_start', provider: 'google',
+        request_id: 'qa-link-request', url: 'https://accounts.google.com/o/oauth2/v2/auth?state=qa'}),
+    }});
+  });
+  expect(Linking.openURL).toHaveBeenCalledWith('https://accounts.google.com/o/oauth2/v2/auth?state=qa');
+  await ReactTestRenderer.act(async () => renderer!.unmount());
+});
+
 test('returns a bound PKCE callback to the ready WebView without logging codes', async () => {
   const log = jest.spyOn(console, 'log').mockImplementation();
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;

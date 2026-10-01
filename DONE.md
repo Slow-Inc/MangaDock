@@ -590,3 +590,8 @@ After Gemini 10-perspective scrutiny + roadmap comparison:
 - QA APK: C:/Users/woral/Desktop/MangaDock-feat-mobile-shell-phase3/Mobile/build/qa/mangadock-phase3-beta3-direct-webview-20261001.apk
 - SHA256: 950988cb2bc86a9699d219ab2994b5a0723dba7e6ecb7f918d713bec02a9e54f
 - Version remains 1.0.1-beta.3 / code 4; debug signed. This is a new APK distinguished by filename/checksum. The previous AAB does not include this UI change.
+## Explicit OAuth request metadata — 2026-10-01
+
+- Extend the injected startOAuth capability with optional requestId for provider URL account linking; existing URL-based sign-in remains compatible.
+- Native handler checks metadata against redirect nonce when present; direct provider URLs require explicit requestId, trusted frontend origin and the matching Google/Facebook host.
+- 56 tests, lint and TypeScript passed. Matching frontend fix is on fix/cli-native-auth-compat-20261001.

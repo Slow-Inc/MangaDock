@@ -187,18 +187,24 @@ export function MangaDockWebViewScreen(
           typeof message.url === 'string'
         ) {
           const authorize = new URL(message.url);
-          const redirect = new URL(
-            authorize.searchParams.get('redirect_to') ?? '',
-          );
-          const requestId = redirect.searchParams.get('request_id');
-          if (
-            authorize.protocol !== 'https:' ||
-            redirect.protocol !== 'mangadock:' ||
-            redirect.hostname !== 'auth' ||
-            redirect.pathname !== '/callback' ||
-            !requestId
-          )
-            return;
+          const redirectTo = authorize.searchParams.get('redirect_to');
+          let requestId = typeof message.request_id === 'string' ? message.request_id : null;
+          if (authorize.protocol !== 'https:') return;
+          if (redirectTo) {
+            const redirect = new URL(redirectTo);
+            const redirectRequestId = redirect.searchParams.get('request_id');
+            if (redirect.protocol !== 'mangadock:' || redirect.hostname !== 'auth' ||
+                redirect.pathname !== '/callback' || !redirectRequestId ||
+                (requestId && requestId !== redirectRequestId)) return;
+            requestId = redirectRequestId;
+          } else {
+            // linkIdentity returns the provider URL; callback binding is explicit.
+            const allowedHost = message.provider === 'google'
+              ? authorize.hostname === 'accounts.google.com'
+              : ['www.facebook.com', 'm.facebook.com'].includes(authorize.hostname);
+            if (!allowedHost) return;
+          }
+          if (!requestId) return;
           const request = { provider: message.provider, requestId };
           nativeOAuthRequestRef.current = request;
           pendingNativeOAuthPayloadRef.current = null;

@@ -72,10 +72,11 @@ export function createMobileShellInjectionScript(hardwareId: string) {
         window.localStorage.setItem(${serializedHardwareIdKey}, ${serializedHardwareId});
         window.__MANGA_DOCK_CLIENT__ = 'android-mobile-shell';
         window.__MANGA_DOCK_NATIVE_AUTH__ = {
-          startOAuth: function (provider, url) {
+          startOAuth: function (provider, url, requestId) {
             postDiagnosticsEvent({
               type: 'oauth_start',
               provider: provider,
+              request_id: requestId,
               url: url
             });
           }
