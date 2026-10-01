@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
 export type ReviewItem = {
@@ -79,7 +74,9 @@ export class ReviewsService {
     );
 
     if (error) throw new Error(`Failed to upsert review: ${error.message}`);
-    this.logger.log(`User ${uid} reviewed manga ${mangaId} with rating ${data.rating}`);
+    this.logger.log(
+      `User ${uid} reviewed manga ${mangaId} with rating ${data.rating}`,
+    );
   }
 
   async deleteReview(uid: string, mangaId: string): Promise<void> {
@@ -96,7 +93,9 @@ export class ReviewsService {
   async getMyReview(uid: string, mangaId: string): Promise<ReviewItem | null> {
     const { data, error } = await this.db
       .from('manga_reviews')
-      .select('id, uid, manga_id, rating, body, created_at, profiles(display_name, photo_url)')
+      .select(
+        'id, uid, manga_id, rating, body, created_at, profiles(display_name, photo_url)',
+      )
       .eq('uid', uid)
       .eq('manga_id', mangaId)
       .maybeSingle<ReviewRow>();
@@ -112,30 +111,38 @@ export class ReviewsService {
   ): Promise<ReviewItem[]> {
     const { data, error } = await this.db
       .from('manga_reviews')
-      .select('id, uid, manga_id, rating, body, created_at, profiles(display_name, photo_url)')
+      .select(
+        'id, uid, manga_id, rating, body, created_at, profiles(display_name, photo_url)',
+      )
       .eq('manga_id', mangaId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) throw new Error(`Failed to fetch reviews: ${error.message}`);
-    return (data ?? []).map((row) => this.mapReview(row as ReviewRow));
+    return (data ?? []).map((row) =>
+      this.mapReview(row as unknown as ReviewRow),
+    );
   }
 
   async getReviewSummary(mangaId: string): Promise<ReviewSummary> {
-    const { data, error } = await this.db
-      .from('manga_reviews')
-      .select('rating')
-      .eq('manga_id', mangaId);
+    // DB-side aggregate: avg/count over ALL rows, not the ~1000-row PostgREST cap.
+    const { data, error } = (await this.db.rpc('get_review_summary', {
+      p_manga_id: mangaId,
+    })) as {
+      data: Array<{
+        average_rating: number | string | null;
+        review_count: number | string | null;
+      }> | null;
+      error: { message: string } | null;
+    };
 
-    if (error) throw new Error(`Failed to fetch review summary: ${error.message}`);
+    if (error)
+      throw new Error(`Failed to fetch review summary: ${error.message}`);
 
-    const rows = data ?? [];
-    if (rows.length === 0) return { averageRating: 0, count: 0 };
-
-    const sum = rows.reduce((acc, r) => acc + (r as { rating: number }).rating, 0);
+    const row = data?.[0];
     return {
-      averageRating: Math.round((sum / rows.length) * 10) / 10,
-      count: rows.length,
+      averageRating: Number(row?.average_rating ?? 0),
+      count: Number(row?.review_count ?? 0),
     };
   }
 }
