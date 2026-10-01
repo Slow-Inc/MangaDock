@@ -12,6 +12,7 @@ import { useBookActions } from "../hooks/useBookActions";
 import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
 import { getHistory } from "../lib/readingHistory";
 import { translateDescription } from "../lib/translateDescription";
+import { stripMarkdown } from "../lib/markdownText";
 import type { LandingBook } from "../lib/types";
 
 type BookRowProps = {
@@ -204,7 +205,7 @@ function BookCard({
           <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white">{book.title}</h3>
           <div className="space-y-1">
             <p className="line-clamp-3 text-xs leading-relaxed text-white/65">
-              {translatedDesc && !showOriginalDesc ? truncate(translatedDesc, 120) : truncate(book.description, 120)}
+              {translatedDesc && !showOriginalDesc ? truncate(stripMarkdown(translatedDesc), 120) : truncate(stripMarkdown(book.description), 120)}
             </p>
             {translatingDesc && <p className="text-[9px] text-white/30">กำลังแปล...</p>}
             {translatedDesc && !translatingDesc && (

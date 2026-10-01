@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { createPortal } from "react-dom";
 import CoverLightbox from "./CoverLightbox";
 import ModelBadge from "./ModelBadge";
+import MarkdownDescription from "./MarkdownDescription";
 import MangaReader from "./MangaReader";
 import ChapterList from "./ChapterList";
 import { addToHistory, getHistory } from "../lib/readingHistory";
@@ -665,9 +666,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
           <div className="flex gap-6 px-5 pb-2 pt-4">
             {/* Description */}
             <div className="flex-1 space-y-1.5">
-              <p className="text-sm leading-relaxed text-white/75">
-                {(translatedDesc && !showOriginalDesc) ? translatedDesc : (book.description || detail?.description || "ไม่มีคำอธิบายสำหรับเรื่องนี้")}
-              </p>
+              <MarkdownDescription
+                text={(translatedDesc && !showOriginalDesc) ? translatedDesc : (book.description || detail?.description || "ไม่มีคำอธิบายสำหรับเรื่องนี้")}
+              />
               {translatingDesc && (
                 <p className="text-xs text-white/30">กำลังแปล...</p>
               )}

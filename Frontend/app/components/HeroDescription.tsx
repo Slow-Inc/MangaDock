@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import ModelBadge from "./ModelBadge";
 import { translateDescription } from "../lib/translateDescription";
+import { stripMarkdown } from "../lib/markdownText";
 
 const truncate = (text: string, length: number) =>
   text.length > length ? `${text.slice(0, length)}...` : text;
@@ -30,7 +31,7 @@ export default function HeroDescription({ description }: { description: string }
   return (
     <div className="space-y-1.5">
       <p className="text-sm leading-relaxed text-white/85 md:text-base">
-        {truncate(displayText, 210)}
+        {truncate(stripMarkdown(displayText), 210)}
       </p>
       <div className="flex items-center gap-2 h-5">
         {translating && (
