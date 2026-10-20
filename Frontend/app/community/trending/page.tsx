@@ -36,13 +36,13 @@ function TrendingMangaCard({ item, rank }: { item: TrendingManga; rank: number }
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-surface/90 via-transparent to-transparent" />
           {/* Rank badge */}
-          <div className="absolute top-3 left-3 w-7 h-7 rounded-full bg-bg/60 backdrop-blur-sm border border-line flex items-center justify-center">
+          <div className="absolute top-3 left-3 w-7 h-7 rounded-full bg-bg/80 border border-line flex items-center justify-center">
             <span className={`text-[10px] font-black ${rank <= 3 ? "text-accent" : "text-ink-2"}`}>
               {rank}
             </span>
           </div>
           {/* Post count badge */}
-          <div className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-bg/60 backdrop-blur-sm border border-line">
+          <div className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-bg/80 border border-line">
             <svg className="w-3 h-3 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>

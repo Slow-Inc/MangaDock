@@ -90,7 +90,7 @@ function HistoryCard({
     <article
       ref={articleRef}
       onMouseEnter={handleHover}
-      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-line bg-fill md:backdrop-blur-xl md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-ink-3 ${expandRight ? "origin-left" : "origin-right"} ${isNew ? "cr-card-enter" : ""}`}
+      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-line bg-fill md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-ink-3 ${expandRight ? "origin-left" : "origin-right"} ${isNew ? "cr-card-enter" : ""}`}
     >
       {/* Cover */}
       <div
@@ -138,7 +138,7 @@ function HistoryCard({
 
       {/* Info panel */}
       <div
-        className={`pointer-events-none absolute top-0 z-20 hidden h-full w-56 flex-col justify-between bg-surface/95 p-4 opacity-0 shadow-2xl ring-1 ring-line backdrop-blur-xl transition-all duration-300 md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 ${
+        className={`pointer-events-none absolute top-0 z-20 hidden h-full w-56 flex-col justify-between bg-surface p-4 opacity-0 shadow-2xl ring-1 ring-line transition-all duration-300 md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 ${
           expandRight
             ? "left-full -translate-x-2 rounded-r-2xl group-hover:translate-x-0"
             : "right-full translate-x-2 rounded-l-2xl group-hover:translate-x-0"
@@ -362,7 +362,7 @@ export default function ContinueReadingRow() {
                 onClick={() => scrollBy("left")}
                 onMouseEnter={() => setHoveredArrow("left")}
                 onMouseLeave={() => setHoveredArrow(null)}
-                className={`absolute left-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/70 text-ink ring-1 ring-ink-3 backdrop-blur-sm transition-all duration-300 md:flex ${
+                className={`absolute left-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 text-ink ring-1 ring-ink-3 transition-all duration-300 md:flex ${
                   hoveredArrow === "left" ? "h-11 w-11" : "h-9 w-9"
                 } ${isHovering && canScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"}`}
                 aria-label="เลื่อนซ้าย"
@@ -377,7 +377,7 @@ export default function ContinueReadingRow() {
                 onClick={() => scrollBy("right")}
                 onMouseEnter={() => setHoveredArrow("right")}
                 onMouseLeave={() => setHoveredArrow(null)}
-                className={`absolute right-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/70 text-ink ring-1 ring-ink-3 backdrop-blur-sm transition-all duration-300 md:flex ${
+                className={`absolute right-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 text-ink ring-1 ring-ink-3 transition-all duration-300 md:flex ${
                   hoveredArrow === "right" ? "h-11 w-11" : "h-9 w-9"
                 } ${isHovering && canScrollRight ? "opacity-100" : "pointer-events-none opacity-0"}`}
                 aria-label="เลื่อนขวา"

@@ -32,7 +32,7 @@ export default function TopTenRow({ books }: Props) {
           onClick={() => scrollBy("left")}
           onMouseEnter={() => setHoveredArrow("left")}
           onMouseLeave={() => setHoveredArrow(null)}
-          className={`absolute left-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/70 text-ink ring-1 ring-ink-3 backdrop-blur-sm transition-all duration-300 md:flex ${
+          className={`absolute left-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 text-ink ring-1 ring-ink-3 transition-all duration-300 md:flex ${
             hoveredArrow === "left" ? "h-11 w-11" : "h-9 w-9"
           } ${
             isHovering && canScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"
@@ -49,7 +49,7 @@ export default function TopTenRow({ books }: Props) {
           onClick={() => scrollBy("right")}
           onMouseEnter={() => setHoveredArrow("right")}
           onMouseLeave={() => setHoveredArrow(null)}
-          className={`absolute right-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/70 text-ink ring-1 ring-ink-3 backdrop-blur-sm transition-all duration-300 md:flex ${
+          className={`absolute right-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 text-ink ring-1 ring-ink-3 transition-all duration-300 md:flex ${
             hoveredArrow === "right" ? "h-11 w-11" : "h-9 w-9"
           } ${
             isHovering && canScrollRight ? "opacity-100" : "pointer-events-none opacity-0"

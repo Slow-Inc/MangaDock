@@ -24,7 +24,7 @@ export default function TopTenCard({ book, index }: Props) {
         type="button"
         onClick={() => setShowModal(true)}
         aria-label={`ดูรายละเอียด ${book.title}`}
-        className={`relative overflow-hidden rounded-xl border border-line bg-fill md:backdrop-blur-xl transition-all duration-300 hover:border-ink-3 hover:scale-105 focus-visible:scale-105 focus-visible:border-ink-3 ${
+        className={`relative overflow-hidden rounded-xl border border-line bg-fill transition-all duration-300 hover:border-ink-3 hover:scale-105 focus-visible:scale-105 focus-visible:border-ink-3 ${
           isLandscape ? "aspect-4/3 w-32 sm:w-40 md:w-48" : "h-32 w-24 sm:h-36 sm:w-28 md:h-40 md:w-28"
         }`}
       >

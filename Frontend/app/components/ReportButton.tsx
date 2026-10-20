@@ -86,7 +86,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
 
       {/* Modal */}
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-scrim/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-scrim/70 p-4">
           <div ref={dialogRef} className="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-2xl">
             {done ? (
               <div className="text-center">

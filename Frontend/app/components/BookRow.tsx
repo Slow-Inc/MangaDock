@@ -95,7 +95,7 @@ function BookCard({
       ref={articleRef}
       key={`${rowId}-${book.id}`}
       onMouseEnter={handleHover}
-      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-line bg-fill md:backdrop-blur-xl md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-ink-3 ${expandRight ? "origin-left" : "origin-right"}`}
+      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-line bg-fill md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-ink-3 ${expandRight ? "origin-left" : "origin-right"}`}
     >
       {/* Cover image */}
       <div
@@ -139,7 +139,7 @@ function BookCard({
         <button
           onClick={(e) => { e.stopPropagation(); setShowCover(true); }}
           title="ดูหน้าปกขนาดใหญ่"
-          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/50 text-ink-2 opacity-100 backdrop-blur-sm transition-all duration-200 hover:bg-bg/80 hover:text-ink md:opacity-0 md:group-hover:opacity-100"
+          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/75 text-ink-2 opacity-100 transition-all duration-200 hover:bg-bg/80 hover:text-ink md:opacity-0 md:group-hover:opacity-100"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
             <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
@@ -149,7 +149,7 @@ function BookCard({
 
       {/* Info panel — expands right unless near the right edge */}
       <div
-        className={`pointer-events-none absolute top-0 z-20 hidden h-full w-56 flex-col justify-between bg-surface/95 p-4 opacity-0 shadow-2xl ring-1 ring-line backdrop-blur-xl transition-all duration-300 md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 ${
+        className={`pointer-events-none absolute top-0 z-20 hidden h-full w-56 flex-col justify-between bg-surface p-4 opacity-0 shadow-2xl ring-1 ring-line transition-all duration-300 md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 ${
           expandRight
             ? "left-full -translate-x-2 rounded-r-2xl group-hover:translate-x-0"
             : "right-full translate-x-2 rounded-l-2xl group-hover:translate-x-0"
@@ -311,7 +311,7 @@ export default function BookRow({ rowId, rowTitle, items, seeMoreHref }: BookRow
           onClick={() => scrollBy("left")}
           onMouseEnter={() => setHoveredArrow("left")}
           onMouseLeave={() => setHoveredArrow(null)}
-          className={`absolute left-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/70 text-ink ring-1 ring-ink-3 backdrop-blur-sm transition-all duration-300 md:flex ${
+          className={`absolute left-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 text-ink ring-1 ring-ink-3 transition-all duration-300 md:flex ${
             hoveredArrow === "left" ? "h-11 w-11" : "h-9 w-9"
           } ${
             isHoveringRow && canScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"
@@ -328,7 +328,7 @@ export default function BookRow({ rowId, rowTitle, items, seeMoreHref }: BookRow
           onClick={() => scrollBy("right")}
           onMouseEnter={() => setHoveredArrow("right")}
           onMouseLeave={() => setHoveredArrow(null)}
-          className={`absolute right-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/70 text-ink ring-1 ring-ink-3 backdrop-blur-sm transition-all duration-300 md:flex ${
+          className={`absolute right-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 text-ink ring-1 ring-ink-3 transition-all duration-300 md:flex ${
             hoveredArrow === "right" ? "h-11 w-11" : "h-9 w-9"
           } ${
             isHoveringRow && canScrollRight ? "opacity-100" : "pointer-events-none opacity-0"

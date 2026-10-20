@@ -305,11 +305,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const content = (
     <div
       onClickCapture={onLinkClickCapture}
-      className={`fixed inset-0 z-200 flex items-center justify-center md:p-4 md:backdrop-blur-sm transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`fixed inset-0 z-200 flex items-center justify-center md:p-4 transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-bg md:bg-scrim/80"
+        className="absolute inset-0 bg-bg md:bg-scrim/90"
         onClick={handleClose}
       />
 
@@ -754,7 +754,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   {/* Left arrow */}
                   <button
                     onClick={() => scrollCovers("left")}
-                    className={`absolute left-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-bg/70 ring-1 ring-ink-3 backdrop-blur-sm transition-all duration-200 ${isHoveringCovers && coverCanScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    className={`absolute left-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-bg/85 ring-1 ring-ink-3 transition-all duration-200 ${isHoveringCovers && coverCanScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"}`}
                     aria-label="เลื่อนซ้าย"
                   >
                     <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-ink"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" /></svg>
@@ -763,7 +763,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   {/* Right arrow */}
                   <button
                     onClick={() => scrollCovers("right")}
-                    className={`absolute right-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-bg/70 ring-1 ring-ink-3 backdrop-blur-sm transition-all duration-200 ${isHoveringCovers && coverCanScrollRight ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    className={`absolute right-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-bg/85 ring-1 ring-ink-3 transition-all duration-200 ${isHoveringCovers && coverCanScrollRight ? "opacity-100" : "pointer-events-none opacity-0"}`}
                     aria-label="เลื่อนขวา"
                   >
                     <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-ink"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" /></svg>
@@ -807,7 +807,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       {/* Expand button */}
                       <div
                         onClick={(e) => { e.stopPropagation(); setLightboxSrc(displayUrl); }}
-                        className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-bg/70 text-ink opacity-100 backdrop-blur-sm transition-all duration-200 hover:bg-bg/90 hover:text-ink md:opacity-0 md:text-ink-2 md:group-hover:opacity-100"
+                        className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-bg/80 text-ink opacity-100 transition-all duration-200 hover:bg-bg/90 hover:text-ink md:opacity-0 md:text-ink-2 md:group-hover:opacity-100"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
                           <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />

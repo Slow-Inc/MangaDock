@@ -68,7 +68,7 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
       
       {/* Mobile Drawer Overlay */}
       <div 
-        className={`fixed inset-0 z-50 bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+        className={`fixed inset-0 z-50 bg-scrim/80 transition-opacity duration-300 lg:hidden ${
           isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setIsMobileMenuOpen(false)}

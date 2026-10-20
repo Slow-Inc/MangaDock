@@ -23,7 +23,7 @@ export default function CoverLightbox({ src, alt, onClose }: Props) {
 
   const content = (
     <div
-      className={`fixed inset-0 z-300 flex items-center justify-center p-6 backdrop-blur-md transition-opacity duration-300 ${
+      className={`fixed inset-0 z-300 flex items-center justify-center p-6 transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
       onClick={close}

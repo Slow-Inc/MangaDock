@@ -375,7 +375,7 @@ function CommunityContent() {
       {/* Create Post Modal — bottom sheet on mobile, centered dialog on desktop */}
       {showCreateModal && (
         <div
-          className={`fixed inset-0 z-[100] flex items-end sm:items-center sm:p-4 bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 ${isModalVisible ? 'opacity-100' : 'opacity-0'}`}
+          className={`fixed inset-0 z-[100] flex items-end sm:items-center sm:p-4 bg-scrim/80 transition-opacity duration-300 ${isModalVisible ? 'opacity-100' : 'opacity-0'}`}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
           <div className={`

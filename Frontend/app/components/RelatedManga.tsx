@@ -60,7 +60,7 @@ function ScrollArrow({
       onClick={onClick}
       aria-label={dir === "left" ? "เลื่อนซ้าย" : "เลื่อนขวา"}
       // top = half the 2:3 cover height (7.5rem wide -> 11.25rem tall), so it centres on the covers, not the titles
-      className={`absolute ${dir === "left" ? "left-1" : "right-1"} top-[5.625rem] z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-bg/70 ring-1 ring-ink-3 backdrop-blur-sm transition hover:bg-bg/90 md:flex ${
+      className={`absolute ${dir === "left" ? "left-1" : "right-1"} top-[5.625rem] z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 ring-1 ring-ink-3 transition hover:bg-bg/90 md:flex ${
         visible ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     >

@@ -75,7 +75,7 @@ function GridCard({ book }: { book: GridBook }) {
           {lastChapterId && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowReader(true); }}
-              className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-1.5 rounded-b-xl bg-bg/75 py-1.5 text-[11px] font-medium text-ink backdrop-blur-[2px] transition-colors hover:bg-bg/90 active:bg-bg"
+              className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-1.5 rounded-b-xl bg-bg/75 py-1.5 text-[11px] font-medium text-ink transition-colors hover:bg-bg/90 active:bg-bg"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 shrink-0">
                 <path d="M8 5v14l11-7z" />
@@ -87,7 +87,7 @@ function GridCard({ book }: { book: GridBook }) {
           <button
             onClick={(e) => { e.stopPropagation(); setShowCover(true); }}
             title="ดูหน้าปกขนาดใหญ่"
-            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/50 text-ink-2 opacity-0 backdrop-blur-sm transition-all duration-200 group-hover:opacity-100 hover:bg-bg/80 hover:text-ink"
+            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/75 text-ink-2 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-bg/80 hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
               <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />

@@ -115,6 +115,7 @@ One easing `cubic-bezier(0.23, 1, 0.32, 1)`, durations 160 / 320 / 600 ms, 38 ms
 
 ### Don't
 - Use purple, gradients behind content, glass panels or glow.
+- Put `backdrop-blur` on anything that repeats (cards, list rows, buttons on covers) or on a full-screen scrim. Each one is re-blurred every scroll frame: 80 blurred book cards held the home page at 30 fps and the book popup at ~10 fps (2026-10-20). Only the navbar and a single floating menu may blur; scrims use `bg-scrim/80–90`.
 - Put spaces inside animated inline-blocks (the words run together).
 - Copy a spinner or a button style instead of using `components/ui`.
 
@@ -196,6 +197,7 @@ easing ตัวเดียว `cubic-bezier(0.23, 1, 0.32, 1)` ความย
 
 ### ไม่ควรทำ
 - ใช้สีม่วง, gradient หลังเนื้อหา, panel แบบ glass หรือแสงเรือง
+- ใส่ `backdrop-blur` ให้ของที่ซ้ำกันหลายชิ้น (การ์ด แถวในลิสต์ ปุ่มบนปก) หรือ scrim เต็มจอ เพราะทุกชิ้นต้อง blur ใหม่ทุกเฟรมที่ scroll: การ์ดหนังสือ 80 ใบที่ blur ทำให้หน้า home เหลือ 30 fps และ popup หนังสือเหลือราว 10 fps (2026-10-20) ใช้ blur ได้เฉพาะ navbar กับเมนูลอยชิ้นเดียว ส่วน scrim ใช้ `bg-scrim/80–90`
 - ใส่ช่องว่างไว้ใน inline-block ที่ animate (คำจะติดกัน)
 - copy spinner หรือสไตล์ปุ่มมาใช้แทนการใช้ `components/ui`
 

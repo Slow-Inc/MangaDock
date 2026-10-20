@@ -239,7 +239,7 @@ export default function MangaCommunityPage() {
 
       {/* ── Create Post Modal ── */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-scrim/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-scrim/80">
           <div className="bg-surface border border-line rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
             <header className="p-6 border-b border-line flex items-center justify-between">
               <div>
