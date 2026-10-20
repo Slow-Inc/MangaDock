@@ -1,5 +1,32 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-20 — PR #782 scrutiny follow-up / แก้ผล scrutinize
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | Mobile API strict/nullable JSON helpers, own-review caller, Reader pinch lifecycle and regressions | แยก helper JSON แก้ caller รีวิวตัวเอง วงจร pinch Reader และ regressions |
+| 2. Results / outcome | Empty required review data yields retryable error; rejoining a finger preserves zoom | ข้อมูลรีวิวที่จำเป็นแต่ว่างแสดง error/ลองใหม่ วางนิ้วกลับไม่ทำ zoom กระโดด |
+| 3. Expected performance gain % | Not measured | ไม่วัด |
+| 4. Benefits | Review-render stability and continuous pinch interaction | รีวิวไม่ render ล้มและ pinch ต่อเนื่อง |
+| 5. Purpose | Resolve two reproducible scrutiny findings in the existing PR | แก้สอง finding ที่มี repro ใน PR เดิม |
+| 6. Why + architectural impact | Optional absence must not change all response contracts; current touch geometry differs from gesture history | ข้อมูล optional ที่ไม่มีไม่ควรเปลี่ยน contract ทั้งหมด และ geometry นิ้วปัจจุบันต่างจากประวัติ gesture |
+| 7. Problems before | Empty summary published null then TypeError; pinch rejoin jumped 2x → 1x | summary ว่าง publish null แล้ว TypeError วางนิ้วกลับทำ zoom2x → 1x |
+| 8. Goals | Keep own-review absence valid and prevent zoom jumps or pinch-triggered page turns | คงกรณีไม่มีรีวิวและป้องกันซูมกระโดด/เปลี่ยนหน้าเมื่อ pinch |
+| 9. Architecture before | Shared API parser allowed every empty body; one pinch flag served two roles | parser อนุญาตทุก body ว่างและใช้ flag pinch เดียวสองหน้าที่ |
+| 10. Architecture after | Explicit nullable parser entry; independent active-baseline and ever-pinched state | แยกเส้นทาง nullable และสถานะ baseline/เคย pinch |
+| 11. Refactor list | Internal parser shared by two typed entry points; reuse touch handler for start/end/move | ใช้ parser ร่วมสอง entry ที่ระบุ type และ handler touch ร่วม start/end/move |
+| 12. Metrics | Two observed RED → GREEN regressions; combined Mobile235/235, tooling58/58; types/env/format and Hermes773 modules/11 assets pass | RED → GREEN สองกรณี Mobile รวม235/235 tooling58/58 types/env/format และ Hermes773 modules/11 assets ผ่าน |
+| 13. Technical debt removed | Implicit optional-response semantics and stale pinch baseline | ลด nullable ที่ไม่ระบุชัดและ baseline pinch เก่า |
+| 14. Risk reduction / rollback | Required and optional bodies tested separately; revert follow-up code commit, retaining chapter-list work | ทดสอบ body แยกประเภท ย้อน commit แก้นี้โดยคงงานรายการตอน |
+| 15. Developer experience impact | Typed optional helper and tests reproduce the user-facing failures | helper optional ระบุ type และ tests จำลองอาการผู้ใช้ |
+| 16. Future opportunities | Build a fresh APK and repeat two scenarios on physical devices | สร้าง APK ใหม่และทดสอบสองกรณีซ้ำบนเครื่องจริง |
+| 17. Lessons learned | Preserve concurrent commits; verify export entry when dependencies are junction-linked | คง commit ที่เพิ่มระหว่างทำและตรวจ entry export เมื่อใช้ junction |
+| 18. KPI | Retryable required-body error; stable2x after rejoin; no new physical acceptance claim | ข้อมูลจำเป็นว่างลองใหม่ได้ วางนิ้วกลับคง2x ไม่อ้างรับเครื่องจริงเพิ่ม |
+
+Repro, root cause, fix, why previous tests missed it, validation and limits: [follow-up report](../../Mobile/docs/2026-10-20-review-fixes.md), [PR #782](https://github.com/Slow-Inc/MangaDock/pull/782). No Backend/Frontend/MIT, provider, schema or dependency change; no performance or production acceptance claim.
+
+ภาษาไทย: ดู repro สาเหตุ วิธีแก้ ช่องว่าง tests เดิม การตรวจและข้อจำกัดในรายงานกับ PR ด้านบน ไม่แก้ Backend/Frontend/MIT/provider/schema/dependency และไม่อ้างผลประสิทธิภาพหรือ production acceptance
+
 ## 2026-10-20 — Native chapter list web alignment / รายการตอน Native ใกล้เว็บ
 
 | Field | Change / การเปลี่ยนแปลง |

@@ -1,6 +1,15 @@
 <!-- lang:en -->
 # DONE — Claude Code Session Log
 
+## PR #782 scrutiny follow-up — 2026-10-20
+
+- Final combined-head checks: clean npm ci, Mobile **235/235**, types/env/format, tooling **58/58**, Android Hermes export **773 modules/11 assets** pass; corrected bundle contains the new helper and excludes checked private values. No replacement APK or new physical-device acceptance.
+- ภาษาไทย: ตรวจ head รวมสุดท้าย npm ci ใหม่ Mobile **235/235** types/env/format tooling **58/58** และ Hermes export **773 modules/11 assets** ผ่าน bundle มี helper ใหม่และไม่พบค่าลับที่ตรวจ ยังไม่สร้าง APK ทดแทนหรือรับผลเครื่องจริงเพิ่ม
+
+- Fixed required empty JSON responses silently publishing null and crashing review rendering: strict `json` plus explicit `nullableJson` for the absent own-review contract. Component regression observed RED TypeError → GREEN retryable Thai error for summary/list, while optional empty responses remain supported.
+- Rebased active pinch geometry after finger lift/rejoin without clearing the gesture-wide page-turn guard. Component regression observed RED zoom1 instead of2 → GREEN stable2, subsequent3/back2; covers move and touch lifecycle events. Preserved concurrent chapter-list commit `72af504` and both sides of its test insertion conflict. Earlier APK/device evidence remains historical; no new phone pass claimed. [Report and resume point](Mobile/docs/2026-10-20-review-fixes.md).
+- ภาษาไทย: แก้ body JSON ที่จำเป็นแต่ว่างไม่ให้ publish null จน render รีวิวล้ม โดยแยก `json` แบบเข้มงวดกับ `nullableJson` สำหรับรีวิวตัวเองที่อาจไม่มี มี RED TypeError → GREEN แสดง error ภาษาไทย/ลองใหม่ทั้ง summary และ list คง optional body ว่าง ส่วน pinch ตั้ง baseline ใหม่เมื่อยก/วางนิ้ว โดยคงตัวกันเปลี่ยนหน้า มี RED zoom1 แทน2 → GREEN คง2/ขยับ3/คืน2 ผ่านทั้ง move และ touch lifecycle เก็บ commit รายการตอนและ tests ทั้งสองฝั่ง ไม่อ้างทดสอบมือถือใหม่จาก APK ก่อนหน้า
+
 ## Native chapter list web alignment — 2026-10-20
 
 - Follow-up approved after a cancellation made before any source edits: bounded320dp/half-window chapter viewport, compact language/source/page-count-or-price rows, busy/empty/accessibility behavior. Studio count uses existing version pages; no new HTTP/server/dependency. Existing Reader access gates retained.

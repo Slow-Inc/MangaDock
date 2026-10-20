@@ -3,6 +3,24 @@
 Goal: address B1–B6 in `qa/REPORT-full-test-2026-10-20.md` against source `443dc80`.
 Workspace: existing isolated checkout `C:/Users/woral/md4` (initially detached).
 
+## PR #782 scrutiny follow-up / แก้ผล scrutinize
+
+Current follow-up preserves the chapter-list update at `72af504` and fixes two reproducible review findings. `api.json<T>` now rejects empty required responses with the existing Thai `ApiError`; only `nullableJson<T>` permits absent optional data, used by `reviews/:id/my`. A rendered-review regression failed with `Cannot read properties of null (reading 'averageRating')` before the fix, then passed for both an empty summary and an empty list. Optional empty/whitespace/204 bodies still return null, and malformed nonempty JSON still rejects in both helpers.
+
+รอบนี้คงงานรายการตอนที่ `72af504` และแก้สองจุดจาก scrutinize ที่มี repro: `api.json<T>` ปฏิเสธ body ว่างของข้อมูลที่จำเป็นด้วย `ApiError` ภาษาไทยเดิม ส่วน `nullableJson<T>` อนุญาตข้อมูล optional ที่ไม่มี โดยใช้กับ `reviews/:id/my` regression ที่ render รีวิวจริงล้มด้วย `Cannot read properties of null (reading 'averageRating')` ก่อนแก้ แล้วผ่านทั้ง summary และ list ที่ว่าง body optional ว่าง/whitespace/204 ยังคงคืน null และ JSON ที่เสียแต่ไม่ว่างยังถูกปฏิเสธทั้งสอง helper
+
+Pinch now distinguishes an active two-finger baseline from a gesture that has ever pinched. Lifting one finger clears only the active baseline; rejoining starts at the current zoom while release still cannot turn the page. The existing component gesture regression first failed at expected zoom2 / actual1, then passed through 2 → rejoin2 → move3 → return2. It covers move-only boundaries and native touch start/end events, retaining the original swipe/pinch-release/picker-Back assertions.
+
+Pinch แยก baseline สองนิ้วที่กำลังใช้ออกจากสถานะว่า gesture นี้เคย pinch เมื่อยกนิ้วจะล้างเฉพาะ baseline วางกลับจึงเริ่มที่ zoom ปัจจุบัน และยังไม่เปลี่ยนหน้าตอนปล่อยนิ้ว test component เดิมล้มที่คาด zoom2 แต่ได้1 ก่อนแก้ แล้วผ่านลำดับ 2 → วางกลับ2 → ขยับ3 → คืน2 ครอบคลุมทั้ง move และ native touch start/end พร้อมคง assertions เรื่อง swipe/ปล่อย pinch/Back ของ picker
+
+The concurrent chapter-list commit conflicted only with the insertion point of `native-flows.test.ts`; both tests were retained and the combined suite passed. An initial Android export through junction-linked dependencies resolved the original checkout's Expo entry; that output is not accepted as verification of this patch. Final checks use dependencies installed from the unchanged lockfile in the isolated worktree. No new APK or phone interaction is claimed for this follow-up; the artifact/device evidence below belongs to earlier builds and requires a new build before phone retesting.
+
+Commit รายการตอนที่เพิ่มระหว่างทำชนเฉพาะจุดแทรก test ใน `native-flows.test.ts` เก็บ tests ทั้งสองฝั่งและตรวจ suite รวมผ่าน การ export ครั้งแรกผ่าน dependencies แบบ junction เลือก Expo entry ของ checkout เดิม จึงไม่นับ output นั้นเป็นหลักฐาน patch นี้ การตรวจสุดท้ายใช้ dependencies ที่ติดตั้งจาก lockfile เดิมใน worktree แยก รอบนี้ไม่อ้าง APK ใหม่หรือการทดสอบมือถือจริง หลักฐานไฟล์และอุปกรณ์ด้านล่างเป็น build ก่อนหน้า ต้อง build ใหม่ก่อนทดสอบบนมือถือ
+
+Follow-up validation: clean `npm ci` from the unchanged lockfile, **235/235 Mobile tests**, TypeScript, environment validation, touched-source formatting, repository tooling **58/58**, and Android Hermes export **773 modules / 11 assets** pass. The corrected bundle contains the new nullable helper; the rejected junction export does not. Checked private values are absent from the corrected bundle. Native APK assembly/device interaction was not rerun. Resume on the updated PR branch; build a replacement APK before physical revalidation. This follow-up changes no Backend/Frontend/MIT, dependencies, provider configuration or schema.
+
+ผลตรวจรอบแก้ scrutinize: `npm ci` ใหม่จาก lockfile เดิม **Mobile235/235**, TypeScript, env, format โค้ดที่แก้, tooling **58/58** และ Android Hermes export **773 modules / 11 assets** ผ่าน bundle ที่ถูกต้องมี helper nullable ใหม่ ส่วน export ผ่าน junction ที่ไม่นับไม่มี ตรวจไม่พบค่าลับที่ตรวจใน bundle ที่ถูกต้อง ไม่ได้รัน native APK assembly/interaction บนมือถือซ้ำ ให้ทำต่อจาก branch PR ที่อัปเดตและ build APK ใหม่ก่อนตรวจเครื่องจริง รอบนี้ไม่แก้ Backend/Frontend/MIT/dependency/provider/schema
+
 ## Plan and acceptance
 
 - [x] B1: reproduce empty successful API bodies, return null, retain malformed-response errors and verify signed-in review loading.
