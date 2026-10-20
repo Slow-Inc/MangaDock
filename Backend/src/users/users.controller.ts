@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   Res,
   UseGuards,
@@ -22,6 +23,7 @@ import { memoryStorage } from 'multer';
 import * as path from 'path';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UsersService } from './users.service';
+import { MascotDto } from './mascot.dto';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 import {
   STORAGE_PROVIDER,
@@ -55,6 +57,22 @@ export class UsersController {
     @Body() body: { displayName?: string; photoURL?: string },
   ) {
     await this.users.updateUserProfile(req[USER_KEY].uid, body);
+    return { ok: true };
+  }
+
+  /** The caller's mascot (Epic D); null when they never dressed one. */
+  @Get('me/mascot')
+  async getMyMascot(@Req() req: Request & { [USER_KEY]: SupabaseAuthUser }) {
+    return { mascot: await this.users.getMascot(req[USER_KEY].uid) };
+  }
+
+  /** Save the caller's mascot. MascotDto allow-lists every field (global ValidationPipe, whitelist). */
+  @Put('me/mascot')
+  async setMyMascot(
+    @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
+    @Body() body: MascotDto,
+  ) {
+    await this.users.setMascot(req[USER_KEY].uid, body);
     return { ok: true };
   }
 

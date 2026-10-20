@@ -12,6 +12,7 @@ import {
   STORAGE_PROVIDER,
   type StorageProvider,
 } from '../common/storage/storage-provider.interface';
+import type { MascotDto } from './mascot.dto';
 
 export const ROLE = {
   USER: 0,
@@ -283,6 +284,26 @@ export class UsersService {
       throw new Error(`Failed to update user profile: ${error.message}`);
     }
     this.logger.log(`Updated profile for user: ${uid}`);
+  }
+
+  /** The caller's mascot config (Epic D), or null when they never dressed one. */
+  async getMascot(uid: string): Promise<MascotDto | null> {
+    const { data, error } = await this.db
+      .from('profiles')
+      .select('mascot')
+      .eq('uid', uid)
+      .maybeSingle<{ mascot: MascotDto | null }>();
+    if (error) throw new Error(`Failed to read mascot: ${error.message}`);
+    return data?.mascot ?? null;
+  }
+
+  /** Saves an already-validated mascot (MascotDto, allow-listed) on the caller's own row. */
+  async setMascot(uid: string, mascot: MascotDto): Promise<void> {
+    const { error } = await this.db
+      .from('profiles')
+      .update({ mascot, updated_at: new Date().toISOString() })
+      .eq('uid', uid);
+    if (error) throw new Error(`Failed to save mascot: ${error.message}`);
   }
 
   async getProfile(uid: string): Promise<UserProfile> {
@@ -664,7 +685,12 @@ export class UsersService {
   async deleteUserAccount(uid: string): Promise<void> {
     // Child tables are independent of each other — delete them in parallel.
     // They FK-reference profiles(uid), so the parent row must be deleted AFTER them.
-    const tables = ['user_favorites', 'user_liked', 'user_history', 'series_follows'];
+    const tables = [
+      'user_favorites',
+      'user_liked',
+      'user_history',
+      'series_follows',
+    ];
     const results = await Promise.all(
       tables.map((table) => this.db.from(table).delete().eq('uid', uid)),
     );
