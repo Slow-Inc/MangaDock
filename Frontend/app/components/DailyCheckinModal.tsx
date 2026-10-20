@@ -8,6 +8,8 @@ import { Flame } from "lucide-react";
 import Coin from "./ui/Coin";
 import Mascot from "./mascot/Mascot";
 import { checkinErrorMessage, utcDayKey } from "../lib/dailyCheckin";
+import { getWalletBalance } from "../lib/studioApi";
+import type { CoinBalanceUpdate } from "../lib/coinBalanceEvent";
 
 type Status = { checkedInToday: boolean; streakDay: number; coinsToday: number };
 
@@ -80,6 +82,12 @@ export default function DailyCheckinModal() {
         setStatus(data);
         setClaimed(true);
         localStorage.setItem(STORAGE_KEY, utcDayKey(new Date()));
+        // Update the navbar coin chip: authoritative total if the refetch works,
+        // otherwise the amount the server just credited.
+        getWalletBalance(token)
+          .then((r): CoinBalanceUpdate => ({ balance: r.balance }))
+          .catch((): CoinBalanceUpdate => ({ delta: data.coinsToday }))
+          .then((detail) => window.dispatchEvent(new CustomEvent("mb:coin-balance-update", { detail })));
       } else {
         setError(checkinErrorMessage(res.status));
         // Already claimed today (e.g. in another tab): let the user close the modal.

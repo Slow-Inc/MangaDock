@@ -9,6 +9,7 @@ import LoginModal from "./LoginModal";
 import { useAuth } from "../contexts/AuthContext";
 import TopupModal from "./TopupModal";
 import { getWalletBalance } from "../lib/studioApi";
+import { applyCoinBalanceUpdate, type CoinBalanceUpdate } from "../lib/coinBalanceEvent";
 import NotificationBell from "./NotificationBell";
 import Coin from "./ui/Coin";
 import { UidMascot } from "./mascot/Mascot";
@@ -44,10 +45,11 @@ export default function NavbarActions() {
     });
   }, [user, getIdToken]);
 
-  // Listen for balance updates dispatched by TopupModal on success
+  // Listen for balance updates dispatched by TopupModal / unlock / daily check-in
   useEffect(() => {
     const handler = (e: Event) => {
-      setCoinBalance((e as CustomEvent<{ balance: number }>).detail.balance);
+      const detail = (e as CustomEvent<CoinBalanceUpdate>).detail;
+      setCoinBalance((prev) => applyCoinBalanceUpdate(prev, detail));
     };
     window.addEventListener("mb:coin-balance-update", handler);
     return () => window.removeEventListener("mb:coin-balance-update", handler);
