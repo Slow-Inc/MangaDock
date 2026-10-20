@@ -8,6 +8,7 @@
 **Perf Δ:** fit scan 6–24 ms/region (bounded by area cap); balloon detection is cached on ctx, so merge-on adds no second YOLO pass in the patches path.
 **Quality:** replay A/B (17 pages): no region smaller with identical translation; composite failures 0 → 0.
 **Validation:** unit tests red-first for every change (container_merge 10, doctor page 13, font_fit 10, detection_postproc 19, Backend spec 42); deterministic replay benchmark with PNG.
+**Also (same loop):** #759 Thai line breaking (`text_render._glue_thai_tokens`, atomic Thai words, `_thai_subwords`) — replay A/B 0 font changes, spill unchanged, bad breaks fixed; #763 `CommonTranslator._is_glitched` + `manga_translator/translation_quality.py` — foreign-script leaks 1–2 → 0 per corpus run, one extra LLM call only on a leaking page; #762 prompt A/B inconclusive on style, v2 YAML kept as an experiment.
 **Risk / follow-up:** merge stays opt-in until more pages; wrapper overshooting `max_width` (root of the non-monotonic fit) still open; SFX katakana transliteration junk (`ベ`→`เบ`) and translation prompt quality are next.
 
 ## 2026-10-20 — #693: SFX rescue gate = ocr_vlm.should_rescue_sfx on integrate (quality guard)
