@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cacheOrFetch, TTL } from '../../lib/apiCache';
+import AdminTableSkeleton from '../components/AdminTableSkeleton';
 
 const savedTx = { filterUid: '', filterType: '', filterFrom: '', filterTo: '', page: 1 };
 
@@ -12,14 +13,14 @@ interface AdminTransaction {
 
 const TX_TYPES = ['topup', 'purchase', 'refund', 'reward'];
 const LIMIT = 20;
-const inputCls = 'bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-white/20 focus:bg-white/[0.06] transition-colors';
+const inputCls = 'bg-fill border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 focus:bg-raised transition-colors';
 
 function TypeBadge({ type }: { type: string }) {
   const cls =
-    type === 'topup'    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-    type === 'purchase' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-    type === 'refund'   ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-    'bg-white/5 text-white/40 border-white/10';
+    type === 'topup'    ? 'bg-ok/10 text-ok border-ok/40' :
+    type === 'purchase' ? 'bg-accent/10 text-accent border-accent/40' :
+    type === 'refund'   ? 'bg-coin/10 text-coin border-coin/40' :
+    'bg-fill text-ink-3 border-line';
   return <span className={`text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{type}</span>;
 }
 
@@ -91,52 +92,46 @@ export default function AdminTransactionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Transactions</h1>
-        <p className="text-sm text-white/35 mt-0.5">{total.toLocaleString()} total records</p>
+        <h1 className="text-2xl font-semibold text-ink">Transactions</h1>
+        <p className="text-sm text-ink-3 mt-0.5">{total.toLocaleString()} total records</p>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2.5 p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+      <div className="flex flex-wrap gap-2.5 p-4 bg-fill border border-line rounded-xl">
         <input value={filterUid} onChange={e => setFilterUidPersist(e.target.value)} placeholder="Filter by UID…" className={`${inputCls} w-60`} />
-        <select value={filterType} onChange={e => setFilterTypePersist(e.target.value)} className={`${inputCls} text-white/60`}>
+        <select value={filterType} onChange={e => setFilterTypePersist(e.target.value)} className={`${inputCls} text-ink-2`}>
           <option value="">All types</option>
           {TX_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
-        <input type="date" value={filterFrom} onChange={e => setFilterFromPersist(e.target.value)} className={`${inputCls} text-white/60`} />
-        <input type="date" value={filterTo} onChange={e => setFilterToPersist(e.target.value)} className={`${inputCls} text-white/60`} />
+        <input type="date" value={filterFrom} onChange={e => setFilterFromPersist(e.target.value)} className={`${inputCls} text-ink-2`} />
+        <input type="date" value={filterTo} onChange={e => setFilterToPersist(e.target.value)} className={`${inputCls} text-ink-2`} />
       </div>
 
       {/* Table */}
-      <div className="border border-white/[0.07] rounded-xl overflow-hidden">
+      <div className="border border-line rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-white/[0.07] bg-white/[0.02]">
+            <tr className="border-b border-line bg-fill">
               {['UID', 'Type', 'Amount', 'Balance After', 'Created', ''].map((h, i) => (
-                <th key={i} className="text-left px-4 py-3 text-[11px] font-medium text-white/35 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                <th key={i} className="text-left px-4 py-3 text-[11px] font-medium text-ink-3 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              [...Array(5)].map((_, i) => (
-                <tr key={i} className="border-b border-white/5 last:border-0">
-                  {[...Array(6)].map((_, j) => (
-                    <td key={j} className="px-4 py-3.5"><div className="h-3 bg-white/5 rounded animate-pulse" style={{ width: `${[80,60,50,60,90,40][j]}px` }} /></td>
-                  ))}
-                </tr>
-              ))
+              <AdminTableSkeleton rows={5} columns={[80, 60, 50, 60, 90, 40]} />
             ) : transactions.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-white/30 text-sm">No transactions found.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-ink-3 text-sm">No transactions found.</td></tr>
             ) : transactions.map(t => (
-              <tr key={t.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors cursor-pointer" onClick={() => openDetail(t.id)}>
-                <td className="px-4 py-3.5 text-white/40 font-mono text-xs">{t.uid.slice(0, 8)}…</td>
+              <tr key={t.id} className="border-b border-line last:border-0 hover:bg-fill transition-colors cursor-pointer" onClick={() => openDetail(t.id)}>
+                <td className="px-4 py-3.5 text-ink-3 font-mono text-xs">{t.uid.slice(0, 8)}…</td>
                 <td className="px-4 py-3.5"><TypeBadge type={t.type} /></td>
-                <td className={`px-4 py-3.5 font-medium ${t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <td className={`px-4 py-3.5 font-medium ${t.amount >= 0 ? 'text-ok' : 'text-danger'}`}>
                   {t.amount >= 0 ? '+' : ''}{t.amount}
                 </td>
-                <td className="px-4 py-3.5 text-white/45">{t.balanceAfter}</td>
-                <td className="px-4 py-3.5 text-white/35 text-xs whitespace-nowrap">{new Date(t.createdAt).toLocaleString()}</td>
-                <td className="px-4 py-3.5 text-white/25 text-xs">Detail →</td>
+                <td className="px-4 py-3.5 text-ink-3">{t.balanceAfter}</td>
+                <td className="px-4 py-3.5 text-ink-3 text-xs whitespace-nowrap">{new Date(t.createdAt).toLocaleString()}</td>
+                <td className="px-4 py-3.5 text-ink-3 text-xs">Detail →</td>
               </tr>
             ))}
           </tbody>
@@ -145,36 +140,36 @@ export default function AdminTransactionsPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center gap-3 text-sm text-white/35">
-          <button disabled={page <= 1} onClick={() => setPagePersist(page - 1)} className="disabled:opacity-25 hover:text-white transition-colors smooth-hover-fast">← Prev</button>
-          <span className="text-white/50">{page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPagePersist(page + 1)} className="disabled:opacity-25 hover:text-white transition-colors smooth-hover-fast">Next →</button>
+        <div className="flex items-center gap-3 text-sm text-ink-3">
+          <button disabled={page <= 1} onClick={() => setPagePersist(page - 1)} className="disabled:opacity-25 hover:text-ink transition-colors smooth-hover-fast">← Prev</button>
+          <span className="text-ink-2">{page} / {totalPages}</span>
+          <button disabled={page >= totalPages} onClick={() => setPagePersist(page + 1)} className="disabled:opacity-25 hover:text-ink transition-colors smooth-hover-fast">Next →</button>
         </div>
       )}
 
       {/* Detail panel */}
       {detail && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setDetail(null)} />
-          <div className="relative w-96 bg-[#0d0d0d] border-l border-white/[0.08] h-full overflow-y-auto p-6 space-y-5">
-            <button onClick={() => setDetail(null)} className="absolute top-4 right-4 text-white/30 hover:text-white transition-colors text-lg leading-none">✕</button>
+          <div className="absolute inset-0 bg-scrim/70 backdrop-blur-sm" onClick={() => setDetail(null)} />
+          <div className="relative w-96 bg-surface border-l border-line h-full overflow-y-auto p-6 space-y-5">
+            <button onClick={() => setDetail(null)} className="absolute top-4 right-4 text-ink-3 hover:text-ink transition-colors text-lg leading-none">✕</button>
             <div>
-              <h2 className="text-base font-semibold text-white">Transaction Detail</h2>
-              <p className="text-xs text-white/35 mt-0.5 font-mono">{detail.id}</p>
+              <h2 className="text-base font-semibold text-ink">Transaction Detail</h2>
+              <p className="text-xs text-ink-3 mt-0.5 font-mono">{detail.id}</p>
             </div>
             <div className="space-y-0 text-sm">
               {([
-                ['UID', <span key="uid" className="font-mono text-xs text-white/50 break-all">{detail.uid}</span>],
+                ['UID', <span key="uid" className="font-mono text-xs text-ink-2 break-all">{detail.uid}</span>],
                 ['Type', <TypeBadge key="t" type={detail.type} />],
-                ['Amount', <span key="a" className={`font-medium ${detail.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{detail.amount >= 0 ? '+' : ''}{detail.amount}</span>],
+                ['Amount', <span key="a" className={`font-medium ${detail.amount >= 0 ? 'text-ok' : 'text-danger'}`}>{detail.amount >= 0 ? '+' : ''}{detail.amount}</span>],
                 ['Balance After', `${detail.balanceAfter} coins`],
                 ['Description', detail.description || '—'],
                 ['Reference ID', detail.referenceId || '—'],
                 ['Created', new Date(detail.createdAt).toLocaleString()],
               ] as [string, React.ReactNode][]).map(([label, val]) => (
-                <div key={String(label)} className="flex justify-between items-start gap-4 py-2.5 border-b border-white/[0.05] last:border-0">
-                  <span className="text-white/35 shrink-0 text-xs">{label}</span>
-                  <span className="text-white text-right text-xs break-all">{val}</span>
+                <div key={String(label)} className="flex justify-between items-start gap-4 py-2.5 border-b border-line last:border-0">
+                  <span className="text-ink-3 shrink-0 text-xs">{label}</span>
+                  <span className="text-ink text-right text-xs break-all">{val}</span>
                 </div>
               ))}
             </div>

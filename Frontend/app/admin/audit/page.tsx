@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import AdminTableSkeleton from '../components/AdminTableSkeleton';
 
 interface AuditLog {
   id: string;
@@ -24,19 +25,19 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ACTION_COLOR: Record<string, string> = {
-  ban_user: 'bg-red-500/10 text-red-400 border-red-500/20',
-  unban_user: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  delete_post: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  delete_comment: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  ban_user: 'bg-danger/10 text-danger border-danger/40',
+  unban_user: 'bg-ok/10 text-ok border-ok/40',
+  delete_post: 'bg-danger/10 text-danger border-danger/40',
+  delete_comment: 'bg-danger/10 text-danger border-danger/40',
   change_role: 'bg-accent/10 text-accent border-accent/40',
-  approve_content: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  reject_content: 'bg-red-500/10 text-red-400 border-red-500/20',
+  approve_content: 'bg-ok/10 text-ok border-ok/40',
+  reject_content: 'bg-danger/10 text-danger border-danger/40',
 };
 
 const LIMIT = 20;
 
 const inputCls =
-  'bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-white/20 focus:bg-white/[0.06] transition-colors';
+  'bg-fill border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 focus:bg-raised transition-colors';
 
 function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n) + '…' : s;
@@ -109,16 +110,16 @@ export default function AdminAuditPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Audit Log</h1>
-        <p className="text-sm text-white/35 mt-0.5">บันทึกการดำเนินการของ Admin ทั้งหมด</p>
+        <h1 className="text-2xl font-semibold text-ink">Audit Log</h1>
+        <p className="text-sm text-ink-3 mt-0.5">บันทึกการดำเนินการของ Admin ทั้งหมด</p>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2.5 p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+      <div className="flex flex-wrap gap-2.5 p-4 bg-fill border border-line rounded-xl">
         <select
           value={filterAction}
           onChange={e => setFilterAction(e.target.value)}
-          className={`${inputCls} text-white/60`}
+          className={`${inputCls} text-ink-2`}
         >
           <option value="">ทุกประเภท</option>
           {Object.entries(ACTION_LABELS).map(([k, v]) => (
@@ -134,7 +135,7 @@ export default function AdminAuditPage() {
         {(filterAction || filterActorUid) && (
           <button
             onClick={() => { setFilterAction(''); setFilterActorUid(''); setDebouncedActor(''); }}
-            className="px-3 py-2 text-xs text-white/35 hover:text-white transition-colors rounded-lg border border-white/[0.06] hover:border-white/20"
+            className="px-3 py-2 text-xs text-ink-3 hover:text-ink transition-colors rounded-lg border border-line hover:border-ink-3"
           >
             ล้างตัวกรอง
           </button>
@@ -142,14 +143,14 @@ export default function AdminAuditPage() {
       </div>
 
       {/* Table */}
-      <div className="border border-white/[0.07] rounded-xl overflow-hidden">
+      <div className="border border-line rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-white/[0.07] bg-white/[0.02]">
+            <tr className="border-b border-line bg-fill">
               {['เวลา', 'ผู้กระทำ', 'การกระทำ', 'เป้าหมาย', 'รายละเอียด'].map(h => (
                 <th
                   key={h}
-                  className="text-left px-4 py-3 text-[11px] font-medium text-white/35 uppercase tracking-wide whitespace-nowrap"
+                  className="text-left px-4 py-3 text-[11px] font-medium text-ink-3 uppercase whitespace-nowrap"
                 >
                   {h}
                 </th>
@@ -158,34 +159,23 @@ export default function AdminAuditPage() {
           </thead>
           <tbody>
             {loading ? (
-              [...Array(8)].map((_, i) => (
-                <tr key={i} className="border-b border-white/5 last:border-0">
-                  {[...Array(5)].map((_, j) => (
-                    <td key={j} className="px-4 py-3.5">
-                      <div
-                        className="h-3 bg-white/5 rounded animate-pulse"
-                        style={{ width: `${[90, 130, 80, 110, 60][j]}px` }}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))
+              <AdminTableSkeleton rows={8} columns={[90, 130, 80, 110, 60]} />
             ) : logs.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-white/30 text-sm">
+                <td colSpan={5} className="px-4 py-10 text-center text-ink-3 text-sm">
                   ยังไม่มี audit log
                 </td>
               </tr>
             ) : (
               logs.map(log => {
-                const actionCls = ACTION_COLOR[log.action] ?? 'bg-white/5 text-white/50 border-white/10';
+                const actionCls = ACTION_COLOR[log.action] ?? 'bg-fill text-ink-2 border-line';
                 return (
                   <tr
                     key={log.id}
-                    className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors"
+                    className="border-b border-line last:border-0 hover:bg-fill transition-colors"
                   >
                     {/* เวลา */}
-                    <td className="px-4 py-3.5 text-white/35 text-xs whitespace-nowrap">
+                    <td className="px-4 py-3.5 text-ink-3 text-xs whitespace-nowrap">
                       {new Date(log.created_at).toLocaleString('th-TH', {
                         day: 'numeric',
                         month: 'short',
@@ -197,7 +187,7 @@ export default function AdminAuditPage() {
                     {/* ผู้กระทำ */}
                     <td className="px-4 py-3.5">
                       <span
-                        className="font-mono text-[11px] text-white/50 cursor-default"
+                        className="font-mono text-[11px] text-ink-2 cursor-default"
                         title={log.actor_uid}
                       >
                         {truncate(log.actor_uid, 12)}
@@ -210,26 +200,26 @@ export default function AdminAuditPage() {
                       </span>
                     </td>
                     {/* เป้าหมาย */}
-                    <td className="px-4 py-3.5 text-white/40 text-xs">
+                    <td className="px-4 py-3.5 text-ink-3 text-xs">
                       {log.target_type && (
-                        <span className="text-white/25 mr-1">{log.target_type}/</span>
+                        <span className="text-ink-3 mr-1">{log.target_type}/</span>
                       )}
                       {log.target_id ? (
                         <span className="font-mono" title={log.target_id}>
                           {truncate(log.target_id, 14)}
                         </span>
                       ) : (
-                        <span className="text-white/20">—</span>
+                        <span className="text-ink-3">—</span>
                       )}
                     </td>
                     {/* รายละเอียด */}
-                    <td className="px-4 py-3.5 text-white/35 text-[11px] font-mono max-w-[200px]">
+                    <td className="px-4 py-3.5 text-ink-3 text-[11px] font-mono max-w-[200px]">
                       {log.metadata ? (
                         <span className="truncate block" title={JSON.stringify(log.metadata)}>
                           {JSON.stringify(log.metadata)}
                         </span>
                       ) : (
-                        <span className="text-white/20">—</span>
+                        <span className="text-ink-3">—</span>
                       )}
                     </td>
                   </tr>
@@ -242,19 +232,19 @@ export default function AdminAuditPage() {
 
       {/* Pagination */}
       {(page > 1 || hasMore) && (
-        <div className="flex items-center gap-3 text-sm text-white/35">
+        <div className="flex items-center gap-3 text-sm text-ink-3">
           <button
             disabled={page <= 1}
             onClick={() => setPage(p => p - 1)}
-            className="disabled:opacity-25 hover:text-white transition-colors smooth-hover-fast"
+            className="disabled:opacity-25 hover:text-ink transition-colors smooth-hover-fast"
           >
             ← ก่อนหน้า
           </button>
-          <span className="text-white/50">หน้า {page}</span>
+          <span className="text-ink-2">หน้า {page}</span>
           <button
             disabled={!hasMore}
             onClick={() => setPage(p => p + 1)}
-            className="disabled:opacity-25 hover:text-white transition-colors smooth-hover-fast"
+            className="disabled:opacity-25 hover:text-ink transition-colors smooth-hover-fast"
           >
             ถัดไป →
           </button>
