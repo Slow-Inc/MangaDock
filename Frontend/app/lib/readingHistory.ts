@@ -13,6 +13,7 @@
 import { apiFetch } from "./apiFetch";
 import { createAuthHeaders } from "./apiUtils";
 import { parseJsonArray } from "./safeJson";
+import { mergeRemoteHistory } from "./historyMerge";
 
 const API_BASE = "/api/proxy";
 const STORAGE_KEY = "mangadock_reading_history";
@@ -118,13 +119,12 @@ async function backfillChapterNumbers() {
           if (b.id !== mangaId || !b.lastChapterId || b.lastChapterNumber !== undefined) continue;
           const ch = chapters.find((c) => c.id === b.lastChapterId);
           b.lastChapterNumber = ch?.chapterNumber ?? null;
-          pendingUpserts.set(b.id, b);
           changed = true;
         }
+        // Local only: the server does not store lastChapterNumber, so an upsert here was a wasted POST (#814).
         if (changed) {
           saveToLS();
           notify();
-          scheduleFlush();
         }
       } catch { /* ignore */ }
     })
@@ -192,13 +192,9 @@ export async function loadHistoryData(token: string) {
 
     if (generation !== cacheGeneration) return;
 
-    // Merge: keep local entries not in remote, then prepend remote sorted by lastReadAt
+    // Merge: server entries win (keeping local display-only fields), local-only entries are kept
     const localOnly = books.filter((b) => !remote.find((r) => r.id === b.id));
-    const merged = [...remote, ...localOnly]
-      .sort((a, b) => b.lastReadAt - a.lastReadAt)
-      .slice(0, MAX_ITEMS);
-
-    books = merged;
+    books = mergeRemoteHistory(books, remote, MAX_ITEMS);
     syncedIds = new Set(remote.map((b) => b.id));
 
     // Any local-only items are pending upserts
