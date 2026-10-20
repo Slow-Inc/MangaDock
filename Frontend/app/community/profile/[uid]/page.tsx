@@ -58,6 +58,8 @@ export default function PublicProfilePage() {
 
   const [data, setData] = useState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  // The photo URL that failed to load (Google's avatar CDN can refuse); keyed by URL so another profile starts clean.
+  const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("posts");
   const [extraPosts, setExtraPosts] = useState<ForumPost[]>([]);
   const [hasMorePosts, setHasMorePosts] = useState(true);
@@ -396,9 +398,11 @@ export default function PublicProfilePage() {
           onAnimationEnd={() => setRepoAnim(null)}
         >
           {/* Avatar + Name */}
-          <div className="flex items-end gap-3 sm:gap-4 -mt-12 sm:-mt-14 mb-3 sm:mb-4">
+          {/* The avatar rides up over the banner; the name starts right below it (the banner is positioned,
+              so anything non-positioned pulled up under it is painted over). */}
+          <div className="flex items-start gap-3 sm:gap-4 -mt-12 sm:-mt-14 mb-3 sm:mb-4">
             <div className="relative z-30 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-fill overflow-hidden border-4 border-surface shrink-0 shadow-xl">
-              {profile.photoUrl ? (
+              {profile.photoUrl && brokenPhoto !== profile.photoUrl ? (
                 <Image
                   src={profile.photoUrl}
                   alt={profile.displayName ?? "user"}
@@ -406,7 +410,7 @@ export default function PublicProfilePage() {
                   height={96}
                   className="object-cover w-full h-full"
                   unoptimized={isSocialCdnUrl(profile.photoUrl)}
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  onError={() => setBrokenPhoto(profile.photoUrl)}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-2xl sm:text-3xl font-black text-ink-3">
@@ -414,7 +418,7 @@ export default function PublicProfilePage() {
                 </div>
               )}
             </div>
-            <div className="pb-1 min-w-0 flex-1">
+            <div className="pt-14 sm:pt-16 min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap mb-0.5">
                 <h1 className="text-lg sm:text-2xl font-black text-ink truncate">
                   {profile.displayName ?? "ผู้ใช้ไม่ระบุชื่อ"}
