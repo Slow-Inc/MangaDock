@@ -351,3 +351,23 @@ def test_greedy_pack_places_an_over_wide_syllable_instead_of_looping():
     w = tr.get_string_width(20, word)
     lines, widths, _ = tr._greedy_pack([word], [w], [[word]], 20, w // 2, 0, 0)
     assert lines == [[0]]
+
+
+def _ink_height(font, text):
+    import cv2
+    tr.set_font(font)
+    img = tr.put_text_horizontal(60, text, 600, 300, 'left', False, (0, 0, 0), (255, 255, 255), 'THA')
+    return cv2.boundingRect(img[..., 3])[3]
+
+
+def test_a_tone_mark_over_an_upper_vowel_stays_visible():
+    """#793: Prompt (prod font) puts the tone at the vowel's height and relies on OpenType
+    mark-to-mark positioning, which this per-glyph renderer lacks — 'ที่' drew as 'ที'."""
+    prompt = str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf')
+    for word, bare in [('ที่', 'ที'), ('นี้', 'นี'), ('กั้น', 'กัน'), ('น้ำ', 'นำ'), ('ต่ำ', 'ตำ')]:
+        assert _ink_height(prompt, word) > _ink_height(prompt, bare), word
+
+
+def test_a_font_that_already_places_the_tone_high_is_untouched():
+    tr.set_font(_FONT)
+    assert tr._stacked_mark_lift('ี', '่', 60) == 0

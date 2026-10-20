@@ -160,7 +160,7 @@ async def main():
         except ValueError:
             parsed = value              # a bare string ('lama_large')
         cfg.setdefault(section, {})[name] = parsed
-    font = os.path.join(MIT, 'fonts', 'Prompt-Bold.ttf')
+    font = os.path.join(MIT, 'fonts', 'Prompt-Regular.ttf')  # the prod default (mode/share.py)
     tr = MangaTranslator({'use_gpu': True, 'kernel_size': 3, 'model_dir': os.path.join(MIT, 'models'),
                           'font_path': font if os.path.isfile(font) else None})
     if args.replay:

@@ -1210,6 +1210,25 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     return line_text_list, line_width_list
 
 
+_THAI_UPPER_VOWELS = frozenset('ัิีึื็ํ')
+_THAI_UPPER_MARKS = _THAI_UPPER_VOWELS | {'ำ'}  # + sara am, whose nikhahit sits up there
+_THAI_TONE_MARKS = frozenset('่้๊๋์')
+
+
+def _stacked_mark_lift(prev: str, ch: str, font_size: int) -> int:
+    """Pixels to raise a Thai tone mark drawn over an upper vowel ('ที่') or sara am ('น้ำ'; pass
+    the ำ as ``prev``). Fonts such as Prompt
+    (the prod face) put both at the same height and rely on OpenType mark-to-mark positioning,
+    which this per-glyph FreeType renderer does not do — the tone drew inside the vowel and
+    vanished (#793). Measured from the two bitmaps, so 0 for a font that already sets it high."""
+    if ch not in _THAI_TONE_MARKS or prev not in _THAI_UPPER_MARKS:
+        return 0
+    vowel_top = get_char_glyph(prev, font_size, 0).bitmap_top
+    mark = get_char_glyph(ch, font_size, 0)
+    mark_bottom = mark.bitmap_top - mark.bitmap.rows
+    return max(0, vowel_top + max(1, font_size // 20) - mark_bottom)
+
+
 def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_text: np.ndarray, canvas_border: np.ndarray, border_size: int):
     """
     Render a single character (with optional stroke) onto horizontally oriented canvas.
@@ -1370,14 +1389,19 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
         # print((line_width, pen_line[0], canvas_w))
         # print(0, pen_line, line_text)
 
-        for c in line_text:
+        prev = ''
+        for k, c in enumerate(line_text):
             if reversed_direction:
                 cdpt, rot_degree = CJK_Compatibility_Forms_translate(c, 0)
                 glyph = get_char_glyph(cdpt, font_size, 0)
                 offset_x = glyph.metrics.horiAdvance >> 6
                 pen_line[0] -= offset_x
-            # print(1, pen_line, c)
-            offset_x = put_char_horizontal(font_size, c, pen_line, canvas_text, canvas_border, border_size=bg_size)
+            # the upper glyph is the vowel before the tone, or sara am's nikhahit after it ('น้ำ')
+            upper = prev if prev in _THAI_UPPER_VOWELS else line_text[k + 1:k + 2]
+            lift = _stacked_mark_lift(upper, c, font_size)
+            pen_char = [pen_line[0], pen_line[1] - lift] if lift else pen_line
+            offset_x = put_char_horizontal(font_size, c, pen_char, canvas_text, canvas_border, border_size=bg_size)
+            prev = c
             if not reversed_direction:
                 pen_line[0] += offset_x
         pen_orig[1] += spacing_y + font_size
