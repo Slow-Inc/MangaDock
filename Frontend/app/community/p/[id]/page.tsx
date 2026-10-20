@@ -16,6 +16,8 @@ import VoteButtons from "../../../components/VoteButtons";
 import CommentThread from "../../../components/CommentThread";
 import { useAuth } from "../../../contexts/AuthContext";
 import { usePostStream } from "../../../hooks/useForumStream";
+import { usePageVisible } from "../../../hooks/pageVisibility";
+import { cacheInvalidate } from "../../../lib/apiCache";
 
 const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 import type { ForumPost, ForumComment } from "../../../lib/types";
@@ -176,6 +178,30 @@ export default function PostDetailPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // The stream is closed while the tab is hidden (#821), so events from that time never arrive: on coming
+  // back, re-read the post and comments (fresh, not from cache) and leave if the post was deleted meanwhile.
+  const visible = usePageVisible();
+  const wasHiddenRef = useRef(false);
+  useEffect(() => {
+    if (!visible) { wasHiddenRef.current = true; return; }
+    if (!wasHiddenRef.current || !id) return;
+    wasHiddenRef.current = false;
+    cacheInvalidate(`post:${id}`, `comments:${id}`);
+    Promise.all([getPost(id), listComments(id)])
+      .then(([postRes, commentsRes]) => {
+        if (!mountedRef.current) return;
+        setPost(postRes);
+        setComments(commentsRes);
+        setVoteCounts(new Map());
+      })
+      .catch(() => {
+        // getPost throws the same error for every non-2xx; leave only when the post is really gone (404).
+        fetch(`/api/proxy/forum/posts/${id}`)
+          .then((res) => { if (mountedRef.current && res.status === 404) router.push("/community"); })
+          .catch(() => {});
+      });
+  }, [visible, id, router]);
 
   // Stable identity so the React.memo'd CommentThread items are not invalidated
   // on every post re-render (plan 2026-07-11 Perf 3).

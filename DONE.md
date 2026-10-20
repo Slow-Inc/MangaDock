@@ -14,7 +14,7 @@ useSyncExternalStore over `visibilitychange`); both streams connect only while t
 **Validated:** `pageVisibility.test.ts` red → green; production build, headless Chromium, one profile: 6 community
 tabs with 5 hidden → live streams [0,0,0,0,0,1], a request from another tab 7 ms (was: never answers); a tab made
 visible again reconnects; same for 6 post tabs. Production behind Cloudflare negotiates HTTP/2 (not starved).
-Trade-off: events while a tab is hidden are not delivered.
+Events while a tab is hidden are not delivered; the post page catches up on return (fresh post + comments; a post deleted meanwhile → /community).
 
 ---
 

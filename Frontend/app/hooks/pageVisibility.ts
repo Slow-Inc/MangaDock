@@ -15,7 +15,8 @@ export function visibilityStore(doc: VisibilityDoc) {
   };
 }
 
-// One store per page, so useSyncExternalStore does not resubscribe on every render.
+// Module-level subscribe/getSnapshot keep stable identities (no resubscribe per render); `??=` only defers
+// touching `document` until first use in the browser.
 let pageStore: ReturnType<typeof visibilityStore> | null = null;
 const subscribe = (onChange: () => void) =>
   (pageStore ??= visibilityStore(document)).subscribe(onChange);

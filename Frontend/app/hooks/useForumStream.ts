@@ -58,6 +58,7 @@ export function usePostStream({ postId, onEvent, enabled = true }: UsePostStream
   const visible = usePageVisible();
   useEffect(() => {
     if (!enabled || !visible) return;
+    retriesRef.current = 0; // a tab coming back starts with the short backoff
     connect();
     return () => {
       timerRef.current && clearTimeout(timerRef.current);
@@ -110,6 +111,7 @@ export function useFeedStream({ onNewPost, enabled = true }: UseFeedStreamOption
   const visible = usePageVisible();
   useEffect(() => {
     if (!enabled || !visible) return;
+    retriesRef.current = 0; // a tab coming back starts with the short backoff
     connect();
     return () => {
       timerRef.current && clearTimeout(timerRef.current);
