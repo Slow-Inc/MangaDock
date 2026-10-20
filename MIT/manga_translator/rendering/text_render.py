@@ -89,6 +89,32 @@ def _insert_thai_word_breaks(text: str) -> str:
         return text
 
 
+def _thai_subwords(word: str) -> Optional[List[str]]:
+    """Split a Thai compound newmm kept whole ('ในเวลาเดียวกัน') into the fewest dictionary words,
+    excluding the word itself — the break points an over-wide compound should use. None when
+    the dictionary cannot cover it (a transliterated name). Pure DP over the default trie."""
+    if not _HAS_PYTHAINLP:
+        return None
+    try:
+        from pythainlp.tokenize.core import word_dict_trie
+        trie = word_dict_trie()
+    except Exception:
+        return None
+    n = len(word)
+    best: List[Optional[List[str]]] = [None] * (n + 1)
+    best[0] = []
+    for i in range(n):
+        if best[i] is None:
+            continue
+        for p in trie.prefixes(word[i:]):
+            j = i + len(p)
+            if (i, j) == (0, n):
+                continue
+            if best[j] is None or len(best[i]) + 1 < len(best[j]):
+                best[j] = best[i] + [p]
+    return best[n]
+
+
 # Bound morphemes newmm splits off their head ('ผู้|พักอาศัย'): a line must not end on one.
 _THAI_PREFIXES = frozenset(['ผู้', 'นัก', 'การ', 'ความ', 'ชาว', 'ช่าง'])
 # Demonstratives always follow the noun/classifier they modify ('พวก|นั้น'): never start a line.
@@ -759,19 +785,27 @@ def _split_into_syllables(words: List[str], font_size: int, max_width: int, lang
             except Exception:
                 new_syls = []
         if len(new_syls) == 0:
-            if len(word) <= 3:
+            # Thai has no hyphenation: a Thai word is atomic (char clusters as "syllables" let
+            # the line rebalancing break it mid-word — 'เดี|ยว'). An over-wide word is still
+            # char-split by the max_width pass below.
+            if len(word) <= 3 or _THAI_RE.search(word):
                 new_syls = [word]
             else:
                 new_syls = _safe_char_split(word)
 
-        # Split up syllables that are too large
+        # Split up syllables that are too large. An over-wide Thai compound ('ในเวลาเดียวกัน')
+        # breaks between its dictionary parts first; char clusters are the last resort.
         normalized_syls = []
         for syl in new_syls:
-            syl_width = get_string_width(font_size, syl)
-            if syl_width > max_width:
-                normalized_syls.extend(_safe_char_split(syl))
-            else:
+            if get_string_width(font_size, syl) <= max_width:
                 normalized_syls.append(syl)
+                continue
+            parts = (_thai_subwords(syl) if _THAI_RE.search(syl) else None) or [syl]
+            for part in parts:
+                if len(parts) > 1 and get_string_width(font_size, part) <= max_width:
+                    normalized_syls.append(part)
+                else:
+                    normalized_syls.extend(_safe_char_split(part))
         syllables.append(normalized_syls)
     return syllables
 

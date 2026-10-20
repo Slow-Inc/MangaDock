@@ -173,3 +173,35 @@ def test_demonstrative_stays_with_the_word_it_modifies():
         return
     segs = _segments('เทพธิดาพวกนั้นช่างน่ารังเกียจนัก!')
     assert not any(s.startswith(('นั้น', 'นี้', 'โน้น')) for s in segs)
+
+
+def test_overwide_thai_compound_splits_into_dictionary_subwords():
+    """A compound wider than the column must break between its dictionary parts, not at an
+    arbitrary character cluster."""
+    if not _HAS_PYTHAINLP:
+        return
+    from manga_translator.rendering.text_render import _thai_subwords
+    assert _thai_subwords('ในเวลาเดียวกัน') == ['ใน', 'เวลา', 'เดียวกัน']
+    assert _thai_subwords('เวสตา') is None  # no dictionary split -> caller falls back
+
+
+def test_line_breaks_never_split_a_thai_word():
+    """The resize_regions_thai golden caught it (2026-10-20): at 38 px calc_horizontal laid out
+    'น่ารักในเวลาเดี / ยวกันเลยนะ'. newmm keeps 'ในเวลาเดียวกัน' as one token; wider than the
+    column, it was char-split. Every break must fall on a word or dictionary-subword boundary."""
+    if not _HAS_PYTHAINLP:
+        return
+    from manga_translator.rendering.text_render import _thai_subwords
+    tr.set_font(_FONT)
+    text = 'ไฮมิยะเซนไพน่ากลัวและก็น่ารักในเวลาเดียวกันเลยนะ'
+    boundaries, pos = set(), 0
+    for seg in _segments(text):
+        for part in (_thai_subwords(seg) or [seg]):
+            pos += len(part)
+            boundaries.add(pos)
+    for size in range(24, 44):
+        lines, _ = tr.calc_horizontal(size, text, max_width=239, max_height=184, language='THA')
+        pos = 0
+        for line in lines[:-1]:
+            pos += len(line.replace(_ZWSP, '').replace('-', ''))
+            assert pos in boundaries, (size, lines)
