@@ -34,6 +34,9 @@ MAX_REGION_PAGE_SHARE = 0.2
 #: page height) is not dialogue — it is a junk read blown up to fill a huge box.
 JUNK_FONT_X_MEDIAN = 3.0
 JUNK_FONT_PAGE_SHARE = 0.04
+#: Two rendered blocks sharing more than this share of the smaller one's area sit on top of each
+#: other (Chainsaw Man c3 p0: 9 px credit lines laid out at 20 px overlapped 50-60%).
+OVERLAP_SHARE = 0.15
 #: Luminance std-dev under which a dst box is blank — rendered text always has contrast.
 BLANK_STD = 2.0
 _LATIN_WORD = re.compile(r'[A-Za-z]{2,}')
@@ -237,8 +240,27 @@ def _probe_translate(page: PageSnapshot, flags: Flags) -> StageReport:
                        '; '.join(evidence))
 
 
+def _overlaps(page: PageSnapshot) -> Dict[int, int]:
+    """Region index -> an earlier region whose rendered block it sits on."""
+    placed, out = [], {}
+    for r in page.regions:
+        d = r.render_dst_box
+        if d is None:
+            continue
+        for idx, e in placed:
+            ix = min(d[2], e[2]) - max(d[0], e[0])
+            iy = min(d[3], e[3]) - max(d[1], e[1])
+            smaller = min((d[2] - d[0]) * (d[3] - d[1]), (e[2] - e[0]) * (e[3] - e[1]))
+            if ix > 0 and iy > 0 and smaller > 0 and ix * iy > OVERLAP_SHARE * smaller:
+                out[r.index] = idx
+                break
+        placed.append((r.index, d))
+    return out
+
+
 def _probe_render(page: PageSnapshot, flags: Flags) -> StageReport:
     floor = max(10.0, 0.006 * page.height)
+    overlaps = _overlaps(page)
 
     def verdict(r: Region) -> Verdict:
         if r.render_branch == 'suppressed':
@@ -247,6 +269,8 @@ def _probe_render(page: PageSnapshot, flags: Flags) -> StageReport:
             d, c, t = r.render_dst_box, r.bubble_box, SPILL_TOLERANCE_PX
             if d[0] < c[0] - t or d[1] < c[1] - t or d[2] > c[2] + t or d[3] > c[3] + t:
                 return 'spill', FAIL, f'region {r.index} spills out of its container'
+        if r.index in overlaps:
+            return 'overlap', FAIL, f'region {r.index} overlaps region {overlaps[r.index]}'
         if r.render_font_px and r.render_font_px < floor and not r.from_sfx:
             return 'small_font', WARN, f'region {r.index} font {r.render_font_px:.0f}px < {floor:.0f}px'
         return None
@@ -254,7 +278,8 @@ def _probe_render(page: PageSnapshot, flags: Flags) -> StageReport:
     root, inherited, statuses, evidence, kinds = _attribute(page, flags, 'render', verdict)
     return StageReport('render', _status(statuses),
                        {'root': root, 'inherited': inherited, 'spill': kinds['spill'],
-                        'small_font': kinds['small_font'], 'suppressed': kinds['suppressed']},
+                        'overlap': kinds['overlap'], 'small_font': kinds['small_font'],
+                        'suppressed': kinds['suppressed']},
                        '; '.join(evidence))
 
 

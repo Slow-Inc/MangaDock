@@ -245,3 +245,19 @@ def test_text_detected_but_no_regions_returned_fails_at_translate():
     translate = _by_stage(diagnose(page)[0])['translate']
     assert translate.status == FAIL
     assert 'no regions' in translate.evidence and '502' in translate.evidence
+
+
+def test_two_rendered_blocks_on_top_of_each_other_fail_at_render():
+    """Chainsaw Man c3 p0 (2026-10-20): three 9 px credit lines were laid out at 20 px and their
+    rendered blocks overlapped 50-60%, yet render reported OK — no region left its container."""
+    page = PageSnapshot(target_lang='THA', width=800, height=800, textlines=2, sfx_lines=0,
+                        empty_reads=0, regions=[
+        _region(0, (520, 755, 773, 764), 'CONSIDER BUYING', 'พิจารณาซื้อ', dst=(524, 729, 768, 777)),
+        _region(1, (515, 770, 782, 779), 'WHEN THEY ARE', 'เมื่อมีวางขาย', dst=(520, 764, 777, 788)),
+        _region(2, (100, 100, 200, 130), 'HELLO', 'สวัสดี', dst=(100, 100, 200, 130)),
+    ])
+    run, flags = diagnose(page)
+    render = _by_stage(run)['render']
+    assert render.status == FAIL
+    assert render.metrics['overlap'] == 1
+    assert 'overlap' in render.evidence and 2 not in flags
