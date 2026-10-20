@@ -287,3 +287,19 @@ def test_anti_overlap_does_not_push_a_region_out_of_the_balloon_it_shares(monkey
                                      clean_layout=True)
     x1, _, x2, _ = a.render_dst_box
     assert (x1 + x2) / 2 == pytest.approx(513.0)
+
+
+def test_anti_overlap_never_pushes_a_block_out_of_its_own_balloon(monkeypatch):
+    """#795 follow-up (Tsuki p1, 2026-10-21): dodging a balloon-less neighbour shifted 'ARE YOU
+    SERIOUS?' 12 px past its own balloon's left edge. After the dodge the block is kept inside
+    its balloon whenever it fits there."""
+    monkeypatch.setattr(rend, '_clean_layout_dst',
+                        lambda region, shape, fmin, fmax, page_shape=None, **kw: (20, 93.0, 48.0))
+    img = np.full((800, 800, 3), 255, np.uint8)
+    a = FakeRegion(horizontal=True, translation='ARE YOU SERIOUS?', xyxy=(73, 550, 136, 580),
+                   bubble_box=(68.0, 473.0, 161.0, 654.0))
+    b = FakeRegion(horizontal=True, translation='IT WONT KILL ME', xyxy=(150, 502, 211, 544))
+    rend.resize_regions_to_font_size(img, [a, b], None, 0, 8, bubble_fit=False, anti_overlap=True,
+                                     clean_layout=True)
+    x1, _, x2, _ = a.render_dst_box
+    assert x1 >= 68.0 - 0.5 and x2 <= 161.0 + 0.5, a.render_dst_box

@@ -160,6 +160,13 @@ def _box(v):
     return tuple(float(x) for x in v) if v is not None else None
 
 
+def _clamp_center(c, size, lo, hi):
+    """Centre ``c`` moved so a span of ``size`` stays within [lo, hi] — unchanged if it can't fit."""
+    if size > hi - lo:
+        return c
+    return min(max(c, lo + size / 2.0), hi - size / 2.0)
+
+
 def _region_territory(region):
     """The box a region 'owns' for anti-overlap: its balloon (#170) if known, else its
     detection box. Returns None when neither is available."""
@@ -515,6 +522,12 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                          cx + block_w / 2.0, cy + block_h / 2.0), territories, margin=2)
                     if (cb[2] - cb[0]) >= 6 and (cb[3] - cb[1]) >= 6:
                         cx, cy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
+                    # ...but never out of its own balloon when it fits there (Tsuki p1: a dodge
+                    # pushed 'ARE YOU SERIOUS?' 12 px past its balloon edge).
+                    own = _box(getattr(region, 'bubble_box', None))
+                    if own is not None:
+                        cx = _clamp_center(cx, block_w, own[0], own[2])
+                        cy = _clamp_center(cy, block_h, own[1], own[3])
                 region.font_size = clean_fs
                 region._direction = 'h'
                 # #535 Phase-0c telemetry (additive, no behavior change).
