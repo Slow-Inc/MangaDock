@@ -5,13 +5,14 @@
  * Save = PUT the config (users/me/mascot) + a still PNG of the preview through the existing avatar
  * upload, written to photo_url — so every place that shows avatars shows the mascot without changes.
  */
-import { memo, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import { forwardRef, memo, useCallback, useEffect, useRef, useState } from "react";
 import { BotAvatar } from "bot-avatars";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { MASCOT_GLASSES, MASCOT_HATS, MASCOT_TYPES, mascotFromUid, type MascotConfig } from "../../lib/mascot";
 import { getMyMascot, saveMyMascot } from "../../lib/mascotApi";
 import { useIsScrolling } from "../../hooks/useIsScrolling";
+import { useThrottledValue } from "../../hooks/useThrottledValue";
 import Pill from "../ui/Pill";
 import Button from "../ui/Button";
 import Loader from "../ui/Loader";
@@ -46,27 +47,69 @@ const ShapePicker = memo(function ShapePicker({ selected, onPick }: { selected: 
   );
 });
 
+/**
+ * The live preview, memoised: bot-avatars repaints on every render of its parent, so without this each
+ * colour-input event repainted the preview twice (urgent render with the old deferred value, then the new).
+ */
+const Preview = memo(
+  forwardRef<HTMLCanvasElement, { config: MascotConfig }>(function Preview({ config }, ref) {
+    return <BotAvatar ref={ref} {...config} size={160} theme="auto" aria-label="มาสคอตของคุณ" />;
+  }),
+);
+
 export default function MascotEditor() {
   const { user, getIdToken, uploadProfilePhoto, updateUserPhotoURL } = useAuth();
   const { showToast } = useToast();
   const [config, setConfig] = useState<MascotConfig | null>(null);
   const [saving, setSaving] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);
-  // The preview follows a deferred copy, so the colour input stays responsive and React can drop
-  // intermediate preview renders while a colour is being dragged.
-  const preview = useDeferredValue(config);
-  // While the page scrolls, the live preview is hidden behind a still of its last frame: bot-avatars keeps
-  // repainting even a paused avatar (~19 times/s), which held /settings at 30 fps. It stays mounted
-  // (display:none — its IntersectionObserver stops the loop) because a remount re-bakes the fur and
-  // stutters for about a second after every scroll.
-  const still = useRef<string | null>(null);
-  const scrolling = useIsScrolling(200, () => {
+  // The preview follows a throttled copy: a colour change makes bot-avatars re-bake the fur (~50 ms),
+  // and a dragged colour picker fires ~60 times a second.
+  const preview = useThrottledValue(config, 120);
+  // The furred 160 px preview costs a frame budget of its own (/settings ran at ~30 fps with it on
+  // screen, 60 without; `paused` does not help — bot-avatars still repaints ~19 times/s). So it is live
+  // only while someone is dressing it (pointer over the editor or focus inside it, which covers an open
+  // colour picker) and not scrolling; otherwise a still of its last frame stands in and the canvas is
+  // display:none, which stops its loop through its IntersectionObserver without a remount (a remount
+  // re-bakes the fur and stutters for about a second).
+  const box = useRef<HTMLDivElement>(null);
+  const engaged = useRef(false);
+  const [still, setStill] = useState<{ src: string; left: number; top: number; width: number; height: number } | null>(null);
+  const [live, setLive] = useState(true);
+  const snapshot = useCallback(() => {
+    const c = canvas.current, b = box.current;
+    if (!c || !b || c.offsetParent === null) return;
     try {
-      still.current = canvas.current?.toDataURL() ?? null;
+      const cr = c.getBoundingClientRect(), br = b.getBoundingClientRect();
+      setStill({ src: c.toDataURL(), left: cr.left - br.left, top: cr.top - br.top, width: cr.width, height: cr.height });
     } catch {
-      still.current = null;
+      /* a tainted canvas cannot be read; stay live */
     }
-  });
+  }, []);
+  const rest = useCallback(() => {
+    snapshot();
+    setLive(false);
+  }, [snapshot]);
+  const scrolling = useIsScrolling(200, snapshot);
+  // Settle to a still a moment after load, once the fur has baked, unless someone is already editing.
+  useEffect(() => {
+    if (!preview) return;
+    const t = setTimeout(() => {
+      if (!engaged.current) rest();
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [preview, rest]);
+  const engage = () => {
+    engaged.current = true;
+    setLive(true);
+  };
+  const disengage = (e: { currentTarget: HTMLElement; relatedTarget: EventTarget | null }) => {
+    if (e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return;
+    if (e.currentTarget.contains(document.activeElement)) return; // still typing / picking a colour
+    engaged.current = false;
+    rest();
+  };
+  const showStill = Boolean(still) && (!live || scrolling);
   const pickType = useCallback((type: MascotConfig["type"]) => setConfig((c) => (c ? { ...c, type } : c)), []);
 
   useEffect(() => {
@@ -112,16 +155,25 @@ export default function MascotEditor() {
   };
 
   return (
-    <section aria-labelledby="mascot-editor-title" className="rounded-[var(--r-card)] border border-line bg-surface p-5 sm:p-6">
+    <section
+      aria-labelledby="mascot-editor-title"
+      onPointerEnter={engage}
+      onPointerLeave={disengage}
+      onFocus={engage}
+      onBlur={disengage}
+      className="rounded-[var(--r-card)] border border-line bg-surface p-5 sm:p-6"
+    >
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
         <div className="flex shrink-0 flex-col items-center gap-3">
           <div className="rounded-[var(--r3)] bg-fill p-3">
-            {scrolling && still.current ? (
-              // eslint-disable-next-line @next/next/no-img-element -- a data URL still of the canvas, shown only mid-scroll
-              <img src={still.current} alt="" aria-hidden width={160} height={160} className="block h-40 w-40 object-contain" />
-            ) : null}
-            <div className={scrolling && still.current ? "hidden" : undefined}>
-              <BotAvatar ref={canvas} {...preview} size={160} theme="auto" aria-label="มาสคอตของคุณ" />
+            <div ref={box} className="relative h-40 w-40">
+              {showStill && still ? (
+                // eslint-disable-next-line @next/next/no-img-element -- a data-URL still of the canvas, laid exactly over it
+                <img src={still.src} alt="" aria-hidden className="pointer-events-none absolute max-w-none" style={{ left: still.left, top: still.top, width: still.width, height: still.height }} />
+              ) : null}
+              <div className={showStill ? "hidden" : undefined}>
+                <Preview ref={canvas} config={preview} />
+              </div>
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setConfig(mascotFromUid(`${user.uid}:${Date.now()}`))}>
