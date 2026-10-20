@@ -3,7 +3,8 @@
  * scoped to the caller's own versions. Pure, so it is unit-tested without Supabase.
  */
 export type VersionRow = {
-  id: string;
+  /** chapter_versions primary key (supabase-migration.sql:78). */
+  version_id: string;
   title_id: string;
   title_name: string | null;
   created_at: string;
@@ -67,7 +68,7 @@ export function aggregateStats(
     byDay.set(date, { date, unlocks: 0, revenue: 0, earnings: 0, uploads: 0 });
   }
 
-  const owned = new Map(versions.map((v) => [v.id, v]));
+  const owned = new Map(versions.map((v) => [v.version_id, v]));
   const titles = new Map<string, TitleStat>();
 
   for (const u of unlocks) {

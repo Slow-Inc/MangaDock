@@ -32,7 +32,7 @@ describe('StudioStatsService — money rows are read only for the caller’s own
     const { calls, svc } = makeDb({
       chapter_versions: [
         {
-          id: 'v1',
+          version_id: 'v1',
           title_id: 't1',
           title_name: 'A',
           created_at: '2026-10-19T00:00:00Z',

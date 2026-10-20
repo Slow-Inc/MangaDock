@@ -4,19 +4,19 @@ const NOW = new Date('2026-10-20T10:00:00Z');
 
 const versions = [
   {
-    id: 'v1',
+    version_id: 'v1',
     title_id: 't1',
     title_name: 'Alpha',
     created_at: '2026-10-18T03:00:00Z',
   },
   {
-    id: 'v2',
+    version_id: 'v2',
     title_id: 't1',
     title_name: 'Alpha',
     created_at: '2026-10-20T01:00:00Z',
   },
   {
-    id: 'v3',
+    version_id: 'v3',
     title_id: 't2',
     title_name: 'Beta',
     created_at: '2026-09-01T00:00:00Z',

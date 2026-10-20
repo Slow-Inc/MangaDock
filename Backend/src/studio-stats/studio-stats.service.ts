@@ -35,7 +35,7 @@ export class StudioStatsService {
 
     const { data: versions, error: vErr } = await this.db
       .from('chapter_versions')
-      .select('id, title_id, title_name, created_at')
+      .select('version_id, title_id, title_name, created_at')
       .eq('translator_uid', uid);
     if (vErr) throw new Error(`Failed to load versions: ${vErr.message}`);
     const owned = (versions ?? []) as VersionRow[];
@@ -46,7 +46,7 @@ export class StudioStatsService {
       .select('version_id, price_paid, unlocked_at')
       .in(
         'version_id',
-        owned.map((v) => v.id),
+        owned.map((v) => v.version_id),
       )
       .gte('unlocked_at', since);
     if (uErr) throw new Error(`Failed to load unlocks: ${uErr.message}`);
