@@ -115,6 +115,21 @@ def test_dense_dark_art_is_rejected():
     assert got == []                                          # too dense = art, not text
 
 
+
+def test_panel_wide_light_art_is_not_a_text_cluster():
+    """2026-10-20 corpus (Lv2 p1): a light panel showing a UI screen — sparse thin strokes on a
+    light background — passed the density/background gates as ONE cluster 93% of the page wide;
+    OCR read it as 'd' and the renderer drew a 120 px glyph over the art. Text blocks are not
+    panel-wide, so a cluster spanning most of the page width is art."""
+    from manga_translator.detection_postproc import uncovered_text_clusters
+    def draw(img, cv2):
+        for y in range(120, 190, 26):                 # UI rows: thin frames + tick marks (~20% area)
+            cv2.rectangle(img, (14, y), (386, y + 14), 0, 1)
+            for x in range(20, 380, 18):
+                cv2.line(img, (x, y + 3), (x + 6, y + 3), 0, 1)
+    img = _page_with(draw)
+    assert uncovered_text_clusters(img, covered_boxes=[]) == []
+
 # ---- #535 white caption boxes: bright rectangles are balloons the YOLO can't see ----
 
 def test_white_caption_box_detected():

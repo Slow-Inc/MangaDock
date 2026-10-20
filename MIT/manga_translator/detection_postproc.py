@@ -133,7 +133,8 @@ def merge_empty_balloons(ctx, result, device):
 def uncovered_text_clusters(gray, covered_boxes, min_area: int = 1200,
                             max_area_frac: float = 0.25,
                             ink_lo: float = 0.04, ink_hi: float = 0.45,
-                            bg_light: int = 190, dilate_px: int = 9):
+                            bg_light: int = 190, dilate_px: int = 9,
+                            max_width_frac: float = 0.7):
     """#535 completeness (Otome "STARTING WITH…" box + the "ME OFF!" line): find
     text-like INK CLUSTERS no detector covered — sparse dark strokes sitting on a
     LIGHT background (typeset captions / dialogue), the exact pattern both DBNet and
@@ -156,6 +157,8 @@ def uncovered_text_clusters(gray, covered_boxes, min_area: int = 1200,
         x, y, bw, bh, area = stats[i]
         if bw * bh < min_area or (bw * bh) / page_area > max_area_frac:
             continue
+        if bw > max_width_frac * w:
+            continue                      # panel-wide = light art (a UI screen), not a text block
         crop = g[y:y + bh, x:x + bw]
         crop_ink = (crop < 128)
         density = float(crop_ink.mean())
