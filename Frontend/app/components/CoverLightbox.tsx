@@ -14,11 +14,14 @@ export default function CoverLightbox({ src, alt, onClose }: Props) {
   const { visible, close } = useModalTransition(true, { duration: 300, onClosed: onClose });
 
   useEffect(() => {
+    // Capture phase + stop: the book popup underneath listens for Escape on window too (#840).
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      close();
     };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    window.addEventListener("keydown", handleKey, true);
+    return () => window.removeEventListener("keydown", handleKey, true);
   }, [close]);
 
   const content = (

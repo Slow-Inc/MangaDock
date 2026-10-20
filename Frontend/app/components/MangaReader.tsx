@@ -24,6 +24,7 @@ import ReaderCommentDrawer from "./ReaderCommentDrawer";
 import ReportButton from "./ReportButton";
 import Loader from "./ui/Loader";
 import Mascot from "./mascot/Mascot";
+import { hasLayerAbove, useDialogFocus } from "../hooks/useDialogFocus";
 
 const MIT_OFFLINE_LABEL = "ระบบแปลออฟไลน์";
 
@@ -185,6 +186,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       ? `เหลือ ${formatEta(etaSec)}`
       : null;
   const [mounted, setMounted] = useState(false);
+  // Full-screen layer: focus in on open, Tab stays inside, focus back to the opener on close (#840).
+  const readerRef = useRef<HTMLDivElement>(null);
+  // Not on the popup's modal stack: it is "top" unless another layer (e.g. the login modal) was opened over it.
+  const readerIsTop = () => !!readerRef.current && !hasLayerAbove(readerRef.current);
+  useDialogFocus(readerRef, readerIsTop, mounted);
   // Default to continuous mode on mobile (< 640px) for better UX
   const [continuousMode, setContinuousMode] = useState(() =>
     typeof window !== "undefined" && window.innerWidth < 640
@@ -444,7 +450,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     };
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { if (showChapterPickerRef.current) { closePicker(); return; } handleClose(); return; }
       if (continuousModeRef.current) {
         if (e.key === "ArrowDown" || e.key === "ArrowUp") {
           e.preventDefault();
@@ -470,11 +475,25 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       }
     };
 
+    // Escape in the capture phase, stopped here: the book popup underneath listens on window too and used to close
+    // along with the reader (#840).
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Focus in a layer over the reader (e.g. the login prompt) — that layer owns Escape.
+      const active = document.activeElement;
+      if (readerRef.current && active && active !== document.body && !readerRef.current.contains(active)) return;
+      e.stopPropagation();
+      if (showChapterPickerRef.current) { closePicker(); return; }
+      handleClose();
+    };
+
     rafId = requestAnimationFrame(loop);
+    window.addEventListener("keydown", onEscape, true);
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
     return () => {
       cancelAnimationFrame(rafId);
+      window.removeEventListener("keydown", onEscape, true);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
     };
@@ -510,7 +529,14 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     : (chapterTitle ?? "ตัวอย่างมังงะ");
 
   const content = (
-    <div className={`theme-dark fixed inset-0 z-300 flex flex-col bg-bg transition-opacity duration-250 ${visible ? "opacity-100" : "opacity-0"}`}>
+    <div
+      ref={readerRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label={mangaTitle ? `อ่าน ${mangaTitle}` : "อ่านมังงะ"}
+      className={`theme-dark fixed inset-0 z-300 flex flex-col bg-bg outline-none transition-opacity duration-250 ${visible ? "opacity-100" : "opacity-0"}`}
+    >
       <ReaderCaptchaGate
         passed={turnstilePassed}
         exiting={turnstileExiting}
