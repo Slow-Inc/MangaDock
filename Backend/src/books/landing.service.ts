@@ -17,9 +17,10 @@ const THAI = /[\u0E00-\u0E7F]/;
 
 /** A line of the translation (not leaked English reasoning): mostly Thai, or a Markdown link/rule line. */
 function isTranslationLine(line: string): boolean {
+  if (line.trim() === '') return true; // paragraph breaks keep the Markdown structure
   if (/\]\(https?:\/\/[^)]+\)/.test(line)) return true;
   if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) return true;
-  const thai = (line.match(/[\u0E00-\u0E7F]/g) || []).length;
+  const thai = (line.match(new RegExp(THAI.source, 'g')) || []).length;
   return thai > 0 && thai / Math.max(line.trim().length, 1) > 0.2;
 }
 
@@ -269,7 +270,10 @@ export class LandingService {
         if (translatedText.includes('THOUGHTS:')) {
           const kept = translatedText.split('\n').filter(isTranslationLine);
           if (kept.some((l) => THAI.test(l)))
-            translatedText = kept.join('\n').trim();
+            translatedText = kept
+              .join('\n')
+              .replace(/\n{3,}/g, '\n\n')
+              .trim();
         }
         const payload = { translatedText, translated: true, model: modelName };
         await this.cache.setMangaCacheWithTiers(cacheKey, payload);

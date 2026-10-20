@@ -357,6 +357,8 @@ describe('translateDescription() — reports the model that produced the text', 
       'THOUGHTS: The user wants a Thai translation of a description.',
       'I will keep the link.',
       'เรื่องราวของนักผจญภัย',
+      '',
+      '---',
       '- [Official Raw](https://example.com/raw)',
     ].join('\n');
     const { svc } = makeSvc({
@@ -372,7 +374,7 @@ describe('translateDescription() — reports the model that produced the text', 
     const result = await svc.translateDescription(text);
 
     expect(result.translatedText).toBe(
-      'เรื่องราวของนักผจญภัย\n- [Official Raw](https://example.com/raw)',
+      'เรื่องราวของนักผจญภัย\n\n---\n- [Official Raw](https://example.com/raw)',
     );
   });
 
