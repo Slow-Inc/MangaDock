@@ -3,6 +3,16 @@
 
 ---
 
+## MIT quality loop — Pipeline Doctor page mode + merge/fit/ink-cluster fixes (2026-10-20)
+
+Branch `feat/mit-quality-loop` (off `integrate/render-reconcile`; lands after #642).
+- **#756 Pipeline Doctor page mode** — `MIT/tools/doctor_page.py <pages…> [--target] [--set sec.key=val] [--tag] [--replay doctor.json]`: runs the production patches path, composites patches **with their alpha** (as the Reader does), and attributes each defect to its first stage (`detect` implausible region · `ocr` · `merge` split/paragraphs/shared/near-miss · `translate` empty/untranslated/Latin · `render` spill/small/suppressed · `composite` blank). `--replay` reuses recorded translations → deterministic render A/B. Pure probes in `tools/pipeline_doctor/page_probes.py`, torch-free tests.
+- **#757 container merge (opt-in `detector.det_bubble_merge` / `MIT_BUBBLE_MERGE=1`)** — caption lines spaced 1.00–1.74× the font were one region per line (strict `< 1.0×` merge gap). Lines sharing one balloon/caption polygon are coalesced when one is a single-line fragment, they chain as one block (gap ≤ 2× font, ≥30% cross-overlap) and none is det_sfx. Caption page: 21 → 8 regions, merge split 3 → 0; Lv2 p1 split 2 → 0. **Opt-in, not default:** exposes the bubble-fit small-font case (#761, now fixed) and needs more pages before a default flip.
+- **#760 ink-cluster rescue** rejected panel-wide light art (a UI-screen panel became a `'d'` region → 120 px glyph). Clusters > 70% page width are not text.
+- **#761 bubble fit** — bisection over a non-monotonic wrap fit returned 13 px where 26 fits; now a descending scan with an area cap. Replay A/B over 17 pages: 182 regions, 2 changed with identical translations, both bigger, none smaller (`docs/reports/benchmarks/2026-10-20-761-bubble-fit-scan.*`).
+- **Lesson:** the first doctor composite pasted patch rectangles without alpha and invented "text missing" findings; any composite must use the patch alpha.
+- **Disk:** a full MIT pytest in a fresh worktree downloads ~4.3 GB of offline translator weights (`test_offline_translators`) — D: hit 0 GB; deselect it in worktrees.
+
 ## #693 — SFX rescue gate: ADR 026 Addendum guard restored on integrate (2026-10-20)
 
 **What:** `MIT/manga_translator/manga_translator.py` rescue site now gates via `ocr_vlm.should_rescue_sfx`

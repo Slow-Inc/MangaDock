@@ -1,5 +1,15 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-20 — MIT quality loop: #756 doctor page mode, #757 container merge (opt-in), #760 ink-cluster gate, #761 bubble-fit scan
+
+**What & where:** `MIT/tools/doctor_page.py` + `tools/pipeline_doctor/page_probes.py` (new, tooling); `manga_translator/container_merge.py` (new) + `textline_merge/__init__.py` (+`containers` param) + `manga_translator.py` (`_bubble_polygons` cache, `_textline_containers`) + `config.py` (`det_bubble_merge`); `detection_postproc.uncovered_text_clusters` (`max_width_frac`); `font_fit.py` (descending scan, `area_font_cap`) + `rendering/__init__.py` (`_bubble_fit_font_size` cap); `Backend/src/books/mit-config.ts` (`MIT_BUBBLE_MERGE`).
+**Why:** EN→TH captions translated per line; junk panel-wide region rendered a 120 px glyph; sole-occupant balloons fitted at 13 px with room for 26.
+**Before → after:** caption page regions 21 → 8 (merge on); `'d'` junk region gone (detect FAIL → OK); bubble_fit_sole font 13/15/21 → 26/22/24 px with identical translations.
+**Perf Δ:** fit scan 6–24 ms/region (bounded by area cap); balloon detection is cached on ctx, so merge-on adds no second YOLO pass in the patches path.
+**Quality:** replay A/B (17 pages): no region smaller with identical translation; composite failures 0 → 0.
+**Validation:** unit tests red-first for every change (container_merge 10, doctor page 13, font_fit 10, detection_postproc 19, Backend spec 42); deterministic replay benchmark with PNG.
+**Risk / follow-up:** merge stays opt-in until more pages; wrapper overshooting `max_width` (root of the non-monotonic fit) still open; SFX katakana transliteration junk (`ベ`→`เบ`) and translation prompt quality are next.
+
 ## 2026-10-20 — #693: SFX rescue gate = ocr_vlm.should_rescue_sfx on integrate (quality guard)
 
 **What & where:** `MIT/manga_translator/manga_translator.py` (rescue call site), removed
