@@ -423,16 +423,6 @@ def test_a_tall_balloon_shrinks_the_font_until_the_block_fits_816():
     assert fs < 20 and bw <= 44 * 1.05 and bh <= 180, (fs, bw, bh)
 
 
-def test_negation_and_preverbal_auxiliaries_bind_to_the_verb():
-    """One-Punch JP->TH (2026-10-21): 'ไม่ / เกี่ยวกับ', 'ฉัน จะ / ปล่อยมัน', 'ยัง / หลบซ่อน' — a
-    negation or auxiliary left alone at a line end, cut off from the verb it modifies."""
-    from manga_translator.rendering.text_render import _glue_thai_tokens
-    assert _glue_thai_tokens(['ไม่', 'เกี่ยวกับ']) == ['ไม่เกี่ยวกับ']
-    assert _glue_thai_tokens(['ฉัน ', 'จะ', 'ปล่อย']) == ['ฉัน ', 'จะปล่อย']
-    assert _glue_thai_tokens(['ยัง', 'หลบซ่อน']) == ['ยังหลบซ่อน']
-    assert _glue_thai_tokens(['จะ ', 'ไป']) == ['จะ ', 'ไป']   # a real space stays a break point
-
-
 def test_fullwidth_and_double_marks_never_start_a_line():
     """'จะทำยังไง / ⁉ ตอนนี้' (One-Punch JP->TH): ⁉ ‼ ！ ？ were not in the closer set."""
     from manga_translator.rendering.text_render import _glue_thai_tokens

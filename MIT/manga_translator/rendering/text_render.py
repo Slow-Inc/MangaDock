@@ -138,10 +138,6 @@ def _thai_subwords(word: str) -> Optional[Tuple[str, ...]]:
 
 # Bound morphemes newmm splits off their head ('ผู้|พักอาศัย'): a line must not end on one.
 _THAI_PREFIXES = frozenset(['ผู้', 'นัก', 'การ', 'ความ', 'ชาว', 'ช่าง'])
-# Negation and pre-verbal auxiliaries modify the verb after them ('ไม่|เกี่ยวกับ', 'จะ|ปล่อย',
-# 'ยัง|หลบซ่อน'): left alone at a line end they read as a dangling word (One-Punch JP->TH, 2026-10-21).
-_THAI_PREVERBAL = frozenset(['ไม่', 'จะ', 'ยัง', 'กำลัง',
-                             'ต้อง', 'ควร', 'อย่า'])
 # Demonstratives always follow the noun/classifier they modify ('พวก|นั้น'): never start a line.
 _THAI_DEMONSTRATIVES = frozenset(['นี้', 'นั้น', 'โน้น'])
 _OPENERS = frozenset('([“‘「『')
@@ -169,7 +165,7 @@ def _glue_thai_tokens(tokens: List[str]) -> List[str]:
             out[-1] += tok
         else:
             out.append(tok)
-        bind_next = (tok in _THAI_PREFIXES or tok in _THAI_PREVERBAL or opener) and not tok.endswith(' ')
+        bind_next = (tok in _THAI_PREFIXES or opener) and not tok.endswith(' ')
     return out
 # ─────────────────────────────────────────────────────────────────────────────
 
