@@ -98,7 +98,7 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
               type="button"
               onClick={() => setTab('upload')}
               className={`flex-1 py-2 text-xs font-bold transition-colors ${
-                tab === 'upload' ? 'bg-fill text-ink' : 'text-ink-3 hover:text-ink-2'
+                tab === 'upload' ? 'bg-fill text-ink' : 'text-ink-2 hover:text-ink'
               }`}
             >
               อัพโหลดไฟล์
@@ -107,7 +107,7 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
               type="button"
               onClick={() => setTab('url')}
               className={`flex-1 py-2 text-xs font-bold transition-colors border-l border-line ${
-                tab === 'url' ? 'bg-fill text-ink' : 'text-ink-3 hover:text-ink-2'
+                tab === 'url' ? 'bg-fill text-ink' : 'text-ink-2 hover:text-ink'
               }`}
             >
               ลิงก์รูปภาพ

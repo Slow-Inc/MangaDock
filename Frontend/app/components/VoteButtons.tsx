@@ -96,7 +96,7 @@ export default function VoteButtons({
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border smooth-hover-fast transition-colors ${
           userVote === 1
             ? "bg-accent/10 text-accent border-accent/40"
-            : "text-ink-3 border-transparent hover:text-ink-2 hover:bg-fill hover:border-line"
+            : "text-ink-2 border-transparent hover:text-ink hover:bg-fill hover:border-line"
         }`}
       >
         <svg aria-hidden="true" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -114,7 +114,7 @@ export default function VoteButtons({
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border smooth-hover-fast transition-colors ${
           userVote === -1
             ? "bg-accent/10 text-accent border-accent/40"
-            : "text-ink-3 border-transparent hover:text-ink-2 hover:bg-fill hover:border-line"
+            : "text-ink-2 border-transparent hover:text-ink hover:bg-fill hover:border-line"
         }`}
       >
         <svg aria-hidden="true" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">

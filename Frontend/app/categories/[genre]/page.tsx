@@ -80,7 +80,7 @@ export default function GenrePage() {
         <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-ink-3 sm:mb-6 sm:text-sm">
           <button
             onClick={() => router.back()}
-            className="transition-colors hover:text-ink-2"
+            className="text-ink-2 transition-colors hover:text-ink"
           >
             ← ย้อนกลับ
           </button>

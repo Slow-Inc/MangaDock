@@ -104,7 +104,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
               <form onSubmit={handleSubmit}>
                 <div className="mb-4 flex items-center justify-between">
                   <p className="font-semibold text-ink">รายงานเนื้อหา</p>
-                  <button type="button" onClick={() => setOpen(false)} className="text-ink-3 transition hover:text-ink-2">
+                  <button type="button" onClick={() => setOpen(false)} className="text-ink-2 transition hover:text-ink">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
                       <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
                     </svg>

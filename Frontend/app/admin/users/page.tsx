@@ -213,7 +213,7 @@ export default function AdminUsersPage() {
                 </td>
                 <td className="px-4 py-3.5">
                   <div className="flex items-center gap-2">
-                    <button onClick={() => openDetail(u.uid)} className="text-xs text-ink-3 hover:text-ink transition-colors smooth-hover-fast">Detail</button>
+                    <button onClick={() => openDetail(u.uid)} className="text-xs text-ink-2 hover:text-ink transition-colors smooth-hover-fast">Detail</button>
                     {u.role < 8 && (
                       <>
                         <select defaultValue={u.role} onChange={e => { setConfirmRoleUid(u.uid); setConfirmRole(Number(e.target.value)); }}
@@ -249,7 +249,7 @@ export default function AdminUsersPage() {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-scrim/80" onClick={() => setDetailOpen(false)} />
           <div className="relative w-96 bg-surface border-l border-line h-full overflow-y-auto p-6 space-y-5">
-            <button onClick={() => setDetailOpen(false)} className="absolute top-4 right-4 text-ink-3 hover:text-ink transition-colors text-lg leading-none">✕</button>
+            <button onClick={() => setDetailOpen(false)} className="absolute top-4 right-4 text-ink-2 hover:text-ink transition-colors text-lg leading-none">✕</button>
             <div>
               <h2 className="text-base font-semibold text-ink">{detail.displayName || 'Unknown'}</h2>
               <p className="text-xs text-ink-3 mt-0.5">{detail.email}</p>
@@ -316,7 +316,7 @@ export default function AdminUsersPage() {
           <div className="relative bg-surface border border-line rounded-xl p-6 w-80 space-y-4 shadow-2xl">
             <p className="text-sm text-ink">Change role to <strong className="text-ink">{ROLE_LABEL[confirmRole]}</strong>?</p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setConfirmRoleUid(null)} className="text-sm text-ink-3 hover:text-ink transition-colors">Cancel</button>
+              <button onClick={() => setConfirmRoleUid(null)} className="text-sm text-ink-2 hover:text-ink transition-colors">Cancel</button>
               <button onClick={submitRoleChange} className={`text-sm px-4 py-1.5 rounded-lg transition-colors font-medium ${PRIMARY_FILL}`}>Confirm</button>
             </div>
           </div>
@@ -334,7 +334,7 @@ export default function AdminUsersPage() {
                 : 'Unban this user?'}
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setConfirmBanUid(null)} className="text-sm text-ink-3 hover:text-ink transition-colors">Cancel</button>
+              <button onClick={() => setConfirmBanUid(null)} className="text-sm text-ink-2 hover:text-ink transition-colors">Cancel</button>
               <button onClick={submitBanAction} className={`text-sm px-4 py-1.5 rounded-lg transition-colors font-medium ${confirmBanAction === 'ban' ? 'bg-danger text-bg hover:bg-danger/90' : PRIMARY_FILL}`}>
                 {confirmBanAction === 'ban' ? 'Ban' : 'Unban'}
               </button>

@@ -113,7 +113,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="sticky top-0 z-20 border-b border-line bg-bg md:hidden">
         <div className="flex items-center justify-between px-4 pt-4 pb-3">
           <p className="text-sm font-semibold text-ink">Admin Panel</p>
-          <Link href="/" className="text-xs text-ink-3 hover:text-ink-2 smooth-hover-fast">Back to App</Link>
+          <Link href="/" className="text-xs text-ink-2 hover:text-ink smooth-hover-fast">Back to App</Link>
         </div>
         <nav ref={mobileNavRef} className="mobile-tabs-scroll flex gap-1 overflow-x-auto scroll-px-3 px-3 pb-3" aria-label="Admin">
           {NAV.map(({ href, label, exact }) => {
@@ -124,7 +124,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 href={href}
                 aria-current={isActive ? 'page' : undefined}
                 className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs smooth-hover-fast ${
-                  isActive ? 'bg-accent/10 text-accent font-medium border-accent/40' : 'text-ink-3 border-transparent hover:text-ink hover:bg-fill'
+                  isActive ? 'bg-accent/10 text-accent font-medium border-accent/40' : 'text-ink-2 border-transparent hover:text-ink hover:bg-fill'
                 }`}
               >
                 {label}
@@ -164,7 +164,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm smooth-hover-fast border ${
                   isActive
                     ? 'bg-accent/10 text-accent font-medium border-accent/40'
-                    : 'text-ink-3 hover:text-ink hover:bg-fill border-transparent'
+                    : 'text-ink-2 hover:text-ink hover:bg-fill border-transparent'
                 }`}
               >
                 {icon}
@@ -178,7 +178,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="px-4 py-4 border-t border-line">
           <Link
             href="/"
-            className="flex items-center gap-2 text-xs text-ink-3 hover:text-ink-2 smooth-hover-fast transition-colors"
+            className="flex items-center gap-2 text-xs text-ink-2 hover:text-ink smooth-hover-fast transition-colors"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />

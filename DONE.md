@@ -3,6 +3,19 @@
 
 ---
 
+## #833 Controls no longer use the tertiary ink-3 token (WCAG AA contrast) (2026-10-21)
+
+**What:** an axe-core audit (already in node_modules) over 9 public routes × 1440/390 found 236 colour-contrast
+failures. Controls in `ink-3` (3.75:1 on `bg`) — inactive tabs, "ดูเพิ่มเติม", Hot/New, filter/underline buttons, chapter
+pills, Navbar + mobile bottom-bar inactive items, the category back button — moved to `ink-2` (7.8:1); no token value
+changed; TopupModal and DangerTab (parked) untouched; icon-only controls stay `ink-3` (non-text needs 3:1).
+
+**Validated:** axe re-run: interactive failures 79 → 0; total 236 → 134. Remaining 134 are static text that fails
+because of the Strata token values themselves (`ink-3` 42% mix: 3.75:1; `accent` tags: 4.16:1) — left for the developer
+(numbers in PR). Visual check 1440/390: active/inactive distinction kept.
+
+---
+
 ## #830 Settings tab strip keeps the active tab visible on a phone (2026-10-21)
 
 **What:** at 390 px the settings tab strip always started at the left, so on stats and danger zone the active tab

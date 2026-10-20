@@ -177,7 +177,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
                 if (myReview) { setRating(myReview.rating); setBody(myReview.body ?? ""); }
                 else { setRating(0); setBody(""); }
               }}
-              className="rounded-lg px-3 py-1.5 text-sm text-ink-3 transition hover:text-ink-2"
+              className="rounded-lg px-3 py-1.5 text-sm text-ink-2 transition hover:text-ink"
             >
               ยกเลิก
             </button>
@@ -217,7 +217,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       {!user && (
         <button
           onClick={showLoginPrompt}
-          className="mt-4 w-full rounded-xl border border-line py-3 text-sm text-ink-3 transition hover:border-line hover:text-ink-2"
+          className="mt-4 w-full rounded-xl border border-line py-3 text-sm text-ink-2 transition hover:border-line hover:text-ink"
         >
           เข้าสู่ระบบเพื่อเขียนรีวิว
         </button>

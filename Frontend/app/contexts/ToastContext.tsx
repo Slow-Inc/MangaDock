@@ -205,7 +205,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <button
               onClick={dismissToast}
               disabled={actionLoading}
-              className="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-3 transition hover:text-ink disabled:opacity-50"
+              className="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-2 transition hover:text-ink disabled:opacity-50"
               aria-label="ปิด"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">

@@ -218,8 +218,8 @@ function CommunityContent() {
       <div className="sm:hidden -mx-4 px-4 mb-5">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
           <div className="flex items-center bg-fill rounded-lg p-0.5 border border-line shrink-0">
-            <button onClick={() => setSort('hot')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === 'hot' ? 'bg-fill text-ink' : 'text-ink-3'}`}>Hot</button>
-            <button onClick={() => setSort('new')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === 'new' ? 'bg-fill text-ink' : 'text-ink-3'}`}>New</button>
+            <button onClick={() => setSort('hot')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === 'hot' ? 'bg-fill text-ink' : 'text-ink-2'}`}>Hot</button>
+            <button onClick={() => setSort('new')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === 'new' ? 'bg-fill text-ink' : 'text-ink-2'}`}>New</button>
           </div>
           <div className="w-px h-5 bg-fill shrink-0" />
           <button
@@ -245,7 +245,7 @@ function CommunityContent() {
           <div className="flex items-center bg-fill rounded-lg p-1 border border-line smooth-hover hidden sm:flex">
             <button 
               onClick={() => setViewMode('card')}
-              className={`p-1.5 rounded-md smooth-hover-fast ${viewMode === 'card' ? "bg-fill text-ink" : "text-ink-3 hover:text-ink-2"}`}
+              className={`p-1.5 rounded-md smooth-hover-fast ${viewMode === 'card' ? "bg-fill text-ink" : "text-ink-2 hover:text-ink"}`}
               title="Card View"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -255,7 +255,7 @@ function CommunityContent() {
             </button>
             <button 
               onClick={() => setViewMode('compact')}
-              className={`p-1.5 rounded-md smooth-hover-fast ${viewMode === 'compact' ? "bg-fill text-ink" : "text-ink-3 hover:text-ink-2"}`}
+              className={`p-1.5 rounded-md smooth-hover-fast ${viewMode === 'compact' ? "bg-fill text-ink" : "text-ink-2 hover:text-ink"}`}
               title="Compact View"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,7 +298,7 @@ function CommunityContent() {
           <button
             onClick={() => setSort('hot')}
             className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${
-              sort === 'hot' ? "bg-fill text-ink" : "text-ink-3 hover:text-ink-2"
+              sort === 'hot' ? "bg-fill text-ink" : "text-ink-2 hover:text-ink"
             }`}
           >
             Hot
@@ -306,7 +306,7 @@ function CommunityContent() {
           <button
             onClick={() => setSort('new')}
             className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${
-              sort === 'new' ? "bg-fill text-ink" : "text-ink-3 hover:text-ink-2"
+              sort === 'new' ? "bg-fill text-ink" : "text-ink-2 hover:text-ink"
             }`}
           >
             New
@@ -396,7 +396,7 @@ function CommunityContent() {
 
             <header className="px-5 py-4 sm:p-6 border-b border-line flex items-center justify-between shrink-0">
               <h2 className="text-lg sm:text-xl font-bold text-ink">สร้างโพสต์ใหม่</h2>
-              <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center rounded-full bg-fill hover:bg-raised text-ink-3 hover:text-ink transition-all">
+              <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center rounded-full bg-fill hover:bg-raised text-ink-2 hover:text-ink transition-all">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6L18 18" />
                 </svg>

@@ -142,7 +142,7 @@ export default function AdminAuditPage() {
         {(filterAction || filterActorUid) && (
           <button
             onClick={() => { setFilterAction(''); setFilterActorUid(''); setDebouncedActor(''); }}
-            className="px-3 py-2 text-xs text-ink-3 hover:text-ink transition-colors rounded-lg border border-line hover:border-ink-3"
+            className="px-3 py-2 text-xs text-ink-2 hover:text-ink transition-colors rounded-lg border border-line hover:border-ink-3"
           >
             ล้างตัวกรอง
           </button>

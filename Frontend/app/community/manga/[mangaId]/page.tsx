@@ -206,13 +206,13 @@ export default function MangaCommunityPage() {
         <div className="flex items-center bg-fill rounded-lg p-1 border border-line smooth-hover">
           <button
             onClick={() => setSort("hot")}
-            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === "hot" ? "bg-fill text-ink" : "text-ink-3 hover:text-ink-2"}`}
+            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === "hot" ? "bg-fill text-ink" : "text-ink-2 hover:text-ink"}`}
           >
             Hot
           </button>
           <button
             onClick={() => setSort("new")}
-            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === "new" ? "bg-fill text-ink" : "text-ink-3 hover:text-ink-2"}`}
+            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === "new" ? "bg-fill text-ink" : "text-ink-2 hover:text-ink"}`}
           >
             New
           </button>
@@ -254,7 +254,7 @@ export default function MangaCommunityPage() {
                   setPostImages([]);
                   setNewPost({ title: "", content: "", category: "general" as ForumCategory });
                 }}
-                className="text-ink-3 hover:text-ink"
+                className="text-ink-2 hover:text-ink"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />

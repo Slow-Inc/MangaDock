@@ -91,7 +91,7 @@ export default function ChapterPicker({
                 className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-medium transition ${
                   langFilter === l
                     ? "bg-ink text-bg"
-                    : "bg-fill text-ink-3 hover:bg-raised hover:text-ink-2"
+                    : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
                 }`}
               >
                 {labelFor(l)}

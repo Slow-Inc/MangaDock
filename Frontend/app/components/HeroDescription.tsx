@@ -46,7 +46,7 @@ export default function HeroDescription({ description }: { description: string }
             <ModelBadge model={model} small />
             <button
               onClick={() => setShowOriginal((v) => !v)}
-              className="text-[10px] text-ink-3 underline underline-offset-2 hover:text-ink-2 transition-colors"
+              className="text-[10px] text-ink-2 underline underline-offset-2 hover:text-ink transition-colors"
             >
               {showOriginal ? "แสดงคำแปล" : "ต้นฉบับ"}
             </button>

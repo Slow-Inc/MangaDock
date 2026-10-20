@@ -646,7 +646,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   <ModelBadge model={descModel} small />
                   <button
                     onClick={() => setShowOriginalDesc((v) => !v)}
-                    className="text-xs text-ink-3 underline underline-offset-2 hover:text-ink-2 transition-colors"
+                    className="text-xs text-ink-2 underline underline-offset-2 hover:text-ink transition-colors"
                   >
                     {showOriginalDesc ? "แสดงคำแปล" : "ต้นฉบับ"}
                   </button>

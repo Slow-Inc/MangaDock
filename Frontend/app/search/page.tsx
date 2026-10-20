@@ -368,7 +368,7 @@ function SearchResults() {
                     className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                       showAdvanced || statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0
                         ? "border-accent/40 bg-accent/10 text-accent"
-                        : "border-line text-ink-3 hover:border-ink-3 hover:text-ink-2"
+                        : "border-line text-ink-2 hover:border-ink-3 hover:text-ink"
                     }`}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
@@ -432,7 +432,7 @@ function SearchResults() {
                   className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 {(yearFrom || yearTo) && (
-                  <button onClick={() => { setYearFrom(''); setYearTo(''); }} className="text-xs text-ink-3 hover:text-ink-2 transition">ล้าง</button>
+                  <button onClick={() => { setYearFrom(''); setYearTo(''); }} className="text-xs text-ink-2 hover:text-ink transition">ล้าง</button>
                 )}
               </div>
 
@@ -450,7 +450,7 @@ function SearchResults() {
               {(statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0) && (
                 <button
                   onClick={() => { setStatusFilter('all'); setYearFrom(''); setYearTo(''); setRatingMin(0); }}
-                  className="text-xs text-ink-3 underline underline-offset-2 hover:text-ink-2 transition"
+                  className="text-xs text-ink-2 underline underline-offset-2 hover:text-ink transition"
                 >
                   ล้างตัวกรองทั้งหมด
                 </button>

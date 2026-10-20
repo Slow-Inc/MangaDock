@@ -18,7 +18,7 @@ export default function PostImage({ url, alt, className = "", priority = false, 
   const [failed, setFailed] = useState<string | null>(null);
   if (!src || failed === src) {
     return (
-      <div role="img" aria-label={`${alt} (โหลดไม่ได้)`} className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-fill text-ink-3">
+      <div role="img" aria-label={`${alt} (โหลดไม่ได้)`} className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-fill text-ink-2">
         <ImageOff aria-hidden className="h-6 w-6" strokeWidth={1.5} />
         <span className="text-xs">โหลดรูปไม่ได้</span>
       </div>
