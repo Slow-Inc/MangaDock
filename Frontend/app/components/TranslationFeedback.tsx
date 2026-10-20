@@ -23,22 +23,30 @@ export default function TranslationFeedback({ mangaId, chapterId, pageNumber }: 
   const [vote, setVote] = useState<1 | -1 | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchMyVote = useCallback(async () => {
+  const fetchMyVote = useCallback(async (signal: AbortSignal) => {
     const token = await getToken();
-    if (!token) return;
-    const res = await fetch(
-      `/api/proxy/translation-feedback/my?mangaId=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chapterId)}&page=${pageNumber}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    if (res.ok) {
-      const data = await parseJsonOrNull<{ vote?: 1 | -1 }>(res);
-      setVote(data?.vote ?? null);
+    if (!token || signal.aborted) return;
+    try {
+      const res = await fetch(
+        `/api/proxy/translation-feedback/my?mangaId=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chapterId)}&page=${pageNumber}`,
+        { headers: { Authorization: `Bearer ${token}` }, signal },
+      );
+      if (res.ok) {
+        const data = await parseJsonOrNull<{ vote?: 1 | -1 }>(res);
+        // A newer page's request superseded this one — never let it overwrite.
+        if (!signal.aborted) setVote(data?.vote ?? null);
+      }
+    } catch (err) {
+      if (!signal.aborted) throw err;
     }
   }, [mangaId, chapterId, pageNumber]);
 
   useEffect(() => {
     setVote(null);
-    if (user) fetchMyVote();
+    if (!user) return;
+    const controller = new AbortController();
+    fetchMyVote(controller.signal);
+    return () => controller.abort();
   }, [user, fetchMyVote]);
 
   async function handleVote(v: 1 | -1) {
