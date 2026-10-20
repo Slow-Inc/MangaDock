@@ -1,4 +1,5 @@
 'use client';
+import AdminLoadError from './components/AdminLoadError';
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { cacheOrFetch, TTL } from '../lib/apiCache';
@@ -75,7 +76,7 @@ export default function AdminOverviewPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (error) return <p className="text-danger text-sm">{error}</p>;
+  if (error) return <AdminLoadError what="stats" onRetry={() => { setError(null); load(); }} />;
 
   return (
     <div className="space-y-8">

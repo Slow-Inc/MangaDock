@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cacheOrFetch, TTL } from '../../lib/apiCache';
 import AdminTableSkeleton from '../components/AdminTableSkeleton';
+import AdminLoadError from '../components/AdminLoadError';
 
 const savedTx = { filterUid: '', filterType: '', filterFrom: '', filterTo: '', page: 1 };
 
@@ -35,6 +36,7 @@ export default function AdminTransactionsPage() {
   const [filterTo, setFilterTo] = useState(savedTx.filterTo);
   const [detail, setDetail] = useState<AdminTransaction | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const searchRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const didMount = useRef(false);
 
@@ -51,6 +53,7 @@ export default function AdminTransactionsPage() {
 
   const load = useCallback(async (p: number) => {
     setLoading(true);
+    setLoadFailed(false);
     const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
     if (filterUid) params.set('uid', filterUid);
     if (filterType) params.set('type', filterType);
@@ -69,7 +72,9 @@ export default function AdminTransactionsPage() {
       );
       setTransactions(d.transactions);
       setTotal(d.total);
-    } catch { /* keep stale */ }
+    } catch {
+      setLoadFailed(true); // keep stale
+    }
     setLoading(false);
   }, [authFetch, filterUid, filterType, filterFrom, filterTo]);
 
@@ -107,8 +112,10 @@ export default function AdminTransactionsPage() {
         <input type="date" value={filterTo} onChange={e => setFilterToPersist(e.target.value)} className={`${inputCls} text-ink-2`} />
       </div>
 
+      {loadFailed && <AdminLoadError what="transactions" onRetry={() => load(page)} />}
+
       {/* Table */}
-      <div className="border border-line rounded-xl overflow-hidden">
+      <div className="border border-line rounded-xl overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
@@ -120,7 +127,7 @@ export default function AdminTransactionsPage() {
           <tbody>
             {loading ? (
               <AdminTableSkeleton rows={5} columns={[80, 60, 50, 60, 90, 40]} />
-            ) : transactions.length === 0 ? (
+            ) : transactions.length === 0 && !loadFailed ? (
               <tr><td colSpan={6} className="px-4 py-10 text-center text-ink-3 text-sm">No transactions found.</td></tr>
             ) : transactions.map(t => (
               <tr key={t.id} className="border-b border-line last:border-0 hover:bg-fill transition-colors cursor-pointer" onClick={() => openDetail(t.id)}>

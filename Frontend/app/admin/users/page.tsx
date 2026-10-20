@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cacheOrFetch, cacheClearByTag, TTL } from '../../lib/apiCache';
 import AdminTableSkeleton from '../components/AdminTableSkeleton';
+import AdminLoadError from '../components/AdminLoadError';
 import { PRIMARY_FILL } from '../../components/ui/Button';
 
 const savedUsers = { search: '', filterRole: '', filterPlan: '', filterBanned: '', page: 1 };
@@ -53,6 +54,7 @@ export default function AdminUsersPage() {
   const [confirmBanUid, setConfirmBanUid] = useState<string | null>(null);
   const [confirmBanAction, setConfirmBanAction] = useState<'ban' | 'unban'>('ban');
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustDelta, setAdjustDelta] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
@@ -73,6 +75,7 @@ export default function AdminUsersPage() {
 
   const loadUsers = useCallback(async (p: number) => {
     setLoading(true);
+    setLoadFailed(false);
     const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
     if (search) params.set('search', search);
     if (filterRole !== '') params.set('role', filterRole);
@@ -91,7 +94,9 @@ export default function AdminUsersPage() {
       );
       setUsers(d.users);
       setTotal(d.total);
-    } catch { /* keep stale data */ }
+    } catch {
+      setLoadFailed(true); // keep stale data
+    }
     setLoading(false);
   }, [authFetch, search, filterRole, filterPlan, filterBanned]);
 
@@ -176,8 +181,10 @@ export default function AdminUsersPage() {
         </select>
       </div>
 
+      {loadFailed && <AdminLoadError what="users" onRetry={() => loadUsers(page)} />}
+
       {/* Table */}
-      <div className="border border-line rounded-xl overflow-hidden">
+      <div className="border border-line rounded-xl overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
@@ -189,7 +196,7 @@ export default function AdminUsersPage() {
           <tbody>
             {loading ? (
               <AdminTableSkeleton rows={5} columns={[80, 120, 60, 40, 30, 70, 50, 100]} />
-            ) : users.length === 0 ? (
+            ) : users.length === 0 && !loadFailed ? (
               <tr><td colSpan={8} className="px-4 py-10 text-center text-ink-3 text-sm">No users found.</td></tr>
             ) : users.map(u => (
               <tr key={u.uid} className="border-b border-line last:border-0 hover:bg-fill transition-colors">
