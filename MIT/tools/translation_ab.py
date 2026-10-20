@@ -72,6 +72,18 @@ def tally(votes: Dict[str, str], key: Dict[str, str]) -> Dict[str, int]:
 
 async def _translate(args):
     sys.path.insert(0, MIT)
+    if args.base or args.model or args.key_env:
+        # Point custom_openai at another OpenAI-compatible endpoint for THIS process only (set
+        # before initialize(): load_dotenv does not override). The key is read from MIT/.env.
+        from dotenv import dotenv_values
+        env = dotenv_values(os.path.join(MIT, '.env'))
+        if args.base:
+            os.environ['CUSTOM_OPENAI_API_BASE'] = args.base
+        if args.model:
+            os.environ['CUSTOM_OPENAI_MODEL'] = args.model
+        if args.key_env:
+            os.environ['CUSTOM_OPENAI_API_KEY'] = env.get(args.key_env) or os.environ.get(args.key_env, '')
+        os.environ['CUSTOM_OPENAI_ENABLE_THINKING'] = 'true'  # qwen-only extra_body off
     from manga_translator import initialize
     initialize()
     from manga_translator.config import TranslatorConfig
@@ -101,6 +113,9 @@ def main():
     t.add_argument('--gpt-config', default=None)
     t.add_argument('--label', required=True)
     t.add_argument('--target', default='THA')
+    t.add_argument('--base', help='OpenAI-compatible base URL to use instead of CUSTOM_OPENAI_API_BASE')
+    t.add_argument('--model', help='model name to use instead of CUSTOM_OPENAI_MODEL')
+    t.add_argument('--key-env', help='name of the MIT/.env variable holding the API key for --base')
     p = sub.add_parser('packet')
     p.add_argument('a')
     p.add_argument('b')
