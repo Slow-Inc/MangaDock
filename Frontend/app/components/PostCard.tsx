@@ -126,9 +126,9 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
 
           {/* Title */}
           <Link href={`/community/p/${post.id}`} className="block group/link">
-            <h3 className="font-bold text-ink group-hover/link:text-accent smooth-hover text-sm leading-snug line-clamp-2">
+            <h2 className="font-bold text-ink group-hover/link:text-accent smooth-hover text-sm leading-snug line-clamp-2">
               {post.title}
-            </h3>
+            </h2>
           </Link>
 
           {/* Action row */}
@@ -197,9 +197,9 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
 
       <div className="flex-1 flex flex-col min-h-0">
         <Link href={`/community/p/${post.id}`} className="block group/link mb-3">
-          <h3 className="text-lg font-black text-ink mb-2 line-clamp-2 leading-tight group-hover/link:text-accent smooth-hover">
+          <h2 className="text-lg font-black text-ink mb-2 line-clamp-2 leading-tight group-hover/link:text-accent smooth-hover">
             {post.title}
-          </h3>
+          </h2>
           <div className="relative">
             <p
               className="text-ink-2 text-sm line-clamp-3 leading-relaxed smooth-hover select-none"

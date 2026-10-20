@@ -3,6 +3,19 @@
 
 ---
 
+## #835 Landmarks, redundant alts, heading structure (axe) (2026-10-21)
+
+**What:** the non-contrast axe-core findings: the home hero now sits in the page's one `<main>`; `BookDetailModal` is a
+`role="dialog"` with `aria-modal` and the title as label; covers next to their own caption/label (volume covers, related
+manga, mobile hero cards) get `alt=""`; `/search` has an `sr-only` `h1`; PostCard titles are `h2`; `ForumSideMenu` is a
+`<nav aria-label>` instead of a nested `<aside>`. No visual change.
+
+**Validated:** axe over 9 public routes × 1440/390: `region` 34 → 0, `image-redundant-alt` 34 → 0, `page-has-heading-one`,
+`heading-order`, `landmark-complementary-is-top-level` → 0; only colour-contrast (Strata token values, #833) remains.
+Screenshots: home layout unchanged at 1440/390. tsc 0; eslint counts unchanged.
+
+---
+
 ## #833 Controls no longer use the tertiary ink-3 token (WCAG AA contrast) (2026-10-21)
 
 **What:** an axe-core audit (already in node_modules) over 9 public routes × 1440/390 found 236 colour-contrast

@@ -50,9 +50,11 @@ export default async function Home({
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
 
+      {/* One <main> for the whole page so the hero is inside a landmark too (#835). */}
+      <main>
       {topRankedBooks.length > 0 && <HeroCarousel books={topRankedBooks} />}
 
-      <main className="relative z-10 space-y-10 px-6 pb-20 md:pb-16 lg:px-12">
+      <div className="relative z-10 space-y-10 px-6 pb-20 md:pb-16 lg:px-12">
         <HomeStatusLine serverUnavailable={backendUnavailable} staleTimestamp={staleTimestamp} />
 
         {backendUnavailable && <HomeCachedLanding />}
@@ -72,6 +74,7 @@ export default async function Home({
             seeMoreHref={`/new?tab=${row.id}`}
           />
         ))}
+      </div>
       </main>
     </div>
   );
