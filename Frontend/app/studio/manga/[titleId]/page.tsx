@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import Navbar from "../../../components/Navbar";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../contexts/ToastContext";
 import {
@@ -366,17 +365,15 @@ export default function MangaDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-bg">
+      <div className="flex h-full items-center justify-center bg-bg">
         <Loader context="page" className="text-ink-2" />
       </div>
     );
   }
 
   return (
-    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-ink md:pb-0">
-      <Navbar />
-
-      <div className="mx-auto max-w-3xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
+    <div className="text-ink">
+      <div className="mx-auto max-w-3xl px-4 py-6">
         {/* Back */}
         <div className="mb-5">
           <Link
@@ -401,7 +398,7 @@ export default function MangaDetailPage() {
               />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold">{displayTitle}</h1>
+              <h2 className="text-xl font-bold">{displayTitle}</h2>
               <p className="mt-0.5 text-sm text-ink-3">
                 {loadingVersions ? "กำลังโหลด..." : `${versions.length} ตอนที่อัปโหลด`}
               </p>

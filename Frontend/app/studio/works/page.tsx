@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Navbar from "../../components/Navbar";
 
 import LoadingScreen from "../../components/LoadingScreen";
 import { useProtectedPage } from "../../hooks/useProtectedPage";
@@ -15,14 +14,9 @@ import type { ChapterVersion, VersionStatus } from "../../lib/types";
 import { getCached, setCache } from "../../lib/studioCache";
 import { StudioWorksSkeleton } from "../components/StudioSkeleton";
 import { MetricCard, StudioSection } from "../components/StudioDashboardWidgets";
-import {
-  StudioMobileHeader,
-  StudioMobileHero,
-  StudioMobileSection,
-} from "../components/StudioMobileShell";
+import { StudioToolbar } from "../components/StudioToolbar";
 import { StudioSelect } from "../components/StudioSelect";
 import { formatCurrency, getOverviewStats } from "../lib/dashboardAnalytics";
-import { useIsMobile } from "../../hooks/useIsMobile";
 import { CoverImage } from "../components/CoverImage";
 import { PRIMARY_FILL } from "../../components/ui/Button";
 import Mascot from "../../components/mascot/Mascot";
@@ -35,7 +29,6 @@ type MangaGroup = {
 };
 
 type ViewMode = "list" | "card";
-type WorksMobileView = "browse" | "filters";
 
 const STATUS_OPTIONS: { value: "" | VersionStatus; label: string }[] = [
   { value: "", label: "ทั้งหมด" },
@@ -126,7 +119,6 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
 export default function WorksPage() {
   const { user, loading, getIdToken } = useProtectedPage();
   const { showToast } = useToast();
-  const isMobile = useIsMobile();
 
   const [versions, setVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("studio:versions") ?? []);
   const [loadingVersions, setLoadingVersions] = useState(() => getCached("studio:versions") === null);
@@ -134,7 +126,6 @@ export default function WorksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | VersionStatus>("");
   const [langFilter, setLangFilter] = useState("");
-  const [mobileView, setMobileView] = useState<WorksMobileView>("browse");
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -193,156 +184,20 @@ export default function WorksPage() {
 
   if (loading) return <LoadingScreen />;
 
-  if (isMobile) {
-    const renderMobileResults = () => {
-      if (loadingVersions && mangaGroups.length === 0) {
-        return <StudioWorksSkeleton viewMode={viewMode} />;
-      }
-      if (!loadingVersions && mangaGroups.length === 0 && !hasFilters) return <EmptyState />;
-      if (mangaGroups.length === 0) {
-        return (
-          <div className="py-12 text-center">
-            <p className="text-sm text-ink-3">ไม่พบผลงานที่ตรงกับตัวกรอง</p>
-            <button onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }} className="mt-2 text-xs text-accent">ล้างตัวกรอง</button>
-          </div>
-        );
-      }
-      if (viewMode === "list") {
-        return <div className="space-y-3">{mangaGroups.map((group) => <MangaListCard key={group.titleId} group={group} />)}</div>;
-      }
-      return (
-        <div className="grid grid-cols-2 gap-x-3 gap-y-5">
-          {mangaGroups.map((group) => <MangaThumbnailCard key={group.titleId} group={group} />)}
-        </div>
-      );
-    };
-
-    return (
-      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-ink">
-        <Navbar />
-        <div className="pt-[calc(4.9rem+env(safe-area-inset-top))]">
-          {mobileView === "filters" ? (
-            <div className="space-y-4 px-4 py-4">
-              <StudioMobileHeader
-                title="ตัวกรองผลงาน"
-                subtitle="แยกส่วนจัดการตัวกรองออกจากรายการหลักบนมือถือ"
-                onBack={() => setMobileView("browse")}
-              />
-              <StudioMobileSection title="ค้นหาและกรอง">
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="ชื่อเรื่อง..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full rounded-2xl border border-line bg-fill px-3 py-3 text-sm text-ink placeholder:text-ink-3 outline-none focus:border-accent"
-                  />
-                  <StudioSelect
-                    value={statusFilter}
-                    onChange={(value) => setStatusFilter(value as "" | VersionStatus)}
-                    options={STATUS_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-                  />
-                  <StudioSelect
-                    value={langFilter}
-                    onChange={setLangFilter}
-                    options={[
-                      { value: "", label: "ทุกภาษา" },
-                      ...availableLanguages.map((lang) => ({ value: lang, label: LANG_LABELS[lang] ?? lang })),
-                    ]}
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setViewMode("list")}
-                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "list" ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-fill text-ink-2"}`}
-                    >
-                      แบบรายการ
-                    </button>
-                    <button
-                      onClick={() => setViewMode("card")}
-                      className={`rounded-2xl border px-3 py-3 text-sm ${viewMode === "card" ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-fill text-ink-2"}`}
-                    >
-                      แบบการ์ด
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => { setSearchQuery(""); setStatusFilter(""); setLangFilter(""); }}
-                      className="rounded-2xl border border-line bg-fill px-3 py-3 text-sm text-ink-2"
-                    >
-                      ล้างค่า
-                    </button>
-                    <button
-                      onClick={() => setMobileView("browse")}
-                      className={`rounded-2xl ${PRIMARY_FILL} px-3 py-3 text-sm font-semibold`}
-                    >
-                      ดูผลลัพธ์
-                    </button>
-                  </div>
-                </div>
-              </StudioMobileSection>
-            </div>
-          ) : (
-            <div className="space-y-4 px-4 py-4">
-              <StudioMobileHero
-                title="ผลงานของฉัน"
-                description="จัดการงานแปลและบทของคุณทั้งหมดในที่เดียว"
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="title ที่มีเวอร์ชัน" tone="indigo" />
-                <MetricCard label="จำนวนตอน" value={overviewStats.totalChapters} hint={`${overviewStats.totalPages} หน้า`} tone="violet" />
-                <MetricCard label="เผยแพร่แล้ว" value={overviewStats.published} hint={`ร่าง ${overviewStats.draft}`} tone="emerald" />
-                <MetricCard label="ตอนมีราคา" value={overviewStats.paidChapters} hint={`เฉลี่ย ${formatCurrency(overviewStats.avgPrice)}`} tone="amber" />
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="ค้นหาชื่อเรื่อง..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 rounded-2xl border border-line bg-fill px-3 py-3 text-sm text-ink placeholder:text-ink-3 outline-none focus:border-accent"
-                />
-                <button
-                  onClick={() => setMobileView("filters")}
-                  className="rounded-2xl border border-line bg-fill px-4 py-3 text-sm text-ink"
-                >
-                  กรอง
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-ink-3">แสดง {mangaGroups.length} เรื่อง</p>
-                <Link href="/studio/upload" className={`rounded-2xl ${PRIMARY_FILL} px-4 py-2.5 text-sm font-semibold`}>
-                  + อัปโหลด
-                </Link>
-              </div>
-              {renderMobileResults()}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-ink md:pb-0">
-      <Navbar />
-      <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
+    <div className="text-ink">
+      <StudioToolbar>
+        <p className="text-sm text-ink-3">แสดง {mangaGroups.length} เรื่อง</p>
+        <div className="flex items-center gap-2">
+          <ViewToggle mode={viewMode} onChange={handleSetViewMode} />
+          <Link href="/studio/upload" className={`rounded-xl ${PRIMARY_FILL} px-4 py-2 text-sm font-semibold transition active:scale-95`}>
+            + อัปโหลดใหม่
+          </Link>
+        </div>
+      </StudioToolbar>
+
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         <div className="space-y-5">
-
-          <div className="rounded-[2rem] border border-line bg-fill p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h1 className="mt-2 text-2xl font-semibold text-ink sm:text-3xl">ผลงานของฉัน</h1>
-                <p className="mt-2 text-sm text-ink-3">จัดการ chapter/version ทั้งหมด พร้อมตัวกรองและภาพรวมแบบใกล้ dashboard นักเขียน</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <ViewToggle mode={viewMode} onChange={handleSetViewMode} />
-                <Link href="/studio/upload" className={`rounded-xl ${PRIMARY_FILL} px-4 py-2.5 text-sm font-semibold transition active:scale-95`}>
-                  + อัปโหลดใหม่
-                </Link>
-              </div>
-            </div>
-          </div>
-
           <StudioSection title="ภาพรวมผลงาน" subtitle="สรุปจำนวนเรื่อง ตอน ภาษา และสถานะหลักก่อนลงไปจัดการรายละเอียด">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="นับจาก title ที่มีเวอร์ชัน" tone="indigo" />
@@ -395,7 +250,6 @@ export default function WorksPage() {
                 </div>
               </div>
 
-              <p className="text-xs text-ink-3">แสดง {mangaGroups.length} เรื่อง</p>
             </div>
           </StudioSection>
 

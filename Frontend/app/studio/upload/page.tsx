@@ -51,13 +51,6 @@ function StudioUploadContent() {
   const [description, setDescription] = useState("");
   const [priceCoins, setPriceCoins] = useState<string | number>(0);
 
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
   const [loadingExisting, setLoadingExisting] = useState(!!existingVersionId);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -166,7 +159,7 @@ function StudioUploadContent() {
 
   if (loading || loadingExisting) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-bg">
+      <div className="flex h-full items-center justify-center bg-bg">
         <Loader context="page" className="text-ink-2" />
       </div>
     );
@@ -178,9 +171,7 @@ function StudioUploadContent() {
   return (
     <div className="pb-20 text-ink">
       {/* Header */}
-      <div className={`sticky top-0 z-20 transition-all duration-500 ${scrolled ? "border-b border-line shadow-lg" : "border-b border-transparent"}`}>
-        {/* Blur + bg overlay */}
-        <div className={`pointer-events-none absolute inset-0 -z-10 transition-all duration-500 ${scrolled ? "bg-bg/90 backdrop-blur-xl" : "bg-bg"}`} />
+      <div className="sticky top-0 z-20 border-b border-line bg-bg">
         <div className="mx-auto flex max-w-3xl items-center gap-[0.52rem] px-4 py-[0.52rem] md:gap-[0.66rem] md:py-[0.86rem]">
           <button
             onClick={() => titleId ? router.push(`/studio/manga/${encodeURIComponent(titleId)}?titleName=${encodeURIComponent(titleName)}`) : router.push("/studio")}
@@ -191,7 +182,7 @@ function StudioUploadContent() {
             </svg>
           </button>
           <div className="min-w-0">
-            <h1 className="text-[15px] font-bold leading-tight md:text-base">{hasVersion ? "แก้ไขงานแปล" : "อัปโหลดงานแปลใหม่"}</h1>
+            <h2 className="text-[15px] font-bold leading-tight md:text-base">{hasVersion ? "แก้ไขงานแปล" : "อัปโหลดงานแปลใหม่"}</h2>
             <p className="truncate text-[11px] leading-tight text-ink-3 md:text-xs">
               {hasVersion ? `ID: ${versionId}` : "กรอกข้อมูลและอัปโหลดหน้า"}
             </p>
@@ -419,7 +410,7 @@ function StudioUploadContent() {
 
 export default function StudioUploadPage() {
   return (
-    <Suspense fallback={<div className="flex h-screen items-center justify-center text-ink-2">กำลังโหลด...</div>}>
+    <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-2">กำลังโหลด...</div>}>
       <StudioUploadContent />
     </Suspense>
   );

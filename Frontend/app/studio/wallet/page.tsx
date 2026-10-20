@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ROLE } from "../../lib/types/user";
-import Navbar from "../../components/Navbar";
 
 import LoadingScreen from "../../components/LoadingScreen";
 import { useProtectedPage } from "../../hooks/useProtectedPage";
@@ -18,14 +17,8 @@ import { getCached, setCache } from "../../lib/studioCache";
 import { StudioWalletSkeleton } from "../components/StudioSkeleton";
 import { MetricCard, StudioSection } from "../components/StudioDashboardWidgets";
 import StudioBarChart from "../components/charts/StudioBarChart";
-import {
-  StudioMobileHeader,
-  StudioMobileHero,
-  StudioMobileMenuCard,
-  StudioMobileSection,
-} from "../components/StudioMobileShell";
+import { StudioTabBar, StudioToolbar, tabPanelProps, type StudioTab } from "../components/StudioToolbar";
 import { StudioSelect } from "../components/StudioSelect";
-import { useIsMobile } from "../../hooks/useIsMobile";
 import {
   formatCurrency,
   getAvailableTransactionYears,
@@ -34,10 +27,17 @@ import {
   getWalletMonthSummary,
   getWalletMonthlyTotals,
 } from "../lib/dashboardAnalytics";
-import { ArrowDownLeft, ArrowUpRight, FileText, Gift, LockOpen, TrendingUp, Undo2, Wallet, type LucideIcon } from "lucide-react";
+import { FileText, Gift, LockOpen, Undo2, Wallet, type LucideIcon } from "lucide-react";
 
 const THAI_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-type WalletMobileView = "menu" | "analytics" | "income" | "spending";
+type WalletTab = "summary" | "charts" | "history";
+
+// Tabs show one group at a time, so the wallet mounts only the charts on screen.
+const WALLET_TABS: StudioTab<WalletTab>[] = [
+  { key: "summary", label: "ภาพรวม" },
+  { key: "charts", label: "กราฟ" },
+  { key: "history", label: "ประวัติ" },
+];
 
 function TransactionRow({ tx }: { tx: WalletTransaction }) {
   const isPositive = tx.type === "topup" || tx.type === "refund" || tx.type === "reward";
@@ -146,14 +146,13 @@ function WalletSummaryModal({
 export default function WalletPage() {
   const { user, loading, getIdToken, userRole } = useProtectedPage();
   const { showToast } = useToast();
-  const isMobile = useIsMobile();
 
   const [balance, setBalance] = useState<number | null>(() => getCached<number>("wallet:balance") ?? null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>(() => getCached<WalletTransaction[]>("wallet:transactions") ?? []);
   const [loadingData, setLoadingData] = useState(() => getCached("wallet:balance") === null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [mobileView, setMobileView] = useState<WalletMobileView>("menu");
+  const [tab, setTab] = useState<WalletTab>("summary");
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [earnings, setEarnings] = useState<CreatorEarnings | null>(null);
   const hasFetched = useRef(false);
@@ -234,179 +233,22 @@ export default function WalletPage() {
 
   if (loading) return <LoadingScreen />;
 
-  if (isMobile) {
-    const renderMobileContent = () => {
-      if (loadingData) {
-        return <StudioWalletSkeleton />;
-      }
-
-      if (mobileView === "menu") {
-        return (
-          <div className="space-y-4 px-4 py-4">
-
-            <StudioMobileHero
-              title="กระเป๋าเงินนักแปล"
-              description="มือถือจะพาคุณดูเฉพาะยอดหลักและ action สำคัญก่อน แล้วค่อยแยกกราฟกับประวัติธุรกรรมเป็นหน้าย่อย"
-              aside={(
-                <div className="rounded-2xl border border-coin/15 bg-coin/10 px-3 py-2 text-right">
-                  <p className="text-[10px] text-ink-3">คงเหลือ</p>
-                  <p className="mt-1 text-xl font-semibold text-coin">{formatCurrency(balance ?? 0)}</p>
-                </div>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard label="รายรับสะสม" value={formatCurrency(walletStats.topupTotal + walletStats.rewardTotal)} hint="topup, reward, refund" tone="indigo" />
-              <MetricCard label="ใช้จ่ายสะสม" value={formatCurrency(walletStats.spendingTotal)} hint="purchase ทั้งหมด" tone="rose" />
-              <MetricCard label="รางวัล/คืนเงิน" value={formatCurrency(walletStats.rewardTotal)} hint="reward + refund" tone="sky" />
-              <MetricCard label="รายการทั้งหมด" value={transactions.length} hint={`เดือน ${THAI_MONTHS[selectedMonth]}`} tone="amber" />
-            </div>
-
-            <button
-              onClick={() => setShowSummaryModal(true)}
-              className="w-full rounded-2xl border border-line bg-fill px-4 py-3 text-sm font-medium text-ink transition hover:border-ink-3 hover:bg-raised"
-            >
-              ดูเพิ่มเติม
-            </button>
-
-            {isCreator && earnings !== null && (
-              <StudioMobileSection title="ยอดขาย" subtitle="สถิติการขายบทแปลสะสม">
-                <div className="grid grid-cols-2 gap-3">
-                  <MetricCard label="ยอดขายทั้งหมด" value={earnings.totalSales} hint="จำนวนครั้งที่ซื้อ" tone="indigo" />
-                  <MetricCard label="รายได้สะสม" value={formatCurrency(earnings.totalEarned)} hint="หลังหัก 30%" tone="emerald" />
-                  <MetricCard label="ชื่อเรื่อง" value={earnings.titlesSold} hint="title ที่มียอดขาย" tone="sky" />
-                  <MetricCard label="ผู้ซื้อไม่ซ้ำ" value={earnings.uniqueBuyers} hint="unique buyers" tone="amber" />
-                </div>
-              </StudioMobileSection>
-            )}
-
-            <StudioMobileSection title="ดูรายละเอียดเพิ่ม" subtitle="แยกข้อมูลที่เยอะเป็นหน้าจอย่อยตามแบบ native mobile">
-              <div className="space-y-3">
-                <StudioMobileMenuCard
-                  icon={<TrendingUp className="h-5 w-5" strokeWidth={1.75} />}
-                  title="สรุปรายเดือน"
-                  description="กราฟรายวันของเดือนที่เลือก และภาพรวม 6 เดือนล่าสุด"
-                  value={`${THAI_MONTHS[selectedMonth]} ${selectedYear}`}
-                  tone="indigo"
-                  onClick={() => setMobileView("analytics")}
-                />
-                <StudioMobileMenuCard
-                  icon={<ArrowDownLeft className="h-5 w-5" strokeWidth={1.75} />}
-                  title="ประวัติรายรับ"
-                  description="ดู topup, reward และ refund แบบเต็มหน้าจอ"
-                  value={`${incomeTransactions.length} รายการ`}
-                  tone="emerald"
-                  onClick={() => setMobileView("income")}
-                />
-                <StudioMobileMenuCard
-                  icon={<ArrowUpRight className="h-5 w-5" strokeWidth={1.75} />}
-                  title="ประวัติรายจ่าย"
-                  description="รวมรายการ purchase ทั้งหมดในกระเป๋าเงิน"
-                  value={`${spendingTransactions.length} รายการ`}
-                  tone="rose"
-                  onClick={() => setMobileView("spending")}
-                />
-              </div>
-            </StudioMobileSection>
-          </div>
-        );
-      }
-
-      if (mobileView === "analytics") {
-        return (
-          <div className="space-y-4 px-4 py-4">
-            <StudioMobileHeader
-              title="สรุปรายเดือน"
-              subtitle="กราฟและสถิติแบบเต็มหน้าจอสำหรับมือถือ"
-              onBack={() => setMobileView("menu")}
-            />
-            <StudioMobileSection title="เลือกเดือนที่ต้องการ" subtitle="กรองข้อมูลกราฟก่อนลงรายละเอียด">
-              <div className="grid grid-cols-2 gap-2">
-                <StudioSelect
-                  value={String(selectedMonth)}
-                  onChange={(value) => setSelectedMonth(Number(value))}
-                  options={THAI_MONTHS.map((monthLabel, monthIndex) => ({ value: String(monthIndex), label: monthLabel }))}
-                />
-                <StudioSelect
-                  value={String(selectedYear)}
-                  onChange={(value) => setSelectedYear(Number(value))}
-                  options={availableYears.map((year) => ({ value: String(year), label: String(year) }))}
-                />
-              </div>
-            </StudioMobileSection>
-            <StudioMobileSection title={`ข้อมูลประจำเดือน ${THAI_MONTHS[selectedMonth]} ${selectedYear}`}>
-              <StudioBarChart points={recentDailySeries} valueFormatter={formatCurrency} ariaLabel="รายรับและรายจ่ายรายวันของเดือนที่เลือก" />
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                <MetricCard label="รายรับ" value={formatCurrency(monthlySummary.income)} tone="indigo" />
-                <MetricCard label="รายจ่าย" value={formatCurrency(monthlySummary.spending)} tone="rose" />
-                <MetricCard label="สุทธิ" value={formatCurrency(monthlySummary.net)} tone={monthlySummary.net >= 0 ? "emerald" : "amber"} />
-              </div>
-            </StudioMobileSection>
-            <StudioMobileSection title="ภาพรวม 6 เดือนล่าสุด">
-              <StudioBarChart points={monthlyTotals} valueFormatter={formatCurrency} ariaLabel="รายรับและรายจ่ายรายเดือน 6 เดือนล่าสุด" />
-            </StudioMobileSection>
-          </div>
-        );
-      }
-
-      const targetTransactions = mobileView === "income" ? incomeTransactions : spendingTransactions;
-      const targetTitle = mobileView === "income" ? "ประวัติรายรับ" : "ประวัติรายจ่าย";
-      const targetSubtitle = mobileView === "income" ? "topup, reward และ refund" : "รายการ purchase ทั้งหมด";
-
-      return (
-        <div className="space-y-4 px-4 py-4">
-          <StudioMobileHeader
-            title={targetTitle}
-            subtitle={targetSubtitle}
-            onBack={() => setMobileView("menu")}
-          />
-          <StudioMobileSection title={`${targetTitle} - ${THAI_MONTHS[selectedMonth]} ${selectedYear}`}>
-            {targetTransactions.length === 0 ? (
-              <p className="py-12 text-center text-sm text-ink-3">ยังไม่มีรายการ</p>
-            ) : (
-              <div className="space-y-1">
-                {targetTransactions.map((tx) => <TransactionRow key={`${mobileView}-${tx.id}`} tx={tx} />)}
-              </div>
-            )}
-          </StudioMobileSection>
-        </div>
-      );
-    };
-
-    return (
-      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-ink">
-        <Navbar />
-        <div className="pt-[calc(4.9rem+env(safe-area-inset-top))]">
-          {renderMobileContent()}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-ink md:pb-0">
-      <Navbar />
+    <div className="text-ink">
+      <StudioToolbar>
+        <StudioTabBar tabs={WALLET_TABS} value={tab} onChange={setTab} label="มุมมองกระเป๋าเงิน" idBase="wallet" />
+        <p className="rounded-full border border-line px-3 py-1.5 text-sm text-ink-2">
+          ยอดคงเหลือ <span className="font-semibold tabular-nums text-coin">{formatCurrency(balance ?? 0)}</span>
+        </p>
+      </StudioToolbar>
 
-      <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
-        <div className="space-y-5">
-
-          <div className="rounded-[2rem] border border-line bg-fill p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h1 className="mt-2 text-2xl font-semibold text-ink sm:text-3xl">กระเป๋าเงินนักแปล</h1>
-                <p className="mt-2 text-sm text-ink-3">ดูยอดคงเหลือ แนวโน้มรายวัน รายเดือน และประวัติธุรกรรม</p>
-              </div>
-              <div className="rounded-2xl border border-coin/15 bg-coin/10 px-4 py-3 text-right">
-                <p className="text-xs text-ink-3">ยอดคงเหลือปัจจุบัน</p>
-                <p className="mt-1 text-2xl font-semibold text-coin">{formatCurrency(balance ?? 0)}</p>
-              </div>
-            </div>
-          </div>
-
+      <div {...tabPanelProps("wallet", tab)} className="mx-auto max-w-6xl px-4 py-6 focus-visible:outline-none sm:px-6">
           {loadingData ? (
             <StudioWalletSkeleton />
           ) : (
             <div className="space-y-6">
+              {tab === "summary" ? (
+              <>
               <StudioSection 
                 title="ภาพรวมกระเป๋าเงิน" 
                 subtitle="รวมยอดเคลื่อนไหวหลักของบัญชีคุณ"
@@ -440,7 +282,8 @@ export default function WalletPage() {
                   </div>
                 </StudioSection>
               )}
-
+              </>
+              ) : tab === "charts" ? (
               <div className="grid gap-6 xl:grid-cols-2">
                 <StudioSection
                   title={`ข้อมูลประจำเดือน: ${THAI_MONTHS[selectedMonth]} ${selectedYear}`}
@@ -476,7 +319,7 @@ export default function WalletPage() {
                   <StudioBarChart points={monthlyTotals} valueFormatter={formatCurrency} ariaLabel="รายรับและรายจ่ายรายเดือน 6 เดือนล่าสุด" />
                 </StudioSection>
               </div>
-
+              ) : (
               <div className="grid gap-6 xl:grid-cols-2">
                 <StudioSection title={`ประวัติรายรับ - ${THAI_MONTHS[selectedMonth]} ${selectedYear}`} subtitle="topup, refund และ reward ทั้งหมด">
                   {incomeTransactions.length === 0 ? (
@@ -498,9 +341,9 @@ export default function WalletPage() {
                   )}
                 </StudioSection>
               </div>
+              )}
             </div>
           )}
-        </div>
       </div>
 
       <WalletSummaryModal

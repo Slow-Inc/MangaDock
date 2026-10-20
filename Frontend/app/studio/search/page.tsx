@@ -96,7 +96,7 @@ function SearchContent() {
   const isSearchReady = trimmedQuery.length >= MIN_SEARCH_QUERY_LENGTH;
 
   return (
-    <div className="flex h-dvh flex-col bg-bg text-ink">
+    <div className="flex h-full flex-col bg-bg text-ink">
 
       {/* Sticky header */}
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-bg px-4 py-3">
@@ -163,7 +163,7 @@ function SearchContent() {
       </div>
 
       {/* Results area */}
-      <div ref={scrollRef} className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-[calc(var(--mobile-nav-height)+env(safe-area-inset-bottom))]">
+      <div ref={scrollRef} className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
 
         {/* Empty / initial state */}
         {!isSearchReady && !searching && (

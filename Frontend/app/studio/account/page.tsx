@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import Navbar from "../../components/Navbar";
 
 import LoadingScreen from "../../components/LoadingScreen";
 import { useProtectedPage } from "../../hooks/useProtectedPage";
@@ -11,19 +10,13 @@ import { getMyProfile, updateTranslatorProfile } from "../../lib/studioApi";
 import { getCached, setCache } from "../../lib/studioCache";
 import { StudioAccountSkeleton } from "../components/StudioSkeleton";
 import { MetricCard, StudioSection } from "../components/StudioDashboardWidgets";
-import {
-  StudioMobileHeader,
-  StudioMobileHero,
-  StudioMobileMenuCard,
-  StudioMobileSection,
-} from "../components/StudioMobileShell";
+import { StudioToolbar } from "../components/StudioToolbar";
 import { StudioSelect } from "../components/StudioSelect";
 import { CountrySelect } from "../components/CountrySelect";
 import { getAccountProfileCompleteness } from "../lib/dashboardAnalytics";
-import { useIsMobile } from "../../hooks/useIsMobile";
 import Loader from "../../components/ui/Loader";
 import { PRIMARY_FILL } from "../../components/ui/Button";
-import { Globe, Lightbulb, PenLine, Settings2, User } from "lucide-react";
+import { User } from "lucide-react";
 
 const LANGUAGE_OPTIONS = [
   { code: "th", label: "ไทย" },
@@ -41,7 +34,6 @@ const LANGUAGE_OPTIONS = [
   { code: "ru", label: "Русский" },
 ];
 
-type AccountMobileView = "menu" | "bio" | "languages" | "identity" | "guide";
 
 function LanguageSelect({
   value,
@@ -67,7 +59,6 @@ function LanguageSelect({
 export default function StudioAccountPage() {
   const { user, loading, getIdToken } = useProtectedPage();
   const { showToast } = useToast();
-  const isMobile = useIsMobile();
 
   type ProfileCache = { bio: string; languages: string[]; country: string; preferredLanguage: string };
   const cached = getCached<ProfileCache>("account:profile");
@@ -79,9 +70,6 @@ export default function StudioAccountPage() {
   const [loadingProfile, setLoadingProfile] = useState(!cached);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const [mobileView, setMobileView] = useState<AccountMobileView>("menu");
-  const mobileMenuScrollRef = useRef(0);
-  const shouldRestoreMenuScrollRef = useRef(false);
   const hasFetched = useRef(false);
   const originalRef = useRef({ bio: cached?.bio ?? "", languages: cached?.languages ?? [] as string[], country: cached?.country ?? "", preferredLanguage: cached?.preferredLanguage ?? "" });
   const profileCompleteness = useMemo(
@@ -182,249 +170,19 @@ export default function StudioAccountPage() {
     }
   };
 
-  const openMobileProfileSection = (view: Exclude<AccountMobileView, "menu">) => {
-    mobileMenuScrollRef.current = window.scrollY;
-    shouldRestoreMenuScrollRef.current = false;
-    setMobileView(view);
-    window.scrollTo({ top: 0, behavior: "auto" });
-  };
-
-  const returnToMobileMenu = () => {
-    shouldRestoreMenuScrollRef.current = true;
-    setMobileView("menu");
-  };
-
-  useEffect(() => {
-    if (!isMobile || mobileView !== "menu" || !shouldRestoreMenuScrollRef.current) return;
-
-    let frame1 = 0;
-    let frame2 = 0;
-    const restore = () => {
-      window.scrollTo({ top: mobileMenuScrollRef.current, behavior: "auto" });
-      shouldRestoreMenuScrollRef.current = false;
-    };
-
-    frame1 = requestAnimationFrame(() => {
-      frame2 = requestAnimationFrame(restore);
-    });
-
-    return () => {
-      cancelAnimationFrame(frame1);
-      cancelAnimationFrame(frame2);
-    };
-  }, [isMobile, mobileView]);
-
   if (loading) return <LoadingScreen />;
 
-  if (isMobile) {
-    const saveButton = (
-      <button
-        onClick={handleSave}
-        disabled={!hasChanges || saving}
-        className={`w-full rounded-2xl ${PRIMARY_FILL} px-5 py-3 text-sm font-semibold disabled:opacity-40`}
-      >
-        {saving ? "กำลังบันทึก..." : hasChanges ? "บันทึกการเปลี่ยนแปลง" : "ข้อมูลล่าสุดแล้ว"}
-      </button>
-    );
-
-    const renderMobileContent = () => {
-      if (loadingProfile) {
-        return <StudioAccountSkeleton />;
-      }
-
-      if (mobileView === "menu") {
-        return (
-          <div className="space-y-4 px-4 py-4">
-            <StudioMobileHero
-              title="ข้อมูลนักแปล"
-              description="บนมือถือเราจะแยกการแก้โปรไฟล์ออกเป็นหน้าจอย่อย คล้าย account modal ของระบบหลัก"
-              aside={(
-                <div className="rounded-2xl border border-ok/15 bg-ok/10 px-3 py-2 text-right">
-                  <p className="text-[10px] text-ink-3">สมบูรณ์</p>
-                  <p className="mt-1 text-xl font-semibold text-ok">{profileCompleteness.percent}%</p>
-                </div>
-              )}
-            />
-
-            <div className="flex items-center gap-4 rounded-[1.5rem] border border-line bg-fill p-4">
-              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-raised">
-                {user?.photoURL ? (
-                  <Image src={user.photoURL} alt="" fill className="object-cover" />
-                ) : (
-                  <User aria-hidden className="h-6 w-6 text-ink-3" strokeWidth={1.5} />
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-base font-semibold text-ink">{user?.displayName ?? "ไม่ระบุชื่อ"}</p>
-                <p className="truncate text-xs text-ink-3">{user?.email ?? ""}</p>
-                <p className="mt-1 text-[11px] text-ink-3">กรอกแล้ว {profileCompleteness.completed}/{profileCompleteness.total} หมวดหลัก</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard label="ภาษาแปลได้" value={languages.length} hint="สูงสุด 10 ภาษา" tone="indigo" />
-              <MetricCard label="ภาษาหลัก" value={preferredLanguage ? preferredLanguage.toUpperCase() : "-"} hint="ค่าเริ่มต้นของโปรไฟล์" tone="sky" />
-              <MetricCard label="ประเทศ" value={country || "-"} hint="แสดงในโปรไฟล์" tone="violet" />
-              <MetricCard label="สถานะ" value={hasChanges ? "มีการแก้ไข" : "ล่าสุด"} hint={hasChanges ? "ยังไม่บันทึก" : "ตรงกับระบบ"} tone={hasChanges ? "amber" : "emerald"} />
-            </div>
-
-            <StudioMobileSection title="จัดการโปรไฟล์" subtitle="แยกหัวข้อเป็นหน้าย่อยเพื่อให้อ่านและแก้ง่ายบนมือถือ">
-              <div className="space-y-3">
-                <StudioMobileMenuCard
-                  icon={<PenLine className="h-5 w-5" strokeWidth={1.75} />}
-                  title="แนะนำตัว"
-                  description="เขียน bio และแนะนำแนวทางการแปลของคุณ"
-                  value={`${bio.length}/500`}
-                  tone="indigo"
-                  onClick={() => openMobileProfileSection("bio")}
-                />
-                <StudioMobileMenuCard
-                  icon={<Globe className="h-5 w-5" strokeWidth={1.75} />}
-                  title="ภาษาที่แปลได้"
-                  description="เลือกภาษาที่ถนัดและใช้ทำงานจริง"
-                  value={`${languages.length} ภาษา`}
-                  tone="emerald"
-                  onClick={() => openMobileProfileSection("languages")}
-                />
-                <StudioMobileMenuCard
-                  icon={<Settings2 className="h-5 w-5" strokeWidth={1.75} />}
-                  title="ข้อมูลหลัก"
-                  description="ประเทศและภาษาหลักของบัญชี"
-                  value={country || "ยังไม่ตั้ง"}
-                  tone="indigo"
-                  onClick={() => openMobileProfileSection("identity")}
-                />
-                <StudioMobileMenuCard
-                  icon={<Lightbulb className="h-5 w-5" strokeWidth={1.75} />}
-                  title="คำแนะนำ"
-                  description="แนวทางทำให้โปรไฟล์พร้อมใช้งานและครบถ้วน"
-                  tone="default"
-                  onClick={() => openMobileProfileSection("guide")}
-                />
-              </div>
-            </StudioMobileSection>
-
-            {saveButton}
-          </div>
-        );
-      }
-
-      if (mobileView === "bio") {
-        return (
-          <div className="space-y-4 px-4 py-4">
-            <StudioMobileHeader title="แนะนำตัว" subtitle="เขียน bio แบบอ่านง่ายบนมือถือ" onBack={returnToMobileMenu} />
-            <StudioMobileSection title="Bio">
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value.slice(0, 500))}
-                placeholder="เล่าเกี่ยวกับตัวคุณให้ผู้อ่านรู้จัก..."
-                rows={9}
-                className="w-full resize-none rounded-2xl border border-line bg-fill px-3 py-3 text-sm text-ink placeholder:text-ink-3 outline-none focus:border-accent"
-              />
-              <p className="mt-2 text-right text-[11px] text-ink-3">{bio.length}/500</p>
-            </StudioMobileSection>
-            {saveButton}
-          </div>
-        );
-      }
-
-      if (mobileView === "languages") {
-        return (
-          <div className="space-y-4 px-4 py-4">
-            <StudioMobileHeader title="ภาษาที่แปลได้" subtitle="เลือกภาษาแบบเต็มหน้าจอบนมือถือ" onBack={returnToMobileMenu} />
-            <StudioMobileSection title="รายการภาษา" subtitle="เลือกได้สูงสุด 10 ภาษา">
-              <div className="flex flex-wrap gap-2">
-                {LANGUAGE_OPTIONS.map((lang) => {
-                  const selected = languages.includes(lang.code);
-                  return (
-                    <button
-                      key={lang.code}
-                      onClick={() => toggleLanguage(lang.code)}
-                      className={`rounded-2xl border px-3 py-2 text-xs font-medium transition ${
-                        selected
-                          ? "border-accent/40 bg-accent/10 text-accent"
-                          : "border-line bg-fill text-ink-2"
-                      }`}
-                    >
-                      {lang.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </StudioMobileSection>
-            {saveButton}
-          </div>
-        );
-      }
-
-      if (mobileView === "identity") {
-        return (
-          <div className="space-y-4 px-4 py-4">
-            <StudioMobileHeader title="ข้อมูลหลัก" subtitle="ตั้งประเทศและภาษาหลักของบัญชี" onBack={returnToMobileMenu} />
-            <StudioMobileSection title="ประเทศ">
-              <CountrySelect
-                value={country}
-                onChange={setCountry}
-                placeholder="ค้นหาหรือเลือกประเทศ..."
-              />
-            </StudioMobileSection>
-            <StudioMobileSection title="ภาษาหลัก">
-              <LanguageSelect
-                value={preferredLanguage}
-                onChange={setPreferredLanguage}
-                options={LANGUAGE_OPTIONS}
-              />
-            </StudioMobileSection>
-            {saveButton}
-          </div>
-        );
-      }
-
-      return (
-        <div className="space-y-4 px-4 py-4">
-          <StudioMobileHeader title="คำแนะนำ" subtitle="แนวทางทำให้โปรไฟล์พร้อมใช้งาน" onBack={returnToMobileMenu} />
-          <StudioMobileSection title="ข้อมูลเพิ่มเติม" subtitle="สรุปจากแนวทางการตั้งค่าโปรไฟล์นักแปล">
-            <div className="space-y-4 text-sm leading-6 text-ink-2">
-              <p>กรอก bio ให้ชัดเจนเพื่อช่วยให้ผู้อ่านรู้จักแนวทางการแปลของคุณมากขึ้น</p>
-              <p>เลือกภาษาที่แปลได้ให้ครบ เพราะข้อมูลนี้สามารถนำไปใช้กับระบบค้นหานักแปลหรือ matching ในอนาคตได้</p>
-              <p>ตั้งค่าภาษาหลักเพื่อใช้เป็นค่าเริ่มต้นในเครื่องมือ Studio และให้ทีมงานตีความโปรไฟล์ได้ตรงขึ้น</p>
-              <p>ถ้าอยากให้หน้าโปรไฟล์พร้อมใช้งานจริง ควรมีรูปโปรไฟล์ ประเทศ และอย่างน้อย 1 ภาษาแปล</p>
-            </div>
-          </StudioMobileSection>
-        </div>
-      );
-    };
-
-    return (
-      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-ink">
-        <Navbar />
-        <div className="pt-[calc(4.9rem+env(safe-area-inset-top))]">
-          {renderMobileContent()}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-ink md:pb-0">
-      <Navbar />
+    <div className="text-ink">
+      <StudioToolbar>
+        <p className="text-sm text-ink-3">จัดการโปรไฟล์ ภาษา และข้อมูลหลักของบัญชี</p>
+        <p className="rounded-full border border-line px-3 py-1.5 text-sm text-ink-2">
+          ความสมบูรณ์ของโปรไฟล์ <span className="font-semibold tabular-nums text-ok">{profileCompleteness.percent}%</span>
+        </p>
+      </StudioToolbar>
 
-      <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         <div className="space-y-5">
-
-          <div className="rounded-[2rem] border border-line bg-fill p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h1 className="mt-2 text-2xl font-semibold text-ink sm:text-3xl">ข้อมูลนักแปล</h1>
-                <p className="mt-2 text-sm text-ink-3">จัดการความพร้อมของโปรไฟล์ ภาษา และข้อมูลหลักของบัญชีในสไตล์ dashboard นักเขียน</p>
-              </div>
-              <div className="rounded-2xl border border-ok/15 bg-ok/10 px-4 py-3">
-                <p className="text-xs text-ink-3">ความสมบูรณ์ของโปรไฟล์</p>
-                <p className="mt-1 text-2xl font-semibold text-ok">{profileCompleteness.percent}%</p>
-              </div>
-            </div>
-          </div>
-
           {loadingProfile ? (
             <StudioAccountSkeleton />
           ) : (
