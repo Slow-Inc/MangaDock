@@ -303,3 +303,19 @@ def test_anti_overlap_never_pushes_a_block_out_of_its_own_balloon(monkeypatch):
                                      clean_layout=True)
     x1, _, x2, _ = a.render_dst_box
     assert x1 >= 68.0 - 0.5 and x2 <= 161.0 + 0.5, a.render_dst_box
+
+
+def test_a_clean_layout_block_is_fitted_into_its_narrow_balloon_832():
+    """#832 (Iruma p0): the English covered 43 of a 59 px balloon, so the region went to clean_layout,
+    whose column was floored at the widest Thai word — an 89 px block spilling past the balloon.
+    When the block is wider than the balloon interior it is laid out again on that interior."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1000, 800, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='เธอฉลาดมากนะ โย-ชาน!', xyxy=(66.4, 743, 109.0, 805),
+                   bubble_box=(58.0, 710.0, 117.9, 834.0), target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    x1, y1, x2, y2 = r.render_dst_box
+    assert x2 - x1 <= 59 * 1.05 and x1 >= 58 - 1 and x2 <= 117 + 1, r.render_dst_box

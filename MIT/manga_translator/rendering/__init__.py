@@ -524,6 +524,20 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
 
         if clean_layout and not _sfx_display and region.translation and region.translation.strip():
             laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max, page_shape)
+            # #832: a region in a balloon it does not fill (EN words stacked in a narrow column)
+            # lands here, and its column floored at the widest Thai word can be wider than the
+            # balloon. Lay it out again on the balloon interior, as bubble_fit_tall does (#816).
+            _bb = getattr(region, 'bubble_box', None)
+            if laid is not None and _bb is not None and region.horizontal:
+                _fw, _fh, (_acx, _acy) = _bubble_interior_box(region, _bb, img.shape)
+                if laid[1] > _fw * 1.05:
+                    from types import SimpleNamespace
+                    _proxy = SimpleNamespace(
+                        translation=region.translation, target_lang=getattr(region, 'target_lang', 'en_US'),
+                        font_size=getattr(region, 'font_size', 0),
+                        xyxy=(_acx - _fw / 2.0, _acy - _fh / 2.0, _acx + _fw / 2.0, _acy + _fh / 2.0))
+                    laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum, font_size_max,
+                                             page_shape, shrink_to_fit=True) or laid
             if laid is not None:
                 clean_fs, block_w, block_h = laid
                 x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
