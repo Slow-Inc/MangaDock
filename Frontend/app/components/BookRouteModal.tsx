@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BookDetailModal from "./BookDetailModal";
 import { bookFromDetail } from "../lib/bookFromDetail";
@@ -32,7 +32,7 @@ export default function BookRouteModal({ id }: { id: string }) {
     };
   }, [id]);
 
-  const close = () => router.replace("/");
+  const close = useCallback(() => router.replace("/"), [router]);
 
   if (state === "loading") return <PopupSkeleton onClose={close} />;
 
@@ -61,10 +61,28 @@ export default function BookRouteModal({ id }: { id: string }) {
  */
 function PopupSkeleton({ onClose }: { onClose: () => void }) {
   const cover = "relative aspect-2/3 shrink-0 overflow-hidden rounded-xl bg-fill ring-1 ring-line";
+  // A slow fetch must not trap anyone: Escape and a close button work as in the popup itself.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
-    <div className="fixed inset-0 z-200 flex items-center justify-center md:p-4">
+    <div role="dialog" aria-modal="true" aria-label="กำลังโหลดหนังสือ" className="fixed inset-0 z-200 flex items-center justify-center md:p-4">
       <div className="absolute inset-0 bg-bg md:bg-scrim/90" onClick={onClose} />
       <div className="relative z-10 flex h-full w-full flex-col overflow-hidden bg-surface shadow-2xl md:h-auto md:max-h-[90vh] md:max-w-3xl md:rounded-3xl">
+        <button
+          onClick={onClose}
+          title="ปิด"
+          aria-label="ปิด"
+          className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-bg/80 text-ink transition-colors hover:bg-raised"
+        >
+          <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
         <div className="flex flex-col items-center gap-5 px-5 pb-6 pt-9 md:flex-row md:items-end md:pt-14">
           <div className={`${cover} w-36 md:w-40`}>
             <div aria-hidden className={`h-full w-full animate-pulse ${DOT_FIELD}`} />

@@ -410,7 +410,7 @@ function StudioUploadContent() {
 
 export default function StudioUploadPage() {
   return (
-    <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-2">กำลังโหลด...</div>}>
+    <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-2"><Loader context="section" label="กำลังโหลด" /></div>}>
       <StudioUploadContent />
     </Suspense>
   );

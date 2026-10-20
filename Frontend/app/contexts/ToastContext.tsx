@@ -190,7 +190,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 className={`ml-1 shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition active:scale-95 disabled:opacity-60 ${
                   toast.action?.variant === "white"
                     ? PRIMARY_FILL
-                    : "bg-accent text-bg hover:bg-accent/85"
+                    : "bg-accent text-bg hover:bg-accent/85 focus-visible:outline-bg" /* an accent ring on an accent fill would vanish */
                 }`}
               >
                 {actionLoading ? (

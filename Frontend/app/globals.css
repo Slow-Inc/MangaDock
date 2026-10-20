@@ -221,14 +221,18 @@ body::-webkit-scrollbar-thumb:active {
   /* Inside anything that clips — scroll rows, cards, menus, scrolling panels — a ring floating outside
      the element is cut off on the clipped sides; draw it inside the element instead. (A focus audit
      over 9 routes found 3–5 px cut rings on chips, menu items, chapter rows, tabs and cover buttons.) */
-  :is(.overflow-hidden, .overflow-clip, .overflow-auto, .overflow-x-auto, .overflow-y-auto) :focus-visible {
+  :is(.overflow-hidden, .overflow-clip, .overflow-auto, .overflow-scroll, .overflow-x-auto, .overflow-y-auto) :focus-visible {
     outline-offset: -2px;
   }
 }
 
-img,
-svg {
-  max-width: 100%;
+/* In @layer base so utilities like max-w-none win — unlayered, it squeezed the mascot editor's still
+   image (laid over an overscanned 240 px canvas) into its 160 px box. */
+@layer base {
+  img,
+  svg {
+    max-width: 100%;
+  }
 }
 
 .page-shell {

@@ -650,7 +650,7 @@ export default function PublicProfilePage() {
             {/* Following */}
             {tab === "following" && (
               loadingFollowing ? (
-                <p className="py-10 text-center text-sm text-ink-3">กำลังโหลด...</p>
+                <div className="flex justify-center py-10"><Loader context="section" label="กำลังโหลด" className="text-ink-3" /></div>
               ) : followingUsers.length === 0 ? (
                 <EmptyState text="ยังไม่ได้ติดตามใคร" />
               ) : (

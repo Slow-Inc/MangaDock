@@ -33,11 +33,17 @@ function useTheme(): string | null {
   const [theme, setTheme] = useState<string | null>(null);
   useEffect(() => {
     const root = document.documentElement;
-    const read = () => setTheme(root.getAttribute("data-theme"));
+    // "System" mode drops data-theme and follows the OS, so an OS flip must rebuild too.
+    const os = window.matchMedia("(prefers-color-scheme: dark)");
+    const read = () => setTheme(`${root.getAttribute("data-theme") ?? "system"}:${os.matches ? "dark" : "light"}`);
     read();
     const mo = new MutationObserver(read);
     mo.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => mo.disconnect();
+    os.addEventListener("change", read);
+    return () => {
+      mo.disconnect();
+      os.removeEventListener("change", read);
+    };
   }, []);
   return theme;
 }

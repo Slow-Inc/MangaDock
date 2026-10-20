@@ -23,6 +23,7 @@ import {
 } from "../lib/readingHistory";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
 
 type TabKey = "favorites" | "follows" | "liked" | "history";
 
@@ -461,10 +462,12 @@ function MyListContent() {
           /* Skeleton while session is restoring — mirrors MangaGrid layout */
           <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
             {[...Array(14)].map((_, i) => (
-              <div key={i} className="flex flex-col gap-2">
-                <div className="aspect-2/3 w-full animate-pulse rounded-xl bg-fill" />
-                <div className="h-3 w-4/5 animate-pulse rounded bg-fill" />
-                <div className="h-3 w-3/5 animate-pulse rounded bg-fill" />
+              <div key={i} aria-hidden className="flex flex-col gap-2">
+                <div className="aspect-2/3 w-full overflow-hidden rounded-xl bg-fill">
+                  <div className={`h-full w-full animate-pulse ${DOT_FIELD}`} style={shimmerDelay(i)} />
+                </div>
+                <div className="h-3 w-4/5 rounded bg-fill" />
+                <div className="h-3 w-3/5 rounded bg-fill" />
               </div>
             ))}
           </div>

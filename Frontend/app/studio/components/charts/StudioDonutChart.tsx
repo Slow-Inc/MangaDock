@@ -8,7 +8,7 @@ import { useCallback, useMemo, useRef } from "react";
 import type { BreakdownDatum } from "../../lib/dashboardAnalytics";
 import { formatCompactNumber } from "../../lib/dashboardAnalytics";
 import ChartEmpty from "./ChartEmpty";
-import { percentages, toneCss } from "./chartMath";
+import { hasValues, percentages, toneCss } from "./chartMath";
 import { useStudioChart, type ChartKit, type Register } from "./useStudioChart";
 
 const register: Register = (charts, components) => [charts.PieChart, components.TooltipComponent];
@@ -74,6 +74,6 @@ export default function StudioDonutChart({
   formatter?: (value: number) => string;
   ariaLabel: string;
 }) {
-  if (data.length === 0) return <ChartEmpty label="ยังไม่มีข้อมูลสัดส่วน" />;
+  if (!hasValues(data.map((d) => d.value))) return <ChartEmpty label="ยังไม่มีข้อมูลสัดส่วน" />;
   return <Donut data={data} formatter={formatter} ariaLabel={ariaLabel} />;
 }

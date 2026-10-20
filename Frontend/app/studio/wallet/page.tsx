@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Coin from "../../components/ui/Coin";
 import { ROLE } from "../../lib/types/user";
 
 import LoadingScreen from "../../components/LoadingScreen";
@@ -71,7 +72,7 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
       </div>
       <div className="shrink-0 text-right">
         <p className={`text-sm font-semibold ${isPositive ? "text-coin" : "text-danger"}`}>
-          {isPositive ? "+" : "-"}{formatCurrency(Math.abs(tx.amount))}
+          {isPositive ? "+" : "-"}<Coin className="mr-1 inline align-[-0.125em] text-coin" />{formatCurrency(Math.abs(tx.amount))}
         </p>
         <p className="text-[10px] text-ink-3">คงเหลือ {formatCurrency(tx.balanceAfter)}</p>
       </div>
@@ -238,7 +239,7 @@ export default function WalletPage() {
       <StudioToolbar>
         <StudioTabBar tabs={WALLET_TABS} value={tab} onChange={setTab} label="มุมมองกระเป๋าเงิน" idBase="wallet" />
         <p className="rounded-full border border-line px-3 py-1.5 text-sm text-ink-2">
-          ยอดคงเหลือ <span className="font-semibold tabular-nums text-coin">{formatCurrency(balance ?? 0)}</span>
+          ยอดคงเหลือ <span className="font-semibold tabular-nums text-coin"><Coin className="mr-1 inline align-[-0.125em]" />{formatCurrency(balance ?? 0)}</span>
         </p>
       </StudioToolbar>
 
@@ -262,7 +263,7 @@ export default function WalletPage() {
                 }
               >
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <MetricCard label="เหรียญคงเหลือ" value={formatCurrency(walletStats.balance)} hint="ยอดล่าสุดใน wallet" tone="amber" />
+                  <MetricCard label="เหรียญคงเหลือ" value={<><Coin className="mr-1.5 inline align-[-0.1em] text-coin" />{formatCurrency(walletStats.balance)}</>} hint="ยอดล่าสุดใน wallet" tone="amber" />
                   <MetricCard label="รายรับสะสม" value={formatCurrency(walletStats.topupTotal + walletStats.rewardTotal)} hint="topup, reward, refund" tone="indigo" />
                   <MetricCard label="ใช้จ่ายสะสม" value={formatCurrency(walletStats.spendingTotal)} hint="purchase ทั้งหมด" tone="rose" />
                   <MetricCard label="รางวัล/คืนเงิน" value={formatCurrency(walletStats.rewardTotal)} hint="reward + refund" tone="sky" />

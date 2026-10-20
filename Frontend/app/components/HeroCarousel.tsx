@@ -97,7 +97,7 @@ function Dots({ total, idx, desktop, onDotClick }: DotsProps) {
           key={i}
           ref={(el) => { dotEls.current[i] = el; }}
           onClick={() => onDotClick(i)}
-          className="h-2 w-2 rounded-full bg-ink/25 transition-colors duration-300 hover:bg-ink/50"
+          className="h-2 w-2 rounded-full bg-ink/25 transition-colors duration-300 hover:bg-ink/50 focus-visible:outline-offset-2" /* 8 px dot: an inset ring would read as "selected" */
           aria-label={`สลับไปรายการที่ ${i + 1}`}
         />
       ))}

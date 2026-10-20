@@ -85,8 +85,10 @@ function MarqueeTitle({ title, active }: { title: string; active: boolean }) {
 }
 
 export default function BookDetailModal({ book, onClose, scrollToChapters = false, highlightChapterId, routed = false }: Props) {
-  const [mounted, setMounted] = useState(false);
-  const [visible, setVisible] = useState(false);
+  // A routed popup replaces PopupSkeleton, which already shows the scrim and window: start shown, or the
+  // home page flashes through and the entry animation replays. (It only mounts client-side, after a fetch.)
+  const [mounted, setMounted] = useState(routed);
+  const [visible, setVisible] = useState(routed);
   const { favorited, liked, handleToggleFavorite, handleToggleLiked } = useBookActions(book);
 
   // Auto-detect last read chapter from history when prop is not explicitly provided
@@ -441,7 +443,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                             <path d="M8 5v14l11-7z" />
                           </svg>
                         )}
-                        {loadingChapters ? "กำลังโหลด..." : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
+                        {loadingChapters ? <span className="inline-flex items-center gap-2"><Loader context="inline" />กำลังโหลด</span> : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
                       </button>
                     )
                   ) : (
@@ -564,7 +566,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                               <path d="M8 5v14l11-7z" />
                             </svg>
                           )}
-                          {loadingChapters ? "กำลังโหลด..." : "ดูตอนทั้งหมด"}
+                          {loadingChapters ? <span className="inline-flex items-center gap-2"><Loader context="inline" />กำลังโหลด</span> : "ดูตอนทั้งหมด"}
                         </button>
                       )
                     ) : (
@@ -589,7 +591,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
                           <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                         </svg>
-                        {loadingChapters ? "กำลังโหลด..." : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
+                        {loadingChapters ? <span className="inline-flex items-center gap-2"><Loader context="inline" />กำลังโหลด</span> : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
                       </button>
                     )}
                     <button

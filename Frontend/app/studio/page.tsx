@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Coin from "../components/ui/Coin";
 import Link from "next/link";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
@@ -81,7 +82,7 @@ function RecentTransactionList({ transactions }: { transactions: WalletTransacti
 
             <div className="shrink-0 text-right">
               <p className={`text-sm font-semibold ${isPositive ? "text-coin" : "text-danger"}`}>
-                {isPositive ? "+" : "-"}{formatCurrency(Math.abs(tx.amount))}
+                {isPositive ? "+" : "-"}<Coin className="mr-1 inline align-[-0.125em] text-coin" />{formatCurrency(Math.abs(tx.amount))}
               </p>
               <p className="text-[11px] text-ink-3">
                 {date.toLocaleDateString("th-TH", { day: "numeric", month: "short" })}
@@ -192,7 +193,7 @@ export default function StudioOverviewPage() {
                 <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="นับจาก title ที่เคยอัปโหลด" tone="indigo" />
                 <MetricCard label="จำนวนตอน" value={overviewStats.totalChapters} hint={`รวมทั้งหมด ${overviewStats.totalPages} หน้า`} tone="violet" />
                 <MetricCard label="เผยแพร่แล้ว" value={overviewStats.published} hint={`รอตรวจสอบ ${overviewStats.pending} | แบบร่าง ${overviewStats.draft}`} tone="emerald" />
-                <MetricCard label="เหรียญคงเหลือ" value={formatCurrency(overviewStats.balance)} hint={`ใช้จ่ายสะสม ${formatCurrency(overviewStats.spendingTotal)}`} tone="amber" />
+                <MetricCard label="เหรียญคงเหลือ" value={<><Coin className="mr-1.5 inline align-[-0.1em] text-coin" />{formatCurrency(overviewStats.balance)}</>} hint={`ใช้จ่ายสะสม ${formatCurrency(overviewStats.spendingTotal)}`} tone="amber" />
               </div>
             </StudioSection>
 
