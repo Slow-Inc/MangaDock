@@ -269,3 +269,21 @@ def test_duplicate_translation_display_sfx_keeps_largest(stubs, monkeypatch):
                                      bubble_fit=False, clean_layout=True)
     assert big.render_branch == 'sfx_display'
     assert small.render_branch == 'suppressed' and not small.translation
+
+
+def test_anti_overlap_does_not_push_a_region_out_of_the_balloon_it_shares(monkeypatch):
+    """Tsuki p1 (2026-10-20): two regions shared one balloon; the sibling's territory is that
+    whole balloon, so clamping against it shoved the block out of its own balloon and onto the
+    neighbouring balloon's text. Siblings in one balloon are not neighbours to avoid."""
+    monkeypatch.setattr(rend, '_clean_layout_dst',
+                        lambda region, shape, fmin, fmax, page_shape=None: (20, 89.0, 96.0))
+    img = np.full((800, 800, 3), 255, np.uint8)
+    balloon = (477.0, 473.0, 560.0, 694.0)
+    a = FakeRegion(horizontal=True, translation='BUT THAT SORT OF', xyxy=(483, 522, 543, 584),
+                   bubble_box=balloon)
+    b = FakeRegion(horizontal=True, translation='MY APOLOGIES', xyxy=(488, 603, 544, 633),
+                   bubble_box=balloon)
+    rend.resize_regions_to_font_size(img, [a, b], None, 0, 8, bubble_fit=False, anti_overlap=True,
+                                     clean_layout=True)
+    x1, _, x2, _ = a.render_dst_box
+    assert (x1 + x2) / 2 == pytest.approx(513.0)

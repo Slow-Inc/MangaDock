@@ -166,6 +166,26 @@ def _region_territory(region):
     return (float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3])) if xy is not None else None
 
 
+def _neighbor_territories(text_regions, i):
+    """Territories region ``i`` must stay out of. A sibling in the SAME balloon owns only its
+    detection box: its territory would otherwise be that whole balloon, and clamping against it
+    shoved region ``i`` out of its own balloon onto the next one (Tsuki p1, 2026-10-20)."""
+    own = getattr(text_regions[i], 'bubble_box', None)
+    out = []
+    for j, r in enumerate(text_regions):
+        if j == i:
+            continue
+        bb = getattr(r, 'bubble_box', None)
+        if own is not None and bb is not None and tuple(map(float, bb)) == tuple(map(float, own)):
+            xy = getattr(r, 'xyxy', None)
+            t = tuple(float(v) for v in xy) if xy is not None else None
+        else:
+            t = _region_territory(r)
+        if t is not None:
+            out.append(t)
+    return out
+
+
 def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None):
     """Render-layout rework: lay the translated text out as an upright horizontal block
     at a *small absolute* font, wrapped to a compact width, ready to be placed on the
@@ -383,8 +403,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             # region's territory; the font is then fit to the clamped box, so the text
             # stays in its own space instead of colliding with the next bubble.
             if anti_overlap:
-                territories = [t for j, r in enumerate(text_regions) if j != i
-                               for t in (_region_territory(r),) if t is not None]
+                territories = _neighbor_territories(text_regions, i)
                 cb = clamp_box_to_neighbors(
                     (acx - fit_w / 2.0, acy - fit_h / 2.0, acx + fit_w / 2.0, acy + fit_h / 2.0),
                     territories, margin=2)
@@ -478,8 +497,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 cx, cy = (x1f + x2f) / 2.0, (y1f + y2f) / 2.0
                 # anti-overlap: shift the upright block off any neighbour's territory.
                 if anti_overlap:
-                    territories = [t for j, r in enumerate(text_regions) if j != i
-                                   for t in (_region_territory(r),) if t is not None]
+                    territories = _neighbor_territories(text_regions, i)
                     cb = clamp_box_to_neighbors(
                         (cx - block_w / 2.0, cy - block_h / 2.0,
                          cx + block_w / 2.0, cy + block_h / 2.0), territories, margin=2)
@@ -616,8 +634,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             pts = dst_points.reshape(-1, 2)
             ax1, ay1 = float(pts[:, 0].min()), float(pts[:, 1].min())
             ax2, ay2 = float(pts[:, 0].max()), float(pts[:, 1].max())
-            territories = [t for j, r in enumerate(text_regions) if j != i
-                           for t in (_region_territory(r),) if t is not None]
+            territories = _neighbor_territories(text_regions, i)
             cb = clamp_box_to_neighbors((ax1, ay1, ax2, ay2), territories, margin=2)
             if ((cb[2] - cb[0]) >= 6 and (cb[3] - cb[1]) >= 6 and
                     (cb[0] > ax1 + 0.5 or cb[1] > ay1 + 0.5
