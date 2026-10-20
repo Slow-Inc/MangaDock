@@ -37,7 +37,6 @@ const navItems = [
 ];
 
 export default function Navbar() {
-  const [scrolled, setScrolled]   = useState(false);
   const [genreOpen, setGenreOpen] = useState(false);
   const [mobileGenreOpen, setMobileGenreOpen] = useState(false);
   const pathname                   = usePathname();
@@ -45,13 +44,6 @@ export default function Navbar() {
   const genreRef                   = useRef<HTMLDivElement>(null);
   const isStudioPath               = pathname.startsWith("/studio");
   const activeStudioTab            = getActiveStudioTab(pathname);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   // Close genre dropdown on outside click
   useEffect(() => {
@@ -98,25 +90,12 @@ export default function Navbar() {
   return (
     <>
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-[border-color,box-shadow] duration-500 ${
-        scrolled
-          ? "border-b border-line"
-          : "border-b border-transparent"
-      }`}
+      className="fixed inset-x-0 top-0 z-50 border-b border-line"
     >
-      {/* Blur + bg overlay — kept as a child so dropdown's backdrop-blur isn't blocked by parent compositing */}
-      <div
-        className={`pointer-events-none absolute inset-0 -z-10 transition-all duration-500 ${
-          scrolled ? "bg-bg/60 backdrop-blur-xl" : "bg-transparent"
-        }`}
-      />
-
-      {/* Gradient shadow */}
-      <div
-        className={`pointer-events-none absolute inset-x-0 top-0 -z-10 h-40 bg-linear-to-b from-bg/70 to-transparent transition-opacity duration-500 ${
-          scrolled ? "opacity-0" : "opacity-100"
-        }`}
-      />
+      {/* Strata nav (globals.css 268-420): always bg at 86 % with blur and a hairline — it used to turn
+          on only after a window scroll, so pages that scroll an inner container (settings) showed content
+          straight through it. Kept as a child so the dropdown's backdrop-blur isn't blocked by compositing. */}
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-bg/[0.86] backdrop-blur-md backdrop-saturate-[1.2]" />
 
       <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-10">
         <div className="flex items-center gap-3 sm:gap-8">
