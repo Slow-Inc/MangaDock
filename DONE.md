@@ -8,10 +8,10 @@
 **What:** the server has no column for `lastChapterNumber`, and `loadHistoryData` replaced local entries
 with the server's, so every signed-in load erased the numbers; the backfill then re-fetched each manga's
 chapter list and queued a POST that could not store the field (11 POSTs per load for a 30-entry history).
-New pure `lib/historyMerge.ts` keeps local display-only fields (`lastChapterNumber`, `thumbnailLocal`)
+A pure `mergeRemoteHistory` (in readingHistory.ts) keeps local display-only fields (`lastChapterNumber`, `thumbnailLocal`)
 when the server entry is for the same chapter; the backfill updates local state only.
 
-**Validated:** `historyMerge.test.ts` red → green (3 cases); signed-in browser, production build: second
+**Validated:** `readingHistory.test.ts` red → green (4 cases); signed-in browser, production build: second
 load → 0 history POSTs (was 11), 0 entries missing a chapter number. Not changed: the hero's per-slide
 chapter fetch (HeroDetailButton, by design) and a second history GET per load (AuthContext — parked).
 

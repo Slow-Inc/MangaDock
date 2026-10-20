@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { mergeRemoteHistory, type MergeableEntry } from "./historyMerge";
+import { mergeRemoteHistory } from "./readingHistory";
+
+type MergeableEntry = Parameters<typeof mergeRemoteHistory>[0][number];
 
 const e = (id: string, lastReadAt: number, extra: Partial<MergeableEntry> = {}): MergeableEntry => ({ id, lastReadAt, ...extra });
 
@@ -16,6 +18,12 @@ describe("mergeRemoteHistory: server history wins, local display-only fields sur
     const local = [e("a", 100, { lastChapterId: "c1", lastChapterNumber: "12" })];
     const remote = [e("a", 200, { lastChapterId: "c2" })];
     expect(mergeRemoteHistory(local, remote, 30)).toEqual([e("a", 200, { lastChapterId: "c2" })]);
+  });
+
+  test("a chapterless entry keeps its cached thumbnail (server null vs local undefined)", () => {
+    const local = [e("a", 100, { thumbnailLocal: "/img-cache/a.jpg" })];
+    const remote = [e("a", 200, { lastChapterId: null })];
+    expect(mergeRemoteHistory(local, remote, 30)).toEqual([e("a", 200, { lastChapterId: null, thumbnailLocal: "/img-cache/a.jpg" })]);
   });
 
   test("keeps local-only entries, newest first, capped", () => {

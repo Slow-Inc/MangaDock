@@ -13,7 +13,6 @@
 import { apiFetch } from "./apiFetch";
 import { createAuthHeaders } from "./apiUtils";
 import { parseJsonArray } from "./safeJson";
-import { mergeRemoteHistory } from "./historyMerge";
 
 const API_BASE = "/api/proxy";
 const STORAGE_KEY = "mangadock_reading_history";
@@ -178,6 +177,30 @@ async function flushToServer() {
   } catch { /* retry on next change */ }
 }
 
+// ─── Merge server history into the local list (#814) ─────────────────────────
+// The server is the source of truth for what was read and when, but it does not store the display-only
+// fields — so a local lastChapterNumber / thumbnailLocal is kept when the server entry is for the same
+// chapter. Without this every load erased the numbers and the backfill re-fetched every chapter list.
+// Lives here, not in its own module: tests/cache-account-regression loads this file with an import allow-list.
+type MergeableEntry = Pick<HistoryBook, "id" | "lastReadAt" | "lastChapterNumber" | "thumbnailLocal"> & {
+  lastChapterId?: string | null;
+};
+
+export function mergeRemoteHistory<T extends MergeableEntry>(local: T[], remote: T[], max: number): T[] {
+  const localById = new Map(local.map((b) => [b.id, b]));
+  const fromRemote = remote.map((r) => {
+    const l = localById.get(r.id);
+    if (!l || (l.lastChapterId ?? null) !== (r.lastChapterId ?? null)) return r;
+    const kept: Partial<MergeableEntry> = {};
+    if (l.lastChapterNumber !== undefined) kept.lastChapterNumber = l.lastChapterNumber;
+    if (l.thumbnailLocal !== undefined) kept.thumbnailLocal = l.thumbnailLocal;
+    return { ...r, ...kept };
+  });
+  const remoteIds = new Set(remote.map((r) => r.id));
+  const localOnly = local.filter((b) => !remoteIds.has(b.id));
+  return [...fromRemote, ...localOnly].sort((a, b) => b.lastReadAt - a.lastReadAt).slice(0, max);
+}
+
 // ─── Load from server on login ──────────────────────────────────────────────
 export async function loadHistoryData(token: string) {
   const generation = cacheGeneration;
@@ -193,7 +216,8 @@ export async function loadHistoryData(token: string) {
     if (generation !== cacheGeneration) return;
 
     // Merge: server entries win (keeping local display-only fields), local-only entries are kept
-    const localOnly = books.filter((b) => !remote.find((r) => r.id === b.id));
+    const remoteIds = new Set(remote.map((r) => r.id));
+    const localOnly = books.filter((b) => !remoteIds.has(b.id));
     books = mergeRemoteHistory(books, remote, MAX_ITEMS);
     syncedIds = new Set(remote.map((b) => b.id));
 
