@@ -46,7 +46,7 @@ export default function DevMangaTranslateModelToggle() {
               onClick={() => changeModel(option)}
               className={`rounded-md border px-2 py-1 text-[10px] font-medium transition-colors ${
                 active
-                  ? "border-blue-400/70 bg-blue-500/20 text-blue-200"
+                  ? "border-accent/70 bg-accent/15 text-accent"
                   : "border-line bg-fill text-ink-2 hover:bg-raised"
               }`}
               title={`เลือกโมเดล ${LABELS[option]} สำหรับระบบแปลมังงะในตอน (Dev)`}

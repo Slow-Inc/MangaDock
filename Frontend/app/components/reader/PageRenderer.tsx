@@ -120,7 +120,7 @@ function PageRendererImpl({
               {/* Per-page translation status badge — continuous mode */}
               {pageIsPending && (
                 <div className="pointer-events-none absolute bottom-0 left-0 right-0 flex justify-center pb-2">
-                  <div className="flex items-center gap-1.5 rounded-full border border-accent/30 bg-bg/75 px-3 py-1 shadow-lg backdrop-blur-sm">
+                  <div className="flex items-center gap-1.5 rounded-full border border-accent/30 bg-bg/85 px-3 py-1 shadow-lg">
                     <Loader context="translate" label="กำลังแปล" />
                     <span className="text-[10px] font-medium text-accent">
                       {currentStage?.pageIndex === i || translatingCurrentPageIndex === i

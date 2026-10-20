@@ -84,7 +84,7 @@ describe("chapterAccess — unavailableLabel", () => {
 
   test("coin-locked shows the coin price", () => {
     const ch = base({ source: "user", priceCoins: 30, versionId: "v1" });
-    expect(chapterAccess(ch, ctx([])).unavailableLabel).toBe("🪙 30");
+    expect(chapterAccess(ch, ctx([])).unavailableLabel).toBe("30 เหรียญ");
   });
 
   test("falls back to the generic locked label", () => {
@@ -98,7 +98,7 @@ describe("chapterAccess — combined", () => {
     expect(chapterAccess(ch, ctx([]))).toEqual({
       coinLocked: true,
       readable: false,
-      unavailableLabel: "🪙 45",
+      unavailableLabel: "45 เหรียญ",
     });
   });
 

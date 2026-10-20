@@ -150,7 +150,7 @@ export default function AdminTransactionsPage() {
       {/* Detail panel */}
       {detail && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-scrim/70 backdrop-blur-sm" onClick={() => setDetail(null)} />
+          <div className="absolute inset-0 bg-scrim/80" onClick={() => setDetail(null)} />
           <div className="relative w-96 bg-surface border-l border-line h-full overflow-y-auto p-6 space-y-5">
             <button onClick={() => setDetail(null)} className="absolute top-4 right-4 text-ink-3 hover:text-ink transition-colors text-lg leading-none">✕</button>
             <div>

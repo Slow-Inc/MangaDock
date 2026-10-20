@@ -240,7 +240,7 @@ export default function AdminUsersPage() {
       {/* Detail slide-over */}
       {detailOpen && detail && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-scrim/70 backdrop-blur-sm" onClick={() => setDetailOpen(false)} />
+          <div className="absolute inset-0 bg-scrim/80" onClick={() => setDetailOpen(false)} />
           <div className="relative w-96 bg-surface border-l border-line h-full overflow-y-auto p-6 space-y-5">
             <button onClick={() => setDetailOpen(false)} className="absolute top-4 right-4 text-ink-3 hover:text-ink transition-colors text-lg leading-none">✕</button>
             <div>
@@ -305,7 +305,7 @@ export default function AdminUsersPage() {
       {/* Role confirm */}
       {confirmRoleUid && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-scrim/70 backdrop-blur-sm" onClick={() => setConfirmRoleUid(null)} />
+          <div className="absolute inset-0 bg-scrim/80" onClick={() => setConfirmRoleUid(null)} />
           <div className="relative bg-surface border border-line rounded-xl p-6 w-80 space-y-4 shadow-2xl">
             <p className="text-sm text-ink">Change role to <strong className="text-ink">{ROLE_LABEL[confirmRole]}</strong>?</p>
             <div className="flex gap-3 justify-end">
@@ -319,7 +319,7 @@ export default function AdminUsersPage() {
       {/* Ban confirm */}
       {confirmBanUid && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-scrim/70 backdrop-blur-sm" onClick={() => setConfirmBanUid(null)} />
+          <div className="absolute inset-0 bg-scrim/80" onClick={() => setConfirmBanUid(null)} />
           <div className="relative bg-surface border border-line rounded-xl p-6 w-80 space-y-4 shadow-2xl">
             <p className="text-sm text-ink">
               {confirmBanAction === 'ban'

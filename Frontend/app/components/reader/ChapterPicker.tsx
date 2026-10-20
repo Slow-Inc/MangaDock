@@ -66,7 +66,7 @@ export default function ChapterPicker({
 
   return (
     <div
-      className={`absolute inset-0 z-50 flex items-start justify-center bg-scrim/50 backdrop-blur-sm transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`absolute inset-0 z-50 flex items-start justify-center bg-scrim/70 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div

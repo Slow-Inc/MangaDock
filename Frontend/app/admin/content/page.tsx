@@ -162,7 +162,7 @@ export default function AdminContentPage() {
       {/* Delete confirm */}
       {confirmDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-scrim/70 backdrop-blur-sm" onClick={() => setConfirmDeleteId(null)} />
+          <div className="absolute inset-0 bg-scrim/80" onClick={() => setConfirmDeleteId(null)} />
           <div className="relative bg-surface border border-line rounded-xl p-6 w-80 space-y-4 shadow-2xl">
             <p className="text-sm text-ink">Delete this post? This cannot be undone.</p>
             <div className="flex gap-3 justify-end">
