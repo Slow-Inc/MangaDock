@@ -428,3 +428,17 @@ def test_fullwidth_and_double_marks_never_start_a_line():
     from manga_translator.rendering.text_render import _glue_thai_tokens
     for mark in ('⁉', '‼', '！', '？'):
         assert _glue_thai_tokens(['ยังไง', mark]) == ['ยังไง' + mark], mark
+
+
+def test_a_tall_balloon_keeps_its_size_when_dictionary_breaks_make_it_fit_816():
+    """#816 replay: the first fix shrank 'เทพธิดาพวกนั้นช่างน่ารังเกียจนัก!' to 10 px in a 74x166 interior,
+    because the column was never narrower than its longest word. Broken at dictionary parts it fits
+    at the full 20 px as a 5-line column — shrink only when that is not enough."""
+    if not _HAS_PYTHAINLP:
+        return
+    from manga_translator.rendering import _clean_layout_dst
+    tr.set_font(_PROMPT)
+    region = SimpleNamespace(translation='เทพธิดาพวกนั้นช่างน่ารังเกียจนัก!', target_lang='THA',
+                             font_size=0, xyxy=(0.0, 0.0, 74.0, 166.0))
+    fs, bw, bh = _clean_layout_dst(region, (800, 800, 3), 8, 20, shrink_to_fit=True)
+    assert fs == 20 and bw <= 74 * 1.05 and bh <= 166, (fs, bw, bh)

@@ -283,11 +283,19 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # flat fallback: squeeze at the flat size (tall-narrow, height-bounded as before).
     block_w, block_h = _layout_at(clean_fs)
     # #816: when the box is a balloon interior (bubble_fit_tall), a block that still overflows at
-    # the flat size spills past the balloon edge — shrink until it fits, down to a readable floor.
-    floor_fs = max(10, font_size_minimum)
-    while shrink_to_fit and clean_fs > floor_fs and (block_w > bbox_w * 1.05 or block_h > box_h):
-        clean_fs -= 1
-        block_w, block_h = _layout_at(clean_fs)
+    # the flat size spills past the balloon edge. Wrap straight to the interior width — the
+    # wrapper then breaks a too-long word at its dictionary parts, giving a taller column at the
+    # same size — and shrink only while that still does not fit, down to a readable floor.
+    if shrink_to_fit and (block_w > bbox_w * 1.05 or block_h > box_h):
+        floor_fs = max(10, font_size_minimum)
+        for fs in range(clean_fs, floor_fs - 1, -1):
+            ls, ws = text_render.calc_horizontal(fs, region.translation, int(bbox_w),
+                                                 int(img_shape[0]), language=lang)
+            block_w = float(max(ws)) if ws else float(bbox_w)
+            block_h = max(1, len(ls)) * fs * _LINE_HEIGHT
+            clean_fs = fs
+            if block_w <= bbox_w * 1.05 and block_h <= box_h:
+                break
     return int(clean_fs), float(block_w), float(block_h)
 
 
