@@ -2,6 +2,7 @@
 
 import { useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { supabase } from "../lib/supabase";
 
 type Props = { targetUid: string };
@@ -17,6 +18,10 @@ export default function FollowUserButton({ targetUid }: Props) {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
   const togglingRef = useRef(false);
+  const { showToast } = useToast();
+  // The profile a pending toggle belongs to; its rollback must not land on the next profile (#663).
+  const currentTarget = useRef(targetUid);
+  currentTarget.current = targetUid;
 
   useEffect(() => {
     // The instance is reused across /community/profile/[uid] navigations: drop the
@@ -49,6 +54,12 @@ export default function FollowUserButton({ targetUid }: Props) {
     if (togglingRef.current) return;
     togglingRef.current = true;
     const next = !following;
+    const target = targetUid;
+    const fail = () => {
+      if (currentTarget.current !== target) return;
+      setFollowing(!next);
+      showToast({ type: "error", message: next ? "ติดตามไม่สำเร็จ ลองใหม่อีกครั้ง" : "เลิกติดตามไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
+    };
     setFollowing(next);
     setToggling(true);
     try {
@@ -58,9 +69,9 @@ export default function FollowUserButton({ targetUid }: Props) {
         method,
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) setFollowing(!next);
+      if (!res.ok) fail();
     } catch {
-      setFollowing(!next);
+      fail();
     } finally {
       togglingRef.current = false;
       setToggling(false);

@@ -83,10 +83,11 @@ export default function PublicProfilePage() {
 
   // Fetched per profile (not on tab click) so the "following" tab badge shows the real count.
   // The tab is hidden on your own profile, so skip the request there.
-  const viewerUid = user?.uid;
+  // Keyed on the boolean, not the viewer uid: the uid going undefined → set as auth resolves would refetch.
+  const viewingOwn = user?.uid === uid;
   useEffect(() => {
     setFollowingUsers([]);
-    if (!uid || viewerUid === uid) { setLoadingFollowing(false); return; }
+    if (!uid || viewingOwn) { setLoadingFollowing(false); return; }
     let cancelled = false;
     setLoadingFollowing(true);
     fetch(`/api/proxy/user-follows/${encodeURIComponent(uid)}/following`)
@@ -95,7 +96,7 @@ export default function PublicProfilePage() {
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoadingFollowing(false); });
     return () => { cancelled = true; };
-  }, [uid, viewerUid]);
+  }, [uid, viewingOwn]);
 
   const openReposition = () => { setRepositioning(true);  setRepoAnim("entering"); };
   const closeReposition = () => { setRepositioning(false); setRepoAnim("exiting"); };

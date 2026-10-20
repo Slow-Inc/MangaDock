@@ -68,6 +68,27 @@ describe("singleFlight (#669a)", () => {
     expect(calls).toBe(2);
   });
 
+  it("reset() marks the call already in flight as stale, so its late result can be dropped", async () => {
+    let release!: () => void;
+    let stillCurrent: boolean | null = null;
+    const load = singleFlight(async (isCurrent) => {
+      await new Promise<void>((r) => { release = r; });
+      stillCurrent = isCurrent();
+    });
+    const p = load.run();
+    load.reset(); // e.g. sign-out while user A's follows are still loading
+    release();
+    await p;
+    expect(stillCurrent).toBe(false);
+  });
+
+  it("an undisturbed call stays current", async () => {
+    let stillCurrent: boolean | null = null;
+    const load = singleFlight(async (isCurrent) => { stillCurrent = isCurrent(); });
+    await load.run();
+    expect(stillCurrent).toBe(true);
+  });
+
   it("reset() forgets the in-flight call so the next caller starts its own", () => {
     let calls = 0;
     const load = singleFlight(() => {

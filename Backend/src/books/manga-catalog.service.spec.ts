@@ -280,6 +280,35 @@ describe('MangaCatalogService — search + passthrough (#231)', () => {
     expect(k1).not.toEqual(k2);
   });
 
+  it('year range: an empty result is cached too, so a miss does not rescan upstream (#661)', async () => {
+    const cache = makeCache(null);
+    const mangaDex = {
+      searchManga: jest.fn().mockResolvedValue({
+        items: [{ id: 'a', publishedDate: '1999' }],
+        total: 1,
+      }),
+      fetchMangaByIds: jest.fn(),
+    };
+    const svc = new MangaCatalogService(
+      mangaDex as any,
+      makeSupabase([]) as any,
+      cache as any,
+    );
+
+    const out = await svc.searchBooks(
+      'x',
+      undefined,
+      28,
+      0,
+      undefined,
+      2010,
+      2015,
+    );
+
+    expect(out.items).toEqual([]);
+    expect(cache.set).toHaveBeenCalledTimes(1);
+  });
+
   it('omitting new params returns same results as before (backward compat)', async () => {
     const cache = makeCache(null);
     const mangaDex = {

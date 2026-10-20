@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { removeFollowItem, restoreFollowItem, singleFlight, type FollowedSeries, type RemovedFollow } from "./seriesFollowState";
@@ -30,8 +30,9 @@ export function loadFollows(): Promise<void> {
   return followsLoad.run();
 }
 
-async function fetchFollows(): Promise<void> {
+async function fetchFollows(isCurrent: () => boolean): Promise<void> {
   const token = await getToken();
+  if (!isCurrent()) return; // signed out meanwhile — this result belongs to the previous user
   if (!token) {
     followedIds = new Set();
     followItems = [];
@@ -45,6 +46,7 @@ async function fetchFollows(): Promise<void> {
     });
     if (!res.ok) return;
     const data: FollowedSeries[] = await res.json();
+    if (!isCurrent()) return;
     followItems = data;
     followedIds = new Set(data.map((f) => f.id));
     loaded = true;
@@ -73,6 +75,7 @@ export function useSeriesFollow(book: { id: string; title: string; thumbnail: st
   const { user, showLoginPrompt } = useContext(AuthContext);
   const [following, setFollowing] = useState(() => followedIds.has(book.id));
   const [toggling, setToggling] = useState(false);
+  const busy = useRef(false); // re-entry guard; `toggling` state is stale inside a double click (#669)
 
   useEffect(() => {
     const sync = () => setFollowing(followedIds.has(book.id));
@@ -87,8 +90,13 @@ export function useSeriesFollow(book: { id: string; title: string; thumbnail: st
 
   const toggle = useCallback(async () => {
     if (!user) { showLoginPrompt(); return; }
+    if (busy.current) return;
+    busy.current = true;
     const token = await getToken();
-    if (!token || toggling) return;
+    if (!token) {
+      busy.current = false;
+      return;
+    }
 
     const wasFollowing = followedIds.has(book.id);
     let removed: RemovedFollow = null;
@@ -108,20 +116,19 @@ export function useSeriesFollow(book: { id: string; title: string; thumbnail: st
 
     setToggling(true);
     try {
-      if (wasFollowing) {
-        await fetch(`/api/proxy/users/me/follows/${encodeURIComponent(book.id)}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } else {
-        await fetch("/api/proxy/users/me/follows", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ id: book.id, title: book.title, thumbnail: book.thumbnail }),
-        });
-      }
+      const res = wasFollowing
+        ? await fetch(`/api/proxy/users/me/follows/${encodeURIComponent(book.id)}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        : await fetch("/api/proxy/users/me/follows", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ id: book.id, title: book.title, thumbnail: book.thumbnail }),
+          });
+      if (!res.ok) throw new Error(`follow ${res.status}`);
     } catch {
-      // Revert on network error
+      // Revert on a network error or an error response (#667)
       if (wasFollowing) {
         followedIds.add(book.id);
         followItems = restoreFollowItem(followItems, removed);
@@ -132,9 +139,10 @@ export function useSeriesFollow(book: { id: string; title: string; thumbnail: st
       setFollowing(wasFollowing);
       notify();
     } finally {
+      busy.current = false;
       setToggling(false);
     }
-  }, [user, book, toggling, showLoginPrompt]);
+  }, [user, book, showLoginPrompt]);
 
   return { following, toggling, toggle };
 }

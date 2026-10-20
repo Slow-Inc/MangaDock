@@ -153,7 +153,9 @@ export class MangaCatalogService {
       }
     }
 
-    if (result.items.length > 0) {
+    // A year-range miss costs up to YEAR_SCAN_MAX_PAGES upstream calls, so cache it too (#661);
+    // other empty results stay uncached as before.
+    if (result.items.length > 0 || hasYearRange) {
       await this.cache.set(cacheKey, result, CACHE_TTL_MS);
     }
 
@@ -165,7 +167,7 @@ export class MangaCatalogService {
    * upstream (#661). Scan upstream pages from offset 0 and filter locally until
    * one match past this page is found (so the next page stays reachable), the
    * upstream is exhausted, or the scan cap is hit. `total` is exact when the
-   * scan exhausted upstream, otherwise a lower bound that is > offset + limit.
+   * scan exhausted upstream, otherwise a lower bound (> offset + limit unless the scan cap stopped it first).
    */
   private async searchByYearRange(
     query: string,

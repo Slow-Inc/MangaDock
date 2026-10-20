@@ -3,6 +3,7 @@
 import StarRating from "./StarRating";
 import { safeUrl } from "../lib/safeUrl";
 import type { ReviewItem } from "../lib/reviewTypes";
+import { useState } from "react";
 
 type Props = {
   review: ReviewItem;
@@ -24,16 +25,19 @@ function timeAgo(iso: string): string {
 
 export default function ReviewCard({ review, isOwn, onDelete }: Props) {
   const initials = (review.displayName ?? "?").slice(0, 2).toUpperCase();
+  // A blocked scheme comes back as "#" — show the initials rather than an <img src="#"> that refetches the page.
+  const photo = review.photoUrl ? safeUrl(review.photoUrl) : "#";
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   return (
     <div className={`rounded-xl border p-4 ${isOwn ? "border-accent/40 bg-accent/10" : "border-line bg-fill"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          {review.photoUrl ? (
+          {photo !== "#" && !photoFailed ? (
             <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full">
               {/* User avatar host is arbitrary → plain <img>; next/image throws on un-allow-listed hosts. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={safeUrl(review.photoUrl)} alt="" className="h-full w-full object-cover" />
+              <img src={photo} alt="" className="h-full w-full object-cover" onError={() => setPhotoFailed(true)} />
             </div>
           ) : (
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fill text-xs font-bold text-ink-2">

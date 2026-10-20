@@ -35,7 +35,7 @@ function StreakFlame({ day }: { day: number }) {
 }
 
 export default function DailyCheckinModal() {
-  const { user } = useContext(AuthContext);
+  const { user, showLoginPrompt } = useContext(AuthContext);
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
   const [claiming, setClaiming] = useState(false);
@@ -72,7 +72,8 @@ export default function DailyCheckinModal() {
     setError("");
     try {
       const token = await getToken();
-      if (!token) { setError(checkinErrorMessage(401)); return; }
+      // Signed out under us: the login prompt, not a dead-end message (CLAUDE.md: always showLoginPrompt()).
+      if (!token) { showLoginPrompt(); return; }
       const res = await fetch("/api/proxy/checkin", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -88,6 +89,8 @@ export default function DailyCheckinModal() {
           .then((r): CoinBalanceUpdate => ({ balance: r.balance }))
           .catch((): CoinBalanceUpdate => ({ delta: data.coinsToday }))
           .then((detail) => window.dispatchEvent(new CustomEvent("mb:coin-balance-update", { detail })));
+      } else if (res.status === 401) {
+        showLoginPrompt();
       } else {
         setError(checkinErrorMessage(res.status));
         // Already claimed today (e.g. in another tab): let the user close the modal.

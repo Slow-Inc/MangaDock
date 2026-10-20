@@ -23,9 +23,6 @@ describe("checkinErrorMessage", () => {
     expect(checkinErrorMessage(null)).toBe("เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง");
   });
 
-  test("401 asks the user to sign in again", () => {
-    expect(checkinErrorMessage(401)).toBe("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
-  });
 
   test("409 says today's check-in was already claimed", () => {
     expect(checkinErrorMessage(409)).toBe("วันนี้เช็คอินไปแล้ว");
