@@ -7,6 +7,7 @@ import { getTrendingManga, type TrendingManga } from "../lib/communityApi";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import type { LandingBook, ForumCategory } from "../lib/types";
 import { CATEGORY_LIST } from "../lib/forumCategories";
+import Loader from "./ui/Loader";
 
 interface ForumSideMenuProps {
   onMangaSelect: (mangaId: string | undefined) => void;
@@ -126,9 +127,9 @@ export default function ForumSideMenu({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="ค้นหาชุมชนมังงะ..."
-          className="relative w-full bg-white/3 border border-white/10 rounded-2xl px-4 py-3 pl-11 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-500/50 focus:bg-white/5 transition-all smooth-hover"
+          className="relative w-full bg-fill border border-line rounded-2xl px-4 py-3 pl-11 text-xs text-ink placeholder-ink-3 focus:outline-none focus:border-accent/50 focus:bg-raised transition-all smooth-hover"
         />
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-hover:text-amber-400 transition-colors">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-3 group-hover:text-accent transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -136,10 +137,10 @@ export default function ForumSideMenu({
         
         {/* Search Results Dropdown */}
         {searchQuery.length >= 2 && (
-          <div className="absolute z-30 top-full mt-3 w-full bg-[#151518]/98 border border-white/10 rounded-2xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="absolute z-30 top-full mt-3 w-full bg-surface border border-line rounded-2xl shadow-[0_18px_40px_-16px_rgb(0_0_0/.3)] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
             {searching ? (
               <div className="p-6 text-center">
-                <div className="w-6 h-6 border-2 border-white/10 border-t-amber-500 rounded-full animate-spin mx-auto" />
+                <Loader context="section" />
               </div>
             ) : searchResults.length > 0 ? (
               <div className="p-1.5">
@@ -150,17 +151,17 @@ export default function ForumSideMenu({
                       onMangaSelect(m.id);
                       setSearchQuery("");
                     }}
-                    className="w-full flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/5 text-left transition-all group/item"
+                    className="w-full flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-fill text-left transition-all group/item"
                   >
-                    <div className="relative w-9 aspect-[2/3] shrink-0 rounded-lg overflow-hidden bg-white/5 border border-white/5 shadow-lg group-hover/item:border-amber-500/30 transition-all">
+                    <div className="relative w-9 aspect-[2/3] shrink-0 rounded-lg overflow-hidden bg-fill border border-line shadow-lg group-hover/item:border-accent/30 transition-all">
                       <Image src={m.thumbnail} alt="" fill sizes="36px" className="object-cover" />
                     </div>
-                    <p className="text-xs font-black text-white/80 group-hover/item:text-amber-400 transition-colors truncate">{m.title}</p>
+                    <p className="text-xs font-black text-ink group-hover/item:text-accent transition-colors truncate">{m.title}</p>
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="p-6 text-center text-xs text-white/20 font-bold">ไม่พบมังงะที่คุณค้นหา</div>
+              <div className="p-6 text-center text-xs text-ink-3 font-bold">ไม่พบมังงะที่คุณค้นหา</div>
             )}
           </div>
         )}
@@ -168,41 +169,41 @@ export default function ForumSideMenu({
 
       {/* 1. FEEDS SECTION */}
       <div>
-        <h3 className="px-4 text-xs font-semibold text-white/40 mb-2">ฟีด</h3>
+        <h3 className="px-4 text-xs font-semibold text-ink-3 mb-2">ฟีด</h3>
         <div className="space-y-1">
           <button
             onClick={() => { onMangaSelect(undefined); onCategorySelect(undefined); }}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left transition-all smooth-hover ${
               !selectedMangaId && !selectedCategory && !isOnTrending
-                ? "bg-white/5 text-amber-400"
-                : "text-white/50 hover:text-white hover:bg-white/2"
+                ? "bg-fill text-accent"
+                : "text-ink-2 hover:text-ink hover:bg-fill"
             }`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
-            <span className="text-sm font-bold tracking-tight">หน้าแรก</span>
+            <span className="text-sm font-bold">หน้าแรก</span>
           </button>
           
           <button
             onClick={onTrendingSelect}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left transition-all smooth-hover ${
               isOnTrending
-                ? "bg-white/5 text-amber-400"
-                : "text-white/50 hover:text-white hover:bg-white/2"
+                ? "bg-fill text-accent"
+                : "text-ink-2 hover:text-ink hover:bg-fill"
             }`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
-            <span className="text-sm font-bold tracking-tight">ยอดนิยม</span>
+            <span className="text-sm font-bold">ยอดนิยม</span>
           </button>
         </div>
       </div>
 
       {/* 2. TOPICS SECTION */}
       <div>
-        <h3 className="px-4 text-xs font-semibold text-white/40 mb-2">หัวข้อ</h3>
+        <h3 className="px-4 text-xs font-semibold text-ink-3 mb-2">หัวข้อ</h3>
         <div className="space-y-0.5">
           {categories.map((cat) => (
             <button
@@ -210,14 +211,14 @@ export default function ForumSideMenu({
               onClick={() => onCategorySelect(selectedCategory === cat.id ? undefined : cat.id)}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left transition-all smooth-hover group ${
                 selectedCategory === cat.id 
-                  ? "bg-white/5 text-amber-400" 
-                  : "text-white/50 hover:text-white hover:bg-white/2"
+                  ? "bg-fill text-accent" 
+                  : "text-ink-2 hover:text-ink hover:bg-fill"
               }`}
             >
-              <div className={`transition-colors ${selectedCategory === cat.id ? "text-amber-400" : "text-white/30 group-hover:text-white/50"}`}>
+              <div className={`transition-colors ${selectedCategory === cat.id ? "text-accent" : "text-ink-3 group-hover:text-ink-2"}`}>
                 {cat.icon}
               </div>
-              <span className="text-sm font-bold tracking-tight">{cat.label}</span>
+              <span className="text-sm font-bold">{cat.label}</span>
             </button>
           ))}
         </div>
@@ -226,16 +227,16 @@ export default function ForumSideMenu({
       {/* 3. POPULAR COMMUNITIES (Reddit-style Manga List) */}
       <div>
         <div className="flex items-center justify-between px-4 mb-3">
-          <h3 className="text-xs font-semibold text-white/40">คอมมูนิตี้มังงะ</h3>
-          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <h3 className="text-xs font-semibold text-ink-3">คอมมูนิตี้มังงะ</h3>
+          <div className="w-1.5 h-1.5 rounded-full bg-accent" />
         </div>
 
         <div className="space-y-0.5">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                <div className="w-6 h-6 rounded-full bg-white/5 animate-pulse" />
-                <div className="h-3 w-32 bg-white/5 rounded-full animate-pulse" />
+                <div className="w-6 h-6 rounded-full bg-fill animate-pulse" />
+                <div className="h-3 w-32 bg-fill rounded-full animate-pulse" />
               </div>
             ))
           ) : trending.slice(0, 5).map((item, index) => (
@@ -244,23 +245,23 @@ export default function ForumSideMenu({
               onClick={() => onMangaSelect(item.mangaId)}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left transition-all smooth-hover group ${
                 selectedMangaId === item.mangaId 
-                  ? "bg-white/5 text-amber-400 shadow-sm" 
-                  : "text-white/50 hover:text-white hover:bg-white/2"
+                  ? "bg-fill text-accent shadow-sm" 
+                  : "text-ink-2 hover:text-ink hover:bg-fill"
               }`}
             >
-              <div className="relative w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white/5 border border-white/10 shadow-lg group-hover:border-white/20 transition-all">
+              <div className="relative w-6 h-6 shrink-0 rounded-full overflow-hidden bg-fill border border-line shadow-lg group-hover:border-ink-3 transition-all">
                 {item.mangaCover ? (
                   <Image src={item.mangaCover} alt="" fill sizes="24px" className="object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[6px] font-black text-white/20 uppercase">M</div>
+                  <div className="w-full h-full flex items-center justify-center text-[6px] font-black text-ink-3 uppercase">M</div>
                 )}
                 {/* Micro Rank */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                  <span className="text-[8px] font-black text-amber-400">{index + 1}</span>
+                <div className="absolute inset-0 bg-scrim/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <span className="text-[8px] font-black text-accent">{index + 1}</span>
                 </div>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold truncate tracking-tight">{item.mangaTitle}</p>
+                <p className="text-sm font-bold truncate">{item.mangaTitle}</p>
               </div>
             </button>
           ))}
@@ -268,7 +269,7 @@ export default function ForumSideMenu({
           {trending.length > 5 && (
             <button
               onClick={() => router.push("/community/trending")}
-              className="w-full mt-2 px-4 py-2 text-xs font-semibold text-amber-400/70 hover:text-amber-400 hover:bg-amber-500/5 rounded-xl transition-all text-center"
+              className="w-full mt-2 px-4 py-2 text-xs font-semibold text-accent/70 hover:text-accent hover:bg-accent/5 rounded-xl transition-all text-center"
             >
               ดูทั้งหมด
             </button>
@@ -277,13 +278,13 @@ export default function ForumSideMenu({
       </div>
 
       {/* 4. GUIDELINES */}
-      <div className="pt-6 border-t border-white/5">
-        <div className="px-4 py-4 rounded-2xl bg-white/[0.01] border border-white/5">
-           <h4 className="text-xs font-semibold text-white/40 mb-2">กฎของชุมชน</h4>
+      <div className="pt-6 border-t border-line">
+        <div className="px-4 py-4 rounded-2xl bg-fill border border-line">
+           <h4 className="text-xs font-semibold text-ink-3 mb-2">กฎของชุมชน</h4>
            <ul className="space-y-2">
              {["เคารพซึ่งกันและกัน", "ไม่สปอย", "ไม่สแปม"].map((r, i) => (
-               <li key={i} className="flex items-center gap-2 text-[10px] text-white/30 font-medium">
-                 <div className="w-1 h-1 rounded-full bg-white/10" />
+               <li key={i} className="flex items-center gap-2 text-[10px] text-ink-3 font-medium">
+                 <div className="w-1 h-1 rounded-full bg-fill" />
                  {r}
                </li>
              ))}

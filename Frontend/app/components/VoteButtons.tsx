@@ -95,8 +95,8 @@ export default function VoteButtons({
         aria-label="โหวตขึ้น"
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border smooth-hover-fast transition-colors ${
           userVote === 1
-            ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
-            : "text-white/40 border-transparent hover:text-white/70 hover:bg-white/[0.06] hover:border-white/10"
+            ? "bg-accent/10 text-accent border-accent/40"
+            : "text-ink-3 border-transparent hover:text-ink-2 hover:bg-fill hover:border-line"
         }`}
       >
         <svg aria-hidden="true" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -105,7 +105,7 @@ export default function VoteButtons({
         <span>{upvotes}</span>
       </button>
 
-      <div className="w-px h-3.5 bg-white/10 shrink-0" />
+      <div className="w-px h-3.5 bg-fill shrink-0" />
 
       <button
         onClick={() => handleVote(-1)}
@@ -114,7 +114,7 @@ export default function VoteButtons({
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border smooth-hover-fast transition-colors ${
           userVote === -1
             ? "bg-accent/10 text-accent border-accent/40"
-            : "text-white/40 border-transparent hover:text-white/70 hover:bg-white/[0.06] hover:border-white/10"
+            : "text-ink-3 border-transparent hover:text-ink-2 hover:bg-fill hover:border-line"
         }`}
       >
         <svg aria-hidden="true" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">

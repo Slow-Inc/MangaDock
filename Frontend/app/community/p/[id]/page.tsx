@@ -18,6 +18,8 @@ const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นั
 import type { ForumPost, ForumComment } from "../../../lib/types";
 import { isDisplayedVoteEvent } from "../../../lib/voteEvents";
 import { isSocialCdnUrl } from '../../../lib/avatarUpload';
+import Loader from "../../../components/ui/Loader";
+import { PRIMARY_FILL } from "../../../components/ui/Button";
 
 function MarqueeText({ text, textClassName, active }: { text: string; textClassName?: string; active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -238,7 +240,7 @@ export default function PostDetailPage() {
   }
 
   if (!post) return (
-    <div className="py-20 text-center text-white/40">ไม่พบข้อมูลกระทู้</div>
+    <div className="py-20 text-center text-ink-3">ไม่พบข้อมูลกระทู้</div>
   );
 
   return (
@@ -251,16 +253,16 @@ export default function PostDetailPage() {
       <div
         className={`sticky top-16 z-50 flex h-14 items-center gap-3 border-b transition-all duration-300 ${
           headerScrolled
-            ? "bg-[#141414]/80 backdrop-blur-md border-white/10 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]"
+            ? "bg-surface/80 backdrop-blur-md border-line shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]"
             : "bg-transparent border-transparent"
         }`}
       >
         <button
           onClick={() => router.back()}
           className="group relative flex items-center gap-2 h-9 px-3 sm:px-5 rounded-full overflow-hidden shrink-0
-            bg-white/[0.07] hover:bg-white/[0.13]
-            border border-white/[0.13] hover:border-white/25
-            text-white/70 hover:text-white
+            bg-fill hover:bg-raised
+            border border-line hover:border-ink-3
+            text-ink-2 hover:text-ink
             transition-all duration-200"
           aria-label="ย้อนกลับ"
         >
@@ -270,22 +272,22 @@ export default function PostDetailPage() {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
-          <span className="hidden sm:block text-xs font-bold tracking-wide">ย้อนกลับ</span>
+          <span className="hidden sm:block text-xs font-bold">ย้อนกลับ</span>
         </button>
 
         <div className={`min-w-0 flex-1 transition-opacity duration-300 ${headerScrolled ? "opacity-100" : "opacity-0"}`}>
           <MarqueeText
             text={post.title}
-            textClassName="text-sm font-semibold text-white"
+            textClassName="text-sm font-semibold text-ink"
             active={headerScrolled}
           />
         </div>
       </div>
 
-      <article className="bg-[#1a1a1a] border border-white/10 rounded-2xl overflow-hidden mb-8 shadow-xl">
+      <article className="bg-surface border border-line rounded-2xl overflow-hidden mb-8 shadow-xl">
           <div className="p-4 sm:p-8">
-            <header className="flex items-center flex-wrap gap-3 mb-3 sm:mb-4 text-xs text-white/40 relative">
-              <div className="w-6 h-6 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/5">
+            <header className="flex items-center flex-wrap gap-3 mb-3 sm:mb-4 text-xs text-ink-3 relative">
+              <div className="w-6 h-6 rounded-full bg-fill overflow-hidden shrink-0 border border-line">
                 {post.authorPhotoUrl && (
                   <Image
                     src={post.authorPhotoUrl}
@@ -301,13 +303,13 @@ export default function PostDetailPage() {
               <Link
                 href={`/community/profile/${post.authorUid}`}
                 className={`font-bold text-sm hover:underline underline-offset-2 transition-opacity hover:opacity-80 ${
-                  post.authorRole === 1 ? "text-amber-400" :
-                  post.authorRole === 2 ? "text-orange-400" : "text-white/80"
+                  post.authorRole === 1 ? "text-accent" :
+                  post.authorRole === 2 ? "text-ink" : "text-ink"
                 }`}
               >
                 {post.authorName || 'Unknown User'}
                 {post.authorRole > 0 && (
-                  <span className="ml-1.5 px-1 bg-white/10 rounded text-[9px] uppercase tracking-tighter text-white/70">
+                  <span className="ml-1.5 px-1 bg-fill rounded text-[9px] uppercase tracking-tighter text-ink-2">
                     {ROLE_LABEL[post.authorRole] ?? String(post.authorRole)}
                   </span>
                 )}
@@ -319,7 +321,7 @@ export default function PostDetailPage() {
               {post.category !== 'general' && (
                 <>
                   <span>•</span>
-                  <span className="px-2.5 py-1 rounded-full bg-white/10 text-amber-400 font-bold uppercase tracking-wider text-[10px] border border-amber-500/20">
+                  <span className="px-2.5 py-1 rounded-full bg-fill text-accent font-bold uppercase tracking-wider text-[10px] border border-accent/20">
                     {post.category}
                   </span>
                 </>
@@ -327,9 +329,9 @@ export default function PostDetailPage() {
               {post.targetMangaTitle && (
                 <>
                   <span>•</span>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold border border-amber-500/20">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/10 text-accent text-[10px] font-bold border border-accent/20">
                     {post.targetMangaCover && (
-                      <div className="w-3.5 h-3.5 rounded-sm overflow-hidden relative border border-amber-500/20 shrink-0">
+                      <div className="w-3.5 h-3.5 rounded-sm overflow-hidden relative border border-accent/20 shrink-0">
                         <Image src={post.targetMangaCover} alt="manga" fill sizes="14px" className="object-cover" />
                       </div>
                     )}
@@ -341,7 +343,7 @@ export default function PostDetailPage() {
                 <div ref={menuRef} className="ml-auto relative shrink-0">
                   <button
                     onClick={() => menuOpen ? closeMenu() : openMenu()}
-                    className="w-8 h-8 flex items-center justify-center rounded-full text-white/30 hover:text-white/70 hover:bg-white/8 active:bg-white/12 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-ink-3 hover:text-ink-2 hover:bg-fill active:bg-fill transition-colors"
                     aria-label="ตัวเลือกโพสต์"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -351,7 +353,7 @@ export default function PostDetailPage() {
 
                   {menuOpen && (
                     <div
-                      className={`absolute right-0 top-full mt-1 z-30 w-44 bg-[#202020] border border-white/10 rounded-2xl overflow-hidden origin-top-right transition-[opacity,transform] duration-150 ease-out ${
+                      className={`absolute right-0 top-full mt-1 z-30 w-44 bg-surface border border-line rounded-2xl overflow-hidden origin-top-right transition-[opacity,transform] duration-150 ease-out ${
                         menuVisible
                           ? "opacity-100 scale-100 translate-y-0"
                           : "opacity-0 scale-95 -translate-y-1"
@@ -359,20 +361,20 @@ export default function PostDetailPage() {
                     >
                       {confirmDeletePost ? (
                         <div key="confirm" className="p-3 space-y-2.5 animate-in fade-in slide-in-from-right-2 duration-150">
-                          <p className="text-xs text-white/40 text-center font-medium">ลบโพสต์นี้ใช่ไหม?</p>
+                          <p className="text-xs text-ink-3 text-center font-medium">ลบโพสต์นี้ใช่ไหม?</p>
                           <div className="flex gap-2">
                             <button
                               onClick={() => setConfirmDeletePost(false)}
-                              className="flex-1 py-2 rounded-xl text-xs font-bold text-white/50 hover:bg-white/8 active:bg-white/12 transition-colors"
+                              className="flex-1 py-2 rounded-xl text-xs font-bold text-ink-2 hover:bg-fill active:bg-fill transition-colors"
                             >
                               ยกเลิก
                             </button>
                             <button
                               onClick={handleDeletePost}
                               disabled={deletingPost}
-                              className="flex-1 py-2 rounded-xl text-xs font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25 active:bg-red-500/35 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+                              className="flex-1 py-2 rounded-xl text-xs font-bold bg-danger/15 text-danger hover:bg-danger/25 active:bg-danger/35 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
                             >
-                              {deletingPost && <div className="w-3 h-3 border border-red-400/30 border-t-red-400 rounded-full animate-spin" />}
+                              {deletingPost && <Loader context="inline" />}
                               {deletingPost ? "กำลังลบ..." : "ลบ"}
                             </button>
                           </div>
@@ -381,7 +383,7 @@ export default function PostDetailPage() {
                         <div key="menu" className="animate-in fade-in slide-in-from-left-2 duration-150">
                           <button
                             onClick={() => { handleEditPostStart(); closeMenu(); }}
-                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold text-white/70 hover:bg-white/5 active:bg-white/8 transition-colors"
+                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold text-ink-2 hover:bg-fill active:bg-fill transition-colors"
                           >
                             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -389,10 +391,10 @@ export default function PostDetailPage() {
                             <span className="sm:hidden">แก้ไข</span>
                             <span className="hidden sm:inline">แก้ไขโพสต์</span>
                           </button>
-                          <div className="h-px bg-white/5 mx-3" />
+                          <div className="h-px bg-fill mx-3" />
                           <button
                             onClick={() => setConfirmDeletePost(true)}
-                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold text-red-400/70 hover:bg-red-500/8 active:bg-red-500/12 hover:text-red-400 transition-colors"
+                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold text-danger/70 hover:bg-danger/8 active:bg-danger/12 hover:text-danger transition-colors"
                           >
                             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -413,27 +415,27 @@ export default function PostDetailPage() {
                 <input
                   value={editPostTitle}
                   onChange={(e) => setEditPostTitle(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xl sm:text-2xl font-black text-white focus:outline-none focus:border-amber-500 transition-colors mb-3"
+                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-xl sm:text-2xl font-black text-ink focus:outline-none focus:border-accent transition-colors mb-3"
                   placeholder="หัวข้อกระทู้"
                 />
                 <textarea
                   value={editPostContent}
                   onChange={(e) => setEditPostContent(e.target.value)}
                   rows={8}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm sm:text-base text-white/90 focus:outline-none focus:border-amber-500 transition-colors resize-none leading-relaxed"
+                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm sm:text-base text-ink focus:outline-none focus:border-accent transition-colors resize-none leading-relaxed"
                   placeholder="เนื้อหากระทู้"
                 />
                 <div className="flex justify-end gap-2 mt-3">
                   <button
                     onClick={() => setIsEditingPost(false)}
-                    className="px-4 py-2 rounded-xl text-sm font-bold text-white/50 hover:bg-white/5 transition-colors"
+                    className="px-4 py-2 rounded-xl text-sm font-bold text-ink-2 hover:bg-fill transition-colors"
                   >
                     ยกเลิก
                   </button>
                   <button
                     onClick={handleSavePost}
                     disabled={savingPost || !editPostTitle.trim() || !editPostContent.trim()}
-                    className="px-6 py-2 rounded-xl bg-white text-black text-sm font-bold hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className={`px-6 py-2 rounded-xl ${PRIMARY_FILL} text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                   >
                     {savingPost ? "กำลังบันทึก..." : "บันทึก"}
                   </button>
@@ -441,7 +443,7 @@ export default function PostDetailPage() {
               </div>
             ) : (
               <>
-                <h1 className="text-xl sm:text-3xl font-black text-white mb-3 sm:mb-6 leading-tight tracking-tight">
+                <h1 className="text-xl sm:text-3xl font-black text-ink mb-3 sm:mb-6 leading-tight">
                   {post.title}
                 </h1>
 
@@ -449,28 +451,28 @@ export default function PostDetailPage() {
                 {post.category === 'spoiler' ? (
                   <div className="relative mb-4 sm:mb-6">
                     <div
-                      className={`text-white/90 text-sm sm:text-base leading-relaxed whitespace-pre-wrap ${spoilerRevealed ? '' : 'select-none pointer-events-none line-clamp-4'}`}
+                      className={`text-ink text-sm sm:text-base leading-relaxed whitespace-pre-wrap ${spoilerRevealed ? '' : 'select-none pointer-events-none line-clamp-4'}`}
                       style={{ filter: spoilerRevealed ? 'blur(0px)' : 'blur(4px)', transition: 'filter 0.5s ease' }}
                     >
                       {post.content}
                     </div>
-                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/30 rounded-xl backdrop-blur-[2px] transition-opacity duration-500 ${
+                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 bg-scrim/30 rounded-xl backdrop-blur-[2px] transition-opacity duration-500 ${
                       spoilerRevealed ? 'opacity-0 pointer-events-none' : 'opacity-100'
                     }`}>
-                      <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                       </svg>
-                      <p className="text-amber-400 font-bold text-sm">เนื้อหานี้มีสปอยล์</p>
+                      <p className="text-accent font-bold text-sm">เนื้อหานี้มีสปอยล์</p>
                       <button
                         onClick={() => setSpoilerRevealed(true)}
-                        className="px-5 py-2 rounded-full bg-amber-500 text-black font-black text-sm hover:bg-amber-400 active:scale-95 transition-all duration-150"
+                        className={`px-5 py-2 rounded-full ${PRIMARY_FILL} font-black text-sm active:scale-95 transition-all duration-150`}
                       >
                         คลิกเพื่อดูสปอยล์
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-white/90 text-sm sm:text-base leading-relaxed whitespace-pre-wrap mb-4 sm:mb-6">
+                  <div className="text-ink text-sm sm:text-base leading-relaxed whitespace-pre-wrap mb-4 sm:mb-6">
                     {post.content}
                   </div>
                 )}
@@ -495,7 +497,7 @@ export default function PostDetailPage() {
                     href={safeUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`relative block overflow-hidden bg-white/5 rounded-lg group ${
+                    className={`relative block overflow-hidden bg-fill rounded-lg group ${
                       post.imageUrls.length === 1 ? 'aspect-video' : 'aspect-square'
                     } ${post.imageUrls.length === 3 && i === 0 ? 'col-span-2 aspect-video' : ''}`}
                   >
@@ -506,8 +508,8 @@ export default function PostDetailPage() {
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
                       unoptimized
                     />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                      <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="absolute inset-0 bg-scrim/0 group-hover:bg-scrim/20 transition-colors flex items-center justify-center">
+                      <svg className="w-8 h-8 text-ink opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
                     </div>
@@ -517,7 +519,7 @@ export default function PostDetailPage() {
               </div>
             )}
 
-            <footer className="pt-4 sm:pt-6 border-t border-white/5 flex items-center gap-6">
+            <footer className="pt-4 sm:pt-6 border-t border-line flex items-center gap-6">
               <VoteButtons
                 targetType="post"
                 targetId={post.id}
@@ -526,7 +528,7 @@ export default function PostDetailPage() {
                 initialUserVote={post.userVote}
                 externalCounts={voteCounts.get(`post:${post.id}`)}
               />
-              <div className="text-sm font-bold text-white/30">
+              <div className="text-sm font-bold text-ink-3">
                 {post.commentCount} ความคิดเห็น
               </div>
             </footer>
@@ -535,17 +537,17 @@ export default function PostDetailPage() {
 
       {/* Comment Input */}
       <section id="comments" className="mb-10">
-        <h2 className="text-xl font-bold text-white mb-6">
+        <h2 className="text-xl font-bold text-ink mb-6">
           ความคิดเห็น
           {post.commentCount > 0 && (
-            <span className="ml-2 text-base font-medium text-white/30">({post.commentCount})</span>
+            <span className="ml-2 text-base font-medium text-ink-3">({post.commentCount})</span>
           )}
         </h2>
         
         {user ? (
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-4">
+          <div className="bg-surface border border-line rounded-2xl p-4">
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/5 mt-1">
+              <div className="w-8 h-8 rounded-full bg-fill overflow-hidden shrink-0 border border-line mt-1">
                 {user.photoURL && (
                   <img src={user.photoURL} alt={user.displayName || 'user'} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                 )}
@@ -556,15 +558,15 @@ export default function PostDetailPage() {
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="ร่วมแสดงความคิดเห็นของคุณ..."
                   rows={3}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-amber-500 transition-all resize-none mb-3"
+                  className="w-full bg-fill border border-line rounded-xl p-3 text-ink text-sm focus:outline-none focus:border-accent transition-all resize-none mb-3"
                 />
                 <div className="flex justify-end">
                   <button
                     onClick={handlePostComment}
                     disabled={!newComment.trim() || submitting}
-                    className="px-6 py-2 rounded-xl bg-white text-black font-bold text-sm hover:bg-white/90 disabled:opacity-50 transition-all flex items-center gap-2"
+                    className={`px-6 py-2 rounded-xl ${PRIMARY_FILL} font-bold text-sm disabled:opacity-50 transition-all flex items-center gap-2`}
                   >
-                    {submitting && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                    {submitting && <Loader context="inline" />}
                     {submitting ? "กำลังส่ง..." : "ส่งความคิดเห็น"}
                   </button>
                 </div>
@@ -572,14 +574,14 @@ export default function PostDetailPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-white/5 border border-dashed border-white/10 rounded-2xl py-10 text-center space-y-3">
-            <div className="w-10 h-10 mx-auto rounded-2xl bg-white/5 flex items-center justify-center">
-              <svg className="w-5 h-5 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-fill border border-dashed border-line rounded-2xl py-10 text-center space-y-3">
+            <div className="w-10 h-10 mx-auto rounded-2xl bg-fill flex items-center justify-center">
+              <svg className="w-5 h-5 text-ink-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <p className="text-white/40 text-sm font-medium">เข้าสู่ระบบเพื่อร่วมแสดงความคิดเห็น</p>
-            <button onClick={showLoginPrompt} className="px-5 py-2 rounded-xl bg-white text-black text-sm font-bold hover:bg-white/90 smooth-hover">
+            <p className="text-ink-3 text-sm font-medium">เข้าสู่ระบบเพื่อร่วมแสดงความคิดเห็น</p>
+            <button onClick={showLoginPrompt} className={`px-5 py-2 rounded-xl ${PRIMARY_FILL} text-sm font-bold smooth-hover`}>
               เข้าสู่ระบบ
             </button>
           </div>
@@ -598,7 +600,7 @@ export default function PostDetailPage() {
           ))
         ) : (
           <div className="py-10 text-center">
-            <p className="text-white/20 font-bold">ยังไม่มีใครมาแสดงความเห็นเลย...</p>
+            <p className="text-ink-3 font-bold">ยังไม่มีใครมาแสดงความเห็นเลย...</p>
           </div>
         )}
       </section>

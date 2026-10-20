@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import ForumSideMenu from "../components/ForumSideMenu";
 import { ReactLenis } from 'lenis/react';
 import type { ForumCategory } from "../lib/types";
+import Loader from "../components/ui/Loader";
 
 function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -62,12 +63,12 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-[--surface-base]">
+    <div className="min-h-screen bg-bg">
       <Navbar />
       
       {/* Mobile Drawer Overlay */}
       <div 
-        className={`fixed inset-0 z-50 bg-black/80 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+        className={`fixed inset-0 z-50 bg-scrim/80 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
           isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setIsMobileMenuOpen(false)}
@@ -77,14 +78,14 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
           role="dialog"
           aria-modal="true"
           aria-label="เมนู"
-          className={`absolute top-0 left-0 w-[300px] h-full bg-[--surface-overlay] shadow-2xl border-r border-white/10 transition-transform duration-300 ease-out overflow-y-auto custom-scrollbar p-6 ${
+          className={`absolute top-0 left-0 w-[300px] h-full bg-surface shadow-2xl border-r border-line transition-transform duration-300 ease-out overflow-y-auto custom-scrollbar p-6 ${
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
-            <h2 className="font-black text-white uppercase tracking-widest text-xs">Community</h2>
-            <button onClick={() => setIsMobileMenuOpen(false)} aria-label="ปิดเมนู" className="text-white/40 hover:text-white">
+          <div className="flex justify-between items-center mb-6 pb-4 border-b border-line">
+            <h2 className="font-black text-ink uppercase tracking-[0.1em] text-xs">Community</h2>
+            <button onClick={() => setIsMobileMenuOpen(false)} aria-label="ปิดเมนู" className="text-ink-3 hover:text-ink">
               <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
               </svg>
@@ -134,8 +135,8 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
 export default function CommunityLayout({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={
-        <div className="min-h-screen bg-[--surface-base] flex items-center justify-center">
-            <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+        <div className="min-h-screen bg-bg flex items-center justify-center">
+            <Loader context="page" />
         </div>
     }>
       <CommunityLayoutContent>{children}</CommunityLayoutContent>

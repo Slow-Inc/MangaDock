@@ -59,7 +59,7 @@ export default function FollowUserButton({ targetUid }: Props) {
     }
   }
 
-  if (loading) return <div className="h-8 w-24 animate-pulse rounded-full bg-white/10" />;
+  if (loading) return <div className="h-8 w-24 animate-pulse rounded-full bg-fill" />;
 
   return (
     <button
@@ -67,7 +67,7 @@ export default function FollowUserButton({ targetUid }: Props) {
       disabled={toggling}
       className={`flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-semibold transition ${
         following
-          ? "border-white/20 bg-white/8 text-white/70 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
+          ? "border-ink-3 bg-fill text-ink-2 hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
           : "border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
       }`}
     >

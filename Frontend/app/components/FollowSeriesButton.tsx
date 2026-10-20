@@ -18,8 +18,8 @@ export default function FollowSeriesButton({ book, variant = "icon-rounded" }: P
   const active = following
     ? "border-accent/40 bg-accent/10 text-accent"
     : isSquare
-      ? "border-white/25 text-white/80 hover:border-white/50"
-      : "border-white/40 text-white hover:border-white";
+      ? "border-ink-3 text-ink hover:border-ink"
+      : "border-ink-3 text-ink hover:border-ink";
 
   return (
     <button
