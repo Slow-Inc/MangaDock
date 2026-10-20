@@ -16,11 +16,8 @@ import {
 } from "../../lib/studioApi";
 import { getCached, setCache } from "../../lib/studioCache";
 import { StudioWalletSkeleton } from "../components/StudioSkeleton";
-import {
-  GroupedBarChart,
-  MetricCard,
-  StudioSection,
-} from "../components/StudioDashboardWidgets";
+import { MetricCard, StudioSection } from "../components/StudioDashboardWidgets";
+import StudioBarChart from "../components/charts/StudioBarChart";
 import {
   StudioMobileHeader,
   StudioMobileHero,
@@ -338,7 +335,7 @@ export default function WalletPage() {
               </div>
             </StudioMobileSection>
             <StudioMobileSection title={`ข้อมูลประจำเดือน ${THAI_MONTHS[selectedMonth]} ${selectedYear}`}>
-              <GroupedBarChart points={recentDailySeries} valueFormatter={formatCurrency} />
+              <StudioBarChart points={recentDailySeries} valueFormatter={formatCurrency} ariaLabel="รายรับและรายจ่ายรายวันของเดือนที่เลือก" />
               <div className="mt-4 grid grid-cols-3 gap-3">
                 <MetricCard label="รายรับ" value={formatCurrency(monthlySummary.income)} tone="indigo" />
                 <MetricCard label="รายจ่าย" value={formatCurrency(monthlySummary.spending)} tone="rose" />
@@ -346,7 +343,7 @@ export default function WalletPage() {
               </div>
             </StudioMobileSection>
             <StudioMobileSection title="ภาพรวม 6 เดือนล่าสุด">
-              <GroupedBarChart points={monthlyTotals} valueFormatter={formatCurrency} />
+              <StudioBarChart points={monthlyTotals} valueFormatter={formatCurrency} ariaLabel="รายรับและรายจ่ายรายเดือน 6 เดือนล่าสุด" />
             </StudioMobileSection>
           </div>
         );
@@ -467,7 +464,7 @@ export default function WalletPage() {
                     </div>
                   }
                 >
-                  <GroupedBarChart points={recentDailySeries} valueFormatter={formatCurrency} />
+                  <StudioBarChart points={recentDailySeries} valueFormatter={formatCurrency} ariaLabel="รายรับและรายจ่ายรายวันของเดือนที่เลือก" />
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     <MetricCard label="รายรับเดือนนี้" value={formatCurrency(monthlySummary.income)} tone="indigo" />
                     <MetricCard label="รายจ่ายเดือนนี้" value={formatCurrency(monthlySummary.spending)} tone="rose" />
@@ -476,7 +473,7 @@ export default function WalletPage() {
                 </StudioSection>
 
                 <StudioSection title="ภาพรวม 6 เดือนล่าสุด" subtitle="เปรียบเทียบ income / spending แบบ monthly">
-                  <GroupedBarChart points={monthlyTotals} valueFormatter={formatCurrency} />
+                  <StudioBarChart points={monthlyTotals} valueFormatter={formatCurrency} ariaLabel="รายรับและรายจ่ายรายเดือน 6 เดือนล่าสุด" />
                 </StudioSection>
               </div>
 

@@ -1,8 +1,8 @@
 /**
  * Provenance: evilcharts `src/registry/ui/echarts-chart.tsx`
  * (https://github.com/legions-developer/evilcharts, MIT, Copyright (c) 2026 Gurbinder).
- * Only the pieces Studio uses are kept (site:): renderer registration — SVG only, the one StudioAreaChart
- * asks for — and the two colour helpers. The registry's theme/config/ChartStyle machinery was dropped
+ * Only the pieces Studio uses are kept (site:): renderer registration — SVG only, the one the Studio charts
+ * ask for (`useStudioChart`) — and the two colour helpers. The registry's theme/config/ChartStyle machinery was dropped
  * because our charts read the design tokens directly.
  */
 import { SVGRenderer } from "echarts/renderers";

@@ -16,14 +16,13 @@ import { getCached, setCache } from "../lib/studioCache";
 import Loader from "../components/ui/Loader";
 import { PRIMARY_FILL } from "../components/ui/Button";
 import { StudioOverviewSkeleton } from "./components/StudioSkeleton";
-import {
-  DonutChart,
-  GroupedBarChart,
-  HorizontalBreakdownChart,
-  LineChart,
-  MetricCard,
-  StudioSection,
-} from "./components/StudioDashboardWidgets";
+import { MetricCard, StudioSection } from "./components/StudioDashboardWidgets";
+import StudioAreaChart, { type AreaSeries } from "./components/charts/StudioAreaChart";
+import StudioBarChart from "./components/charts/StudioBarChart";
+import StudioBreakdownChart from "./components/charts/StudioBreakdownChart";
+import StudioDonutChart from "./components/charts/StudioDonutChart";
+import ChartEmpty from "./components/charts/ChartEmpty";
+import { hasValues } from "./components/charts/chartMath";
 import {
   StudioMobileHeader,
   StudioMobileHero,
@@ -96,6 +95,11 @@ function RecentTransactionList({ transactions }: { transactions: WalletTransacti
   );
 }
 
+function IncomeChart({ labels, series }: { labels: string[]; series: AreaSeries[] }) {
+  if (!hasValues(series[0].values)) return <ChartEmpty label="ยังไม่มีข้อมูลเพียงพอสำหรับกราฟนี้" />;
+  return <StudioAreaChart labels={labels} series={series} valueFormatter={formatCurrency} ariaLabel="รายรับรายวัน 30 วันล่าสุด" />;
+}
+
 export default function StudioOverviewPage() {
   const { getIdToken } = useAuth();
   const { showToast } = useToast();
@@ -149,8 +153,9 @@ export default function StudioOverviewPage() {
   const transactionTypes = useMemo(() => getTransactionTypeBreakdown(transactions), [transactions]);
   const last30Days = useMemo(() => getWalletFlowLastDays(transactions, 30), [transactions]);
   const monthlyWallet = useMemo(() => getWalletMonthlyTotals(transactions, 6), [transactions]);
-  const dailyIncome = useMemo(
-    () => last30Days.map((item) => ({ label: item.label, value: item.income })),
+  const incomeLabels = useMemo(() => last30Days.map((item) => item.label), [last30Days]);
+  const incomeSeries = useMemo<AreaSeries[]>(
+    () => [{ name: "รายรับ", values: last30Days.map((item) => item.income), token: "--accent" }],
     [last30Days],
   );
 
@@ -274,13 +279,13 @@ export default function StudioOverviewPage() {
               onBack={() => setMobileView("menu")}
             />
             <StudioMobileSection title="สถานะผลงาน" subtitle="สัดส่วน draft, pending, approved, published และรายการที่โดน moderator ลบ">
-              <DonutChart data={statusBreakdown} />
+              <StudioDonutChart data={statusBreakdown} ariaLabel="สัดส่วนสถานะผลงาน" />
             </StudioMobileSection>
             <StudioMobileSection title="โครงสร้างภาษา" subtitle="ภาษาที่ถูกใช้งานบ่อยที่สุด">
-              <HorizontalBreakdownChart data={languageBreakdown} />
+              <StudioBreakdownChart data={languageBreakdown} ariaLabel="จำนวนตอนแยกตามภาษา" />
             </StudioMobileSection>
             <StudioMobileSection title="เรื่องหลักของสตูดิโอ" subtitle="เรื่องที่มีจำนวนตอนมากที่สุด">
-              <HorizontalBreakdownChart data={titleBreakdown} />
+              <StudioBreakdownChart data={titleBreakdown} ariaLabel="เรื่องที่มีจำนวนตอนมากที่สุด" />
             </StudioMobileSection>
           </div>
         );
@@ -295,13 +300,13 @@ export default function StudioOverviewPage() {
               onBack={() => setMobileView("menu")}
             />
             <StudioMobileSection title="ภาพรวม 6 เดือนล่าสุด" subtitle="เปรียบเทียบรายรับและรายจ่ายแบบรายเดือน">
-              <GroupedBarChart points={monthlyWallet} valueFormatter={formatCurrency} />
+              <StudioBarChart points={monthlyWallet} valueFormatter={formatCurrency} ariaLabel="รายรับและรายจ่ายรายเดือน 6 เดือนล่าสุด" />
             </StudioMobileSection>
             <StudioMobileSection title="รายรับ 30 วันล่าสุด" subtitle="ดูเฉพาะธุรกรรมขาเข้า เช่น topup, reward และ refund">
-              <LineChart points={dailyIncome} valueFormatter={formatCurrency} />
+              <IncomeChart labels={incomeLabels} series={incomeSeries} />
             </StudioMobileSection>
             <StudioMobileSection title="ประเภทธุรกรรม" subtitle="สัดส่วน transaction ทั้งหมดในกระเป๋าเงิน">
-              <DonutChart data={transactionTypes} />
+              <StudioDonutChart data={transactionTypes} ariaLabel="สัดส่วนประเภทธุรกรรม" />
             </StudioMobileSection>
           </div>
         );
@@ -422,31 +427,31 @@ export default function StudioOverviewPage() {
 
               <div className="grid gap-6 xl:grid-cols-2">
                 <StudioSection title="สถานะผลงาน" subtitle="สัดส่วน draft / published / pending moderation ของเวอร์ชันทั้งหมด">
-                  <DonutChart data={statusBreakdown} />
+                  <StudioDonutChart data={statusBreakdown} ariaLabel="สัดส่วนสถานะผลงาน" />
                 </StudioSection>
 
                 <StudioSection title="โครงสร้างภาษา" subtitle="ภาษาที่ใช้งานบ่อยที่สุดในผลงานของคุณ">
-                  <HorizontalBreakdownChart data={languageBreakdown} />
+                  <StudioBreakdownChart data={languageBreakdown} ariaLabel="จำนวนตอนแยกตามภาษา" />
                 </StudioSection>
               </div>
 
               <div className="grid gap-6 xl:grid-cols-2">
                 <StudioSection title="กระแสเหรียญรายเดือน" subtitle="เปรียบเทียบรายรับและรายจ่าย 6 เดือนล่าสุด">
-                  <GroupedBarChart points={monthlyWallet} valueFormatter={formatCurrency} />
+                  <StudioBarChart points={monthlyWallet} valueFormatter={formatCurrency} ariaLabel="รายรับและรายจ่ายรายเดือน 6 เดือนล่าสุด" />
                 </StudioSection>
 
                 <StudioSection title="รายรับรายวัน 30 วันล่าสุด" subtitle="กราฟเส้นสำหรับธุรกรรมขาเข้า เช่น topup, reward และ refund">
-                  <LineChart points={dailyIncome} valueFormatter={formatCurrency} />
+                  <IncomeChart labels={incomeLabels} series={incomeSeries} />
                 </StudioSection>
               </div>
 
               <div className="grid gap-6 xl:grid-cols-2">
                 <StudioSection title="ผลงานที่มีจำนวนตอนสูงสุด" subtitle="ดูได้เร็วว่าชื่อเรื่องไหนเป็นแกนหลักของสตูดิโอคุณ">
-                  <HorizontalBreakdownChart data={titleBreakdown} />
+                  <StudioBreakdownChart data={titleBreakdown} ariaLabel="เรื่องที่มีจำนวนตอนมากที่สุด" />
                 </StudioSection>
 
                 <StudioSection title="ประเภทธุรกรรม" subtitle="สัดส่วนธุรกรรมที่เกิดขึ้นในกระเป๋าเงินทั้งหมด">
-                  <DonutChart data={transactionTypes} />
+                  <StudioDonutChart data={transactionTypes} ariaLabel="สัดส่วนประเภทธุรกรรม" />
                 </StudioSection>
               </div>
 

@@ -1,105 +1,67 @@
 "use client";
 
 /**
- * A lean ECharts area chart for Studio (Epic C #788). echarts is imported on demand (Studio routes only),
- * tree-shaken from `echarts/core`; the renderer registration comes from the vendored evilcharts core
- * (`./echarts-chart.tsx`). Colours come from the design tokens at render time, so the chart follows the theme.
- * Hover shows one tooltip for the day; reduced motion disables the entrance animation.
+ * A lean ECharts area chart for Studio (Epic C #788): one line per series with a soft fill under it. Shared plumbing
+ * (on-demand echarts, token colours, theme rebuild, reduced motion, dispose) lives in `useStudioChart`.
+ * Hover shows one tooltip for the day.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
+import { useStudioChart, type ChartKit, type Register } from "./useStudioChart";
 
 export type AreaSeries = { name: string; values: number[]; token: "--accent" | "--coin" | "--ok" };
 
-export default function StudioAreaChart({ labels, series, height = 240, ariaLabel }: { labels: string[]; series: AreaSeries[]; height?: number; ariaLabel: string }) {
+const register: Register = (charts, components) => [charts.LineChart, components.GridComponent, components.TooltipComponent];
+
+export default function StudioAreaChart({
+  labels,
+  series,
+  height = 240,
+  ariaLabel,
+  valueFormatter,
+}: {
+  labels: string[];
+  series: AreaSeries[];
+  height?: number;
+  ariaLabel: string;
+  valueFormatter?: (value: number) => string;
+}) {
   const el = useRef<HTMLDivElement>(null);
-  // Colours are read from the tokens when the chart is built, so rebuild when the theme changes.
-  const [theme, setTheme] = useState<string | null>(null);
-  useEffect(() => {
-    const root = document.documentElement;
-    const read = () => setTheme(root.getAttribute("data-theme"));
-    read();
-    const mo = new MutationObserver(read);
-    mo.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => mo.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const node = el.current;
-    if (!node) return;
-    let disposed = false;
-    let chart: { setOption: (o: unknown) => void; resize: () => void; dispose: () => void } | null = null;
-    let ro: ResizeObserver | null = null;
-
-    (async () => {
-      const [echarts, charts, components, core] = await Promise.all([
-        import("echarts/core"),
-        import("echarts/charts"),
-        import("echarts/components"),
-        import("./echarts-chart"), // registers the canvas + svg renderers; withAlpha for the fill
-      ]);
-      if (disposed) return;
-      echarts.use([charts.LineChart, components.GridComponent, components.TooltipComponent]);
-
-      const css = getComputedStyle(node);
-      // Tokens are hex or color-mix(); normalise to rgba so ECharts (and withAlpha) can use them.
-      const v = (name: string) => core.normalizeColor(css.getPropertyValue(name));
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-      chart = echarts.init(node, null, { renderer: "svg" });
-      chart.setOption({
-        animation: !reduce,
-        animationDuration: 600,
-        grid: { left: 8, right: 8, top: 16, bottom: 24, containLabel: true },
-        tooltip: {
-          trigger: "axis",
-          backgroundColor: v("--surface"),
-          borderColor: v("--ink-3"),
-          textStyle: { color: v("--ink"), fontFamily: "var(--font-inter), var(--font-anuphan), system-ui" },
-          axisPointer: { type: "line", lineStyle: { color: v("--ink-3") } },
-        },
-        xAxis: {
-          type: "category",
-          boundaryGap: false,
-          data: labels,
-          axisLine: { lineStyle: { color: v("--ink-3") } },
-          axisTick: { show: false },
-          axisLabel: { color: v("--ink-3"), fontSize: 11, hideOverlap: true },
-        },
-        yAxis: {
-          type: "value",
-          minInterval: 1,
-          splitLine: { lineStyle: { color: v("--ink-3"), opacity: 0.25 } },
-          axisLabel: { color: v("--ink-3"), fontSize: 11 },
-        },
-        series: series.map((s) => {
-          const color = v(s.token);
-          return {
-            name: s.name,
-            type: "line",
-            smooth: 0.35,
-            symbol: "none",
-            data: s.values,
-            lineStyle: { width: 2, color },
-            itemStyle: { color },
-            areaStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: core.withAlpha(color, 0.28) },
-                { offset: 1, color: core.withAlpha(color, 0) },
-              ]),
-            },
-          };
-        }),
-      });
-      ro = new ResizeObserver(() => chart?.resize());
-      ro.observe(node);
-    })();
-
-    return () => {
-      disposed = true;
-      ro?.disconnect();
-      chart?.dispose();
-    };
-  }, [labels, series, theme]);
+  const build = useCallback(
+    (kit: ChartKit) => ({
+      ...kit.base("axis"),
+      grid: { left: 8, right: 8, top: 16, bottom: 24, containLabel: true },
+      xAxis: { type: "category", boundaryGap: false, data: labels, ...kit.axisStyle() },
+      yAxis: {
+        type: "value",
+        minInterval: 1,
+        splitLine: kit.splitLine(),
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: kit.color("--ink-3"), fontSize: 11, formatter: valueFormatter },
+      },
+      series: series.map((s) => {
+        const color = kit.color(s.token);
+        return {
+          name: s.name,
+          type: "line",
+          smooth: 0.35,
+          symbol: "none",
+          data: s.values,
+          lineStyle: { width: 2, color },
+          itemStyle: { color },
+          tooltip: valueFormatter ? { valueFormatter } : undefined,
+          areaStyle: {
+            color: new kit.echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: kit.withAlpha(color, 0.28) },
+              { offset: 1, color: kit.withAlpha(color, 0) },
+            ]),
+          },
+        };
+      }),
+    }),
+    [labels, series, valueFormatter],
+  );
+  useStudioChart(el, register, build);
 
   return <div ref={el} role="img" aria-label={ariaLabel} style={{ height }} className="w-full" />;
 }
