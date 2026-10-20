@@ -335,6 +335,10 @@ def replay_translations(texts: List[str], recorded: Dict) -> Tuple[List[Optional
     """Map each source text to the translation a previous doctor run recorded (its `.doctor.json`).
 
     Returns the translations (None where unseen) and the indices that still need a live call."""
-    by_src = {r['src']: r['dst'] for r in recorded.get('regions', []) if r.get('src')}
+    # A text the recorded run dropped as 'identical to original' was translated to itself; replaying
+    # that keeps the arms comparable instead of re-asking the LLM (2026-10-21).
+    by_src = {src: src for src, reason in recorded.get('dropped', [])
+              if src and 'identical' in str(reason).lower()}
+    by_src.update({r['src']: r['dst'] for r in recorded.get('regions', []) if r.get('src')})
     out = [by_src.get(t) for t in texts]
     return out, [i for i, t in enumerate(out) if t is None]

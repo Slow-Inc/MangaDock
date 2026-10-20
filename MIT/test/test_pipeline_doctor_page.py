@@ -261,3 +261,14 @@ def test_two_rendered_blocks_on_top_of_each_other_fail_at_render():
     assert render.status == FAIL
     assert render.metrics['overlap'] == 1
     assert 'overlap' in render.evidence and 2 not in flags
+
+
+def test_replay_reproduces_a_translation_the_recording_dropped_as_identical():
+    """2026-10-21: texts the recorded run dropped as 'identical to original' were missing from the
+    recording, so every replay re-translated them live and two arms disagreed ('力' -> 'พลัง' in one,
+    dropped in the other) — the A/B diff was LLM noise, not the code under test."""
+    from tools.pipeline_doctor.page_probes import replay_translations
+    recorded = {'regions': [{'src': 'HELLO', 'dst': 'สวัสดี'}],
+                'dropped': [['力', 'Translation identical to original'], ['X', 'Target language ratio']]}
+    out, missing = replay_translations(['HELLO', '力', 'X'], recorded)
+    assert out[:2] == ['สวัสดี', '力'] and missing == [2]
