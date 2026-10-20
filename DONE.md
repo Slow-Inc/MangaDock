@@ -3,6 +3,17 @@
 
 ---
 
+## #830 Settings tab strip keeps the active tab visible on a phone (2026-10-21)
+
+**What:** at 390 px the settings tab strip always started at the left, so on stats and danger zone the active tab
+was off-screen. The strip scrolls its own scrollLeft (pure `lib/stripScroll.ts`, never the page) to show the active tab on navigation, and both navs mark it with
+`aria-current="page"` — same pattern as the admin strip (#819).
+
+**Validated:** `stripScroll.test.ts` red → green; production build, local test session at 390: active tab fully visible on profile, password,
+accounts, stats and danger (stats/danger were off-screen); 0 page overflow. tsc 0; eslint 0.
+
+---
+
 ## #828 Studio says "could not load" instead of showing zero works and 0 coins (2026-10-21)
 
 **What:** a failed Studio overview/works load showed a toast and then a full set of zero metrics and empty charts
