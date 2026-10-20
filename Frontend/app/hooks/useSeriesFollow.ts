@@ -3,7 +3,7 @@
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
-import { removeFollowItem, restoreFollowItem, type FollowedSeries, type RemovedFollow } from "./seriesFollowState";
+import { removeFollowItem, restoreFollowItem, singleFlight, type FollowedSeries, type RemovedFollow } from "./seriesFollowState";
 
 export type { FollowedSeries };
 
@@ -23,7 +23,14 @@ async function getToken(): Promise<string | null> {
   return session?.access_token ?? null;
 }
 
-export async function loadFollows(): Promise<void> {
+// Every follow button on a page calls loadFollows() before `loaded` flips — share one request.
+const followsLoad = singleFlight(fetchFollows);
+
+export function loadFollows(): Promise<void> {
+  return followsLoad.run();
+}
+
+async function fetchFollows(): Promise<void> {
   const token = await getToken();
   if (!token) {
     followedIds = new Set();
@@ -46,6 +53,7 @@ export async function loadFollows(): Promise<void> {
 }
 
 export function clearFollowCache() {
+  followsLoad.reset();
   followedIds = new Set();
   followItems = [];
   loaded = false;

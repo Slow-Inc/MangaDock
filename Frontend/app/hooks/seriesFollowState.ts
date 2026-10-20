@@ -28,3 +28,21 @@ export function restoreFollowItem(items: FollowedSeries[], snapshot: RemovedFoll
   const index = Math.min(snapshot.index, items.length);
   return [...items.slice(0, index), snapshot.item, ...items.slice(index)];
 }
+
+/** Concurrent run() calls share one in-flight promise; reset() drops it (e.g. on sign-out). */
+export function singleFlight(fn: () => Promise<void>) {
+  let inflight: Promise<void> | null = null;
+  return {
+    run(): Promise<void> {
+      if (inflight) return inflight;
+      const p: Promise<void> = fn().finally(() => {
+        if (inflight === p) inflight = null;
+      });
+      inflight = p;
+      return p;
+    },
+    reset() {
+      inflight = null;
+    },
+  };
+}

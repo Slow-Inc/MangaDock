@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { removeFollowItem, restoreFollowItem } from "./seriesFollowState";
+import { removeFollowItem, restoreFollowItem, singleFlight } from "./seriesFollowState";
 import type { FollowedSeries } from "./seriesFollowState";
 
 const item = (id: string, followedAt: string): FollowedSeries => ({
@@ -38,5 +38,45 @@ describe("removeFollowItem / restoreFollowItem (#667)", () => {
   it("clamps the index when the list shrank while the request was in flight", () => {
     const { snapshot } = removeFollowItem(original, "c");
     expect(restoreFollowItem([item("a", "x")], snapshot).map((f) => f.id)).toEqual(["a", "c"]);
+  });
+});
+
+describe("singleFlight (#669a)", () => {
+  it("shares one in-flight call between concurrent callers", async () => {
+    let calls = 0;
+    let release!: () => void;
+    const load = singleFlight(() => {
+      calls += 1;
+      return new Promise<void>((r) => { release = r; });
+    });
+    const p1 = load.run();
+    const p2 = load.run();
+    const p3 = load.run();
+    expect(calls).toBe(1);
+    release();
+    await Promise.all([p1, p2, p3]);
+  });
+
+  it("starts a fresh call once the previous one settled (resolved or rejected)", async () => {
+    let calls = 0;
+    const load = singleFlight(async () => {
+      calls += 1;
+      if (calls === 1) throw new Error("boom");
+    });
+    await expect(load.run()).rejects.toThrow("boom");
+    await load.run();
+    expect(calls).toBe(2);
+  });
+
+  it("reset() forgets the in-flight call so the next caller starts its own", () => {
+    let calls = 0;
+    const load = singleFlight(() => {
+      calls += 1;
+      return new Promise<void>(() => {});
+    });
+    load.run();
+    load.reset();
+    load.run();
+    expect(calls).toBe(2);
   });
 });
