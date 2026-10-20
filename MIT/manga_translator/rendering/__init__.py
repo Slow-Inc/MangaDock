@@ -183,7 +183,8 @@ def _neighbor_territories(text_regions, i):
     return out
 
 
-def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None):
+def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None,
+                      shrink_to_fit: bool = False):
     """Render-layout rework: lay the translated text out as an upright horizontal block
     at a *small absolute* font, wrapped to a compact width, ready to be placed on the
     region's centre. Returns ``(font_size, block_w, block_h)`` — or ``None`` when the
@@ -281,6 +282,12 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
 
     # flat fallback: squeeze at the flat size (tall-narrow, height-bounded as before).
     block_w, block_h = _layout_at(clean_fs)
+    # #816: when the box is a balloon interior (bubble_fit_tall), a block that still overflows at
+    # the flat size spills past the balloon edge — shrink until it fits, down to a readable floor.
+    floor_fs = max(10, font_size_minimum)
+    while shrink_to_fit and clean_fs > floor_fs and (block_w > bbox_w * 1.05 or block_h > box_h):
+        clean_fs -= 1
+        block_w, block_h = _layout_at(clean_fs)
     return int(clean_fs), float(block_w), float(block_h)
 
 
@@ -420,7 +427,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                     xyxy=(acx - fit_w / 2.0, acy - fit_h / 2.0,
                           acx + fit_w / 2.0, acy + fit_h / 2.0))
                 _laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum,
-                                          font_size_max, page_shape)
+                                          font_size_max, page_shape, shrink_to_fit=True)
                 if _laid is not None:
                     _fs, _bw, _bh = _laid
                     region.font_size = int(_fs)

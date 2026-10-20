@@ -406,3 +406,18 @@ def test_spaced_mai_yamok_never_starts_a_line_and_words_stay_whole():
             lines, _ = tr.calc_horizontal(20, text, w, 400, language='THA')
             assert not any(l.startswith('ๆ') for l in lines), (text, w, lines)
             assert not any(l.endswith('ม') for l in lines), (text, w, lines)
+
+
+def test_a_tall_balloon_shrinks_the_font_until_the_block_fits_816():
+    """#816: bubble_fit_tall fell back to the flat 20 px unconditionally, so a Thai line wider than
+    the balloon's interior was placed spilling past the edge (Tsuki p1: 8-25 px over the art)."""
+    if not _HAS_PYTHAINLP:
+        return
+    from manga_translator.rendering import _clean_layout_dst
+    tr.set_font(_PROMPT)
+    region = SimpleNamespace(translation='เทพธิดาพวกนั้นช่างน่ารักจริงๆ เลยนะ', target_lang='THA',
+                             font_size=0, xyxy=(0.0, 0.0, 44.0, 180.0))
+    _, bw0, _ = _clean_layout_dst(region, (800, 800, 3), 8, 20)
+    assert bw0 > 44 * 1.05  # the flat 20 px really overflows this interior
+    fs, bw, bh = _clean_layout_dst(region, (800, 800, 3), 8, 20, shrink_to_fit=True)
+    assert fs < 20 and bw <= 44 * 1.05 and bh <= 180, (fs, bw, bh)
