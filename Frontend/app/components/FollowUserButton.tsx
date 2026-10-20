@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 
@@ -16,6 +16,7 @@ export default function FollowUserButton({ targetUid }: Props) {
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
+  const togglingRef = useRef(false);
 
   useEffect(() => {
     // The instance is reused across /community/profile/[uid] navigations: drop the
@@ -44,7 +45,9 @@ export default function FollowUserButton({ targetUid }: Props) {
 
   async function handleToggle() {
     if (!user) { showLoginPrompt(); return; }
-    if (toggling) return;
+    // A ref, not the `toggling` state: two clicks before the re-render would both read the stale `false`.
+    if (togglingRef.current) return;
+    togglingRef.current = true;
     const next = !following;
     setFollowing(next);
     setToggling(true);
@@ -59,6 +62,7 @@ export default function FollowUserButton({ targetUid }: Props) {
     } catch {
       setFollowing(!next);
     } finally {
+      togglingRef.current = false;
       setToggling(false);
     }
   }
