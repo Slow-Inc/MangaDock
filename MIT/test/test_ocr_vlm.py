@@ -310,7 +310,7 @@ def test_a_completed_reply_logs_nothing(caplog):
 # Doctor timing on 17 real pages: every SFX rescue call ended finish_reason=length with no
 # content (the gateway model reasons past max_tokens and cannot see images, #693), ~2.5-3 s each,
 # sequential — up to 20 s of a page's 31 s. After a run of unusable replies the rescue stops
-# calling for the rest of the process; a usable reply resets the streak.
+# calling until a cooldown trial succeeds; a usable reply resets the streak.
 
 def test_rescue_stops_calling_after_consecutive_unusable_replies(caplog):
     from manga_translator.ocr_vlm import SFX_UNSERVED_LIMIT
@@ -389,3 +389,16 @@ def test_a_tripped_rescue_retries_once_after_the_cooldown(monkeypatch):
     assert call() != ''                                          # trial succeeds -> closed
     call()
     assert calls['n'] == ocr_vlm.SFX_UNSERVED_LIMIT + 3
+
+
+def test_after_the_cooldown_only_one_trial_is_admitted(monkeypatch):
+    """Half-open means ONE trial: concurrent pages must not each spend a ~3 s call."""
+    from manga_translator import ocr_vlm
+    clock = {'t': 1000.0}
+    monkeypatch.setattr(ocr_vlm, '_now', lambda: clock['t'])
+    for _ in range(ocr_vlm.SFX_UNSERVED_LIMIT):
+        ocr_vlm._breaker.fail('m')
+    assert not ocr_vlm._breaker.allows()
+    clock['t'] += ocr_vlm.SFX_BREAKER_COOLDOWN_S
+    assert ocr_vlm._breaker.allows()        # the trial
+    assert not ocr_vlm._breaker.allows()    # a concurrent page while the trial is in flight

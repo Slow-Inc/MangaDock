@@ -8,7 +8,7 @@ prompt tried on 17 real pages. All three are countable, so the translator can re
 import re
 from typing import Optional
 
-from .utils.lang_ratio import _SCRIPT_RANGES, _in_ranges
+from .utils.lang_ratio import _SCRIPT_RANGES
 
 _ALL_SCRIPTS = tuple({r for ranges in _SCRIPT_RANGES.values() for r in ranges})
 #: '・' (U+30FB) and 'ー' (U+30FC) sit in the kana block but are punctuation that legitimately
@@ -17,13 +17,19 @@ _NEUTRAL = {0x30FB, 0x30FC}
 _REAL_WORD = re.compile(r'[A-Za-z]{4,}')
 
 
-def foreign_script(text: str, target: str) -> bool:
-    """True when ``text`` uses a script that is neither the target's nor Latin."""
+def _scripts(text: str) -> set:
+    return {r for cp in map(ord, text or '') if cp not in _NEUTRAL for r in _ALL_SCRIPTS
+            if r[0] <= cp <= r[1]}
+
+
+def foreign_script(text: str, target: str, source: str = '') -> bool:
+    """True when ``text`` uses a non-Latin script that is neither the target's nor one the
+    ``source`` already uses (a kana SFX the prompt says to keep is copied, not leaked). Latin
+    targets are never checked: their output legitimately carries names and SFX in any script."""
     own = _SCRIPT_RANGES.get(target)
     if own is None:
         return False
-    return any(cp not in _NEUTRAL and not _in_ranges(cp, own) and _in_ranges(cp, _ALL_SCRIPTS)
-               for cp in map(ord, text or ''))
+    return bool(_scripts(text) - set(own) - _scripts(source))
 
 
 def classify_glitch(src: str, dst: str, target: str) -> Optional[str]:
@@ -34,6 +40,6 @@ def classify_glitch(src: str, dst: str, target: str) -> Optional[str]:
         return 'empty'
     if d.upper() == (src or '').strip().upper() and _REAL_WORD.search(d):
         return 'untranslated'
-    if foreign_script(d, target):
+    if foreign_script(d, target, src):
         return 'foreign_script'
     return None

@@ -232,6 +232,48 @@ def test_punctuation_never_starts_a_line_even_with_kept_spaces():
     assert not any(s.strip()[:1] in ',.!?:;…)”' for s in segs[1:])  # a straight " may open
 
 
+def test_space_after_punctuation_survives_in_spaced_languages():
+    """#792: compact_special_symbols deleted every space after punctuation (a CJK rule), so English
+    rendered 'Well,I / so!Yes.' and Thai credits 'RTSD,ZERO'. CJK still compacts."""
+    c = tr.compact_special_symbols
+    assert c('Well, I think so! Yes.') == 'Well, I think so! Yes.'
+    assert c('จัดหน้าโดย RTSD, ZERO') == 'จัดหน้าโดย RTSD, ZERO'
+    assert c('เยส! ฉันอยากทำ') == 'เยส! ฉันอยากทำ'
+    assert c('안녕! 세계') == '안녕! 세계'
+    assert c('你好！ 世界') == '你好！世界'
+    assert c('本当? 嘘だ') == '本当?嘘だ'
+    assert c('Wait... what') == 'Wait… what'
+
+
+def test_put_text_horizontal_wraps_english_on_its_spaces(monkeypatch):
+    """#792: the render entry point compacts before wrapping — measure what it actually wraps."""
+    seen = {}
+    real = tr.calc_horizontal
+
+    def spy(font_size, text, *a, **k):
+        seen['text'] = text
+        return real(font_size, text, *a, **k)
+
+    monkeypatch.setattr(tr, 'calc_horizontal', spy)
+    tr.set_font(_FONT)
+    tr.put_text_horizontal(20, 'Well, I think so! Yes.', 90, 400, 'center', False,
+                           (0, 0, 0), (255, 255, 255), 'en_US')
+    assert seen['text'] == 'Well, I think so! Yes.'
+
+
+def test_a_token_starting_with_punctuation_never_starts_a_line():
+    """#792: a translator that typed no space ('RTSD,ZERO') makes newmm emit ',ZERO' — the comma
+    must still stay on the previous line."""
+    if not _HAS_PYTHAINLP:
+        return
+    tr.set_font(_FONT)
+    for size in range(14, 30):
+        for w in range(60, 130, 6):
+            lines, _ = tr.calc_horizontal(size, 'จัดหน้าโดย RTSD,ZERO', max_width=w, max_height=400,
+                                          language='THA')
+            assert not any(l.lstrip().startswith(',') for l in lines), (size, w, lines)
+
+
 def test_latin_words_inside_thai_text_are_not_split():
     """Guard (2026-10-20): a replay of the Chainsaw Man credits page showed 'RTSD / ,ZERO'. A fresh
     process does not reproduce it at any size — this pins that a Latin word and its comma stay
@@ -243,3 +285,69 @@ def test_latin_words_inside_thai_text_are_not_split():
         lines, _ = tr.calc_horizontal(size, 'จัดหน้าโดย RTSD, ZERO', max_width=110, max_height=400, language='THA')
         assert not any(l.lstrip().startswith(',') for l in lines), (size, lines)
         assert any('RTSD' in l for l in lines), (size, lines)
+
+
+def _assert_no_mid_word(lines, words):
+    """Every dictionary word must sit whole on one line."""
+    joined = [l.replace(' ', '') for l in lines]
+    for w in words:
+        assert any(w in l for l in joined), (w, lines)
+
+
+def test_a_kept_space_does_not_stop_the_dictionary_split():
+    """Review 2026-10-20: the trailing space #791 keeps on a token made _thai_subwords fail
+    ('ในเวลาเดียวกัน ' is not in the trie) so the compound fell to a mid-word char split."""
+    if not _HAS_PYTHAINLP:
+        return
+    tr.set_font(_FONT)
+    lines, widths = tr.calc_horizontal(20, 'ผมไปในเวลาเดียวกัน ครับ', 70, 400, language='THA')
+    _assert_no_mid_word(lines, ['เวลา', 'เดียวกัน', 'ครับ'])
+
+
+def test_an_over_wide_dictionary_part_is_split_again():
+    """'ในเวลาเดียวกันนั้น' -> fewest words ('ในเวลาเดียวกัน', 'นั้น'); the first part is itself
+    too wide and must break at its own dictionary parts ('เดียว|กัน'), not mid-word ('เดียวกั|นนั้น')."""
+    if not _HAS_PYTHAINLP:
+        return
+    tr.set_font(_FONT)
+    lines, _ = tr.calc_horizontal(20, 'ในเวลาเดียวกันนั้น', 60, 400, language='THA')
+    _assert_no_mid_word(lines, ['เวลา', 'เดียว', 'กัน', 'นั้น'])
+
+
+def test_a_demonstrative_after_a_real_space_may_start_a_line():
+    """A space is a legal Thai break point; gluing 'นี้' back across it made 'ชื่อ นี้' unbreakable."""
+    from manga_translator.rendering.text_render import _glue_thai_tokens
+    assert _glue_thai_tokens(['ชื่อ ', 'นี้']) == ['ชื่อ ', 'นี้']
+    assert _glue_thai_tokens(['ชื่อ', 'นี้']) == ['ชื่อนี้']
+
+
+def test_no_rendered_line_starts_or_ends_with_a_space():
+    if not _HAS_PYTHAINLP:
+        return
+    tr.set_font(_FONT)
+    for text in ['กันนั้น ', 'ในเวลาเดียวกันนั้น ครับ', 'เยส! ฉันอยากทำ']:
+        for w in (40, 60, 90):
+            lines, _ = tr.calc_horizontal(20, text, w, 400, language='THA')
+            assert all(l == l.strip(' ') for l in lines), (text, w, lines)
+
+
+def test_every_piece_of_a_spaced_compound_fits_the_column():
+    """2026-10-20: the kept trailing space appended to the last dictionary piece made it wider than
+    max_width, and the greedy packer (which assumes every piece fits) broke empty lines forever."""
+    if not _HAS_PYTHAINLP:
+        return
+    from manga_translator.rendering.text_render import _fit_syllable
+    tr.set_font(_FONT)
+    for w in range(40, 120, 3):
+        for piece in _fit_syllable('ในเวลาเดียวกัน ', 20, w):
+            assert tr.get_string_width(20, piece) <= w, (w, piece)
+
+
+def test_greedy_pack_places_an_over_wide_syllable_instead_of_looping():
+    """Guard for the packer's invariant: a syllable wider than the column goes on its own line.
+    (Red not run on purpose — before the guard this call never returns and eats memory.)"""
+    tr.set_font(_FONT)
+    word = 'กกกกกกกกกกกกกกกกกกกก'
+    w = tr.get_string_width(20, word)
+    lines, widths, _ = tr._greedy_pack([word], [w], [[word]], 20, w // 2, 0, 0)
+    assert lines == [[0]]

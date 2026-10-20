@@ -33,3 +33,10 @@ def test_script_table_is_shared_with_the_page_ratio_check():
     leak check — Serbian/Montenegrin Cyrillic targets are known to both."""
     assert not foreign_script('Здраво', 'SRP')
     assert foreign_script('Здраво 你好', 'SRP')
+
+
+def test_a_script_copied_from_the_source_is_not_foreign():
+    assert not foreign_script('ドン เสียงดัง', 'THA', source='ドン')
+    assert foreign_script('ドン เสียงดัง', 'THA', source='BANG')
+    assert classify_glitch('ドン', 'ドン', 'THA') is None
+    assert classify_glitch('BANG', 'ドン', 'THA') == 'foreign_script'

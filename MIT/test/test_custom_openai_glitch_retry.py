@@ -35,3 +35,14 @@ def test_a_clean_page_is_translated_once():
     out = asyncio.run(t.translate('ENG', 'THA', ['HELLO', 'BYE']))
     assert out == ['สวัสดี', 'ลาก่อน']
     assert t.client.chat.completions.create.call_count == 1
+
+
+def test_a_script_the_source_already_uses_is_not_a_leak():
+    """Review 2026-10-20: the default prompt keeps SFX untranslated, so a JP page's kana SFX in a
+    Thai translation was re-asked twice (three full-page calls) and shipped anyway. A script the
+    source itself uses was copied, not leaked."""
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(return_value=_reply('<|1|>ドン!\n<|2|>ลาก่อน'))
+    out = asyncio.run(t.translate('JPN', 'THA', ['ドン!', 'さようなら']))
+    assert out == ['ドン!', 'ลาก่อน']
+    assert t.client.chat.completions.create.call_count == 1

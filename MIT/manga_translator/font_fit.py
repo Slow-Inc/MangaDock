@@ -10,7 +10,7 @@ from typing import Callable, Tuple
 
 
 def font_high_cap(h_box: float, max_box_ratio: float, floor: int = 8) -> int:
-    """Binary-search ceiling for #166 fitting: ``int(h_box * max_box_ratio)``,
+    """Search ceiling for #166 fitting: ``int(h_box * max_box_ratio)``,
     never below ``floor``.
 
     Render-parity C: ``max_box_ratio`` (#175 default 0.5) caps the font so a short

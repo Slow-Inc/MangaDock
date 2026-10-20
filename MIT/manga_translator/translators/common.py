@@ -200,7 +200,7 @@ class CommonTranslator(InfererModule):
             for j in untranslated_indices:
                 q, t = queries[j], translations[j]
                 # Repeat invalid translations with slightly modified queries
-                if self._is_translation_invalid(q, t) or self._is_glitched(t, to_lang):
+                if self._is_translation_invalid(q, t) or self._is_glitched(q, t, to_lang):
                     new_untranslated_indices.append(j)
                     queries[j] = self._modify_invalid_translation_query(q, t)
             untranslated_indices = new_untranslated_indices
@@ -249,11 +249,11 @@ class CommonTranslator(InfererModule):
             return True
         return False
 
-    def _is_glitched(self, trans: str, to_lang: str) -> bool:
+    def _is_glitched(self, query: str, trans: str, to_lang: str) -> bool:
         """A translation that leaks a script foreign to the target ('甚至连' inside Thai) — LLM
         code-switching measured at random on real pages (quality loop, 2026-10-20). Counts as
         invalid so the repeat above re-asks it."""
-        return bool(trans) and foreign_script(trans, to_lang)
+        return bool(trans) and foreign_script(trans, to_lang, query)
 
     def _modify_invalid_translation_query(self, query: str, trans: str) -> str:
         """

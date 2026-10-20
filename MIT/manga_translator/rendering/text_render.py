@@ -149,11 +149,12 @@ def _glue_thai_tokens(tokens: List[str]) -> List[str]:
     for tok in tokens:
         core = tok.strip()
         opener = bool(core) and all(c in _OPENERS for c in core)
-        closer = bool(core) and all(c in _CLOSERS for c in core)
+        closer = core[:1] in _CLOSERS  # ',ZERO' too: newmm keeps it whole (#792)
         if core == '"':
             opener, closer = not quote_open, quote_open
             quote_open = not quote_open
-        if out and (bind_next or tok[0] in 'ๆฯ' or closer or core in _THAI_DEMONSTRATIVES):
+        demonstrative = core in _THAI_DEMONSTRATIVES and not (out and out[-1].endswith(' '))
+        if out and (bind_next or tok[0] in 'ๆฯ' or closer or demonstrative):
             out[-1] += tok
         else:
             out.append(tok)
@@ -284,9 +285,11 @@ def CJK_Compatibility_Forms_translate(cdpt: str, direction: int):
 def compact_special_symbols(text: str) -> str:  
     text = text.replace('...', '…')  
     text = text.replace('..', '…')      
-    # Remove half-width and full-width spaces after each punctuation mark
-    pattern = r'([^\w\s])[ \u3000]+'  
-    text = re.sub(pattern, r'\1', text) 
+    # Drop the space after punctuation only where CJK typesetting wants none: after full-width /
+    # CJK punctuation, or before Han/kana. Spaced languages (Latin, Thai, Korean) keep it —
+    # deleting it everywhere rendered 'Well,I / so!Yes.' (#792).
+    text = re.sub(r'([\u3000-\u303f\uff00-\uffef])[ \u3000]+', r'\1', text)
+    text = re.sub(r'([^\w\s])[ \u3000]+(?=[\u3040-\u30ff\u4e00-\u9fff])', r'\1', text)
     return text
     
 def rotate_image(image, angle):
@@ -817,17 +820,29 @@ def _split_into_syllables(words: List[str], font_size: int, max_width: int, lang
         # breaks between its dictionary parts first; char clusters are the last resort.
         normalized_syls = []
         for syl in new_syls:
-            if get_string_width(font_size, syl) <= max_width:
-                normalized_syls.append(syl)
-                continue
-            parts = (_thai_subwords(syl) if _THAI_RE.search(syl) else None) or [syl]
-            for part in parts:
-                if len(parts) > 1 and get_string_width(font_size, part) <= max_width:
-                    normalized_syls.append(part)
-                else:
-                    normalized_syls.extend(_safe_char_split(part))
+            normalized_syls.extend(_fit_syllable(syl, font_size, max_width))
         syllables.append(normalized_syls)
     return syllables
+
+
+def _fit_syllable(syl: str, font_size: int, max_width: int) -> List[str]:
+    """Pieces of ``syl`` no wider than ``max_width``: an over-wide Thai compound breaks at its
+    dictionary parts, recursively (a part can itself be too wide); char clusters are the last
+    resort. A kept trailing space rides on the last piece, or stands alone when that piece would
+    no longer fit (the packers rely on every piece fitting)."""
+    if get_string_width(font_size, syl) <= max_width:
+        return [syl]
+    core = syl.rstrip(' ')
+    parts = _thai_subwords(core) if _THAI_RE.search(core) else None
+    if not parts:
+        return _safe_char_split(syl)
+    pieces = [p for part in parts for p in _fit_syllable(part, font_size, max_width)]
+    tail = syl[len(core):]
+    if tail and get_string_width(font_size, pieces[-1] + tail) <= max_width:
+        pieces[-1] += tail
+    elif tail:
+        pieces.append(tail)
+    return pieces
 
 
 def _greedy_pack(words, word_widths, syllables, font_size, max_width,
@@ -868,13 +883,14 @@ def _greedy_pack(words, word_widths, syllables, font_size, max_width,
             line_width += current_width + word_widths[i]
             i += 1
         elif word_widths[i] > max_width:
-            # We know no syllable can be larger than max_width
+            # No syllable should be larger than max_width; one that is still goes on an empty
+            # line, or this loop would break empty lines forever (2026-10-20: 11 GB in tests).
             j = 0
             hyphenation_idx = 0
             while j < len(syllables[i]):
                 syl = syllables[i][j]
                 syl_width = get_string_width(font_size, syl)
-                if line_width + current_width + syl_width <= max_width:
+                if line_width + current_width + syl_width <= max_width or line_width + current_width == 0:
                     current_width += syl_width
                     j += 1
                     hyphenation_idx = j
@@ -1002,6 +1018,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     text = _insert_thai_word_breaks(text)
     text = _insert_cjk_word_breaks(text)
     has_zwsp_breaks = _ZWSP in text
+    thai_text = bool(_THAI_RE.search(text))
     max_width = max(max_width, 2 * font_size)
 
     whitespace_offset_x = 0 if has_zwsp_breaks else get_char_offset_x(font_size, ' ')
@@ -1184,7 +1201,7 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
         # print(line_text, get_string_width(font_size, line_text), line_width_list[i])
         # assert(line_width_list[i] == get_string_width(font_size, line_text))
 
-        if has_zwsp_breaks:  # a kept Thai space must not start or end a line
+        if thai_text:  # a kept Thai space must not start or end a line
             line_text = line_text.strip(' ')
         # Shouldn't be needed but there is apparently still a bug somewhere (See #458)
         line_width_list[i] = get_string_width(font_size, line_text)

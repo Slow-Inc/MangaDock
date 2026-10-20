@@ -40,15 +40,19 @@ class _Breaker:
         self.opened_at = 0.0
 
     def allows(self) -> bool:
-        return self.streak < SFX_UNSERVED_LIMIT or _now() - self.opened_at >= SFX_BREAKER_COOLDOWN_S
+        if self.streak < SFX_UNSERVED_LIMIT:
+            return True
+        if _now() - self.opened_at < SFX_BREAKER_COOLDOWN_S:
+            return False
+        self.opened_at = _now()  # half-open: one trial call; concurrent pages wait for its verdict
+        return True
 
     def fail(self, model: str) -> None:
         self.streak += 1
         if self.streak >= SFX_UNSERVED_LIMIT:
-            if self.streak == SFX_UNSERVED_LIMIT:
-                logger.warning("[OcrVLM] %d unusable SFX replies in a row — rescue paused for %.0f s "
-                               "(if model %s cannot serve it, set MIT_OCR_VLM_RESCUE=0)",
-                               SFX_UNSERVED_LIMIT, SFX_BREAKER_COOLDOWN_S, model)
+            logger.warning("[OcrVLM] %d unusable SFX replies in a row — rescue paused for %.0f s "
+                           "(if model %s cannot serve it, set MIT_OCR_VLM_RESCUE=0)",
+                           self.streak, SFX_BREAKER_COOLDOWN_S, model)
             self.opened_at = _now()
 
     def ok(self) -> None:
