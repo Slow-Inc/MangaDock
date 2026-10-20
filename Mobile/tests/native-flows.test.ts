@@ -13,6 +13,7 @@ const { pickImages } = await import("../src/native-images.ts");
 const { NativeReadingView } = await import("../src/NativeReadingView.tsx");
 const { NativeReaderView } = await import("../src/NativeReaderView.tsx");
 const { NativeReaderComments } = await import("../src/NativeReadingSocial.tsx");
+const { NativeReviewSection } = await import("../src/NativeReadingSocial.tsx");
 const { NativeAccountActivity } =
   await import("../src/NativeAccountActivity.tsx");
 const { createAccountActivity } = await import("../src/account-activity.ts");
@@ -61,6 +62,49 @@ function button(ui: ReactTestRenderer, label: string) {
           .some((text) => text.children.join("") === label),
     )!;
 }
+test("empty required review data renders a retryable error instead of crashing the review section", async (t) => {
+  for (const emptyPart of ["summary", "list"]) {
+    const { runtime } = setup({
+      externalFetch: async (input) => {
+        const path = new URL(String(input)).pathname;
+        if (path.endsWith("/my")) return new Response(null);
+        const isSummary = path.endsWith("/summary");
+        if (isSummary === (emptyPart === "summary")) return new Response(null);
+        return Response.json(isSummary ? { averageRating: 0, count: 0 } : []);
+      },
+    });
+    await runtime.session.signIn(
+      "reader@example.test",
+      "correct-test-password",
+    );
+    const social = createReadingSocial(runtime);
+    let ui!: ReactTestRenderer;
+    t.after(async () => {
+      await act(async () => ui?.unmount());
+      social.dispose();
+      runtime.dispose();
+    });
+    await act(async () => {
+      ui = create(
+        React.createElement(NativeReviewSection, {
+          social,
+          runtime,
+          mangaId: "manga-1",
+          title: "Test",
+          onAccount() {},
+        }),
+      );
+    });
+    assert.match(social.snapshot().reviews.error ?? "", /ข้อมูล.*ไม่ถูกต้อง/);
+    assert.ok(button(ui, "ลองใหม่"));
+    assert.deepEqual(social.snapshot().reviews.items, []);
+    assert.deepEqual(social.snapshot().reviews.summary, {
+      averageRating: 0,
+      count: 0,
+    });
+    await act(async () => ui.unmount());
+  }
+});
 test("native selection returns the OS file without unsupported React Native binary Blob construction", async () => {
   const original = globalThis.Blob;
   const file = new original(["image-bytes"], { type: "image/png" });
@@ -434,6 +478,52 @@ test("Reader wires horizontal page swipes and Android Back closes the chapter pi
   });
   assert.equal(reader.snapshot().position?.zoom, 2);
   assert.equal(imageScrolls().at(-1)!.props.scrollEnabled, true);
+  // Both move events and touch lifecycle events must rebase a replaced second finger.
+  for (const [lift, rejoin] of [
+    ["onPanResponderMove", "onPanResponderMove"],
+    ["onPanResponderEnd", "onPanResponderStart"],
+  ]) {
+    await act(async () => {
+      gesture.props[lift]({
+        nativeEvent: { touches: [{ pageX: 0, pageY: 0 }] },
+      });
+      gesture.props[rejoin]({
+        nativeEvent: {
+          touches: [
+            { pageX: 0, pageY: 0 },
+            { pageX: 100, pageY: 0 },
+          ],
+        },
+      });
+    });
+    assert.equal(
+      reader.snapshot().position?.zoom,
+      2,
+      "rejoining must not jump zoom",
+    );
+    await act(async () => {
+      gesture.props.onPanResponderMove({
+        nativeEvent: {
+          touches: [
+            { pageX: 0, pageY: 0 },
+            { pageX: 150, pageY: 0 },
+          ],
+        },
+      });
+    });
+    assert.equal(reader.snapshot().position?.zoom, 3);
+    await act(async () => {
+      gesture.props.onPanResponderMove({
+        nativeEvent: {
+          touches: [
+            { pageX: 0, pageY: 0 },
+            { pageX: 100, pageY: 0 },
+          ],
+        },
+      });
+    });
+    assert.equal(reader.snapshot().position?.zoom, 2);
+  }
   await act(async () => {
     gesture.props.onPanResponderGrant({
       nativeEvent: {

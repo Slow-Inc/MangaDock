@@ -18,6 +18,7 @@ import {
   TextInput,
   View,
   useWindowDimensions,
+  type GestureResponderEvent,
 } from "react-native";
 import type { createReader } from "./reader.ts";
 import type { Chapter } from "./catalog.ts";
@@ -205,59 +206,57 @@ export function NativeReaderView({
   }
   const panStart = useRef({ distance: 1, zoom: 1 });
   const pinching = useRef(false);
-  const pinch = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: (event) =>
-          event.nativeEvent.touches.length === 2,
-        onMoveShouldSetPanResponder: (event, gesture) =>
-          event.nativeEvent.touches.length === 2 ||
-          (event.nativeEvent.touches.length === 1 &&
-            viewer.snapshot().mode !== "strip" &&
-            viewer.snapshot().zoom === 1 &&
-            Math.abs(gesture.dx) >= 20 &&
-            Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5),
-        onPanResponderGrant: (event) => {
-          const [a, b] = event.nativeEvent.touches;
-          pinching.current = !!b;
-          if (a && b)
-            panStart.current = {
-              distance: Math.max(
-                1,
-                Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY),
-              ),
-              zoom: viewer.snapshot().zoom,
-            };
-        },
-        onPanResponderMove: (event) => {
-          const [a, b] = event.nativeEvent.touches;
-          if (a && b) {
-            if (!pinching.current)
-              panStart.current = {
-                distance: Math.max(
-                  1,
-                  Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY),
-                ),
-                zoom: viewer.snapshot().zoom,
-              };
-            pinching.current = true;
-            viewer.setZoom(
-              (panStart.current.zoom *
-                Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY)) /
-                panStart.current.distance,
-            );
-          }
-        },
-        onPanResponderRelease: (_event, gesture) => {
-          if (!pinching.current) viewer.swipe(gesture.dx, gesture.dy);
-          pinching.current = false;
-        },
-        onPanResponderTerminate: () => {
-          pinching.current = false;
-        },
-      }),
-    [viewer],
-  );
+  const pinchActive = useRef(false);
+  const pinch = useMemo(() => {
+    function updatePinch(event: GestureResponderEvent) {
+      const [a, b] = event.nativeEvent.touches;
+      if (!a || !b) {
+        pinchActive.current = false;
+        return;
+      }
+      pinching.current = true;
+      const distance = Math.max(
+        1,
+        Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY),
+      );
+      if (!pinchActive.current) {
+        panStart.current = { distance, zoom: viewer.snapshot().zoom };
+        pinchActive.current = true;
+        return;
+      }
+      viewer.setZoom(
+        (panStart.current.zoom * distance) / panStart.current.distance,
+      );
+    }
+    return PanResponder.create({
+      onStartShouldSetPanResponder: (event) =>
+        event.nativeEvent.touches.length === 2,
+      onMoveShouldSetPanResponder: (event, gesture) =>
+        event.nativeEvent.touches.length === 2 ||
+        (event.nativeEvent.touches.length === 1 &&
+          viewer.snapshot().mode !== "strip" &&
+          viewer.snapshot().zoom === 1 &&
+          Math.abs(gesture.dx) >= 20 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5),
+      onPanResponderGrant: (event) => {
+        pinching.current = false;
+        pinchActive.current = false;
+        updatePinch(event);
+      },
+      onPanResponderStart: updatePinch,
+      onPanResponderEnd: updatePinch,
+      onPanResponderMove: updatePinch,
+      onPanResponderRelease: (_event, gesture) => {
+        if (!pinching.current) viewer.swipe(gesture.dx, gesture.dy);
+        pinching.current = false;
+        pinchActive.current = false;
+      },
+      onPanResponderTerminate: () => {
+        pinching.current = false;
+        pinchActive.current = false;
+      },
+    });
+  }, [viewer]);
   useEffect(() => {
     translation.activate();
     translation.setForeground(AppState.currentState === "active");
