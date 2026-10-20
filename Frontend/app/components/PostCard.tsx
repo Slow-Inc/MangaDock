@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import UserAvatar from "./ui/UserAvatar";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -9,7 +10,6 @@ import { th } from "date-fns/locale";
 import VoteButtons from "./VoteButtons";
 import ReportButton from "./ReportButton";
 import type { ForumPost } from "../lib/types";
-import { isSocialCdnUrl } from "../lib/avatarUpload";
 
 const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 const CAT_LABEL: Record<string, string> = { announcement: 'ประกาศ', spoiler: 'สปอยล์', manga_update: 'อัปเดต' };
@@ -98,11 +98,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
         <div className="flex-1 px-3 py-2.5 min-w-0 flex flex-col justify-center gap-1">
           {/* Meta row */}
           <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-xs text-ink-3">
-            <div className="w-4 h-4 rounded-full bg-fill overflow-hidden shrink-0">
-              {post.authorPhotoUrl && (
-                <Image src={post.authorPhotoUrl} alt={post.authorName || 'user'} width={16} height={16} className="object-cover" unoptimized={isSocialCdnUrl(post.authorPhotoUrl)} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-              )}
-            </div>
+            <UserAvatar uid={post.authorUid} photoUrl={post.authorPhotoUrl} size={16} />
             <Link
               href={`/community/profile/${post.authorUid}`}
               onClick={(e) => e.stopPropagation()}
@@ -177,19 +173,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
   return (
     <article className="bg-raised border border-line rounded-2xl overflow-hidden hover:border-ink-3 hover:shadow-2xl smooth-hover flex flex-col group p-5 min-h-[260px] shadow-lg">
       <header className="flex items-center gap-3 mb-4">
-        <div className="w-11 h-11 rounded-full bg-fill overflow-hidden shrink-0 border border-line ring-1 ring-line">
-          {post.authorPhotoUrl && (
-            <Image
-              src={post.authorPhotoUrl}
-              alt={post.authorName || 'user'}
-              width={40}
-              height={40}
-              className="object-cover"
-              unoptimized={isSocialCdnUrl(post.authorPhotoUrl)}
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
-          )}
-        </div>
+        <UserAvatar uid={post.authorUid} photoUrl={post.authorPhotoUrl} size={44} className="ring-1 ring-line" />
         <div className="flex flex-col min-w-0">
           <Link
             href={`/community/profile/${post.authorUid}`}

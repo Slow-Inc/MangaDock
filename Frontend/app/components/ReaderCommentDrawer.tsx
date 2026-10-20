@@ -1,8 +1,8 @@
 "use client";
 
 import { PRIMARY_FILL } from "./ui/Button";
+import UserAvatar from "./ui/UserAvatar";
 import Loader from "./ui/Loader";
-import Image from "next/image";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -142,19 +142,10 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
           ) : (
             <div className="flex flex-col gap-4">
               {comments.map((c) => {
-                const initials = (c.displayName ?? "?").slice(0, 2).toUpperCase();
                 const isOwn = user?.uid === c.uid;
                 return (
                   <div key={c.id} className="flex items-start gap-2.5">
-                    {c.photoUrl ? (
-                      <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full">
-                        <Image src={c.photoUrl} alt="" fill className="object-cover" sizes="28px" />
-                      </div>
-                    ) : (
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-fill text-xs font-bold text-ink-2">
-                        {initials}
-                      </div>
-                    )}
+                    <UserAvatar uid={c.uid} photoUrl={c.photoUrl} size={28} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-1">
                         <p className="text-xs font-semibold text-ink-2">{c.displayName ?? "ผู้ใช้"}</p>

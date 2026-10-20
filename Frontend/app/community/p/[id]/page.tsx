@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import UserAvatar from "../../../components/ui/UserAvatar";
 import { flushSync } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -17,7 +18,6 @@ import { usePostStream } from "../../../hooks/useForumStream";
 const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 import type { ForumPost, ForumComment } from "../../../lib/types";
 import { isDisplayedVoteEvent } from "../../../lib/voteEvents";
-import { isSocialCdnUrl } from '../../../lib/avatarUpload';
 import Loader from "../../../components/ui/Loader";
 import { PRIMARY_FILL } from "../../../components/ui/Button";
 
@@ -287,19 +287,7 @@ export default function PostDetailPage() {
       <article className="bg-surface border border-line rounded-2xl overflow-hidden mb-8 shadow-xl">
           <div className="p-4 sm:p-8">
             <header className="flex items-center flex-wrap gap-3 mb-3 sm:mb-4 text-xs text-ink-3 relative">
-              <div className="w-6 h-6 rounded-full bg-fill overflow-hidden shrink-0 border border-line">
-                {post.authorPhotoUrl && (
-                  <Image
-                    src={post.authorPhotoUrl}
-                    alt={post.authorName || 'user'}
-                    width={24}
-                    height={24}
-                    className="object-cover"
-                    unoptimized={isSocialCdnUrl(post.authorPhotoUrl)}
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  />
-                )}
-              </div>
+              <UserAvatar uid={post.authorUid} photoUrl={post.authorPhotoUrl} size={24} className="ring-1 ring-line" />
               <Link
                 href={`/community/profile/${post.authorUid}`}
                 className={`font-bold text-sm hover:underline underline-offset-2 transition-opacity hover:opacity-80 ${
@@ -547,11 +535,7 @@ export default function PostDetailPage() {
         {user ? (
           <div className="bg-surface border border-line rounded-2xl p-4">
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-fill overflow-hidden shrink-0 border border-line mt-1">
-                {user.photoURL && (
-                  <img src={user.photoURL} alt={user.displayName || 'user'} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                )}
-              </div>
+              <UserAvatar uid={user.uid} photoUrl={user.photoURL} size={32} className="mt-1 ring-1 ring-line" />
               <div className="flex-1">
                 <textarea
                   value={newComment}
