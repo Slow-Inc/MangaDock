@@ -1,12 +1,14 @@
-import { HttpException } from '@nestjs/common';
+import { ExecutionContext, HttpException } from '@nestjs/common';
 import { TranslateThrottleGuard } from './translate-throttle.guard';
 
 /**
- * GET /books/translate is public and can spend a paid provider key (#801). Limit each client, plus a
- * global ceiling so a client that rotates its forwarded address still cannot exceed the budget.
+ * GET /books/translate is public and can spend a paid provider key (#801). Limit each client — keyed on a
+ * value the client cannot forge — and keep a global ceiling that rejected requests do not consume.
  */
 const ctx = (headers: Record<string, string>, ip = '10.0.0.1') =>
-  ({ switchToHttp: () => ({ getRequest: () => ({ headers, ip }) }) }) as any;
+  ({
+    switchToHttp: () => ({ getRequest: () => ({ headers, ip }) }),
+  }) as unknown as ExecutionContext;
 
 describe('TranslateThrottleGuard', () => {
   it('allows a client under both limits', async () => {
@@ -16,18 +18,27 @@ describe('TranslateThrottleGuard', () => {
     ).resolves.toBe(true);
   });
 
-  it('keys the client on the first forwarded address (the browser behind the Next proxy)', async () => {
+  it('keys the client on cf-connecting-ip (set by Cloudflare) and ignores a client-sent X-Forwarded-For', async () => {
     const incrWithTtl = jest.fn().mockResolvedValue(1);
-    await new TranslateThrottleGuard({ incrWithTtl } as any).canActivate(
-      ctx({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' }),
+    const guard = new TranslateThrottleGuard({ incrWithTtl } as any);
+    await guard.canActivate(
+      ctx({
+        'cf-connecting-ip': '203.0.113.7',
+        'x-forwarded-for': '198.51.100.1',
+      }),
     );
     expect(incrWithTtl).toHaveBeenCalledWith(
       'translate:desc:rl:203.0.113.7',
       60,
     );
+    incrWithTtl.mockClear();
+    await guard.canActivate(
+      ctx({ 'x-forwarded-for': '198.51.100.1' }, '10.0.0.9'),
+    );
+    expect(incrWithTtl).toHaveBeenCalledWith('translate:desc:rl:10.0.0.9', 60);
   });
 
-  it('answers 429 once one client is over its limit', async () => {
+  it('answers 429 once one client is over its limit, without spending the global budget', async () => {
     const incrWithTtl = jest
       .fn()
       .mockImplementation((key: string) =>
@@ -36,9 +47,10 @@ describe('TranslateThrottleGuard', () => {
     await expect(
       new TranslateThrottleGuard({ incrWithTtl } as any).canActivate(ctx({})),
     ).rejects.toThrow(HttpException);
+    expect(incrWithTtl).not.toHaveBeenCalledWith('translate:desc:rl:all', 60);
   });
 
-  it('answers 429 once the global ceiling is reached, whatever the client address', async () => {
+  it('answers 429 once the global ceiling is reached', async () => {
     const incrWithTtl = jest
       .fn()
       .mockImplementation((key: string) =>
@@ -46,7 +58,7 @@ describe('TranslateThrottleGuard', () => {
       );
     await expect(
       new TranslateThrottleGuard({ incrWithTtl } as any).canActivate(
-        ctx({ 'x-forwarded-for': '198.51.100.9' }),
+        ctx({ 'cf-connecting-ip': '198.51.100.9' }),
       ),
     ).rejects.toThrow(HttpException);
   });
