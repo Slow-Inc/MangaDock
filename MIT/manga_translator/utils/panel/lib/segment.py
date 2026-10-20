@@ -18,10 +18,11 @@ class Segment:
 		return f"({self.a}, {self.b})"
 
 	def __eq__(self, other):
-		return any([
-			self.a == other.a and self.b == other.b,
-			self.a == other.b and self.b == other.a,
-		])
+		return (self.a == other.a and self.b == other.b) or (self.a == other.b and self.b == other.a)
+
+	def key(self):
+		"""Order-free endpoints: two segments are __eq__ exactly when their keys are equal."""
+		return (self.a, self.b) if self.a <= self.b else (self.b, self.a)
 
 	def dist(self):
 		return math.sqrt(self.dist_x()**2 + self.dist_y()**2)
@@ -164,21 +165,21 @@ class Segment:
 		while unioned_segments:
 			unioned_segments = False
 			dedup_segments = []
-			used = []
+			used = set()  # #822: order-free endpoint keys — same meaning as `in` on a list, O(1)
 			for i, s1 in enumerate(segments):
 				for s2 in segments[i + 1:]:
-					if s2 in used:
+					if s2.key() in used:
 						continue
 
 					s3 = s1.union(s2)
 					if s3 is not None:
 						unioned_segments = True
 						dedup_segments += [s3]
-						used.append(s1)
-						used.append(s2)
+						used.add(s1.key())
+						used.add(s2.key())
 						break
 
-				if s1 not in used:
+				if s1.key() not in used:
 					dedup_segments += [s1]
 
 			segments = dedup_segments
