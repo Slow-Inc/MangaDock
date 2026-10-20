@@ -155,7 +155,11 @@ async def main():
     for item in args.set:
         key, value = item.split('=', 1)
         section, name = key.split('.', 1)
-        cfg.setdefault(section, {})[name] = json.loads(value) if value[:1] in '[{"0123456789-tfn' else value
+        try:
+            parsed = json.loads(value)  # numbers, true/false, lists
+        except ValueError:
+            parsed = value              # a bare string ('lama_large')
+        cfg.setdefault(section, {})[name] = parsed
     font = os.path.join(MIT, 'fonts', 'Prompt-Bold.ttf')
     tr = MangaTranslator({'use_gpu': True, 'kernel_size': 3, 'model_dir': os.path.join(MIT, 'models'),
                           'font_path': font if os.path.isfile(font) else None})

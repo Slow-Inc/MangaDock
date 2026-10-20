@@ -16,6 +16,7 @@ import base64
 import io
 import logging
 import re
+import time
 import unicodedata
 from typing import Callable, Optional
 
@@ -24,15 +25,41 @@ from PIL import Image
 
 logger = logging.getLogger('manga_translator')
 
-#: After this many consecutive UNUSABLE rescue replies (truncated / no content — the configured
-#: model cannot serve the rescue, #693) stop calling for the rest of the process: each call cost
-#: ~2.5-3 s of page latency for nothing (doctor timing, 2026-10-20). A usable reply resets it.
+#: After this many consecutive unusable or failed rescue calls (truncated / no content / error —
+#: the configured model cannot serve the rescue, #693) stop calling: each call cost ~2.5-3 s of
+#: page latency for nothing (doctor timing, 2026-10-20). After the cooldown one trial call is let
+#: through, so a transient gateway outage does not disable rescue for the life of the server.
 SFX_UNSERVED_LIMIT = 3
-_unserved = {'streak': 0}
+SFX_BREAKER_COOLDOWN_S = 300.0
+_now = time.monotonic
+
+
+class _Breaker:
+    def __init__(self):
+        self.streak = 0
+        self.opened_at = 0.0
+
+    def allows(self) -> bool:
+        return self.streak < SFX_UNSERVED_LIMIT or _now() - self.opened_at >= SFX_BREAKER_COOLDOWN_S
+
+    def fail(self, model: str) -> None:
+        self.streak += 1
+        if self.streak >= SFX_UNSERVED_LIMIT:
+            if self.streak == SFX_UNSERVED_LIMIT:
+                logger.warning("[OcrVLM] %d unusable SFX replies in a row — rescue paused for %.0f s "
+                               "(if model %s cannot serve it, set MIT_OCR_VLM_RESCUE=0)",
+                               SFX_UNSERVED_LIMIT, SFX_BREAKER_COOLDOWN_S, model)
+            self.opened_at = _now()
+
+    def ok(self) -> None:
+        self.streak = 0
+
+
+_breaker = _Breaker()
 
 
 def reset_sfx_breaker() -> None:
-    _unserved['streak'] = 0
+    _breaker.ok()
 
 # Languages that letter SFX in Latin script (UPPERCASE convention). CJK/Thai/etc. use their own
 # script and have no case — mirrors the CJK-vs-Latin split in manga_translator.py.
@@ -204,7 +231,7 @@ def vlm_localize_sfx(
     a fake in tests. The response is parsed as an OpenAI chat completion."""
     if not (api_base and api_key and model):
         return ''
-    if _unserved['streak'] >= SFX_UNSERVED_LIMIT:
+    if not _breaker.allows():
         return ''
     try:
         if post_fn is None:
@@ -236,21 +263,13 @@ def vlm_localize_sfx(
         if content is None or (finish is not None and finish != 'stop'):
             logger.warning("[OcrVLM] SFX reply unusable: finish_reason=%s content=%s %s",
                            finish, 'None' if content is None else repr(content), where)
-            _count_unserved(model)
+            _breaker.fail(model)
             return result
-        _unserved['streak'] = 0
+        _breaker.ok()
         if not result:
             logger.warning("[OcrVLM] SFX reply sanitised to empty: %r %s", content, where)
         return result
     except Exception:
         logger.warning("[OcrVLM] SFX localize failed — region will drop as before", exc_info=True)
-        _count_unserved(model)  # a failing call wastes the same page time as a truncated one
+        _breaker.fail(model)  # a failing call wastes the same page time as a truncated one
         return ''
-
-
-def _count_unserved(model: str) -> None:
-    _unserved['streak'] += 1
-    if _unserved['streak'] == SFX_UNSERVED_LIMIT:
-        logger.warning("[OcrVLM] %d unusable SFX replies in a row — rescue disabled for this "
-                       "process (model %s cannot serve it; set MIT_OCR_VLM_RESCUE=0)",
-                       SFX_UNSERVED_LIMIT, model)

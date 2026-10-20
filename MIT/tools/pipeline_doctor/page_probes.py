@@ -10,9 +10,13 @@ every place it shows.
 """
 
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
+
+from manga_translator.container_merge import components_chain
+from manga_translator.translation_quality import classify_glitch
+from manga_translator.utils.lang_ratio import _SCRIPT_RANGES
 
 from .report import FAIL, OK, WARN, DoctorRun, StageReport
 
@@ -32,12 +36,7 @@ JUNK_FONT_X_MEDIAN = 3.0
 JUNK_FONT_PAGE_SHARE = 0.04
 #: Luminance std-dev under which a dst box is blank — rendered text always has contrast.
 BLANK_STD = 2.0
-#: Targets whose script is not Latin: Latin words left in their translation are suspicious.
-NON_LATIN_TARGETS = {'THA', 'JPN', 'CHS', 'CHT', 'KOR', 'RUS', 'UKR', 'ARA', 'HIN'}
 _LATIN_WORD = re.compile(r'[A-Za-z]{2,}')
-def _foreign_script(text: str, target: str) -> bool:
-    from manga_translator.translation_quality import foreign_script
-    return foreign_script(text, target)
 
 
 @dataclass
@@ -92,7 +91,6 @@ def _flag(flags: Flags, idx: int, stage: str, status: str) -> bool:
 
 def _chain(group: List[Region]) -> bool:
     """Do these regions read as consecutive lines of one block? (container_merge's rule)"""
-    from manga_translator.container_merge import components_chain
     tall = all(r.xyxy[3] - r.xyxy[1] > 1.5 * (r.xyxy[2] - r.xyxy[0]) for r in group)
     return components_chain([{i} for i in range(len(group))], 'v' if tall else 'h',
                             [r.xyxy for r in group], [r.font_size for r in group])
@@ -186,76 +184,77 @@ def _probe_merge(page: PageSnapshot, flags: Flags) -> StageReport:
                        '; '.join(evidence))
 
 
-def _probe_translate(page: PageSnapshot, flags: Flags) -> StageReport:
-    root, inherited, statuses, evidence = 0, 0, [], []
-    empty = untranslated = latin = foreign = 0
+Verdict = Optional[Tuple[str, str, str]]  # (kind, status, evidence)
+
+
+def _attribute(page: PageSnapshot, flags: Flags, stage: str, verdict: Callable[[Region], Verdict]):
+    """Run one stage's per-region verdict; a region an earlier stage already flagged counts as
+    inherited, not as a new defect. Returns (root, inherited, statuses, evidence, kind counts)."""
+    root, inherited, statuses, evidence, kinds = 0, 0, [], [], Counter()
     for r in page.regions:
-        if r.from_sfx:
+        v = verdict(r)
+        if v is None:
             continue
-        out = (r.translation or '').strip()
-        verdict = None
-        if not out:
-            empty += 1
-            verdict = (FAIL, f'region {r.index} empty')
-        elif out.upper() == r.text.strip().upper() and re.search(r'\w', out):
-            untranslated += 1
-            verdict = (WARN, f'region {r.index} untranslated')
-        elif _foreign_script(out, page.target_lang):
-            foreign += 1
-            verdict = (WARN, f'region {r.index} leaks a foreign script')
-        elif page.target_lang in NON_LATIN_TARGETS:
-            # all-caps tokens of <= 3 letters are abbreviations ('IC', 'OK') kept on purpose
-            words = [w for w in _LATIN_WORD.findall(out) if not (w.isupper() and len(w) <= 3)]
-            if words:
-                latin += 1
-                verdict = (WARN, f'region {r.index} keeps Latin {words[:3]}')
-        if verdict is None:
-            continue
-        if _flag(flags, r.index, 'translate', verdict[0]):
+        kind, status, msg = v
+        kinds[kind] += 1
+        if _flag(flags, r.index, stage, status):
             root += 1
-            statuses.append(verdict[0])
-            evidence.append(verdict[1])
+            statuses.append(status)
+            evidence.append(msg)
         else:
             inherited += 1
+    return root, inherited, statuses, evidence, kinds
+
+
+def _probe_translate(page: PageSnapshot, flags: Flags) -> StageReport:
+    non_latin = page.target_lang in _SCRIPT_RANGES
+
+    def verdict(r: Region) -> Verdict:
+        if r.from_sfx:
+            return None
+        glitch = classify_glitch(r.text, r.translation, page.target_lang)
+        if glitch:
+            status = FAIL if glitch == 'empty' else WARN
+            return glitch, status, f'region {r.index} {glitch.replace("_", " ")}'
+        if non_latin:
+            # all-caps tokens of <= 3 letters are abbreviations ('IC', 'OK') kept on purpose
+            words = [w for w in _LATIN_WORD.findall(r.translation or '')
+                     if not (w.isupper() and len(w) <= 3)]
+            if words:
+                return 'latin_in_target', WARN, f'region {r.index} keeps Latin {words[:3]}'
+        return None
+
+    root, inherited, statuses, evidence, kinds = _attribute(page, flags, 'translate', verdict)
     if page.textlines and not page.regions and not page.dropped:
         statuses.append(FAIL)
         evidence.append(f'{page.textlines} textlines read but no regions returned'
                         + (f' — {page.errors[-1][:160]}' if page.errors else ''))
     return StageReport('translate', _status(statuses),
-                       {'root': root, 'inherited': inherited, 'empty': empty,
-                        'untranslated': untranslated, 'latin_in_target': latin,
-                        'foreign_script': foreign},
+                       {'root': root, 'inherited': inherited, 'empty': kinds['empty'],
+                        'untranslated': kinds['untranslated'],
+                        'latin_in_target': kinds['latin_in_target'],
+                        'foreign_script': kinds['foreign_script']},
                        '; '.join(evidence))
 
 
 def _probe_render(page: PageSnapshot, flags: Flags) -> StageReport:
-    root, inherited, statuses, evidence = 0, 0, [], []
-    spill = small = suppressed = 0
     floor = max(10.0, 0.006 * page.height)
-    for r in page.regions:
-        verdict = None
+
+    def verdict(r: Region) -> Verdict:
         if r.render_branch == 'suppressed':
-            suppressed += 1
-            verdict = (WARN, f'region {r.index} suppressed')
-        elif r.render_dst_box is not None and r.bubble_box is not None:
+            return 'suppressed', WARN, f'region {r.index} suppressed'
+        if r.render_dst_box is not None and r.bubble_box is not None:
             d, c, t = r.render_dst_box, r.bubble_box, SPILL_TOLERANCE_PX
             if d[0] < c[0] - t or d[1] < c[1] - t or d[2] > c[2] + t or d[3] > c[3] + t:
-                spill += 1
-                verdict = (FAIL, f'region {r.index} spills out of its container')
-        if verdict is None and r.render_font_px and r.render_font_px < floor and not r.from_sfx:
-            small += 1
-            verdict = (WARN, f'region {r.index} font {r.render_font_px:.0f}px < {floor:.0f}px')
-        if verdict is None:
-            continue
-        if _flag(flags, r.index, 'render', verdict[0]):
-            root += 1
-            statuses.append(verdict[0])
-            evidence.append(verdict[1])
-        else:
-            inherited += 1
+                return 'spill', FAIL, f'region {r.index} spills out of its container'
+        if r.render_font_px and r.render_font_px < floor and not r.from_sfx:
+            return 'small_font', WARN, f'region {r.index} font {r.render_font_px:.0f}px < {floor:.0f}px'
+        return None
+
+    root, inherited, statuses, evidence, kinds = _attribute(page, flags, 'render', verdict)
     return StageReport('render', _status(statuses),
-                       {'root': root, 'inherited': inherited, 'spill': spill, 'small_font': small,
-                        'suppressed': suppressed},
+                       {'root': root, 'inherited': inherited, 'spill': kinds['spill'],
+                        'small_font': kinds['small_font'], 'suppressed': kinds['suppressed']},
                        '; '.join(evidence))
 
 
@@ -289,17 +288,14 @@ def snapshot_from_payload(payload: Dict, target_lang: str, *, textlines: int, sf
 
 def _probe_composite(page: PageSnapshot, flags: Flags) -> StageReport:
     """Translated text that is not visible on the final page (e.g. a later patch covered it)."""
-    root, inherited, evidence = 0, 0, []
-    for r in page.regions:
+    def verdict(r: Region) -> Verdict:
         if not (r.translation or '').strip() or r.dst_ink_std is None or r.dst_ink_std >= BLANK_STD:
-            continue
-        if _flag(flags, r.index, 'composite', FAIL):
-            root += 1
-            evidence.append(f'region {r.index} {r.text[:16]!r} translated but blank on the page')
-        else:
-            inherited += 1
+            return None
+        return 'invisible', FAIL, f'region {r.index} {r.text[:16]!r} translated but blank on the page'
+
+    root, inherited, _, evidence, kinds = _attribute(page, flags, 'composite', verdict)
     return StageReport('composite', FAIL if root else OK,
-                       {'root': root, 'inherited': inherited, 'invisible': root + inherited},
+                       {'root': root, 'inherited': inherited, 'invisible': kinds['invisible']},
                        '; '.join(evidence))
 
 

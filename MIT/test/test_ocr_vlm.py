@@ -358,3 +358,34 @@ def test_failed_calls_count_toward_the_unserved_streak():
     for _ in range(SFX_UNSERVED_LIMIT + 2):
         assert vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m', post_fn=post) == ''
     assert calls['n'] == SFX_UNSERVED_LIMIT
+
+
+def test_a_tripped_rescue_retries_once_after_the_cooldown(monkeypatch):
+    """A breaker that latched for the life of the process turned one gateway outage into silent,
+    permanent loss of SFX rescue on a long-running server. After the cooldown one trial call is
+    allowed: a usable reply closes the breaker, another failure re-opens it."""
+    from manga_translator import ocr_vlm
+    clock = {'t': 1000.0}
+    monkeypatch.setattr(ocr_vlm, '_now', lambda: clock['t'])
+    replies = [_Completion(None, 'length')] * ocr_vlm.SFX_UNSERVED_LIMIT
+    calls = {'n': 0}
+
+    def post(*a, **k):
+        calls['n'] += 1
+        return replies[calls['n'] - 1] if calls['n'] <= len(replies) else _Completion('BAM', 'stop')
+
+    def call():
+        return vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m', post_fn=post)
+
+    for _ in range(ocr_vlm.SFX_UNSERVED_LIMIT + 2):
+        call()
+    assert calls['n'] == ocr_vlm.SFX_UNSERVED_LIMIT              # tripped
+    clock['t'] += ocr_vlm.SFX_BREAKER_COOLDOWN_S
+    replies.append(_Completion(None, 'length'))
+    call()
+    call()
+    assert calls['n'] == ocr_vlm.SFX_UNSERVED_LIMIT + 1          # one trial, failed -> open again
+    clock['t'] += ocr_vlm.SFX_BREAKER_COOLDOWN_S
+    assert call() != ''                                          # trial succeeds -> closed
+    call()
+    assert calls['n'] == ocr_vlm.SFX_UNSERVED_LIMIT + 3

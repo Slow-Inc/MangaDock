@@ -76,10 +76,12 @@ def _safe_char_split(s: str) -> List[str]:
     return clusters
 
 
+@functools.lru_cache(maxsize=1024)
 def _insert_thai_word_breaks(text: str) -> str:
     """If text contains Thai characters, segment it with pythainlp and
     insert zero-width spaces between tokens so calc_horizontal can wrap on
-    word boundaries without introducing visible spaces in rendered Thai text."""
+    word boundaries without introducing visible spaces in rendered Thai text. Cached: the font
+    fit scan measures the same text at every candidate size."""
     if not _HAS_PYTHAINLP or not _THAI_RE.search(text):
         return text
     try:
@@ -99,10 +101,12 @@ def _insert_thai_word_breaks(text: str) -> str:
         return text
 
 
-def _thai_subwords(word: str) -> Optional[List[str]]:
+@functools.lru_cache(maxsize=1024)
+def _thai_subwords(word: str) -> Optional[Tuple[str, ...]]:
     """Split a Thai compound newmm kept whole ('ในเวลาเดียวกัน') into the fewest dictionary words,
     excluding the word itself — the break points an over-wide compound should use. None when
-    the dictionary cannot cover it (a transliterated name). Pure DP over the default trie."""
+    the dictionary cannot cover it (a transliterated name). Pure DP over the default trie;
+    cached (and a tuple) because the font fit scan revisits the same word at each size."""
     if not _HAS_PYTHAINLP:
         return None
     try:
@@ -122,7 +126,7 @@ def _thai_subwords(word: str) -> Optional[List[str]]:
                 continue
             if best[j] is None or len(best[i]) + 1 < len(best[j]):
                 best[j] = best[i] + [p]
-    return best[n]
+    return tuple(best[n]) if best[n] is not None else None
 
 
 # Bound morphemes newmm splits off their head ('ผู้|พักอาศัย'): a line must not end on one.

@@ -16,10 +16,24 @@ import json
 import os
 import random
 import sys
+from collections import Counter
 from typing import Dict, List, Tuple
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MIT = os.path.dirname(HERE)
+sys.path.insert(0, MIT)
+
+from manga_translator.translation_quality import classify_glitch  # noqa: E402
+
+
+def _load(path: str):
+    with open(path, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def _dump(obj, path: str) -> None:
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(obj, f, ensure_ascii=False, indent=1)
 
 
 def page_texts(doctor_json: Dict) -> List[str]:
@@ -41,21 +55,10 @@ def blind_pairs(a: Dict[str, List[str]], b: Dict[str, List[str]], seed: int = 7)
 
 
 def glitches(sources: List[str], outputs: List[str], target: str) -> Dict[str, int]:
-    """Count judge-free translation glitches: a foreign script leaking in, a segment left
-    untranslated (identical to a source with a real word), an empty segment."""
-    import re
-    sys.path.insert(0, MIT)
-    from manga_translator.translation_quality import foreign_script as _foreign_script
-    out = {'segments': len(outputs), 'foreign_script': 0, 'untranslated': 0, 'empty': 0}
-    for src, dst in zip(sources, outputs):
-        d = (dst or '').strip()
-        if not d:
-            out['empty'] += 1
-        elif d.upper() == (src or '').strip().upper() and re.search(r'[A-Za-z]{4,}', d):
-            out['untranslated'] += 1
-        elif _foreign_script(d, target):
-            out['foreign_script'] += 1
-    return out
+    """Count judge-free translation glitches per kind (`translation_quality.classify_glitch`)."""
+    kinds = Counter(classify_glitch(s, d, target) for s, d in zip(sources, outputs))
+    return {'segments': len(outputs), 'foreign_script': kinds['foreign_script'],
+            'untranslated': kinds['untranslated'], 'empty': kinds['empty']}
 
 
 def tally(votes: Dict[str, str], key: Dict[str, str]) -> Dict[str, int]:
@@ -71,7 +74,6 @@ def tally(votes: Dict[str, str], key: Dict[str, str]) -> Dict[str, int]:
 
 
 async def _translate(args):
-    sys.path.insert(0, MIT)
     if args.base or args.model or args.key_env:
         # Point custom_openai at another OpenAI-compatible endpoint for THIS process only (set
         # before initialize(): load_dotenv does not override). The key is read from MIT/.env.
@@ -94,10 +96,10 @@ async def _translate(args):
                                    gpt_config=args.gpt_config))
     out = {'label': args.label, 'gpt_config': args.gpt_config, 'pages': {}, 'sources': {}, 'errors': {}}
     for path in args.doctor:
-        texts = page_texts(json.load(open(path, encoding='utf-8')))
+        texts = page_texts(_load(path))
         if not texts:
             continue
-        page = os.path.basename(path).split('_THA')[0]
+        page = os.path.basename(path).split(f'_{args.target}')[0]
         try:
             out['pages'][page] = await tr.translate('auto', args.target, texts)
             out['sources'][page] = texts
@@ -105,7 +107,7 @@ async def _translate(args):
         except Exception as e:  # one page's failure (rate limit, gateway) must not lose the run
             out['errors'][page] = f'{type(e).__name__}: {e}'[:300]
             print(f'[ab] {args.label} {page}: FAILED {out["errors"][page]}', flush=True)
-        json.dump(out, open(args.out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        _dump(out, args.out)
         await asyncio.sleep(args.delay)
 
 
@@ -134,15 +136,13 @@ def main():
     if args.cmd == 'translate':
         asyncio.run(_translate(args))
     elif args.cmd == 'packet':
-        A, B = (json.load(open(f, encoding='utf-8')) for f in (args.a, args.b))
+        A, B = _load(args.a), _load(args.b)
         packet, key = blind_pairs(A['pages'], B['pages'], args.seed)
         for item in packet:
             item['source'] = A['sources'][item['page']]
-        json.dump({'packet': packet, 'key': key}, open(args.out, 'w', encoding='utf-8'),
-                  ensure_ascii=False, indent=1)
+        _dump({'packet': packet, 'key': key}, args.out)
     else:
-        P = json.load(open(args.packet, encoding='utf-8'))
-        print(tally(json.load(open(args.votes, encoding='utf-8')), P['key']))
+        print(tally(_load(args.votes), _load(args.packet)['key']))
 
 
 if __name__ == '__main__':

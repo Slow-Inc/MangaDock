@@ -1423,7 +1423,7 @@ class MangaTranslator:
             polygons = self._bubble_polygons(ctx)
             if not polygons:
                 return None
-            boxes = [(t.aabb.x, t.aabb.y, t.aabb.x + t.aabb.w, t.aabb.y + t.aabb.h) for t in ctx.textlines]
+            boxes = [t.xyxy for t in ctx.textlines]
             return associate_regions_to_bubbles(boxes, polygons)
         except Exception:
             logger.warning(f"[BubbleMerge] container assignment failed:\n{traceback.format_exc()}")

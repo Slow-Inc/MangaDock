@@ -181,7 +181,7 @@ def test_overwide_thai_compound_splits_into_dictionary_subwords():
     if not _HAS_PYTHAINLP:
         return
     from manga_translator.rendering.text_render import _thai_subwords
-    assert _thai_subwords('ในเวลาเดียวกัน') == ['ใน', 'เวลา', 'เดียวกัน']
+    assert _thai_subwords('ในเวลาเดียวกัน') == ('ใน', 'เวลา', 'เดียวกัน')
     assert _thai_subwords('เวสตา') is None  # no dictionary split -> caller falls back
 
 
@@ -230,3 +230,16 @@ def test_punctuation_never_starts_a_line_even_with_kept_spaces():
         return
     segs = _segments('จัดหน้าโดย RTSD, ZERO และ "เพื่อน" ของเขา')
     assert not any(s.strip()[:1] in ',.!?:;…)”' for s in segs[1:])  # a straight " may open
+
+
+def test_latin_words_inside_thai_text_are_not_split():
+    """Guard (2026-10-20): a replay of the Chainsaw Man credits page showed 'RTSD / ,ZERO'. A fresh
+    process does not reproduce it at any size — this pins that a Latin word and its comma stay
+    together, so a regression shows up here rather than on a page."""
+    if not _HAS_PYTHAINLP:
+        return
+    tr.set_font(_FONT)
+    for size in range(14, 30):
+        lines, _ = tr.calc_horizontal(size, 'จัดหน้าโดย RTSD, ZERO', max_width=110, max_height=400, language='THA')
+        assert not any(l.lstrip().startswith(',') for l in lines), (size, lines)
+        assert any('RTSD' in l for l in lines), (size, lines)

@@ -4,6 +4,7 @@ import asyncio
 from typing import List, Tuple
 from abc import abstractmethod
 
+from ..translation_quality import foreign_script
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -252,7 +253,6 @@ class CommonTranslator(InfererModule):
         """A translation that leaks a script foreign to the target ('甚至连' inside Thai) — LLM
         code-switching measured at random on real pages (quality loop, 2026-10-20). Counts as
         invalid so the repeat above re-asks it."""
-        from ..translation_quality import foreign_script
         return bool(trans) and foreign_script(trans, to_lang)
 
     def _modify_invalid_translation_query(self, query: str, trans: str) -> str:
