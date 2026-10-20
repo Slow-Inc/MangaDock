@@ -17,6 +17,7 @@ import {
 import { fetchProxiedImage, MAX_PROXY_BYTES } from './img-proxy.helper';
 import type { Request, Response } from 'express';
 import { BooksService } from './books.service';
+import { TranslateThrottleGuard } from './translate-throttle.guard';
 import { StatsIncrementService } from '../cache/stats-increment.service';
 import {
   TurnstileGuard,
@@ -165,6 +166,8 @@ export class BooksController {
     return result;
   }
 
+  // Public, and may spend a paid provider key: rate-limited per client + globally (#801).
+  @UseGuards(TranslateThrottleGuard)
   @Get('translate')
   translateDescription(@Query('text') text: string) {
     return this.booksService.translateDescription(text ?? '');

@@ -306,6 +306,25 @@ describe('translateDescription() — reports the model that produced the text', 
     expect(keys[0]).not.toEqual(keys[1]);
   });
 
+  it('does not send an over-long text to the provider (#801)', async () => {
+    const complete = jest.fn().mockResolvedValue('คำแปลภาษาไทย');
+    const { svc } = makeSvc({
+      env: {
+        LLM_PROVIDER: 'custom',
+        LLM_API_KEY: 'k',
+        LLM_BASE_URL: 'http://x',
+      },
+      descriptionModel: 'm',
+      complete,
+    });
+    const long = 'word '.repeat(2000); // 10,000 chars
+
+    const result = await svc.translateDescription(long);
+
+    expect(result).toEqual({ translatedText: long, translated: false });
+    expect(complete).not.toHaveBeenCalled();
+  });
+
   it('does not invent a model for an older cached payload that lacks one', async () => {
     const { svc } = makeSvc({
       env: { LLM_PROVIDER: 'openai', LLM_API_KEY: 'k' },
