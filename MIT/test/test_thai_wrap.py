@@ -380,3 +380,29 @@ def test_arial_never_lifts_a_stacked_mark_at_any_size():
         for word in ('ที่', 'นี้', 'ปี่', 'กิ๊ก',
                      'น้ำ', 'ศักดิ์'):
             assert all(tr._stacked_mark_lift(word, k, size) == 0 for k in range(len(word))), (size, word)
+
+
+_PROMPT = str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf')
+
+
+def test_a_bracketed_word_that_fits_is_not_split_by_its_trailing_space():
+    """Scrutinize 2026-10-21: '(ผู้ชาย)' is exactly as wide as the column; its kept trailing space
+    made the piece over-wide, so it was char-split to '(ผู้' / 'ชาย)'."""
+    if not _HAS_PYTHAINLP:
+        return
+    tr.set_font(_PROMPT)
+    lines, _ = tr.calc_horizontal(20, 'ฉัน (ผู้ชาย) ไป', 60, 400, language='THA')
+    assert any('(ผู้ชาย)' in l for l in lines), lines
+
+
+def test_spaced_mai_yamok_never_starts_a_line_and_words_stay_whole():
+    """Scrutinize 2026-10-21: newmm returns 'ไป ๆ มา ๆ' as ONE token with spaces inside; it was
+    char-split ('ไป ๆ ม' / 'า ๆ อยู่') or, without ZWSP, split on spaces so 'ๆ' started a line."""
+    if not _HAS_PYTHAINLP:
+        return
+    tr.set_font(_PROMPT)
+    for text in ('ฉันเดินไป ๆ มา ๆ อยู่ที่นี่ทั้งวันเลย', 'ไป ๆ มา ๆ'):
+        for w in (60, 90):
+            lines, _ = tr.calc_horizontal(20, text, w, 400, language='THA')
+            assert not any(l.startswith('ๆ') for l in lines), (text, w, lines)
+            assert not any(l.endswith('ม') for l in lines), (text, w, lines)

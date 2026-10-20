@@ -831,6 +831,8 @@ class MangaTranslator:
             # 'W'->'ว' over the art or the real line.
             if sfx_false_positive(region.text, speculative_box(region), region.xyxy, dialogue_boxes):
                 logger.info(f'Dropped det_sfx false-positive: "{region.text}"')
+                ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+                ctx.dropped_regions.append((region, 'speculative box read as junk'))  # payload says why
                 continue
 
             if len(region.text) < config.ocr.min_text_length \

@@ -94,8 +94,10 @@ def _insert_thai_word_breaks(text: str) -> str:
         # A real space (Thai sentence/phrase separator, or between Latin words) stays visible:
         # it rides on the end of the previous token, so the ZWSP split keeps it and the line
         # assembly trims it when a break lands there.
+        # newmm can return a multi-word token with spaces inside ('ไป ๆ มา ๆ'): split it so its
+        # words break apart and the repetition mark glues back like any other.
         words: List[str] = []
-        for t in tokens:
+        for t in (p for tok in tokens for p in re.findall(r'\S+|\s+', tok)):
             if not t.strip():
                 if words and not words[-1].endswith(' '):
                     words[-1] += ' '
@@ -838,11 +840,19 @@ def _fit_syllable(syl: str, font_size: int, max_width: int) -> List[str]:
     if get_string_width(font_size, syl) <= max_width:
         return [syl]
     core = syl.rstrip(' ')
-    parts = _thai_subwords(core) if _THAI_RE.search(core) else None
+    tail = syl[len(core):]
+    if tail and get_string_width(font_size, core) <= max_width:
+        return [core, tail]  # only the kept space overflowed — never cut the word for it
+    # Brackets/quotes glued on ('(ผู้ชาย)') are not dictionary text: split the body, re-attach them.
+    body = core.lstrip(''.join(_OPENERS))
+    lead = core[:len(core) - len(body)]
+    body = body.rstrip(''.join(_CLOSERS))
+    trail = core[len(lead) + len(body):]
+    parts = list(_thai_subwords(body) or ()) if _THAI_RE.search(body) else []
     if not parts:
         return _safe_char_split(syl)
+    parts[0], parts[-1] = lead + parts[0], parts[-1] + trail
     pieces = [p for part in parts for p in _fit_syllable(part, font_size, max_width)]
-    tail = syl[len(core):]
     if tail and get_string_width(font_size, pieces[-1] + tail) <= max_width:
         pieces[-1] += tail
     elif tail:
