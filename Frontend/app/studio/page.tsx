@@ -16,6 +16,8 @@ import { getCached, setCache } from "../lib/studioCache";
 import { PRIMARY_FILL } from "../components/ui/Button";
 import { StudioOverviewSkeleton } from "./components/StudioSkeleton";
 import { MetricCard, StudioSection } from "./components/StudioDashboardWidgets";
+import StudioLoadError from "./components/StudioLoadError";
+import { studioLoadState } from "./lib/studioLoadState";
 import StudioAreaChart, { type AreaSeries } from "./components/charts/StudioAreaChart";
 import StudioBarChart from "./components/charts/StudioBarChart";
 import StudioBreakdownChart from "./components/charts/StudioBreakdownChart";
@@ -108,26 +110,33 @@ export default function StudioOverviewPage() {
   const [balance, setBalance] = useState<number | null>(() => getCached<number>("overview:balance") ?? null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>(() => getCached<WalletTransaction[]>("overview:transactions") ?? []);
   const [loadingData, setLoadingData] = useState(() => getCached("studio:versions") === null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [txFailed, setTxFailed] = useState(false);
   const [tab, setTab] = useState<OverviewTab>("summary");
   const hasFetched = useRef(false);
 
   const fetchAll = useCallback(async () => {
+    setLoadFailed(false);
     try {
       const token = await getIdToken();
       if (!token) return;
       const [vers, bal, txs] = await Promise.all([
         getMyVersions(token),
-        getWalletBalance(token).catch(() => ({ balance: 0 })),
-        getWalletTransactions(token).catch(() => [] as WalletTransaction[]),
+        // A failed wallet call is "unknown", not 0 coins (#828).
+        getWalletBalance(token).catch(() => null),
+        getWalletTransactions(token).catch(() => null),
       ]);
 
       setVersions(vers);
-      setBalance(bal.balance);
-      setTransactions(txs);
+      setBalance(bal?.balance ?? null);
+      // A failed list keeps the last good one (if any) and is reported, never shown as "no spending".
+      setTxFailed(txs === null);
+      if (txs) setTransactions(txs);
       setCache("studio:versions", vers);
-      setCache("overview:balance", bal.balance);
-      setCache("overview:transactions", txs);
+      if (bal) setCache("overview:balance", bal.balance);
+      if (txs) setCache("overview:transactions", txs);
     } catch {
+      setLoadFailed(true);
       showToast({ type: "error", message: "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้", duration: 3000 });
     } finally {
       setLoadingData(false);
@@ -140,6 +149,10 @@ export default function StudioOverviewPage() {
       fetchAll();
     }
   }, [fetchAll]);
+
+  // Nothing is known about the wallet's history: every figure derived from it shows "—" (#828).
+  const txUnknown = txFailed && transactions.length === 0;
+  const view = studioLoadState({ loading: loadingData, failed: loadFailed, hasData: versions.length > 0 });
 
   const overviewStats = useMemo(
     () => getOverviewStats(versions, transactions, balance),
@@ -181,8 +194,10 @@ export default function StudioOverviewPage() {
       <div {...tabPanelProps("overview", tab)} className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
         {tab === "summary" ? <StatsOverview /> : null}
 
-        {loadingData ? (
+        {view === "loading" ? (
           <StudioOverviewSkeleton />
+        ) : view === "error" ? (
+          <StudioLoadError what="ข้อมูลสตูดิโอ" onRetry={() => { setLoadingData(true); return fetchAll(); }} />
         ) : tab === "summary" ? (
           <>
             <StudioSection
@@ -193,7 +208,7 @@ export default function StudioOverviewPage() {
                 <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="นับจาก title ที่เคยอัปโหลด" tone="indigo" />
                 <MetricCard label="จำนวนตอน" value={overviewStats.totalChapters} hint={`รวมทั้งหมด ${overviewStats.totalPages} หน้า`} tone="violet" />
                 <MetricCard label="เผยแพร่แล้ว" value={overviewStats.published} hint={`รอตรวจสอบ ${overviewStats.pending} | แบบร่าง ${overviewStats.draft}`} tone="emerald" />
-                <MetricCard label="เหรียญคงเหลือ" value={<><Coin className="mr-1.5 inline align-[-0.1em] text-coin" />{formatCurrency(overviewStats.balance)}</>} hint={`ใช้จ่ายสะสม ${formatCurrency(overviewStats.spendingTotal)}`} tone="amber" />
+                <MetricCard label="เหรียญคงเหลือ" value={balance === null ? "—" : <><Coin className="mr-1.5 inline align-[-0.1em] text-coin" />{formatCurrency(overviewStats.balance)}</>} hint={`ใช้จ่ายสะสม ${txUnknown ? "—" : formatCurrency(overviewStats.spendingTotal)}`} tone="amber" />
               </div>
             </StudioSection>
 
@@ -206,8 +221,8 @@ export default function StudioOverviewPage() {
                   <MetricCard label="จำนวนภาษา" value={overviewStats.languages} hint="ภาษางานแปลที่เคยใช้งาน" tone="sky" />
                   <MetricCard label="ตอนมีราคา" value={overviewStats.paidChapters} hint={`ราคาเฉลี่ย ${formatCurrency(overviewStats.avgPrice)} เหรียญ`} tone="amber" />
                   <MetricCard label="คุณภาพเฉลี่ย" value={overviewStats.avgQuality.toFixed(1)} hint="คำนวณจาก qualityScore ของแต่ละเวอร์ชัน" tone="emerald" />
-                  <MetricCard label="รายรับสะสม" value={formatCurrency(overviewStats.topupTotal + overviewStats.rewardTotal)} hint="topup, reward, refund" tone="indigo" />
-                  <MetricCard label="รางวัล/คืนเงิน" value={formatCurrency(overviewStats.rewardTotal)} hint="reward + refund" tone="sky" />
+                  <MetricCard label="รายรับสะสม" value={txUnknown ? "—" : formatCurrency(overviewStats.topupTotal + overviewStats.rewardTotal)} hint="topup, reward, refund" tone="indigo" />
+                  <MetricCard label="รางวัล/คืนเงิน" value={txUnknown ? "—" : formatCurrency(overviewStats.rewardTotal)} hint="reward + refund" tone="sky" />
                   <MetricCard label="โดน moderator ลบ" value={overviewStats.rejected} hint={`approved ${overviewStats.approved} เวอร์ชัน`} tone="rose" />
                 </div>
               </StudioSection>
@@ -221,7 +236,11 @@ export default function StudioOverviewPage() {
                   </Link>
                 }
               >
-                <RecentTransactionList transactions={transactions} />
+                {txUnknown ? (
+                  <p className="py-6 text-center text-sm text-ink-3">โหลดธุรกรรมไม่สำเร็จ</p>
+                ) : (
+                  <RecentTransactionList transactions={transactions} />
+                )}
               </StudioSection>
             </div>
           </>
@@ -241,6 +260,8 @@ export default function StudioOverviewPage() {
               <StudioBreakdownChart data={titleBreakdown} ariaLabel="เรื่องที่มีจำนวนตอนมากที่สุด" />
             </StudioSection>
           </>
+        ) : txUnknown ? (
+          <StudioLoadError what="ธุรกรรมกระเป๋าเงิน" onRetry={() => { setLoadingData(true); return fetchAll(); }} />
         ) : (
           <>
             <div className="grid gap-6 xl:grid-cols-2">
