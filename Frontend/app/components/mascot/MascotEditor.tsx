@@ -110,20 +110,31 @@ export default function MascotEditor() {
     rest();
   };
   const showStill = Boolean(still) && (!live || scrolling);
-  const pickType = useCallback((type: MascotConfig["type"]) => setConfig((c) => (c ? { ...c, type } : c)), []);
+  // Every edit wakes the preview first: on touch, pointerleave fires right after the tap (before the
+  // click's change) and would otherwise leave the still one edit behind.
+  const edit = useCallback((next: (c: MascotConfig) => MascotConfig) => {
+    setLive(true);
+    setConfig((c) => (c ? next(c) : c));
+  }, []);
+  const pickType = useCallback((type: MascotConfig["type"]) => edit((c) => ({ ...c, type })), [edit]);
+  const [canSave, setCanSave] = useState(true);
+  const uid = user?.uid;
 
+  // Keyed on the uid, not the user object, so a refreshed user object does not reset unsaved edits.
   useEffect(() => {
-    if (!user) return;
+    if (!uid) return;
     let cancelled = false;
     (async () => {
       const token = await getIdToken();
-      const saved = token ? await getMyMascot(token).catch(() => null) : null;
-      if (!cancelled) setConfig(saved ?? mascotFromUid(user.uid));
+      const res = token ? await getMyMascot(token).catch(() => null) : null;
+      if (cancelled) return;
+      setConfig(res?.mascot ?? mascotFromUid(uid));
+      setCanSave(res?.canSave ?? true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [user, getIdToken]);
+  }, [uid, getIdToken]);
 
   if (!user) return null;
   if (!config || !preview) {
@@ -134,7 +145,7 @@ export default function MascotEditor() {
     );
   }
 
-  const set = (patch: Partial<MascotConfig>) => setConfig({ ...config, ...patch });
+  const set = (patch: Partial<MascotConfig>) => edit((c) => ({ ...c, ...patch }));
 
   const save = async () => {
     setSaving(true);
@@ -176,7 +187,7 @@ export default function MascotEditor() {
               </div>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setConfig(mascotFromUid(`${user.uid}:${Date.now()}`))}>
+          <Button variant="ghost" size="sm" onClick={() => edit(() => mascotFromUid(`${user.uid}:${Date.now()}`))}>
             สุ่มใหม่
           </Button>
         </div>
@@ -223,10 +234,11 @@ export default function MascotEditor() {
           </Row>
 
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button variant="primary" onClick={save} disabled={saving}>
+            <Button variant="primary" onClick={save} disabled={saving || !canSave}>
               {saving ? <Loader context="inline" label="กำลังบันทึก" /> : null}
               ใช้เป็นรูปโปรไฟล์
             </Button>
+            {!canSave ? <p className="self-center text-sm text-ink-3">แต่งได้แล้ว แต่ยังบันทึกไม่ได้ — ระบบมาสคอตกำลังเปิดใช้งาน</p> : null}
           </div>
         </div>
       </div>

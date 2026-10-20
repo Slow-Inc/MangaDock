@@ -5,12 +5,15 @@ import { sanitizeMascot, type MascotConfig } from "./mascot";
 
 const BASE = "/api/proxy/users/me/mascot";
 
-/** The saved mascot, or null when none is saved (or the server cannot say — the editor then starts from a default). */
-export async function getMyMascot(token: string): Promise<MascotConfig | null> {
+/**
+ * The saved mascot (null when none is saved, or the server cannot say — the editor then starts from a
+ * default) and whether saving is possible: 503 means the server's mascot storage is not enabled yet.
+ */
+export async function getMyMascot(token: string): Promise<{ mascot: MascotConfig | null; canSave: boolean }> {
   const res = await apiFetch(BASE, { headers: createAuthHeaders(token) });
-  if (!res.ok) return null;
+  if (!res.ok) return { mascot: null, canSave: res.status !== 503 };
   const body = (await res.json().catch(() => null)) as { mascot?: unknown } | null;
-  return sanitizeMascot(body?.mascot);
+  return { mascot: sanitizeMascot(body?.mascot), canSave: true };
 }
 
 export async function saveMyMascot(token: string, mascot: MascotConfig): Promise<void> {
@@ -19,5 +22,6 @@ export async function saveMyMascot(token: string, mascot: MascotConfig): Promise
     headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(mascot),
   });
+  if (res.status === 503) throw new Error("ยังบันทึกมาสคอตไม่ได้ ระบบกำลังเปิดใช้งาน");
   if (!res.ok) throw new Error(`บันทึกมาสคอตไม่สำเร็จ (${res.status})`);
 }

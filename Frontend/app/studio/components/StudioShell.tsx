@@ -59,6 +59,10 @@ export default function StudioShell({ children }: { children: ReactNode }) {
     dragging.current = false;
     commit(e.clientX);
   };
+  // A cancelled pointer (touch scroll takeover, window blur) must end the drag, or a later hover resizes.
+  const onPointerCancel = () => {
+    dragging.current = false;
+  };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowLeft") commit(width - SIDEBAR.step);
     else if (e.key === "ArrowRight") commit(width + SIDEBAR.step);
@@ -123,6 +127,8 @@ export default function StudioShell({ children }: { children: ReactNode }) {
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+          onLostPointerCapture={onPointerCancel}
           onKeyDown={onKeyDown}
           onDoubleClick={() => commit(SIDEBAR.initial)}
           className="absolute -right-1 top-0 h-full w-2 cursor-col-resize after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-ink-3 focus-visible:outline-none focus-visible:after:w-0.5 focus-visible:after:bg-accent"

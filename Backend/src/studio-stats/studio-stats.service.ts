@@ -8,6 +8,26 @@ import {
   type VersionRow,
 } from './aggregate-stats';
 
+const PAGE = 1000; // PostgREST's default max rows per request
+const ID_CHUNK = 100; // ~3.7 kB of UUIDs per request URL
+
+/** Reads every row of a query by paging with .range() until a short page comes back. */
+async function readAll<T>(
+  page: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) throw new Error(`Failed to load studio stats: ${error.message}`);
+    const batch = (data ?? []) as T[];
+    rows.push(...batch);
+    if (batch.length < PAGE) return rows;
+  }
+}
+
 /**
  * Creator stats for the Studio dashboard (Epic C #787). Ownership is the same rule Studio already uses
  * (`chapter_versions.translator_uid = caller`, versions.service.ts): unlock rows are read only for the
@@ -33,24 +53,33 @@ export class StudioStatsService {
         (n - 1) * 86_400_000,
     ).toISOString();
 
-    const { data: versions, error: vErr } = await this.db
-      .from('chapter_versions')
-      .select('version_id, title_id, title_name, created_at')
-      .eq('translator_uid', uid);
-    if (vErr) throw new Error(`Failed to load versions: ${vErr.message}`);
-    const owned = (versions ?? []) as VersionRow[];
+    const owned = await readAll<VersionRow>((a, b) =>
+      this.db
+        .from('chapter_versions')
+        .select('version_id, title_id, title_name, created_at')
+        .eq('translator_uid', uid)
+        .order('version_id')
+        .range(a, b),
+    );
     if (owned.length === 0) return aggregateStats([], [], n, now);
 
-    const { data: unlocks, error: uErr } = await this.db
-      .from('unlocks')
-      .select('version_id, price_paid, unlocked_at')
-      .in(
-        'version_id',
-        owned.map((v) => v.version_id),
-      )
-      .gte('unlocked_at', since);
-    if (uErr) throw new Error(`Failed to load unlocks: ${uErr.message}`);
+    // Ids go in the request URL, so ask in chunks; each chunk is paged past PostgREST's 1000-row cap.
+    const unlocks: UnlockRow[] = [];
+    for (let i = 0; i < owned.length; i += ID_CHUNK) {
+      const ids = owned.slice(i, i + ID_CHUNK).map((v) => v.version_id);
+      unlocks.push(
+        ...(await readAll<UnlockRow>((a, b) =>
+          this.db
+            .from('unlocks')
+            .select('version_id, price_paid, unlocked_at')
+            .in('version_id', ids)
+            .gte('unlocked_at', since)
+            .order('unlocked_at')
+            .range(a, b),
+        )),
+      );
+    }
 
-    return aggregateStats(owned, (unlocks ?? []) as UnlockRow[], n, now);
+    return aggregateStats(owned, unlocks, n, now);
   }
 }

@@ -6,12 +6,22 @@
  * (`./echarts-chart.tsx`). Colours come from the design tokens at render time, so the chart follows the theme.
  * Hover shows one tooltip for the day; reduced motion disables the entrance animation.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type AreaSeries = { name: string; values: number[]; token: "--accent" | "--coin" | "--ok" };
 
 export default function StudioAreaChart({ labels, series, height = 240, ariaLabel }: { labels: string[]; series: AreaSeries[]; height?: number; ariaLabel: string }) {
   const el = useRef<HTMLDivElement>(null);
+  // Colours are read from the tokens when the chart is built, so rebuild when the theme changes.
+  const [theme, setTheme] = useState<string | null>(null);
+  useEffect(() => {
+    const root = document.documentElement;
+    const read = () => setTheme(root.getAttribute("data-theme"));
+    read();
+    const mo = new MutationObserver(read);
+    mo.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => mo.disconnect();
+  }, []);
 
   useEffect(() => {
     const node = el.current;
@@ -89,7 +99,7 @@ export default function StudioAreaChart({ labels, series, height = 240, ariaLabe
       ro?.disconnect();
       chart?.dispose();
     };
-  }, [labels, series]);
+  }, [labels, series, theme]);
 
   return <div ref={el} role="img" aria-label={ariaLabel} style={{ height }} className="w-full" />;
 }

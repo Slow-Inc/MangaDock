@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import * as path from 'path';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -120,6 +121,23 @@ export function isSocialCdnUrl(url: string): boolean {
     url.includes('fbsbx.com') ||
     url.includes('graph.facebook.com')
   );
+}
+
+/**
+ * profiles.mascot arrives with migrations/2026-10-20-profiles-mascot.sql. Until it is applied the column
+ * is missing (42703 on select, PGRST204 on update): answer 503 so the editor can say "not yet" instead
+ * of a generic failure.
+ */
+function mascotError(
+  error: { code?: string; message: string },
+  op: 'read' | 'save',
+): Error {
+  if (error.code === '42703' || error.code === 'PGRST204') {
+    return new ServiceUnavailableException(
+      'Mascots are not enabled on this server yet',
+    );
+  }
+  return new Error(`Failed to ${op} mascot: ${error.message}`);
 }
 
 @Injectable()
@@ -293,7 +311,7 @@ export class UsersService {
       .select('mascot')
       .eq('uid', uid)
       .maybeSingle<{ mascot: MascotDto | null }>();
-    if (error) throw new Error(`Failed to read mascot: ${error.message}`);
+    if (error) throw mascotError(error, 'read');
     return data?.mascot ?? null;
   }
 
@@ -303,7 +321,7 @@ export class UsersService {
       .from('profiles')
       .update({ mascot, updated_at: new Date().toISOString() })
       .eq('uid', uid);
-    if (error) throw new Error(`Failed to save mascot: ${error.message}`);
+    if (error) throw mascotError(error, 'save');
   }
 
   async getProfile(uid: string): Promise<UserProfile> {

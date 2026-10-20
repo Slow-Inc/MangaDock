@@ -3,6 +3,7 @@ import { UsersService } from './users.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { STORAGE_PROVIDER } from '../common/storage/storage-provider.interface';
 import type { MascotDto } from './mascot.dto';
+import { ServiceUnavailableException } from '@nestjs/common';
 
 const MASCOT: MascotDto = {
   type: 'cat',
@@ -65,6 +66,24 @@ describe('UsersService mascot', () => {
     const update = t.calls.find((c) => c.op === 'update');
     expect(update?.args[0]).toMatchObject({ mascot: MASCOT });
     expect(t.calls).toContainEqual({ op: 'eq', args: ['uid', 'uid-2'] });
+  });
+
+  it('says "not available yet" (503) while the profiles.mascot column is missing', async () => {
+    // 42703 = undefined_column on select; PGRST204 = column not in PostgREST's schema cache on update.
+    const read = await makeService(null, {
+      code: '42703',
+      message: 'column profiles.mascot does not exist',
+    }).build();
+    await expect(read.getMascot('uid-4')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    const write = await makeService(null, {
+      code: 'PGRST204',
+      message: "Could not find the 'mascot' column",
+    }).build();
+    await expect(write.setMascot('uid-4', MASCOT)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
   });
 
   it('surfaces a database error instead of pretending it saved', async () => {

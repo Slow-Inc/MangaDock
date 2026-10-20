@@ -32,7 +32,7 @@ export default function TranslateProgress({
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="truncate text-[0.8125rem] font-medium text-ink">{title}</span>
-          {elapsedSec > 0 ? <span className="shrink-0 font-mono text-[0.6875rem] tabular-nums text-ink-3">{elapsedSec}s</span> : null}
+          {elapsedSec > 0 ? <span aria-hidden className="shrink-0 font-mono text-[0.6875rem] tabular-nums text-ink-3">{elapsedSec}s</span> : null}
         </div>
         <div className="mt-1.5 flex gap-1" aria-hidden>
           {segments.map((s, i) => (
