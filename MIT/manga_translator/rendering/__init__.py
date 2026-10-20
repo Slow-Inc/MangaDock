@@ -192,6 +192,31 @@ def _dodge_center(c, size, lo, hi):
     return (lo + hi) / 2.0 if lo_pushed else c
 
 
+def _place_off_neighbours(cx, cy, bw, bh, dodged, free, territories):
+    """Centre for a ``bw`` x ``bh`` block after a dodge (#795). Per axis: inside ``free`` (the
+    dodged box clipped to the balloon) when the block fits it, else flush with the edge a
+    neighbour pushed in — read off ``dodged``, since the balloon clip is no push (Tsuki p1). If that move runs into another neighbour, the block is centred in the
+    gap between the two instead (Mieruko p0: flush alone pushed a sign onto the line below)."""
+    def axis(c, size, k):
+        if size <= free[k + 2] - free[k]:
+            return _clamp_center(c, size, free[k], free[k + 2])
+        return _dodge_center(c, size, dodged[k], dodged[k + 2])
+
+    cx, cy = axis(cx, bw, 0), axis(cy, bh, 1)
+    moved = (cx - bw / 2.0, cy - bh / 2.0, cx + bw / 2.0, cy + bh / 2.0)
+    again = clamp_box_to_neighbors(moved, territories, margin=2)
+
+    def gap(c, size, k):
+        lo_hit, hi_hit = again[k] > moved[k] + 1e-6, again[k + 2] < moved[k + 2] - 1e-6
+        if not (lo_hit or hi_hit):
+            return c
+        lo = again[k] if lo_hit else dodged[k]
+        hi = again[k + 2] if hi_hit else dodged[k + 2]
+        return _clamp_center(c, size, lo, hi) if size <= hi - lo else (lo + hi) / 2.0
+
+    return gap(cx, bw, 0), gap(cy, bh, 1)
+
+
 def _region_territory(region):
     """The box a region 'owns' for anti-overlap: its balloon (#170) if known, else its
     detection box. Returns None when neither is available."""
@@ -581,12 +606,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                                                         font_size_max, page_shape, shrink_to_fit=True)
                             if _relaid is not None and _relaid[1] <= _free_w * 1.05:
                                 clean_fs, block_w, block_h = _relaid
-                        # fits the free space: stay inside it; else move off the edges only a
-                        # neighbour pushed (not the balloon clip — Tsuki p1 stays centred)
-                        cx = (_clamp_center(cx, block_w, free[0], free[2]) if block_w <= free[2] - free[0]
-                              else _dodge_center(cx, block_w, dodged[0], dodged[2]))
-                        cy = (_clamp_center(cy, block_h, free[1], free[3]) if block_h <= free[3] - free[1]
-                              else _dodge_center(cy, block_h, dodged[1], dodged[3]))
+                        cx, cy = _place_off_neighbours(cx, cy, block_w, block_h, dodged, free, territories)
                     if own is not None:            # a dodge never takes the text out of its balloon
                         cx = _clamp_center(cx, block_w, own[0], own[2])
                         cy = _clamp_center(cy, block_h, own[1], own[3])

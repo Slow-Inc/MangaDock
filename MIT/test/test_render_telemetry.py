@@ -357,3 +357,24 @@ def test_a_block_taller_than_the_dodged_space_still_moves_off_the_neighbour_795(
                                      font_size_max=20, clean_layout=True)
     assert text.render_dst_box[1] >= 1275.0, (caption.render_dst_box, text.render_dst_box)
     assert text.render_dst_box[3] <= balloon[3] + 1, text.render_dst_box
+
+
+def test_a_dodge_that_runs_into_another_neighbour_shares_the_gap_795():
+    """Mieruko p0 (2026-10-21): the balloon above pushed the sign text's top edge down; moving the
+    block flush with that edge ran it 29 px into the line below, which it had not touched. A block
+    taller than the gap between two neighbours is centred in that gap instead."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1500, 1000, 3), 255, np.uint8)
+    above = FakeRegion(horizontal=True, translation='ฉันจะกลับมาอีกแน่นอน!', xyxy=(146.0, 879.0, 265.0, 984.0),
+                       bubble_box=(90.0, 801.0, 312.0, 1084.0), target_lang='THA', font_size=14)
+    sign = FakeRegion(horizontal=True, translation='ดูดวง นาทีละ 5, 000 เยน นาทีละ 10, 000 เยน',
+                      xyxy=(65.0, 1051.0, 200.0, 1211.0), target_lang='THA', font_size=14)
+    below = FakeRegion(horizontal=True, translation='คอร์สปิเศษ 30, 000 เยน', xyxy=(62.0, 1208.0, 223.0, 1281.0),
+                       target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [above, sign, below], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    _, y1, _, y2 = sign.render_dst_box
+    assert y2 - y1 > 1206 - 1086, 'precondition: the block is taller than the gap'
+    assert abs((y2 - 1206.0) - (1086.0 - y1)) <= 2, sign.render_dst_box
