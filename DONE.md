@@ -7,12 +7,13 @@
 
 **What:** AuthContext starts with `user = null` + `loading = true`; the admin layout redirected on `user === null`
 without reading `loading`, so a direct load or refresh of any `/admin/*` page sent an admin to `/` (settings and
-studio already waited for `!loading`). New pure `admin/components/adminGate.ts` → wait / redirect / allow.
+studio already waited for `!loading`). The JWT role can also lag — an admin promoted in the panel has the role only
+in `profiles.role` — so the layout reads `GET /users/me` itself when the JWT is not admin. New pure
+`admin/components/adminGate.ts` → wait / redirect / allow.
 
-**Validated:** `adminGate.test.ts` red → green; production build with a local test session (role 8, Supabase
-and admin APIs mocked locally): before, all five admin URLs ended on `/`; after, all five render at 1440 and 390.
-Residual: if an admin's role were only in the backend profile (not JWT metadata) the gate could still redirect
-before the profile arrives — fixing that is AuthContext (parked).
+**Validated:** `adminGate.test.ts` red → green (5 cases); production build with a local test session (Supabase and
+admin APIs mocked locally): JWT 8 → all five admin URLs render (were redirected); JWT 1 + profile 8 → all five
+render; JWT 1 + profile 1 → redirected home. 1440 and 390.
 
 ---
 

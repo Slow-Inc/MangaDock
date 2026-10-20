@@ -1,8 +1,9 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
+import { ROLE } from '../lib/types/user';
 import { adminGate } from './components/adminGate';
 
 const NAV = [
@@ -62,10 +63,33 @@ const NAV = [
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, getIdToken } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const gate = adminGate({ user, loading });
+  // The authoritative role (profiles.role): the JWT can lag for an admin promoted in the panel (#817).
+  const [profile, setProfile] = useState<{ uid: string; role: number | null } | null>(null);
+  const uid = user?.uid;
+  const jwtRole = user?.role;
+
+  useEffect(() => {
+    if (loading || !uid || (jwtRole ?? 0) >= ROLE.ADMIN) return;
+    let active = true;
+    (async () => {
+      let role: number | null = null;
+      try {
+        const token = await getIdToken();
+        const res = token ? await fetch('/api/proxy/users/me', { headers: { Authorization: `Bearer ${token}` } }) : null;
+        if (res?.ok) {
+          const r = Number((await res.json())?.role);
+          role = Number.isFinite(r) ? r : null;
+        }
+      } catch { /* role stays null → redirect */ }
+      if (active) setProfile({ uid, role });
+    })();
+    return () => { active = false; };
+  }, [loading, uid, jwtRole, getIdToken]);
+
+  const gate = adminGate({ user, loading, profileRole: profile && profile.uid === uid ? profile.role : undefined });
 
   useEffect(() => {
     if (gate === 'redirect') router.replace('/');
