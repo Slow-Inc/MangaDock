@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import Navbar from "../components/Navbar";
@@ -23,6 +23,12 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     if (!loading && !user) router.replace("/");
   }, [user, loading, router]);
 
+  // Keep the active tab visible in the scrolling mobile strip (stats / danger sit past the right edge).
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    mobileNavRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [pathname, loading, user]);
+
   if (loading || !user) return null;
 
   return (
@@ -31,11 +37,12 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       <div className="mx-auto max-w-4xl px-4 pt-24 pb-8">
         <h1 className="mb-6 text-lg font-bold text-ink">การตั้งค่า</h1>
         {/* Mobile tab nav */}
-        <div className="mb-4 flex gap-1 overflow-x-auto pb-1 md:hidden">
+        <div ref={mobileNavRef} className="mb-4 flex gap-1 overflow-x-auto scroll-px-4 pb-1 md:hidden">
           {NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={pathname === item.href ? "page" : undefined}
               className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                 pathname === item.href
                   ? item.danger ? "bg-danger/10 text-danger" : "bg-fill text-ink"
@@ -53,6 +60,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={pathname === item.href ? "page" : undefined}
                   className={`flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                     pathname === item.href
                       ? item.danger ? "bg-danger/10 text-danger" : "bg-fill text-ink"
