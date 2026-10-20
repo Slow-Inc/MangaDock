@@ -14,6 +14,7 @@ import FollowSeriesButton from "./FollowSeriesButton";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { useRouter } from "next/navigation";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 import { backOwnEntry, bookPath, inPopupLinkTarget, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
 import { loadMangaDetail } from "../lib/mangaDetail";
 import { translateDescription } from "../lib/translateDescription";
@@ -122,6 +123,10 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const chaptersRef = useRef<HTMLDivElement>(null); // For scrolling to start
   const modalScrollRef = useRef<HTMLDivElement>(null);
   const modalContentRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<Popup | null>(null);
+  // Focus in on open, Tab stays inside while this is the top-most popup, focus back on close (#837).
+  useDialogFocus(dialogRef, () => !!popupRef.current && modalStack.isTop(popupRef.current), mounted);
   const closingRef = useRef(false);
   const historyPushedRef = useRef(false);
   const router = useRouter();
@@ -203,6 +208,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       },
     };
     modalStack.push(popup);
+    popupRef.current = popup;
     if (!routed && !historyPushedRef.current) { // ref guard: dev StrictMode runs this effect twice
       markModalNavigation();
       window.history.pushState({ mbModal: book.id }, "", bookPath(book.id, window.location.search));
@@ -306,11 +312,13 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
   const content = (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label={book.title}
       onClickCapture={onLinkClickCapture}
-      className={`fixed inset-0 z-200 flex items-center justify-center md:p-4 transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`fixed inset-0 z-200 outline-none flex items-center justify-center md:p-4 transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
     >
       {/* Backdrop */}
       <div
