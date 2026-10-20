@@ -167,12 +167,13 @@ export default function MascotEditor() {
 
   return (
     <section
+      id="mascot-editor"
       aria-labelledby="mascot-editor-title"
       onPointerEnter={engage}
       onPointerLeave={disengage}
       onFocus={engage}
       onBlur={disengage}
-      className="rounded-[var(--r-card)] border border-line bg-surface p-5 sm:p-6"
+      className="scroll-mt-24 rounded-[var(--r-card)] border border-line bg-surface p-5 sm:p-6"
     >
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
         <div className="flex shrink-0 flex-col items-center gap-3">

@@ -1,6 +1,7 @@
 "use client";
 import { useReducer } from "react";
 import ProfileTab from "../../components/account/ProfileTab";
+import ProfilePhotoPicker from "../../components/account/ProfilePhotoPicker";
 import MascotEditor from "../../components/mascot/MascotEditor";
 import { formReducer, initialFormState } from "../../components/account/formReducer";
 
@@ -13,6 +14,7 @@ export default function ProfileSettingsPage() {
         <p className="mt-1 text-xs text-ink-3">แก้ไขชื่อผู้ใช้และรูปโปรไฟล์</p>
       </div>
       <ProfileTab formState={formState} dispatch={dispatch} isOpen={true} />
+      <ProfilePhotoPicker />
       <MascotEditor />
     </div>
   );
