@@ -40,6 +40,24 @@ def blind_pairs(a: Dict[str, List[str]], b: Dict[str, List[str]], seed: int = 7)
     return packet, key
 
 
+def glitches(sources: List[str], outputs: List[str], target: str) -> Dict[str, int]:
+    """Count judge-free translation glitches: a foreign script leaking in, a segment left
+    untranslated (identical to a source with a real word), an empty segment."""
+    import re
+    sys.path.insert(0, MIT)
+    from manga_translator.translation_quality import foreign_script as _foreign_script
+    out = {'segments': len(outputs), 'foreign_script': 0, 'untranslated': 0, 'empty': 0}
+    for src, dst in zip(sources, outputs):
+        d = (dst or '').strip()
+        if not d:
+            out['empty'] += 1
+        elif d.upper() == (src or '').strip().upper() and re.search(r'[A-Za-z]{4,}', d):
+            out['untranslated'] += 1
+        elif _foreign_script(d, target):
+            out['foreign_script'] += 1
+    return out
+
+
 def tally(votes: Dict[str, str], key: Dict[str, str]) -> Dict[str, int]:
     """Turn per-page 'X' / 'Y' / 'TIE' votes into arm wins."""
     out = {'A': 0, 'B': 0, 'TIE': 0}

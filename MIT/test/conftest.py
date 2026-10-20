@@ -24,6 +24,7 @@ _HEAVY_TESTS = [
     'test_batch_preprocess.py',
     'test_concise_bubbles.py',       # imports translators.config_gpt -> translators/__init__ (torch)
     'test_custom_openai_none_content.py',  # imports translators.custom_openai -> translators/__init__ (torch)
+    'test_custom_openai_glitch_retry.py',  # imports translators.custom_openai (torch)
     'test_custom_openai_parse.py',
     'test_custom_openai_thinking.py',
     'test_numbered_contract.py',     # imports translators.numbered_contract -> translators/__init__ (torch)

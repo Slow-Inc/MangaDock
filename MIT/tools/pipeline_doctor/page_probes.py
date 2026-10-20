@@ -35,20 +35,9 @@ BLANK_STD = 2.0
 #: Targets whose script is not Latin: Latin words left in their translation are suspicious.
 NON_LATIN_TARGETS = {'THA', 'JPN', 'CHS', 'CHT', 'KOR', 'RUS', 'UKR', 'ARA', 'HIN'}
 _LATIN_WORD = re.compile(r'[A-Za-z]{2,}')
-#: Script ranges per target; a translation using any OTHER listed script leaked a language.
-_SCRIPTS = {
-    'THA': r'฀-๿', 'RUS': r'Ѐ-ӿ', 'UKR': r'Ѐ-ӿ',
-    'KOR': r'가-힯ᄀ-ᇿ', 'JPN': r'぀-ヿ一-鿿',
-    'CHS': r'一-鿿', 'CHT': r'一-鿿', 'ARA': r'؀-ۿ',
-}
-_ALL_SCRIPTS = r'฀-๿Ѐ-ӿ가-힯ᄀ-ᇿ぀-ヿ一-鿿؀-ۿ'
-
-
 def _foreign_script(text: str, target: str) -> bool:
-    own = _SCRIPTS.get(target)
-    if own is None:
-        return False
-    return bool(re.search(f'[{_ALL_SCRIPTS}]', re.sub(f'[{own}]', '', text)))
+    from manga_translator.translation_quality import foreign_script
+    return foreign_script(text, target)
 
 
 @dataclass
