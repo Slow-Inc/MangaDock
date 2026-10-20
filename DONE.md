@@ -3,6 +3,30 @@
 
 ---
 
+## #764 Strata redesign — Epics B/C/D + performance pass (2026-10-20)
+
+**What:** every user area moved onto the Strata tokens (home/catalog/search/nav #773, book popup +
+reader #774, community #775, settings/account/top-up/check-in #776, admin #777); Studio rebuilt (#786
+vendored evilcharts ECharts core, #787 `GET /studio/stats`, #788 resizable shell + stats overview, #789
+pages + CopyButton); the bot-avatars mascot cast placed per area (#783), `GET/PUT /users/me/mascot`
+(#784, migration written, not applied) and the mascot editor in settings (#785). ADR 029 records the
+design system. Emoji-as-icon replaced by lucide line icons, the coin glyph and the mascots.
+
+**Performance pass (asked for by the dev, production build, headless Chromium 1440×900):**
+home scroll 30 → 60 fps and book popup ~10 → 60 fps (backdrop-blur on 80 repeated cards and on
+full-screen scrims, measured by A/B — DESIGN.md now forbids it); mascot editor colour drag 41 → 4.8 ms
+sync work per event, frames over 50 ms 86 → 15; /settings scroll slow frames 123/389 → 0 and idle 60 fps
+(the furred preview rests as a still unless someone is dressing it). Search/new/community/studio/
+mylist/reader paging were already 60 fps.
+
+**Also fixed in passing:** profile display name painted under the banner; broken profile photo left an
+empty box; non-numeric chapter labels overflowed the Studio badge; Studio sidebar 12 px below the navbar.
+
+**Open:** light theme (#778, blocked on parked auth-flow files); profiles.mascot migration needs dev
+confirmation; colour-drag preview still ~30 fps while actively dragging (library re-shades the fur).
+
+---
+
 ## #722 — one owner for the identity-change reset (2026-10-20)
 
 **What:** `Frontend/app/lib/identityReset.ts` `resetClientStateForIdentityChange()` is now the only

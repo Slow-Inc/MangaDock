@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { getHistory, HISTORY_EVENT, type HistoryBook, patchThumbnailLocal } from "../lib/readingHistory";
 import BookDetailModal from "./BookDetailModal";
 import ModelBadge from "./ModelBadge";
+import Loader from "./ui/Loader";
 import MangaReader from "./MangaReader";
 import { useBookActions } from "../hooks/useBookActions";
 import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
@@ -90,7 +91,7 @@ function HistoryCard({
     <article
       ref={articleRef}
       onMouseEnter={handleHover}
-      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-white/10 bg-white/5 md:backdrop-blur-xl md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-white/20 ${expandRight ? "origin-left" : "origin-right"} ${isNew ? "cr-card-enter" : ""}`}
+      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-line bg-fill md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-ink-3 ${expandRight ? "origin-left" : "origin-right"} ${isNew ? "cr-card-enter" : ""}`}
     >
       {/* Cover */}
       <div
@@ -120,25 +121,25 @@ function HistoryCard({
           }`}
           sizes="220px"
         />
-        <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-100 transition duration-300 md:opacity-0 md:group-hover:opacity-100" />
+        <div className="absolute inset-0 bg-linear-to-t from-bg/70 via-transparent to-transparent opacity-100 transition duration-300 md:opacity-0 md:group-hover:opacity-100" />
 
         {/* "อ่านต่อ" badge */}
         <div
           onClick={(e) => { e.stopPropagation(); openContinue(); }}
           className="absolute bottom-2 left-2 right-2 opacity-100 transition duration-300 md:opacity-0 md:group-hover:opacity-100"
         >
-          <div className="flex items-center gap-1.5 rounded-lg bg-white/90 px-2.5 py-1.5">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 shrink-0 translate-x-px text-black">
+          <div className="flex items-center gap-1.5 rounded-lg bg-ink/90 px-2.5 py-1.5">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 shrink-0 translate-x-px text-bg">
               <path d="M8 5v14l11-7z" />
             </svg>
-            <span className="text-[11px] font-bold text-black">อ่านต่อ</span>
+            <span className="text-[11px] font-bold text-bg">อ่านต่อ</span>
           </div>
         </div>
       </div>
 
       {/* Info panel */}
       <div
-        className={`pointer-events-none absolute top-0 z-20 hidden h-full w-56 flex-col justify-between bg-black/95 p-4 opacity-0 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl transition-all duration-300 md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 ${
+        className={`pointer-events-none absolute top-0 z-20 hidden h-full w-56 flex-col justify-between bg-surface p-4 opacity-0 shadow-2xl ring-1 ring-line transition-all duration-300 md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 ${
           expandRight
             ? "left-full -translate-x-2 rounded-r-2xl group-hover:translate-x-0"
             : "right-full translate-x-2 rounded-l-2xl group-hover:translate-x-0"
@@ -148,7 +149,7 @@ function HistoryCard({
           <button
             onClick={openContinue}
             title="อ่านต่อ"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black transition hover:bg-white/80"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-bg transition hover:bg-ink/80"
           >
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 translate-x-px">
               <path d="M8 5v14l11-7z" />
@@ -159,8 +160,8 @@ function HistoryCard({
             onClick={handleToggleFavorite}
             className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
               favorited
-                ? "border-green-400/60 bg-green-500/20 text-green-400"
-                : "border-white/30 text-white hover:border-white/60"
+                ? "border-ok/40 bg-ok/10 text-ok"
+                : "border-ink-3 text-ink hover:border-ink"
             }`}
           >
             {favorited ? (
@@ -178,8 +179,8 @@ function HistoryCard({
             onClick={handleToggleLiked}
             className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
               liked
-                ? "border-red-400/60 bg-red-500/20 text-red-400"
-                : "border-white/30 text-white hover:border-white/60"
+                ? "border-danger/40 bg-danger/10 text-danger"
+                : "border-ink-3 text-ink hover:border-ink"
             }`}
           >
             <svg viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-4 w-4">
@@ -189,25 +190,30 @@ function HistoryCard({
         </div>
 
         <div className="space-y-2">
-          <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white">{book.title}</h3>
+          <h3 className="line-clamp-2 text-sm font-bold leading-snug text-ink">{book.title}</h3>
           <div className="space-y-1">
-            <p className="line-clamp-3 text-xs leading-relaxed text-white/65">
+            <p className="line-clamp-3 text-xs leading-relaxed text-ink-2">
               {translatedDesc && !showOriginalDesc ? truncate(stripMarkdown(translatedDesc), 120) : truncate(stripMarkdown(book.description), 120)}
             </p>
-            {translatingDesc && <p className="text-[9px] text-white/30">กำลังแปล...</p>}
+            {translatingDesc && (
+              <div className="flex h-4 items-center gap-2">
+                <Loader context="inline" label="กำลังแปลคำโปรย" className="text-ink-3" />
+                <ModelBadge model={descModel} small />
+              </div>
+            )}
             {translatedDesc && !translatingDesc && (
-              <div className="flex items-center gap-2">
+              <div className="flex h-4 items-center gap-2">
                 <ModelBadge model={descModel} small />
                 <button
                   onClick={() => setShowOriginalDesc((v) => !v)}
-                  className="text-[9px] text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"
+                  className="text-[9px] text-ink-3 underline underline-offset-2 hover:text-ink-2 transition-colors"
                 >
                   {showOriginalDesc ? "แสดงคำแปล" : "ต้นฉบับ"}
                 </button>
               </div>
             )}
           </div>
-          <p className="text-[11px] text-white/35">{relativeTime(book.lastReadAt)}</p>
+          <p className="text-[11px] text-ink-3">{relativeTime(book.lastReadAt)}</p>
         </div>
 
         <div className="flex flex-wrap gap-1.5">
@@ -216,7 +222,7 @@ function HistoryCard({
             .map((cat) => (
               <span
                 key={cat}
-                className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-white/55"
+                className="rounded-full border border-line px-2 py-0.5 text-[10px] text-ink-2"
               >
                 {cat}
               </span>
@@ -225,7 +231,7 @@ function HistoryCard({
 
         <button
           onClick={openDetail}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/15 py-1.5 text-[11px] text-white/60 transition hover:border-white/30 hover:text-white/90"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-line py-1.5 text-[11px] text-ink-2 transition hover:border-ink-3 hover:text-ink"
         >
           ดูรายละเอียด
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
@@ -339,15 +345,15 @@ export default function ContinueReadingRow() {
             onMouseLeave={() => setIsHovering(false)}
           >
             <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
-              <h2 className="text-lg font-bold text-white sm:text-xl md:text-2xl">
+              <h2 className="text-lg font-bold text-ink sm:text-xl md:text-2xl">
                 อ่านต่อ
-                <span className="ml-3 rounded-full border border-blue-400/30 bg-blue-500/10 px-2.5 py-0.5 text-xs font-normal text-blue-300">
+                <span className="ml-3 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 text-xs font-normal text-accent">
                   {history.length} เรื่อง
                 </span>
               </h2>
               <Link
                 href="/mylist?tab=history"
-                className="flex items-center gap-1 text-xs text-white/40 transition hover:text-white/80"
+                className="flex items-center gap-1 text-xs text-ink-3 transition hover:text-ink"
               >
                 ดูเพิ่มเติม
                 <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
@@ -362,12 +368,12 @@ export default function ContinueReadingRow() {
                 onClick={() => scrollBy("left")}
                 onMouseEnter={() => setHoveredArrow("left")}
                 onMouseLeave={() => setHoveredArrow(null)}
-                className={`absolute left-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/70 ring-1 ring-white/20 backdrop-blur-sm transition-all duration-300 md:flex ${
+                className={`absolute left-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 text-ink ring-1 ring-ink-3 transition-all duration-300 md:flex ${
                   hoveredArrow === "left" ? "h-11 w-11" : "h-9 w-9"
                 } ${isHovering && canScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"}`}
                 aria-label="เลื่อนซ้าย"
               >
-                <svg viewBox="0 0 24 24" fill="white" className="h-5 w-5">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
                   <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
                 </svg>
               </button>
@@ -377,12 +383,12 @@ export default function ContinueReadingRow() {
                 onClick={() => scrollBy("right")}
                 onMouseEnter={() => setHoveredArrow("right")}
                 onMouseLeave={() => setHoveredArrow(null)}
-                className={`absolute right-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/70 ring-1 ring-white/20 backdrop-blur-sm transition-all duration-300 md:flex ${
+                className={`absolute right-2 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 text-ink ring-1 ring-ink-3 transition-all duration-300 md:flex ${
                   hoveredArrow === "right" ? "h-11 w-11" : "h-9 w-9"
                 } ${isHovering && canScrollRight ? "opacity-100" : "pointer-events-none opacity-0"}`}
                 aria-label="เลื่อนขวา"
               >
-                <svg viewBox="0 0 24 24" fill="white" className="h-5 w-5">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
                   <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
                 </svg>
               </button>

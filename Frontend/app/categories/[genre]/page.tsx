@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import MangaGrid, { GridBook } from "../../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../../lib/apiCache";
+import Loader from "../../components/ui/Loader";
 
 const API_BASE = "/api/proxy";
 
@@ -71,30 +72,30 @@ export default function GenrePage() {
   const isNextDisabled = page >= totalPages;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen bg-bg text-ink">
       <Navbar />
 
       <main className="page-shell page-shell-nav page-shell-wide">
         {/* Breadcrumb */}
-        <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-white/40 sm:mb-6 sm:text-sm">
+        <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-ink-3 sm:mb-6 sm:text-sm">
           <button
             onClick={() => router.back()}
-            className="transition-colors hover:text-white/70"
+            className="transition-colors hover:text-ink-2"
           >
             ← ย้อนกลับ
           </button>
           <span>/</span>
-          <span className="text-white/70">{genreLabel}</span>
+          <span className="text-ink-2">{genreLabel}</span>
         </div>
 
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4 sm:mb-8">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+            <h1 className="text-2xl font-bold text-ink md:text-3xl">
               {genreLabel}
             </h1>
             {total > 0 && (
-              <p className="mt-1 text-sm text-white/40">
+              <p className="mt-1 text-sm text-ink-3">
                 {total.toLocaleString()} เรื่อง · หน้า {page}/{totalPages}
               </p>
             )}
@@ -106,17 +107,17 @@ export default function GenrePage() {
               <button
                 disabled={isPrevDisabled}
                 onClick={() => setPage((p) => p - 1)}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-sm transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 text-white/60"
+                className="rounded-lg border border-line px-3 py-1.5 text-sm transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 text-ink-2"
               >
                 ← ก่อนหน้า
               </button>
-              <span className="text-xs text-white/40">
+              <span className="text-xs text-ink-3">
                 {page} / {totalPages}
               </span>
               <button
                 disabled={isNextDisabled}
                 onClick={() => setPage((p) => p + 1)}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-sm transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 text-white/60"
+                className="rounded-lg border border-line px-3 py-1.5 text-sm transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 text-ink-2"
               >
                 ถัดไป →
               </button>
@@ -127,12 +128,12 @@ export default function GenrePage() {
         {/* Content */}
         {loading && (
           <div className="flex items-center justify-center py-32">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+            <Loader context="section" />
           </div>
         )}
 
         {!loading && error && (
-          <p className="py-20 text-center text-sm text-white/40">
+          <p className="py-20 text-center text-sm text-ink-3">
             ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง
           </p>
         )}
@@ -142,21 +143,21 @@ export default function GenrePage() {
         {/* Bottom pagination */}
         {!loading && !error && totalPages > 1 && (
           <div className="mt-10 flex flex-col items-center gap-3">
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-ink-3">
               หน้า {page} / {totalPages} — {total.toLocaleString()} รายการทั้งหมด
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button
                 disabled={isPrevDisabled}
                 onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                className="rounded-lg border border-line px-3 py-2 text-xs text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
               >
                 «
               </button>
               <button
                 disabled={isPrevDisabled}
                 onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                className="rounded-lg border border-white/10 px-4 py-2 text-sm transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 text-white/60"
+                className="rounded-lg border border-line px-4 py-2 text-sm transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 text-ink-2"
               >
                 ← ก่อนหน้า
               </button>
@@ -171,8 +172,8 @@ export default function GenrePage() {
                     onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                     className={`h-9 w-9 rounded-lg text-sm transition ${
                       p === page
-                        ? "bg-white text-black font-semibold"
-                        : "border border-white/10 text-white/50 hover:border-white/30 hover:text-white"
+                        ? "bg-ink text-bg font-semibold"
+                        : "border border-line text-ink-2 hover:border-ink-3 hover:text-ink"
                     }`}
                   >
                     {p}
@@ -183,14 +184,14 @@ export default function GenrePage() {
               <button
                 disabled={isNextDisabled}
                 onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                className="rounded-lg border border-white/10 px-4 py-2 text-sm transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 text-white/60"
+                className="rounded-lg border border-line px-4 py-2 text-sm transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 text-ink-2"
               >
                 ถัดไป →
               </button>
               <button
                 disabled={isNextDisabled}
                 onClick={() => { setPage(totalPages); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                className="rounded-lg border border-line px-3 py-2 text-xs text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
               >
                 »
               </button>

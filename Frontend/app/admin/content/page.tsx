@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cacheOrFetch, cacheClearByTag, TTL } from '../../lib/apiCache';
+import AdminTableSkeleton from '../components/AdminTableSkeleton';
 
 const savedContent = { search: '', filterCategory: '', filterAuthor: '', page: 1 };
 
@@ -12,7 +13,7 @@ interface AdminPost {
 
 const CATEGORIES = ['general', 'announcement', 'spoiler', 'manga_update'];
 const LIMIT = 20;
-const inputCls = 'bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-white/20 focus:bg-white/[0.06] transition-colors';
+const inputCls = 'bg-fill border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 focus:bg-raised transition-colors';
 
 export default function AdminContentPage() {
   const { getIdToken } = useAuth();
@@ -92,14 +93,14 @@ export default function AdminContentPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Content</h1>
-        <p className="text-sm text-white/35 mt-0.5">{total.toLocaleString()} forum posts</p>
+        <h1 className="text-2xl font-semibold text-ink">Content</h1>
+        <p className="text-sm text-ink-3 mt-0.5">{total.toLocaleString()} forum posts</p>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2.5 p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+      <div className="flex flex-wrap gap-2.5 p-4 bg-fill border border-line rounded-xl">
         <input value={search} onChange={e => setSearchPersist(e.target.value)} placeholder="Search title or content…" className={`${inputCls} w-60`} />
-        <select value={filterCategory} onChange={e => setFilterCategoryPersist(e.target.value)} className={`${inputCls} text-white/60`}>
+        <select value={filterCategory} onChange={e => setFilterCategoryPersist(e.target.value)} className={`${inputCls} text-ink-2`}>
           <option value="">All categories</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -107,46 +108,40 @@ export default function AdminContentPage() {
       </div>
 
       {/* Table */}
-      <div className="border border-white/[0.07] rounded-xl overflow-hidden">
+      <div className="border border-line rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-white/[0.07] bg-white/[0.02]">
+            <tr className="border-b border-line bg-fill">
               {['Title', 'Author', 'Category', 'Created', 'Comments', 'Pinned', 'Actions'].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-[11px] font-medium text-white/35 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                <th key={h} className="text-left px-4 py-3 text-[11px] font-medium text-ink-3 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              [...Array(5)].map((_, i) => (
-                <tr key={i} className="border-b border-white/5 last:border-0">
-                  {[...Array(7)].map((_, j) => (
-                    <td key={j} className="px-4 py-3.5"><div className="h-3 bg-white/5 rounded animate-pulse" style={{ width: `${[160,80,70,60,30,40,80][j]}px` }} /></td>
-                  ))}
-                </tr>
-              ))
+              <AdminTableSkeleton rows={5} columns={[160, 80, 70, 60, 30, 40, 80]} />
             ) : posts.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-white/30 text-sm">No posts found.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-3 text-sm">No posts found.</td></tr>
             ) : posts.map(p => (
-              <tr key={p.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
-                <td className="px-4 py-3.5 text-white max-w-xs truncate font-medium">{p.title}</td>
-                <td className="px-4 py-3.5 text-white/45 text-xs">{p.authorName || p.authorUid.slice(0, 8)}</td>
+              <tr key={p.id} className="border-b border-line last:border-0 hover:bg-fill transition-colors">
+                <td className="px-4 py-3.5 text-ink max-w-xs truncate font-medium">{p.title}</td>
+                <td className="px-4 py-3.5 text-ink-3 text-xs">{p.authorName || p.authorUid.slice(0, 8)}</td>
                 <td className="px-4 py-3.5">
-                  <span className="text-[11px] px-2 py-0.5 rounded-full border bg-white/[0.04] text-white/45 border-white/[0.08]">{p.category}</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full border bg-fill text-ink-3 border-line">{p.category}</span>
                 </td>
-                <td className="px-4 py-3.5 text-white/35 text-xs whitespace-nowrap">{new Date(p.createdAt).toLocaleDateString()}</td>
-                <td className="px-4 py-3.5 text-white/40">{p.commentCount}</td>
+                <td className="px-4 py-3.5 text-ink-3 text-xs whitespace-nowrap">{new Date(p.createdAt).toLocaleDateString()}</td>
+                <td className="px-4 py-3.5 text-ink-3">{p.commentCount}</td>
                 <td className="px-4 py-3.5">
                   {p.pinned
-                    ? <span className="text-[11px] text-amber-400 font-medium">Pinned</span>
-                    : <span className="text-xs text-white/20">—</span>}
+                    ? <span className="text-[11px] text-accent font-medium">Pinned</span>
+                    : <span className="text-xs text-ink-3">—</span>}
                 </td>
                 <td className="px-4 py-3.5">
                   <div className="flex items-center gap-3">
-                    <button onClick={() => togglePin(p)} className="text-xs text-white/35 hover:text-white transition-colors smooth-hover-fast">
+                    <button onClick={() => togglePin(p)} className="text-xs text-ink-3 hover:text-ink transition-colors smooth-hover-fast">
                       {p.pinned ? 'Unpin' : 'Pin'}
                     </button>
-                    <button onClick={() => setConfirmDeleteId(p.id)} className="text-xs text-red-400 hover:text-red-300 transition-colors smooth-hover-fast">Delete</button>
+                    <button onClick={() => setConfirmDeleteId(p.id)} className="text-xs text-danger hover:text-danger/80 transition-colors smooth-hover-fast">Delete</button>
                   </div>
                 </td>
               </tr>
@@ -157,22 +152,22 @@ export default function AdminContentPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center gap-3 text-sm text-white/35">
-          <button disabled={page <= 1} onClick={() => setPagePersist(page - 1)} className="disabled:opacity-25 hover:text-white transition-colors smooth-hover-fast">← Prev</button>
-          <span className="text-white/50">{page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPagePersist(page + 1)} className="disabled:opacity-25 hover:text-white transition-colors smooth-hover-fast">Next →</button>
+        <div className="flex items-center gap-3 text-sm text-ink-3">
+          <button disabled={page <= 1} onClick={() => setPagePersist(page - 1)} className="disabled:opacity-25 hover:text-ink transition-colors smooth-hover-fast">← Prev</button>
+          <span className="text-ink-2">{page} / {totalPages}</span>
+          <button disabled={page >= totalPages} onClick={() => setPagePersist(page + 1)} className="disabled:opacity-25 hover:text-ink transition-colors smooth-hover-fast">Next →</button>
         </div>
       )}
 
       {/* Delete confirm */}
       {confirmDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setConfirmDeleteId(null)} />
-          <div className="relative bg-[#0f0f0f] border border-white/[0.08] rounded-xl p-6 w-80 space-y-4 shadow-2xl">
-            <p className="text-sm text-white">Delete this post? This cannot be undone.</p>
+          <div className="absolute inset-0 bg-scrim/80" onClick={() => setConfirmDeleteId(null)} />
+          <div className="relative bg-surface border border-line rounded-xl p-6 w-80 space-y-4 shadow-2xl">
+            <p className="text-sm text-ink">Delete this post? This cannot be undone.</p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setConfirmDeleteId(null)} className="text-sm text-white/35 hover:text-white transition-colors">Cancel</button>
-              <button onClick={confirmDelete} className="text-sm px-4 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors font-medium">Delete</button>
+              <button onClick={() => setConfirmDeleteId(null)} className="text-sm text-ink-3 hover:text-ink transition-colors">Cancel</button>
+              <button onClick={confirmDelete} className="text-sm px-4 py-1.5 bg-danger text-bg rounded-lg hover:bg-danger/90 transition-colors font-medium">Delete</button>
             </div>
           </div>
         </div>

@@ -10,6 +10,8 @@ import { StudioBook, getBookCoverUrl, getVersion } from "../../lib/studioApi";
 import { resolvedThumbnail } from "../../lib/imgUrl";
 import { StudioSelect } from "../components/StudioSelect";
 import { MangaPickerModal } from "../components/MangaPickerModal";
+import Loader from "../../components/ui/Loader";
+import { PRIMARY_FILL } from "../../components/ui/Button";
 
 const SUPPORTED_LANGUAGES = [
   { code: "th", label: "ภาษาไทย" },
@@ -49,13 +51,6 @@ function StudioUploadContent() {
   const [description, setDescription] = useState("");
   const [priceCoins, setPriceCoins] = useState<string | number>(0);
 
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
   const [loadingExisting, setLoadingExisting] = useState(!!existingVersionId);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -164,8 +159,8 @@ function StudioUploadContent() {
 
   if (loading || loadingExisting) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#141414]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+      <div className="flex h-full items-center justify-center bg-bg">
+        <Loader context="page" className="text-ink-2" />
       </div>
     );
   }
@@ -174,23 +169,21 @@ function StudioUploadContent() {
   const hasVersion = !!versionId;
 
   return (
-    <div className="pb-20 text-white">
+    <div className="pb-20 text-ink">
       {/* Header */}
-      <div className={`sticky top-0 z-20 transition-all duration-500 ${scrolled ? "border-b border-white/10 shadow-lg" : "border-b border-transparent"}`}>
-        {/* Blur + bg overlay */}
-        <div className={`pointer-events-none absolute inset-0 -z-10 transition-all duration-500 ${scrolled ? "bg-black/60 backdrop-blur-xl" : "bg-[#141414]"}`} />
+      <div className="sticky top-0 z-20 border-b border-line bg-bg">
         <div className="mx-auto flex max-w-3xl items-center gap-[0.52rem] px-4 py-[0.52rem] md:gap-[0.66rem] md:py-[0.86rem]">
           <button
             onClick={() => titleId ? router.push(`/studio/manga/${encodeURIComponent(titleId)}?titleName=${encodeURIComponent(titleName)}`) : router.push("/studio")}
-            className="flex h-[1.8rem] w-[1.8rem] items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white md:h-[2rem] md:w-[2rem]"
+            className="flex h-[1.8rem] w-[1.8rem] items-center justify-center rounded-full text-ink-2 transition hover:bg-fill hover:text-ink md:h-[2rem] md:w-[2rem]"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div className="min-w-0">
-            <h1 className="text-[15px] font-bold leading-tight md:text-base">{hasVersion ? "แก้ไขงานแปล" : "อัปโหลดงานแปลใหม่"}</h1>
-            <p className="truncate text-[11px] leading-tight text-white/40 md:text-xs">
+            <h2 className="text-[15px] font-bold leading-tight md:text-base">{hasVersion ? "แก้ไขงานแปล" : "อัปโหลดงานแปลใหม่"}</h2>
+            <p className="truncate text-[11px] leading-tight text-ink-3 md:text-xs">
               {hasVersion ? `ID: ${versionId}` : "กรอกข้อมูลและอัปโหลดหน้า"}
             </p>
           </div>
@@ -199,8 +192,8 @@ function StudioUploadContent() {
 
       <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
         {/* Metadata form (disabled if version is already created) */}
-        <div className="rounded-2xl border border-white/10 bg-white/3 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-white/80">ข้อมูลงานแปล</h2>
+        <div className="rounded-2xl border border-line bg-fill p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-ink">ข้อมูลงานแปล</h2>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* Manga selector */}
@@ -210,11 +203,11 @@ function StudioUploadContent() {
                   type="button"
                   disabled={hasVersion}
                   onClick={() => setIsSearchModalOpen(true)}
-                  className={`group relative flex aspect-[2/3] w-full max-w-[200px] flex-col overflow-hidden rounded-xl border bg-white/5 transition ${
+                  className={`group relative flex aspect-[2/3] w-full max-w-[200px] flex-col overflow-hidden rounded-xl border bg-fill transition ${
                     titleThumbnail
-                      ? "border-white/10 hover:border-white/30"
-                      : "border-dashed border-white/20 hover:border-amber-300/50"
-                  } disabled:cursor-default disabled:hover:border-white/10`}
+                      ? "border-line hover:border-ink-3"
+                      : "border-dashed border-ink-3 hover:border-accent/40"
+                  } disabled:cursor-default disabled:hover:border-line`}
                 >
                   {titleThumbnail ? (
                     <Image
@@ -225,12 +218,12 @@ function StudioUploadContent() {
                       className="object-cover transition-all duration-300 group-hover:scale-[1.02] disabled:group-hover:scale-100"
                     />
                   ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/35">
-                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-3xl font-light text-white/75">+</span>
-                      <span className="text-xs tracking-wide">เลือกมังงะ</span>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-ink-3">
+                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-ink-3 bg-fill text-3xl font-light text-ink-2">+</span>
+                      <span className="text-xs">เลือกมังงะ</span>
                     </div>
                   )}
-                  <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/90 via-black/15 to-transparent" />
+                  <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-scrim/90 via-scrim/15 to-transparent" />
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3">
                     <p className="line-clamp-2 text-center text-sm font-semibold leading-snug text-white drop-shadow-md">
                       {titleName || "ยังไม่ได้เลือกมังงะ"}
@@ -241,27 +234,27 @@ function StudioUploadContent() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs text-white/50">ตอนที่</label>
+              <label className="text-xs text-ink-2">ตอนที่</label>
               <input
                 value={chapterNumber}
                 onChange={(e) => setChapterNumber(e.target.value)}
                 disabled={hasVersion}
                 placeholder="เช่น 1, 2, 1.5"
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/30 disabled:opacity-40"
+                className="w-full rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/60 focus:ring-1 focus:ring-accent/30 disabled:opacity-40"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-white/50">ชื่อตอน (ถ้ามี)</label>
+              <label className="text-xs text-ink-2">ชื่อตอน (ถ้ามี)</label>
               <input
                 value={chapterTitle}
                 onChange={(e) => setChapterTitle(e.target.value)}
                 disabled={hasVersion}
                 placeholder="ชื่อตอน"
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/30 disabled:opacity-40"
+                className="w-full rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/60 focus:ring-1 focus:ring-accent/30 disabled:opacity-40"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-white/50">ภาษาที่แปล</label>
+              <label className="text-xs text-ink-2">ภาษาที่แปล</label>
               <StudioSelect
                 value={language}
                 onChange={setLanguage}
@@ -275,33 +268,33 @@ function StudioUploadContent() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-white/50">หมายเหตุของนักแปล (ไม่บังคับ)</label>
+            <label className="text-xs text-ink-2">หมายเหตุของนักแปล (ไม่บังคับ)</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               maxLength={1000}
               placeholder="บันทึกเพิ่มเติมจากนักแปล..."
-              className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/30"
+              className="w-full resize-none rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
             />
           </div>
 
           <div className="flex items-center gap-3">
             <div className="space-y-1 flex-1">
-              <label className="text-xs text-white/50">ราคา (เหรียญ) — 0 = ฟรี</label>
+              <label className="text-xs text-ink-2">ราคา (เหรียญ) — 0 = ฟรี</label>
               <input
                 type="number"
                 min={0}
                 value={priceCoins}
                 onChange={(e) => setPriceCoins(e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/30"
+                className="w-full rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink outline-none transition focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
               />
             </div>
             {hasVersion && (
               <button
                 onClick={handleSaveMetadata}
                 disabled={saving}
-                className="mt-5 self-end rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white/60 transition hover:bg-white/5 hover:text-white disabled:opacity-40"
+                className="mt-5 self-end rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink-2 transition hover:bg-fill hover:text-ink disabled:opacity-40"
               >
                 {saving ? "กำลังบันทึก..." : "บันทึก"}
               </button>
@@ -310,15 +303,15 @@ function StudioUploadContent() {
         </div>
 
         {/* Page upload area */}
-        <div className="rounded-2xl border border-white/10 bg-white/3 p-5 space-y-4">
+        <div className="rounded-2xl border border-line bg-fill p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white/80">
+            <h2 className="text-sm font-semibold text-ink">
               หน้ามังงะ ({pages.length} หน้า)
             </h2>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="rounded-xl bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-white/90 active:scale-95 disabled:opacity-50"
+              className={`rounded-xl ${PRIMARY_FILL} px-4 py-2 text-xs font-semibold transition active:scale-95 disabled:opacity-50`}
             >
               {uploading ? "กำลังอัปโหลด..." : "+ เพิ่มหน้า"}
             </button>
@@ -339,19 +332,19 @@ function StudioUploadContent() {
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
             onClick={() => pages.length === 0 && fileInputRef.current?.click()}
-            className={`min-h-32 rounded-xl border border-dashed border-white/15 transition ${
-              pages.length === 0 ? "flex cursor-pointer items-center justify-center hover:border-amber-400/50 hover:bg-amber-950/10" : ""
+            className={`min-h-32 rounded-xl border border-dashed border-line transition ${
+              pages.length === 0 ? "flex cursor-pointer items-center justify-center hover:border-accent/40 hover:bg-accent/5" : ""
             }`}
           >
             {pages.length === 0 ? (
               <div className="text-center">
-                <p className="text-sm text-white/40">วางไฟล์ที่นี่ หรือคลิกเพื่อเลือก</p>
-                <p className="mt-1 text-xs text-white/25">รองรับ JPG, PNG, WEBP, GIF (สูงสุด 10 MB ต่อไฟล์)</p>
+                <p className="text-sm text-ink-3">วางไฟล์ที่นี่ หรือคลิกเพื่อเลือก</p>
+                <p className="mt-1 text-xs text-ink-3">รองรับ JPG, PNG, WEBP, GIF (สูงสุด 10 MB ต่อไฟล์)</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2 p-1 sm:grid-cols-4 md:grid-cols-5">
                 {pages.map((page, idx) => (
-                  <div key={`${page.url}-${idx}`} className="group relative aspect-[2/3] overflow-hidden rounded-xl bg-white/5">
+                  <div key={`${page.url}-${idx}`} className="group relative aspect-[2/3] overflow-hidden rounded-xl bg-fill">
                     <Image
                       src={page.url}
                       alt={`หน้า ${idx + 1}`}
@@ -361,23 +354,23 @@ function StudioUploadContent() {
                     />
                     {page.uploading && (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        <Loader context="inline" className="text-ink" />
                       </div>
                     )}
                     {page.error && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-red-900/60">
-                        <p className="px-1 text-center text-[9px] text-red-200">{page.error}</p>
+                      <div className="absolute inset-0 flex items-center justify-center bg-scrim/70">
+                        <p className="px-1 text-center text-[9px] text-danger">{page.error}</p>
                       </div>
                     )}
                     {/* Page number */}
-                    <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[9px] text-white/70">
+                    <span className="absolute left-1 top-1 rounded bg-bg/60 px-1 text-[9px] text-ink-2">
                       {idx + 1}
                     </span>
                     {/* Delete button */}
                     {!page.uploading && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeletePage(page.url); }}
-                        className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded bg-red-600/80 text-[10px] text-white transition group-hover:flex"
+                        className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded bg-danger/80 text-[10px] text-bg transition group-hover:flex"
                       >
                         ✕
                       </button>
@@ -394,8 +387,8 @@ function StudioUploadContent() {
           onClick={handleDone}
           className={`w-full rounded-xl py-3 text-sm font-semibold transition active:scale-95 ${
             titleId && chapterNumber.trim() && pages.length > 0 && !pages.some((p) => p.uploading)
-              ? "bg-green-600 text-white hover:bg-green-500"
-              : "border border-white/15 text-white/60 hover:bg-white/5 hover:text-white"
+              ? "bg-ok text-bg hover:bg-ok/90"
+              : "border border-line text-ink-2 hover:bg-fill hover:text-ink"
           }`}
         >
           เสร็จสิ้น
@@ -417,7 +410,7 @@ function StudioUploadContent() {
 
 export default function StudioUploadPage() {
   return (
-    <Suspense fallback={<div className="flex h-screen items-center justify-center text-white/50">กำลังโหลด...</div>}>
+    <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-2"><Loader context="section" label="กำลังโหลด" /></div>}>
       <StudioUploadContent />
     </Suspense>
   );

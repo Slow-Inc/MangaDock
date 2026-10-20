@@ -67,10 +67,10 @@ export default function HomeStatusLine({ serverUnavailable, staleTimestamp }: Pr
 
   return (
     <div className="mx-auto max-w-5xl px-1">
-      <p className="flex items-center justify-center gap-2 text-center text-[11px] leading-relaxed tracking-[0.06em] text-white/45 sm:justify-start sm:text-left sm:text-sm sm:tracking-[0.14em]">
+      <p className="flex items-center justify-center gap-2 text-center text-[11px] leading-relaxed text-ink-3 sm:justify-start sm:text-left sm:text-sm">
         <span
           aria-hidden="true"
-          className="inline-flex h-5 items-center justify-center rounded-full border border-amber-300/45 px-2 text-[9px] font-semibold leading-none tracking-[0.14em] text-amber-200"
+          className="inline-flex h-5 items-center justify-center rounded-full border border-accent/40 px-2 text-[9px] font-semibold leading-none tracking-[0.1em] text-accent"
         >
           {badgeText}
         </span>

@@ -66,8 +66,8 @@ export default function StatsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-white/90">สถิติการอ่าน</h2>
-        <p className="mt-0.5 text-sm text-white/40">ข้อมูลจากประวัติการอ่านในเครื่องของคุณ</p>
+        <h2 className="text-lg font-bold text-ink">สถิติการอ่าน</h2>
+        <p className="mt-0.5 text-sm text-ink-3">ข้อมูลจากประวัติการอ่านในเครื่องของคุณ</p>
       </div>
 
       {/* Summary cards */}
@@ -78,8 +78,8 @@ export default function StatsPage() {
       </div>
 
       {/* Activity by day of week */}
-      <div className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <p className="mb-4 text-sm font-semibold text-white/70">กิจกรรมรายวัน</p>
+      <div className="rounded-2xl border border-line bg-fill p-5">
+        <p className="mb-4 text-sm font-semibold text-ink-2">กิจกรรมรายวัน</p>
         <div className="flex items-end gap-2">
           {activity.map((count, i) => (
             <div key={i} className="flex flex-1 flex-col items-center gap-1">
@@ -87,7 +87,7 @@ export default function StatsPage() {
                 className="w-full rounded-sm bg-accent/60 transition-all"
                 style={{ height: `${Math.max(4, (count / maxActivity) * 80)}px` }}
               />
-              <span className="text-xs text-white/30">{DAY_LABELS[i]}</span>
+              <span className="text-xs text-ink-3">{DAY_LABELS[i]}</span>
             </div>
           ))}
         </div>
@@ -95,19 +95,19 @@ export default function StatsPage() {
 
       {/* Top genres */}
       {genres.length > 0 && (
-        <div className="rounded-2xl border border-white/8 bg-white/3 p-5">
-          <p className="mb-4 text-sm font-semibold text-white/70">แนวที่ชอบ</p>
+        <div className="rounded-2xl border border-line bg-fill p-5">
+          <p className="mb-4 text-sm font-semibold text-ink-2">แนวที่ชอบ</p>
           <div className="space-y-2.5">
             {genres.map(({ genre, count }) => (
               <div key={genre} className="flex items-center gap-3">
-                <span className="w-28 shrink-0 truncate text-xs text-white/60">{genre}</span>
-                <div className="flex-1 overflow-hidden rounded-full bg-white/8">
+                <span className="w-28 shrink-0 truncate text-xs text-ink-2">{genre}</span>
+                <div className="flex-1 overflow-hidden rounded-full bg-fill">
                   <div
                     className="h-1.5 rounded-full bg-accent/70"
                     style={{ width: `${(count / (genres[0]?.count ?? 1)) * 100}%` }}
                   />
                 </div>
-                <span className="w-6 text-right text-xs text-white/35">{count}</span>
+                <span className="w-6 text-right text-xs text-ink-3">{count}</span>
               </div>
             ))}
           </div>
@@ -115,7 +115,7 @@ export default function StatsPage() {
       )}
 
       {history.length === 0 && (
-        <div className="py-16 text-center text-sm text-white/30">
+        <div className="py-16 text-center text-sm text-ink-3">
           ยังไม่มีประวัติการอ่าน เริ่มอ่านมังงะเพื่อดูสถิติของคุณ
         </div>
       )}
@@ -125,10 +125,10 @@ export default function StatsPage() {
 
 function StatCard({ label, value, sub, accent }: { label: string; value: number; sub: string; accent?: boolean }) {
   return (
-    <div className={`rounded-2xl border p-4 ${accent ? "border-accent/40 bg-accent/10" : "border-white/8 bg-white/3"}`}>
-      <p className="text-xs text-white/40">{label}</p>
-      <p className={`mt-1 text-3xl font-black ${accent ? "text-accent" : "text-white/90"}`}>{value}</p>
-      <p className="mt-0.5 text-xs text-white/30">{sub}</p>
+    <div className={`rounded-2xl border p-4 ${accent ? "border-accent/40 bg-accent/10" : "border-line bg-fill"}`}>
+      <p className="text-xs text-ink-3">{label}</p>
+      <p className={`mt-1 text-3xl font-black ${accent ? "text-accent" : "text-ink"}`}>{value}</p>
+      <p className="mt-0.5 text-xs text-ink-3">{sub}</p>
     </div>
   );
 }

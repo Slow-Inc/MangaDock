@@ -17,6 +17,9 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "../lib/forumCategories";
 import { useToast } from "../contexts/ToastContext";
 import { CommunityErrorBoundary } from "./components/CommunityErrorBoundary";
+import Loader from "../components/ui/Loader";
+import { PRIMARY_FILL } from "../components/ui/Button";
+import Mascot from "../components/mascot/Mascot";
 
 function CommunityContent() {
   const { user, userRole, showLoginPrompt } = useAuth();
@@ -199,13 +202,13 @@ function CommunityContent() {
     <div className="relative">
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="w-full sm:w-auto">
-          <h1 className="text-3xl font-extrabold text-white mb-1 tracking-tight">คอมมูนิตี้</h1>
-          <p className="text-white/40 text-sm font-medium">พื้นที่แบ่งปันและพูดคุยเกี่ยวกับมังงะที่คุณรัก</p>
+          <h1 className="text-3xl font-extrabold text-ink mb-1">คอมมูนิตี้</h1>
+          <p className="text-ink-3 text-sm font-medium">พื้นที่แบ่งปันและพูดคุยเกี่ยวกับมังงะที่คุณรัก</p>
         </div>
         
         <button
           onClick={() => user ? openModal() : showLoginPrompt()}
-          className="hidden sm:block px-8 py-3 rounded-2xl bg-white text-black font-black text-sm hover:bg-white/90 smooth-hover shrink-0 active:scale-95"
+          className={`hidden sm:block px-8 py-3 rounded-2xl ${PRIMARY_FILL} font-black text-sm smooth-hover shrink-0 active:scale-95`}
         >
           + สร้างโพสต์ใหม่
         </button>
@@ -214,20 +217,20 @@ function CommunityContent() {
       {/* Mobile Filter Strip — sort + category in one scrollable row */}
       <div className="sm:hidden -mx-4 px-4 mb-5">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          <div className="flex items-center bg-white/5 rounded-lg p-0.5 border border-white/10 shrink-0">
-            <button onClick={() => setSort('hot')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === 'hot' ? 'bg-white/10 text-white' : 'text-white/30'}`}>Hot</button>
-            <button onClick={() => setSort('new')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === 'new' ? 'bg-white/10 text-white' : 'text-white/30'}`}>New</button>
+          <div className="flex items-center bg-fill rounded-lg p-0.5 border border-line shrink-0">
+            <button onClick={() => setSort('hot')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === 'hot' ? 'bg-fill text-ink' : 'text-ink-3'}`}>Hot</button>
+            <button onClick={() => setSort('new')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${sort === 'new' ? 'bg-fill text-ink' : 'text-ink-3'}`}>New</button>
           </div>
-          <div className="w-px h-5 bg-white/10 shrink-0" />
+          <div className="w-px h-5 bg-fill shrink-0" />
           <button
             onClick={() => handleMobileCategorySelect(undefined)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${!category ? 'bg-white border-amber-500 text-black' : 'bg-white/5 border-white/10 text-white/50'}`}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${!category ? 'bg-ink border-ink text-bg' : 'bg-fill border-line text-ink-2'}`}
           >ทั้งหมด</button>
           {availableCategories(userRole).map(cat => (
             <button
               key={cat}
               onClick={() => handleMobileCategorySelect(category === cat ? undefined : cat)}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${category === cat ? 'bg-white border-amber-500 text-black' : 'bg-white/5 border-white/10 text-white/50'}`}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${category === cat ? 'bg-ink border-ink text-bg' : 'bg-fill border-line text-ink-2'}`}
             >
               {cat === 'general' ? 'ทั่วไป' : cat === 'announcement' ? 'ประกาศ' : cat === 'spoiler' ? 'สปอยล์' : 'อัปเดต'}
             </button>
@@ -239,10 +242,10 @@ function CommunityContent() {
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex flex-wrap items-center gap-3">
           {/* View Mode Toggle - Moved to Left */}
-          <div className="flex items-center bg-white/5 rounded-lg p-1 border border-white/10 smooth-hover hidden sm:flex">
+          <div className="flex items-center bg-fill rounded-lg p-1 border border-line smooth-hover hidden sm:flex">
             <button 
               onClick={() => setViewMode('card')}
-              className={`p-1.5 rounded-md smooth-hover-fast ${viewMode === 'card' ? "bg-white/10 text-white" : "text-white/30 hover:text-white/60"}`}
+              className={`p-1.5 rounded-md smooth-hover-fast ${viewMode === 'card' ? "bg-fill text-ink" : "text-ink-3 hover:text-ink-2"}`}
               title="Card View"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -252,7 +255,7 @@ function CommunityContent() {
             </button>
             <button 
               onClick={() => setViewMode('compact')}
-              className={`p-1.5 rounded-md smooth-hover-fast ${viewMode === 'compact' ? "bg-white/10 text-white" : "text-white/30 hover:text-white/60"}`}
+              className={`p-1.5 rounded-md smooth-hover-fast ${viewMode === 'compact' ? "bg-fill text-ink" : "text-ink-3 hover:text-ink-2"}`}
               title="Compact View"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -262,13 +265,13 @@ function CommunityContent() {
           </div>
 
           {mangaId && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-bold animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-bold animate-in fade-in zoom-in-95">
               <span>ชุมชนมังงะ</span>
               <button onClick={() => {
                 const params = new URLSearchParams(window.location.search);
                 params.delete('mangaId');
                 router.push(`/community?${params.toString()}`);
-              }} className="hover:text-white transition-colors">
+              }} className="hover:text-ink transition-colors">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6L18 18" />
                 </svg>
@@ -276,13 +279,13 @@ function CommunityContent() {
             </div>
           )}
           {category && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-amber-500/20 text-amber-400 text-xs font-bold animate-in fade-in zoom-in-95">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-fill border border-accent/20 text-accent text-xs font-bold animate-in fade-in zoom-in-95">
               <span>หมวด: {category === 'general' ? 'ทั่วไป' : category === 'announcement' ? 'ประกาศ' : category === 'spoiler' ? 'สปอยล์' : 'อัปเดตมังงะ'}</span>
               <button onClick={() => {
                 const params = new URLSearchParams(window.location.search);
                 params.delete('category');
                 router.push(`/community?${params.toString()}`);
-              }} className="hover:text-white transition-colors">
+              }} className="hover:text-ink transition-colors">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6L18 18" />
                 </svg>
@@ -291,11 +294,11 @@ function CommunityContent() {
           )}
         </div>
         
-        <div className="hidden sm:flex items-center bg-white/5 rounded-lg p-1 border border-white/10 smooth-hover">
+        <div className="hidden sm:flex items-center bg-fill rounded-lg p-1 border border-line smooth-hover">
           <button
             onClick={() => setSort('hot')}
             className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${
-              sort === 'hot' ? "bg-white/10 text-white" : "text-white/30 hover:text-white/60"
+              sort === 'hot' ? "bg-fill text-ink" : "text-ink-3 hover:text-ink-2"
             }`}
           >
             Hot
@@ -303,7 +306,7 @@ function CommunityContent() {
           <button
             onClick={() => setSort('new')}
             className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase smooth-hover-fast ${
-              sort === 'new' ? "bg-white/10 text-white" : "text-white/30 hover:text-white/60"
+              sort === 'new' ? "bg-fill text-ink" : "text-ink-3 hover:text-ink-2"
             }`}
           >
             New
@@ -316,7 +319,7 @@ function CommunityContent() {
         <div className="sticky top-20 z-30 flex justify-center mb-4 pointer-events-none">
           <button
             onClick={() => { fetchPosts(); setNewPostCount(0); }}
-            className="pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black text-sm font-bold animate-in slide-in-from-top-2 duration-300 hover:bg-white/90 active:scale-95 transition-transform"
+            className={`pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-full ${PRIMARY_FILL} text-sm font-bold animate-in slide-in-from-top-2 duration-300 active:scale-95 transition-transform`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
@@ -337,15 +340,13 @@ function CommunityContent() {
         ) : posts.length > 0 ? (
           posts.map(post => <PostCard key={post.id} post={post} viewMode={viewMode} />)
         ) : (
-          <div className="bg-[#1a1a1a] border border-dashed border-white/10 rounded-2xl py-16 text-center space-y-3">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-white/5 flex items-center justify-center">
-              <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
+          <div className="bg-surface border border-dashed border-line rounded-2xl py-16 text-center space-y-3">
+            <div className="flex justify-center">
+              <Mascot area="community" size={88} />
             </div>
-            <p className="text-white/40 font-medium">ยังไม่มีโพสต์ในหมวดหมู่นี้</p>
+            <p className="text-ink-3 font-medium">ยังไม่มีโพสต์ในหมวดหมู่นี้</p>
             {user && (
-              <button onClick={openModal} className="px-5 py-2 rounded-xl bg-white text-black text-sm font-bold hover:bg-white/90 smooth-hover">
+              <button onClick={openModal} className={`px-5 py-2 rounded-xl ${PRIMARY_FILL} text-sm font-bold smooth-hover`}>
                 สร้างโพสต์แรก
               </button>
             )}
@@ -359,11 +360,11 @@ function CommunityContent() {
           <button
             onClick={loadMore}
             disabled={loadingMore}
-            className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-sm font-bold text-white/50 hover:bg-white/[0.08] hover:text-white/80 disabled:opacity-40 smooth-hover flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-2xl bg-fill border border-line text-sm font-bold text-ink-2 hover:bg-raised hover:text-ink disabled:opacity-40 smooth-hover flex items-center justify-center gap-2"
           >
             {loadingMore ? (
               <>
-                <div className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                <Loader context="inline" />
                 กำลังโหลด...
               </>
             ) : 'โหลดโพสต์เพิ่ม'}
@@ -374,12 +375,12 @@ function CommunityContent() {
       {/* Create Post Modal — bottom sheet on mobile, centered dialog on desktop */}
       {showCreateModal && (
         <div
-          className={`fixed inset-0 z-[100] flex items-end sm:items-center sm:p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${isModalVisible ? 'opacity-100' : 'opacity-0'}`}
+          className={`fixed inset-0 z-[100] flex items-end sm:items-center sm:p-4 bg-scrim/80 transition-opacity duration-300 ${isModalVisible ? 'opacity-100' : 'opacity-0'}`}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
           <div className={`
             w-full sm:max-w-2xl sm:mx-auto
-            bg-[#1a1a1a] border border-white/10 border-b-0 sm:border-b
+            bg-surface border border-line border-b-0 sm:border-b
             rounded-t-[2rem] sm:rounded-3xl
             shadow-2xl flex flex-col
             h-[92dvh] sm:h-auto sm:max-h-[90vh]
@@ -390,12 +391,12 @@ function CommunityContent() {
           `}>
             {/* Drag handle — mobile only */}
             <div className="flex justify-center pt-3 pb-1 sm:hidden shrink-0">
-              <div className="w-10 h-1 rounded-full bg-white/20" />
+              <div className="w-10 h-1 rounded-full bg-fill" />
             </div>
 
-            <header className="px-5 py-4 sm:p-6 border-b border-white/5 flex items-center justify-between shrink-0">
-              <h2 className="text-lg sm:text-xl font-bold text-white">สร้างโพสต์ใหม่</h2>
-              <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all">
+            <header className="px-5 py-4 sm:p-6 border-b border-line flex items-center justify-between shrink-0">
+              <h2 className="text-lg sm:text-xl font-bold text-ink">สร้างโพสต์ใหม่</h2>
+              <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center rounded-full bg-fill hover:bg-raised text-ink-3 hover:text-ink transition-all">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6L18 18" />
                 </svg>
@@ -409,7 +410,7 @@ function CommunityContent() {
               {/* Category + Manga — stack on mobile */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">หมวดหมู่</label>
+                  <label className="block text-[10px] font-black text-ink-3 uppercase mb-2">หมวดหมู่</label>
                   <div className="flex flex-wrap gap-2">
                     {availableCategories(userRole).map((cat) => (
                       <button
@@ -417,8 +418,8 @@ function CommunityContent() {
                         onClick={() => setNewPost({ ...newPost, category: cat })}
                         className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
                           newPost.category === cat
-                            ? "bg-white border-amber-500 text-black"
-                            : "bg-white/5 text-white/40 border-white/5 hover:border-white/20"
+                            ? "bg-ink border-ink text-bg"
+                            : "bg-fill text-ink-3 border-line hover:border-ink-3"
                         }`}
                       >
                         {cat === 'general' ? 'ทั่วไป' : cat === 'announcement' ? 'ประกาศ' : cat === 'spoiler' ? 'สปอยล์' : 'อัปเดตมังงะ'}
@@ -434,43 +435,43 @@ function CommunityContent() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">หัวข้อ</label>
+                <label className="block text-[10px] font-black text-ink-3 uppercase mb-2">หัวข้อ</label>
                 <input
                   type="text"
                   value={newPost.title}
                   onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
                   placeholder="เขียนหัวข้อโพสต์ที่นี่..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all"
+                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm text-ink focus:outline-none focus:border-accent transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">เนื้อหา</label>
+                <label className="block text-[10px] font-black text-ink-3 uppercase mb-2">เนื้อหา</label>
                 <textarea
                   value={newPost.content}
                   onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
                   placeholder="รายละเอียดสิ่งที่คุณต้องการจะพูดคุย..."
                   rows={4}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all resize-none"
+                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm text-ink focus:outline-none focus:border-accent transition-all resize-none"
                 />
               </div>
 
               <PostImageUploader images={postImages} onChange={setPostImages} />
             </div>
 
-            <footer className="px-5 py-4 sm:p-6 bg-white/[0.02] border-t border-white/5 flex gap-3 shrink-0"
+            <footer className="px-5 py-4 sm:p-6 bg-fill border-t border-line flex gap-3 shrink-0"
               style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
             >
               <button
                 onClick={closeModal}
-                className="flex-1 sm:flex-none px-5 py-3 rounded-xl text-sm font-bold text-white/50 bg-white/5 hover:bg-white/8 transition-all active:scale-95"
+                className="flex-1 sm:flex-none px-5 py-3 rounded-xl text-sm font-bold text-ink-2 bg-fill hover:bg-raised transition-all active:scale-95"
               >
                 ยกเลิก
               </button>
               <button
                 onClick={handleCreatePost}
                 disabled={!newPost.title.trim() || !newPost.content.trim() || submitting}
-                className="flex-1 sm:flex-none px-8 py-3 rounded-xl bg-white text-black font-black text-sm hover:bg-white/90 disabled:opacity-40 transition-all active:scale-95"
+                className={`flex-1 sm:flex-none px-8 py-3 rounded-xl ${PRIMARY_FILL} font-black text-sm disabled:opacity-40 transition-all active:scale-95`}
               >
                 {submitting ? "กำลังโพสต์..." : "โพสต์เลย"}
               </button>
@@ -482,7 +483,7 @@ function CommunityContent() {
       {/* FAB — Mobile Create Post */}
       <button
         onClick={() => user ? openModal() : showLoginPrompt()}
-        className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-white text-black flex items-center justify-center sm:hidden active:scale-95 transition-transform"
+        className={`fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full ${PRIMARY_FILL} flex items-center justify-center sm:hidden active:scale-95 transition-transform`}
         aria-label="สร้างโพสต์"
       >
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -497,8 +498,8 @@ export default function CommunityPage() {
   return (
     <CommunityErrorBoundary>
       <Suspense fallback={
-        <div className="min-h-screen bg-[#141414] flex items-center justify-center">
-          <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+        <div className="min-h-screen bg-bg flex items-center justify-center">
+          <Loader context="page" />
         </div>
       }>
         <CommunityContent />

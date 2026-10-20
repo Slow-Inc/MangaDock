@@ -61,14 +61,14 @@ export default function HeroDetailButton({ book }: Props) {
         {isManga && hasReadable === true && (
           <button
             onClick={openRead}
-            className="rounded-lg bg-white px-8 py-2.5 text-sm font-bold text-black transition hover:bg-white/90"
+            className="rounded-lg bg-ink px-8 py-2.5 text-sm font-bold text-bg transition hover:bg-ink/90"
           >
             อ่านเลย
           </button>
         )}
         <button
           onClick={openDetail}
-          className="rounded-lg border border-white/25 bg-white/10 px-8 py-2.5 text-sm font-bold text-white backdrop-blur-xl transition hover:bg-white/20"
+          className="rounded-lg border border-ink-3 bg-fill px-8 py-2.5 text-sm font-bold text-ink backdrop-blur-xl transition hover:bg-raised"
         >
           รายละเอียดเพิ่มเติม
         </button>

@@ -12,6 +12,7 @@ import { UsersModule } from './users/users.module';
 import { StatusModule } from './status/status.module';
 import { CacheModule } from './cache/cache.module';
 import { VersionsModule } from './versions/versions.module';
+import { StudioStatsModule } from './studio-stats/studio-stats.module';
 import { UploadModule } from './upload/upload.module';
 import { WalletModule } from './wallet/wallet.module';
 import { UnlockModule } from './unlock/unlock.module';
@@ -41,6 +42,7 @@ import { validate } from './common/env.validation';
     UsersModule,
     StatusModule,
     VersionsModule,
+    StudioStatsModule,
     UploadModule,
     WalletModule,
     UnlockModule,

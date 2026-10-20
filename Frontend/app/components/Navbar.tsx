@@ -37,7 +37,6 @@ const navItems = [
 ];
 
 export default function Navbar() {
-  const [scrolled, setScrolled]   = useState(false);
   const [genreOpen, setGenreOpen] = useState(false);
   const [mobileGenreOpen, setMobileGenreOpen] = useState(false);
   const pathname                   = usePathname();
@@ -45,13 +44,6 @@ export default function Navbar() {
   const genreRef                   = useRef<HTMLDivElement>(null);
   const isStudioPath               = pathname.startsWith("/studio");
   const activeStudioTab            = getActiveStudioTab(pathname);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   // Close genre dropdown on outside click
   useEffect(() => {
@@ -98,32 +90,19 @@ export default function Navbar() {
   return (
     <>
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-[border-color,box-shadow] duration-500 ${
-        scrolled
-          ? "border-b border-white/10 shadow-lg"
-          : "border-b border-transparent"
-      }`}
+      className="fixed inset-x-0 top-0 z-50 border-b border-line"
     >
-      {/* Blur + bg overlay — kept as a child so dropdown's backdrop-blur isn't blocked by parent compositing */}
-      <div
-        className={`pointer-events-none absolute inset-0 -z-10 transition-all duration-500 ${
-          scrolled ? "bg-black/60 backdrop-blur-xl" : "bg-transparent"
-        }`}
-      />
-
-      {/* Gradient shadow */}
-      <div
-        className={`pointer-events-none absolute inset-x-0 top-0 -z-10 h-40 bg-linear-to-b from-black/70 to-transparent transition-opacity duration-500 ${
-          scrolled ? "opacity-0" : "opacity-100"
-        }`}
-      />
+      {/* Strata nav (globals.css 268-420): always bg at 86 % with blur and a hairline — it used to turn
+          on only after a window scroll, so pages that scroll an inner container (settings) showed content
+          straight through it. Kept as a child so the dropdown's backdrop-blur isn't blocked by compositing. */}
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-bg/[0.86] backdrop-blur-md backdrop-saturate-[1.2]" />
 
       <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-10">
         <div className="flex items-center gap-3 sm:gap-8">
           {pathname.startsWith("/community") && (
             <button 
               onClick={() => window.dispatchEvent(new Event('toggleMobileMenu'))}
-              className="lg:hidden p-2 -ml-1 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white transition-colors"
+              className="lg:hidden p-2 -ml-1 rounded-xl bg-fill border border-line text-ink-2 hover:text-ink transition-colors"
               aria-label="Open Community Menu"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,8 +129,8 @@ export default function Navbar() {
                   onClick={(e) => handleNavClick(e, item)}
                   className={`rounded-lg px-3 py-2 smooth-hover-fast ${
                     isActive
-                      ? "font-semibold text-white"
-                      : "text-white/65 hover:text-white"
+                      ? "font-semibold text-ink"
+                      : "text-ink-2 hover:text-ink"
                   }`}
                 >
                   {item.label}
@@ -167,8 +146,8 @@ export default function Navbar() {
                 aria-controls="genre-dropdown"
                 className={`flex items-center gap-1 rounded-lg px-3 py-2 transition-colors duration-200 ${
                   genreOpen || pathname.startsWith("/categories")
-                    ? "font-semibold text-white"
-                    : "text-white/65 hover:text-white"
+                    ? "font-semibold text-ink"
+                    : "text-ink-2 hover:text-ink"
                 }`}
               >
                 หมวดหมู่
@@ -190,15 +169,15 @@ export default function Navbar() {
               <div
                 id="genre-dropdown"
                 role="region"
-                className={`absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-white/15 bg-black/70 shadow-2xl backdrop-blur-sm transition-all duration-200 origin-top-left ${
+                className={`absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-line bg-surface/70 shadow-2xl backdrop-blur-sm transition-all duration-200 origin-top-left ${
                   genreOpen
                     ? "pointer-events-auto scale-100 opacity-100"
                     : "pointer-events-none scale-95 opacity-0"
                 }`}
               >
                 {/* Header */}
-                <div className="border-b border-white/10 px-4 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-white/40">
+                <div className="border-b border-line px-4 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase text-ink-3">
                     เลือกหมวดหมู่
                   </p>
                 </div>
@@ -214,8 +193,8 @@ export default function Navbar() {
                         onClick={() => setGenreOpen(false)}
                         className={`rounded-lg px-2 py-1.5 text-center text-xs transition-colors duration-150 ${
                           isActive
-                            ? "bg-white/15 font-semibold text-white"
-                            : "text-white/60 hover:bg-white/10 hover:text-white"
+                            ? "bg-ink/15 font-semibold text-ink"
+                            : "text-ink-2 hover:bg-fill hover:text-ink"
                         }`}
                       >
                         {g.label}
@@ -233,7 +212,7 @@ export default function Navbar() {
     </header>
 
     {/* ── Mobile bottom navigation (Webtoon-style) ── */}
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-black md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-bg md:hidden">
       {isStudioPath ? (
         <div className="flex h-16 items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
           {STUDIO_TABS.slice(0, 2).map((tab) => {
@@ -243,7 +222,7 @@ export default function Navbar() {
                 key={tab.key}
                 href={tab.href}
                 className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 text-[10px] transition-colors duration-200 ${
-                  isActive ? "text-white" : "text-white/45"
+                  isActive ? "text-ink" : "text-ink-3"
                 }`}
               >
                 {tab.icon("h-5 w-5")}
@@ -269,7 +248,7 @@ export default function Navbar() {
                 key={tab.key}
                 href={tab.href}
                 className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 text-[10px] transition-colors duration-200 ${
-                  isActive ? "text-white" : "text-white/45"
+                  isActive ? "text-ink" : "text-ink-3"
                 }`}
               >
                 {tab.icon("h-5 w-5")}
@@ -282,11 +261,11 @@ export default function Navbar() {
         <>
       {/* Genre dropdown (slides up from bottom nav) */}
       <div
-        className={`overflow-hidden border-b border-white/10 transition-all duration-300 ${
+        className={`overflow-hidden border-b border-line transition-all duration-300 ${
           mobileGenreOpen ? "max-h-60 opacity-100" : "max-h-0 opacity-0 border-b-0"
         }`}
       >
-        <div className="grid grid-cols-4 gap-1 bg-black p-3">
+        <div className="grid grid-cols-4 gap-1 bg-bg p-3">
           {GENRES.map((g) => {
             const active = pathname === `/categories/${g.slug}`;
             return (
@@ -296,8 +275,8 @@ export default function Navbar() {
                 onClick={() => setMobileGenreOpen(false)}
                 className={`rounded-lg px-1.5 py-2 text-center text-[11px] transition-colors duration-150 ${
                   active
-                    ? "bg-white/15 font-semibold text-white"
-                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                    ? "bg-ink/15 font-semibold text-ink"
+                    : "text-ink-2 hover:bg-fill hover:text-ink"
                 }`}
               >
                 {g.label}
@@ -309,7 +288,7 @@ export default function Navbar() {
 
       <div className="flex h-16 items-center justify-around px-1 pb-[env(safe-area-inset-bottom)]">
         {/* หน้าหลัก */}
-        <Link href="/" className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${pathname === "/" ? "text-white" : "text-white/45"}`}>
+        <Link href="/" className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${pathname === "/" ? "text-ink" : "text-ink-3"}`}>
           <svg viewBox="0 0 24 24" fill={pathname === "/" ? "currentColor" : "none"} stroke="currentColor" strokeWidth={pathname === "/" ? 0 : 2} className="h-5 w-5" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
@@ -317,7 +296,7 @@ export default function Navbar() {
         </Link>
 
         {/* หนังสือทั้งหมด */}
-        <Link href="/new" className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${pathname.startsWith("/new") ? "text-white" : "text-white/45"}`}>
+        <Link href="/new" className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${pathname.startsWith("/new") ? "text-ink" : "text-ink-3"}`}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={pathname.startsWith("/new") ? 2.5 : 2} className="h-5 w-5" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
@@ -325,7 +304,7 @@ export default function Navbar() {
         </Link>
 
         {/* คอมมูนิตี้ */}
-        <Link href="/community" className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${pathname.startsWith("/community") ? "text-white" : "text-white/45"}`}>
+        <Link href="/community" className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${pathname.startsWith("/community") ? "text-ink" : "text-ink-3"}`}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={pathname.startsWith("/community") ? 2.5 : 2} className="h-5 w-5" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
@@ -333,7 +312,7 @@ export default function Navbar() {
         </Link>
 
         {/* ค้นหา */}
-        <Link href="/search" className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${pathname.startsWith("/search") ? "text-white" : "text-white/45"}`}>
+        <Link href="/search" className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${pathname.startsWith("/search") ? "text-ink" : "text-ink-3"}`}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={pathname.startsWith("/search") ? 2.5 : 2} className="h-5 w-5" aria-hidden>
             <circle cx="11" cy="11" r="8" />
             <path strokeLinecap="round" d="m21 21-4.35-4.35" />
@@ -345,7 +324,7 @@ export default function Navbar() {
         <button
           onClick={() => setMobileGenreOpen((v) => !v)}
           className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${
-            mobileGenreOpen || pathname.startsWith("/categories") ? "text-white" : "text-white/45"
+            mobileGenreOpen || pathname.startsWith("/categories") ? "text-ink" : "text-ink-3"
           }`}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={pathname.startsWith("/categories") ? 2.5 : 2} className="h-5 w-5" aria-hidden>
@@ -355,7 +334,7 @@ export default function Navbar() {
         </button>
 
         {/* รายการของฉัน */}
-        <Link href="/mylist" className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${pathname.startsWith("/mylist") ? "text-white" : "text-white/45"}`}>
+        <Link href="/mylist" className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${pathname.startsWith("/mylist") ? "text-ink" : "text-ink-3"}`}>
           <svg viewBox="0 0 24 24" fill={pathname.startsWith("/mylist") ? "currentColor" : "none"} stroke="currentColor" strokeWidth={pathname.startsWith("/mylist") ? 0 : 2} className="h-5 w-5" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
           </svg>

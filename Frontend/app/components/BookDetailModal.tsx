@@ -20,6 +20,7 @@ import { translateDescription } from "../lib/translateDescription";
 import MangaDiscussion from "./MangaDiscussion";
 import ReviewSection from "./ReviewSection";
 import RelatedManga from "./RelatedManga";
+import Loader from "./ui/Loader";
 import type { LandingBook, MangaDetail, MangaChapter, ActiveChapter } from "../lib/types";
 
 type Props = {
@@ -67,7 +68,7 @@ function MarqueeTitle({ title, active }: { title: string; active: boolean }) {
     <div ref={containerRef} className="min-w-0 flex-1 overflow-hidden">
       <span
         ref={textRef}
-        className="inline-block whitespace-nowrap text-sm font-semibold tracking-[0.01em] text-white/98"
+        className="inline-block whitespace-nowrap text-sm font-semibold text-ink"
         style={
           shouldScroll
             ? ({
@@ -84,8 +85,10 @@ function MarqueeTitle({ title, active }: { title: string; active: boolean }) {
 }
 
 export default function BookDetailModal({ book, onClose, scrollToChapters = false, highlightChapterId, routed = false }: Props) {
-  const [mounted, setMounted] = useState(false);
-  const [visible, setVisible] = useState(false);
+  // A routed popup replaces PopupSkeleton, which already shows the scrim and window: start shown, or the
+  // home page flashes through and the entry animation replays. (It only mounts client-side, after a fetch.)
+  const [mounted, setMounted] = useState(routed);
+  const [visible, setVisible] = useState(routed);
   const { favorited, liked, handleToggleFavorite, handleToggleLiked } = useBookActions(book);
 
   // Auto-detect last read chapter from history when prop is not explicitly provided
@@ -304,30 +307,30 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const content = (
     <div
       onClickCapture={onLinkClickCapture}
-      className={`fixed inset-0 z-200 flex items-center justify-center md:p-4 md:backdrop-blur-sm transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`fixed inset-0 z-200 flex items-center justify-center md:p-4 transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black md:bg-black/80"
+        className="absolute inset-0 bg-bg md:bg-scrim/90"
         onClick={handleClose}
       />
 
       {/* Modal container */}
       <div
-        className={`relative z-10 flex w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] flex-col overflow-hidden md:rounded-3xl bg-[#141414] shadow-2xl transition-[transform,opacity] duration-300 md:duration-400 ease-out ${visible ? "translate-y-0 md:scale-100 md:opacity-100" : "translate-y-full md:translate-y-8 md:scale-90 md:opacity-0"}`}
+        className={`relative z-10 flex w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] flex-col overflow-hidden md:rounded-3xl bg-surface shadow-2xl transition-[transform,opacity] duration-300 md:duration-400 ease-out ${visible ? "translate-y-0 md:scale-100 md:opacity-100" : "translate-y-full md:translate-y-8 md:scale-90 md:opacity-0"}`}
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 md:hidden">
           <div
             className={`flex items-center gap-2.5 border-b px-3.5 pb-[0.55rem] pt-[calc(env(safe-area-inset-top)+0.6rem)] transition-[background-color,backdrop-filter,box-shadow,border-color,opacity] duration-300 ease-out ${
               headerScrolled
-                ? "border-white/8 bg-[#141414]/62 opacity-100 shadow-[0_6px_18px_rgba(0,0,0,0.16)] backdrop-blur-md"
+                ? "border-line bg-surface/62 opacity-100 shadow-[0_6px_18px_rgba(0,0,0,0.16)] backdrop-blur-md"
                 : "border-transparent bg-transparent opacity-0 shadow-none backdrop-blur-none"
             }`}
           >
             <button
               onClick={handleClose}
               title="กลับ"
-              className="pointer-events-auto flex h-[2.2rem] w-[2.2rem] items-center justify-center rounded-full border border-white/10 bg-black/20 text-white transition hover:bg-white/10"
+              className="pointer-events-auto flex h-[2.2rem] w-[2.2rem] items-center justify-center rounded-full border border-line bg-bg/20 text-ink transition hover:bg-fill"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4.5 w-4.5">
                 <path d="M19 12H5M12 5l-7 7 7 7" />
@@ -344,14 +347,14 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
           <div ref={modalContentRef}>
             {/* Drag handle — mobile only */}
             <div className="flex justify-center pt-3 pb-0.5 md:hidden">
-              <div className="h-1 w-10 rounded-full bg-white/20" />
+              <div className="h-1 w-10 rounded-full bg-ink-3" />
             </div>
 
             {/* Close button — desktop only */}
             <button
               onClick={handleClose}
               title="ปิด"
-              className={`absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-[opacity,transform] duration-300 hover:bg-white/20 md:opacity-100 md:pointer-events-auto ${headerScrolled ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"}`}
+              className={`absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-bg/60 text-ink backdrop-blur-sm transition-[opacity,transform] duration-300 hover:bg-raised md:opacity-100 md:pointer-events-auto ${headerScrolled ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"}`}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
                 <path d="M18 6L6 18M6 6l12 12" />
@@ -371,12 +374,12 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
                 />
               </div>
-              <div className="absolute inset-0 bg-linear-to-b from-[#141414]/60 via-transparent to-[#141414]" />
+              <div className="absolute inset-0 bg-linear-to-b from-surface/60 via-transparent to-surface" />
 
               {/* ── Mobile: stacked layout ─────────────────────────── */}
               <div className="relative z-10 md:hidden flex flex-col items-center px-5 pb-6 pt-9">
                 {/* Cover */}
-                <div className="relative aspect-2/3 w-36 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10">
+                <div className="relative aspect-2/3 w-36 overflow-hidden rounded-xl shadow-2xl ring-1 ring-line">
                   <Image
                     src={displayThumbnail}
                     alt={book.title}
@@ -389,25 +392,25 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
                 {/* Title */}
                 <div className="mt-3 w-full text-center">
-                  <h2 className="text-xl font-black leading-tight text-white">{book.title}</h2>
+                  <h2 className="text-xl font-black leading-tight text-ink">{book.title}</h2>
                   {book.subtitle && (
-                    <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-white/60">{book.subtitle}</p>
+                    <p className="mt-0.5 text-xs font-semibold uppercase text-ink-2">{book.subtitle}</p>
                   )}
                 </div>
 
                 {/* Meta chips */}
                 <div className="mt-2 flex flex-wrap justify-center items-center gap-1.5 text-xs">
                   {book.averageRating > 0 && (
-                    <span className="flex items-center gap-1 font-semibold text-green-400">
+                    <span className="flex items-center gap-1 font-semibold text-ok">
                       <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3">
                         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                       </svg>
                       {book.averageRating.toFixed(1)}
                     </span>
                   )}
-                  {book.publishedDate && <span className="text-white/50">{book.publishedDate}</span>}
+                  {book.publishedDate && <span className="text-ink-2">{book.publishedDate}</span>}
                   {categories.slice(0, 3).map((cat) => (
-                    <span key={cat} className="rounded-full border border-white/20 px-2 py-0.5 text-white/70">{cat}</span>
+                    <span key={cat} className="rounded-full border border-ink-3 px-2 py-0.5 text-ink-2">{cat}</span>
                   ))}
                 </div>
 
@@ -416,7 +419,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   {/* Primary CTA: อ่านตอนแรก — full width */}
                   {isManga ? (
                     !loadingChapters && chaptersEmpty ? (
-                      <button disabled className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-white/20 py-3 text-sm font-bold text-white/40">
+                      <button disabled className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-fill py-3 text-sm font-bold text-ink-3">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
                           <path d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
                         </svg>
@@ -431,22 +434,20 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                           }
                         }}
                         disabled={!firstReadableChapter || loadingChapters}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-bold text-black transition active:bg-white/85 disabled:opacity-50"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-3 text-sm font-bold text-bg transition active:bg-ink/85 disabled:opacity-50"
                       >
                         {loadingChapters ? (
-                          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                          </svg>
+                          <Loader context="inline" className="text-bg!" />
                         ) : (
                           <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
                             <path d="M8 5v14l11-7z" />
                           </svg>
                         )}
-                        {loadingChapters ? "กำลังโหลด..." : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
+                        {loadingChapters ? <span className="inline-flex items-center gap-2"><Loader context="inline" />กำลังโหลด</span> : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
                       </button>
                     )
                   ) : (
-                    <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-bold text-black transition active:bg-white/85">
+                    <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-3 text-sm font-bold text-bg transition active:bg-ink/85">
                       <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
                         <path d="M8 5v14l11-7z" />
                       </svg>
@@ -460,7 +461,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       <button
                         onClick={() => chaptersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
                         disabled={loadingChapters || chaptersEmpty}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/25 py-2.5 text-xs font-semibold text-white/80 transition active:bg-white/8 disabled:opacity-40"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-ink-3 py-2.5 text-xs font-semibold text-ink transition active:bg-fill disabled:opacity-40"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0">
                           <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
@@ -472,7 +473,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       title={favorited ? "อยู่ในรายการแล้ว" : "เพิ่มในรายการ"}
                       onClick={handleToggleFavorite}
                       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition ${
-                        favorited ? "border-white bg-white text-black" : "border-white/25 text-white/80"
+                        favorited ? "border-ink bg-ink text-bg" : "border-ink-3 text-ink"
                       }`}
                     >
                       {favorited ? (
@@ -490,7 +491,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       title={liked ? "เอาออก" : "ถูกใจ"}
                       onClick={handleToggleLiked}
                       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition ${
-                        liked ? "border-red-500 text-red-500" : "border-white/25 text-white/80"
+                        liked ? "border-danger text-danger" : "border-ink-3 text-ink"
                       }`}
                     >
                       <svg viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-4 w-4">
@@ -504,7 +505,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               {/* ── Desktop: two-panel layout ──────────────────────── */}
               <div className="relative z-10 hidden md:flex gap-5 px-5 pb-6 pt-14">
                 {/* Portrait thumbnail */}
-                <div className="relative aspect-2/3 w-40 shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10">
+                <div className="relative aspect-2/3 w-40 shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-line">
                   <Image
                     src={displayThumbnail}
                     alt={book.title}
@@ -518,11 +519,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                 {/* Info panel */}
                 <div className="flex min-w-0 flex-1 flex-col justify-end gap-3">
                   <div>
-                    <h2 className="text-2xl font-black leading-tight text-white drop-shadow-lg">
+                    <h2 className="text-2xl font-black leading-tight text-ink">
                       {book.title}
                     </h2>
                     {book.subtitle && (
-                      <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-white/60">
+                      <p className="mt-0.5 text-xs font-semibold uppercase text-ink-2">
                         {book.subtitle}
                       </p>
                     )}
@@ -530,23 +531,23 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
                   <div className="flex flex-wrap items-center gap-1.5 text-xs">
                     {book.averageRating > 0 && (
-                      <span className="flex items-center gap-1 font-semibold text-green-400">
+                      <span className="flex items-center gap-1 font-semibold text-ok">
                         <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3">
                           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                         </svg>
                         {book.averageRating.toFixed(1)}
                       </span>
                     )}
-                    {book.publishedDate && <span className="text-white/50">{book.publishedDate}</span>}
+                    {book.publishedDate && <span className="text-ink-2">{book.publishedDate}</span>}
                     {categories.slice(0, 3).map((cat) => (
-                      <span key={cat} className="rounded-full border border-white/20 px-2 py-0.5 text-white/70">{cat}</span>
+                      <span key={cat} className="rounded-full border border-ink-3 px-2 py-0.5 text-ink-2">{cat}</span>
                     ))}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     {isManga ? (
                       !loadingChapters && chaptersEmpty ? (
-                        <button disabled className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-white/20 px-5 py-2 text-sm font-bold text-white/40">
+                        <button disabled className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-fill px-5 py-2 text-sm font-bold text-ink-3">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
                             <path d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
                           </svg>
@@ -556,22 +557,20 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         <button
                           onClick={() => chaptersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
                           disabled={loadingChapters}
-                          className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-white/85 disabled:opacity-50"
+                          className="flex items-center gap-2 rounded-lg bg-ink px-5 py-2 text-sm font-bold text-bg transition hover:bg-ink/85 disabled:opacity-50"
                         >
                           {loadingChapters ? (
-                            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                            </svg>
+                            <Loader context="inline" className="text-bg!" />
                           ) : (
                             <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
                               <path d="M8 5v14l11-7z" />
                             </svg>
                           )}
-                          {loadingChapters ? "กำลังโหลด..." : "ดูตอนทั้งหมด"}
+                          {loadingChapters ? <span className="inline-flex items-center gap-2"><Loader context="inline" />กำลังโหลด</span> : "ดูตอนทั้งหมด"}
                         </button>
                       )
                     ) : (
-                      <button className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-white/85">
+                      <button className="flex items-center gap-2 rounded-lg bg-ink px-5 py-2 text-sm font-bold text-bg transition hover:bg-ink/85">
                         <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 translate-x-px">
                           <path d="M8 5v14l11-7z" />
                         </svg>
@@ -587,19 +586,19 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                           }
                         }}
                         disabled={chaptersEmpty || !firstReadableChapter}
-                        className="flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-40"
+                        className="flex items-center gap-2 rounded-lg border border-ink-3 px-4 py-2 text-sm font-semibold text-ink transition hover:bg-fill disabled:opacity-40"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
                           <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                         </svg>
-                        {loadingChapters ? "กำลังโหลด..." : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
+                        {loadingChapters ? <span className="inline-flex items-center gap-2"><Loader context="inline" />กำลังโหลด</span> : !!firstReadableChapter ? `อ่านตอนที่ ${firstReadableChapter?.chapterNumber ?? "1"}` : "ไม่มีตอน"}
                       </button>
                     )}
                     <button
                       title={favorited ? "อยู่ในรายการแล้ว" : "เพิ่มในรายการ"}
                       onClick={handleToggleFavorite}
                       className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
-                        favorited ? "border-white bg-white text-black" : "border-white/40 text-white hover:border-white"
+                        favorited ? "border-ink bg-ink text-bg" : "border-ink-2 text-ink hover:border-ink"
                       }`}
                     >
                       {favorited ? (
@@ -617,7 +616,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       title={liked ? "เอาออก" : "ถูกใจ"}
                       onClick={handleToggleLiked}
                       className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
-                        liked ? "border-red-500 text-red-500" : "border-white/40 text-white hover:border-white"
+                        liked ? "border-danger text-danger" : "border-ink-2 text-ink hover:border-ink"
                       }`}
                     >
                       <svg viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-4 w-4">
@@ -637,14 +636,17 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                 text={(translatedDesc && !showOriginalDesc) ? translatedDesc : (book.description || detail?.description || "ไม่มีคำอธิบายสำหรับเรื่องนี้")}
               />
               {translatingDesc && (
-                <p className="text-xs text-white/30">กำลังแปล...</p>
+                <div className="flex items-center gap-2">
+                  <Loader context="inline" label="กำลังแปลคำโปรย" className="text-ink-3" />
+                  <ModelBadge model={descModel} small />
+                </div>
               )}
               {translatedDesc && !translatingDesc && (
                 <div className="flex items-center gap-2">
                   <ModelBadge model={descModel} small />
                   <button
                     onClick={() => setShowOriginalDesc((v) => !v)}
-                    className="text-xs text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"
+                    className="text-xs text-ink-3 underline underline-offset-2 hover:text-ink-2 transition-colors"
                   >
                     {showOriginalDesc ? "แสดงคำแปล" : "ต้นฉบับ"}
                   </button>
@@ -654,20 +656,20 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               {/* Mobile-only metadata row */}
               <div className="md:hidden pt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                 {allAuthors.length > 0 && (
-                  <span className="text-white/40">
-                    ผู้แต่ง <span className="text-white/65">{allAuthors.slice(0, 2).join(", ")}</span>
+                  <span className="text-ink-3">
+                    ผู้แต่ง <span className="text-ink-2">{allAuthors.slice(0, 2).join(", ")}</span>
                   </span>
                 )}
                 {detail?.artists && detail.artists.length > 0 && (
-                  <span className="text-white/40">
-                    นักวาด <span className="text-white/65">{detail.artists.slice(0, 2).join(", ")}</span>
+                  <span className="text-ink-3">
+                    นักวาด <span className="text-ink-2">{detail.artists.slice(0, 2).join(", ")}</span>
                   </span>
                 )}
                 {detail?.covers && (() => {
                   const vols = detail.covers.map((c) => parseFloat(c.volume ?? "")).filter((v) => !isNaN(v));
                   const last = vols.length > 0 ? Math.max(...vols) : null;
                   return last !== null ? (
-                    <span className="text-white/40">จบเล่ม <span className="text-white/65">{last}</span></span>
+                    <span className="text-ink-3">จบเล่ม <span className="text-ink-2">{last}</span></span>
                   ) : null;
                 })()}
               </div>
@@ -677,26 +679,26 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
             <div className="hidden w-40 shrink-0 space-y-3 text-xs md:block">
               {allAuthors.length > 0 && (
                 <div>
-                  <span className="text-white/40">ผู้แต่ง: </span>
-                  <span className="text-white/85">{detail?.authors.join(", ") || book.authors.join(", ")}</span>
+                  <span className="text-ink-3">ผู้แต่ง: </span>
+                  <span className="text-ink">{detail?.authors.join(", ") || book.authors.join(", ")}</span>
                 </div>
               )}
               {detail?.artists && detail.artists.length > 0 && (
                 <div>
-                  <span className="text-white/40">นักวาด: </span>
-                  <span className="text-white/85">{detail.artists.join(", ")}</span>
+                  <span className="text-ink-3">นักวาด: </span>
+                  <span className="text-ink">{detail.artists.join(", ")}</span>
                 </div>
               )}
               {categories.length > 0 && (
                 <div>
-                  <span className="text-white/40">หมวดหมู่: </span>
-                  <span className="text-white/85">{categories.join(", ")}</span>
+                  <span className="text-ink-3">หมวดหมู่: </span>
+                  <span className="text-ink">{categories.join(", ")}</span>
                 </div>
               )}
               {book.ratingsCount > 0 && (
                 <div>
-                  <span className="text-white/40">รีวิว: </span>
-                  <span className="text-white/85">{book.ratingsCount.toLocaleString()}</span>
+                  <span className="text-ink-3">รีวิว: </span>
+                  <span className="text-ink">{book.ratingsCount.toLocaleString()}</span>
                 </div>
               )}
               {detail?.covers && (() => {
@@ -706,8 +708,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                 const lastVolume = volumes.length > 0 ? Math.max(...volumes) : null;
                 return lastVolume !== null ? (
                   <div>
-                    <span className="text-white/40">จำนวนเล่ม: </span>
-                    <span className="text-white/85">{lastVolume} เล่ม</span>
+                    <span className="text-ink-3">จำนวนเล่ม: </span>
+                    <span className="text-ink">{lastVolume} เล่ม</span>
                   </div>
                 ) : null;
               })()}
@@ -718,7 +720,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
           {isManga && (
             <div className="px-6 pb-7">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white/80">
+                <h3 className="text-sm font-semibold text-ink">
                   {loadingDetail
                     ? "กำลังโหลดปกทุกเล่ม..."
                     : (() => {
@@ -735,7 +737,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                 {selectedCover && (
                   <button
                     onClick={() => setSelectedCover(null)}
-                    className="text-xs text-blue-400 hover:text-blue-300"
+                    className="text-xs text-accent hover:text-accent/80"
                   >
                     ← กลับปกหลัก
                   </button>
@@ -745,7 +747,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               {loadingDetail ? (
                 <div  className="flex gap-3 overflow-x-auto pb-2">
                   {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="h-36 w-24 shrink-0 animate-pulse rounded-xl bg-white/10" />
+                    <div key={i} className="h-36 w-24 shrink-0 animate-pulse rounded-xl bg-fill" />
                   ))}
                 </div>
               ) : detail?.covers && detail.covers.length > 0 ? (
@@ -757,19 +759,19 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   {/* Left arrow */}
                   <button
                     onClick={() => scrollCovers("left")}
-                    className={`absolute left-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 ring-1 ring-white/20 backdrop-blur-sm transition-all duration-200 ${isHoveringCovers && coverCanScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    className={`absolute left-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-bg/85 ring-1 ring-ink-3 transition-all duration-200 ${isHoveringCovers && coverCanScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"}`}
                     aria-label="เลื่อนซ้าย"
                   >
-                    <svg viewBox="0 0 24 24" fill="white" className="h-4 w-4"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" /></svg>
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-ink"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" /></svg>
                   </button>
 
                   {/* Right arrow */}
                   <button
                     onClick={() => scrollCovers("right")}
-                    className={`absolute right-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 ring-1 ring-white/20 backdrop-blur-sm transition-all duration-200 ${isHoveringCovers && coverCanScrollRight ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    className={`absolute right-0 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-bg/85 ring-1 ring-ink-3 transition-all duration-200 ${isHoveringCovers && coverCanScrollRight ? "opacity-100" : "pointer-events-none opacity-0"}`}
                     aria-label="เลื่อนขวา"
                   >
-                    <svg viewBox="0 0 24 24" fill="white" className="h-4 w-4"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" /></svg>
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-ink"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" /></svg>
                   </button>
 
                   <div
@@ -791,8 +793,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       }
                       className={`group relative h-36 w-24 shrink-0 overflow-hidden rounded-xl border transition-all duration-200 ${
                         selectedCover === displayUrl
-                          ? "border-white ring-2 ring-white/50"
-                          : "border-white/10 hover:border-white/40"
+                          ? "border-ink ring-2 ring-ink-2"
+                          : "border-line hover:border-ink-2"
                       }`}
                     >
                       <Image
@@ -803,14 +805,14 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         sizes="96px"
                       />
                       {cover.volume && (
-                        <div className="absolute inset-x-0 bottom-0 bg-black/75 py-0.5 text-center text-xs font-semibold text-white">
+                        <div className="absolute inset-x-0 bottom-0 bg-bg/75 py-0.5 text-center text-xs font-semibold text-ink">
                           เล่ม {cover.volume}
                         </div>
                       )}
                       {/* Expand button */}
                       <div
                         onClick={(e) => { e.stopPropagation(); setLightboxSrc(displayUrl); }}
-                        className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white/90 opacity-100 backdrop-blur-sm transition-all duration-200 hover:bg-black/90 hover:text-white md:opacity-0 md:text-white/70 md:group-hover:opacity-100"
+                        className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-bg/80 text-ink opacity-100 transition-all duration-200 hover:bg-bg/90 hover:text-ink md:opacity-0 md:text-ink-2 md:group-hover:opacity-100"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
                           <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
@@ -822,7 +824,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-white/40">ไม่พบข้อมูลปก</p>
+                <p className="text-xs text-ink-3">ไม่พบข้อมูลปก</p>
               )}
             </div>
           )}

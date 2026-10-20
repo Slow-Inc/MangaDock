@@ -12,6 +12,7 @@
   --accent: #0a62d6; /* the only hue: status, focus, selection, highlight — used sparingly */
   --ok: #1a8a4a;
   --danger: #c8322f; /* MangaDock addition: Strata has no error colour */
+  --coin: #b7791f; /* MangaDock addition: the coin/wallet gold — a currency meaning, not decoration */
 }
 
 :root[data-theme="dark"],
@@ -23,6 +24,7 @@
   --accent: #5aa2ff;
   --ok: #4cc380;
   --danger: #ff6b6b;
+  --coin: #fbbf24;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -34,6 +36,7 @@
     --accent: #5aa2ff;
     --ok: #4cc380;
     --danger: #ff6b6b;
+    --coin: #fbbf24;
   }
 }
 
@@ -92,6 +95,9 @@
   --color-accent: var(--accent);
   --color-ok: var(--ok);
   --color-danger: var(--danger);
+  --color-coin: var(--coin);
+  /* Behind modals and drawers, and over images: dark in every theme (a light scrim reads as fog). */
+  --color-scrim: #000;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
@@ -141,6 +147,12 @@ body:lang(th) {
   background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
+/* RollingNumber: a 0–9 strip slides to the digit (--d). */
+@keyframes md-roll {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(var(--d) * -1em)); }
+}
+
 /* Content settles in as it arrives — only when scripts run, so nothing is ever hidden for good. */
 html.js .reveal {
   opacity: 0;
@@ -187,16 +199,40 @@ body::-webkit-scrollbar-thumb:active {
   background: var(--accent);
 }
 
-/* Global focus ring — WCAG 2.1 SC 2.4.7 (Strata globals 99-103) */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: 4px;
+/* Global focus ring — WCAG 2.1 SC 2.4.7 (Strata globals 99-103).
+   In @layer base so a component's own utilities win (`outline-none` + a container ring, an inset
+   ring inside a clipping card). It never changes the element's shape: the outline follows the
+   element's own border-radius. (It used to be unlayered and set border-radius: 4px, which beat
+   `outline-none` and drew a square ring inside rounded, overflow-hidden boxes — the clipped corners
+   the dev reported on the navbar search.) */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Text fields: the ring sits on the field's own border (one crisp edge). */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline-offset: -1px;
+  }
+
+  /* Inside anything that clips — scroll rows, cards, menus, scrolling panels — a ring floating outside
+     the element is cut off on the clipped sides; draw it inside the element instead. (A focus audit
+     over 9 routes found 3–5 px cut rings on chips, menu items, chapter rows, tabs and cover buttons.) */
+  :is(.overflow-hidden, .overflow-clip, .overflow-auto, .overflow-scroll, .overflow-x-auto, .overflow-y-auto) :focus-visible {
+    outline-offset: -2px;
+  }
 }
 
-img,
-svg {
-  max-width: 100%;
+/* In @layer base so utilities like max-w-none win — unlayered, it squeezed the mascot editor's still
+   image (laid over an overscanned 240 px canvas) into its 160 px box. */
+@layer base {
+  img,
+  svg {
+    max-width: 100%;
+  }
 }
 
 .page-shell {

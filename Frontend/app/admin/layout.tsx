@@ -75,11 +75,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (user === undefined || user === null || (user.role ?? 0) < ROLE.ADMIN) return null;
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-bg">
       {/* Sidebar */}
-      <aside className="w-60 shrink-0 border-r border-white/10 flex flex-col sticky top-0 h-screen overflow-hidden">
+      <aside className="w-60 shrink-0 border-r border-line flex flex-col sticky top-0 h-screen overflow-hidden">
         {/* Brand */}
-        <div className="px-5 pt-6 pb-5 border-b border-white/[0.06]">
+        <div className="px-5 pt-6 pb-5 border-b border-line">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill border border-line shrink-0">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-accent">
@@ -87,15 +87,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-white leading-tight">Admin Panel</p>
-              <p className="text-[11px] text-white/30 leading-tight">MangaDock</p>
+              <p className="text-sm font-semibold text-ink leading-tight">Admin Panel</p>
+              <p className="text-[11px] text-ink-3 leading-tight">MangaDock</p>
             </div>
           </div>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 px-3 pt-4 pb-2 space-y-0.5 overflow-y-auto">
-          <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest px-3 mb-2.5">Management</p>
+          <p className="text-[10px] font-semibold text-ink-3 uppercase tracking-[0.1em] px-3 mb-2.5">Management</p>
           {NAV.map(({ href, label, exact, icon }) => {
             const isOverview = exact && pathname === '/admin';
             const isActive = isOverview || (!exact && pathname.startsWith(href) && href !== '/admin');
@@ -106,7 +106,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm smooth-hover-fast border ${
                   isActive
                     ? 'bg-accent/10 text-accent font-medium border-accent/40'
-                    : 'text-white/45 hover:text-white hover:bg-white/[0.06] border-transparent'
+                    : 'text-ink-3 hover:text-ink hover:bg-fill border-transparent'
                 }`}
               >
                 {icon}
@@ -117,10 +117,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         {/* Footer */}
-        <div className="px-4 py-4 border-t border-white/[0.06]">
+        <div className="px-4 py-4 border-t border-line">
           <Link
             href="/"
-            className="flex items-center gap-2 text-xs text-white/30 hover:text-white/60 smooth-hover-fast transition-colors"
+            className="flex items-center gap-2 text-xs text-ink-3 hover:text-ink-2 smooth-hover-fast transition-colors"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />

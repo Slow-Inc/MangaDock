@@ -14,7 +14,7 @@ export default function ModelBadge({
   return (
     <span
       title={title}
-      className={`inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 font-medium text-white/70 ${
+      className={`inline-flex items-center gap-1 rounded-full border border-line bg-fill font-medium text-ink-2 ${
         small ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"
       }`}
     >

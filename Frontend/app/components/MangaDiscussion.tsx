@@ -89,9 +89,9 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
   };
 
   return (
-    <section className="px-6 py-8 border-t border-white/5">
+    <section className="px-6 py-8 border-t border-line">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold text-white">กระทู้พูดคุย</h3>
+        <h3 className="text-lg font-bold text-ink">กระทู้พูดคุย</h3>
         {!isPosting && user && (
           <button 
             onClick={() => setIsPosting(true)}
@@ -103,19 +103,19 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
       </div>
 
       {isPosting && (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="bg-fill border border-line rounded-2xl p-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-300">
           <textarea
             value={newPostContent}
             onChange={(e) => setNewPostContent(e.target.value)}
             placeholder="คุณคิดยังไงกับเรื่องนี้..."
-            className="w-full bg-transparent border-none text-sm text-white placeholder:text-white/20 focus:ring-0 resize-none"
+            className="w-full bg-transparent border-none text-sm text-ink placeholder:text-ink-3 focus:ring-0 resize-none"
             rows={3}
             autoFocus
           />
-          <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-white/5">
+          <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-line">
             <button 
               onClick={() => setIsPosting(false)}
-              className="px-3 py-1.5 text-xs font-bold text-white/40 hover:text-white"
+              className="px-3 py-1.5 text-xs font-bold text-ink-3 hover:text-ink"
             >
               ยกเลิก
             </button>
@@ -139,8 +139,8 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
         ) : posts.length > 0 ? (
           posts.map(post => <PostCard key={post.id} post={post} />)
         ) : (
-          <div className="py-12 text-center bg-white/2 border border-dashed border-white/5 rounded-2xl">
-            <p className="text-xs font-medium text-white/20 uppercase tracking-widest">ยังไม่มีบทสนทนา</p>
+          <div className="py-12 text-center bg-fill border border-dashed border-line rounded-2xl">
+            <p className="text-xs font-medium text-ink-3 uppercase">ยังไม่มีบทสนทนา</p>
           </div>
         )}
       </div>
@@ -149,7 +149,7 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
         <div className="mt-6 text-center">
           <Link
             href={`/community?mangaId=${mangaId}`}
-            className="text-[10px] font-black uppercase tracking-widest text-white/30 hover:text-white transition-colors"
+            className="text-[10px] font-black uppercase text-ink-3 hover:text-ink transition-colors"
           >
             ดูการสนทนาทั้งหมด
           </Link>

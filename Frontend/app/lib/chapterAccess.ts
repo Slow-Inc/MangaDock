@@ -66,7 +66,7 @@ function unavailableChapterLabel(
     return "ไม่ได้สำรอง";
   }
   if (chapterCoinLocked(ch, unlockedVersions)) {
-    return `🪙 ${ch.priceCoins}`;
+    return `${ch.priceCoins} เหรียญ`;
   }
   return "ล็อค";
 }

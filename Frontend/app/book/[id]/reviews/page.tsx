@@ -35,7 +35,7 @@ export default async function ReviewsPage({ params }: Props) {
     <main className="mx-auto max-w-2xl px-4 py-10">
       <Link
         href={`/book/${id}`}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-white/40 transition hover:text-white/70"
+        className="mb-6 inline-flex items-center gap-1.5 text-sm text-ink-3 transition hover:text-ink-2"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
           <path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
@@ -44,11 +44,11 @@ export default async function ReviewsPage({ params }: Props) {
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-xl font-bold text-white/90">รีวิวทั้งหมด</h1>
+        <h1 className="text-xl font-bold text-ink">รีวิวทั้งหมด</h1>
         {summary.count > 0 && (
           <div className="mt-2 flex items-center gap-3">
             <StarRating value={Math.round(summary.averageRating)} readonly size="md" />
-            <span className="text-sm text-white/50">
+            <span className="text-sm text-ink-2">
               {summary.averageRating.toFixed(1)} / 5 · {summary.count} รีวิว
             </span>
           </div>
@@ -56,7 +56,7 @@ export default async function ReviewsPage({ params }: Props) {
       </div>
 
       {reviews.length === 0 ? (
-        <p className="py-12 text-center text-sm text-white/30">ยังไม่มีรีวิว</p>
+        <p className="py-12 text-center text-sm text-ink-3">ยังไม่มีรีวิว</p>
       ) : (
         <div className="flex flex-col gap-3">
           {reviews.map((r) => (

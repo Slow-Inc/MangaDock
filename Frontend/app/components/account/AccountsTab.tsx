@@ -5,6 +5,7 @@ import { errMessage } from "@/lib/errMessage";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import type { FormState, FormAction } from "./formReducer";
+import Loader from "../ui/Loader";
 
 type Tab = "profile" | "password" | "accounts" | "danger";
 
@@ -36,7 +37,7 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
       type: "warning",
       message: (
         <>
-          บัญชี <span className="font-semibold text-white">{info.provider === "google" ? "Google" : "Facebook"}</span> นี้ผูกกับ MangaDock อีกบัญชีอยู่แล้ว
+          บัญชี <span className="font-semibold text-ink">{info.provider === "google" ? "Google" : "Facebook"}</span> นี้ผูกกับ MangaDock อีกบัญชีอยู่แล้ว
         </>
       ),
       duration: 0,
@@ -114,18 +115,18 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
   return (
     <>
       {successMessage && (
-        <div className="mb-4 rounded-xl bg-green-500/20 border border-green-500/30 px-4 py-2.5 text-sm text-green-300">
+        <div className="mb-4 rounded-xl bg-ok/10 border border-ok/40 px-4 py-2.5 text-sm text-ok">
           {successMessage}
         </div>
       )}
       {errorMessage && (
-        <div className="mb-4 rounded-xl bg-red-500/20 border border-red-500/30 px-4 py-2.5 text-sm text-red-300">
+        <div className="mb-4 rounded-xl bg-danger/10 border border-danger/40 px-4 py-2.5 text-sm text-danger">
           {errorMessage}
         </div>
       )}
       <div className="space-y-3">
         {/* Email/Password row */}
-        <div className="p-4 rounded-xl border border-white/10 bg-white/5 space-y-3">
+        <div className="p-4 rounded-xl border border-line bg-fill space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface">
@@ -134,24 +135,24 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
                 </svg>
               </div>
               <div>
-                <p className="text-sm text-white font-medium">อีเมล/รหัสผ่าน</p>
-                <p className="text-xs text-white/40">{user?.email}</p>
+                <p className="text-sm text-ink font-medium">อีเมล/รหัสผ่าน</p>
+                <p className="text-xs text-ink-3">{user?.email}</p>
               </div>
             </div>
             <div className="flex items-center">
               {hasPasswordProvider ? (
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300">เชื่อมต่อแล้ว</span>
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-ok/10 text-ok">เชื่อมต่อแล้ว</span>
               ) : (
                 <div className="group relative flex items-center">
-                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-300 cursor-default select-none">
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent cursor-default select-none">
                     ไม่ได้ตั้งค่า
-                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-amber-300/40 bg-amber-300/10 text-[9px] font-bold leading-none">i</span>
+                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-accent/40 bg-accent/10 text-[9px] font-bold leading-none">i</span>
                   </span>
                   <div className="absolute top-full right-0 pt-2 hidden group-hover:block z-50">
-                    <div className="w-52 rounded-xl border border-white/10 bg-black/90 px-3 py-2 text-[11px] text-white/70 shadow-xl backdrop-blur-xl">
+                    <div className="w-52 rounded-xl border border-line bg-raised px-3 py-2 text-[11px] text-ink-2 shadow-xl">
                       ไปที่แท็บ{" "}
                       <strong
-                        className="text-white underline decoration-white/40 cursor-pointer hover:text-amber-300 hover:decoration-amber-300"
+                        className="text-ink underline decoration-ink-3 cursor-pointer hover:text-accent hover:decoration-accent"
                         onClick={() => onTabChange("password")}
                       >
                         เพิ่มรหัสผ่าน
@@ -166,14 +167,14 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
           {/* Email verification status */}
           <div className="flex items-center justify-between pl-12">
             {user?.emailVerified ? (
-              <span className="flex items-center gap-1.5 text-[11px] text-green-400/80">
+              <span className="flex items-center gap-1.5 text-[11px] text-ok">
                 <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
                 ยืนยัน email แล้ว
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-[11px] text-amber-400/80">
+              <span className="flex items-center gap-1.5 text-[11px] text-accent">
                 <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86l-8.17 14.17A1 1 0 003 19.5h18a1 1 0 00.88-1.47L13.71 3.86a2 2 0 00-3.52.14z" />
                 </svg>
@@ -193,14 +194,11 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
                   }
                 }}
                 disabled={sendingVerification}
-                className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-300 transition hover:bg-amber-500/20 active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1 text-[11px] font-medium text-accent transition hover:bg-accent/20 active:scale-95 disabled:opacity-50"
               >
                 {sendingVerification ? (
                   <>
-                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                    </svg>
+                    <Loader context="inline" />
                     กำลังส่ง…
                   </>
                 ) : (
@@ -217,7 +215,7 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
         </div>
 
         {/* Facebook row */}
-        <div className="flex items-center justify-between p-4 rounded-xl border border-white/10 bg-white/5">
+        <div className="flex items-center justify-between p-4 rounded-xl border border-line bg-fill">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#1877F2] flex items-center justify-center shrink-0">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="white">
@@ -225,8 +223,8 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
               </svg>
             </div>
             <div>
-              <p className="text-sm text-white font-medium">Facebook</p>
-              <p className="text-xs text-white/40">เข้าสู่ระบบด้วยบัญชี Facebook</p>
+              <p className="text-sm text-ink font-medium">Facebook</p>
+              <p className="text-xs text-ink-3">เข้าสู่ระบบด้วยบัญชี Facebook</p>
             </div>
           </div>
           {hasFacebookProvider ? (
@@ -234,7 +232,7 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
               onClick={() => handleUnlinkProvider("facebook.com")}
               disabled={loading || !!linking || (!hasPasswordProvider && !hasGoogleProvider)}
               title={(!hasPasswordProvider && !hasGoogleProvider) ? "ต้องมีวิธีเข้าสู่ระบบอย่างน้อย 1 วิธี" : ""}
-              className="px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 text-xs font-medium hover:bg-red-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 rounded-lg border border-danger/40 bg-danger/10 text-danger text-xs font-medium hover:bg-danger/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               ยกเลิก
             </button>
@@ -242,14 +240,11 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
             <button
               onClick={handleLinkFacebook}
               disabled={!!linking || loading}
-              className="px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-300 text-xs font-medium hover:bg-blue-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 rounded-lg border border-accent/40 bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {linking === "facebook" ? (
                 <span className="flex items-center gap-1.5">
-                  <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                  </svg>
+                  <Loader context="inline" />
                   กำลังเชื่อมต่อ…
                 </span>
               ) : "เชื่อมต่อ"}
@@ -258,7 +253,7 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
         </div>
 
         {/* Google row */}
-        <div className="flex items-center justify-between p-4 rounded-xl border border-white/10 bg-white/5">
+        <div className="flex items-center justify-between p-4 rounded-xl border border-line bg-fill">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
               <svg viewBox="0 0 24 24" className="h-5 w-5">
@@ -269,8 +264,8 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
               </svg>
             </div>
             <div>
-              <p className="text-sm text-white font-medium">Google</p>
-              <p className="text-xs text-white/40">เข้าสู่ระบบด้วยบัญชี Google</p>
+              <p className="text-sm text-ink font-medium">Google</p>
+              <p className="text-xs text-ink-3">เข้าสู่ระบบด้วยบัญชี Google</p>
             </div>
           </div>
           {hasGoogleProvider ? (
@@ -278,7 +273,7 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
               onClick={() => handleUnlinkProvider("google.com")}
               disabled={loading || !!linking || (!hasPasswordProvider && !hasFacebookProvider)}
               title={(!hasPasswordProvider && !hasFacebookProvider) ? "ต้องมีวิธีเข้าสู่ระบบอย่างน้อย 1 วิธี" : ""}
-              className="px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 text-xs font-medium hover:bg-red-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 rounded-lg border border-danger/40 bg-danger/10 text-danger text-xs font-medium hover:bg-danger/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               ยกเลิก
             </button>
@@ -286,14 +281,11 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
             <button
               onClick={handleLinkGoogle}
               disabled={!!linking || loading}
-              className="px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-300 text-xs font-medium hover:bg-blue-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 rounded-lg border border-accent/40 bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {linking === "google" ? (
                 <span className="flex items-center gap-1.5">
-                  <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                  </svg>
+                  <Loader context="inline" />
                   กำลังเชื่อมต่อ…
                 </span>
               ) : "เชื่อมต่อ"}
@@ -301,7 +293,7 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
           )}
         </div>
 
-        <p className="text-[11px] text-white/30 pt-1">💡 เชื่อมต่อบัญชีหลายแบบเพื่อเข้าสู่ระบบได้หลายวิธี</p>
+        <p className="text-[11px] text-ink-3 pt-1">เชื่อมต่อบัญชีหลายแบบเพื่อเข้าสู่ระบบได้หลายวิธี</p>
       </div>
     </>
   );

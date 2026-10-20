@@ -5,7 +5,7 @@
  */
 import { expect, test } from "bun:test";
 
-import { formatEta, pillMainText, stageLabel } from "./translationStages";
+import { activeTranslatingPage, formatEta, pillMainText, stageLabel, stageSegments } from "./translationStages";
 
 test("maps the patch-pipeline stages to ordered Thai labels", () => {
   expect(stageLabel("detection")).toEqual({ text: "ตรวจหาข้อความ", step: 1, total: 5 });
@@ -41,4 +41,19 @@ test("unknown or bookkeeping stages return null (UI falls back to generic text)"
 test("pill text: batch run reports progress; single-page run names the page", () => {
   expect(pillMainText(true, 4, 20, 7)).toBe("แปลไปแล้ว 4/20 หน้า");
   expect(pillMainText(false, 0, 0, 7)).toBe("กำลังแปลหน้า 7");
+});
+
+test("stage segments: the five MIT steps as done / active / todo for the staged progress bar", () => {
+  expect(stageSegments(null)).toEqual(["todo", "todo", "todo", "todo", "todo"]);
+  expect(stageSegments({ text: "อ่านข้อความ", step: 2, total: 5 })).toEqual(["done", "active", "todo", "todo", "todo"]);
+  expect(stageSegments({ text: "วาดข้อความแปล", step: 5, total: 5 })).toEqual(["done", "done", "done", "done", "active"]);
+});
+
+test("active page: a batch run reports its page through the stage event, a single-page run through its own index", () => {
+  // Batch: translatingCurrentPageIndex stays null; the stream's progress event names the page.
+  expect(activeTranslatingPage(null, { pageIndex: 6, stage: "ocr" })).toBe(6);
+  // Single page: its own index wins.
+  expect(activeTranslatingPage(3, null)).toBe(3);
+  expect(activeTranslatingPage(3, { pageIndex: 6, stage: "ocr" })).toBe(3);
+  expect(activeTranslatingPage(null, null)).toBeNull();
 });

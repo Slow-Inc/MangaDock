@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ModelBadge from "./ModelBadge";
+import Loader from "./ui/Loader";
 import { translateDescription } from "../lib/translateDescription";
 import { stripMarkdown } from "../lib/markdownText";
 
@@ -30,19 +31,22 @@ export default function HeroDescription({ description }: { description: string }
 
   return (
     <div className="space-y-1.5">
-      <p className="text-sm leading-relaxed text-white/85 md:text-base">
+      <p className="text-sm leading-relaxed text-ink md:text-base">
         {truncate(stripMarkdown(displayText), 210)}
       </p>
       <div className="flex items-center gap-2 h-5">
         {translating && (
-          <p className="text-[10px] text-white/40">กำลังแปล...</p>
+          <>
+            <Loader context="inline" label="กำลังแปลคำโปรย" className="text-ink-3" />
+            <ModelBadge model={model} small />
+          </>
         )}
         {translated && !translating && (
           <>
             <ModelBadge model={model} small />
             <button
               onClick={() => setShowOriginal((v) => !v)}
-              className="text-[10px] text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"
+              className="text-[10px] text-ink-3 underline underline-offset-2 hover:text-ink-2 transition-colors"
             >
               {showOriginal ? "แสดงคำแปล" : "ต้นฉบับ"}
             </button>
