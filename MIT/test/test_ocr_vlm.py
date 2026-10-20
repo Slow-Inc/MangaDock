@@ -338,3 +338,23 @@ def test_a_usable_reply_resets_the_unserved_streak():
     for _ in replies:
         vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m', post_fn=post)
     assert calls['n'] == len(replies)  # never tripped
+
+
+def test_failed_calls_count_toward_the_unserved_streak():
+    """Doctor 2026-10-20 (Kage p1): the gateway answered an error body with no 'choices' four
+    times, ~6 s each — a failing call wastes the same page time as a truncated one."""
+    from manga_translator.ocr_vlm import SFX_UNSERVED_LIMIT
+
+    class ErrorBody:
+        def json(self):
+            return {'error': {'message': 'upstream overloaded'}}
+
+    calls = {'n': 0}
+
+    def post(*a, **k):
+        calls['n'] += 1
+        return ErrorBody()
+
+    for _ in range(SFX_UNSERVED_LIMIT + 2):
+        assert vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m', post_fn=post) == ''
+    assert calls['n'] == SFX_UNSERVED_LIMIT

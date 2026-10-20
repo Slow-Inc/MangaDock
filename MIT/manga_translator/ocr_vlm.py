@@ -236,11 +236,7 @@ def vlm_localize_sfx(
         if content is None or (finish is not None and finish != 'stop'):
             logger.warning("[OcrVLM] SFX reply unusable: finish_reason=%s content=%s %s",
                            finish, 'None' if content is None else repr(content), where)
-            _unserved['streak'] += 1
-            if _unserved['streak'] == SFX_UNSERVED_LIMIT:
-                logger.warning("[OcrVLM] %d unusable SFX replies in a row — rescue disabled for this "
-                               "process (model %s cannot serve it; set MIT_OCR_VLM_RESCUE=0)",
-                               SFX_UNSERVED_LIMIT, model)
+            _count_unserved(model)
             return result
         _unserved['streak'] = 0
         if not result:
@@ -248,4 +244,13 @@ def vlm_localize_sfx(
         return result
     except Exception:
         logger.warning("[OcrVLM] SFX localize failed — region will drop as before", exc_info=True)
+        _count_unserved(model)  # a failing call wastes the same page time as a truncated one
         return ''
+
+
+def _count_unserved(model: str) -> None:
+    _unserved['streak'] += 1
+    if _unserved['streak'] == SFX_UNSERVED_LIMIT:
+        logger.warning("[OcrVLM] %d unusable SFX replies in a row — rescue disabled for this "
+                       "process (model %s cannot serve it; set MIT_OCR_VLM_RESCUE=0)",
+                       SFX_UNSERVED_LIMIT, model)
