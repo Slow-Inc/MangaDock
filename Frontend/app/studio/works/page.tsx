@@ -13,6 +13,8 @@ import {
 import type { ChapterVersion, VersionStatus } from "../../lib/types";
 import { getCached, setCache } from "../../lib/studioCache";
 import { StudioWorksSkeleton } from "../components/StudioSkeleton";
+import StudioLoadError from "../components/StudioLoadError";
+import { studioLoadState } from "../lib/studioLoadState";
 import { MetricCard, StudioSection } from "../components/StudioDashboardWidgets";
 import { StudioToolbar } from "../components/StudioToolbar";
 import { StudioSelect } from "../components/StudioSelect";
@@ -122,6 +124,7 @@ export default function WorksPage() {
 
   const [versions, setVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("studio:versions") ?? []);
   const [loadingVersions, setLoadingVersions] = useState(() => getCached("studio:versions") === null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | VersionStatus>("");
@@ -137,17 +140,22 @@ export default function WorksPage() {
 
   const fetchVersions = useCallback(async () => {
     if (!user) return;
+    setLoadFailed(false);
     try {
       const token = await getIdToken();
       if (!token) throw new Error("ไม่พบ token");
       const data = await getMyVersions(token);
       setVersions(data);
       setCache("studio:versions", data);
-    } catch { showToast({ type: "error", message: "ไม่สามารถโหลดรายการเวอร์ชันได้", duration: 3000 }); }
+    } catch {
+      setLoadFailed(true);
+      showToast({ type: "error", message: "ไม่สามารถโหลดรายการเวอร์ชันได้", duration: 3000 });
+    }
     finally { setLoadingVersions(false); }
   }, [user, getIdToken, showToast]);
 
   useEffect(() => { if (user && !hasFetched.current) { hasFetched.current = true; fetchVersions(); } }, [user, fetchVersions]);
+  const view = studioLoadState({ loading: loadingVersions, failed: loadFailed, hasData: versions.length > 0 });
 
   // Compute available languages from data
   const availableLanguages = useMemo(() => {
@@ -197,7 +205,10 @@ export default function WorksPage() {
       </StudioToolbar>
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        <div className="space-y-5">
+        {view === "error" && (
+          <StudioLoadError what="ผลงาน" onRetry={() => { setLoadingVersions(true); fetchVersions(); }} />
+        )}
+        <div className={view === "error" ? "hidden" : "space-y-5"}>
           <StudioSection title="ภาพรวมผลงาน" subtitle="สรุปจำนวนเรื่อง ตอน ภาษา และสถานะหลักก่อนลงไปจัดการรายละเอียด">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="นับจาก title ที่มีเวอร์ชัน" tone="indigo" />

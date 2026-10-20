@@ -3,6 +3,19 @@
 
 ---
 
+## #828 Studio says "could not load" instead of showing zero works and 0 coins (2026-10-21)
+
+**What:** a failed Studio overview/works load showed a toast and then a full set of zero metrics and empty charts
+("you have no works"); a failed wallet call was swallowed into a 0-coin balance. New pure
+`studio/lib/studioLoadState.ts` (loading / error / ready; cached data stays) and `StudioLoadError` (sleeping studio
+mascot + "ลองใหม่"); the wallet fallback is `null` and the balance card shows "—".
+
+**Validated:** `studioLoadState.test.ts` red → green; production build, local test session with the Studio APIs
+failing: overview and works at 1440 and 390 show the error + retry, no zero metrics, Retry re-requests once;
+signed-in Chrome with real data: overview (3 works, 9 chapters, 109 coins) and works list render as before.
+
+---
+
 ## #826 Reader asks for a translation rating only on translated pages (2026-10-21)
 
 **What:** `showTranslation` defaults to true, so the "คุณภาพแปล 👍 👎" pill sat over every page, including pages never
