@@ -21,7 +21,10 @@ type CommentRow = {
   page_number: number;
   body: string;
   created_at: string;
-  profiles: { display_name: string | null; photo_url: string | null } | null;
+  profiles:
+    | { display_name: string | null; photo_url: string | null }
+    | { display_name: string | null; photo_url: string | null }[]
+    | null;
 };
 
 @Injectable()
@@ -35,6 +38,9 @@ export class ReaderCommentsService {
   }
 
   private map(row: CommentRow): ReaderComment {
+    const profile = Array.isArray(row.profiles)
+      ? row.profiles[0]
+      : row.profiles;
     return {
       id: row.id,
       uid: row.uid,
@@ -43,8 +49,8 @@ export class ReaderCommentsService {
       pageNumber: row.page_number,
       body: row.body,
       createdAt: row.created_at,
-      displayName: row.profiles?.display_name ?? null,
-      photoUrl: row.profiles?.photo_url ?? null,
+      displayName: profile?.display_name ?? null,
+      photoUrl: profile?.photo_url ?? null,
     };
   }
 
@@ -56,7 +62,9 @@ export class ReaderCommentsService {
   ): Promise<ReaderComment[]> {
     const { data, error } = await this.db
       .from('reader_comments')
-      .select('id, uid, manga_id, chapter_id, page_number, body, created_at, profiles(display_name, photo_url)')
+      .select(
+        'id, uid, manga_id, chapter_id, page_number, body, created_at, profiles(display_name, photo_url)',
+      )
       .eq('manga_id', mangaId)
       .eq('chapter_id', chapterId)
       .eq('page_number', pageNumber)
@@ -64,7 +72,7 @@ export class ReaderCommentsService {
       .limit(limit);
 
     if (error) throw new Error(`Failed to fetch comments: ${error.message}`);
-    return (data ?? []).map((r) => this.map(r as CommentRow));
+    return (data ?? []).map((r) => this.map(r));
   }
 
   async addComment(
@@ -78,13 +86,23 @@ export class ReaderCommentsService {
 
     const { data, error } = await this.db
       .from('reader_comments')
-      .insert({ uid, manga_id: mangaId, chapter_id: chapterId, page_number: pageNumber, body: body.trim() })
-      .select('id, uid, manga_id, chapter_id, page_number, body, created_at, profiles(display_name, photo_url)')
+      .insert({
+        uid,
+        manga_id: mangaId,
+        chapter_id: chapterId,
+        page_number: pageNumber,
+        body: body.trim(),
+      })
+      .select(
+        'id, uid, manga_id, chapter_id, page_number, body, created_at, profiles(display_name, photo_url)',
+      )
       .single();
 
     if (error) throw new Error(`Failed to add comment: ${error.message}`);
-    this.logger.log(`User ${uid} commented on ${mangaId}/${chapterId} p${pageNumber}`);
-    return this.map(data as CommentRow);
+    this.logger.log(
+      `User ${uid} commented on ${mangaId}/${chapterId} p${pageNumber}`,
+    );
+    return this.map(data);
   }
 
   async deleteComment(uid: string, id: string): Promise<void> {
