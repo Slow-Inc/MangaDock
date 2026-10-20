@@ -3,6 +3,31 @@
 
 ---
 
+## Follow-up fixes after the Strata redesign — PRs #800 #803 #804 #805 #807 (2026-10-21)
+
+**What:**
+- **#800** — feature-audit bugs #661–#663, #666–#672, #675 (year-range search pages before paging, compare
+  reader zooms both panels, follow/vote/review/check-in rollbacks with visible errors, one shared
+  `/users/me/follows` load per page, reader fetches abort stale pages, pin/unpin audit rows) and
+  **#798**: avatar upload validated by magic bytes (`detectAllowedImage`), like every other upload.
+- **#803** (#801) — `TranslateThrottleGuard` keys on `cf-connecting-ip`, per-client 30/min checked before
+  the global 600/min, explicit fail-open; 6,000-char text cap.
+- **#804** — `UserAvatar` + `avatarSource` used for posts, comments, reader comments, reviews and the
+  profile following list; the mascot fallback is `aria-hidden`.
+- **#805** (#802) — the prompt keeps Markdown; the stripper runs only on `THOUGHTS:` and keeps links,
+  rules and blank lines; cache version v4 → v5.
+- **#807** (#806) — one `PostImage` for the forum card grid, compact thumbnail, post page and the
+  create-post preview: scheme-guarded (`safeImageSrc`), designed fallback on a blocked URL or load error;
+  the compact thumbnail is resized via `sizes` (`w=256`).
+
+**Validated:** each PR's own tests red → green, tsc 0, CI green, production-build browser checks
+(details in each PR). Not E2E-checked: the #807 uploader preview (needs a signed-in browser).
+
+**Left open:** #664 (check-in credit atomicity, wallet), #665 backend half (wallet), sweep of avatars
+stored before #798.
+
+---
+
 ## #764 Strata redesign — Epics B/C/D + performance pass (2026-10-20)
 
 **What:** every user area moved onto the Strata tokens (home/catalog/search/nav #773, book popup +
