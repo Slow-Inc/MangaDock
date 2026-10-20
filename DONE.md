@@ -3,6 +3,19 @@
 
 ---
 
+## #812 Untranslated descriptions are no longer re-requested every hero slide (2026-10-21)
+
+**What:** `translateDescription` cached only successes, so a `translated: false` answer was re-fetched on
+every hero rotation (~5 s), each time making the backend try every Gemini model on the shared free-tier key
+(270 failure lines in one session). The "not translated" answer is now cached (as null) and still rejects;
+failed requests (network / non-2xx) stay uncached and retry.
+
+**Validated:** `translateDescription.test.ts` red → green (3 cases, counting fetch stub); production build in
+a signed-in browser: 60 s on the home page → 9 translate requests, all distinct texts (before: the same
+text repeated each rotation).
+
+---
+
 ## #810 Studio nav highlights the right item on upload / manga / search (2026-10-21)
 
 **What:** `getActiveStudioTab` fell back to Overview for `/studio/upload`, `/studio/manga/[id]` and
