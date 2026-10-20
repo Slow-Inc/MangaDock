@@ -3,6 +3,21 @@
 
 ---
 
+## #821 Background community tabs no longer starve the browser's connections (2026-10-21)
+
+**What:** the notifications dropdown that spun forever in a real Chrome session (every `/api/proxy/*` call from the
+tab hung while curl answered in ~50 ms). Root cause reproduced: `useFeedStream` / `usePostStream` kept an
+`EventSource` open in background tabs, and over HTTP/1.1 a browser shares 6 connections per host across all tabs —
+6 open `/community` tabs → every other request hangs (5 → fine). New `hooks/pageVisibility.ts` (`usePageVisible`,
+useSyncExternalStore over `visibilitychange`); both streams connect only while the tab is visible.
+
+**Validated:** `pageVisibility.test.ts` red → green; production build, headless Chromium, one profile: 6 community
+tabs with 5 hidden → live streams [0,0,0,0,0,1], a request from another tab 7 ms (was: never answers); a tab made
+visible again reconnects; same for 6 post tabs. Production behind Cloudflare negotiates HTTP/2 (not starved).
+Trade-off: events while a tab is hidden are not delivered.
+
+---
+
 ## #819 Admin works at phone width; a failed load says so (2026-10-21)
 
 **What:** below `md` the admin sidebar is replaced by a sticky top bar with a scrolling tab strip (active tab kept in

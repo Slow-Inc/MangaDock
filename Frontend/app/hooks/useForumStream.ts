@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import type { ForumComment } from "../lib/types";
+import { usePageVisible } from "./pageVisibility";
 
 export type ForumStreamEvent =
   | { type: "vote"; postId: string; targetType: "post" | "comment"; targetId: string; upvotes: number; downvotes: number }
@@ -53,15 +54,17 @@ export function usePostStream({ postId, onEvent, enabled = true }: UsePostStream
     };
   }, [postId]);
 
+  // Hidden tabs let go of the stream (#821): HTTP/1.1 shares 6 connections per host across all tabs.
+  const visible = usePageVisible();
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !visible) return;
     connect();
     return () => {
       timerRef.current && clearTimeout(timerRef.current);
       esRef.current?.close();
       esRef.current = null;
     };
-  }, [connect, enabled]);
+  }, [connect, enabled, visible]);
 }
 
 interface UseFeedStreamOptions {
@@ -103,13 +106,15 @@ export function useFeedStream({ onNewPost, enabled = true }: UseFeedStreamOption
     };
   }, []);
 
+  // Hidden tabs let go of the stream (#821): HTTP/1.1 shares 6 connections per host across all tabs.
+  const visible = usePageVisible();
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !visible) return;
     connect();
     return () => {
       timerRef.current && clearTimeout(timerRef.current);
       esRef.current?.close();
       esRef.current = null;
     };
-  }, [connect, enabled]);
+  }, [connect, enabled, visible]);
 }
