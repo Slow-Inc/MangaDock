@@ -84,3 +84,10 @@ def test_det_sfx_lines_are_never_coalesced_into_dialogue():
     out = _merge([{0}, {1}, {2}], [0, 0, 0], ['h'] * 3, boxes, sfx=[False, True, False])
     assert {1} in out
     assert {0, 2} in out
+
+
+def test_container_merge_is_on_by_default():
+    """#757: 17 corpus pages, 0 wrong merges, caption pages 21 -> 8 regions; the opt-in was only
+    pending more evidence. Default on (goal 2026-10-21: proven configs become the MIT default)."""
+    from manga_translator.config import Config
+    assert Config().detector.det_bubble_merge is True
