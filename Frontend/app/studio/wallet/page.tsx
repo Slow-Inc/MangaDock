@@ -242,7 +242,7 @@ export default function WalletPage() {
         </p>
       </StudioToolbar>
 
-      <div {...tabPanelProps("wallet", tab)} className="mx-auto max-w-6xl px-4 py-6 focus-visible:outline-none sm:px-6">
+      <div {...tabPanelProps("wallet", tab)} className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
           {loadingData ? (
             <StudioWalletSkeleton />
           ) : (

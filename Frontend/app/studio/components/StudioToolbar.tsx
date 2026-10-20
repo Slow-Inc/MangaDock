@@ -21,9 +21,9 @@ export function StudioToolbar({ children }: { children: ReactNode }) {
 const tabId = (idBase: string, key: string) => `${idBase}-tab-${key}`;
 const panelId = (idBase: string, key: string) => `${idBase}-panel-${key}`;
 
-/** Props for the element that shows the active tab's content. */
+/** Props for the element that shows the active tab's content (no tabIndex: every panel has focusable content). */
 export function tabPanelProps(idBase: string, key: string) {
-  return { role: "tabpanel", id: panelId(idBase, key), "aria-labelledby": tabId(idBase, key), tabIndex: 0 } as const;
+  return { role: "tabpanel", id: panelId(idBase, key), "aria-labelledby": tabId(idBase, key) } as const;
 }
 
 export function StudioTabBar<K extends string>({

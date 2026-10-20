@@ -177,7 +177,7 @@ export default function StudioOverviewPage() {
         </div>
       </StudioToolbar>
 
-      <div {...tabPanelProps("overview", tab)} className="mx-auto max-w-6xl space-y-6 px-4 py-6 focus-visible:outline-none sm:px-6">
+      <div {...tabPanelProps("overview", tab)} className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
         {tab === "summary" ? <StatsOverview /> : null}
 
         {loadingData ? (
