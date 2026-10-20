@@ -35,7 +35,8 @@ accents, gradient backgrounds, copy-pasted spinners).
    picture**; every accessory is free for everyone (dev).
 
 **Non-goals**
-- MIT render/translation quality, reader page rendering, backend business logic (other than the mascot storage in Epic D).
+- MIT render/translation quality, reader page rendering, backend business logic (except Epic C's stats endpoints and
+  Epic D's mascot storage).
 - A marketing landing page.
 - Strata's product-specific content: the nine-mood story, the Compare window, the live demo proxy, the film section
   (Strata 02 §11.2) — the *patterns* carry over, the content does not.
@@ -129,6 +130,12 @@ Per-area ideas from the recon (agent call, to be refined per PRD):
 Dashboard Shell layout (resizable sidebar, header with status, tabs with sliding pill, toolbar) replacing `StudioNav` tabs
 (agent call); overview in the Analytics Dashboard style (metric cards with rolling digits, sparklines); ECharts + spell-ui
 Chart for all charts; CopyButton where something is copied; `mech` mascot. Studio uses `--fill`/tokens, no hue-coded tiles.
+- **Backend is in scope for this epic (dev):** today Studio only has `me/versions`, wallet `balance` and `transactions`
+  (`studio/page.tsx`); there is no reads / views / unlocks / earnings over time. Add aggregate stats endpoints (per creator,
+  per title, per day) so the charts and sparklines show real series. This is the one exception to the "no backend business
+  logic" non-goal, together with Epic D's storage.
+- **Block source (dev):** the Dashboard Shell and Analytics Dashboard blocks come from the same registry as evilcharts.
+  Locate them there, check their licence and add credits (§7) before copying.
 
 ### Epic D — Mascot system
 - **Cast (agent call):** one character per area so people learn "this one lives here":
@@ -145,8 +152,9 @@ Chart for all charts; CopyButton where something is copied; `mech` mascot. Studi
 
   Each instance gets its own `seed`; `theme="auto"`.
 - **User mascot (dev):** users dress their own mascot — `type` (18), `face`, body `color`, `hat`, `glasses`, `headphones`,
-  `bowTie`, `accessoryColor` — with a live preview, and choose it **or** their OAuth photo as the profile picture. **All
-  accessories are free** (dev).
+  `bowTie`, `accessoryColor` — with a live preview. The profile picture is one of **three** choices: the mascot, the OAuth
+  photo, or a self-uploaded image — the existing upload (`users.service.ts`, `uploads/avatars`, with orphan cleanup) stays
+  (dev). **All accessories are free** (dev).
 - **Where the profile picture shows** (render sites on `main`): `NavbarActions`, `PostCard`, `CommentThread`,
   `ReaderCommentDrawer`, `ReviewCard`, `MangaDiscussion`, `community/page`, `community/p/[id]`, `community/manga/[mangaId]`,
   `community/profile/[uid]`, `studio/account`, `LinkAccountModal`; data from `AuthContext` and Backend `users.service` /
