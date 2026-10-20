@@ -125,7 +125,7 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
               onDrop={handleDrop}
               onClick={() => !uploading && fileInputRef.current?.click()}
               className={`p-6 text-center cursor-pointer transition-all ${
-                dragOver ? 'bg-indigo-500/10 border-indigo-500/30' : 'hover:bg-white/3'
+                dragOver ? 'bg-white/10 border-amber-500/30' : 'hover:bg-white/3'
               }`}
             >
               <input
@@ -137,7 +137,7 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
               />
               {uploading ? (
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
                   <span className="text-white/40 text-xs">กำลังอัพโหลด...</span>
                 </div>
               ) : (
@@ -160,13 +160,13 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
                 onChange={(e) => setUrlInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleUrlAdd()}
                 placeholder="https://example.com/image.jpg"
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500 transition-all"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500 transition-all"
               />
               <button
                 type="button"
                 onClick={handleUrlAdd}
                 disabled={!urlInput.trim()}
-                className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500 disabled:opacity-50 transition-all shrink-0"
+                className="px-4 py-2 rounded-lg bg-white text-black text-xs font-bold hover:bg-white/90 disabled:opacity-50 transition-all shrink-0"
               >
                 เพิ่ม
               </button>

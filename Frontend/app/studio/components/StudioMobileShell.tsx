@@ -35,21 +35,18 @@ export function StudioMobileHeader({
 }
 
 export function StudioMobileHero({
-  eyebrow,
   title,
   description,
   aside,
 }: {
-  eyebrow: string;
   title: string;
   description: string;
   aside?: ReactNode;
 }) {
   return (
-    <div className="rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(129,140,248,0.16),transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] px-4 py-4 shadow-[0_28px_70px_-40px_rgba(0,0,0,0.9)]">
+    <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.02] px-4 py-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.32em] text-white/35">{eyebrow}</p>
           <h1 className="mt-2 text-[1.65rem] font-semibold leading-tight text-white">{title}</h1>
           <p className="mt-2 text-sm leading-6 text-white/45">{description}</p>
         </div>
@@ -76,7 +73,7 @@ export function StudioMobileMenuCard({
 }) {
   const toneStyles = {
     default: "border-white/10 bg-white/[0.045] text-white/80",
-    indigo: "border-indigo-500/20 bg-indigo-500/10 text-indigo-200",
+    indigo: "border-amber-500/20 bg-white/10 text-amber-200",
     emerald: "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
     amber: "border-amber-500/20 bg-amber-500/10 text-amber-200",
     rose: "border-rose-500/20 bg-rose-500/10 text-rose-200",
@@ -118,7 +115,7 @@ export function StudioMobileSection({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-4 shadow-[0_20px_50px_-40px_rgba(0,0,0,0.9)]">
+    <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-4">
       <div className="mb-3">
         <h2 className="text-sm font-semibold text-white">{title}</h2>
         {subtitle ? <p className="mt-1 text-xs leading-5 text-white/40">{subtitle}</p> : null}

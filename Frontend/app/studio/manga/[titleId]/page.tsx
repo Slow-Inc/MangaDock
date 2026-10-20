@@ -92,7 +92,7 @@ function VersionRow({
           {version.status === "draft" && version.pages.length > 0 && (
             <button
               onClick={() => onSubmit(version)}
-              className="flex-1 rounded-lg bg-indigo-600 py-1.5 text-[11px] font-semibold text-white transition hover:bg-indigo-500"
+              className="flex-1 rounded-lg bg-white py-1.5 text-[11px] font-semibold text-black transition hover:bg-white/90"
             >
               เผยแพร่
             </button>
@@ -196,7 +196,7 @@ function ChapterGroup({
             {versions[0].status === "draft" && versions[0].pages.length > 0 && (
               <button
                 onClick={() => onSubmit(versions[0])}
-                className="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-black transition hover:bg-white/90"
               >
                 เผยแพร่
               </button>
@@ -404,7 +404,7 @@ export default function MangaDetailPage() {
           </div>
           <Link
             href={`/studio/upload?titleId=${encodeURIComponent(titleId)}&titleName=${encodeURIComponent(displayTitle)}`}
-            className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95 sm:self-start"
+            className="shrink-0 rounded-xl bg-white px-4 py-2.5 text-center text-sm font-semibold text-black transition hover:bg-white/90 active:scale-95 sm:self-start"
           >
             + อัปโหลดตอนใหม่
           </Link>

@@ -21,7 +21,6 @@ import {
   HorizontalBreakdownChart,
   LineChart,
   MetricCard,
-  StudioAnnouncement,
   StudioSection,
 } from "./components/StudioDashboardWidgets";
 import {
@@ -63,7 +62,7 @@ function RecentTransactionList({ transactions }: { transactions: WalletTransacti
         const date = new Date(tx.createdAt);
         return (
           <div key={tx.id} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${isPositive ? "bg-indigo-500/12 text-indigo-300" : "bg-rose-500/12 text-rose-300"}`}>
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${isPositive ? "bg-white/12 text-amber-300" : "bg-rose-500/12 text-rose-300"}`}>
               {isPositive ? (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -81,7 +80,7 @@ function RecentTransactionList({ transactions }: { transactions: WalletTransacti
             </div>
 
             <div className="shrink-0 text-right">
-              <p className={`text-sm font-semibold ${isPositive ? "text-indigo-300" : "text-rose-300"}`}>
+              <p className={`text-sm font-semibold ${isPositive ? "text-amber-300" : "text-rose-300"}`}>
                 {isPositive ? "+" : "-"}{formatCurrency(Math.abs(tx.amount))}
               </p>
               <p className="text-[11px] text-white/25">
@@ -166,10 +165,8 @@ export default function StudioOverviewPage() {
       if (mobileView === "menu") {
         return (
           <div className="space-y-4 px-4 py-4">
-            <StudioAnnouncement />
 
             <StudioMobileHero
-              eyebrow="Studio Dashboard"
               title="สตูดิโอของฉัน"
               description="ดูสถิติ รายได้ และกิจกรรมล่าสุดของคุณ"
               aside={(
@@ -190,7 +187,7 @@ export default function StudioOverviewPage() {
             <div className="grid grid-cols-2 gap-3">
               <Link
                 href="/studio/upload"
-                className="rounded-2xl bg-indigo-500 px-4 py-3 text-center text-sm font-semibold text-white transition active:scale-[0.99]"
+                className="rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-black transition active:scale-[0.99]"
               >
                 + อัปโหลดใหม่
               </Link>
@@ -348,21 +345,19 @@ export default function StudioOverviewPage() {
 
       <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
         <div className="space-y-5">
-          <StudioAnnouncement />
 
-          <div className="flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(129,140,248,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.8)] sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-white/[0.02] p-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.32em] text-white/35">Studio Dashboard</p>
               <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">ภาพรวมสตูดิโอของฉัน</h1>
               <p className="mt-2 max-w-2xl text-sm text-white/45">
-                รวมสถิติผลงาน สถานะการเผยแพร่ และการเคลื่อนไหวของกระเป๋าเงินไว้ในที่เดียว โดยใช้ข้อมูลจริงจาก MetaBooks
+                รวมสถิติผลงาน สถานะการเผยแพร่ และการเคลื่อนไหวของกระเป๋าเงินไว้ในที่เดียว
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/studio/upload"
-                className="rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-400 active:scale-95"
+                className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90 active:scale-95"
               >
                 + อัปโหลดใหม่
               </Link>
@@ -396,7 +391,7 @@ export default function StudioOverviewPage() {
               <div className="grid gap-6 xl:grid-cols-[1.25fr,0.95fr]">
                 <StudioSection
                   title="ข้อมูลผลงานเชิงลึก"
-                  subtitle="ส่วนนี้แทนภาพรวมแนว ReadRealm โดยใช้ข้อมูลที่ MetaBooks มีอยู่จริง"
+                  subtitle="ภาษา ราคา และคุณภาพของตอนที่คุณเผยแพร่"
                 >
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     <MetricCard label="จำนวนภาษา" value={overviewStats.languages} hint="ภาษางานแปลที่เคยใช้งาน" tone="sky" />
@@ -412,7 +407,7 @@ export default function StudioOverviewPage() {
                   title="รายการล่าสุด"
                   subtitle="ธุรกรรมล่าสุดในระบบกระเป๋าเงิน"
                   action={
-                    <Link href="/studio/wallet" className="text-xs font-medium text-indigo-300 transition hover:text-indigo-200">
+                    <Link href="/studio/wallet" className="text-xs font-medium text-amber-300 transition hover:text-amber-200">
                       ดูทั้งหมด →
                     </Link>
                   }
@@ -454,19 +449,19 @@ export default function StudioOverviewPage() {
               <StudioSection title="ลิงก์ด่วน" subtitle="เข้าถึงหัวข้อหลักในสไตล์ dashboard นักเขียนได้ไวขึ้น">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <Link href="/studio/works" className="group rounded-2xl border border-white/10 bg-white/4 p-4 transition hover:border-white/20 hover:bg-white/7">
-                    <p className="text-sm font-semibold text-white transition group-hover:text-indigo-300">ผลงานของฉัน</p>
+                    <p className="text-sm font-semibold text-white transition group-hover:text-amber-300">ผลงานของฉัน</p>
                     <p className="mt-1 text-xs text-white/35">ค้นหา กรอง และจัดการตอนทั้งหมด</p>
                   </Link>
                   <Link href="/studio/upload" className="group rounded-2xl border border-white/10 bg-white/4 p-4 transition hover:border-white/20 hover:bg-white/7">
-                    <p className="text-sm font-semibold text-white transition group-hover:text-indigo-300">อัปโหลดงานใหม่</p>
+                    <p className="text-sm font-semibold text-white transition group-hover:text-amber-300">อัปโหลดงานใหม่</p>
                     <p className="mt-1 text-xs text-white/35">เพิ่ม chapter/version ใหม่เข้าสู่ระบบ</p>
                   </Link>
                   <Link href="/studio/wallet" className="group rounded-2xl border border-white/10 bg-white/4 p-4 transition hover:border-white/20 hover:bg-white/7">
-                    <p className="text-sm font-semibold text-white transition group-hover:text-indigo-300">กระเป๋าเงิน</p>
+                    <p className="text-sm font-semibold text-white transition group-hover:text-amber-300">กระเป๋าเงิน</p>
                     <p className="mt-1 text-xs text-white/35">ดู transaction และแนวโน้มรายเดือน</p>
                   </Link>
                   <Link href="/studio/account" className="group rounded-2xl border border-white/10 bg-white/4 p-4 transition hover:border-white/20 hover:bg-white/7">
-                    <p className="text-sm font-semibold text-white transition group-hover:text-indigo-300">ข้อมูลนักแปล</p>
+                    <p className="text-sm font-semibold text-white transition group-hover:text-amber-300">ข้อมูลนักแปล</p>
                     <p className="mt-1 text-xs text-white/35">แก้ไขโปรไฟล์และความพร้อมของบัญชี</p>
                   </Link>
                 </div>

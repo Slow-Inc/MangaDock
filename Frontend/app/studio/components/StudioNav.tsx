@@ -19,14 +19,14 @@ export default function StudioNav() {
               href={tab.href}
               className={`relative flex flex-col items-center gap-0.5 px-3 py-2.5 text-xs transition-colors sm:flex-row sm:gap-2 sm:px-4 sm:text-sm ${
                 isActive
-                  ? "text-indigo-400"
+                  ? "text-amber-400"
                   : "text-white/40 hover:text-white/70"
               }`}
             >
               {tab.icon("h-4 w-4")}
               <span>{tab.label}</span>
               {isActive && (
-                <span className="absolute bottom-0 left-0 h-0.5 w-full bg-indigo-400" />
+                <span className="absolute bottom-0 left-0 h-0.5 w-full bg-amber-400" />
               )}
             </Link>
           );
