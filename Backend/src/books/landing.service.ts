@@ -13,6 +13,17 @@ import {
   type LandingRow,
 } from './books.types';
 
+const THAI = /[\u0E00-\u0E7F]/;
+
+/** A line of the translation (not leaked English reasoning): mostly Thai, or a Markdown link/rule line. */
+function isTranslationLine(line: string): boolean {
+  if (line.trim() === '') return true; // paragraph breaks keep the Markdown structure
+  if (/\]\(https?:\/\/[^)]+\)/.test(line)) return true;
+  if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) return true;
+  const thai = (line.match(new RegExp(THAI.source, 'g')) || []).length;
+  return thai > 0 && thai / Math.max(line.trim().length, 1) > 0.2;
+}
+
 /** Longest description we send to a translation provider (MangaDex descriptions are far shorter). */
 const MAX_DESCRIPTION_CHARS = 6000;
 
@@ -238,7 +249,7 @@ export class LandingService {
     // The whole text, hashed: GET /books/translate is public, and a key from only the first bytes let any
     // text that opens like a book's description overwrite that book's cached translation for everyone.
     const fingerprint = createHash('sha256').update(text).digest('hex');
-    const cacheKey = `translate:th:v4:${models.join('|')}:${fingerprint}`;
+    const cacheKey = `translate:th:v5:${models.join('|')}:${fingerprint}`;
     const cached = await this.cache.get<{
       translatedText: string;
       translated: boolean;
@@ -246,27 +257,23 @@ export class LandingService {
     }>(cacheKey);
     if (cached) return cached.data;
 
-    const prompt = `Translate the following manga/book description to Thai. Output ONLY the Thai translation. Do not include any reasoning, explanations, thoughts, or notes. Just the translated text:\n\n${text}`;
+    const prompt = `Translate the following manga/book description to Thai. Output ONLY the Thai translation. Do not include any reasoning, explanations, thoughts, or notes. Keep the Markdown formatting exactly: links stay as [text](url) with the URL unchanged, and bold, lists and horizontal rules stay where they are:\n\n${text}`;
 
     for (const modelName of models) {
       try {
         let translatedText = (
           await this.llmService.complete(prompt, modelName)
         ).trim();
-        // Strip THOUGHTS section if model still outputs it (fallback)
-        if (
-          translatedText.includes('THOUGHTS:') ||
-          translatedText.includes('* **')
-        ) {
-          const lines = translatedText.split('\n');
-          const thaiLines = lines.filter((l) => {
-            const thaiCount = (l.match(/[\u0E00-\u0E7F]/g) || []).length;
-            return (
-              thaiCount > 0 && thaiCount / Math.max(l.trim().length, 1) > 0.2
-            );
-          });
-          if (thaiLines.length > 0)
-            translatedText = thaiLines.join('\n').trim();
+        // A leaked reasoning block (fallback): keep the translation's lines - Thai text plus the Markdown
+        // that carries no Thai (link lines, rules) - and drop the English reasoning. Only an explicit
+        // THOUGHTS marker triggers it: '* **' is ordinary Markdown (a bold bullet), not a leak (#802).
+        if (translatedText.includes('THOUGHTS:')) {
+          const kept = translatedText.split('\n').filter(isTranslationLine);
+          if (kept.some((l) => THAI.test(l)))
+            translatedText = kept
+              .join('\n')
+              .replace(/\n{3,}/g, '\n\n')
+              .trim();
         }
         const payload = { translatedText, translated: true, model: modelName };
         await this.cache.setMangaCacheWithTiers(cacheKey, payload);
