@@ -7,6 +7,7 @@ import { supabase } from "../lib/supabase";
 import { parseJsonOrNull } from "../lib/safeJson";
 import StarRating from "./StarRating";
 import ReviewCard from "./ReviewCard";
+import Loader from "./ui/Loader";
 import type { ReviewItem, ReviewSummary } from "../lib/reviewTypes";
 
 type Props = { mangaId: string; mangaTitle: string };
@@ -191,7 +192,9 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
 
       {/* Other reviews */}
       {loadingReviews ? (
-        <div className="py-6 text-center text-sm text-ink-3">กำลังโหลด...</div>
+        <div className="flex justify-center py-6 text-ink-3">
+          <Loader context="section" label="กำลังโหลดรีวิว" />
+        </div>
       ) : others.length === 0 && !myReview ? (
         <div className="py-6 text-center text-sm text-ink-3">ยังไม่มีรีวิว เป็นคนแรกที่รีวิว!</div>
       ) : (

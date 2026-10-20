@@ -1,6 +1,7 @@
 "use client";
 
 import { PRIMARY_FILL } from "./ui/Button";
+import Loader from "./ui/Loader";
 import Image from "next/image";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
@@ -126,7 +127,9 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
         {/* Comment list */}
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
-            <p className="text-center text-sm text-ink-3">กำลังโหลด...</p>
+            <div className="flex justify-center py-6 text-ink-3">
+              <Loader context="section" label="กำลังโหลดความคิดเห็น" />
+            </div>
           ) : comments.length === 0 ? (
             <p className="text-center text-sm text-ink-3">ยังไม่มีความคิดเห็น</p>
           ) : (

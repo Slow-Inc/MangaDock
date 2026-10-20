@@ -7,6 +7,14 @@ import Loader from "../ui/Loader";
 import type { ChapterPageItem } from "../../hooks/useChapters";
 import type { PatchData } from "../../lib/mangaTranslatePage";
 
+/** Translated patches fade in once their image has loaded instead of popping (#774). The
+ *  opacity is set on the element, not in state, so a page of patches costs no re-render; the
+ *  global reduced-motion block cuts the transition to nothing. */
+const PATCH_FADE = { opacity: 0, transition: "opacity var(--t2) var(--ease)" } as const;
+const revealPatch = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  e.currentTarget.style.opacity = "1";
+};
+
 export interface PageRendererProps {
   viewport: ReaderViewport;
   /** Non-null — the orchestrator renders this component only when chapter
@@ -102,12 +110,14 @@ function PageRendererImpl({
               {showTranslation && patchedPages.has(i) && patchedPages.get(i)!.map((p, pi) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  key={pi}
+                  key={`${pi}:${p.url}`}
                   src={p.url}
                   alt=""
                   aria-hidden
                   draggable={false}
+                  onLoad={revealPatch}
                   style={{
+                    ...PATCH_FADE,
                     position: "absolute",
                     left: `${p.xPct * 100}%`,
                     top: `${p.yPct * 100}%`,
@@ -199,12 +209,14 @@ function PageRendererImpl({
           {showTranslation && patchedPages.has(page) && patchedPages.get(page)!.map((p, pi) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              key={pi}
+              key={`${pi}:${p.url}`}
               src={p.url}
               alt=""
               aria-hidden
               draggable={false}
+              onLoad={revealPatch}
               style={{
+                ...PATCH_FADE,
                 position: "absolute",
                 left: `${p.xPct * 100}%`,
                 top: `${p.yPct * 100}%`,

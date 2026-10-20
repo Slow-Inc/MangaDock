@@ -634,7 +634,10 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                 text={(translatedDesc && !showOriginalDesc) ? translatedDesc : (book.description || detail?.description || "ไม่มีคำอธิบายสำหรับเรื่องนี้")}
               />
               {translatingDesc && (
-                <p className="text-xs text-ink-3">กำลังแปล...</p>
+                <div className="flex items-center gap-2">
+                  <Loader context="inline" label="กำลังแปลคำโปรย" className="text-ink-3" />
+                  <ModelBadge model={descModel} small />
+                </div>
               )}
               {translatedDesc && !translatingDesc && (
                 <div className="flex items-center gap-2">
