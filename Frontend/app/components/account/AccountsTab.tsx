@@ -293,7 +293,7 @@ export default function AccountsTab({ formState, dispatch, onTabChange, onClose 
           )}
         </div>
 
-        <p className="text-[11px] text-ink-3 pt-1">💡 เชื่อมต่อบัญชีหลายแบบเพื่อเข้าสู่ระบบได้หลายวิธี</p>
+        <p className="text-[11px] text-ink-3 pt-1">เชื่อมต่อบัญชีหลายแบบเพื่อเข้าสู่ระบบได้หลายวิธี</p>
       </div>
     </>
   );

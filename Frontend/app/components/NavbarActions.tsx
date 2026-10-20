@@ -10,6 +10,7 @@ import { useAuth } from "../contexts/AuthContext";
 import TopupModal from "./TopupModal";
 import { getWalletBalance } from "../lib/studioApi";
 import NotificationBell from "./NotificationBell";
+import Coin from "./ui/Coin";
 
 export default function NavbarActions() {
   const router = useRouter();
@@ -70,7 +71,7 @@ export default function NavbarActions() {
               className="flex items-center gap-1 rounded-full border border-coin/40 bg-coin/10 px-2.5 py-1 text-xs text-coin smooth-hover-fast hover:bg-coin/20"
               title="เติมเหรียญ"
             >
-              🪙 {coinBalance.toLocaleString()}
+              <Coin className="mr-0.5" /> {coinBalance.toLocaleString()}
             </button>
           )}
           <div ref={menuRef} className="relative">

@@ -9,6 +9,7 @@ import { cancelTopup, simulateTopup } from "../lib/studioApi";
 import { errMessage } from "@/lib/errMessage";
 import { PRIMARY_FILL } from "./ui/Button";
 import Mascot from "./mascot/Mascot";
+import Coin from "./ui/Coin";
 
 function formatCountdown(s: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -75,7 +76,7 @@ function QrStep({
             <p className="text-base font-bold text-ink">ชำระเงินสำเร็จ</p>
             {successBalance !== null && (
               <>
-                <p className="text-2xl font-bold text-coin">🪙 {successBalance.toLocaleString()}</p>
+                <p className="flex items-center justify-center gap-2 text-2xl font-bold text-coin"><Coin /> {successBalance.toLocaleString()}</p>
                 <p className="text-xs text-ink-3">ยอดเหรียญปัจจุบัน</p>
               </>
             )}

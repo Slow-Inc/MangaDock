@@ -12,6 +12,7 @@ import { addToHistory } from "../lib/readingHistory";
 import { useAuth } from "../contexts/AuthContext";
 import Loader from "./ui/Loader";
 import type { LandingBook, MangaChapter, ActiveChapter } from "../lib/types";
+import Coin from "./ui/Coin";
 
 const API_BASE = "/api/proxy";
 
@@ -103,7 +104,7 @@ function ChapterRowInner({
           </span>
         ) : (
           <span className="shrink-0 rounded bg-coin/20 px-2 py-0.5 text-[10px] font-semibold text-coin">
-            🪙 {ch.priceCoins} ปลดล็อค
+            <Coin className="mr-0.5 inline align-[-0.125em]" />{ch.priceCoins} ปลดล็อค
           </span>
         )
       ) : readable ? (
@@ -313,7 +314,7 @@ export default function ChapterList({
               className="flex items-center gap-1 rounded-full bg-coin/15 px-2 py-0.5 text-[10px] font-semibold text-coin transition hover:bg-coin/25"
               title="เติมเหรียญ"
             >
-              🪙 {coinBalance}
+              <Coin /> {coinBalance}
             </button>
           )}
         </div>
