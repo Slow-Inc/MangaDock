@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -14,32 +14,42 @@ import { isSocialCdnUrl } from "../lib/avatarUpload";
 const ROLE_LABEL: Record<number, string> = { 1: 'นักแปล', 2: 'นักเขียน', 8: 'ผู้ดูแล', 9: 'ผู้พัฒนา' };
 const CAT_LABEL: Record<string, string> = { announcement: 'ประกาศ', spoiler: 'สปอยล์', manga_update: 'อัปเดต' };
 
+/**
+ * A manga tag that fits its width: a long title ends in "…" and scrolls into view only while hovered
+ * (it used to loop forever on every card in the list, with hard cut edges). Reduced motion: no scroll.
+ */
 function MarqueeMangaTag({ title, maxWidth }: { title: string; maxWidth: number }) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
 
-  useLayoutEffect(() => {
+  const start = () => {
     const container = containerRef.current;
     const text = textRef.current;
-    if (!container || !text) return;
-    const gap = text.scrollWidth - container.clientWidth;
-    const overflow = gap > 2 ? gap : 0;
-    if (overflow > 0) {
-      text.style.setProperty("--marquee-overflow", `${overflow}px`);
-      text.style.animation = `marquee-title ${Math.max(5, overflow / 22)}s linear infinite`;
-    } else {
-      text.style.removeProperty("--marquee-overflow");
-      text.style.animation = "";
-    }
-  }, [title]);
+    if (!container || !text || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const overflow = text.scrollWidth - container.clientWidth;
+    if (overflow <= 2) return;
+    text.classList.remove("truncate");
+    text.style.setProperty("--marquee-overflow", `${overflow}px`);
+    text.style.animation = `marquee-title ${Math.max(5, overflow / 22)}s linear infinite`;
+  };
+  const stop = () => {
+    const text = textRef.current;
+    if (!text) return;
+    text.style.animation = "";
+    text.style.removeProperty("--marquee-overflow");
+    text.classList.add("truncate");
+  };
 
   return (
     <span
       ref={containerRef}
-      className="overflow-hidden inline-block align-middle"
+      onMouseEnter={start}
+      onMouseLeave={stop}
+      title={title}
+      className="inline-block overflow-hidden align-middle"
       style={{ maxWidth }}
     >
-      <span ref={textRef} className="inline-block whitespace-nowrap">
+      <span ref={textRef} className="block truncate whitespace-nowrap">
         {title}
       </span>
     </span>

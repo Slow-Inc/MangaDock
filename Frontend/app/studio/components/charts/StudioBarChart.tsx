@@ -31,7 +31,7 @@ function Bars({ points, valueFormatter, ariaLabel }: { points: StackedChartPoint
       });
       return {
         ...kit.base("axis"),
-        legend: { bottom: 0, left: 0, icon: "circle", itemWidth: 8, itemHeight: 8, textStyle: { color: ink3, fontSize: 12 } },
+        legend: { bottom: 0, left: 0, icon: "circle", itemWidth: 8, itemHeight: 8, itemGap: 16, textStyle: { color: ink3, fontSize: 12, padding: [0, 0, 0, 2] } },
         grid: { left: 8, right: 8, top: 16, bottom: 36, containLabel: true },
         xAxis: { type: "category", data: points.map((p) => p.label), ...kit.axisStyle() },
         yAxis: { type: "value", splitLine: kit.splitLine(), axisLabel: { color: ink3, fontSize: 11, formatter: valueFormatter } },

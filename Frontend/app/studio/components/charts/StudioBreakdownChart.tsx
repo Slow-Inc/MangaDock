@@ -15,7 +15,8 @@ function Bars({ data, formatter, ariaLabel }: { data: BreakdownDatum[]; formatte
   const build = useCallback(
     (kit: ChartKit) => ({
       ...kit.base("item"),
-      grid: { left: 0, right: 56, top: 8, bottom: 8, containLabel: true },
+      // A fixed label column: containLabel measures the untruncated title and cut long ones at the left edge.
+      grid: { left: 152, right: 40, top: 8, bottom: 8 },
       xAxis: { type: "value", show: false },
       yAxis: {
         type: "category",
@@ -23,7 +24,7 @@ function Bars({ data, formatter, ariaLabel }: { data: BreakdownDatum[]; formatte
         data: data.map((d) => d.label),
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: kit.color("--ink-2"), fontSize: 12, width: 140, overflow: "truncate" },
+        axisLabel: { color: kit.color("--ink-2"), fontSize: 12, width: 140, overflow: "truncate", ellipsis: "…", margin: 12 },
       },
       series: [
         {
@@ -31,7 +32,7 @@ function Bars({ data, formatter, ariaLabel }: { data: BreakdownDatum[]; formatte
           barMaxWidth: 10,
           showBackground: true,
           backgroundStyle: { color: kit.color("--fill"), borderRadius: 999 },
-          data: data.map((d) => ({ name: d.label, value: d.value, itemStyle: { color: kit.tone(d.tone), borderRadius: 999 } })),
+          data: data.map((d) => ({ name: d.label, value: d.value, itemStyle: { color: kit.tone(), borderRadius: 999 } })), // one series, one hue
           label: { show: true, position: "right", color: kit.color("--ink"), fontSize: 12, formatter: (p: { value: number }) => formatter(p.value) },
           tooltip: { valueFormatter: formatter },
         },
