@@ -4,9 +4,9 @@
  * A mascot from `bot-avatars` (MIT, Jakub Antalik). Canvas 2-D, no WebGL; the library pauses off-screen,
  * respects reduced motion and sets role="img" — we pass a Thai label for it.
  */
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { BotAvatar, type BotAvatarState } from "bot-avatars";
-import { CAST, type MascotArea, type MascotConfig } from "../../lib/mascot";
+import { CAST, mascotFromUid, type MascotArea, type MascotConfig } from "../../lib/mascot";
 
 const LABEL: Record<BotAvatarState, string> = {
   default: "มาสคอต",
@@ -18,7 +18,7 @@ const LABEL: Record<BotAvatarState, string> = {
  * Memoised: bot-avatars redraws even a paused avatar on every render of its parent, and avatars sit in
  * busy parents (the reader, the navbar). Pass a stable `config` (useMemo) for the memo to hold.
  */
-export default memo(function Mascot({
+const Mascot = memo(function Mascot({
   area,
   config,
   state = "default",
@@ -56,4 +56,16 @@ export default memo(function Mascot({
       className={className}
     />
   );
+});
+
+export default Mascot;
+
+/**
+ * The stable mascot of a user who has no profile photo (Epic D: "users who never dressed one get a
+ * stable mascot from their uid") — stands in for the initial-letter avatar. Still by default: avatars
+ * sit in lists and chips, where a live canvas loop costs a frame budget each.
+ */
+export const UidMascot = memo(function UidMascot({ uid, size, paused = true, className }: { uid: string; size: number; paused?: boolean; className?: string }) {
+  const config = useMemo(() => mascotFromUid(uid), [uid]);
+  return <Mascot config={config} size={size} paused={paused} interactive={false} label="มาสคอตประจำตัว" className={className} />;
 });

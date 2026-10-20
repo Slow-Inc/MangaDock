@@ -11,6 +11,7 @@ import TopupModal from "./TopupModal";
 import { getWalletBalance } from "../lib/studioApi";
 import NotificationBell from "./NotificationBell";
 import Coin from "./ui/Coin";
+import { UidMascot } from "./mascot/Mascot";
 
 export default function NavbarActions() {
   const router = useRouter();
@@ -92,8 +93,8 @@ export default function NavbarActions() {
                   />
                 </div>
               ) : (
-                <span className="flex h-6.5 w-6.5 items-center justify-center rounded-full bg-accent text-xs font-bold uppercase text-bg">
-                  {(user.displayName ?? user.email ?? "U")[0]}
+                <span className="flex h-6.5 w-6.5 shrink-0 items-center justify-center">
+                  <UidMascot uid={user.uid} size={24} />
                 </span>
               )}
               <span className="hidden max-w-25 truncate md:block">

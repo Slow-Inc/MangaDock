@@ -13,6 +13,7 @@ import type { UserProfileResponse, ForumPost } from "../../../lib/types";
 import { isSocialCdnUrl } from '../../../lib/avatarUpload';
 import FollowUserButton from '../../../components/FollowUserButton';
 import Loader from "../../../components/ui/Loader";
+import { UidMascot } from "../../../components/mascot/Mascot";
 import { PRIMARY_FILL } from "../../../components/ui/Button";
 
 type Tab = "posts" | "comments" | "liked" | "translated" | "following";
@@ -413,8 +414,8 @@ export default function PublicProfilePage() {
                   onError={() => setBrokenPhoto(profile.photoUrl)}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-2xl sm:text-3xl font-black text-ink-3">
-                  {(profile.displayName ?? "?")[0]?.toUpperCase()}
+                <div className="w-full h-full flex items-center justify-center">
+                  <UidMascot uid={profile.uid} size={56} />
                 </div>
               )}
             </div>
@@ -667,8 +668,8 @@ export default function PublicProfilePage() {
                           <Image src={u.photoUrl} alt="" fill className="object-cover" sizes="36px" />
                         </div>
                       ) : (
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-fill text-sm font-bold text-ink-2">
-                          {(u.displayName ?? "?")[0]?.toUpperCase()}
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                          <UidMascot uid={u.uid} size={30} />
                         </div>
                       )}
                       <span className="truncate text-sm font-medium text-ink">
