@@ -7,6 +7,7 @@ import { PRIMARY_FILL } from "./ui/Button";
 import { Flame } from "lucide-react";
 import Coin from "./ui/Coin";
 import Mascot from "./mascot/Mascot";
+import { utcDayKey } from "../lib/dailyCheckin";
 
 type Status = { checkedInToday: boolean; streakDay: number; coinsToday: number };
 
@@ -40,7 +41,7 @@ export default function DailyCheckinModal() {
 
   useEffect(() => {
     if (!user) return;
-    const today = new Date().toDateString();
+    const today = utcDayKey(new Date());
     if (localStorage.getItem(STORAGE_KEY) === today) return;
 
     let cancelled = false;
@@ -75,7 +76,7 @@ export default function DailyCheckinModal() {
         const data: Status = await res.json();
         setStatus(data);
         setClaimed(true);
-        localStorage.setItem(STORAGE_KEY, new Date().toDateString());
+        localStorage.setItem(STORAGE_KEY, utcDayKey(new Date()));
       }
     } finally {
       setClaiming(false);
@@ -84,7 +85,7 @@ export default function DailyCheckinModal() {
 
   function handleClose() {
     setOpen(false);
-    localStorage.setItem(STORAGE_KEY, new Date().toDateString());
+    localStorage.setItem(STORAGE_KEY, utcDayKey(new Date()));
   }
 
   if (!open || !status) return null;
