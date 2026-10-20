@@ -117,6 +117,21 @@ def refine_mask(rgbimg, rawmask):
     crf_mask = np.array(res * 255, dtype=np.uint8)
     return crf_mask
 
+_BILATERAL_D = 17
+
+
+def bilateral_region(img: np.ndarray, x: int, y: int, w: int, h: int) -> np.ndarray:
+    """``cv2.bilateralFilter(img, 17, 80, 80)[y:y+h, x:x+w]`` without filtering the whole image:
+    the filter only reads pixels within its radius, so filtering the rect plus that margin gives the
+    same pixels (image borders are the crop's borders too, so the edge handling matches) (#822)."""
+    r = _BILATERAL_D // 2
+    H, W = img.shape[:2]
+    x0, y0 = max(0, x - r), max(0, y - r)
+    x1, y1 = min(W, x + w + r), min(H, y + h + r)
+    out = cv2.bilateralFilter(np.ascontiguousarray(img[y0:y1, x0:x1]), _BILATERAL_D, 80, 80)
+    return out[y - y0:y - y0 + h, x - x0:x - x0 + w]
+
+
 def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilateral], keep_threshold = 1e-2, dilation_offset = 0,kernel_size=3):
     bboxes = [txtln.aabb.xywh for txtln in textlines]
     polys = [Polygon(txtln.pts) for txtln in textlines]
@@ -190,7 +205,10 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
     textline_rects[:, 3] -= textline_rects[:, 1]
     
     final_mask = np.zeros_like(mask)
-    img = cv2.bilateralFilter(img, 17, 80, 80)
+    # #822: the filtered image is only read inside each textline rect — filter those (bilateral_region)
+    # instead of the whole page, unless the rects cover most of it anyway.
+    covered = sum(int(r[2]) * int(r[3]) for r in textline_rects)
+    filtered = cv2.bilateralFilter(img, _BILATERAL_D, 80, 80) if covered > 0.5 * img.shape[0] * img.shape[1] else None
     for i, cc in enumerate(tqdm(textline_ccs, '[mask]')):
         x1, y1, w1, h1 = textline_rects[i]
         text_size = min(w1, h1, textlines[i].font_size)
@@ -203,7 +221,8 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
         if cc_region.size == 0:
             continue
         # cv2.imshow('cc before', image_resize(cc_region, height = 800))
-        img_region = np.ascontiguousarray(img[y1: y1 + h1, x1: x1 + w1])
+        img_region = np.ascontiguousarray(filtered[y1: y1 + h1, x1: x1 + w1] if filtered is not None
+                                          else bilateral_region(img, x1, y1, w1, h1))
         # cv2.imshow('img', image_resize(img_region, height = 800))
         cc_region = refine_mask(img_region, cc_region)
         # cv2.imshow('cc after', image_resize(cc_region, height = 800))

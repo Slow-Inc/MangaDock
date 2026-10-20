@@ -467,3 +467,19 @@ def test_a_lone_out_of_dictionary_character_never_starts_a_piece():
     pieces = _insert_thai_word_breaks('เฮ้ ซิด!!').split(_ZWSP)
     assert any('ซิด' in p for p in pieces), pieces
     assert _insert_thai_word_breaks('ฉันเดินไป').count(_ZWSP) == 2   # real words still break
+
+
+def test_glyph_bitmap_copy_matches_freetypes_buffer_822():
+    """#822 profile: freetype-py's bitmap.buffer builds a Python list byte by byte (3 s on 6 pages).
+    Glyph copies the same bytes through numpy instead — identical content."""
+    import numpy as np
+    tr.set_font(_PROMPT)
+    for ch in ('ก', 'ที่', 'W', 'あ', '!'):
+        for size in (12, 40):
+            face = tr._select_face_for_char(ch[0], size, 0)
+            face.load_char(ch[0])
+            want = face.glyph.bitmap.buffer
+            got = tr.Glyph(face.glyph).bitmap.buffer
+            assert len(got) == len(want) and np.array_equal(np.asarray(got, dtype=np.uint8),
+                                                            np.asarray(want, dtype=np.uint8)), (ch, size)
+            assert isinstance(got, np.ndarray)

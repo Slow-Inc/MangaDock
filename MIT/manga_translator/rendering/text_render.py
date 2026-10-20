@@ -1,3 +1,4 @@
+import ctypes
 import os
 import re
 import cv2
@@ -413,10 +414,20 @@ def set_font(font_path: str):
 class namespace:
     pass
 
+def _bitmap_bytes(bitmap) -> np.ndarray:
+    """The glyph bitmap's rows*pitch bytes as a uint8 array — the same bytes freetype-py's
+    ``bitmap.buffer`` returns, without building a Python list one byte at a time (#822: ~3 s of
+    every 6 pages went to that list)."""
+    n = bitmap.rows * bitmap.pitch
+    if n <= 0:
+        return np.zeros(0, dtype=np.uint8)
+    return np.frombuffer(ctypes.string_at(bitmap._FT_Bitmap.buffer, n), dtype=np.uint8).copy()
+
+
 class Glyph:
     def __init__(self, glyph):
         self.bitmap = namespace()
-        self.bitmap.buffer = glyph.bitmap.buffer
+        self.bitmap.buffer = _bitmap_bytes(glyph.bitmap)
         self.bitmap.rows = glyph.bitmap.rows
         self.bitmap.width = glyph.bitmap.width
         self.advance = namespace()
