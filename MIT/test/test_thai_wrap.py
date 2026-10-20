@@ -442,3 +442,17 @@ def test_a_tall_balloon_keeps_its_size_when_dictionary_breaks_make_it_fit_816():
                              font_size=0, xyxy=(0.0, 0.0, 74.0, 166.0))
     fs, bw, bh = _clean_layout_dst(region, (800, 800, 3), 8, 20, shrink_to_fit=True)
     assert fs == 20 and bw <= 74 * 1.05 and bh <= 166, (fs, bw, bh)
+
+
+def test_render_rewrap_follows_the_layouts_dictionary_breaks_816():
+    """#816 replay: the layout broke 'น่ารังเกียจ' to fit a 68 px balloon, but the supersampled
+    render re-wrapped at >= the longest whole word, then squeezed the wider block into the box —
+    the text came out visibly smaller. When the layout had to split a word, re-wrap at the layout's
+    own width; otherwise the floor is unchanged."""
+    if not _HAS_PYTHAINLP:
+        return
+    from manga_translator.rendering import _render_wrap_width
+    tr.set_font(_PROMPT)
+    thai = 'เทพธิดาพวกนั้นช่างน่ารังเกียจนัก!'
+    assert _render_wrap_width(20, thai, 'THA', 68.0, 4) <= (68 + 1) * 4
+    assert _render_wrap_width(20, 'HELLO THERE', 'en_US', 200.0, 4) == 800

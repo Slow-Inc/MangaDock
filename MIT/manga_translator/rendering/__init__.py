@@ -160,6 +160,20 @@ def _box(v):
     return tuple(float(x) for x in v) if v is not None else None
 
 
+def _render_wrap_width(font_size, text, lang, box_w, ss):
+    """Wrap width for the ss-scaled render. #item9: never narrower than the widest whole word
+    (ss rounding would otherwise force-split it). #816: but when that word is wider than the box,
+    the layout already broke it at its dictionary parts — re-wrap at the layout's own width so the
+    render keeps those breaks instead of re-widening the block and squeezing it into the box."""
+    floor = text_render.longest_token_width(font_size * ss, text, lang)
+    if floor > box_w * ss:
+        _, widths = text_render.calc_horizontal(font_size, text, max(1, int(round(box_w))), 10 ** 6,
+                                                language=lang)
+        if widths:
+            floor = min(floor, (max(widths) + 1) * ss)
+    return max(round(box_w * ss), floor)
+
+
 def _clamp_center(c, size, lo, hi):
     """Centre ``c`` moved so a span of ``size`` stays within [lo, hi] — unchanged if it can't fit."""
     if size > hi - lo:
@@ -802,8 +816,7 @@ def render(
         # narrower than the widest atomic word at font*ss — integer rounding at ss=4
         # otherwise force-splits Thai/CJK words the layout kept whole ("ขอโทษ"→"ขอโ/ทบ").
         _render_text = region.get_translation_for_rendering()
-        _wrap_w_ss = max(round(norm_h[0] * ss),
-                         text_render.longest_token_width(region.font_size * ss, _render_text, region.target_lang))
+        _wrap_w_ss = _render_wrap_width(region.font_size, _render_text, region.target_lang, norm_h[0], ss)
         temp_box = text_render.put_text_horizontal(
             region.font_size * ss,
             _render_text,
