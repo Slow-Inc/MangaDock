@@ -39,6 +39,7 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 ## 🚧 Project — สถานะงาน & ข้อจำกัด
 
 - [[project-animetext-approved]] — User approved downloading the AnimeText YOLO model (deepghs/AnimeText_yolo) for #168 SFX detection on 2026-06-09 — the .pt security gate is cleared for this model
+- [[project-mit-pytest-runaway-watchdog]] — A hung MIT pytest cannot be killed from the session and the venv launcher orphans the real python — run risky suites under an in-process os._exit watchdog
 - [[project-backend-pre-existing-test-failures]] — Backend books suite has 14 pre-existing test failures (pubsub suite only) unrelated to feature work
 - [[project-cache-phase2]] — "Multi-layer cache hardening phases 2.1–2.3 — what's done, what's pending"
 - [[project-cache-quality-gaps]] — Known quality gaps in the Multi-Layer Cache implementation — areas not yet covered that should be addressed before production

@@ -1,5 +1,15 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-20 — MIT quality loop round 2: #793 Thai tone marks, #791/#792 spaces + punctuation, review fixes
+
+**What & where:** `rendering/text_render.py` — `_stacked_mark_lift` + line loop in `put_text_horizontal` (#793), `compact_special_symbols` (#792), `_insert_thai_word_breaks` / `_glue_thai_tokens` / `_fit_syllable` / `_greedy_pack` guard (#791 + review); `translation_quality.py` (shared script table, `classify_glitch`, source-aware `foreign_script`) + `translators/common.py` (`_is_glitched(query, …)`); `ocr_vlm.py` (half-open `_Breaker`); `text_layer.empty_patch_result`; `tools/doctor_page.py` (prod font).
+**Why:** every Thai page lost the tone mark of words like `ที่ นี้ ชื่อ ตั้งแต่` with the prod font (no OpenType shaping); spaces the translator wrote were dropped; English lost the space after `,`/`!` (`Well,I`); review found a mid-word split, a JP-source re-ask loop and a breaker that never recovered.
+**Before → after:** stacked marks visible in 66/156 corpus regions (42%) that showed them missing; `RTSD,ZERO` → `RTSD, / ZERO`; `ขับขี่รถ / ยนต์` → `ขับขี่ / รถยนต์`; JP page with a kept kana SFX 3 LLM calls → 1.
+**Perf Δ:** none measurable in the renderer (two glyph lookups per stacked mark; Thai segmentation now lru_cached across the fit scan). SFX rescue costs at most one trial call per 300 s while the breaker is open.
+**Quality:** replay A/B with identical translations — spill 7 → 7 in both A/Bs; font changes 5/177 (#791/#792) and 2/156 (#793).
+**Validation:** red-first unit tests for each fix (tone height, compaction, glue, recursive split, packer guard, source-aware glitch, one-trial breaker); full MIT suite 872 passed; benchmarks `2026-10-20-791-792-thai-spaces-punctuation.*`, `2026-10-20-793-thai-tone-marks.*`.
+**Risk / follow-up:** shaping is still absent (tall-consonant mark offsets, other scripts' GPOS) — HarfBuzz is the general fix; Chainsaw p0 red credit lines overlap (layout); #757 merge default still opt-in pending more pages.
+
 ## 2026-10-20 — MIT quality loop: #756 doctor page mode, #757 container merge (opt-in), #760 ink-cluster gate, #761 bubble-fit scan
 
 **What & where:** `MIT/tools/doctor_page.py` + `tools/pipeline_doctor/page_probes.py` (new, tooling); `manga_translator/container_merge.py` (new) + `textline_merge/__init__.py` (+`containers` param) + `manga_translator.py` (`_bubble_polygons` cache, `_textline_containers`) + `config.py` (`det_bubble_merge`); `detection_postproc.uncovered_text_clusters` (`max_width_frac`); `font_fit.py` (descending scan, `area_font_cap`) + `rendering/__init__.py` (`_bubble_fit_font_size` cap); `Backend/src/books/mit-config.ts` (`MIT_BUBBLE_MERGE`).
