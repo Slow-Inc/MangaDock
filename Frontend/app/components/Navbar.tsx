@@ -222,7 +222,7 @@ export default function Navbar() {
                 key={tab.key}
                 href={tab.href}
                 className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 text-[10px] transition-colors duration-200 ${
-                  isActive ? "text-ink" : "text-ink-2"
+                  isActive ? "text-ink font-semibold" : "text-ink-2"
                 }`}
               >
                 {tab.icon("h-5 w-5")}
@@ -248,7 +248,7 @@ export default function Navbar() {
                 key={tab.key}
                 href={tab.href}
                 className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 text-[10px] transition-colors duration-200 ${
-                  isActive ? "text-ink" : "text-ink-2"
+                  isActive ? "text-ink font-semibold" : "text-ink-2"
                 }`}
               >
                 {tab.icon("h-5 w-5")}

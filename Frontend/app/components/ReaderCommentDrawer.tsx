@@ -152,7 +152,7 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-xs text-ink-3">{timeAgo(c.createdAt)}</span>
                           {isOwn && (
-                            <button onClick={() => handleDelete(c.id)} className="text-ink-3 transition hover:text-danger">
+                            <button onClick={() => handleDelete(c.id)} className="text-ink-2 transition hover:text-danger">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
                                 <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
