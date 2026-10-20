@@ -110,6 +110,9 @@ async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('pages', nargs='+')
     ap.add_argument('--target', default='THA')
+    ap.add_argument('--source', default='ANY',
+                    help='source language as the backend sends it (e.g. ENG): sets source_lang + '
+                         'source_lang_only like production; ANY = auto-detect')
     ap.add_argument('--out', default=os.path.join(MIT, 'result', 'doctor'))
     ap.add_argument('--json', action='store_true', help='print the JSON report instead of the table')
     ap.add_argument('--set', action='append', default=[], metavar='SECTION.KEY=VALUE',
@@ -124,6 +127,8 @@ async def main():
     _spy_textlines(stats)
     cfg = copy.deepcopy(TUNED)
     cfg['translator']['target_lang'] = args.target
+    if args.source != 'ANY':  # mirrors Backend buildMitConfig
+        cfg['translator'].update(source_lang=args.source, source_lang_only=True)
     for item in args.set:
         key, value = item.split('=', 1)
         section, name = key.split('.', 1)
