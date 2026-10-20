@@ -702,7 +702,8 @@ class MangaTranslator:
             ctx.textlines = filtered_textlines  
     
         text_regions = await dispatch_textline_merge(ctx.textlines, ctx.img_rgb.shape[1], ctx.img_rgb.shape[0],  
-                                                     verbose=self.verbose)  
+                                                     verbose=self.verbose,
+                                                     containers=self._textline_containers(config, ctx))
 
         new_text_regions = []
         for region in text_regions:
@@ -1406,6 +1407,28 @@ class MangaTranslator:
     ) -> np.ndarray:
         return crop_mask_for_patch(raw_mask_source, x1, y1, x2, y2, img_h, img_w)
 
+    def _bubble_polygons(self, ctx):
+        """Balloon/caption polygons for this page, detected once and cached on ctx (#757)."""
+        if getattr(ctx, 'bubble_polygons', None) is None:
+            from .bubble_detector import detect_bubbles
+            ctx.bubble_polygons = detect_bubbles(ctx.img_rgb, device=str(self.device or 'cuda')) or []
+        return ctx.bubble_polygons
+
+    def _textline_containers(self, config: Config, ctx):
+        """#757: the balloon/caption index of each textline, or None when the stage is off."""
+        if not (config.detector.det_bubble_seg and config.detector.det_bubble_merge) or not ctx.textlines:
+            return None
+        try:
+            from .bubble_association import associate_regions_to_bubbles
+            polygons = self._bubble_polygons(ctx)
+            if not polygons:
+                return None
+            boxes = [(t.aabb.x, t.aabb.y, t.aabb.x + t.aabb.w, t.aabb.y + t.aabb.h) for t in ctx.textlines]
+            return associate_regions_to_bubbles(boxes, polygons)
+        except Exception:
+            logger.warning(f"[BubbleMerge] container assignment failed:\n{traceback.format_exc()}")
+            return None
+
     def _tag_regions_with_bubbles(self, ctx, regions: List[Any], synth_fallback: bool = False) -> None:
         """#170: detect speech balloons and tag each region with the balloon
         containing it (``region.bubble_idx`` + ``region.bubble_box``), so
@@ -1414,12 +1437,10 @@ class MangaTranslator:
         Best-effort: any failure (or no balloons) leaves regions untagged and
         the pipeline behaves exactly as if the stage were off.
         """
-        from .bubble_detector import detect_bubbles
         from .bubble_association import associate_regions_to_bubbles, acceptable_synth_bubble
-        from .bubble_association import associate_regions_to_bubbles
         from .detection_postproc import expand_balloons_with_white_boxes, white_box_candidates
 
-        polygons = detect_bubbles(ctx.img_rgb, device=str(self.device or 'cuda'))
+        polygons = self._bubble_polygons(ctx)
         if not polygons:
             logger.info('[BubbleSeg] no balloons detected — proximity grouping')
             return

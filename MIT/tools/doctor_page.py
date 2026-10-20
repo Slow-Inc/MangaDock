@@ -1,6 +1,6 @@
 """Pipeline Doctor, page mode (#756): run one real page and attribute each defect to its stage.
 
-    <MIT/.venv>/python.exe tools/doctor_page.py <page.png> [--target THA] [--out DIR] [--json]
+    <MIT/.venv>/python.exe tools/doctor_page.py <page.png> [more pages...] [--target THA] [--set sec.key=val] [--tag _x] [--out DIR] [--json]
 
 Runs the production patches path (`MangaTranslator.translate_patches` — the one `/translate/
 with-form/patches` serves, so bubbles are tagged as in prod) in-process with the tuned config of
@@ -37,11 +37,11 @@ def _spy_textlines(stats):
     """Count what reaches textline_merge: lines, det_sfx lines, empty OCR reads."""
     original = mt_mod.dispatch_textline_merge
 
-    async def spy(textlines, width, height, verbose=False):
+    async def spy(textlines, width, height, verbose=False, **kwargs):
         stats['textlines'] = len(textlines)
         stats['sfx_lines'] = sum(1 for t in textlines if getattr(t, 'is_sfx', False))
         stats['empty_reads'] = sum(1 for t in textlines if not (getattr(t, 'text', '') or '').strip())
-        return await original(textlines, width, height, verbose)
+        return await original(textlines, width, height, verbose, **kwargs)
 
     mt_mod.dispatch_textline_merge = spy
 
@@ -75,40 +75,51 @@ def _overlay(source, rendered, page, flags):
 
 async def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('page')
+    ap.add_argument('pages', nargs='+')
     ap.add_argument('--target', default='THA')
     ap.add_argument('--out', default=os.path.join(MIT, 'result', 'doctor'))
     ap.add_argument('--json', action='store_true', help='print the JSON report instead of the table')
+    ap.add_argument('--set', action='append', default=[], metavar='SECTION.KEY=VALUE',
+                    help='override one config knob, e.g. --set detector.det_bubble_merge=true')
+    ap.add_argument('--tag', default='', help='suffix for output files (A/B runs)')
     args = ap.parse_args()
 
     stats = {'textlines': 0, 'sfx_lines': 0, 'empty_reads': 0}
     _spy_textlines(stats)
     cfg = copy.deepcopy(TUNED)
     cfg['translator']['target_lang'] = args.target
+    for item in args.set:
+        key, value = item.split('=', 1)
+        section, name = key.split('.', 1)
+        cfg.setdefault(section, {})[name] = json.loads(value) if value[:1] in '[{"0123456789-tfn' else value
     font = os.path.join(MIT, 'fonts', 'Prompt-Bold.ttf')
     tr = MangaTranslator({'use_gpu': True, 'kernel_size': 3, 'model_dir': os.path.join(MIT, 'models'),
                           'font_path': font if os.path.isfile(font) else None})
-    source = Image.open(args.page).convert('RGB')
-    payload = await tr.translate_patches(source, Config(**cfg))
-
-    page = snapshot_from_payload(payload, args.target, **stats)
-    run, flags = diagnose(page)
-    rendered = _composite(source, payload)
-
     os.makedirs(args.out, exist_ok=True)
-    stem = os.path.join(args.out, f'{os.path.splitext(os.path.basename(args.page))[0]}_{args.target}')
-    rendered.save(stem + '.rendered.png')
-    _overlay(source, rendered, page, flags).save(stem + '.doctor.png')
-    report = {**run.to_json(), 'flags': {str(k): v for k, v in flags.items()},
-              'regions': [{'index': r.index, 'xyxy': r.xyxy, 'src': r.text, 'dst': r.translation,
-                           'container': r.bubble_idx, 'branch': r.render_branch,
-                           'font_px': r.render_font_px} for r in page.regions],
-              'dropped': page.dropped}
-    with open(stem + '.doctor.json', 'w', encoding='utf-8') as fh:
-        json.dump(report, fh, ensure_ascii=False, indent=1)
-    print(json.dumps(report, ensure_ascii=False, indent=1) if args.json else run.to_table())
-    print(f'\n-> {stem}.doctor.png / .doctor.json')
-    return run.exit_code
+    worst = 0
+    for path in args.pages:
+        source = Image.open(path).convert('RGB')
+        payload = await tr.translate_patches(source, Config(**cfg))
+
+        page = snapshot_from_payload(payload, args.target, **stats)
+        run, flags = diagnose(page)
+        rendered = _composite(source, payload)
+
+        stem = os.path.join(args.out, f'{os.path.splitext(os.path.basename(path))[0]}_{args.target}{args.tag}')
+        rendered.save(stem + '.rendered.png')
+        _overlay(source, rendered, page, flags).save(stem + '.doctor.png')
+        report = {**run.to_json(), 'page': path, 'flags': {str(k): v for k, v in flags.items()},
+                  'regions': [{'index': r.index, 'xyxy': r.xyxy, 'src': r.text, 'dst': r.translation,
+                               'container': r.bubble_idx, 'branch': r.render_branch,
+                               'font_px': r.render_font_px} for r in page.regions],
+                  'dropped': page.dropped}
+        with open(stem + '.doctor.json', 'w', encoding='utf-8') as fh:
+            json.dump(report, fh, ensure_ascii=False, indent=1)
+        print(f'== {os.path.basename(path)}')
+        print(json.dumps(report, ensure_ascii=False, indent=1) if args.json else run.to_table())
+        print(f'-> {stem}.doctor.png / .doctor.json\n')
+        worst = max(worst, run.exit_code)
+    return worst
 
 
 if __name__ == '__main__':

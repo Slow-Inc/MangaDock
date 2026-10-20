@@ -379,6 +379,11 @@ class DetectorConfig(BaseModel):
     bubbles → dialogue treated as narration + under-filled), synthesize one with a classical
     flood-fill, accepted only through acceptable_synth_bubble (encloses text, not a page leak).
     Requires det_bubble_seg. Off → byte-identical."""
+    det_bubble_merge: bool = False
+    """#757: detect balloons/captions BEFORE textline merge and coalesce line components that share
+    one container when one of them is a single line, so a caption whose lines are spaced 1.0-1.7x
+    the font size is translated as one block, not per-line fragments. Requires det_bubble_seg.
+    Off → byte-identical."""
     det_sfx: bool = False
     """#168: run a second SFX/display-text detector (AnimeText YOLO) after DBNet
     and merge its boxes (IoA dedup) into the textline flow, so stylized katakana
