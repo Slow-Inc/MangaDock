@@ -3,6 +3,22 @@
 
 ---
 
+## #837 #838 Book popup keyboard focus; grid cards reachable by keyboard (2026-10-21)
+
+**What:** the book popup (`role="dialog"` + `aria-modal` since #835) left focus on the page behind it, let Tab walk the
+page underneath, and dropped focus to `<body>` on close. New `hooks/useDialogFocus.ts` (pure `focusWrapTarget`, unit-
+tested): focus moves in on open, Tab/Shift+Tab wrap inside while the popup is the top-most (`modalStack.isTop`, so a
+stacked related-manga popup owns the keyboard), focus returns to the opener on close. While testing it: `MangaGrid`
+cards (`/new`, categories, My List) were an `<article onClick>` with a `<p>` title — not reachable by keyboard; the
+title is now a `<button>` (mouse behaviour unchanged).
+
+**Validated:** `useDialogFocus.test.ts` red → green (5 cases). Production build, keyboard only: Tab to a grid title →
+Enter opens the popup with focus inside; 80 Tabs / 20 Shift+Tabs never leave it (24 stops); Escape closes and focus is
+back on the title. Stacked: related manga opened from the popup → 2 dialogs, 40 Tabs stay in the top one, Escape →
+focus back on that related button. axe: no new violations.
+
+---
+
 ## #835 Landmarks, redundant alts, heading structure (axe) (2026-10-21)
 
 **What:** the non-contrast axe-core findings: the home hero now sits in the page's one `<main>`; `BookDetailModal` is a

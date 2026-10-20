@@ -97,9 +97,14 @@ function GridCard({ book }: { book: GridBook }) {
 
         {/* Info */}
         <div className="mt-2 space-y-0.5 px-0.5">
-          <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink transition-colors duration-200 group-hover:text-ink">
+          {/* The card's keyboard/screen-reader entry point (#838): the article's click is mouse-only. */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowModal(true); }}
+            className="line-clamp-2 w-full rounded-sm text-left text-xs font-semibold leading-snug text-ink transition-colors duration-200 group-hover:text-ink"
+          >
             {book.title}
-          </p>
+          </button>
           {book.authors?.length > 0 && (
             <p className="line-clamp-1 text-[10px] text-ink-3">
               {book.authors[0]}
