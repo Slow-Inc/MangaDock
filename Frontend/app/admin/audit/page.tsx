@@ -153,7 +153,7 @@ export default function AdminAuditPage() {
 
       {/* Table */}
       <div className="border border-line rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[44rem] text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
               {['เวลา', 'ผู้กระทำ', 'การกระทำ', 'เป้าหมาย', 'รายละเอียด'].map(h => (
@@ -196,7 +196,7 @@ export default function AdminAuditPage() {
                     {/* ผู้กระทำ */}
                     <td className="px-4 py-3.5">
                       <span
-                        className="font-mono text-[11px] text-ink-2 cursor-default"
+                        className="font-mono text-[11px] text-ink-2 cursor-default whitespace-nowrap"
                         title={log.actor_uid}
                       >
                         {truncate(log.actor_uid, 12)}
@@ -204,7 +204,7 @@ export default function AdminAuditPage() {
                     </td>
                     {/* การกระทำ */}
                     <td className="px-4 py-3.5">
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full border ${actionCls}`}>
+                      <span className={`whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full border ${actionCls}`}>
                         {ACTION_LABELS[log.action] ?? log.action}
                       </span>
                     </td>
@@ -214,7 +214,7 @@ export default function AdminAuditPage() {
                         <span className="text-ink-3 mr-1">{log.target_type}/</span>
                       )}
                       {log.target_id ? (
-                        <span className="font-mono" title={log.target_id}>
+                        <span className="font-mono whitespace-nowrap" title={log.target_id}>
                           {truncate(log.target_id, 14)}
                         </span>
                       ) : (

@@ -22,7 +22,7 @@ function TypeBadge({ type }: { type: string }) {
     type === 'purchase' ? 'bg-accent/10 text-accent border-accent/40' :
     type === 'refund'   ? 'bg-coin/10 text-coin border-coin/40' :
     'bg-fill text-ink-3 border-line';
-  return <span className={`text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{type}</span>;
+  return <span className={`whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{type}</span>;
 }
 
 export default function AdminTransactionsPage() {
@@ -116,7 +116,7 @@ export default function AdminTransactionsPage() {
 
       {/* Table */}
       <div className="border border-line rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[44rem] text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
               {['UID', 'Type', 'Amount', 'Balance After', 'Created', ''].map((h, i) => (

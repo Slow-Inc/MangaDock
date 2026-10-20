@@ -28,12 +28,12 @@ function RoleBadge({ role }: { role: number }) {
     role === 2 ? 'text-ink border-ink-3' :
     role === 1 ? 'bg-accent/10 text-accent border-accent/40' :
     'text-ink-3 border-line';
-  return <span className={`text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{ROLE_LABEL[role] ?? role}</span>;
+  return <span className={`whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{ROLE_LABEL[role] ?? role}</span>;
 }
 
 function PlanBadge({ plan }: { plan: string }) {
   const cls = plan === 'pro' ? 'bg-accent/10 text-accent border-accent/40' : 'bg-fill text-ink-3 border-line';
-  return <span className={`text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{plan}</span>;
+  return <span className={`whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{plan}</span>;
 }
 
 const inputCls = 'bg-fill border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 focus:bg-raised transition-colors';
@@ -185,7 +185,7 @@ export default function AdminUsersPage() {
 
       {/* Table */}
       <div className="border border-line rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[44rem] text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
               {['Name', 'Email', 'Role', 'Plan', 'Trust', 'Joined', 'Status', 'Actions'].map(h => (
@@ -200,7 +200,7 @@ export default function AdminUsersPage() {
               <tr><td colSpan={8} className="px-4 py-10 text-center text-ink-3 text-sm">No users found.</td></tr>
             ) : users.map(u => (
               <tr key={u.uid} className="border-b border-line last:border-0 hover:bg-fill transition-colors">
-                <td className="px-4 py-3.5 text-ink font-medium">{u.displayName || '—'}</td>
+                <td className="px-4 py-3.5 text-ink font-medium max-w-[14rem] truncate" title={u.displayName || undefined}>{u.displayName || '—'}</td>
                 <td className="px-4 py-3.5 text-ink-3 text-xs">{u.email}</td>
                 <td className="px-4 py-3.5"><RoleBadge role={u.role} /></td>
                 <td className="px-4 py-3.5"><PlanBadge plan={u.plan} /></td>
@@ -208,7 +208,7 @@ export default function AdminUsersPage() {
                 <td className="px-4 py-3.5 text-ink-3 text-xs whitespace-nowrap">{new Date(u.joinedAt).toLocaleDateString()}</td>
                 <td className="px-4 py-3.5">
                   {u.banned
-                    ? <span className="text-[11px] px-2 py-0.5 rounded-full border bg-danger/10 text-danger border-danger/40">Banned</span>
+                    ? <span className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full border bg-danger/10 text-danger border-danger/40">Banned</span>
                     : <span className="text-xs text-ink-3">Active</span>}
                 </td>
                 <td className="px-4 py-3.5">

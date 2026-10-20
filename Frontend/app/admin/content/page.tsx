@@ -116,7 +116,7 @@ export default function AdminContentPage() {
 
       {/* Table */}
       <div className="border border-line rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[44rem] text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
               {['Title', 'Author', 'Category', 'Created', 'Comments', 'Pinned', 'Actions'].map(h => (
@@ -132,9 +132,9 @@ export default function AdminContentPage() {
             ) : posts.map(p => (
               <tr key={p.id} className="border-b border-line last:border-0 hover:bg-fill transition-colors">
                 <td className="px-4 py-3.5 text-ink max-w-xs truncate font-medium">{p.title}</td>
-                <td className="px-4 py-3.5 text-ink-3 text-xs">{p.authorName || p.authorUid.slice(0, 8)}</td>
+                <td className="px-4 py-3.5 text-ink-3 text-xs max-w-[10rem] truncate" title={p.authorName || p.authorUid}>{p.authorName || p.authorUid.slice(0, 8)}</td>
                 <td className="px-4 py-3.5">
-                  <span className="text-[11px] px-2 py-0.5 rounded-full border bg-fill text-ink-3 border-line">{p.category}</span>
+                  <span className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full border bg-fill text-ink-3 border-line">{p.category}</span>
                 </td>
                 <td className="px-4 py-3.5 text-ink-3 text-xs whitespace-nowrap">{new Date(p.createdAt).toLocaleDateString()}</td>
                 <td className="px-4 py-3.5 text-ink-3">{p.commentCount}</td>

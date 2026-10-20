@@ -118,8 +118,8 @@ export default function AdminOverviewPage() {
         ) : stats.recentBans.length === 0 ? (
           <p className="text-ink-3 text-sm">No bans recorded.</p>
         ) : (
-          <div className="border border-line rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="border border-line rounded-xl overflow-x-auto">
+            <table className="w-full min-w-[32rem] text-sm">
               <thead>
                 <tr className="border-b border-line bg-fill">
                   {['User', 'UID', 'Banned At'].map(h => (
@@ -130,9 +130,9 @@ export default function AdminOverviewPage() {
               <tbody>
                 {stats.recentBans.map((b) => (
                   <tr key={b.uid} className="border-b border-line last:border-0 hover:bg-fill transition-colors">
-                    <td className="px-5 py-3.5 text-ink font-medium">{b.displayName || '—'}</td>
-                    <td className="px-5 py-3.5 text-ink-3 font-mono text-xs">{b.uid}</td>
-                    <td className="px-5 py-3.5 text-ink-3 text-xs">{new Date(b.bannedAt).toLocaleString()}</td>
+                    <td className="px-5 py-3.5 text-ink font-medium max-w-[12rem] truncate" title={b.displayName || undefined}>{b.displayName || '—'}</td>
+                    <td className="px-5 py-3.5 text-ink-3 font-mono text-xs whitespace-nowrap">{b.uid}</td>
+                    <td className="px-5 py-3.5 text-ink-3 text-xs whitespace-nowrap">{new Date(b.bannedAt).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
