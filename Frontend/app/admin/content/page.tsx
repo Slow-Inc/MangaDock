@@ -145,7 +145,7 @@ export default function AdminContentPage() {
                 </td>
                 <td className="px-4 py-3.5">
                   <div className="flex items-center gap-3">
-                    <button onClick={() => togglePin(p)} className="text-xs text-ink-3 hover:text-ink transition-colors smooth-hover-fast">
+                    <button onClick={() => togglePin(p)} className="text-xs text-ink-2 hover:text-ink transition-colors smooth-hover-fast">
                       {p.pinned ? 'Unpin' : 'Pin'}
                     </button>
                     <button onClick={() => setConfirmDeleteId(p.id)} className="text-xs text-danger hover:text-danger/80 transition-colors smooth-hover-fast">Delete</button>
@@ -173,7 +173,7 @@ export default function AdminContentPage() {
           <div className="relative bg-surface border border-line rounded-xl p-6 w-80 space-y-4 shadow-2xl">
             <p className="text-sm text-ink">Delete this post? This cannot be undone.</p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setConfirmDeleteId(null)} className="text-sm text-ink-3 hover:text-ink transition-colors">Cancel</button>
+              <button onClick={() => setConfirmDeleteId(null)} className="text-sm text-ink-2 hover:text-ink transition-colors">Cancel</button>
               <button onClick={confirmDelete} className="text-sm px-4 py-1.5 bg-danger text-bg rounded-lg hover:bg-danger/90 transition-colors font-medium">Delete</button>
             </div>
           </div>

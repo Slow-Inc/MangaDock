@@ -124,7 +124,7 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
             <p className="text-sm font-semibold text-ink">ความคิดเห็น</p>
             <p className="text-xs text-ink-3">หน้า {pageNumber}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-ink-3 transition hover:text-ink">
+          <button onClick={onClose} className="rounded-lg p-1.5 text-ink-2 transition hover:text-ink">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
               <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
             </svg>
@@ -152,7 +152,7 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-xs text-ink-3">{timeAgo(c.createdAt)}</span>
                           {isOwn && (
-                            <button onClick={() => handleDelete(c.id)} className="text-ink-3 transition hover:text-danger">
+                            <button onClick={() => handleDelete(c.id)} className="text-ink-2 transition hover:text-danger">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
                                 <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
@@ -191,7 +191,7 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
               </button>
             </form>
           ) : (
-            <button onClick={showLoginPrompt} className="w-full rounded-xl border border-line py-2.5 text-sm text-ink-3 transition hover:text-ink-2">
+            <button onClick={showLoginPrompt} className="w-full rounded-xl border border-line py-2.5 text-sm text-ink-2 transition hover:text-ink">
               เข้าสู่ระบบเพื่อแสดงความคิดเห็น
             </button>
           )}

@@ -359,7 +359,7 @@ export default function PostDetailPage() {
                 <div ref={menuRef} className="ml-auto relative shrink-0">
                   <button
                     onClick={() => menuOpen ? closeMenu() : openMenu()}
-                    className="w-8 h-8 flex items-center justify-center rounded-full text-ink-3 hover:text-ink-2 hover:bg-fill active:bg-fill transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-ink-2 hover:text-ink hover:bg-fill active:bg-fill transition-colors"
                     aria-label="ตัวเลือกโพสต์"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">

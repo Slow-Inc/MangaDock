@@ -528,7 +528,7 @@ export default function PublicProfilePage() {
               className={`flex items-center gap-1.5 px-4 sm:px-5 py-3 sm:py-3.5 text-xs sm:text-sm font-bold whitespace-nowrap transition-colors shrink-0 ${
                 tab === t.id
                   ? "text-ink border-b-2 border-accent -mb-px bg-fill"
-                  : "text-ink-3 hover:text-ink-2"
+                  : "text-ink-2 hover:text-ink"
               }`}
             >
               {t.label}

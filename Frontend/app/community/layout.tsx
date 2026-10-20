@@ -85,7 +85,7 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
         >
           <div className="flex justify-between items-center mb-6 pb-4 border-b border-line">
             <h2 className="font-black text-ink uppercase tracking-[0.1em] text-xs">Community</h2>
-            <button onClick={() => setIsMobileMenuOpen(false)} aria-label="ปิดเมนู" className="text-ink-3 hover:text-ink">
+            <button onClick={() => setIsMobileMenuOpen(false)} aria-label="ปิดเมนู" className="text-ink-2 hover:text-ink">
               <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
               </svg>

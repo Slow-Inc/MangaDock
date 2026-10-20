@@ -90,7 +90,7 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
               onSelect(null);
               setQuery("");
             }}
-            className="p-1.5 rounded-full hover:bg-fill text-ink-3 hover:text-ink transition-all smooth-hover"
+            className="p-1.5 rounded-full hover:bg-fill text-ink-2 hover:text-ink transition-all smooth-hover"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />

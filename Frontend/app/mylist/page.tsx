@@ -411,7 +411,7 @@ function MyListContent() {
                 className={`relative flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors sm:px-5 ${
                   activeTab === tab.key
                     ? "text-ink"
-                    : "text-ink-3 hover:text-ink-2"
+                    : "text-ink-2 hover:text-ink"
                 }`}
               >
                 {tab.label}

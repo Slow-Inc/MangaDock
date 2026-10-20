@@ -115,7 +115,7 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
           <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-line">
             <button 
               onClick={() => setIsPosting(false)}
-              className="px-3 py-1.5 text-xs font-bold text-ink-3 hover:text-ink"
+              className="px-3 py-1.5 text-xs font-bold text-ink-2 hover:text-ink"
             >
               ยกเลิก
             </button>
@@ -149,7 +149,7 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
         <div className="mt-6 text-center">
           <Link
             href={`/community?mangaId=${mangaId}`}
-            className="text-[10px] font-black uppercase text-ink-3 hover:text-ink transition-colors"
+            className="text-[10px] font-black uppercase text-ink-2 hover:text-ink transition-colors"
           >
             ดูการสนทนาทั้งหมด
           </Link>

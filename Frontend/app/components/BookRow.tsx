@@ -219,7 +219,7 @@ function BookCard({
                 <ModelBadge model={descModel} small />
                 <button
                   onClick={() => setShowOriginalDesc((v) => !v)}
-                  className="text-[9px] text-ink-3 underline underline-offset-2 hover:text-ink-2 transition-colors"
+                  className="text-[9px] text-ink-2 underline underline-offset-2 hover:text-ink transition-colors"
                 >
                   {showOriginalDesc ? "แสดงคำแปล" : "ต้นฉบับ"}
                 </button>
@@ -299,7 +299,7 @@ export default function BookRow({ rowId, rowTitle, items, seeMoreHref }: BookRow
         {seeMoreHref && (
           <Link
             href={seeMoreHref}
-            className="flex items-center gap-1 text-xs text-ink-3 transition hover:text-ink"
+            className="flex items-center gap-1 text-xs text-ink-2 transition hover:text-ink"
           >
             ดูเพิ่มเติม
             <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>

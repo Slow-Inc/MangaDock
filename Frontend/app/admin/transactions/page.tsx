@@ -159,7 +159,7 @@ export default function AdminTransactionsPage() {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-scrim/80" onClick={() => setDetail(null)} />
           <div className="relative w-96 bg-surface border-l border-line h-full overflow-y-auto p-6 space-y-5">
-            <button onClick={() => setDetail(null)} className="absolute top-4 right-4 text-ink-3 hover:text-ink transition-colors text-lg leading-none">✕</button>
+            <button onClick={() => setDetail(null)} className="absolute top-4 right-4 text-ink-2 hover:text-ink transition-colors text-lg leading-none">✕</button>
             <div>
               <h2 className="text-base font-semibold text-ink">Transaction Detail</h2>
               <p className="text-xs text-ink-3 mt-0.5 font-mono">{detail.id}</p>

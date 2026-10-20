@@ -42,7 +42,7 @@ export default function ReviewCard({ review, isOwn, onDelete }: Props) {
           {isOwn && onDelete && (
             <button
               onClick={onDelete}
-              className="rounded-lg p-1 text-ink-3 transition hover:text-danger"
+              className="rounded-lg p-1 text-ink-2 transition hover:text-danger"
               title="ลบรีวิวของฉัน"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">

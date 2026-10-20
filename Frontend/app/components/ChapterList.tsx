@@ -328,7 +328,7 @@ export default function ChapterList({
                 className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
                   langFilter === l
                     ? "bg-ink text-bg"
-                    : "bg-fill text-ink-3 hover:bg-raised hover:text-ink-2"
+                    : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
                 }`}
               >
                 {labelFor(l)}
