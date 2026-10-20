@@ -365,3 +365,33 @@ async def test_merge_image10():
     # print((await generate_combinations(lines, width, height))[0])
     expected_combinations = [[0, 9], [1, 6, 8, 11], [2], [3, 4], [5, 7, 10], [12, 13]]
     await run_test(lines, expected_combinations, width, height, '10.png')
+
+
+def _box(x1, y1, x2, y2):
+    return [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+
+
+@pytest.mark.asyncio
+async def test_two_caps_lines_of_one_sentence_merge():
+    """Chainsaw Man c3 p0 credits (2026-10-20): two 9 px all-caps lines 6 px apart. Their line pitch
+    is 1.68x the detected font (cap height), over the 1.5x a 2-line component needed, so the sentence
+    was split and translated as two halves (one duplicated). A 2-line component now merges when
+    its pitch is under 2x the font, the same gap rule (< 1 font) that admitted the pair."""
+    combos, _ = await generate_combinations([_box(520, 755, 773, 764), _box(515, 770, 782, 779)], 800, 800)
+    assert sorted(combos) == [[0, 1]]
+
+
+@pytest.mark.asyncio
+async def test_two_lines_two_fonts_apart_stay_separate():
+    combos, _ = await generate_combinations([_box(520, 700, 773, 709), _box(515, 728, 782, 737)], 800, 800)
+    assert sorted(combos) == [[0], [1]]
+
+
+@pytest.mark.asyncio
+async def test_a_region_of_rescue_placeholders_is_marked():
+    lines = [Quadrilateral(np.array(_box(100, 100, 200, 300)), 'w', 1),
+             Quadrilateral(np.array(_box(500, 100, 600, 130)), 'HELLO', 1)]
+    lines[0].rescue_placeholder = True
+    regions = await dispatch_merge(lines, 800, 800)
+    by_text = {r.text: r for r in regions}
+    assert by_text['w'].rescue_placeholder and not by_text['HELLO'].rescue_placeholder

@@ -120,6 +120,13 @@ def ocr_read_real_text(stripped_text: str) -> bool:
     return bool(re.search(r'[A-Za-z0-9]', stripped_text or ''))
 
 
+def speculative_box(region) -> bool:
+    """A region whose box is a detector's guess rather than a found text line: a det_sfx box, or
+    an empty-balloon / ink-cluster placeholder queued for the VLM rescue. Its line-OCR read gets
+    the false-positive DROP."""
+    return bool(getattr(region, 'from_sfx_detection', False) or getattr(region, 'rescue_placeholder', False))
+
+
 def sfx_false_positive(stripped_text: str, from_sfx_detection: bool, box, dialogue_boxes) -> bool:
     """#754 — ADR 026 Addendum DROP: a det_sfx region the line-OCR read as real text that is not an
     SFX to keep. Narrowed by the 2026-10-20 corpus probe (16 EN pages): every false-positive read a

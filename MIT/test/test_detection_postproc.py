@@ -262,3 +262,19 @@ def test_flatten_skips_art_boxes():
     inpainted = np.stack([orig]*3, axis=2).copy()
     out = flatten_white_captions(inpainted, orig)
     assert out[220, 220, 0] == 15                  # art preserved, box skipped
+
+
+def test_rescue_placeholders_are_marked_so_a_junk_read_can_be_dropped(monkeypatch):
+    """2026-10-20 corpus probe: the empty-balloon / ink-cluster placeholders exist for the VLM
+    rescue; with the rescue unserved the line-OCR reads the whole box ('w', 'I', 'V', '7') and the
+    junk was translated ('w' -> 'ว' at 84 px over 'อ่า...', Mushoku p0). They must be identifiable."""
+    import numpy as np
+    from types import SimpleNamespace
+    import manga_translator.bubble_detector as bd
+    from manga_translator.detection_postproc import merge_empty_balloons
+    img = np.full((400, 400, 3), 255, np.uint8)
+    img[150:250, 150:250] = 0                                   # ink inside the balloon
+    monkeypatch.setattr(bd, 'detect_bubbles',
+                        lambda image, device='cuda': [[(100, 100), (300, 100), (300, 300), (100, 300)]])
+    textlines, _, _ = merge_empty_balloons(SimpleNamespace(img_rgb=img), ([], None, None), 'cpu')
+    assert textlines and all(getattr(t, 'rescue_placeholder', False) for t in textlines)

@@ -430,3 +430,11 @@ def test_only_det_sfx_provenance_and_ascii_reads_are_dropped():
     from manga_translator.ocr_vlm import sfx_false_positive
     assert not sfx_false_positive('I', False, (0, 0, 200, 300), [])      # dialogue 'I' stays
     assert not sfx_false_positive('ぬ', True, (0, 0, 200, 300), [])      # dropped glyph: rescue's job
+
+
+def test_a_rescue_placeholder_counts_as_a_speculative_box():
+    from types import SimpleNamespace
+    from manga_translator.ocr_vlm import speculative_box
+    assert speculative_box(SimpleNamespace(from_sfx_detection=True))
+    assert speculative_box(SimpleNamespace(rescue_placeholder=True))
+    assert not speculative_box(SimpleNamespace())

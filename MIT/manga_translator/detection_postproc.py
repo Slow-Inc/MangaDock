@@ -66,6 +66,12 @@ def empty_balloon_boxes(balloon_aabbs, textline_aabbs, ink_of_box, min_ink: int 
     return out
 
 
+def _placeholder(q):
+    """Mark a textline that only exists for the VLM rescue (its OCR read is a guess at a box)."""
+    q.rescue_placeholder = True
+    return q
+
+
 def merge_empty_balloons(ctx, result, device):
     """#535: append an empty textline for every inked balloon DBNet left uncovered —
     it then flows OCR → vlm_rescue → translate → render exactly like a rescued SFX.
@@ -109,7 +115,7 @@ def merge_empty_balloons(ctx, result, device):
         fresh = empty_balloon_boxes(balloons, existing, _ink)
         for (x1, y1, x2, y2) in fresh:
             pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
-            textlines.append(Quadrilateral(pts, '', 1.0))
+            textlines.append(_placeholder(Quadrilateral(pts, '', 1.0)))
         if fresh:
             logger.info(f"[EmptyBalloon] +{len(fresh)} uncovered inked balloon(s) queued for VLM rescue")
 
@@ -121,7 +127,7 @@ def merge_empty_balloons(ctx, result, device):
         clusters = uncovered_text_clusters(gray, covered)
         for (x1, y1, x2, y2) in clusters:
             pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
-            textlines.append(Quadrilateral(pts, '', 1.0))
+            textlines.append(_placeholder(Quadrilateral(pts, '', 1.0)))
         if clusters:
             logger.info(f"[InkCluster] +{len(clusters)} uncovered text cluster(s) queued for VLM rescue")
         return (textlines, mask_raw, mask)
