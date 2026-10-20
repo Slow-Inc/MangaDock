@@ -177,6 +177,89 @@ describe('MangaCatalogService — search + passthrough (#231)', () => {
     expect(out.total).toBe(1);
   });
 
+  it('year range: scans past the first upstream page so deeper matches are reachable and total is not the page count (#661)', async () => {
+    const cache = makeCache(null);
+    // Upstream: 250 results; 3 in-range on page 1, 1 on page 2, 1 on page 3.
+    const page = (start: number, hits: number[]) =>
+      Array.from({ length: 100 }, (_, i) => ({
+        id: `m${start + i}`,
+        publishedDate: hits.includes(start + i) ? '2015' : '1999',
+      }));
+    const pages: Record<number, any[]> = {
+      0: page(0, [5, 40, 90]),
+      100: page(100, [150]),
+      200: page(200, [210]).slice(0, 50),
+    };
+    const mangaDex = {
+      searchManga: jest.fn(
+        async (_q: string, _l: unknown, _lim: number, off: number) => ({
+          items: pages[off] ?? [],
+          total: 250,
+        }),
+      ),
+      fetchMangaByIds: jest.fn(),
+    };
+    const svc = new MangaCatalogService(
+      mangaDex as any,
+      makeSupabase([]) as any,
+      cache as any,
+    );
+
+    const out = await svc.searchBooks(
+      'naruto',
+      undefined,
+      28,
+      0,
+      undefined,
+      2010,
+      2020,
+    );
+
+    expect(out.items.map((b: any) => b.id)).toEqual([
+      'm5',
+      'm40',
+      'm90',
+      'm150',
+      'm210',
+    ]);
+    expect(out.total).toBe(5);
+
+    // Page 2 of the filtered list (offset 2, limit 2) serves deeper matches.
+    const page2 = await svc.searchBooks(
+      'naruto',
+      undefined,
+      2,
+      2,
+      undefined,
+      2010,
+      2020,
+    );
+    expect(page2.items.map((b: any) => b.id)).toEqual(['m90', 'm150']);
+    expect(page2.total).toBeGreaterThan(4);
+  });
+
+  it('year range: yearFrom-only and yearTo-only use distinct cache keys (#661)', async () => {
+    const cache = makeCache(null);
+    const mangaDex = {
+      searchManga: jest.fn().mockResolvedValue({
+        items: [{ id: 'a', publishedDate: '2010' }],
+        total: 1,
+      }),
+      fetchMangaByIds: jest.fn(),
+    };
+    const svc = new MangaCatalogService(
+      mangaDex as any,
+      makeSupabase([]) as any,
+      cache as any,
+    );
+
+    await svc.searchBooks('x', undefined, 28, 0, undefined, 2010);
+    await svc.searchBooks('x', undefined, 28, 0, undefined, undefined, 2010);
+
+    const [k1, k2] = cache.set.mock.calls.map((c: any[]) => c[0]);
+    expect(k1).not.toEqual(k2);
+  });
+
   it('omitting new params returns same results as before (backward compat)', async () => {
     const cache = makeCache(null);
     const mangaDex = {
