@@ -1,6 +1,13 @@
 <!-- lang:en -->
 # DONE — Claude Code Session Log
 
+## Native chapter list web alignment — 2026-10-20
+
+- Follow-up approved after a cancellation made before any source edits: bounded320dp/half-window chapter viewport, compact language/source/page-count-or-price rows, busy/empty/accessibility behavior. Studio count uses existing version pages; no new HTTP/server/dependency. Existing Reader access gates retained.
+- Mobile234/234, TypeScript/format and Android build/vital lint pass. Reviewer found no actionable issues. Galaxy Z Flip4 verified nested scrolling without moving review heading, all83 entries reachable, last chapter68.5 through CAPTCHA into Reader1/15, and150% font layout; restored font1.0. [Report and screenshots](Mobile/docs/2026-10-20-native-chapter-list-parity.md).
+- ARM64 QA APK: `Mobile/build/apk/2026-10-20/MangaDock-0.1.0-native-chapter-list-arm64.apk`, SHA256 `db33b7c15aef8b33d1d461b38f7f872fe1d215c2d1c047e9f09b2571ed6bc441`; installed hash matches. Existing debug/LAN configuration and account session retained. Does not close broader release acceptance or add web language filters/grouping.
+- ภาษาไทย: ปรับรายการตอนตามเว็บหลังผู้ใช้สั่งต่อ จำกัด320dp/ครึ่งจอ แถวข้อมูลกระชับ เปิดอ่านผ่าน gates เดิม tests234/types/format/buildผ่าน เครื่องจริงเลื่อนภายใน83ตอนได้โดยรีวิวยังอยู่ที่เดิม เปิดตอนสุดท้าย68.5หน้า1/15และฟอนต์150%ผ่าน คืนฟอนต์1.0 APK/hashตามด้านบน ไม่อ้างปิด release gates หรือเพิ่มตัวกรอง/จัดกลุ่มเวอร์ชันของเว็บ
+
 ## Native Phase4 review fixes B1–B6 — 2026-10-20
 
 - Implemented in `C:/Users/woral/md4`, branch `fix/native-phase4-review-20261020` from `443dc80`: empty-body API handling, shared Reader layout geometry, nested book Back history, directional page swipes/pinch separation, visible wrapping page controls, picker Back, modal safe areas and requested-page translation counters. No runtime dependency or server/provider change.
