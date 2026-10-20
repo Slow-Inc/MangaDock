@@ -3,6 +3,19 @@
 
 ---
 
+## #824 Admin tables scroll on a phone instead of squashing (2026-10-21)
+
+**What:** with realistic data the admin tables (`w-full` in the new `overflow-x-auto` wrappers) squashed to 390 px:
+names stacked a word per line, action/role badges wrapped inside their pills, UIDs broke at hyphens. Tables get a
+minimum width (`min-w-[44rem]`, recent bans `32rem`) so they scroll in their card; badges, UIDs and dates are
+`whitespace-nowrap`; long names truncate with the full text in `title`.
+
+**Validated:** production build, local test session (role 8) with fixture data shaped like the admin API: 5 pages ×
+390 → 0 stacked cells (were 3/2/4/0/14 per page), 0 wrapped badges, every table scrolls in its card, 0 page overflow;
+1440 → 0 stacked cells, no table scroll, unchanged.
+
+---
+
 ## #821 Background community tabs no longer starve the browser's connections (2026-10-21)
 
 **What:** the notifications dropdown that spun forever in a real Chrome session (every `/api/proxy/*` call from the
