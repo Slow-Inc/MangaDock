@@ -325,6 +325,59 @@ describe('translateDescription() — reports the model that produced the text', 
     expect(complete).not.toHaveBeenCalled();
   });
 
+  it('keeps markdown links, bold bullets and rules in a translated description (#802)', async () => {
+    const thai = [
+      'เรื่องราวของนักผจญภัย',
+      '',
+      '* **ตัวละครหลัก:** ฮีโร่',
+      '---',
+      '- อ่านต้นฉบับที่ [Official Raw](https://example.com/raw)',
+    ].join('\n');
+    const complete = jest.fn().mockResolvedValue(thai);
+    const { svc } = makeSvc({
+      env: {
+        LLM_PROVIDER: 'custom',
+        LLM_API_KEY: 'k',
+        LLM_BASE_URL: 'http://x',
+      },
+      descriptionModel: 'm',
+      complete,
+    });
+
+    const result = await svc.translateDescription(
+      text + ' with **bold** and [a link](https://example.com/raw)',
+    );
+
+    expect(result.translatedText).toBe(thai);
+    expect(complete.mock.calls[0][0]).toMatch(/markdown/i);
+  });
+
+  it('drops a leaked THOUGHTS block but keeps the translated link lines (#802)', async () => {
+    const leaked = [
+      'THOUGHTS: The user wants a Thai translation of a description.',
+      'I will keep the link.',
+      'เรื่องราวของนักผจญภัย',
+      '',
+      '---',
+      '- [Official Raw](https://example.com/raw)',
+    ].join('\n');
+    const { svc } = makeSvc({
+      env: {
+        LLM_PROVIDER: 'custom',
+        LLM_API_KEY: 'k',
+        LLM_BASE_URL: 'http://x',
+      },
+      descriptionModel: 'm',
+      complete: jest.fn().mockResolvedValue(leaked),
+    });
+
+    const result = await svc.translateDescription(text);
+
+    expect(result.translatedText).toBe(
+      'เรื่องราวของนักผจญภัย\n\n---\n- [Official Raw](https://example.com/raw)',
+    );
+  });
+
   it('does not invent a model for an older cached payload that lacks one', async () => {
     const { svc } = makeSvc({
       env: { LLM_PROVIDER: 'openai', LLM_API_KEY: 'k' },
