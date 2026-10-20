@@ -3,6 +3,32 @@
 
 ---
 
+## #722 — one owner for the identity-change reset (2026-10-20)
+
+**What:** `Frontend/app/lib/identityReset.ts` `resetClientStateForIdentityChange()` is now the only
+list of per-user client caches dropped on an identity change (`clearUserCache`,
+`clearHistory({syncRemote: false})`, `clearFollowCache`, `clearAllApiCache`). `AuthContext.tsx`
+calls it at the four sites that used to spell the four calls out by hand (account switch,
+`SIGNED_OUT`, `signOut()`, `deleteAccount()`). ADR 015 updated.
+
+**Why:** the list had already drifted once (`clearFollowCache` was added late at every site), and the
+one cache with a pending-write flag is the one that wiped a user's server history (#720).
+
+**Not rebased:** `refactor/identity-reset-single-owner` was rebuilt on main instead. Its #720 half was
+already shipped by #712 — the branch's own history tests pass against main's
+`clearHistory({syncRemote: false})` and the "first read after re-sign-in" test fails with
+`syncRemote: true`. Main's `cacheGeneration` guards (in-flight load/flush of the previous user) stay.
+
+**Validation:** TDD — `identityReset.test.ts` red (module missing) → green, 2 tests; mutation:
+dropping any one of the four calls fails at least one test (4/4). `test:auth` 12/12 after
+allow-listing the new import in the `oauth-regression` harness (it threw `Unexpected import` →
+4 red before that). `bun test` 239 pass; the 8 failures are `app/docs/__tests__` integration tests
+that need a running server, same as before. Browser: signed out on the dev server — Supabase
+`logout` 204, signed-out UI, no `DELETE /users/me/history`. Limit: the local backend returned 404 for
+`/users/me/*`, so the account had no history to clear; the clearing itself is covered by the tests.
+
+---
+
 ## #694 — SFX rescue says why it returned nothing (2026-09-26)
 
 **What:** `MIT/manga_translator/ocr_vlm.py` `vlm_localize_sfx` now logs one `WARNING` when the
