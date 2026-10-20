@@ -3,6 +3,7 @@
 import { Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "../components/Navbar";
+import Mascot from "../components/mascot/Mascot";
 import MangaGrid, { GridBook } from "../components/MangaGrid";
 import {
   getFavorites,
@@ -227,19 +228,7 @@ function ChipBar({ categories, active, onSelect }: {
 function EmptyState({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-32 text-center">
-      <svg
-        className="mb-4 h-14 w-14 text-ink-3"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"
-        />
-      </svg>
+      <Mascot area="reader" size={72} className="mb-4" />
       <p className="text-sm text-ink-3">{label}</p>
     </div>
   );
@@ -248,19 +237,7 @@ function EmptyState({ label }: { label: string }) {
 function LoginPrompt({ onLogin }: { onLogin: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-32 text-center">
-      <svg
-        className="mb-4 h-14 w-14 text-ink-3"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-        />
-      </svg>
+      <Mascot area="login" size={72} className="mb-4" />
       <p className="mb-4 text-sm text-ink-3">เข้าสู่ระบบเพื่อดูรายการของคุณ</p>
       <button
         onClick={onLogin}

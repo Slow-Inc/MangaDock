@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import PostImage from "../../../components/PostImage";
+import Mascot from "../../../components/mascot/Mascot";
 import UserAvatar from "../../../components/ui/UserAvatar";
 import { flushSync } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
@@ -578,8 +579,11 @@ export default function PostDetailPage() {
             />
           ))
         ) : (
-          <div className="py-10 text-center">
-            <p className="text-ink-3 font-bold">ยังไม่มีใครมาแสดงความเห็นเลย...</p>
+          <div className="py-10 text-center space-y-2">
+            <div className="flex justify-center">
+              <Mascot area="community" size={56} />
+            </div>
+            <p className="text-ink-3 font-medium">ยังไม่มีความคิดเห็น — เริ่มเป็นคนแรกได้เลย</p>
           </div>
         )}
       </section>

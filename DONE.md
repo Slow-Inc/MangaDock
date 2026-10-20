@@ -3,6 +3,17 @@
 
 ---
 
+## #808 Reviews page shell + mascot empty states (2026-10-21)
+
+**What:** `/book/[id]/reviews` — the only route without the Navbar — now uses `page-shell page-shell-nav`,
+the shared page header and a `max-w-3xl` reading column; its empty state, Trending, post-page comments
+and My List (empty + signed out) show the area mascot (community / reader / login). Markup only.
+
+**Validated:** tsc 0; production build at 1440 + 390 on the four routes — 0 overflow, 0 console errors,
+screenshots reviewed; code-review + scrutinize: merge. Not checked: My List's signed-in empty tabs.
+
+---
+
 ## Follow-up fixes after the Strata redesign — PRs #800 #803 #804 #805 #807 (2026-10-21)
 
 **What:**

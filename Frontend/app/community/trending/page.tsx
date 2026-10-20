@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { getTrendingManga, type TrendingManga } from "../../lib/communityApi";
 import { useToast } from "../../contexts/ToastContext";
 import { cacheGet, cacheSet, TTL } from "../../lib/apiCache";
+import Mascot from "../../components/mascot/Mascot";
 
 function TrendingMangaCard({ item, rank }: { item: TrendingManga; rank: number }) {
   const router = useRouter();
@@ -129,7 +130,10 @@ export default function TrendingPage() {
           ))}
         </div>
       ) : (
-        <div className="bg-surface border border-dashed border-line rounded-2xl py-20 text-center">
+        <div className="bg-surface border border-dashed border-line rounded-2xl py-16 text-center space-y-3">
+          <div className="flex justify-center">
+            <Mascot area="community" size={88} />
+          </div>
           <p className="text-ink-3 font-medium">ยังไม่มีมังงะที่กำลังเป็นที่นิยม</p>
         </div>
       )}
