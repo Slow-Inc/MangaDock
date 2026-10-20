@@ -84,7 +84,12 @@ def merge_empty_balloons(ctx, result, device):
         from .bubble_detector import detect_bubbles
         from .utils.generic import Quadrilateral
         textlines, mask_raw, mask = result
-        polygons = detect_bubbles(ctx.img_rgb, device=str(device or 'cuda'))
+        # One balloon detection per page: container merge and tagging reuse ctx.bubble_polygons
+        # (the YOLO ran twice per page before — same image, same model, same answer).
+        polygons = getattr(ctx, 'bubble_polygons', None)
+        if polygons is None:
+            polygons = detect_bubbles(ctx.img_rgb, device=str(device or 'cuda')) or []
+            ctx.bubble_polygons = polygons
         if not polygons:
             return result
         img = ctx.img_rgb

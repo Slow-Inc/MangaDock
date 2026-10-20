@@ -278,3 +278,25 @@ def test_rescue_placeholders_are_marked_so_a_junk_read_can_be_dropped(monkeypatc
                         lambda image, device='cuda': [[(100, 100), (300, 100), (300, 300), (100, 300)]])
     textlines, _, _ = merge_empty_balloons(SimpleNamespace(img_rgb=img), ([], None, None), 'cpu')
     assert textlines and all(getattr(t, 'rescue_placeholder', False) for t in textlines)
+
+
+def test_empty_balloon_rescue_shares_the_pages_balloon_detection(monkeypatch):
+    """Speed (2026-10-21): the balloon YOLO ran twice per page — once here, once (cached on ctx)
+    for container merge and balloon tagging. Same image, same model: detect once, share it."""
+    import numpy as np
+    from types import SimpleNamespace
+    import manga_translator.bubble_detector as bd
+    from manga_translator.detection_postproc import merge_empty_balloons
+    calls = {'n': 0}
+
+    def detect(image, device='cuda'):
+        calls['n'] += 1
+        return [[(100, 100), (300, 100), (300, 300), (100, 300)]]
+
+    monkeypatch.setattr(bd, 'detect_bubbles', detect)
+    img = np.full((400, 400, 3), 255, np.uint8)
+    ctx = SimpleNamespace(img_rgb=img)
+    merge_empty_balloons(ctx, ([], None, None), 'cpu')
+    assert ctx.bubble_polygons == [[(100, 100), (300, 100), (300, 300), (100, 300)]]
+    merge_empty_balloons(ctx, ([], None, None), 'cpu')        # a second consumer on the same page
+    assert calls['n'] == 1
