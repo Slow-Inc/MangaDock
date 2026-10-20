@@ -20,7 +20,7 @@ export default function ReaderCaptchaGate({ passed, exiting, siteKey, chapterLab
   return (
     <>
       {(!passed || exiting) && siteKey && (
-        <div className={`absolute inset-0 z-[400] flex items-end sm:items-center justify-center sm:pt-16 bg-black/10 backdrop-blur-[2px] transition-opacity duration-300 ${exiting ? "opacity-0" : "opacity-100"}`}>
+        <div className={`absolute inset-0 z-[400] flex items-end sm:items-center justify-center sm:pt-16 bg-scrim/10 backdrop-blur-[2px] transition-opacity duration-300 ${exiting ? "opacity-0" : "opacity-100"}`}>
           <style>{`
             @keyframes mobileSlideUp {
               0% { transform: translateY(100%); opacity: 0; }
@@ -55,19 +55,19 @@ export default function ReaderCaptchaGate({ passed, exiting, siteKey, chapterLab
           `}</style>
 
           <div
-            className={`relative flex w-full sm:max-w-sm flex-col items-center overflow-hidden rounded-t-[2rem] sm:rounded-3xl border-t sm:border border-white/10 bg-zinc-950/95 sm:bg-zinc-900 shadow-[0_-10px_60px_-15px_rgba(0,0,0,0.7)] sm:shadow-2xl backdrop-blur-2xl p-6 pb-12 sm:p-8 ${exiting ? "animate-captcha-out" : "animate-captcha-in"}`}
+            className={`relative flex w-full sm:max-w-sm flex-col items-center overflow-hidden rounded-t-[2rem] sm:rounded-3xl border-t sm:border border-line bg-bg/95 sm:bg-surface shadow-[0_-10px_60px_-15px_rgba(0,0,0,0.7)] sm:shadow-2xl backdrop-blur-2xl p-6 pb-12 sm:p-8 ${exiting ? "animate-captcha-out" : "animate-captcha-in"}`}
           >
-            <div className="w-12 h-1.5 bg-white/20 rounded-full mb-6 sm:hidden"></div>
+            <div className="w-12 h-1.5 bg-ink-3 rounded-full mb-6 sm:hidden"></div>
 
             <div className="mb-6 text-center">
-              <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 tracking-tight">ยืนยันตัวตน</h3>
-              <p className="text-[13px] sm:text-sm text-white/50 px-2 leading-relaxed">
+              <h3 className="text-xl sm:text-2xl font-bold text-ink mb-2">ยืนยันตัวตน</h3>
+              <p className="text-[13px] sm:text-sm text-ink-2 px-2 leading-relaxed">
                 กำลังตรวจสอบความปลอดภัย<br />
                 {chapterLabel}
               </p>
             </div>
 
-            <div className="flex justify-center w-full overflow-hidden rounded-xl border border-white/5 bg-black/50 p-2">
+            <div className="flex justify-center w-full overflow-hidden rounded-xl border border-line bg-bg/50 p-2">
               <Turnstile
                 siteKey={siteKey}
                 onSuccess={onVerify}

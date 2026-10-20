@@ -7,7 +7,8 @@ import { resolveReaderPages, buildOtherLangNextMap } from "../lib/readerPages";
 import { useChapterTranslation, TARGET_LANG_OPTIONS } from "../hooks/useChapterTranslation";
 import { buildTranslationSources } from "../lib/translationSources";
 import { buildTranslateMenu } from "../lib/translateMenu";
-import { formatEta, pillMainText, stageLabel } from "../lib/translationStages";
+import { activeTranslatingPage, formatEta, pillMainText, stageLabel } from "../lib/translationStages";
+import TranslateProgress from "./reader/TranslateProgress";
 import { apiFetch } from "../lib/apiFetch";
 import { useChapters, type ChapterPageItem } from "../hooks/useChapters";
 import { ZOOM_MIN, ZOOM_MAX } from "../lib/zoomLevel";
@@ -20,6 +21,7 @@ import PageRenderer from "./reader/PageRenderer";
 import TranslationFeedback from "./TranslationFeedback";
 import ReaderCommentDrawer from "./ReaderCommentDrawer";
 import ReportButton from "./ReportButton";
+import Loader from "./ui/Loader";
 
 export type ChapterPages = {
   pages: string[];
@@ -165,6 +167,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   // Perceived-progress strings: ticking seconds + live MIT stage + honest ETA
   // keep the 20-60s per-page wait from reading as a frozen spinner.
   const stageInfo = stageLabel(currentStage?.stage ?? null);
+  // The page MIT is on: a batch names it only in the stage event (the strip used to stay idle there).
+  const activePage = activeTranslatingPage(translatingCurrentPageIndex, currentStage);
   const translateDetail = [
     pageElapsedSec > 0 ? `${pageElapsedSec} วิ` : null,
     stageInfo ? `${stageInfo.text} (${stageInfo.step}/${stageInfo.total})` : null,
@@ -503,7 +507,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     : (chapterTitle ?? "ตัวอย่างมังงะ");
 
   const content = (
-    <div className={`fixed inset-0 z-300 flex flex-col bg-black transition-opacity duration-250 ${visible ? "opacity-100" : "opacity-0"}`}>
+    <div className={`theme-dark fixed inset-0 z-300 flex flex-col bg-bg transition-opacity duration-250 ${visible ? "opacity-100" : "opacity-0"}`}>
       <ReaderCaptchaGate
         passed={turnstilePassed}
         exiting={turnstileExiting}
@@ -512,15 +516,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
         onVerify={onVerify}
       >
         {/* Top bar — z-10 ensures dropdown panel stacks above the reader area (flip buttons etc.) */}
-        <div className="relative z-10 flex shrink-0 items-center border-b border-white/10 bg-black/80 px-2 py-2 sm:px-4 sm:py-3 backdrop-blur-sm">
+        <div className="relative z-10 flex shrink-0 items-center border-b border-line bg-bg/80 px-2 py-2 sm:px-4 sm:py-3 backdrop-blur-sm">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs text-white/50">{mangaTitle}</p>
-            <p className="truncate text-sm font-semibold text-white">{chapterLabel}</p>
+            <p className="truncate text-xs text-ink-2">{mangaTitle}</p>
+            <p className="truncate text-sm font-semibold text-ink">{chapterLabel}</p>
           </div>
 
           {/* Page counter — centered absolutely so it's always in the middle, hidden on mobile */}
           {(totalPages > 0 || lastValidTotalPages > 0) && (
-            <span className={`pointer-events-none hidden sm:inline absolute left-1/2 -translate-x-1/2 rounded-lg bg-white/10 px-3 py-1.5 text-xs text-white/80 transition-opacity duration-250 ${
+            <span className={`pointer-events-none hidden sm:inline absolute left-1/2 -translate-x-1/2 rounded-lg bg-fill px-3 py-1.5 text-xs text-ink transition-opacity duration-250 ${
               contentReady && !error && totalPages > 0 ? "opacity-100" : "opacity-0"
             }`}>
               {(!contentReady || error ? lastValidTotalPages : totalPages) > 0
@@ -532,19 +536,19 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             {/* Chapter navigation */}
             {sameLangList.length > 1 && (
-              <div className="flex items-center gap-1 rounded-lg border border-white/15 bg-white/5">
+              <div className="flex items-center gap-1 rounded-lg border border-line bg-fill">
                 <button
                   onClick={() => prevSameLang && goToChapter(prevSameLang)}
                   disabled={!hasPrev}
                   title="ตอนก่อนหน้า"
-                  className="flex h-8 w-8 items-center justify-center rounded-l-lg text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="flex h-8 w-8 items-center justify-center rounded-l-lg text-ink-2 transition hover:bg-fill hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" /></svg>
                 </button>
                 <button
                   onClick={() => pickerMounted ? closePicker() : openPicker(currentLang ?? "all")}
                   title="เลือกตอน"
-                  className="flex h-8 items-center px-3 text-xs text-white/60 select-none whitespace-nowrap transition hover:text-white hover:bg-white/10"
+                  className="flex h-8 items-center px-3 text-xs text-ink-2 select-none whitespace-nowrap transition hover:text-ink hover:bg-fill"
                 >
                   {chapterNumDisplay !== null && maxMainChapter !== null
                       ? `ตอน ${chapterNumDisplay} / ${maxMainChapter}`
@@ -554,13 +558,13 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   onClick={() => nextSameLang && goToChapter(nextSameLang)}
                   disabled={!hasNext}
                   title="ตอนถัดไป"
-                  className="flex h-8 w-8 items-center justify-center rounded-r-lg text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="flex h-8 w-8 items-center justify-center rounded-r-lg text-ink-2 transition hover:bg-fill hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" /></svg>
                 </button>
               </div>
             )}
-            <button onClick={() => setUseSaver((s) => !s)} title={useSaver ? "สลับเป็นคุณภาพสูง" : "สลับเป็นโหมดประหยัดข้อมูล"} className="hidden rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white sm:block">
+            <button onClick={() => setUseSaver((s) => !s)} title={useSaver ? "สลับเป็นคุณภาพสูง" : "สลับเป็นโหมดประหยัดข้อมูล"} className="hidden rounded-lg border border-ink-3 px-3 py-1.5 text-xs text-ink-2 transition hover:border-ink-2 hover:text-ink sm:block">
               {useSaver ? "Data Saver" : "HD"}
             </button>
 
@@ -572,12 +576,12 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
               const triggerColorCls =
                 mitStatus === "offline"
-                  ? "border-amber-400/30 bg-amber-500/10 text-amber-200 hover:border-amber-400/60"
+                  ? "border-danger/30 bg-danger/10 text-danger hover:border-danger/60"
                   : translating
-                  ? "border-red-400/40 bg-red-500/10 text-red-300 hover:border-red-400/60"
+                  ? "border-accent/40 bg-accent/10 text-accent hover:border-accent/60"
                   : hasAnyTranslation
-                  ? "border-blue-400/40 bg-blue-500/10 text-blue-300 hover:border-blue-400/60"
-                  : "border-white/20 text-white/70 hover:border-white/40 hover:text-white";
+                  ? "border-ok/40 bg-ok/10 text-ok hover:border-ok/60"
+                  : "border-ink-3 text-ink-2 hover:border-ink-2 hover:text-ink";
 
               return (
                 <div ref={translateMenuRef} className="relative hidden sm:block">
@@ -596,9 +600,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                     {/* Status indicator */}
                     {!translating && (
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                        mitStatus === "online" ? "bg-green-400"
-                        : mitStatus === "offline" ? "bg-red-500"
-                        : "bg-white/30"
+                        mitStatus === "online" ? "bg-ok"
+                        : mitStatus === "offline" ? "bg-danger"
+                        : "bg-ink-3"
                       }`} />
                     )}
                     {translating && (
@@ -628,22 +632,22 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
                   {/* Dropdown panel — Navbar style, always in DOM, shown via CSS transition */}
                   <div
-                    className={`absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-white/15 bg-black/70 shadow-2xl backdrop-blur-sm transition-all duration-200 origin-top-right ${
+                    className={`absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-line bg-bg/70 shadow-2xl backdrop-blur-sm transition-all duration-200 origin-top-right ${
                       translateMenuOpen && !translating
                         ? "pointer-events-auto scale-100 opacity-100"
                         : "pointer-events-none scale-95 opacity-0"
                     }`}
                   >
                     {/* Header */}
-                    <div className="border-b border-white/10 px-4 py-2.5">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-white/40">การแปล AI</p>
+                    <div className="border-b border-line px-4 py-2.5">
+                      <p className="text-xs font-semibold uppercase text-ink-3">การแปล AI</p>
                     </div>
 
                     <div className="p-2">
                       {/* Language selector */}
                       {LANGS.length > 0 && (
                         <div className="mb-1">
-                          <div className="mb-1.5 px-2 pt-1 text-xs font-semibold uppercase tracking-widest text-white/35">ภาษาที่แปลออกมา</div>
+                          <div className="mb-1.5 px-2 pt-1 text-xs font-semibold uppercase text-ink-3">ภาษาที่แปลออกมา</div>
                           <div className="flex flex-wrap gap-1 px-1 pb-1">
                             {LANGS.map((l) => (
                               <button
@@ -651,8 +655,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                                 onClick={() => setTargetLang(l.code)}
                                 className={`rounded-lg px-3 py-1.5 text-xs transition-colors duration-150 ${
                                   currentTarget?.code === l.code
-                                    ? "bg-white/15 font-semibold text-white"
-                                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                                    ? "bg-ink font-semibold text-bg"
+                                    : "text-ink-2 hover:bg-fill hover:text-ink"
                                 }`}
                               >
                                 {l.label}
@@ -665,14 +669,14 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       {/* Image-translation model selector (#87) — Gemini deployments only (#134) */}
                       {showModelSelector && availableModels.length > 0 && (
                         <div className="mb-1">
-                          <div className="mb-1.5 px-2 pt-1 text-xs font-semibold uppercase tracking-widest text-white/35">โมเดล AI</div>
+                          <div className="mb-1.5 px-2 pt-1 text-xs font-semibold uppercase text-ink-3">โมเดล AI</div>
                           <div className="flex flex-wrap gap-1 px-1 pb-1">
                             <button
                               onClick={() => selectImageModel(null)}
                               className={`rounded-lg px-3 py-1.5 text-xs transition-colors duration-150 ${
                                 imageModel === null
-                                  ? "bg-white/15 font-semibold text-white"
-                                  : "text-white/60 hover:bg-white/10 hover:text-white"
+                                  ? "bg-ink font-semibold text-bg"
+                                  : "text-ink-2 hover:bg-fill hover:text-ink"
                               }`}
                             >
                               อัตโนมัติ
@@ -683,8 +687,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                                 onClick={() => selectImageModel(m)}
                                 className={`rounded-lg px-3 py-1.5 text-xs transition-colors duration-150 ${
                                   imageModel === m
-                                    ? "bg-white/15 font-semibold text-white"
-                                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                                    ? "bg-ink font-semibold text-bg"
+                                    : "text-ink-2 hover:bg-fill hover:text-ink"
                                 }`}
                               >
                                 {m.replace(/^gemini-/, "")}
@@ -694,7 +698,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         </div>
                       )}
 
-                      <div className="my-1 border-t border-white/10" />
+                      <div className="my-1 border-t border-line" />
 
                       {/* Translate actions — hidden once the chapter is fully
                           translated (#162): a translate button that has nothing
@@ -705,11 +709,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                           <button
                             onClick={() => { translateCurrentPage(); setTranslateMenuOpen(false); }}
                             disabled={translatingCurrentPage}
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-accent/90 transition-colors duration-150 hover:bg-white/10 hover:text-accent disabled:opacity-50"
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-accent/90 transition-colors duration-150 hover:bg-fill hover:text-accent disabled:opacity-50"
                           >
                             {translatingCurrentPage ? (
                               <>
-                                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" strokeOpacity="0.3" /><path d="M12 3a9 9 0 0 1 9 9" /></svg>
+                                <Loader context="translate" label="กำลังแปล" />
                                 กำลังแปลหน้า {(translatingCurrentPageIndex ?? page) + 1}...
                               </>
                             ) : (
@@ -723,7 +727,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                           {/* Batch translate */}
                           <button
                             onClick={() => { startTranslate(); setTranslateMenuOpen(false); }}
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink-2 transition-colors duration-150 hover:bg-fill hover:text-ink"
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M4 6h16M4 10h16M4 14h10M4 18h6" /></svg>
                             แปลทั้งตอน
@@ -734,10 +738,10 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       {/* Show / hide translation toggle */}
                       {translateMenu.viewToggleLabel && (
                         <>
-                          {translateMenu.showTranslateButtons && <div className="my-1 border-t border-white/10" />}
+                          {translateMenu.showTranslateButtons && <div className="my-1 border-t border-line" />}
                           <button
                             onClick={() => { setShowTranslation((s) => !s); setTranslateMenuOpen(false); }}
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink-2 transition-colors duration-150 hover:bg-fill hover:text-ink"
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                             {translateMenu.viewToggleLabel}
@@ -746,10 +750,10 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       )}
                       {showTranslation && !continuousMode && (
                         <>
-                          <div className="my-1 border-t border-white/10" />
+                          <div className="my-1 border-t border-line" />
                           <button
                             onClick={() => { setSideBySide((s) => !s); setTranslateMenuOpen(false); }}
-                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors duration-150 hover:bg-white/10 ${sideBySide ? "text-blue-300" : "text-white/65 hover:text-white"}`}
+                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors duration-150 hover:bg-fill ${sideBySide ? "text-accent" : "text-ink-2 hover:text-ink"}`}
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0">
                               <rect x="2" y="3" width="9" height="18" rx="1" /><rect x="13" y="3" width="9" height="18" rx="1" />
@@ -765,10 +769,10 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             })()}
 
             {/* Read mode toggle — hidden on mobile, shown in more menu */}
-            <div className="hidden sm:flex overflow-hidden rounded-lg border border-white/15 bg-white/5 text-xs">
+            <div className="hidden sm:flex overflow-hidden rounded-lg border border-line bg-fill text-xs">
               <button
                 onClick={() => setContinuousMode(false)}
-                className={`px-2.5 py-1.5 transition ${!continuousMode ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
+                className={`px-2.5 py-1.5 transition ${!continuousMode ? "bg-ink text-bg" : "text-ink-2 hover:text-ink"}`}
                 title="โหมดทีละหน้า"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5">
@@ -777,7 +781,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               </button>
               <button
                 onClick={() => setContinuousMode(true)}
-                className={`px-2.5 py-1.5 transition ${continuousMode ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
+                className={`px-2.5 py-1.5 transition ${continuousMode ? "bg-ink text-bg" : "text-ink-2 hover:text-ink"}`}
                 title="โหมดอ่านต่อเนื่อง"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5">
@@ -787,14 +791,14 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             </div>
 
             {/* Zoom controls — hidden on mobile, shown in more menu */}
-            <div className="hidden sm:flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1.5 py-1">
-              <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} title="ย่อ" className="flex h-6 w-6 items-center justify-center rounded text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-30">
+            <div className="hidden sm:flex items-center gap-1 rounded-lg border border-line bg-fill px-1.5 py-1">
+              <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} title="ย่อ" className="flex h-6 w-6 items-center justify-center rounded text-ink-2 transition hover:bg-fill hover:text-ink disabled:opacity-30">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5"><path d="M5 12h14" /></svg>
               </button>
-              <button onClick={zoomReset} title="รีเซ็ต" className="min-w-10 rounded px-1 py-0.5 text-center text-xs text-white/70 transition hover:bg-white/10 hover:text-white">
+              <button onClick={zoomReset} title="รีเซ็ต" className="min-w-10 rounded px-1 py-0.5 text-center text-xs text-ink-2 transition hover:bg-fill hover:text-ink">
                 {Math.round(zoom * 100)}%
               </button>
-              <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} title="ขยาย" className="flex h-6 w-6 items-center justify-center rounded text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-30">
+              <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} title="ขยาย" className="flex h-6 w-6 items-center justify-center rounded text-ink-2 transition hover:bg-fill hover:text-ink disabled:opacity-30">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5"><path d="M12 5v14M5 12h14" /></svg>
               </button>
             </div>
@@ -804,8 +808,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               <button
                 onClick={() => setMoreMenuOpen((o) => !o)}
                 title="เพิ่มเติม"
-                className={`flex h-9 w-9 items-center justify-center rounded-full border text-white/70 transition hover:bg-white/15 hover:text-white ${
-                  moreMenuOpen ? "border-white/40 bg-white/10 text-white" : "border-white/20"
+                className={`flex h-9 w-9 items-center justify-center rounded-full border text-ink-2 transition hover:bg-raised hover:text-ink ${
+                  moreMenuOpen ? "border-ink-2 bg-fill text-ink" : "border-ink-3"
                 }`}
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
@@ -817,36 +821,36 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
               {/* Mobile dropdown panel */}
               <div
-                className={`absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-white/15 bg-black/95 shadow-2xl backdrop-blur-xl transition-all duration-200 origin-top-right ${
+                className={`absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-line bg-bg/95 shadow-2xl backdrop-blur-xl transition-all duration-200 origin-top-right ${
                   moreMenuOpen
                     ? "pointer-events-auto scale-100 opacity-100"
                     : "pointer-events-none scale-95 opacity-0"
                 }`}
               >
                 {/* Zoom section */}
-                <div className="border-b border-white/10 px-4 py-3">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/40">ซูม</p>
+                <div className="border-b border-line px-4 py-3">
+                  <p className="mb-2 text-xs font-semibold uppercase text-ink-3">ซูม</p>
                   <div className="flex items-center gap-2">
-                    <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white disabled:opacity-30">
+                    <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-ink-2 transition hover:bg-raised hover:text-ink disabled:opacity-30">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M5 12h14" /></svg>
                     </button>
-                    <button onClick={zoomReset} className="flex-1 rounded-lg bg-white/10 py-1.5 text-center text-xs text-white/70 transition hover:bg-white/20 hover:text-white">
+                    <button onClick={zoomReset} className="flex-1 rounded-lg bg-fill py-1.5 text-center text-xs text-ink-2 transition hover:bg-raised hover:text-ink">
                       {Math.round(zoom * 100)}%
                     </button>
-                    <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white disabled:opacity-30">
+                    <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-ink-2 transition hover:bg-raised hover:text-ink disabled:opacity-30">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M12 5v14M5 12h14" /></svg>
                     </button>
                   </div>
                 </div>
 
                 {/* Read mode section */}
-                <div className="border-b border-white/10 px-4 py-3">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/40">โหมดอ่าน</p>
+                <div className="border-b border-line px-4 py-3">
+                  <p className="mb-2 text-xs font-semibold uppercase text-ink-3">โหมดอ่าน</p>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setContinuousMode(false)}
                       className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs transition ${
-                        !continuousMode ? "bg-white/20 text-white" : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
+                        !continuousMode ? "bg-ink text-bg" : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
                       }`}
                     >
                       <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" /></svg>
@@ -855,7 +859,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                     <button
                       onClick={() => setContinuousMode(true)}
                       className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs transition ${
-                        continuousMode ? "bg-white/20 text-white" : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
+                        continuousMode ? "bg-ink text-bg" : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
                       }`}
                     >
                       <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5"><path d="M4 4h16v4H4zm0 6h16v4H4zm0 6h16v4H4z" /></svg>
@@ -865,15 +869,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                 </div>
 
                 {/* Data saver section */}
-                <div className={`${data && pages.length > 0 ? "border-b border-white/10" : ""} px-4 py-3`}>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/40">คุณภาพ</p>
+                <div className={`${data && pages.length > 0 ? "border-b border-line" : ""} px-4 py-3`}>
+                  <p className="mb-2 text-xs font-semibold uppercase text-ink-3">คุณภาพ</p>
                   <button
                     onClick={() => setUseSaver((s) => !s)}
-                    className="flex w-full items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"
+                    className="flex w-full items-center justify-between rounded-lg bg-fill px-3 py-2 text-xs text-ink-2 transition hover:bg-raised hover:text-ink"
                   >
                     <span>{useSaver ? "Data Saver" : "HD"}</span>
                     <span className={`rounded px-2 py-0.5 text-xs ${
-                      useSaver ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"
+                      useSaver ? "bg-accent/20 text-accent" : "bg-ok/20 text-ok"
                     }`}>
                       {useSaver ? "ประหยัดข้อมูล" : "คุณภาพสูง"}
                     </span>
@@ -888,9 +892,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   return (
                     <div className="px-4 py-3">
                       <div className="mb-2 flex items-center gap-2">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-white/40">การแปล AI</p>
+                        <p className="text-xs font-semibold uppercase text-ink-3">การแปล AI</p>
                         <span className={`h-1.5 w-1.5 rounded-full ${
-                          mitStatus === "online" ? "bg-green-400" : mitStatus === "offline" ? "bg-red-500" : "bg-white/30"
+                          mitStatus === "online" ? "bg-ok" : mitStatus === "offline" ? "bg-danger" : "bg-ink-3"
                         }`} />
                       </div>
 
@@ -903,8 +907,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                               onClick={() => setTargetLang(l.code)}
                               className={`rounded-lg px-3 py-1.5 text-xs transition ${
                                 currentTarget?.code === l.code
-                                  ? "bg-white/15 font-semibold text-white"
-                                  : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                                  ? "bg-ink font-semibold text-bg"
+                                  : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
                               }`}
                             >
                               {l.label}
@@ -920,8 +924,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                             onClick={() => selectImageModel(null)}
                             className={`rounded-lg px-3 py-1.5 text-xs transition ${
                               imageModel === null
-                                ? "bg-white/15 font-semibold text-white"
-                                : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                                ? "bg-ink font-semibold text-bg"
+                                : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
                             }`}
                           >
                             อัตโนมัติ
@@ -932,8 +936,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                               onClick={() => selectImageModel(m)}
                               className={`rounded-lg px-3 py-1.5 text-xs transition ${
                                 imageModel === m
-                                  ? "bg-white/15 font-semibold text-white"
-                                  : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                                  ? "bg-ink font-semibold text-bg"
+                                  : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
                               }`}
                             >
                               {m.replace(/^gemini-/, "")}
@@ -948,11 +952,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         <button
                           onClick={() => { translateCurrentPage(); setMoreMenuOpen(false); }}
                           disabled={translatingCurrentPage || translating}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-accent/90 transition hover:bg-white/10 hover:text-accent disabled:opacity-50"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-accent/90 transition hover:bg-fill hover:text-accent disabled:opacity-50"
                         >
                           {translatingCurrentPage ? (
                             <>
-                              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" strokeOpacity="0.3" /><path d="M12 3a9 9 0 0 1 9 9" /></svg>
+                              <Loader context="translate" label="กำลังแปล" />
                               กำลังแปลหน้า {(translatingCurrentPageIndex ?? page) + 1}...
                             </>
                           ) : (
@@ -964,7 +968,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         </button>
                         <button
                           onClick={() => { if (translating) { cancelTranslate(); } else { startTranslate(); setMoreMenuOpen(false); } }}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition hover:bg-white/10 hover:text-white"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink-2 transition hover:bg-fill hover:text-ink"
                         >
                           {translating ? (
                             <>
@@ -982,7 +986,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         {translateMenu.viewToggleLabel && (
                           <button
                             onClick={() => { setShowTranslation((s) => !s); setMoreMenuOpen(false); }}
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/65 transition hover:bg-white/10 hover:text-white"
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink-2 transition hover:bg-fill hover:text-ink"
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                             {translateMenu.viewToggleLabel}
@@ -991,7 +995,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         {showTranslation && !continuousMode && (
                           <button
                             onClick={() => { setSideBySide((s) => !s); setMoreMenuOpen(false); }}
-                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition hover:bg-white/10 ${sideBySide ? "text-blue-300" : "text-white/65 hover:text-white"}`}
+                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition hover:bg-fill ${sideBySide ? "text-accent" : "text-ink-2 hover:text-ink"}`}
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0">
                               <rect x="2" y="3" width="9" height="18" rx="1" /><rect x="13" y="3" width="9" height="18" rx="1" />
@@ -1008,7 +1012,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
             {mangaId && (
               <>
-                <button onClick={() => setCommentOpen(true)} title="ความคิดเห็น" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/70 transition hover:bg-white/15 hover:text-white">
+                <button onClick={() => setCommentOpen(true)} title="ความคิดเห็น" className="flex h-9 w-9 items-center justify-center rounded-full border border-ink-3 text-ink-2 transition hover:bg-raised hover:text-ink">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4.5 w-4.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
                   </svg>
@@ -1016,7 +1020,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                 <ReportButton contentType="manga" contentId={mangaId} />
               </>
             )}
-            <button onClick={handleClose} title="ปิด" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white transition hover:bg-white/15">
+            <button onClick={handleClose} title="ปิด" className="flex h-9 w-9 items-center justify-center rounded-full border border-ink-3 text-ink transition hover:bg-raised">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5"><path d="M18 6L6 18M6 6l12 12" /></svg>
             </button>
           </div>
@@ -1049,22 +1053,22 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           <div data-lenis-prevent ref={scrollContainerRef} className="flex flex-1 flex-col items-center overflow-y-auto custom-scrollbar">
             <div ref={continuousContentRef} className="flex w-full flex-col items-center">
             {loading && (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-white/50">
-                <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-ink-2">
+                <Loader context="page" />
                 <span className="text-sm">กำลังโหลดหน้ามังงะ...</span>
               </div>
             )}
             {error && (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-white/50">
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-ink-2">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12 opacity-40"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
                 <p className="text-sm">ไม่สามารถโหลดหน้ามังงะได้</p>
               </div>
             )}
             {noCacheError && (
               <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12 text-yellow-500/60"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" /><path d="M16 3v4M8 3v4M12 12h.01" /></svg>
-                <p className="text-sm font-semibold text-yellow-400">ไม่มีข้อมูลใน Cache</p>
-                <p className="max-w-xs text-xs text-white/40">รูปภาพตอนนี้ยังไม่ได้ถูกดาวน์โหลดเก็บไว้ในเครื่องยัง ลองอ่านตอนนี้ในโหมดปกติก่อน เพื่อให้ระบบดาวน์โหลดข้อมูลมาเก็บ</p>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12 text-accent/60"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" /><path d="M16 3v4M8 3v4M12 12h.01" /></svg>
+                <p className="text-sm font-semibold text-accent">ไม่มีข้อมูลใน Cache</p>
+                <p className="max-w-xs text-xs text-ink-3">รูปภาพตอนนี้ยังไม่ได้ถูกดาวน์โหลดเก็บไว้ในเครื่องยัง ลองอ่านตอนนี้ในโหมดปกติก่อน เพื่อให้ระบบดาวน์โหลดข้อมูลมาเก็บ</p>
               </div>
             )}
             {data && (
@@ -1101,26 +1105,26 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           /* ── Paged mode ── */
           <div className={`relative flex flex-1 items-center justify-center overflow-hidden ${zoom > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : ""}`}>
             {loading && (
-              <div className="flex flex-col items-center gap-3 text-white/50">
-                <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
+              <div className="flex flex-col items-center gap-3 text-ink-2">
+                <Loader context="page" />
                 <span className="text-sm">กำลังโหลดหน้ามังงะ...</span>
               </div>
             )}
             {error && (
-              <div className="flex flex-col items-center gap-3 text-center text-white/50">
+              <div className="flex flex-col items-center gap-3 text-center text-ink-2">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12 opacity-40"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
                 <p className="text-sm">ไม่สามารถโหลดหน้ามังงะได้</p>
-                <p className="text-xs text-white/30">ตอนนี้อาจถูกล็อกหรือยังไม่มีภาพให้อ่าน</p>
+                <p className="text-xs text-ink-3">ตอนนี้อาจถูกล็อกหรือยังไม่มีภาพให้อ่าน</p>
               </div>
             )}
             {noCacheError && (
               <div className="relative flex flex-1 flex-col items-center justify-center gap-2 text-center">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12 text-yellow-500/60">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12 text-accent/60">
                   <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
                   <path d="M16 3v4M8 3v4M12 12h.01" />
                 </svg>
-                <p className="text-sm font-semibold text-yellow-400">ไม่มีข้อมูลใน Cache</p>
-                <p className="max-w-xs text-xs text-white/40">รูปภาพตอนนี้ยังไม่ได้ถูกดาวน์โหลดเก็บไว้ในเครื่องยัง ลองอ่านตอนนี้ในโหมดปกติก่อน เพื่อให้ระบบดาวน์โหลดข้อมูลมาเก็บ</p>
+                <p className="text-sm font-semibold text-accent">ไม่มีข้อมูลใน Cache</p>
+                <p className="max-w-xs text-xs text-ink-3">รูปภาพตอนนี้ยังไม่ได้ถูกดาวน์โหลดเก็บไว้ในเครื่องยัง ลองอ่านตอนนี้ในโหมดปกติก่อน เพื่อให้ระบบดาวน์โหลดข้อมูลมาเก็บ</p>
               </div>
             )}
             {data && (
@@ -1129,7 +1133,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   <div className="flex h-full w-full gap-0.5 overflow-hidden">
                     {/* Original */}
                     <div className="relative flex flex-1 flex-col overflow-hidden">
-                      <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-2.5 py-0.5 text-xs text-white/50 backdrop-blur-sm">ต้นฉบับ</div>
+                      <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-bg/60 px-2.5 py-0.5 text-xs text-ink-2 backdrop-blur-sm">ต้นฉบับ</div>
                       <PageRenderer
                         viewport={viewport}
                         data={data}
@@ -1159,7 +1163,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                     </div>
                     {/* Translated */}
                     <div className="relative flex flex-1 flex-col overflow-hidden">
-                      <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-blue-500/30 px-2.5 py-0.5 text-xs text-blue-300 backdrop-blur-sm">แปล</div>
+                      <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-accent/30 px-2.5 py-0.5 text-xs text-accent backdrop-blur-sm">แปล</div>
                       <PageRenderer
                         viewport={viewport}
                         data={data}
@@ -1232,31 +1236,23 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             per-page badges scroll out of view; this pill never does. */}
         {(translating || translatingCurrentPage) && (
           <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 -translate-x-1/2">
-            <div className="flex flex-col items-center gap-1 rounded-2xl border border-blue-400/40 bg-black/85 px-4 py-2 shadow-xl shadow-black/60 backdrop-blur-sm">
-              <div className="flex items-center gap-2">
-                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400/30 border-t-blue-400" />
-                <span className="text-xs font-medium text-blue-300">
-                  {pillMainText(translating, transProgress.done, transProgress.total, (translatingCurrentPageIndex ?? page) + 1)}
-                  {translateDetail ? ` · ${translateDetail}` : "..."}
-                </span>
-                {transProgress.failed > 0 && (
-                  <span className="text-xs font-medium text-red-400">ไม่สำเร็จ {transProgress.failed}</span>
-                )}
-              </div>
-              {translateSubline && (
-                <span className="text-xs text-white/40">{translateSubline}</span>
-              )}
-            </div>
+            <TranslateProgress
+              title={pillMainText(translating, transProgress.done, transProgress.total, (activePage ?? page) + 1)}
+              stage={stageInfo}
+              elapsedSec={pageElapsedSec}
+              subline={translateSubline}
+              failed={transProgress.failed}
+            />
           </div>
         )}
 
         {/* Bottom page strip */}
-        <div className={`shrink-0 overflow-hidden border-t border-white/10 bg-black/80 transition-all duration-300 ease-in-out ${
+        <div className={`shrink-0 overflow-hidden border-t border-line bg-bg/80 transition-all duration-300 ease-in-out ${
           contentReady && !error && totalPages > 0 ? "max-h-10 opacity-100 pt-0.5 pb-2.5" : "max-h-0 opacity-0 py-0"
         }`}>
           <div ref={stripScrollRef} className="flex gap-1 overflow-x-auto px-4 pt-0.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {pages.map((_, i: number) => {
-              const btnCurrentTranslating = translatingCurrentPageIndex === i;
+              const btnCurrentTranslating = activePage === i;
               const btnQueued = translating && !completedTranslatedPages.has(i) && !btnCurrentTranslating;
               const btnDone = patchedPages.has(i);
               return (
@@ -1266,15 +1262,15 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   onClick={() => continuousMode ? scrollToPage(i) : setPage(i)}
                   className={`relative flex h-7 min-w-9 shrink-0 items-center justify-center rounded-md text-xs font-medium transition-[background-color,color,box-shadow,transform] duration-700 ease-out ${
                     i === page
-                      ? "bg-white/90 text-black shadow-[0_0_0_1px_rgba(255,255,255,0.52),0_0_14px_rgba(255,255,255,0.12)]"
-                      : "bg-white/8 text-white/55 shadow-[0_0_0_1px_rgba(255,255,255,0)] hover:bg-white/14"
+                      ? "bg-ink/90 text-bg"
+                      : "bg-fill text-ink-2 hover:bg-raised"
                   } ${
                     btnCurrentTranslating
-                      ? "ring-1 ring-slate-300/70 animate-pulse [animation-duration:1.8s]"
+                      ? "ring-1 ring-accent/70 animate-pulse [animation-duration:1.8s]"
                       : btnQueued
-                      ? "ring-1 ring-slate-500/55"
+                      ? "ring-1 ring-ink-3"
                       : btnDone
-                      ? "ring-1 ring-white/55"
+                      ? "ring-1 ring-ink-2"
                       : ""
                   }`}
                 >

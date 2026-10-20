@@ -36,12 +36,12 @@ export default function BookRouteModal({ id }: { id: string }) {
 
   if (state === "missing") {
     return (
-      <div className="fixed inset-0 z-200 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-        <div className="rounded-2xl bg-[#141414] p-8 text-center shadow-2xl">
-          <p className="text-white/60">ไม่พบข้อมูลหนังสือ</p>
+      <div className="fixed inset-0 z-200 flex items-center justify-center bg-scrim/70 p-4 backdrop-blur-sm">
+        <div className="rounded-2xl bg-surface p-8 text-center shadow-2xl">
+          <p className="text-ink-2">ไม่พบข้อมูลหนังสือ</p>
           <button
             onClick={close}
-            className="mt-4 rounded-lg border border-white/20 px-4 py-2 text-sm text-white/70 hover:bg-white/10"
+            className="mt-4 rounded-lg border border-ink-3 px-4 py-2 text-sm text-ink-2 hover:bg-fill"
           >
             ← กลับหน้าแรก
           </button>

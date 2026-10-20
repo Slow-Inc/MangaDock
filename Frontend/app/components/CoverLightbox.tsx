@@ -29,13 +29,13 @@ export default function CoverLightbox({ src, alt, onClose }: Props) {
       onClick={close}
     >
       {/* Dark backdrop */}
-      <div className="absolute inset-0 bg-black/90" />
+      <div className="absolute inset-0 bg-scrim/90" />
 
       {/* Close button */}
       <button
         onClick={close}
         title="ปิด"
-        className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white/70 backdrop-blur-sm transition hover:bg-white/20 hover:text-white"
+        className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-fill text-ink-2 backdrop-blur-sm transition hover:bg-raised hover:text-ink"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
           <path d="M18 6 6 18M6 6l12 12" />
@@ -53,13 +53,13 @@ export default function CoverLightbox({ src, alt, onClose }: Props) {
         <img
           src={src}
           alt={alt}
-          className="max-h-[88vh] max-w-[80vw] rounded-2xl object-contain shadow-2xl shadow-black/60 ring-1 ring-white/10"
+          className="max-h-[88vh] max-w-[80vw] rounded-2xl object-contain shadow-2xl shadow-black/60 ring-1 ring-line"
         />
       </div>
 
       {/* Title caption */}
       <p
-        className={`absolute bottom-5 left-0 right-0 text-center text-sm text-white/50 transition-opacity duration-300 ${
+        className={`absolute bottom-5 left-0 right-0 text-center text-sm text-ink-2 transition-opacity duration-300 ${
           visible ? "opacity-100" : "opacity-0"
         }`}
       >

@@ -111,17 +111,17 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
   return (
     <section className="mt-8 px-6">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-base font-semibold text-white/90">รีวิวจากผู้อ่าน</h3>
+        <h3 className="text-base font-semibold text-ink">รีวิวจากผู้อ่าน</h3>
         <div className="flex items-center gap-2">
           {summary.count > 0 && (
-            <span className="text-sm text-white/50">
+            <span className="text-sm text-ink-2">
               {summary.averageRating.toFixed(1)} / 5 · {summary.count} รีวิว
             </span>
           )}
           {user && !myReview && !showForm && (
             <button
               onClick={() => setShowForm(true)}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/70 transition hover:border-white/20 hover:text-white/90"
+              className="rounded-lg border border-line bg-fill px-3 py-1 text-xs font-medium text-ink-2 transition hover:border-ink-3 hover:text-ink"
             >
               เขียนรีวิว
             </button>
@@ -143,13 +143,13 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
           onSubmit={handleSubmit}
           className="mb-5 rounded-xl border border-accent/40 bg-accent/10 p-4"
         >
-          <p className="mb-3 text-sm font-medium text-white/80">
+          <p className="mb-3 text-sm font-medium text-ink">
             {myReview ? "แก้ไขรีวิวของคุณ" : "เขียนรีวิว"}
           </p>
           <div className="mb-3 flex items-center gap-2">
             <StarRating value={rating} onChange={setRating} size="lg" />
             {rating > 0 && (
-              <span className="text-sm text-white/50">{rating} / 5</span>
+              <span className="text-sm text-ink-2">{rating} / 5</span>
             )}
           </div>
           <textarea
@@ -157,7 +157,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
             onChange={(e) => setBody(e.target.value)}
             placeholder="แสดงความคิดเห็นเพิ่มเติม (ไม่บังคับ)"
             rows={3}
-            className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 placeholder-white/25 outline-none transition focus:border-ink-3 focus:bg-white/8"
+            className="w-full resize-none rounded-lg border border-line bg-fill px-3 py-2 text-sm text-ink placeholder-ink-3 outline-none transition focus:border-ink-3 focus:bg-raised"
           />
           <div className="mt-3 flex items-center justify-end gap-2">
             <button
@@ -167,7 +167,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
                 if (myReview) { setRating(myReview.rating); setBody(myReview.body ?? ""); }
                 else { setRating(0); setBody(""); }
               }}
-              className="rounded-lg px-3 py-1.5 text-sm text-white/40 transition hover:text-white/70"
+              className="rounded-lg px-3 py-1.5 text-sm text-ink-3 transition hover:text-ink-2"
             >
               ยกเลิก
             </button>
@@ -191,9 +191,9 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
 
       {/* Other reviews */}
       {loadingReviews ? (
-        <div className="py-6 text-center text-sm text-white/30">กำลังโหลด...</div>
+        <div className="py-6 text-center text-sm text-ink-3">กำลังโหลด...</div>
       ) : others.length === 0 && !myReview ? (
-        <div className="py-6 text-center text-sm text-white/30">ยังไม่มีรีวิว เป็นคนแรกที่รีวิว!</div>
+        <div className="py-6 text-center text-sm text-ink-3">ยังไม่มีรีวิว เป็นคนแรกที่รีวิว!</div>
       ) : (
         <div className="flex flex-col gap-3">
           {others.map((r) => (
@@ -205,7 +205,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       {!user && (
         <button
           onClick={showLoginPrompt}
-          className="mt-4 w-full rounded-xl border border-white/8 py-3 text-sm text-white/40 transition hover:border-white/15 hover:text-white/60"
+          className="mt-4 w-full rounded-xl border border-line py-3 text-sm text-ink-3 transition hover:border-line hover:text-ink-2"
         >
           เข้าสู่ระบบเพื่อเขียนรีวิว
         </button>

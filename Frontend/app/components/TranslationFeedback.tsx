@@ -68,14 +68,14 @@ export default function TranslationFeedback({ mangaId, chapterId, pageNumber }: 
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1 backdrop-blur-sm">
-      <span className="mr-1 text-xs text-white/40">คุณภาพแปล</span>
+    <div className="flex items-center gap-1 rounded-full border border-line bg-bg/50 px-2 py-1 backdrop-blur-sm">
+      <span className="mr-1 text-xs text-ink-3">คุณภาพแปล</span>
       <button
         onClick={() => handleVote(1)}
         disabled={submitting}
         title="แปลได้ดี"
         className={`flex h-6 w-6 items-center justify-center rounded-full transition ${
-          vote === 1 ? "bg-green-500/20 text-green-400" : "text-white/40 hover:text-green-400"
+          vote === 1 ? "bg-ok/20 text-ok" : "text-ink-3 hover:text-ok"
         }`}
       >
         <svg viewBox="0 0 24 24" fill={vote === 1 ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
@@ -87,7 +87,7 @@ export default function TranslationFeedback({ mangaId, chapterId, pageNumber }: 
         disabled={submitting}
         title="แปลไม่ดี"
         className={`flex h-6 w-6 items-center justify-center rounded-full transition ${
-          vote === -1 ? "bg-red-500/20 text-red-400" : "text-white/40 hover:text-red-400"
+          vote === -1 ? "bg-danger/20 text-danger" : "text-ink-3 hover:text-danger"
         }`}
       >
         <svg viewBox="0 0 24 24" fill={vote === -1 ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">

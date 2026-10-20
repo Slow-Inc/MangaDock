@@ -61,7 +61,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
     variant === "menu-item" ? (
       <button
         onClick={handleOpen}
-        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-400/80 transition hover:bg-red-500/10 hover:text-red-300"
+        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-danger/80 transition hover:bg-danger/10 hover:text-danger"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l1.664 9.143M3 3h13m0 0l1.664 9.143M16 3l1.664 9.143M4.664 12.143h12.672M6 21l1-4h10l1 4" />
@@ -72,7 +72,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
       <button
         onClick={handleOpen}
         title="รายงาน"
-        className="flex h-7 w-7 items-center justify-center rounded-full text-white/25 transition hover:bg-red-500/10 hover:text-red-400"
+        className="flex h-7 w-7 items-center justify-center rounded-full text-ink-3 transition hover:bg-danger/10 hover:text-danger"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
@@ -86,16 +86,16 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
 
       {/* Modal */}
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div ref={dialogRef} className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#1a1a1a] p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-scrim/60 p-4 backdrop-blur-sm">
+          <div ref={dialogRef} className="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-2xl">
             {done ? (
               <div className="text-center">
                 <div className="mb-3 text-3xl">✅</div>
-                <p className="font-semibold text-white/90">ส่งรายงานแล้ว</p>
-                <p className="mt-1 text-sm text-white/40">ขอบคุณที่ช่วยดูแลชุมชน</p>
+                <p className="font-semibold text-ink">ส่งรายงานแล้ว</p>
+                <p className="mt-1 text-sm text-ink-3">ขอบคุณที่ช่วยดูแลชุมชน</p>
                 <button
                   onClick={() => setOpen(false)}
-                  className="mt-5 w-full rounded-xl bg-white/10 py-2.5 text-sm text-white/70 transition hover:bg-white/15"
+                  className="mt-5 w-full rounded-xl bg-fill py-2.5 text-sm text-ink-2 transition hover:bg-raised"
                 >
                   ปิด
                 </button>
@@ -103,8 +103,8 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
             ) : (
               <form onSubmit={handleSubmit}>
                 <div className="mb-4 flex items-center justify-between">
-                  <p className="font-semibold text-white/90">รายงานเนื้อหา</p>
-                  <button type="button" onClick={() => setOpen(false)} className="text-white/30 transition hover:text-white/70">
+                  <p className="font-semibold text-ink">รายงานเนื้อหา</p>
+                  <button type="button" onClick={() => setOpen(false)} className="text-ink-3 transition hover:text-ink-2">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
                       <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
                     </svg>
@@ -112,7 +112,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
                 </div>
                 <div className="mb-3 space-y-2">
                   {REASONS.map((r) => (
-                    <label key={r.value} className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 transition ${reason === r.value ? "border-accent/40 bg-accent/10" : "border-white/8 hover:border-white/15"}`}>
+                    <label key={r.value} className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 transition ${reason === r.value ? "border-accent/40 bg-accent/10" : "border-line hover:border-line"}`}>
                       <input
                         type="radio"
                         name="reason"
@@ -121,7 +121,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
                         onChange={() => setReason(r.value)}
                         className="accent-accent"
                       />
-                      <span className="text-sm text-white/75">{r.label}</span>
+                      <span className="text-sm text-ink">{r.label}</span>
                     </label>
                   ))}
                 </div>
@@ -131,13 +131,13 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
                     onChange={(e) => setDetails(e.target.value)}
                     placeholder="อธิบายเพิ่มเติม..."
                     rows={2}
-                    className="mb-3 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 placeholder-white/25 outline-none focus:border-ink-3"
+                    className="mb-3 w-full resize-none rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder-ink-3 outline-none focus:border-ink-3"
                   />
                 )}
                 <button
                   type="submit"
                   disabled={!reason || submitting}
-                  className="w-full rounded-xl bg-red-600/80 py-2.5 text-sm font-semibold text-white transition enabled:hover:bg-red-600 disabled:opacity-40"
+                  className="w-full rounded-xl bg-danger/80 py-2.5 text-sm font-semibold text-bg transition enabled:hover:bg-danger disabled:opacity-40"
                 >
                   {submitting ? "กำลังส่ง..." : "ส่งรายงาน"}
                 </button>

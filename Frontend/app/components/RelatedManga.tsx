@@ -20,7 +20,7 @@ function RelatedCard({ book }: { book: LandingBook }) {
         onClick={() => setShowModal(true)}
         className="group flex w-[7.5rem] min-w-[7.5rem] shrink-0 flex-col gap-2 text-left"
       >
-        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-white/10 bg-white/5">
+        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-line bg-fill">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={thumbSrc}
@@ -34,9 +34,9 @@ function RelatedCard({ book }: { book: LandingBook }) {
             }}
             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
           />
-          <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+          <div className="absolute inset-0 bg-linear-to-t from-bg/60 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
         </div>
-        <p className="line-clamp-2 text-[11px] leading-snug text-white/70 transition group-hover:text-white">
+        <p className="line-clamp-2 text-[11px] leading-snug text-ink-2 transition group-hover:text-ink">
           {book.title}
         </p>
       </button>
@@ -60,11 +60,11 @@ function ScrollArrow({
       onClick={onClick}
       aria-label={dir === "left" ? "เลื่อนซ้าย" : "เลื่อนขวา"}
       // top = half the 2:3 cover height (7.5rem wide -> 11.25rem tall), so it centres on the covers, not the titles
-      className={`absolute ${dir === "left" ? "left-1" : "right-1"} top-[5.625rem] z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/70 ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-black/90 md:flex ${
+      className={`absolute ${dir === "left" ? "left-1" : "right-1"} top-[5.625rem] z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-bg/70 ring-1 ring-ink-3 backdrop-blur-sm transition hover:bg-bg/90 md:flex ${
         visible ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
-      <svg viewBox="0 0 24 24" fill="white" className="h-5 w-5" aria-hidden>
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-ink" aria-hidden>
         <path d={dir === "left" ? "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" : "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"} />
       </svg>
     </button>
@@ -110,7 +110,7 @@ export default function RelatedManga({ mangaId }: { mangaId: string }) {
 
   return (
     <section className="mt-6 px-6 pb-6">
-      <h3 className="mb-3 text-sm font-bold text-white">มังงะที่คล้ายกัน</h3>
+      <h3 className="mb-3 text-sm font-bold text-ink">มังงะที่คล้ายกัน</h3>
       <div className="relative">
         <ScrollArrow dir="left" visible={canScrollLeft} onClick={() => scrollBy("left")} />
         <ScrollArrow dir="right" visible={canScrollRight} onClick={() => scrollBy("right")} />
