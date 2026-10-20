@@ -1,5 +1,5 @@
 const required = [
-  "EXPO_PUBLIC_WEB_URL",
+  "EXPO_PUBLIC_API_BASE_URL",
   "EXPO_PUBLIC_SUPABASE_URL",
   "EXPO_PUBLIC_SUPABASE_ANON_KEY",
 ];
@@ -11,7 +11,7 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-for (const name of ["EXPO_PUBLIC_WEB_URL", "EXPO_PUBLIC_SUPABASE_URL"]) {
+for (const name of ["EXPO_PUBLIC_API_BASE_URL", "EXPO_PUBLIC_SUPABASE_URL"]) {
   try {
     new URL(process.env[name]);
   } catch {

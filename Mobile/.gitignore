@@ -1,6 +1,7 @@
 node_modules/
 .expo/
 dist/
+.native-export/
 build/
 android/
 ios/
@@ -14,4 +15,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 *.log
+.npm-logs/
+.npm-cache/
 .DS_Store

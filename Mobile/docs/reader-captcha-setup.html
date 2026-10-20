@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="th">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ตั้งหน้า CAPTCHA สำหรับ MangaDock Mobile</title>
+<style>
+body{font:17px/1.8 system-ui,sans-serif;background:#0b1020;color:#e6edf7;margin:0}main{max-width:780px;margin:auto;padding:32px 24px}h1{line-height:1.3}h2{font-size:21px;color:#c4b5fd}section{background:#151d31;border:1px solid #2b3650;border-radius:14px;padding:18px 22px;margin:20px 0}pre{background:#090e1b;border-radius:8px;padding:14px;overflow:auto;white-space:pre-wrap}code{color:#fde68a}a{color:#a5b4fc}.note{border-left:3px solid #a78bfa;padding-left:14px}label{display:block;margin:12px 0}input{margin-right:10px}
+</style>
+<main>
+<p>MANGADOCK · คู่มือตั้งค่าจริง · 2026-10-05</p>
+<h1>เปิดหน้าตรวจสอบก่อนเริ่มอ่าน</h1>
+<p>แอปเปิดหน้า HTTPS เพื่อรับผลจาก Turnstile แล้วกลับเข้าแอป Backend เดิมตรวจผลและออกสิทธิ์อ่าน หน้าเว็บนี้ใช้ไฟล์ที่มีอยู่แล้วใน <code>Mobile/captcha/</code></p>
+<p class="note">URL และ key ด้านล่างเป็นตัวอย่าง ต้องแทนด้วยค่าจริง Cloudflare MCP เป็นเครื่องมือเชื่อมต่อ ไม่ใช่ URL หน้าตรวจสอบ</p>
+<section><h2>1. เลือก Turnstile widget เดิม</h2><p>เปิด Cloudflare Dashboard → Turnstile เลือก widget ที่มี Site key ตรงกับ <code>NEXT_PUBLIC_TURNSTILE_SITE_KEY</code> ใน <code>Frontend/.env</code> และตรวจว่า Secret key ของ widget เดียวกันอยู่ใน <code>Backend/.env</code> เป็น <code>TURNSTILE_SECRET_KEY</code> ใช้คู่เดิมเพื่อให้ Backend ตรวจ token ได้ ไม่ต้องส่ง secret ในแชต</p><label><input type="checkbox">ตรวจคู่ Site key / Secret key แล้ว</label></section>
+<section><h2>2. ตั้ง public site key ของหน้าตรวจ</h2><p>เปิด <code>Mobile/captcha/config.js</code> คัดลอกค่าของ NEXT_PUBLIC_TURNSTILE_SITE_KEY มาใส่เฉพาะค่า Site key:</p><pre>window.MANGADOCK_CAPTCHA_SITE_KEY = 'SITE_KEY_จริงของคุณ';</pre><p>Site key ใช้ในหน้าเว็บ ส่วน Secret key คงอยู่ที่ Backend</p><label><input type="checkbox">บันทึก config.js แล้ว</label></section>
+<section><h2>3. เผยแพร่หน้าเว็บบน Cloudflare Pages</h2><p>Dashboard → Workers &amp; Pages → Create application → Pages / Get started → Drag and drop your files ตั้งชื่อโครงการ เช่น <code>mangadock-captcha</code> แล้วอัปโหลดโฟลเดอร์ <code>Mobile/captcha</code> โดยให้ไฟล์สามไฟล์ต่อไปนี้อยู่ที่ root ของเว็บ:</p><pre>index.html
+config.js
+protocol.mjs</pre><p>เลือก Deploy site แล้วคัดลอก URL production ที่ Cloudflare ให้จริง ตัวอย่าง <code>https://mangadock-captcha.pages.dev</code> ชื่อจริงอาจต่างจากตัวอย่าง</p><label><input type="checkbox">Deploy และเก็บ URL จริงแล้ว</label></section>
+<section><h2>4. อนุญาต hostname ใน Turnstile</h2><p>กลับไป widget เดิม → Settings → Hostname Management → Add Hostnames เพิ่มเฉพาะ hostname ของ production เช่น:</p><pre>mangadock-captcha.pages.dev</pre><p>ใช้ชื่อจริงจากขั้น 3 โดยไม่ใส่ https://, port หรือ /index.html คง hostnames เว็บเดิมทั้งหมด</p><label><input type="checkbox">เพิ่ม hostname จริงและบันทึกแล้ว</label></section>
+<section><h2>5. ตั้ง URL ใน Mobile</h2><p>เพิ่มใน <code>Mobile/.env</code> โดยใช้ URL ของ production ที่ได้จริง:</p><pre>EXPO_PUBLIC_CAPTCHA_URL=https://mangadock-captcha.pages.dev/index.html</pre><p>Mobile อ่าน env ของตัวเอง จึงต้องตั้งค่านี้แม้ Frontend มี key แล้ว</p><label><input type="checkbox">Mobile/.env ใช้ URL จริงแล้ว</label></section>
+<section><h2>6. โหลดค่าใหม่และลองจากแอป</h2><p>หยุด Metro เดิมด้วย Ctrl+C รันในโฟลเดอร์ Mobile:</p><pre>npm.cmd run start -- --clear</pre><p>Reload แอป development ที่ต่อ Metro เปิดตอน → เปิดการตรวจสอบ → ทำ Turnstile → กดกลับไป MangaDock ควรกลับมาโหลดหน้าอ่านผ่าน Backend ที่กำลังทำงานอยู่ แอป release ที่ bundle JS ไว้ต้อง build ใหม่เมื่อเปลี่ยน public env</p><label><input type="checkbox">หน้าตรวจเปิด widget และกลับมาอ่านต่อได้จริง</label></section>
+<section><h2>ตรวจอาการหากยังไม่ผ่าน</h2><p><strong>เปิดหน้าตรวจสอบไม่ได้ในแอป:</strong> ตรวจ Mobile env และ reload JS <strong>หน้าเว็บบอกไม่พบคำขอ:</strong> เปิดใหม่จากแอป เพราะแอปต้องสร้าง state ของคำขอ <strong>widget ไม่ขึ้น:</strong> ตรวจ config.js ที่ deploy แล้วและ hostname <strong>กลับเข้าแอปแล้วตรวจไม่ผ่าน:</strong> ตรวจคู่ key และข้อความตอบจาก Backend</p><p>การเปิด URL โดยตรงไม่ได้ยืนยัน flow ทั้งหมด เพราะยังไม่มีคำขอจากแอป หากเปลี่ยน config.js หลัง deploy ต้องอัปโหลด deployment ใหม่</p></section>
+<p>เอกสารต้นทาง: <a href="https://developers.cloudflare.com/pages/get-started/direct-upload/">Pages Direct Upload</a> · <a href="https://developers.cloudflare.com/turnstile/additional-configuration/hostname-management/">Turnstile hostnames</a> · <a href="https://developers.cloudflare.com/turnstile/get-started/">Turnstile key pair</a> · <a href="https://docs.expo.dev/guides/environment-variables/">Expo public environment</a></p>
+</main>
+</html>

@@ -1,0 +1,179 @@
+{
+  "parent": "https://github.com/Slow-Inc/MangaDock/issues/724",
+  "slices": [
+    {
+      "slice": 1,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/725",
+      "type": "AFK",
+      "phase": 1
+    },
+    {
+      "slice": 2,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/726",
+      "type": "AFK",
+      "phase": 1
+    },
+    {
+      "slice": 3,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/727",
+      "type": "HITL",
+      "phase": 1
+    },
+    {
+      "slice": 4,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/728",
+      "type": "AFK",
+      "phase": 1
+    },
+    {
+      "slice": 5,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/729",
+      "type": "AFK",
+      "phase": 1
+    },
+    {
+      "slice": 6,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/730",
+      "type": "AFK",
+      "phase": 1
+    },
+    {
+      "slice": 7,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/731",
+      "type": "AFK",
+      "phase": 1
+    },
+    {
+      "slice": 8,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/732",
+      "type": "AFK",
+      "phase": 1
+    },
+    {
+      "slice": 9,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/733",
+      "type": "AFK",
+      "phase": 1
+    },
+    {
+      "slice": 10,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/734",
+      "type": "HITL",
+      "phase": 1
+    },
+    {
+      "slice": 11,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/735",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 12,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/736",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 13,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/737",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 14,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/738",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 15,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/739",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 16,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/740",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 17,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/741",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 18,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/742",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 19,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/743",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 20,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/744",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 21,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/745",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 22,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/746",
+      "type": "AFK",
+      "phase": 2
+    },
+    {
+      "slice": 23,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/747",
+      "type": "AFK",
+      "phase": 3
+    },
+    {
+      "slice": 24,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/748",
+      "type": "AFK",
+      "phase": 3
+    },
+    {
+      "slice": 25,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/749",
+      "type": "AFK",
+      "phase": 3
+    },
+    {
+      "slice": 26,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/750",
+      "type": "AFK",
+      "phase": 3
+    },
+    {
+      "slice": 27,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/751",
+      "type": "AFK",
+      "phase": 3
+    },
+    {
+      "slice": 28,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/752",
+      "type": "AFK",
+      "phase": 3
+    },
+    {
+      "slice": 29,
+      "url": "https://github.com/Slow-Inc/MangaDock/issues/753",
+      "type": "HITL",
+      "phase": 3
+    }
+  ]
+}
