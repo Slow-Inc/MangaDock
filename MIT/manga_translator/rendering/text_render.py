@@ -84,9 +84,36 @@ def _insert_thai_word_breaks(text: str) -> str:
         return text
     try:
         tokens = _thai_tokenize(text, engine='newmm', keep_whitespace=False)
-        return _ZWSP.join(t for t in tokens if t.strip())
+        return _ZWSP.join(_glue_thai_tokens([t for t in tokens if t.strip()]))
     except Exception:
         return text
+
+
+# Bound morphemes newmm splits off their head ('ผู้|พักอาศัย'): a line must not end on one.
+_THAI_PREFIXES = frozenset(['ผู้', 'นัก', 'การ', 'ความ', 'ชาว', 'ช่าง'])
+_OPENERS = frozenset('([“‘「『')
+_CLOSERS = frozenset(')]”’」』')
+
+
+def _glue_thai_tokens(tokens: List[str]) -> List[str]:
+    """Join tokens that must not be separated by a line break: a prefix morpheme or an opening
+    bracket/quote with the next token, and a repetition mark (ๆ/ฯ) or closing bracket/quote with
+    the previous one. A straight `"` alternates: it opens, then closes."""
+    out: List[str] = []
+    bind_next = False
+    quote_open = False
+    for tok in tokens:
+        opener = all(c in _OPENERS for c in tok)
+        closer = all(c in _CLOSERS for c in tok)
+        if tok == '"':
+            opener, closer = not quote_open, quote_open
+            quote_open = not quote_open
+        if out and (bind_next or tok[0] in 'ๆฯ' or closer):
+            out[-1] += tok
+        else:
+            out.append(tok)
+        bind_next = tok in _THAI_PREFIXES or opener
+    return out
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:

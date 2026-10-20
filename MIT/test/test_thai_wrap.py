@@ -136,3 +136,31 @@ def test_thai_text_segmented_into_words_when_available():
         # Degrades to a no-op without the dependency (cluster-safe fallback still
         # protects marks at the calc_horizontal layer).
         assert out == s
+
+
+# ── no-break rules on top of newmm tokens (2026-10-20 quality loop) ───────────
+# newmm splits bound morphemes off their head ('ผู้|พักอาศัย'), so the wrapper could end a line
+# on 'ผู้' and start the next with 'พักอาศัย' — seen on the 2026-10-20 EN→TH caption page.
+
+def _segments(text):
+    return _insert_thai_word_breaks(text).split(_ZWSP)
+
+
+def test_prefix_morpheme_stays_with_its_head():
+    if not _HAS_PYTHAINLP:
+        return
+    assert 'ผู้พักอาศัย' in _segments('ผู้พักอาศัยถูกท่วมท้นโดยไม่มีโอกาส')
+
+
+def test_repetition_mark_never_starts_a_segment():
+    if not _HAS_PYTHAINLP:
+        return
+    assert not any(s.startswith('ๆ') for s in _segments('เด็กๆ วิ่งเล่นกันอยู่'))
+
+
+def test_brackets_and_quotes_bind_to_the_word_they_enclose():
+    if not _HAS_PYTHAINLP:
+        return
+    segs = _segments('ในปี 1254 ตามปฏิทินจักรวรรดิ (IC) เรียกว่า "บั๊กส์"')
+    assert not any(s in ('(', ')', '"') for s in segs)
+    assert '"บั๊กส์"' in segs  # a straight quote opens, then closes
