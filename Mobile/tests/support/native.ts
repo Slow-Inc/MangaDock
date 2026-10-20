@@ -13,6 +13,8 @@ export const native = {
     assets: [] as Array<{ uri: string; mimeType: string; fileName: string }>,
   },
   files: new Map<string, Blob>(),
+  scrolls: [] as Array<{ index?: number; offset?: number }>,
+  insets: { top: 0, bottom: 0, left: 0, right: 0 },
   pressBack() {
     return [...this.back].reverse().some((listener) => listener());
   },
@@ -31,10 +33,10 @@ const mocks: Record<string, string> = {
     export const Alert={alert(){}}, AppState={currentState:'active',addEventListener:()=>({remove(){}})};
     export const BackHandler={addEventListener:(name,fn)=>{os.back.push(fn);return {remove(){const i=os.back.indexOf(fn);if(i>=0)os.back.splice(i,1);}}}};
     export const Image=Object.assign((props)=>React.createElement('Image',props),{getSize:(uri,done)=>done(100,140),prefetch:async()=>true,abortPrefetch(){}});
-    export const PanResponder={create:()=>({panHandlers:{}})}, useWindowDimensions=()=>({width:390,height:844,scale:1,fontScale:1});
-    export const FlatList=React.forwardRef((p,ref)=>{React.useImperativeHandle(ref,()=>({scrollToIndex(){},scrollToOffset(){}}));return React.createElement('FlatList',p,p.ListHeaderComponent,(p.data??[]).map((item,index)=>React.createElement(React.Fragment,{key:p.keyExtractor?.(item,index)??index},p.renderItem?.({item,index}))),p.ListFooterComponent);});`,
+    export const PanResponder={create:handlers=>({panHandlers:handlers})}, useWindowDimensions=()=>({width:390,height:844,scale:1,fontScale:1});
+    export const FlatList=React.forwardRef((p,ref)=>{React.useImperativeHandle(ref,()=>({scrollToIndex(args){os.scrolls.push(args)},scrollToOffset(args){os.scrolls.push(args)}}));return React.createElement('FlatList',p,p.ListHeaderComponent,(p.data??[]).map((item,index)=>React.createElement(React.Fragment,{key:p.keyExtractor?.(item,index)??index},p.renderItem?.({item,index}))),p.ListFooterComponent);});`,
   "react-native-safe-area-context":
-    "export const SafeAreaView='SafeAreaView'; export const useSafeAreaInsets=()=>({top:0,bottom:0,left:0,right:0});",
+    "export const SafeAreaView='SafeAreaView'; export const useSafeAreaInsets=()=>globalThis.__mangaNativeBoundary.insets;",
   "@react-native-async-storage/async-storage":
     "const rows=new Map();export default {getItem:async k=>rows.get(k)??null,setItem:async(k,v)=>{rows.set(k,v)},removeItem:async k=>{rows.delete(k)}};",
   "expo-image-picker":

@@ -39,7 +39,13 @@ export function createApi(options: {
   return {
     request,
     async json<T>(path: string, init: RequestInit = {}): Promise<T> {
-      return (await request(path, init)).json();
+      const body = await (await request(path, init)).text();
+      if (!body.trim()) return null as T;
+      try {
+        return JSON.parse(body) as T;
+      } catch {
+        throw new ApiError(502, "ข้อมูลจากบริการไม่ถูกต้อง กรุณาลองอีกครั้ง");
+      }
     },
   };
 }

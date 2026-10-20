@@ -61,6 +61,7 @@ export function createCatalog(options: {
   let generation = 0;
   let offset = 0;
   let loadingMore: Promise<void> | null = null;
+  const bookHistory: Array<Pick<CatalogState, "book" | "chapters">> = [];
   const listeners = new Set<() => void>();
   const publish = (next: CatalogState) => {
     state = next;
@@ -76,7 +77,15 @@ export function createCatalog(options: {
     },
     closeBook() {
       generation++;
+      bookHistory.length = 0;
       publish({ ...state, book: null, chapters: [] });
+    },
+    backBook() {
+      generation++;
+      publish({
+        ...state,
+        ...(bookHistory.pop() ?? { book: null, chapters: [] }),
+      });
     },
     loadMore(): Promise<void> {
       if (loadingMore) return loadingMore;
@@ -134,7 +143,11 @@ export function createCatalog(options: {
           (parseFloat(a.chapterNumber ?? "0") || 0) -
           (parseFloat(b.chapterNumber ?? "0") || 0),
       );
-      if (current === generation) publish({ ...state, book, chapters });
+      if (current === generation) {
+        if (state.book && state.book.id !== book.id)
+          bookHistory.push({ book: state.book, chapters: state.chapters });
+        publish({ ...state, book, chapters });
+      }
     },
     async search(query: string) {
       const current = ++generation;

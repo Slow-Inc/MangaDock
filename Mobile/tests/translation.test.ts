@@ -1,11 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createReader } from '../src/reader.ts';
-import { createTranslation } from '../src/translation.ts';
+import { createTranslation, translationProgress } from '../src/translation.ts';
 
 const chapter = { id: 'chapter-1', chapterNumber: '1', title: 'Original', translatedLanguage: 'ja' };
 const pages = ['https://images.example.test/1.jpg', 'https://images.example.test/2.jpg'];
 const patches = [{ xPct: 10, yPct: 20, wPct: 30, hPct: 15, url: '/img-cache/patches/test.png' }];
+test('failed page and chapter requests mark only the requested unresolved pages as failed', async () => {
+  const fetch: typeof globalThis.fetch = async (input) => String(input).includes('translate-patches') ? new Response(null, { status: 503 }) : Response.json({ pages });
+  const reader = createReader({ apiOrigin: 'https://api.example.test', deviceId: 'native', fetch });
+  await reader.open('manga-1', chapter);
+  const translation = createTranslation({ reader, apiOrigin: 'https://api.example.test', deviceId: 'native', fetch });
+  await translation.translatePage(1, 'th');
+  assert.deepEqual(Object.keys(translation.snapshot().failedPages ?? {}), ['1']);
+  assert.deepEqual(translation.snapshot().requestedPages, [1]);
+  assert.deepEqual(translationProgress(translation.snapshot()), { total: 1, completed: 0, failed: 1, pending: 0 });
+  await translation.translateChapter('th');
+  assert.deepEqual(Object.keys(translation.snapshot().failedPages ?? {}), ['0', '1']);
+  assert.deepEqual(translation.snapshot().requestedPages, [0, 1]);
+  translation.deactivate();
+});
+test('a failed retry of a previously translated page does not count its old overlay as success', async () => {
+  let failure = false;
+  const fetch: typeof globalThis.fetch = async (input) => String(input).includes('translate-patches') ? failure ? new Response(null, { status: 503 }) : Response.json({ patches }) : Response.json({ pages });
+  const reader = createReader({ apiOrigin: 'https://api.example.test', deviceId: 'native', fetch });
+  await reader.open('manga-1', chapter);
+  const translation = createTranslation({ reader, apiOrigin: 'https://api.example.test', deviceId: 'native', fetch });
+  await translation.translatePage(1, 'th');
+  failure = true; await translation.translatePage(1, 'th');
+  assert.deepEqual(translationProgress(translation.snapshot()), { total: 1, completed: 0, failed: 1, pending: 0 });
+  failure = false; await translation.translatePage(1, 'th');
+  assert.deepEqual(translationProgress(translation.snapshot()), { total: 1, completed: 1, failed: 0, pending: 0 });
+  translation.deactivate();
+});
 
 test('single-page translation exposes Backend Patches for the selected native page', async () => {
   const fetch: typeof globalThis.fetch = async (input, init) => {

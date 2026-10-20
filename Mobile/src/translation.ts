@@ -6,7 +6,13 @@ export type Patch = { xPct: number; yPct: number; wPct: number; hPct: number; ur
 function validPatches(value: unknown): value is Patch[] {
   return Array.isArray(value) && value.every((patch) => patch && typeof patch.url === 'string' && !!patch.url && ['xPct', 'yPct', 'wPct', 'hPct'].every((key) => typeof patch[key] === 'number' && Number.isFinite(patch[key]) && patch[key] >= 0 && patch[key] <= 100));
 }
-export type TranslationState = { status: 'idle' | 'running' | 'completed' | 'interrupted' | 'failed'; patches: Record<number, Patch[]>; error: string | null; failedPages?: Record<number, string>; stage?: { pageIndex: number; stage: string } };
+export type TranslationState = { status: 'idle' | 'running' | 'completed' | 'interrupted' | 'failed'; patches: Record<number, Patch[]>; error: string | null; requestedPages?: number[]; failedPages?: Record<number, string>; stage?: { pageIndex: number; stage: string } };
+export function translationProgress(state: TranslationState) {
+  const requested = state.requestedPages ?? [];
+  const completed = requested.filter(index => state.patches[index] !== undefined).length;
+  const failed = requested.filter(index => state.failedPages?.[index] !== undefined).length;
+  return { total: requested.length, completed, failed, pending: state.status === 'running' ? requested.length - completed - failed : 0 };
+}
 export function createTranslation(options: { reader: ReturnType<typeof createReader>; apiOrigin: string; deviceId: string; fetch: typeof globalThis.fetch; deadlineMs?: number; autoConnect?: boolean }) {
   let state: TranslationState = { status: 'idle', patches: {}, error: null };
   const listeners = new Set<() => void>();
@@ -15,10 +21,16 @@ export function createTranslation(options: { reader: ReturnType<typeof createRea
   let foreground = true;
   let generation = 0;
   let job: AbortController | null = null;
+  function fail(message: string) {
+    const failedPages = { ...state.failedPages };
+    for (const index of state.requestedPages ?? [])
+      if (state.patches[index] === undefined) failedPages[index] = 'หน้านี้แปลไม่สำเร็จ';
+    publish({ ...state, status: 'failed', failedPages, error: message, stage: undefined });
+  }
   function deadline(controller: AbortController, current: number) {
     return setTimeout(() => {
       if (current !== generation) return;
-      publish({ ...state, status: 'failed', error: 'การแปลใช้เวลานานเกินไป กรุณาเริ่มแปลใหม่', stage: undefined });
+      fail('การแปลใช้เวลานานเกินไป กรุณาเริ่มแปลใหม่');
       controller.abort();
     }, options.deadlineMs ?? 16 * 60 * 1000);
   }
@@ -62,7 +74,7 @@ export function createTranslation(options: { reader: ReturnType<typeof createRea
       const current = ++generation;
       const controller = new AbortController(); job = controller;
       const timer = deadline(controller, current);
-      publish({ status: 'running', patches: {}, failedPages: {}, error: null, stage: undefined });
+      publish({ status: 'running', patches: {}, requestedPages: reading.pages.map((_, index) => index), failedPages: {}, error: null, stage: undefined });
       const completed = new Set<number>();
       try {
         const response = await api.request(`books/chapters/${encodeURIComponent(reading.chapter.id)}/batch-translate-patches`, {
@@ -88,7 +100,7 @@ export function createTranslation(options: { reader: ReturnType<typeof createRea
         if (current === generation && !controller.signal.aborted) publish({ ...state, status: 'completed', stage: undefined });
       } catch (error) {
         if (current === generation && error instanceof ApiError && error.status === 401) options.reader.requireCaptcha();
-        if (current === generation && !controller.signal.aborted) publish({ ...state, status: 'failed', error: 'แปลไม่สำเร็จ กรุณาเริ่มแปลใหม่', stage: undefined });
+        if (current === generation && !controller.signal.aborted) fail('แปลไม่สำเร็จ กรุณาเริ่มแปลใหม่');
       } finally { clearTimeout(timer); if (current === generation) job = null; }
     },
     async translatePage(pageIndex: number, targetLang: string, imageModel?: string) {
@@ -100,7 +112,11 @@ export function createTranslation(options: { reader: ReturnType<typeof createRea
     const current = ++generation;
     const controller = new AbortController(); job = controller;
     const timer = deadline(controller, current);
-    publish({ ...state, status: 'running', error: null, stage: undefined });
+    const failedPages = { ...state.failedPages };
+    delete failedPages[pageIndex];
+    const patches = { ...state.patches };
+    delete patches[pageIndex];
+    publish({ ...state, patches, requestedPages: [pageIndex], failedPages, status: 'running', error: null, stage: undefined });
     try {
       const response = await api.json<{ patches: Patch[] }>(`books/chapters/${encodeURIComponent(reading.chapter.id)}/pages/${pageIndex}/translate-patches`, {
       signal: controller.signal,
@@ -108,10 +124,10 @@ export function createTranslation(options: { reader: ReturnType<typeof createRea
       body: JSON.stringify({ pageUrl: reading.pages[pageIndex], sourceLang: reading.chapter.translatedLanguage, targetLang, imageModel, derivative: reading.derivative ?? 'hd', mangaId: reading.mangaId }),
     });
       if (!validPatches(response.patches)) throw new Error('Invalid translation response');
-      if (current === generation && !controller.signal.aborted) publish({ status: 'completed', patches: { ...state.patches, [pageIndex]: response.patches }, error: null });
+      if (current === generation && !controller.signal.aborted) publish({ ...state, status: 'completed', patches: { ...state.patches, [pageIndex]: response.patches }, error: null });
     } catch (error) {
       if (current === generation && error instanceof ApiError && error.status === 401) options.reader.requireCaptcha();
-      if (current === generation && !controller.signal.aborted) publish({ ...state, status: 'failed', error: 'แปลไม่สำเร็จ กรุณาลองอีกครั้ง', stage: undefined });
+      if (current === generation && !controller.signal.aborted) fail('แปลไม่สำเร็จ กรุณาลองอีกครั้ง');
     } finally { clearTimeout(timer); if (current === generation) job = null; }
   } };
 }

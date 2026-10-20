@@ -1,6 +1,14 @@
 <!-- lang:en -->
 # DONE — Claude Code Session Log
 
+## Native Phase4 review fixes B1–B6 — 2026-10-20
+
+- Implemented in `C:/Users/woral/md4`, branch `fix/native-phase4-review-20261020` from `443dc80`: empty-body API handling, shared Reader layout geometry, nested book Back history, directional page swipes/pinch separation, visible wrapping page controls, picker Back, modal safe areas and requested-page translation counters. No runtime dependency or server/provider change.
+- Verification: Mobile **230/230**, typecheck/env pass; final Android assemble/vital lint passes. Independent review found three gesture boundary defects, all corrected and regression-verified. Galaxy Z Flip4/Android16 final APK: LTR/RTL slow swipes pass; history resumes page40 and page20; picker Back retains Reader; comments and notifications clear system navigation; failed page/batch translations show pending0. Intermediate build also verified signed-in review form and related-book Back.
+- Final ARM64 APK: `Mobile/build/apk/2026-10-20/MangaDock-0.1.0-phase4-review-fixes-arm64.apk`, SHA256 `d4b36ecdbe2e8514ab62bf97534d6044f8daf1065ecd0b969db2d385c00a4a2e`. Installed base.apk matches; existing debug certificate and account session retained. LAN-only internal QA; version0.1.0/code1.
+- [Fix report and resume point](Mobile/docs/2026-10-20-review-fixes.md), [ADR031](docs/adr/031-mobile-reader-geometry-and-review-recovery.md). Evidence `qa/review-fixes/`; baseline artifacts retained. The user subsequently authorized commit/push and a PR into `feat/mobile-native-phase4`; fresh precommit checks230 Mobile/58 tooling/types/env/lockfile pass. Successful MIT, money/account mutations, fold/offline/long sessions and broader redesign/filter requests remain outside this pass.
+- ภาษาไทย: แก้ B1–B6 ใน branch/worktree ด้านบน ไม่เพิ่ม dependency หรือเปลี่ยน server/provider Tests **230/230** types/env/build ผ่าน แก้ gesture สามกรณีที่ reviewer พบและทดสอบ regression แล้ว เครื่องจริงปัดตามทิศทางได้ อ่านต่อ40/20ตรงหน้า Back ปิด picker ก่อน และแผงไม่ทับ navigation ตัวนับแปลไม่ค้าง pending ส่วนรีวิว/Back เรื่องเกี่ยวข้องตรวจบน build ระหว่างทางที่ใช้ logic เดียวกัน APK สุดท้าย hash ตรงที่ติดตั้ง เก็บ session เดิม ผู้ใช้อนุญาต commit/push/PR ภายหลัง ตรวจใหม่ผ่าน Mobile230/tooling58/types/env/lockfile ไม่อ้างผล MIT/payment/offline/จอพับ/sessionยาว หรือปิดงานออกแบบส่วนอื่น
+
 ## Native commit validation — 2026-10-20
 
 - At the user's subsequent commit/push request, validated the pending native implementation and separate Backend profile-join fix: Mobile **220/220**, typecheck/env and lockfile dry-run; Backend build, full CI Jest **90 suites/960 tests**, focused lint; repository tooling **58/58**. Existing same-day ARM64 APK build/artifact checks remain applicable to unchanged Mobile source.

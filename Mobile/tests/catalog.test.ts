@@ -1,6 +1,40 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createCatalog } from "../src/catalog.ts";
+test("Back restores nested related books and their chapters without a new request", async () => {
+  const catalog = createCatalog({
+    apiOrigin: "https://api.example.test",
+    deviceId: "native",
+    fetch: async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path.startsWith("/versions/")) return Response.json([]);
+      if (path.endsWith("/chapters"))
+        return Response.json([{ id: path.split("/")[3] + "-chapter" }]);
+      return Response.json({
+        id: path.split("/").at(-1),
+        authors: [],
+        genres: [],
+        covers: [],
+      });
+    },
+  });
+  await catalog.openBook("A");
+  await catalog.openBook("B");
+  await catalog.openBook("C");
+  catalog.backBook();
+  assert.equal(catalog.snapshot().book?.id, "B");
+  assert.equal(catalog.snapshot().chapters[0].id, "B-chapter");
+  catalog.backBook();
+  assert.equal(catalog.snapshot().book?.id, "A");
+  catalog.backBook();
+  assert.equal(catalog.snapshot().book, null);
+  await catalog.openBook("A");
+  await catalog.openBook("B");
+  catalog.closeBook();
+  await catalog.openBook("C");
+  catalog.backBook();
+  assert.equal(catalog.snapshot().book, null);
+});
 test("chapter choices retain original source and creator names for otherwise identical versions", async () => {
   const catalog = createCatalog({
     apiOrigin: "https://api.example.test",

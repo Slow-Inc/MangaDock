@@ -1,5 +1,32 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-20 — Native physical-review fixes B1–B6 / แก้บั๊กจากรีวิวบนเครื่องจริง
+
+| Field | Change record / บันทึกการเปลี่ยนแปลง |
+| --- | --- |
+| 1. What/where | Mobile API, catalog, Reader, modal sheets, translation state and regression tests / API/catalog/Reader/modal/สถานะแปลและ tests ฝั่ง Mobile |
+| 2. Outcome | Six reported paths corrected, verified within stated coverage / แก้หกเส้นทางตามขอบเขตที่ตรวจ |
+| 3. Performance gain | Not benchmarked; no percentage claim / ไม่ benchmark ไม่อ้างเปอร์เซ็นต์ |
+| 4. Benefits | Reviews load, resume returns to selected page, Back preserves related-book history, swipes work, controls accessible, counters truthful / รีวิวและอ่านต่อใช้ได้ Back/ปัดหน้า/ปุ่มและตัวนับถูกต้อง |
+| 5. Purpose | Resolve physical QA B1–B6 from443dc80 / แก้ปัญหาจาก QA เครื่องจริง |
+| 6. Why/impact | Share list/image geometry and maintain local successful-detail stack in existing stores / ใช้ geometry ร่วมและ stack ใน stores เดิม |
+| 7. Before | Empty JSON parse, average-height restore, one book slot, no swipe, unsafe modals, chapter-wide pending counter / parseว่าง/คืนหน้าจากความสูงเฉลี่ย/เก็บเรื่องเดียว/ไม่มีswipe/modalทับ/นับรอทั้งตอน |
+| 8. Goals | Correct six defects without changing service/business contracts / แก้หกข้อโดยคงสัญญาบริการและธุรกิจ |
+| 9. Architecture before | Existing native stores + variable image-local ratios / storesเดิมและอัตราส่วนภาพแยกภายในแต่ละภาพ |
+| 10. Architecture after | Same stores with shared geometry, detail snapshots and requested translation indices / storesเดิมเพิ่มgeometryร่วม/snapshots/หน้าที่ร้องขอ |
+| 11. Refactor list | Reader removes measured-cell/average-retry machinery; no dependency / ลบ cell measurement/average retries ไม่เพิ่มdependency |
+| 12. Metrics | Tests220→230; final build316 tasks/37s; ARM64 hash in report / tests220→230 build316tasks/37s hashตามรายงาน |
+| 13. Debt removed | Parallel geometry sources and unscoped pending calculation / ลบgeometryสองแหล่งและการนับpendingไม่ตรงscope |
+| 14. Risk/rollback | Native response arbitration tested physically; revert Mobile batch together; preserve data / ทดสอบgestureจริง ย้อนMobileชุดนี้ร่วมกัน คงข้อมูล |
+| 15. Developer experience | Reproducible red/green cases and device evidence / มีred-greenและหลักฐานเครื่องจริง |
+| 16. Future opportunities | Broader UX/filter requests, other devices and release acceptance / UX/filterเพิ่มเติม เครื่องอื่นและรับrelease |
+| 17. Lessons | Real native ScrollView can steal JS swipes; pinch transitions need independent geometry / native scrollแย่งgestureได้ ต้องตั้งgeometryเมื่อเพิ่มนิ้ว |
+| 18. KPI | 230tests/types/env/build pass; device resume40&20, LTR/RTL, modal clearance and pending0 / checksผ่านพร้อมผลเครื่องจริงตามที่ระบุ |
+
+Evidence and limitations: [fix report](../../Mobile/docs/2026-10-20-review-fixes.md), [ADR031](../adr/031-mobile-reader-geometry-and-review-recovery.md). Final installed APK matches SHA256 `d4b36ecdbe2e8514ab62bf97534d6044f8daf1065ecd0b969db2d385c00a4a2e`. Internal LAN/debug signing; no production MIT success, payment/account mutation, fold/offline/long-session acceptance inferred. Subsequent user authorization covers commit/push/PR into the Phase4 branch; deployment is excluded.
+
+ภาษาไทย: รายงานมีขั้นตอนและข้อจำกัด APK ที่ติดตั้ง hash ตรง เป็น LAN/debug ภายใน ไม่อนุมาน MITสำเร็จ/เงิน/แก้บัญชี/จอพับ/offline/sessionยาว ผู้ใช้อนุญาต commit/push/PR เข้า branch Phase4 ภายหลัง ไม่รวม deploy
+
 ## 2026-10-20 — Downloadable ARM64 test APK / APK ARM64 สำหรับโหลดทดสอบ
 
 | Field | English | ไทย |

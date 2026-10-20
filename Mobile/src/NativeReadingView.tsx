@@ -285,7 +285,7 @@ export function NativeReadingView({
     persistProgress();
     reader.close();
     if (wasClosed) {
-      if (library.book) catalog.closeBook();
+      if (library.book) catalog.backBook();
       else if (tab === "community" && community.back()) return;
       else tabs.back();
     }
@@ -611,7 +611,10 @@ export function NativeReadingView({
           }}
         />
       ) : library.book ? (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          key={library.book.id}
+          contentContainerStyle={styles.content}
+        >
           <View style={styles.hero}>
             {library.book.covers[0]?.url && (
               <Image
