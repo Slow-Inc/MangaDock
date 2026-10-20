@@ -153,3 +153,19 @@ def test_two_multi_line_paragraphs_in_one_box_only_warn():
     assert merge.status == WARN
     assert merge.metrics['split_containers'] == 0
     assert merge.metrics['paragraph_containers'] == 1
+
+
+def test_separate_blocks_under_one_container_are_not_a_split():
+    """One YOLO polygon can cover two speech boxes drawn as one white shape (2026-10-20 corpus:
+    6.1x the font apart). They do not chain as lines of one block, so this is not a merge defect —
+    the same rule `container_merge` uses to decide what to coalesce."""
+    box = (480, 280, 620, 650)
+    page = PageSnapshot(target_lang='THA', width=800, height=1150, textlines=8, sfx_lines=0,
+                        empty_reads=0, regions=[
+        _region(0, (565, 350, 615, 382), 'TSUKUYOMI', 'ก', font=14, bubble=1, bubble_box=box),
+        _region(1, (500, 466, 592, 595), 'IF THERE WAS A RELIGION', 'ข', font=14, bubble=1, bubble_box=box),
+    ])
+    merge = _by_stage(diagnose(page)[0])['merge']
+    assert merge.status == OK
+    assert merge.metrics['split_containers'] == 0
+    assert merge.metrics['shared_containers'] == 1

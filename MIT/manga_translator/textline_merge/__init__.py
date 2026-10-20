@@ -145,7 +145,9 @@ def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height, contain
     if containers is not None:
         from ..container_merge import coalesce_container_fragments
         region_indices = coalesce_container_fragments(
-            region_indices, containers, [box.direction for box in bboxes])
+            region_indices, containers, [box.direction for box in bboxes],
+            [(b.aabb.x, b.aabb.y, b.aabb.x + b.aabb.w, b.aabb.y + b.aabb.h) for b in bboxes],
+            [b.font_size for b in bboxes])
 
     # step 3: return regions
     for node_set in region_indices:

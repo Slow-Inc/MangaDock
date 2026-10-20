@@ -75,6 +75,14 @@ def _flag(flags: Flags, idx: int, stage: str, status: str) -> bool:
     return True
 
 
+def _chain(group: List[Region]) -> bool:
+    """Do these regions read as consecutive lines of one block? (container_merge's rule)"""
+    from manga_translator.container_merge import components_chain
+    tall = all(r.xyxy[3] - r.xyxy[1] > 1.5 * (r.xyxy[2] - r.xyxy[0]) for r in group)
+    return components_chain([{i} for i in range(len(group))], 'v' if tall else 'h',
+                            [r.xyxy for r in group], [r.font_size for r in group])
+
+
 def _line_count(r: Region) -> int:
     """Approximate lines in a region from its height (the payload carries no line list)."""
     return max(1, round((r.xyxy[3] - r.xyxy[1]) / max(1.0, r.font_size * 2.0)))
@@ -103,11 +111,14 @@ def _probe_merge(page: PageSnapshot, flags: Flags) -> StageReport:
     for r in text_regions:
         if r.bubble_idx is not None:
             groups[r.bubble_idx].append(r)
-    shared = [sorted(g, key=lambda r: r.xyxy[1]) for g in groups.values() if len(g) > 1]
-    # A single-line region inside a shared container proves a split; when every region is
-    # several lines tall the box most likely holds separate paragraphs.
-    split = [g for g in shared if any(_line_count(r) < 2 for r in g)]
-    paragraphs = [g for g in shared if g not in split]
+    multi = [sorted(g, key=lambda r: r.xyxy[1]) for g in groups.values() if len(g) > 1]
+    # Only regions that chain as consecutive lines of one block can be a split — the same rule
+    # container_merge (#757) uses; others are separate blocks under one polygon. Then a
+    # single-line region proves a split, while all-multi-line regions are separate paragraphs.
+    chained = [g for g in multi if _chain(g)]
+    shared = [g for g in multi if g not in chained]
+    split = [g for g in chained if any(_line_count(r) < 2 for r in g)]
+    paragraphs = [g for g in chained if g not in split]
     evidence = []
     for kind, status, found in (('split', FAIL, split), ('paragraphs', WARN, paragraphs)):
         for g in found:
@@ -139,7 +150,8 @@ def _probe_merge(page: PageSnapshot, flags: Flags) -> StageReport:
     status = FAIL if split else WARN if near or paragraphs else OK
     return StageReport('merge', status,
                        {'split_containers': len(split), 'split_regions': sum(len(g) for g in split),
-                        'paragraph_containers': len(paragraphs), 'near_miss_pairs': near},
+                        'paragraph_containers': len(paragraphs), 'shared_containers': len(shared),
+                        'near_miss_pairs': near},
                        '; '.join(evidence))
 
 
