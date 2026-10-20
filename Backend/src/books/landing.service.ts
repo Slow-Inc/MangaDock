@@ -13,6 +13,9 @@ import {
   type LandingRow,
 } from './books.types';
 
+/** Longest description we send to a translation provider (MangaDex descriptions are far shorter). */
+const MAX_DESCRIPTION_CHARS = 6000;
+
 const LANDING_CACHE_KEY = 'landing:full:v5';
 
 /**
@@ -218,6 +221,9 @@ export class LandingService {
     if (!this.llmService.isConfigured())
       return { translatedText: text, translated: false };
     if (!text?.trim()) return { translatedText: text, translated: false };
+    // The endpoint is public: an over-long text is not worth a paid provider call (#801).
+    if (text.length > MAX_DESCRIPTION_CHARS)
+      return { translatedText: text, translated: false };
 
     // Detect if already Thai — skip if >25% Thai chars
     const thaiChars = (text.match(/[\u0E00-\u0E7F]/g) ?? []).length;
