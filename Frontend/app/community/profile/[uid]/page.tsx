@@ -81,15 +81,21 @@ export default function PublicProfilePage() {
   const bannerContainerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startY: number; startPos: number } | null>(null);
 
+  // Fetched per profile (not on tab click) so the "following" tab badge shows the real count.
+  // The tab is hidden on your own profile, so skip the request there.
+  const viewerUid = user?.uid;
   useEffect(() => {
-    if (tab !== "following" || !uid) return;
+    setFollowingUsers([]);
+    if (!uid || viewerUid === uid) { setLoadingFollowing(false); return; }
+    let cancelled = false;
     setLoadingFollowing(true);
     fetch(`/api/proxy/user-follows/${encodeURIComponent(uid)}/following`)
       .then((r) => (r.ok ? r.json() : []))
-      .then(setFollowingUsers)
+      .then((list: FollowProfile[]) => { if (!cancelled) setFollowingUsers(list); })
       .catch(() => {})
-      .finally(() => setLoadingFollowing(false));
-  }, [tab, uid]);
+      .finally(() => { if (!cancelled) setLoadingFollowing(false); });
+    return () => { cancelled = true; };
+  }, [uid, viewerUid]);
 
   const openReposition = () => { setRepositioning(true);  setRepoAnim("entering"); };
   const closeReposition = () => { setRepositioning(false); setRepoAnim("exiting"); };
@@ -219,7 +225,7 @@ export default function PublicProfilePage() {
     { id: "comments",   label: "ความคิดเห็น",   count: comments.length },
     { id: "liked",      label: "ถูกใจ",          count: likedPosts.length },
     ...(isCreator ? [{ id: "translated" as Tab, label: "มังงะที่แปล", count: translatedTitles.length }] : []),
-    ...(!isOwnProfile ? [{ id: "following" as Tab, label: "ติดตาม", count: 0 }] : []),
+    ...(!isOwnProfile ? [{ id: "following" as Tab, label: "ติดตาม", count: followingUsers.length }] : []),
   ];
 
   const gradientClass =
