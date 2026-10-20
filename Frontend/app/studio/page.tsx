@@ -150,6 +150,8 @@ export default function StudioOverviewPage() {
     }
   }, [fetchAll]);
 
+  // Nothing is known about the wallet's history: every figure derived from it shows "—" (#828).
+  const txUnknown = txFailed && transactions.length === 0;
   const view = studioLoadState({ loading: loadingData, failed: loadFailed, hasData: versions.length > 0 });
 
   const overviewStats = useMemo(
@@ -206,7 +208,7 @@ export default function StudioOverviewPage() {
                 <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="นับจาก title ที่เคยอัปโหลด" tone="indigo" />
                 <MetricCard label="จำนวนตอน" value={overviewStats.totalChapters} hint={`รวมทั้งหมด ${overviewStats.totalPages} หน้า`} tone="violet" />
                 <MetricCard label="เผยแพร่แล้ว" value={overviewStats.published} hint={`รอตรวจสอบ ${overviewStats.pending} | แบบร่าง ${overviewStats.draft}`} tone="emerald" />
-                <MetricCard label="เหรียญคงเหลือ" value={balance === null ? "—" : <><Coin className="mr-1.5 inline align-[-0.1em] text-coin" />{formatCurrency(overviewStats.balance)}</>} hint={`ใช้จ่ายสะสม ${txFailed && transactions.length === 0 ? "—" : formatCurrency(overviewStats.spendingTotal)}`} tone="amber" />
+                <MetricCard label="เหรียญคงเหลือ" value={balance === null ? "—" : <><Coin className="mr-1.5 inline align-[-0.1em] text-coin" />{formatCurrency(overviewStats.balance)}</>} hint={`ใช้จ่ายสะสม ${txUnknown ? "—" : formatCurrency(overviewStats.spendingTotal)}`} tone="amber" />
               </div>
             </StudioSection>
 
@@ -219,8 +221,8 @@ export default function StudioOverviewPage() {
                   <MetricCard label="จำนวนภาษา" value={overviewStats.languages} hint="ภาษางานแปลที่เคยใช้งาน" tone="sky" />
                   <MetricCard label="ตอนมีราคา" value={overviewStats.paidChapters} hint={`ราคาเฉลี่ย ${formatCurrency(overviewStats.avgPrice)} เหรียญ`} tone="amber" />
                   <MetricCard label="คุณภาพเฉลี่ย" value={overviewStats.avgQuality.toFixed(1)} hint="คำนวณจาก qualityScore ของแต่ละเวอร์ชัน" tone="emerald" />
-                  <MetricCard label="รายรับสะสม" value={formatCurrency(overviewStats.topupTotal + overviewStats.rewardTotal)} hint="topup, reward, refund" tone="indigo" />
-                  <MetricCard label="รางวัล/คืนเงิน" value={formatCurrency(overviewStats.rewardTotal)} hint="reward + refund" tone="sky" />
+                  <MetricCard label="รายรับสะสม" value={txUnknown ? "—" : formatCurrency(overviewStats.topupTotal + overviewStats.rewardTotal)} hint="topup, reward, refund" tone="indigo" />
+                  <MetricCard label="รางวัล/คืนเงิน" value={txUnknown ? "—" : formatCurrency(overviewStats.rewardTotal)} hint="reward + refund" tone="sky" />
                   <MetricCard label="โดน moderator ลบ" value={overviewStats.rejected} hint={`approved ${overviewStats.approved} เวอร์ชัน`} tone="rose" />
                 </div>
               </StudioSection>
@@ -234,7 +236,11 @@ export default function StudioOverviewPage() {
                   </Link>
                 }
               >
-                <RecentTransactionList transactions={transactions} />
+                {txUnknown ? (
+                  <p className="py-6 text-center text-sm text-ink-3">โหลดธุรกรรมไม่สำเร็จ</p>
+                ) : (
+                  <RecentTransactionList transactions={transactions} />
+                )}
               </StudioSection>
             </div>
           </>
@@ -254,7 +260,7 @@ export default function StudioOverviewPage() {
               <StudioBreakdownChart data={titleBreakdown} ariaLabel="เรื่องที่มีจำนวนตอนมากที่สุด" />
             </StudioSection>
           </>
-        ) : txFailed && transactions.length === 0 ? (
+        ) : txUnknown ? (
           <StudioLoadError what="ธุรกรรมกระเป๋าเงิน" onRetry={() => { setLoadingData(true); fetchAll(); }} />
         ) : (
           <>
