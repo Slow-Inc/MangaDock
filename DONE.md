@@ -3,6 +3,16 @@
 
 ---
 
+## #810 Studio nav highlights the right item on upload / manga / search (2026-10-21)
+
+**What:** `getActiveStudioTab` fell back to Overview for `/studio/upload`, `/studio/manga/[id]` and
+`/studio/search`; they now map to Works (sidebar + mobile Studio bar share the function).
+
+**Validated:** `studioTabs.test.ts` red → green; signed-in browser on a production build — upload, search and a
+work page highlight ผลงาน, `/studio` still ภาพรวม. Not browser-checked: the mobile bar (same function).
+
+---
+
 ## #808 Reviews page shell + mascot empty states (2026-10-21)
 
 **What:** `/book/[id]/reviews` — the only route without the Navbar — now uses `page-shell page-shell-nav`,
