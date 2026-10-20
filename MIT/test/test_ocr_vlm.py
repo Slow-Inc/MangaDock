@@ -304,3 +304,37 @@ def test_reply_that_sanitises_to_nothing_is_logged(caplog):
 def test_a_completed_reply_logs_nothing(caplog):
     assert _localize(_Completion('LOOM', 'stop'), caplog) == 'LOOM'
     assert _warnings(caplog) == []
+
+
+# ── 2026-10-20 quality loop: stop paying for a rescue the model cannot serve ─────────────────
+# Doctor timing on 17 real pages: every SFX rescue call ended finish_reason=length with no
+# content (the gateway model reasons past max_tokens and cannot see images, #693), ~2.5-3 s each,
+# sequential — up to 20 s of a page's 31 s. After a run of unusable replies the rescue stops
+# calling for the rest of the process; a usable reply resets the streak.
+
+def test_rescue_stops_calling_after_consecutive_unusable_replies(caplog):
+    from manga_translator.ocr_vlm import SFX_UNSERVED_LIMIT
+    calls = {'n': 0}
+
+    def post(*a, **k):
+        calls['n'] += 1
+        return _Completion(None, 'length')
+
+    for _ in range(SFX_UNSERVED_LIMIT + 3):
+        assert vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m', post_fn=post) == ''
+    assert calls['n'] == SFX_UNSERVED_LIMIT
+
+
+def test_a_usable_reply_resets_the_unserved_streak():
+    from manga_translator.ocr_vlm import SFX_UNSERVED_LIMIT
+    replies = [_Completion(None, 'length')] * (SFX_UNSERVED_LIMIT - 1) + [_Completion('BAM', 'stop')] \
+        + [_Completion(None, 'length')] * (SFX_UNSERVED_LIMIT - 1)
+    calls = {'n': 0}
+
+    def post(*a, **k):
+        calls['n'] += 1
+        return replies[calls['n'] - 1]
+
+    for _ in replies:
+        vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m', post_fn=post)
+    assert calls['n'] == len(replies)  # never tripped

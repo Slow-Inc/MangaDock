@@ -92,16 +92,21 @@ async def _translate(args):
     tr = CustomOpenAiTranslator()
     tr.parse_args(TranslatorConfig(translator='custom_openai', target_lang=args.target,
                                    gpt_config=args.gpt_config))
-    out = {'label': args.label, 'gpt_config': args.gpt_config, 'pages': {}, 'sources': {}}
+    out = {'label': args.label, 'gpt_config': args.gpt_config, 'pages': {}, 'sources': {}, 'errors': {}}
     for path in args.doctor:
         texts = page_texts(json.load(open(path, encoding='utf-8')))
         if not texts:
             continue
         page = os.path.basename(path).split('_THA')[0]
-        out['sources'][page] = texts
-        out['pages'][page] = await tr.translate('auto', args.target, texts)
-        print(f'[ab] {args.label} {page}: {len(texts)} segments', flush=True)
-    json.dump(out, open(args.out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        try:
+            out['pages'][page] = await tr.translate('auto', args.target, texts)
+            out['sources'][page] = texts
+            print(f'[ab] {args.label} {page}: {len(texts)} segments', flush=True)
+        except Exception as e:  # one page's failure (rate limit, gateway) must not lose the run
+            out['errors'][page] = f'{type(e).__name__}: {e}'[:300]
+            print(f'[ab] {args.label} {page}: FAILED {out["errors"][page]}', flush=True)
+        json.dump(out, open(args.out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        await asyncio.sleep(args.delay)
 
 
 def main():
@@ -116,6 +121,7 @@ def main():
     t.add_argument('--base', help='OpenAI-compatible base URL to use instead of CUSTOM_OPENAI_API_BASE')
     t.add_argument('--model', help='model name to use instead of CUSTOM_OPENAI_MODEL')
     t.add_argument('--key-env', help='name of the MIT/.env variable holding the API key for --base')
+    t.add_argument('--delay', type=float, default=0.0, help='seconds between pages (rate limits)')
     p = sub.add_parser('packet')
     p.add_argument('a')
     p.add_argument('b')

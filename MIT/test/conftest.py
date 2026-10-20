@@ -53,6 +53,19 @@ def pytest_addoption(parser):
     parser.addoption('--text', action='store', default=None, help='Text to be used for translation test run')
     parser.addoption('--count', action='store', type=int, default=1, help='Amount of times the test should be repeated')
 
+@pytest.fixture(autouse=True)
+def _reset_sfx_breaker():
+    """The SFX-rescue circuit breaker is process state — isolate every test from it."""
+    try:
+        from manga_translator.ocr_vlm import reset_sfx_breaker
+    except Exception:
+        yield
+        return
+    reset_sfx_breaker()
+    yield
+    reset_sfx_breaker()
+
+
 @pytest.fixture
 def translator(request):
     return request.config.getoption('--translator')

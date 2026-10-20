@@ -24,6 +24,16 @@ from PIL import Image
 
 logger = logging.getLogger('manga_translator')
 
+#: After this many consecutive UNUSABLE rescue replies (truncated / no content — the configured
+#: model cannot serve the rescue, #693) stop calling for the rest of the process: each call cost
+#: ~2.5-3 s of page latency for nothing (doctor timing, 2026-10-20). A usable reply resets it.
+SFX_UNSERVED_LIMIT = 3
+_unserved = {'streak': 0}
+
+
+def reset_sfx_breaker() -> None:
+    _unserved['streak'] = 0
+
 # Languages that letter SFX in Latin script (UPPERCASE convention). CJK/Thai/etc. use their own
 # script and have no case — mirrors the CJK-vs-Latin split in manga_translator.py.
 _LATIN_SFX_LANGS = {
@@ -194,6 +204,8 @@ def vlm_localize_sfx(
     a fake in tests. The response is parsed as an OpenAI chat completion."""
     if not (api_base and api_key and model):
         return ''
+    if _unserved['streak'] >= SFX_UNSERVED_LIMIT:
+        return ''
     try:
         if post_fn is None:
             import requests
@@ -224,7 +236,14 @@ def vlm_localize_sfx(
         if content is None or (finish is not None and finish != 'stop'):
             logger.warning("[OcrVLM] SFX reply unusable: finish_reason=%s content=%s %s",
                            finish, 'None' if content is None else repr(content), where)
-        elif not result:
+            _unserved['streak'] += 1
+            if _unserved['streak'] == SFX_UNSERVED_LIMIT:
+                logger.warning("[OcrVLM] %d unusable SFX replies in a row — rescue disabled for this "
+                               "process (model %s cannot serve it; set MIT_OCR_VLM_RESCUE=0)",
+                               SFX_UNSERVED_LIMIT, model)
+            return result
+        _unserved['streak'] = 0
+        if not result:
             logger.warning("[OcrVLM] SFX reply sanitised to empty: %r %s", content, where)
         return result
     except Exception:
