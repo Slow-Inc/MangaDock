@@ -249,7 +249,11 @@ describe('translateDescription() — reports the model that produced the text', 
 
   it('returns the configured model for a non-Gemini provider', async () => {
     const { svc } = makeSvc({
-      env: { LLM_PROVIDER: 'custom', LLM_API_KEY: 'k', LLM_BASE_URL: 'http://x' },
+      env: {
+        LLM_PROVIDER: 'custom',
+        LLM_API_KEY: 'k',
+        LLM_BASE_URL: 'http://x',
+      },
       descriptionModel: 'deepseek-v4-flash',
       complete: jest.fn().mockResolvedValue('คำแปลภาษาไทย'),
     });
@@ -279,6 +283,27 @@ describe('translateDescription() — reports the model that produced the text', 
       expect.any(String),
       expect.objectContaining({ model: 'gemini-2.5-flash' }),
     );
+  });
+
+  it('keys the cache on the whole text, so a text sharing the first bytes of a description cannot poison it', async () => {
+    const { svc, cache } = makeSvc({
+      env: {
+        LLM_PROVIDER: 'custom',
+        LLM_API_KEY: 'k',
+        LLM_BASE_URL: 'http://x',
+      },
+      descriptionModel: 'm',
+      complete: jest.fn().mockResolvedValue('คำแปลภาษาไทย'),
+    });
+    const head = 'A long English description that opens a popular book page, ';
+    await svc.translateDescription(head + 'and continues as written.');
+    await svc.translateDescription(
+      head + 'and then [a link](https://example.invalid).',
+    );
+    const keys = (cache.get as jest.Mock).mock.calls.map(
+      (c: unknown[]) => c[0],
+    );
+    expect(keys[0]).not.toEqual(keys[1]);
   });
 
   it('does not invent a model for an older cached payload that lacks one', async () => {
