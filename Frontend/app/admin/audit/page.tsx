@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminTableSkeleton from '../components/AdminTableSkeleton';
+import AdminLoadError from '../components/AdminLoadError';
 
 interface AuditLog {
   id: string;
@@ -52,6 +53,7 @@ export default function AdminAuditPage() {
 
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
@@ -74,6 +76,7 @@ export default function AdminAuditPage() {
   const load = useCallback(
     async (p: number) => {
       setLoading(true);
+      setLoadFailed(false);
       const params = new URLSearchParams({
         limit: String(LIMIT + 1), // fetch one extra to detect hasMore
         offset: String((p - 1) * LIMIT),
@@ -88,7 +91,7 @@ export default function AdminAuditPage() {
         setHasMore(data.length > LIMIT);
         setLogs(data.slice(0, LIMIT));
       } catch {
-        // keep stale data on error
+        setLoadFailed(true); // keep stale data on error
       }
       setLoading(false);
     },
@@ -146,8 +149,10 @@ export default function AdminAuditPage() {
         )}
       </div>
 
+      {loadFailed && <AdminLoadError what="audit log" onRetry={() => load(page)} />}
+
       {/* Table */}
-      <div className="border border-line rounded-xl overflow-hidden">
+      <div className="border border-line rounded-xl overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
@@ -164,7 +169,7 @@ export default function AdminAuditPage() {
           <tbody>
             {loading ? (
               <AdminTableSkeleton rows={8} columns={[90, 130, 80, 110, 60]} />
-            ) : logs.length === 0 ? (
+            ) : logs.length === 0 && !loadFailed ? (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-ink-3 text-sm">
                   ยังไม่มี audit log

@@ -3,6 +3,20 @@
 
 ---
 
+## #819 Admin works at phone width; a failed load says so (2026-10-21)
+
+**What:** below `md` the admin sidebar is replaced by a sticky top bar with a scrolling tab strip (active tab kept in
+view, `aria-current`); `main` padding `p-4 md:p-8`; table wrappers scroll horizontally instead of clipping. One
+`AdminLoadError` (role=alert + Retry) on the Overview and above the table of Users / Content / Transactions / Audit
+when the latest load failed — the "No … found" row shows only after a successful load.
+
+**Validated:** production build, local test session (role 8) with the admin APIs answering 403: all five pages at
+390 → main 390 px wide (was ~120 px), sidebar hidden, 0 overflow, error + Retry shown, Retry re-requests once; 1440
+unchanged (main 1200 px beside the 240 px sidebar). tsc 0; eslint on the touched pages: same pre-existing
+set-state-in-effect count as main.
+
+---
+
 ## #817 Opening /admin directly no longer bounces an admin home (2026-10-21)
 
 **What:** AuthContext starts with `user = null` + `loading = true`; the admin layout redirected on `user === null`

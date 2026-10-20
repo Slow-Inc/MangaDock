@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cacheOrFetch, cacheClearByTag, TTL } from '../../lib/apiCache';
 import AdminTableSkeleton from '../components/AdminTableSkeleton';
+import AdminLoadError from '../components/AdminLoadError';
 
 const savedContent = { search: '', filterCategory: '', filterAuthor: '', page: 1 };
 
@@ -24,6 +25,7 @@ export default function AdminContentPage() {
   const [filterCategory, setFilterCategory] = useState(savedContent.filterCategory);
   const [filterAuthor, setFilterAuthor] = useState(savedContent.filterAuthor);
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const searchRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const didMount = useRef(false);
@@ -40,6 +42,7 @@ export default function AdminContentPage() {
 
   const load = useCallback(async (p: number) => {
     setLoading(true);
+    setLoadFailed(false);
     const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
     if (search) params.set('search', search);
     if (filterCategory) params.set('category', filterCategory);
@@ -57,7 +60,9 @@ export default function AdminContentPage() {
       );
       setPosts(d.posts);
       setTotal(d.total);
-    } catch { /* keep stale */ }
+    } catch {
+      setLoadFailed(true); // keep stale
+    }
     setLoading(false);
   }, [authFetch, search, filterCategory, filterAuthor]);
 
@@ -107,8 +112,10 @@ export default function AdminContentPage() {
         <input value={filterAuthor} onChange={e => setFilterAuthorPersist(e.target.value)} placeholder="Author UID…" className={`${inputCls} w-52`} />
       </div>
 
+      {loadFailed && <AdminLoadError what="posts" onRetry={() => load(page)} />}
+
       {/* Table */}
-      <div className="border border-line rounded-xl overflow-hidden">
+      <div className="border border-line rounded-xl overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
@@ -120,7 +127,7 @@ export default function AdminContentPage() {
           <tbody>
             {loading ? (
               <AdminTableSkeleton rows={5} columns={[160, 80, 70, 60, 30, 40, 80]} />
-            ) : posts.length === 0 ? (
+            ) : posts.length === 0 && !loadFailed ? (
               <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-3 text-sm">No posts found.</td></tr>
             ) : posts.map(p => (
               <tr key={p.id} className="border-b border-line last:border-0 hover:bg-fill transition-colors">
