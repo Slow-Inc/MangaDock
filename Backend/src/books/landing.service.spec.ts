@@ -206,3 +206,92 @@ describe('translateDescription() — openai provider', () => {
     expect(mockLlm.complete).not.toHaveBeenCalled();
   });
 });
+
+describe('translateDescription() — reports the model that produced the text', () => {
+  const text = 'Some English description here and more text';
+
+  function makeSvc(opts: {
+    env: NodeJS.ProcessEnv;
+    cached?: unknown;
+    complete: jest.Mock;
+    catalogModels?: string[];
+    descriptionModel?: string;
+  }) {
+    const cache = {
+      get: jest
+        .fn()
+        .mockResolvedValue(opts.cached ? { data: opts.cached } : null),
+      setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
+    };
+    const llm = {
+      isConfigured: jest.fn().mockReturnValue(true),
+      getDescriptionModel: jest
+        .fn()
+        .mockReturnValue(opts.descriptionModel ?? 'unused'),
+      complete: opts.complete,
+    } as unknown as LlmService;
+    const geminiCatalog = {
+      getDescriptionModels: jest
+        .fn()
+        .mockResolvedValue(opts.catalogModels ?? []),
+    };
+    const svc = new LandingService(
+      cache as any,
+      { enabled: false } as any,
+      {} as any,
+      geminiCatalog as any,
+      () => 'http://localhost',
+      opts.env,
+      llm,
+    );
+    return { svc, cache };
+  }
+
+  it('returns the configured model for a non-Gemini provider', async () => {
+    const { svc } = makeSvc({
+      env: { LLM_PROVIDER: 'custom', LLM_API_KEY: 'k', LLM_BASE_URL: 'http://x' },
+      descriptionModel: 'deepseek-v4-flash',
+      complete: jest.fn().mockResolvedValue('คำแปลภาษาไทย'),
+    });
+
+    const result = await svc.translateDescription(text);
+
+    expect(result.translated).toBe(true);
+    expect(result.model).toBe('deepseek-v4-flash');
+  });
+
+  it('returns the fallback model when the first one failed', async () => {
+    const complete = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('model overloaded'))
+      .mockResolvedValueOnce('คำแปลภาษาไทย');
+    const { svc, cache } = makeSvc({
+      env: { LLM_API_KEY: 'k' },
+      catalogModels: ['gemini-3-flash-preview', 'gemini-2.5-flash'],
+      complete,
+    });
+
+    const result = await svc.translateDescription(text);
+
+    expect(result.model).toBe('gemini-2.5-flash');
+    // the cached payload carries the model too, so cache hits keep reporting it
+    expect(cache.setMangaCacheWithTiers).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ model: 'gemini-2.5-flash' }),
+    );
+  });
+
+  it('does not invent a model for an older cached payload that lacks one', async () => {
+    const { svc } = makeSvc({
+      env: { LLM_PROVIDER: 'openai', LLM_API_KEY: 'k' },
+      descriptionModel: 'gpt-4o-mini',
+      cached: { translatedText: 'คำแปลเก่า', translated: true },
+      complete: jest.fn(),
+    });
+
+    const result = await svc.translateDescription(text);
+
+    expect(result.translatedText).toBe('คำแปลเก่า');
+    expect(result.model).toBeUndefined();
+  });
+});

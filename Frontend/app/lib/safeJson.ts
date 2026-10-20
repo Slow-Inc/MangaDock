@@ -15,3 +15,14 @@ export async function parseJsonArray<T>(res: Response): Promise<T[] | null> {
   const data = await res.json().catch(() => null);
   return Array.isArray(data) ? (data as T[]) : null;
 }
+
+/**
+ * Parse a fetch Response body as JSON, returning `null` when there is nothing
+ * to parse. NestJS serialises a handler's `null` return as HTTP 200 with an
+ * empty body (not the text `null`), so `res.json()` throws `SyntaxError` for
+ * "no result" endpoints such as `GET /reviews/:id/my` before the user has
+ * reviewed. Unlike {@link parseJsonArray} this does not constrain the shape.
+ */
+export async function parseJsonOrNull<T>(res: Response): Promise<T | null> {
+  return (await res.json().catch(() => null)) as T | null;
+}
