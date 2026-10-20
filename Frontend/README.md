@@ -1,5 +1,12 @@
 # Frontend (Next.js + TailwindCSS)
 
+## Auth regression checks (2026-10-01)
+
+Run `npm run test:auth` for callback, MFA ordering and delayed cross-account cache
+regressions. The dedicated OAuth callback workflow runs these checks in CI.
+For local browser checks, run `tests/oauth-callback.e2e.cjs` with Playwright supplied
+by your tooling environment; see [the validation report](../docs/reports/phase3-auth-20261001/README.md).
+
 Landing Page สำหรับ MangaDock ในสไตล์ Netflix + Glassmorphism
 
 ## เทคโนโลยี

@@ -1,5 +1,157 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-09-26 — #694: SFX rescue logs why a reply produced no SFX (observability)
+
+**What & where:** `MIT/manga_translator/ocr_vlm.py` (`vlm_localize_sfx`, ~10 lines),
+`MIT/test/test_ocr_vlm.py` (4 tests).
+
+**Why:** a truncated or `None` vision reply collapsed to `''`, indistinguishable from "no SFX here";
+two past investigations were misdirected by that silence.
+
+**Before → After:** silent `''` → the same `''` plus one `WARNING` naming `finish_reason`, the
+content, `max_tokens`, and the crop size (or the raw reply, when sanitising emptied it).
+
+**Performance Δ:** none measurable — one dict lookup and, on the failure path only, one log line.
+
+**Quality:** no render change; return values identical on every path (asserted by the tests).
+Side effect: on the currently served thinking model, where every SFX call truncates at
+`max_tokens=24`, each rescue attempt now emits a warning — that volume *is* the signal.
+
+**Validation:** 3 red → green; 3 mutations each killed by exactly one test; 47 passed on the
+ocr_vlm-related suites.
+
+**Risk / rollback:** log-only; rollback = revert.
+
+**Tech-debt register:** `sanitize_sfx` lets `(no sound effect)` / `EMPTY LINE` style refusals through
+as lettered text (seen here, measured by #688's `sanitize` probe) — needs its own issue.
+
+**Links:** #694, #688, #679, #631.
+
+---
+
+## 2026-08-31 — #688: Pipeline Doctor LLM/gateway contracts (feature / test-infra)
+
+**What & where:** `MIT/tools/pipeline_doctor/llm_contracts.py` (new, ~245 lines — four probes plus
+`capture_sfx_call` / `SfxCall` / `DoctorPage`), `MIT/test/test_pipeline_doctor_llm.py` (new, 20
+tests). **No pipeline code touched** — `manga_translator/ocr_vlm.py` is imported and exercised, not
+modified.
+
+**Why:** the LLM/gateway layer had no observability of any kind. The three defects found on
+2026-07-28 took ~10 hand-written probes to locate, and all three were invisible to the 111 MIT test
+files, the `mit_logic` gate, and every `tools/diag_*.py` script — those cover the GPU half and stop
+before the LLM call.
+
+**Before → after:** a truncated reply collapsed to `''`, indistinguishable from "this region has no
+SFX" (the silence that made the 2026-07-11 investigation conclude "text MoE" and move on). Now one
+walk emits four rows: `vlm-send` FAIL (budget 24 ≤ 2048 measured to truncate; thinking unset),
+`vlm-image` WARN (~40 visual tokens vs 336 measured answerable), `vlm-recv` FAIL
+(`finish_reason=length, content=None`), `sanitize` FAIL (`'EMPTY LINE'` survives sanitising).
+`exit_code=1`.
+
+**Perf Δ:** none on any production path — nothing here runs in the pipeline. The probes add ~0.3 s
+to the `mit_logic` gate (20 tests), no GPU, no network.
+
+**Quality:** the contracts capture the request from the **real** `vlm_localize_sfx` through its
+`post_fn` seam, so they track production code rather than a copy of it. Every threshold is a cited
+measurement; two bands ship as WARN because their boundary is unmeasured (vision floor = one
+measurement; budget 2048–4096 = untested).
+
+**Validation:** 20 new tests green; mutation-tested 6/6 (each mutation reverted in isolation — the
+strongest being "capture a hand-written body instead of the real call", which reds 9 of 20). Full
+MIT suite 768 passed / 1 pre-existing failure (`test_online_translators`, live Papago endpoint,
+excluded from the gate). Benchmark + PNG: `docs/reports/benchmarks/2026-08-31-688-doctor-llm-contracts.md`.
+
+**Risk / debt carried forward:**
+- **#688 D1 not done, premise void on this base.** The five thinking/budget helpers the issue asks
+  to extract from `custom_openai` do not exist on `main` — they arrived with #623 on `perf`. The
+  translator path therefore stays outside the gate; revisit after Phase E.
+- **The vision floor is one measurement.** 336 is a size that worked, not a located boundary.
+  #689's sweep is what turns it into a threshold. Until then it must never be a FAIL.
+- **The refusal corpus is observational**, not an enumeration. New refusal wording leaks until added.
+- **Production is still silent.** These probes only speak inside a Doctor run; `ocr_vlm` itself
+  still swallows `finish_reason: length`. That is the benchmark's verdict #4 and is filed separately.
+
+---
+
+## 2026-08-31 — #686: Pipeline Doctor core — report model + probe registry (feature / test-infra)
+
+**What & where:** `MIT/tools/pipeline_doctor/` (new package — `report.py`, `runner.py`,
+`__init__.py`, 188 lines), `MIT/test/test_pipeline_doctor_core.py` (new, 13 tests). No pipeline code
+touched.
+
+**Why:** #685's other five deliverables each need somewhere to report *to*. Without a shared model
+every probe would invent its own output, and the Doctor would decay into another `tools/diag_*.py`
+nobody runs. This is the seam, built first and deliberately empty of pipeline knowledge.
+
+**Before → After:** no package → a `StageReport`/`DoctorRun` model, a `ProbeRegistry` that probes
+attach to by decorator, and two renderers (aligned text table, JSON) driven from one walk. Probes
+register themselves on import, so the core holds no stage list; registration order is pipeline
+order. A probe that raises becomes a `FAIL` row and the walk continues.
+
+**Performance Δ:** none — the package is not on any request path; it is a developer/CI tool. Import
+cost is `dataclasses` + `typing` only, which is what keeps it inside the torch-free `mit_logic` gate.
+
+**Quality:** additive; no existing behaviour changes. The one hardening decision worth recording is
+that `to_table` escapes control characters rather than stripping them — probe evidence for the LLM
+stages is text the *model* wrote, so a raw `[2J`/`[31m` would clear or recolour the
+developer's terminal and let a `FAIL` row be dressed up as anything. Escaping keeps the bytes
+legible as evidence; `to_json` stays verbatim because JSON already escapes them and an agent should
+receive exactly what the model sent.
+
+**Validation:** TDD, RED first (`ImportError: cannot import name 'ProbeRegistry'`). Because an
+ImportError red only proves absence, each assertion was additionally mutation-checked: four
+mutations (`sorted(self._probes)`, dropping the `is not None` guard, letting a probe crash
+propagate, `_one_line` as identity) each redden exactly the test naming that behaviour. CI
+`mit_logic` gate **651 passed, 3 skipped, 0 failed** (run 33361709801); local full-deps run **740
+passed, 2 skipped, 0 failed**. Benchmark + committed PNG:
+`docs/reports/benchmarks/2026-08-31-686-pipeline-doctor-core.md`.
+
+**Tech debt created (tracked, not silent):** a run in which every probe declines reports
+`ok=True`/`exit_code=0` with zero stages — a CI gate wired to it would go green having inspected
+nothing. The core cannot know which stages *should* have reported, so the "expected stage set"
+assertion belongs to **#690**, where it is recorded rather than left to be rediscovered.
+
+---
+
+## 2026-07-28 — #679: SFX wiring guard tested at the behaviour, and an ADR-026 gap surfaced
+
+**What & where:** `MIT/test/sfx_gate_scan.py` (new, pure `ast`), `MIT/test/test_sfx_gate_scan.py`
+(new, 7 tests), `MIT/test/test_stage_c_wiring.py` (the #278 assertion rewritten + one new
+assertion), `docs/adr/026-mit-sfx-rescue-provenance-gate.md` (Amendment).
+
+**Why:** the guard asserted the literal symbol `should_rescue_sfx`, so a deliberate, benchmarked
+swap to landing's equivalent gate made it fire with a message that misdescribed the cause. A guard
+that cannot be tested itself, and that pins an implementation rather than a behaviour, produces
+false alarms and — as here — hides the requirement it is not checking.
+
+**Before → After:** one implementation-coupled assertion → a pure rule exercised against synthetic
+drivers, plus **two separate assertions** matching ADR 026's two requirements (provenance gating;
+the Addendum's real-text guard). The gate-less driver case the guard exists for is now actually
+covered, which it never was.
+
+**Performance Δ:** none (test-infra).
+
+**Quality:** no production code changed. The change is in what CI can see: on
+`integrate/render-reconcile` the rescue path never consults the line-OCR read, so the phantom
+target-language onomatopoeia over real dialogue that ADR 026's Addendum closed is reachable there.
+That now fails a test instead of passing silently.
+
+**Validation:** 10 tests over both files; full torch-free suite 646 passed, 0 failed on `main`.
+Both checks were run over both real drivers: `main` = provenance `should_rescue_sfx` + guard yes;
+`integrate/render-reconcile` = provenance `should_sfx_rescue` + guard no.
+
+**Risk / rollback:** test-infra only; rollback = revert. Deliberate consequence: the branch's
+`mit_logic` stays red until the trade-off is decided — that is the intended signal, not breakage.
+
+**Tech-debt register:** (1) the SFX-gate trade-off is **open** — ADR 026's Amendment records it and
+requires a superseding benchmark covering both the stylized SFX case and an ASCII det_sfx
+false-positive; (2) whichever gate loses becomes dead code to remove, together with
+`textline_merge/__init__.py`'s comment that still names `should_rescue_sfx` as *the* rescue path;
+(3) `ocr_vlm.should_rescue_sfx` currently has passing tests and no caller on the branch.
+
+**Links:** #679, #278, #609, #626, #642, ADR 026.
+
+---
 
 ## 2026-07-28 — #680: glyph cache ignored font switches (render correctness)
 
@@ -269,6 +421,31 @@ tracked for atomic reland (#503). Follow-up debt: the render-layout impl (page_s
 **Before → After:** translate on expired token → `401` + error toast, permanently stuck / → Turnstile "ยืนยันตัวตน" modal re-appears, user re-verifies and retries in place.
 
 **Performance Δ:** N/A. **Quality:** removes a hard dead-end in the translate UX. **Validation:** unit (`isCaptchaExpiredError`) + full suite green + live E2E (inject bogus token → `401` → modal re-prompt, screenshot). **Risk / rollback:** additive; reuses the proven page-fetch recovery path; no backend change. **Links:** post-mortem `docs/reports/2026-07-01-captcha-reprompt-hotfix.md`, PR (hotfix/captcha-reprompt-on-translate-401).
+
+## 2026-06-28 — CI test gates: GitHub Actions, first CI in the repo (infra / tech-debt)
+
+**Scope:** repo-wide (`.github/workflows/` + `Backend/jest.ci.config.js` + one test fix) · **Type:** Infra — first automated test gate · **Tests:** backend 62 suites / 616 green on CI (Node 22), frontend 120 green; mit report-only.
+
+**What & where:**
+- `.github/workflows/{backend,frontend,mit}-ci.yml` *(new)* — path-filtered per service.
+- `Backend/jest.ci.config.js` *(new)* — inherits `package.json`'s jest block (single source of truth) + documented skip-list (#358).
+- `Backend/src/books/books-health.spec.ts` — fetch mock fixed (assign `global.fetch`, not `spyOn` on the lazy global); re-enabled.
+
+**Why:** no CI existed; the 176 test files ran only when a dev remembered. With two self-merging devs the gate stops one tired late-night merge from landing red.
+
+**Before → After:** PRs merged with CodeQL as the only check (tests on the honor system). → Every PR touching a service runs its unit suite automatically; a genuine test failure now visible pre-merge.
+
+**Performance Δ:** path-filtered so a single-service PR doesn't run the other two; backend ~1–2 min, frontend <1 min, MIT slow (full ML install) so report-only for now.
+
+**Quality:** `npm ci` was found broken on main (`package-lock.json` stale) → CI uses `bun install` (the maintained lockfile); Jest 30 found incompatible with the dev box's Node 26 → CI + local pinned to Node 22.
+
+**Validation:** verified green on CI (backend 62/616, frontend 120) + locally on Node 22; scrutinized before merge (fixed MAJOR 2 jest-config-duplication in-PR).
+
+**Risk / rollback:** additive (new files only); revert = delete the workflows. Skip-list keeps the gate green from day one without hiding debt (each entry tracked, removed as fixed).
+
+**Links:** PR #355 (`31b7a31`); ADR 020; follow-ups #356 (safe required-checks → branch protection), #357 (pin bun + empty-files guard), #358 (shrink skip-list), #359 (MIT lazy torch).
+
+---
 
 ## 2026-06-19 — Coin Topup System: Xendit PromptPay QR (feature)
 

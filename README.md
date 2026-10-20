@@ -187,6 +187,29 @@ After starting all services, verify at minimum:
 4. Backend connected to Redis at `localhost:6379`
 5. Backend connected to Supabase (verify `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`)
 6. Mobile development build opens the frontend WebView and native OAuth returns to `mangadock://auth/callback`
+
+## Continuous Integration
+
+GitHub Actions runs the unit suites on every PR from one workflow, `.github/workflows/ci.yml`, whose jobs are path-filtered and which ends in a single required `gate` check. [ADR 020](docs/adr/020-ci-test-gates.md) records the original decision (partly superseded, see its status line); `DONE.md` ("CI gates made real") records what replaced it.
+
+| Job | What it runs |
+|---|---|
+| `backend (jest)` | `bun install` + `jest` on **Node 22** + a Redis service (`jest.ci.config.js`) |
+| `frontend (bun test)` | `bun test` |
+| `mobile (typecheck)` | mobile typecheck |
+| `pytest (logic gate, torch-free)` | MIT logic suite without torch — **blocking**; heavy modules are skipped by `MIT/test/conftest.py` (#359) |
+| `pytest (heavy ML, report-only)` | MIT suites that need the ML stack — `continue-on-error`, never blocks |
+| `scripts (node --test)` | repo scripts |
+| `gate` | the one required check: fails if any blocking job above failed |
+
+**Run Backend tests locally on Node 22** (Jest 30 does not support Node 26):
+
+```bash
+cd Backend
+npx jest -c jest.ci.config.js --runInBand   # the exact CI command
+```
+
+`jest.ci.config.js` inherits the `jest` block from `package.json` and adds a skip-list of documented pre-existing failures (#358) so the gate is green; remove an entry as its suite is fixed.
 <!-- lang:end -->
 
 <!-- lang:th -->

@@ -1,0 +1,43 @@
+name: OAuth callback regressions
+
+on:
+  pull_request:
+    paths:
+      - 'Frontend/app/contexts/AuthContext.tsx'
+      - 'Frontend/app/auth/callback/**'
+      - 'Frontend/app/lib/oauthCallback.ts'
+      - 'Frontend/app/lib/userCache.ts'
+      - 'Frontend/app/lib/readingHistory.ts'
+      - 'Frontend/tests/*regression.test.cjs'
+      - 'Frontend/package.json'
+      - 'Frontend/bun.lock'
+      - '.github/workflows/auth-callback.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Frontend/app/contexts/AuthContext.tsx'
+      - 'Frontend/app/auth/callback/**'
+      - 'Frontend/app/lib/userCache.ts'
+      - 'Frontend/app/lib/readingHistory.ts'
+      - 'Frontend/tests/*regression.test.cjs'
+      - '.github/workflows/auth-callback.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  auth:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+      - run: bun install --frozen-lockfile
+      - run: npm run test:auth

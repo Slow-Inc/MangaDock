@@ -18,6 +18,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 MIT = os.path.dirname(HERE)
 sys.path.insert(0, MIT)
 
+from manga_translator import initialize as _initialize_env  # noqa: E402
+
+# #614 — this script builds a real `MangaTranslator`, so the translator keys must come from
+# `.env`. It used to get them for free because importing the package called `load_dotenv()`;
+# now that the load is explicit, a benchmark tool that skipped it would silently run against
+# DEFAULT keys (empty API key, localhost endpoint) and produce a reference image attributed to
+# a render change. Same one-line contract as the server and CLI entry points.
+_initialize_env()
+
 from manga_translator import MangaTranslator, Config, logger  # noqa: E402
 
 # The tuned config = Backend/.env (render_version landing-2026-07-04), set directly.

@@ -6,7 +6,8 @@
     "dev": "next dev --hostname 0.0.0.0 --port 4000",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 4000",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:auth": "node --test tests/oauth-regression.test.cjs tests/cache-account-regression.test.cjs"
   },
   "dependencies": {
     "@marsidev/react-turnstile": "^1.4.2",

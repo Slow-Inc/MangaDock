@@ -35,3 +35,39 @@ def test_extra_body_suppresses_thinking_when_disabled():
 def test_extra_body_none_when_thinking_enabled():
     # Enabled → send nothing extra, preserving default model behaviour.
     assert thinking_extra_body(True) is None
+
+
+# Wiring (ported from main's #706 test): the helpers above only matter if
+# _request_translation actually hands their result to chat.completions.create.
+# content=None ends the call with EmptyContentError (#631), so one call is enough.
+def _extra_body_sent_by_request(monkeypatch, env_value):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest import mock
+
+    import pytest
+
+    from manga_translator.translators.custom_openai import CustomOpenAiTranslator, EmptyContentError
+
+    if env_value is None:
+        monkeypatch.delenv('CUSTOM_OPENAI_ENABLE_THINKING', raising=False)
+    else:
+        monkeypatch.setenv('CUSTOM_OPENAI_ENABLE_THINKING', env_value)
+    t = CustomOpenAiTranslator()
+    create = mock.AsyncMock(return_value=SimpleNamespace(
+        choices=[SimpleNamespace(finish_reason='length', message=SimpleNamespace(content=None))],
+        usage=SimpleNamespace(total_tokens=1, prompt_tokens=1, completion_tokens=0),
+    ))
+    t.client.chat.completions.create = create
+    with pytest.raises(EmptyContentError):
+        asyncio.run(t._request_translation('ENG', 'hello'))
+    return create.call_args.kwargs.get('extra_body')
+
+
+def test_request_sends_thinking_off_body_by_default(monkeypatch):
+    assert _extra_body_sent_by_request(monkeypatch, None) == {
+        'chat_template_kwargs': {'enable_thinking': False}}
+
+
+def test_request_sends_no_extra_body_when_thinking_enabled(monkeypatch):
+    assert _extra_body_sent_by_request(monkeypatch, 'true') is None

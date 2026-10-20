@@ -33,3 +33,77 @@ Full-stack EN→Thai benchmarking surfaced that **`det_sfx` itself false-positiv
 
 - **Validated:** `docs/reports/benchmarks/2026-06-30-sfx-falsepos-phantom-fix.md` — across all 5 problem pages every ASCII phantom (7) is dropped and every non-ASCII SFX (ほ。ん, サ×2, ⁉, ぎい) is still rescued; bubbles render real dialogue. +1 `ocr_read_real_text` test + 1 ascii-reject + 1 nonascii-keep on `should_rescue_sfx`; `test_ocr_vlm` 27/0.
 - **Limitation:** a genuine standalone **Latin** SFX (e.g. a stylized "BOOM") found only via det_sfx is now dropped rather than localized; acceptable — this content's real SFX are CJK, and a readable Latin SFX degrades to the normal translate path, never a phantom. The `det_sfx`-over-dialogue **overlap** when both render (#436) is separate and still open.
+
+## Amendment (2026-07-28) — a second implementation exists, and the Addendum is not in it
+
+Two implementations of the Decision now live in the tree, and `integrate/render-reconcile` calls the
+other one:
+
+| | `ocr_vlm.should_rescue_sfx` (this ADR) | `sfx_merge.should_sfx_rescue` (landing) |
+|---|---|---|
+| provenance gate | `from_sfx_detection` | `region.is_sfx` |
+| box size gate | inside the helper | at the driver call site |
+| length rule (≤4 / ≤2) | yes | **no** |
+| Addendum real-text guard | yes (inside) | **no** |
+| called by `main` | yes | no |
+| called by `integrate/render-reconcile` | no | yes |
+
+The swap was deliberate and measured — commit `7e78341e`: main's Addendum false-positive DROP removed
+the One-Punch `ぬ` SFX (line-OCR read `"X"`) before the rescue could run, so the page no longer rendered
+the SLURP the landing baseline renders. Under the reconciliation branch's hard constraint that quality
+must equal the landing baseline, landing's gate was restored verbatim.
+
+**What that costs is exactly what the Addendum above bought.** On that branch the rescue path never
+consults the line-OCR read, so the failure mode benchmarked on 2026-06-30 — a det_sfx box sitting on a
+speech bubble, read as `W` / `THE` / `M`, sent to the gateway and returned as a phantom Thai
+onomatopoeia rendered over the real dialogue — is reachable again. `ocr_read_real_text` is still called
+inside `ocr_vlm.should_rescue_sfx`, but nothing on that branch calls that helper: it is live code with
+passing tests and no caller, which reads as coverage it no longer provides.
+
+**Status: the trade-off is open, not decided.** Keeping the `ぬ` SFX and keeping the phantom-token guard
+are not in conflict in principle — the Addendum's rule (a clean ASCII read means the OCR succeeded) and
+the `ぬ` case (read as `"X"`, a single ASCII letter) collide only because the rule is a heuristic. A gate
+that satisfies both is findable; neither branch has one today. Until it is decided:
+
+- `test_stage_c_wiring.py` asserts the two requirements **separately** — provenance gating (either
+  implementation satisfies it) and the Addendum's real-text guard. `main` passes both;
+  `integrate/render-reconcile` passes the first and fails the second, which is the honest signal.
+- Whichever way it lands, the loser becomes dead code to remove, and
+  `textline_merge/__init__.py`'s comment pointing at `should_rescue_sfx` as *the* rescue path needs
+  updating with it.
+
+
+### Benchmark 2026-07-28 — the trade-off is not live, and the rescue is not working
+
+`docs/reports/benchmarks/2026-07-28-679-sfx-gate.md` replayed both gates over the recorded telemetry
+and probed the gateway directly. Two results change the picture:
+
+- **Gate scoring on the documented defect set: this ADR's gate 11/12, landing's 5/12.** Landing's only
+  win is the `ぬ` row; it loses all seven phantom rows.
+- **The rescue produces nothing on the current gateway/model, so neither gate has visible effect
+  today — but the feature is unserved, not dead.** It rendered `SQUELCH` over the inpainted `ぬ` on
+  2026-07-04 through this same code path (`2026-07-04-sfx-rescue-fix.md`, committed render
+  `2026-07-04-sfx-rescue-vs-target.jpg`), at the same `max_tokens=24`. What regressed is the model
+  behind `gateway.9arm.co`, which today lists only `qwen3.6-35b-a3b`. `vlm_localize_sfx` always returns `''` — its hardcoded `max_tokens=24` is far below the
+  model's reasoning floor, so every call ends `finish_reason: length` with `content: None`. That is a
+  real defect (`ocr_vlm.py` never adopted the `thinking_extra_body()` / `resolve_max_completion_tokens()`
+  helpers #623/#631 added for the translator path).
+
+**Do not repair it by disabling thinking or raising the budget.** With thinking off the call answers in
+3–4 tokens, but the answer is unrelated to the image: a pure-white crop returns `วูบ`, a pure-black crop
+once returned `สวัสดี` ("hello"), and the same crop never returns the same word twice. Fixing the
+truncation would convert a safe empty result into random target-language words rendered over artwork.
+Reviving the feature requires a model whose answer demonstrably varies with the image; the benchmark's
+B3 probe is the check for that.
+
+The genuine code defect exposed here is that the failure is **silent**: a truncated reply collapses to
+`''`, indistinguishable from "this region has no SFX" — which is why 2026-07-11 concluded "text MoE"
+and moved on. Making `finish_reason: length` / `content: None` observable is worth doing on its own,
+independently of which model is configured.
+
+Consequence for this ADR: keeping the Addendum guard costs nothing measurable while the rescue is inert,
+and prevents the 2026-06-30 corruption from returning the moment the configuration changes — which is
+the likeliest way it would return, since a config change carries no reason to re-run a render benchmark.
+
+Tracked in #679. Superseding this ADR requires a benchmark that covers **both** cases: the `ぬ`
+stylized SFX is still localized, and an ASCII det_sfx false-positive on a bubble is still not.

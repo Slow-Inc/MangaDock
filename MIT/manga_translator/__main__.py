@@ -4,6 +4,13 @@ import asyncio
 import logging
 from argparse import Namespace
 
+# #614 — the CLI is an entry point, so it loads `.env` explicitly. This must precede the
+# `from manga_translator import Config` below: that resolves the package's lazy public API,
+# which reaches `translators.keys`, and keys snapshots the environment at ITS import time.
+from manga_translator import initialize as _initialize_env
+
+_initialize_env()
+
 from manga_translator import Config
 from manga_translator.args import parser, reparse
 from .manga_translator import (

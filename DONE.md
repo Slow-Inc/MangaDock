@@ -3,6 +3,158 @@
 
 ---
 
+## #694 — SFX rescue says why it returned nothing (2026-09-26)
+
+**What:** `MIT/manga_translator/ocr_vlm.py` `vlm_localize_sfx` now logs one `WARNING` when the
+vision reply yields no usable SFX: `SFX reply unusable: finish_reason=… content=… max_tokens=24
+crop=WxH` for a truncated or `None` reply, and `SFX reply sanitised to empty: '…'` when a reply
+arrived but `sanitize_sfx` reduced it to nothing. The return value is unchanged in every case — the
+degrade-to-`''` behaviour is deliberate and safe (the region renders the raw SFX).
+
+**Why:** `''` from this function reads downstream as "this region has no SFX". A truncation looked
+exactly like an empty region, which is why 2026-07-11 concluded "text MoE" and why 2026-07-28 needed
+~10 hand-written probes to find three defects (verdict #4 of
+`docs/reports/benchmarks/2026-07-28-679-sfx-gate.md`). The Doctor (#688) can name it, but only
+inside a Doctor run; production stayed silent.
+
+**Not in scope:** raising the token budget or disabling thinking (verdict #3: on the served model
+those ship confident nonsense). The function has no region id, so the crop size stands in for "the
+region".
+
+**Found while writing the tests:** `'(no sound effect)!!'` survives `sanitize_sfx` as
+`NO SOUND EFFECT !!` — the refusal-leak the #688 `sanitize` probe reports. Left for its own issue.
+
+**Validation:** TDD — 4 new tests, 3 red first (no warning emitted), then green. Each branch
+mutation-checked: dropping the `finish_reason` check, the sanitised-empty check, or the budget in the
+message each fails exactly one test. 47 passed across `test_ocr_vlm`, `test_sfx_gate_scan`,
+`test_lazy_import`, `test_stage_c_wiring`. MIT not booted (torch-free tests only).
+## #688 — Doctor LLM contracts: four checks that turn a silent `''` into named failures (2026-08-31)
+
+**What:** `MIT/tools/pipeline_doctor/llm_contracts.py` — four probes over one SFX rescue call,
+covering the LLM/gateway layer that nothing in the repo looked at. `vlm-send` (model set, budget
+above the reasoning floor, thinking flag applied), `vlm-image` (decodes, RGB, not blank, above the
+vision-resolution floor), `vlm-recv` (`finish_reason`, `content` not `None`), `sanitize` (a corpus
+of refusal forms the model actually emitted). 20 tests in `test/test_pipeline_doctor_llm.py`.
+
+**The design choice that carries the value:** `capture_sfx_call` runs the **real**
+`vlm_localize_sfx` with its `post_fn` seam filled by a recorder, so the contracts report on
+production code. A probe reading a hand-written copy of the payload would stay green through
+exactly the edit it exists to catch — mutating the capture to a hand-written body reds 9 of 20.
+
+**Acceptance (#685's falsifiable bar) is met:** all three 2026-07-28 defects surface in one walk,
+each on its own row with its own evidence — `vlm-send` FAIL (`budget 24 <= 2048 measured to
+truncate`), `vlm-recv` FAIL (`finish_reason=length, content=None`), `sanitize` FAIL (`'EMPTY LINE'
+-> 'EMPTY LINE'`), plus `vlm-image` WARN (≈40 visual tokens vs the 336 measured to be answered).
+
+**Every threshold is a measurement, cited at the constant that uses it** (`2026-07-28-679-sfx-gate.md`).
+Two bands stay WARN because nobody located their boundary: the vision floor rests on a single
+measurement, and the 2048–4096 budget band is unmeasured. The Doctor **fixes nothing** — it makes
+the defects nameable. Deliberately so: that benchmark's verdict is that raising the budget on the
+current model ships confident nonsense into renders.
+
+**A defect in this work's own tests, found and fixed:** `test_the_contracts_import_without_torch`
+first asserted `'torch' not in sys.modules` inline — green in CI (no torch installed), red locally
+the moment an earlier module imports the pipeline. It measured the suite's import order, not the
+import graph, and would have been green in exactly the environment that cannot detect a regression.
+Rewritten as a subprocess check with a negative control.
+
+**Scope held:** #688's D1 (extract five thinking/budget helpers from `custom_openai`) was **not**
+done — those helpers do not exist on `main` (they arrived with #623 on `perf`), so the premise is
+void on this base. The SFX half, which the issue names as the priority, is what shipped. The
+production-side gap the benchmark asked for (log `finish_reason: length` in `ocr_vlm` itself) is
+new work and was filed rather than absorbed.
+
+Benchmark: `docs/reports/benchmarks/2026-08-31-688-doctor-llm-contracts.md` (+ PNG).
+Tests: 20 new, mutation-tested 6/6; full MIT suite 768 passed / 1 pre-existing network failure.
+
+Refs #688 #685.
+
+---
+
+## #686 — Pipeline Doctor core: probe registry + runner, two renderings from one walk (2026-08-31)
+
+**What:** `MIT/tools/pipeline_doctor/` — the seam every other #685 deliverable plugs into.
+`StageReport` (stage id, `OK`/`WARN`/`FAIL`, metrics, evidence), a `ProbeRegistry` probes attach to
+by decorator, and two renderers over the same data: an aligned text table for a terminal and JSON
+for an agent.
+
+**The design constraint that shapes it:** the core must not know what a pipeline stage *is*. Probes
+register themselves on import, so the core never holds a stage list it would have to keep current —
+which is what keeps it from importing the pipeline, and therefore torch-free and runnable in the
+`mit_logic` gate. Registration order is pipeline order deliberately; sorting would print `render`
+before `vlm-send` and describe a pipeline that does not exist.
+
+**A probe that raises becomes a `FAIL` row carrying the exception, and the walk continues** — a
+diagnostic that aborts on the first broken stage says nothing about the remaining ones, which is
+exactly when it is most needed.
+
+**Found by /scrutinize, not by the tests:** `to_table` broke a promise it makes in its own docstring.
+Evidence containing a newline rendered 2 stages as 3 lines and destroyed the aligned status column,
+and a control byte reached the terminal verbatim. The evidence a probe carries for the LLM stages is
+a string the *model* wrote, so `[2J` clears the developer's screen and `[31m` recolours
+everything after it — a `FAIL` row could be dressed up as anything. `_one_line` escapes rather than
+strips (which bytes came back *is* the diagnosis); `to_json` stays verbatim, since JSON already
+escapes them and an agent should get exactly what the model sent.
+
+**Validation:** TDD, red first (`ImportError: cannot import name 'ProbeRegistry'`). That red proves
+only absence, so each assertion was mutation-checked against the finished code — all four mutations
+redden exactly the test naming the behaviour and nothing else. 13 tests. `mit_logic` gate in CI:
+**651 passed, 3 skipped, 0 failed**; the fuller local run (full deps) is **740 passed, 2 skipped, 0
+failed**. Benchmark + PNG: `docs/reports/benchmarks/2026-08-31-686-pipeline-doctor-core.md`.
+
+**Known and not fixed here:** a run where every probe declines reports `ok=True`/`exit_code=0` with
+zero stages, so a CI gate wired to it would go green having inspected nothing. The core cannot know
+which stages *should* have reported, so that assertion belongs to #690 (the CI-wiring deliverable),
+where it is recorded.
+
+PR #692. Refs #686 #685.
+
+---
+
+## #679 — the SFX wiring guard was asserting a symbol name; fixing it uncovered a real gap (2026-07-28)
+
+**What #679 said:** the driver on `integrate/render-reconcile` "reverted to the pre-#278 4-char SFX
+heuristic". **That was wrong** — I filed it by repeating the test's own failure message without
+opening the driver. The driver does gate on provenance, via landing's `sfx_merge.should_sfx_rescue`
+(`region.is_sfx`), swapped in deliberately and with a benchmark in `7e78341e`. No length heuristic
+exists in that file.
+
+**The guard's actual defect:** `test_stage_c_wiring.py` asserted the literal symbol
+`should_rescue_sfx` appeared as a call. That pins an implementation, not the behaviour it protects,
+so a deliberate swap to an equivalent gate fired it — and the failure message accused the driver of
+something that had not happened. Fixed by moving the rule into `test/sfx_gate_scan.py`, a pure
+`ast` module tested against **synthetic** drivers, including the gate-less one no real file in the
+tree exhibits, which is the case the guard exists for and could never previously be exercised.
+
+**What fixing it uncovered — this is the part that matters.** ADR 026 has two independent
+requirements and the guard only ever checked one. The Decision is "gate on provenance". The
+**Addendum** is "provenance alone was insufficient": det_sfx itself false-positives on speech
+bubbles, and without a real-text guard the vision gateway is handed a dialogue fragment, told it is
+an SFX, and returns a phantom onomatopoeia rendered over the real line — benchmarked across 5 pages
+on 2026-06-30.
+
+Landing's gate is provenance-only. Verified by running both checks over both drivers:
+
+| | provenance gate | Addendum real-text guard |
+|---|---|---|
+| `main` | `should_rescue_sfx` | **yes** |
+| `integrate/render-reconcile` | `should_sfx_rescue` | **no** |
+
+So the branch satisfies the #278 Decision and reintroduces the defect class its Addendum closed.
+`ocr_read_real_text` still runs *inside* `ocr_vlm.should_rescue_sfx`, but nothing on that branch
+calls that helper — live code with passing tests and no caller, which reads as coverage it no longer
+provides.
+
+**Deliberately not papered over.** The obvious move — make the guard accept either gate and go green —
+would have turned a true signal into silence. `test_stage_c_wiring.py` now asserts the two
+requirements **separately**: `main` passes both, the branch passes the first and fails the second.
+The trade-off is recorded as **open** in ADR 026's new Amendment, with the note that the two aims are
+not in conflict in principle — the Addendum's rule and the stylized-SFX case collide only because the
+rule is a heuristic, so a gate satisfying both is findable. Neither branch has one today.
+
+**Validated:** 10 tests across the two files; full torch-free suite 646 passed, 0 failed on `main`.
+
+---
 
 ## #680 — glyph cache ignored font switches (real render bug, found by root-causing 4 red goldens) (2026-07-28)
 
@@ -453,6 +605,21 @@ Designed the **Staff Console** (role-tiered back-office: Moderator/Admin/Dev) of
 - **Side fix:** shadcn MCP cwd gotcha — Claude Code `.mcp.json` has no `cwd` field → added wrapper `Frontend/run-shadcn-mcp.ps1` so the server runs in `Frontend/` and reads `components.json` (`@react-bits` + `radix-rhea`); needs a full Claude Code restart (reconnect does not reload config).
 
 ---
+
+## CI test gates — GitHub Actions, first CI in the repo (2026-06-28, #355)
+
+**Goal:** run the 176 existing test files automatically on every PR — closing the gap where tests relied on two self-merging devs remembering to run them locally.
+
+**Shipped (PR #355, squash-merged to main `31b7a31`):**
+- `.github/workflows/{backend,frontend,mit}-ci.yml` — path-filtered per service.
+- `backend-ci`: bun install (not `npm ci` — `package-lock.json` is stale) + jest on **Node 22** + Redis service, `--runInBand`. **62 suites / 616 tests green on CI.**
+- `frontend-ci`: `bun test`, excludes `*.integration.test.ts` (needs live `:4000`). **120 green.**
+- `mit-ci`: pytest **report-only** (`continue-on-error`) until torch is lazy-imported (#359).
+- `Backend/jest.ci.config.js` — inherits `package.json`'s jest block (single source of truth) + a documented skip-list of pre-existing failures (#358); converges to zero.
+
+**TDD (first skip-list shrink):** `books-health.spec.ts` RED→GREEN — `jest.spyOn(global,'fetch')` + `restoreAllMocks()` deletes Node's lazy `fetch` global, so the 2nd test threw "Property `fetch` does not exist"; fixed by assigning `global.fetch` directly + save/restore. Skip-list **9 → 8**; re-enabled in CI (real path: `BooksService → MitTranslationService → MitClient.ready → fetch`).
+
+**Process:** scrutinized before merge (per policy) → found + fixed MAJOR 2 (jest config was duplicated, would drift) in-PR; filed the rest as #356 (safe required-checks before branch protection), #357 (pin bun + empty-files guard), #358 (shrink skip-list), #359 (MIT lazy torch). Dev box needed **Node 22** (Jest 30 can't run on Node 26 — `setTimeout` undefined in sandbox); installed via nvm-windows. ADR `docs/adr/020-ci-test-gates.md`; impact report 2026-06-28 (CI gates).
 
 ## Coin Topup System — Xendit PromptPay QR (2026-06-19, sandbox)
 
@@ -1010,6 +1177,97 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 # DONE — Claude Code Review Fix Session (2026-05-27)
 
 ---
+
+## #694 — SFX rescue บอกเหตุผลเมื่อคืนค่าว่าง (2026-09-26)
+
+**อะไร:** `vlm_localize_sfx` ใน `MIT/manga_translator/ocr_vlm.py` ตอนนี้ log `WARNING` หนึ่งบรรทัดเมื่อคำตอบจาก
+vision model ใช้เป็น SFX ไม่ได้: `SFX reply unusable: finish_reason=… content=… max_tokens=24 crop=WxH`
+เมื่อคำตอบถูกตัดหรือเป็น `None` และ `SFX reply sanitised to empty: '…'` เมื่อได้คำตอบมาแต่ `sanitize_sfx`
+ตัดจนว่าง ค่าที่ return ไม่เปลี่ยนในทุกกรณี — การถอยกลับเป็น `''` ตั้งใจและปลอดภัย (region จะแสดง SFX ดิบ)
+
+**ทำไม:** `''` จากฟังก์ชันนี้ถูกอ่านต่อว่า "region นี้ไม่มี SFX" คำตอบที่ถูกตัดจึงดูเหมือน region ว่างทุกประการ
+เป็นเหตุที่ 2026-07-11 สรุปว่า "text MoE" และ 2026-07-28 ต้องเขียน probe เองราว 10 ตัวกว่าจะเจอ defect สามตัว
+(verdict #4 ใน `docs/reports/benchmarks/2026-07-28-679-sfx-gate.md`) Doctor (#688) ระบุได้ แต่เฉพาะตอนรัน
+Doctor เท่านั้น production ยังเงียบ
+
+**ไม่อยู่ใน scope:** เพิ่ม token budget หรือปิด thinking (verdict #3: บน model ที่ใช้อยู่ จะได้ผลมั่วที่ดูมั่นใจ)
+ฟังก์ชันไม่รู้ id ของ region จึงใช้ขนาด crop แทน
+
+**เจอระหว่างเขียนเทสต์:** `'(no sound effect)!!'` ผ่าน `sanitize_sfx` ออกมาเป็น `NO SOUND EFFECT !!` —
+คือ refusal ที่หลุดตามที่ probe `sanitize` ของ #688 รายงาน แยกไว้เป็น issue ของมันเอง
+
+**Validation:** TDD — เทสต์ใหม่ 4 ตัว แดงก่อน 3 ตัว (ไม่มี warning) แล้วเขียว mutation ทุก branch: ลบเช็ค
+`finish_reason`, ลบเช็ค sanitise-ว่าง หรือลบ budget ออกจากข้อความ แต่ละอย่างทำให้เทสต์แดงหนึ่งตัวพอดี
+ผ่าน 47 ตัวใน `test_ocr_vlm`, `test_sfx_gate_scan`, `test_lazy_import`, `test_stage_c_wiring` ไม่ได้ boot MIT
+## #688 — Doctor LLM contracts: สี่ด่านที่เปลี่ยน `''` เงียบ ๆ ให้เป็น failure ที่มีชื่อ (2026-08-31)
+
+**อะไร:** `MIT/tools/pipeline_doctor/llm_contracts.py` — probe สี่ตัวบนการเรียก SFX rescue ครั้งเดียว
+ครอบชั้น LLM/gateway ที่ไม่มีอะไรใน repo มองเลย · `vlm-send` (ตั้ง model, budget สูงกว่าพื้น reasoning,
+ใส่ flag thinking), `vlm-image` (ถอดรหัสได้, RGB, ไม่ว่างเปล่า, ไม่ต่ำกว่าพื้นความละเอียด vision),
+`vlm-recv` (`finish_reason`, `content` ไม่เป็น `None`), `sanitize` (คลังรูปแบบการปฏิเสธที่โมเดลพ่นออกมาจริง)
+· 20 เทสต์ใน `test/test_pipeline_doctor_llm.py`
+
+**จุดออกแบบที่เป็นหัวใจ:** `capture_sfx_call` รัน `vlm_localize_sfx` **ตัวจริง** โดยเสียบ recorder เข้าที่รอยต่อ
+`post_fn` ดังนั้น contract ตรวจโค้ด production จริง ๆ · probe ที่อ่าน payload ฉบับเขียนมือจะเขียวผ่านการแก้ที่มัน
+มีไว้จับพอดี — ลองเปลี่ยน capture เป็น body เขียนมือแล้วเทสต์แดง 9 จาก 20
+
+**ผ่านเกณฑ์ของ #685 (เกณฑ์ที่พิสูจน์ผิดได้):** บั๊กทั้งสามของ 2026-07-28 โผล่ในการเดินรอบเดียว แต่ละตัวมีบรรทัด
+และหลักฐานของตัวเอง — `vlm-send` FAIL (`budget 24 <= 2048 measured to truncate`), `vlm-recv` FAIL
+(`finish_reason=length, content=None`), `sanitize` FAIL (`'EMPTY LINE' -> 'EMPTY LINE'`) และ
+`vlm-image` WARN (~40 visual token เทียบกับ 336 ที่วัดว่าโมเดลตอบ)
+
+**ทุก threshold คือค่าที่วัดมา และอ้างอิงไว้ตรงค่าคงที่ที่ใช้มัน** (`2026-07-28-679-sfx-gate.md`) ·
+สองช่วงยังเป็น WARN เพราะไม่มีใครหาขอบเขตจริงเจอ: พื้นความละเอียด vision มาจากการวัดครั้งเดียว และช่วง budget
+2048–4096 ยังไม่มีใครวัด · Doctor **ไม่แก้อะไรเลย** — มันแค่ทำให้บั๊กเรียกชื่อได้ · ตั้งใจแบบนั้น เพราะคำตัดสินของ
+benchmark นั้นคือการเพิ่ม budget บนโมเดลปัจจุบันจะพ่นคำมั่ว ๆ ที่ดูมั่นใจลงไปบนภาพ
+
+**บั๊กในเทสต์ของงานนี้เอง ที่เจอและแก้แล้ว:** `test_the_contracts_import_without_torch` ตอนแรก assert
+`'torch' not in sys.modules` ตรง ๆ — เขียวใน CI (ไม่ได้ลง torch) แต่แดงบนเครื่อง local ทันทีที่มีโมดูลก่อนหน้า
+import pipeline · มันวัดลำดับการ import ของ suite ไม่ใช่กราฟ import ของโมดูล และจะเขียวพอดีในสภาพแวดล้อมที่
+ตรวจ regression ไม่ได้ · เขียนใหม่เป็นการเช็คใน subprocess พร้อม negative control
+
+**คุมขอบเขต:** D1 ของ #688 (แยกฟังก์ชัน thinking/budget ห้าตัวออกจาก `custom_openai`) **ไม่ได้ทำ** —
+ฟังก์ชันพวกนั้นไม่มีอยู่บน `main` (มากับ #623 บน `perf`) ข้อตั้งต้นจึงเป็นโมฆะบนฐานนี้ · สิ่งที่ส่งคือครึ่ง SFX
+ซึ่ง issue ระบุเองว่าเป็นลำดับแรก · ส่วนช่องว่างฝั่ง production ที่ benchmark ขอไว้ (log `finish_reason: length`
+ใน `ocr_vlm` เอง) เป็นงานใหม่ และเปิด issue แยกแทนที่จะกลืนเข้ามา
+
+Benchmark: `docs/reports/benchmarks/2026-08-31-688-doctor-llm-contracts.md` (+ PNG)
+เทสต์: ใหม่ 20 ตัว, mutation-test ผ่าน 6/6, suite MIT เต็ม 768 ผ่าน / 1 fail ที่ค้างมาก่อน (network)
+
+Refs #688 #685
+
+---
+
+## #686 — แกน Pipeline Doctor: probe registry + runner, เดินรอบเดียวได้ผลสองแบบ (2026-08-31)
+
+**อะไร:** `MIT/tools/pipeline_doctor/` — รอยต่อที่งานอื่นทุกชิ้นของ #685 จะเสียบเข้ามา
+`StageReport` (id ของ stage, `OK`/`WARN`/`FAIL`, metrics, evidence), `ProbeRegistry` ที่ probe เกาะเข้ามาด้วย
+decorator และตัวเรนเดอร์สองแบบจากข้อมูลชุดเดียว: ตารางจัดคอลัมน์สำหรับ terminal และ JSON สำหรับ agent
+
+**ข้อจำกัดที่กำหนดรูปร่างของมัน:** core ต้องไม่รู้ว่า stage ของไปป์ไลน์*คืออะไร* · probe ลงทะเบียนตัวเองตอน import
+core จึงไม่เคยถือรายชื่อ stage ที่ต้องคอยตามแก้ — ซึ่งเป็นสิ่งที่ทำให้มันไม่ต้อง import ไปป์ไลน์ จึง torch-free
+และรันใน gate `mit_logic` ได้ · ลำดับการลงทะเบียนคือลำดับไปป์ไลน์โดยตั้งใจ ถ้า sort จะพิมพ์ `render` ก่อน
+`vlm-send` แล้วบรรยายไปป์ไลน์ที่ไม่มีอยู่จริง
+
+**probe ที่ crash กลายเป็นแถว `FAIL` ที่พก exception มาด้วย แล้วเดินต่อ** — เครื่องมือวินิจฉัยที่หยุดตรง stage แรกที่พัง
+ไม่บอกอะไรเลยเกี่ยวกับ stage ที่เหลือ ซึ่งเป็นตอนที่ต้องการมันที่สุดพอดี
+
+**เจอโดย /scrutinize ไม่ใช่โดยเทสต์:** `to_table` ผิดคำสัญญาที่ตัวเองเขียนไว้ใน docstring · evidence ที่มี newline
+ทำให้ 2 stage ออกมาเป็น 3 บรรทัดและพังคอลัมน์สถานะที่จัดไว้ และ control byte หลุดถึง terminal ดิบ ๆ ·
+evidence ที่ probe พกมาสำหรับ stage ฝั่ง LLM คือสตริงที่ *โมเดล* เขียน ดังนั้น `[2J` ล้างจอ developer และ
+`[31m` เปลี่ยนสีทุกอย่างที่ตามมา — แถว `FAIL` จะถูกแต่งให้เป็นอะไรก็ได้ · `_one_line` จึง escape ไม่ใช่ strip
+(ไบต์ไหนกลับมา *คือ* ตัวการวินิจฉัย) ส่วน `to_json` เก็บดิบไว้ เพราะ JSON escape ให้อยู่แล้วและ agent ควรได้สิ่งที่โมเดลส่งมาจริง ๆ
+
+**การตรวจสอบ:** TDD แดงก่อน (`ImportError: cannot import name 'ProbeRegistry'`) · แดงนั้นพิสูจน์แค่ว่า "ยังไม่มี"
+จึง mutation-check ทุก assertion กับโค้ดที่เสร็จแล้ว — mutation ทั้งสี่ทำให้แดงตรงเทสต์ที่ระบุพฤติกรรมนั้นพอดี ไม่เกินไปกว่านั้น ·
+13 เทสต์ · gate `mit_logic` ใน CI: **651 passed, 3 skipped, 0 failed** ส่วนการรันในเครื่องแบบ deps ครบคือ
+**740 passed, 2 skipped, 0 failed** · benchmark + PNG: `docs/reports/benchmarks/2026-08-31-686-pipeline-doctor-core.md`
+
+**รู้อยู่และไม่ได้แก้ที่นี่:** ถ้าทุก probe ไม่รับงาน run นั้นจะรายงาน `ok=True`/`exit_code=0` โดยมี 0 stage
+ดังนั้น CI gate ที่ต่อกับมันจะเขียวทั้งที่ไม่ได้ตรวจอะไรเลย · core ไม่มีทางรู้ว่า stage ไหน*ควร*จะรายงาน
+assertion ข้อนี้จึงเป็นของ #690 (งานต่อ CI) ซึ่งบันทึกไว้แล้ว
+
+PR #692 · Refs #686 #685
 
 ## ✅ LEAK SWEEP — #136 #137 #139 (+#138 falsified) — 2026-06-06, /improve-codebase-architecture → /to-issues → /tdd
 
@@ -2962,3 +3220,10 @@ Converged the 3-way divergence (`main`/`landing`/`perf`) onto `integrate/render-
 - **Benchmarks (committed PNG+MD):** `docs/reports/benchmarks/2026-07-10-626-render-recon-vs-landing.*` (render 0%), `2026-07-10-626-translation-thinking-ab.*` (translation A/B).
 - **Follow-ups filed:** #628 (telemetry unify), #629 (is_sfx helper), #630 (remove shelved render-campaign code — render_replay broken post-pivot).
 - **REMAINING (dev-gated):** Phase A perf-WIP freeze (#625) + Phase E merge integrate→main + ff→perf + bump MIT_RENDER_VERSION + enforce lama_large/selective_flux-off/KP-gate. Agent self-merge to main is classifier-blocked. Full E2E translate verify pending stable gateway + GPU (render E2E is proven by byte-identical code).
+## Phase 3 auth delivery on current main ? 2026-10-01
+
+- Ported callback completion/timeout and synchronous auth-notification fixes without replacing current MFA, trusted callback envelope or native protocol.
+- Added identity/generation guards for deferred profile and cache work, including cache flush/backfill completion; auth cache clearing no longer schedules remote history deletion for the next account.
+- Added 12 auth/MFA/cache regressions and a dedicated CI workflow. Canonical frontend suite: 226 passed; TypeScript and targeted lint passed.
+- Local placeholder-config build passed. Playwright checked URL errors, timeout and a preexisting synthetic session; production baseline error URL still showed pending text. Screenshots and limitations: docs/reports/phase3-auth-20261001/README.md.
+- Independent review findings fixed. Real provider/MFA/device E2E and Vercel production deployment are not claimed by this source validation.

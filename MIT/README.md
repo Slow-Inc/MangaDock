@@ -249,6 +249,7 @@ GEMINI_MODEL=gemini-2.5-flash
 OPENAI_API_KEY=
 CUSTOM_OPENAI_API_BASE=http://localhost:11434/v1
 CUSTOM_OPENAI_MODEL=
+# CUSTOM_OPENAI_ENABLE_THINKING=false  # thinking is off by default; true = send no extra request body (#623)
 
 # DeepL
 DEEPL_AUTH_KEY=

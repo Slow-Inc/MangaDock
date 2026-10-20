@@ -1,6 +1,12 @@
 import os
-from dotenv import load_dotenv
-load_dotenv()
+
+# #614 — no `load_dotenv()` here. This module snapshots the keys into module constants at
+# ITS import time, so whoever imports it first decides what the process sees. Loading
+# `.env` as a side-effect of that import made the environment non-deterministic in tests and
+# clashed with the Backend's `buildMitConfig`, which reads env at one controlled point.
+# Instead the entry points call `manga_translator.initialize()` BEFORE anything reaches this
+# module (`server/main.py` and `manga_translator/__main__.py` do), so a real deploy still
+# resolves the same keys — just from an explicit, testable moment.
 
 # baidu
 BAIDU_APP_ID = os.getenv('BAIDU_APP_ID', '') #你的appid

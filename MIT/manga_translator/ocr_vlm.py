@@ -111,6 +111,23 @@ def _to_data_url(crop_rgb: np.ndarray) -> str:
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
+def _is_sfx_refusal(line: str, target_lang: str) -> bool:
+    """True when a model reply is a refusal (not a sound effect), so it is dropped rather than
+    rendered. A real SFX is never (a) wrapped in parentheses — the model uses parens for
+    meta-commentary, e.g. '(no sound effect)' — (b) a restatement of the prompt's own "reply with
+    an empty line" instruction, or (c) an explicit negation in the target language (Thai 'ไม่').
+    Pure."""
+    s = line.strip()
+    if s.startswith('(') and ')' in s:
+        return True
+    letters = re.sub(r'[^a-z]', '', s.lower())
+    if 'empty' in letters and 'line' in letters:
+        return True
+    if target_lang == 'THA' and 'ไม่' in s:
+        return True
+    return False
+
+
 def sanitize_sfx(raw: str, target_lang: str = 'ENG') -> str:
     """Reduce a model reply to a single lettered SFX token: first non-empty line, strip quotes/
     punctuation, collapse spaces, cap at 24 chars. For Latin-script targets it keeps Latin (incl.
@@ -120,6 +137,8 @@ def sanitize_sfx(raw: str, target_lang: str = 'ENG') -> str:
     if not raw:
         return ''
     line = next((l.strip() for l in raw.splitlines() if l.strip()), '')
+    if _is_sfx_refusal(line, target_lang):
+        return ''
     if target_lang in _LATIN_SFX_LANGS:
         line = re.sub(r'[^A-Za-zÀ-ɏ !\-]', ' ', line)   # letters (incl. accented) + space/!/-
         line = re.sub(r'\s+', ' ', line).strip().upper()
@@ -194,8 +213,19 @@ def vlm_localize_sfx(
             timeout=timeout,
         )
         data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        return sanitize_sfx(content if isinstance(content, str) else '', target_lang)
+        choice = data["choices"][0]
+        content = choice["message"]["content"]
+        result = sanitize_sfx(content if isinstance(content, str) else '', target_lang)
+        # #694: '' here reads downstream as "no SFX in this region". Say why instead, so a
+        # truncated reply is visible without a Doctor run. Degrade-to-'' itself is unchanged.
+        finish = choice.get("finish_reason")
+        where = f"max_tokens={body['max_tokens']} crop={crop_rgb.shape[1]}x{crop_rgb.shape[0]}"
+        if content is None or (finish is not None and finish != 'stop'):
+            logger.warning("[OcrVLM] SFX reply unusable: finish_reason=%s content=%s %s",
+                           finish, 'None' if content is None else repr(content), where)
+        elif not result:
+            logger.warning("[OcrVLM] SFX reply sanitised to empty: %r %s", content, where)
+        return result
     except Exception:
         logger.warning("[OcrVLM] SFX localize failed — region will drop as before", exc_info=True)
         return ''
