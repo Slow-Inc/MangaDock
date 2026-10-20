@@ -30,7 +30,10 @@ export default function UserAvatar({
         // eslint-disable-next-line @next/next/no-img-element -- arbitrary avatar hosts; see the header
         <img src={src} alt="" width={size} height={size} loading="lazy" className="h-full w-full object-cover" onError={() => setFailed(src)} />
       ) : (
-        <UidMascot uid={uid} size={Math.round(size * 0.92)} />
+        // Decorative: the user's name is always printed beside the avatar.
+        <span aria-hidden className="contents">
+          <UidMascot uid={uid} size={Math.round(size * 0.92)} />
+        </span>
       )}
     </span>
   );
