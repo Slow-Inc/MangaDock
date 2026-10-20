@@ -80,16 +80,16 @@ export function StudioSelect({
         }}
         className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-sm transition-all duration-200 ${
           disabled
-            ? "cursor-not-allowed border-white/8 bg-white/[0.04] text-white/25"
+            ? "cursor-not-allowed border-line bg-fill text-ink-3"
             : open
-              ? "border-white/20 bg-white/12 text-white ring-1 ring-white/8 backdrop-blur-xl"
-              : "border-white/10 bg-white/5 text-white/70 hover:border-white/20 hover:bg-white/8 hover:text-white"
+              ? "border-ink-3 bg-raised text-ink ring-1 ring-line"
+              : "border-line bg-fill text-ink-2 hover:border-ink-3 hover:bg-raised hover:text-ink"
         }`}
       >
         <span className="truncate">{selected ? selected.label : placeholder}</span>
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className={`h-4 w-4 shrink-0 text-white/40 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          className={`h-4 w-4 shrink-0 text-ink-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -101,7 +101,7 @@ export function StudioSelect({
 
       {renderPanel && (
         <div
-          className={`absolute left-0 right-0 z-50 overflow-hidden rounded-2xl border border-white/15 bg-black/70 shadow-2xl shadow-black/45 ring-1 ring-white/6 backdrop-blur-md transition-all duration-200 ease-in-out ${
+          className={`absolute left-0 right-0 z-50 overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_18px_40px_-16px_rgb(0_0_0/.3)] transition-all duration-200 ease-in-out ${
             dropUp ? "bottom-full mb-1.5 origin-bottom-left" : "top-full mt-1.5 origin-top-left"
           } ${
             open
@@ -122,13 +122,13 @@ export function StudioSelect({
                       onChange(option.value);
                       setWantOpen(false);
                     }}
-                    className={`flex w-full items-center justify-between px-4 py-3 text-sm transition hover:bg-white/10 ${
-                      isSelected ? "text-amber-400" : "text-white/70 hover:text-white"
+                    className={`flex w-full items-center justify-between px-4 py-3 text-sm transition hover:bg-fill ${
+                      isSelected ? "text-accent" : "text-ink-2 hover:text-ink"
                     }`}
                   >
                     <span>{option.label}</span>
                     {isSelected ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : null}

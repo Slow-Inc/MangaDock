@@ -15,7 +15,6 @@ import {
   CreatorEarnings,
 } from "../../lib/studioApi";
 import { getCached, setCache } from "../../lib/studioCache";
-import StudioNav from "../components/StudioNav";
 import { StudioWalletSkeleton } from "../components/StudioSkeleton";
 import {
   GroupedBarChart,
@@ -38,6 +37,7 @@ import {
   getWalletMonthSummary,
   getWalletMonthlyTotals,
 } from "../lib/dashboardAnalytics";
+import { ArrowDownLeft, ArrowUpRight, FileText, Gift, LockOpen, TrendingUp, Undo2, Wallet, type LucideIcon } from "lucide-react";
 
 const THAI_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 type WalletMobileView = "menu" | "analytics" | "income" | "spending";
@@ -50,32 +50,33 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
     refund: "คืนเงิน",
     reward: "รางวัล",
   };
-  const icons: Record<string, string> = {
-    topup: "💰",
-    purchase: "🔓",
-    refund: "↩️",
-    reward: "🎁",
+  const icons: Record<string, LucideIcon> = {
+    topup: Wallet,
+    purchase: LockOpen,
+    refund: Undo2,
+    reward: Gift,
   };
+  const Icon = icons[tx.type] ?? FileText;
 
   const date = new Date(tx.createdAt);
   const dateStr = date.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
   const timeStr = date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="flex items-center gap-3 border-b border-white/5 py-3 last:border-0">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 text-base">
-        {icons[tx.type] ?? "📝"}
+    <div className="flex items-center gap-3 border-b border-line py-3 last:border-0">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-fill text-base">
+        <Icon aria-hidden className="h-4 w-4 text-ink-2" strokeWidth={1.75} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-white">{labels[tx.type] ?? tx.type}</p>
-        {tx.description ? <p className="truncate text-xs text-white/30">{tx.description}</p> : null}
-        <p className="text-[10px] text-white/20">{dateStr} {timeStr}</p>
+        <p className="text-sm font-medium text-ink">{labels[tx.type] ?? tx.type}</p>
+        {tx.description ? <p className="truncate text-xs text-ink-3">{tx.description}</p> : null}
+        <p className="text-[10px] text-ink-3">{dateStr} {timeStr}</p>
       </div>
       <div className="shrink-0 text-right">
-        <p className={`text-sm font-semibold ${isPositive ? "text-amber-300" : "text-rose-300"}`}>
+        <p className={`text-sm font-semibold ${isPositive ? "text-coin" : "text-danger"}`}>
           {isPositive ? "+" : "-"}{formatCurrency(Math.abs(tx.amount))}
         </p>
-        <p className="text-[10px] text-white/20">คงเหลือ {formatCurrency(tx.balanceAfter)}</p>
+        <p className="text-[10px] text-ink-3">คงเหลือ {formatCurrency(tx.balanceAfter)}</p>
       </div>
     </div>
   );
@@ -99,20 +100,20 @@ function WalletSummaryModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-scrim/65 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-[1.75rem] border border-white/12 bg-[#151518]/92 p-5 shadow-2xl backdrop-blur-xl"
+        className="w-full max-w-md rounded-[1.75rem] border border-line bg-surface p-5 shadow-[0_50px_90px_-50px_rgb(0_0_0/.45)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-white">สรุปธุรกรรมทั้งหมด</h3>
-            <p className="mt-1 text-sm text-white/45">ภาพรวมรายรับ รายจ่าย และจำนวนรายการในระบบกระเป๋าเงิน</p>
+            <h3 className="text-lg font-semibold text-ink">สรุปธุรกรรมทั้งหมด</h3>
+            <p className="mt-1 text-sm text-ink-3">ภาพรวมรายรับ รายจ่าย และจำนวนรายการในระบบกระเป๋าเงิน</p>
           </div>
           <button
             onClick={onClose}
             aria-label="ปิด"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-fill text-ink-2 transition hover:bg-raised hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4.5 w-4.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
@@ -120,23 +121,23 @@ function WalletSummaryModal({
           </button>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-white/8 bg-black/20 p-4">
-          <div className="space-y-3 text-sm text-white/55">
+        <div className="mt-5 rounded-2xl border border-line bg-bg p-4">
+          <div className="space-y-3 text-sm text-ink-2">
             <div className="flex items-center justify-between">
               <span>จำนวนรายการรวม</span>
-              <span className="font-medium text-white">{transactionsCount}</span>
+              <span className="font-medium text-ink">{transactionsCount}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>รายการรายรับ</span>
-              <span className="font-medium text-amber-300">{incomeTransactionsCount}</span>
+              <span className="font-medium text-coin">{incomeTransactionsCount}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>รายการรายจ่าย</span>
-              <span className="font-medium text-rose-300">{spendingTransactionsCount}</span>
+              <span className="font-medium text-danger">{spendingTransactionsCount}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>เดือนที่เลือก</span>
-              <span className="font-medium text-white">{monthLabel}</span>
+              <span className="font-medium text-ink">{monthLabel}</span>
             </div>
           </div>
         </div>
@@ -250,9 +251,9 @@ export default function WalletPage() {
               title="กระเป๋าเงินนักแปล"
               description="มือถือจะพาคุณดูเฉพาะยอดหลักและ action สำคัญก่อน แล้วค่อยแยกกราฟกับประวัติธุรกรรมเป็นหน้าย่อย"
               aside={(
-                <div className="rounded-2xl border border-amber-400/15 bg-amber-400/10 px-3 py-2 text-right">
-                  <p className="text-[10px] text-white/45">คงเหลือ</p>
-                  <p className="mt-1 text-xl font-semibold text-amber-300">{formatCurrency(balance ?? 0)}</p>
+                <div className="rounded-2xl border border-coin/15 bg-coin/10 px-3 py-2 text-right">
+                  <p className="text-[10px] text-ink-3">คงเหลือ</p>
+                  <p className="mt-1 text-xl font-semibold text-coin">{formatCurrency(balance ?? 0)}</p>
                 </div>
               )}
             />
@@ -266,7 +267,7 @@ export default function WalletPage() {
 
             <button
               onClick={() => setShowSummaryModal(true)}
-              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/8"
+              className="w-full rounded-2xl border border-line bg-fill px-4 py-3 text-sm font-medium text-ink transition hover:border-ink-3 hover:bg-raised"
             >
               ดูเพิ่มเติม
             </button>
@@ -285,7 +286,7 @@ export default function WalletPage() {
             <StudioMobileSection title="ดูรายละเอียดเพิ่ม" subtitle="แยกข้อมูลที่เยอะเป็นหน้าจอย่อยตามแบบ native mobile">
               <div className="space-y-3">
                 <StudioMobileMenuCard
-                  icon={<span className="text-lg">📈</span>}
+                  icon={<TrendingUp className="h-5 w-5" strokeWidth={1.75} />}
                   title="สรุปรายเดือน"
                   description="กราฟรายวันของเดือนที่เลือก และภาพรวม 6 เดือนล่าสุด"
                   value={`${THAI_MONTHS[selectedMonth]} ${selectedYear}`}
@@ -293,7 +294,7 @@ export default function WalletPage() {
                   onClick={() => setMobileView("analytics")}
                 />
                 <StudioMobileMenuCard
-                  icon={<span className="text-lg">🟢</span>}
+                  icon={<ArrowDownLeft className="h-5 w-5" strokeWidth={1.75} />}
                   title="ประวัติรายรับ"
                   description="ดู topup, reward และ refund แบบเต็มหน้าจอ"
                   value={`${incomeTransactions.length} รายการ`}
@@ -301,7 +302,7 @@ export default function WalletPage() {
                   onClick={() => setMobileView("income")}
                 />
                 <StudioMobileMenuCard
-                  icon={<span className="text-lg">🔴</span>}
+                  icon={<ArrowUpRight className="h-5 w-5" strokeWidth={1.75} />}
                   title="ประวัติรายจ่าย"
                   description="รวมรายการ purchase ทั้งหมดในกระเป๋าเงิน"
                   value={`${spendingTransactions.length} รายการ`}
@@ -364,7 +365,7 @@ export default function WalletPage() {
           />
           <StudioMobileSection title={`${targetTitle} - ${THAI_MONTHS[selectedMonth]} ${selectedYear}`}>
             {targetTransactions.length === 0 ? (
-              <p className="py-12 text-center text-sm text-white/30">ยังไม่มีรายการ</p>
+              <p className="py-12 text-center text-sm text-ink-3">ยังไม่มีรายการ</p>
             ) : (
               <div className="space-y-1">
                 {targetTransactions.map((tx) => <TransactionRow key={`${mobileView}-${tx.id}`} tx={tx} />)}
@@ -376,7 +377,7 @@ export default function WalletPage() {
     };
 
     return (
-      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-white">
+      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-ink">
         <Navbar />
         <div className="pt-[calc(4.9rem+env(safe-area-inset-top))]">
           {renderMobileContent()}
@@ -386,26 +387,24 @@ export default function WalletPage() {
   }
 
   return (
-    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-white md:pb-0">
+    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-ink md:pb-0">
       <Navbar />
 
       <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
         <div className="space-y-5">
 
-          <div className="rounded-[2rem] border border-white/10 bg-white/[0.02] p-6">
+          <div className="rounded-[2rem] border border-line bg-fill p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">กระเป๋าเงินนักแปล</h1>
-                <p className="mt-2 text-sm text-white/45">ดูยอดคงเหลือ แนวโน้มรายวัน รายเดือน และประวัติธุรกรรม</p>
+                <h1 className="mt-2 text-2xl font-semibold text-ink sm:text-3xl">กระเป๋าเงินนักแปล</h1>
+                <p className="mt-2 text-sm text-ink-3">ดูยอดคงเหลือ แนวโน้มรายวัน รายเดือน และประวัติธุรกรรม</p>
               </div>
-              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/10 px-4 py-3 text-right">
-                <p className="text-xs text-white/45">ยอดคงเหลือปัจจุบัน</p>
-                <p className="mt-1 text-2xl font-semibold text-amber-300">{formatCurrency(balance ?? 0)}</p>
+              <div className="rounded-2xl border border-coin/15 bg-coin/10 px-4 py-3 text-right">
+                <p className="text-xs text-ink-3">ยอดคงเหลือปัจจุบัน</p>
+                <p className="mt-1 text-2xl font-semibold text-coin">{formatCurrency(balance ?? 0)}</p>
               </div>
             </div>
           </div>
-
-          <StudioNav />
 
           {loadingData ? (
             <StudioWalletSkeleton />
@@ -417,7 +416,7 @@ export default function WalletPage() {
                 action={
                   <button
                     onClick={() => setShowSummaryModal(true)}
-                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white/75 transition hover:border-white/20 hover:bg-white/8 hover:text-white"
+                    className="rounded-xl border border-line bg-fill px-3 py-2 text-sm font-medium text-ink-2 transition hover:border-ink-3 hover:bg-raised hover:text-ink"
                   >
                     ดูเพิ่มเติม
                   </button>
@@ -484,7 +483,7 @@ export default function WalletPage() {
               <div className="grid gap-6 xl:grid-cols-2">
                 <StudioSection title={`ประวัติรายรับ - ${THAI_MONTHS[selectedMonth]} ${selectedYear}`} subtitle="topup, refund และ reward ทั้งหมด">
                   {incomeTransactions.length === 0 ? (
-                    <p className="py-10 text-center text-sm text-white/30">ยังไม่มีประวัติรายรับ</p>
+                    <p className="py-10 text-center text-sm text-ink-3">ยังไม่มีประวัติรายรับ</p>
                   ) : (
                     <div className="custom-scrollbar max-h-[360px] overflow-y-auto">
                       {incomeTransactions.map((tx) => <TransactionRow key={tx.id} tx={tx} />)}
@@ -494,7 +493,7 @@ export default function WalletPage() {
 
                 <StudioSection title={`ประวัติรายจ่าย - ${THAI_MONTHS[selectedMonth]} ${selectedYear}`} subtitle="รายการ purchase ทั้งหมดในกระเป๋าเงิน">
                   {spendingTransactions.length === 0 ? (
-                    <p className="py-10 text-center text-sm text-white/30">ยังไม่มีประวัติการใช้จ่าย</p>
+                    <p className="py-10 text-center text-sm text-ink-3">ยังไม่มีประวัติการใช้จ่าย</p>
                   ) : (
                     <div className="custom-scrollbar max-h-[360px] overflow-y-auto">
                       {spendingTransactions.map((tx) => <TransactionRow key={tx.id} tx={tx} />)}

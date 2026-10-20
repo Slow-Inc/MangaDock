@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { BookOpen } from "lucide-react";
 
 interface CoverImageProps {
   src: string;
   alt: string;
   className?: string;
-  fallbackSize?: number; // emoji font-size in px, default 32
+  fallbackSize?: number; // fallback icon size in px, default 32
 }
 
 export function CoverImage({ src, alt, className = "", fallbackSize = 32 }: CoverImageProps) {
@@ -15,8 +16,8 @@ export function CoverImage({ src, alt, className = "", fallbackSize = 32 }: Cove
 
   if (imgError || !src) {
     return (
-      <div className={`flex items-center justify-center bg-white/5 ${className}`}>
-        <span style={{ fontSize: fallbackSize }}>📚</span>
+      <div className={`flex items-center justify-center bg-fill ${className}`}>
+        <BookOpen aria-hidden className="text-ink-3" style={{ width: fallbackSize, height: fallbackSize }} strokeWidth={1.5} />
       </div>
     );
   }

@@ -9,7 +9,6 @@ import { useProtectedPage } from "../../hooks/useProtectedPage";
 import { useToast } from "../../contexts/ToastContext";
 import { getMyProfile, updateTranslatorProfile } from "../../lib/studioApi";
 import { getCached, setCache } from "../../lib/studioCache";
-import StudioNav from "../components/StudioNav";
 import { StudioAccountSkeleton } from "../components/StudioSkeleton";
 import { MetricCard, StudioSection } from "../components/StudioDashboardWidgets";
 import {
@@ -22,6 +21,9 @@ import { StudioSelect } from "../components/StudioSelect";
 import { CountrySelect } from "../components/CountrySelect";
 import { getAccountProfileCompleteness } from "../lib/dashboardAnalytics";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import Loader from "../../components/ui/Loader";
+import { PRIMARY_FILL } from "../../components/ui/Button";
+import { Globe, Lightbulb, PenLine, Settings2, User } from "lucide-react";
 
 const LANGUAGE_OPTIONS = [
   { code: "th", label: "ไทย" },
@@ -219,7 +221,7 @@ export default function StudioAccountPage() {
       <button
         onClick={handleSave}
         disabled={!hasChanges || saving}
-        className="w-full rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-black disabled:opacity-40"
+        className={`w-full rounded-2xl ${PRIMARY_FILL} px-5 py-3 text-sm font-semibold disabled:opacity-40`}
       >
         {saving ? "กำลังบันทึก..." : hasChanges ? "บันทึกการเปลี่ยนแปลง" : "ข้อมูลล่าสุดแล้ว"}
       </button>
@@ -237,25 +239,25 @@ export default function StudioAccountPage() {
               title="ข้อมูลนักแปล"
               description="บนมือถือเราจะแยกการแก้โปรไฟล์ออกเป็นหน้าจอย่อย คล้าย account modal ของระบบหลัก"
               aside={(
-                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/10 px-3 py-2 text-right">
-                  <p className="text-[10px] text-white/45">สมบูรณ์</p>
-                  <p className="mt-1 text-xl font-semibold text-emerald-300">{profileCompleteness.percent}%</p>
+                <div className="rounded-2xl border border-ok/15 bg-ok/10 px-3 py-2 text-right">
+                  <p className="text-[10px] text-ink-3">สมบูรณ์</p>
+                  <p className="mt-1 text-xl font-semibold text-ok">{profileCompleteness.percent}%</p>
                 </div>
               )}
             />
 
-            <div className="flex items-center gap-4 rounded-[1.5rem] border border-white/10 bg-white/4 p-4">
-              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/20">
+            <div className="flex items-center gap-4 rounded-[1.5rem] border border-line bg-fill p-4">
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-raised">
                 {user?.photoURL ? (
                   <Image src={user.photoURL} alt="" fill className="object-cover" />
                 ) : (
-                  <span className="text-2xl">👤</span>
+                  <User aria-hidden className="h-6 w-6 text-ink-3" strokeWidth={1.5} />
                 )}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-base font-semibold text-white">{user?.displayName ?? "ไม่ระบุชื่อ"}</p>
-                <p className="truncate text-xs text-white/40">{user?.email ?? ""}</p>
-                <p className="mt-1 text-[11px] text-white/30">กรอกแล้ว {profileCompleteness.completed}/{profileCompleteness.total} หมวดหลัก</p>
+                <p className="truncate text-base font-semibold text-ink">{user?.displayName ?? "ไม่ระบุชื่อ"}</p>
+                <p className="truncate text-xs text-ink-3">{user?.email ?? ""}</p>
+                <p className="mt-1 text-[11px] text-ink-3">กรอกแล้ว {profileCompleteness.completed}/{profileCompleteness.total} หมวดหลัก</p>
               </div>
             </div>
 
@@ -269,7 +271,7 @@ export default function StudioAccountPage() {
             <StudioMobileSection title="จัดการโปรไฟล์" subtitle="แยกหัวข้อเป็นหน้าย่อยเพื่อให้อ่านและแก้ง่ายบนมือถือ">
               <div className="space-y-3">
                 <StudioMobileMenuCard
-                  icon={<span className="text-lg">✍️</span>}
+                  icon={<PenLine className="h-5 w-5" strokeWidth={1.75} />}
                   title="แนะนำตัว"
                   description="เขียน bio และแนะนำแนวทางการแปลของคุณ"
                   value={`${bio.length}/500`}
@@ -277,7 +279,7 @@ export default function StudioAccountPage() {
                   onClick={() => openMobileProfileSection("bio")}
                 />
                 <StudioMobileMenuCard
-                  icon={<span className="text-lg">🌐</span>}
+                  icon={<Globe className="h-5 w-5" strokeWidth={1.75} />}
                   title="ภาษาที่แปลได้"
                   description="เลือกภาษาที่ถนัดและใช้ทำงานจริง"
                   value={`${languages.length} ภาษา`}
@@ -285,15 +287,15 @@ export default function StudioAccountPage() {
                   onClick={() => openMobileProfileSection("languages")}
                 />
                 <StudioMobileMenuCard
-                  icon={<span className="text-lg">⚙️</span>}
+                  icon={<Settings2 className="h-5 w-5" strokeWidth={1.75} />}
                   title="ข้อมูลหลัก"
                   description="ประเทศและภาษาหลักของบัญชี"
                   value={country || "ยังไม่ตั้ง"}
-                  tone="amber"
+                  tone="indigo"
                   onClick={() => openMobileProfileSection("identity")}
                 />
                 <StudioMobileMenuCard
-                  icon={<span className="text-lg">💡</span>}
+                  icon={<Lightbulb className="h-5 w-5" strokeWidth={1.75} />}
                   title="คำแนะนำ"
                   description="แนวทางทำให้โปรไฟล์พร้อมใช้งานและครบถ้วน"
                   tone="default"
@@ -317,9 +319,9 @@ export default function StudioAccountPage() {
                 onChange={(e) => setBio(e.target.value.slice(0, 500))}
                 placeholder="เล่าเกี่ยวกับตัวคุณให้ผู้อ่านรู้จัก..."
                 rows={9}
-                className="w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-amber-500"
+                className="w-full resize-none rounded-2xl border border-line bg-fill px-3 py-3 text-sm text-ink placeholder:text-ink-3 outline-none focus:border-accent"
               />
-              <p className="mt-2 text-right text-[11px] text-white/25">{bio.length}/500</p>
+              <p className="mt-2 text-right text-[11px] text-ink-3">{bio.length}/500</p>
             </StudioMobileSection>
             {saveButton}
           </div>
@@ -340,8 +342,8 @@ export default function StudioAccountPage() {
                       onClick={() => toggleLanguage(lang.code)}
                       className={`rounded-2xl border px-3 py-2 text-xs font-medium transition ${
                         selected
-                          ? "border-amber-500 bg-white/20 text-amber-300"
-                          : "border-white/10 bg-white/5 text-white/55"
+                          ? "border-accent/40 bg-accent/10 text-accent"
+                          : "border-line bg-fill text-ink-2"
                       }`}
                     >
                       {lang.label}
@@ -382,7 +384,7 @@ export default function StudioAccountPage() {
         <div className="space-y-4 px-4 py-4">
           <StudioMobileHeader title="คำแนะนำ" subtitle="แนวทางทำให้โปรไฟล์พร้อมใช้งาน" onBack={returnToMobileMenu} />
           <StudioMobileSection title="ข้อมูลเพิ่มเติม" subtitle="สรุปจากแนวทางการตั้งค่าโปรไฟล์นักแปล">
-            <div className="space-y-4 text-sm leading-6 text-white/60">
+            <div className="space-y-4 text-sm leading-6 text-ink-2">
               <p>กรอก bio ให้ชัดเจนเพื่อช่วยให้ผู้อ่านรู้จักแนวทางการแปลของคุณมากขึ้น</p>
               <p>เลือกภาษาที่แปลได้ให้ครบ เพราะข้อมูลนี้สามารถนำไปใช้กับระบบค้นหานักแปลหรือ matching ในอนาคตได้</p>
               <p>ตั้งค่าภาษาหลักเพื่อใช้เป็นค่าเริ่มต้นในเครื่องมือ Studio และให้ทีมงานตีความโปรไฟล์ได้ตรงขึ้น</p>
@@ -394,7 +396,7 @@ export default function StudioAccountPage() {
     };
 
     return (
-      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-white">
+      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-ink">
         <Navbar />
         <div className="pt-[calc(4.9rem+env(safe-area-inset-top))]">
           {renderMobileContent()}
@@ -404,26 +406,24 @@ export default function StudioAccountPage() {
   }
 
   return (
-    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-white md:pb-0">
+    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-ink md:pb-0">
       <Navbar />
 
       <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
         <div className="space-y-5">
 
-          <div className="rounded-[2rem] border border-white/10 bg-white/[0.02] p-6">
+          <div className="rounded-[2rem] border border-line bg-fill p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">ข้อมูลนักแปล</h1>
-                <p className="mt-2 text-sm text-white/45">จัดการความพร้อมของโปรไฟล์ ภาษา และข้อมูลหลักของบัญชีในสไตล์ dashboard นักเขียน</p>
+                <h1 className="mt-2 text-2xl font-semibold text-ink sm:text-3xl">ข้อมูลนักแปล</h1>
+                <p className="mt-2 text-sm text-ink-3">จัดการความพร้อมของโปรไฟล์ ภาษา และข้อมูลหลักของบัญชีในสไตล์ dashboard นักเขียน</p>
               </div>
-              <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/10 px-4 py-3">
-                <p className="text-xs text-white/45">ความสมบูรณ์ของโปรไฟล์</p>
-                <p className="mt-1 text-2xl font-semibold text-emerald-300">{profileCompleteness.percent}%</p>
+              <div className="rounded-2xl border border-ok/15 bg-ok/10 px-4 py-3">
+                <p className="text-xs text-ink-3">ความสมบูรณ์ของโปรไฟล์</p>
+                <p className="mt-1 text-2xl font-semibold text-ok">{profileCompleteness.percent}%</p>
               </div>
             </div>
           </div>
-
-          <StudioNav />
 
           {loadingProfile ? (
             <StudioAccountSkeleton />
@@ -431,13 +431,13 @@ export default function StudioAccountPage() {
             <div className="space-y-6">
               <StudioSection title="สถานะบัญชี" subtitle="ข้อมูลโปรไฟล์และสถานะการยืนยันของบัญชีนักแปล">
                 <div className="space-y-4">
-                  <div className={`rounded-2xl border px-4 py-4 ${profileCompleteness.percent >= 80 ? "border-emerald-500/20 bg-emerald-500/10" : "border-amber-500/20 bg-amber-500/10"}`}>
-                    <p className={`text-sm font-medium ${profileCompleteness.percent >= 80 ? "text-emerald-300" : "text-amber-300"}`}>
+                  <div className={`rounded-2xl border px-4 py-4 ${profileCompleteness.percent >= 80 ? "border-ok/20 bg-ok/10" : "border-accent/20 bg-accent/10"}`}>
+                    <p className={`text-sm font-medium ${profileCompleteness.percent >= 80 ? "text-ok" : "text-accent"}`}>
                       {profileCompleteness.percent >= 80
                         ? "โปรไฟล์นักแปลของคุณพร้อมใช้งาน"
                         : "โปรไฟล์ยังกรอกไม่ครบ แนะนำให้เติมข้อมูลให้สมบูรณ์"}
                     </p>
-                    <p className="mt-1 text-xs text-white/45">
+                    <p className="mt-1 text-xs text-ink-3">
                       กรอกแล้ว {profileCompleteness.completed}/{profileCompleteness.total} หมวดหลัก
                     </p>
                   </div>
@@ -454,40 +454,40 @@ export default function StudioAccountPage() {
               <div className="grid gap-6 xl:grid-cols-[1.25fr,0.75fr]">
                 <div className="space-y-6">
             {/* Profile Header */}
-            <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/3 p-5">
-              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/20">
+            <div className="flex items-center gap-4 rounded-2xl border border-line bg-fill p-5">
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-raised">
                 {user?.photoURL ? (
                   <Image src={user.photoURL} alt="" fill className="object-cover" />
                 ) : (
-                  <span className="text-2xl">👤</span>
+                  <User aria-hidden className="h-6 w-6 text-ink-3" strokeWidth={1.5} />
                 )}
               </div>
               <div className="min-w-0">
                 <p className="truncate text-base font-semibold">{user?.displayName ?? "ไม่ระบุชื่อ"}</p>
-                <p className="truncate text-sm text-white/40">{user?.email ?? ""}</p>
-                <span className="mt-1 inline-block rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-semibold text-amber-300">
+                <p className="truncate text-sm text-ink-3">{user?.email ?? ""}</p>
+                <span className="mt-1 inline-block rounded-full bg-accent/10 px-2.5 py-0.5 text-[10px] font-semibold text-accent">
                   นักแปล
                 </span>
               </div>
             </div>
 
             {/* Bio */}
-            <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
+            <div className="rounded-2xl border border-line bg-fill p-5">
               <label className="mb-2 block text-sm font-semibold">แนะนำตัว</label>
               <textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value.slice(0, 500))}
                 placeholder="เล่าเกี่ยวกับตัวคุณให้ผู้อ่านรู้จัก..."
                 rows={3}
-                className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-amber-500"
+                className="w-full resize-none rounded-xl border border-line bg-fill px-3 py-2.5 text-sm text-ink placeholder:text-ink-3 outline-none focus:border-accent"
               />
-              <p className="mt-1 text-right text-[10px] text-white/20">{bio.length}/500</p>
+              <p className="mt-1 text-right text-[10px] text-ink-3">{bio.length}/500</p>
             </div>
 
             {/* Languages */}
-            <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
+            <div className="rounded-2xl border border-line bg-fill p-5">
               <label className="mb-1 block text-sm font-semibold">ภาษาที่แปลได้</label>
-              <p className="mb-3 text-xs text-white/30">เลือกภาษาที่คุณสามารถแปลได้ (สูงสุด 10 ภาษา)</p>
+              <p className="mb-3 text-xs text-ink-3">เลือกภาษาที่คุณสามารถแปลได้ (สูงสุด 10 ภาษา)</p>
               <div className="flex flex-wrap gap-2">
                 {LANGUAGE_OPTIONS.map((lang) => {
                   const selected = languages.includes(lang.code);
@@ -497,8 +497,8 @@ export default function StudioAccountPage() {
                       onClick={() => toggleLanguage(lang.code)}
                       className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition ${
                         selected
-                          ? "border-amber-500 bg-white/20 text-amber-300"
-                          : "border-white/10 bg-white/5 text-white/50 hover:border-white/20 hover:text-white/70"
+                          ? "border-accent/40 bg-accent/10 text-accent"
+                          : "border-line bg-fill text-ink-2 hover:border-ink-3 hover:text-ink-2"
                       }`}
                     >
                       {lang.label}
@@ -510,7 +510,7 @@ export default function StudioAccountPage() {
 
             {/* Country & Preferred Language */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
+              <div className="rounded-2xl border border-line bg-fill p-5">
                 <label className="mb-2 block text-sm font-semibold">ประเทศ</label>
                 <CountrySelect
                   value={country}
@@ -518,7 +518,7 @@ export default function StudioAccountPage() {
                   placeholder="ค้นหาหรือเลือกประเทศ..."
                 />
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
+              <div className="rounded-2xl border border-line bg-fill p-5">
                 <label className="mb-2 block text-sm font-semibold">ภาษาหลัก</label>
                 <LanguageSelect
                   value={preferredLanguage}
@@ -533,11 +533,11 @@ export default function StudioAccountPage() {
               <button
                 onClick={handleSave}
                 disabled={!hasChanges || saving}
-                className="rounded-xl bg-white px-6 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90 active:scale-95 disabled:opacity-40"
+                className={`rounded-xl ${PRIMARY_FILL} px-6 py-2.5 text-sm font-semibold transition active:scale-95 disabled:opacity-40`}
               >
                 {saving ? (
                   <span className="flex items-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    <Loader context="inline" />
                     กำลังบันทึก...
                   </span>
                 ) : (
@@ -548,7 +548,7 @@ export default function StudioAccountPage() {
                 </div>
 
                 <StudioSection title="ข้อมูลเพิ่มเติม" subtitle="แนวทางจัดการโปรไฟล์นักแปลให้พร้อมใช้งาน">
-                  <div className="space-y-4 text-sm text-white/60">
+                  <div className="space-y-4 text-sm text-ink-2">
                     <p>กรอก bio ให้ชัดเจนเพื่อช่วยให้ผู้อ่านรู้จักแนวทางการแปลของคุณมากขึ้น</p>
                     <p>เลือกภาษาที่แปลได้ให้ครบ เพราะข้อมูลนี้สามารถนำไปใช้กับระบบค้นหานักแปลหรือ matching ในอนาคตได้</p>
                     <p>ตั้งค่าภาษาหลักเพื่อใช้เป็นค่าเริ่มต้นในเครื่องมือ Studio และให้ทีมงานตีความโปรไฟล์ได้ตรงขึ้น</p>

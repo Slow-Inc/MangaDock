@@ -13,7 +13,8 @@ import {
 } from "../lib/studioApi";
 import type { ChapterVersion } from "../lib/types";
 import { getCached, setCache } from "../lib/studioCache";
-import StudioNav from "./components/StudioNav";
+import Loader from "../components/ui/Loader";
+import { PRIMARY_FILL } from "../components/ui/Button";
 import { StudioOverviewSkeleton } from "./components/StudioSkeleton";
 import {
   DonutChart,
@@ -53,7 +54,7 @@ function RecentTransactionList({ transactions }: { transactions: WalletTransacti
   };
 
   if (transactions.length === 0) {
-    return <p className="py-10 text-center text-sm text-white/30">ยังไม่มีรายการล่าสุด</p>;
+    return <p className="py-10 text-center text-sm text-ink-3">ยังไม่มีรายการล่าสุด</p>;
   }
 
   return (
@@ -62,8 +63,8 @@ function RecentTransactionList({ transactions }: { transactions: WalletTransacti
         const isPositive = tx.type === "topup" || tx.type === "refund" || tx.type === "reward";
         const date = new Date(tx.createdAt);
         return (
-          <div key={tx.id} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${isPositive ? "bg-white/12 text-amber-300" : "bg-rose-500/12 text-rose-300"}`}>
+          <div key={tx.id} className="flex items-center gap-3 rounded-2xl border border-line bg-bg px-3 py-3">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${isPositive ? "bg-fill text-coin" : "bg-danger/10 text-danger"}`}>
               {isPositive ? (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -76,15 +77,15 @@ function RecentTransactionList({ transactions }: { transactions: WalletTransacti
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-white/85">{labels[tx.type] ?? tx.type}</p>
-              <p className="truncate text-[11px] text-white/30">{tx.description || "รายการกระเป๋าเงิน"}</p>
+              <p className="text-sm font-medium text-ink">{labels[tx.type] ?? tx.type}</p>
+              <p className="truncate text-[11px] text-ink-3">{tx.description || "รายการกระเป๋าเงิน"}</p>
             </div>
 
             <div className="shrink-0 text-right">
-              <p className={`text-sm font-semibold ${isPositive ? "text-amber-300" : "text-rose-300"}`}>
+              <p className={`text-sm font-semibold ${isPositive ? "text-coin" : "text-danger"}`}>
                 {isPositive ? "+" : "-"}{formatCurrency(Math.abs(tx.amount))}
               </p>
-              <p className="text-[11px] text-white/25">
+              <p className="text-[11px] text-ink-3">
                 {date.toLocaleDateString("th-TH", { day: "numeric", month: "short" })}
               </p>
             </div>
@@ -158,7 +159,7 @@ export default function StudioOverviewPage() {
       if (loadingData) {
         return (
           <div className="flex justify-center py-20">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+            <Loader context="section" className="text-ink-2" />
           </div>
         );
       }
@@ -171,9 +172,9 @@ export default function StudioOverviewPage() {
               title="สตูดิโอของฉัน"
               description="ดูสถิติ รายได้ และกิจกรรมล่าสุดของคุณ"
               aside={(
-                <div className="rounded-2xl border border-amber-400/15 bg-amber-400/10 px-3 py-2 text-right">
-                  <p className="text-[10px] text-white/45">เหรียญ</p>
-                  <p className="mt-1 text-xl font-semibold text-amber-300">{formatCurrency(overviewStats.balance)}</p>
+                <div className="rounded-2xl border border-coin/15 bg-coin/10 px-3 py-2 text-right">
+                  <p className="text-[10px] text-ink-3">เหรียญ</p>
+                  <p className="mt-1 text-xl font-semibold text-coin">{formatCurrency(overviewStats.balance)}</p>
                 </div>
               )}
             />
@@ -190,13 +191,13 @@ export default function StudioOverviewPage() {
             <div className="grid grid-cols-2 gap-3">
               <Link
                 href="/studio/upload"
-                className="rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-black transition active:scale-[0.99]"
+                className={`rounded-2xl ${PRIMARY_FILL} px-4 py-3 text-center text-sm font-semibold transition active:scale-[0.99]`}
               >
                 + อัปโหลดใหม่
               </Link>
               <Link
                 href="/studio/works"
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm font-medium text-white/80 transition active:scale-[0.99]"
+                className="rounded-2xl border border-line bg-fill px-4 py-3 text-center text-sm font-medium text-ink transition active:scale-[0.99]"
               >
                 ไปหน้าผลงาน
               </Link>
@@ -246,17 +247,17 @@ export default function StudioOverviewPage() {
 
             <StudioMobileSection title="ไปต่อเร็ว ๆ" subtitle="ลัดไปหน้าเฉพาะทางแทนการรวมทุกอย่างไว้จอเดียว">
               <div className="space-y-3">
-                <Link href="/studio/works" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/4 px-4 py-4 text-sm text-white/80">
+                <Link href="/studio/works" className="flex items-center justify-between rounded-2xl border border-line bg-fill px-4 py-4 text-sm text-ink">
                   <span>จัดการผลงาน</span>
-                  <span className="text-white/30">→</span>
+                  <span className="text-ink-3">→</span>
                 </Link>
-                <Link href="/studio/wallet" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/4 px-4 py-4 text-sm text-white/80">
+                <Link href="/studio/wallet" className="flex items-center justify-between rounded-2xl border border-line bg-fill px-4 py-4 text-sm text-ink">
                   <span>ดูประวัติกระเป๋าเงิน</span>
-                  <span className="text-white/30">→</span>
+                  <span className="text-ink-3">→</span>
                 </Link>
-                <Link href="/studio/account" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/4 px-4 py-4 text-sm text-white/80">
+                <Link href="/studio/account" className="flex items-center justify-between rounded-2xl border border-line bg-fill px-4 py-4 text-sm text-ink">
                   <span>แก้ไขโปรไฟล์นักแปล</span>
-                  <span className="text-white/30">→</span>
+                  <span className="text-ink-3">→</span>
                 </Link>
               </div>
             </StudioMobileSection>
@@ -318,13 +319,13 @@ export default function StudioOverviewPage() {
           </StudioMobileSection>
           <StudioMobileSection title="ลิงก์ด่วน" subtitle="ไปยังหน้าจัดการแบบเต็มเมื่ออยากลงรายละเอียด">
             <div className="space-y-3">
-              <Link href="/studio/wallet" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/4 px-4 py-4 text-sm text-white/80">
+              <Link href="/studio/wallet" className="flex items-center justify-between rounded-2xl border border-line bg-fill px-4 py-4 text-sm text-ink">
                 <span>เปิดหน้ากระเป๋าเงินเต็ม</span>
-                <span className="text-white/30">→</span>
+                <span className="text-ink-3">→</span>
               </Link>
-              <Link href="/studio/works" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/4 px-4 py-4 text-sm text-white/80">
+              <Link href="/studio/works" className="flex items-center justify-between rounded-2xl border border-line bg-fill px-4 py-4 text-sm text-ink">
                 <span>ไปหน้าผลงาน</span>
-                <span className="text-white/30">→</span>
+                <span className="text-ink-3">→</span>
               </Link>
             </div>
           </StudioMobileSection>
@@ -333,7 +334,7 @@ export default function StudioOverviewPage() {
     };
 
     return (
-      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-white">
+      <div className="pb-[calc(var(--mobile-nav-height)+1.75rem+env(safe-area-inset-bottom))] text-ink">
         <Navbar />
         <div className="pt-[calc(4.9rem+env(safe-area-inset-top))]">
           {renderMobileContent()}
@@ -343,16 +344,16 @@ export default function StudioOverviewPage() {
   }
 
   return (
-    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-white md:pb-0">
+    <div className="pb-[calc(var(--mobile-nav-height)+1.5rem)] text-ink md:pb-0">
       <Navbar />
 
       <div className="mx-auto max-w-6xl px-4 py-6 pt-[calc(5.5rem+env(safe-area-inset-top))] md:pt-28">
         <div className="space-y-5">
 
-          <div className="flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-white/[0.02] p-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-[2rem] border border-line bg-fill p-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">ภาพรวมสตูดิโอของฉัน</h1>
-              <p className="mt-2 max-w-2xl text-sm text-white/45">
+              <h1 className="mt-2 text-2xl font-semibold text-ink sm:text-3xl">ภาพรวมสตูดิโอของฉัน</h1>
+              <p className="mt-2 max-w-2xl text-sm text-ink-3">
                 รวมสถิติผลงาน สถานะการเผยแพร่ และการเคลื่อนไหวของกระเป๋าเงินไว้ในที่เดียว
               </p>
             </div>
@@ -360,13 +361,13 @@ export default function StudioOverviewPage() {
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/studio/upload"
-                className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90 active:scale-95"
+                className={`rounded-xl ${PRIMARY_FILL} px-4 py-2.5 text-sm font-semibold transition active:scale-95`}
               >
                 + อัปโหลดใหม่
               </Link>
               <Link
                 href="/studio/wallet"
-                className="rounded-xl border border-white/12 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/75 transition hover:border-white/20 hover:bg-white/8 hover:text-white"
+                className="rounded-xl border border-line bg-fill px-4 py-2.5 text-sm font-medium text-ink-2 transition hover:border-ink-3 hover:bg-raised hover:text-ink"
               >
                 ดูกระเป๋าเงิน
               </Link>
@@ -410,7 +411,7 @@ export default function StudioOverviewPage() {
                   title="รายการล่าสุด"
                   subtitle="ธุรกรรมล่าสุดในระบบกระเป๋าเงิน"
                   action={
-                    <Link href="/studio/wallet" className="text-xs font-medium text-amber-300 transition hover:text-amber-200">
+                    <Link href="/studio/wallet" className="text-xs font-medium text-accent transition hover:text-accent/80">
                       ดูทั้งหมด →
                     </Link>
                   }
@@ -451,21 +452,21 @@ export default function StudioOverviewPage() {
 
               <StudioSection title="ลิงก์ด่วน" subtitle="เข้าถึงหัวข้อหลักในสไตล์ dashboard นักเขียนได้ไวขึ้น">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <Link href="/studio/works" className="group rounded-2xl border border-white/10 bg-white/4 p-4 transition hover:border-white/20 hover:bg-white/7">
-                    <p className="text-sm font-semibold text-white transition group-hover:text-amber-300">ผลงานของฉัน</p>
-                    <p className="mt-1 text-xs text-white/35">ค้นหา กรอง และจัดการตอนทั้งหมด</p>
+                  <Link href="/studio/works" className="group rounded-2xl border border-line bg-fill p-4 transition hover:border-ink-3 hover:bg-raised">
+                    <p className="text-sm font-semibold text-ink transition group-hover:text-accent">ผลงานของฉัน</p>
+                    <p className="mt-1 text-xs text-ink-3">ค้นหา กรอง และจัดการตอนทั้งหมด</p>
                   </Link>
-                  <Link href="/studio/upload" className="group rounded-2xl border border-white/10 bg-white/4 p-4 transition hover:border-white/20 hover:bg-white/7">
-                    <p className="text-sm font-semibold text-white transition group-hover:text-amber-300">อัปโหลดงานใหม่</p>
-                    <p className="mt-1 text-xs text-white/35">เพิ่ม chapter/version ใหม่เข้าสู่ระบบ</p>
+                  <Link href="/studio/upload" className="group rounded-2xl border border-line bg-fill p-4 transition hover:border-ink-3 hover:bg-raised">
+                    <p className="text-sm font-semibold text-ink transition group-hover:text-accent">อัปโหลดงานใหม่</p>
+                    <p className="mt-1 text-xs text-ink-3">เพิ่ม chapter/version ใหม่เข้าสู่ระบบ</p>
                   </Link>
-                  <Link href="/studio/wallet" className="group rounded-2xl border border-white/10 bg-white/4 p-4 transition hover:border-white/20 hover:bg-white/7">
-                    <p className="text-sm font-semibold text-white transition group-hover:text-amber-300">กระเป๋าเงิน</p>
-                    <p className="mt-1 text-xs text-white/35">ดู transaction และแนวโน้มรายเดือน</p>
+                  <Link href="/studio/wallet" className="group rounded-2xl border border-line bg-fill p-4 transition hover:border-ink-3 hover:bg-raised">
+                    <p className="text-sm font-semibold text-ink transition group-hover:text-accent">กระเป๋าเงิน</p>
+                    <p className="mt-1 text-xs text-ink-3">ดู transaction และแนวโน้มรายเดือน</p>
                   </Link>
-                  <Link href="/studio/account" className="group rounded-2xl border border-white/10 bg-white/4 p-4 transition hover:border-white/20 hover:bg-white/7">
-                    <p className="text-sm font-semibold text-white transition group-hover:text-amber-300">ข้อมูลนักแปล</p>
-                    <p className="mt-1 text-xs text-white/35">แก้ไขโปรไฟล์และความพร้อมของบัญชี</p>
+                  <Link href="/studio/account" className="group rounded-2xl border border-line bg-fill p-4 transition hover:border-ink-3 hover:bg-raised">
+                    <p className="text-sm font-semibold text-ink transition group-hover:text-accent">ข้อมูลนักแปล</p>
+                    <p className="mt-1 text-xs text-ink-3">แก้ไขโปรไฟล์และความพร้อมของบัญชี</p>
                   </Link>
                 </div>
               </StudioSection>

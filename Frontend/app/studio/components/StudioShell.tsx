@@ -72,7 +72,7 @@ export default function StudioShell({ children }: { children: ReactNode }) {
     <div style={{ "--studio-sidebar": `${width}px` } as CSSProperties}>
       <aside
         aria-label="เมนูสตูดิโอ"
-        className="fixed bottom-0 left-0 top-[4.75rem] z-30 hidden border-r border-line bg-bg md:flex md:w-[var(--studio-sidebar)] md:flex-col"
+        className="fixed bottom-0 left-0 top-16 z-30 hidden border-r border-line bg-bg md:flex md:w-[var(--studio-sidebar)] md:flex-col"
       >
         <div className="px-5 pb-3 pt-6">
           <p className="font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-ink-3">Studio</p>
