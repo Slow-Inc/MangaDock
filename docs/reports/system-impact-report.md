@@ -1,5 +1,30 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-20 — Native chapter list web alignment / รายการตอน Native ใกล้เว็บ
+
+| Field | Change / การเปลี่ยนแปลง |
+| --- | --- |
+| 1. What/where | NativeChapterList, detail wiring, catalog counts and tests / componentรายการตอน, wiring, จำนวนหน้าและtests |
+| 2. Outcome | Bounded chapter scrolling with reviews reachable / เลื่อนตอนในกรอบและเข้าถึงรีวิวง่าย |
+| 3. Performance gain | Not measured / ไม่วัด |
+| 4. Benefits | Pages/price visible,83 chapters accessible / เห็นจำนวนหน้าหรือราคาและเข้าถึง83ตอน |
+| 5. Purpose | User-approved alignment with web / ปรับตามเว็บที่ผู้ใช้อนุมัติ |
+| 6. Why/impact | Small presentational component, existing reader boundary / แยกcomponentแสดงผล คงขอบเขตReader |
+| 7. Before | Every chapter extended outer page; no page counts / รายการยืดหน้าหลักและไม่มีจำนวนหน้า |
+| 8. Goal | Preserve all selection/access behavior with compact UI / คงการเลือกและสิทธิ์ด้วยUIกระชับ |
+| 9. Architecture before | Detail-owned chapter rows / แถวตอนในรายละเอียด |
+| 10. Architecture after | Bounded child ScrollView; existing API metadata / ScrollViewภายในที่จำกัดสูง ใช้metadataเดิม |
+| 11. Refactor | Extract chapter view and remove orphan styles / แยกviewและลบstylesที่ไม่ใช้ |
+| 12. Metrics |234tests;320dp viewport;316build tasks/39s / tests234 กรอบ320dp build316tasks/39s |
+| 13. Debt removed | Missing typed page count and mixed detail rendering / เพิ่มชนิดจำนวนหน้าและแยกหน้าที่แสดงตอน |
+| 14. Risk/rollback | Physical nested-scroll/access check; revert UX commit / ตรวจscrollและอ่านจริง ย้อนcommitUXได้ |
+| 15. Developer experience | Focused component tests and tracked screenshots / testsเฉพาะcomponentและภาพในrepo |
+| 16. Future | Optional web language filters/grouping / ตัวกรองภาษาและกลุ่มเวอร์ชันเพิ่มเติม |
+| 17. Lesson | Verify native inner/outer gestures physically / ตรวจgestureสองชั้นบนเครื่องจริง |
+| 18. KPI |234pass, types/build pass, last chapter and150% font verified / checksผ่านพร้อมตอนสุดท้ายและฟอนต์150% |
+
+Evidence / หลักฐาน: [report, artifact hash and screenshots](../../Mobile/docs/2026-10-20-native-chapter-list-parity.md). No backend/schema/dependency change, no performance percentage claim, debug/LAN QA only; all prior release gates remain separate. / ไม่แก้backend/schema/dependency ไม่อ้างความเร็วเพิ่ม เป็นdebug/LAN และแยกrelease gatesเดิม
+
 ## 2026-10-20 — Native physical-review fixes B1–B6 / แก้บั๊กจากรีวิวบนเครื่องจริง
 
 | Field | Change record / บันทึกการเปลี่ยนแปลง |

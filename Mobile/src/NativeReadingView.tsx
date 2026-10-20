@@ -25,6 +25,7 @@ import { createCatalog } from "./catalog.ts";
 import { createReader } from "./reader.ts";
 import type { MobileRuntime } from "./runtime.ts";
 import { NativeReaderView } from "./NativeReaderView.tsx";
+import { NativeChapterList } from "./NativeChapterList.tsx";
 import { NativeWalletView } from "./NativeWalletView.tsx";
 import { createWallet } from "./wallet.ts";
 import { imageUri } from "./assets.ts";
@@ -613,6 +614,7 @@ export function NativeReadingView({
       ) : library.book ? (
         <ScrollView
           key={library.book.id}
+          nestedScrollEnabled
           contentContainerStyle={styles.content}
         >
           <View style={styles.hero}>
@@ -693,42 +695,13 @@ export function NativeReadingView({
               target={{ contentType: "manga", contentId: library.book.id }}
               onAccount={onAccount}
             />
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>ตอนทั้งหมด</Text>
-              <Text style={styles.caption}>{library.chapters.length} ตอน</Text>
-            </View>
-            {library.chapters.map((chapter) => (
-              <Pressable
-                accessibilityRole="button"
-                key={chapter.id}
-                disabled={busy}
-                onPress={() =>
-                  void run(() => reader.open(library.book!.id, chapter))
-                }
-                style={styles.chapterRow}
-              >
-                <View style={styles.bookText}>
-                  <Text numberOfLines={2} style={styles.chapter}>
-                    ตอน {chapter.chapterNumber || "พิเศษ"}
-                    {chapter.title ? ` · ${chapter.title}` : ""}
-                  </Text>
-                  <Text style={styles.caption}>
-                    {chapter.translatedLanguage.toUpperCase()}
-                  </Text>
-                </View>
-                <Text
-                  style={chapter.priceCoins ? styles.price : styles.caption}
-                >
-                  {chapter.source === "studio"
-                    ? `Studio · ${chapter.translatorName || "นักแปล"} · `
-                    : "MangaDex · "}
-                  {chapter.priceCoins ? `${chapter.priceCoins} เหรียญ` : "อ่าน"}
-                </Text>
-              </Pressable>
-            ))}
-            {library.chapters.length === 0 && (
-              <Text style={styles.caption}>ไม่พบตอนที่อ่านได้</Text>
-            )}
+            <NativeChapterList
+              chapters={library.chapters}
+              busy={busy}
+              onSelect={(chapter) =>
+                void run(() => reader.open(library.book!.id, chapter))
+              }
+            />
           </View>
           <NativeReviewSection
             key={`reviews:${library.book.id}`}
@@ -943,7 +916,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 8,
   },
-  chapter: { color: design.foreground, fontSize: 14, fontWeight: "600" },
   caption: { color: design.muted, fontSize: 12, lineHeight: 20 },
   description: { color: "#d4d4d8", fontSize: 14, lineHeight: 24 },
   button: {
@@ -996,7 +968,6 @@ const styles = StyleSheet.create({
   },
   bookAuthor: { color: design.muted, fontSize: 12 },
   bookGenre: { color: "#a5b4fc", fontSize: 12 },
-  bookText: { flex: 1, gap: 4 },
   hero: {
     backgroundColor: "#141414",
     paddingHorizontal: 20,
@@ -1054,14 +1025,5 @@ const styles = StyleSheet.create({
   },
   readText: { color: design.background, fontSize: 14, fontWeight: "700" },
   detailBody: { padding: 20, gap: 16 },
-  chapterRow: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: design.border,
-    paddingVertical: 14,
-  },
-  price: { color: design.amberText, fontSize: 12 },
   error: { color: design.error, padding: 16, lineHeight: 22 },
 });

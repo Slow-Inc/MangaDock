@@ -33,6 +33,12 @@ Mobile can progress independently of service changes and can exercise real modul
 Rollback: revert Mobile navigation/discovery/personal/Community views and store wiring together; keep existing Backend data and Phase 1 services. This ADR supersedes no browser/server/translation ADR. [Execution evidence and resume instructions](../../Mobile/docs/2026-10-03-native-phase2-implementation.md).
 <!-- lang:end -->
 
+## 2026-10-20 addendum — chapter detail layout / รูปแบบรายการตอน
+
+Use the web chapter viewport as a bounded Native ScrollView (half window height, cap320dp), with nested Android scrolling and compact language/source/page-count-or-price rows. Retain the existing catalog/Reader access boundary and derive count metadata from responses already loaded. Full web language filters/grouping are outside this bounded UX change. [Implementation and physical evidence](../../Mobile/docs/2026-10-20-native-chapter-list-parity.md).
+
+ภาษาไทย: ใช้กล่องเลื่อนรายการตอนตามเว็บ สูงครึ่งจอไม่เกิน320dp รองรับ nested scrolling ของ Android และแถวภาษา/แหล่งที่มา/จำนวนหน้าหรือราคา คงขอบเขต catalog/Reader และคำนวณจำนวนหน้าจาก response ที่โหลดอยู่แล้ว งานนี้ไม่รวมตัวกรองภาษา/จัดกลุ่มเวอร์ชันเต็มของเว็บ หลักฐานเครื่องจริงอยู่ในรายงานที่ลิงก์
+
 <!-- lang:th -->
 # ADR 029 — Discovery, navigation และประวัติการอ่านร่วมของ Mobile native
 

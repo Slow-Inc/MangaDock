@@ -61,6 +61,90 @@ function button(ui: ReactTestRenderer, label: string) {
           .some((text) => text.children.join("") === label),
     )!;
 }
+
+test("long chapter lists remain bounded like web, show existing page counts and open the final chapter", async (t) => {
+  const opened: string[] = [];
+  const chapters = Array.from({ length: 83 }, (_, i) => ({
+    id: `chapter-${i + 1}`,
+    chapterNumber: String(i + 1),
+    title: `Chapter ${i + 1}`,
+    translatedLanguage: "en",
+    pageCount: i + 10,
+  }));
+  const { runtime } = setup({
+    externalFetch: async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path === "/books/landing")
+        return Response.json({ hero: null, rows: [], updatedAt: "" });
+      if (path.endsWith("/summary"))
+        return Response.json({ averageRating: 0, count: 0 });
+      if (path === "/books/manga/manga-1")
+        return Response.json({
+          id: "manga-1",
+          title: "Title",
+          authors: [],
+          genres: [],
+          covers: [],
+        });
+      if (path.endsWith("/chapters")) return Response.json(chapters);
+      if (path.includes("/books/chapters/") && path.endsWith("/pages")) {
+        opened.push(path);
+        return Response.json({ pages: ["/one.png"] });
+      }
+      return Response.json([]);
+    },
+  });
+  let ui!: ReactTestRenderer;
+  t.after(async () => {
+    await act(async () => ui?.unmount());
+    runtime.dispose();
+  });
+  await act(async () => {
+    ui = create(
+      React.createElement(NativeReadingView, {
+        runtime,
+        onAccount() {},
+        accountLabel: "Account",
+        initialDestination: { kind: "book", id: "manga-1" },
+      }),
+    );
+  });
+  const list = ui.root.findAll(
+    (node) =>
+      String(node.type) === "ScrollView" &&
+      node.props.accessibilityLabel === "รายการตอน",
+  )[0];
+  assert.ok(list, "chapter rows should have their own scrolling viewport");
+  assert.equal(list.props.nestedScrollEnabled, true);
+  const style = Object.assign({}, ...[list.props.style].flat(Infinity));
+  assert.ok(style.maxHeight > 0 && style.maxHeight <= 844 / 2);
+  const texts = () =>
+    ui.root
+      .findAll((node) => String(node.type) === "Text")
+      .map((node) => node.children.join(""));
+  assert.ok(texts().includes("ตอนทั้งหมด (83)"));
+  assert.ok(texts().includes("10 หน้า"));
+  assert.ok(texts().includes("92 หน้า"));
+  assert.equal(
+    list.findAll((node) => String(node.type) === "Pressable").length,
+    83,
+    "all chapters stay available inside the bounded list",
+  );
+  assert.equal(
+    list.findAll(
+      (node) =>
+        String(node.type) === "Text" &&
+        node.children.join("").includes("รีวิว"),
+    ).length,
+    0,
+    "reviews must stay outside the chapter viewport",
+  );
+  const last = list
+    .findAll((node) => String(node.type) === "Pressable")
+    .at(-1)!;
+  await act(async () => last.props.onPress());
+  assert.deepEqual(opened, ["/books/chapters/chapter-83/pages"]);
+});
 test("native selection returns the OS file without unsupported React Native binary Blob construction", async () => {
   const original = globalThis.Blob;
   const file = new original(["image-bytes"], { type: "image/png" });

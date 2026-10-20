@@ -16,6 +16,7 @@ export type Chapter = {
   title: string | null;
   translatedLanguage: string;
   priceCoins?: number;
+  pageCount?: number;
   source?: "mangadex" | "studio";
   translatorName?: string | null;
 };
@@ -28,6 +29,7 @@ type Version = {
   status: string;
   translatorName?: string | null;
   backendAvailable?: boolean;
+  pages?: string[];
 };
 export type BookDetail = {
   id: string;
@@ -131,6 +133,7 @@ export function createCatalog(options: {
           priceCoins: item.priceCoins,
           source: "studio",
           translatorName: item.translatorName,
+          ...(item.pages ? { pageCount: item.pages.length } : {}),
         }));
       const chapters = [
         ...original.map((chapter) => ({
