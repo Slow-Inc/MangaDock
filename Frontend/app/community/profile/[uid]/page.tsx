@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import UserAvatar from "../../../components/ui/UserAvatar";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -669,15 +670,7 @@ export default function PublicProfilePage() {
                       href={`/community/profile/${u.uid}`}
                       className="flex items-center gap-3 rounded-xl border border-line bg-fill p-3 transition hover:bg-raised"
                     >
-                      {u.photoUrl ? (
-                        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full">
-                          <Image src={u.photoUrl} alt="" fill className="object-cover" sizes="36px" />
-                        </div>
-                      ) : (
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center">
-                          <UidMascot uid={u.uid} size={30} />
-                        </div>
-                      )}
+                      <UserAvatar uid={u.uid} photoUrl={u.photoUrl} size={36} />
                       <span className="truncate text-sm font-medium text-ink">
                         {u.displayName ?? "ผู้ใช้ไม่ระบุชื่อ"}
                       </span>

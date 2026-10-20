@@ -1,10 +1,10 @@
 "use client";
 
 import { PRIMARY_FILL } from "./ui/Button";
+import UserAvatar from "./ui/UserAvatar";
 import Loader from "./ui/Loader";
 import { useState, useRef, memo } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
@@ -133,17 +133,7 @@ function CommentThreadImpl({
     <div className={`mt-4 ${depth > 0 ? "ml-4 pl-4 border-l border-line" : ""}`}>
       <div className="flex gap-3">
         <div className="flex flex-col items-center gap-1">
-          <div className="w-8 h-8 rounded-full bg-fill overflow-hidden shrink-0">
-            {comment.authorPhotoUrl && (
-              <Image
-                src={comment.authorPhotoUrl}
-                alt={comment.authorName || 'user'}
-                width={32}
-                height={32}
-                className="object-cover"
-              />
-            )}
-          </div>
+          <UserAvatar uid={comment.authorUid} photoUrl={comment.authorPhotoUrl} size={32} />
         </div>
 
         <div className="flex-1 min-w-0">
