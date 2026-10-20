@@ -35,7 +35,7 @@ accents, gradient backgrounds, copy-pasted spinners).
    picture**; every accessory is free for everyone (dev).
 
 **Non-goals**
-- MIT render/translation quality, reader page rendering, backend business logic (other than §8 storage).
+- MIT render/translation quality, reader page rendering, backend business logic (other than the mascot storage in Epic D).
 - A marketing landing page.
 - Strata's product-specific content: the nine-mood story, the Compare window, the live demo proxy, the film section
   (Strata 02 §11.2) — the *patterns* carry over, the content does not.
@@ -105,9 +105,14 @@ Port rules (Strata 09 "Port playbook", 02 §11.3, 10 §10.2):
    community/studio — land it first and purge the rest.
 7. Shared loading surfaces: `app/loading.tsx`, `app/error.tsx`, `app/not-found.tsx` do not exist today; the server-fetched
    home page shows nothing while loading.
+8. **Rewrite the root `DESIGN.md`** as the token source of truth for this language (agent call). Today it still declares
+   `primary: "#6366f1"` (indigo, line 7), "Indigo Action" (line 71), Noto Sans Thai (line 85) and "stay within the
+   indigo/amber range" (line 152). Agents and the `impeccable` skill read it, so leaving it would reintroduce purple.
 
 ### Epic B — Area redesigns (each area gets its own flourish)
-Order (agent call): Home/catalog/search → book popup + reader → community → settings/account → admin.
+Order (agent call): Home/catalog/search (incl. `/new`, `/categories`, `/mylist`) → book popup + reader → community →
+settings/account/`auth` → admin. **Light mode is switched on when every user-facing route above is token-clean.** The
+internal tools `/docs`, `/status` and `/metrics` are out of scope and become always-dark islands (agent call).
 Per-area ideas from the recon (agent call, to be refined per PRD):
 - **Search:** skeleton cards with a dot-field shimmer instead of flat grey blocks; `ghost` mascot for "ไม่พบ".
 - **Book popup / direct `/book/<id>`:** today the direct link shows a blank home until the fetch ends (`BookRouteModal`
@@ -146,6 +151,11 @@ Chart for all charts; CopyButton where something is copied; `mech` mascot. Studi
   `ReaderCommentDrawer`, `ReviewCard`, `MangaDiscussion`, `community/page`, `community/p/[id]`, `community/manga/[mangaId]`,
   `community/profile/[uid]`, `studio/account`, `LinkAccountModal`; data from `AuthContext` and Backend `users.service` /
   `users.controller` / `supabase.service`.
+- **Storage (agent call):** keep `profiles.photo_url` as the one avatar field the five services already join (forum,
+  reviews, reader-comments, user-follows, users). The editor saves the config in a new `profiles.mascot` JSON column (for
+  the editor and the animated places) **and** a still PNG rendered on the client, uploaded through the existing avatar
+  upload path (magic-byte checked) and written to `photo_url`. So the five services and their response types do not change;
+  only `users` gains the config field and DTO.
 - **Performance (agent call):** long lists (community feed, comments) render the mascot `paused` (a still pose); it animates
   only on the profile page, the user's own nav avatar, and on hover.
 - **Default (agent call):** a user who never dressed one gets a stable mascot derived from their uid, not an empty circle.
