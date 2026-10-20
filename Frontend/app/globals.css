@@ -1,43 +1,176 @@
 @import "tailwindcss";
 
+/* ── Design tokens ─────────────────────────────────────────────────────────────
+   Ported from the Strata site (Strata-xeno Web/app/globals.css:5-57; system-design ch. 02 §2-§3).
+   Three states via data-theme on <html> (lib/theme.ts). MangaDock defaults to DARK: the boot
+   script writes data-theme="dark" unless the visitor chose otherwise. */
 :root {
-  --background: #08090d;
-  --foreground: #f8f9fb;
+  color-scheme: light;
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --ink: #131316;
+  --accent: #0a62d6; /* the only hue: status, focus, selection, highlight — used sparingly */
+  --ok: #1a8a4a;
+  --danger: #c8322f; /* MangaDock addition: Strata has no error colour */
+}
+
+:root[data-theme="dark"],
+.theme-dark {
+  color-scheme: dark;
+  --bg: #0b0b0d;
+  --surface: #151518;
+  --ink: #f1f1f3;
+  --accent: #5aa2ff;
+  --ok: #4cc380;
+  --danger: #ff6b6b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b0b0d;
+    --surface: #151518;
+    --ink: #f1f1f3;
+    --accent: #5aa2ff;
+    --ok: #4cc380;
+    --danger: #ff6b6b;
+  }
+}
+
+/* Derived tokens. Re-declared on .theme-dark: a color-mix resolves where it is declared, so an
+   always-dark island inside a light page would otherwise inherit the light values (ch. 02 §11.1). */
+:root,
+.theme-dark {
+  --ink-2: color-mix(in srgb, var(--ink) 66%, var(--bg));
+  --ink-3: color-mix(in srgb, var(--ink) 42%, var(--bg));
+  --line: color-mix(in srgb, var(--ink) 12%, transparent);
+  --fill: color-mix(in srgb, var(--ink) 6%, transparent);
+  --raised: color-mix(in srgb, var(--ink) 4%, var(--surface));
+
+  /* Legacy names still read by older components — now token-backed. */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --surface-base: var(--surface);
+  --surface-raised: var(--raised);
+  --surface-overlay: var(--surface);
+  --bg-card: var(--raised);
+  --border: var(--line);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-3);
+}
+
+:root {
+  /* Motion: one easing, three durations (Strata globals 16-20) + the glide for growing boxes. */
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-glide: cubic-bezier(0.4, 0, 0.2, 1);
+  --t1: 160ms;
+  --t2: 320ms;
+  --t3: 600ms;
+  --t-glide: 420ms;
+  --stagger: 38ms;
+
+  /* Shape and layout (Strata globals 25-30). */
+  --r1: 8px;
+  --r2: 12px;
+  --r3: 16px;
+  --r-card: 28px;
+  --gutter: clamp(16px, 3vw, 32px);
+  --max: 1320px;
+  --nav-h: 60px;
   --mobile-nav-height: 4.25rem;
-
-  /* Surface depth scale */
-  --surface-base: #141414;
-  --surface-raised: #1a1a1a;
-  --surface-overlay: #151518;
-
-  /* Design token aliases (for legacy components) */
-  --bg-card: var(--surface-raised);
-  --border: rgba(255, 255, 255, 0.1);
-  --text-primary: #f8f9fb;
-  --text-secondary: rgba(248, 249, 251, 0.4);
-  --accent: #f59e0b;
-  --font-display: var(--font-noto-sans-thai);
 }
 
 @theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-fill: var(--fill);
+  --color-accent: var(--accent);
+  --color-ok: var(--ok);
+  --color-danger: var(--danger);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-noto-sans-thai);
+
+  --font-sans: var(--font-inter), var(--font-anuphan), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, Consolas, monospace;
+  --font-serif: var(--font-instrument-serif), Georgia, serif;
+  --font-display: var(--font-inter), var(--font-anuphan), system-ui, sans-serif;
+
+  --radius-card: 28px;
+  --ease-strata: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 html {
-  background: #08090d;
+  background: var(--bg);
   overflow-x: clip;
 }
 
 body {
   min-height: 100vh;
-  background: #08090d;
-  color: var(--foreground);
-  font-family: var(--font-noto-sans-thai), sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-inter), var(--font-anuphan), system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+  line-height: 1.6;
   overflow-x: clip;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: var(--line) transparent;
+}
+
+/* Thai: taller lines (Strata globals 80-83). Set on <body> only, so children inherit it and a
+   leading-* utility on any element still wins. Wide tracking on Thai text is removed where it is
+   used (Epic B), not by a global letter-spacing rule — unlayered CSS would beat every tracking utility. */
+body:lang(th) {
+  line-height: 1.75;
+  font-feature-settings: normal;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* Motion vocabulary (Strata globals 2199-2260). One fade-up distance instead of Strata's three
+   (rise 14 / page 8 / swap 10 — ch. 09 P1 asks to consolidate). */
+@keyframes md-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes md-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes md-pop {
+  0% { opacity: 0; transform: translateY(16px) scale(0.86); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+
+/* Content settles in as it arrives — only when scripts run, so nothing is ever hidden for good. */
+html.js .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity var(--t3) var(--ease), transform var(--t3) var(--ease);
+  transition-delay: calc(var(--i, 0) * var(--stagger));
+}
+html.js .reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Reduced motion: every animation and transition off (Strata globals 2271-2289). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 body::-webkit-scrollbar {
@@ -58,13 +191,13 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 body::-webkit-scrollbar-thumb:active {
-  background: rgba(99, 102, 241, 0.6);
+  background: var(--accent);
 }
 
-/* Global focus ring — WCAG 2.1 SC 2.4.7 */
+/* Global focus ring — WCAG 2.1 SC 2.4.7 (Strata globals 99-103) */
 :focus-visible {
-  outline: 2px solid #6366f1;
-  outline-offset: 2px;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
   border-radius: 4px;
 }
 
@@ -236,7 +369,7 @@ svg {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:active {
-  background: rgba(99, 102, 241, 0.6);
+  background: var(--accent);
 }
 
 /* Override focus ring to be invisible inside .no-focus-ring descendants */
