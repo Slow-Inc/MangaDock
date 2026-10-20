@@ -1,7 +1,78 @@
 <!-- lang:en -->
 # DONE — Claude Code Session Log
 
+## Native commit validation — 2026-10-20
+
+- At the user's subsequent commit/push request, validated the pending native implementation and separate Backend profile-join fix: Mobile **220/220**, typecheck/env and lockfile dry-run; Backend build, full CI Jest **90 suites/960 tests**, focused lint; repository tooling **58/58**. Existing same-day ARM64 APK build/artifact checks remain applicable to unchanged Mobile source.
+- Fixed lint only in the six Backend files being committed: consistent formatting, explicit Promise-returning typed HTTP test boundaries, proper Request URL handling and removal of an unused import. Profile behavior and API contracts remain unchanged. Private-env/artifact exclusions and secret scan checked before staging; the only matched literal was a documented public Cloudflare test key already present in historical documentation.
+- Git packaging revealed LF normalization changed all ten vendored QR source digests in the index (working copies matched 10/10, index 0/10). Added a narrow `.gitattributes` `-text` rule; re-staged index now matches **10/10**, QR behavior tests **2/2**. Upstream whitespace is intentionally retained; whitespace checks pass outside immutable vendor JavaScript.
+- ภาษาไทย: ตามคำขอ commit/push ที่ตามมา ตรวจงาน native และ Backend profile-join แยกส่วน Mobile **220/220** typecheck/env/lockfile dry-run ผ่าน Backend build/CI Jest **90 suites/960 tests**/lint เฉพาะไฟล์ผ่าน tooling **58/58** หลักฐาน build APK ARM64 วันนี้ยังใช้กับ Mobile source ที่ไม่เปลี่ยน แก้เฉพาะ lint ของ Backend หกไฟล์ ได้แก่ format/types/Promise และ Request URL ใน fixtures พร้อมลบ import ไม่ใช้ คง behavior/API ตรวจ exclusions และ secrets ก่อน stage พบเพียง public Cloudflare test key ในเอกสารเก่า
+- ภาษาไทย: พบ Git normalize LF ทำให้ digests vendor QR ใน index ผิดทั้งสิบไฟล์ (working copies ตรง 10/10 แต่ index 0/10) เพิ่ม `.gitattributes` `-text` เฉพาะ vendor แล้ว index ตรง **10/10** tests QR **2/2** คง whitespace upstream ตามต้นฉบับ และตรวจ whitespace ส่วนอื่นผ่าน
+
+## Downloadable native Android test APK — 2026-10-20
+
+- Built `MangaDock-0.1.0-arm64-test.apk`, 27,760,069 bytes, embedded Hermes, existing Android Debug signing, for the current Wi-Fi LAN Backend. Native assemble/vital lint passes; Mobile 220/220, typecheck/env pass. Verified certificate/ABI/SDK, embedded public values, absence of checked private token, and matching streamed HTTP download hash. [Artifact/download/install evidence](Mobile/docs/2026-10-20-test-apk.md).
+- Existing public API returned 530, so this is explicitly LAN-only. No physical device connected; install/interaction/MIT/production acceptance remain open. Initial PowerShell argument failure corrected without source changes. No Frontend/Backend/MIT source or private env changes, website button, production keys, Git/tracker mutation. Backend and a directory-only LAN download server left running.
+- ภาษาไทย: สร้าง APK ARM64 ใหม่ 27,760,069 bytes ฝัง Hermes เซ็น Android Debug เดิมและใช้ Backend ใน Wi-Fi ปัจจุบัน Native build/vital lint และ Mobile 220/220 typecheck/env ผ่าน ตรวจ certificate/ABI/SDK/public values/ไม่มี token ส่วนตัวที่ตรวจ และ hash ดาวน์โหลดตรงไฟล์ API สาธารณะเดิม 530 จึงระบุ LAN-only ยังไม่มีมือถือจริง ไม่รับ install/interaction/MIT/production แก้รูปแบบ argument PowerShell ไม่แก้ source Frontend/Backend/MIT หรือ private env ไม่เพิ่มปุ่มเว็บ/production keys/commit/tracker เปิด Backend และ download server เฉพาะโฟลเดอร์ค้างไว้
+## Native acceptance execution — 2026-10-16
+
+- Restored existing Supabase to ACTIVE_HEALTHY; DNS/Auth HTTP 200 and seven diagnostic destinations accepted. Started Backend/Metro; verified current public Android bundle. MIT runtime/models and Redis remain unavailable. Task 0 matrix covers all 29 slices; later device/roles/payment/release gates stay open.
+- Fixed empty MangaDex/Studio page responses publishing a ready Reader with two observed RED → GREEN regressions. Mobile **220/220**, typecheck/env and fresh Android export pass. Live controller obtains 30 pages with a simulated browser/development CAPTCHA; one image JPEG HTTP 200. Actual login/browser/device/production protection not accepted. Existing APK verifies with Android Debug certificate, x86_64 only. [Evidence and next inputs](Mobile/docs/2026-10-16-native-acceptance-progress.md). No Frontend/Backend/MIT source change for this fix; no commit or issue closure.
+- ภาษาไทย: กู้ Supabase เดิมเป็น ACTIVE_HEALTHY ตรวจ DNS/Auth/redirect เจ็ดกรณี เปิด Backend/Metro และตรวจ bundle ใหม่ จัด matrix 29 slices ครบ แต่ขาด MIT/Redis และยังค้าง device/roles/payment/release แก้ตอนว่าง MangaDex/Studio ด้วย RED → GREEN สอง tests ผ่าน **220/220** typecheck/env/export Controller ได้ 30 หน้าโดยจำลอง browser/test CAPTCHA ภาพแรก JPEG 200 ไม่อ้าง login/device/protection จริง APK เดิมเซ็น debug และเป็น x86_64 ไม่แก้ source Frontend/Backend/MIT รอบนี้ ไม่ commit/ปิด issue
+
+## Native Mobile status audit — 2026-10-16
+
+- Cross-checked current native entry/view/controller/test wiring against the approved feature mapping and queried all 30 migration issues: all remain open. Fresh Mobile tests **218/218**, typecheck, env validation and Android Hermes export **772 modules/~3 MB/11 assets** pass; Backend build and three affected suites **12/12** pass. Existing APK is debug; no new signed release was built.
+- Current service blockers: Supabase MCP reports MangaDock **INACTIVE**, its API hostname returns **ENOTFOUND**, and previous local Backend/Metro/MIT ports have no listeners. CAPTCHA's three HTTPS assets remain HTTP 200 and match staged uploads; the development test keys remain configured. Recorded live/device/visual/release/configuration and uncommitted workspace follow-up in [full audit](Mobile/docs/2026-10-16-native-status-audit.md). No app-source, private env, remote-state, Git or issue-state mutation.
+- ภาษาไทย: เทียบ wiring native ปัจจุบันกับ feature mapping และตรวจ issues migration 30 รายการ ยังเปิดทั้งหมด Mobile tests **218/218** typecheck env และ Hermes export **772 modules/~3 MB/11 assets** ผ่าน Backend build และ tests สาม suites ที่เกี่ยวข้อง **12/12** ผ่าน APK ที่มีเป็น debug ไม่สร้าง signed release ใหม่ Supabase MCP เป็น **INACTIVE** hostname API **ENOTFOUND** พอร์ต Backend/Metro/MIT เดิมไม่มี listener แต่ CAPTCHA HTTPS สาม assets ยัง 200/ตรง upload และใช้ test keys บันทึกงานค้างบริการ/อุปกรณ์/ภาพ/release/config/workspace ในรายงาน ไม่แก้ app source/env/remote/Git/issue state
+
+## Native Reader development CAPTCHA deployment — 2026-10-05
+
+- Deployed exactly three existing CAPTCHA assets with generated public development-key config on the user's selected Cloudflare account; live page: https://mangadock-mobile-captcha-dev.pages.dev/. Hosted bodies match upload, JavaScript MIME types are correct and hosting redirects preserve request state. CLI create initially delegated to Workers and failed; verified direct Pages opt-out then created/deployed successfully without changing other projects.
+- Set the ignored Mobile CAPTCHA URL and added required Expo API/Auth names after discovering Frontend-style aliases in local env. Preserved all old assignments, used the existing project/public publishable key and copied no server secret. Env validation passes; verified and restarted only Mobile Metro, then checked fresh Android bundle values and exclusion of server-only variable names. Focused tests **19/19**, hosted Supabase Auth HTTP 200, Backend CAPTCHA HTTP 201.
+- The existing always-pass development test pair was retained; actual browser/device challenge return and production bot protection remain unaccepted. No app/dependency/Frontend/Backend/MIT source change, Git commit or issue closure. [Evidence and rollback](Mobile/docs/2026-10-05-reader-captcha-setup.md).
+- ภาษาไทย: deploy CAPTCHA เดิมสาม assets พร้อม public config ทดสอบบน account ที่ผู้ใช้เลือก ตรวจเนื้อหา/MIME/state hosting ผ่าน CLI create แรกส่งไป Workers และไม่ผ่าน ตรวจ opt-out Pages ตรงแล้วสร้าง/deploy สำเร็จ ไม่เปลี่ยนโครงการอื่น ตั้ง URL และเพิ่มชื่อ Expo API/Auth ที่ขาดใน env Mobile คง assignments เดิม ใช้ project/publishable key เดิม ไม่คัดลอก secret env validation ผ่าน restart เฉพาะ Metro ที่ตรวจ workspace แล้ว bundle Android ใหม่มีค่าครบและไม่รวมชื่อ server-only Focused tests 19/19 Supabase Auth 200 Backend CAPTCHA 201 คงคู่ทดสอบ always-pass ยังต้องรับรอง browser/กลับเข้าแอปและ protection จริง ไม่เปลี่ยน source/dependency หรือ commit/ปิด issue ดูรายงานด้านบน
+
+## Supabase native Auth redirects — 2026-10-05
+
+- Added all five native return URLs to the existing hosted project through authenticated Supabase CLI 2.119.0. Preserved ten web URLs, Site URL and all 17 undeclared remote properties; reviewed config updates changed from 1 before push to 0 afterward.
+- Live diagnostic cancellations passed 7/7 destination checks, including Google/Facebook native callbacks and the original web callback. No application source changed; actual account login/device session acceptance remains open. [Evidence and rollback](Mobile/docs/2026-10-05-native-auth-redirects.md).
+- ภาษาไทย: เพิ่ม native URL ทั้งห้าแล้ว คงเว็บเดิม 10 ค่าและ settings อื่น ตรวจปลายทางจริงผ่าน 7/7 ให้ลอง social login ใหม่ได้โดยไม่ต้อง build การตรวจนี้ยังไม่ใช่การเข้าสู่ระบบบัญชีจริง
+
 ---
+
+## Native Phase 2 first delivery and migration issue publication — 2026-10-03
+
+- Continued the approved `$grill-me` → `$to-prd` → `$to-issues` → `$tdd` direction using the existing full-parity plan. Published native [PRD #724](https://github.com/Slow-Inc/MangaDock/issues/724) and 29 bilingual slices #725–#753 through resumable GitHub CLI tooling; preserved old/new parents and left every issue open. No commit, PR, merge or duplicate plan.
+- Added native Home/hero/landing rows, the original six mobile destinations, release/tag/genre pagination and related manga using existing services/artwork. Initial personal library and read-only Community feeds/posts are implemented; Home/history resumes guarded Reader at saved Chapter/Page. Existing history writes are authenticated, serialized, account-isolated and server-acknowledged; delayed reads do not move progress backwards. Save failures show retry.
+- TDD checked response/filter/Back races and account isolation through real Mobile modules/Supabase SDK with external HTTP fixtures. Fresh Mobile verification: **121/121 tests**, typecheck, Android Hermes export **709 modules / 2.6MB / 10 assets**, all exit 0. No new runtime dependency or additional Frontend/Backend/MIT/shared-bridge source change in this batch.
+- New Phase 2 visual/live acceptance remains open: Mobile env lacks the three required public API/Supabase variables and contains Backend configuration keys; Backend runtime is unavailable. Secrets were not copied/overwritten. Automatic approval review rejected temporary-credential Metro startup with only “blocked by policy”; no bypass. Source export does not prove initialization/visual parity. Signed/physical beta and remaining Phase 2/3 workflows remain unaccepted.
+- Resume from [Phase 2 ledger](Mobile/docs/2026-10-03-native-phase2-implementation.md), [ADR 029](docs/adr/029-mobile-native-discovery-navigation-and-history.md) and [impact record](docs/reports/system-impact-report.md). Uncommitted. Configure private environments, validate, then compare populated web/native screens before accepting S11; continue S12/S20 missing criteria and later slices.
+
+## Android local SDK discovery — 2026-10-03
+
+- Reproduced `SDK location not found` with `gradlew.bat help`: installed SDK exists, both Android SDK environment variables are unset, and generated `android/local.properties` was absent. Added only the ignored local `sdk.dir` pointing to the existing SDK; documented machine setup and clean-prebuild recovery in Mobile README.
+- Verified original `app:assembleDebug` command for x86_64: **BUILD SUCCESSFUL**, exit 0, 204 tasks (5 executed / 199 up-to-date). No app-source or dependency change. Debug assembly does not prove live services or beta acceptance. Tracked documentation remains uncommitted.
+
+## Native UI follows the existing responsive mobile design — 2026-10-02
+
+- User clarified the visual baseline: root `DESIGN.md` and the actual responsive mobile Frontend. Updated Phase 1 native views with the original logo, Deep Space/indigo/amber palette, portrait search grid, centered detail cover/CTA, social-first sign-in, topup presets and progressively disclosed Reader controls. API/auth/payment/translation controllers retain their contracts; search offline errors no longer appear as an empty successful result.
+- Added Mobile-owned tokens, native shared chrome, six raster assets and a development asset generator. No new runtime dependency, Frontend/Backend/MIT source edit or shared-bridge change. PRD/slice criteria now carry this visual baseline into all phases; full bottom navigation and its destinations stay in Phase 2.
+- Verified: Mobile **88/88 tests**, typecheck, Android Hermes export **697 modules / 2.5MB**. Inspected the new logo/sign-in render on the already-installed emulator debug app. [Source mapping, before/after captures and remaining gates](Mobile/docs/2026-10-02-native-responsive-design-parity.md).
+- Live populated-screen acceptance remains open: Backend port 4001 was unavailable; an agent-started watch failed missing Supabase environment validation and was stopped. No new signed APK. Exact bundled font metrics, web/native image comparisons and authenticated Wallet/Reader checks remain. Uncommitted. Resume from the Mobile design-port note.
+
+## Android Gradle wrapper compatibility — 2026-10-02
+
+- Restored generated `Mobile/android/gradle/wrapper/gradle-wrapper.properties` from 9.4.1 to **9.3.1**, matching the installed Expo template and RN plugin wrapper. User build logs show Kotlin 2.3.0 metadata rejected by the Kotlin 2.1.20 plugin compiler; Gradle 9.3.1 `--version` confirms embedded Kotlin 2.2.21.
+- Documented the toolchain and next run in [Mobile README](Mobile/README.md#android-gradlekotlin-compatibility) and [execution ledger](Mobile/docs/2026-10-02-native-phase1-implementation.md). Native files are generated/ignored; fresh prebuild already uses 9.3.1. No new dependency or custom plugin.
+- APK build remains unverified: agent assemble failed on a sandbox Java real-path `AccessDeniedException`. Standalone Java reads the same workspace JAR (83,267 bytes) but `Path.toRealPath()` fails. Resume with `npm.cmd run android` in the user's normal Mobile terminal. Uncommitted; no additional Backend/Frontend/MIT edits.
+
+## Backend profile-join compilation fix — 2026-10-02
+
+- Fixed five TS2352 errors in reader comments, reviews, and user follows. Profile mappers now accept object, array, or null joins; empty joins preserve null author fields or omit missing follow profiles. Removed incompatible casts without changing queries or API response fields.
+- TDD reproduced lost author details and invalid follow profiles for array-shaped joins through the real Supabase SDK with a controlled HTTP boundary. Added 12 regression tests; `npm.cmd run build` passed; full Backend suite: **90 suites / 960 tests passed**.
+- Scope: three Backend services and their new specs, plus this history and the [impact report](docs/reports/system-impact-report.md). No dependency, schema, Frontend, or MIT changes. Uncommitted local fix for the reported Backend startup blocker, separate from native Mobile feature work.
+- Resume here: rerun `npm.cmd run start:dev` in `Backend` if the existing watch process has not rebuilt; database/runtime connectivity remains to be checked in the user's environment.
 
 ## #694 — SFX rescue says why it returned nothing (2026-09-26)
 
@@ -1102,6 +1173,39 @@ Dead code removed (#81): `translateMangaPage()` full-image path, its controller 
 # DONE — Claude Code Review Fix Session (2026-05-27)
 
 ---
+
+## ส่งมอบ Native Phase 2 ชุดแรกและเผยแพร่ issues การย้าย — 2026-10-03
+
+- ทำต่อทิศทาง `$grill-me` → `$to-prd` → `$to-issues` → `$tdd` ที่อนุมัติโดยใช้แผน parity ครบเดิม เผยแพร่ native [PRD #724](https://github.com/Slow-Inc/MangaDock/issues/724) และ slices สองภาษา 29 งาน #725–#753 ผ่าน GitHub CLI tooling ที่ทำต่อได้ คง parents เก่า/ใหม่และเปิดทุก issue ไว้ ไม่ทำ commit/PR/merge หรือแผนซ้ำ
+- เพิ่ม Home/hero/landing rows native, navigation mobile หกปลายทางเดิม, pagination releases/tags/genres และ related manga ด้วยบริการ/artwork เดิม มีรายการส่วนตัวเริ่มต้นและเปิดดู feeds/posts Community; Home/ประวัติกู้ Reader ที่ผ่าน gates ตาม Chapter/Page ที่บันทึกไว้ History writes เดิมใช้ auth เรียงลำดับ แยกบัญชีและรอ server acknowledgement; reads ช้าไม่ทำ progress ย้อน แสดง save failures พร้อม retry
+- TDD ตรวจ races ของ response/filter/Back และการแยกบัญชีผ่าน modules Mobile/Supabase SDK จริงกับ HTTP fixtures ภายนอก การตรวจ Mobile ล่าสุด: **121/121 tests**, typecheck, Android Hermes export **709 modules / 2.6MB / 10 assets** ทุกคำสั่ง exit 0 ไม่เพิ่ม runtime dependency หรือแก้ source Frontend/Backend/MIT/shared bridge เพิ่มในรอบนี้
+- ยังเปิด acceptance ภาพ/บริการจริง Phase 2 ใหม่: env Mobile ขาด public variables API/Supabase สามตัวและมีชื่อ config Backend; runtime Backend ไม่พร้อม ไม่คัดลอก/เขียนทับ secrets Automatic approval review ปฏิเสธการเปิด Metro ด้วย credentials ชั่วคราว โดยแจ้งเพียง “blocked by policy” และไม่ได้เลี่ยง Source export ไม่ยืนยัน initialization/visual parity ส่วน signed/physical beta และ workflows Phase 2/3 ที่เหลือยังไม่ผ่าน acceptance
+- ทำต่อจาก [Ledger Phase 2](Mobile/docs/2026-10-03-native-phase2-implementation.md), [ADR 029](docs/adr/029-mobile-native-discovery-navigation-and-history.md) และ [impact record](docs/reports/system-impact-report.md) ยังไม่ commit ให้ตั้ง environments ส่วนตัว validate แล้วเทียบเว็บ/native ที่มีข้อมูลก่อนรับ S11 จากนั้นทำเกณฑ์ที่ขาดของ S12/S20 และ slices ถัดไป
+
+## ตั้งตำแหน่ง Android SDK เฉพาะเครื่อง — 2026-10-03
+
+- ทำซ้ำ `SDK location not found` ด้วย `gradlew.bat help`: SDK ติดตั้งอยู่แล้ว แต่ environment SDK ทั้งสองตัวยังว่าง และไม่มี `android/local.properties` เพิ่มเฉพาะ `sdk.dir` ในไฟล์ local ที่ Git ignore ให้ชี้ SDK เดิม พร้อมบันทึกวิธีตั้งค่าเครื่องและกู้คืนหลัง clean prebuild ใน Mobile README
+- ตรวจคำสั่ง `app:assembleDebug` เดิมสำหรับ x86_64: **BUILD SUCCESSFUL**, exit 0, 204 tasks (รัน 5 / up-to-date 199) ไม่แก้ source แอปหรือ dependencies การสร้าง debug APK ไม่ยืนยันบริการจริงหรือ acceptance beta เอกสารที่เก็บใน Git ยังไม่ได้ commit
+
+## Native UI อิง design responsive mobile เดิม — 2026-10-02
+
+- ผู้ใช้ชี้แจงต้นแบบภาพ: `DESIGN.md` รากและ Frontend responsive mobile จริง ปรับ native views Phase 1 ด้วยโลโก้เดิม สี Deep Space/indigo/amber, grid ปกค้นหา, ปก/CTA รายละเอียดกลาง, Login social ก่อนอีเมล, presets เติมเงิน และเปิด Reader controls เมื่อต้องใช้ โดยคง contracts ของ controllers API/auth/payment/translation และไม่แสดง search offline error เป็นผลสำเร็จที่ว่าง
+- เพิ่ม tokens และ shared chrome ที่ Mobile ดูแล พร้อม raster assets หกไฟล์และตัวสร้าง assets ตอนพัฒนา ไม่มี runtime dependency, การแก้ source Frontend/Backend/MIT หรือ shared bridge เกณฑ์ PRD/slices ครอบคลุมต้นแบบภาพนี้ทุก phase; bottom navigation ครบและหน้าปลายทางอยู่ Phase 2
+- ตรวจแล้ว: Mobile **88/88 tests**, typecheck, Android Hermes export **697 modules / 2.5MB** ตรวจภาพโลโก้/Login ใหม่บน debug app ที่ติดตั้งอยู่ใน emulator จริง [Mapping ภาพก่อน/หลังและเกณฑ์ที่เหลือ](Mobile/docs/2026-10-02-native-responsive-design-parity.md)
+- ยังเปิด acceptance หน้าที่มีข้อมูลจริง: Backend port 4001 ไม่พร้อม; watch ที่ agent เปิดเองล้มจาก environment Supabase ที่ขาดและหยุดแล้ว ไม่มี signed APK ใหม่ ยังต้องตรวจ metrics ฟอนต์ที่ bundle โดยตรง ภาพเทียบเว็บ/native และ Wallet/Reader ที่ต้องบัญชี ยังไม่ได้ commit ทำต่อจาก design-port note ของ Mobile
+
+## แก้ความเข้ากันได้ของ Android Gradle wrapper — 2026-10-02
+
+- คืน `Mobile/android/gradle/wrapper/gradle-wrapper.properties` ที่สร้างอัตโนมัติจาก 9.4.1 เป็น **9.3.1** ให้ตรง template Expo และ wrapper ของ RN plugin ที่ติดตั้ง Log build ผู้ใช้พบ compiler Kotlin 2.1.20 อ่าน metadata Kotlin 2.3.0 ไม่ได้; `--version` ของ Gradle 9.3.1 ยืนยัน Kotlin 2.2.21
+- บันทึก toolchain และการรันต่อใน [Mobile README](Mobile/README.md#android-gradlekotlin-compatibility) และ [execution ledger](Mobile/docs/2026-10-02-native-phase1-implementation.md) Native files เป็นไฟล์ที่สร้างและไม่เก็บใน Git; prebuild ใหม่ใช้ 9.3.1 อยู่แล้ว ไม่มี dependency หรือ custom plugin เพิ่ม
+- ยังไม่ยืนยัน APK: assemble ของ agent ล้มจาก Java หา real path ใน sandbox แล้วได้ `AccessDeniedException` ทดสอบ Java แยกอ่าน JAR เดียวกันใน workspace ได้ 83,267 bytes แต่ `Path.toRealPath()` ล้ม ทำต่อด้วย `npm.cmd run android` ใน terminal ปกติของผู้ใช้ใน Mobile ยังไม่ได้ commit และไม่แก้ Backend/Frontend/MIT เพิ่ม
+
+## แก้ Backend compile ไม่ผ่านจาก profile join — 2026-10-02
+
+- แก้ TS2352 ทั้งห้าจุดใน reader comments, reviews และ user follows ให้ตัวแปลง profile รองรับ object, array และ null; join ว่างยังคืนชื่อ/รูปเป็น null หรือข้าม profile ที่ไม่มีในรายการ follow ถอด cast ที่ไม่ตรงชนิดโดยคง query และฟิลด์ response API เดิม
+- ทำ TDD ยืนยันว่าข้อมูลชื่อ/รูปหายและรายการ follow ผิดเมื่อ join เป็น array โดยใช้ Supabase SDK จริงกับ HTTP จำลอง เพิ่ม regression tests 12 เคส; `npm.cmd run build` ผ่าน; ชุดทดสอบ Backend ทั้งหมด **90 suites / 960 tests ผ่าน**
+- ขอบเขต: Backend สาม services และ specs ใหม่ พร้อม history นี้และ [impact report](docs/reports/system-impact-report.md) ไม่มีการเปลี่ยน dependency, schema, Frontend หรือ MIT เป็นการแก้ปัญหาเปิด Backend ที่ผู้ใช้รายงาน แยกจากงาน native Mobile และยังไม่ได้ commit
+- ทำต่อจากตรงนี้: หาก watch เดิมยังไม่ rebuild ให้รัน `npm.cmd run start:dev` ใน `Backend` ใหม่; ยังต้องตรวจการเชื่อมต่อฐานข้อมูล/runtime ในเครื่องผู้ใช้
 
 ## #694 — SFX rescue บอกเหตุผลเมื่อคืนค่าว่าง (2026-09-26)
 
@@ -3133,3 +3237,14 @@ Six-PR agent-owned tech-debt batch, all TDD + `/scrutinize` (posted bilingual) +
 - Also: closed **#543** obsolete (already fixed by #106 `1de61ffe`); filed leftovers **#614** (load_dotenv extraction, ex-#192) + **#615** (BaseGPTTranslator, ex-#188).
 
 Dogfooded #620 the same session: after #619 landed, #612 was rebased onto post-#619 `main` (disjoint → clean) before merge, which also greened its heavy-ML job; #613/#621 were verified disjoint from main's new commits and squash-merged. Missing dev dep `pytest-asyncio` installed in the MIT venv (local async tests were silently failing "async def not natively supported").
+# Native Phase 2/3 implementation checkpoint — 2026-10-04
+
+- Added native collections/history CSV and OS sharing, reviews/page comments/reports/translation votes, profiles/banner/follows, check-in/notifications/preferences/statistics, full supported account security, Community CRUD/images/replies/votes/SSE, creator Studio/uploads/publish/earnings and existing staff users/content/transactions/audit. Original responsive mobile source and DESIGN.md remain the reference; server/account/business contracts stay unchanged.
+- Verification before final review: **210 Mobile tests**, typecheck, fresh Hermes Android export **772 modules / approximately 3 MB / 11 assets** and x86_64 debug native assembly passed (204 tasks). Installed SDK-compatible native media/sharing dependencies and regenerated Android without clean. Initial missing-import failures in five tracer modules were not valid behavior RED; the ledger corrects this evidence rather than claiming perfect TDD history.
+- Final source review completed in one fresh context: corrected native image construction, Studio read navigation, Android Back, same-language chapter navigation, stale post/vote SSE reconciliation and creator/source labels. Regraded lost Reader mode/RTL/zoom as Important and preserved preferences across chapters. Observed behavior RED→GREEN, including actual React component/controller flows with OS boundaries substituted; **218/218 tests**, typecheck and post-fix Hermes Android export passed. Populated web/native comparisons, real provider/captcha/payment/translation and signed physical-device acceptance S10/S29 remain open. Env validation still misses three public variables; no secrets copied or exposed. No commits, issue closure or additional Backend/Frontend/MIT source edits in this increment. See [feature/status mapping](Mobile/docs/2026-10-04-native-full-implementation.md), [ledger](Mobile/docs/2026-10-03-native-completion-ledger.md), [ADR 030](docs/adr/030-mobile-native-account-community-and-creator-contracts.md) and [impact report](docs/reports/system-impact-report.md).
+
+## ภาษาไทย
+
+- เพิ่ม native collections/history CSV และ OS sharing รีวิว/คอมเมนต์รายหน้า/รายงาน/โหวตแปล profiles/banner/follows เช็กอิน/แจ้งเตือน/preferences/สถิติ account security ที่รองรับครบ Community CRUD/รูป/replies/votes/SSE creator Studio/uploads/publish/earnings และทีมงาน users/content/transactions/audit เดิม ยึด source responsive mobile กับ DESIGN.md คง contracts server/บัญชี/ธุรกิจ
+- ตรวจก่อน final review: **Mobile 210 tests**, typecheck, Hermes Android export ใหม่ **772 modules / ประมาณ 3 MB / assets 11 ไฟล์** และประกอบ debug native x86_64 ผ่าน (204 tasks) ติดตั้ง media/sharing dependencies ที่เข้ากับ SDK และ generate Android ใหม่โดยไม่ clean Missing-import failures แรกของ tracers ห้าตัวไม่ใช่ behavior RED ที่ถูกต้อง แก้หลักฐานใน ledger โดยไม่อ้างประวัติ TDD สมบูรณ์
+- Review source สุดท้ายใช้บริบทใหม่หนึ่งตัวแล้ว แก้ native image construction navigation อ่าน Studio Android Back การเปลี่ยนตอนภาษาเดียว SSE post/vote เก่าทับใหม่และ labels creator/source ยกระดับ preferences mode/RTL/zoom หายเป็น Important และคงข้ามตอน พบ behavior RED→GREEN จริงรวม flow components/controllers React ที่จำลองเฉพาะขอบ OS **218/218 tests**, typecheck และ Hermes Android หลังแก้ผ่าน ยังเปิดภาพ populated web/native บริการ provider/captcha/payment/translation จริงและ signed physical-device acceptance S10/S29 Validate env ยังขาด public variables สามค่า ไม่คัดลอกหรือเผย secrets ไม่มี commit/ปิด issue หรือเพิ่ม source changes Backend/Frontend/MIT รอบนี้ ดู [mapping ฟีเจอร์/สถานะ](Mobile/docs/2026-10-04-native-full-implementation.md), [ledger](Mobile/docs/2026-10-03-native-completion-ledger.md), [ADR 030](docs/adr/030-mobile-native-account-community-and-creator-contracts.md), [impact report](docs/reports/system-impact-report.md)
