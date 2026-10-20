@@ -145,6 +145,15 @@ _OPENERS = frozenset('([“‘「『')
 _CLOSERS = frozenset(')]”’」』,.!?:;…‥⁉‼⁈⁇！？、。')
 
 
+@functools.lru_cache(maxsize=4096)
+def _is_thai_word(token: str) -> bool:
+    try:
+        from pythainlp.tokenize.core import word_dict_trie
+        return token in word_dict_trie()
+    except Exception:
+        return True
+
+
 def _glue_thai_tokens(tokens: List[str]) -> List[str]:
     """Join tokens that must not be separated by a line break: a prefix morpheme or an opening
     bracket/quote with the next token, and a repetition mark (ๆ/ฯ), a demonstrative, punctuation
@@ -161,7 +170,8 @@ def _glue_thai_tokens(tokens: List[str]) -> List[str]:
             opener, closer = not quote_open, quote_open
             quote_open = not quote_open
         demonstrative = core in _THAI_DEMONSTRATIVES and not (out and out[-1].endswith(' '))
-        if out and (bind_next or tok[0] in 'ๆฯ' or closer or demonstrative):
+        lone = len(core) == 1 and _THAI_RE.search(core) and not _is_thai_word(core)  # newmm's 'ซิ|ด'
+        if out and (bind_next or tok[0] in 'ๆฯ' or closer or demonstrative or lone):
             out[-1] += tok
         else:
             out.append(tok)

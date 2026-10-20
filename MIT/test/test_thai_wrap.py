@@ -456,3 +456,14 @@ def test_render_rewrap_follows_the_layouts_dictionary_breaks_816():
     thai = 'เทพธิดาพวกนั้นช่างน่ารังเกียจนัก!'
     assert _render_wrap_width(20, thai, 'THA', 68.0, 4) <= (68 + 1) * 4
     assert _render_wrap_width(20, 'HELLO THERE', 'en_US', 200.0, 4) == 800
+
+
+def test_a_lone_out_of_dictionary_character_never_starts_a_piece():
+    """KP A/B 2026-10-21 (Kage p1): newmm split the name 'ซิด' into 'ซิ' + 'ด' (a single character that
+    is not a word) and the gap became a break point — 'เฮ้ ซิ / ด!!'. A one-character non-word glues
+    back. (Names made of dictionary syllables — 'ระ|คุ', 'ทา|เค|ชิ' — are not separable this way.)"""
+    if not _HAS_PYTHAINLP:
+        return
+    pieces = _insert_thai_word_breaks('เฮ้ ซิด!!').split(_ZWSP)
+    assert any('ซิด' in p for p in pieces), pieces
+    assert _insert_thai_word_breaks('ฉันเดินไป').count(_ZWSP) == 2   # real words still break
