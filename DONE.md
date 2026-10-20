@@ -3,6 +3,20 @@
 
 ---
 
+## #693 — SFX rescue gate: ADR 026 Addendum guard restored on integrate (2026-10-20)
+
+**What:** `MIT/manga_translator/manga_translator.py` rescue site now gates via `ocr_vlm.should_rescue_sfx`
+(det_sfx provenance + real-text guard + size) instead of landing's `sfx_merge.should_sfx_rescue`
+(provenance only), which was removed with its 2 tests. Dev decision on #693.
+**Why:** landing's gate scored 5/12 on the documented defect set vs 11/12
+(`docs/reports/benchmarks/2026-07-28-679-sfx-gate.md`); it would send det_sfx false-positives on
+speech bubbles (`W`, `THE`) to the gateway the moment a vision-capable model is configured.
+**Validation:** `test_026_addendum_real_text_guard_is_on_the_rescue_path` red → green; full MIT suite
+806 passed, 1 skipped (Papago live-scrape test deselected — external).
+**Render:** neutral today — the rescue returns `''` on the configured model (2026-07-28 benchmark B).
+Trade-off: One-Punch `ぬ` (read `X`) not rescued. **Deferred:** the Addendum's DROP half → #754 (changes
+render vs baseline, needs its own benchmark). ADR 026 amended.
+
 ## #694 — SFX rescue says why it returned nothing (2026-09-26)
 
 **What:** `MIT/manga_translator/ocr_vlm.py` `vlm_localize_sfx` now logs one `WARNING` when the

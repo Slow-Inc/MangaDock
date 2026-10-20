@@ -45,7 +45,7 @@ def test_278_sfx_provenance_gate_is_called_by_the_driver():
     # that misreads short dialogue in a big bubble as SFX and overwrites it with an onomatopoeia.
     #
     # #679: this used to assert the literal symbol `should_rescue_sfx`. Two implementations of the
-    # same gate exist — `ocr_vlm.should_rescue_sfx` (main, on `from_sfx_detection`) and
+    # same gate existed (landing's was removed in #693) — `ocr_vlm.should_rescue_sfx` (main, on `from_sfx_detection`) and
     # `sfx_merge.should_sfx_rescue` (landing, on `region.is_sfx`) — so pinning one name made the
     # guard fire on a deliberate, benchmarked swap (7e78341e) and accuse the driver of a revert
     # that had not happened. Which implementation is canonical is an ADR 026 decision, not

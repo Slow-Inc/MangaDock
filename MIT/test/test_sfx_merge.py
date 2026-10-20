@@ -76,29 +76,7 @@ def test_sfx_box_far_from_text_still_kept():
     assert dedup_sfx_boxes(existing, candidate) == [(300, 300, 400, 400)]
 
 
-# ---- #278: gate SFX rescue on det_sfx provenance, not a length heuristic ----
-
-class _Region:
-    def __init__(self, text, xyxy, is_sfx=False):
-        self.text, self.xyxy, self.is_sfx = text, xyxy, is_sfx
-
-
-def test_should_sfx_rescue_only_for_provenance_regions():
-    from manga_translator.sfx_merge import should_sfx_rescue
-    # a det_sfx-provenance region (appended by merge_sfx_detections) -> rescue
-    sfx = _Region('ﾄﾞ', (10, 10, 120, 120), is_sfx=True)
-    assert should_sfx_rescue(sfx) is True
-    # short dialogue in a large bubble ('は？', 'HUH?') -> NOT SFX -> no rescue
-    dialogue = _Region('は？', (0, 0, 200, 200), is_sfx=False)
-    assert should_sfx_rescue(dialogue) is False
-
-
-def test_should_sfx_rescue_missing_flag_defaults_false():
-    from manga_translator.sfx_merge import should_sfx_rescue
-    class Bare:  # a region that never got the attribute
-        text, xyxy = 'おい', (0, 0, 90, 90)
-    assert should_sfx_rescue(Bare()) is False
-
+# ---- #278: det_sfx provenance reaches the merged region ----
 
 def test_is_sfx_provenance_propagates_through_textline_merge():
     # merge_sfx_detections flags SFX textlines is_sfx=True; the flag must reach the merged

@@ -798,34 +798,30 @@ class MangaTranslator:
             # custom_openai/9arm vision gateway and keep it. (The old code nested the rescue inside
             # the filter, which only caught SFX when the misread happened to match the target script
             # — i.e. English — so SFX were dropped, leaving the raw JP glyph, for TH/ZH/KO.)
-            # #626 baseline-parity: LANDING's rescue gate (sfx_merge.should_sfx_rescue reads
-            # region.is_sfx provenance; size-gated). main's variant added a det_sfx
-            # false-positive DROP (ocr_read_real_text) that changed output vs the landing
-            # baseline — measured: the One-Punch ぬ SFX OCR'd as "X" was dropped before the
-            # VLM rescue, so no SLURP/LOOM rendered (baseline renders it). Per the dev hard
-            # constraint (quality == baseline), landing's behavior is restored verbatim.
-            from .sfx_merge import should_sfx_rescue
-            if config.ocr.vlm_rescue and should_sfx_rescue(region):
-                x1, y1, x2, y2 = (int(v) for v in region.xyxy)
-                if (x2 - x1) * (y2 - y1) >= 3600 and min(x2 - x1, y2 - y1) >= 24:
-                    from .ocr_vlm import vlm_localize_sfx
-                    from .translators.keys import (CUSTOM_OPENAI_API_BASE,
-                                                   CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
-                    crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
-                    if crop.size:
-                        rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
-                                                   api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
-                                                   target_lang=config.translator.target_lang)
-                        if rescued:
-                            logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
-                            # The rescue produced the FINAL SFX in the target language. Pre-setting
-                            # text+translation makes source_lang auto-derive as the target so the
-                            # translate stage skips it, and filter_translated_regions keeps it.
-                            region.text = rescued
-                            region.translation = rescued
-                            region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
-                            new_text_regions.append(region)
-                            continue
+            # #693: gated by should_rescue_sfx — det_sfx provenance + ADR 026 Addendum real-text
+            # guard (no phantom SFX over an ASCII-read bubble) + size. See ADR 026.
+            from .ocr_vlm import should_rescue_sfx
+            x1, y1, x2, y2 = (int(v) for v in region.xyxy)
+            if should_rescue_sfx(region.text, getattr(region, 'from_sfx_detection', False),
+                                 x2 - x1, y2 - y1, config.ocr.vlm_rescue):
+                from .ocr_vlm import vlm_localize_sfx
+                from .translators.keys import (CUSTOM_OPENAI_API_BASE,
+                                               CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
+                crop = ctx.img_rgb[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
+                if crop.size:
+                    rescued = vlm_localize_sfx(crop, api_base=CUSTOM_OPENAI_API_BASE,
+                                               api_key=CUSTOM_OPENAI_API_KEY, model=CUSTOM_OPENAI_MODEL,
+                                               target_lang=config.translator.target_lang)
+                    if rescued:
+                        logger.info(f'[OcrVLM] rescued SFX region "{region.text}" -> "{rescued}"')
+                        # The rescue produced the FINAL SFX in the target language. Pre-setting
+                        # text+translation makes source_lang auto-derive as the target so the
+                        # translate stage skips it, and filter_translated_regions keeps it.
+                        region.text = rescued
+                        region.translation = rescued
+                        region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
+                        new_text_regions.append(region)
+                        continue
 
             if len(region.text) < config.ocr.min_text_length \
                     or not is_valuable_text(region.text) \

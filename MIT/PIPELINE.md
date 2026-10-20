@@ -348,7 +348,8 @@ ink-fraction both destroyed a character figure) — only erase inside VERIFIED w
 - `sfx_merge.py` — `should_sfx_rescue(region)` (#278): gate the target-independent SFX rescue on `is_sfx`
   PROVENANCE (set on the det_sfx textlines in `merge_sfx_detections`, propagated to the region in
   `textline_merge`) not `len(text)<=4`, so short dialogue in a big bubble is no longer sent to the vision
-  gateway. `ocr_vlm.sanitize_sfx` now drops refusals on non-Latin targets too (`_SFX_REFUSALS`).
+  gateway. **Removed 2026-10-20 (#693):** the rescue gates on `ocr_vlm.should_rescue_sfx` (ADR 026 +
+  Addendum real-text guard) instead. `ocr_vlm.sanitize_sfx` now drops refusals on non-Latin targets too (`_SFX_REFUSALS`).
 - `ocr_rescue.py` (**new**, #172) — pure ML-free OCR rescue ladder: `ocr_rescue_steps(prob, aspect)` (which
   steps fire), `split_overlong_box` (tile a long-thin line for shorter 48px reads), `rejoin_segment_reads`.
   The OCR-flow wiring (split→OCR→rejoin) is the pending integration half.

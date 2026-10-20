@@ -1,5 +1,18 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-20 — #693: SFX rescue gate = ocr_vlm.should_rescue_sfx on integrate (quality guard)
+
+**What & where:** `MIT/manga_translator/manga_translator.py` (rescue call site), removed
+`sfx_merge.should_sfx_rescue` + 2 tests; ADR 026 amended; comment/doc touch-ups.
+**Why:** restore ADR 026's Addendum real-text guard (dev decision, #693).
+**Before → after:** det_sfx region read as ASCII on a bubble → *before:* eligible for the vision
+rescue (phantom SFX risk); *after:* not rescued. ≤2-char non-ASCII read without provenance in a large
+box → *after:* eligible (landing never rescued it) — inert while the rescue is unserved.
+**Perf Δ:** none measurable (one regex per region when `vlm_rescue` is on).
+**Quality:** render-neutral on the current model; gate 11/12 vs 5/12 on the documented set.
+**Validation:** guard test red → green; MIT suite 806 passed.
+**Risk / follow-up:** One-Punch `ぬ` not rescued (accepted); DROP half #754; bubble-overlap gate open.
+
 ## 2026-09-26 — #694: SFX rescue logs why a reply produced no SFX (observability)
 
 **What & where:** `MIT/manga_translator/ocr_vlm.py` (`vlm_localize_sfx`, ~10 lines),

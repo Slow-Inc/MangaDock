@@ -75,7 +75,8 @@ def ocr_read_real_text(stripped_text: str) -> bool:
     proof the OCR succeeded on real characters: a dialogue fragment or a det_sfx false-positive
     sitting on a speech bubble — NOT a dropped glyph. Used to (a) skip the vision rescue and
     (b) drop the det_sfx false-positive so its literal fragment ('W'→'ว') is not translated and
-    rendered over the dialogue bubble (#278). Pure."""
+    rendered over the dialogue bubble (#278). On integrate/render-reconcile only (a) is wired;
+    (b) is tracked in #754. Pure."""
     return bool(re.search(r'[A-Za-z0-9]', stripped_text or ''))
 
 
