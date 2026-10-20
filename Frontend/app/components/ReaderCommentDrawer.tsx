@@ -178,12 +178,12 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePost(e); } }}
                 placeholder="เขียนความคิดเห็น..."
                 rows={2}
-                className="flex-1 resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 placeholder-white/25 outline-none transition focus:border-indigo-500/50"
+                className="flex-1 resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 placeholder-white/25 outline-none transition focus:border-ink-3"
               />
               <button
                 type="submit"
                 disabled={posting || !text.trim()}
-                className="self-end rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition enabled:hover:bg-indigo-500 disabled:opacity-40"
+                className="self-end rounded-xl bg-ink px-3 py-2 text-sm font-medium text-bg transition enabled:hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] disabled:opacity-40"
               >
                 ส่ง
               </button>

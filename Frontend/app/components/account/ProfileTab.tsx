@@ -93,7 +93,7 @@ export default function ProfileTab({ formState, dispatch, isOpen }: ProfileTabPr
             </div>
             <Link
               href="/studio"
-              className="rounded-xl border border-indigo-500/40 bg-indigo-600/20 px-3 py-1.5 text-xs font-semibold text-indigo-300 transition hover:bg-indigo-600/30"
+              className="rounded-xl border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent transition hover:bg-accent/20"
             >
               {isTranslator ? "เปิดสตูดิโอ" : "สมัคร"}
             </Link>

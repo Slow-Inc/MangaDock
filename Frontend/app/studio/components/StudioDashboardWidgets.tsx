@@ -145,8 +145,8 @@ function EmptyChartState({ label }: { label: string }) {
 
 export function LineChart({
   points,
-  stroke = "#818cf8",
-  fill = "rgba(129,140,248,0.16)",
+  stroke = "#3987e5",
+  fill = "rgba(57,135,229,0.16)",
   valueFormatter = formatCompactNumber,
 }: {
   points: ChartPoint[];
@@ -273,7 +273,7 @@ export function GroupedBarChart({
                   width={barWidth}
                   height={incomeHeight}
                   rx="4"
-                  fill="#818cf8"
+                  fill="#3987e5"
                 />
                 <rect
                   x={groupX + 2}

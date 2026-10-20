@@ -20,10 +20,10 @@ const LIMIT = 20;
 
 function RoleBadge({ role }: { role: number }) {
   const cls =
-    role === 9 ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+    role === 9 ? 'bg-fill text-ink border-ink-3' :
     role === 8 ? 'bg-red-500/10 text-red-400 border-red-500/20' :
     role === 2 ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-    role === 1 ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+    role === 1 ? 'bg-accent/10 text-accent border-accent/40' :
     'bg-white/5 text-white/40 border-white/10';
   return <span className={`text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{ROLE_LABEL[role] ?? role}</span>;
 }
@@ -270,7 +270,7 @@ export default function AdminUsersPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-white text-xs">{detail.walletBalance.toLocaleString()} coins</span>
                         <button onClick={() => { setAdjustOpen(v => !v); setAdjustDelta(''); setAdjustReason(''); }}
-                          className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors">
+                          className="text-[11px] text-accent hover:text-ink transition-colors">
                           {adjustOpen ? 'Cancel' : 'Edit'}
                         </button>
                       </div>
@@ -279,14 +279,14 @@ export default function AdminUsersPage() {
                       <div className="pb-3 space-y-2">
                         <input type="number" value={adjustDelta} onChange={e => setAdjustDelta(e.target.value)}
                           placeholder="+100 or -50"
-                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:border-indigo-500/40 transition-colors" />
+                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:border-ink-3 transition-colors" />
                         <input value={adjustReason} onChange={e => setAdjustReason(e.target.value)}
                           placeholder="Reason (required)…"
-                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:border-indigo-500/40 transition-colors" />
+                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:border-ink-3 transition-colors" />
                         <div className="flex justify-end">
                           <button onClick={submitAdjust}
                             disabled={adjusting || !adjustDelta || !adjustReason.trim() || parseInt(adjustDelta, 10) === 0 || isNaN(parseInt(adjustDelta, 10))}
-                            className="text-xs px-3 py-1.5 bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 rounded-lg hover:bg-indigo-500/25 transition-colors disabled:opacity-35 font-medium">
+                            className="text-xs px-3 py-1.5 bg-accent/10 text-accent border border-accent/40 rounded-lg hover:bg-accent/20 transition-colors disabled:opacity-35 font-medium">
                             {adjusting ? 'Applying…' : 'Apply'}
                           </button>
                         </div>

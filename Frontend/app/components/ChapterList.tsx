@@ -79,7 +79,7 @@ function ChapterRowInner({
       )}
       {ch.source === "user" && (
         <span
-          className="shrink-0 rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-medium text-purple-300"
+          className="shrink-0 rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent"
           title={ch.translatorName ? `แปลโดย ${ch.translatorName}` : "แปลโดยผู้ใช้"}
         >
           {ch.translatorName ? ch.translatorName : "ผู้ใช้แปล"}

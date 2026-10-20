@@ -68,7 +68,7 @@ export default function FollowUserButton({ targetUid }: Props) {
       className={`flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-semibold transition ${
         following
           ? "border-white/20 bg-white/8 text-white/70 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
-          : "border-indigo-500/50 bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/35"
+          : "border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
       }`}
     >
       {following ? (

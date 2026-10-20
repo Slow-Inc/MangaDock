@@ -26,7 +26,7 @@ export default function ReviewCard({ review, isOwn, onDelete }: Props) {
   const initials = (review.displayName ?? "?").slice(0, 2).toUpperCase();
 
   return (
-    <div className={`rounded-xl border p-4 ${isOwn ? "border-indigo-500/40 bg-indigo-500/5" : "border-white/8 bg-white/3"}`}>
+    <div className={`rounded-xl border p-4 ${isOwn ? "border-accent/40 bg-accent/10" : "border-white/8 bg-white/3"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           {review.photoUrl ? (
@@ -41,7 +41,7 @@ export default function ReviewCard({ review, isOwn, onDelete }: Props) {
           <div>
             <p className="text-sm font-semibold text-white/90">
               {review.displayName ?? "ผู้ใช้ไม่ระบุชื่อ"}
-              {isOwn && <span className="ml-1.5 text-xs font-medium text-indigo-400">คุณ</span>}
+              {isOwn && <span className="ml-1.5 text-xs font-medium text-accent">คุณ</span>}
             </p>
             <p className="text-xs text-white/35">{timeAgo(review.createdAt)}</p>
           </div>

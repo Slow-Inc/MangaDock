@@ -28,7 +28,7 @@ const ACTION_COLOR: Record<string, string> = {
   unban_user: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   delete_post: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
   delete_comment: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  change_role: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  change_role: 'bg-accent/10 text-accent border-accent/40',
   approve_content: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   reject_content: 'bg-red-500/10 text-red-400 border-red-500/20',
 };
