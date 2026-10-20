@@ -101,9 +101,9 @@ function GridCard({ book }: { book: GridBook }) {
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowModal(true); }}
-            className="line-clamp-2 w-full rounded-sm text-left text-xs font-semibold leading-snug text-ink transition-colors duration-200 group-hover:text-ink"
+            className="block w-full rounded-sm text-left text-xs font-semibold leading-snug text-ink transition-colors duration-200 group-hover:text-ink"
           >
-            {book.title}
+            <span className="line-clamp-2">{book.title}</span>
           </button>
           {book.authors?.length > 0 && (
             <p className="line-clamp-1 text-[10px] text-ink-3">

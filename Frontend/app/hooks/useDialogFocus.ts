@@ -4,11 +4,14 @@ import { useEffect, type RefObject } from "react";
 
 /**
  * Where Tab should land when it would leave the dialog (#837): the last control wraps to the first, Shift+Tab on
- * the first wraps to the last, focus that is outside the dialog (index -1) is pulled back in. null = let the
- * browser move focus normally.
+ * the first wraps to the last, focus that was lost (index -1, on <body>) is pulled back in. Focus inside another
+ * layer opened from the dialog (the reader, a lightbox — portals outside it) is left alone. null = let the browser
+ * move focus normally.
  */
-export function focusWrapTarget({ index, count, backwards }: { index: number; count: number; backwards: boolean }): number | null {
-  if (count === 0) return null;
+export function focusWrapTarget({ index, count, backwards, focusInOtherLayer = false }: {
+  index: number; count: number; backwards: boolean; focusInOtherLayer?: boolean;
+}): number | null {
+  if (count === 0 || focusInOtherLayer) return null;
   if (index === -1) return backwards ? count - 1 : 0;
   if (!backwards && index === count - 1) return 0;
   if (backwards && index === 0) return count - 1;
@@ -33,8 +36,10 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, isTop: () => 
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !isTop() || !ref.current) return;
       const items = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0); // visible (offsetParent is null for fixed elements)
-      const index = items.indexOf(document.activeElement as HTMLElement);
-      const target = focusWrapTarget({ index, count: items.length, backwards: e.shiftKey });
+      const active = document.activeElement;
+      const index = items.indexOf(active as HTMLElement);
+      const focusInOtherLayer = !!active && active !== document.body && !ref.current.contains(active);
+      const target = focusWrapTarget({ index, count: items.length, backwards: e.shiftKey, focusInOtherLayer });
       if (target === null) return;
       e.preventDefault();
       items[target].focus();

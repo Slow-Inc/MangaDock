@@ -16,6 +16,10 @@ describe("focusWrapTarget: Tab stays inside the dialog (#837)", () => {
     expect(focusWrapTarget({ index: 2, count: 5, backwards: false })).toBeNull();
     expect(focusWrapTarget({ index: 2, count: 5, backwards: true })).toBeNull();
   });
+  test("focus inside another layer opened from the dialog (reader, lightbox) is left alone", () => {
+    expect(focusWrapTarget({ index: -1, count: 5, backwards: false, focusInOtherLayer: true })).toBeNull();
+    expect(focusWrapTarget({ index: -1, count: 5, backwards: true, focusInOtherLayer: true })).toBeNull();
+  });
   test("no focusable controls: nothing to do", () => {
     expect(focusWrapTarget({ index: -1, count: 0, backwards: false })).toBeNull();
   });

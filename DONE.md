@@ -15,7 +15,7 @@ title is now a `<button>` (mouse behaviour unchanged).
 **Validated:** `useDialogFocus.test.ts` red → green (5 cases). Production build, keyboard only: Tab to a grid title →
 Enter opens the popup with focus inside; 80 Tabs / 20 Shift+Tabs never leave it (24 stops); Escape closes and focus is
 back on the title. Stacked: related manga opened from the popup → 2 dialogs, 40 Tabs stay in the top one, Escape →
-focus back on that related button. axe: no new violations.
+focus back on that related button; the reader opened from the popup keeps its own Tab order (0 of 12 Tabs pulled back). axe: no new violations.
 
 ---
 
