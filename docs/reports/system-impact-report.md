@@ -1,5 +1,31 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-20 — #722: identity-change reset has one owner (refactor)
+
+**What & where:** new `Frontend/app/lib/identityReset.ts` (+ `identityReset.test.ts`);
+`Frontend/app/contexts/AuthContext.tsx` four call sites → one call; `Frontend/tests/oauth-regression.test.cjs`
+import allow-list; ADR 015.
+
+**Why:** the same four cache clears were written out at four sites and had drifted once; a missing
+clear means cross-account data bleed.
+
+**Before → After:** 4 sites × 4 calls → 4 sites × 1 call; the order and the calls themselves are
+unchanged (`clearHistory({syncRemote: false})` as #712 left it).
+
+**Performance Δ:** none — same calls, one extra function frame.
+
+**Quality:** no behaviour change on any path; a forgotten cache is now one missing line in one file,
+pinned by tests over the real cache modules.
+
+**Validation:** 2 tests red → green, 4/4 mutations killed; `test:auth` 12/12; `bun test` 239 pass
+(8 known `app/docs` integration failures); sign-out in the browser issues no history `DELETE`.
+
+**Risk / rollback:** low; rollback = revert. #720 is closed as shipped by #712 rather than by its own branch.
+
+**Links:** #722, #720, #712, ADR 015.
+
+---
+
 ## 2026-09-26 — #694: SFX rescue logs why a reply produced no SFX (observability)
 
 **What & where:** `MIT/manga_translator/ocr_vlm.py` (`vlm_localize_sfx`, ~10 lines),
