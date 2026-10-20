@@ -183,7 +183,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     : etaSec !== null
       ? `เหลือ ${formatEta(etaSec)}`
       : null;
-  const [imgLoading, setImgLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   // Default to continuous mode on mobile (< 640px) for better UX
   const [continuousMode, setContinuousMode] = useState(() =>
@@ -256,7 +255,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     zoomReset,
     resetZoomAndPan,
     continuousLenisRef,
-    refs: { scrollContainerRef, continuousContentRef, pageRefs, continuousModeRef },
+    refs: { zoomWrapperRef, scrollContainerRef, continuousContentRef, pageRefs, continuousModeRef },
   } = viewport;
 
   // Auto-scroll bottom strip to keep current page button visible
@@ -1091,8 +1090,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                 translatingCurrentPageIndex={translatingCurrentPageIndex}
                 currentStage={currentStage}
                 translateDetail={translateDetail}
-                imgLoading={imgLoading}
-                setImgLoading={setImgLoading}
                 hasNextSameLang={hasNextSameLang}
                 hasNextOtherLang={hasNextOtherLang}
                 nextSameLang={nextSameLang}
@@ -1106,7 +1103,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           </div>
         ) : (
           /* ── Paged mode ── */
-          <div className={`relative flex flex-1 items-center justify-center overflow-hidden ${zoom > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : ""}`}>
+          /* zoomWrapperRef holds the zoom/pan CSS vars; every .manga-zoom-wrapper
+             below inherits them, so side-by-side panels zoom/drag in lockstep (#662). */
+          <div ref={zoomWrapperRef} className={`relative flex flex-1 items-center justify-center overflow-hidden ${zoom > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : ""}`}>
             {loading && (
               <div className="flex flex-col items-center gap-3 text-ink-2">
                 <Loader context="page" />
@@ -1153,8 +1152,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         translatingCurrentPageIndex={translatingCurrentPageIndex}
                         currentStage={currentStage}
                         translateDetail={translateDetail}
-                        imgLoading={imgLoading}
-                        setImgLoading={setImgLoading}
                         hasNextSameLang={hasNextSameLang}
                         hasNextOtherLang={hasNextOtherLang}
                         nextSameLang={nextSameLang}
@@ -1183,8 +1180,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         translatingCurrentPageIndex={translatingCurrentPageIndex}
                         currentStage={currentStage}
                         translateDetail={translateDetail}
-                        imgLoading={imgLoading}
-                        setImgLoading={setImgLoading}
                         hasNextSameLang={hasNextSameLang}
                         hasNextOtherLang={hasNextOtherLang}
                         nextSameLang={nextSameLang}
@@ -1212,8 +1207,6 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                     translatingCurrentPageIndex={translatingCurrentPageIndex}
                     currentStage={currentStage}
                     translateDetail={translateDetail}
-                    imgLoading={imgLoading}
-                    setImgLoading={setImgLoading}
                     hasNextSameLang={hasNextSameLang}
                     hasNextOtherLang={hasNextOtherLang}
                     nextSameLang={nextSameLang}

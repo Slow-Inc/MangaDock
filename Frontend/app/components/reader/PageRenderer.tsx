@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, type Dispatch, type SetStateAction } from "react";
+import { memo, useState, type Dispatch, type SetStateAction } from "react";
 import type { ReaderViewport } from "../../hooks/useReaderViewport";
 import type { ChapterPages } from "../MangaReader";
 import Loader from "../ui/Loader";
@@ -35,8 +35,6 @@ export interface PageRendererProps {
   translatingCurrentPageIndex: number | null;
   currentStage: { pageIndex: number; stage: string } | null;
   translateDetail: string;
-  imgLoading: boolean;
-  setImgLoading: (v: boolean) => void;
   hasNextSameLang: boolean;
   hasNextOtherLang: boolean;
   nextSameLang: ChapterPageItem | null;
@@ -74,8 +72,6 @@ function PageRendererImpl({
   translatingCurrentPageIndex,
   currentStage,
   translateDetail,
-  imgLoading,
-  setImgLoading,
   hasNextSameLang,
   hasNextOtherLang,
   nextSameLang,
@@ -86,8 +82,11 @@ function PageRendererImpl({
 }: PageRendererProps) {
   const {
     zoom,
-    refs: { zoomWrapperRef, pageRefs },
+    refs: { pageRefs },
   } = viewport;
+  // Per-instance (#662): side-by-side mounts two PageRenderers, and a shared
+  // flag let one panel's onLoad/onLoadStart flip the other's spinner.
+  const [imgLoading, setImgLoading] = useState(true);
 
   if (continuousMode) {
     return (
@@ -186,7 +185,9 @@ function PageRendererImpl({
 
   return (
     <>
-      <div ref={zoomWrapperRef} className="manga-zoom-wrapper relative flex items-center justify-center select-none">
+      {/* Zoom/pan CSS vars are inherited from the paged container in
+          MangaReader (zoomWrapperRef), so both side-by-side panels move together (#662). */}
+      <div className="manga-zoom-wrapper relative flex items-center justify-center select-none">
         {imgLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader context="section" />
