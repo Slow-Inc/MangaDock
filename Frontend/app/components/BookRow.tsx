@@ -209,13 +209,13 @@ function BookCard({
               {translatedDesc && !showOriginalDesc ? truncate(stripMarkdown(translatedDesc), 120) : truncate(stripMarkdown(book.description), 120)}
             </p>
             {translatingDesc && (
-              <div className="flex items-center gap-2">
+              <div className="flex h-4 items-center gap-2">
                 <Loader context="inline" label="กำลังแปลคำโปรย" className="text-ink-3" />
                 <ModelBadge model={descModel} small />
               </div>
             )}
             {translatedDesc && !translatingDesc && (
-              <div className="flex items-center gap-2">
+              <div className="flex h-4 items-center gap-2">
                 <ModelBadge model={descModel} small />
                 <button
                   onClick={() => setShowOriginalDesc((v) => !v)}
