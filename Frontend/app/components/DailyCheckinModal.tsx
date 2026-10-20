@@ -7,7 +7,7 @@ import { PRIMARY_FILL } from "./ui/Button";
 import { Flame } from "lucide-react";
 import Coin from "./ui/Coin";
 import Mascot from "./mascot/Mascot";
-import { utcDayKey } from "../lib/dailyCheckin";
+import { checkinErrorMessage, utcDayKey } from "../lib/dailyCheckin";
 
 type Status = { checkedInToday: boolean; streakDay: number; coinsToday: number };
 
@@ -38,6 +38,7 @@ export default function DailyCheckinModal() {
   const [status, setStatus] = useState<Status | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -66,8 +67,10 @@ export default function DailyCheckinModal() {
   async function handleClaim() {
     if (claiming) return;
     setClaiming(true);
+    setError("");
     try {
       const token = await getToken();
+      if (!token) { setError(checkinErrorMessage(401)); return; }
       const res = await fetch("/api/proxy/checkin", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -77,7 +80,16 @@ export default function DailyCheckinModal() {
         setStatus(data);
         setClaimed(true);
         localStorage.setItem(STORAGE_KEY, utcDayKey(new Date()));
+      } else {
+        setError(checkinErrorMessage(res.status));
+        // Already claimed today (e.g. in another tab): let the user close the modal.
+        if (res.status === 409) {
+          setClaimed(true);
+          localStorage.setItem(STORAGE_KEY, utcDayKey(new Date()));
+        }
       }
+    } catch {
+      setError(checkinErrorMessage(null));
     } finally {
       setClaiming(false);
     }
@@ -122,6 +134,8 @@ export default function DailyCheckinModal() {
               <p className="text-xs text-ink-3">เหรียญ{claimed ? " (รับแล้ว)" : ""}</p>
             </div>
           </div>
+
+          {error && <p className="mb-3 text-center text-xs text-danger">{error}</p>}
 
           {claimed ? (
             <button
