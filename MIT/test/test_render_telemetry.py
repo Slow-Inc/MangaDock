@@ -319,3 +319,22 @@ def test_a_clean_layout_block_is_fitted_into_its_narrow_balloon_832():
                                      font_size_max=20, clean_layout=True)
     x1, y1, x2, y2 = r.render_dst_box
     assert x2 - x1 <= 59 * 1.05 and x1 >= 58 - 1 and x2 <= 117 + 1, r.render_dst_box
+
+
+def test_a_dodge_that_narrows_the_space_relays_the_text_to_fit_it_795():
+    """Iruma p0 (2026-10-21): the balloon detector merged three balloons into one box; dodging the
+    neighbour shrank the free space to ~69 px but the 91 px block was only re-centred, so it still
+    ran into the next balloon's text. When the dodge leaves a narrower space, lay the text out to it."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1000, 800, 3), 255, np.uint8)
+    merged = (418.0, 367.0, 777.0, 610.0)
+    a = FakeRegion(horizontal=True, translation='แม้แต่ของฟรีที่ได้มาไม่พอจะรั้งเธอไว้ได้ตลอด',
+                   xyxy=(409.0, 485.0, 472.0, 626.0), bubble_box=merged, target_lang='THA', font_size=14)
+    b = FakeRegion(horizontal=True, translation='ถ้าเธอไม่มีพลังที่มีประโยชน์แบบนี้ ก็คงไม่มีใครคบกับตัวป่วนอย่างเธอ',
+                   xyxy=(489.0, 438.0, 607.0, 566.0), bubble_box=merged, target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [a, b], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    ax2 = a.render_dst_box[2]
+    assert ax2 <= 489.0 + 1, (a.render_dst_box, b.render_dst_box)

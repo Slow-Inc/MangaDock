@@ -542,20 +542,39 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 clean_fs, block_w, block_h = laid
                 x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
                 cx, cy = (x1f + x2f) / 2.0, (y1f + y2f) / 2.0
-                # anti-overlap: shift the upright block off any neighbour's territory.
+                # anti-overlap: the block must stay off every neighbour's territory (#795) and inside
+                # its own balloon when the region sits in one (Tsuki p1). The free space is the
+                # dodged box clipped to that balloon; if it is narrower than the block, the text is
+                # laid out again to fit it (Iruma p0: re-centring alone still overlapped).
                 if anti_overlap:
                     territories = _neighbor_territories(text_regions, i)
-                    cb = clamp_box_to_neighbors(
+                    free = list(clamp_box_to_neighbors(
                         (cx - block_w / 2.0, cy - block_h / 2.0,
-                         cx + block_w / 2.0, cy + block_h / 2.0), territories, margin=2)
-                    if (cb[2] - cb[0]) >= 6 and (cb[3] - cb[1]) >= 6:
-                        cx, cy = (cb[0] + cb[2]) / 2.0, (cb[1] + cb[3]) / 2.0
-                    # ...but never out of its own balloon when it fits there (Tsuki p1: a dodge
-                    # pushed 'ARE YOU SERIOUS?' 12 px past its balloon edge).
+                         cx + block_w / 2.0, cy + block_h / 2.0), territories, margin=2))
                     own = _box(getattr(region, 'bubble_box', None))
-                    if own is not None:
-                        cx = _clamp_center(cx, block_w, own[0], own[2])
-                        cy = _clamp_center(cy, block_h, own[1], own[3])
+                    if own is not None and own[0] <= cx <= own[2] and own[1] <= cy <= own[3]:
+                        free = [max(free[0], own[0]), max(free[1], own[1]),
+                                min(free[2], own[2]), min(free[3], own[3])]
+                    if (free[2] - free[0]) >= 6 and (free[3] - free[1]) >= 6:
+                        _free_w = free[2] - free[0]
+                        if _free_w < block_w - 1 and _free_w >= 2 * font_size_minimum:
+                            from types import SimpleNamespace
+                            _h = max(block_h, y2f - y1f)
+                            _proxy = SimpleNamespace(
+                                translation=region.translation,
+                                target_lang=getattr(region, 'target_lang', 'en_US'),
+                                font_size=getattr(region, 'font_size', 0),
+                                xyxy=(free[0], cy - _h / 2.0, free[2], cy + _h / 2.0))
+                            _relaid = _clean_layout_dst(_proxy, img.shape, font_size_minimum,
+                                                        font_size_max, page_shape, shrink_to_fit=True)
+                            if _relaid is not None and _relaid[1] <= _free_w * 1.05:
+                                clean_fs, block_w, block_h = _relaid
+                        if block_w <= _free_w + 0.5:
+                            cx = _clamp_center(cx, block_w, free[0], free[2])
+                        elif own is not None:      # cannot fit the free space: stay in the balloon
+                            cx = _clamp_center(cx, block_w, own[0], own[2])
+                        if own is not None:
+                            cy = _clamp_center(cy, block_h, own[1], own[3])
                 region.font_size = clean_fs
                 region._direction = 'h'
                 # #535 Phase-0c telemetry (additive, no behavior change).
