@@ -206,7 +206,7 @@ export default function WorksPage() {
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {view === "error" && (
-          <StudioLoadError what="ผลงาน" onRetry={() => { setLoadingVersions(true); fetchVersions(); }} />
+          <StudioLoadError what="ผลงาน" onRetry={() => { setLoadingVersions(true); return fetchVersions(); }} />
         )}
         <div className={view === "error" ? "hidden" : "space-y-5"}>
           <StudioSection title="ภาพรวมผลงาน" subtitle="สรุปจำนวนเรื่อง ตอน ภาษา และสถานะหลักก่อนลงไปจัดการรายละเอียด">

@@ -197,7 +197,7 @@ export default function StudioOverviewPage() {
         {view === "loading" ? (
           <StudioOverviewSkeleton />
         ) : view === "error" ? (
-          <StudioLoadError what="ข้อมูลสตูดิโอ" onRetry={() => { setLoadingData(true); fetchAll(); }} />
+          <StudioLoadError what="ข้อมูลสตูดิโอ" onRetry={() => { setLoadingData(true); return fetchAll(); }} />
         ) : tab === "summary" ? (
           <>
             <StudioSection
@@ -261,7 +261,7 @@ export default function StudioOverviewPage() {
             </StudioSection>
           </>
         ) : txUnknown ? (
-          <StudioLoadError what="ธุรกรรมกระเป๋าเงิน" onRetry={() => { setLoadingData(true); fetchAll(); }} />
+          <StudioLoadError what="ธุรกรรมกระเป๋าเงิน" onRetry={() => { setLoadingData(true); return fetchAll(); }} />
         ) : (
           <>
             <div className="grid gap-6 xl:grid-cols-2">
