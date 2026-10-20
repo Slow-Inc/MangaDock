@@ -21,6 +21,10 @@ Follow-up validation: clean `npm ci` from the unchanged lockfile, **235/235 Mobi
 
 ผลตรวจรอบแก้ scrutinize: `npm ci` ใหม่จาก lockfile เดิม **Mobile235/235**, TypeScript, env, format โค้ดที่แก้, tooling **58/58** และ Android Hermes export **773 modules / 11 assets** ผ่าน bundle ที่ถูกต้องมี helper nullable ใหม่ ส่วน export ผ่าน junction ที่ไม่นับไม่มี ตรวจไม่พบค่าลับที่ตรวจใน bundle ที่ถูกต้อง ไม่ได้รัน native APK assembly/interaction บนมือถือซ้ำ ให้ทำต่อจาก branch PR ที่อัปเดตและ build APK ใหม่ก่อนตรวจเครื่องจริง รอบนี้ไม่แก้ Backend/Frontend/MIT/dependency/provider/schema
 
+PR-body validation initially imported the CLI module from Node stdin, where its CLI guard requires a missing `process.argv[1]`; rerunning the canonical CLI with `PR_BODY` passed before publishing the bilingual update. The checker itself was not changed. The PR remains open; no merge or deployment was performed.
+
+การตรวจ body PR ครั้งแรก import โมดูล CLI ผ่าน stdin ซึ่งไม่มี `process.argv[1]` ที่ guard ของ CLI ต้องใช้ จึงรัน CLI ปกติด้วย `PR_BODY` ใหม่และผ่านก่อนเผยแพร่ body สองภาษา ไม่แก้ checker และคง PR เปิดไว้โดยไม่ merge หรือ deploy
+
 ## Plan and acceptance
 
 - [x] B1: reproduce empty successful API bodies, return null, retain malformed-response errors and verify signed-in review loading.
