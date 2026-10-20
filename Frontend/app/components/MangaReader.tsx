@@ -22,6 +22,9 @@ import TranslationFeedback from "./TranslationFeedback";
 import ReaderCommentDrawer from "./ReaderCommentDrawer";
 import ReportButton from "./ReportButton";
 import Loader from "./ui/Loader";
+import Mascot from "./mascot/Mascot";
+
+const MIT_OFFLINE_LABEL = "ระบบแปลออฟไลน์";
 
 export type ChapterPages = {
   pages: string[];
@@ -597,14 +600,12 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                     title={translating ? "หยุดแปล" : "เมนูการแปล"}
                     className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition ${triggerColorCls}`}
                   >
-                    {/* Status indicator */}
-                    {!translating && (
-                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                        mitStatus === "online" ? "bg-ok"
-                        : mitStatus === "offline" ? "bg-danger"
-                        : "bg-ink-3"
-                      }`} />
-                    )}
+                    {/* Status indicator — MIT offline: the reader's droid asleep (Epic D #783) */}
+                    {!translating && (mitStatus === "offline" ? (
+                      <Mascot area="reader" state="sleeping" size={14} paused interactive={false} label={MIT_OFFLINE_LABEL} />
+                    ) : (
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${mitStatus === "online" ? "bg-ok" : "bg-ink-3"}`} />
+                    ))}
                     {translating && (
                       <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 shrink-0"><rect x="6" y="6" width="12" height="12" /></svg>
                     )}
@@ -893,9 +894,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                     <div className="px-4 py-3">
                       <div className="mb-2 flex items-center gap-2">
                         <p className="text-xs font-semibold uppercase text-ink-3">การแปล AI</p>
-                        <span className={`h-1.5 w-1.5 rounded-full ${
-                          mitStatus === "online" ? "bg-ok" : mitStatus === "offline" ? "bg-danger" : "bg-ink-3"
-                        }`} />
+                        {mitStatus === "offline" ? (
+                          <Mascot area="reader" state="sleeping" size={14} paused interactive={false} label={MIT_OFFLINE_LABEL} />
+                        ) : (
+                          <span className={`h-1.5 w-1.5 rounded-full ${mitStatus === "online" ? "bg-ok" : "bg-ink-3"}`} />
+                        )}
                       </div>
 
                       {/* Language selector */}

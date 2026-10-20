@@ -4,6 +4,7 @@
  * A mascot from `bot-avatars` (MIT, Jakub Antalik). Canvas 2-D, no WebGL; the library pauses off-screen,
  * respects reduced motion and sets role="img" — we pass a Thai label for it.
  */
+import { memo } from "react";
 import { BotAvatar, type BotAvatarState } from "bot-avatars";
 import { CAST, type MascotArea, type MascotConfig } from "../../lib/mascot";
 
@@ -13,7 +14,11 @@ const LABEL: Record<BotAvatarState, string> = {
   sleeping: "มาสคอตกำลังพัก",
 };
 
-export default function Mascot({
+/**
+ * Memoised: bot-avatars redraws even a paused avatar on every render of its parent, and avatars sit in
+ * busy parents (the reader, the navbar). Pass a stable `config` (useMemo) for the memo to hold.
+ */
+export default memo(function Mascot({
   area,
   config,
   state = "default",
@@ -51,4 +56,4 @@ export default function Mascot({
       className={className}
     />
   );
-}
+});
