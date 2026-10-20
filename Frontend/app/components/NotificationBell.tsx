@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabase";
 import type { NotificationItem } from "../lib/notificationTypes";
+import Loader from "./ui/Loader";
 
 const POLL_INTERVAL = 60_000;
 
@@ -118,7 +119,9 @@ export default function NotificationBell() {
 
         <div className="max-h-96 overflow-y-auto">
           {loading ? (
-            <div className="py-8 text-center text-sm text-ink-3">กำลังโหลด...</div>
+            <div className="flex justify-center py-8 text-ink-3">
+              <Loader context="section" label="กำลังโหลดการแจ้งเตือน" />
+            </div>
           ) : items.length === 0 ? (
             <div className="py-8 text-center text-sm text-ink-3">ไม่มีการแจ้งเตือน</div>
           ) : (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ModelBadge from "./ModelBadge";
+import Loader from "./ui/Loader";
 import { translateDescription } from "../lib/translateDescription";
 import { stripMarkdown } from "../lib/markdownText";
 
@@ -35,7 +36,10 @@ export default function HeroDescription({ description }: { description: string }
       </p>
       <div className="flex items-center gap-2 h-5">
         {translating && (
-          <p className="text-[10px] text-ink-3">กำลังแปล...</p>
+          <>
+            <Loader context="inline" label="กำลังแปลคำโปรย" className="text-ink-3" />
+            <ModelBadge model={model} small />
+          </>
         )}
         {translated && !translating && (
           <>

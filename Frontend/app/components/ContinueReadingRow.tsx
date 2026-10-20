@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { getHistory, HISTORY_EVENT, type HistoryBook, patchThumbnailLocal } from "../lib/readingHistory";
 import BookDetailModal from "./BookDetailModal";
 import ModelBadge from "./ModelBadge";
+import Loader from "./ui/Loader";
 import MangaReader from "./MangaReader";
 import { useBookActions } from "../hooks/useBookActions";
 import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
@@ -194,7 +195,12 @@ function HistoryCard({
             <p className="line-clamp-3 text-xs leading-relaxed text-ink-2">
               {translatedDesc && !showOriginalDesc ? truncate(stripMarkdown(translatedDesc), 120) : truncate(stripMarkdown(book.description), 120)}
             </p>
-            {translatingDesc && <p className="text-[9px] text-ink-3">กำลังแปล...</p>}
+            {translatingDesc && (
+              <div className="flex items-center gap-2">
+                <Loader context="inline" label="กำลังแปลคำโปรย" className="text-ink-3" />
+                <ModelBadge model={descModel} small />
+              </div>
+            )}
             {translatedDesc && !translatingDesc && (
               <div className="flex items-center gap-2">
                 <ModelBadge model={descModel} small />

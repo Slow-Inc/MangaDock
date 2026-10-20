@@ -11,6 +11,8 @@ import { getHistory, type HistoryBook } from "../lib/readingHistory";
 import { resolvedThumbnail } from "../lib/imgUrl";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import { inputClass } from "../components/ui/Input";
+import Pill from "../components/ui/Pill";
+import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
 import type { LandingBook } from "../lib/types";
 import Mascot from "../components/mascot/Mascot";
 
@@ -102,14 +104,9 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
 // ─── FilterChip ───────────────────────────────────────────────────────────────
 function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-        active ? "bg-ink text-bg" : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
-      }`}
-    >
+    <Pill size="sm" selected={active} onClick={onClick} className="shrink-0 font-medium">
       {children}
-    </button>
+    </Pill>
   );
 }
 
@@ -491,10 +488,12 @@ function SearchResults() {
         {isLoading && (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="flex flex-col gap-2">
-                <div className="aspect-2/3 w-full animate-pulse rounded-xl bg-fill" />
-                <div className="h-3 w-3/4 animate-pulse rounded bg-fill" />
-                <div className="h-3 w-1/2 animate-pulse rounded bg-fill" />
+              <div key={i} aria-hidden className="flex flex-col gap-2">
+                <div className="aspect-2/3 w-full overflow-hidden rounded-xl bg-fill">
+                  <div className={`h-full w-full animate-pulse ${DOT_FIELD}`} style={shimmerDelay(i)} />
+                </div>
+                <div className="h-3 w-3/4 rounded bg-fill" />
+                <div className="h-3 w-1/2 rounded bg-fill" />
               </div>
             ))}
           </div>
