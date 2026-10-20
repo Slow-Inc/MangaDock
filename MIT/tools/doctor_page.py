@@ -28,7 +28,7 @@ from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 from manga_translator import MangaTranslator, Config  # noqa: E402
 import manga_translator.manga_translator as mt_mod  # noqa: E402
 from tools.pipeline_doctor import FAIL, WARN  # noqa: E402
-from tools.pipeline_doctor.page_probes import diagnose, snapshot_from_payload  # noqa: E402
+from tools.pipeline_doctor.page_probes import diagnose, replay_translations, snapshot_from_payload  # noqa: E402
 
 _COLOURS = {FAIL: (220, 30, 30), WARN: (240, 150, 0)}
 
@@ -44,6 +44,22 @@ def _spy_textlines(stats):
         return await original(textlines, width, height, verbose, **kwargs)
 
     mt_mod.dispatch_textline_merge = spy
+
+
+def _install_replay(tr, recorded):
+    """Answer the translation call from a recorded doctor run; only unseen texts go live."""
+    live = tr._dispatch_with_context
+
+    async def replay(config, texts, ctx):
+        out, missing = replay_translations(list(texts), recorded)
+        if missing:
+            print(f'[replay] {len(missing)}/{len(texts)} texts unseen -> live translator')
+            fresh = await live(config, [texts[i] for i in missing], ctx)
+            for i, t in zip(missing, fresh):
+                out[i] = t
+        return out
+
+    tr._dispatch_with_context = replay
 
 
 def _composite(source, payload):
@@ -99,6 +115,9 @@ async def main():
     ap.add_argument('--set', action='append', default=[], metavar='SECTION.KEY=VALUE',
                     help='override one config knob, e.g. --set detector.det_bubble_merge=true')
     ap.add_argument('--tag', default='', help='suffix for output files (A/B runs)')
+    ap.add_argument('--replay', metavar='DOCTOR_JSON',
+                    help='reuse the translations a previous run recorded (deterministic render A/B; '
+                         'single page). Unseen texts still go to the live translator.')
     args = ap.parse_args()
 
     stats = {'textlines': 0, 'sfx_lines': 0, 'empty_reads': 0}
@@ -112,6 +131,9 @@ async def main():
     font = os.path.join(MIT, 'fonts', 'Prompt-Bold.ttf')
     tr = MangaTranslator({'use_gpu': True, 'kernel_size': 3, 'model_dir': os.path.join(MIT, 'models'),
                           'font_path': font if os.path.isfile(font) else None})
+    if args.replay:
+        _install_replay(tr, json.load(open(args.replay, encoding='utf-8')))
+
     os.makedirs(args.out, exist_ok=True)
     worst = 0
     for path in args.pages:

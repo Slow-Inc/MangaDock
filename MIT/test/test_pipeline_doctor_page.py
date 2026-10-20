@@ -206,3 +206,14 @@ def test_a_page_spanning_region_fails_at_detect():
     assert detect.status == FAIL
     assert detect.metrics['implausible'] == 1
     assert flags[0][0] == ('detect', FAIL)
+
+
+def test_replay_reuses_recorded_translations_and_reports_misses():
+    """Deterministic render A/B: replay a previous run's translations by source text so only the
+    code under test changes between arms; anything unseen is left for the live translator."""
+    from tools.pipeline_doctor.page_probes import replay_translations
+    recorded = {'regions': [{'src': 'WELL HOW DO I CHECK', 'dst': 'แล้วจะตรวจสอบ'},
+                            {'src': 'I THINK?', 'dst': 'ใช่ไหม?'}]}
+    out, missing = replay_translations(['I THINK?', 'NEW LINE', 'WELL HOW DO I CHECK'], recorded)
+    assert out == ['ใช่ไหม?', None, 'แล้วจะตรวจสอบ']
+    assert missing == [1]

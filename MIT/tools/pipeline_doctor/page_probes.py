@@ -297,3 +297,12 @@ def diagnose(page: PageSnapshot) -> Tuple[DoctorRun, Flags]:
                _probe_translate(page, flags), _probe_render(page, flags),
                _probe_composite(page, flags)]
     return DoctorRun(reports), flags
+
+
+def replay_translations(texts: List[str], recorded: Dict) -> Tuple[List[Optional[str]], List[int]]:
+    """Map each source text to the translation a previous doctor run recorded (its `.doctor.json`).
+
+    Returns the translations (None where unseen) and the indices that still need a live call."""
+    by_src = {r['src']: r['dst'] for r in recorded.get('regions', []) if r.get('src')}
+    out = [by_src.get(t) for t in texts]
+    return out, [i for i, t in enumerate(out) if t is None]
