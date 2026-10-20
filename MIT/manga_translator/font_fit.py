@@ -39,19 +39,27 @@ def fit_font_size(
     of the clipped benchmark renders. ``margin=1.0`` is edge-to-edge (default,
     backward-compatible).
 
-    Standard binary search: ``mid=(low+high)//2``; fits → search higher, else
-    lower. If even ``low`` overflows, returns ``low`` — a too-tight floor beats
-    invisible text; squeezing below the floor is a later refinement.
+    The wrapper's fit is NOT monotonic in size — a size can overflow while a larger one
+    fits, because the line breaks land differently (2026-10-20: a Thai line fit at 23/24/26
+    but not at 20-22, and bisection returned 13). So scan DOWN from ``high`` and return the
+    first size that fits; the caller keeps the scan short by passing a tight ``high`` (see
+    ``area_font_cap``). If nothing fits, return ``low`` — a too-tight floor beats invisible
+    text.
     """
     w_max, h_max = box_wh[0] * margin, box_wh[1] * margin
-    best = low
-    lo, hi = low, high
-    while lo <= hi:
-        mid = (lo + hi) // 2
-        block_w, block_h = measure(mid)
+    for size in range(high, low - 1, -1):
+        block_w, block_h = measure(size)
         if block_w <= w_max and block_h <= h_max:
-            best = mid
-            lo = mid + 1
-        else:
-            hi = mid - 1
-    return best
+            return size
+    return low
+
+
+def area_font_cap(box_wh: Tuple[float, float], width_per_px: float, line_height: float,
+                  margin: float = 1.0, slack: int = 2) -> int:
+    """Upper bound on a fitting font size from area alone: text that is ``width_per_px * s``
+    wide on one line, wrapped into ``w x h`` at ``line_height``, needs
+    ``width_per_px * s * s * line_height <= w * h``. ``slack`` covers wrap-ragged lines. Pure."""
+    w, h = box_wh[0] * margin, box_wh[1] * margin
+    if width_per_px <= 0:
+        return 10 ** 6
+    return int((w * h / (line_height * width_per_px)) ** 0.5) + slack

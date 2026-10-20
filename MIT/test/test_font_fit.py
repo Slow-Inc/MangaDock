@@ -93,3 +93,14 @@ def test_binary_search_fit_is_wired_into_the_renderer():
     pr = (base / 'patch_renderer.py').read_text(encoding='utf-8')
     assert 'config.render.bubble_area_fit' in pr  # render flag drives the patch crop-grow
     assert 'union_box' in pr                       # crop grows to cover the balloon
+
+
+def test_fit_finds_the_largest_size_when_the_measure_is_not_monotonic():
+    """The real wrapper is not monotonic: a size can overflow while a larger one fits, because
+    the line breaks land differently (2026-10-20 Lv2 p1: a Thai line fit at 23/24/26 but not at
+    20-22). Binary search turned at 20 and returned 13 — the bubble got a 13 px font with room
+    for 24+. The fit must return the largest size that fits, not the first one a bisection
+    lands on."""
+    fits = {8, 10, 11, 12, 13, 16, 18, 19, 23, 24, 26}
+    measure = lambda s: (10, 10) if s in fits else (999, 999)
+    assert fit_font_size((100, 100), measure, low=8, high=89) == 26

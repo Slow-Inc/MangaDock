@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 # from .ballon_extractor import extract_ballon_region
 from . import text_render
-from ..font_fit import fit_font_size, font_high_cap
+from ..font_fit import area_font_cap, fit_font_size, font_high_cap
 from ..bubble_association import balloon_occupancy
 from ..render_overlap import box_containment, fills_bubble_width, clamp_box_to_neighbors, apply_font_cap, centered_box, clean_wrap_width, squeeze_width
 from ..safe_area import safe_area_box
@@ -98,6 +98,13 @@ def _bubble_fit_font_size(region, bubble_wh, max_box_ratio: float = _MAX_FONT_BO
         return block_w, block_h
 
     high = font_high_cap(h_box, max_box_ratio, floor=8)
+    # The fit scans DOWN from `high` (the wrapper is not monotonic in size), so cap `high`
+    # by area first: a one-line width of k px per font px cannot wrap into w x h above
+    # sqrt(w*h / (line_height * k)).
+    probe = 100
+    one_line = text_render.get_string_width(probe, text.replace('\n', ' '))
+    high = max(8, min(high, area_font_cap((w_box, h_box), one_line / probe, _LINE_HEIGHT,
+                                          margin=_FIT_MARGIN)))
     return fit_font_size((w_box, h_box), measure, low=8, high=high, margin=_FIT_MARGIN)
 
 
