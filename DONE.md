@@ -3,6 +3,19 @@
 
 ---
 
+## #840 Reader takes keyboard focus; Escape closes only the top layer (2026-10-21)
+
+**What:** the reader (portal, `fixed inset-0`) is now `role="dialog"` `aria-modal` and uses `useDialogFocus` (#837): focus
+moves in on open, Tab stays inside, focus returns to the popup's read button on close. Found on the way: Escape in the
+reader — and in the cover lightbox — also closed the book popup underneath (the popup listens on `window` and was
+registered first). Both now handle Escape in the capture phase and stop it.
+
+**Validated:** production build, keyboard only, reader opened from the popup: focus inside the reader, 25 Tabs never leave
+it, ArrowRight still pages (1 → 2 / 26), Escape closes only the reader and focus is back on "อ่านตอนที่ 0" with the popup
+still open. Lightbox (opened by mouse) + Escape → lightbox closed, popup still open. tsc 0; eslint counts unchanged.
+
+---
+
 ## #837 #838 Book popup keyboard focus; grid cards reachable by keyboard (2026-10-21)
 
 **What:** the book popup (`role="dialog"` + `aria-modal` since #835) left focus on the page behind it, let Tab walk the
