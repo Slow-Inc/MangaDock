@@ -41,16 +41,15 @@ function loadComponent(relativePath, {auth, window, fetch} = {}) {
       if (name.endsWith('/supabase')) return {supabase: {auth}};
       if (name.endsWith('/ToastContext')) return {useToast: () => ({showToast: noop, dismissToast: noop})};
       if (name.endsWith('/emailValidation')) return {};
-      if (name.endsWith('/userCache')) return {setTokenSupplier: noop, clearUserCache: noop, loadUserData: noop};
-      if (name.endsWith('/readingHistory')) return {setHistoryTokenSupplier: noop, clearHistory: noop, loadHistoryData: noop};
-      if (name.endsWith('/useSeriesFollow')) return {clearFollowCache: noop};
+      if (name.endsWith('/userCache')) return {setTokenSupplier: noop, loadUserData: noop};
+      if (name.endsWith('/readingHistory')) return {setHistoryTokenSupplier: noop, loadHistoryData: noop};
+      if (name.endsWith('/identityReset')) return {resetClientStateForIdentityChange: noop};
       if (name.endsWith('/browserActions')) return {reloadPage: noop, redirectToHome: noop};
       if (name.endsWith('/fingerprint')) return {getHardwareId: () => null};
       if (name.endsWith('/avatarUpload')) return {resolveAvatarUrl: value => value};
       if (name.endsWith('/types/user')) return {ROLE: {USER: 0, TRANSLATOR: 1, CREATOR: 2, ADMIN: 8, DEV: 9}};
       if (name === '@mangadock/mobile-bridge') return {};
       if (name.endsWith('/oauthCallback')) return {postOAuthCallbackMessage: (opener, payload, origin) => opener.postMessage({type: 'supabase:oauth:callback', ...payload}, origin)};
-      if (name.endsWith('/apiCache')) return {clearAllApiCache: noop};
       throw Error(`Unexpected import: ${name}`);
     },
   }, {filename});

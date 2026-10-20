@@ -17,10 +17,9 @@ import {
   normalizeEmail,
   validateEmailBeforeSignup,
 } from "../lib/emailValidation";
-import { setTokenSupplier, loadUserData, clearUserCache, flushNow } from "../lib/userCache";
-import { clearFollowCache } from "../hooks/useSeriesFollow";
-import { clearHistory, flushHistoryNow, setHistoryTokenSupplier, loadHistoryData } from "../lib/readingHistory";
-import { clearAllApiCache } from "../lib/apiCache";
+import { setTokenSupplier, loadUserData, flushNow } from "../lib/userCache";
+import { flushHistoryNow, setHistoryTokenSupplier, loadHistoryData } from "../lib/readingHistory";
+import { resetClientStateForIdentityChange } from "../lib/identityReset";
 import { reloadPage, redirectToHome } from "../lib/browserActions";
 import { getHardwareId } from "../lib/fingerprint";
 import { resolveAvatarUrl } from "../lib/avatarUpload";
@@ -381,10 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (suUser && session) {
         // User switched: clear local-first caches to prevent cross-account bleed
         if (lastUidRef.current && lastUidRef.current !== suUser.id) {
-          clearUserCache();
-          clearHistory({syncRemote: false});
-          clearFollowCache();
-          clearAllApiCache();
+          resetClientStateForIdentityChange();
         }
         lastUidRef.current = suUser.id;
 
@@ -447,10 +443,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else if (event === "SIGNED_OUT") {
         lastUidRef.current = null;
-        clearUserCache();
-        clearHistory({syncRemote: false});
-        clearFollowCache();
-        clearAllApiCache();
+        resetClientStateForIdentityChange();
       }
     });
 
@@ -722,10 +715,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await Promise.all([flushNow(), flushHistoryNow()]);
-    clearUserCache();
-    clearHistory({syncRemote: false});
-    clearFollowCache();
-    clearAllApiCache();
+    resetClientStateForIdentityChange();
     await supabase.auth.signOut();
     setUser(null);
     showToast({ type: "success", message: "ออกจากระบบแล้ว", duration: 3000 });
@@ -901,10 +891,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (!res.ok) throw new Error(`ลบข้อมูลไม่สำเร็จ (${res.status})`);
     await Promise.all([flushNow(), flushHistoryNow()]);
-    clearUserCache();
-    clearHistory({syncRemote: false});
-    clearFollowCache();
-    clearAllApiCache();
+    resetClientStateForIdentityChange();
     await supabase.auth.signOut();
     setUser(null);
     redirectToHome();
