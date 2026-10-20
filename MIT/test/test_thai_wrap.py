@@ -164,3 +164,12 @@ def test_brackets_and_quotes_bind_to_the_word_they_enclose():
     segs = _segments('ในปี 1254 ตามปฏิทินจักรวรรดิ (IC) เรียกว่า "บั๊กส์"')
     assert not any(s in ('(', ')', '"') for s in segs)
     assert '"บั๊กส์"' in segs  # a straight quote opens, then closes
+
+
+def test_demonstrative_stays_with_the_word_it_modifies():
+    """Replay A/B 2026-10-20 (Tsukimichi p0): 'เทพธิดาพวก / นั้น' — newmm splits 'พวก|นั้น' and the
+    wrapper broke between them. A demonstrative (นี้/นั้น/โน้น) never starts a line."""
+    if not _HAS_PYTHAINLP:
+        return
+    segs = _segments('เทพธิดาพวกนั้นช่างน่ารังเกียจนัก!')
+    assert not any(s.startswith(('นั้น', 'นี้', 'โน้น')) for s in segs)

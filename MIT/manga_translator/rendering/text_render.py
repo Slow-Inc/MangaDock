@@ -91,14 +91,16 @@ def _insert_thai_word_breaks(text: str) -> str:
 
 # Bound morphemes newmm splits off their head ('ผู้|พักอาศัย'): a line must not end on one.
 _THAI_PREFIXES = frozenset(['ผู้', 'นัก', 'การ', 'ความ', 'ชาว', 'ช่าง'])
+# Demonstratives always follow the noun/classifier they modify ('พวก|นั้น'): never start a line.
+_THAI_DEMONSTRATIVES = frozenset(['นี้', 'นั้น', 'โน้น'])
 _OPENERS = frozenset('([“‘「『')
 _CLOSERS = frozenset(')]”’」』')
 
 
 def _glue_thai_tokens(tokens: List[str]) -> List[str]:
     """Join tokens that must not be separated by a line break: a prefix morpheme or an opening
-    bracket/quote with the next token, and a repetition mark (ๆ/ฯ) or closing bracket/quote with
-    the previous one. A straight `"` alternates: it opens, then closes."""
+    bracket/quote with the next token, and a repetition mark (ๆ/ฯ), a demonstrative or a closing
+    bracket/quote with the previous one. A straight `"` alternates: it opens, then closes."""
     out: List[str] = []
     bind_next = False
     quote_open = False
@@ -108,7 +110,7 @@ def _glue_thai_tokens(tokens: List[str]) -> List[str]:
         if tok == '"':
             opener, closer = not quote_open, quote_open
             quote_open = not quote_open
-        if out and (bind_next or tok[0] in 'ๆฯ' or closer):
+        if out and (bind_next or tok[0] in 'ๆฯ' or closer or tok in _THAI_DEMONSTRATIVES):
             out[-1] += tok
         else:
             out.append(tok)
