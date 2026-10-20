@@ -371,3 +371,12 @@ def test_a_tone_mark_over_an_upper_vowel_stays_visible():
 def test_a_font_that_already_places_the_tone_high_is_untouched():
     tr.set_font(_FONT)
     assert tr._stacked_mark_lift('ที่', 2, 60) == 0
+
+
+def test_arial_never_lifts_a_stacked_mark_at_any_size():
+    """#793 must leave a font that already sets tones high byte-identical (the render goldens)."""
+    tr.set_font(_FONT)
+    for size in range(12, 64, 4):
+        for word in ('ที่', 'นี้', 'ปี่', 'กิ๊ก',
+                     'น้ำ', 'ศักดิ์'):
+            assert all(tr._stacked_mark_lift(word, k, size) == 0 for k in range(len(word))), (size, word)

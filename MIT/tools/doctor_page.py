@@ -65,7 +65,7 @@ def _install_replay(tr, recorded):
             for i, t in zip(unseen, await call_live([texts[i] for i in unseen])):
                 fresh_cache[texts[i]] = t
         for i in missing:
-            out[i] = fresh_cache[texts[i]]
+            out[i] = fresh_cache.get(texts[i], '')
         return out
 
     main_live, batch_live = tr._dispatch_with_context, tr._batch_translate_texts

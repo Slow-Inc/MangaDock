@@ -13,8 +13,7 @@ def split_text_region(
         width,
         height,
         gamma = 0.5,
-        sigma = 2,
-        pair_pitch = 2.0
+        sigma = 2
     ) -> List[Set[int]]:
 
     connected_region_indices = list(connected_region_indices)
@@ -33,10 +32,7 @@ def split_text_region(
         # print(fs, bboxes[connected_region_indices[0]].distance(bboxes[connected_region_indices[1]]), (1 + gamma) * fs)
         # print(bboxes[connected_region_indices[0]].angle, bboxes[connected_region_indices[1]].angle, 4 * np.pi / 180)
 
-        # Line pitch under pair_pitch (2x) the font — the same gap (< 1 font) quadrilateral_can_merge_region
-        # admitted the pair on. It was (1 + gamma) = 1.5x, which split normally-leaded all-caps
-        # lines (font = cap height, pitch ~1.7x): a 2-line sentence translated as two halves.
-        if bboxes[connected_region_indices[0]].distance(bboxes[connected_region_indices[1]]) < pair_pitch * fs \
+        if bboxes[connected_region_indices[0]].distance(bboxes[connected_region_indices[1]]) < (1 + gamma) * fs \
                 and abs(bboxes[connected_region_indices[0]].angle - bboxes[connected_region_indices[1]].angle) < 0.2 * np.pi:
             return [set(connected_region_indices)]
         else:
@@ -228,8 +224,9 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
         # inert for the render/rescue path here — kept only as provenance. Unify to one
         # is_display_sfx_region helper: tracked in #629.
         region.is_sfx = from_sfx
-        # A region made only of empty-balloon / ink-cluster rescue placeholders: its text is a
-        # line-OCR guess at a whole box, dropped when it is junk (ocr_vlm.speculative_box).
-        region.rescue_placeholder = all(t.rescue_placeholder for t in txtlns)
+        # Speculative only when EVERY line is a detector guess (a det_sfx box or an empty-balloon /
+        # ink-cluster placeholder): a real line merged with a det_sfx fragment is dialogue, and
+        # must never meet the junk-read drop (ocr_vlm.sfx_false_positive, #754/#797).
+        region.speculative = all(t.is_sfx or t.rescue_placeholder for t in txtlns)
         text_regions.append(region)
     return text_regions

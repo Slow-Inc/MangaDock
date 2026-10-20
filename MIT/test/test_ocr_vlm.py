@@ -421,9 +421,16 @@ def test_real_multi_char_lettering_off_the_dialogue_is_kept():
         assert not sfx_false_positive(t, True, (0, 0, 200, 300), [(500, 500, 600, 540)])
 
 
-def test_a_real_text_read_on_top_of_a_dialogue_line_is_dropped():
+def test_a_real_text_read_that_is_a_fragment_of_a_dialogue_line_is_dropped():
     from manga_translator.ocr_vlm import sfx_false_positive
-    assert sfx_false_positive('THE', True, (100, 100, 300, 260), [(150, 150, 250, 180)])
+    assert sfx_false_positive('THE', True, (160, 150, 240, 175), [(100, 140, 300, 190)])
+
+
+def test_a_big_real_sfx_around_a_small_dialogue_line_is_kept():
+    """Review 2026-10-20: 'contains a dialogue centre' dropped a panel-wide 'BOOM' that merely
+    surrounded a small line; a false positive is a fragment INSIDE the dialogue instead."""
+    from manga_translator.ocr_vlm import sfx_false_positive
+    assert not sfx_false_positive('BOOM', True, (0, 0, 400, 300), [(150, 150, 250, 180)])
 
 
 def test_only_det_sfx_provenance_and_ascii_reads_are_dropped():
@@ -432,9 +439,9 @@ def test_only_det_sfx_provenance_and_ascii_reads_are_dropped():
     assert not sfx_false_positive('ぬ', True, (0, 0, 200, 300), [])      # dropped glyph: rescue's job
 
 
-def test_a_rescue_placeholder_counts_as_a_speculative_box():
+def test_speculative_box_reads_the_region_provenance():
     from types import SimpleNamespace
     from manga_translator.ocr_vlm import speculative_box
-    assert speculative_box(SimpleNamespace(from_sfx_detection=True))
-    assert speculative_box(SimpleNamespace(rescue_placeholder=True))
+    assert speculative_box(SimpleNamespace(speculative=True))
+    assert not speculative_box(SimpleNamespace(speculative=False))
     assert not speculative_box(SimpleNamespace())

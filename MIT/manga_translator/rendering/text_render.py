@@ -1229,8 +1229,10 @@ def _stacked_mark_lift(line_text: str, k: int, font_size: int) -> int:
         return 0
     vowel_top = get_char_glyph(upper, font_size, 0).bitmap_top
     mark = get_char_glyph(line_text[k], font_size, 0)
-    mark_bottom = mark.bitmap_top - mark.bitmap.rows
-    return max(0, vowel_top + max(1, font_size // 20) - mark_bottom)
+    overlap = vowel_top - (mark.bitmap_top - mark.bitmap.rows)
+    gap = max(1, font_size // 20)
+    # A font that already sets the tone high (Arial) touches at most by hinting — leave it alone.
+    return overlap + gap if overlap > gap else 0
 
 
 def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canvas_text: np.ndarray, canvas_border: np.ndarray, border_size: int):

@@ -121,24 +121,25 @@ def ocr_read_real_text(stripped_text: str) -> bool:
 
 
 def speculative_box(region) -> bool:
-    """A region whose box is a detector's guess rather than a found text line: a det_sfx box, or
-    an empty-balloon / ink-cluster placeholder queued for the VLM rescue. Its line-OCR read gets
-    the false-positive DROP."""
-    return bool(getattr(region, 'from_sfx_detection', False) or getattr(region, 'rescue_placeholder', False))
+    """A region whose every line is a detector's guess rather than a found text line — det_sfx
+    boxes or empty-balloon / ink-cluster placeholders (``TextBlock.speculative``, set by the merge).
+    Its line-OCR read gets the false-positive DROP."""
+    return bool(getattr(region, 'speculative', False))
 
 
 def sfx_false_positive(stripped_text: str, speculative: bool, box, dialogue_boxes) -> bool:
     """#754 — ADR 026 Addendum DROP: a speculative box (``speculative_box``) the line-OCR read as
     real text that is not an SFX to keep. Narrowed by the 2026-10-20 corpus probe (16 EN pages): every false-positive read a
     single ASCII char off the art ('I', 'v', 'S', '1'), while multi-char reads were real lettering
-    ('CHAINSAWMAN', 'Yamai', '491'). A real-text read over a dialogue line ('THE' on a bubble) is a
-    false-positive whatever its length. Pure."""
+    ('CHAINSAWMAN', 'Yamai', '491'). A real-text read lying mostly INSIDE a dialogue line ('THE', a
+    fragment of a bubble's text) is a false-positive whatever its length; a big SFX merely
+    surrounding a small line is not. Pure."""
     if not (speculative and ocr_read_real_text(stripped_text)):
         return False
     if len(stripped_text.strip()) <= 1:
         return True
-    x1, y1, x2, y2 = box
-    return any(x1 <= (d[0] + d[2]) / 2 <= x2 and y1 <= (d[1] + d[3]) / 2 <= y2 for d in dialogue_boxes)
+    from .render_overlap import box_containment
+    return any(box_containment(box, d) > 0.5 for d in dialogue_boxes)
 
 
 def should_rescue_sfx(stripped_text: str, from_sfx_detection: bool, box_w: float, box_h: float,
