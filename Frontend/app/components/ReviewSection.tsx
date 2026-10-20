@@ -3,6 +3,7 @@
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { parseJsonOrNull } from "../lib/safeJson";
 import StarRating from "./StarRating";
 import ReviewCard from "./ReviewCard";
 import type { ReviewItem, ReviewSummary } from "../lib/reviewTypes";
@@ -50,7 +51,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
-      const data = await res.json();
+      const data = await parseJsonOrNull<ReviewItem>(res);
       setMyReview(data);
       if (data) {
         setRating(data.rating);
@@ -107,7 +108,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
   const others = reviews.filter((r) => !myReview || r.id !== myReview.id);
 
   return (
-    <section className="mt-8">
+    <section className="mt-8 px-6">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-base font-semibold text-white/90">รีวิวจากผู้อ่าน</h3>
         <div className="flex items-center gap-2">

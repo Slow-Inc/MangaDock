@@ -3,6 +3,7 @@
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { parseJsonOrNull } from "../lib/safeJson";
 
 type Props = {
   mangaId: string;
@@ -28,7 +29,7 @@ export default function TranslationFeedback({ mangaId, chapterId, pageNumber }: 
       { headers: { Authorization: `Bearer ${token}` } },
     );
     if (res.ok) {
-      const data = await res.json();
+      const data = await parseJsonOrNull<{ vote?: 1 | -1 }>(res);
       setVote(data?.vote ?? null);
     }
   }, [mangaId, chapterId, pageNumber]);

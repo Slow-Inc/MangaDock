@@ -209,9 +209,12 @@ export class LandingService {
     };
   }
 
+  /** `model` = the model that actually produced the text (the fallback one if the
+   *  first failed). Absent on untranslated results and on payloads cached before
+   *  the field existed — callers must not guess it. */
   async translateDescription(
     text: string,
-  ): Promise<{ translatedText: string; translated: boolean }> {
+  ): Promise<{ translatedText: string; translated: boolean; model?: string }> {
     if (!this.llmService.isConfigured())
       return { translatedText: text, translated: false };
     if (!text?.trim()) return { translatedText: text, translated: false };
@@ -226,13 +229,14 @@ export class LandingService {
       provider === 'gemini'
         ? await this.geminiCatalog.getDescriptionModels()
         : [this.llmService.getDescriptionModel()];
-    const fingerprint = Buffer.from(text.slice(0, 512))
-      .toString('base64')
-      .slice(0, 64);
-    const cacheKey = `translate:th:v3:${models.join('|')}:${fingerprint}`;
+    // The whole text, hashed: GET /books/translate is public, and a key from only the first bytes let any
+    // text that opens like a book's description overwrite that book's cached translation for everyone.
+    const fingerprint = createHash('sha256').update(text).digest('hex');
+    const cacheKey = `translate:th:v4:${models.join('|')}:${fingerprint}`;
     const cached = await this.cache.get<{
       translatedText: string;
       translated: boolean;
+      model?: string;
     }>(cacheKey);
     if (cached) return cached.data;
 
@@ -258,7 +262,7 @@ export class LandingService {
           if (thaiLines.length > 0)
             translatedText = thaiLines.join('\n').trim();
         }
-        const payload = { translatedText, translated: true };
+        const payload = { translatedText, translated: true, model: modelName };
         await this.cache.setMangaCacheWithTiers(cacheKey, payload);
         return payload;
       } catch (err) {

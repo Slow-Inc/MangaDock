@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import BookDetailModal from "./BookDetailModal";
+import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
 import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import type { LandingBook } from "../lib/types";
@@ -44,10 +45,41 @@ function RelatedCard({ book }: { book: LandingBook }) {
   );
 }
 
+function ScrollArrow({
+  dir,
+  visible,
+  onClick,
+}: {
+  dir: "left" | "right";
+  visible: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={dir === "left" ? "เลื่อนซ้าย" : "เลื่อนขวา"}
+      // top = half the 2:3 cover height (7.5rem wide -> 11.25rem tall), so it centres on the covers, not the titles
+      className={`absolute ${dir === "left" ? "left-1" : "right-1"} top-[5.625rem] z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/70 ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-black/90 md:flex ${
+        visible ? "opacity-100" : "pointer-events-none opacity-0"
+      }`}
+    >
+      <svg viewBox="0 0 24 24" fill="white" className="h-5 w-5" aria-hidden>
+        <path d={dir === "left" ? "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" : "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"} />
+      </svg>
+    </button>
+  );
+}
+
 export default function RelatedManga({ mangaId }: { mangaId: string }) {
   const [items, setItems] = useState<LandingBook[]>([]);
   const [loading, setLoading] = useState(true);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { ref, canScrollLeft, canScrollRight, update, scrollBy } = useHorizontalScroll();
+
+  useEffect(() => {
+    update();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `update` only reads the ref; re-measure when the items change
+  }, [items]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,15 +109,20 @@ export default function RelatedManga({ mangaId }: { mangaId: string }) {
   if (loading || items.length === 0) return null;
 
   return (
-    <section className="mt-6">
+    <section className="mt-6 px-6 pb-6">
       <h3 className="mb-3 text-sm font-bold text-white">มังงะที่คล้ายกัน</h3>
-      <div
-        ref={scrollRef}
-        className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {items.map((book) => (
-          <RelatedCard key={book.id} book={book} />
-        ))}
+      <div className="relative">
+        <ScrollArrow dir="left" visible={canScrollLeft} onClick={() => scrollBy("left")} />
+        <ScrollArrow dir="right" visible={canScrollRight} onClick={() => scrollBy("right")} />
+        <div
+          ref={ref}
+          onScroll={update}
+          className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {items.map((book) => (
+            <RelatedCard key={book.id} book={book} />
+          ))}
+        </div>
       </div>
     </section>
   );

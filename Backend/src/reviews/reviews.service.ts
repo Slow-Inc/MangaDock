@@ -118,7 +118,7 @@ export class ReviewsService {
       .range(offset, offset + limit - 1);
 
     if (error) throw new Error(`Failed to fetch reviews: ${error.message}`);
-    return (data ?? []).map((row) => this.mapReview(row as ReviewRow));
+    return (data ?? []).map((row) => this.mapReview(row as unknown as ReviewRow));
   }
 
   async getReviewSummary(mangaId: string): Promise<ReviewSummary> {

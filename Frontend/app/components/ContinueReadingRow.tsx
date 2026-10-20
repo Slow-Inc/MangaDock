@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getHistory, HISTORY_EVENT, type HistoryBook, patchThumbnailLocal } from "../lib/readingHistory";
 import BookDetailModal from "./BookDetailModal";
-import GeminiBadge from "./GeminiBadge";
+import ModelBadge from "./ModelBadge";
 import MangaReader from "./MangaReader";
 import { useBookActions } from "../hooks/useBookActions";
 import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
 import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
 import { translateDescription } from "../lib/translateDescription";
+import { stripMarkdown } from "../lib/markdownText";
 
 const truncate = (text: string, length: number) => {
   if (!text) return "ค้นพบหนังสือใหม่ที่น่าอ่านในทุกวัน";
@@ -45,6 +46,7 @@ function HistoryCard({
   const articleRef = useRef<HTMLElement>(null);
 
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
+  const [descModel, setDescModel] = useState<string | undefined>();
   const [translatingDesc, setTranslatingDesc] = useState(false);
   const [showOriginalDesc, setShowOriginalDesc] = useState(false);
   const translateFetched = useRef(false);
@@ -76,8 +78,9 @@ function HistoryCard({
     translateFetched.current = true;
     setTranslatingDesc(true);
     translateDescription(book.description)
-      .then((translated) => {
-        setTranslatedDesc(translated);
+      .then(({ text, model }) => {
+        setTranslatedDesc(text);
+        setDescModel(model);
         setTranslatingDesc(false);
       })
       .catch(() => setTranslatingDesc(false));
@@ -189,12 +192,12 @@ function HistoryCard({
           <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white">{book.title}</h3>
           <div className="space-y-1">
             <p className="line-clamp-3 text-xs leading-relaxed text-white/65">
-              {translatedDesc && !showOriginalDesc ? truncate(translatedDesc, 120) : truncate(book.description, 120)}
+              {translatedDesc && !showOriginalDesc ? truncate(stripMarkdown(translatedDesc), 120) : truncate(stripMarkdown(book.description), 120)}
             </p>
             {translatingDesc && <p className="text-[9px] text-white/30">กำลังแปล...</p>}
             {translatedDesc && !translatingDesc && (
               <div className="flex items-center gap-2">
-                <GeminiBadge small />
+                <ModelBadge model={descModel} small />
                 <button
                   onClick={() => setShowOriginalDesc((v) => !v)}
                   className="text-[9px] text-white/40 underline underline-offset-2 hover:text-white/70 transition-colors"

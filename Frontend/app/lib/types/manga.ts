@@ -6,6 +6,8 @@ export type MangaCover = {
 
 export type MangaDetail = {
   id: string;
+  /** In the API response; omitted when MangaDex returned no title. */
+  title?: string;
   authors: string[];
   artists: string[];
   covers: MangaCover[];
