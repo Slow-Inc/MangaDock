@@ -11,8 +11,8 @@ export default function AccountsSettingsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-base font-semibold text-white">การเชื่อมต่อ</h2>
-        <p className="mt-1 text-xs text-white/40">เชื่อมต่อ Google และ Facebook</p>
+        <h2 className="text-base font-semibold text-ink">การเชื่อมต่อ</h2>
+        <p className="mt-1 text-xs text-ink-3">เชื่อมต่อ Google และ Facebook</p>
       </div>
       <AccountsTab formState={formState} dispatch={dispatch} onTabChange={handleTabChange} onClose={() => router.push("/")} />
     </div>

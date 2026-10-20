@@ -26,10 +26,10 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   if (loading || !user) return null;
 
   return (
-    <div className="min-h-dvh bg-[#141414] pb-20">
+    <div className="min-h-dvh bg-bg pb-20">
       <Navbar />
       <div className="mx-auto max-w-4xl px-4 pt-24 pb-8">
-        <h1 className="mb-6 text-lg font-bold text-white">การตั้งค่า</h1>
+        <h1 className="mb-6 text-lg font-bold text-ink">การตั้งค่า</h1>
         {/* Mobile tab nav */}
         <div className="mb-4 flex gap-1 overflow-x-auto pb-1 md:hidden">
           {NAV.map((item) => (
@@ -38,8 +38,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
               href={item.href}
               className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                 pathname === item.href
-                  ? item.danger ? "bg-red-500/15 text-red-300" : "bg-white/10 text-white"
-                  : item.danger ? "text-red-400/60" : "text-white/50"
+                  ? item.danger ? "bg-danger/10 text-danger" : "bg-fill text-ink"
+                  : item.danger ? "text-danger/60" : "text-ink-2"
               }`}
             >
               {item.label}
@@ -55,8 +55,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                   href={item.href}
                   className={`flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                     pathname === item.href
-                      ? item.danger ? "bg-red-500/15 text-red-300" : "bg-white/10 text-white"
-                      : item.danger ? "text-red-400/60 hover:bg-red-500/8 hover:text-red-300" : "text-white/50 hover:bg-white/5 hover:text-white"
+                      ? item.danger ? "bg-danger/10 text-danger" : "bg-fill text-ink"
+                      : item.danger ? "text-danger/60 hover:bg-danger/10 hover:text-danger" : "text-ink-2 hover:bg-fill hover:text-ink"
                   }`}
                 >
                   {item.label}

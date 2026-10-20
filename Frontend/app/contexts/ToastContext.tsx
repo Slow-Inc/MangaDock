@@ -1,5 +1,7 @@
 "use client";
 
+import Loader from "../components/ui/Loader";
+import { PRIMARY_FILL } from "../components/ui/Button";
 import React, {
   createContext,
   useCallback,
@@ -25,7 +27,7 @@ export type ToastOptions = {
   action?: {
     label: string;
     onClick: () => void | Promise<void>;
-    /** "primary" = blue (default), "white" = white with black text */
+    /** "primary" = accent fill (default), "white" = ink fill */
     variant?: "primary" | "white";
   };
 };
@@ -50,25 +52,25 @@ function ToastIcon({ type }: { type: ToastType }) {
   const base = "h-4 w-4";
   if (type === "success")
     return (
-      <svg viewBox="0 0 24 24" className={`${base} text-green-400`} fill="none" stroke="currentColor" strokeWidth="2.5">
+      <svg viewBox="0 0 24 24" className={`${base} text-ok`} fill="none" stroke="currentColor" strokeWidth="2.5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
       </svg>
     );
   if (type === "warning")
     return (
-      <svg viewBox="0 0 24 24" className={`${base} text-yellow-400`} fill="none" stroke="currentColor" strokeWidth="2">
+      <svg viewBox="0 0 24 24" className={`${base} text-accent`} fill="none" stroke="currentColor" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86l-8.17 14.17A1 1 0 003 19.5h18a1 1 0 00.88-1.47L13.71 3.86a2 2 0 00-3.52.14z" />
       </svg>
     );
   if (type === "error")
     return (
-      <svg viewBox="0 0 24 24" className={`${base} text-red-400`} fill="none" stroke="currentColor" strokeWidth="2.5">
+      <svg viewBox="0 0 24 24" className={`${base} text-danger`} fill="none" stroke="currentColor" strokeWidth="2.5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
       </svg>
     );
   // info (default)
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`${base} text-white/70`}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`${base} text-ink-2`}>
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
@@ -76,24 +78,24 @@ function ToastIcon({ type }: { type: ToastType }) {
 }
 
 function iconBg(type: ToastType) {
-  if (type === "success") return "bg-green-500/20";
-  if (type === "warning") return "bg-yellow-500/20";
-  if (type === "error") return "bg-red-500/20";
-  return "bg-white/10";
+  if (type === "success") return "bg-ok/10";
+  if (type === "warning") return "bg-accent/10";
+  if (type === "error") return "bg-danger/10";
+  return "bg-fill";
 }
 
 function borderColor(type: ToastType) {
-  if (type === "success") return "border-green-500/30";
-  if (type === "warning") return "border-yellow-500/30";
-  if (type === "error") return "border-red-500/30";
-  return "border-white/15";
+  if (type === "success") return "border-ok/40";
+  if (type === "warning") return "border-accent/40";
+  if (type === "error") return "border-danger/40";
+  return "border-line";
 }
 
 function progressColor(type: ToastType) {
-  if (type === "success") return "bg-green-400/60";
-  if (type === "warning") return "bg-yellow-400/60";
-  if (type === "error") return "bg-red-400/60";
-  return "bg-white/35";
+  if (type === "success") return "bg-ok/60";
+  if (type === "warning") return "bg-accent/60";
+  if (type === "error") return "bg-danger/60";
+  return "bg-ink-3";
 }
 
 // ── Provider ───────────────────────────────────────────────────────────────
@@ -171,14 +173,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         }`}
       >
         {toast && (
-          <div className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-black/90 px-4 py-3 shadow-2xl backdrop-blur-xl ${borderColor(toast.type ?? "info")}`}>
+          <div className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-raised px-4 py-3 shadow-2xl ${borderColor(toast.type ?? "info")}`}>
             {/* Icon */}
             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${iconBg(toast.type ?? "info")}`}>
               <ToastIcon type={toast.type ?? "info"} />
             </div>
 
             {/* Message */}
-            <p className="text-sm text-white/80">{toast.message}</p>
+            <p className="text-sm text-ink">{toast.message}</p>
 
             {/* Action button */}
             {toast.action && (
@@ -187,16 +189,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 disabled={actionLoading}
                 className={`ml-1 shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition active:scale-95 disabled:opacity-60 ${
                   toast.action?.variant === "white"
-                    ? "bg-white text-black hover:bg-white/85"
-                    : "bg-blue-600 text-white hover:bg-blue-500"
+                    ? PRIMARY_FILL
+                    : "bg-accent text-bg hover:bg-accent/85"
                 }`}
               >
                 {actionLoading ? (
                   <span className="flex items-center gap-1.5">
-                    <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
+                    <Loader context="inline" className="text-current!" />
                   </span>
                 ) : toast.action.label}
               </button>
@@ -206,7 +205,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <button
               onClick={dismissToast}
               disabled={actionLoading}
-              className="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white/40 transition hover:text-white/80 disabled:opacity-50"
+              className="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-3 transition hover:text-ink disabled:opacity-50"
               aria-label="ปิด"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">

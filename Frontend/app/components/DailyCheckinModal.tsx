@@ -3,6 +3,7 @@
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { PRIMARY_FILL } from "./ui/Button";
 
 type Status = { checkedInToday: boolean; streakDay: number; coinsToday: number };
 
@@ -30,7 +31,7 @@ function StreakFlame({ day }: { day: number }) {
       {milestones.map((m) => (
         <div key={m} className={`flex flex-col items-center ${day >= m ? "opacity-100" : "opacity-25"}`}>
           <span className="text-base">{day >= m ? "🔥" : "○"}</span>
-          <span className="text-xs text-white/40">{m}</span>
+          <span className="text-xs text-ink-3">{m}</span>
         </div>
       ))}
     </div>
@@ -96,40 +97,40 @@ export default function DailyCheckinModal() {
   if (!open || !status) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-xs overflow-hidden rounded-3xl border border-white/10 bg-[#18181b] shadow-2xl">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-scrim/70 p-4">
+      <div className="w-full max-w-xs overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl">
         {/* Header */}
-        <div className="relative bg-gradient-to-b from-amber-500/20 to-transparent px-6 pb-4 pt-8 text-center">
+        <div className="relative px-6 pb-4 pt-8 text-center">
           <div className="mb-2 text-5xl">🌅</div>
-          <p className="text-lg font-black text-white/90">เช็คอินประจำวัน</p>
-          <p className="mt-0.5 text-sm text-white/40">
+          <p className="text-lg font-black text-ink">เช็คอินประจำวัน</p>
+          <p className="mt-0.5 text-sm text-ink-3">
             {claimed ? `วันที่ ${status.streakDay} ติดต่อกัน! 🎉` : "อย่าลืมเช็คอินทุกวันเพื่อรับรางวัล"}
           </p>
         </div>
 
         <div className="px-6 pb-6 pt-4">
           {/* Streak progress */}
-          <div className="mb-5 rounded-2xl border border-white/8 bg-white/3 p-4">
-            <p className="mb-3 text-center text-xs text-white/40">Streak ปัจจุบัน</p>
+          <div className="mb-5 rounded-2xl border border-line bg-fill p-4">
+            <p className="mb-3 text-center text-xs text-ink-3">Streak ปัจจุบัน</p>
             <StreakFlame day={status.streakDay} />
-            <p className="mt-2 text-center text-xs text-amber-400/80">
+            <p className="mt-2 text-center text-xs text-accent">
               {status.streakDay} วันติดต่อกัน
             </p>
           </div>
 
           {/* Coin reward */}
-          <div className={`mb-5 flex items-center justify-center gap-2 rounded-2xl border py-4 ${claimed ? "border-amber-500/40 bg-amber-500/10" : "border-white/8 bg-white/3"}`}>
+          <div className={`mb-5 flex items-center justify-center gap-2 rounded-2xl border py-4 ${claimed ? "border-coin/40 bg-coin/10" : "border-line bg-fill"}`}>
             <CoinIcon size={28} />
             <div className="text-center">
-              <span className="text-3xl font-black text-amber-400">+{status.coinsToday}</span>
-              <p className="text-xs text-white/40">เหรียญ{claimed ? " (รับแล้ว)" : ""}</p>
+              <span className="text-3xl font-black text-coin">+{status.coinsToday}</span>
+              <p className="text-xs text-ink-3">เหรียญ{claimed ? " (รับแล้ว)" : ""}</p>
             </div>
           </div>
 
           {claimed ? (
             <button
               onClick={handleClose}
-              className="w-full rounded-2xl bg-white/10 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/15"
+              className="w-full rounded-2xl bg-fill py-3 text-sm font-semibold text-ink-2 transition hover:bg-raised"
             >
               ปิด
             </button>
@@ -137,7 +138,7 @@ export default function DailyCheckinModal() {
             <button
               onClick={handleClaim}
               disabled={claiming}
-              className="w-full rounded-2xl bg-amber-500 py-3 text-sm font-black text-black transition enabled:hover:bg-amber-400 disabled:opacity-50"
+              className={`w-full rounded-2xl ${PRIMARY_FILL} py-3 text-sm font-black transition disabled:opacity-50`}
             >
               {claiming ? "กำลังรับ..." : `รับ ${status.coinsToday} เหรียญ!`}
             </button>

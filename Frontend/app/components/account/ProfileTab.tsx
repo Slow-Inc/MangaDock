@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "../../contexts/AuthContext";
 import { errMessage } from "@/lib/errMessage";
 import type { FormState, FormAction } from "./formReducer";
+import { PRIMARY_FILL } from "../ui/Button";
 
 interface ProfileTabProps {
   formState: FormState;
@@ -12,8 +13,8 @@ interface ProfileTabProps {
   isOpen: boolean;
 }
 
-const inputClass = "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/30";
-const labelClass = "block text-xs font-medium text-white/50 mb-1.5";
+const inputClass = "w-full rounded-xl border border-line bg-fill px-4 py-2.5 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/40";
+const labelClass = "block text-xs font-medium text-ink-2 mb-1.5";
 
 export default function ProfileTab({ formState, dispatch, isOpen }: ProfileTabProps) {
   const { user, updateUserProfile, isTranslator } = useAuth();
@@ -44,12 +45,12 @@ export default function ProfileTab({ formState, dispatch, isOpen }: ProfileTabPr
   return (
     <>
       {successMessage && (
-        <div className="mb-4 rounded-xl bg-green-500/20 border border-green-500/30 px-4 py-2.5 text-sm text-green-300">
+        <div className="mb-4 rounded-xl bg-ok/10 border border-ok/40 px-4 py-2.5 text-sm text-ok">
           {successMessage}
         </div>
       )}
       {errorMessage && (
-        <div className="mb-4 rounded-xl bg-red-500/20 border border-red-500/30 px-4 py-2.5 text-sm text-red-300">
+        <div className="mb-4 rounded-xl bg-danger/10 border border-danger/40 px-4 py-2.5 text-sm text-danger">
           {errorMessage}
         </div>
       )}
@@ -71,23 +72,23 @@ export default function ProfileTab({ formState, dispatch, isOpen }: ProfileTabPr
             value={email}
             disabled
             title="อีเมล (ไม่สามารถแก้ไขได้)"
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white/40 outline-none cursor-not-allowed"
+            className="w-full rounded-xl border border-line bg-fill px-4 py-2.5 text-sm text-ink-3 outline-none cursor-not-allowed"
           />
-          <p className="text-[11px] text-white/30 mt-1.5">ไม่สามารถเปลี่ยนอีเมลได้ในขณะนี้</p>
+          <p className="text-[11px] text-ink-3 mt-1.5">ไม่สามารถเปลี่ยนอีเมลได้ในขณะนี้</p>
         </div>
         <button
           onClick={handleUpdateProfile}
           disabled={loading || !displayName.trim()}
-          className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`w-full rounded-xl ${PRIMARY_FILL} py-2.5 text-sm font-semibold transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           {loading ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
         </button>
 
-        <div className="rounded-xl border border-white/10 bg-white/3 px-4 py-3">
+        <div className="rounded-xl border border-line bg-fill px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-white/70">สตูดิโอนักแปล</p>
-              <p className="text-[11px] text-white/30">
+              <p className="text-xs font-semibold text-ink-2">สตูดิโอนักแปล</p>
+              <p className="text-[11px] text-ink-3">
                 {isTranslator ? "จัดการงานแปลและอัปโหลดใหม่" : "สมัครเพื่อเริ่มอัปโหลดงานแปล"}
               </p>
             </div>
