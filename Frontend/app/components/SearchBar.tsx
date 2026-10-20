@@ -42,7 +42,7 @@ export default function SearchBar() {
       <form
         onSubmit={handleSubmit}
         aria-hidden={!isOpen}
-        className={`flex items-center overflow-hidden rounded-full border border-line bg-surface/75 backdrop-blur-xl transition-all duration-300 ${
+        className={`flex items-center overflow-hidden rounded-full border border-line bg-surface/75 backdrop-blur-xl transition-all duration-300 focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/20 ${
           isOpen
             ? "fixed left-4 right-4 top-[calc(4.75rem+env(safe-area-inset-top))] z-[80] w-auto opacity-100 shadow-2xl md:static md:left-auto md:right-auto md:top-auto md:z-auto md:w-72 md:shadow-none"
             : "pointer-events-none w-0 opacity-0"

@@ -199,19 +199,31 @@ body::-webkit-scrollbar-thumb:active {
   background: var(--accent);
 }
 
-/* Global focus ring — WCAG 2.1 SC 2.4.7 (Strata globals 99-103) */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
+/* Global focus ring — WCAG 2.1 SC 2.4.7 (Strata globals 99-103).
+   In @layer base so a component's own utilities win (`outline-none` + a container ring, an inset
+   ring inside a clipping card). It never changes the element's shape: the outline follows the
+   element's own border-radius. (It used to be unlayered and set border-radius: 4px, which beat
+   `outline-none` and drew a square ring inside rounded, overflow-hidden boxes — the clipped corners
+   the dev reported on the navbar search.) */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 
-/* Text fields: the ring sits on the field's own border (one crisp edge) instead of floating 3 px outside
-   it, which read as a double ring on the search box. */
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline-offset: -1px;
+  /* Text fields: the ring sits on the field's own border (one crisp edge). */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline-offset: -1px;
+  }
+
+  /* Inside anything that clips — scroll rows, cards, menus, scrolling panels — a ring floating outside
+     the element is cut off on the clipped sides; draw it inside the element instead. (A focus audit
+     over 9 routes found 3–5 px cut rings on chips, menu items, chapter rows, tabs and cover buttons.) */
+  :is(.overflow-hidden, .overflow-clip, .overflow-auto, .overflow-x-auto, .overflow-y-auto) :focus-visible {
+    outline-offset: -2px;
+  }
 }
 
 img,
