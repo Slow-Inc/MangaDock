@@ -7,6 +7,9 @@ import { PRIMARY_FILL } from "./ui/Button";
 import { Flame } from "lucide-react";
 import Coin from "./ui/Coin";
 import Mascot from "./mascot/Mascot";
+import { checkinErrorMessage, utcDayKey } from "../lib/dailyCheckin";
+import { getWalletBalance } from "../lib/studioApi";
+import type { CoinBalanceUpdate } from "../lib/coinBalanceEvent";
 
 type Status = { checkedInToday: boolean; streakDay: number; coinsToday: number };
 
@@ -32,15 +35,16 @@ function StreakFlame({ day }: { day: number }) {
 }
 
 export default function DailyCheckinModal() {
-  const { user } = useContext(AuthContext);
+  const { user, showLoginPrompt } = useContext(AuthContext);
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) return;
-    const today = new Date().toDateString();
+    const today = utcDayKey(new Date());
     if (localStorage.getItem(STORAGE_KEY) === today) return;
 
     let cancelled = false;
@@ -65,8 +69,11 @@ export default function DailyCheckinModal() {
   async function handleClaim() {
     if (claiming) return;
     setClaiming(true);
+    setError("");
     try {
       const token = await getToken();
+      // Signed out under us: the login prompt, not a dead-end message (CLAUDE.md: always showLoginPrompt()).
+      if (!token) { showLoginPrompt(); return; }
       const res = await fetch("/api/proxy/checkin", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -75,8 +82,25 @@ export default function DailyCheckinModal() {
         const data: Status = await res.json();
         setStatus(data);
         setClaimed(true);
-        localStorage.setItem(STORAGE_KEY, new Date().toDateString());
+        localStorage.setItem(STORAGE_KEY, utcDayKey(new Date()));
+        // Update the navbar coin chip: authoritative total if the refetch works,
+        // otherwise the amount the server just credited.
+        getWalletBalance(token)
+          .then((r): CoinBalanceUpdate => ({ balance: r.balance }))
+          .catch((): CoinBalanceUpdate => ({ delta: data.coinsToday }))
+          .then((detail) => window.dispatchEvent(new CustomEvent("mb:coin-balance-update", { detail })));
+      } else if (res.status === 401) {
+        showLoginPrompt();
+      } else {
+        setError(checkinErrorMessage(res.status));
+        // Already claimed today (e.g. in another tab): let the user close the modal.
+        if (res.status === 409) {
+          setClaimed(true);
+          localStorage.setItem(STORAGE_KEY, utcDayKey(new Date()));
+        }
       }
+    } catch {
+      setError(checkinErrorMessage(null));
     } finally {
       setClaiming(false);
     }
@@ -84,7 +108,7 @@ export default function DailyCheckinModal() {
 
   function handleClose() {
     setOpen(false);
-    localStorage.setItem(STORAGE_KEY, new Date().toDateString());
+    localStorage.setItem(STORAGE_KEY, utcDayKey(new Date()));
   }
 
   if (!open || !status) return null;
@@ -121,6 +145,8 @@ export default function DailyCheckinModal() {
               <p className="text-xs text-ink-3">เหรียญ{claimed ? " (รับแล้ว)" : ""}</p>
             </div>
           </div>
+
+          {error && <p className="mb-3 text-center text-xs text-danger">{error}</p>}
 
           {claimed ? (
             <button

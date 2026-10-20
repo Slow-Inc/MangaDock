@@ -30,6 +30,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [showForm, setShowForm] = useState(false);
 
   const fetchPublic = useCallback(async () => {
@@ -76,8 +77,10 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
     if (!user) { showLoginPrompt(); return; }
     if (rating === 0) return;
     setSubmitting(true);
+    setSubmitError("");
     try {
       const token = await getToken();
+      if (!token) { showLoginPrompt(); return; }
       const res = await fetch(BASE(mangaId), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -86,7 +89,11 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       if (res.ok) {
         setShowForm(false);
         await Promise.all([fetchPublic(), fetchMyReview()]);
+      } else {
+        setSubmitError("บันทึกรีวิวไม่สำเร็จ ลองใหม่อีกครั้ง");
       }
+    } catch {
+      setSubmitError("บันทึกรีวิวไม่สำเร็จ ลองใหม่อีกครั้ง");
     } finally {
       setSubmitting(false);
     }
@@ -160,11 +167,13 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
             rows={3}
             className="w-full resize-none rounded-lg border border-line bg-fill px-3 py-2 text-sm text-ink placeholder-ink-3 outline-none transition focus:border-ink-3 focus:bg-raised"
           />
+          {submitError && <p className="mt-2 text-xs text-danger">{submitError}</p>}
           <div className="mt-3 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => {
                 setShowForm(false);
+                setSubmitError("");
                 if (myReview) { setRating(myReview.rating); setBody(myReview.body ?? ""); }
                 else { setRating(0); setBody(""); }
               }}

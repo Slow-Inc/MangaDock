@@ -47,26 +47,33 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
   const [posting, setPosting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const fetchComments = useCallback(async () => {
+  const fetchComments = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
     try {
       const res = await fetch(
         `/api/proxy/reader-comments?mangaId=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chapterId)}&page=${pageNumber}`,
+        { signal },
       );
-      if (res.ok) setComments(await res.json());
+      const data = res.ok ? await res.json() : null;
+      // A newer page's request superseded this one — never let it overwrite.
+      if (data && !signal.aborted) setComments(data);
+    } catch (err) {
+      if (!signal.aborted) throw err;
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }, [mangaId, chapterId, pageNumber]);
 
   useEffect(() => {
-    if (open) {
-      fetchComments();
-      setTimeout(() => textareaRef.current?.focus(), 300);
-    } else {
+    if (!open) {
       setComments([]);
       setText("");
+      return;
     }
+    const controller = new AbortController();
+    fetchComments(controller.signal);
+    setTimeout(() => textareaRef.current?.focus(), 300);
+    return () => controller.abort();
   }, [open, fetchComments]);
 
   async function handlePost(e: React.FormEvent) {

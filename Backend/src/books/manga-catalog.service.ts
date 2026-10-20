@@ -12,6 +12,9 @@ import {
 } from './books.types';
 
 const QUERY_CACHE_PREFIX = 'books:query:';
+/** Year-range search scans upstream in MangaDex-max pages, capped (#661). */
+const YEAR_SCAN_PAGE_SIZE = 100;
+const YEAR_SCAN_MAX_PAGES = 10;
 
 /**
  * MangaDex catalog passthrough + search carved out of BooksService (#231, PRD
@@ -96,7 +99,7 @@ export class MangaCatalogService {
       .replace(
         /\s+/g,
         '_',
-      )}${lang ? `:${lang}` : ''}${status ? `:${status}` : ''}${yearFrom != null ? `:y${yearFrom}` : ''}${yearTo != null ? `:y${yearTo}` : ''}:${offset}:${limit}`;
+      )}${lang ? `:${lang}` : ''}${status ? `:${status}` : ''}${yearFrom != null ? `:yf${yearFrom}` : ''}${yearTo != null ? `:yt${yearTo}` : ''}:${offset}:${limit}`;
 
     const cached = await this.cache.get<{
       items: LandingBook[];
@@ -109,49 +112,95 @@ export class MangaCatalogService {
       return cached.data;
     }
 
-    const result = await this.mangaDex.searchManga(
-      query,
-      lang,
-      limit,
-      offset,
-      status,
-    );
+    const hasYearRange = yearFrom != null || yearTo != null;
+    const inYearRange = (b: LandingBook) => {
+      const year = parseInt(b.publishedDate ?? '', 10);
+      if (isNaN(year)) return false;
+      if (yearFrom != null && year < yearFrom) return false;
+      if (yearTo != null && year > yearTo) return false;
+      return true;
+    };
 
-    // Enhance: also match user-uploaded alt names in chapter_versions
-    try {
-      const existingIds = new Set(result.items.map((b) => b.id));
-      const altMatches = await this.findTitleIdsByAltName(query);
-      const newIds = altMatches.filter((id) => !existingIds.has(id));
-      if (newIds.length > 0) {
-        const extra = await this.mangaDex.fetchMangaByIds(newIds);
-        result.items.push(...extra);
-        result.total += extra.length;
-        this.logger.log(
-          `Alt-name search added ${extra.length} extra manga for "${query}"`,
-        );
+    const result = hasYearRange
+      ? await this.searchByYearRange(
+          query,
+          lang,
+          limit,
+          offset,
+          status,
+          inYearRange,
+        )
+      : await this.mangaDex.searchManga(query, lang, limit, offset, status);
+
+    // Enhance: also match user-uploaded alt names in chapter_versions. First page only — appended to
+    // every page they repeated on each one and pushed later pages past `limit` (#661).
+    if (offset === 0) {
+      try {
+        const existingIds = new Set(result.items.map((b) => b.id));
+        const altMatches = await this.findTitleIdsByAltName(query);
+        const newIds = altMatches.filter((id) => !existingIds.has(id));
+        if (newIds.length > 0) {
+          let extra = await this.mangaDex.fetchMangaByIds(newIds);
+          if (hasYearRange) extra = extra.filter(inYearRange);
+          result.items.push(...extra);
+          result.total += extra.length;
+          this.logger.log(
+            `Alt-name search added ${extra.length} extra manga for "${query}"`,
+          );
+        }
+      } catch (err) {
+        this.logger.warn(`Alt-name lookup failed: ${String(err)}`);
       }
-    } catch (err) {
-      this.logger.warn(`Alt-name lookup failed: ${String(err)}`);
     }
 
-    // Apply year range filter post-fetch (publishedDate is a year string e.g. "2015")
-    if (yearFrom != null || yearTo != null) {
-      result.items = result.items.filter((b) => {
-        if (!b.publishedDate) return false;
-        const year = parseInt(b.publishedDate, 10);
-        if (isNaN(year)) return false;
-        if (yearFrom != null && year < yearFrom) return false;
-        if (yearTo != null && year > yearTo) return false;
-        return true;
-      });
-      result.total = result.items.length;
-    }
-
-    if (result.items.length > 0) {
+    // A year-range miss costs up to YEAR_SCAN_MAX_PAGES upstream calls, so cache it too (#661);
+    // other empty results stay uncached as before.
+    if (result.items.length > 0 || hasYearRange) {
       await this.cache.set(cacheKey, result, CACHE_TTL_MS);
     }
 
     return result;
+  }
+
+  /**
+   * MangaDex's `year` param takes a single year, so a range can't be pushed
+   * upstream (#661). Scan upstream pages from offset 0 and filter locally until
+   * one match past this page is found (so the next page stays reachable), the
+   * upstream is exhausted, or the scan cap is hit. `total` is exact when the
+   * scan exhausted upstream, otherwise a lower bound (> offset + limit unless the scan cap stopped it first).
+   */
+  private async searchByYearRange(
+    query: string,
+    lang: string | undefined,
+    limit: number,
+    offset: number,
+    status: 'ongoing' | 'completed' | 'hiatus' | undefined,
+    inYearRange: (b: LandingBook) => boolean,
+  ): Promise<{ items: LandingBook[]; total: number }> {
+    const matches: LandingBook[] = [];
+    for (
+      let upstreamOffset = 0, page = 0;
+      page < YEAR_SCAN_MAX_PAGES && matches.length <= offset + limit;
+      page++, upstreamOffset += YEAR_SCAN_PAGE_SIZE
+    ) {
+      const { items, total } = await this.mangaDex.searchManga(
+        query,
+        lang,
+        YEAR_SCAN_PAGE_SIZE,
+        upstreamOffset,
+        status,
+      );
+      matches.push(...items.filter(inYearRange));
+      if (
+        items.length < YEAR_SCAN_PAGE_SIZE ||
+        upstreamOffset + YEAR_SCAN_PAGE_SIZE >= total
+      )
+        break;
+    }
+    return {
+      items: matches.slice(offset, offset + limit),
+      total: matches.length,
+    };
   }
 
   /** Query chapter_versions for title_name / title_alt_name matching the search query. */

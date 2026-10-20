@@ -2,6 +2,7 @@
 
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { supabase } from "../lib/supabase";
 import { parseJsonOrNull } from "../lib/safeJson";
 
@@ -18,50 +19,66 @@ async function getToken(): Promise<string | null> {
 
 export default function TranslationFeedback({ mangaId, chapterId, pageNumber }: Props) {
   const { user, showLoginPrompt } = useContext(AuthContext);
+  const { showToast } = useToast();
   const [vote, setVote] = useState<1 | -1 | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchMyVote = useCallback(async () => {
+  const fetchMyVote = useCallback(async (signal: AbortSignal) => {
     const token = await getToken();
-    if (!token) return;
-    const res = await fetch(
-      `/api/proxy/translation-feedback/my?mangaId=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chapterId)}&page=${pageNumber}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    if (res.ok) {
-      const data = await parseJsonOrNull<{ vote?: 1 | -1 }>(res);
-      setVote(data?.vote ?? null);
+    if (!token || signal.aborted) return;
+    try {
+      const res = await fetch(
+        `/api/proxy/translation-feedback/my?mangaId=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chapterId)}&page=${pageNumber}`,
+        { headers: { Authorization: `Bearer ${token}` }, signal },
+      );
+      if (res.ok) {
+        const data = await parseJsonOrNull<{ vote?: 1 | -1 }>(res);
+        // A newer page's request superseded this one — never let it overwrite.
+        if (!signal.aborted) setVote(data?.vote ?? null);
+      }
+    } catch (err) {
+      if (!signal.aborted) throw err;
     }
   }, [mangaId, chapterId, pageNumber]);
 
   useEffect(() => {
     setVote(null);
-    if (user) fetchMyVote();
+    if (!user) return;
+    const controller = new AbortController();
+    fetchMyVote(controller.signal);
+    return () => controller.abort();
   }, [user, fetchMyVote]);
 
   async function handleVote(v: 1 | -1) {
     if (!user) { showLoginPrompt(); return; }
     if (submitting) return;
     setSubmitting(true);
+    const prev = vote;
     try {
       const token = await getToken();
-      if (!token) return;
+      if (!token) { showLoginPrompt(); return; }
 
+      let res: Response;
       if (vote === v) {
         // Toggle off — delete vote
         setVote(null);
-        await fetch(
+        res = await fetch(
           `/api/proxy/translation-feedback?mangaId=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chapterId)}&page=${pageNumber}`,
           { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
         );
       } else {
         setVote(v);
-        await fetch("/api/proxy/translation-feedback", {
+        res = await fetch("/api/proxy/translation-feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ mangaId, chapterId, pageNumber, vote: v }),
         });
       }
+      if (!res.ok) throw new Error(`vote failed: ${res.status}`);
+    } catch {
+      // Roll back the optimistic vote so the UI matches the server.
+      setVote(prev);
+      showToast({ type: "error", message: "บันทึกโหวตไม่สำเร็จ ลองใหม่อีกครั้ง" });
     } finally {
       setSubmitting(false);
     }
