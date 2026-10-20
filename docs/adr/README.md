@@ -29,6 +29,7 @@ overturns an earlier one marks the old ADR **Superseded**.
 | [019](019-mit-status-stream-forward-jwt-verification.md) | MIT `/status` + `/status/stream` hybrid SSE telemetry; forwarded-JWT verified via Supabase `getUser` (refines 018's PyJWT assumption) | MIT · Dashboard | Accepted — **implemented** (#279) |
 | [020](020-ci-test-gates.md) | CI test gates: GitHub Actions per-service (Node 22 + bun), jest config inherited + green-from-day-one skip-list, MIT report-only | Infra | Accepted — **implemented** (#355) |
 | [021](021-deployment-and-cost-architecture.md) | Deployment & cost: ephemeral on-demand 2-tier (serverless GPU + shared VPS), near-zero marginal cost, deferred until validated | Infra | Accepted — **planned** |
+| [029](029-frontend-strata-design-system-and-mascots.md) | Frontend design system: Strata tokens, dark default + 3 modes, no purple, one loader family, bot-avatars mascots as profile identity, on-demand ECharts in Studio | Frontend | Accepted — **implementing** (#764) |
 
 ## Conventions
 
