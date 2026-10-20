@@ -34,7 +34,7 @@ export default function BookRouteModal({ id }: { id: string }) {
 
   const close = () => router.replace("/");
 
-  if (state === "loading") return <PopupSkeleton />;
+  if (state === "loading") return <PopupSkeleton onClose={close} />;
 
   if (state === "missing") {
     return (
@@ -59,11 +59,11 @@ export default function BookRouteModal({ id }: { id: string }) {
  * Stands in for the popup while the detail loads: the same scrim and window as `BookDetailModal`
  * (so the swap does not flash), with the cover in the dot field and quiet bars for the text.
  */
-function PopupSkeleton() {
+function PopupSkeleton({ onClose }: { onClose: () => void }) {
   const cover = "relative aspect-2/3 shrink-0 overflow-hidden rounded-xl bg-fill ring-1 ring-line";
   return (
     <div className="fixed inset-0 z-200 flex items-center justify-center md:p-4">
-      <div className="absolute inset-0 bg-bg md:bg-scrim/90" />
+      <div className="absolute inset-0 bg-bg md:bg-scrim/90" onClick={onClose} />
       <div className="relative z-10 flex h-full w-full flex-col overflow-hidden bg-surface shadow-2xl md:h-auto md:max-h-[90vh] md:max-w-3xl md:rounded-3xl">
         <div className="flex flex-col items-center gap-5 px-5 pb-6 pt-9 md:flex-row md:items-end md:pt-14">
           <div className={`${cover} w-36 md:w-40`}>
