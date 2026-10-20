@@ -4,6 +4,9 @@ import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { PRIMARY_FILL } from "./ui/Button";
+import { Flame } from "lucide-react";
+import Coin from "./ui/Coin";
+import Mascot from "./mascot/Mascot";
 
 type Status = { checkedInToday: boolean; streakDay: number; coinsToday: number };
 
@@ -14,23 +17,13 @@ async function getToken(): Promise<string | null> {
   return session?.access_token ?? null;
 }
 
-function CoinIcon({ size = 20 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="inline-block">
-      <circle cx="12" cy="12" r="10" fill="#F59E0B" />
-      <circle cx="12" cy="12" r="7.5" fill="#FBBF24" />
-      <text x="12" y="16" textAnchor="middle" fontSize="9" fontWeight="bold" fill="#92400E">C</text>
-    </svg>
-  );
-}
-
 function StreakFlame({ day }: { day: number }) {
   const milestones = [1, 3, 7, 14, 30];
   return (
     <div className="flex items-center justify-center gap-1.5">
       {milestones.map((m) => (
-        <div key={m} className={`flex flex-col items-center ${day >= m ? "opacity-100" : "opacity-25"}`}>
-          <span className="text-base">{day >= m ? "🔥" : "○"}</span>
+        <div key={m} className={`flex flex-col items-center gap-0.5 ${day >= m ? "text-coin" : "text-ink-3 opacity-40"}`}>
+          <Flame aria-hidden className="h-4 w-4" strokeWidth={day >= m ? 2 : 1.5} fill={day >= m ? "currentColor" : "none"} />
           <span className="text-xs text-ink-3">{m}</span>
         </div>
       ))}
@@ -101,10 +94,12 @@ export default function DailyCheckinModal() {
       <div className="w-full max-w-xs overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl">
         {/* Header */}
         <div className="relative px-6 pb-4 pt-8 text-center">
-          <div className="mb-2 text-5xl">🌅</div>
+          <div className="mb-2 flex justify-center">
+            <Mascot area="wallet" size={72} />
+          </div>
           <p className="text-lg font-black text-ink">เช็คอินประจำวัน</p>
           <p className="mt-0.5 text-sm text-ink-3">
-            {claimed ? `วันที่ ${status.streakDay} ติดต่อกัน! 🎉` : "อย่าลืมเช็คอินทุกวันเพื่อรับรางวัล"}
+            {claimed ? `วันที่ ${status.streakDay} ติดต่อกัน!` : "อย่าลืมเช็คอินทุกวันเพื่อรับรางวัล"}
           </p>
         </div>
 
@@ -120,7 +115,7 @@ export default function DailyCheckinModal() {
 
           {/* Coin reward */}
           <div className={`mb-5 flex items-center justify-center gap-2 rounded-2xl border py-4 ${claimed ? "border-coin/40 bg-coin/10" : "border-line bg-fill"}`}>
-            <CoinIcon size={28} />
+            <Coin size={28} className="text-coin" />
             <div className="text-center">
               <span className="text-3xl font-black text-coin">+{status.coinsToday}</span>
               <p className="text-xs text-ink-3">เหรียญ{claimed ? " (รับแล้ว)" : ""}</p>
