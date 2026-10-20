@@ -3,6 +3,19 @@
 
 ---
 
+## #817 Opening /admin directly no longer bounces an admin home (2026-10-21)
+
+**What:** AuthContext starts with `user = null` + `loading = true`; the admin layout redirected on `user === null`
+without reading `loading`, so a direct load or refresh of any `/admin/*` page sent an admin to `/` (settings and
+studio already waited for `!loading`). New pure `admin/components/adminGate.ts` → wait / redirect / allow.
+
+**Validated:** `adminGate.test.ts` red → green; production build with a local test session (role 8, Supabase
+and admin APIs mocked locally): before, all five admin URLs ended on `/`; after, all five render at 1440 and 390.
+Residual: if an admin's role were only in the backend profile (not JWT metadata) the gate could still redirect
+before the profile arrives — fixing that is AuthContext (parked).
+
+---
+
 ## #814 Reading history no longer re-backfills and re-POSTs on every load (2026-10-21)
 
 **What:** the server has no column for `lastChapterNumber`, and `loadHistoryData` replaced local entries

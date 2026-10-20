@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
-import { ROLE } from '../lib/types/user';
+import { adminGate } from './components/adminGate';
 
 const NAV = [
   {
@@ -62,17 +62,16 @@ const NAV = [
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const gate = adminGate({ user, loading });
 
   useEffect(() => {
-    if (user !== undefined && (user === null || (user.role ?? 0) < ROLE.ADMIN)) {
-      router.replace('/');
-    }
-  }, [user, router]);
+    if (gate === 'redirect') router.replace('/');
+  }, [gate, router]);
 
-  if (user === undefined || user === null || (user.role ?? 0) < ROLE.ADMIN) return null;
+  if (gate !== 'allow') return null;
 
   return (
     <div className="flex min-h-screen bg-bg">
