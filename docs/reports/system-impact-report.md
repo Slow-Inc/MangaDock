@@ -8,6 +8,7 @@
 **Perf Δ:** none measurable in the renderer (two glyph lookups per stacked mark; Thai segmentation now lru_cached across the fit scan). SFX rescue costs at most one trial call per 300 s while the breaker is open.
 **Quality:** replay A/B with identical translations — spill 7 → 7 in both A/Bs; font changes 5/177 (#791/#792) and 2/156 (#793).
 **Validation:** red-first unit tests for each fix (tone height, compaction, glue, recursive split, packer guard, source-aware glitch, one-trial breaker); full MIT suite 872 passed; benchmarks `2026-10-20-791-792-thai-spaces-punctuation.*`, `2026-10-20-793-thai-tone-marks.*`.
+**Also (#795/#754/#796/#797):** anti-overlap sibling territories (`rendering/__init__.py:_neighbor_territories`), junk-read DROP (`ocr_vlm.sfx_false_positive` / `speculative_box`, `detection_postproc._placeholder`, `textline_merge` propagation), 2-line merge pitch < 2× font (`split_text_region`). Corpus: overlapping rendered pairs 5 → 1, junk one-letter regions 6 → 0, real lettering kept; doctor `overlap` verdict added.
 **Risk / follow-up:** shaping is still absent (tall-consonant mark offsets, other scripts' GPOS) — HarfBuzz is the general fix; Chainsaw p0 red credit lines overlap (layout); #757 merge default still opt-in pending more pages.
 
 ## 2026-10-20 — MIT quality loop: #756 doctor page mode, #757 container merge (opt-in), #760 ink-cluster gate, #761 bubble-fit scan
