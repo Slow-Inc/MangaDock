@@ -132,22 +132,25 @@ export class MangaCatalogService {
         )
       : await this.mangaDex.searchManga(query, lang, limit, offset, status);
 
-    // Enhance: also match user-uploaded alt names in chapter_versions
-    try {
-      const existingIds = new Set(result.items.map((b) => b.id));
-      const altMatches = await this.findTitleIdsByAltName(query);
-      const newIds = altMatches.filter((id) => !existingIds.has(id));
-      if (newIds.length > 0) {
-        let extra = await this.mangaDex.fetchMangaByIds(newIds);
-        if (hasYearRange) extra = extra.filter(inYearRange);
-        result.items.push(...extra);
-        result.total += extra.length;
-        this.logger.log(
-          `Alt-name search added ${extra.length} extra manga for "${query}"`,
-        );
+    // Enhance: also match user-uploaded alt names in chapter_versions. First page only — appended to
+    // every page they repeated on each one and pushed later pages past `limit` (#661).
+    if (offset === 0) {
+      try {
+        const existingIds = new Set(result.items.map((b) => b.id));
+        const altMatches = await this.findTitleIdsByAltName(query);
+        const newIds = altMatches.filter((id) => !existingIds.has(id));
+        if (newIds.length > 0) {
+          let extra = await this.mangaDex.fetchMangaByIds(newIds);
+          if (hasYearRange) extra = extra.filter(inYearRange);
+          result.items.push(...extra);
+          result.total += extra.length;
+          this.logger.log(
+            `Alt-name search added ${extra.length} extra manga for "${query}"`,
+          );
+        }
+      } catch (err) {
+        this.logger.warn(`Alt-name lookup failed: ${String(err)}`);
       }
-    } catch (err) {
-      this.logger.warn(`Alt-name lookup failed: ${String(err)}`);
     }
 
     if (result.items.length > 0) {

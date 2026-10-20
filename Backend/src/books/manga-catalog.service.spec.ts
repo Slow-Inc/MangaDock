@@ -65,6 +65,26 @@ describe('MangaCatalogService — search + passthrough (#231)', () => {
     expect(cache.set).toHaveBeenCalledTimes(1);
   });
 
+  it('adds alt-name matches to the first page only, so later pages keep their size (#661)', async () => {
+    const cache = makeCache(null);
+    const page2 = Array.from({ length: 28 }, (_, i) => ({ id: `p2-${i}` }));
+    const mangaDex = {
+      searchManga: jest.fn().mockResolvedValue({ items: page2, total: 60 }),
+      fetchMangaByIds: jest.fn().mockResolvedValue([{ id: 'alt' }]),
+    };
+    const svc = new MangaCatalogService(
+      mangaDex as any,
+      makeSupabase([{ title_id: 'alt' }]) as any,
+      cache as any,
+    );
+
+    const out = await svc.searchBooks('naruto', undefined, 28, 28);
+
+    expect(out.items).toHaveLength(28);
+    expect(out.total).toBe(60);
+    expect(mangaDex.fetchMangaByIds).not.toHaveBeenCalled();
+  });
+
   it('swallows an alt-name lookup failure and returns the base search', async () => {
     const cache = makeCache(null);
     const mangaDex = {
