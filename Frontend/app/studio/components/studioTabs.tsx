@@ -62,7 +62,8 @@ export const STUDIO_TABS: StudioTab[] = [
 
 export function getActiveStudioTab(pathname: string): StudioTabKey {
   if (pathname === "/studio") return "overview";
-  if (pathname.startsWith("/studio/works")) return "works";
+  // Uploading, one work's page and finding a manga to translate are all work management (#810).
+  if (["/studio/works", "/studio/upload", "/studio/manga", "/studio/search"].some((p) => pathname.startsWith(p))) return "works";
   if (pathname.startsWith("/studio/wallet")) return "wallet";
   if (pathname.startsWith("/studio/account")) return "account";
   return "overview";
