@@ -221,13 +221,13 @@ function CommunityContent() {
           <div className="w-px h-5 bg-white/10 shrink-0" />
           <button
             onClick={() => handleMobileCategorySelect(undefined)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${!category ? 'bg-white border-amber-500 text-black' : 'bg-white/5 border-white/10 text-black/50'}`}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${!category ? 'bg-white border-amber-500 text-black' : 'bg-white/5 border-white/10 text-white/50'}`}
           >ทั้งหมด</button>
           {availableCategories(userRole).map(cat => (
             <button
               key={cat}
               onClick={() => handleMobileCategorySelect(category === cat ? undefined : cat)}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${category === cat ? 'bg-white border-amber-500 text-black' : 'bg-white/5 border-white/10 text-black/50'}`}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border smooth-hover-fast ${category === cat ? 'bg-white border-amber-500 text-black' : 'bg-white/5 border-white/10 text-white/50'}`}
             >
               {cat === 'general' ? 'ทั่วไป' : cat === 'announcement' ? 'ประกาศ' : cat === 'spoiler' ? 'สปอยล์' : 'อัปเดต'}
             </button>

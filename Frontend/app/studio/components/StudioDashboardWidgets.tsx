@@ -9,8 +9,8 @@ const TONE_STYLES = {
     text: "text-amber-300",
     border: "border-amber-500/20",
     bg: "bg-amber-500/10",
-    fill: "#fbbf24",
-    softFill: "rgba(251,191,36,0.26)",
+    fill: "#e7e5e4",
+    softFill: "rgba(231,229,228,0.22)",
   },
   emerald: {
     text: "text-emerald-300",
@@ -37,8 +37,8 @@ const TONE_STYLES = {
     text: "text-white/70",
     border: "border-white/10",
     bg: "bg-white/5",
-    fill: "#94a3b8",
-    softFill: "rgba(148,163,184,0.22)",
+    fill: "#3987e5",
+    softFill: "rgba(57,135,229,0.24)",
   },
   violet: {
     text: "text-white/70",
