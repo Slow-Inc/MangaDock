@@ -189,7 +189,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         if to_lang in self.chat_sample:
             return '\n'.join([
                 'System:',
-                self.chat_system_template.format(to_lang=to_lang),
+                self.system_prompt(to_lang),
                 'User:',
                 self.chat_sample[to_lang][0],
                 'Assistant:',
@@ -200,7 +200,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         else:
             return '\n'.join([
                 'System:',
-                self.chat_system_template.format(to_lang=to_lang),
+                self.system_prompt(to_lang),
                 'User:',
                 prompt,
             ])
@@ -290,7 +290,7 @@ class CustomOpenAiTranslator(ConfigGPT, CommonTranslator):
         return translations
 
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
-        messages = [{'role': 'system', 'content': self.chat_system_template.format(to_lang=to_lang)}]
+        messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]
 
         # Add chat samples if available
         lang_chat_samples = self.get_chat_sample(to_lang)

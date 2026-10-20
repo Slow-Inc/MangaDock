@@ -673,7 +673,7 @@ class OpenAITranslator(ConfigGPT, CommonTranslator):
                 
         # 构建 messages / Construct messages
         messages = [  
-            {'role': 'system', 'content': self.chat_system_template.format(to_lang=lang_name)},  
+            {'role': 'system', 'content': self.system_prompt(lang_name)},  
         ]  
 
         # 提取相关术语并添加到系统消息中  / Extract relevant terms and add them to the system message

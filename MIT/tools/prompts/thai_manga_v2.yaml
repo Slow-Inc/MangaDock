@@ -1,3 +1,5 @@
+# SHIPPED 2026-10-21 as MIT's default Thai prompt: manga_translator/translators/prompts/thai_manga_system.txt
+# (this file stays as the #762 A/B experiment record).
 # Translation-prompt variant B v2 (2026-10-20 quality loop): v1 + fixes for the failures the
 # blind judges found in v1 (Korean/untranslated credits, dangling fragments, misused royal register).
 # Differs from the built-in template (config_gpt._CHAT_SYSTEM_TEMPLATE) only in the system

@@ -46,3 +46,22 @@ def test_a_script_the_source_already_uses_is_not_a_leak():
     out = asyncio.run(t.translate('JPN', 'THA', ['ドン!', 'さようなら']))
     assert out == ['ドン!', 'ลาก่อน']
     assert t.client.chat.completions.create.call_count == 1
+
+
+def _system_message(t, to_lang, sources):
+    t.client.chat.completions.create = mock.AsyncMock(return_value=_reply('<|1|>x'))
+    asyncio.run(t.translate('JPN', to_lang, sources))
+    return t.client.chat.completions.create.call_args.kwargs['messages'][0]['content']
+
+
+def test_thai_uses_the_thai_manga_prompt_by_default():
+    """#762 (2026-10-21): the generic prompt inserted a spurious 'ทน' ('ฉันทนฟังบทสนทนา' for "I heard
+    your conversation", 'ฉันทะโกด') on Tsuki p1 in 1 of 3 runs and across the corpus; the Thai prompt
+    v2 did not in 9 runs and left 0 segments untranslated. Thai gets it by default."""
+    sys_msg = _system_message(CustomOpenAiTranslator(), 'THA', ['I HEARD YOUR CONVERSATION'])
+    assert 'Thai editions of manga' in sys_msg
+
+
+def test_other_targets_keep_the_generic_prompt():
+    sys_msg = _system_message(CustomOpenAiTranslator(), 'ENG', ['こんにちは'])
+    assert 'Thai editions of manga' not in sys_msg

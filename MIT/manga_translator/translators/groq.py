@@ -89,7 +89,7 @@ class GroqTranslator(CommonTranslator):
     def _format_prompt_log(self, to_lang: str, prompt: str) -> str:
         return '\n'.join([
             'System:',
-            self.chat_system_template.format(to_lang=to_lang),
+            self.system_prompt(to_lang),
             'User:',
             self.chat_sample[0],
             'Assistant:',

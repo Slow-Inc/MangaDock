@@ -128,7 +128,7 @@ class Qwen3Translator(OfflineTranslator, ConfigGPT):
         for i, query in enumerate(queries):
             prompt += f'\n<|{i+1}|>{query}'
 
-        messages = [{'role': 'system', 'content': self.chat_system_template.format(to_lang=to_lang)}]
+        messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]
         if to_lang in self.chat_sample:
             messages.append({'role': 'user', 'content': self.chat_sample[to_lang][0]})
             messages.append({'role': 'assistant', 'content': self.chat_sample[to_lang][1]})

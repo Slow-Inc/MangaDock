@@ -112,7 +112,7 @@ class Qwen2Translator(OfflineTranslator, ConfigGPT):
             prompt += f'\n<|{i+1}|>{query}'
 
         tokenizer = self.tokenizer
-        messages = [{'role': 'system', 'content': self.chat_system_template.format(to_lang=to_lang)}]
+        messages = [{'role': 'system', 'content': self.system_prompt(to_lang)}]
         
         if to_lang in self.chat_sample:
             messages.append({'role': 'user', 'content': self.chat_sample[to_lang][0]})
