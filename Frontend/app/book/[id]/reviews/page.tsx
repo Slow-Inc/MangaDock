@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Navbar from "../../../components/Navbar";
 import ReviewCard from "../../../components/ReviewCard";
+import Mascot from "../../../components/mascot/Mascot";
 import StarRating from "../../../components/StarRating";
 import type { ReviewItem, ReviewSummary } from "../../../lib/reviewTypes";
 
@@ -32,38 +34,53 @@ export default async function ReviewsPage({ params }: Props) {
   const { reviews, summary } = await fetchReviews(id);
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <Link
-        href={`/book/${id}`}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-ink-3 transition hover:text-ink-2"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-          <path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        กลับ
-      </Link>
+    <div className="min-h-screen bg-bg text-ink">
+      <Navbar />
+      <main className="page-shell page-shell-nav">
+        <div className="max-w-3xl">
+        <Link
+          href={`/book/${id}`}
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-ink-3 transition hover:text-ink-2"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden>
+            <path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          กลับไปหน้ามังงะ
+        </Link>
 
-      <div className="mb-8">
-        <h1 className="text-xl font-bold text-ink">รีวิวทั้งหมด</h1>
-        {summary.count > 0 && (
-          <div className="mt-2 flex items-center gap-3">
-            <StarRating value={Math.round(summary.averageRating)} readonly size="md" />
-            <span className="text-sm text-ink-2">
-              {summary.averageRating.toFixed(1)} / 5 · {summary.count} รีวิว
-            </span>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl font-bold text-ink md:text-3xl">รีวิวทั้งหมด</h1>
+          {summary.count > 0 ? (
+            <div className="mt-2 flex items-center gap-3">
+              <StarRating value={Math.round(summary.averageRating)} readonly size="md" />
+              <span className="text-sm text-ink-2">
+                {summary.averageRating.toFixed(1)} / 5 · {summary.count} รีวิว
+              </span>
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-ink-3">ความเห็นของผู้อ่านเรื่องนี้</p>
+          )}
+        </div>
+
+        {reviews.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-line bg-surface py-16 text-center">
+            <div className="flex justify-center">
+              <Mascot area="community" size={72} />
+            </div>
+            <p className="mt-3 font-medium text-ink-3">ยังไม่มีรีวิว</p>
+            <Link href={`/book/${id}`} className="mt-1 inline-block text-sm text-accent hover:underline">
+              อ่านแล้วเขียนรีวิวแรกได้ที่หน้ามังงะ
+            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {reviews.map((r) => (
+              <ReviewCard key={r.id} review={r} />
+            ))}
           </div>
         )}
-      </div>
-
-      {reviews.length === 0 ? (
-        <p className="py-12 text-center text-sm text-ink-3">ยังไม่มีรีวิว</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {reviews.map((r) => (
-            <ReviewCard key={r.id} review={r} />
-          ))}
         </div>
-      )}
-    </main>
+      </main>
+    </div>
   );
 }
