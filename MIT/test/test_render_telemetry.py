@@ -23,7 +23,7 @@ def stubs(monkeypatch):
     monkeypatch.setattr(rend, '_bubble_fit_font_size',
                         lambda region, wh, ratio: 42)
     monkeypatch.setattr(rend, '_clean_layout_dst',
-                        lambda region, shape, fmin, fmax, page_shape=None: (20, 80.0, 30.0))
+                        lambda region, shape, fmin, fmax, page_shape=None, **kw: (20, 80.0, 30.0))
     return monkeypatch
 
 
@@ -276,7 +276,7 @@ def test_anti_overlap_does_not_push_a_region_out_of_the_balloon_it_shares(monkey
     whole balloon, so clamping against it shoved the block out of its own balloon and onto the
     neighbouring balloon's text. Siblings in one balloon are not neighbours to avoid."""
     monkeypatch.setattr(rend, '_clean_layout_dst',
-                        lambda region, shape, fmin, fmax, page_shape=None: (20, 89.0, 96.0))
+                        lambda region, shape, fmin, fmax, page_shape=None, **kw: (20, 89.0, 96.0))
     img = np.full((800, 800, 3), 255, np.uint8)
     balloon = (477.0, 473.0, 560.0, 694.0)
     a = FakeRegion(horizontal=True, translation='BUT THAT SORT OF', xyxy=(483, 522, 543, 584),
