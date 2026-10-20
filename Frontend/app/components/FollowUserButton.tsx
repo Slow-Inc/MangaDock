@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 
@@ -17,26 +17,30 @@ export default function FollowUserButton({ targetUid }: Props) {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
 
-  const fetchStatus = useCallback(async () => {
-    const token = await getToken();
-    if (!token) { setLoading(false); return; }
-    try {
-      const res = await fetch(`/api/proxy/user-follows/${encodeURIComponent(targetUid)}/is-following`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setFollowing(data.following ?? false);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [targetUid]);
-
   useEffect(() => {
-    if (user) fetchStatus();
-    else setLoading(false);
-  }, [user, fetchStatus]);
+    // The instance is reused across /community/profile/[uid] navigations: drop the
+    // previous profile's state and ignore responses that arrive for an old targetUid.
+    let cancelled = false;
+    setFollowing(false);
+    if (!user) { setLoading(false); return; }
+    setLoading(true);
+    (async () => {
+      let next = false; // unknown (no token / non-ok / network error) → not following
+      try {
+        const token = await getToken();
+        if (token) {
+          const res = await fetch(`/api/proxy/user-follows/${encodeURIComponent(targetUid)}/is-following`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) next = (await res.json()).following ?? false;
+        }
+      } catch { /* keep `next = false`; the button stays usable */ }
+      if (cancelled) return;
+      setFollowing(next);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user, targetUid]);
 
   async function handleToggle() {
     if (!user) { showLoginPrompt(); return; }
