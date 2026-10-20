@@ -402,3 +402,31 @@ def test_after_the_cooldown_only_one_trial_is_admitted(monkeypatch):
     clock['t'] += ocr_vlm.SFX_BREAKER_COOLDOWN_S
     assert ocr_vlm._breaker.allows()        # the trial
     assert not ocr_vlm._breaker.allows()    # a concurrent page while the trial is in flight
+
+
+# #754 — ADR 026 Addendum DROP, narrowed by the 2026-10-20 corpus probe (16 EN pages): every det_sfx
+# false-positive read ONE ASCII char from art ('I', 'v', 'n', 'S', '1'), while multi-char ASCII
+# reads were real lettering worth keeping ('CHAINSAWMAN', 'Yamai', 'Omake', '491'). A real-text
+# read sitting on a dialogue line ('W'/'THE' over a bubble, Gal Yome 2026-06-30) is dropped too.
+
+def test_a_single_char_ascii_read_from_det_sfx_is_a_false_positive():
+    from manga_translator.ocr_vlm import sfx_false_positive
+    for t in ('I', 'v', 'S', '1'):
+        assert sfx_false_positive(t, True, (0, 0, 200, 300), [])
+
+
+def test_real_multi_char_lettering_off_the_dialogue_is_kept():
+    from manga_translator.ocr_vlm import sfx_false_positive
+    for t in ('CHAINSAWMAN', 'Yamai', '491'):
+        assert not sfx_false_positive(t, True, (0, 0, 200, 300), [(500, 500, 600, 540)])
+
+
+def test_a_real_text_read_on_top_of_a_dialogue_line_is_dropped():
+    from manga_translator.ocr_vlm import sfx_false_positive
+    assert sfx_false_positive('THE', True, (100, 100, 300, 260), [(150, 150, 250, 180)])
+
+
+def test_only_det_sfx_provenance_and_ascii_reads_are_dropped():
+    from manga_translator.ocr_vlm import sfx_false_positive
+    assert not sfx_false_positive('I', False, (0, 0, 200, 300), [])      # dialogue 'I' stays
+    assert not sfx_false_positive('ぬ', True, (0, 0, 200, 300), [])      # dropped glyph: rescue's job

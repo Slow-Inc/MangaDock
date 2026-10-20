@@ -706,6 +706,7 @@ class MangaTranslator:
                                                      containers=self._textline_containers(config, ctx))
 
         new_text_regions = []
+        dialogue_boxes = [r.xyxy for r in text_regions if not getattr(r, 'from_sfx_detection', False)]
         for region in text_regions:
             # Remove leading spaces after pre-translation dictionary replacement                
             original_text = region.text  
@@ -823,6 +824,15 @@ class MangaTranslator:
                         region.sfx_rescued = True  # restore_sfx_translations re-applies after translate
                         new_text_regions.append(region)
                         continue
+
+            # #754 (ADR 026 Addendum DROP): a det_sfx box the OCR read as one stray ASCII char, or as
+            # real text over a dialogue line, is a detector false-positive — translated, it renders
+            # 'W'->'ว' over the art or the real line.
+            from .ocr_vlm import sfx_false_positive
+            if sfx_false_positive(region.text, getattr(region, 'from_sfx_detection', False),
+                                  region.xyxy, dialogue_boxes):
+                logger.info(f'Dropped det_sfx false-positive: "{region.text}"')
+                continue
 
             if len(region.text) < config.ocr.min_text_length \
                     or not is_valuable_text(region.text) \

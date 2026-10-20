@@ -75,3 +75,10 @@ def test_026_addendum_real_text_guard_is_on_the_rescue_path():
         'sent to the vision gateway and its hallucinated onomatopoeia rendered over real '
         'dialogue. See ADR 026 Addendum; if this is a deliberate trade-off, amend the ADR.'
     )
+
+
+def test_754_det_sfx_false_positive_drop_is_called_by_the_driver():
+    # ADR 026 Addendum DROP (#754): without it a det_sfx box read as 'W' is translated ('ว') and
+    # rendered over the art or the real dialogue.
+    assert 'sfx_false_positive' in _called_names(), (
+        'the driver no longer drops det_sfx false-positives (ocr_vlm.sfx_false_positive, #754)')

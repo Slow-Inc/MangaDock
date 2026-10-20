@@ -116,9 +116,22 @@ def ocr_read_real_text(stripped_text: str) -> bool:
     proof the OCR succeeded on real characters: a dialogue fragment or a det_sfx false-positive
     sitting on a speech bubble — NOT a dropped glyph. Used to (a) skip the vision rescue and
     (b) drop the det_sfx false-positive so its literal fragment ('W'→'ว') is not translated and
-    rendered over the dialogue bubble (#278). On integrate/render-reconcile only (a) is wired;
-    (b) is tracked in #754. Pure."""
+    rendered over the dialogue bubble (#278; (b) is ``sfx_false_positive``, #754). Pure."""
     return bool(re.search(r'[A-Za-z0-9]', stripped_text or ''))
+
+
+def sfx_false_positive(stripped_text: str, from_sfx_detection: bool, box, dialogue_boxes) -> bool:
+    """#754 — ADR 026 Addendum DROP: a det_sfx region the line-OCR read as real text that is not an
+    SFX to keep. Narrowed by the 2026-10-20 corpus probe (16 EN pages): every false-positive read a
+    single ASCII char off the art ('I', 'v', 'S', '1'), while multi-char reads were real lettering
+    ('CHAINSAWMAN', 'Yamai', '491'). A real-text read over a dialogue line ('THE' on a bubble) is a
+    false-positive whatever its length. Pure."""
+    if not (from_sfx_detection and ocr_read_real_text(stripped_text)):
+        return False
+    if len(stripped_text.strip()) <= 1:
+        return True
+    x1, y1, x2, y2 = box
+    return any(x1 <= (d[0] + d[2]) / 2 <= x2 and y1 <= (d[1] + d[3]) / 2 <= y2 for d in dialogue_boxes)
 
 
 def should_rescue_sfx(stripped_text: str, from_sfx_detection: bool, box_w: float, box_h: float,
