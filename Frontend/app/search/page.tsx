@@ -317,6 +317,7 @@ function SearchResults() {
       <Navbar />
 
       <main className="page-shell page-shell-nav page-shell-wide">
+        <h1 className="sr-only">ค้นหามังงะ</h1>
 
         {/* ── Search bar ────────────────────────────────────────────── */}
         <form onSubmit={handleSearch} className="mb-7 flex flex-col gap-3 sm:flex-row">

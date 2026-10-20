@@ -306,6 +306,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
   const content = (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={book.title}
       onClickCapture={onLinkClickCapture}
       className={`fixed inset-0 z-200 flex items-center justify-center md:p-4 transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
     >
@@ -799,7 +802,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                     >
                       <Image
                         src={displayUrl}
-                        alt={cover.volume ? `เล่ม ${cover.volume}` : `ปก ${i + 1}`}
+                        alt={cover.volume ? "" : `ปก ${i + 1}`} // the caption below already says "เล่ม N"
                         fill
                         className="object-cover transition duration-200 group-hover:scale-105"
                         sizes="96px"

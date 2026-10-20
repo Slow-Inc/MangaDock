@@ -119,7 +119,7 @@ export default function ForumSideMenu({
   }, [searchQuery, handleSearch]);
 
   return (
-    <aside className="space-y-8 w-full pb-10">
+    <nav aria-label="เมนูคอมมูนิตี้" className="space-y-8 w-full pb-10">
       {/* Sidebar Search - Premium Search Bar */}
       <div className="relative group px-1">
         <input
@@ -291,6 +291,6 @@ export default function ForumSideMenu({
            </ul>
         </div>
       </div>
-    </aside>
+    </nav>
   );
 }

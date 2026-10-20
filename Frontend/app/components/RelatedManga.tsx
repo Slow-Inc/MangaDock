@@ -24,7 +24,7 @@ function RelatedCard({ book }: { book: LandingBook }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={thumbSrc}
-            alt={book.title}
+            alt="" // the title is the text right below, inside the same button
             onError={() => {
               if (!thumbFellBack) {
                 const fallback = thumbnailFallbackSrc(book);

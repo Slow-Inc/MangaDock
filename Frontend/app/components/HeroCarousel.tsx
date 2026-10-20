@@ -195,7 +195,7 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
             ) : (
               <Image
                 src={imgUrl}
-                alt={book.title}
+                alt="" // the button's aria-label and the h1 below already name the book
                 fill
                 priority={idx === 0}
                 sizes="88vw"
