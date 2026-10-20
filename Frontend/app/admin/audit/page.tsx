@@ -76,7 +76,7 @@ export default function AdminAuditPage() {
   const load = useCallback(
     async (p: number) => {
       setLoading(true);
-    setLoadFailed(false);
+      setLoadFailed(false);
       const params = new URLSearchParams({
         limit: String(LIMIT + 1), // fetch one extra to detect hasMore
         offset: String((p - 1) * LIMIT),
