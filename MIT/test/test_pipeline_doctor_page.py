@@ -217,3 +217,19 @@ def test_replay_reuses_recorded_translations_and_reports_misses():
     out, missing = replay_translations(['I THINK?', 'NEW LINE', 'WELL HOW DO I CHECK'], recorded)
     assert out == ['ใช่ไหม?', None, 'แล้วจะตรวจสอบ']
     assert missing == [1]
+
+
+def test_foreign_script_leaking_into_a_thai_translation_warns():
+    """Seen in the 2026-10-20 prompt A/B: the LLM emitted Cyrillic ('Чит') and Korean into Thai
+    output. Any script that is neither the target's nor Latin is a translate-stage defect."""
+    page = PageSnapshot(target_lang='THA', width=800, height=1150, textlines=3, sfx_lines=0,
+                        empty_reads=0, regions=[
+        _region(0, (100, 100, 300, 160), 'CHEAT', 'Чит โกง'),
+        _region(1, (100, 300, 300, 360), 'SPECIAL THANKS', '특별 감사'),
+        _region(2, (100, 500, 300, 560), 'HELLO', 'สวัสดี'),
+    ])
+    run, flags = diagnose(page)
+    translate = _by_stage(run)['translate']
+    assert translate.status == WARN
+    assert translate.metrics['foreign_script'] == 2
+    assert 2 not in flags
