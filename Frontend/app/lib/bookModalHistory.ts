@@ -57,6 +57,23 @@ export function backOwnEntry() {
   window.history.back();
 }
 
+type LinkClick = { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; defaultPrevented: boolean };
+
+/** The in-app path a click inside a popup navigates to, or null to leave the click to the
+ *  browser / Next. A popup that pushed /book/<id> must REPLACE that entry when a link takes
+ *  the user elsewhere: a push leaves /book/<id> behind, and Back then shows the page behind
+ *  at /book/<id> with no popup. */
+export function inPopupLinkTarget(
+  a: { getAttribute(name: string): string | null } | null,
+  e: LinkClick,
+): string | null {
+  if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return null;
+  const href = a.getAttribute("href");
+  if (!href || !href.startsWith("/") || href.startsWith("//")) return null;
+  if (a.getAttribute("target") === "_blank" || a.getAttribute("download") !== null) return null;
+  return href;
+}
+
 let lastModalNavigation = Number.NEGATIVE_INFINITY;
 
 /** Called right before a popup opens/closes its history entry. */

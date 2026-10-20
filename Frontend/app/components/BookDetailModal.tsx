@@ -13,7 +13,8 @@ import { useBookActions } from "../hooks/useBookActions";
 import FollowSeriesButton from "./FollowSeriesButton";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
-import { backOwnEntry, bookPath, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
+import { useRouter } from "next/navigation";
+import { backOwnEntry, bookPath, inPopupLinkTarget, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
 import { loadMangaDetail } from "../lib/mangaDetail";
 import { translateDescription } from "../lib/translateDescription";
 import MangaDiscussion from "./MangaDiscussion";
@@ -120,6 +121,21 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const modalContentRef = useRef<HTMLDivElement>(null);
   const closingRef = useRef(false);
   const historyPushedRef = useRef(false);
+  const router = useRouter();
+
+  // A link inside the popup (discussion, post cards, profiles) leaves the page while this
+  // popup's /book/<id> entry is still on top: replace that entry instead of pushing past it.
+  // Only links in this popup's own DOM — a nested popup's links are its own to handle.
+  const onLinkClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!historyPushedRef.current) return;
+    const a = (e.target as Element).closest("a");
+    if (!a || !e.currentTarget.contains(a)) return;
+    const href = inPopupLinkTarget(a, e);
+    if (!href) return;
+    e.preventDefault();
+    historyPushedRef.current = false;
+    router.replace(href);
+  };
 
   const [isHoveringCovers, setIsHoveringCovers] = useState(false);
   const [coverCanScrollLeft, setCoverCanScrollLeft] = useState(false);
@@ -287,6 +303,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
 
   const content = (
     <div
+      onClickCapture={onLinkClickCapture}
       className={`fixed inset-0 z-200 flex items-center justify-center md:p-4 md:backdrop-blur-sm transition-opacity duration-300 md:duration-400 ${visible ? "opacity-100" : "opacity-0"}`}
     >
       {/* Backdrop */}

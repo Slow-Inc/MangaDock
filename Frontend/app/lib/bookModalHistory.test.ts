@@ -66,6 +66,32 @@ describe("bookPath", () => {
   });
 });
 
+describe("inPopupLinkTarget: which clicks inside a popup should replace its history entry", () => {
+  const click = { button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, defaultPrevented: false };
+  const anchor = (attrs: Record<string, string>) => ({ getAttribute: (n: string) => attrs[n] ?? null });
+
+  test("a plain click on an in-app link goes to its path", async () => {
+    const { inPopupLinkTarget } = await fresh();
+    expect(inPopupLinkTarget(anchor({ href: "/community?mangaId=x" }), click)).toBe("/community?mangaId=x");
+  });
+
+  test("leaves alone what the browser should handle: new tab/window, external, protocol-relative, download", async () => {
+    const { inPopupLinkTarget } = await fresh();
+    expect(inPopupLinkTarget(anchor({ href: "/community" }), { ...click, ctrlKey: true })).toBeNull();
+    expect(inPopupLinkTarget(anchor({ href: "/community" }), { ...click, button: 1 })).toBeNull();
+    expect(inPopupLinkTarget(anchor({ href: "/community", target: "_blank" }), click)).toBeNull();
+    expect(inPopupLinkTarget(anchor({ href: "https://manga.nicovideo.jp/comic/1" }), click)).toBeNull();
+    expect(inPopupLinkTarget(anchor({ href: "//evil.example/x" }), click)).toBeNull();
+    expect(inPopupLinkTarget(anchor({ href: "/file.zip", download: "" }), click)).toBeNull();
+  });
+
+  test("no anchor, or a click something already handled, passes through", async () => {
+    const { inPopupLinkTarget } = await fresh();
+    expect(inPopupLinkTarget(null, click)).toBeNull();
+    expect(inPopupLinkTarget(anchor({ href: "/community" }), { ...click, defaultPrevented: true })).toBeNull();
+  });
+});
+
 describe("modalStack: a Back press goes to the top-most popup that still owns a history entry", () => {
   test("only the top-most popup answers", async () => {
     const { modalStack } = await fresh();
