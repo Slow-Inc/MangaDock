@@ -328,7 +328,7 @@ export function HorizontalBreakdownChart({
           <div key={item.label} className="space-y-1.5">
             <div className="flex items-center justify-between gap-3 text-sm">
               <p className="truncate text-white/75">{item.label}</p>
-              <p className={`shrink-0 font-medium ${styles.text}`}>{formatter(item.value)}</p>
+              <p className="shrink-0 font-medium tabular-nums text-white/90">{formatter(item.value)}</p>
             </div>
             <div className="h-2 rounded-full bg-white/6">
               <div className="h-full rounded-full" style={{ width, backgroundColor: styles.fill }} />
@@ -416,7 +416,7 @@ export function DonutChart({
                 <p className="truncate text-sm text-white/75">{item.label}</p>
               </div>
               <div className="text-right">
-                <p className={`text-sm font-medium ${styles.text}`}>{formatter(item.value)}</p>
+                <p className="text-sm font-medium tabular-nums text-white/90">{formatter(item.value)}</p>
                 <p className="text-[11px] text-white/30">{percent}%</p>
               </div>
             </div>
