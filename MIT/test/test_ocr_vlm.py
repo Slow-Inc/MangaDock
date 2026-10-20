@@ -445,3 +445,15 @@ def test_speculative_box_reads_the_region_provenance():
     assert speculative_box(SimpleNamespace(speculative=True))
     assert not speculative_box(SimpleNamespace(speculative=False))
     assert not speculative_box(SimpleNamespace())
+
+
+# #797 follow-up (2026-10-21 probe, 16 pages): rescue placeholders whose OCR read was junk all had
+# confidence <= 0.657 ('TAF' .60, 'V' .61, 'LIt' .045); real reads were >= 0.959 ('STICK', 'IS SHE',
+# 'CALLED', '-AVALA'). Length cannot tell 'LIt' from 'WAS'; confidence can.
+
+def test_a_low_confidence_placeholder_read_is_junk():
+    from types import SimpleNamespace
+    from manga_translator.ocr_vlm import placeholder_junk
+    assert placeholder_junk(SimpleNamespace(rescue_placeholder=True, prob=0.6))
+    assert not placeholder_junk(SimpleNamespace(rescue_placeholder=True, prob=0.97))
+    assert not placeholder_junk(SimpleNamespace(rescue_placeholder=False, prob=0.1))  # DBNet text

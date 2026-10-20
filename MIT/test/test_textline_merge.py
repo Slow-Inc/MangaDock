@@ -379,6 +379,7 @@ async def test_a_region_of_rescue_placeholders_is_marked():
     regions = await dispatch_merge(lines, 800, 800)
     by_text = {r.text: r for r in regions}
     assert by_text['w'].speculative and not by_text['HELLO'].speculative
+    assert by_text['w'].rescue_placeholder and not by_text['HELLO'].rescue_placeholder
 
 
 @pytest.mark.asyncio

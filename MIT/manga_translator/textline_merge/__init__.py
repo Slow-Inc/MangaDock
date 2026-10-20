@@ -228,5 +228,6 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
         # ink-cluster placeholder): a real line merged with a det_sfx fragment is dialogue, and
         # must never meet the junk-read drop (ocr_vlm.sfx_false_positive, #754/#797).
         region.speculative = all(t.is_sfx or t.rescue_placeholder for t in txtlns)
+        region.rescue_placeholder = all(t.rescue_placeholder for t in txtlns)
         text_regions.append(region)
     return text_regions

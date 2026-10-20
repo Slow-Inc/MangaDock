@@ -88,3 +88,7 @@ def test_rescue_placeholders_go_through_the_false_positive_drop():
     # a junk OCR read of an empty-balloon / ink-cluster placeholder ('w' -> 'ว') is dropped like a
     # det_sfx false-positive: the driver asks speculative_box(), not from_sfx_detection alone.
     assert 'speculative_box' in _called_names()
+
+
+def test_low_confidence_placeholder_reads_are_dropped_by_the_driver():
+    assert 'placeholder_junk' in _called_names()

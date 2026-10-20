@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 3 — proven configs become defaults, scrutinize fixes (2026-10-21)
+
+Branch `feat/mit-quality-loop` (PR #794). Goal rule added 2026-10-21: a config proven on real pages becomes the MIT default without asking.
+- **#762 Thai manga prompt is the Thai default** — the generic prompt inserted a spurious `ทน` (`ฉันทนฟังบทสนทนา` for "I heard your conversation", `ฉันทะโกด`) in 1/3 runs on Tsuki p1 and across the corpus; the Thai prompt had 0 in 9 runs. Shipped in-package (`translators/prompts/thai_manga_system.txt`), picked by `ConfigGPT.system_prompt(to_lang)` unless a gpt_config overrides; all GPT-family translators format through it.
+- **#757 container merge on by default** — replay A/B: split containers 3 → 1, spill/overlap unchanged, merges correct (`2026-10-21-757-container-merge-default.*`).
+- **Scrutinize fixes** — `(ผู้ชาย)` no longer char-split by its trailing space; newmm multi-word tokens (`ไป ๆ มา ๆ`) split so `ๆ` never starts a line; #754/#797 drops recorded in the payload (`speculative box read as junk`). Kept: the exhaustive font scan (#761, ~7× slower than bisection on short text, but finds the largest fitting size) — speed phase. Deploy: bump `MIT_RENDER_VERSION` so cached pages re-render (code changes are not in the cache key).
+- **Doctor** — replay reproduces texts the recording dropped as identical, so A/B arms differ only by code.
+
 ## MIT quality loop, round 2 — spaces, punctuation, tone marks, review fixes (2026-10-20)
 
 Branch `feat/mit-quality-loop`.

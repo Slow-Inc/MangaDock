@@ -127,6 +127,17 @@ def speculative_box(region) -> bool:
     return bool(getattr(region, 'speculative', False))
 
 
+#: Rescue placeholders: a junk OCR read of a whole box scored <= 0.657, real text >= 0.959
+#: (16-page probe, 2026-10-21).
+PLACEHOLDER_MIN_PROB = 0.9
+
+
+def placeholder_junk(region) -> bool:
+    """An empty-balloon / ink-cluster placeholder whose line-OCR read is low-confidence — a guess
+    at a whole box, not text (#797: 'LIt', 'TAF', 'V' rendered as Thai). Real reads score high."""
+    return bool(getattr(region, 'rescue_placeholder', False)) and         float(getattr(region, 'prob', 1.0)) < PLACEHOLDER_MIN_PROB
+
+
 def sfx_false_positive(stripped_text: str, speculative: bool, box, dialogue_boxes) -> bool:
     """#754 — ADR 026 Addendum DROP: a speculative box (``speculative_box``) the line-OCR read as
     real text that is not an SFX to keep. Narrowed by the 2026-10-20 corpus probe (16 EN pages): every false-positive read a
