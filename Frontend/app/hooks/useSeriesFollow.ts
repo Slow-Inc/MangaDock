@@ -3,15 +3,11 @@
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import { removeFollowItem, restoreFollowItem, type FollowedSeries, type RemovedFollow } from "./seriesFollowState";
+
+export type { FollowedSeries };
 
 export const FOLLOW_EVENT = "mb-follow-updated";
-
-export type FollowedSeries = {
-  id: string;
-  title: string;
-  thumbnail: string;
-  followedAt: string;
-};
 
 // ─── Module-level cache ────────────────────────────────────────────────────
 let followedIds: Set<string> = new Set();
@@ -87,10 +83,11 @@ export function useSeriesFollow(book: { id: string; title: string; thumbnail: st
     if (!token || toggling) return;
 
     const wasFollowing = followedIds.has(book.id);
+    let removed: RemovedFollow = null;
     // Optimistic update
     if (wasFollowing) {
       followedIds.delete(book.id);
-      followItems = followItems.filter((f) => f.id !== book.id);
+      ({ items: followItems, snapshot: removed } = removeFollowItem(followItems, book.id));
     } else {
       followedIds.add(book.id);
       followItems = [
@@ -119,10 +116,7 @@ export function useSeriesFollow(book: { id: string; title: string; thumbnail: st
       // Revert on network error
       if (wasFollowing) {
         followedIds.add(book.id);
-        followItems = [
-          { id: book.id, title: book.title, thumbnail: book.thumbnail, followedAt: "" },
-          ...followItems,
-        ];
+        followItems = restoreFollowItem(followItems, removed);
       } else {
         followedIds.delete(book.id);
         followItems = followItems.filter((f) => f.id !== book.id);
