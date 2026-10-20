@@ -103,6 +103,7 @@ export default function PublicProfilePage() {
   useEffect(() => {
     if (!uid) return;
     setLoading(true);
+    setTab("posts");
     setExtraPosts([]);
     setHasMorePosts(true);
     setLoadingMorePosts(false);
@@ -654,7 +655,7 @@ export default function PublicProfilePage() {
             )}
 
             {/* Following */}
-            {tab === "following" && (
+            {tab === "following" && !isOwnProfile && (
               loadingFollowing ? (
                 <div className="flex justify-center py-10"><Loader context="section" label="กำลังโหลด" className="text-ink-3" /></div>
               ) : followingUsers.length === 0 ? (
