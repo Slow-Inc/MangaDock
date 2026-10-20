@@ -319,6 +319,14 @@ MANGA_TRANSLATOR_URL=http://10.0.0.25:5003
 
 ให้ปรับ translator และ target language ตามความต้องการของโปรเจกต์ที่นำไปใช้งาน
 
+### ผลแปลเพี้ยน — หาว่าเพี้ยนที่ stage ไหน (Pipeline Doctor page mode, #756)
+
+```bash
+.venv/Scripts/python.exe tools/doctor_page.py <page.png> --target THA   # [--out DIR] [--json]
+```
+
+รันหน้าเดียวผ่าน patches path (path เดียวกับ production) แล้วรายงาน `OK` / `WARN` / `FAIL` ของแต่ละ stage (`detect` → `ocr` → `merge` → `translate` → `render`) พร้อมหลักฐาน เช่น `gap/char` ของบรรทัดที่ถูกหั่นออกจากกล่องเดียวกัน · defect ที่เกิดใน stage ก่อนหน้าจะถูกนับเป็น *inherited* ใน stage ถัดไป รายงานจึงชี้ stage แรกที่พัง · ได้ไฟล์ `<stem>_<target>.doctor.png` (ต้นฉบับที่ตีกรอบ region ที่มีปัญหา คู่กับหน้าที่ render แล้ว), `.doctor.json` และ `.rendered.png` ใน `result/doctor/` · exit code เป็น 1 เมื่อมี `FAIL`
+
 ## การอ้างอิงต้นทาง
 
 - Upstream repository: `https://github.com/zyddnys/manga-image-translator`
