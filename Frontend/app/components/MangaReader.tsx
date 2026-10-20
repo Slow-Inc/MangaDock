@@ -24,7 +24,7 @@ import ReaderCommentDrawer from "./ReaderCommentDrawer";
 import ReportButton from "./ReportButton";
 import Loader from "./ui/Loader";
 import Mascot from "./mascot/Mascot";
-import { useDialogFocus } from "../hooks/useDialogFocus";
+import { hasLayerAbove, useDialogFocus } from "../hooks/useDialogFocus";
 
 const MIT_OFFLINE_LABEL = "ระบบแปลออฟไลน์";
 
@@ -188,7 +188,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [mounted, setMounted] = useState(false);
   // Full-screen layer: focus in on open, Tab stays inside, focus back to the opener on close (#840).
   const readerRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(readerRef, () => true, mounted);
+  // Not on the popup's modal stack: it is "top" unless another layer (e.g. the login modal) was opened over it.
+  const readerIsTop = () => !!readerRef.current && !hasLayerAbove(readerRef.current);
+  useDialogFocus(readerRef, readerIsTop, mounted);
   // Default to continuous mode on mobile (< 640px) for better UX
   const [continuousMode, setContinuousMode] = useState(() =>
     typeof window !== "undefined" && window.innerWidth < 640
@@ -477,6 +479,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     // along with the reader (#840).
     const onEscape = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // Focus in a layer over the reader (e.g. the login prompt) — that layer owns Escape.
+      const active = document.activeElement;
+      if (readerRef.current && active && active !== document.body && !readerRef.current.contains(active)) return;
       e.stopPropagation();
       if (showChapterPickerRef.current) { closePicker(); return; }
       handleClose();

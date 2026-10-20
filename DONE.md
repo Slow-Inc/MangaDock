@@ -12,7 +12,9 @@ registered first). Both now handle Escape in the capture phase and stop it.
 
 **Validated:** production build, keyboard only, reader opened from the popup: focus inside the reader, 25 Tabs never leave
 it, ArrowRight still pages (1 → 2 / 26), Escape closes only the reader and focus is back on "อ่านตอนที่ 0" with the popup
-still open. Lightbox (opened by mouse) + Escape → lightbox closed, popup still open. tsc 0; eslint counts unchanged.
+still open. Lightbox (opened by mouse) + Escape → lightbox closed, popup still open. Guest login prompt (z 9999, opened from the
+reader) shown → Tab from the reader's last control leaves the reader (the prompt is reachable); hidden → Tab wraps. tsc 0;
+eslint counts unchanged.
 
 ---
 

@@ -18,6 +18,31 @@ export function focusWrapTarget({ index, count, backwards, focusInOtherLayer = f
   return null;
 }
 
+/** A shown overlay: fixed, visible (opacity > 0), holding controls — a login prompt bar, a modal, a lightbox. */
+const isOverlayLayer = (n: Element) => {
+  if (!(n instanceof HTMLElement)) return false;
+  const cs = getComputedStyle(n);
+  return cs.position === "fixed" && cs.visibility !== "hidden" && Number(cs.opacity) > 0 &&
+    n.getClientRects().length > 0 && !!n.querySelector("input, button, a[href], textarea, select");
+};
+const zIndexOf = (n: Element) => Number.parseInt(getComputedStyle(n).zIndex, 10) || 0;
+
+/**
+ * Whether another layer is shown over `el` (#840), among its siblings (portals are children of <body>): a higher
+ * z-index wins wherever it sits in the DOM (the login prompt bar, z 9999, comes *before* the reader); at the same
+ * z-index the later one is on top. Lets a full-screen layer that is not on a modal stack (the reader) stand aside —
+ * its Tab trap and Escape — while something is open over it.
+ */
+export function hasLayerAbove(
+  el: Element,
+  { isLayer = isOverlayLayer, zIndex = zIndexOf }: { isLayer?: (n: Element) => boolean; zIndex?: (n: Element) => number } = {},
+): boolean {
+  const siblings = [...(el.parentElement?.children ?? [])];
+  const mine = zIndex(el);
+  const at = siblings.indexOf(el);
+  return siblings.some((n, i) => n !== el && isLayer(n) && (zIndex(n) > mine || (zIndex(n) === mine && i > at)));
+}
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
