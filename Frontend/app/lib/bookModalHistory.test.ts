@@ -7,6 +7,9 @@ import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
  */
 let popstateListeners: Set<() => void>;
 let instance = 0;
+// Restored after each test: a fake window left on globalThis makes later files that
+// import styled-jsx take the browser branch and crash on the missing `document`.
+const realWindow = (globalThis as { window?: unknown }).window;
 
 const firePopstate = () => [...popstateListeners].forEach((l) => l());
 
@@ -29,6 +32,7 @@ beforeEach(() => {
 afterEach(() => {
   jest.clearAllTimers();
   jest.useRealTimers();
+  Object.assign(globalThis, { window: realWindow });
 });
 
 /** A fake popup: `handles` is whether it still owns an unpopped history entry. */
