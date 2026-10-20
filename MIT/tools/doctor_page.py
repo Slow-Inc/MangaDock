@@ -49,7 +49,10 @@ def _spy_textlines(stats):
 def _composite(source, payload):
     page = source.copy()
     for p in payload.get('patches', []):
-        page.paste(Image.open(io.BytesIO(p['img_png'])).convert('RGB'), (p['x'], p['y']))
+        # patches carry an alpha of only their own work (#535 overlap-safe) — composite with
+        # it, exactly as the Reader overlays them; pasting the full rectangle hides neighbours.
+        patch = Image.open(io.BytesIO(p['img_png'])).convert('RGBA')
+        page.paste(patch.convert('RGB'), (p['x'], p['y']), patch.getchannel('A'))
     return page
 
 
