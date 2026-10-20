@@ -139,6 +139,7 @@ Used when an area is moved onto the tokens (Epic B). Pick by meaning, not by the
 | hand-made `animate-spin` ring or SVG spinner | `<Loader context="inline" / "section" / "page" />` |
 | `tracking-widest`, `tracking-[0.1em+]` on Thai text | remove (mono Latin labels may keep `tracking-[0.1em]`) |
 | glow `shadow-*-500/…`, `drop-shadow` glows, gradient blobs | remove |
+| `bg-black/NN` scrim behind a modal / drawer, or over an image | `bg-scrim/NN` (black in every theme); a small chip on an image may use `bg-bg/NN` |
 <!-- lang:end -->
 
 <!-- lang:th -->
@@ -219,4 +220,5 @@ easing ตัวเดียว `cubic-bezier(0.23, 1, 0.32, 1)` ความย
 | วง `animate-spin` หรือ spinner SVG ที่ทำเอง | `<Loader context="inline" / "section" / "page" />` |
 | `tracking-widest`, `tracking-[0.1em+]` บนข้อความไทย | เอาออก (label ภาษาละตินแบบ mono ยังใช้ `tracking-[0.1em]` ได้) |
 | แสงเรือง `shadow-*-500/…`, `drop-shadow` ที่เรืองแสง, gradient blob | เอาออก |
+| ม่าน `bg-black/NN` หลัง modal / drawer หรือทับรูป | `bg-scrim/NN` (สีดำในทุกธีม); chip เล็กที่วางบนรูปใช้ `bg-bg/NN` ได้ |
 <!-- lang:end -->

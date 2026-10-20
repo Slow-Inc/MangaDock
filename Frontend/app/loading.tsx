@@ -4,7 +4,7 @@ import Loader from "./components/ui/Loader";
 export default function Loading() {
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
-      <Loader context="page" label="กำลังโหลดหน้า" />
+      <Loader context="page" label="กำลังโหลดหน้า" className="text-ink-2" />
     </div>
   );
 }

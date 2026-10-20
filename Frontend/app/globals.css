@@ -96,6 +96,8 @@
   --color-ok: var(--ok);
   --color-danger: var(--danger);
   --color-coin: var(--coin);
+  /* Behind modals and drawers, and over images: dark in every theme (a light scrim reads as fog). */
+  --color-scrim: #000;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
@@ -196,6 +198,14 @@ body::-webkit-scrollbar-thumb:active {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: 4px;
+}
+
+/* Text fields: the ring sits on the field's own border (one crisp edge) instead of floating 3 px outside
+   it, which read as a double ring on the search box. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: -1px;
 }
 
 img,
