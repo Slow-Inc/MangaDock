@@ -127,13 +127,13 @@ def speculative_box(region) -> bool:
     return bool(getattr(region, 'from_sfx_detection', False) or getattr(region, 'rescue_placeholder', False))
 
 
-def sfx_false_positive(stripped_text: str, from_sfx_detection: bool, box, dialogue_boxes) -> bool:
-    """#754 — ADR 026 Addendum DROP: a det_sfx region the line-OCR read as real text that is not an
-    SFX to keep. Narrowed by the 2026-10-20 corpus probe (16 EN pages): every false-positive read a
+def sfx_false_positive(stripped_text: str, speculative: bool, box, dialogue_boxes) -> bool:
+    """#754 — ADR 026 Addendum DROP: a speculative box (``speculative_box``) the line-OCR read as
+    real text that is not an SFX to keep. Narrowed by the 2026-10-20 corpus probe (16 EN pages): every false-positive read a
     single ASCII char off the art ('I', 'v', 'S', '1'), while multi-char reads were real lettering
     ('CHAINSAWMAN', 'Yamai', '491'). A real-text read over a dialogue line ('THE' on a bubble) is a
     false-positive whatever its length. Pure."""
-    if not (from_sfx_detection and ocr_read_real_text(stripped_text)):
+    if not (speculative and ocr_read_real_text(stripped_text)):
         return False
     if len(stripped_text.strip()) <= 1:
         return True

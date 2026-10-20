@@ -156,31 +156,28 @@ def _expand_single_axis(region, needed_count: int, used_count: int, horizontal_a
         return None
 
 
+def _box(v):
+    return tuple(float(x) for x in v) if v is not None else None
+
+
 def _region_territory(region):
     """The box a region 'owns' for anti-overlap: its balloon (#170) if known, else its
     detection box. Returns None when neither is available."""
     bb = getattr(region, 'bubble_box', None)
-    if bb is not None:
-        return (float(bb[0]), float(bb[1]), float(bb[2]), float(bb[3]))
-    xy = getattr(region, 'xyxy', None)
-    return (float(xy[0]), float(xy[1]), float(xy[2]), float(xy[3])) if xy is not None else None
+    return _box(bb) if bb is not None else _box(getattr(region, 'xyxy', None))
 
 
 def _neighbor_territories(text_regions, i):
     """Territories region ``i`` must stay out of. A sibling in the SAME balloon owns only its
     detection box: its territory would otherwise be that whole balloon, and clamping against it
     shoved region ``i`` out of its own balloon onto the next one (Tsuki p1, 2026-10-20)."""
-    own = getattr(text_regions[i], 'bubble_box', None)
+    own = _box(getattr(text_regions[i], 'bubble_box', None))
     out = []
     for j, r in enumerate(text_regions):
         if j == i:
             continue
-        bb = getattr(r, 'bubble_box', None)
-        if own is not None and bb is not None and tuple(map(float, bb)) == tuple(map(float, own)):
-            xy = getattr(r, 'xyxy', None)
-            t = tuple(float(v) for v in xy) if xy is not None else None
-        else:
-            t = _region_territory(r)
+        sibling = own is not None and _box(getattr(r, 'bubble_box', None)) == own
+        t = _box(getattr(r, 'xyxy', None)) if sibling else _region_territory(r)
         if t is not None:
             out.append(t)
     return out

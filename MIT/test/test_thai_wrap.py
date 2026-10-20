@@ -370,4 +370,4 @@ def test_a_tone_mark_over_an_upper_vowel_stays_visible():
 
 def test_a_font_that_already_places_the_tone_high_is_untouched():
     tr.set_font(_FONT)
-    assert tr._stacked_mark_lift('ี', '่', 60) == 0
+    assert tr._stacked_mark_lift('ที่', 2, 60) == 0

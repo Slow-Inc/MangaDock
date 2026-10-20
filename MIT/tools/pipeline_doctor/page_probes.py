@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
 from manga_translator.container_merge import components_chain
+from manga_translator.render_overlap import box_containment
 from manga_translator.translation_quality import classify_glitch
 from manga_translator.utils.lang_ratio import _SCRIPT_RANGES
 
@@ -248,10 +249,7 @@ def _overlaps(page: PageSnapshot) -> Dict[int, int]:
         if d is None:
             continue
         for idx, e in placed:
-            ix = min(d[2], e[2]) - max(d[0], e[0])
-            iy = min(d[3], e[3]) - max(d[1], e[1])
-            smaller = min((d[2] - d[0]) * (d[3] - d[1]), (e[2] - e[0]) * (e[3] - e[1]))
-            if ix > 0 and iy > 0 and smaller > 0 and ix * iy > OVERLAP_SHARE * smaller:
+            if max(box_containment(d, e), box_containment(e, d)) > OVERLAP_SHARE:
                 out[r.index] = idx
                 break
         placed.append((r.index, d))

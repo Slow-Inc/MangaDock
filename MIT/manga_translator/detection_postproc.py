@@ -66,8 +66,12 @@ def empty_balloon_boxes(balloon_aabbs, textline_aabbs, ink_of_box, min_ink: int 
     return out
 
 
-def _placeholder(q):
-    """Mark a textline that only exists for the VLM rescue (its OCR read is a guess at a box)."""
+def _placeholder_quad(box):
+    """An empty textline over ``box`` that only exists for the VLM rescue — its OCR read is a
+    guess at a whole box, dropped when junk (#797)."""
+    from .utils.generic import Quadrilateral
+    x1, y1, x2, y2 = box
+    q = Quadrilateral(np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32), '', 1.0)
     q.rescue_placeholder = True
     return q
 
@@ -113,9 +117,7 @@ def merge_empty_balloons(ctx, result, device):
         balloons += [_shrink(b) for b in white_box_candidates(gray_pre)]
         existing = [textline_aabb(t) for t in textlines]
         fresh = empty_balloon_boxes(balloons, existing, _ink)
-        for (x1, y1, x2, y2) in fresh:
-            pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
-            textlines.append(_placeholder(Quadrilateral(pts, '', 1.0)))
+        textlines.extend(_placeholder_quad(b) for b in fresh)
         if fresh:
             logger.info(f"[EmptyBalloon] +{len(fresh)} uncovered inked balloon(s) queued for VLM rescue")
 
@@ -125,9 +127,7 @@ def merge_empty_balloons(ctx, result, device):
         gray = img.mean(axis=2).astype('uint8') if img.ndim == 3 else img
         covered = [textline_aabb(t) for t in textlines] + list(balloons)
         clusters = uncovered_text_clusters(gray, covered)
-        for (x1, y1, x2, y2) in clusters:
-            pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
-            textlines.append(_placeholder(Quadrilateral(pts, '', 1.0)))
+        textlines.extend(_placeholder_quad(b) for b in clusters)
         if clusters:
             logger.info(f"[InkCluster] +{len(clusters)} uncovered text cluster(s) queued for VLM rescue")
         return (textlines, mask_raw, mask)

@@ -60,6 +60,11 @@ _THAI_COMBINING = frozenset(
     + [chr(c) for c in range(0x0E34, 0x0E3B)]  # SARA I..U + PHINTHU
     + [chr(c) for c in range(0x0E47, 0x0E4F)]  # MAITAIKHU..YAMAKKAN (incl. tone marks)
 )
+# Stacking marks (#793): an upper vowel with a tone mark drawn above it; sara am carries a
+# nikhahit up there too, after the tone.
+_THAI_UPPER_VOWELS = frozenset([chr(0x0E31), *map(chr, range(0x0E34, 0x0E38)), chr(0x0E47), chr(0x0E4D)])
+_THAI_TONE_MARKS = frozenset(map(chr, range(0x0E48, 0x0E4D)))
+_SARA_AM = chr(0x0E33)
 
 
 def _safe_char_split(s: str) -> List[str]:
@@ -1210,21 +1215,20 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     return line_text_list, line_width_list
 
 
-_THAI_UPPER_VOWELS = frozenset('ัิีึื็ํ')
-_THAI_UPPER_MARKS = _THAI_UPPER_VOWELS | {'ำ'}  # + sara am, whose nikhahit sits up there
-_THAI_TONE_MARKS = frozenset('่้๊๋์')
-
-
-def _stacked_mark_lift(prev: str, ch: str, font_size: int) -> int:
-    """Pixels to raise a Thai tone mark drawn over an upper vowel ('ที่') or sara am ('น้ำ'; pass
-    the ำ as ``prev``). Fonts such as Prompt
-    (the prod face) put both at the same height and rely on OpenType mark-to-mark positioning,
-    which this per-glyph FreeType renderer does not do — the tone drew inside the vowel and
-    vanished (#793). Measured from the two bitmaps, so 0 for a font that already sets it high."""
-    if ch not in _THAI_TONE_MARKS or prev not in _THAI_UPPER_MARKS:
+def _stacked_mark_lift(line_text: str, k: int, font_size: int) -> int:
+    """Pixels to raise the Thai tone mark at ``line_text[k]`` when it stacks on an upper vowel
+    before it or on sara am's nikhahit after it. Fonts such as Prompt (the prod face) set both at
+    the same height and rely on OpenType mark-to-mark positioning, which this per-glyph FreeType
+    renderer does not do — the tone drew inside the vowel and vanished (#793). Measured from the
+    two bitmaps, so 0 for a font that already sets it high."""
+    if line_text[k] not in _THAI_TONE_MARKS:
         return 0
-    vowel_top = get_char_glyph(prev, font_size, 0).bitmap_top
-    mark = get_char_glyph(ch, font_size, 0)
+    before, after = (line_text[k - 1] if k else ''), line_text[k + 1:k + 2]
+    upper = before if before in _THAI_UPPER_VOWELS else after if after == _SARA_AM else ''
+    if not upper:
+        return 0
+    vowel_top = get_char_glyph(upper, font_size, 0).bitmap_top
+    mark = get_char_glyph(line_text[k], font_size, 0)
     mark_bottom = mark.bitmap_top - mark.bitmap.rows
     return max(0, vowel_top + max(1, font_size // 20) - mark_bottom)
 
@@ -1389,19 +1393,15 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
         # print((line_width, pen_line[0], canvas_w))
         # print(0, pen_line, line_text)
 
-        prev = ''
         for k, c in enumerate(line_text):
             if reversed_direction:
                 cdpt, rot_degree = CJK_Compatibility_Forms_translate(c, 0)
                 glyph = get_char_glyph(cdpt, font_size, 0)
                 offset_x = glyph.metrics.horiAdvance >> 6
                 pen_line[0] -= offset_x
-            # the upper glyph is the vowel before the tone, or sara am's nikhahit after it ('น้ำ')
-            upper = prev if prev in _THAI_UPPER_VOWELS else line_text[k + 1:k + 2]
-            lift = _stacked_mark_lift(upper, c, font_size)
+            lift = _stacked_mark_lift(line_text, k, font_size)
             pen_char = [pen_line[0], pen_line[1] - lift] if lift else pen_line
             offset_x = put_char_horizontal(font_size, c, pen_char, canvas_text, canvas_border, border_size=bg_size)
-            prev = c
             if not reversed_direction:
                 pen_line[0] += offset_x
         pen_orig[1] += spacing_y + font_size

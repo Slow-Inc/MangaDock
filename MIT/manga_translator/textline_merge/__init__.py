@@ -13,7 +13,8 @@ def split_text_region(
         width,
         height,
         gamma = 0.5,
-        sigma = 2
+        sigma = 2,
+        pair_pitch = 2.0
     ) -> List[Set[int]]:
 
     connected_region_indices = list(connected_region_indices)
@@ -32,10 +33,10 @@ def split_text_region(
         # print(fs, bboxes[connected_region_indices[0]].distance(bboxes[connected_region_indices[1]]), (1 + gamma) * fs)
         # print(bboxes[connected_region_indices[0]].angle, bboxes[connected_region_indices[1]].angle, 4 * np.pi / 180)
 
-        # Line pitch under 2x the font — the same gap (< 1 font) quadrilateral_can_merge_region
+        # Line pitch under pair_pitch (2x) the font — the same gap (< 1 font) quadrilateral_can_merge_region
         # admitted the pair on. It was (1 + gamma) = 1.5x, which split normally-leaded all-caps
         # lines (font = cap height, pitch ~1.7x): a 2-line sentence translated as two halves.
-        if bboxes[connected_region_indices[0]].distance(bboxes[connected_region_indices[1]]) < 2 * fs \
+        if bboxes[connected_region_indices[0]].distance(bboxes[connected_region_indices[1]]) < pair_pitch * fs \
                 and abs(bboxes[connected_region_indices[0]].angle - bboxes[connected_region_indices[1]].angle) < 0.2 * np.pi:
             return [set(connected_region_indices)]
         else:
@@ -229,6 +230,6 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
         region.is_sfx = from_sfx
         # A region made only of empty-balloon / ink-cluster rescue placeholders: its text is a
         # line-OCR guess at a whole box, dropped when it is junk (ocr_vlm.speculative_box).
-        region.rescue_placeholder = all(getattr(t, 'rescue_placeholder', False) for t in txtlns)
+        region.rescue_placeholder = all(t.rescue_placeholder for t in txtlns)
         text_regions.append(region)
     return text_regions
