@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import type { LandingBook } from "../lib/types";
+import Loader from "./ui/Loader";
 
 interface MangaSearchSelectorProps {
   onSelect: (manga: LandingBook | null) => void;
@@ -110,7 +111,7 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
           />
           <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
             {searching ? (
-              <div className="w-4 h-4 rounded-full border-2 border-white/10 border-t-ink-2 animate-spin" />
+              <Loader context="inline" label="กำลังค้นหา" />
             ) : (
               <svg className="w-4.5 h-4.5 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="8" strokeWidth={2.5} />
@@ -144,7 +145,7 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
                   ))}
                 </div>
               ) : !searching ? (
-                <div className="p-5 text-center text-xs text-white/20 font-bold">ไม่พบมังงะที่ตรงกับ "{query}"</div>
+                <div className="p-5 text-center text-xs text-white/20 font-bold">ไม่พบมังงะที่ตรงกับ &ldquo;{query}&rdquo;</div>
               ) : null}
             </div>
           )}

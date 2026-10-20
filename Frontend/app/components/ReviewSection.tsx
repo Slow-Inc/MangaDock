@@ -1,5 +1,6 @@
 "use client";
 
+import { PRIMARY_FILL } from "./ui/Button";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -173,7 +174,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
             <button
               type="submit"
               disabled={submitting || rating === 0}
-              className="rounded-lg bg-ink px-4 py-1.5 text-sm font-semibold text-bg transition enabled:hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] disabled:opacity-40"
+              className={`${PRIMARY_FILL} rounded-lg px-4 py-1.5 text-sm font-semibold transition disabled:opacity-40`}
             >
               {submitting ? "กำลังบันทึก..." : myReview ? "อัปเดต" : "ส่งรีวิว"}
             </button>

@@ -9,8 +9,11 @@ const BASE =
   "transition-[transform,background-color,border-color,color] duration-[var(--t1)] ease-[var(--ease)] " +
   "active:translate-y-px disabled:opacity-45 disabled:cursor-not-allowed disabled:active:translate-y-0";
 
+/** The primary fill on its own, for buttons whose size and shape stay their own (inline forms, FABs). */
+export const PRIMARY_FILL = "bg-ink text-bg border-ink hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))]";
+
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-ink text-bg border-ink hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))]",
+  primary: PRIMARY_FILL,
   secondary: "bg-surface text-ink border-line hover:border-ink",
   ghost: "bg-transparent text-ink-2 border-transparent hover:text-ink hover:bg-fill",
 };
@@ -25,13 +28,27 @@ export function buttonClass(variant: Variant = "secondary", size: Size = "md", e
   return `${BASE} ${VARIANT[variant]} ${SIZE[size]} ${extra}`;
 }
 
-type Props = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size };
+type Props = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; arrow?: boolean };
+
+/** Strata's CTA arrow (globals.css 576-582): slides 4 px on hover, outside the label so spacing never animates. */
+export function Arrow() {
+  return (
+    <span aria-hidden className="inline-block transition-transform duration-[var(--t2)] ease-[var(--ease)] group-hover:translate-x-1">
+      →
+    </span>
+  );
+}
 
 const Button = forwardRef<HTMLButtonElement, Props>(function Button(
-  { variant = "secondary", size = "md", className = "", type = "button", ...rest },
+  { variant = "secondary", size = "md", arrow = false, className = "", type = "button", children, ...rest },
   ref,
 ) {
-  return <button ref={ref} type={type} className={buttonClass(variant, size, className)} {...rest} />;
+  return (
+    <button ref={ref} type={type} className={buttonClass(variant, size, `group ${className}`)} {...rest}>
+      {children}
+      {arrow ? <Arrow /> : null}
+    </button>
+  );
 });
 
 export default Button;

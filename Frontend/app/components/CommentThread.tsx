@@ -1,5 +1,6 @@
 "use client";
 
+import { PRIMARY_FILL } from "./ui/Button";
 import { useState, useRef, memo } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -188,7 +189,7 @@ function CommentThreadImpl({
                   <button
                     onClick={handleSaveEdit}
                     disabled={!editContent.trim() || savingEdit}
-                    className="px-4 py-1.5 rounded-lg bg-ink text-bg text-xs font-bold hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] disabled:opacity-50 disabled:cursor-not-allowed smooth-hover shadow-lg"
+                    className={`${PRIMARY_FILL} px-4 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed smooth-hover`}
                   >
                     {savingEdit ? "กำลังบันทึก..." : "บันทึก"}
                   </button>
@@ -292,7 +293,7 @@ function CommentThreadImpl({
                 <button
                   onClick={handleReply}
                   disabled={!replyContent.trim() || submitting}
-                  className="px-4 py-1.5 rounded-lg bg-ink text-bg text-xs font-bold hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] disabled:opacity-50 disabled:cursor-not-allowed smooth-hover shadow-lg"
+                  className={`${PRIMARY_FILL} px-4 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed smooth-hover`}
                 >
                   {submitting ? "กำลังส่ง..." : "ส่งข้อความ"}
                 </button>

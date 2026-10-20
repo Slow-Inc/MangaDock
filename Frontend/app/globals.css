@@ -100,8 +100,16 @@
   --font-serif: var(--font-instrument-serif), Georgia, serif;
   --font-display: var(--font-inter), var(--font-anuphan), system-ui, sans-serif;
 
-  --radius-card: 28px;
-  --ease-strata: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Type scale (Strata globals 145-204). Line-heights are the Thai values (globals 175-184): the app is
+     Thai-first, and Latin display text in it reads fine at these heights. */
+  --text-display: clamp(2.3rem, 4.1vw, 3.9rem);
+  --text-display--line-height: 1.2;
+  --text-h2: clamp(2rem, 4.2vw, 3.6rem);
+  --text-h2--line-height: 1.2;
+  --text-h3: clamp(1.5rem, 2.4vw, 2.05rem);
+  --text-h3--line-height: 1.25;
+  --text-lede: clamp(1.1rem, 1.5vw, 1.3rem);
+  --text-lede--line-height: 1.7;
 }
 
 html {
@@ -133,22 +141,6 @@ body:lang(th) {
   background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
-/* Motion vocabulary (Strata globals 2199-2260). One fade-up distance instead of Strata's three
-   (rise 14 / page 8 / swap 10 — ch. 09 P1 asks to consolidate). */
-@keyframes md-rise {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes md-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes md-pop {
-  0% { opacity: 0; transform: translateY(16px) scale(0.86); }
-  60% { opacity: 1; }
-  100% { opacity: 1; transform: none; }
-}
-
 /* Content settles in as it arrives — only when scripts run, so nothing is ever hidden for good. */
 html.js .reveal {
   opacity: 0;
@@ -169,6 +161,7 @@ html.js .reveal.is-in {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0s !important; /* or a staggered Reveal still arrives one item at a time */
     scroll-behavior: auto !important;
   }
 }

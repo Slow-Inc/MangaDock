@@ -110,7 +110,7 @@ export default function NotificationBell() {
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <p className="text-sm font-semibold text-white/90">การแจ้งเตือน</p>
           {unread > 0 && (
-            <button onClick={handleMarkAllRead} className="text-xs text-accent transition hover:text-accent">
+            <button onClick={handleMarkAllRead} className="text-xs text-accent transition hover:text-ink">
               อ่านทั้งหมด
             </button>
           )}

@@ -21,12 +21,8 @@ export const metadata: Metadata = {
   description: "แพลตฟอร์ม E-Book สไตล์ Netflix ด้วย MangaDex API",
 };
 
-export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f5f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0b0d" },
-  ],
-};
+// The browser bar matches the default (dark) theme, not the OS preference: MangaDock opens dark.
+export const viewport: Viewport = { themeColor: "#0b0b0d" };
 
 export default function RootLayout({
   children,

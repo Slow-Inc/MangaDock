@@ -29,8 +29,8 @@ typography:
   display:
     size: "clamp(2.3rem, 4.1vw, 3.9rem)"
     weight: 600
-    letterSpacing: "-0.045em (Latin) / 0 (Thai)"
-    lineHeight: "1 (Latin) / 1.14 (Thai)"
+    letterSpacing: "0 by default; -0.035em only on a Latin-only heading"
+    lineHeight: "1.2 (Thai-first app)"
   body:
     size: "1.0625rem"
     lineHeight: "1.6 (Latin) / 1.75 (Thai)"
@@ -64,7 +64,7 @@ components:
 <!-- lang:en -->
 # Design System: MangaDock
 
-Source of truth for tokens is `Frontend/app/globals.css`; components live in `Frontend/app/components/ui/`. The language is ported from the Strata site — read `D:\Github\Strata-xeno-System-Design\ROUTER.md` for its reasoning, and `docs/superpowers/specs/2026-10-20-frontend-redesign-strata-design.md` for how MangaDock adopts it.
+This file is the source of truth for the design language; the token values are implemented in `Frontend/app/globals.css` (keep the two in step) and the components in `Frontend/app/components/ui/`. The language is ported from the Strata site — read `D:\Github\Strata-xeno-System-Design\ROUTER.md` for its reasoning, and `docs/superpowers/specs/2026-10-20-frontend-redesign-strata-design.md` for how MangaDock adopts it.
 
 ## 1. Overview
 
@@ -84,7 +84,7 @@ Source of truth for tokens is `Frontend/app/globals.css`; components live in `Fr
 
 ## 3. Typography
 
-Inter for Latin, Anuphan for Thai glyphs (same stack, falls through per glyph), JetBrains Mono for labels and numbers (`tabular-nums`), Instrument Serif for at most one statement word per page. Headings weight 600, `text-wrap: balance`, negative tracking for Latin only. **Thai text never gets wide letter-spacing** — it breaks Thai clusters. Page titles use `GradientHeading` (neutral grey-to-grey only).
+Inter for Latin, Anuphan for Thai glyphs (same stack, falls through per glyph), JetBrains Mono for labels and numbers (`tabular-nums`), Instrument Serif for at most one statement word per page. Headings weight 600, `text-wrap: balance`, no tracking by default (a Latin-only heading may add `-0.035em`). **Thai text never gets letter-spacing** — it breaks Thai clusters. Type scale: `text-display`, `text-h2`, `text-h3`, `text-lede` (Tailwind tokens, Strata sizes, Thai line-heights 1.2–1.25). Spacing uses Tailwind's 4 px scale in steps of 8 px. Page titles use `GradientHeading` (neutral grey-to-grey only).
 
 ## 4. Elevation
 
@@ -92,7 +92,8 @@ Almost flat. Depth comes from a 1 px `line` border and the `raised` surface, not
 
 ## 5. Components
 
-- **Button** (`ui/Button`): 44 px pill; `primary` = ink fill with bg text (hover mixes 12 % accent), `secondary` = surface + line, `ghost` = transparent. Press moves 1 px down.
+- **Button** (`ui/Button`): 44 px pill; `primary` = ink fill with bg text (hover mixes 12 % accent), `secondary` = surface + line, `ghost` = transparent. Press moves 1 px down; `arrow` adds the sliding →. A button that keeps its own size uses `PRIMARY_FILL` instead of copying the classes.
+- **StatusPage** (`ui/StatusPage`): the shell for 404 / error screens.
 - **Pill** (`ui/Pill`): one component for chips, filters and tabs; selected = ink fill.
 - **Badge** (`ui/Badge`): mono 11 px pill, tone tints the border.
 - **Input** (`ui/Input`): 48 px pill on surface.
@@ -121,7 +122,7 @@ One easing `cubic-bezier(0.23, 1, 0.32, 1)`, durations 160 / 320 / 600 ms, 38 ms
 <!-- lang:th -->
 # ระบบออกแบบ: MangaDock
 
-ที่อ้างอิงหลักของ token คือ `Frontend/app/globals.css` ส่วน component อยู่ใน `Frontend/app/components/ui/` ภาษา design นี้พอร์ตมาจากเว็บ Strata — อ่านเหตุผลได้ที่ `D:\Github\Strata-xeno-System-Design\ROUTER.md` และอ่านวิธีที่ MangaDock นำมาใช้ได้ที่ `docs/superpowers/specs/2026-10-20-frontend-redesign-strata-design.md`
+ไฟล์นี้คือที่อ้างอิงหลักของภาษา design ส่วนค่าของ token เขียนไว้ใน `Frontend/app/globals.css` (ต้องแก้สองที่ให้ตรงกันเสมอ) และ component อยู่ใน `Frontend/app/components/ui/` ภาษา design นี้พอร์ตมาจากเว็บ Strata — อ่านเหตุผลได้ที่ `D:\Github\Strata-xeno-System-Design\ROUTER.md` และอ่านวิธีที่ MangaDock นำมาใช้ได้ที่ `docs/superpowers/specs/2026-10-20-frontend-redesign-strata-design.md`
 
 ## 1. ภาพรวม
 
@@ -141,7 +142,7 @@ One easing `cubic-bezier(0.23, 1, 0.32, 1)`, durations 160 / 320 / 600 ms, 38 ms
 
 ## 3. ตัวอักษร
 
-Inter สำหรับตัวละติน, Anuphan สำหรับตัวอักษรไทย (อยู่ใน stack เดียวกัน ระบบเลือกฟอนต์ทีละตัวอักษร), JetBrains Mono สำหรับ label และตัวเลข (`tabular-nums`), Instrument Serif ใช้ได้มากสุดหนึ่งคำต่อหน้า หัวข้อหนา 600 ใช้ `text-wrap: balance` และ tracking ติดลบเฉพาะตัวละติน **ข้อความไทยห้ามถ่างตัวอักษร** เพราะจะทำให้กลุ่มตัวอักษรไทยแตก หัวข้อหลักของหน้าใช้ `GradientHeading` (เฉพาะโทนเทาไล่เทาเท่านั้น)
+Inter สำหรับตัวละติน, Anuphan สำหรับตัวอักษรไทย (อยู่ใน stack เดียวกัน ระบบเลือกฟอนต์ทีละตัวอักษร), JetBrains Mono สำหรับ label และตัวเลข (`tabular-nums`), Instrument Serif ใช้ได้มากสุดหนึ่งคำต่อหน้า หัวข้อหนา 600 ใช้ `text-wrap: balance` ค่าเริ่มต้นไม่มี tracking (หัวข้อที่เป็นตัวละตินล้วนใส่ `-0.035em` ได้) **ข้อความไทยห้ามปรับระยะตัวอักษร** เพราะจะทำให้กลุ่มตัวอักษรไทยแตก type scale: `text-display`, `text-h2`, `text-h3`, `text-lede` (token ของ Tailwind ใช้ขนาดของ Strata และ line-height แบบไทย 1.2–1.25) ระยะห่างใช้ scale 4 px ของ Tailwind โดยขยับทีละ 8 px หัวข้อหลักของหน้าใช้ `GradientHeading` (เฉพาะโทนเทาไล่เทาเท่านั้น)
 
 ## 4. ความลึก
 
@@ -149,7 +150,8 @@ Inter สำหรับตัวละติน, Anuphan สำหรับต�
 
 ## 5. Component
 
-- **Button** (`ui/Button`): pill สูง 44 px; `primary` = พื้น ink ตัวหนังสือสี bg (hover ผสม accent 12 %), `secondary` = surface + line, `ghost` = โปร่งใส กดแล้วเลื่อนลง 1 px
+- **Button** (`ui/Button`): pill สูง 44 px; `primary` = พื้น ink ตัวหนังสือสี bg (hover ผสม accent 12 %), `secondary` = surface + line, `ghost` = โปร่งใส กดแล้วเลื่อนลง 1 px ส่วน `arrow` เพิ่มลูกศร → ที่เลื่อนตอน hover ปุ่มที่ต้องคงขนาดของตัวเองให้ใช้ `PRIMARY_FILL` แทนการ copy class
+- **StatusPage** (`ui/StatusPage`): โครงของหน้า 404 / error
 - **Pill** (`ui/Pill`): component เดียวสำหรับ chip, ตัวกรอง และ tab เมื่อถูกเลือก = พื้น ink
 - **Badge** (`ui/Badge`): pill ตัวอักษร mono 11 px สีของ tone แต้มที่เส้นขอบ
 - **Input** (`ui/Input`): pill สูง 48 px บน surface

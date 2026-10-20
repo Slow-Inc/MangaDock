@@ -1,5 +1,6 @@
 "use client";
 
+import { PRIMARY_FILL } from "./ui/Button";
 import { useEffect, useState, useCallback } from "react";
 import { ROLE } from "../lib/types/user";
 import Link from "next/link";
@@ -121,7 +122,7 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
             <button 
               onClick={handleQuickPost}
               disabled={!newPostContent.trim() || submitting}
-              className="px-4 py-1.5 bg-ink rounded-lg text-xs font-bold text-bg hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] disabled:opacity-50"
+              className={`${PRIMARY_FILL} px-4 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50`}
             >
               {submitting ? "กำลังส่ง..." : "โพสต์"}
             </button>

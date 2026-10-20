@@ -15,7 +15,9 @@ export default function GradientHeading({
   children: ReactNode;
 }) {
   return (
-    <Tag className={`font-semibold tracking-[-0.035em] [text-wrap:balance] ${className}`}>
+    // No tracking by default: the app is Thai-first and Thai text must not be tracked (DESIGN.md §3).
+    // A Latin-only heading may add `tracking-[-0.035em]` through className.
+    <Tag className={`font-semibold [text-wrap:balance] ${className}`}>
       <span className="bg-[linear-gradient(to_top,var(--ink-2),var(--ink))] bg-clip-text pb-[0.08em] text-transparent">{children}</span>
     </Tag>
   );

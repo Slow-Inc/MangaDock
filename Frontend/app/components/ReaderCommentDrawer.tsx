@@ -1,5 +1,6 @@
 "use client";
 
+import { PRIMARY_FILL } from "./ui/Button";
 import Image from "next/image";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
@@ -183,7 +184,7 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
               <button
                 type="submit"
                 disabled={posting || !text.trim()}
-                className="self-end rounded-xl bg-ink px-3 py-2 text-sm font-medium text-bg transition enabled:hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] disabled:opacity-40"
+                className={`${PRIMARY_FILL} self-end rounded-xl px-3 py-2 text-sm font-medium transition disabled:opacity-40`}
               >
                 ส่ง
               </button>
