@@ -175,6 +175,10 @@ export function buildJobKey(
  *   MIT_BUBBLE_SEG=1        — run a speech-balloon YOLO alongside DBNet and
  *                             tag each text-line region with its balloon mask
  *                             (renderer area, mask-aware crop, OCR scoping).
+ *   MIT_BUBBLE_MERGE=1      — (#757, needs MIT_BUBBLE_SEG) coalesce text lines that
+ *                             share one balloon/caption before translation, so a
+ *                             caption spaced >1x its font is one sentence, not
+ *                             per-line fragments.
  */
 export function buildMitConfig(
   env: NodeJS.ProcessEnv,
@@ -255,6 +259,9 @@ export function buildMitConfig(
       // and tag each text-line region with its balloon mask, so the renderer
       // can size text to the balloon area. Absent → stage off, byte-identical.
       ...(flagEnv('MIT_BUBBLE_SEG') ? { det_bubble_seg: true } : {}),
+      // Container merge (#757): coalesce caption/balloon line fragments before
+      // translation. Needs MIT_BUBBLE_SEG. Absent → byte-identical.
+      ...(flagEnv('MIT_BUBBLE_MERGE') ? { det_bubble_merge: true } : {}),
       // SFX detector (#168): second YOLO pass for stylized katakana SFX that
       // DBNet can't see. Absent → stage off, byte-identical.
       ...(flagEnv('MIT_SFX_DETECTOR') ? { det_sfx: true } : {}),

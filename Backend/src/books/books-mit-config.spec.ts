@@ -61,6 +61,7 @@ const ENV_KEYS = [
   'MIT_DET_INVERT',
   'MIT_DET_GAMMA_CORRECT',
   'MIT_BUBBLE_SEG',
+  'MIT_BUBBLE_MERGE',
   'MIT_FONT_SIZE_OFFSET',
   'MIT_FONT_SIZE_MIN',
   'MIT_BUBBLE_AREA_FIT',
@@ -219,6 +220,19 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.detector.det_bubble_seg).toBeUndefined();
+  });
+
+  /** #757 container merge — opt-in; coalesces caption lines that share one balloon. */
+  it('enables container merge via MIT_BUBBLE_MERGE (#757)', () => {
+    process.env.MIT_BUBBLE_MERGE = '1';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.detector.det_bubble_merge).toBe(true);
+  });
+
+  it('omits det_bubble_merge unless MIT_BUBBLE_MERGE is exactly "1" (#757)', () => {
+    process.env.MIT_BUBBLE_MERGE = '0';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.detector.det_bubble_merge).toBeUndefined();
   });
 
   /** #166 font-size fidelity — the renderer's auto floor is (img.h+img.w)/200,
