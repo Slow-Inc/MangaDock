@@ -2,4 +2,5 @@
 // Tests that exercise uploadBanner/uploadImage should override this mock per-test.
 module.exports = {
   fileTypeFromFile: jest.fn().mockResolvedValue({ mime: 'image/jpeg', ext: 'jpg' }),
+  fileTypeFromBuffer: jest.fn().mockResolvedValue({ mime: 'image/jpeg', ext: 'jpg' }),
 };

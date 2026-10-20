@@ -20,10 +20,11 @@ import { isValidHardwareId } from '../common/middleware/hardware-id.middleware';
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import * as path from 'path';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UsersService } from './users.service';
 import { MascotDto } from './mascot.dto';
+import { detectAllowedImage } from '../common/storage/detect-image';
+import { ALLOWED_IMAGE_MIME } from '../common/storage/image-mime';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 import {
   STORAGE_PROVIDER,
@@ -139,10 +140,11 @@ export class UsersController {
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      // A cheap first gate on the client's Content-Type; the real check is the magic bytes below.
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
+        if (!ALLOWED_IMAGE_MIME.has(file.mimetype)) {
           return cb(
-            new BadRequestException('Only image files are allowed'),
+            new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed'),
             false,
           );
         }
@@ -157,12 +159,18 @@ export class UsersController {
   ) {
     if (!file) throw new BadRequestException('No file provided');
 
+    // Type, extension and Content-Type all come from the bytes: the client's Content-Type and file
+    // name are attacker-controlled (an SVG or "x.html" would otherwise be stored and served as such).
+    const image = await detectAllowedImage(file.buffer);
+    if (!image) {
+      throw new BadRequestException('Only JPEG, PNG, WebP and GIF are allowed');
+    }
+
     const uid = req[USER_KEY].uid;
-    const ext = path.extname(file.originalname) || '.jpg';
-    const filename = `${uid}_${Date.now()}${ext}`;
+    const filename = `${uid}_${Date.now()}${image.ext}`;
     const key = `uploads/avatars/${filename}`;
 
-    await this.storage.put(key, file.buffer, { contentType: file.mimetype });
+    await this.storage.put(key, file.buffer, { contentType: image.mime });
 
     return { url: `/${key}` };
   }
