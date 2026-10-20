@@ -35,8 +35,12 @@ to 2× changes only that pair.
   re-translates the page live, bypassing the replay. On Chainsaw p0 that retry returned
   `CHAINSAWMAN` untranslated, so the title was filtered as "identical to original"; on Lv2 p1 the
   same mechanism flipped which of `HOW DO I CALL I OUT?` / `ー` survived. Neither is caused by the
-  DROP or the merge — both are LLM non-determinism in the retry path. Making the doctor's replay
-  cover the retry is a follow-up for #756.
+  DROP or the merge — both are LLM non-determinism in the retry path. Fixed afterwards in the
+  doctor (#756): the replay now also answers the batch retry, and two replays of Chainsaw p0 give
+  identical output with the title kept. In that deterministic run the merged credit sentence is
+  dropped instead — the model echoes the garbled OCR (`CONSIDFR … THF … RFGION`, a 9 px typewriter
+  font read E→F) untranslated, so the original English stays visible. OCR of tiny lettering is the
+  next defect on that page.
 - **`S` was a real SFX (`CHOMP`).** Dropping it shows the original English lettering instead of a
   meaningless `ซ`; translating it needs the VLM rescue, which the current gateway model cannot serve
   (#771).

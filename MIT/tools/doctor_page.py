@@ -50,19 +50,37 @@ def _spy_textlines(stats):
 
 
 def _install_replay(tr, recorded):
-    """Answer the translation call from a recorded doctor run; only unseen texts go live."""
-    live = tr._dispatch_with_context
+    """Answer translation calls from a recorded doctor run; only unseen texts go live, once.
 
-    async def replay(config, texts, ctx):
-        out, missing = replay_translations(list(texts), recorded)
-        if missing:
-            print(f'[replay] {len(missing)}/{len(texts)} texts unseen -> live translator')
-            fresh = await live(config, [texts[i] for i in missing], ctx)
-            for i, t in zip(missing, fresh):
-                out[i] = t
-        return out
+    Both entry points are covered: the main pass (`_dispatch_with_context`) and the page-level
+    Thai-ratio batch retry (`_batch_translate_texts`), which otherwise re-translated the whole page
+    live and made a replay A/B non-deterministic (2026-10-20: a retry dropped 'CHAINSAWMAN')."""
+    fresh_cache = {}
 
-    tr._dispatch_with_context = replay
+    def wrap(live):
+        async def replay(texts, call_live):
+            out, missing = replay_translations(list(texts), recorded)
+            unseen = [i for i in missing if texts[i] not in fresh_cache]
+            if unseen:
+                print(f'[replay] {len(unseen)}/{len(texts)} texts unseen -> live translator')
+                for i, t in zip(unseen, await call_live([texts[i] for i in unseen])):
+                    fresh_cache[texts[i]] = t
+            for i in missing:
+                out[i] = fresh_cache[texts[i]]
+            return out
+        return replay
+
+    main_live, batch_live = tr._dispatch_with_context, tr._batch_translate_texts
+    main_replay, batch_replay = wrap(main_live), wrap(batch_live)
+
+    async def dispatch(config, texts, ctx):
+        return await main_replay(texts, lambda sub: main_live(config, sub, ctx))
+
+    async def batch(texts, config, ctx, *args, **kwargs):
+        return await batch_replay(texts, lambda sub: batch_live(sub, config, ctx, *args, **kwargs))
+
+    tr._dispatch_with_context = dispatch
+    tr._batch_translate_texts = batch
 
 
 class _Timings(logging.Handler):
