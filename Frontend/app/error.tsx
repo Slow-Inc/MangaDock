@@ -10,6 +10,8 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
     <StatusPage
       label="error"
       labelTone="danger"
+      mascot="error"
+      mascotState="sleeping"
       title="หน้านี้มีปัญหา"
       actions={
         <>

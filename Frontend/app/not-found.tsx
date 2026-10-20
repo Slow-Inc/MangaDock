@@ -6,6 +6,7 @@ export default function NotFound() {
   return (
     <StatusPage
       label="404"
+      mascot="search"
       title="ไม่พบหน้านี้"
       actions={
         <>
