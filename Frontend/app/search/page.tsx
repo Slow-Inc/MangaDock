@@ -10,6 +10,7 @@ import { getFavorites, type CachedBook } from "../lib/userCache";
 import { getHistory, type HistoryBook } from "../lib/readingHistory";
 import { resolvedThumbnail } from "../lib/imgUrl";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { inputClass } from "../components/ui/Input";
 import type { LandingBook } from "../lib/types";
 
 const API_BASE = "/api/proxy";
@@ -58,7 +59,7 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
   return (
     <>
       <div className="group flex flex-col gap-2 text-left cursor-pointer" onClick={onSelect}>
-        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-white/10 smooth-hover group-hover:scale-[1.03] group-hover:border-white/30 group-hover:shadow-lg group-hover:shadow-black/50">
+        <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-line smooth-hover group-hover:scale-[1.03] group-hover:border-ink-3">
           <Image
             src={thumb}
             alt={book.title}
@@ -72,14 +73,14 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
             className="object-cover"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
           />
-          <div className="absolute inset-0 flex items-end bg-linear-to-t from-black/80 via-transparent to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-            <span className="text-xs font-semibold text-white">ดูรายละเอียด</span>
+          <div className="absolute inset-0 flex items-end bg-linear-to-t from-bg/80 via-transparent to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+            <span className="text-xs font-semibold text-ink">ดูรายละเอียด</span>
           </div>
           {/* Expand cover button */}
           <button
             onClick={(e) => { e.stopPropagation(); setShowCover(true); }}
             title="ดูหน้าปกขนาดใหญ่"
-            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white/70 opacity-0 backdrop-blur-sm transition-all duration-200 group-hover:opacity-100 hover:bg-black/80 hover:text-white"
+            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/50 text-ink-2 opacity-0 backdrop-blur-sm transition-all duration-200 group-hover:opacity-100 hover:bg-bg/80 hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
               <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
@@ -87,8 +88,8 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
           </button>
         </div>
         <div>
-          <p className="line-clamp-2 text-xs font-semibold leading-snug text-white">{book.title}</p>
-          {book.authors.length > 0 && <p className="mt-0.5 truncate text-xs text-white/45">{book.authors[0]}</p>}
+          <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">{book.title}</p>
+          {book.authors.length > 0 && <p className="mt-0.5 truncate text-xs text-ink-3">{book.authors[0]}</p>}
           {book.categories.length > 0 && <p className="mt-1 truncate text-xs text-accent/70">{book.categories[0]}</p>}
         </div>
       </div>
@@ -103,7 +104,7 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
     <button
       onClick={onClick}
       className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-        active ? "bg-white text-black" : "bg-white/8 text-white/55 hover:bg-white/15 hover:text-white/80"
+        active ? "bg-ink text-bg" : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
       }`}
     >
       {children}
@@ -161,11 +162,11 @@ function ChipBar({ categories, active, onSelect }: {
     <div className="relative min-w-0 flex-1">
       {canLeft && (
         <>
-          <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12 bg-linear-to-r from-[#0a0a0a] to-transparent" />
+          <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12 bg-linear-to-r from-bg to-transparent" />
           <button
             aria-label="เลื่อนซ้าย"
             onClick={() => scroll(-1)}
-            className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] p-1.5 text-white/60 transition hover:border-white/30 hover:text-white"
+            className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-line bg-bg p-1.5 text-ink-2 transition hover:border-ink-3 hover:text-ink"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
@@ -185,11 +186,11 @@ function ChipBar({ categories, active, onSelect }: {
 
       {canRight && (
         <>
-          <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-linear-to-l from-[#0a0a0a] to-transparent" />
+          <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-linear-to-l from-bg to-transparent" />
           <button
             aria-label="เลื่อนขวา"
             onClick={() => scroll(1)}
-            className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] p-1.5 text-white/60 transition hover:border-white/30 hover:text-white"
+            className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-line bg-bg p-1.5 text-ink-2 transition hover:border-ink-3 hover:text-ink"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
@@ -314,7 +315,7 @@ function SearchResults() {
   const isLoading = !isMyList && loading;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen bg-bg text-ink">
       <Navbar />
 
       <main className="page-shell page-shell-nav page-shell-wide">
@@ -322,7 +323,7 @@ function SearchResults() {
         {/* ── Search bar ────────────────────────────────────────────── */}
         <form onSubmit={handleSearch} className="mb-7 flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/40">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-3">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
@@ -331,10 +332,10 @@ function SearchResults() {
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="ค้นหาหนังสือ, มังงะ..."
               autoFocus
-              className="w-full rounded-2xl border border-white/15 bg-white/5 py-3 pl-12 pr-4 text-base text-white placeholder-white/30 outline-none transition focus:border-white/30 focus:bg-white/8"
+              className={`${inputClass} pl-12`}
             />
           </div>
-          <button type="submit" className="w-full rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-white/90 active:scale-95 sm:w-auto">
+          <button type="submit" className="w-full rounded-2xl bg-ink px-6 py-3 text-sm font-semibold text-bg transition hover:bg-ink/90 active:scale-95 sm:w-auto">
             ค้นหา
           </button>
         </form>
@@ -344,19 +345,19 @@ function SearchResults() {
           {/* Row 1: แหล่งข้อมูล + ภาษา + advanced toggle */}
           <div className="space-y-2 sm:space-y-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="shrink-0 text-xs font-medium text-white/30">แหล่งข้อมูล</span>
+              <span className="shrink-0 text-xs font-medium text-ink-3">แหล่งข้อมูล</span>
               <FilterChip active={source === "all"} onClick={() => setSource("all")}>ทั้งหมด</FilterChip>
               <FilterChip active={source === "mylist"} onClick={() => setSource("mylist")}>
                 รายการของฉัน
                 {localBooks.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-px text-xs">{localBooks.length}</span>
+                  <span className="ml-1.5 rounded-full bg-fill px-1.5 py-px text-xs">{localBooks.length}</span>
                 )}
               </FilterChip>
 
               {!isMyList && (
                 <>
-                  <span className="mx-1 hidden h-4 w-px shrink-0 bg-white/15 sm:block" />
-                  <span className="hidden shrink-0 text-xs font-medium text-white/30 sm:block">ภาษา</span>
+                  <span className="mx-1 hidden h-4 w-px shrink-0 bg-line sm:block" />
+                  <span className="hidden shrink-0 text-xs font-medium text-ink-3 sm:block">ภาษา</span>
                   <div className="hidden flex-wrap items-center gap-2 sm:flex">
                     {LANG_OPTIONS.map((opt) => (
                       <FilterChip key={opt.value} active={langFilter === opt.value} onClick={() => setLangFilter(opt.value)}>
@@ -369,7 +370,7 @@ function SearchResults() {
                     className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                       showAdvanced || statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0
                         ? "border-accent/40 bg-accent/10 text-accent"
-                        : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
+                        : "border-line text-ink-3 hover:border-ink-3 hover:text-ink-2"
                     }`}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
@@ -388,7 +389,7 @@ function SearchResults() {
 
             {!isMyList && (
               <div className="flex flex-wrap items-center gap-2 sm:hidden">
-                <span className="shrink-0 text-xs font-medium text-white/30">ภาษา</span>
+                <span className="shrink-0 text-xs font-medium text-ink-3">ภาษา</span>
                 {LANG_OPTIONS.map((opt) => (
                   <FilterChip key={opt.value} active={langFilter === opt.value} onClick={() => setLangFilter(opt.value)}>
                     {opt.label}
@@ -400,10 +401,10 @@ function SearchResults() {
 
           {/* Advanced filter panel */}
           {!isMyList && showAdvanced && (
-            <div className="rounded-2xl border border-white/8 bg-white/3 p-4 space-y-4">
+            <div className="rounded-2xl border border-line bg-fill p-4 space-y-4">
               {/* สถานะ */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 shrink-0 text-xs font-medium text-white/35">สถานะ</span>
+                <span className="w-14 shrink-0 text-xs font-medium text-ink-3">สถานะ</span>
                 <FilterChip active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>ทั้งหมด</FilterChip>
                 {(['ongoing', 'completed', 'hiatus'] as const).map((s) => (
                   <FilterChip key={s} active={statusFilter === s} onClick={() => setStatusFilter((prev) => prev === s ? 'all' : s)}>
@@ -414,32 +415,32 @@ function SearchResults() {
 
               {/* ปี */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 shrink-0 text-xs font-medium text-white/35">ปี</span>
+                <span className="w-14 shrink-0 text-xs font-medium text-ink-3">ปี</span>
                 <input
                   type="number"
                   value={yearFrom}
                   onChange={(e) => setYearFrom(e.target.value)}
                   placeholder="จาก"
                   min={1900} max={2100}
-                  className="w-20 rounded-xl border border-white/15 bg-white/5 px-2 py-1.5 text-xs text-white placeholder-white/30 outline-none transition focus:border-white/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
-                <span className="text-xs text-white/30">–</span>
+                <span className="text-xs text-ink-3">–</span>
                 <input
                   type="number"
                   value={yearTo}
                   onChange={(e) => setYearTo(e.target.value)}
                   placeholder="ถึง"
                   min={1900} max={2100}
-                  className="w-20 rounded-xl border border-white/15 bg-white/5 px-2 py-1.5 text-xs text-white placeholder-white/30 outline-none transition focus:border-white/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 {(yearFrom || yearTo) && (
-                  <button onClick={() => { setYearFrom(''); setYearTo(''); }} className="text-xs text-white/30 hover:text-white/60 transition">ล้าง</button>
+                  <button onClick={() => { setYearFrom(''); setYearTo(''); }} className="text-xs text-ink-3 hover:text-ink-2 transition">ล้าง</button>
                 )}
               </div>
 
               {/* คะแนน */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 shrink-0 text-xs font-medium text-white/35">คะแนน</span>
+                <span className="w-14 shrink-0 text-xs font-medium text-ink-3">คะแนน</span>
                 {([0, 3, 4, 4.5] as const).map((r) => (
                   <FilterChip key={r} active={ratingMin === r} onClick={() => setRatingMin(r)}>
                     {r === 0 ? 'ทั้งหมด' : `≥ ${r}★`}
@@ -451,7 +452,7 @@ function SearchResults() {
               {(statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0) && (
                 <button
                   onClick={() => { setStatusFilter('all'); setYearFrom(''); setYearTo(''); setRatingMin(0); }}
-                  className="text-xs text-white/30 underline underline-offset-2 hover:text-white/60 transition"
+                  className="text-xs text-ink-3 underline underline-offset-2 hover:text-ink-2 transition"
                 >
                   ล้างตัวกรองทั้งหมด
                 </button>
@@ -462,7 +463,7 @@ function SearchResults() {
           {/* Row 3: หมวดหมู่ (dynamic from results) */}
           {availableCategories.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="shrink-0 text-xs font-medium text-white/30">หมวดหมู่</span>
+              <span className="shrink-0 text-xs font-medium text-ink-3">หมวดหมู่</span>
               <ChipBar
                 categories={["all", ...availableCategories]}
                 active={categoryFilter}
@@ -474,7 +475,7 @@ function SearchResults() {
 
         {/* ── Heading ───────────────────────────────────────────────── */}
         {(query || isMyList) && (
-          <p className="mb-6 text-sm text-white/45">
+          <p className="mb-6 text-sm text-ink-3">
             {isLoading
               ? `กำลังค้นหา "${query}"...`
               : isMyList && !query
@@ -490,9 +491,9 @@ function SearchResults() {
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {Array.from({ length: 12 }).map((_, i) => (
               <div key={i} className="flex flex-col gap-2">
-                <div className="aspect-2/3 w-full animate-pulse rounded-xl bg-white/10" />
-                <div className="h-3 w-3/4 animate-pulse rounded bg-white/10" />
-                <div className="h-3 w-1/2 animate-pulse rounded bg-white/10" />
+                <div className="aspect-2/3 w-full animate-pulse rounded-xl bg-fill" />
+                <div className="h-3 w-3/4 animate-pulse rounded bg-fill" />
+                <div className="h-3 w-1/2 animate-pulse rounded bg-fill" />
               </div>
             ))}
           </div>
@@ -512,21 +513,21 @@ function SearchResults() {
           const totalPages = Math.ceil(apiTotal / PAGE_SIZE);
           return (
             <div className="mt-10 flex flex-col items-center gap-3">
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-ink-3">
                 หน้า {page} จาก {totalPages} — {apiTotal} รายการทั้งหมด
               </p>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                   disabled={page <= 1}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-lg border border-line bg-fill px-3 py-2 text-xs text-ink-2 transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   «
                 </button>
                 <button
                   onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                   disabled={page <= 1}
-                  className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-lg border border-line bg-fill px-4 py-2 text-sm text-ink transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   ← ก่อนหน้า
                 </button>
@@ -539,8 +540,8 @@ function SearchResults() {
                       onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                       className={`h-9 w-9 rounded-lg text-sm font-medium transition ${
                         p === page
-                          ? "bg-white text-black"
-                          : "border border-white/10 bg-white/5 text-white/70 hover:bg-white/15"
+                          ? "bg-ink text-bg"
+                          : "border border-line bg-fill text-ink-2 hover:bg-raised"
                       }`}
                     >
                       {p}
@@ -550,14 +551,14 @@ function SearchResults() {
                 <button
                   onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                   disabled={page >= totalPages}
-                  className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-lg border border-line bg-fill px-4 py-2 text-sm text-ink transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   ถัดไป →
                 </button>
                 <button
                   onClick={() => { setPage(totalPages); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                   disabled={page >= totalPages}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-lg border border-line bg-fill px-3 py-2 text-xs text-ink-2 transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   »
                 </button>
@@ -568,7 +569,7 @@ function SearchResults() {
 
         {/* ── Empty state ───────────────────────────────────────────── */}
         {!isLoading && (searched || isMyList) && displayed.length === 0 && (query || isMyList) && (
-          <div className="flex flex-col items-center gap-4 py-24 text-center text-white/40">
+          <div className="flex flex-col items-center gap-4 py-24 text-center text-ink-3">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-16 w-16 opacity-30">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
@@ -583,7 +584,7 @@ function SearchResults() {
 
         {/* ── Initial state ─────────────────────────────────────────── */}
         {!query && !isMyList && !isLoading && (
-          <div className="flex flex-col items-center gap-4 py-24 text-center text-white/40">
+          <div className="flex flex-col items-center gap-4 py-24 text-center text-ink-3">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-16 w-16 opacity-30">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>

@@ -91,13 +91,13 @@ function Dots({ total, idx, desktop, onDotClick }: DotsProps) {
         desktop ? 'mt-8 justify-start' : 'mt-3 justify-center'
       }`}
     >
-      <div ref={pillRef} className="pointer-events-none absolute h-2 rounded-full bg-white" />
+      <div ref={pillRef} className="pointer-events-none absolute h-2 rounded-full bg-ink" />
       {Array.from({ length: total }, (_, i) => (
         <button
           key={i}
           ref={(el) => { dotEls.current[i] = el; }}
           onClick={() => onDotClick(i)}
-          className="h-2 w-2 rounded-full bg-white/25 transition-colors duration-300 hover:bg-white/50"
+          className="h-2 w-2 rounded-full bg-ink/25 transition-colors duration-300 hover:bg-ink/50"
           aria-label={`สลับไปรายการที่ ${i + 1}`}
         />
       ))}
@@ -187,11 +187,11 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
           type="button"
           onClick={handleMobileTap}
           aria-label={`ดูรายละเอียด ${book.title}`}
-          className="group relative mx-auto block aspect-2/3 w-full max-w-[88%] overflow-hidden rounded-2xl text-left shadow-2xl"
+          className="group relative mx-auto block aspect-2/3 w-full max-w-[88%] overflow-hidden rounded-2xl text-left"
         >
           <div className={`absolute inset-0 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
             {book.thumbnailCached === false ? (
-              <div className="absolute inset-0 bg-linear-to-br from-white/5 to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-br from-fill to-transparent" />
             ) : (
               <Image
                 src={imgUrl}
@@ -204,21 +204,21 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
               />
             )}
           </div>
-          <div className="absolute inset-x-0 bottom-0 h-2/5 bg-linear-to-t from-black/90 via-black/50 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-2/5 bg-linear-to-t from-bg/90 via-bg/50 to-transparent" />
           <div className={`absolute inset-x-0 bottom-0 p-5 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-            <h1 className="text-2xl font-black leading-tight text-white text-balance drop-shadow-lg">{titleMain}</h1>
+            <h1 className="text-2xl font-black leading-tight text-ink text-balance">{titleMain}</h1>
             {titleSub && (
-              <p className="mt-1 text-sm font-semibold tracking-wide text-white/75 drop-shadow-lg">
+              <p className="mt-1 text-sm font-semibold text-ink">
                 {titleSub}
               </p>
             )}
           </div>
         </button>
 
-        <div className={`mt-3 flex flex-wrap items-center justify-center gap-x-1 text-xs text-white/70 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
+        <div className={`mt-3 flex flex-wrap items-center justify-center gap-x-1 text-xs text-ink-2 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
           {(book.categories.length > 0 ? book.categories : ["E-Book"]).slice(0, 4).map((cat, i) => (
             <span key={cat} className="flex items-center gap-1">
-              {i > 0 && <span className="text-white/30">•</span>}
+              {i > 0 && <span className="text-ink-3">•</span>}
               {cat}
             </span>
           ))}
@@ -249,15 +249,15 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
             />
           )}
         </div>
-        <div className="absolute inset-0 bg-linear-to-b from-background/60 via-background/40 to-background" />
+        <div className="absolute inset-0 bg-linear-to-b from-bg/60 via-bg/40 to-bg" />
 
         {/* Two-panel card */}
         <div className="relative z-10 mx-auto flex h-96 max-w-5xl gap-8 px-8 lg:h-108 lg:gap-12 lg:px-12 xl:h-120 xl:max-w-6xl">
           {/* Poster */}
-          <div className="relative aspect-2/3 w-64 shrink-0 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10 lg:w-72 xl:w-80">
+          <div className="relative aspect-2/3 w-64 shrink-0 overflow-hidden rounded-2xl ring-1 ring-line lg:w-72 xl:w-80">
             <div className={`absolute inset-0 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
               {book.thumbnailCached === false ? (
-                <div className="absolute inset-0 bg-linear-to-br from-white/5 to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-br from-fill to-transparent" />
               ) : (
                 <Image
                   src={imgUrl}
@@ -274,22 +274,22 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
 
           {/* Info */}
           <div className={`flex min-w-0 flex-1 flex-col justify-center overflow-hidden py-4 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-            <p className="mb-3 text-xs font-semibold tracking-[0.32em] text-amber-400">Top 10 หนังสือที่น่าอ่านวันนี้</p>
-            <h1 className="text-4xl font-black uppercase leading-tight text-white text-balance lg:text-5xl xl:text-6xl">
+            <p className="mb-3 text-xs font-semibold text-accent">Top 10 หนังสือที่น่าอ่านวันนี้</p>
+            <h1 className="text-4xl font-black uppercase leading-tight text-ink text-balance lg:text-5xl xl:text-6xl">
               {titleMain}
             </h1>
             {titleSub && (
-              <p className="mt-2 text-lg font-semibold tracking-[0.08em] text-white/70 lg:text-xl">
+              <p className="mt-2 text-lg font-semibold text-ink-2 lg:text-xl">
                 {titleSub}
               </p>
             )}
             <div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
               {(book.categories.length > 0 ? book.categories : ["E-Book"]).slice(0, 5).map((cat) => (
-                <span key={cat} className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-white/90">
+                <span key={cat} className="rounded-full border border-ink-3 bg-fill px-3 py-1 text-ink">
                   {cat}
                 </span>
               ))}
-              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-white/90">
+              <span className="rounded-full border border-ink-3 bg-fill px-3 py-1 text-ink">
                 {book.publishedDate || "ปีที่ไม่ระบุ"}
               </span>
             </div>

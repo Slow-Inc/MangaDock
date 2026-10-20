@@ -71,9 +71,9 @@ function ChipBar({ categories, active, onSelect }: {
     <div className="relative mb-6">
       {canLeft && (
         <>
-          <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12 bg-linear-to-r from-[#0a0a0a] to-transparent" />
+          <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12 bg-linear-to-r from-bg to-transparent" />
           <button aria-label="เลื่อนซ้าย" onClick={() => scroll(-1)}
-            className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] p-1.5 text-white/60 transition hover:border-white/30 hover:text-white">
+            className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-line bg-bg p-1.5 text-ink-2 transition hover:border-ink-3 hover:text-ink">
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </>
@@ -82,7 +82,7 @@ function ChipBar({ categories, active, onSelect }: {
         {categories.map((cat) => (
           <button key={cat} onClick={() => onSelect(cat)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-              active === cat ? "bg-white text-black" : "bg-white/8 text-white/55 hover:bg-white/15 hover:text-white/80"
+              active === cat ? "bg-ink text-bg" : "bg-fill text-ink-2 hover:bg-raised hover:text-ink"
             }`}>
             {cat === "all" ? "ทั้งหมด" : cat}
           </button>
@@ -90,9 +90,9 @@ function ChipBar({ categories, active, onSelect }: {
       </div>
       {canRight && (
         <>
-          <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-linear-to-l from-[#0a0a0a] to-transparent" />
+          <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-linear-to-l from-bg to-transparent" />
           <button aria-label="เลื่อนขวา" onClick={() => scroll(1)}
-            className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-[#0a0a0a] p-1.5 text-white/60 transition hover:border-white/30 hover:text-white">
+            className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-line bg-bg p-1.5 text-ink-2 transition hover:border-ink-3 hover:text-ink">
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </>
@@ -151,21 +151,21 @@ function Pagination({
 
   return (
     <div className="mt-8 flex flex-col items-center gap-3">
-      <p className="text-xs text-white/40">
+      <p className="text-xs text-ink-3">
         หน้า {page} / {totalPages} — {total.toLocaleString()} รายการทั้งหมด
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <button
           disabled={page <= 1}
           onClick={() => onPageChange(1)}
-          className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          className="rounded-lg border border-line px-3 py-2 text-xs text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
         >
           «
         </button>
         <button
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          className="rounded-lg border border-line px-4 py-2 text-sm text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
         >
           ← ก่อนหน้า
         </button>
@@ -176,8 +176,8 @@ function Pagination({
             onClick={() => onPageChange(p)}
             className={`h-9 w-9 rounded-lg text-sm transition ${
               p === page
-                ? "bg-white font-semibold text-black"
-                : "border border-white/10 text-white/50 hover:border-white/30 hover:text-white"
+                ? "bg-ink font-semibold text-bg"
+                : "border border-line text-ink-2 hover:border-ink-3 hover:text-ink"
             }`}
           >
             {p}
@@ -187,14 +187,14 @@ function Pagination({
         <button
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          className="rounded-lg border border-line px-4 py-2 text-sm text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
         >
           ถัดไป →
         </button>
         <button
           disabled={page >= totalPages}
           onClick={() => onPageChange(totalPages)}
-          className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          className="rounded-lg border border-line px-3 py-2 text-xs text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
         >
           »
         </button>
@@ -273,7 +273,7 @@ function Section({ order }: { order: TabKey }) {
     <section>
       {/* Stats row */}
       {data.total > 0 && (
-        <p className="mb-5 text-xs text-white/30">
+        <p className="mb-5 text-xs text-ink-3">
           {data.total.toLocaleString()} เรื่อง · หน้า {page}/{totalPages}
           {categoryFilter !== "all" && ` · ${categoryFilter}`}
         </p>
@@ -297,7 +297,7 @@ function Section({ order }: { order: TabKey }) {
         }`}
       >
         {error ? (
-          <p className="py-16 text-center text-sm text-white/40">
+          <p className="py-16 text-center text-sm text-ink-3">
             ไม่สามารถโหลดข้อมูลได้
           </p>
         ) : (
@@ -319,7 +319,7 @@ function Section({ order }: { order: TabKey }) {
 
 export default function NewBooksPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0a0a0a]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-bg" />}>
       <NewBooksPageInner />
     </Suspense>
   );
@@ -333,35 +333,35 @@ function NewBooksPageInner() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen bg-bg text-ink">
       <Navbar />
 
       <main className="page-shell page-shell-nav page-shell-wide">
         {/* Page header */}
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+          <h1 className="text-2xl font-bold text-ink md:text-3xl">
             หนังสือทั้งหมด
           </h1>
-          <p className="mt-1 text-sm text-white/40">
+          <p className="mt-1 text-sm text-ink-3">
             เรียกดูมังงะตามหมวดที่คุณสนใจ
           </p>
         </div>
 
         {/* Tab bar */}
-        <div className="mobile-tabs-scroll mb-6 flex gap-0 overflow-x-auto whitespace-nowrap border-b border-white/10 sm:mb-8">
+        <div className="mobile-tabs-scroll mb-6 flex gap-0 overflow-x-auto whitespace-nowrap border-b border-line sm:mb-8">
           {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`relative shrink-0 px-4 py-2.5 text-sm font-medium transition-colors sm:px-5 ${
                 activeTab === tab.key
-                  ? "text-white"
-                  : "text-white/40 hover:text-white/70"
+                  ? "text-ink"
+                  : "text-ink-3 hover:text-ink-2"
               }`}
             >
               {tab.label}
               {activeTab === tab.key && (
-                <span className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-white" />
+                <span className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-ink" />
               )}
             </button>
           ))}
