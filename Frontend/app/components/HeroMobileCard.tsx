@@ -29,7 +29,7 @@ export default function HeroMobileCard({ book, imageUrl, titleMain, titleSub }: 
           ) : (
             <Image
               src={imageUrl}
-              alt="" // the link's aria-label already names the book
+              alt="" // the button's aria-label already names the book
               fill
               className="object-cover object-center transition duration-300 group-active:scale-[0.985]"
               priority
