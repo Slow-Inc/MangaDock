@@ -232,7 +232,7 @@ function SearchContent() {
                   <p className="line-clamp-2 text-sm font-semibold leading-snug text-white">{book.title}</p>
                   {book.subtitle && <p className="mt-0.5 truncate text-xs text-white/35">{book.subtitle}</p>}
                   {book.authors && book.authors.length > 0 && (
-                    <p className="mt-1 truncate text-[11px] text-indigo-400/60">{book.authors[0]}</p>
+                    <p className="mt-1 truncate text-[11px] text-amber-400/60">{book.authors[0]}</p>
                   )}
                 </div>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 shrink-0 text-white/20">

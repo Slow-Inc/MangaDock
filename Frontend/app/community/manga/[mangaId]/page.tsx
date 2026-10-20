@@ -148,14 +148,14 @@ export default function MangaCommunityPage() {
       {/* ── Subreddit-style header ── */}
       <div className="relative mb-8 rounded-2xl overflow-hidden">
         {/* Banner */}
-        <div className="h-32 sm:h-40 relative bg-gradient-to-br from-indigo-900/40 via-purple-900/30 to-[#1a1a2e] overflow-hidden">
+        <div className="h-32 sm:h-40 relative bg-white/[0.03] overflow-hidden">
           {mangaCover && (
             <Image
               src={mangaCover}
               alt=""
               fill
               sizes="100vw"
-              className="object-cover opacity-20 blur-xl scale-110"
+              className="object-cover opacity-15"
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/60 to-transparent" />
@@ -193,7 +193,7 @@ export default function MangaCommunityPage() {
             onClick={() =>
               user ? setShowCreateModal(true) : showLoginPrompt()
             }
-            className="hidden sm:block shrink-0 px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-xs hover:bg-indigo-500 shadow-xl shadow-indigo-500/20 smooth-hover active:scale-95"
+            className="hidden sm:block shrink-0 px-5 py-2.5 rounded-xl bg-white text-black font-black text-xs hover:bg-white/90 smooth-hover active:scale-95"
           >
             + โพสต์
           </button>
@@ -271,7 +271,7 @@ export default function MangaCommunityPage() {
                       onClick={() => setNewPost({ ...newPost, category: cat })}
                       className={`px-4 py-2 rounded-xl text-xs font-bold border smooth-hover ${
                         newPost.category === cat
-                          ? "bg-indigo-600 border-indigo-500 text-white"
+                          ? "bg-white border-amber-500 text-black"
                           : "bg-white/5 text-white/40 border-white/5 hover:border-white/20"
                       }`}
                     >
@@ -288,7 +288,7 @@ export default function MangaCommunityPage() {
                   value={newPost.title}
                   onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
                   placeholder="เขียนหัวข้อโพสต์ที่นี่..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-all"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500 transition-all"
                 />
               </div>
 
@@ -299,7 +299,7 @@ export default function MangaCommunityPage() {
                   onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
                   placeholder="รายละเอียดสิ่งที่คุณต้องการจะพูดคุย..."
                   rows={5}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-all resize-none"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500 transition-all resize-none"
                 />
               </div>
 
@@ -316,7 +316,7 @@ export default function MangaCommunityPage() {
               <button
                 onClick={handleCreatePost}
                 disabled={!newPost.title.trim() || !newPost.content.trim() || submitting}
-                className="px-8 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-sm hover:bg-indigo-500 shadow-lg shadow-indigo-500/20 disabled:opacity-50 transition-all"
+                className="px-8 py-2.5 rounded-xl bg-white text-black font-black text-sm hover:bg-white/90 disabled:opacity-50 transition-all"
               >
                 {submitting ? "กำลังโพสต์..." : "โพสต์เลย"}
               </button>
@@ -328,7 +328,7 @@ export default function MangaCommunityPage() {
       {/* FAB — Mobile Create Post */}
       <button
         onClick={() => user ? setShowCreateModal(true) : showLoginPrompt()}
-        className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-2xl shadow-indigo-500/40 sm:hidden active:scale-95 transition-transform"
+        className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-white text-black flex items-center justify-center sm:hidden active:scale-95 transition-transform"
         aria-label="สร้างโพสต์"
       >
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
