@@ -77,7 +77,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
             className={`relative shrink-0 w-28 sm:w-36 self-stretch overflow-hidden bg-fill border-r border-line ${isSpoiler && !spoilerRevealed ? 'pointer-events-none' : ''}`}
             style={{ filter: isSpoiler && !spoilerRevealed ? 'blur(4px)' : 'blur(0px)', transition: 'filter 0.5s ease' }}
           >
-            <PostImage url={thumbUrl!} alt="รูปประกอบโพสต์" />
+            <PostImage url={thumbUrl!} alt="รูปประกอบโพสต์" sizes="144px" />
             {post.imageUrls.length > 1 && (
               <div className="absolute bottom-1.5 left-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-bg/80">
                 <svg className="w-2.5 h-2.5 text-ink-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
