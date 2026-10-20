@@ -3,6 +3,19 @@
 
 ---
 
+## #826 Reader asks for a translation rating only on translated pages (2026-10-21)
+
+**What:** `showTranslation` defaults to true, so the "คุณภาพแปล 👍 👎" pill sat over every page, including pages never
+translated; its `bg-bg/50` + blur read as a grey smudge over manga art. New pure
+`components/reader/pageShowsTranslation.ts` gates it on the current page being in `translatedPages`/`patchedPages`;
+the pill is a solid `bg-bg/85` surface with a `text-ink-2` label.
+
+**Validated:** `pageShowsTranslation.test.ts` red → green; production build, chapter opened signed out (MIT offline):
+pill absent at 1440 and 390, no page errors. Not browser-checked: the pill on a translated page (needs a translation
+run).
+
+---
+
 ## #824 Admin tables scroll on a phone instead of squashing (2026-10-21)
 
 **What:** with realistic data the admin tables (`w-full` in the new `overflow-x-auto` wrappers) squashed to 390 px:

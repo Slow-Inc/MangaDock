@@ -19,6 +19,7 @@ import ReaderCaptchaGate from "./reader/ReaderCaptchaGate";
 import ChapterPicker from "./reader/ChapterPicker";
 import PageRenderer from "./reader/PageRenderer";
 import TranslationFeedback from "./TranslationFeedback";
+import { pageShowsTranslation } from "./reader/pageShowsTranslation";
 import ReaderCommentDrawer from "./ReaderCommentDrawer";
 import ReportButton from "./ReportButton";
 import Loader from "./ui/Loader";
@@ -1216,7 +1217,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                     goToChapter={goToChapter}
                   />
                 )}
-                {showTranslation && mangaId && (
+                {mangaId && pageShowsTranslation({ showTranslation, page, translatedPages, patchedPages }) && (
                   <div className="absolute bottom-20 left-1/2 z-10 -translate-x-1/2">
                     <TranslationFeedback mangaId={mangaId} chapterId={chapterId} pageNumber={page + 1} />
                   </div>

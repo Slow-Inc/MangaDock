@@ -85,8 +85,8 @@ export default function TranslationFeedback({ mangaId, chapterId, pageNumber }: 
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-full border border-line bg-bg/50 px-2 py-1 backdrop-blur-sm">
-      <span className="mr-1 text-xs text-ink-3">คุณภาพแปล</span>
+    <div className="flex items-center gap-1 rounded-full border border-line bg-bg/85 px-2 py-1">
+      <span className="mr-1 text-xs text-ink-2">คุณภาพแปล</span>
       <button
         onClick={() => handleVote(1)}
         disabled={submitting}
