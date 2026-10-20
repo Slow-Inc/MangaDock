@@ -271,8 +271,8 @@ class CommonTranslator(InfererModule):
 
         # '  ' -> ' '
         trans = re.sub(r'\s+', r' ', trans)
-        # 'text.text' -> 'text. text'
-        trans = re.sub(r'(?<![.,;!?])([.,;!?])(?=\w)', r'\1 ', trans)
+        # 'text.text' -> 'text. text' — but not a separator inside a number ('5,000', '1.5')
+        trans = re.sub(r'(?<![.,;!?])((?<!\d)[.,;!?]|[;!?]|[.,](?!\d))(?=\w)', r'\1 ', trans)
         # ' ! ! . . ' -> ' !!.. '
         trans = re.sub(r'([.,;!?])\s+(?=[.,;!?]|$)', r'\1', trans)
 

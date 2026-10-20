@@ -40,6 +40,7 @@ _HEAVY_TESTS = [
     'test_stages.py',
     'test_timed_stage.py',           # imports MangaTranslator (torch) to check _run_* __name__
     'test_translation.py',
+    'test_translation_cleanup.py',   # imports translators.common -> translators/__init__ (torch)
     'test_translation_manual.py',
     'test_worker_bind.py',
 ]
