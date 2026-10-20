@@ -36,10 +36,29 @@ export function createApi(options: {
     }
     return response;
   }
+  async function readJson(
+    path: string,
+    init: RequestInit,
+    allowEmpty: boolean,
+  ): Promise<unknown> {
+    const body = await (await request(path, init)).text();
+    if (allowEmpty && !body.trim()) return null;
+    try {
+      return JSON.parse(body);
+    } catch {
+      throw new ApiError(502, "ข้อมูลจากบริการไม่ถูกต้อง กรุณาลองอีกครั้ง");
+    }
+  }
   return {
     request,
     async json<T>(path: string, init: RequestInit = {}): Promise<T> {
-      return (await request(path, init)).json();
+      return (await readJson(path, init, false)) as T;
+    },
+    async nullableJson<T>(
+      path: string,
+      init: RequestInit = {},
+    ): Promise<T | null> {
+      return (await readJson(path, init, true)) as T | null;
     },
   };
 }

@@ -7,6 +7,30 @@ const options = {
   apiOrigin: "https://api.example.test",
   deviceId: "mdock_native_test",
 };
+test("a signed-in reader with no existing review can load the review section when Backend returns an empty body", async () => {
+  const auth = fixture({
+    externalFetch: async (input) => {
+      const path = new URL(String(input)).pathname;
+      return path.endsWith("/my")
+        ? new Response(null)
+        : Response.json(
+            path.endsWith("/summary") ? { averageRating: 0, count: 0 } : [],
+          );
+    },
+  });
+  await auth.app.signIn("reader@example.test", "correct-test-password");
+  const social = createReadingSocial({
+    ...options,
+    fetch: auth.fetch,
+    session: auth.app,
+  });
+  await social.reviews("manga-1");
+  assert.equal(social.snapshot().reviews.error, null);
+  assert.equal(social.snapshot().reviews.mine, null);
+  assert.deepEqual(social.snapshot().reviews.items, []);
+  social.dispose();
+  auth.app.dispose();
+});
 const review = {
   id: "review-1",
   uid: "reader-1",

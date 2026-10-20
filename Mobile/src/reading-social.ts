@@ -184,7 +184,7 @@ export function createReadingSocial(options: {
             { signal },
           ),
           token
-            ? api.json<Review | null>(`${path}/my`, {
+            ? api.nullableJson<Review>(`${path}/my`, {
                 headers: { Authorization: `Bearer ${token}` },
                 signal,
               })
