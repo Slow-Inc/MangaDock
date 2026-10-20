@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import StarRating from "./StarRating";
+import { safeUrl } from "../lib/safeUrl";
 import type { ReviewItem } from "../lib/reviewTypes";
 
 type Props = {
@@ -31,7 +31,9 @@ export default function ReviewCard({ review, isOwn, onDelete }: Props) {
         <div className="flex items-center gap-2.5">
           {review.photoUrl ? (
             <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full">
-              <Image src={review.photoUrl} alt="" fill className="object-cover" sizes="32px" />
+              {/* User avatar host is arbitrary → plain <img>; next/image throws on un-allow-listed hosts. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={safeUrl(review.photoUrl)} alt="" className="h-full w-full object-cover" />
             </div>
           ) : (
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fill text-xs font-bold text-ink-2">
