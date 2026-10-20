@@ -205,3 +205,28 @@ def test_line_breaks_never_split_a_thai_word():
         for line in lines[:-1]:
             pos += len(line.replace(_ZWSP, '').replace('-', ''))
             assert pos in boundaries, (size, lines)
+
+
+def test_thai_sentence_spaces_survive_wrapping():
+    """Thai separates sentences/phrases with a space ('เวสตา มีอุตสาหกรรม'); the ZWSP segmentation
+    dropped every space, so rendered captions ran sentences together. A space that fits stays a
+    space; a break may replace it, and no line starts or ends with one."""
+    if not _HAS_PYTHAINLP:
+        return
+    tr.set_font(_FONT)
+    text = 'ดาวอาณานิคมเวสตา มีอุตสาหกรรมหลักคือเกษตรกรรม'
+    lines, _ = tr.calc_horizontal(20, text, max_width=2000, max_height=400, language='THA')
+    assert lines == [text]
+    lines, _ = tr.calc_horizontal(20, text, max_width=180, max_height=400, language='THA')
+    assert len(lines) > 1
+    assert all(l == l.strip() for l in lines)
+    assert ''.join(l.replace(_ZWSP, '') for l in lines).replace(' ', '') == text.replace(' ', '')
+
+
+def test_punctuation_never_starts_a_line_even_with_kept_spaces():
+    """Replay A/B 2026-10-20 (Chainsaw Man credits): 'RTSD / ,ZERO' — once spaces were kept, the
+    comma token became ', ' and the closer check no longer recognised it."""
+    if not _HAS_PYTHAINLP:
+        return
+    segs = _segments('จัดหน้าโดย RTSD, ZERO และ "เพื่อน" ของเขา')
+    assert not any(s.strip()[:1] in ',.!?:;…)”' for s in segs[1:])  # a straight " may open

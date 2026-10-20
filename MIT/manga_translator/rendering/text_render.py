@@ -83,8 +83,18 @@ def _insert_thai_word_breaks(text: str) -> str:
     if not _HAS_PYTHAINLP or not _THAI_RE.search(text):
         return text
     try:
-        tokens = _thai_tokenize(text, engine='newmm', keep_whitespace=False)
-        return _ZWSP.join(_glue_thai_tokens([t for t in tokens if t.strip()]))
+        tokens = _thai_tokenize(text, engine='newmm', keep_whitespace=True)
+        # A real space (Thai sentence/phrase separator, or between Latin words) stays visible:
+        # it rides on the end of the previous token, so the ZWSP split keeps it and the line
+        # assembly trims it when a break lands there.
+        words: List[str] = []
+        for t in tokens:
+            if not t.strip():
+                if words and not words[-1].endswith(' '):
+                    words[-1] += ' '
+            else:
+                words.append(t)
+        return _ZWSP.join(_glue_thai_tokens(words))
     except Exception:
         return text
 
@@ -120,27 +130,30 @@ _THAI_PREFIXES = frozenset(['ผู้', 'นัก', 'การ', 'ความ
 # Demonstratives always follow the noun/classifier they modify ('พวก|นั้น'): never start a line.
 _THAI_DEMONSTRATIVES = frozenset(['นี้', 'นั้น', 'โน้น'])
 _OPENERS = frozenset('([“‘「『')
-_CLOSERS = frozenset(')]”’」』')
+# Closing brackets/quotes and sentence punctuation never start a line.
+_CLOSERS = frozenset(')]”’」』,.!?:;…‥')
 
 
 def _glue_thai_tokens(tokens: List[str]) -> List[str]:
     """Join tokens that must not be separated by a line break: a prefix morpheme or an opening
-    bracket/quote with the next token, and a repetition mark (ๆ/ฯ), a demonstrative or a closing
-    bracket/quote with the previous one. A straight `"` alternates: it opens, then closes."""
+    bracket/quote with the next token, and a repetition mark (ๆ/ฯ), a demonstrative, punctuation
+    or a closing bracket/quote with the previous one. A straight `"` alternates: it opens, then
+    closes. Tokens may carry a kept trailing space, so the checks look at the stripped token."""
     out: List[str] = []
     bind_next = False
     quote_open = False
     for tok in tokens:
-        opener = all(c in _OPENERS for c in tok)
-        closer = all(c in _CLOSERS for c in tok)
-        if tok == '"':
+        core = tok.strip()
+        opener = bool(core) and all(c in _OPENERS for c in core)
+        closer = bool(core) and all(c in _CLOSERS for c in core)
+        if core == '"':
             opener, closer = not quote_open, quote_open
             quote_open = not quote_open
-        if out and (bind_next or tok[0] in 'ๆฯ' or closer or tok in _THAI_DEMONSTRATIVES):
+        if out and (bind_next or tok[0] in 'ๆฯ' or closer or core in _THAI_DEMONSTRATIVES):
             out[-1] += tok
         else:
             out.append(tok)
-        bind_next = tok in _THAI_PREFIXES or opener
+        bind_next = (tok in _THAI_PREFIXES or opener) and not tok.endswith(' ')
     return out
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -752,7 +765,10 @@ def get_string_width(font_size: int, text: str):
 def _split_words_and_widths(text: str, font_size: int) -> Tuple[List[str], List[int]]:
     """#186: split text on whitespace / zero-width-space and precompute each word's
     pixel width. Extracted verbatim from ``calc_horizontal``."""
-    words = re.split(rf'[\s{_ZWSP}]+', text)
+    if _ZWSP in text:  # pre-segmented (Thai/CJK): ZWSP is the break; real spaces stay in words
+        words = [w for w in text.split(_ZWSP) if w]
+    else:
+        words = re.split(rf'[\s{_ZWSP}]+', text)
     return words, [get_string_width(font_size, w) for w in words]
 
 
@@ -1164,6 +1180,8 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
         # print(line_text, get_string_width(font_size, line_text), line_width_list[i])
         # assert(line_width_list[i] == get_string_width(font_size, line_text))
 
+        if has_zwsp_breaks:  # a kept Thai space must not start or end a line
+            line_text = line_text.strip(' ')
         # Shouldn't be needed but there is apparently still a bug somewhere (See #458)
         line_width_list[i] = get_string_width(font_size, line_text)
         line_text_list.append(line_text)
