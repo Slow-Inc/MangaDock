@@ -705,7 +705,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                           <button
                             onClick={() => { translateCurrentPage(); setTranslateMenuOpen(false); }}
                             disabled={translatingCurrentPage}
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-purple-300/90 transition-colors duration-150 hover:bg-white/10 hover:text-purple-200 disabled:opacity-50"
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-accent/90 transition-colors duration-150 hover:bg-white/10 hover:text-accent disabled:opacity-50"
                           >
                             {translatingCurrentPage ? (
                               <>
@@ -948,7 +948,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         <button
                           onClick={() => { translateCurrentPage(); setMoreMenuOpen(false); }}
                           disabled={translatingCurrentPage || translating}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-purple-300/90 transition hover:bg-white/10 hover:text-purple-200 disabled:opacity-50"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-accent/90 transition hover:bg-white/10 hover:text-accent disabled:opacity-50"
                         >
                           {translatingCurrentPage ? (
                             <>

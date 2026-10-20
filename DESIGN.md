@@ -1,259 +1,178 @@
 ---
 name: MangaDock Visual System
-description: A premium, multi-contextual design system bridging cinematic content with tactical precision.
+description: The Strata design language applied to a manga reading app — Modern Swiss, Editorial Minimalism, Apple-like calm; minimal but never boring because each area carries its own visual.
 colors:
-  background: "#08090d"
-  surface: "#1a1a1a"
-  primary: "#6366f1"
-  primary-glow: "rgba(99, 102, 241, 0.2)"
-  secondary: "#f59e0b"
-  secondary-glow: "rgba(245, 158, 11, 0.2)"
-  foreground: "#f8f9fb"
-  foreground-muted: "rgba(248, 249, 251, 0.4)"
-  border: "rgba(255, 255, 255, 0.1)"
+  light:
+    bg: "#f5f5f7"
+    surface: "#ffffff"
+    ink: "#131316"
+    accent: "#0a62d6"
+    ok: "#1a8a4a"
+    danger: "#c8322f"
+  dark:
+    bg: "#0b0b0d"
+    surface: "#151518"
+    ink: "#f1f1f3"
+    accent: "#5aa2ff"
+    ok: "#4cc380"
+    danger: "#ff6b6b"
+  derived:
+    ink-2: "color-mix(in srgb, var(--ink) 66%, var(--bg))"
+    ink-3: "color-mix(in srgb, var(--ink) 42%, var(--bg))"
+    line: "color-mix(in srgb, var(--ink) 12%, transparent)"
+    fill: "color-mix(in srgb, var(--ink) 6%, transparent)"
+    raised: "color-mix(in srgb, var(--ink) 4%, var(--surface))"
 typography:
+  sans: "Inter, Anuphan (Thai), system-ui"
+  mono: "JetBrains Mono — labels, numbers, badges"
+  serif: "Instrument Serif — at most one statement word per page"
   display:
-    fontFamily: "var(--font-noto-sans-thai), sans-serif"
-    fontWeight: 900
-    letterSpacing: "-0.02em"
-    lineHeight: 1.1
+    size: "clamp(2.3rem, 4.1vw, 3.9rem)"
+    weight: 600
+    letterSpacing: "0 by default; -0.035em only on a Latin-only heading"
+    lineHeight: "1.2 (Thai-first app)"
   body:
-    fontFamily: "var(--font-noto-sans-thai), sans-serif"
-    fontWeight: 400
-    fontSize: "14px"
-    lineHeight: 1.6
+    size: "1.0625rem"
+    lineHeight: "1.6 (Latin) / 1.75 (Thai)"
 rounded:
-  sm: "8px"
-  md: "12px"
-  lg: "16px"
-  xl: "24px"
-  full: "9999px"
-spacing:
-  xs: "4px"
-  sm: "8px"
-  md: "16px"
-  lg: "24px"
-  xl: "32px"
+  r1: "8px"
+  r2: "12px"
+  r3: "16px"
+  card: "28px"
+  pill: "999px"
+motion:
+  ease: "cubic-bezier(0.23, 1, 0.32, 1)"
+  durations: "160ms / 320ms / 600ms"
+  stagger: "38ms"
+  glide: "420ms cubic-bezier(0.4, 0, 0.2, 1)"
 components:
-  card-monolith:
-    backgroundColor: "{colors.surface}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.lg}"
   button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.foreground}"
-    rounded: "{rounded.md}"
-    padding: "12px 24px"
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.bg}"
+    rounded: "{rounded.pill}"
+    height: "44px"
+  pill-selected:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.bg}"
+    rounded: "{rounded.pill}"
+  card:
+    backgroundColor: "{colors.surface}"
+    border: "1px {colors.line}"
+    rounded: "{rounded.card}"
 ---
 
 <!-- lang:en -->
 # Design System: MangaDock
 
+This file is the source of truth for the design language; the token values are implemented in `Frontend/app/globals.css` (keep the two in step) and the components in `Frontend/app/components/ui/`. The language is ported from the Strata site — read `D:\Github\Strata-xeno-System-Design\ROUTER.md` for its reasoning, and `docs/superpowers/specs/2026-10-20-frontend-redesign-strata-design.md` for how MangaDock adopts it.
+
 ## 1. Overview
 
-**Creative North Star: "The Contextual Triad"**
-
-MangaDock utilizes a layered aesthetic philosophy that adapts to the user's current task. It shifts between three distinct modes:
-- **The Cinematic Canvas:** During manga reading, the UI recedes into the background. Depth is minimized, and controls are transparent or hidden to let the content dominate.
-- **The Polished Monolith:** For general interaction and discovery (Home, Feed, Studio), the UI uses "Liquid Glass" surfaces—dark, polished stone-like containers with backdrop blurs and subtle 1px borders that convey physical substance and premium craft.
-- **The Tactical Terminal:** For system status, wallet transactions, and high-precision tools, the UI adopts a high-density, status-driven look using glow effects and strict grid alignments.
-
-**Key Characteristics:**
-- **Zero AI Slop:** No generic gradients or unearned emojis. Every pixel is intentional.
-- **Atmospheric Depth:** Layers are defined by opacity (`white/5`) and blur (`backdrop-blur-md`) rather than heavy drop shadows.
-- **Native Fluidity:** Interactions are designed to feel like native OS components.
+**North star: "Minimal, never boring."** A calm, editorial surface — monochrome hierarchy, wide whitespace, flush-left text, hairline dividers — so the manga covers and pages are the colour. Each feature area adds one visual that belongs to it (a mascot, a staged progress, a dot field), never decoration for its own sake. MangaDock is an app, not a landing page.
 
 ## 2. Colors
 
-The palette is rooted in deep space neutrals tinted with purposeful accents.
+- **Base:** `bg`, `surface`, `ink`; everything else is derived from `ink` with `color-mix` (`ink-2` secondary text, `ink-3` tertiary, `line` borders, `fill` tints, `raised` a lifted surface).
+- **Accent:** one hue only — blue (`#0a62d6` light / `#5aa2ff` dark) for focus, selection, status and a rare highlight.
+- **Status:** `ok` and `danger`, always with an icon or a label, never colour alone.
+- **Themes:** System / Light / Dark through `data-theme` on `<html>`; **default dark**. Always-dark islands (the reader) use `.theme-dark`, which re-declares the derived tokens.
 
-### Primary
-- **Indigo Action** (#6366f1): Used for primary calls-to-action, platform-wide navigation, and Translator-related states. It represents the "engine" of the platform.
-
-### Secondary
-- **Amber Manga** (#f59e0b): Used for manga-specific metadata (ranks, tags) and Creator-related states. It represents the "heart" and "value" of the content.
-
-### Neutral
-- **Deep Space** (#08090d): The base background. Always darker than sRGB black-grey to provide extreme contrast for manga content.
-- **Monolith Surface** (#1a1a1a): Used for cards and secondary containers.
-
-### Named Rules
-**The Tint-Over-Solid Rule.** Surfaces should rarely be solid colors. Prefer `bg-white/5` over a fixed hex when layering to allow the background depth to bleed through.
+### Named rules
+- **No purple, anywhere** — no indigo, violet or fuchsia, no purple gradients, no purple glow.
+- **Plain backgrounds** — page background is `bg`, flat; no gradient blobs, no full-page glass, no neon.
+- **No literal hex in components** — use the Tailwind token colours (`bg-surface`, `text-ink-2`, `border-line`, `bg-fill`, `text-accent`).
 
 ## 3. Typography
 
-The system uses Noto Sans Thai as a unified, high-performance font stack.
-
-### Hierarchy
-- **Display** (900 weight, dynamic clamp, 1.1 line-height): Used for cinematic headings and hero sections.
-- **Headline** (800 weight, 24-30px): Used for major page sections (e.g., "คอมมูนิตี้").
-- **Body** (400-500 weight, 14px, 1.6 line-height): Standard reading text. Max line length capped at 75ch for comfort.
-- **Label** (900 weight, 10-12px, 0.25em tracking, UPPERCASE): Used for tactical indicators and section headers.
+Inter for Latin, Anuphan for Thai glyphs (same stack, falls through per glyph), JetBrains Mono for labels and numbers (`tabular-nums`), Instrument Serif for at most one statement word per page. Headings weight 600, `text-wrap: balance`, no tracking by default (a Latin-only heading may add `-0.035em`). **Thai text never gets letter-spacing** — it breaks Thai clusters. Type scale: `text-display`, `text-h2`, `text-h3`, `text-lede` (Tailwind tokens, Strata sizes, Thai line-heights 1.2–1.25). Spacing uses Tailwind's 4 px scale in steps of 8 px. Page titles use `GradientHeading` (neutral grey-to-grey only).
 
 ## 4. Elevation
 
-Depth is conveyed through **Physical Transparency** and **Ambient Glow**.
-
-### Shadow Vocabulary
-- **Tactical Glow** (`shadow-[0_0_8px_var(--glow-color)]`): Used for icons and status lights in Terminal mode.
-- **Monolith Lift** (`shadow-2xl shadow-black/40`): Used for floating Modals and high-priority Cards to separate them from the base canvas.
+Almost flat. Depth comes from a 1 px `line` border and the `raised` surface, not shadows. Shadows only for floating layers: menus `0 18px 40px -16px rgb(0 0 0 / .3)`, windows `0 50px 90px -50px rgb(0 0 0 / .45)`.
 
 ## 5. Components
 
-### Buttons
-- **Shape:** Soft tactical (12px radius).
-- **Primary:** Indigo base with a 0.18s smooth transition. Active state scale down to 95%.
-- **Liquid Glass:** `bg-white/5` with `backdrop-blur-md`. Used for secondary actions.
+- **Button** (`ui/Button`): 44 px pill; `primary` = ink fill with bg text (hover mixes 12 % accent), `secondary` = surface + line, `ghost` = transparent. Press moves 1 px down; `arrow` adds the sliding →. A button that keeps its own size uses `PRIMARY_FILL` instead of copying the classes.
+- **StatusPage** (`ui/StatusPage`): the shell for 404 / error screens.
+- **Pill** (`ui/Pill`): one component for chips, filters and tabs; selected = ink fill.
+- **Badge** (`ui/Badge`): mono 11 px pill, tone tints the border.
+- **Input** (`ui/Input`): 48 px pill on surface.
+- **Card** (`ui/Card`): 1 px line, 28 px radius, hover raises the border.
+- **Disclosure** (`ui/Disclosure`): native `<details>` row with a +/− circle.
+- **Loader** (`ui/Loader`, loading-dev): page/section = Atom, inline = Arc, MIT translation = Slide. Never a hand-made `animate-spin` ring.
+- **Reveal** (`ui/Reveal`): content visible by default; under `html.js` it rises in once, staggered.
 
-### Cards / Containers
-- **Monolith Card:** `#1a1a1a` background, 1px border `white/10`, 16px-24px radius.
-- **Compact Strip:** Reduced padding (12px), horizontal flow, minimal metadata.
+## 6. Motion
 
-### Navigation
-- **Top Bar:** Fixed height (64px), high-blur backdrop, z-index 50.
-- **Mobile Menu:** Right-aligned slide-over drawer with tactical navigation links.
-
-## 6. Brand Identity
-
-### Brand Personality
-- **Sophisticated & Precise:** Like Apple, every gap and alignment is intentional.
-- **Immersive & Cinematic:** Like Netflix, the UI recedes to let the content shine.
-- **Tech-Forward:** Confident, high-performance, and reliable.
-
-### Anti-references
-- **Legacy Forums:** Avoid cluttered, dense, and "old-web" board designs.
-- **Childish Palettes:** No oversaturated, "toy-like" colors.
-- **AI Slop:** NO excessive emojis, generic gradients, or unpolished "generated" feels.
-- **Friction:** No complex workflows or deep nesting.
-
-### Core Design Principles
-- **Native-First Fluidity:** Every interaction must feel purpose-built and as smooth as a native OS app.
-- **High-Fidelity Minimalism:** Precision over decoration. Use "Liquid Glass" and blur for depth, not complexity.
-- **Content as the Hero:** The UI provides the frame; the manga and the community provide the life.
-- **Zero-Latency Feedback:** Instant responses (Optimistic UI) and clear, elegant loading states.
-
-### Accessibility
-- WCAG 2.1 Level AA.
-- Support for high-contrast reading and reduced motion preferences.
-- Inclusive typography optimized for multi-language manga text.
-
----
+One easing `cubic-bezier(0.23, 1, 0.32, 1)`, durations 160 / 320 / 600 ms, 38 ms stagger, 420 ms glide for growing boxes. No scroll hijacking. Everything turns off under `prefers-reduced-motion`. Heavy visuals (canvas, 3-D) load when near, run only when seen, release on unmount, and always have a static fallback.
 
 ## 7. Do's and Don'ts
 
-### Do:
-- **Do** use `backdrop-blur-md` on all floating surfaces.
-- **Do** use `.smooth-hover` (0.18s) for all transition-ready elements.
-- **Do** use `Math.floor` for all financial revenue split calculations to favor creators.
+### Do
+- Start from the final, readable state; add motion as a layer.
+- Check 390 / 1024 / 1440 px every time; `scrollWidth` must equal `clientWidth`.
+- Give every wait, empty and error state a designed visual.
 
-### Don't:
-- **Don't** use emojis for primary navigation or status. Use high-fidelity SVGs. (Anti-reference: "AI Slop").
-- **Don't** use border-left/right stripes as accents. (Design Law: Absolute Ban).
-- **Don't** use bright, "childish" primary colors. Stay within the sophisticated indigo/amber range.
+### Don't
+- Use purple, gradients behind content, glass panels or glow.
+- Put spaces inside animated inline-blocks (the words run together).
+- Copy a spinner or a button style instead of using `components/ui`.
 <!-- lang:end -->
 
 <!-- lang:th -->
 # ระบบออกแบบ: MangaDock
 
+ไฟล์นี้คือที่อ้างอิงหลักของภาษา design ส่วนค่าของ token เขียนไว้ใน `Frontend/app/globals.css` (ต้องแก้สองที่ให้ตรงกันเสมอ) และ component อยู่ใน `Frontend/app/components/ui/` ภาษา design นี้พอร์ตมาจากเว็บ Strata — อ่านเหตุผลได้ที่ `D:\Github\Strata-xeno-System-Design\ROUTER.md` และอ่านวิธีที่ MangaDock นำมาใช้ได้ที่ `docs/superpowers/specs/2026-10-20-frontend-redesign-strata-design.md`
+
 ## 1. ภาพรวม
 
-**Creative North Star: "The Contextual Triad"**
-
-MangaDock ใช้ปรัชญาด้านสุนทรียศาสตร์แบบหลายชั้นที่ปรับตัวตามงานของผู้ใช้ ระบบสลับระหว่าง 3 โหมด:
-- **The Cinematic Canvas:** ระหว่างอ่านมังงะ UI จะถอยหลังไปอยู่เบื้องหลัง ลด depth ให้น้อยที่สุด ปุ่มควบคุมโปร่งใสหรือซ่อนไว้ให้เนื้อหาครองพื้นที่
-- **The Polished Monolith:** สำหรับการใช้งานทั่วไปและค้นหา (Home, Feed, Studio) UI ใช้พื้นผิว "Liquid Glass" — คอนเทนเนอร์สีเข้มคล้ายหินขัดเงา มี backdrop blur และขอบ 1px ที่ส่อถึงวัสดุจริงและงานฝีมือพรีเมียม
-- **The Tactical Terminal:** สำหรับสถานะระบบ ธุรกรรม wallet และเครื่องมือแม่นยำสูง UI ใช้รูปแบบ high-density ขับเคลื่อนด้วยสถานะ ใช้ glow effects และ grid alignment ที่เข้มงวด
-
-**ลักษณะสำคัญ:**
-- **Zero AI Slop:** ไม่มี gradient ทั่วไปหรือ emoji ที่ไม่มีความหมาย ทุก pixel มีเจตนา
-- **Atmospheric Depth:** ชั้นต่างๆ กำหนดโดย opacity (`white/5`) และ blur (`backdrop-blur-md`) ไม่ใช่ drop shadow หนักๆ
-- **Native Fluidity:** Interaction ออกแบบให้รู้สึกเหมือน component ของ OS จริง
+**หลักนำทาง: "Minimal แต่ไม่น่าเบื่อ"** พื้นผิวสงบแบบงานบรรณาธิการ — ลำดับชั้นด้วยขาวดำ ที่ว่างกว้าง ข้อความชิดซ้าย เส้นคั่นบางเฉียบ — เพื่อให้ปกมังงะกับหน้ามังงะเป็นสีสันของหน้า แต่ละพื้นที่ของฟีเจอร์เพิ่ม visual หนึ่งอย่างที่เป็นของพื้นที่นั้น (mascot, progress แบบเป็นขั้น, ทุ่งจุด) ไม่ใช่ของตกแต่งเพื่อตกแต่ง MangaDock คือแอป ไม่ใช่ landing page
 
 ## 2. สี
 
-จานสีมีรากฐานจากสีกลางโทน deep space ที่เติมสีน้ำหนักเจาะจง
-
-### Primary
-- **Indigo Action** (#6366f1): ใช้สำหรับ call-to-action หลัก, navigation ทั่วแพลตฟอร์ม, และสถานะ Translator แทน "เครื่องยนต์" ของแพลตฟอร์ม
-
-### Secondary
-- **Amber Manga** (#f59e0b): ใช้สำหรับ metadata เฉพาะมังงะ (อันดับ, แท็ก) และสถานะ Creator แทน "หัวใจ" และ "คุณค่า" ของเนื้อหา
-
-### Neutral
-- **Deep Space** (#08090d): พื้นหลังหลัก เข้มกว่า sRGB black-grey เสมอเพื่อให้มีคอนทราสต์สูงสุดกับเนื้อหามังงะ
-- **Monolith Surface** (#1a1a1a): ใช้สำหรับ card และ secondary container
+- **สีหลัก:** `bg`, `surface`, `ink` ที่เหลือคำนวณต่อจาก `ink` ด้วย `color-mix` (`ink-2` ตัวหนังสือรอง, `ink-3` ตัวหนังสือระดับสาม, `line` เส้นขอบ, `fill` สีจางๆ, `raised` พื้นผิวที่ยกขึ้น)
+- **Accent:** มีสีเดียวคือน้ำเงิน (`#0a62d6` สว่าง / `#5aa2ff` มืด) ใช้กับ focus, การเลือก, สถานะ และไฮไลต์นานๆ ครั้ง
+- **สถานะ:** `ok` กับ `danger` ต้องมี icon หรือข้อความประกอบเสมอ ห้ามใช้สีอย่างเดียว
+- **ธีม:** System / Light / Dark ผ่าน `data-theme` บน `<html>` **ค่าเริ่มต้นคือมืด** ส่วนที่มืดตลอด (reader) ใช้ `.theme-dark` ซึ่งประกาศ token ที่คำนวณต่อซ้ำอีกครั้ง
 
 ### กฎที่ตั้งชื่อไว้
-**กฎ Tint-Over-Solid:** พื้นผิวควรเป็นสีทึบน้อยมาก ใช้ `bg-white/5` แทนค่า hex ตายตัวเมื่อซ้อนชั้น เพื่อให้ความลึกของพื้นหลังส่องผ่านได้
+- **ห้ามมีสีม่วงที่ไหนเลย** — ไม่มี indigo, violet หรือ fuchsia ไม่มี gradient สีม่วง ไม่มีแสงเรืองสีม่วง
+- **พื้นหลังเรียบ** — พื้นหลังของหน้าคือ `bg` แบบเรียบ ไม่มี gradient blob ไม่มี glass เต็มหน้า ไม่มี neon
+- **ห้ามใส่ hex ตรงๆ ใน component** — ให้ใช้สี token ของ Tailwind (`bg-surface`, `text-ink-2`, `border-line`, `bg-fill`, `text-accent`)
 
 ## 3. ตัวอักษร
 
-ระบบใช้ Noto Sans Thai เป็น font stack เดียวที่มีประสิทธิภาพสูง
-
-### ลำดับชั้น
-- **Display** (น้ำหนัก 900, clamp แบบ dynamic, line-height 1.1): ใช้สำหรับ heading แบบภาพยนตร์และ hero section
-- **Headline** (น้ำหนัก 800, 24-30px): ใช้สำหรับ section หลักของหน้า
-- **Body** (น้ำหนัก 400-500, 14px, line-height 1.6): ข้อความสำหรับอ่านปกติ ความยาวบรรทัดสูงสุด 75ch
-- **Label** (น้ำหนัก 900, 10-12px, tracking 0.25em, UPPERCASE): ใช้สำหรับตัวบ่งชี้ tactical และ section header
+Inter สำหรับตัวละติน, Anuphan สำหรับตัวอักษรไทย (อยู่ใน stack เดียวกัน ระบบเลือกฟอนต์ทีละตัวอักษร), JetBrains Mono สำหรับ label และตัวเลข (`tabular-nums`), Instrument Serif ใช้ได้มากสุดหนึ่งคำต่อหน้า หัวข้อหนา 600 ใช้ `text-wrap: balance` ค่าเริ่มต้นไม่มี tracking (หัวข้อที่เป็นตัวละตินล้วนใส่ `-0.035em` ได้) **ข้อความไทยห้ามปรับระยะตัวอักษร** เพราะจะทำให้กลุ่มตัวอักษรไทยแตก type scale: `text-display`, `text-h2`, `text-h3`, `text-lede` (token ของ Tailwind ใช้ขนาดของ Strata และ line-height แบบไทย 1.2–1.25) ระยะห่างใช้ scale 4 px ของ Tailwind โดยขยับทีละ 8 px หัวข้อหลักของหน้าใช้ `GradientHeading` (เฉพาะโทนเทาไล่เทาเท่านั้น)
 
 ## 4. ความลึก
 
-ความลึกสื่อผ่าน **Physical Transparency** และ **Ambient Glow**
-
-### คำศัพท์เงา
-- **Tactical Glow** (`shadow-[0_0_8px_var(--glow-color)]`): ใช้สำหรับไอคอนและไฟสถานะในโหมด Terminal
-- **Monolith Lift** (`shadow-2xl shadow-black/40`): ใช้สำหรับ Modal ลอยและ Card ลำดับสูงเพื่อแยกออกจาก canvas หลัก
+เกือบแบน ความลึกมาจากเส้นขอบ `line` 1 px กับพื้นผิว `raised` ไม่ได้มาจากเงา เงาใช้เฉพาะชั้นที่ลอยอยู่: เมนู `0 18px 40px -16px rgb(0 0 0 / .3)`, หน้าต่าง `0 50px 90px -50px rgb(0 0 0 / .45)`
 
 ## 5. Component
 
-### ปุ่ม
-- **รูปร่าง:** Soft tactical (12px radius)
-- **Primary:** ฐาน Indigo พร้อม transition 0.18s scale ลง 95% เมื่อ active
-- **Liquid Glass:** `bg-white/5` กับ `backdrop-blur-md` ใช้สำหรับ action รอง
+- **Button** (`ui/Button`): pill สูง 44 px; `primary` = พื้น ink ตัวหนังสือสี bg (hover ผสม accent 12 %), `secondary` = surface + line, `ghost` = โปร่งใส กดแล้วเลื่อนลง 1 px ส่วน `arrow` เพิ่มลูกศร → ที่เลื่อนตอน hover ปุ่มที่ต้องคงขนาดของตัวเองให้ใช้ `PRIMARY_FILL` แทนการ copy class
+- **StatusPage** (`ui/StatusPage`): โครงของหน้า 404 / error
+- **Pill** (`ui/Pill`): component เดียวสำหรับ chip, ตัวกรอง และ tab เมื่อถูกเลือก = พื้น ink
+- **Badge** (`ui/Badge`): pill ตัวอักษร mono 11 px สีของ tone แต้มที่เส้นขอบ
+- **Input** (`ui/Input`): pill สูง 48 px บน surface
+- **Card** (`ui/Card`): เส้นขอบ line 1 px, radius 28 px, hover แล้วเส้นขอบเข้มขึ้น
+- **Disclosure** (`ui/Disclosure`): แถว `<details>` แบบ native มีวงกลม +/−
+- **Loader** (`ui/Loader`, loading-dev): หน้า/ส่วนของหน้า = Atom, ในบรรทัด = Arc, รอ MIT แปล = Slide ห้ามทำวง `animate-spin` เอง
+- **Reveal** (`ui/Reveal`): เนื้อหามองเห็นได้ตั้งแต่ต้น ภายใต้ `html.js` จะค่อยๆ ลอยขึ้นครั้งเดียวแบบเหลื่อมเวลา
 
-### Card / Container
-- **Monolith Card:** พื้นหลัง `#1a1a1a`, ขอบ 1px `white/10`, radius 16-24px
-- **Compact Strip:** padding น้อยลง (12px), flow แนวนอน, metadata น้อยที่สุด
+## 6. Motion
 
-### Navigation
-- **Top Bar:** ความสูงคงที่ (64px), backdrop blur สูง, z-index 50
-- **Mobile Menu:** drawer เลื่อนจากขวา พร้อม navigation link แบบ tactical
-
-## 6. อัตลักษณ์แบรนด์
-
-### บุคลิกแบรนด์
-- **มีระดับและแม่นยำ:** เหมือน Apple ทุกช่องว่างและการจัดวางมีเจตนา
-- **สมจริงและภาพยนตร์:** เหมือน Netflix UI ถอยให้เนื้อหาส่องแสง
-- **Tech-Forward:** มั่นใจ high-performance และน่าเชื่อถือ
-
-### Anti-references
-- **Legacy Forums:** หลีกเลี่ยงการออกแบบที่รกและแน่นแบบ "เว็บเก่า"
-- **จานสีเด็ก:** ไม่มีสีสดใสเกินจริงแบบ "ของเล่น"
-- **AI Slop:** ห้าม emoji มากเกิน, gradient ทั่วไป หรือ feel "ที่สร้างโดย AI"
-- **Friction:** ไม่มี workflow ซับซ้อนหรือ nesting ลึก
-
-### หลักการออกแบบหลัก
-- **Native-First Fluidity:** ทุก interaction ต้องรู้สึกว่าสร้างมาเพื่อวัตถุประสงค์นั้นโดยเฉพาะ
-- **High-Fidelity Minimalism:** ความแม่นยำเหนือการตกแต่ง ใช้ "Liquid Glass" และ blur สำหรับความลึก
-- **Content as the Hero:** UI ให้กรอบ; มังงะและชุมชนให้ชีวิต
-- **Zero-Latency Feedback:** การตอบสนองทันที (Optimistic UI) และสถานะ loading ที่ชัดเจนสวยงาม
-
-### การเข้าถึง
-- WCAG 2.1 Level AA
-- รองรับการอ่านคอนทราสต์สูงและ reduced motion
-- ตัวอักษรแบบ inclusive ที่ปรับแต่งสำหรับข้อความมังงะหลายภาษา
-
----
+easing ตัวเดียว `cubic-bezier(0.23, 1, 0.32, 1)` ความยาว 160 / 320 / 600 ms stagger 38 ms และ glide 420 ms สำหรับกล่องที่ขยายขนาด ห้าม scroll hijack ทุกอย่างปิดเมื่อ `prefers-reduced-motion` ส่วน visual หนักๆ (canvas, 3-D) โหลดเมื่อเลื่อนใกล้ ทำงานเฉพาะตอนมองเห็น ปล่อยทรัพยากรเมื่อ unmount และมี fallback แบบภาพนิ่งเสมอ
 
 ## 7. สิ่งที่ควรทำและไม่ควรทำ
 
-### ควรทำ:
-- **ควรทำ:** ใช้ `backdrop-blur-md` บนพื้นผิวลอยทั้งหมด
-- **ควรทำ:** ใช้ `.smooth-hover` (0.18s) กับทุก element ที่รองรับ transition
-- **ควรทำ:** ใช้ `Math.floor` ในการคำนวณ revenue split ทั้งหมดเพื่อเอื้อ creator
+### ควรทำ
+- เริ่มจากสถานะสุดท้ายที่อ่านได้ แล้วค่อยเพิ่ม motion เป็นอีกชั้น
+- เช็ก 390 / 1024 / 1440 px ทุกครั้ง `scrollWidth` ต้องเท่ากับ `clientWidth`
+- ทุกช่วงที่ต้องรอ ทุก empty state และทุก error state ต้องมี visual ที่ออกแบบไว้
 
-### ไม่ควรทำ:
-- **ไม่ควรทำ:** ใช้ emoji สำหรับ navigation หรือสถานะหลัก ใช้ SVG ความละเอียดสูงแทน
-- **ไม่ควรทำ:** ใช้ border-left/right เป็น accent สี (Design Law: Absolute Ban)
-- **ไม่ควรทำ:** ใช้สีหลักที่สว่างหรือดูเหมือน "ของเล่น" ยึดอยู่ในช่วง indigo/amber ที่มีระดับ
+### ไม่ควรทำ
+- ใช้สีม่วง, gradient หลังเนื้อหา, panel แบบ glass หรือแสงเรือง
+- ใส่ช่องว่างไว้ใน inline-block ที่ animate (คำจะติดกัน)
+- copy spinner หรือสไตล์ปุ่มมาใช้แทนการใช้ `components/ui`
 <!-- lang:end -->

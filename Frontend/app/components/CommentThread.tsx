@@ -1,5 +1,6 @@
 "use client";
 
+import { PRIMARY_FILL } from "./ui/Button";
 import { useState, useRef, memo } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -158,7 +159,7 @@ function CommentThreadImpl({
               <Link
                 href={`/community/profile/${comment.authorUid}`}
                 className={`font-bold hover:underline underline-offset-2 transition-opacity hover:opacity-80 ${
-                  comment.authorRole === 1 ? "text-indigo-400" :
+                  comment.authorRole === 1 ? "text-accent" :
                   comment.authorRole === 2 ? "text-orange-400" : "text-white/80"
                 }`}
               >
@@ -176,7 +177,7 @@ function CommentThreadImpl({
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   rows={3}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-indigo-500 smooth-hover resize-none"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-ink-3 smooth-hover resize-none"
                 />
                 <div className="flex justify-end gap-2 mt-2">
                   <button
@@ -188,7 +189,7 @@ function CommentThreadImpl({
                   <button
                     onClick={handleSaveEdit}
                     disabled={!editContent.trim() || savingEdit}
-                    className="px-4 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed smooth-hover shadow-lg shadow-indigo-500/10"
+                    className={`${PRIMARY_FILL} px-4 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed smooth-hover`}
                   >
                     {savingEdit ? "กำลังบันทึก..." : "บันทึก"}
                   </button>
@@ -279,7 +280,7 @@ function CommentThreadImpl({
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
                 placeholder="เขียนข้อความตอบกลับ..."
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-indigo-500 smooth-hover resize-none"
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-ink-3 smooth-hover resize-none"
                 rows={3}
               />
               <div className="flex justify-end gap-2 mt-2">
@@ -292,7 +293,7 @@ function CommentThreadImpl({
                 <button
                   onClick={handleReply}
                   disabled={!replyContent.trim() || submitting}
-                  className="px-4 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed smooth-hover shadow-lg shadow-indigo-500/10"
+                  className={`${PRIMARY_FILL} px-4 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed smooth-hover`}
                 >
                   {submitting ? "กำลังส่ง..." : "ส่งข้อความ"}
                 </button>

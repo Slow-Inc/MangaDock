@@ -110,7 +110,7 @@ export default function NotificationBell() {
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <p className="text-sm font-semibold text-white/90">การแจ้งเตือน</p>
           {unread > 0 && (
-            <button onClick={handleMarkAllRead} className="text-xs text-indigo-400 transition hover:text-indigo-300">
+            <button onClick={handleMarkAllRead} className="text-xs text-accent transition hover:text-ink">
               อ่านทั้งหมด
             </button>
           )}
@@ -125,10 +125,10 @@ export default function NotificationBell() {
             items.map((n) => {
               const inner = (
                 <div
-                  className={`flex items-start gap-3 px-4 py-3 transition hover:bg-white/5 ${!n.read ? "bg-indigo-500/5" : ""}`}
+                  className={`flex items-start gap-3 px-4 py-3 transition hover:bg-white/5 ${!n.read ? "bg-accent/10" : ""}`}
                   onClick={() => { if (!n.read) handleMarkRead(n.id); setOpen(false); }}
                 >
-                  <div className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-transparent" : "bg-indigo-400"}`} />
+                  <div className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-transparent" : "bg-accent"}`} />
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm leading-snug ${n.read ? "text-white/50" : "text-white/85"}`}>{n.title}</p>
                     {n.body && <p className="mt-0.5 text-xs text-white/35 line-clamp-2">{n.body}</p>}

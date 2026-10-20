@@ -81,8 +81,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Brand */}
         <div className="px-5 pt-6 pb-5 border-b border-white/[0.06]">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/15 border border-indigo-500/20 shrink-0">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-indigo-400">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill border border-line shrink-0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-accent">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
@@ -105,7 +105,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 href={href}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm smooth-hover-fast border ${
                   isActive
-                    ? 'bg-indigo-500/[0.12] text-indigo-300 font-medium border-indigo-500/20'
+                    ? 'bg-accent/10 text-accent font-medium border-accent/40'
                     : 'text-white/45 hover:text-white hover:bg-white/[0.06] border-transparent'
                 }`}
               >

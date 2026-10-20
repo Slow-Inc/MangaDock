@@ -84,7 +84,7 @@ export default function StatsPage() {
           {activity.map((count, i) => (
             <div key={i} className="flex flex-1 flex-col items-center gap-1">
               <div
-                className="w-full rounded-sm bg-indigo-500/60 transition-all"
+                className="w-full rounded-sm bg-accent/60 transition-all"
                 style={{ height: `${Math.max(4, (count / maxActivity) * 80)}px` }}
               />
               <span className="text-xs text-white/30">{DAY_LABELS[i]}</span>
@@ -103,7 +103,7 @@ export default function StatsPage() {
                 <span className="w-28 shrink-0 truncate text-xs text-white/60">{genre}</span>
                 <div className="flex-1 overflow-hidden rounded-full bg-white/8">
                   <div
-                    className="h-1.5 rounded-full bg-indigo-500/70"
+                    className="h-1.5 rounded-full bg-accent/70"
                     style={{ width: `${(count / (genres[0]?.count ?? 1)) * 100}%` }}
                   />
                 </div>
@@ -125,9 +125,9 @@ export default function StatsPage() {
 
 function StatCard({ label, value, sub, accent }: { label: string; value: number; sub: string; accent?: boolean }) {
   return (
-    <div className={`rounded-2xl border p-4 ${accent ? "border-indigo-500/30 bg-indigo-500/8" : "border-white/8 bg-white/3"}`}>
+    <div className={`rounded-2xl border p-4 ${accent ? "border-accent/40 bg-accent/10" : "border-white/8 bg-white/3"}`}>
       <p className="text-xs text-white/40">{label}</p>
-      <p className={`mt-1 text-3xl font-black ${accent ? "text-indigo-300" : "text-white/90"}`}>{value}</p>
+      <p className={`mt-1 text-3xl font-black ${accent ? "text-accent" : "text-white/90"}`}>{value}</p>
       <p className="mt-0.5 text-xs text-white/30">{sub}</p>
     </div>
   );

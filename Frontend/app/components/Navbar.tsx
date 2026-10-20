@@ -253,10 +253,10 @@ export default function Navbar() {
           })}
           <Link
             href="/"
-            className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 text-[10px] text-indigo-400 transition-colors duration-200"
+            className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 text-[10px] text-accent transition-colors duration-200"
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 shadow-[0_4px_14px_rgba(99,102,241,0.5)] active:scale-95 transition-transform duration-150">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-white">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink active:scale-95 transition-transform duration-150">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-bg">
                 <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
               </svg>
             </span>

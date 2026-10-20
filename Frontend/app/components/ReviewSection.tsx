@@ -1,5 +1,6 @@
 "use client";
 
+import { PRIMARY_FILL } from "./ui/Button";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -128,7 +129,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
           {user && myReview && !showForm && (
             <button
               onClick={() => setShowForm(true)}
-              className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-400 transition hover:bg-indigo-500/20"
+              className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-medium text-accent transition hover:bg-accent/20"
             >
               แก้ไขรีวิว
             </button>
@@ -140,7 +141,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="mb-5 rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4"
+          className="mb-5 rounded-xl border border-accent/40 bg-accent/10 p-4"
         >
           <p className="mb-3 text-sm font-medium text-white/80">
             {myReview ? "แก้ไขรีวิวของคุณ" : "เขียนรีวิว"}
@@ -156,7 +157,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
             onChange={(e) => setBody(e.target.value)}
             placeholder="แสดงความคิดเห็นเพิ่มเติม (ไม่บังคับ)"
             rows={3}
-            className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 placeholder-white/25 outline-none transition focus:border-indigo-500/50 focus:bg-white/8"
+            className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 placeholder-white/25 outline-none transition focus:border-ink-3 focus:bg-white/8"
           />
           <div className="mt-3 flex items-center justify-end gap-2">
             <button
@@ -173,7 +174,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
             <button
               type="submit"
               disabled={submitting || rating === 0}
-              className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white transition enabled:hover:bg-indigo-500 disabled:opacity-40"
+              className={`${PRIMARY_FILL} rounded-lg px-4 py-1.5 text-sm font-semibold transition disabled:opacity-40`}
             >
               {submitting ? "กำลังบันทึก..." : myReview ? "อัปเดต" : "ส่งรีวิว"}
             </button>

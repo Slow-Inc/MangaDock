@@ -112,14 +112,14 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
                 </div>
                 <div className="mb-3 space-y-2">
                   {REASONS.map((r) => (
-                    <label key={r.value} className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 transition ${reason === r.value ? "border-indigo-500/50 bg-indigo-500/10" : "border-white/8 hover:border-white/15"}`}>
+                    <label key={r.value} className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 transition ${reason === r.value ? "border-accent/40 bg-accent/10" : "border-white/8 hover:border-white/15"}`}>
                       <input
                         type="radio"
                         name="reason"
                         value={r.value}
                         checked={reason === r.value}
                         onChange={() => setReason(r.value)}
-                        className="accent-indigo-500"
+                        className="accent-accent"
                       />
                       <span className="text-sm text-white/75">{r.label}</span>
                     </label>
@@ -131,7 +131,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
                     onChange={(e) => setDetails(e.target.value)}
                     placeholder="อธิบายเพิ่มเติม..."
                     rows={2}
-                    className="mb-3 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 placeholder-white/25 outline-none focus:border-indigo-500/50"
+                    className="mb-3 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 placeholder-white/25 outline-none focus:border-ink-3"
                   />
                 )}
                 <button

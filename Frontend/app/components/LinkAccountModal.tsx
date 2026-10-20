@@ -188,7 +188,7 @@ export default function LinkAccountModal({
 
           {/* Letter avatar with link badge */}
           <div className="relative mb-4">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-purple-600 text-3xl font-bold text-white shadow-lg ring-4 ring-white/10">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-surface text-3xl font-bold text-ink shadow-lg ring-4 ring-white/10">
               {email.charAt(0).toUpperCase()}
             </div>
             <span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#0f1117] bg-blue-600 text-white shadow">

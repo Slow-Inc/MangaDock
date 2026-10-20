@@ -89,7 +89,7 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
         <div>
           <p className="line-clamp-2 text-xs font-semibold leading-snug text-white">{book.title}</p>
           {book.authors.length > 0 && <p className="mt-0.5 truncate text-xs text-white/45">{book.authors[0]}</p>}
-          {book.categories.length > 0 && <p className="mt-1 truncate text-xs text-indigo-400/70">{book.categories[0]}</p>}
+          {book.categories.length > 0 && <p className="mt-1 truncate text-xs text-accent/70">{book.categories[0]}</p>}
         </div>
       </div>
       {showCover && <CoverLightbox src={thumb} alt={book.title} onClose={() => setShowCover(false)} />}
@@ -368,7 +368,7 @@ function SearchResults() {
                     onClick={() => setShowAdvanced((s) => !s)}
                     className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                       showAdvanced || statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0
-                        ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-300"
+                        ? "border-accent/40 bg-accent/10 text-accent"
                         : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
                     }`}
                   >
@@ -377,7 +377,7 @@ function SearchResults() {
                     </svg>
                     ตัวกรองขั้นสูง
                     {(statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0) && (
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-ink text-xs font-bold text-bg">
                         {[statusFilter !== 'all', !!yearFrom || !!yearTo, ratingMin > 0].filter(Boolean).length}
                       </span>
                     )}

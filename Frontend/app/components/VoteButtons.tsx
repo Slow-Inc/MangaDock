@@ -113,7 +113,7 @@ export default function VoteButtons({
         aria-label="โหวตลง"
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border smooth-hover-fast transition-colors ${
           userVote === -1
-            ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/25"
+            ? "bg-accent/10 text-accent border-accent/40"
             : "text-white/40 border-transparent hover:text-white/70 hover:bg-white/[0.06] hover:border-white/10"
         }`}
       >
