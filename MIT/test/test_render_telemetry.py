@@ -338,3 +338,22 @@ def test_a_dodge_that_narrows_the_space_relays_the_text_to_fit_it_795():
                                      font_size_max=20, clean_layout=True)
     ax2 = a.render_dst_box[2]
     assert ax2 <= 489.0 + 1, (a.render_dst_box, b.render_dst_box)
+
+
+def test_a_block_taller_than_the_dodged_space_still_moves_off_the_neighbour_795():
+    """Anta p1 (2026-10-21): the caption above pushed the balloon text's top edge down, leaving less
+    height than the block; e9f36bb6 dropped the vertical dodge, so the block stayed put over the
+    caption (19 px). The block moves flush against the edge the neighbour pushed in."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1600, 1100, 3), 255, np.uint8)
+    balloon = (821.0, 953.0, 1051.0, 1404.0)
+    caption = FakeRegion(horizontal=True, translation='RUA-HIME โจมตีไอดอลยอดนิยม 20, 000 วิว. 3 ชั่วโมงที่แล้ว',
+                         xyxy=(551.0, 1206.0, 1016.0, 1275.0), target_lang='THA', font_size=14)
+    text = FakeRegion(horizontal=True, translation='วิดีโอมียอดวิวหลายหมื่น',
+                      xyxy=(848.0, 1241.0, 993.0, 1364.0), bubble_box=balloon, target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [caption, text], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    assert text.render_dst_box[1] >= 1275.0, (caption.render_dst_box, text.render_dst_box)
+    assert text.render_dst_box[3] <= balloon[3] + 1, text.render_dst_box
