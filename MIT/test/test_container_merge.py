@@ -12,9 +12,10 @@ def _stack(n, x1=100, x2=300, top=100, pitch=40, h=20):
     return [(x1, top + i * pitch, x2, top + i * pitch + h) for i in range(n)]
 
 
-def _merge(groups, containers, directions, boxes=None):
+def _merge(groups, containers, directions, boxes=None, sfx=None):
     boxes = boxes or _stack(len(containers))
-    return coalesce_container_fragments(groups, containers, directions, boxes, [20] * len(boxes))
+    sfx = sfx or [False] * len(boxes)
+    return coalesce_container_fragments(groups, containers, directions, boxes, [20] * len(boxes), sfx)
 
 
 def test_fragments_in_one_container_become_one_group():
@@ -72,3 +73,14 @@ def test_vertical_columns_chain_right_to_left():
     # JP vertical text: columns read right-to-left, 1.2x the font apart
     boxes = [(300, 100, 320, 300), (256, 100, 276, 260)]
     assert _merge([{0}, {1}], [0, 0], ['v', 'v'], boxes) == [{0, 1}]
+
+
+
+def test_det_sfx_lines_are_never_coalesced_into_dialogue():
+    """A det_sfx false-positive on a speech bubble ('W', 'THE' — the #693 phantom class) sits
+    close to and aligned with the dialogue. Merging it would stamp from_sfx_detection on the
+    whole dialogue block (textline_merge ORs the flag), routing real dialogue as SFX."""
+    boxes = [(100, 100, 300, 120), (150, 123, 200, 137), (100, 140, 300, 160)]
+    out = _merge([{0}, {1}, {2}], [0, 0, 0], ['h'] * 3, boxes, sfx=[False, True, False])
+    assert {1} in out
+    assert {0, 2} in out

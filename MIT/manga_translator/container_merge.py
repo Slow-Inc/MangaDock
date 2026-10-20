@@ -55,15 +55,18 @@ def components_chain(comps: List[Set[int]], direction: str, boxes: Sequence[Box]
 
 def coalesce_container_fragments(groups: List[Set[int]], containers: Sequence[Optional[int]],
                                  directions: Sequence[str], boxes: Sequence[Box],
-                                 font_sizes: Sequence[float]) -> List[Set[int]]:
+                                 font_sizes: Sequence[float], sfx: Sequence[bool]) -> List[Set[int]]:
     """Merge components (sets of textline indices) that share one container.
 
-    A component belongs to a container only when all its lines do. Components in one container
+    A component belongs to a container only when all its lines do and none is a det_sfx line
+    (merging one would stamp `from_sfx_detection` on the whole dialogue). Components in one container
     are merged when there are several, at least one is a single line, all lines share one
     direction, and they chain as consecutive lines (see module docstring). Output order follows
     each result's first component in `groups`.
     """
     def container_of(group: Set[int]) -> Optional[int]:
+        if any(sfx[i] for i in group):
+            return None
         owners = {containers[i] for i in group}
         return owners.pop() if len(owners) == 1 else None
 
