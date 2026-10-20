@@ -4,7 +4,7 @@
  * A mascot from `bot-avatars` (MIT, Jakub Antalik). Canvas 2-D, no WebGL; the library pauses off-screen,
  * respects reduced motion and sets role="img" — we pass a Thai label for it.
  */
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { BotAvatar, type BotAvatarState } from "bot-avatars";
 import { CAST, mascotFromUid, type MascotArea, type MascotConfig } from "../../lib/mascot";
 
@@ -63,9 +63,33 @@ export default Mascot;
 /**
  * The stable mascot of a user who has no profile photo (Epic D: "users who never dressed one get a
  * stable mascot from their uid") — stands in for the initial-letter avatar. Still by default: avatars
- * sit in lists and chips, where a live canvas loop costs a frame budget each.
+ * sit in lists and chips, where a live canvas loop costs a frame budget each. `liveOnHover` (a profile
+ * header) wakes it only while the pointer is over `className`'s box; a chip that owns its own hover
+ * passes `paused` instead.
  */
-export const UidMascot = memo(function UidMascot({ uid, size, paused = true, className }: { uid: string; size: number; paused?: boolean; className?: string }) {
+export const UidMascot = memo(function UidMascot({
+  uid,
+  size,
+  paused = true,
+  liveOnHover = false,
+  className,
+}: {
+  uid: string;
+  size: number;
+  paused?: boolean;
+  liveOnHover?: boolean;
+  /** The wrapper box (the hover area with `liveOnHover`). */
+  className?: string;
+}) {
   const config = useMemo(() => mascotFromUid(uid), [uid]);
-  return <Mascot config={config} size={size} paused={paused} interactive={false} label="มาสคอตประจำตัว" className={className} />;
+  const [hover, setHover] = useState(false);
+  return (
+    <span
+      className={className}
+      onPointerEnter={liveOnHover ? () => setHover(true) : undefined}
+      onPointerLeave={liveOnHover ? () => setHover(false) : undefined}
+    >
+      <Mascot config={config} size={size} paused={paused && !hover} interactive={false} label="มาสคอตประจำตัว" />
+    </span>
+  );
 });

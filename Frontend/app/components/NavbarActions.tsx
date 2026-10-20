@@ -19,6 +19,8 @@ export default function NavbarActions() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [topupOpen, setTopupOpen] = useState(false);
   const [coinBalance, setCoinBalance] = useState<number | null>(null);
+  // The own avatar animates only while the chip is hovered or focused (a live canvas costs a frame budget).
+  const [chipLive, setChipLive] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, loading, signOut, getIdToken } = useAuth();
 
@@ -78,6 +80,10 @@ export default function NavbarActions() {
           <div ref={menuRef} className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
+              onPointerEnter={() => setChipLive(true)}
+              onPointerLeave={() => setChipLive(false)}
+              onFocus={() => setChipLive(true)}
+              onBlur={() => setChipLive(false)}
               className="flex items-center gap-2 rounded-full border border-line bg-fill px-2 py-1 text-xs text-ink backdrop-blur-xl smooth-hover-fast hover:bg-raised hover:text-ink md:text-sm"
             >
               {user.photoURL ? (
@@ -94,7 +100,7 @@ export default function NavbarActions() {
                 </div>
               ) : (
                 <span className="flex h-6.5 w-6.5 shrink-0 items-center justify-center">
-                  <UidMascot uid={user.uid} size={24} />
+                  <UidMascot uid={user.uid} size={24} paused={!chipLive} />
                 </span>
               )}
               <span className="hidden max-w-25 truncate md:block">

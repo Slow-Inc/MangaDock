@@ -414,9 +414,7 @@ export default function PublicProfilePage() {
                   onError={() => setBrokenPhoto(profile.photoUrl)}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <UidMascot uid={profile.uid} size={56} />
-                </div>
+                <UidMascot uid={profile.uid} size={56} liveOnHover className="w-full h-full flex items-center justify-center" />
               )}
             </div>
             <div className="pt-14 sm:pt-16 min-w-0 flex-1">
