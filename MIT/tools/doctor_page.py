@@ -53,6 +53,20 @@ def _composite(source, payload):
     return page
 
 
+def _measure_ink(page, rendered):
+    """Luminance spread inside each region's dst box on the final page (blank = ~0)."""
+    import numpy as np
+    gray = np.asarray(rendered.convert('L'), dtype=np.float32)
+    h, w = gray.shape
+    for r in page.regions:
+        if r.render_dst_box is None:
+            continue
+        x1, y1, x2, y2 = (int(round(v)) for v in r.render_dst_box)
+        x1, y1, x2, y2 = max(0, x1), max(0, y1), min(w, x2), min(h, y2)
+        if x2 - x1 >= 2 and y2 - y1 >= 2:
+            r.dst_ink_std = float(gray[y1:y2, x1:x2].std())
+
+
 def _overlay(source, rendered, page, flags):
     marked = source.copy()
     draw = ImageDraw.Draw(marked)
@@ -102,16 +116,18 @@ async def main():
         payload = await tr.translate_patches(source, Config(**cfg))
 
         page = snapshot_from_payload(payload, args.target, **stats)
-        run, flags = diagnose(page)
         rendered = _composite(source, payload)
+        _measure_ink(page, rendered)
+        run, flags = diagnose(page)
 
         stem = os.path.join(args.out, f'{os.path.splitext(os.path.basename(path))[0]}_{args.target}{args.tag}')
         rendered.save(stem + '.rendered.png')
         _overlay(source, rendered, page, flags).save(stem + '.doctor.png')
         report = {**run.to_json(), 'page': path, 'flags': {str(k): v for k, v in flags.items()},
                   'regions': [{'index': r.index, 'xyxy': r.xyxy, 'src': r.text, 'dst': r.translation,
-                               'container': r.bubble_idx, 'branch': r.render_branch,
-                               'font_px': r.render_font_px} for r in page.regions],
+                               'container': r.bubble_idx, 'container_box': r.bubble_box,
+                               'branch': r.render_branch, 'font_px': r.render_font_px,
+                               'dst_box': r.render_dst_box} for r in page.regions],
                   'dropped': page.dropped}
         with open(stem + '.doctor.json', 'w', encoding='utf-8') as fh:
             json.dump(report, fh, ensure_ascii=False, indent=1)

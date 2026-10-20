@@ -24,6 +24,14 @@ Box = Tuple[float, float, float, float]
 NEAR_MISS_GAP = (1.0, 1.6)
 #: Render may overshoot its container by this many px before it counts as a spill.
 SPILL_TOLERANCE_PX = 4
+#: A region covering more than this share of the page is not a text block.
+MAX_REGION_PAGE_SHARE = 0.2
+#: A rendered font this many times the page median (and above `JUNK_FONT_PAGE_SHARE` of the
+#: page height) is not dialogue — it is a junk read blown up to fill a huge box.
+JUNK_FONT_X_MEDIAN = 3.0
+JUNK_FONT_PAGE_SHARE = 0.04
+#: Luminance std-dev under which a dst box is blank — rendered text always has contrast.
+BLANK_STD = 2.0
 #: Targets whose script is not Latin: Latin words left in their translation are suspicious.
 NON_LATIN_TARGETS = {'THA', 'JPN', 'CHS', 'CHT', 'KOR', 'RUS', 'UKR', 'ARA', 'HIN'}
 _LATIN_WORD = re.compile(r'[A-Za-z]{2,}')
@@ -42,6 +50,8 @@ class Region:
     render_font_px: Optional[float] = None
     render_dst_box: Optional[Box] = None
     from_sfx: bool = False
+    #: luminance std-dev inside render_dst_box on the composited page (None = not measured)
+    dst_ink_std: Optional[float] = None
 
 
 @dataclass
@@ -92,10 +102,26 @@ def _gap_ratio(upper: Region, lower: Region) -> float:
     return (lower.xyxy[1] - upper.xyxy[3]) / max(1.0, min(upper.font_size, lower.font_size))
 
 
-def _probe_detect(page: PageSnapshot) -> StageReport:
-    status = WARN if page.textlines == 0 else OK
-    return StageReport('detect', status, {'textlines': page.textlines, 'sfx': page.sfx_lines},
-                       'no text lines detected' if status == WARN else '')
+def _probe_detect(page: PageSnapshot, flags: Flags) -> StageReport:
+    fonts = sorted(r.render_font_px for r in page.regions if r.render_font_px)
+    median = fonts[len(fonts) // 2] if fonts else 0
+    page_area = max(1, page.width * page.height)
+    evidence = []
+    for r in page.regions:
+        area = (r.xyxy[2] - r.xyxy[0]) * (r.xyxy[3] - r.xyxy[1])
+        huge = area > MAX_REGION_PAGE_SHARE * page_area
+        blown = (r.render_font_px and median and r.render_font_px > JUNK_FONT_X_MEDIAN * median
+                 and r.render_font_px > JUNK_FONT_PAGE_SHARE * page.height)
+        if huge or blown:
+            _flag(flags, r.index, 'detect', FAIL)
+            evidence.append(f'region {r.index} {r.text[:12]!r} implausible '
+                            f'({area / page_area:.0%} of page, font {r.render_font_px}px vs median {median}px)')
+    status = FAIL if evidence else WARN if page.textlines == 0 else OK
+    if page.textlines == 0:
+        evidence.append('no text lines detected')
+    return StageReport('detect', status, {'textlines': page.textlines, 'sfx': page.sfx_lines,
+                                          'implausible': sum('implausible' in e for e in evidence)},
+                       '; '.join(evidence))
 
 
 def _probe_ocr(page: PageSnapshot) -> StageReport:
@@ -248,9 +274,26 @@ def snapshot_from_payload(payload: Dict, target_lang: str, *, textlines: int, sf
                         dropped=dropped)
 
 
+def _probe_composite(page: PageSnapshot, flags: Flags) -> StageReport:
+    """Translated text that is not visible on the final page (e.g. a later patch covered it)."""
+    root, inherited, evidence = 0, 0, []
+    for r in page.regions:
+        if not (r.translation or '').strip() or r.dst_ink_std is None or r.dst_ink_std >= BLANK_STD:
+            continue
+        if _flag(flags, r.index, 'composite', FAIL):
+            root += 1
+            evidence.append(f'region {r.index} {r.text[:16]!r} translated but blank on the page')
+        else:
+            inherited += 1
+    return StageReport('composite', FAIL if root else OK,
+                       {'root': root, 'inherited': inherited, 'invisible': root + inherited},
+                       '; '.join(evidence))
+
+
 def diagnose(page: PageSnapshot) -> Tuple[DoctorRun, Flags]:
     """Run every page probe in pipeline order; return the report and per-region flags."""
     flags: Flags = {}
-    reports = [_probe_detect(page), _probe_ocr(page), _probe_merge(page, flags),
-               _probe_translate(page, flags), _probe_render(page, flags)]
+    reports = [_probe_detect(page, flags), _probe_ocr(page), _probe_merge(page, flags),
+               _probe_translate(page, flags), _probe_render(page, flags),
+               _probe_composite(page, flags)]
     return DoctorRun(reports), flags

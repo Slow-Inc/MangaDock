@@ -169,3 +169,40 @@ def test_separate_blocks_under_one_container_are_not_a_split():
     assert merge.status == OK
     assert merge.metrics['split_containers'] == 0
     assert merge.metrics['shared_containers'] == 1
+
+
+# ── composite + implausible-region probes (2026-10-20 corpus, Lv2 p1) ─────────
+
+def test_translated_text_missing_from_the_final_page_fails_at_composite():
+    """'FORMER HERO CANDIDATE' had a translation and a dst box, yet the composited page was blank
+    there — a later patch covered it. Blank = near-zero luminance spread inside the dst box."""
+    page = PageSnapshot(target_lang='THA', width=1086, height=1544, textlines=2, sfx_lines=0,
+                        empty_reads=0, regions=[
+        _region(0, (152, 567, 282, 650), 'FORMER HERO CANDIDATE', 'อดีตผู้เข้าชิง', bubble=0,
+                bubble_box=(117, 551, 369, 683), dst=(160, 578, 274, 638)),
+        _region(1, (228, 682, 325, 705), 'BANAZA', 'บานาซา', bubble=1,
+                bubble_box=(189, 618, 369, 743), dst=(249, 682, 304, 706)),
+    ])
+    page.regions[0].dst_ink_std = 0.4
+    page.regions[1].dst_ink_std = 61.0
+    run, flags = diagnose(page)
+    composite = _by_stage(run)['composite']
+    assert composite.status == FAIL
+    assert composite.metrics['invisible'] == 1
+    assert flags[0][0] == ('composite', FAIL)
+    assert 1 not in flags
+
+
+def test_a_page_spanning_region_fails_at_detect():
+    """An OCR read of 'd' over a box covering a third of the page rendered a 120 px glyph."""
+    page = PageSnapshot(target_lang='THA', width=1086, height=1544, textlines=3, sfx_lines=0,
+                        empty_reads=0, regions=[
+        _region(0, (79, 1154, 1086, 1544), 'd', 'ด', font_px=120),
+        _region(1, (737, 1173, 819, 1276), 'HOW DO I CALL IT OUT?', 'จะเรียก', font_px=22),
+        _region(2, (377, 1273, 522, 1426), 'BY USING', 'จากการใช้', font_px=20),
+    ])
+    run, flags = diagnose(page)
+    detect = _by_stage(run)['detect']
+    assert detect.status == FAIL
+    assert detect.metrics['implausible'] == 1
+    assert flags[0][0] == ('detect', FAIL)
