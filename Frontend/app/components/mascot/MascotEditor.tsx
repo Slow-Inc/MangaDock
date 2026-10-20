@@ -5,7 +5,7 @@
  * Save = PUT the config (users/me/mascot) + a still PNG of the preview through the existing avatar
  * upload, written to photo_url — so every place that shows avatars shows the mascot without changes.
  */
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { BotAvatar } from "bot-avatars";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
@@ -27,12 +27,34 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+/**
+ * The body picker. Memoised so a colour drag (one render per input event) does not repaint these
+ * 18 still thumbnails — bot-avatars redraws a paused avatar on every render of its parent.
+ */
+const ShapePicker = memo(function ShapePicker({ selected, onPick }: { selected: MascotConfig["type"]; onPick: (t: MascotConfig["type"]) => void }) {
+  return (
+    <>
+      {MASCOT_TYPES.map((t, i) => (
+        <Pill key={t} size="sm" selected={selected === t} onClick={() => onPick(t)} aria-label={t} className="pl-1.5">
+          {/* A still thumbnail of each body, so the choice is seen, not guessed from a name. */}
+          <BotAvatar type={t} size={22} paused interactive={false} seed={i / MASCOT_TYPES.length} theme="auto" aria-hidden />
+          <span className="text-[0.6875rem]">{t}</span>
+        </Pill>
+      ))}
+    </>
+  );
+});
+
 export default function MascotEditor() {
   const { user, getIdToken, uploadProfilePhoto, updateUserPhotoURL } = useAuth();
   const { showToast } = useToast();
   const [config, setConfig] = useState<MascotConfig | null>(null);
   const [saving, setSaving] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);
+  // The preview follows a deferred copy, so the colour input stays responsive and React can drop
+  // intermediate preview renders while a colour is being dragged.
+  const preview = useDeferredValue(config);
+  const pickType = useCallback((type: MascotConfig["type"]) => setConfig((c) => (c ? { ...c, type } : c)), []);
 
   useEffect(() => {
     if (!user) return;
@@ -48,7 +70,7 @@ export default function MascotEditor() {
   }, [user, getIdToken]);
 
   if (!user) return null;
-  if (!config) {
+  if (!config || !preview) {
     return (
       <div className="flex h-48 items-center justify-center">
         <Loader context="section" label="กำลังโหลดมาสคอต" className="text-ink-2" />
@@ -81,7 +103,7 @@ export default function MascotEditor() {
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
         <div className="flex shrink-0 flex-col items-center gap-3">
           <div className="rounded-[var(--r3)] bg-fill p-3">
-            <BotAvatar ref={canvas} {...config} size={160} theme="auto" aria-label="มาสคอตของคุณ" />
+            <BotAvatar ref={canvas} {...preview} size={160} theme="auto" aria-label="มาสคอตของคุณ" />
           </div>
           <Button variant="ghost" size="sm" onClick={() => setConfig(mascotFromUid(`${user.uid}:${Date.now()}`))}>
             สุ่มใหม่
@@ -95,13 +117,7 @@ export default function MascotEditor() {
           <p className="mt-1 text-sm text-ink-3">แต่งได้ทุกชิ้นฟรี แล้วใช้เป็นรูปโปรไฟล์แทนรูปจากบัญชีหรือรูปที่อัปโหลด</p>
 
           <Row label="รูปร่าง">
-            {MASCOT_TYPES.map((t, i) => (
-              <Pill key={t} size="sm" selected={config.type === t} onClick={() => set({ type: t })} aria-label={t} className="pl-1.5">
-                {/* A still thumbnail of each body, so the choice is seen, not guessed from a name. */}
-                <BotAvatar type={t} size={22} paused interactive={false} seed={i / MASCOT_TYPES.length} theme="auto" aria-hidden />
-                <span className="text-[0.6875rem]">{t}</span>
-              </Pill>
-            ))}
+            <ShapePicker selected={config.type} onPick={pickType} />
           </Row>
           <Row label="หน้า">
             <Pill size="sm" selected={config.face === "eyes"} onClick={() => set({ face: "eyes" })}>ตาอย่างเดียว</Pill>
