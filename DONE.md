@@ -6,10 +6,10 @@
 ## #830 Settings tab strip keeps the active tab visible on a phone (2026-10-21)
 
 **What:** at 390 px the settings tab strip always started at the left, so on stats and danger zone the active tab
-was off-screen. The active tab is scrolled into view (scroll padding) on navigation, and both navs mark it with
+was off-screen. The strip scrolls its own scrollLeft (pure `lib/stripScroll.ts`, never the page) to show the active tab on navigation, and both navs mark it with
 `aria-current="page"` — same pattern as the admin strip (#819).
 
-**Validated:** production build, local test session at 390: active tab fully visible on profile, password,
+**Validated:** `stripScroll.test.ts` red → green; production build, local test session at 390: active tab fully visible on profile, password,
 accounts, stats and danger (stats/danger were off-screen); 0 page overflow. tsc 0; eslint 0.
 
 ---
