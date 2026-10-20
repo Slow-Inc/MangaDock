@@ -1,5 +1,7 @@
 "use client";
 
+import Loader from "./ui/Loader";
+
 /**
  * Skeleton loading for forum posts.
  */
@@ -82,19 +84,20 @@ export function CommentSkeleton() {
 }
 
 /**
- * Full page skeleton for post details.
+ * Full page skeleton for post details. It is shown once per page, so it also carries the
+ * section `Loader` (#775); the list skeletons above repeat and stay loader-free.
  */
 export function PostDetailSkeleton() {
   return (
-    <div className="space-y-8 animate-pulse">
-      <div className="w-20 h-6 rounded bg-fill mb-6" />
-      <div className="bg-surface border border-line rounded-2xl overflow-hidden h-64 flex">
-        <div className="hidden sm:flex flex-col items-center p-4 bg-fill border-r border-line w-16 gap-3">
+    <div className="space-y-8">
+      <div className="w-20 h-6 rounded bg-fill mb-6 animate-pulse" />
+      <div className="relative bg-surface border border-line rounded-2xl overflow-hidden h-64 flex">
+        <div className="hidden sm:flex flex-col items-center p-4 bg-fill border-r border-line w-16 gap-3 animate-pulse">
           <div className="w-8 h-8 rounded-full bg-fill" />
           <div className="w-4 h-4 rounded bg-fill" />
           <div className="w-8 h-8 rounded-full bg-fill" />
         </div>
-        <div className="p-8 flex-1 space-y-6">
+        <div className="p-8 flex-1 space-y-6 animate-pulse">
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 rounded-full bg-fill" />
             <div className="w-32 h-4 rounded bg-fill" />
@@ -106,9 +109,10 @@ export function PostDetailSkeleton() {
             <div className="w-1/2 h-4 rounded bg-fill" />
           </div>
         </div>
+        <Loader context="section" label="กำลังโหลดโพสต์" className="absolute inset-0 text-ink-3" />
       </div>
       <div className="space-y-4">
-        <div className="w-32 h-6 rounded bg-fill mb-6" />
+        <div className="w-32 h-6 rounded bg-fill mb-6 animate-pulse" />
         <CommentSkeleton />
         <CommentSkeleton />
       </div>
