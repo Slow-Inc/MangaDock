@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import PostImage from "../../../components/PostImage";
 import UserAvatar from "../../../components/ui/UserAvatar";
 import { flushSync } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
@@ -489,13 +490,7 @@ export default function PostDetailPage() {
                       post.imageUrls.length === 1 ? 'aspect-video' : 'aspect-square'
                     } ${post.imageUrls.length === 3 && i === 0 ? 'col-span-2 aspect-video' : ''}`}
                   >
-                    <Image
-                      src={safeUrl}
-                      alt={`รูปที่ ${i + 1}`}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      unoptimized
-                    />
+                    <PostImage url={safeUrl} alt={`รูปที่ ${i + 1}`} className="group-hover:scale-105 transition-transform duration-300" priority={i === 0} />
                     <div className="absolute inset-0 bg-scrim/0 group-hover:bg-scrim/20 transition-colors flex items-center justify-center">
                       <svg className="w-8 h-8 text-ink opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />

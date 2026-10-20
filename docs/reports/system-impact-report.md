@@ -1,5 +1,30 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-21 — Follow-up fixes after the redesign: #661–#675, #798, #801, #802, #806 (bug / security)
+
+**What & where:** `Backend/src/users` (avatar upload by magic bytes), `Backend/src/books` translate throttle
+guard + text cap, the translate Markdown stripper and its cache key version, `Frontend/app/components/ui/UserAvatar`,
+`Frontend/app/components/PostImage.tsx` (new) and its call sites, `Frontend/app/lib/safeUrl.ts`
+(`safeImageSrc`), plus the audit-bug files listed in PR #800.
+
+**Why:** the feature audit's `ready-for-agent` bugs; two security gaps found on the way (an avatar upload
+typed by client metadata; a translate throttle a single client could exhaust for everyone); broken images
+rendering as grey boxes with alt text.
+
+**Before → After:** avatar type from the client → from the file's bytes; one global translate bucket →
+per-client first, then global; Markdown removed from prompts → kept, only `THOUGHTS:` stripped; raw
+`<img>`/`<Image>` with a missing guard at one site → one guarded component with a fallback.
+
+**Performance Δ:** compact forum thumbnails fetch a 256-px resize instead of a viewport-wide image.
+
+**Validation:** unit/spec tests per change (red → green), CI green, browser checks on production builds.
+
+**Risk / rollback:** each PR reverts on its own. #805 moved the translate cache key to v5; reverting it serves the older v4 entries again.
+
+**Links:** PRs #800 #803 #804 #805 #807; issues #661–#663 #666–#672 #675 #798 #801 #802 #806.
+
+---
+
 ## 2026-10-20 — #764 Strata redesign, Epics B/C/D + performance pass (feature / perf)
 
 **What & where:** `Frontend/app/**` (all user areas, Studio, mascot cast/editor, ui primitives

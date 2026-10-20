@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import Image from "next/image";
+import PostImage from "./PostImage";
 import { uploadForumImage } from "../lib/communityApi";
 import Loader from "./ui/Loader";
 import { PRIMARY_FILL } from "./ui/Button";
@@ -73,13 +73,7 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
         <div className={`grid gap-2 mb-3 ${images.length === 1 ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-4'}`}>
           {images.map((url, i) => (
             <div key={i} className="relative rounded-lg overflow-hidden bg-fill border border-line group aspect-square">
-              <Image
-                src={url}
-                alt={`รูปที่ ${i + 1}`}
-                fill
-                className="object-cover"
-                unoptimized
-              />
+              <PostImage url={url} alt={`รูปที่ ${i + 1}`} />
               <button
                 type="button"
                 onClick={() => removeImage(i)}

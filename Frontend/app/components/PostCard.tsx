@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import PostImage from "./PostImage";
 import UserAvatar from "./ui/UserAvatar";
 
 import Link from "next/link";
@@ -76,13 +77,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
             className={`relative shrink-0 w-28 sm:w-36 self-stretch overflow-hidden bg-fill border-r border-line ${isSpoiler && !spoilerRevealed ? 'pointer-events-none' : ''}`}
             style={{ filter: isSpoiler && !spoilerRevealed ? 'blur(4px)' : 'blur(0px)', transition: 'filter 0.5s ease' }}
           >
-            <Image
-              src={thumbUrl!}
-              alt="thumbnail"
-              fill
-              loading="lazy"
-              className="object-cover"
-            />
+            <PostImage url={thumbUrl!} alt="รูปประกอบโพสต์" sizes="144px" />
             {post.imageUrls.length > 1 && (
               <div className="absolute bottom-1.5 left-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-bg/80">
                 <svg className="w-2.5 h-2.5 text-ink-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,7 +238,7 @@ export default function PostCard({ post, viewMode = 'card' }: { post: ForumPost,
                   post.imageUrls.length === 1 ? 'aspect-video' : 'aspect-square'
                 } ${post.imageUrls.length === 3 && i === 0 ? 'col-span-2' : ''}`}
               >
-                <Image src={url} alt={`รูปที่ ${i + 1}`} fill loading="lazy" className="object-cover" unoptimized />
+                <PostImage url={url} alt={`รูปที่ ${i + 1}`} />
                 {i === 3 && post.imageUrls.length > 4 && (
                   <div className="absolute inset-0 bg-scrim/60 flex items-center justify-center">
                     <span className="text-ink font-black text-xl">+{post.imageUrls.length - 4}</span>
