@@ -1,5 +1,36 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-20 — #764 Strata redesign, Epics B/C/D + performance pass (feature / perf)
+
+**What & where:** `Frontend/app/**` (all user areas, Studio, mascot cast/editor, ui primitives
+Coin/CopyButton, hooks useIsScrolling/useThrottledValue/throttle), `Backend/src/studio-stats/*`
+(new), `Backend/src/users` mascot DTO + endpoints, `Backend/migrations/2026-10-20-profiles-mascot.sql`
+(not applied), `DESIGN.md`, ADR 029.
+
+**Why:** one design system instead of per-page classes (light theme becomes possible, no purple),
+a Studio creators can read, and mascots as part of identity — the dev's brief.
+
+**Before → After:** hex/white-alpha/purple classes → tokens across the user routes; Studio list-of-
+cards → shell + ECharts stats from a scoped endpoint; emoji icons → line icons/coin/mascots.
+
+**Performance Δ (production build):** home scroll p95 33 → 16.7 ms; book popup p95 67–117 → 16.7 ms
+(0 frames > 50 ms); /settings scroll slow frames 123/389 → 0; colour drag sync 41 → 4.8 ms/event,
+frames > 50 ms 86 → 15. ECharts loads only on Studio routes (dynamic import).
+
+**Quality:** tokens make the light theme a switch away; a measured rule against blurred repeated
+elements; Studio stats read only the caller's own versions (uid from AuthGuard).
+
+**Validation:** tsc 0; bun tests (studio shellMath, loaderFor, throttle red → green); backend specs for
+aggregate-stats + studio-stats service; browser verification at 1440/390 per area; frame measurements
+before/after in headless Chromium on `next start`.
+
+**Risk / rollback:** visual-only for most files; backend additions are new read endpoints + one guarded
+write; mascot save fails gracefully until the migration is applied. Rollback = revert the PR.
+
+**Links:** #764 #765 #772–#778 #780 #786–#790 #781 #783–#785, ADR 029.
+
+---
+
 ## 2026-10-20 — #722: identity-change reset has one owner (refactor)
 
 **What & where:** new `Frontend/app/lib/identityReset.ts` (+ `identityReset.test.ts`);
