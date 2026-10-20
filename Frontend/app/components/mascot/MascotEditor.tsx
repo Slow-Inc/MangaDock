@@ -11,6 +11,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { MASCOT_GLASSES, MASCOT_HATS, MASCOT_TYPES, mascotFromUid, type MascotConfig } from "../../lib/mascot";
 import { getMyMascot, saveMyMascot } from "../../lib/mascotApi";
+import { useIsScrolling } from "../../hooks/useIsScrolling";
 import Pill from "../ui/Pill";
 import Button from "../ui/Button";
 import Loader from "../ui/Loader";
@@ -54,6 +55,18 @@ export default function MascotEditor() {
   // The preview follows a deferred copy, so the colour input stays responsive and React can drop
   // intermediate preview renders while a colour is being dragged.
   const preview = useDeferredValue(config);
+  // While the page scrolls, the live preview is hidden behind a still of its last frame: bot-avatars keeps
+  // repainting even a paused avatar (~19 times/s), which held /settings at 30 fps. It stays mounted
+  // (display:none — its IntersectionObserver stops the loop) because a remount re-bakes the fur and
+  // stutters for about a second after every scroll.
+  const still = useRef<string | null>(null);
+  const scrolling = useIsScrolling(200, () => {
+    try {
+      still.current = canvas.current?.toDataURL() ?? null;
+    } catch {
+      still.current = null;
+    }
+  });
   const pickType = useCallback((type: MascotConfig["type"]) => setConfig((c) => (c ? { ...c, type } : c)), []);
 
   useEffect(() => {
@@ -103,7 +116,13 @@ export default function MascotEditor() {
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
         <div className="flex shrink-0 flex-col items-center gap-3">
           <div className="rounded-[var(--r3)] bg-fill p-3">
-            <BotAvatar ref={canvas} {...preview} size={160} theme="auto" aria-label="มาสคอตของคุณ" />
+            {scrolling && still.current ? (
+              // eslint-disable-next-line @next/next/no-img-element -- a data URL still of the canvas, shown only mid-scroll
+              <img src={still.current} alt="" aria-hidden width={160} height={160} className="block h-40 w-40 object-contain" />
+            ) : null}
+            <div className={scrolling && still.current ? "hidden" : undefined}>
+              <BotAvatar ref={canvas} {...preview} size={160} theme="auto" aria-label="มาสคอตของคุณ" />
+            </div>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setConfig(mascotFromUid(`${user.uid}:${Date.now()}`))}>
             สุ่มใหม่
