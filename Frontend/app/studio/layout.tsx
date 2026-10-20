@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { useToast } from "../contexts/ToastContext";
 import { becomeTranslator } from "../lib/studioApi";
+import StudioShell from "./components/StudioShell";
 
 /**
  * StudioLayout handles global access control for all /studio/* routes.
@@ -139,5 +140,9 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   }
 
   // 4. Authorized Access
-  return <div className="min-h-dvh bg-[#141414]">{children}</div>;
+  return (
+    <div className="min-h-dvh bg-bg">
+      <StudioShell>{children}</StudioShell>
+    </div>
+  );
 }

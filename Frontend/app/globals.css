@@ -147,6 +147,12 @@ body:lang(th) {
   background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
+/* RollingNumber: a 0–9 strip slides to the digit (--d). */
+@keyframes md-roll {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(var(--d) * -1em)); }
+}
+
 /* Content settles in as it arrives — only when scripts run, so nothing is ever hidden for good. */
 html.js .reveal {
   opacity: 0;

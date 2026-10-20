@@ -30,6 +30,7 @@ import {
   StudioMobileSection,
 } from "./components/StudioMobileShell";
 import { useIsMobile } from "../hooks/useIsMobile";
+import StatsOverview from "./components/StatsOverview";
 import {
   formatCurrency,
   getLanguageBreakdown,
@@ -176,6 +177,8 @@ export default function StudioOverviewPage() {
                 </div>
               )}
             />
+
+            <StatsOverview />
 
             <div className="grid grid-cols-2 gap-3">
               <MetricCard label="จำนวนเรื่อง" value={overviewStats.totalWorks} hint="เรื่องที่เคยอัปโหลด" tone="indigo" />
@@ -370,7 +373,7 @@ export default function StudioOverviewPage() {
             </div>
           </div>
 
-          <StudioNav />
+          <StatsOverview />
 
           {loadingData ? (
             <StudioOverviewSkeleton />
