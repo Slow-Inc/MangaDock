@@ -74,7 +74,7 @@ This file is the source of truth for the design language; the token values are i
 
 - **Base:** `bg`, `surface`, `ink`; everything else is derived from `ink` with `color-mix` (`ink-2` secondary text, `ink-3` tertiary, `line` borders, `fill` tints, `raised` a lifted surface).
 - **Accent:** one hue only — blue (`#0a62d6` light / `#5aa2ff` dark) for focus, selection, status and a rare highlight.
-- **Status:** `ok` and `danger`, always with an icon or a label, never colour alone.
+- **Status:** `ok` and `danger`, always with an icon or a label, never colour alone. `coin` is the gold of coins, wallet and prices — a currency meaning, used nowhere else.
 - **Themes:** System / Light / Dark through `data-theme` on `<html>`; **default dark**. Always-dark islands (the reader) use `.theme-dark`, which re-declares the derived tokens.
 
 ### Named rules
@@ -117,6 +117,28 @@ One easing `cubic-bezier(0.23, 1, 0.32, 1)`, durations 160 / 320 / 600 ms, 38 ms
 - Use purple, gradients behind content, glass panels or glow.
 - Put spaces inside animated inline-blocks (the words run together).
 - Copy a spinner or a button style instead of using `components/ui`.
+
+## 8. Migration table (old classes → tokens)
+
+Used when an area is moved onto the tokens (Epic B). Pick by meaning, not by the old shade.
+
+| Old | New |
+|---|---|
+| page `bg-[#0a0a0a]`, `bg-[#08090d]`, `bg-black` | `bg-bg` |
+| panel `bg-[#141414]`, `bg-[#151518]`, `bg-[#181818]`, `bg-[#1a1a1a]`, `bg-[#1c1c1c]`, `bg-[#202020]` | `bg-surface` (a panel on a panel: `bg-raised`) |
+| `bg-white/[0.02]`–`bg-white/10` tints, hovers | `bg-fill` (hover on a fill: `bg-raised`) |
+| `text-white`, `text-white/80`–`/90` | `text-ink` |
+| `text-white/50`–`/70` | `text-ink-2` |
+| `text-white/20`–`/45`, placeholders | `text-ink-3` |
+| `border-white/5`–`/15` | `border-line`; `border-white/20`–`/30` → `border-ink-3` |
+| `bg-white text-black` (selected chip / primary) | `bg-ink text-bg` (`Pill selected`, `Button primary`, `PRIMARY_FILL`) |
+| amber / orange used as highlight, link, selected, active | `text-accent`, `bg-accent/10`, `border-accent/40` |
+| amber / gold for coins, wallet, prices | `text-coin`, `bg-coin/10`, `border-coin/40` |
+| red for errors, destructive | `text-danger`, `bg-danger/10`, `border-danger/40` |
+| green for success | `text-ok`, `bg-ok/10`, `border-ok/40` |
+| hand-made `animate-spin` ring or SVG spinner | `<Loader context="inline" / "section" / "page" />` |
+| `tracking-widest`, `tracking-[0.1em+]` on Thai text | remove (mono Latin labels may keep `tracking-[0.1em]`) |
+| glow `shadow-*-500/…`, `drop-shadow` glows, gradient blobs | remove |
 <!-- lang:end -->
 
 <!-- lang:th -->
@@ -132,7 +154,7 @@ One easing `cubic-bezier(0.23, 1, 0.32, 1)`, durations 160 / 320 / 600 ms, 38 ms
 
 - **สีหลัก:** `bg`, `surface`, `ink` ที่เหลือคำนวณต่อจาก `ink` ด้วย `color-mix` (`ink-2` ตัวหนังสือรอง, `ink-3` ตัวหนังสือระดับสาม, `line` เส้นขอบ, `fill` สีจางๆ, `raised` พื้นผิวที่ยกขึ้น)
 - **Accent:** มีสีเดียวคือน้ำเงิน (`#0a62d6` สว่าง / `#5aa2ff` มืด) ใช้กับ focus, การเลือก, สถานะ และไฮไลต์นานๆ ครั้ง
-- **สถานะ:** `ok` กับ `danger` ต้องมี icon หรือข้อความประกอบเสมอ ห้ามใช้สีอย่างเดียว
+- **สถานะ:** `ok` กับ `danger` ต้องมี icon หรือข้อความประกอบเสมอ ห้ามใช้สีอย่างเดียว ส่วน `coin` คือสีทองของเหรียญ wallet และราคา — เป็นความหมายของเงิน ห้ามใช้ที่อื่น
 - **ธีม:** System / Light / Dark ผ่าน `data-theme` บน `<html>` **ค่าเริ่มต้นคือมืด** ส่วนที่มืดตลอด (reader) ใช้ `.theme-dark` ซึ่งประกาศ token ที่คำนวณต่อซ้ำอีกครั้ง
 
 ### กฎที่ตั้งชื่อไว้
@@ -175,4 +197,26 @@ easing ตัวเดียว `cubic-bezier(0.23, 1, 0.32, 1)` ความย
 - ใช้สีม่วง, gradient หลังเนื้อหา, panel แบบ glass หรือแสงเรือง
 - ใส่ช่องว่างไว้ใน inline-block ที่ animate (คำจะติดกัน)
 - copy spinner หรือสไตล์ปุ่มมาใช้แทนการใช้ `components/ui`
+
+## 8. ตารางแปลง (class เดิม → token)
+
+ใช้ตอนย้ายแต่ละพื้นที่มาใช้ token (Epic B) ให้เลือกตามความหมาย ไม่ใช่ตามเฉดสีเดิม
+
+| เดิม | ใหม่ |
+|---|---|
+| พื้นหลังหน้า `bg-[#0a0a0a]`, `bg-[#08090d]`, `bg-black` | `bg-bg` |
+| panel `bg-[#141414]`, `bg-[#151518]`, `bg-[#181818]`, `bg-[#1a1a1a]`, `bg-[#1c1c1c]`, `bg-[#202020]` | `bg-surface` (panel ที่ซ้อนอยู่บน panel: `bg-raised`) |
+| สีจางๆ และ hover แบบ `bg-white/[0.02]`–`bg-white/10` | `bg-fill` (hover บน fill: `bg-raised`) |
+| `text-white`, `text-white/80`–`/90` | `text-ink` |
+| `text-white/50`–`/70` | `text-ink-2` |
+| `text-white/20`–`/45`, placeholder | `text-ink-3` |
+| `border-white/5`–`/15` | `border-line`; `border-white/20`–`/30` → `border-ink-3` |
+| `bg-white text-black` (chip ที่ถูกเลือก / ปุ่มหลัก) | `bg-ink text-bg` (`Pill selected`, `Button primary`, `PRIMARY_FILL`) |
+| amber / orange ที่ใช้เป็นไฮไลต์ ลิงก์ ตัวที่ถูกเลือก หรือสถานะ active | `text-accent`, `bg-accent/10`, `border-accent/40` |
+| amber / ทอง สำหรับเหรียญ wallet และราคา | `text-coin`, `bg-coin/10`, `border-coin/40` |
+| สีแดงสำหรับ error และการกระทำที่ทำลายข้อมูล | `text-danger`, `bg-danger/10`, `border-danger/40` |
+| สีเขียวสำหรับสำเร็จ | `text-ok`, `bg-ok/10`, `border-ok/40` |
+| วง `animate-spin` หรือ spinner SVG ที่ทำเอง | `<Loader context="inline" / "section" / "page" />` |
+| `tracking-widest`, `tracking-[0.1em+]` บนข้อความไทย | เอาออก (label ภาษาละตินแบบ mono ยังใช้ `tracking-[0.1em]` ได้) |
+| แสงเรือง `shadow-*-500/…`, `drop-shadow` ที่เรืองแสง, gradient blob | เอาออก |
 <!-- lang:end -->

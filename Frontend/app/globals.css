@@ -12,6 +12,7 @@
   --accent: #0a62d6; /* the only hue: status, focus, selection, highlight — used sparingly */
   --ok: #1a8a4a;
   --danger: #c8322f; /* MangaDock addition: Strata has no error colour */
+  --coin: #b7791f; /* MangaDock addition: the coin/wallet gold — a currency meaning, not decoration */
 }
 
 :root[data-theme="dark"],
@@ -23,6 +24,7 @@
   --accent: #5aa2ff;
   --ok: #4cc380;
   --danger: #ff6b6b;
+  --coin: #fbbf24;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -34,6 +36,7 @@
     --accent: #5aa2ff;
     --ok: #4cc380;
     --danger: #ff6b6b;
+    --coin: #fbbf24;
   }
 }
 
@@ -92,6 +95,7 @@
   --color-accent: var(--accent);
   --color-ok: var(--ok);
   --color-danger: var(--danger);
+  --color-coin: var(--coin);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
