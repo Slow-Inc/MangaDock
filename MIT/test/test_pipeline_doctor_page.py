@@ -233,3 +233,15 @@ def test_foreign_script_leaking_into_a_thai_translation_warns():
     assert translate.status == WARN
     assert translate.metrics['foreign_script'] == 2
     assert 2 not in flags
+
+
+def test_text_detected_but_no_regions_returned_fails_at_translate():
+    """2026-10-20 corpus: two pages came back with 15 textlines and ZERO regions and nothing
+    dropped — the whole page untranslated while every probe said OK. A page that read text and
+    returned nothing must fail, carrying the pipeline errors captured for it."""
+    page = PageSnapshot(target_lang='THA', width=800, height=1150, textlines=15, sfx_lines=0,
+                        empty_reads=0, regions=[])
+    page.errors = ['translation failed: APIError: upstream 502']
+    translate = _by_stage(diagnose(page)[0])['translate']
+    assert translate.status == FAIL
+    assert 'no regions' in translate.evidence and '502' in translate.evidence

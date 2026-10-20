@@ -79,7 +79,7 @@ from .utils import (
     sort_regions,
 )
 from .utils.lang_ratio import target_script_ratio
-from .text_layer import regions_payload, dropped_regions_payload
+from .text_layer import regions_payload, dropped_regions_payload, empty_patch_result
 
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
@@ -1534,7 +1534,7 @@ class MangaTranslator:
         img_h, img_w = ctx.img_rgb.shape[:2]
 
         if not ctx.text_regions:
-            return {'img_width': img_w, 'img_height': img_h, 'patches': [], 'regions': []}
+            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 
         await self._report_progress('translating')
         try:
@@ -1547,11 +1547,11 @@ class MangaTranslator:
 
         await self._report_progress('after-translating')
         if not ctx.text_regions or ctx.text_regions == 'cancel':
-            return {'img_width': img_w, 'img_height': img_h, 'patches': [], 'regions': []}
+            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 
         regions = self._filter_regions_by_source_lang(ctx.text_regions, config)
         if not regions:
-            return {'img_width': img_w, 'img_height': img_h, 'patches': [], 'regions': []}
+            return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 
         # Bubble segmentation (#170): tag each region with its speech balloon so
         # grouping stays within balloons (no cross-balloon clumps). Opt-in via

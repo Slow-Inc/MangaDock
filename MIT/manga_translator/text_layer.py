@@ -71,3 +71,10 @@ def dropped_regions_payload(dropped: Iterable) -> List[Dict[str, str]]:
         d['drop_reason'] = reason
         out.append(d)
     return out
+
+
+def empty_patch_result(img_w: int, img_h: int, dropped: Iterable) -> Dict:
+    """The /patches result for a page that renders nothing — still listing what was dropped and
+    why, so "no text" and "every region dropped" are distinguishable (2026-10-20 quality loop)."""
+    return {'img_width': img_w, 'img_height': img_h, 'patches': [],
+            'regions': dropped_regions_payload(dropped or [])}

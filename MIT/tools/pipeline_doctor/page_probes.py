@@ -68,6 +68,8 @@ class PageSnapshot:
     regions: List[Region] = field(default_factory=list)
     #: (source text, drop reason) for regions the post-translation filter removed
     dropped: List[Tuple[str, str]] = field(default_factory=list)
+    #: pipeline warnings/errors captured while this page ran (doctor_page.py)
+    errors: List[str] = field(default_factory=list)
 
 
 #: region index -> [(root stage, status), (later stage, 'inherited'), ...]
@@ -215,6 +217,10 @@ def _probe_translate(page: PageSnapshot, flags: Flags) -> StageReport:
             evidence.append(verdict[1])
         else:
             inherited += 1
+    if page.textlines and not page.regions and not page.dropped:
+        statuses.append(FAIL)
+        evidence.append(f'{page.textlines} textlines read but no regions returned'
+                        + (f' — {page.errors[-1][:160]}' if page.errors else ''))
     return StageReport('translate', _status(statuses),
                        {'root': root, 'inherited': inherited, 'empty': empty,
                         'untranslated': untranslated, 'latin_in_target': latin,

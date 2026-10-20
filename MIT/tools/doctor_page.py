@@ -15,8 +15,11 @@ import asyncio
 import copy
 import io
 import json
+import logging
 import os
+import re
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MIT = os.path.dirname(HERE)
@@ -60,6 +63,26 @@ def _install_replay(tr, recorded):
         return out
 
     tr._dispatch_with_context = replay
+
+
+class _Timings(logging.Handler):
+    """Collect the driver's `[timing] stage=X elapsed_ms=Y` lines (#speed-study) per page."""
+    _RE = re.compile(r'\[timing\] stage=(\S+) elapsed_ms=([\d.]+)')
+
+    def __init__(self):
+        super().__init__(logging.INFO)
+        self.stages = {}
+        self.errors = []
+
+    def emit(self, record):
+        if record.levelno >= logging.WARNING:
+            msg = record.getMessage()
+            if record.exc_info and record.exc_info[1] is not None:
+                msg += f' | {type(record.exc_info[1]).__name__}: {record.exc_info[1]}'
+            self.errors.append(msg[:400])
+        m = self._RE.search(record.getMessage())
+        if m:
+            self.stages[m.group(1)] = self.stages.get(m.group(1), 0.0) + float(m.group(2))
 
 
 def _composite(source, payload):
@@ -140,12 +163,22 @@ async def main():
         _install_replay(tr, json.load(open(args.replay, encoding='utf-8')))
 
     os.makedirs(args.out, exist_ok=True)
+    timings = _Timings()
+    mt_logger = logging.getLogger('manga_translator')
+    mt_logger.addHandler(timings)
+    if mt_logger.level > logging.INFO or mt_logger.level == logging.NOTSET:
+        mt_logger.setLevel(logging.INFO)
     worst = 0
     for path in args.pages:
         source = Image.open(path).convert('RGB')
+        timings.stages = {}
+        timings.errors = []
+        t0 = time.time()
         payload = await tr.translate_patches(source, Config(**cfg))
+        wall_ms = (time.time() - t0) * 1000
 
         page = snapshot_from_payload(payload, args.target, **stats)
+        page.errors = list(timings.errors)
         rendered = _composite(source, payload)
         _measure_ink(page, rendered)
         run, flags = diagnose(page)
@@ -158,11 +191,13 @@ async def main():
                                'container': r.bubble_idx, 'container_box': r.bubble_box,
                                'branch': r.render_branch, 'font_px': r.render_font_px,
                                'dst_box': r.render_dst_box} for r in page.regions],
-                  'dropped': page.dropped}
+                  'dropped': page.dropped, 'errors': page.errors,
+                  'timing_ms': {'wall': round(wall_ms), **{k: round(v) for k, v in timings.stages.items()}}}
         with open(stem + '.doctor.json', 'w', encoding='utf-8') as fh:
             json.dump(report, fh, ensure_ascii=False, indent=1)
         print(f'== {os.path.basename(path)}')
         print(json.dumps(report, ensure_ascii=False, indent=1) if args.json else run.to_table())
+        print('timing_ms ' + ' '.join(f'{k}={v}' for k, v in report['timing_ms'].items()))
         print(f'-> {stem}.doctor.png / .doctor.json\n')
         worst = max(worst, run.exit_code)
     return worst
