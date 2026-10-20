@@ -8,6 +8,7 @@ import { useTopupStream } from "../hooks/useTopupStream";
 import { cancelTopup, simulateTopup } from "../lib/studioApi";
 import { errMessage } from "@/lib/errMessage";
 import { PRIMARY_FILL } from "./ui/Button";
+import Mascot from "./mascot/Mascot";
 
 function formatCountdown(s: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -167,9 +168,12 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
         ) : (
           <>
             <div className="border-b border-line px-5 py-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-ink">เติมเหรียญ</h2>
-                <p className="mt-0.5 text-xs text-ink-3">1 เหรียญ = 1 บาท • PromptPay QR</p>
+              <div className="flex items-center gap-3">
+                <Mascot area="wallet" size={40} interactive={false} />
+                <div>
+                  <h2 className="text-sm font-bold text-ink">เติมเหรียญ</h2>
+                  <p className="mt-0.5 text-xs text-ink-3">1 เหรียญ = 1 บาท • PromptPay QR</p>
+                </div>
               </div>
               <button onClick={onClose} className="text-ink-3 hover:text-ink transition text-lg leading-none">✕</button>
             </div>

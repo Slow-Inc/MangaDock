@@ -1,6 +1,7 @@
 "use client";
 
 import { Turnstile } from "@marsidev/react-turnstile";
+import Mascot from "../mascot/Mascot";
 
 export interface ReaderCaptchaGateProps {
   passed: boolean;
@@ -59,7 +60,8 @@ export default function ReaderCaptchaGate({ passed, exiting, siteKey, chapterLab
           >
             <div className="w-12 h-1.5 bg-ink-3 rounded-full mb-6 sm:hidden"></div>
 
-            <div className="mb-6 text-center">
+            <div className="mb-6 flex flex-col items-center text-center">
+              <Mascot area="login" size={72} interactive={false} className="mb-3" />
               <h3 className="text-xl sm:text-2xl font-bold text-ink mb-2">ยืนยันตัวตน</h3>
               <p className="text-[13px] sm:text-sm text-ink-2 px-2 leading-relaxed">
                 กำลังตรวจสอบความปลอดภัย<br />

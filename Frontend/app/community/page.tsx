@@ -19,6 +19,7 @@ import { useToast } from "../contexts/ToastContext";
 import { CommunityErrorBoundary } from "./components/CommunityErrorBoundary";
 import Loader from "../components/ui/Loader";
 import { PRIMARY_FILL } from "../components/ui/Button";
+import Mascot from "../components/mascot/Mascot";
 
 function CommunityContent() {
   const { user, userRole, showLoginPrompt } = useAuth();
@@ -340,10 +341,8 @@ function CommunityContent() {
           posts.map(post => <PostCard key={post.id} post={post} viewMode={viewMode} />)
         ) : (
           <div className="bg-surface border border-dashed border-line rounded-2xl py-16 text-center space-y-3">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-fill flex items-center justify-center">
-              <svg className="w-6 h-6 text-ink-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
+            <div className="flex justify-center">
+              <Mascot area="community" size={88} />
             </div>
             <p className="text-ink-3 font-medium">ยังไม่มีโพสต์ในหมวดหมู่นี้</p>
             {user && (

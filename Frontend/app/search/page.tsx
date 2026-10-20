@@ -12,6 +12,7 @@ import { resolvedThumbnail } from "../lib/imgUrl";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import { inputClass } from "../components/ui/Input";
 import type { LandingBook } from "../lib/types";
+import Mascot from "../components/mascot/Mascot";
 
 const API_BASE = "/api/proxy";
 
@@ -570,9 +571,7 @@ function SearchResults() {
         {/* ── Empty state ───────────────────────────────────────────── */}
         {!isLoading && (searched || isMyList) && displayed.length === 0 && (query || isMyList) && (
           <div className="flex flex-col items-center gap-4 py-24 text-center text-ink-3">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-16 w-16 opacity-30">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+            <Mascot area="search" size={96} />
             <p className="text-lg font-semibold">
               {isMyList ? (query ? `ไม่พบรายการที่ตรงกับ "${query}"` : "ยังไม่มีรายการในคลังของคุณ") : `ไม่พบหนังสือที่ตรงกับ "${query}"`}
             </p>
