@@ -224,6 +224,11 @@ body::-webkit-scrollbar-thumb:active {
   :is(.overflow-hidden, .overflow-clip, .overflow-auto, .overflow-scroll, .overflow-x-auto, .overflow-y-auto) :focus-visible {
     outline-offset: -2px;
   }
+
+  /* The skip link focuses <main> as a jump target, not a control: no ring around the whole page (#856). */
+  main[tabindex="-1"]:focus-visible {
+    outline: none;
+  }
 }
 
 /* In @layer base so utilities like max-w-none win — unlayered, it squeezed the mascot editor's still

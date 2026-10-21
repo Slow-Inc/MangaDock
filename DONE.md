@@ -18,6 +18,13 @@ the logo (screenshot) — replaced by the translate pattern.
 control in the content (e.g. "อ่านเลย", "มังงะมาใหม่"), not the Navbar; `/search` autofocuses its input, so Tab already starts
 in the content. axe structure sweep 10 routes × 2 widths → 0; signed-in sweep (27) → only `color-contrast`. tsc 0.
 
+**Review round:** (1) focusing `<main>` by script after an Enter keypress matches `:focus-visible`, so the global ring drew a
+2 px accent outline around the whole page (computed style confirmed) — `main[tabindex="-1"]:focus-visible { outline: none }`
+in the same `@layer base`; the link and the next control keep their rings. (2) `/docs` had no `id="main"` and
+SimulationsView nested a `<main>` inside the docs `<main>` — both docs `<main>`s (alternate branches) get the id, the nested
+one is a `<div>`. Re-verified: /new and /docs — link ringed, `<main>` focused with no outline, next Tab ringed inside
+`<main>`; axe structure 11 routes (incl. /docs) × 2 widths → 0.
+
 ---
 
 ## #861 MangaDex fetches time out (2026-10-21)

@@ -1329,7 +1329,7 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
 
         {/* Main content */}
         {view.type === 'simulations' ? (
-          <main className="flex-1 overflow-hidden bg-white">
+          <main id="main" className="flex-1 overflow-hidden bg-white">
             <AnimatePresence mode="wait">
               <motion.div
                 key="simulations"
@@ -1344,7 +1344,7 @@ export default function DocsClient({ mdFiles }: { mdFiles: MdFile[] }) {
             </AnimatePresence>
           </main>
         ) : (
-          <main className="flex-1 overflow-y-auto bg-white" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+          <main id="main" className="flex-1 overflow-y-auto bg-white" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
             <div className="max-w-[760px] mx-auto px-6 md:px-12 py-10">
               <AnimatePresence mode="wait">
                 <motion.div

@@ -6,7 +6,7 @@ type MainLike = {
   focus(): void;
 };
 
-/** Moves keyboard focus to the page's `<main>` (every route has exactly one, #846). `false` when there is none. */
+/** Moves keyboard focus to the page's `<main id="main">` (one per route). `false` when there is none. */
 export function focusMain(doc: { querySelector(selector: "main"): MainLike | null }): boolean {
   const main = doc.querySelector("main");
   if (!main) return false;
