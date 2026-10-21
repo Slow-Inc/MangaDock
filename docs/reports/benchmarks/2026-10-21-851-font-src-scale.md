@@ -28,3 +28,19 @@
 A tradeoff: text matches the source and the page much better, at the cost of 4 new overlaps and
 1 spill (Akuyaku p1, Iruma p1, Kage p1, Anta p1, Mushoku p1). It stays **opt-in** (default 0) — per
 the goal rule a tradeoff is not a default — and the scale is the user's call from the sheet above.
+
+## Update — making it tradeoff-free (2026-10-21, later)
+
+Code review and four more A/B rounds (`d8cb89ef` → `077f8084`), each fixing what the previous round showed:
+
+| round | change | spill / overlap (knob off: 0 / 2) | balloon font spread (median, off: 1.55) |
+|---|---|---|---|
+| `d8cb89ef` | page size caps growth, respects the minimum, skips SFX | 1 / 6 | 1.13 |
+| `7cd7e0d1` | sole balloon occupant only; a block that does not fit its box falls back to the absolute font | 0 / 2 | 1.48 |
+| `8d67df60` | instead of falling straight back: the largest size ≤ the page size that fits (balloon interior, or own footprint when shared) | 1 / 2 | 1.45 |
+| `077f8084` | the fit check has no slack (a 303 px block had passed a 292 px box) | 0 / 2 on the page that spilled (Kage p1) | — |
+
+Balloon text is now 0.76 of the source size on average (off: 0.55) and spill/overlap match the knob
+being off. What remains is a judgement, not a defect count: pages whose source lettering itself varies
+(Akuyaku p1: shouted `NYA`/`AH`/`EH` at 31–39 px beside 17–19 px dialogue) keep that variation, and the
+right scale (Kaoru favoured ~1.25, Akuyaku/Iruma ~1.5) is a look the user picks. Still opt-in (default 0).
