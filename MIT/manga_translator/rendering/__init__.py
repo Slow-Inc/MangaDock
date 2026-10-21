@@ -676,7 +676,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 else:
                     _fit_box = tuple(float(v) for v in region.xyxy)
                 _fbw, _fbh = _fit_box[2] - _fit_box[0], _fit_box[3] - _fit_box[1]
-                if laid[1] > _fbw * 1.05 or laid[2] > _fbh * 1.05:
+                if laid[1] > _fbw or laid[2] > _fbh:   # no slack: 303 px in a 292 px box spilled (Kage p1)
                     from types import SimpleNamespace
                     _fit = _clean_layout_dst(
                         SimpleNamespace(translation=region.translation,
@@ -684,7 +684,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                                         font_size=getattr(region, 'font_size', 0), xyxy=_fit_box),
                         img.shape, font_size_minimum, fmax_i, page_shape, shrink_to_fit=True, grow=False)
                     if (_fit is not None and _fit[0] >= font_size_max
-                            and _fit[1] <= _fbw * 1.05 and _fit[2] <= _fbh * 1.05):
+                            and _fit[1] <= _fbw and _fit[2] <= _fbh):
                         laid = _fit
                     else:
                         _page_sized, fmax_i = False, font_size_max

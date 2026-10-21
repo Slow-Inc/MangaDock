@@ -598,3 +598,16 @@ def test_a_page_size_that_does_not_fit_shrinks_to_fit_before_falling_back_851(mo
     assert [r.render_font_px for r in shared] == [23, 23]     # fits its own 40 px footprint at 25 - 2
     assert tall.render_font_px == 22                           # fits the interior at 25 - 3
     assert small.render_font_px == 20                          # 25 - 12 < 20: the absolute font
+
+
+def test_a_page_sized_block_slightly_taller_than_its_box_is_refitted_851(monkeypatch):
+    """A/B on 8d67df60 (Kage p1): a 303 px block passed the fit check of a 292 px box under 5 % slack
+    and spilled. The page-size fit has no slack."""
+    _echo_stubs(monkeypatch)
+    monkeypatch.setattr(rend, '_bubble_interior_box', lambda region, bubble_box, shape: (60.0, 88.0, (50.0, 50.0)))
+    lines, credit, sole = _page()
+    tall = _in_balloon(500, 18, 'ยาวมาก!', tall=True, horizontal=False)     # laid 90 tall in an 88 px box
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole, tall], None, 0, 8,
+                                     bubble_fit=True, font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert tall.render_font_px == 22                                         # refitted, not 25 at 90 px
