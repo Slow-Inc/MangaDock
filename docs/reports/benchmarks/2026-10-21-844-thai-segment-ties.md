@@ -13,9 +13,12 @@ newmm minimises the word count; `นาทีละ` splits into two dictionary 
 engine disagreed with newmm on 203 and was wrong far more often (`แน่น|อน`, `อะ|ไร`, `ฉันท|นท|า|นม|าก`),
 so the engine stays. newmm's own wrong breaks were all such ties; TNC frequencies (bundled with
 pythainlp) pick the right reading in each, and the two cases where they would not (`ผู้|ทรงพลัง`,
-compounds TNC lacks) are excluded by rule. Offline over 651 corpus translations the rule changes 8
+compounds TNC lacks) are excluded by rule. Offline over 651 corpus translations the rule changed 8
 distinct pairs, all correct: `โจมตี|เมือง`, `ก่อตั้ง|ขึ้น`, `แล้ว|จะ`, `นาที|ละ`, `ตัดสินใจ|มา`, `บอก|ว่า`,
-`ขับไล่|ผี`, `แสงสว่าง|จ้า`.
+`ขับไล่|ผี`, `แสงสว่าง|จ้า`. **Update (`775c864b`, code review):** a dictionary word TNC lacks
+(`หน้าใหม่`) had scored as unseen, so `มี|หน้าใหม่` was wrongly re-split; it now counts as its rarest
+dictionary part. That leaves 6 flips — `ขับ|ไล่ผี` and `แสง|สว่างจ้า` now stay as newmm had them (both
+readings are fine). Replay of both corpora after the fix: 0 regions differ from this report's "after".
 
 ## Result
 
