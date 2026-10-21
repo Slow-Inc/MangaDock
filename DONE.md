@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 8 — credit-block overlap traced to the readable floor (#883, no code change) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **#883** — Chainsaw p0's `NOTICE:` credit block renders its three lines on top of each other (doctor `render` FAIL, overlap 2). Traced: the source lines are 9-10 px tall and 6-15 px apart; the readable floor lifts each block to 20 px (~48 px tall), so the block is **taller than the gap** between its neighbours. The anti-overlap pass already centres a block taller than its gap in that gap (#795) — overlap is the designed fallback here, not a broken dodge.
+- **Tried and reverted:** dodge each neighbour's *rendered* box instead of its detection box (union with its own territory so a balloon keeps its outline). Principled — a grown block's ink is its territory — but the boxes still overlap (1.4k / 4.5k px²) because no placement fits; reverted rather than shipped without evidence.
+- **Needs a decision** (recorded in #883): coalesce the stacked notice lines into one region before translation (#757-style paragraph block), or allow a sub-floor font when a block cannot fit between neighbours.
+- Full-corpus replay tagged `_r2` started against the current head as the next baseline.
+
 ## MIT quality loop, round 7 — the SFX rescue was a silent no-op on a thinking model (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
