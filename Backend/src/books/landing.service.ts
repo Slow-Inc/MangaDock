@@ -13,6 +13,9 @@ import {
   type LandingRow,
 } from './books.types';
 
+/** How long a landing with a failed row is cached before the next request re-fetches it (#865). */
+const PARTIAL_LANDING_TTL_MS = 2 * 60 * 1000;
+
 const THAI = /[\u0E00-\u0E7F]/;
 
 /** A line of the translation (not leaked English reasoning): mostly Thai, or a Markdown link/rule line. */
@@ -323,6 +326,20 @@ export class LandingService {
       return this.serveStale(cacheKey, forceLocal);
     }
 
+    // A row whose MangaDex call failed comes back empty (fetchMangaWithParamsPaged swallows the error), so
+    // "partial" is the failure signal here (#865): fill those rows from the last good landing and cache
+    // briefly, so the failed row is retried in minutes rather than held empty for the full TTL.
+    const partial = rows.some((r) => r.items.length === 0);
+    if (partial) {
+      const staleRows =
+        this.cache.getStale<LandingPayload>(cacheKey)?.data.rows ?? [];
+      rows = rows.map((r) =>
+        r.items.length > 0
+          ? r
+          : { ...r, items: staleRows.find((s) => s.id === r.id)?.items ?? [] },
+      );
+    }
+
     const hero = rows.find((r) => r.items.length > 0)?.items[0] ?? null;
     const payload: LandingPayload = {
       hero,
@@ -331,7 +348,11 @@ export class LandingService {
     };
 
     if (rows.some((r) => r.items.length > 0)) {
-      await this.cache.set(cacheKey, payload, CACHE_TTL_MS);
+      await this.cache.set(
+        cacheKey,
+        payload,
+        partial ? PARTIAL_LANDING_TTL_MS : CACHE_TTL_MS,
+      );
     } else {
       this.logger.warn('No books returned — trying stale cache fallback');
       return this.serveStale(cacheKey, forceLocal);

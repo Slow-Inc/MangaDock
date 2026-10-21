@@ -106,6 +106,52 @@ describe('LandingService — landing assembly + description (#231)', () => {
     expect(cache.set).toHaveBeenCalledTimes(1);
   });
 
+  it('fills a row that came back empty from the stale landing, and caches only briefly (#865)', async () => {
+    const rowDefs = [
+      { id: 'r1', title: 'Row 1', order: 'a', limit: 10 },
+      { id: 'r2', title: 'Row 2', order: 'b', limit: 10 },
+    ];
+    const { svc, cache } = makeDeps({
+      rowDefs,
+      stale: {
+        data: {
+          hero: null,
+          rows: [
+            { id: 'r1', title: 'Row 1', query: 'a', items: [{ id: 'old1' }] },
+            { id: 'r2', title: 'Row 2', query: 'b', items: [{ id: 'old2' }] },
+          ],
+          updatedAt: 'T0',
+        },
+        updatedAt: 'T0',
+      },
+      // r1 fresh; r2's MangaDex call failed (fetchMangaWithParamsPaged swallows it into [])
+      rowFetch: jest.fn(async (order: string) => ({
+        items: order === 'a' ? [{ id: 'new1' }] : [],
+      })),
+    });
+
+    const out = await svc.getLandingBooks();
+
+    expect(out.rows.map((r) => r.items.map((b) => b.id))).toEqual([
+      ['new1'],
+      ['old2'],
+    ]);
+    expect(cache.set).toHaveBeenCalledTimes(1);
+    const ttl = (cache.set.mock.calls[0] as unknown[])[2] as number;
+    expect(ttl).toBeLessThan(5 * 60 * 1000); // retried soon, not held for the full landing TTL
+  });
+
+  it('caches a complete landing for the full TTL (#865)', async () => {
+    const { svc, cache } = makeDeps({
+      rowFetch: jest.fn().mockResolvedValue({ items: [{ id: 'a' }] }),
+    });
+
+    await svc.getLandingBooks();
+
+    const ttl = (cache.set.mock.calls[0] as unknown[])[2] as number;
+    expect(ttl).toBeGreaterThanOrEqual(20 * 60 * 1000);
+  });
+
   it('fetches all landing rows concurrently, preserving input order', async () => {
     const rowDefs = [
       { id: 'r1', title: 'Row 1', order: 'a', limit: 10 },

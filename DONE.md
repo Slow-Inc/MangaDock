@@ -3,6 +3,21 @@
 
 ---
 
+## #865 A failed landing row no longer sits empty for 20 minutes (2026-10-21)
+
+**What:** a landing row whose MangaDex call failed (now including the 6 s timeout from #861) comes back as an empty row —
+`fetchMangaWithParamsPaged` swallows the error — so the landing cached that empty row for the full `CACHE_TTL_MS`. Now an
+empty row is the failure signal: it is filled from the stale landing's row with the same id, and a partial landing is
+cached for `PARTIAL_LANDING_TTL_MS` (2 min) so the next request re-fetches it. A complete landing still gets the full TTL;
+all-empty still goes to `serveStale` as before.
+
+**Validated:** `landing.service.spec.ts` red → green (partial: fresh row kept, failed row filled from stale, TTL < 5 min;
+complete: TTL ≥ 20 min). `src/books` jest 339 pass; eslint 0 (as main). Rebuilt backend: landing 200 (4 rows × 20) — served
+from cache, so the miss path is covered by the specs only; the landing cache was deliberately not wiped (its stale copy is
+the fallback this relies on).
+
+---
+
 ## #856 Skip link past the Navbar (2026-10-21)
 
 **What:** no page had a way past the Navbar for keyboard users (WCAG 2.4.1). `components/SkipLink.tsx` renders
