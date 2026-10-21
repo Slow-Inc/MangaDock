@@ -55,6 +55,7 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[project-dashboard-mit-live]] — Dashboard↔MIT live wiring — OAuth, ports, env, auth model, launch/test gotchas (ADR 019); dashboardv2 = canonical ต่อไป
 - [[project-gal-yome-en-benchmark]] — Gal Yome no Himitsu มี 2 version (ไทย+EN) — ต้องเลือก EN version ก่อน benchmark EN→ไทย
 - [[project-mit-worker-restart-gotcha]] — restart MIT --start-instance worker บน Windows ต้อง kill by PORT OWNER ทั้ง 5003+5004 (process ชื่อ python3.11.exe ไม่ใช่ python.exe)
+- [[project-gateway-thinking-model]] — gateway (qwen3.8-27b-fp8) เป็น thinking model ใช้ ~154 token คิดก่อนตอบ: max_tokens ต่ำกว่า ~256 = คำตอบว่าง; ห้ามปิด thinking (คุณภาพตก)
 - [[project-mit-opencv-threads-ultralytics]] — `import ultralytics` leaves OpenCV single-threaded for the whole MIT process; YOLO loaders restore it (`restore_opencv_threads`) — detection −55 %, identical renders (#872)
 
 
