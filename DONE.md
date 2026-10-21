@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 7 — the SFX rescue was a silent no-op on a thinking model (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **#881** — `vlm_localize_sfx` sent `max_tokens: 24` with no thinking lever. The configured gateway model (`qwen3.8-27b-fp8`) spends ~154 tokens on reasoning before any content, so every rescue truncated (`content=''`, `finish_reason='length'`), which the pipeline reads as "no SFX here"; after three in a row the `#693` breaker paused the rescue for 300 s. Measured on the Boku crop: 24 and 128 truncate, 192 completes, 256/384/512 identical. Thinking must stay on — with `enable_thinking=false` the same crop reads as junk (`ซึ่่ง`). Now `SFX_MAX_TOKENS = 512`; the doctor's `vlm-send` thresholds were re-measured for the configured model (128 truncating / 192 completing; were 2048/4096 from qwen3.6-35b-a3b).
+- **Gateway E2E, same crop:** `vlm_localize_sfx -> 'เฮ้อ'` in 2.3 s, where it returned `''` before.
+- **#882 filed, not fixed** — the `Siiigh` → `ซีไอไอ` junk on Boku p0 is translator-side: `should_rescue_sfx` correctly refuses ASCII-readable text, so the line-OCR read went to the translator as dialogue and was transliterated letter by letter. Needs a discriminator (the `#796/#797` class).
+- **Gate:** torch-free suite 823 passed / 3 skipped (one subprocess self-test deselected — it inherits `PYTHONPATH` in the local torch-absent simulation only).
+
 ## MIT quality loop, round 6 — page edge, English kept, neighbour bbox (2026-10-21)
 
 Branch `feat/mit-quality-loop` (PR #794). Every fix replayed through the doctor; the before/after arms differ only by code.
