@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 6 — page edge, English kept, neighbour bbox (2026-10-21)
+
+Branch `feat/mit-quality-loop` (PR #794). Every fix replayed through the doctor; the before/after arms differ only by code.
+- **#873 page edge** — `clean_layout` centred the Thai block on the source region; wider than the source, it crossed the page edge (Otome p0 narration rendered from x = -7, first letters cut). The block's centre is now clamped to the page — image bounds on a full-page render, `region.page_bounds` in crop coordinates on a patch. 1 of 250 regions re-laid; spill/overlap unchanged.
+- **#857 follow-ups** — the mostly-ASCII Latin guard counts **letters, not punctuation** (`피 WONDER WHY..` stays English); look-alike katakana inside an English word (`＼` read for `I`) map back to Latin before translating. Across every recording exactly 4 texts change, all correct (`STRANGELY…` -> `แปลกประหลาด…`).
+- **#876 neighbour bbox** — `_neighbor_territories` clamped the polygon-interior fit box against the next balloon's **bbox**, whose balloon overlaps this one though the polygons never touch; the fit box was left 14 px wide, so Horimiya p0 `REJECT-ED!` rendered 13 px across the edge. When the fit box is the region's own polygon interior, neighbours now count by their **text box**. r2 13 -> 20 px, `render` FAIL gone, corpus 3 **11/12 pages byte-identical**.
+- **Benchmarks:** `2026-10-21-{873-page-edge,857-english-kept,857-strangely,876-neighbour-bbox}.*`.
+- **Open, not addressed:** doctor `merge` FAIL/WARN on Horimiya p0 r18/19/22/23 shows in both arms; two Tsuki replay pages fail identically under every tag (`detect` / `merge`) — pre-existing. Replay re-translates any text the recording never saw (live LLM), so a text-only diff in an A/B is sampling, not code.
+
 ## MIT quality loop, round 5 — dropped English, tall-balloon columns, page font size (2026-10-21)
 
 Branch `feat/mit-quality-loop` (PR #794). Every fix replayed on both EN corpora + the JP page.
