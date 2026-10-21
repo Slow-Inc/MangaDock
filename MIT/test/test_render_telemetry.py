@@ -405,7 +405,7 @@ def _echo_stubs(monkeypatch):
                         lambda region, bubble_box, shape: (60.0, 40.0, (50.0, 50.0)))
     monkeypatch.setattr(rend, '_bubble_fit_font_size', lambda region, wh, ratio: 42)
 
-    def laid(region, shape, fmin, fmax, page_shape=None, shrink_to_fit=False):
+    def laid(region, shape, fmin, fmax, page_shape=None, shrink_to_fit=False, **kw):
         tall = getattr(region, 'tall', False) and not shrink_to_fit
         return (fmax - 6, 50.0, 30.0) if shrink_to_fit else (fmax, 50.0, 90.0 if tall else 30.0)
     monkeypatch.setattr(rend, '_clean_layout_dst', laid)
@@ -533,3 +533,28 @@ def test_a_tall_balloon_keeps_the_letterers_column_width_too():
                                      font_size_max=20, clean_layout=True)
     x1, _, x2, _ = r.render_dst_box
     assert r.render_branch == 'bubble_fit_tall' and 616 + 4 <= x1 and x2 <= 769 - 4, r.render_dst_box
+
+
+def test_page_size_review_fixes_851(monkeypatch):
+    """Review of d5fda3a3: (a) a page-size font never drops below font_size_minimum; (b) an SFX region
+    gets no page size; (c) clean layout does not grow past the page size toward a bigger own size."""
+    lines = [_in_balloon(100 + 70 * k, s) for k, s in enumerate((30, 30, 50))]
+    tiny = _in_balloon(400, 10)
+    sfx = _in_balloon(500, 30, 'ตูม', from_sfx_detection=True)
+    rend.annotate_page_font(lines + [tiny, sfx], 0.5)
+    assert sfx.page_font is None
+    _echo_stubs(monkeypatch)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [tiny], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=0.5)
+    assert tiny.render_font_px >= 8                                # round(0.5 x 10) = 5 -> the minimum
+
+
+def test_clean_layout_does_not_grow_past_the_page_size_851():
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    from types import SimpleNamespace
+    r = SimpleNamespace(translation='สวัสดี', target_lang='THA', font_size=50, xyxy=(0.0, 0.0, 400.0, 300.0))
+    assert rend._clean_layout_dst(r, (800, 800, 3), 8, 30, grow=False)[0] == 30
+    assert rend._clean_layout_dst(r, (800, 800, 3), 8, 30)[0] == 50     # default unchanged

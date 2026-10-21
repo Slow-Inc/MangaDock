@@ -53,3 +53,13 @@ def test_ocr_noise_glyph_tokens_are_stripped_from_latin_text_857():
     # kept: Latin letters with accents, punctuation, hearts, and anything not mostly Latin
     for keep in ('CAFÉ… ♡', 'DON’T — STOP!', '★ BONUS ★', 'ข้อความไทย OK', '平ク ザワ'):
         assert strip_noise_glyphs(keep) == keep
+
+
+def test_noise_strip_keeps_real_symbols_and_names_857():
+    """Review of 8ec816dd: the allow-list stripped real text — '€', '×', '→', '©', '½', a kanji name.
+    Only known OCR-noise classes (Hangul, box drawing, geometric shapes) are stripped."""
+    from manga_translator.translation_quality import strip_noise_glyphs
+    for keep in ('100 € ONLY!!', '3 × 4 = 12', 'GO A → B', '© 2024 SHUEISHA', 'ONE ½ CUP',
+                 'MR. 田中 IS HERE NOW OK', 'WOW 😂 LOL'):
+        assert strip_noise_glyphs(keep) == keep, keep
+    assert strip_noise_glyphs('A\n피 WONDER') == 'A WONDER'

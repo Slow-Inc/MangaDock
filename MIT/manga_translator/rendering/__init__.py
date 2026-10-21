@@ -262,7 +262,7 @@ def annotate_page_font(regions, scale: float) -> None:
     median = srcs[n // 2] if n % 2 else (srcs[n // 2 - 1] + srcs[n // 2]) / 2.0
     for r in regions:
         own = float(getattr(r, 'font_size', 0) or 0)
-        if own > 2.0 * median:
+        if own > 2.0 * median or _is_sfx_region(r):
             r.page_font = None
             continue
         base = own if 0 < own < 0.5 * median else median
@@ -299,7 +299,7 @@ _LETTER_W_FILL = 0.9
 
 
 def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None,
-                      shrink_to_fit: bool = False):
+                      shrink_to_fit: bool = False, grow: bool = True):
     """Render-layout rework: lay the translated text out as an upright horizontal block
     at a *small absolute* font, wrapped to a compact width, ready to be placed on the
     region's centre. Returns ``(font_size, block_w, block_h)`` — or ``None`` when the
@@ -396,7 +396,8 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # height). Falls back to the flat size (current behavior) when nothing larger
     # fits — a short/wide caption keeps the flat look unchanged.
     orig_fs = int(getattr(region, 'font_size', 0) or 0)
-    hi = min(max(orig_fs, clean_fs), 120)
+    # grow=False (#851 page size): the page's size is the ceiling, not a floor to grow from
+    hi = min(max(orig_fs, clean_fs), 120) if grow else clean_fs
     fs = hi
     while fs > clean_fs:
         bw, bh = _layout_at(fs)
@@ -514,7 +515,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # its neighbours and overlapped them when grown (A/B at 1.4: 10 new pairs)
         _page_sized = bool(font_src_scale and font_src_scale > 0 and getattr(region, 'page_font', None)
                            and getattr(region, 'bubble_box', None) is not None)
-        fmax_i = region.page_font if _page_sized else font_size_max
+        fmax_i = max(font_size_minimum, region.page_font) if _page_sized else font_size_max
         # #436: a deduped (blanked) duplicate renders nothing — skip layout entirely
         # (the legacy path would choke on it); keep a degenerate dst so lists align.
         if not (region.translation and region.translation.strip()):
@@ -573,7 +574,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                     xyxy=(acx - fit_w / 2.0, acy - fit_h / 2.0,
                           acx + fit_w / 2.0, acy + fit_h / 2.0))
                 _laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum,
-                                          fmax_i, page_shape, shrink_to_fit=True)
+                                          fmax_i, page_shape, shrink_to_fit=True, grow=not _page_sized)
                 if _laid is not None:
                     _fs, _bw, _bh = _laid
                     region.font_size = int(_fs)
@@ -642,7 +643,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             continue
 
         if clean_layout and not _sfx_display and region.translation and region.translation.strip():
-            laid = _clean_layout_dst(region, img.shape, font_size_minimum, fmax_i, page_shape)
+            laid = _clean_layout_dst(region, img.shape, font_size_minimum, fmax_i, page_shape, grow=not _page_sized)
             # #832: a region in a balloon it does not fill (EN words stacked in a narrow column)
             # lands here, and its column floored at the widest Thai word can be wider than the
             # balloon. Lay it out again on the balloon interior, as bubble_fit_tall does (#816).
@@ -657,7 +658,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                         font_size=getattr(region, 'font_size', 0),
                         xyxy=(_acx - _fw / 2.0, _acy - _fh / 2.0, _acx + _fw / 2.0, _acy + _fh / 2.0))
                     laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum, fmax_i,
-                                             page_shape, shrink_to_fit=True) or laid
+                                             page_shape, shrink_to_fit=True, grow=not _page_sized) or laid
             if laid is not None:
                 clean_fs, block_w, block_h = laid
                 x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)
@@ -681,7 +682,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                                 font_size=getattr(region, 'font_size', 0),
                                 xyxy=(free[0], cy - _h / 2.0, free[2], cy + _h / 2.0))
                             _relaid = _clean_layout_dst(_proxy, img.shape, font_size_minimum,
-                                                        fmax_i, page_shape, shrink_to_fit=True)
+                                                        fmax_i, page_shape, shrink_to_fit=True, grow=not _page_sized)
                             if _relaid is not None and _relaid[1] <= _free_w * 1.05:
                                 clean_fs, block_w, block_h = _relaid
                         cx, cy = _place_off_neighbours(cx, cy, block_w, block_h, territories, own)
