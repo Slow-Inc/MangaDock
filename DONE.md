@@ -11,7 +11,9 @@ dot, and the row's margins absorb the taller buttons so nothing moves. Dot pitch
 
 **Validated:** production build, before/after measured in headless Chromium: dot top unchanged (390: 593 px, 1440: 554 px),
 desktop first dot still flush with the "อ่านเลย" button (left 560 px); buttons 24 × 24; after tapping dot 4 the pill sits
-exactly on it (left 155 = dot 155 at 390; 632 = 632 at 1440); keyboard focus ring is a circle around the dot. axe
+exactly on it (left 155 = dot 155 at 390; 632 = 632 at 1440); keyboard focus ring is a circle around the dot. Review found
+the desktop info column's `overflow-hidden` clipped the left 8 px of dot 1 (hit test and ring); the column's clip box now
+reaches 8 px further left (`-ml-2 pl-2`) — dot 1 hit-tests across all 24 px, title still at left 560. axe
 `target-size` → 0 nodes on all 10 routes (was 10 nodes on `/` and `/book/[id]`). tsc 0.
 
 ---

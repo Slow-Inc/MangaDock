@@ -278,7 +278,8 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
           </div>
 
           {/* Info */}
-          <div className={`flex min-w-0 flex-1 flex-col justify-center overflow-hidden py-4 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
+          {/* -ml-2 pl-2: the clip box reaches 8 px left of the text so dot 1's 24 px target and ring are not cut (#848) */}
+          <div className={`-ml-2 flex min-w-0 flex-1 flex-col justify-center overflow-hidden py-4 pl-2 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
             <p className="mb-3 text-xs font-semibold text-accent">Top 10 หนังสือที่น่าอ่านวันนี้</p>
             <h1 className="text-4xl font-black uppercase leading-tight text-ink text-balance lg:text-5xl xl:text-6xl">
               {titleMain}
