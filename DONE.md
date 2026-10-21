@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 5 — dropped English, tall-balloon columns, page font size (2026-10-21)
+
+Branch `feat/mit-quality-loop` (PR #794). Every fix replayed on both EN corpora + the JP page.
+- **#857 English kept** — `TextBlock.source_lang` is a lazy langid guess (never empty), so `_detect_region_source_lang` returned it before its mostly-ASCII Latin guard ever ran; English with one OCR-noise glyph (`피 WONDER WHY..`, `… ○`, `♡`) was guessed KO/MT and silently dropped. Guard first; `strip_noise_glyphs` removes non-Latin-only tokens before translating; the filter's drops now reach the payload `dropped` list. Regions 253 → 257.
+- **#864 tall balloons** — `squeeze_width` filled the whole interior height, turning short wide lettering into one word per line. The interior proxy carries the source footprint: squeeze toward the source height, start at 0.9 × the source width (both steps forced by replay findings). 24 regions re-laid, spill/overlap/edge contact unchanged.
+- **#851 page font size — opt-in** `font_src_scale`: page dialogue size = scale × median source size, balloon text only, credits from their own size, untagged SFX keep the absolute font. At 1.4: balloon font spread within a page 1.55× → 1.33×, Thai/source size 0.55 → 0.77, but overlap +4 / spill +1 → stays opt-in, awaiting the user's call on the scale.
+- **Review fixes** (`775c864b`): dodge at the re-laid size; one-sided second dodge; TNC floor for compounds TNC lacks.
+- **Tooling** — doctor JSON records `font_src_px`. Lessons: a probe on the full-page path misses `/patches`-only filters (run the doctor with INFO logs); falsify each hypothesis before fixing (two were wrong here).
+
 ## MIT quality loop, round 4 — second corpus: narrow balloons, merged balloons, numbers, segmenter ties (2026-10-21)
 
 Branch `feat/mit-quality-loop` (PR #794). A second EN corpus (11 mid-chapter pages, 6 new series) found new defect classes; each fix replays both corpora (27 pages) and lands only with its benchmark.
