@@ -61,3 +61,15 @@ def test_ocr_noise_glyphs_are_stripped_before_translation_857():
     regions = [SimpleNamespace(text='피 WONDER WHY..'), SimpleNamespace(text='平ク ザワ')]
     assert _strip(regions) == ['WONDER WHY..', '平ク ザワ']
     assert _strip([SimpleNamespace(text='피 WONDER WHY..')], source='JPN') == ['피 WONDER WHY..']
+
+
+def test_regions_the_filter_drops_are_recorded_for_the_payload_857():
+    """#857: the filter dropped two English balloons and the doctor's `dropped` list stayed empty —
+    the bug was invisible. Its drops now go to ctx.dropped_regions with the detected language."""
+    self = object.__new__(MangaTranslator)
+    config = SimpleNamespace(translator=SimpleNamespace(source_lang_only=True, source_lang='ENG'))
+    keep = SimpleNamespace(text='HELLO THERE', sfx_rescued=False)
+    drop = SimpleNamespace(text='ข้อความภาษาไทยล้วนยาวพอให้ตรวจจับได้', sfx_rescued=False)
+    ctx = SimpleNamespace(text_regions=[keep, drop])
+    assert MangaTranslator._apply_source_lang_filter(self, ctx, config) == [keep]
+    assert [(r, why[:16]) for r, why in ctx.dropped_regions] == [(drop, 'source language ')]

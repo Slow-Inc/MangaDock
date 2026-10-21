@@ -1359,6 +1359,18 @@ class MangaTranslator:
         except Exception:
             return 'UNKNOWN'
 
+    def _apply_source_lang_filter(self, ctx, config: Config) -> List[Any]:
+        """Run the source-language filter on ctx.text_regions and record what it drops in
+        ctx.dropped_regions, so the payload (and the doctor) see it — #857's two English balloons
+        were dropped here with no trace."""
+        kept = self._filter_regions_by_source_lang(ctx.text_regions, config)
+        kept_ids = {id(r) for r in kept}
+        dropped = [r for r in ctx.text_regions if id(r) not in kept_ids]
+        if dropped:
+            ctx.dropped_regions = (getattr(ctx, 'dropped_regions', None) or [])
+            ctx.dropped_regions.extend((r, 'source language filter') for r in dropped)
+        return kept
+
     _LATIN_SOURCE_LANGS = {'ENG', 'ESP', 'FRA', 'DEU', 'ITA', 'PLK', 'PTB', 'ROM', 'IND', 'FIL', 'VIN', 'CSY', 'NLD', 'HUN', 'TRK'}
 
     def _filter_regions_by_source_lang(self, regions: List[Any], config: Config) -> List[Any]:
@@ -1572,7 +1584,7 @@ class MangaTranslator:
         if not ctx.text_regions or ctx.text_regions == 'cancel':
             return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 
-        regions = self._filter_regions_by_source_lang(ctx.text_regions, config)
+        regions = self._apply_source_lang_filter(ctx, config)
         if not regions:
             return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 
