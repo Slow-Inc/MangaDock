@@ -513,8 +513,9 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # the absolute font clean layout starts from: the page's dialogue size (#851) for text in a
         # balloon, else font_size_max — balloon-less text (contents lists, signs) sits tight against
         # its neighbours and overlapped them when grown (A/B at 1.4: 10 new pairs)
+        # ...and only for a balloon's sole occupant: two regions sharing one grew into each other
         _page_sized = bool(font_src_scale and font_src_scale > 0 and getattr(region, 'page_font', None)
-                           and getattr(region, 'bubble_box', None) is not None)
+                           and getattr(region, 'bubble_box', None) is not None and occupancy[i] == 1)
         fmax_i = max(font_size_minimum, region.page_font) if _page_sized else font_size_max
         # #436: a deduped (blanked) duplicate renders nothing — skip layout entirely
         # (the legacy path would choke on it); keep a degenerate dst so lists align.
@@ -643,22 +644,34 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             continue
 
         if clean_layout and not _sfx_display and region.translation and region.translation.strip():
-            laid = _clean_layout_dst(region, img.shape, font_size_minimum, fmax_i, page_shape, grow=not _page_sized)
-            # #832: a region in a balloon it does not fill (EN words stacked in a narrow column)
-            # lands here, and its column floored at the widest Thai word can be wider than the
-            # balloon. Lay it out again on the balloon interior, as bubble_fit_tall does (#816).
             _bb = getattr(region, 'bubble_box', None)
-            if laid is not None and _bb is not None and region.horizontal:
-                _fw, _fh, (_acx, _acy) = _bubble_interior_box(region, _bb, img.shape)
-                # with the page size (#851) a block can also outgrow the interior's height (Akuyaku p1)
-                if laid[1] > _fw * 1.05 or (_page_sized and laid[2] > _fh * 1.05):
-                    from types import SimpleNamespace
-                    _proxy = SimpleNamespace(
-                        translation=region.translation, target_lang=getattr(region, 'target_lang', 'en_US'),
-                        font_size=getattr(region, 'font_size', 0),
-                        xyxy=(_acx - _fw / 2.0, _acy - _fh / 2.0, _acx + _fw / 2.0, _acy + _fh / 2.0))
-                    laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum, fmax_i,
-                                             page_shape, shrink_to_fit=True, grow=not _page_sized) or laid
+
+            def _clean_laid(fmax, page_sized):
+                laid = _clean_layout_dst(region, img.shape, font_size_minimum, fmax, page_shape,
+                                         grow=not page_sized)
+                # #832: a region in a balloon it does not fill (EN words stacked in a narrow column)
+                # lands here, and its column floored at the widest Thai word can be wider than the
+                # balloon. Lay it out again on the balloon interior, as bubble_fit_tall does (#816).
+                if laid is not None and _bb is not None and region.horizontal:
+                    _fw, _fh, (_acx, _acy) = _bubble_interior_box(region, _bb, img.shape)
+                    # with the page size (#851) a block can also outgrow the interior's height
+                    if laid[1] > _fw * 1.05 or (page_sized and laid[2] > _fh * 1.05):
+                        from types import SimpleNamespace
+                        _proxy = SimpleNamespace(
+                            translation=region.translation, target_lang=getattr(region, 'target_lang', 'en_US'),
+                            font_size=getattr(region, 'font_size', 0),
+                            xyxy=(_acx - _fw / 2.0, _acy - _fh / 2.0, _acx + _fw / 2.0, _acy + _fh / 2.0))
+                        laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum, fmax,
+                                                 page_shape, shrink_to_fit=True, grow=not page_sized) or laid
+                return laid
+
+            laid = _clean_laid(fmax_i, _page_sized)
+            # #851: a page-sized block that does not fit its balloon falls back to the absolute font
+            # (Kage p1: a tall narration block outgrew its box) — never worse than without the knob
+            if _page_sized and laid is not None and (laid[1] > (_bb[2] - _bb[0]) * 0.95
+                                                     or laid[2] > (_bb[3] - _bb[1]) * 0.95):
+                _page_sized, fmax_i = False, font_size_max
+                laid = _clean_laid(fmax_i, False)
             if laid is not None:
                 clean_fs, block_w, block_h = laid
                 x1f, y1f, x2f, y2f = (float(v) for v in region.xyxy)

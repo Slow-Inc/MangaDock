@@ -413,7 +413,8 @@ def _echo_stubs(monkeypatch):
 
 def _in_balloon(y, font, text='เฮ้', **kw):
     # a narrow source column in a wider balloon -> the clean_layout branch
-    return FakeRegion(horizontal=True, translation=text, xyxy=(300, y, 340, y + 40),
+    kw.setdefault('horizontal', True)
+    return FakeRegion(translation=text, xyxy=(300, y, 340, y + 40),
                       bubble_box=(290, y - 10, 400, y + 50), font_size=font, **kw)
 
 
@@ -558,3 +559,19 @@ def test_clean_layout_does_not_grow_past_the_page_size_851():
     r = SimpleNamespace(translation='สวัสดี', target_lang='THA', font_size=50, xyxy=(0.0, 0.0, 400.0, 300.0))
     assert rend._clean_layout_dst(r, (800, 800, 3), 8, 30, grow=False)[0] == 30
     assert rend._clean_layout_dst(r, (800, 800, 3), 8, 30)[0] == 50     # default unchanged
+
+
+def test_page_size_applies_only_where_it_fits_851(monkeypatch):
+    """A/B at 1.4 (2026-10-21): two regions sharing one balloon both grew to the page size and
+    collided (Akuyaku p1, Iruma p1), and a tall narration block outgrew its balloon (Kage p1). The
+    page size goes only to a balloon's sole occupant, and a page-sized block that does not fit its
+    balloon falls back to the absolute font — never worse than without the knob."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    shared = [_in_balloon(600, 18, 'หนึ่ง'), _in_balloon(600, 18, 'สอง')]       # same bubble_box
+    tall = _in_balloon(500, 18, 'ยาวมาก', tall=True, horizontal=False)          # no #832 re-lay
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole] + shared + [tall], None, 0, 8,
+                                     bubble_fit=True, font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert [r.render_font_px for r in shared] == [20, 20]
+    assert tall.render_font_px == 20 and lines[0].render_font_px == 25
