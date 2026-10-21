@@ -1,0 +1,15 @@
+{
+  "payload": "MangaDock test payment 100.00 / ทดสอบ",
+  "side": 41,
+  "hashes": [
+    "40404622e04c70e83b67a97b2a4c46bb35dd0b11c1e639b9e455c0739f197349",
+    "e8986489e8386711e02beb0c3b5b8388a8412f47dad899e738eeb78e8174653e",
+    "f1f126a111f1e12772c0499c1ef2ea854f408f84ea78e0a4fc0a23f9522dbddf",
+    "b48eed819f61728a9871cfb8569fa1b02f72d488ca91bd9d8380bbaef5dada7b",
+    "cdf927aeb1b3bb3281ceccde16d6310fa1af20f9aea3fe436f4b8001b427ebda",
+    "4273ad926c6b341cefbb200cd35844fc1b1a68da7eed3fbac46bc7fd33bfab2a",
+    "381788bb45f5df369123d1b73ab51d708cece668a9cd57ba6507af380a6da19d",
+    "690116ff4c144c6112e531f780c7b89b2584f9e6f0faed738ad78477463a3419"
+  ],
+  "provenance": "Python qrcode 8.2, byte-mode UTF-8, ECC M, quiet zone 4, all eight masks"
+}
