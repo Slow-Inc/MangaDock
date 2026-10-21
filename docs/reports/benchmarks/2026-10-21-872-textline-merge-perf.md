@@ -78,7 +78,15 @@ OpenCV's default thread count right after the import.
 | rendering | 625 ms | **395 ms (−37 %)** |
 | wall | 4.85 s | **3.92 s (−19 %)** |
 
+## Update — OCR device syncs (`eb063203`)
+
+The 48px OCR's per-character loop read the beam search's GPU tensors one value at a time
+(`dictionary[chid]`, `.item()`, `int(c * 255)` — several device syncs per character). Each region's
+result is now brought to the CPU once; the float32 colour arithmetic is the same on either device.
+No unit test can tell the devices apart without the model — the evidence is the render probe (texts and
+colours both reach the render): byte-identical 8/8; OCR 1472 → 1283 ms (−13 %), wall 3.89 → 3.70 s.
+
 ## Round total (warm, 8 pages, LLM excluded)
 
-`7d804281` → `2351fb15`: wall **5.84 → 3.92 s/page (−33 %)**, every step byte-identical. On top of #822
-(6.30 → 4.02 s on the first corpus), the non-LLM pipeline is now about 40 % of where it started.
+`7d804281` → `eb063203`: wall **5.84 → 3.70 s/page (−37 %)**, every step byte-identical. On top of #822
+(6.30 → 4.02 s on the first corpus), the non-LLM pipeline now runs in well under two thirds of its start.
