@@ -483,3 +483,18 @@ def test_glyph_bitmap_copy_matches_freetypes_buffer_822():
             assert len(got) == len(want) and np.array_equal(np.asarray(got, dtype=np.uint8),
                                                             np.asarray(want, dtype=np.uint8)), (ch, size)
             assert isinstance(got, np.ndarray)
+
+
+def test_a_tie_between_two_dictionary_splits_goes_to_the_common_words():
+    """Mieruko p0 (2026-10-21): 'นาทีละ' wrapped as 'นา / ทีละ'. newmm splits a compound two ways
+    into two dictionary words and takes the shorter first word; here that cuts 'นาที'. Of the
+    splits whose parts are both known words, the more frequent pair (TNC) wins — but a pair led by
+    a bound prefix ('ผู้|ทรงพลัง') is left to the prefix glue."""
+    if not _HAS_PYTHAINLP:
+        return
+    for text, whole in [('ดูดวง นาทีละ 5,000 เยน', 'นาที'), ('ทหารโจมตีเมือง', 'โจมตี'),
+                        ('เขาบอกว่าไม่', 'บอก'), ('ฉันตัดสินใจมาที่นี่', 'ตัดสินใจ')]:
+        pieces = [p.strip() for p in _insert_thai_word_breaks(text).split(_ZWSP)]
+        assert whole in pieces, (text, pieces)
+    pieces = _insert_thai_word_breaks('เขาเป็นผู้ทรงพลัง').split(_ZWSP)
+    assert 'ผู้ทรงพลัง' in pieces, pieces

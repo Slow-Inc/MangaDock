@@ -104,7 +104,7 @@ def _insert_thai_word_breaks(text: str) -> str:
                     words[-1] += ' '
             else:
                 words.append(t)
-        return _ZWSP.join(_glue_thai_tokens(words))
+        return _ZWSP.join(_glue_thai_tokens(_retie_thai_pairs(words)))
     except Exception:
         return text
 
@@ -153,6 +153,46 @@ def _is_thai_word(token: str) -> bool:
         return token in word_dict_trie()
     except Exception:
         return True
+
+
+@functools.lru_cache(maxsize=1)
+def _thai_word_freqs() -> dict:
+    try:
+        from pythainlp.corpus import tnc
+        return dict(tnc.word_freqs())
+    except Exception:
+        return {}
+
+
+def _retie_thai_pairs(tokens: List[str]) -> List[str]:
+    """Re-split each pair of adjacent words that newmm cut at a tie: when their join also splits
+    into two other dictionary words that are both more common together (TNC frequency product),
+    take that split — 'นา|ทีละ' -> 'นาที|ละ', 'บอ|กว่า' -> 'บอก|ว่า' (Mieruko p0, 2026-10-21).
+    newmm breaks such ties toward the shorter first word. Only parts both seen in TNC count (a
+    compound it lacks would always lose), and a pair led by a bound prefix ('ผู้|ทรงพลัง') is left
+    to the prefix glue. A kept trailing space stays at the end of the pair."""
+    freq = _thai_word_freqs()
+    if not freq:
+        return tokens
+    from pythainlp.tokenize.core import word_dict_trie
+    trie = word_dict_trie()
+    out = list(tokens)
+    for i in range(len(out) - 1):
+        a, b = out[i], out[i + 1]
+        core = b.rstrip(' ')
+        if a != a.strip() or not core.strip() or a in _THAI_PREFIXES or not _THAI_RE.search(a + core):
+            continue
+        word = a + core
+        best = (freq.get(a, 0) + 1) * (freq.get(core, 0) + 1), None
+        for k in range(1, len(word)):
+            x, y = word[:k], word[k:]
+            if k != len(a) and freq.get(x) and freq.get(y) and x in trie and y in trie:
+                score = (freq[x] + 1) * (freq[y] + 1)
+                if score > best[0]:
+                    best = score, k
+        if best[1] is not None:
+            out[i], out[i + 1] = word[:best[1]], word[best[1]:] + b[len(core):]
+    return out
 
 
 def _glue_thai_tokens(tokens: List[str]) -> List[str]:
