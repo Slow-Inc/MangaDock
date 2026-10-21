@@ -4,6 +4,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   Modal,
@@ -186,6 +187,7 @@ export function NativeReaderComments({
   onAccount(): void;
   onClose(): void;
 }) {
+  const insets = useSafeAreaInsets();
   const { comments } = useSyncExternalStore(social.subscribe, social.snapshot);
   const session = useSyncExternalStore(
     runtime.session.subscribe,
@@ -200,7 +202,16 @@ export function NativeReaderComments({
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.scrim}>
-        <View style={styles.sheet}>
+        <View
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: 20 + insets.bottom,
+              paddingLeft: 20 + insets.left,
+              paddingRight: 20 + insets.right,
+            },
+          ]}
+        >
           <View style={styles.row}>
             <Text style={styles.heading}>
               ความคิดเห็น · หน้า {context.pageNumber}

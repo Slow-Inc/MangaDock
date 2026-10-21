@@ -4,6 +4,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   AppState,
@@ -34,6 +35,7 @@ export function NativeAccountActivity({
   onDestination(destination: NotificationDestination): boolean;
   onBalanceChanged?(): void;
 }) {
+  const insets = useSafeAreaInsets();
   const state = useSyncExternalStore(activity.subscribe, activity.snapshot);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null);
@@ -120,7 +122,16 @@ export function NativeAccountActivity({
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.scrim}>
-        <View style={styles.sheet}>
+        <View
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: 20 + insets.bottom,
+              paddingLeft: 20 + insets.left,
+              paddingRight: 20 + insets.right,
+            },
+          ]}
+        >
           <View style={styles.row}>
             <Text style={styles.heading}>{labels[screen]}</Text>
             {button("ปิด", onClose)}

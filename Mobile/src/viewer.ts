@@ -30,6 +30,11 @@ export function createViewer(pageCount: number, initial?: ViewerState) {
       if (current) { scrollRequest = null; if (current.index !== state.pageIndex) publish({ ...state, pageIndex: bounded(current.index) }); }
     },
     next() { goTo(state.pageIndex + (state.mode === 'double' ? 2 : 1)); },
+    swipe(dx: number, dy: number) {
+      if (state.mode === 'strip' || state.zoom > 1 || Math.abs(dx) < 50 || Math.abs(dx) <= Math.abs(dy) * 1.5) return;
+      const forward = state.direction === 'ltr' ? dx < 0 : dx > 0;
+      goTo(state.pageIndex + (forward ? 1 : -1) * (state.mode === 'double' ? 2 : 1));
+    },
     previous() { goTo(state.pageIndex - (state.mode === 'double' ? 2 : 1)); },
     setMode(mode: ViewerState['mode']) { scrollRequest = mode === 'strip' ? state.pageIndex : null; publish({ ...state, mode }); },
     setDirection(direction: ViewerState['direction']) { publish({ ...state, direction }); },

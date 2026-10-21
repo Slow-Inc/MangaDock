@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createViewer } from '../src/viewer.ts';
+test('paged swipes respect direction, spread size, bounds, vertical intent and zoom', () => {
+  const viewer = createViewer(6);
+  viewer.setMode('single'); viewer.swipe(-90, 5);
+  assert.equal(viewer.snapshot().pageIndex, 1);
+  viewer.swipe(90, 5); assert.equal(viewer.snapshot().pageIndex, 0);
+  viewer.setDirection('rtl'); viewer.swipe(90, 5); assert.equal(viewer.snapshot().pageIndex, 1);
+  viewer.swipe(10, 90); viewer.swipe(10, 0); assert.equal(viewer.snapshot().pageIndex, 1);
+  viewer.setZoom(2); viewer.swipe(90, 0); assert.equal(viewer.snapshot().pageIndex, 1);
+  viewer.setZoom(1); viewer.setMode('double'); viewer.swipe(90, 0);
+  assert.equal(viewer.snapshot().pageIndex, 3);
+  viewer.setMode('strip'); viewer.swipe(90, 0); assert.equal(viewer.snapshot().pageIndex, 3);
+});
 
 test('native reader keeps canonical position across long-strip, RTL single and double-page modes', () => {
   const viewer = createViewer(5);

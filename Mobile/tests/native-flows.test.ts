@@ -12,6 +12,11 @@ const { NativeSessionView } = await import("../src/NativeSessionView.tsx");
 const { pickImages } = await import("../src/native-images.ts");
 const { NativeReadingView } = await import("../src/NativeReadingView.tsx");
 const { NativeReaderView } = await import("../src/NativeReaderView.tsx");
+const { NativeReaderComments } = await import("../src/NativeReadingSocial.tsx");
+const { NativeReviewSection } = await import("../src/NativeReadingSocial.tsx");
+const { NativeAccountActivity } =
+  await import("../src/NativeAccountActivity.tsx");
+const { createAccountActivity } = await import("../src/account-activity.ts");
 function setup(authOptions: Parameters<typeof fixture>[0] = {}) {
   const auth = fixture({
     externalFetch: async (input) =>
@@ -57,6 +62,133 @@ function button(ui: ReactTestRenderer, label: string) {
           .some((text) => text.children.join("") === label),
     )!;
 }
+test("empty required review data renders a retryable error instead of crashing the review section", async (t) => {
+  for (const emptyPart of ["summary", "list"]) {
+    const { runtime } = setup({
+      externalFetch: async (input) => {
+        const path = new URL(String(input)).pathname;
+        if (path.endsWith("/my")) return new Response(null);
+        const isSummary = path.endsWith("/summary");
+        if (isSummary === (emptyPart === "summary")) return new Response(null);
+        return Response.json(isSummary ? { averageRating: 0, count: 0 } : []);
+      },
+    });
+    await runtime.session.signIn(
+      "reader@example.test",
+      "correct-test-password",
+    );
+    const social = createReadingSocial(runtime);
+    let ui!: ReactTestRenderer;
+    t.after(async () => {
+      await act(async () => ui?.unmount());
+      social.dispose();
+      runtime.dispose();
+    });
+    await act(async () => {
+      ui = create(
+        React.createElement(NativeReviewSection, {
+          social,
+          runtime,
+          mangaId: "manga-1",
+          title: "Test",
+          onAccount() {},
+        }),
+      );
+    });
+    assert.match(social.snapshot().reviews.error ?? "", /ข้อมูล.*ไม่ถูกต้อง/);
+    assert.ok(button(ui, "ลองใหม่"));
+    assert.deepEqual(social.snapshot().reviews.items, []);
+    assert.deepEqual(social.snapshot().reviews.summary, {
+      averageRating: 0,
+      count: 0,
+    });
+    await act(async () => ui.unmount());
+  }
+});
+
+test("long chapter lists remain bounded like web, show existing page counts and open the final chapter", async (t) => {
+  const opened: string[] = [];
+  const chapters = Array.from({ length: 83 }, (_, i) => ({
+    id: `chapter-${i + 1}`,
+    chapterNumber: String(i + 1),
+    title: `Chapter ${i + 1}`,
+    translatedLanguage: "en",
+    pageCount: i + 10,
+  }));
+  const { runtime } = setup({
+    externalFetch: async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path === "/books/landing")
+        return Response.json({ hero: null, rows: [], updatedAt: "" });
+      if (path.endsWith("/summary"))
+        return Response.json({ averageRating: 0, count: 0 });
+      if (path === "/books/manga/manga-1")
+        return Response.json({
+          id: "manga-1",
+          title: "Title",
+          authors: [],
+          genres: [],
+          covers: [],
+        });
+      if (path.endsWith("/chapters")) return Response.json(chapters);
+      if (path.includes("/books/chapters/") && path.endsWith("/pages")) {
+        opened.push(path);
+        return Response.json({ pages: ["/one.png"] });
+      }
+      return Response.json([]);
+    },
+  });
+  let ui!: ReactTestRenderer;
+  t.after(async () => {
+    await act(async () => ui?.unmount());
+    runtime.dispose();
+  });
+  await act(async () => {
+    ui = create(
+      React.createElement(NativeReadingView, {
+        runtime,
+        onAccount() {},
+        accountLabel: "Account",
+        initialDestination: { kind: "book", id: "manga-1" },
+      }),
+    );
+  });
+  const list = ui.root.findAll(
+    (node) =>
+      String(node.type) === "ScrollView" &&
+      node.props.accessibilityLabel === "รายการตอน",
+  )[0];
+  assert.ok(list, "chapter rows should have their own scrolling viewport");
+  assert.equal(list.props.nestedScrollEnabled, true);
+  const style = Object.assign({}, ...[list.props.style].flat(Infinity));
+  assert.ok(style.maxHeight > 0 && style.maxHeight <= 844 / 2);
+  const texts = () =>
+    ui.root
+      .findAll((node) => String(node.type) === "Text")
+      .map((node) => node.children.join(""));
+  assert.ok(texts().includes("ตอนทั้งหมด (83)"));
+  assert.ok(texts().includes("10 หน้า"));
+  assert.ok(texts().includes("92 หน้า"));
+  assert.equal(
+    list.findAll((node) => String(node.type) === "Pressable").length,
+    83,
+    "all chapters stay available inside the bounded list",
+  );
+  assert.equal(
+    list.findAll(
+      (node) =>
+        String(node.type) === "Text" &&
+        node.children.join("").includes("รีวิว"),
+    ).length,
+    0,
+    "reviews must stay outside the chapter viewport",
+  );
+  const last = list
+    .findAll((node) => String(node.type) === "Pressable")
+    .at(-1)!;
+  await act(async () => last.props.onPress());
+  assert.deepEqual(opened, ["/books/chapters/chapter-83/pages"]);
+});
 test("native selection returns the OS file without unsupported React Native binary Blob construction", async () => {
   const original = globalThis.Blob;
   const file = new original(["image-bytes"], { type: "image/png" });
@@ -238,4 +370,299 @@ test("native Reader next and previous keep the chosen chapter language", async (
   assert.equal(reader.snapshot().chapter?.id, "en-2");
   await act(async () => button(ui, "ตอนก่อน").props.onPress());
   assert.equal(reader.snapshot().chapter?.id, "en-1");
+});
+
+test("restoring page 40 uses exact rendered row geometry after a preceding image changes height", async (t) => {
+  const { runtime } = setup({
+    externalFetch: async () =>
+      Response.json({
+        pages: Array.from({ length: 50 }, (_, i) => `/page-${i}.png`),
+      }),
+  });
+  const reader = createReader(runtime),
+    social = createReadingSocial(runtime);
+  const chapter = {
+    id: "chapter-1",
+    chapterNumber: "1",
+    title: "One",
+    translatedLanguage: "en",
+  };
+  await reader.open("manga-1", chapter, {
+    pageIndex: 39,
+    mode: "strip",
+    direction: "ltr",
+    zoom: 1,
+  });
+  let ui!: ReactTestRenderer;
+  t.after(async () => {
+    await act(async () => ui?.unmount());
+    social.dispose();
+    reader.close();
+    runtime.dispose();
+  });
+  await act(async () => {
+    ui = create(
+      React.createElement(NativeReaderView, {
+        runtime,
+        reader,
+        social,
+        chapters: [chapter],
+        onAccount() {},
+        onChapter() {},
+      }),
+    );
+  });
+  const list = () => ui.root.find((node) => String(node.type) === "FlatList");
+  assert.equal(
+    typeof list().props.getItemLayout,
+    "function",
+    "unmeasured pages must not use averageItemLength to restore history",
+  );
+  let expectedOffset = 0;
+  for (let i = 0; i < 39; i++)
+    expectedOffset += list().props.getItemLayout(null, i).length;
+  assert.equal(list().props.getItemLayout(null, 39).offset, expectedOffset);
+  await act(async () => {
+    ui.root
+      .findAll(
+        (node) =>
+          String(node.type) === "Image" &&
+          node.props.accessibilityLabel === "หน้ามังงะ",
+      )[0]
+      .props.onLoad({ nativeEvent: { source: { width: 100, height: 800 } } });
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
+  assert.equal(list().props.getItemLayout(null, 0).length, 390 * 8);
+  assert.equal(reader.snapshot().position?.pageIndex, 39);
+  assert.ok(
+    native.scrolls.some(
+      (scroll) => scroll.offset === list().props.getItemLayout(null, 39).offset,
+    ),
+  );
+});
+
+test("comments and notifications reserve device safe-area space inside their modal sheets", async (t) => {
+  const { runtime } = setup();
+  const social = createReadingSocial(runtime),
+    activity = createAccountActivity(runtime);
+  native.insets = { top: 0, bottom: 48, left: 12, right: 8 };
+  let ui!: ReactTestRenderer;
+  t.after(async () => {
+    await act(async () => ui?.unmount());
+    native.insets = { top: 0, bottom: 0, left: 0, right: 0 };
+    social.dispose();
+    activity.dispose();
+    runtime.dispose();
+  });
+  const elements = [
+    React.createElement(NativeReaderComments, {
+      social,
+      runtime,
+      context: { mangaId: "A", chapterId: "one", pageNumber: 1 },
+      onAccount() {},
+      onClose() {},
+    }),
+    React.createElement(NativeAccountActivity, {
+      activity,
+      screen: "notifications",
+      onClose() {},
+      onDestination: () => false,
+    }),
+  ];
+  for (const element of elements) {
+    await act(async () => {
+      ui = create(element);
+    });
+    const sheet = ui.root
+      .find((node) => String(node.type) === "Modal")
+      .findAll((node) => String(node.type) === "View")[1];
+    const style = Object.assign({}, ...[sheet.props.style].flat(Infinity));
+    assert.equal(style.paddingBottom, 68);
+    assert.equal(style.paddingLeft, 32);
+    assert.equal(style.paddingRight, 28);
+    await act(async () => ui.unmount());
+  }
+});
+
+test("Reader wires horizontal page swipes and Android Back closes the chapter picker first", async (t) => {
+  const { runtime } = setup({
+    externalFetch: async () =>
+      Response.json({ pages: ["/one.png", "/two.png"] }),
+  });
+  const reader = createReader(runtime),
+    social = createReadingSocial(runtime);
+  const chapter = {
+    id: "chapter-1",
+    chapterNumber: "1",
+    title: "One",
+    translatedLanguage: "en",
+  };
+  await reader.open("manga-1", chapter);
+  let ui!: ReactTestRenderer;
+  t.after(async () => {
+    await act(async () => ui?.unmount());
+    social.dispose();
+    reader.close();
+    runtime.dispose();
+  });
+  await act(async () => {
+    ui = create(
+      React.createElement(NativeReaderView, {
+        runtime,
+        reader,
+        social,
+        chapters: [chapter],
+        onAccount() {},
+        onChapter() {},
+      }),
+    );
+  });
+  await act(async () => button(ui, "ตั้งค่าการอ่าน").props.onPress());
+  await act(async () => button(ui, "หน้าเดียว").props.onPress());
+  const imageScrolls = () =>
+    ui.root.findAll(
+      (node) =>
+        String(node.type) === "ScrollView" &&
+        node.props.horizontal &&
+        node.props.contentContainerStyle?.minWidth === 390,
+    );
+  assert.equal(
+    imageScrolls().at(-1)!.props.scrollEnabled,
+    false,
+    "native scrolling must not intercept unzoomed page swipes",
+  );
+  const gesture = ui.root.findAll(
+    (node) => String(node.type) === "View" && node.props.onPanResponderRelease,
+  )[0];
+  assert.ok(gesture, "the rendered reader must handle swipe releases");
+  await act(async () =>
+    gesture.props.onPanResponderRelease({}, { dx: -100, dy: 2 }),
+  );
+  assert.equal(reader.snapshot().position?.pageIndex, 1);
+  // A two-finger gesture whose centroid moves sideways is still only a pinch.
+  await act(async () => {
+    gesture.props.onPanResponderGrant({
+      nativeEvent: {
+        touches: [
+          { pageX: 0, pageY: 0 },
+          { pageX: 100, pageY: 0 },
+        ],
+      },
+    });
+    gesture.props.onPanResponderMove({
+      nativeEvent: {
+        touches: [
+          { pageX: 0, pageY: 0 },
+          { pageX: 200, pageY: 0 },
+        ],
+      },
+    });
+  });
+  assert.equal(reader.snapshot().position?.zoom, 2);
+  assert.equal(imageScrolls().at(-1)!.props.scrollEnabled, true);
+  // Both move events and touch lifecycle events must rebase a replaced second finger.
+  for (const [lift, rejoin] of [
+    ["onPanResponderMove", "onPanResponderMove"],
+    ["onPanResponderEnd", "onPanResponderStart"],
+  ]) {
+    await act(async () => {
+      gesture.props[lift]({
+        nativeEvent: { touches: [{ pageX: 0, pageY: 0 }] },
+      });
+      gesture.props[rejoin]({
+        nativeEvent: {
+          touches: [
+            { pageX: 0, pageY: 0 },
+            { pageX: 100, pageY: 0 },
+          ],
+        },
+      });
+    });
+    assert.equal(
+      reader.snapshot().position?.zoom,
+      2,
+      "rejoining must not jump zoom",
+    );
+    await act(async () => {
+      gesture.props.onPanResponderMove({
+        nativeEvent: {
+          touches: [
+            { pageX: 0, pageY: 0 },
+            { pageX: 150, pageY: 0 },
+          ],
+        },
+      });
+    });
+    assert.equal(reader.snapshot().position?.zoom, 3);
+    await act(async () => {
+      gesture.props.onPanResponderMove({
+        nativeEvent: {
+          touches: [
+            { pageX: 0, pageY: 0 },
+            { pageX: 100, pageY: 0 },
+          ],
+        },
+      });
+    });
+    assert.equal(reader.snapshot().position?.zoom, 2);
+  }
+  await act(async () => {
+    gesture.props.onPanResponderGrant({
+      nativeEvent: {
+        touches: [
+          { pageX: 0, pageY: 0 },
+          { pageX: 200, pageY: 0 },
+        ],
+      },
+    });
+    gesture.props.onPanResponderMove({
+      nativeEvent: {
+        touches: [
+          { pageX: -140, pageY: 0 },
+          { pageX: -40, pageY: 0 },
+        ],
+      },
+    });
+    gesture.props.onPanResponderRelease({}, { dx: -90, dy: 0 });
+  });
+  assert.equal(reader.snapshot().position?.zoom, 1);
+  assert.equal(
+    reader.snapshot().position?.pageIndex,
+    1,
+    "finishing a pinch must not turn the page",
+  );
+  await act(async () => {
+    gesture.props.onPanResponderGrant({
+      nativeEvent: { touches: [{ pageX: 0, pageY: 0 }] },
+    });
+    gesture.props.onPanResponderMove({
+      nativeEvent: {
+        touches: [
+          { pageX: 0, pageY: 0 },
+          { pageX: 150, pageY: 0 },
+        ],
+      },
+    });
+  });
+  assert.equal(
+    reader.snapshot().position?.zoom,
+    1,
+    "adding a second finger must initialize pinch geometry without jumping zoom",
+  );
+  for (const label of ["หน้าก่อน", "หน้าถัดไป", "ไปหน้า"])
+    assert.equal(
+      button(ui, label).parent?.props.horizontal,
+      undefined,
+      `${label} must not live in a horizontally scrolling toolbar`,
+    );
+  await act(async () => button(ui, "เลือกตอน").props.onPress());
+  let handled = false;
+  await act(async () => {
+    handled = native.pressBack();
+  });
+  assert.equal(handled, true);
+  assert.equal(button(ui, "1 · One · en · MangaDex"), undefined);
+  assert.equal(reader.snapshot().status, "ready");
 });

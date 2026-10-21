@@ -1,6 +1,30 @@
 <!-- lang:en -->
 # DONE — Claude Code Session Log
 
+## PR #782 scrutiny follow-up — 2026-10-20
+
+- Final combined-head checks: clean npm ci, Mobile **235/235**, types/env/format, tooling **58/58**, Android Hermes export **773 modules/11 assets** pass; corrected bundle contains the new helper and excludes checked private values. No replacement APK or new physical-device acceptance.
+- ภาษาไทย: ตรวจ head รวมสุดท้าย npm ci ใหม่ Mobile **235/235** types/env/format tooling **58/58** และ Hermes export **773 modules/11 assets** ผ่าน bundle มี helper ใหม่และไม่พบค่าลับที่ตรวจ ยังไม่สร้าง APK ทดแทนหรือรับผลเครื่องจริงเพิ่ม
+
+- Fixed required empty JSON responses silently publishing null and crashing review rendering: strict `json` plus explicit `nullableJson` for the absent own-review contract. Component regression observed RED TypeError → GREEN retryable Thai error for summary/list, while optional empty responses remain supported.
+- Rebased active pinch geometry after finger lift/rejoin without clearing the gesture-wide page-turn guard. Component regression observed RED zoom1 instead of2 → GREEN stable2, subsequent3/back2; covers move and touch lifecycle events. Preserved concurrent chapter-list commit `72af504` and both sides of its test insertion conflict. Earlier APK/device evidence remains historical; no new phone pass claimed. [Report and resume point](Mobile/docs/2026-10-20-review-fixes.md).
+- ภาษาไทย: แก้ body JSON ที่จำเป็นแต่ว่างไม่ให้ publish null จน render รีวิวล้ม โดยแยก `json` แบบเข้มงวดกับ `nullableJson` สำหรับรีวิวตัวเองที่อาจไม่มี มี RED TypeError → GREEN แสดง error ภาษาไทย/ลองใหม่ทั้ง summary และ list คง optional body ว่าง ส่วน pinch ตั้ง baseline ใหม่เมื่อยก/วางนิ้ว โดยคงตัวกันเปลี่ยนหน้า มี RED zoom1 แทน2 → GREEN คง2/ขยับ3/คืน2 ผ่านทั้ง move และ touch lifecycle เก็บ commit รายการตอนและ tests ทั้งสองฝั่ง ไม่อ้างทดสอบมือถือใหม่จาก APK ก่อนหน้า
+
+## Native chapter list web alignment — 2026-10-20
+
+- Follow-up approved after a cancellation made before any source edits: bounded320dp/half-window chapter viewport, compact language/source/page-count-or-price rows, busy/empty/accessibility behavior. Studio count uses existing version pages; no new HTTP/server/dependency. Existing Reader access gates retained.
+- Mobile234/234, TypeScript/format and Android build/vital lint pass. Reviewer found no actionable issues. Galaxy Z Flip4 verified nested scrolling without moving review heading, all83 entries reachable, last chapter68.5 through CAPTCHA into Reader1/15, and150% font layout; restored font1.0. [Report and screenshots](Mobile/docs/2026-10-20-native-chapter-list-parity.md).
+- ARM64 QA APK: `Mobile/build/apk/2026-10-20/MangaDock-0.1.0-native-chapter-list-arm64.apk`, SHA256 `db33b7c15aef8b33d1d461b38f7f872fe1d215c2d1c047e9f09b2571ed6bc441`; installed hash matches. Existing debug/LAN configuration and account session retained. Does not close broader release acceptance or add web language filters/grouping.
+- ภาษาไทย: ปรับรายการตอนตามเว็บหลังผู้ใช้สั่งต่อ จำกัด320dp/ครึ่งจอ แถวข้อมูลกระชับ เปิดอ่านผ่าน gates เดิม tests234/types/format/buildผ่าน เครื่องจริงเลื่อนภายใน83ตอนได้โดยรีวิวยังอยู่ที่เดิม เปิดตอนสุดท้าย68.5หน้า1/15และฟอนต์150%ผ่าน คืนฟอนต์1.0 APK/hashตามด้านบน ไม่อ้างปิด release gates หรือเพิ่มตัวกรอง/จัดกลุ่มเวอร์ชันของเว็บ
+
+## Native Phase4 review fixes B1–B6 — 2026-10-20
+
+- Implemented in `C:/Users/woral/md4`, branch `fix/native-phase4-review-20261020` from `443dc80`: empty-body API handling, shared Reader layout geometry, nested book Back history, directional page swipes/pinch separation, visible wrapping page controls, picker Back, modal safe areas and requested-page translation counters. No runtime dependency or server/provider change.
+- Verification: Mobile **230/230**, typecheck/env pass; final Android assemble/vital lint passes. Independent review found three gesture boundary defects, all corrected and regression-verified. Galaxy Z Flip4/Android16 final APK: LTR/RTL slow swipes pass; history resumes page40 and page20; picker Back retains Reader; comments and notifications clear system navigation; failed page/batch translations show pending0. Intermediate build also verified signed-in review form and related-book Back.
+- Final ARM64 APK: `Mobile/build/apk/2026-10-20/MangaDock-0.1.0-phase4-review-fixes-arm64.apk`, SHA256 `d4b36ecdbe2e8514ab62bf97534d6044f8daf1065ecd0b969db2d385c00a4a2e`. Installed base.apk matches; existing debug certificate and account session retained. LAN-only internal QA; version0.1.0/code1.
+- [Fix report and resume point](Mobile/docs/2026-10-20-review-fixes.md), [ADR031](docs/adr/031-mobile-reader-geometry-and-review-recovery.md). Evidence `qa/review-fixes/`; baseline artifacts retained. The user subsequently authorized commit/push and a PR into `feat/mobile-native-phase4`; fresh precommit checks230 Mobile/58 tooling/types/env/lockfile pass. Successful MIT, money/account mutations, fold/offline/long sessions and broader redesign/filter requests remain outside this pass.
+- ภาษาไทย: แก้ B1–B6 ใน branch/worktree ด้านบน ไม่เพิ่ม dependency หรือเปลี่ยน server/provider Tests **230/230** types/env/build ผ่าน แก้ gesture สามกรณีที่ reviewer พบและทดสอบ regression แล้ว เครื่องจริงปัดตามทิศทางได้ อ่านต่อ40/20ตรงหน้า Back ปิด picker ก่อน และแผงไม่ทับ navigation ตัวนับแปลไม่ค้าง pending ส่วนรีวิว/Back เรื่องเกี่ยวข้องตรวจบน build ระหว่างทางที่ใช้ logic เดียวกัน APK สุดท้าย hash ตรงที่ติดตั้ง เก็บ session เดิม ผู้ใช้อนุญาต commit/push/PR ภายหลัง ตรวจใหม่ผ่าน Mobile230/tooling58/types/env/lockfile ไม่อ้างผล MIT/payment/offline/จอพับ/sessionยาว หรือปิดงานออกแบบส่วนอื่น
+
 ## Public HTTPS API and test APK — 2026-10-20
 
 - Recovered `api.hayateotsu.space` from Cloudflare 530/1033 with a dedicated remotely managed healthy tunnel; updated only the existing API CNAME target and added a new download hostname. Preserved shared tunnel configuration version 7. Verified official portable cloudflared digest and restricted token-file ACL; private files stay outside delivery.

@@ -8,6 +8,7 @@ import React, {
 import { NativeTranslationFeedback } from "./NativeTranslationFeedback.tsx";
 import {
   AppState,
+  BackHandler,
   FlatList,
   Image,
   PanResponder,
@@ -17,12 +18,16 @@ import {
   TextInput,
   View,
   useWindowDimensions,
-  type FlatListProps,
+  type GestureResponderEvent,
 } from "react-native";
 import type { createReader } from "./reader.ts";
 import type { Chapter } from "./catalog.ts";
-import { createTranslation, type Patch } from "./translation.ts";
-import { createViewer, type PageBounds } from "./viewer.ts";
+import {
+  createTranslation,
+  translationProgress,
+  type Patch,
+} from "./translation.ts";
+import { createViewer } from "./viewer.ts";
 import { createApi } from "./api.ts";
 import { imageUri } from "./assets.ts";
 import type { MobileRuntime } from "./runtime.ts";
@@ -45,14 +50,17 @@ function Page({
   patches,
   runtime,
   viewer,
+  ratio,
+  onRatio,
 }: {
   uri: string;
   width: number;
   patches: Patch[];
   runtime: MobileRuntime;
   viewer: Viewer;
+  ratio: number;
+  onRatio(ratio: number): void;
 }) {
-  const [ratio, setRatio] = useState(1.4);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const height = width * ratio;
@@ -69,8 +77,8 @@ function Page({
         style={{ width, height }}
         resizeMode="contain"
         onLoad={({ nativeEvent }) => {
-          if (nativeEvent.source.width)
-            setRatio(nativeEvent.source.height / nativeEvent.source.width);
+          if (nativeEvent.source.width > 0 && nativeEvent.source.height > 0)
+            onRatio(nativeEvent.source.height / nativeEvent.source.width);
           setFailed(false);
         }}
         onError={() => setFailed(true)}
@@ -160,13 +168,25 @@ export function NativeReaderView({
   const [error, setError] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const list = useRef<FlatList<string>>(null);
-  const bounds = useRef(new Map<number, PageBounds>());
+  const [ratios, setRatios] = useState<Record<string, number>>({});
+  // The list and the images share geometry, including rows not mounted yet.
+  const layouts = useMemo(() => {
+    let offset = 0;
+    return reading.pages.map((uri, index) => {
+      const length = width * position.zoom * (ratios[uri] ?? 1.4);
+      const layout = { index, offset, length };
+      offset += length;
+      return layout;
+    });
+  }, [reading.pages, ratios, width, position.zoom]);
   const viewport = useRef({ offset: 0, height: 0 });
-  const scrollRetry = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryCount = useRef(0);
   function observe() {
     viewer.observeViewport(
-      [...bounds.current.values()],
+      layouts.map(({ index, offset, length }) => ({
+        index,
+        top: offset,
+        height: length,
+      })),
       viewport.current.offset,
       viewport.current.height,
     );
@@ -179,74 +199,64 @@ export function NativeReaderView({
       !reading.pages.length
     )
       return;
-    list.current?.scrollToIndex({ index, animated: false });
+    list.current?.scrollToOffset({
+      offset: layouts[index].offset,
+      animated: false,
+    });
   }
-  const Cell = useMemo(
-    () =>
-      function PageCell(
-        props: React.ComponentProps<
-          NonNullable<FlatListProps<string>["CellRendererComponent"]>
-        >,
-      ) {
-        useEffect(
-          () => () => {
-            bounds.current.delete(props.index);
-          },
-          [props.index],
-        );
-        return (
-          <View
-            style={props.style}
-            {...(props.onFocusCapture
-              ? { onFocusCapture: props.onFocusCapture }
-              : {})}
-            onLayout={(event) => {
-              bounds.current.set(props.index, {
-                index: props.index,
-                top: event.nativeEvent.layout.y,
-                height: event.nativeEvent.layout.height,
-              });
-              props.onLayout?.(event);
-              observe();
-            }}
-          >
-            {props.children}
-          </View>
-        );
-      },
-    [viewer],
-  );
   const panStart = useRef({ distance: 1, zoom: 1 });
-  const pinch = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: (event) =>
-          event.nativeEvent.touches.length === 2,
-        onMoveShouldSetPanResponder: (event) =>
-          event.nativeEvent.touches.length === 2,
-        onPanResponderGrant: (event) => {
-          const [a, b] = event.nativeEvent.touches;
-          if (a && b)
-            panStart.current = {
-              distance: Math.max(
-                1,
-                Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY),
-              ),
-              zoom: viewer.snapshot().zoom,
-            };
-        },
-        onPanResponderMove: (event) => {
-          const [a, b] = event.nativeEvent.touches;
-          if (a && b)
-            viewer.setZoom(
-              (panStart.current.zoom *
-                Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY)) /
-                panStart.current.distance,
-            );
-        },
-      }),
-    [viewer],
-  );
+  const pinching = useRef(false);
+  const pinchActive = useRef(false);
+  const pinch = useMemo(() => {
+    function updatePinch(event: GestureResponderEvent) {
+      const [a, b] = event.nativeEvent.touches;
+      if (!a || !b) {
+        pinchActive.current = false;
+        return;
+      }
+      pinching.current = true;
+      const distance = Math.max(
+        1,
+        Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY),
+      );
+      if (!pinchActive.current) {
+        panStart.current = { distance, zoom: viewer.snapshot().zoom };
+        pinchActive.current = true;
+        return;
+      }
+      viewer.setZoom(
+        (panStart.current.zoom * distance) / panStart.current.distance,
+      );
+    }
+    return PanResponder.create({
+      onStartShouldSetPanResponder: (event) =>
+        event.nativeEvent.touches.length === 2,
+      onMoveShouldSetPanResponder: (event, gesture) =>
+        event.nativeEvent.touches.length === 2 ||
+        (event.nativeEvent.touches.length === 1 &&
+          viewer.snapshot().mode !== "strip" &&
+          viewer.snapshot().zoom === 1 &&
+          Math.abs(gesture.dx) >= 20 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5),
+      onPanResponderGrant: (event) => {
+        pinching.current = false;
+        pinchActive.current = false;
+        updatePinch(event);
+      },
+      onPanResponderStart: updatePinch,
+      onPanResponderEnd: updatePinch,
+      onPanResponderMove: updatePinch,
+      onPanResponderRelease: (_event, gesture) => {
+        if (!pinching.current) viewer.swipe(gesture.dx, gesture.dy);
+        pinching.current = false;
+        pinchActive.current = false;
+      },
+      onPanResponderTerminate: () => {
+        pinching.current = false;
+        pinchActive.current = false;
+      },
+    });
+  }, [viewer]);
   useEffect(() => {
     translation.activate();
     translation.setForeground(AppState.currentState === "active");
@@ -310,16 +320,17 @@ export function NativeReaderView({
     };
   }, [reading.pages, position.pageIndex, runtime.apiOrigin]);
   useEffect(() => {
-    retryCount.current = 0;
     const frame = requestAnimationFrame(restoreScroll);
     return () => cancelAnimationFrame(frame);
-  }, [position.mode]);
-  useEffect(
-    () => () => {
-      if (scrollRetry.current) clearTimeout(scrollRetry.current);
-    },
-    [],
-  );
+  }, [position.mode, layouts]);
+  useEffect(() => {
+    if (!picker) return;
+    const listener = BackHandler.addEventListener("hardwareBackPress", () => {
+      setPicker(false);
+      return true;
+    });
+    return () => listener.remove();
+  }, [picker]);
   async function run(action: () => void | Promise<void>) {
     setError(null);
     try {
@@ -366,7 +377,6 @@ export function NativeReaderView({
   );
   function goTo(index: number) {
     viewer.goTo(index);
-    retryCount.current = 0;
     restoreScroll();
   }
   const page = (index: number, pageWidth: number) => (
@@ -377,6 +387,13 @@ export function NativeReaderView({
       patches={original ? [] : (translated.patches[index] ?? [])}
       runtime={runtime}
       viewer={viewer}
+      ratio={ratios[reading.pages[index]] ?? 1.4}
+      onRatio={(ratio) => {
+        const uri = reading.pages[index];
+        setRatios((current) =>
+          current[uri] === ratio ? current : { ...current, [uri]: ratio },
+        );
+      }}
     />
   );
   const sameLanguage = chapters.filter(
@@ -386,6 +403,7 @@ export function NativeReaderView({
   const currentChapter = sameLanguage.findIndex(
     (chapter) => chapter.id === reading.chapter?.id,
   );
+  const progress = translationProgress(translated);
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
       <View
@@ -475,7 +493,9 @@ export function NativeReaderView({
           {button("+", () => viewer.setZoom(position.zoom + 0.25))}
         </ScrollView>
       )}
-      <ScrollView horizontal style={{ flexGrow: 0 }}>
+      <View
+        style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center" }}
+      >
         {button(
           "ตอนก่อน",
           () => onChapter(sameLanguage[currentChapter - 1]),
@@ -516,7 +536,7 @@ export function NativeReaderView({
           false,
           position.pageIndex >= reading.pages.length - 1,
         )}
-      </ScrollView>
+      </View>
       {picker && (
         <ScrollView style={{ maxHeight: 180 }}>
           {chapters.map((chapter) => (
@@ -598,16 +618,8 @@ export function NativeReaderView({
       )}
       {["running", "failed", "completed"].includes(translated.status) && (
         <Text style={{ color: "#a78bfa", padding: 8 }}>
-          แปลแล้ว {Object.keys(translated.patches).length}/
-          {reading.pages.length} · ไม่สำเร็จ{" "}
-          {Object.keys(translated.failedPages ?? {}).length} · รอผล{" "}
-          {Math.max(
-            0,
-            reading.pages.length -
-              Object.keys(translated.patches).length -
-              Object.keys(translated.failedPages ?? {}).length,
-          )}{" "}
-          หน้า{" "}
+          แปลแล้ว {progress.completed}/{progress.total} · ไม่สำเร็จ{" "}
+          {progress.failed} · รอผล {progress.pending} หน้า{" "}
           {translated.stage
             ? `· หน้า ${translated.stage.pageIndex + 1} ${translated.stage.stage}`
             : ""}
@@ -639,7 +651,9 @@ export function NativeReaderView({
           ref={list}
           style={{ display: position.mode === "strip" ? "flex" : "none" }}
           data={reading.pages}
-          CellRendererComponent={Cell}
+          extraData={layouts}
+          getItemLayout={(_data, index) => layouts[index]}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           keyExtractor={(uri, index) => `${index}:${uri}`}
           initialNumToRender={2}
           maxToRenderPerBatch={2}
@@ -649,6 +663,7 @@ export function NativeReaderView({
             viewport.current.height = event.nativeEvent.layout.height;
             restoreScroll();
           }}
+          onContentSizeChange={restoreScroll}
           onScroll={(event) => {
             viewport.current = {
               offset: event.nativeEvent.contentOffset.y,
@@ -657,24 +672,13 @@ export function NativeReaderView({
             observe();
           }}
           onScrollBeginDrag={() => viewer.cancelScrollRequest()}
-          onScrollToIndexFailed={({ index, averageItemLength }) => {
-            list.current?.scrollToOffset({
-              offset: index * averageItemLength,
-              animated: false,
-            });
-            if (scrollRetry.current) clearTimeout(scrollRetry.current);
-            if (++retryCount.current <= 5)
-              scrollRetry.current = setTimeout(restoreScroll, 120);
-            else {
-              viewer.cancelScrollRequest();
-              observe();
-              setError(
-                "ยังไปหน้าที่เลือกไม่ได้ กรุณาลองอีกครั้งหรือเลื่อนไปยังหน้านั้น",
-              );
-            }
-          }}
           renderItem={({ index }) => (
-            <ScrollView horizontal contentContainerStyle={{ minWidth: width }}>
+            <ScrollView
+              horizontal
+              scrollEnabled={position.zoom > 1}
+              style={{ height: layouts[index].length, flexGrow: 0 }}
+              contentContainerStyle={{ minWidth: width }}
+            >
               {page(index, width * position.zoom)}
             </ScrollView>
           )}
@@ -686,6 +690,7 @@ export function NativeReaderView({
           <ScrollView>
             <ScrollView
               horizontal
+              scrollEnabled={position.zoom > 1}
               contentContainerStyle={{
                 minWidth: width,
                 flexDirection: "row",
