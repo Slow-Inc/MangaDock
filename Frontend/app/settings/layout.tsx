@@ -43,7 +43,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   return (
     <div className="min-h-dvh bg-bg pb-20">
       <Navbar />
-      <main className="mx-auto max-w-4xl px-4 pt-24 pb-8">
+      <main id="main" className="mx-auto max-w-4xl px-4 pt-24 pb-8">
         <h1 className="mb-6 text-lg font-bold text-ink">การตั้งค่า</h1>
         {/* Mobile tab nav */}
         <div ref={mobileNavRef} className="relative mb-4 flex gap-1 overflow-x-auto pb-1 md:hidden">

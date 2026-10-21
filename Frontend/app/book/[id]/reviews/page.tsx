@@ -22,7 +22,7 @@ export default async function ReviewsPage({ params }: Props) {
     <div className="min-h-screen bg-bg text-ink">
       <PageTitle title="รีวิว" />
       <Navbar />
-      <main className="page-shell page-shell-nav">
+      <main id="main" className="page-shell page-shell-nav">
         <div className="max-w-3xl">
           <Link
             href={`/book/${id}`}

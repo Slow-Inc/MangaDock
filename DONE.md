@@ -3,6 +3,30 @@
 
 ---
 
+## #856 Skip link past the Navbar (2026-10-21)
+
+**What:** no page had a way past the Navbar for keyboard users (WCAG 2.4.1). `components/SkipLink.tsx` renders
+"ข้ามไปเนื้อหาหลัก" as the first focusable element (root layout): parked above the viewport until focused, then a solid ink
+pill top-left; activating it focuses the page's `<main>` (`focusMain`: `tabindex="-1"` if it has none, so it is not an extra
+Tab stop) without adding `#main` to the URL. Every `<main>` (12, one per route) carries `id="main"`, so the href is a real
+target — axe only treats an in-page link as a skip link when its target exists (otherwise `region` flagged it on every page).
+`sr-only`/`focus:not-sr-only` was tried first: Tailwind v4's `not-sr-only` sets `padding: 0`, which left a cramped label over
+the logo (screenshot) — replaced by the translate pattern.
+
+**Validated:** `SkipLink.test.ts` red → green (3). Production build, keyboard only, 1440 and 390: on `/`, `/new`,
+`/community` the first Tab shows the link (134×42 at 16,16), Enter puts focus on `<main>`, the next Tab reaches the first
+control in the content (e.g. "อ่านเลย", "มังงะมาใหม่"), not the Navbar; `/search` autofocuses its input, so Tab already starts
+in the content. axe structure sweep 10 routes × 2 widths → 0; signed-in sweep (27) → only `color-contrast`. tsc 0.
+
+**Review round:** (1) focusing `<main>` by script after an Enter keypress matches `:focus-visible`, so the global ring drew a
+2 px accent outline around the whole page (computed style confirmed) — `main[tabindex="-1"]:focus-visible { outline: none }`
+in the same `@layer base`; the link and the next control keep their rings. (2) `/docs` had no `id="main"` and
+SimulationsView nested a `<main>` inside the docs `<main>` — both docs `<main>`s (alternate branches) get the id, the nested
+one is a `<div>`. Re-verified: /new and /docs — link ringed, `<main>` focused with no outline, next Tab ringed inside
+`<main>`; axe structure 11 routes (incl. /docs) × 2 widths → 0.
+
+---
+
 ## #861 MangaDex fetches time out (2026-10-21)
 
 **What:** every MangaDex call goes through `MangaDexService.mangadexFetch`, which had no `signal` — a hung request held the

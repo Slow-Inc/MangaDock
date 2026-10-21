@@ -166,7 +166,7 @@ export default function StudioShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* <main>: the page's main landmark, so the title header inside is not a second banner (#846). */}
-      <main className="flex min-h-0 flex-1 flex-col md:pl-[var(--studio-sidebar)]">
+      <main id="main" className="flex min-h-0 flex-1 flex-col md:pl-[var(--studio-sidebar)]">
         <header className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-6">
           <h1 className="min-w-0 truncate text-lg font-semibold text-ink">{studioPageTitle(pathname)}</h1>
           {role ? <Badge tone="accent">{role}</Badge> : null}

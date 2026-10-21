@@ -319,7 +319,7 @@ function SearchResults() {
     <div className="min-h-screen bg-bg text-ink">
       <Navbar />
 
-      <main className="page-shell page-shell-nav page-shell-wide">
+      <main id="main" className="page-shell page-shell-nav page-shell-wide">
         <h1 className="sr-only">ค้นหามังงะ</h1>
 
         {/* ── Search bar ────────────────────────────────────────────── */}

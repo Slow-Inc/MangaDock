@@ -242,8 +242,8 @@ export default function SimulationsView() {
           onSelect={s => selectScenario(s)}
         />
 
-        {/* Simulator content area */}
-        <main
+        {/* Simulator content area — a <div>: it renders inside the docs page's <main> (#856) */}
+        <div
           className="flex-1 overflow-y-auto"
           style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}
         >
@@ -300,7 +300,7 @@ export default function SimulationsView() {
               })}
             </div>
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );

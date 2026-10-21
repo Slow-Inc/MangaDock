@@ -6,6 +6,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import SupabaseGuard from "./components/SupabaseGuard";
 import DevImageCacheToggle from "./components/DevImageCacheToggle";
 import SmoothScrolling from "./components/SmoothScrolling";
+import SkipLink from "./components/SkipLink";
 import DailyCheckinModal from "./components/DailyCheckinModal";
 import { themeBootScript } from "./lib/theme";
 import { SITE_TITLE } from "./lib/siteTitle";
@@ -37,6 +38,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body className={`${inter.variable} ${anuphan.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable} antialiased`}>
+        <SkipLink />
         <SmoothScrolling>
           <ToastProvider>
             <AuthProvider>

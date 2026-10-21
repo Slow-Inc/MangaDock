@@ -77,7 +77,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
       <div className="min-h-screen bg-bg text-ink">
         <Navbar />
         
-        <main className="pt-32 pb-20 px-4 max-w-4xl mx-auto text-center">
+        <main id="main" className="pt-32 pb-20 px-4 max-w-4xl mx-auto text-center">
           {/* Onboarding Header */}
           <div className="relative p-10 rounded-[2.5rem] border border-line bg-fill overflow-hidden mb-12 animate-in fade-in zoom-in-95 duration-700">
             <span className="relative inline-block px-4 py-1.5 rounded-full bg-fill text-accent font-mono text-xs font-bold uppercase tracking-[0.1em] mb-6">
