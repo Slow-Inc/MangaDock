@@ -69,8 +69,8 @@ const EYEBROW = "font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-ink-
 
 export default function StudioShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const activeTab = STUDIO_TABS.find((t) => t.key === getActiveStudioTab(pathname));
-  usePageTitle(activeTab ? `${activeTab.label} · สตูดิโอ` : "สตูดิโอ");
+  const pageTitle = studioPageTitle(pathname);
+  usePageTitle(pageTitle === "สตูดิโอ" ? pageTitle : `${pageTitle} · สตูดิโอ`);
   const { userRole } = useAuth();
   const role = studioRoleLabel(userRole);
   const [width, setWidth] = useState<number>(SIDEBAR.initial);

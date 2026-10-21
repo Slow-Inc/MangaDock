@@ -8,6 +8,7 @@ import DevImageCacheToggle from "./components/DevImageCacheToggle";
 import SmoothScrolling from "./components/SmoothScrolling";
 import DailyCheckinModal from "./components/DailyCheckinModal";
 import { themeBootScript } from "./lib/theme";
+import { SITE_TITLE } from "./lib/siteTitle";
 
 // Strata type system (system-design ch. 02 §2.4): Inter for Latin, Anuphan for Thai glyphs,
 // JetBrains Mono for labels and numbers, Instrument Serif for at most one statement word per page.
@@ -17,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subset
 const instrumentSerif = Instrument_Serif({ variable: "--font-instrument-serif", subsets: ["latin"], weight: "400" });
 
 export const metadata: Metadata = {
-  title: "MangaDock by Hayate | Manga Streaming Platform",
+  title: SITE_TITLE,
   description: "แพลตฟอร์ม E-Book สไตล์ Netflix ด้วย MangaDex API",
 };
 

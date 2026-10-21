@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect } from "react";
+import { SITE_TITLE } from "../lib/siteTitle";
 
 /**
- * The titles currently claimed, newest on top; the tab shows the top one as `"<title> · MangaDock"`, or the root
- * title when nothing claims it. A stack rather than "restore what I replaced": React unmounts a parent's effects
- * before its child's, so a page and the popup over it would otherwise restore each other's titles in the wrong order.
+ * The titles currently claimed, newest on top; the tab shows the top one as `"<title> · MangaDock"`, or `root`
+ * when nothing claims it. A stack rather than "restore what I replaced": React unmounts a parent's effects before
+ * its child's, so a page and the popup over it would otherwise restore each other's titles in the wrong order.
+ * `root` is a constant, not the title found at the first claim: every route but home claims one, so "nothing
+ * claimed" means home — whatever the tab held before (say, a page titled by its own metadata) is not it.
  */
-export function titleStack(doc: { title: string }) {
+export function titleStack(doc: { title: string }, root: string) {
   const entries: { title: string }[] = [];
-  let root = doc.title;
   const current = () => {
     const top = entries[entries.length - 1];
     return top ? `${top.title} · MangaDock` : null;
@@ -17,7 +19,6 @@ export function titleStack(doc: { title: string }) {
   return {
     current,
     push(title: string): () => void {
-      if (entries.length === 0) root = doc.title;
       const entry = { title };
       entries.push(entry);
       doc.title = current()!;
@@ -33,7 +34,7 @@ let stack: ReturnType<typeof titleStack> | null = null;
 
 function documentStack() {
   if (stack) return stack;
-  const s = (stack = titleStack(document));
+  const s = (stack = titleStack(document, SITE_TITLE));
   // Next re-commits its metadata <title> text after hydration (measured: our write at ~115 ms reverted with no
   // element added), so while a page claims the title, put it back whenever <head> changes. Equal → no write → no loop.
   new MutationObserver(() => {

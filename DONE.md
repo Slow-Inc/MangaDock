@@ -19,6 +19,16 @@ routes and 14 signed-in routes (local session) each show their own title; home a
 client navigation /new → popup → Escape → back → /community → / gives the expected title at every step. tsc 0; eslint
 counts on touched files equal main's; `bun test` 425 pass.
 
+**Review round:** (1) a spike of React 19's hoisted `<title>` (one element instead of the stack and observer) failed on a
+production build: on a direct load Next adds a second copy of its root title ahead of ours after hydration, and on client
+navigation `<title>` elements pile up (up to four) with the winner depending on commit order — kept the stack. (2) The
+stack's root is now the constant `SITE_TITLE` (shared with the layout metadata) instead of the title found at the first
+claim, which wrote a stale root after landing on a metadata-titled page; every route but home claims a title, so "nothing
+claimed" means home. (3) Added: community profile (loaded name), `/book/[id]/reviews` ("รีวิว", metadata unified to
+" · MangaDock"); Studio uses `studioPageTitle` so upload/search/manga are distinct. Verified again: 10 public routes,
+Studio 5 routes (upload now "อัปโหลด"), navigation sequence unchanged. Not verified: the reviews page — its server render
+waits on a backend call with no timeout and hung for 120 s (filed separately).
+
 ---
 
 ## #852 JS smooth scrolling honours reduced motion (2026-10-21)
