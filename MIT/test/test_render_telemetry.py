@@ -611,3 +611,20 @@ def test_a_page_sized_block_slightly_taller_than_its_box_is_refitted_851(monkeyp
     rend.resize_regions_to_font_size(img, lines + [credit, sole, tall], None, 0, 8,
                                      bubble_fit=True, font_size_max=20, clean_layout=True, font_src_scale=1.4)
     assert tall.render_font_px == 22                                         # refitted, not 25 at 90 px
+
+
+def test_a_clean_block_stays_on_the_page(monkeypatch):
+    """Otome p0 (2026-10-21): narration in the page's left gutter ('WE'LL MARCH ON…', source x 0..79)
+    laid out wider than its source and centred on it — the block started at x = -7 and its first
+    letters were cut by the page edge. A clean-layout block is kept inside the page: the whole image
+    on a full-page render, region.page_bounds (page edges in crop coordinates) on a patch."""
+    monkeypatch.setattr(rend, '_clean_layout_dst', lambda region, shape, fmin, fmax, page_shape=None, **kw: (20, 93.0, 140.0))
+    img = np.full((1200, 836, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='เราจะก้าวเดินต่อไป', xyxy=(0.0, 364.0, 79.0, 486.0))
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, clean_layout=True)
+    assert r.render_dst_box[0] >= 0, r.render_dst_box
+    patch = np.full((300, 300, 3), 255, np.uint8)                   # a crop whose left edge is 10 px past the page's
+    p = FakeRegion(horizontal=True, translation='เราจะก้าวเดินต่อไป', xyxy=(10.0, 80.0, 89.0, 202.0),
+                   page_bounds=(10.0, 0.0, 846.0, 1200.0))
+    rend.resize_regions_to_font_size(patch, [p], None, 0, 8, clean_layout=True, page_shape=(1200, 836))
+    assert p.render_dst_box[0] >= 10.0, p.render_dst_box

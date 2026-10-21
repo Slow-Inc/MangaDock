@@ -115,6 +115,8 @@ class PatchRenderer:
 
             crop_rgb = np.ascontiguousarray(ctx.img_rgb[y1:y2, x1:x2].copy())
             local_regions = [build_local_region(r, x1, y1) for r in group]
+            for lr in local_regions:   # the page's edges in this crop's coordinates (render keeps text on the page)
+                lr.page_bounds = (-float(x1), -float(y1), float(img_w - x1), float(img_h - y1))
 
             patch_ctx = Context()
             patch_ctx.input = Image.fromarray(crop_rgb)

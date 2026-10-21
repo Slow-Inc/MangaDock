@@ -719,6 +719,15 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                     if own is not None:            # a dodge never takes the text out of its balloon
                         cx = _clamp_center(cx, block_w, own[0], own[2])
                         cy = _clamp_center(cy, block_h, own[1], own[3])
+                # keep the block on the page (Otome p0: gutter narration laid out wider than its source
+                # started at x = -7 and lost its first letters). A patch knows the page edges in its own
+                # coordinates (page_bounds); a full-page render is the page.
+                _pb = getattr(region, 'page_bounds', None)
+                if _pb is None and page_shape is None:
+                    _pb = (0.0, 0.0, float(img.shape[1]), float(img.shape[0]))
+                if _pb is not None:
+                    cx = _clamp_center(cx, block_w, _pb[0], _pb[2])
+                    cy = _clamp_center(cy, block_h, _pb[1], _pb[3])
                 region.font_size = clean_fs
                 region._direction = 'h'
                 # #535 Phase-0c telemetry (additive, no behavior change).
