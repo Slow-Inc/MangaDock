@@ -94,6 +94,10 @@ All rows initially `NOT_RUN`; device/account/fixture dependencies currently prev
 
 ## Next record / แถวสำหรับตรวจต่อ
 
+For every new scenario, add the full role/device/input/expected/observed/verifier/evidence details. API probes using the real Mobile controllers plus a simulated browser boundary must say `LIVE_BACKEND_TEST_CAPTCHA_MOCK_BROWSER`; they do not complete DEVICE-OS or S03 on their own. A failed row needs a discriminating repro before a Mobile code change.
+
+ภาษาไทย: เติมรายละเอียด role/device/input/expected/observed/ผู้ตรวจ/หลักฐานทุก scenario การเรียก controllers Mobile กับ Backend จริงแต่จำลอง browser ต้องระบุ LIVE_BACKEND_TEST_CAPTCHA_MOCK_BROWSER ไม่ถือผ่าน OS/S03 ทั้งหมด หาก fail ต้องมี repro แยกสาเหตุก่อนแก้โค้ด
+
 ### 2026-10-20 public HTTPS follow-up / ผลตรวจ HTTPS สาธารณะ
 
 | ID | Level | Role/device/input | Expected / observed | Status | Verifier/evidence |
@@ -104,7 +108,3 @@ All rows initially `NOT_RUN`; device/account/fixture dependencies currently prev
 | PHONE-OTHER-NETWORK-20261020 | Actual phone | No attached target | Download/install/sign-in/CAPTCHA return/render on mobile data | NOT_RUN | Public-domain probes do not prove device interaction; S10/S29 remain open |
 
 ภาษาไทย: แถว PASS ใหม่ยืนยัน HTTPS/API/artifact ตามระดับที่ระบุจากเครื่องโฮสต์ ไม่แทนการติดตั้ง ล็อกอิน กลับจากเบราว์เซอร์และแสดงภาพบนมือถือจริงต่างเครือข่าย S10/S29 และ MIT ยังเปิดอยู่
-
-For every new scenario, add the full role/device/input/expected/observed/verifier/evidence details. API probes using the real Mobile controllers plus a simulated browser boundary must say `LIVE_BACKEND_TEST_CAPTCHA_MOCK_BROWSER`; they do not complete DEVICE-OS or S03 on their own. A failed row needs a discriminating repro before a Mobile code change.
-
-ภาษาไทย: เติมรายละเอียด role/device/input/expected/observed/ผู้ตรวจ/หลักฐานทุก scenario การเรียก controllers Mobile กับ Backend จริงแต่จำลอง browser ต้องระบุ LIVE_BACKEND_TEST_CAPTCHA_MOCK_BROWSER ไม่ถือผ่าน OS/S03 ทั้งหมด หาก fail ต้องมี repro แยกสาเหตุก่อนแก้โค้ด

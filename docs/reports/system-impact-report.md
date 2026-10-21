@@ -203,16 +203,20 @@ Evidence and limitations: [fix report](../../Mobile/docs/2026-10-20-review-fixes
 | 10. Architecture after | Native → public HTTPS → dedicated tunnel → same Backend; separate loopback file server | Native → HTTPS → tunnel แยก → Backend เดิม และ file server loopback แยก |
 | 11. Refactor list | None; source/contracts/dependencies/private app env unchanged | ไม่มี refactor คง source/contracts/dependencies/private env แอป |
 | 12. Metrics | APK 27760053 bytes; SHA-256 verified over GET; Reader 30 pages; build 2m11s, 316 tasks | APK 27760053 bytes ตรวจ hash จาก GET Reader 30 หน้า build 2m11s 316 tasks |
-| 13. Technical debt removed | Inactive public route and LAN-only artifact dependency | แก้ route สาธารณะที่หยุดและข้อจำกัดไฟล์ที่ใช้ได้เฉพาะ LAN |
+| 13. Technical debt removed | None; the route was restored, not refactored; the artifact is still debug-signed | ไม่มี เป็นการกู้ route ไม่ใช่ refactor และไฟล์ยังใช้ลายเซ็นทดสอบ |
 | 14. Risk reduction / rollback | Verified binary digest, private-token exclusion/ACL, dedicated routes; restore only old API CNAME target | ตรวจ digest/ไม่มี private token/ACL แยก routes ย้อนโดยคืนเฉพาะ target CNAME API เดิม |
 | 15. Developer experience impact | Bilingual runtime/download/rollback guide; no Metro for installed APK | คู่มือเปิดระบบ/ดาวน์โหลด/ย้อนกลับสองภาษา ติดตั้งแล้วไม่ต้องเปิด Metro |
 | 16. Future opportunities | Real-device cross-network acceptance, always-on hosting, production signing/CAPTCHA, MIT readiness | รับเครื่องจริงต่างเครือข่าย จัดโฮสต์ถาวร signing/CAPTCHA production และ MIT |
 | 17. Lessons learned | Connected accounts differ; verify authoritative zone; DNS convergence and artifact cache need evidence | Account ที่เชื่อมต่างกัน ต้องตรวจ zone จริง รอ DNS และตรวจค่าฝังโดยไม่เชื่อ cache |
-| 18. KPI | Public API 200; full artifact hash matches; no device/production KPI claimed | API 200 hash ไฟล์ครบตรง ไม่อ้าง KPI เครื่องจริงหรือ production |
+| 18. KPI | One-off checks only: API 200 and artifact hash; no device or production KPI claimed | ตรวจครั้งเดียว: API 200 และ hash ของไฟล์ ไม่อ้าง KPI เครื่องจริงหรือ production |
 
-Evidence, commands, identifiers and open acceptance: [public HTTPS report](../../Mobile/docs/2026-10-20-public-https-apk.md). Earlier same-day source suites remain historical evidence; this follow-up reran native build/artifact and public HTTP checks. No source change, new commit/push or issue closure.
+Evidence, commands and open acceptance: [public HTTPS report](../../Mobile/docs/2026-10-20-public-https-apk.md). Earlier same-day source suites remain historical evidence; this follow-up reran the native build and public HTTP checks. No source change accompanied it.
 
-ภาษาไทย: ดูหลักฐาน คำสั่ง รหัสทรัพยากรและ acceptance ที่ค้างในรายงาน HTTPS ผล source suites วันเดียวกันเป็นหลักฐานเดิม รอบนี้ตรวจ build/artifact และ HTTP สาธารณะใหม่ ไม่แก้ source ไม่ commit/push เพิ่มหรือปิด issue
+ภาษาไทย: ดูหลักฐาน คำสั่ง และ acceptance ที่ค้างในรายงาน HTTPS ผล source suites วันเดียวกันเป็นหลักฐานเดิม รอบนี้ตรวจ build/artifact และ HTTP สาธารณะใหม่ โดยไม่มีการแก้ source ไปพร้อมกัน
+
+Correction — 2026-10-22: after review of #878, fields 13 and 18 above were corrected (the route was restored, not debt removed; the checks were one-off, not a KPI), and the Cloudflare identifier table moved off the public page. No other value changed.
+
+ภาษาไทย: แก้ไข — 2026-10-22: หลังรีวิว #878 แก้ช่อง 13 และ 18 ข้างต้น (เป็นการกู้ route ไม่ได้ลบ debt และการตรวจเป็นครั้งเดียว ไม่ใช่ KPI) และย้ายตารางรหัส Cloudflare ออกจากหน้าสาธารณะ ไม่เปลี่ยนค่าอื่น
 
 ## 2026-10-20 — Downloadable ARM64 test APK / APK ARM64 สำหรับโหลดทดสอบ
 
