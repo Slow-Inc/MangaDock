@@ -3,6 +3,19 @@
 
 ---
 
+## #848 Hero carousel dots are real tap targets (2026-10-21)
+
+**What:** axe `target-size` (WCAG 2.2 AA) over 10 public routes at 390 px failed only on the hero carousel dots: 8 × 8 px
+buttons 14 px apart. Each dot is now a 24 × 24 px button with the 8 px dot drawn inside; the liquid pill measures the inner
+dot, and the row's margins absorb the taller buttons so nothing moves. Dot pitch is 24 px (was 14) — the one visible change.
+
+**Validated:** production build, before/after measured in headless Chromium: dot top unchanged (390: 593 px, 1440: 554 px),
+desktop first dot still flush with the "อ่านเลย" button (left 560 px); buttons 24 × 24; after tapping dot 4 the pill sits
+exactly on it (left 155 = dot 155 at 390; 632 = 632 at 1440); keyboard focus ring is a circle around the dot. axe
+`target-size` → 0 nodes on all 10 routes (was 10 nodes on `/` and `/book/[id]`). tsc 0.
+
+---
+
 ## #846 Named controls and landmarks in Studio, Settings, Admin and the post page (2026-10-21)
 
 **What:** an axe sweep of the signed-in routes (Studio, Settings, Admin) found unnamed controls and missing or duplicate

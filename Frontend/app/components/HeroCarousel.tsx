@@ -28,7 +28,7 @@ type DotsProps = {
 
 function Dots({ total, idx, desktop, onDotClick }: DotsProps) {
   const pillRef = useRef<HTMLDivElement>(null);
-  const dotEls = useRef<(HTMLButtonElement | null)[]>([]);
+  const dotEls = useRef<(HTMLSpanElement | null)[]>([]);
   const prevIdxRef = useRef(idx);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -87,19 +87,24 @@ function Dots({ total, idx, desktop, onDotClick }: DotsProps) {
 
   return (
     <div
-      className={`relative flex items-center gap-1.5 ${
-        desktop ? 'mt-8 justify-start' : 'mt-3 justify-center'
+      // 24 px buttons (WCAG 2.5.8) around 8 px dots; margins keep the dots where the old 8 px row sat.
+      className={`relative -mb-2 flex items-center ${
+        desktop ? '-ml-2 mt-6 justify-start' : 'mt-1 justify-center'
       }`}
     >
       <div ref={pillRef} className="pointer-events-none absolute h-2 rounded-full bg-ink" />
       {Array.from({ length: total }, (_, i) => (
         <button
           key={i}
-          ref={(el) => { dotEls.current[i] = el; }}
           onClick={() => onDotClick(i)}
-          className="h-2 w-2 rounded-full bg-ink/25 transition-colors duration-300 hover:bg-ink/50 focus-visible:outline-offset-2" /* 8 px dot: an inset ring would read as "selected" */
+          className="group grid h-6 w-6 place-items-center rounded-full"
           aria-label={`สลับไปรายการที่ ${i + 1}`}
-        />
+        >
+          <span
+            ref={(el) => { dotEls.current[i] = el; }}
+            className="h-2 w-2 rounded-full bg-ink/25 transition-colors duration-300 group-hover:bg-ink/50"
+          />
+        </button>
       ))}
     </div>
   );
