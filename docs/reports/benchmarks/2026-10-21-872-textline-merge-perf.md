@@ -3,7 +3,7 @@
 - **Date:** 2026-10-21 · **Issue:** #872 · **Before:** `7d804281` · **After:** `3d0e7f80` (`45c9c2c0`, `347ccd4b`, `7024f116`, `3d0e7f80`)
 - **Method:** warm in-process probe (models loaded, pass 0 discarded), prod knobs, LLM excluded (`original` translator), 8 corpus pages; renders compared byte for byte.
 
-![textline_merge per page, before vs after](./2026-10-21-872-textline-merge-perf.png)
+![per-stage warm time, round start vs end](./2026-10-21-872-textline-merge-perf.png)
 
 ## Where the time went (warm cProfile, 4 pages)
 
