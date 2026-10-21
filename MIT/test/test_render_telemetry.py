@@ -515,3 +515,21 @@ def test_a_tall_balloon_keeps_the_letterers_column_width():
                                      font_size_max=20, clean_layout=True)
     x1, _, x2, _ = r.render_dst_box
     assert r.render_branch == 'bubble_fit_tall' and x2 - x1 >= 0.75 * 152, (r.render_dst_box, r.render_font_px)
+
+
+def test_a_tall_balloon_keeps_the_letterers_column_width_too():
+    """Replay of a10a303c (Kage p0): with the squeeze aimed at the source height, the Thai wrapped to
+    the full interior width and touched the narration box's border (block 614..771 in a 616..769
+    box) — the old one-word column had hidden it. The column also keeps the letterer's width (the
+    134 px source column), widening toward the interior only if the text does not fit."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1600, 1100, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='ผู้ที่ทำได้เช่นนั้น คือเพียงผู้ถือครองพลังธรรมดาๆ',
+                   xyxy=(624.0, 1231.0, 758.0, 1296.0), bubble_box=(616.0, 1146.0, 769.0, 1382.0),
+                   target_lang='THA', font_size=20)
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    x1, _, x2, _ = r.render_dst_box
+    assert r.render_branch == 'bubble_fit_tall' and 616 + 4 <= x1 and x2 <= 769 - 4, r.render_dst_box

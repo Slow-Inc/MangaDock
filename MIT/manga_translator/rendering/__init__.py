@@ -327,11 +327,16 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # own 2×font so no degenerate sliver.
     box_h = max(1.0, y2f - y1f)
     bbox_w = max(1.0, x2f - x1f)
-    # A balloon interior: squeeze only toward the height the source lettering used, not the whole
-    # balloon (Kaoru p0: two 152 px lines in a tall octagon became a 60 px column of one word per
-    # line; Otome's 'THIS SCUMBAG' filled its tall box, so its column stays tall).
+    # A balloon interior: keep the letterer's column — squeeze only toward the height the source
+    # lettering used, not the whole balloon (Kaoru p0: two 152 px lines in a tall octagon became a
+    # 60 px column of one word per line; Otome's 'THIS SCUMBAG' filled its tall box, so its column
+    # stays tall), and start from its width, not the interior's (Kage p0: the full interior width
+    # put the Thai on the narration box's border). The fit below still widens/shrinks as needed.
+    _letter_w = float(getattr(region, 'letter_w', 0) or 0)
     _letter_h = float(getattr(region, 'letter_h', 0) or 0)
     _squeeze_h = min(box_h, _letter_h) if _letter_h > 0 else box_h
+    if _letter_w > 0:
+        wrap_w = min(wrap_w, _letter_w)
 
     # #183 hard gate, hyphenation-aware: the squeeze floor per TOKEN is (a) the widest
     # SYLLABLE + hyphen when the language hyphenator can split it — long words then
@@ -557,6 +562,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                     translation=region.translation,
                     target_lang=getattr(region, 'target_lang', 'en_US'),
                     font_size=getattr(region, 'font_size', 0),
+                    letter_w=float(region.xyxy[2]) - float(region.xyxy[0]),
                     letter_h=float(region.xyxy[3]) - float(region.xyxy[1]),
                     xyxy=(acx - fit_w / 2.0, acy - fit_h / 2.0,
                           acx + fit_w / 2.0, acy + fit_h / 2.0))
