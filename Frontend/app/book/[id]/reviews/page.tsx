@@ -4,26 +4,10 @@ import Navbar from "../../../components/Navbar";
 import ReviewCard from "../../../components/ReviewCard";
 import Mascot from "../../../components/mascot/Mascot";
 import StarRating from "../../../components/StarRating";
-import type { ReviewItem, ReviewSummary } from "../../../lib/reviewTypes";
+import { fetchReviews } from "../../../lib/reviewsFetch";
 import { PageTitle } from "../../../hooks/pageTitle";
 
 type Props = { params: Promise<{ id: string }> };
-
-const BACKEND = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
-
-async function fetchReviews(mangaId: string): Promise<{ reviews: ReviewItem[]; summary: ReviewSummary }> {
-  try {
-    const [listRes, sumRes] = await Promise.all([
-      fetch(`${BACKEND}/reviews/${encodeURIComponent(mangaId)}?limit=50`, { next: { revalidate: 60 } }),
-      fetch(`${BACKEND}/reviews/${encodeURIComponent(mangaId)}/summary`, { next: { revalidate: 60 } }),
-    ]);
-    const reviews: ReviewItem[] = listRes.ok ? await listRes.json() : [];
-    const summary: ReviewSummary = sumRes.ok ? await sumRes.json() : { averageRating: 0, count: 0 };
-    return { reviews, summary };
-  } catch {
-    return { reviews: [], summary: { averageRating: 0, count: 0 } };
-  }
-}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;

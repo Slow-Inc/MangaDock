@@ -6,6 +6,7 @@ import HomeStatusLine from "./components/HomeStatusLine";
 import Navbar from "./components/Navbar";
 import TopTenRow from "./components/TopTenRow";
 import type { LandingBook, LandingPayload as LandingResponse } from "./lib/types";
+import { SERVER_FETCH_TIMEOUT_MS } from "./lib/serverFetch";
 
 type LandingFetchResult = {
   data: LandingResponse | null;
@@ -19,6 +20,7 @@ const getLandingData = async (forceLocal = false): Promise<LandingFetchResult> =
     const url = `${API_BASE}/books/landing${forceLocal ? "?forceLocal=true" : ""}`;
     const response = await fetch(url, {
       next: { revalidate: forceLocal ? 0 : 1800 },
+      signal: AbortSignal.timeout(SERVER_FETCH_TIMEOUT_MS), // a hung backend lands in the cached-landing fallback (#858)
     });
 
     if (!response.ok) {
