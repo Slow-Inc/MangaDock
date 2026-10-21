@@ -40,3 +40,16 @@ def test_a_script_copied_from_the_source_is_not_foreign():
     assert foreign_script('ドン เสียงดัง', 'THA', source='BANG')
     assert classify_glitch('ドン', 'ドン', 'THA') is None
     assert classify_glitch('BANG', 'ドン', 'THA') == 'foreign_script'
+
+
+def test_ocr_noise_glyph_tokens_are_stripped_from_latin_text_857():
+    """#857 follow-up (Iruma p0, Anta p1, 2026-10-21): once kept, '피 WONDER WHY..' translated as
+    'เพราะ WONDER' (the misread '피' confused the LLM) and '╩ THATS HOW…' carried the '╩' into the
+    Thai. A whitespace token made only of non-Latin glyphs in otherwise Latin text is OCR noise."""
+    from manga_translator.translation_quality import strip_noise_glyphs
+    assert strip_noise_glyphs('피 WONDER WHY..') == 'WONDER WHY..'
+    assert strip_noise_glyphs('╩ THATS HOW YOU WANNA PLAY IT,') == 'THATS HOW YOU WANNA PLAY IT,'
+    assert strip_noise_glyphs('I AL- READY KNEW THAT, DUMMY. ○') == 'I AL- READY KNEW THAT, DUMMY.'
+    # kept: Latin letters with accents, punctuation, hearts, and anything not mostly Latin
+    for keep in ('CAFÉ… ♡', 'DON’T — STOP!', '★ BONUS ★', 'ข้อความไทย OK', '平ク ザワ'):
+        assert strip_noise_glyphs(keep) == keep

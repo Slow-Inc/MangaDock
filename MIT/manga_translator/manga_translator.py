@@ -80,6 +80,7 @@ from .utils import (
 )
 from .utils.lang_ratio import target_script_ratio
 from .text_layer import regions_payload, dropped_regions_payload, empty_patch_result
+from .translation_quality import strip_noise_glyphs
 
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
@@ -903,11 +904,19 @@ class MangaTranslator:
             'cpu' if self._gpu_limited_memory else self.device
         )
 
+    def _strip_source_noise(self, regions, config: Config) -> None:
+        """#857: OCR misreads on Latin lettering ('피' for a lone 'I', '╩', '○') threw the LLM off
+        ('피 WONDER WHY..' -> 'เพราะ WONDER') or were copied into the Thai — strip them before translating."""
+        if str(getattr(config.translator, 'source_lang', '') or '').upper() in self._LATIN_SOURCE_LANGS:
+            for region in regions:
+                region.text = strip_noise_glyphs(region.text)
+
     @_timed_stage("translation")
     async def _run_text_translation(self, config: Config, ctx: Context):
         # 检查text_regions是否为None或空
         if not ctx.text_regions:
             return []
+        self._strip_source_noise(ctx.text_regions, config)
             
         # 如果设置了prep_manual则将translator设置为none，防止token浪费
         # Set translator to none to provent token waste if prep_manual is True  

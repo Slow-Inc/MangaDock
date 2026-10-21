@@ -6,6 +6,7 @@ prompt tried on 17 real pages. All three are countable, so the translator can re
 (`custom_openai`) and Pipeline Doctor / the A/B harness can report them.
 """
 import re
+import unicodedata
 from typing import Optional
 
 from .utils.lang_ratio import _SCRIPT_RANGES
@@ -43,3 +44,24 @@ def classify_glitch(src: str, dst: str, target: str) -> Optional[str]:
     if foreign_script(d, target, src):
         return 'foreign_script'
     return None
+
+
+# Non-ASCII that belongs in Latin-script lettering: accented letters, punctuation, and these.
+_LATIN_SYMBOLS = frozenset('♥♡♪♫★☆')
+
+
+def _latin_glyph(c: str) -> bool:
+    return (ord(c) < 128 or unicodedata.category(c)[0] in 'PZ' or c in _LATIN_SYMBOLS
+            or 'LATIN' in unicodedata.name(c, ''))
+
+
+def strip_noise_glyphs(text: str) -> str:
+    """#857: drop whitespace tokens made only of non-Latin glyphs from otherwise Latin OCR text —
+    the misreads OCR leaves on English lettering ('피' for a lone 'I', '╩', '○'). Kept as-is, the
+    LLM was thrown off ('피 WONDER WHY..' -> 'เพราะ WONDER') or copied the glyph into the Thai.
+    Text that is not mostly ASCII (Thai, CJK) is returned unchanged."""
+    if not text or sum(ord(c) < 128 for c in text) / len(text) <= 0.85:
+        return text
+    tokens = text.split(' ')
+    kept = [t for t in tokens if not t or any(_latin_glyph(c) for c in t)]
+    return text if len(kept) == len(tokens) else ' '.join(t for t in kept if t)
