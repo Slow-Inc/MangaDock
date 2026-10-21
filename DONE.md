@@ -1,6 +1,12 @@
 <!-- lang:en -->
 # DONE — Claude Code Session Log
 
+## Public HTTPS API and test APK — 2026-10-20
+
+- Recovered `api.hayateotsu.space` from Cloudflare 530/1033 with a dedicated remotely managed healthy tunnel; updated only the existing API CNAME target and added a new download hostname. Preserved shared tunnel configuration version 7. Verified official portable cloudflared digest and restricted token-file ACL; private files stay outside delivery.
+- Rebuilt unchanged Mobile source with a process-only HTTPS origin override. ARM64 APK 27,760,053 bytes; native build/vital lint, signature, embedded values/private-token absence pass. Public Reader returns 30 pages after development CAPTCHA; image JPEG 200. Complete HTTPS APK download SHA-256 matches. Actual phone/browser/provider/payment/MIT/production acceptance remains open. Backend, dedicated connector and download server left running; no new commit/push or issue closure. [Artifact, runtime and rollback](Mobile/docs/2026-10-20-public-https-apk.md).
+- ภาษาไทย: กู้ API สาธารณะจาก 530/1033 ด้วย tunnel แยก เปลี่ยนเฉพาะ target CNAME API และเพิ่มโดเมนดาวน์โหลด คง tunnel ร่วม version 7 ตรวจ hash cloudflared ทางการและสิทธิ์ token แยก private ออกจากการส่ง สร้าง APK ARM64 source เดิมโดย override API HTTPS เฉพาะ build ได้ 27,760,053 bytes ตรวจ build/vital lint/ลายเซ็น/ค่าฝัง/ไม่มี token ส่วนตัวที่ตรวจผ่าน Reader ได้ 30 หน้าด้วย CAPTCHA ทดสอบและ JPEG 200 ดาวน์โหลด HTTPS ครบ/hash ตรง ยังไม่รับมือถือ/browser/provider/payment/MIT/production เปิด Backend connector และ download server ค้างไว้ ยังไม่ commit/push หรือปิด issue รอบนี้
+
 ## Native commit validation — 2026-10-20
 
 - At the user's subsequent commit/push request, validated the pending native implementation and separate Backend profile-join fix: Mobile **220/220**, typecheck/env and lockfile dry-run; Backend build, full CI Jest **90 suites/960 tests**, focused lint; repository tooling **58/58**. Existing same-day ARM64 APK build/artifact checks remain applicable to unchanged Mobile source.

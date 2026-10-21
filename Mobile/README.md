@@ -1,5 +1,9 @@
 # MangaDock Mobile
 
+2026-10-20 follow-up: **Public HTTPS ARM64 test APK available**. API and complete public download/hash checks pass from the host; install this replacement for testing on other networks. Keep Backend and Tunnel running. [Download, runtime commands, evidence and limits](docs/2026-10-20-public-https-apk.md). Actual phone acceptance remains open; the LAN report below describes the earlier binary.
+
+ภาษาไทย: มี **APK ARM64 ที่ใช้ API HTTPS สาธารณะ** แล้ว ตรวจ API และดาวน์โหลดครบ/hash ตรงจากเครื่องโฮสต์ ใช้ตัวใหม่เพื่อทดสอบต่างเครือข่าย ต้องเปิด Backend กับ Tunnel ค้างไว้ ดูลิงก์ดาวน์โหลด คำสั่งเปิดระบบและข้อจำกัดในรายงาน ยังไม่รับการใช้งานบนมือถือจริง รายงาน LAN ด้านล่างเป็นไฟล์เก่า
+
 2026-10-20: **ARM64 test APK is available**, with embedded Hermes bundle and a Wi-Fi LAN Backend endpoint. Fresh Mobile 220/220, types/env, native assemble/vital lint, signature and downloaded-file hash checks pass. Actual phone installation remains unverified. [Download, installation steps and artifact identity](docs/2026-10-20-test-apk.md).
 
 ภาษาไทย: 2026-10-20 มี **APK ทดสอบ ARM64** แล้ว ฝัง Hermes และใช้ Backend ใน Wi-Fi LAN ตรวจ Mobile 220/220 types/env native build/vital lint ลายเซ็นและ hash ดาวน์โหลดผ่าน ยังไม่ตรวจติดตั้งบนมือถือ ดูลิงก์ดาวน์โหลด/วิธีติดตั้ง/รายละเอียดไฟล์ด้านบน
