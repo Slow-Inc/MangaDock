@@ -43,3 +43,13 @@ def test_panels_from_the_array_match_the_disk_round_trip():
 def test_no_temp_file_is_written(monkeypatch):
     monkeypatch.setattr(cv2, 'imwrite', lambda *a, **k: (_ for _ in ()).throw(AssertionError('no disk round trip')))
     assert len(get_panels_from_array(_page(), rtl=True)) >= 3
+
+
+def test_non_uint8_or_grayscale_input_still_matches_the_disk_round_trip():
+    """Review of 45c9c2c0: the old imwrite/imread round trip turned any input into 3-channel uint8;
+    passing the array straight through broke grayscale/float input (silent fallback to simple sort).
+    Such input is normalised in memory with the same codec semantics."""
+    img = _page()
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    for variant in (gray, gray[:, :, None], img.astype(np.float32), img.astype(np.uint16) * 200):
+        assert get_panels_from_array(variant, rtl=True) == _panels_via_disk(variant, True)

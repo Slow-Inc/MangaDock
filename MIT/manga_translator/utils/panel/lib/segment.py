@@ -198,7 +198,8 @@ class Segment:
 
 	def projected_point(self, p):
 		# plain floats, same arithmetic as the former 2-element numpy version (exact integer dot
-		# products, one true division) — it ran for every pair union_all and split compare
+		# products, one true division) — it ran for every pair union_all and split compare. Integer
+		# coordinates only (Segment endpoints and contour dots are ints), as int() below assumes.
 		ax, ay = self.a
 		abx, aby = self.b[0] - ax, self.b[1] - ay
 		if abx == 0 and aby == 0:
