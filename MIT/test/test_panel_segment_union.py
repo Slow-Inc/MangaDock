@@ -41,3 +41,18 @@ def test_union_all_matches_the_reference_on_random_page_like_segments():
         want = [(s.a, s.b) for s in _reference_union_all(list(segs))]
         got = [(s.a, s.b) for s in Segment.union_all(list(segs))]
         assert got == want
+
+
+def test_cached_length_and_angle_match_their_formulas():
+    """#822 follow-up: dist()/angle() are cached (union_all calls them per pair); the cache must
+    return exactly what the formula does, on every call."""
+    import math
+    rnd = random.Random(7)
+    for _ in range(500):
+        a = (rnd.randint(0, 900), rnd.randint(0, 900))
+        b = (rnd.randint(0, 900), rnd.randint(0, 900))
+        s = Segment(a, b)
+        dx, dy = abs(b[0] - a[0]), abs(b[1] - a[1])
+        for _ in range(2):
+            assert s.dist() == math.sqrt(dx ** 2 + dy ** 2)
+            assert s.angle() == (math.atan(dy / dx) if dx != 0 else math.pi / 2)

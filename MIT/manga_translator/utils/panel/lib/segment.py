@@ -25,7 +25,13 @@ class Segment:
 		return (self.a, self.b) if self.a <= self.b else (self.b, self.a)
 
 	def dist(self):
-		return math.sqrt(self.dist_x()**2 + self.dist_y()**2)
+		# cached: union_all compares every pair of segments (~51k intersect calls on 4 pages), and the
+		# endpoints never change after __init__
+		try:
+			return self._dist
+		except AttributeError:
+			self._dist = math.sqrt(self.dist_x()**2 + self.dist_y()**2)
+			return self._dist
 
 	def dist_x(self, keep_sign = False):
 		dist = self.b[0] - self.a[0]
@@ -124,7 +130,11 @@ class Segment:
 		return angle < 10 or abs(angle - 180) < 10
 
 	def angle(self):
-		return math.atan(self.dist_y() / self.dist_x()) if self.dist_x() != 0 else math.pi / 2
+		try:
+			return self._angle
+		except AttributeError:
+			self._angle = math.atan(self.dist_y() / self.dist_x()) if self.dist_x() != 0 else math.pi / 2
+			return self._angle
 
 	def intersect_all(self, segments):
 		segments_match = []
