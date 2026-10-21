@@ -13,6 +13,7 @@ import { applyCoinBalanceUpdate, type CoinBalanceUpdate } from "../lib/coinBalan
 import NotificationBell from "./NotificationBell";
 import Coin from "./ui/Coin";
 import { UidMascot } from "./mascot/Mascot";
+import { usePopoverDismiss } from "../hooks/popoverDismiss";
 
 export default function NavbarActions() {
   const router = useRouter();
@@ -25,16 +26,8 @@ export default function NavbarActions() {
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, loading, signOut, getIdToken } = useAuth();
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  // Close dropdown on outside click or Escape (#870)
+  usePopoverDismiss(menuOpen, menuRef, () => setMenuOpen(false));
 
   // Fetch coin balance when user logs in / out
   useEffect(() => {
@@ -82,6 +75,8 @@ export default function NavbarActions() {
           <div ref={menuRef} className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
+              aria-controls="account-menu"
+              aria-expanded={menuOpen}
               onPointerEnter={() => setChipLive(true)}
               onPointerLeave={() => setChipLive(false)}
               onFocus={() => setChipLive(true)}
@@ -110,7 +105,7 @@ export default function NavbarActions() {
               </span>
             </button>
 
-            <div className={`absolute right-0 top-11 z-50 min-w-40 overflow-hidden rounded-2xl border border-line bg-surface/80 shadow-xl backdrop-blur-2xl transition-all duration-200 origin-top-right ${
+            <div id="account-menu" inert={!menuOpen} className={`absolute right-0 top-11 z-50 min-w-40 overflow-hidden rounded-2xl border border-line bg-surface/80 shadow-xl backdrop-blur-2xl transition-all duration-200 origin-top-right ${
               menuOpen
                 ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
                 : "opacity-0 scale-95 -translate-y-2 pointer-events-none"
