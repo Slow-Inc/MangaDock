@@ -56,6 +56,8 @@ class Region:
     render_font_px: Optional[float] = None
     render_dst_box: Optional[Box] = None
     from_sfx: bool = False
+    #: the vision rescue localized this region's SFX (drawn at the source glyph size by design)
+    sfx_rescued: bool = False
     #: luminance std-dev inside render_dst_box on the composited page (None = not measured)
     dst_ink_std: Optional[float] = None
 
@@ -118,7 +120,7 @@ def _probe_detect(page: PageSnapshot, flags: Flags) -> StageReport:
         # #881: a vision-rescued SFX is DRAWN at its source glyph size (the display-SFX branch),
         # so a huge font there is the design, not a detection error — flagging it failed 7 of 39
         # pages in the _r2 corpus replay the moment the rescue started serving.
-        if r.render_branch == 'sfx_display':
+        if r.render_branch == 'sfx_display' or r.sfx_rescued:
             continue
         area = (r.xyxy[2] - r.xyxy[0]) * (r.xyxy[3] - r.xyxy[1])
         huge = area > MAX_REGION_PAGE_SHARE * page_area
@@ -307,7 +309,8 @@ def snapshot_from_payload(payload: Dict, target_lang: str, *, textlines: int, sf
             translation=d.get('dst', ''), font_size=float(d.get('font_src_px') or 0),
             bubble_idx=containers.setdefault(bubble, len(containers)) if bubble else None,
             bubble_box=bubble, render_branch=d.get('branch'),
-            render_font_px=d.get('font_final_px'), render_dst_box=_box(d.get('dst_box'))))
+            render_font_px=d.get('font_final_px'), render_dst_box=_box(d.get('dst_box')),
+            sfx_rescued=bool(d.get('sfx_rescued'))))
     return PageSnapshot(target_lang=target_lang, width=payload.get('img_width', 0),
                         height=payload.get('img_height', 0), textlines=textlines,
                         sfx_lines=sfx_lines, empty_reads=empty_reads, regions=regions,

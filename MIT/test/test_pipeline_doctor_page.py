@@ -13,11 +13,11 @@ from tools.pipeline_doctor.page_probes import PageSnapshot, Region, diagnose
 
 
 def _region(i, xyxy, text, translation, *, font=20, bubble=None, bubble_box=None,
-            branch='clean_layout', font_px=18, dst=None, sfx=False):
+            branch='clean_layout', font_px=18, dst=None, sfx=False, rescued=False):
     return Region(index=i, xyxy=xyxy, text=text, translation=translation, font_size=font,
                   bubble_idx=bubble, bubble_box=bubble_box, render_branch=branch,
                   render_font_px=font_px, render_dst_box=dst if dst is not None else xyxy,
-                  from_sfx=sfx)
+                  from_sfx=sfx, sfx_rescued=rescued)
 
 
 CAPTION = (98, 108, 347, 609)
@@ -282,6 +282,23 @@ def test_a_rescued_display_sfx_is_not_an_implausible_region():
     page = PageSnapshot(target_lang='THA', width=1086, height=1544, textlines=3, sfx_lines=0,
                         empty_reads=0, regions=[
         _region(0, (700, 200, 780, 360), 'ฟู่', 'ฟู่', branch='sfx_display', font_px=173),
+        _region(1, (300, 400, 420, 470), 'HI', 'ไฮ', font_px=20),
+        _region(2, (300, 500, 420, 560), 'OK', 'โอเค', font_px=20),
+        _region(3, (300, 600, 420, 660), 'YO', 'โย', font_px=20),
+    ])
+    detect = _by_stage(diagnose(page)[0])['detect']
+    assert detect.status == OK
+    assert detect.metrics['implausible'] == 0
+
+
+def test_a_rescued_sfx_inside_a_balloon_is_not_implausible_either():
+    """The display branch is not the only shape: a rescued SFX that sits inside a speech balloon
+    renders through the dialogue branch (Tsuki p0 'ตุ้บ', 66 px vs a 20 px median). The probe must
+    key on the rescue flag, not on the branch."""
+    page = PageSnapshot(target_lang='THA', width=1086, height=1544, textlines=3, sfx_lines=0,
+                        empty_reads=0, regions=[
+        _region(0, (700, 200, 780, 360), 'ตุ้บ', 'ตุ้บ', branch='bubble_fit_tall', font_px=66,
+                bubble=0, bubble_box=(690, 190, 790, 370), rescued=True),
         _region(1, (300, 400, 420, 470), 'HI', 'ไฮ', font_px=20),
         _region(2, (300, 500, 420, 560), 'OK', 'โอเค', font_px=20),
         _region(3, (300, 600, 420, 660), 'YO', 'โย', font_px=20),

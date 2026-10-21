@@ -41,6 +41,9 @@ def regions_payload(regions: Iterable) -> List[Dict[str, str]]:
             ('render_branch', 'branch', str),
             ('render_font_px', 'font_final_px', int),
             ('render_dst_box', 'dst_box', _float_box),
+            # #881: the doctor tells a rescued SFX (drawn at its source glyph size) from a
+            # detection error; present only when the rescue flagged the region.
+            ('sfx_rescued', 'sfx_rescued', bool),
         ):
             v = getattr(r, attr, None)
             if v is not None:
