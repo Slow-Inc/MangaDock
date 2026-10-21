@@ -115,6 +115,11 @@ def _probe_detect(page: PageSnapshot, flags: Flags) -> StageReport:
     page_area = max(1, page.width * page.height)
     evidence = []
     for r in page.regions:
+        # #881: a vision-rescued SFX is DRAWN at its source glyph size (the display-SFX branch),
+        # so a huge font there is the design, not a detection error — flagging it failed 7 of 39
+        # pages in the _r2 corpus replay the moment the rescue started serving.
+        if r.render_branch == 'sfx_display':
+            continue
         area = (r.xyxy[2] - r.xyxy[0]) * (r.xyxy[3] - r.xyxy[1])
         huge = area > MAX_REGION_PAGE_SHARE * page_area
         blown = (r.render_font_px and median and r.render_font_px > JUNK_FONT_X_MEDIAN * median

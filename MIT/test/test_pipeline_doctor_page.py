@@ -272,3 +272,20 @@ def test_replay_reproduces_a_translation_the_recording_dropped_as_identical():
                 'dropped': [['力', 'Translation identical to original'], ['X', 'Target language ratio']]}
     out, missing = replay_translations(['HELLO', '力', 'X'], recorded)
     assert out[:2] == ['สวัสดี', '力'] and missing == [2]
+
+
+def test_a_rescued_display_sfx_is_not_an_implausible_region():
+    """#881: once the vision rescue serves, a stylized SFX renders through the display-SFX branch
+    at the source glyph's own size (173 px against a 20 px dialogue median) — that is the design,
+    not a detection error. The implausible check caught it and failed 7 of 39 pages in the _r2
+    corpus replay."""
+    page = PageSnapshot(target_lang='THA', width=1086, height=1544, textlines=3, sfx_lines=0,
+                        empty_reads=0, regions=[
+        _region(0, (700, 200, 780, 360), 'ฟู่', 'ฟู่', branch='sfx_display', font_px=173),
+        _region(1, (300, 400, 420, 470), 'HI', 'ไฮ', font_px=20),
+        _region(2, (300, 500, 420, 560), 'OK', 'โอเค', font_px=20),
+        _region(3, (300, 600, 420, 660), 'YO', 'โย', font_px=20),
+    ])
+    detect = _by_stage(diagnose(page)[0])['detect']
+    assert detect.status == OK
+    assert detect.metrics['implausible'] == 0
