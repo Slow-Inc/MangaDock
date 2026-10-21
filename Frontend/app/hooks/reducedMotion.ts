@@ -18,9 +18,11 @@ export function motionStore(query: MotionQuery) {
   };
 }
 
+const QUERY = "(prefers-reduced-motion: reduce)";
+
 // Stable identities, browser-only on first use — same shape as pageVisibility.ts.
 let store: ReturnType<typeof motionStore> | null = null;
-const motion = () => (store ??= motionStore(matchMedia("(prefers-reduced-motion: reduce)")));
+const motion = () => (store ??= motionStore(matchMedia(QUERY)));
 const subscribe = (onChange: () => void) => motion().subscribe(onChange);
 const getSnapshot = () => motion().getSnapshot();
 const getServerSnapshot = () => false;
@@ -37,4 +39,17 @@ export function useReducedMotion(): boolean {
 /** The hero rotates on its own unless the user paused it — or, until they choose, unless they ask for reduced motion. */
 export function heroAutoplay(userChoice: boolean | null, reducedMotion: boolean): boolean {
   return userChoice ?? !reducedMotion;
+}
+
+/** Whether reduced motion is asked for right now — for event handlers and effects, where a hook cannot go. */
+export function prefersReducedMotion(query: Pick<MediaQueryList, "matches"> = matchMedia(QUERY)): boolean {
+  return query.matches;
+}
+
+/**
+ * `behavior` for JS-initiated scrolling (#852). globals.css sets `scroll-behavior: auto` under reduced motion, but
+ * an explicit `behavior: "smooth"` passed to scrollTo/scrollBy/scrollIntoView overrides it.
+ */
+export function scrollBehavior(query?: Pick<MediaQueryList, "matches">): ScrollBehavior {
+  return prefersReducedMotion(query) ? "auto" : "smooth";
 }

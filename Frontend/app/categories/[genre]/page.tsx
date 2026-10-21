@@ -6,6 +6,7 @@ import Navbar from "../../components/Navbar";
 import MangaGrid, { GridBook } from "../../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../../lib/apiCache";
 import Loader from "../../components/ui/Loader";
+import { scrollBehavior } from "../../hooks/reducedMotion";
 
 const API_BASE = "/api/proxy";
 
@@ -149,14 +150,14 @@ export default function GenrePage() {
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button
                 disabled={isPrevDisabled}
-                onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                 className="rounded-lg border border-line px-3 py-2 text-xs text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
               >
                 «
               </button>
               <button
                 disabled={isPrevDisabled}
-                onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                 className="rounded-lg border border-line px-4 py-2 text-sm transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 text-ink-2"
               >
                 ← ก่อนหน้า
@@ -169,7 +170,7 @@ export default function GenrePage() {
                 return (
                   <button
                     key={p}
-                    onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                     className={`h-9 w-9 rounded-lg text-sm transition ${
                       p === page
                         ? "bg-ink text-bg font-semibold"
@@ -183,14 +184,14 @@ export default function GenrePage() {
 
               <button
                 disabled={isNextDisabled}
-                onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                 className="rounded-lg border border-line px-4 py-2 text-sm transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 text-ink-2"
               >
                 ถัดไป →
               </button>
               <button
                 disabled={isNextDisabled}
-                onClick={() => { setPage(totalPages); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                onClick={() => { setPage(totalPages); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                 className="rounded-lg border border-line px-3 py-2 text-xs text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
               >
                 »

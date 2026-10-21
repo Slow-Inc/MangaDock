@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Navbar from "../components/Navbar";
 import MangaGrid, { GridBook } from "../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
+import { scrollBehavior } from "../hooks/reducedMotion";
 
 const API_BASE = "/api/proxy";
 
@@ -64,7 +65,7 @@ function ChipBar({ categories, active, onSelect }: {
     };
   }, [categories]);
 
-  const scroll = (dir: -1 | 1) => scrollRef.current?.scrollBy({ left: dir * 200, behavior: "smooth" });
+  const scroll = (dir: -1 | 1) => scrollRef.current?.scrollBy({ left: dir * 200, behavior: scrollBehavior() });
 
   if (categories.length <= 1) return null;
   return (
@@ -259,14 +260,14 @@ function Section({ order }: { order: TabKey }) {
   const handlePageChange = (p: number) => {
     startFadeOut();
     setPage(p);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
 
   const handleChipSelect = (cat: string) => {
     startFadeOut();
     setCategoryFilter(cat);
     setPage(1);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
 
   return (

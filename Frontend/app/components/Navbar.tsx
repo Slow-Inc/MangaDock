@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import MangaDockLogo from "./MangaDockLogo";
 import NavbarActions from "./NavbarActions";
 import { getActiveStudioTab, STUDIO_TABS } from "../studio/components/studioTabs";
+import { scrollBehavior } from "../hooks/reducedMotion";
 
 const GENRES = [
   { slug: "action",        label: "แอคชัน" },
@@ -75,13 +76,13 @@ export default function Navbar() {
       if (pathname === "/") {
         document
           .getElementById(item.scrollId)
-          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+          ?.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
       } else {
         router.push("/");
         setTimeout(() => {
           document
             .getElementById(item.scrollId!)
-            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+            ?.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
         }, 600);
       }
     }
