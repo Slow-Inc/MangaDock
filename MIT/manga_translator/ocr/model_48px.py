@@ -3,6 +3,7 @@ import math
 from typing import Callable, List, Optional, Tuple, Union
 from collections import defaultdict
 import os
+import sys
 import shutil
 import cv2
 import numpy as np
@@ -16,6 +17,22 @@ from manga_translator.config import OcrConfig
 from .xpos_relative_position import XPOS
 
 # Roformer with Xpos and Local Attention ViT
+
+
+#: #884, measured 2026-10-22 on this Win11 + RTX setup: with cuDNN enabled, each OCR chunk call
+#: inside the running pipeline spent ~2.2 s in host-side cuDNN work (an isolated process pays
+#: ~0.1 s), so the 48px model's 5 chunks cost ~10 s/page. Running ONLY this model's forward with
+#: cuDNN disabled measured 3-4x faster (4.0 -> 0.8 s and 9.6 -> 2.9 s per page) with identical OCR
+#: reads (62 regions over 5 pages); every other model keeps cuDNN (LaMa inpainting regressed 3-12x
+#: without it). The pathology has only been measured here, so non-Windows keeps cuDNN.
+#: ``MIT_OCR_CUDNN=1`` forces it back on, ``MIT_OCR_CUDNN=0`` forces it off.
+_OCR_USE_CUDNN = os.environ.get('MIT_OCR_CUDNN', '1' if sys.platform != 'win32' else '0') == '1'
+
+
+def _cudnn_flags():
+    """cuDNN on/off for THIS model's forward only (#884 — see ``_OCR_USE_CUDNN``). The other
+    models in the pipeline keep cuDNN; this context manager is scoped to the OCR call."""
+    return torch.backends.cudnn.flags(enabled=_OCR_USE_CUDNN)
 
 from .common import OfflineOCR
 from ..utils import TextBlock, Quadrilateral, chunks
@@ -116,7 +133,7 @@ class Model48pxOCR(OfflineOCR):
             image_tensor = einops.rearrange(image_tensor, 'N H W C -> N C H W')
             if self.use_gpu:
                 image_tensor = image_tensor.to(self.device)
-            with torch.no_grad():
+            with torch.no_grad(), _cudnn_flags():
                 ret = self.model.infer_beam_batch_tensor(image_tensor, widths, beams_k = 5, max_seq_length = 255)
             for i, (pred_chars_index, prob, fg_pred, bg_pred, fg_ind_pred, bg_ind_pred) in enumerate(ret):
                 if prob < threshold:

@@ -44,6 +44,7 @@ _HEAVY_TESTS = [
     'test_translation_manual.py',
     'test_worker_bind.py',
     'test_series_context.py',        # imports translators.config_gpt -> translators/__init__ (torch) (#762)
+    'test_ocr_cudnn.py',             # imports torch (#884 cuDNN switch)
     'test_xpos_cache.py',            # imports torch directly (#822 XPOS tables)
 ]
 collect_ignore = [] if _has_torch() else list(_HEAVY_TESTS)
