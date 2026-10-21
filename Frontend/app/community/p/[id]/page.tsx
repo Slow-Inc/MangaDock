@@ -24,6 +24,7 @@ import type { ForumPost, ForumComment } from "../../../lib/types";
 import { isDisplayedVoteEvent } from "../../../lib/voteEvents";
 import Loader from "../../../components/ui/Loader";
 import { PRIMARY_FILL } from "../../../components/ui/Button";
+import { usePageTitle } from "../../../hooks/pageTitle";
 
 function MarqueeText({ text, textClassName, active }: { text: string; textClassName?: string; active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,6 +67,7 @@ export default function PostDetailPage() {
   const { user, showLoginPrompt } = useAuth();
   
   const [post, setPost] = useState<ForumPost | null>(null);
+  usePageTitle(post?.title);
   const [comments, setComments] = useState<ForumComment[]>([]);
   const [loading, setLoading] = useState(true);
   

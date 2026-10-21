@@ -20,6 +20,7 @@ import { CommunityErrorBoundary } from "./components/CommunityErrorBoundary";
 import Loader from "../components/ui/Loader";
 import { PRIMARY_FILL } from "../components/ui/Button";
 import Mascot from "../components/mascot/Mascot";
+import { usePageTitle } from "../hooks/pageTitle";
 
 function CommunityContent() {
   const { user, userRole, showLoginPrompt } = useAuth();
@@ -495,6 +496,7 @@ function CommunityContent() {
 }
 
 export default function CommunityPage() {
+  usePageTitle("คอมมูนิตี้");
   return (
     <CommunityErrorBoundary>
       <Suspense fallback={

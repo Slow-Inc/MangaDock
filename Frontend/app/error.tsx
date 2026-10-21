@@ -3,9 +3,11 @@
 import Link from "next/link";
 import StatusPage from "./components/ui/StatusPage";
 import Button, { buttonClass } from "./components/ui/Button";
+import { usePageTitle } from "./hooks/pageTitle";
 
 /** App-level error boundary: a page that throws gets a way back instead of a blank screen. */
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  usePageTitle("หน้านี้มีปัญหา");
   return (
     <StatusPage
       label="error"

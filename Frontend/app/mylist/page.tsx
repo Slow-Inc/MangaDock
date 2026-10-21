@@ -26,6 +26,7 @@ import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
 import { scrollBehavior } from "../hooks/reducedMotion";
+import { usePageTitle } from "../hooks/pageTitle";
 
 type TabKey = "favorites" | "follows" | "liked" | "history";
 
@@ -510,6 +511,7 @@ function MyListContent() {
 }
 
 export default function MyListPage() {
+  usePageTitle("รายการของฉัน");
   return (
     <Suspense>
       <MyListContent />

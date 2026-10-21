@@ -24,6 +24,7 @@ import RelatedManga from "./RelatedManga";
 import Loader from "./ui/Loader";
 import type { LandingBook, MangaDetail, MangaChapter, ActiveChapter } from "../lib/types";
 import { scrollBehavior } from "../hooks/reducedMotion";
+import { usePageTitle } from "../hooks/pageTitle";
 
 type Props = {
   book: LandingBook;
@@ -91,6 +92,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   // home page flashes through and the entry animation replays. (It only mounts client-side, after a fetch.)
   const [mounted, setMounted] = useState(routed);
   const [visible, setVisible] = useState(routed);
+  usePageTitle(book.title);
   const { favorited, liked, handleToggleFavorite, handleToggleLiked } = useBookActions(book);
 
   // Auto-detect last read chapter from history when prop is not explicitly provided

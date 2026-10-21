@@ -16,6 +16,7 @@ import { CATEGORY_LIST } from "../../../lib/forumCategories";
 import { cacheOrFetch, TTL } from "../../../lib/apiCache";
 import { proxyImageUrl } from "../../../lib/imgUrl";
 import { PRIMARY_FILL } from "../../../components/ui/Button";
+import { usePageTitle } from "../../../hooks/pageTitle";
 
 /** Minimal shape read from the manga-detail endpoint (title + first cover). */
 type MangaMeta = { title?: string; covers?: { url: string; localUrl?: string }[] };
@@ -30,6 +31,7 @@ export default function MangaCommunityPage() {
   const [viewMode, setViewMode] = useState<'card' | 'compact'>('card');
   const isMobile = useIsMobile();
   const [mangaTitle, setMangaTitle] = useState<string | null>(null);
+  usePageTitle(mangaTitle ? `${mangaTitle} · คอมมูนิตี้` : null);
   const [mangaCover, setMangaCover] = useState<string | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);

@@ -18,6 +18,7 @@ import Mascot from "../../components/mascot/Mascot";
 import { useAuth } from "../../contexts/AuthContext";
 import { getActiveStudioTab, STUDIO_TABS } from "./studioTabs";
 import { SIDEBAR, clampSidebarWidth, studioPageTitle, studioRoleLabel } from "../lib/shellMath";
+import { usePageTitle } from "../../hooks/pageTitle";
 
 const WIDTH_KEY = "md-studio-sidebar";
 const ITEM_H = 40; // px per nav row — the active pill moves in these steps
@@ -68,6 +69,8 @@ const EYEBROW = "font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-ink-
 
 export default function StudioShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const pageTitle = studioPageTitle(pathname);
+  usePageTitle(pageTitle === "สตูดิโอ" ? pageTitle : `${pageTitle} · สตูดิโอ`);
   const { userRole } = useAuth();
   const role = studioRoleLabel(userRole);
   const [width, setWidth] = useState<number>(SIDEBAR.initial);

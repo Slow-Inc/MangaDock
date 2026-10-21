@@ -5,6 +5,7 @@ import ReviewCard from "../../../components/ReviewCard";
 import Mascot from "../../../components/mascot/Mascot";
 import StarRating from "../../../components/StarRating";
 import type { ReviewItem, ReviewSummary } from "../../../lib/reviewTypes";
+import { PageTitle } from "../../../hooks/pageTitle";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -26,7 +27,7 @@ async function fetchReviews(mangaId: string): Promise<{ reviews: ReviewItem[]; s
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  return { title: `รีวิว — MangaDock`, description: `รีวิวผู้อ่านสำหรับ manga ${id}` };
+  return { title: "รีวิว · MangaDock", description: `รีวิวผู้อ่านสำหรับ manga ${id}` };
 }
 
 export default async function ReviewsPage({ params }: Props) {
@@ -35,6 +36,7 @@ export default async function ReviewsPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-bg text-ink">
+      <PageTitle title="รีวิว" />
       <Navbar />
       <main className="page-shell page-shell-nav">
         <div className="max-w-3xl">

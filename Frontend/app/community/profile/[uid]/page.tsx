@@ -16,6 +16,7 @@ import FollowUserButton from '../../../components/FollowUserButton';
 import Loader from "../../../components/ui/Loader";
 import { UidMascot } from "../../../components/mascot/Mascot";
 import { PRIMARY_FILL } from "../../../components/ui/Button";
+import { usePageTitle } from "../../../hooks/pageTitle";
 
 type Tab = "posts" | "comments" | "liked" | "translated" | "following";
 type FollowProfile = { uid: string; displayName: string | null; photoUrl: string | null };
@@ -59,6 +60,7 @@ export default function PublicProfilePage() {
   const { user } = useAuth();
 
   const [data, setData] = useState<UserProfileResponse | null>(null);
+  usePageTitle(data ? `${data.profile.displayName ?? "ผู้ใช้ไม่ระบุชื่อ"} · คอมมูนิตี้` : null);
   const [loading, setLoading] = useState(true);
   // The photo URL that failed to load (Google's avatar CDN can refuse); keyed by URL so another profile starts clean.
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);

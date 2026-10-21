@@ -7,6 +7,7 @@ import { getTrendingManga, type TrendingManga } from "../../lib/communityApi";
 import { useToast } from "../../contexts/ToastContext";
 import { cacheGet, cacheSet, TTL } from "../../lib/apiCache";
 import Mascot from "../../components/mascot/Mascot";
+import { usePageTitle } from "../../hooks/pageTitle";
 
 function TrendingMangaCard({ item, rank }: { item: TrendingManga; rank: number }) {
   const router = useRouter();
@@ -78,6 +79,7 @@ function SkeletonCard() {
 }
 
 export default function TrendingPage() {
+  usePageTitle("ยอดนิยม · คอมมูนิตี้");
   const [trending, setTrending] = useState<TrendingManga[]>([]);
   const [loading, setLoading] = useState(true);
   const { showToast } = useToast();
