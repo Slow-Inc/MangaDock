@@ -113,6 +113,10 @@ export class MangaDexService {
   private fetchFn: typeof fetch = (...args: Parameters<typeof fetch>) =>
     fetch(...args);
 
+  // A hung MangaDex request used to hold the caller (e.g. /books/landing on a cold cache) for as long as the
+  // connection lived (#861). Below the frontend's 8 s server-render budget; tests can override it like fetchFn.
+  private mangadexTimeoutMs = 6000;
+
   private mangadexFetch(url: string): Promise<Response> {
     return this.fetchFn(url, {
       headers: {
@@ -120,6 +124,7 @@ export class MangaDexService {
         'User-Agent': 'MangaDock/1.0 (+https://2552667.xyz)',
       },
       cache: 'no-store',
+      signal: AbortSignal.timeout(this.mangadexTimeoutMs),
     });
   }
 
