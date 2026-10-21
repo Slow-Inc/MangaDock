@@ -8,8 +8,11 @@
 **What:** every MangaDex call goes through `MangaDexService.mangadexFetch`, which had no `signal` — a hung request held the
 caller (e.g. `/books/landing` on a cold cache) for as long as the connection lived. It now passes
 `AbortSignal.timeout(mangadexTimeoutMs)` (6 s, below the frontend's 8 s server-render budget from #858; overridable in
-tests like `fetchFn`), so a hung request rejects into the callers' existing error handling. All 10 call sites are JSON API
-calls (manga, feed, cover, tag, at-home server) — no image bytes go through it.
+tests like `fetchFn`), so a hung request rejects into the callers' existing error handling — every one of the 9 call sites
+is inside a try/catch returning empty/stale/null, none escapes as a 500. All are JSON API calls (manga, feed, cover, tag,
+at-home server) — no image bytes. Not a stale-cache fallback for landing: a timed-out row becomes an empty row (as any
+MangaDex error already did) and is cached for the landing TTL — follow-up filed, with the serial-call budgets (getRelated
+≈ 3 × 6 s).
 
 **Validated:** `mangadex-fetch-timeout.spec.ts` red → green (3: a never-answering MangaDex rejects in < 1 s at a 30 ms
 timeout; headers and `no-store` kept; default < 8 s). `src/books` jest: 337 pass, 0 fail. Rebuilt backend live: landing
