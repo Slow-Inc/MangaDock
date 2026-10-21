@@ -9,8 +9,6 @@ import { PageTitle } from "../../../hooks/pageTitle";
 
 type Props = { params: Promise<{ id: string }> };
 
-const BACKEND = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   return { title: "รีวิว · MangaDock", description: `รีวิวผู้อ่านสำหรับ manga ${id}` };
@@ -18,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ReviewsPage({ params }: Props) {
   const { id } = await params;
-  const { reviews, summary } = await fetchReviews(id, { backend: BACKEND });
+  const { reviews, summary } = await fetchReviews(id);
 
   return (
     <div className="min-h-screen bg-bg text-ink">

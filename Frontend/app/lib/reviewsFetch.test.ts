@@ -17,8 +17,10 @@ describe("fetchReviews: the reviews page renders even when the backend hangs (#8
 
   test("returns the list and summary from a healthy backend", async () => {
     const urls: string[] = [];
-    const okFetch = (async (url: string) => {
+    const inits: (RequestInit | undefined)[] = [];
+    const okFetch = (async (url: string, init?: RequestInit) => {
       urls.push(url);
+      inits.push(init);
       const body = url.endsWith("/summary") ? { averageRating: 4.5, count: 2 } : [{ id: "r1" }];
       return new Response(JSON.stringify(body), { status: 200 });
     }) as typeof fetch;
@@ -26,5 +28,7 @@ describe("fetchReviews: the reviews page renders even when the backend hangs (#8
     expect(urls.sort()).toEqual(["http://backend/reviews/m%201/summary", "http://backend/reviews/m%201?limit=50"]);
     expect(result.summary).toEqual({ averageRating: 4.5, count: 2 });
     expect(result.reviews).toHaveLength(1);
+    // both calls carry the deadline and stay in Next's 60 s data cache
+    expect(inits.every((i) => i?.signal instanceof AbortSignal && i.next?.revalidate === 60)).toBe(true);
   });
 });
