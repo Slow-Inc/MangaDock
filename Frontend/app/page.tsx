@@ -53,7 +53,7 @@ export default async function Home({
       <Navbar />
 
       {/* One <main> for the whole page so the hero is inside a landmark too (#835). */}
-      <main>
+      <main id="main">
       {topRankedBooks.length > 0 && <HeroCarousel books={topRankedBooks} />}
 
       <div className="relative z-10 space-y-10 px-6 pb-20 md:pb-16 lg:px-12">

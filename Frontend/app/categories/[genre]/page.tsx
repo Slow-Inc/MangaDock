@@ -78,7 +78,7 @@ export default function GenrePage() {
     <div className="min-h-screen bg-bg text-ink">
       <Navbar />
 
-      <main className="page-shell page-shell-nav page-shell-wide">
+      <main id="main" className="page-shell page-shell-nav page-shell-wide">
         {/* Breadcrumb */}
         <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-ink-3 sm:mb-6 sm:text-sm">
           <button

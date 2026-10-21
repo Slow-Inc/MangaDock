@@ -339,7 +339,7 @@ function NewBooksPageInner() {
     <div className="min-h-screen bg-bg text-ink">
       <Navbar />
 
-      <main className="page-shell page-shell-nav page-shell-wide">
+      <main id="main" className="page-shell page-shell-nav page-shell-wide">
         {/* Page header */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl font-bold text-ink md:text-3xl">

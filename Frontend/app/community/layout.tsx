@@ -104,7 +104,7 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="pt-24 lg:pt-28 pb-20 px-4 lg:px-10 max-w-7xl mx-auto [overflow-x:clip]">
+      <main id="main" className="pt-24 lg:pt-28 pb-20 px-4 lg:px-10 max-w-7xl mx-auto [overflow-x:clip]">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
           {/* Sidebar Column (Left) - Persistent and Pre-loaded */}
           <aside className="hidden lg:block lg:col-span-4 xl:col-span-3 sticky top-28 self-start h-[calc(100vh-8rem)]">
