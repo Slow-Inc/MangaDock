@@ -124,6 +124,7 @@ export default function AdminAuditPage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-2.5 p-4 bg-fill border border-line rounded-xl">
         <select
+          aria-label="กรองตามการกระทำ"
           value={filterAction}
           onChange={e => setFilterAction(e.target.value)}
           className={`${inputCls} text-ink-2`}
@@ -152,7 +153,7 @@ export default function AdminAuditPage() {
       {loadFailed && <AdminLoadError what="audit log" onRetry={() => load(page)} />}
 
       {/* Table */}
-      <div className="border border-line rounded-xl overflow-x-auto">
+      <div tabIndex={0} role="region" aria-label="Audit log table" className="border border-line rounded-xl overflow-x-auto">
         <table className="w-full min-w-[44rem] text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">

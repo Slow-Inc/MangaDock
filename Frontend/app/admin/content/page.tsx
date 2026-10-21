@@ -105,7 +105,7 @@ export default function AdminContentPage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-2.5 p-4 bg-fill border border-line rounded-xl">
         <input value={search} onChange={e => setSearchPersist(e.target.value)} placeholder="Search title or content…" className={`${inputCls} w-60`} />
-        <select value={filterCategory} onChange={e => setFilterCategoryPersist(e.target.value)} className={`${inputCls} text-ink-2`}>
+        <select aria-label="Filter by category" value={filterCategory} onChange={e => setFilterCategoryPersist(e.target.value)} className={`${inputCls} text-ink-2`}>
           <option value="">All categories</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -115,7 +115,7 @@ export default function AdminContentPage() {
       {loadFailed && <AdminLoadError what="posts" onRetry={() => load(page)} />}
 
       {/* Table */}
-      <div className="border border-line rounded-xl overflow-x-auto">
+      <div tabIndex={0} role="region" aria-label="Posts table" className="border border-line rounded-xl overflow-x-auto">
         <table className="w-full min-w-[44rem] text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">

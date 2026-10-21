@@ -115,7 +115,7 @@ export default function Navbar() {
             <MangaDockLogo className="h-8 sm:h-9" />
           </Link>
 
-          <nav className="hidden items-center gap-1 text-sm md:flex">
+          <nav aria-label="เมนูหลัก" className="hidden items-center gap-1 text-sm md:flex">
             {/* Regular nav items */}
             {navItems.map((item) => {
               const isActive =
@@ -212,7 +212,7 @@ export default function Navbar() {
     </header>
 
     {/* ── Mobile bottom navigation (Webtoon-style) ── */}
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-bg md:hidden">
+    <nav aria-label="เมนูด้านล่าง" className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-bg md:hidden">
       {isStudioPath ? (
         <div className="flex h-16 items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
           {STUDIO_TABS.slice(0, 2).map((tab) => {

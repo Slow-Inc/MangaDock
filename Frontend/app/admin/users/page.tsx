@@ -165,16 +165,16 @@ export default function AdminUsersPage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-2.5 p-4 bg-fill border border-line rounded-xl">
         <input value={search} onChange={e => setSearchPersist(e.target.value)} placeholder="Search email or name…" className={`${inputCls} w-60`} />
-        <select value={filterRole} onChange={e => setFilterRolePersist(e.target.value)} className={`${inputCls} text-ink-2`}>
+        <select aria-label="Filter by role" value={filterRole} onChange={e => setFilterRolePersist(e.target.value)} className={`${inputCls} text-ink-2`}>
           <option value="">All roles</option>
           {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
-        <select value={filterPlan} onChange={e => setFilterPlanPersist(e.target.value)} className={`${inputCls} text-ink-2`}>
+        <select aria-label="Filter by plan" value={filterPlan} onChange={e => setFilterPlanPersist(e.target.value)} className={`${inputCls} text-ink-2`}>
           <option value="">All plans</option>
           <option value="free">Free</option>
           <option value="pro">Pro</option>
         </select>
-        <select value={filterBanned} onChange={e => setFilterBannedPersist(e.target.value)} className={`${inputCls} text-ink-2`}>
+        <select aria-label="Filter by status" value={filterBanned} onChange={e => setFilterBannedPersist(e.target.value)} className={`${inputCls} text-ink-2`}>
           <option value="">All statuses</option>
           <option value="false">Active</option>
           <option value="true">Banned</option>
@@ -184,7 +184,7 @@ export default function AdminUsersPage() {
       {loadFailed && <AdminLoadError what="users" onRetry={() => loadUsers(page)} />}
 
       {/* Table */}
-      <div className="border border-line rounded-xl overflow-x-auto">
+      <div tabIndex={0} role="region" aria-label="Users table" className="border border-line rounded-xl overflow-x-auto">
         <table className="w-full min-w-[44rem] text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
@@ -216,7 +216,7 @@ export default function AdminUsersPage() {
                     <button onClick={() => openDetail(u.uid)} className="text-xs text-ink-2 hover:text-ink transition-colors smooth-hover-fast">Detail</button>
                     {u.role < 8 && (
                       <>
-                        <select defaultValue={u.role} onChange={e => { setConfirmRoleUid(u.uid); setConfirmRole(Number(e.target.value)); }}
+                        <select aria-label={`Role of ${u.displayName || u.email}`} defaultValue={u.role} onChange={e => { setConfirmRoleUid(u.uid); setConfirmRole(Number(e.target.value)); }}
                           className="bg-fill border border-line rounded px-2 py-1 text-xs text-ink-2 focus:outline-none">
                           {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                         </select>

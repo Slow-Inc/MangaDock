@@ -104,23 +104,23 @@ export default function AdminTransactionsPage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-2.5 p-4 bg-fill border border-line rounded-xl">
         <input value={filterUid} onChange={e => setFilterUidPersist(e.target.value)} placeholder="Filter by UID…" className={`${inputCls} w-60`} />
-        <select value={filterType} onChange={e => setFilterTypePersist(e.target.value)} className={`${inputCls} text-ink-2`}>
+        <select aria-label="Filter by type" value={filterType} onChange={e => setFilterTypePersist(e.target.value)} className={`${inputCls} text-ink-2`}>
           <option value="">All types</option>
           {TX_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
-        <input type="date" value={filterFrom} onChange={e => setFilterFromPersist(e.target.value)} className={`${inputCls} text-ink-2`} />
-        <input type="date" value={filterTo} onChange={e => setFilterToPersist(e.target.value)} className={`${inputCls} text-ink-2`} />
+        <input type="date" aria-label="From date" value={filterFrom} onChange={e => setFilterFromPersist(e.target.value)} className={`${inputCls} text-ink-2`} />
+        <input type="date" aria-label="To date" value={filterTo} onChange={e => setFilterToPersist(e.target.value)} className={`${inputCls} text-ink-2`} />
       </div>
 
       {loadFailed && <AdminLoadError what="transactions" onRetry={() => load(page)} />}
 
       {/* Table */}
-      <div className="border border-line rounded-xl overflow-x-auto">
+      <div tabIndex={0} role="region" aria-label="Transactions table" className="border border-line rounded-xl overflow-x-auto">
         <table className="w-full min-w-[44rem] text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
               {['UID', 'Type', 'Amount', 'Balance After', 'Created', ''].map((h, i) => (
-                <th key={i} className="text-left px-4 py-3 text-[11px] font-medium text-ink-3 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                <th key={i} className="text-left px-4 py-3 text-[11px] font-medium text-ink-3 uppercase tracking-wide whitespace-nowrap">{h || <span className="sr-only">Detail</span>}</th>
               ))}
             </tr>
           </thead>

@@ -3,6 +3,22 @@
 
 ---
 
+## #846 Named controls and landmarks in Studio, Settings, Admin and the post page (2026-10-21)
+
+**What:** an axe sweep of the signed-in routes (Studio, Settings, Admin) found unnamed controls and missing or duplicate
+landmarks. Admin filter selects, date inputs and row role selects got names; wide tables are named, focusable scroll
+regions; an empty Transactions header cell has sr-only text. Studio upload's back button and form fields, and the
+profile name and email fields, are labelled (`htmlFor`, not the placeholder). Studio and Settings each have exactly one top-level `<main>`, and every `<nav>` has
+its own name (main menu, bottom menu, Studio, Settings). The post page's loading skeleton (sr-only) and "post not found"
+state now carry an `h1`, so a slow or deleted post still has a page heading.
+
+**Validated:** production build; axe over 27 signed-in route/width pairs (local session, mocked data) → only
+`color-contrast` left (Strata `ink-3` token, parked for the developer); axe structure sweep over 10 public routes ×
+1440/390 → 0 violations (the post page was audited while its API timed out, i.e. the loading state). tsc 0; `bun test`
+414 pass, the 9 failures are the `app/docs/__tests__` suites this diff does not touch.
+
+---
+
 ## #843 Cover lightbox reachable by keyboard (2026-10-21)
 
 **What:** the per-volume enlarge icon was a `<div onClick>` inside the volume `<button>` — mouse-only. The tile is now a
@@ -14,6 +30,9 @@ when a layer is above it.
 lightbox with focus inside → 6 Tabs stay inside → Escape closes it, focus back on the enlarge button, popup still open.
 Mouse: hover shows the button, tile click selects the volume, enlarge click opens, close button closes. tsc 0; eslint
 counts unchanged.
+
+**Follow-up (#845):** the enlarge-cover buttons on grid cards, book rows and search results were `opacity-0` until hover,
+so keyboard focus landed on an invisible control; they now show on `focus-visible` too, and the tile hover border stays.
 
 ---
 

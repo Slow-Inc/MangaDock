@@ -118,7 +118,7 @@ export default function AdminOverviewPage() {
         ) : stats.recentBans.length === 0 ? (
           <p className="text-ink-3 text-sm">No bans recorded.</p>
         ) : (
-          <div className="border border-line rounded-xl overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Recent bans" className="border border-line rounded-xl overflow-x-auto">
             <table className="w-full min-w-[32rem] text-sm">
               <thead>
                 <tr className="border-b border-line bg-fill">

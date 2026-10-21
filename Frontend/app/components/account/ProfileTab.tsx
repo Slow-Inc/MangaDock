@@ -56,8 +56,9 @@ export default function ProfileTab({ formState, dispatch, isOpen }: ProfileTabPr
       )}
       <div className="space-y-4">
         <div>
-          <label className={labelClass}>ชื่อผู้ใช้</label>
+          <label htmlFor="profile-name" className={labelClass}>ชื่อผู้ใช้</label>
           <input
+            id="profile-name"
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
@@ -66,8 +67,9 @@ export default function ProfileTab({ formState, dispatch, isOpen }: ProfileTabPr
           />
         </div>
         <div>
-          <label className={labelClass}>อีเมล</label>
+          <label htmlFor="profile-email" className={labelClass}>อีเมล</label>
           <input
+            id="profile-email"
             type="email"
             value={email}
             disabled

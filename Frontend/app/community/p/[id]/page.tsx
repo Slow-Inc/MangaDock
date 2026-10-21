@@ -268,7 +268,7 @@ export default function PostDetailPage() {
   }
 
   if (!post) return (
-    <div className="py-20 text-center text-ink-3">ไม่พบข้อมูลกระทู้</div>
+    <h1 className="py-20 text-center text-ink-3">ไม่พบข้อมูลกระทู้</h1>
   );
 
   return (

@@ -40,7 +40,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   return (
     <div className="min-h-dvh bg-bg pb-20">
       <Navbar />
-      <div className="mx-auto max-w-4xl px-4 pt-24 pb-8">
+      <main className="mx-auto max-w-4xl px-4 pt-24 pb-8">
         <h1 className="mb-6 text-lg font-bold text-ink">การตั้งค่า</h1>
         {/* Mobile tab nav */}
         <div ref={mobileNavRef} className="relative mb-4 flex gap-1 overflow-x-auto pb-1 md:hidden">
@@ -61,7 +61,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         </div>
         <div className="flex gap-6">
           <aside className="hidden w-48 shrink-0 md:block">
-            <nav className="space-y-0.5">
+            <nav aria-label="เมนูการตั้งค่า" className="space-y-0.5">
               {NAV.map((item) => (
                 <Link
                   key={item.href}
@@ -78,9 +78,9 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
               ))}
             </nav>
           </aside>
-          <main className="min-w-0 flex-1">{children}</main>
+          <div className="min-w-0 flex-1">{children}</div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
