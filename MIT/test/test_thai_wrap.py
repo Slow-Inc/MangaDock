@@ -508,3 +508,28 @@ def test_a_compound_tnc_lacks_is_not_resplit():
     assert 'หน้าใหม่' in _insert_thai_word_breaks('ไม่มีหน้าใหม่').split(_ZWSP)
     assert 'ลำดับ' in [p.strip() for p in _insert_thai_word_breaks('ทำเป็นลำดับ').split(_ZWSP)] or \
         'เป็นลำดับ' in _insert_thai_word_breaks('ทำเป็นลำดับ').split(_ZWSP)
+
+
+def test_glyph_stroke_bitmap_matches_freetypes_buffer_872():
+    """#872 profile: the stroke (border) bitmap still went through freetype-py's bitmap.buffer twice
+    (a len() and an np.array of a byte-by-byte Python list) — 1.6 s on 4 pages. Same pixels expected."""
+    import numpy as np
+    import freetype
+    tr.set_font(_PROMPT)
+
+    def reference(cdpt, font_size, direction):
+        g = tr.get_char_border(cdpt, font_size, direction)
+        st = freetype.Stroker()
+        st.set(64 * max(int(0.07 * font_size), 1), freetype.FT_STROKER_LINEJOIN_ROUND,
+               freetype.FT_STROKER_LINECAP_ROUND, 0)
+        g.stroke(st, destroy=True)
+        b = g.to_bitmap(freetype.FT_RENDER_MODE_NORMAL, freetype.Vector(0, 0), True).bitmap
+        if b.rows * b.width > 0 and len(b.buffer) == b.rows * b.width:
+            return np.array(b.buffer, dtype=np.uint8).reshape((b.rows, b.width))
+        return None
+
+    for ch in ('ก', 'ที่', 'W', 'あ', '!', ' '):
+        for size in (13, 40):
+            for direction in (0, 1):
+                got, want = tr._render_glyph_stroke(ch[0], size, direction), reference(ch[0], size, direction)
+                assert (got is None and want is None) or np.array_equal(got, want), (ch, size, direction)

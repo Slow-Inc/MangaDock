@@ -594,8 +594,9 @@ def _render_glyph_stroke(cdpt: str, font_size: int, direction: int) -> Optional[
     blyph = glyph_border.to_bitmap(freetype.FT_RENDER_MODE_NORMAL, freetype.Vector(0, 0), True)
     bitmap_b = blyph.bitmap
     rows, width = bitmap_b.rows, bitmap_b.width
-    if rows * width > 0 and len(bitmap_b.buffer) == rows * width:
-        return np.array(bitmap_b.buffer, dtype=np.uint8).reshape((rows, width))
+    buf = _bitmap_bytes(bitmap_b)   # not bitmap_b.buffer: a byte-by-byte Python list, twice (#872)
+    if rows * width > 0 and len(buf) == rows * width:
+        return buf.reshape((rows, width))
     return None
 
 
