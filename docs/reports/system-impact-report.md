@@ -1,5 +1,102 @@
 # MangaDock — System-Impact Change & Tech-Debt Report
 
+## 2026-10-21 — Discovery UI publication and tablet verification
+
+| Field | Result / ผลลัพธ์ |
+| --- | --- |
+| 1. What / where | NativeDiscoveryView continuous shade, aligned rank/cover geometry, bounded hero / เงาต่อเนื่อง กรอบอันดับตรงปก และHeroจำกัดขนาด |
+| 2. Outcome | Phone plus tablet-sized portrait/landscape UI verified / ตรวจUIมือถือและขนาดtabletสองแนว |
+| 3. Performance gain | Not measured / ไม่วัด |
+| 4. Benefits | Remove shade stripes, floating covers and oversized tablet hero / ลดเงาขีด ปกลอย และHeroใหญ่เกินบนtablet |
+| 5. Purpose | User's conditional push request / ตรวจเงื่อนไขก่อนpushตามผู้ใช้ |
+| 6. Impact | One presentational file; API/auth/reader/catalog/tests match ef301fb / แก้ไฟล์แสดงผลเดียว โค้ดฟังก์ชันตรงฐานef301fb |
+| 7. Before | Unbounded88%-width cover grows past1000dp tall on an800dp tablet / ปก88%ไม่จำกัด สูงเกิน1000dpบนtabletกว้าง800dp |
+| 8. Goal | Phone parity and usable tablet geometry / คงมือถือและจัดขนาดtabletเหมาะสม |
+| 9. Architecture before | Viewport-wide paging plus unbounded cover / หน้าcarouselตามviewportและปกไม่จำกัด |
+| 10. Architecture after | Paging unchanged, cover=min88%,320dp,60%-height2:3 / ระยะหน้าเดิม ปกเลือกต่ำสุด88%,320dp,ปก2:3สูง60% |
+| 11. Refactor | Remove20 shade children; add rank frame; no dependency / ลบเงา20ชิ้น เพิ่มกรอบเลข ไม่เพิ่มdependency |
+| 12. Metrics | Mobile235/235, tooling58/58, types/env/format/lockfile and dual-ABI build pass; live search/reader blocked by DB / checksผ่านแต่search/readerสดติดDB |
+| 13. Debt removed | Discrete overlay and metadata-dependent alignment / เลิกเงาเป็นขั้นและแนวปกที่ขึ้นกับข้อความ |
+| 14. Risk / rollback | Revert presentation only; experimental gradient pinned to RN0.85.3 / ย้อนเฉพาะหน้าตา ตรวจgradientexperimentalเมื่ออัปเกรดRN |
+| 15. Developer experience | Bilingual report, real screenshots, exact artifact hash / รายงานสองภาษา ภาพจริง และhashartifact |
+| 16. Future | Recheck live reader/search when DB is available; physical tablet/iOS / ตรวจreader/searchสดเมื่อDBพร้อม และtabletจริง/iOS |
+| 17. Lessons | Correct ABI needed for emulator; preserve both doc histories / emulatorต้องABIตรงและเก็บประวัติเอกสารทั้งสองฝั่ง |
+| 18. Acceptance | UI/source-regression scope only; not full live-service/store acceptance / รับเฉพาะUIและไม่ถอยหลังในsource ไม่ใช่บริการสดครบหรือstore |
+
+Evidence / หลักฐาน: [bilingual delivery report](../../Mobile/docs/2026-10-21-discovery-delivery.md).
+Final artifact SHA256 `0edfb3115f49428902c2871584c25b5de47e682105267c6f5a66925a55d0b2ac`;
+installed phone/emulator hashes match. Local book/chapter reads200 but versions
+exceeds20s; independent Supabase SQL also times out. No backend/schema/provider
+mutation or fake response used. / hashบนมือถือและemulatorตรงกัน รายละเอียด/ตอนตอบ200
+แต่versionsเกิน20วินาทีและSQLอีกเส้นทางtimeout ไม่แก้backend/schema/providerหรือปลอมผล
+
+## 2026-10-21 — Native Top 10 alignment
+
+**What / where.** `Mobile/src/NativeDiscoveryView.tsx`: top-align ranked cards;
+anchor numeric labels to a 144dp frame derived from 96dp cover width and 2:3
+aspect. Preserve the preceding hero-gradient repair and ordinary rows.
+
+**Why / before → after.** Bottom-aligning full cards made one extra title line
+lift its cover by 19dp (57px on Z Flip4). First cover y429, second y372 before;
+after, complete ranked covers share the same top throughout the horizontal
+sweep and ranks align to cover bottoms. Title metadata remains naturally wrapped.
+
+**Quality / validation.** Mobile234/234, TypeScript/env, Android release build
+including vital lint passed (316 tasks,53s). Z Flip4 install-r/launch and installed
+hash passed. All ten ranks observed in both font1.0 and1.5 sweeps; cover tops
+397/434 and rank bottoms829/866 respectively. Screenshots/XML inspected. Original
+font1.0 restored/read back. An initial probe outside the row viewport was discarded.
+No broad navigation or iOS acceptance is claimed.
+
+**Performance Δ.** Not measured. Adds one small rank frame per visible ranked
+item, no dependency or additional request. No percentage speed/memory claim.
+
+**Risk / rollback.** Low-impact layout correction; preserve natural text wrapping
+and recheck unusual fonts/device widths. Revert ranked layout only to retain the
+hero repair. No backend/auth/schema/payment changes. Earlier visual QA did not
+record this alignment defect; why it escaped review is not established.
+
+**Links / delivery.** [Report](../../Mobile/docs/2026-10-21-top10-alignment.md),
+[ADR033](../adr/033-mobile-ranked-cover-alignment.md). Branch
+`fix/mobile-hero-gradient-20261021`; no new commit/PR. QA APK
+`Mobile/build/apk/2026-10-21/MangaDock-0.1.0-top10-aligned-arm64.apk`, SHA256
+`a6065a042fce0619362fc33bc7feaa98ea9367f1b1499f4f1b19dae9009497da`.
+
+## 2026-10-21 — Native discovery cover shade smoothing
+
+**What / where.** `Mobile/src/NativeDiscoveryView.tsx`: replace 20 adjacent
+black overlays with one continuous native linear gradient.
+
+**Why / mechanism.** Each former strip had constant opacity, increasing in
+0.045 steps. The discontinuities caused visible horizontal lines over the
+cover on Galaxy Z Flip4. The supplied web markup identified the reference
+surface; the faulty overlay was implemented separately in native code.
+
+**Before → after / quality.** Same Chainsaw Man cover: broad horizontal shade
+bands are visible before and absent after. Lower-40% shading, end opacity
+0.855, cover clipping and title layout are preserved. Device screenshots are
+linked in the [report](../../Mobile/docs/2026-10-21-hero-shade.md).
+
+**Performance Δ.** Removes 20 child Views per mounted cover. Runtime speed,
+memory and GPU changes are not measured; no percentage improvement is claimed.
+
+**Validation.** Existing Mobile234/234, TypeScript/env and Android release
+build pass (316 tasks, 2m38s). Z Flip4 install-r and cold launch pass;
+installed SHA-256 matches artifact `2c0cb084118f177dd16d571fb3745a253a85757243a45ce8ef5f53e49a0b4c51`.
+Before/after visually inspected. A supplementary detail-navigation probe
+remained loading; detail/Back acceptance is not claimed. The initial probe's
+weak text assertion was corrected. No iOS or broader release acceptance.
+
+**Risk / rollback.** Uses the pinned React Native version's experimental
+background-gradient property without a new dependency; recheck on upgrades.
+Revert the one source-file diff and reinstall the previous QA APK. No backend,
+auth, schema or payment change. Why the original bands escaped prior visual
+review is not established.
+
+**Links / delivery.** [ADR032](../adr/032-mobile-hero-continuous-shade.md).
+Branch `fix/mobile-hero-gradient-20261021`, base `72af504`; no new commit/PR.
+APK `Mobile/build/apk/2026-10-21/MangaDock-0.1.0-hero-smooth-gradient-arm64.apk`.
+
 ## 2026-10-20 — PR #782 scrutiny follow-up / แก้ผล scrutinize
 
 | Field | English | ไทย |

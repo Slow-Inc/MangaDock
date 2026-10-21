@@ -1,6 +1,28 @@
 <!-- lang:en -->
 # DONE — Claude Code Session Log
 
+## Discovery UI publication validation — 2026-10-21
+
+- User authorized GitHub push after functional parity and phone/tablet checks, then requested continuing with this machine's backend. Replayed only visual work onto current native base `ef301fb` on `fix/mobile-discovery-ui-20261021`; API/reader/auth/catalog/tests unchanged. Resolved doc prepend conflicts preserving both histories; safety stash retained.
+- Added a320dp/60%-height hero cap while retaining full viewport carousel pages. Smooth shade and aligned Top10 fixes included. Mobile235/235, tooling58/58, types/env/format/lockfile dry-run and Android dual-ABI release build/vital lint pass (320tasks,1m56s). Independent source review found no blocking changed-code regression.
+- Final QA APK `Mobile/build/apk/2026-10-21/MangaDock-0.1.0-discovery-responsive-arm64-x86_64.apk`, SHA256 `0edfb3115f49428902c2871584c25b5de47e682105267c6f5a66925a55d0b2ac`,43,448,516bytes. Installed phone/emulator hashes match. Z Flip4 home/dots/categories/2-column catalog/return home pass; tablet800×1280dp and1280×800dp home/dots/categories/3-column grid pass, landscape return home pass. Tablet coverage is emulated; not physical-tablet acceptance.
+- Live search and detail→reader remain blocked by the unchanged backend's database dependency. Direct book/chapter endpoints200; versions exceeded20s; authenticated Data API and independent SQL connection timed out. No fake responses or DB/provider changes. These are explicit live-service limits, not successful E2E acceptance. [Full bilingual report](Mobile/docs/2026-10-21-discovery-delivery.md), selected screenshots and ADR032 follow-up retained. Source publication only; no merge/store/production release.
+- ภาษาไทย: ผู้ใช้อนุญาตpushและให้ใช้backendเครื่องนี้ ต่อฐานef301fbโดยคงโค้ดAPI/reader/auth/catalog/tests จำกัดHero320dp/สูง60% tests235/tooling58/types/env/format/lockfile/buildผ่าน APKรวมARM64+x86ติดตั้งบนZ Flip4และemulator hashตรง UIมือถือกับtabletสองแนวผ่านตามรายการ แต่search/readerสดยังติดฐานข้อมูลtimeout ระบุข้อจำกัดตรงไปตรงมา ไม่ปลอมresponseหรือแก้DB ไม่merge/deploy/store
+
+## Native Top 10 alignment — 2026-10-21
+
+- Continued on `fix/mobile-hero-gradient-20261021`, preserving the uncommitted hero-shade fix. Top-align ranked cards and anchor each number to cover height instead of variable title/metadata height and a 55dp margin. Before: first cover y429, second y372; after: complete ranked covers share one top throughout the sweep.
+- Mobile234/234, types/env and Android release build/vital lint pass (316 tasks,53s). Z Flip4 install-r and launch pass. All10 ranks verified at font1.0 (covers y397, rank bottoms829) and1.5 (covers434, bottoms866), with images/XML inspected; restored font1.0/read-back. Initial missing-cover probe started outside the visible row and was discarded; final sweeps establish their starting state.
+- APK: `Mobile/build/apk/2026-10-21/MangaDock-0.1.0-top10-aligned-arm64.apk`, SHA256 `a6065a042fce0619362fc33bc7feaa98ea9367f1b1499f4f1b19dae9009497da`; installed hash matches. [Report](Mobile/docs/2026-10-21-top10-alignment.md), ADR033 and system-impact report updated. No commit/push/deployment; other rows and prior hero repair retained.
+- ภาษาไทย: แก้Top10ปกลอยไม่เท่ากันเพราะจัดชิดล่างกับชื่อที่สูงไม่เท่ากัน ปกและเลขตรงแนวครบ10อันดับบนZ Flip4ทั้งฟอนต์ปกติและ150% คืนฟอนต์1.0แล้ว tests234/types/env/buildผ่าน APKใหม่รวมเงาเนียนรอบก่อน ยังไม่commit/push/deploy
+
+## Native hero shade smoothing — 2026-10-21
+
+- Replaced 20 constant-opacity strips in `Mobile/src/NativeDiscoveryView.tsx` with one continuous native gradient; same lower-40% coverage, endpoint opacity, cover geometry and title. No dependency change. Branch `fix/mobile-hero-gradient-20261021`, based on UX commit `72af504`.
+- Existing Mobile 234/234, TypeScript/env, Android assembleRelease (316 tasks, 2m38s) passed. Galaxy Z Flip4 install-r/cold launch passed after Play Protect confirmation; installed SHA-256 matches `2c0cb084118f177dd16d571fb3745a253a85757243a45ce8ef5f53e49a0b4c51`. Same-cover screenshots visually confirm removal of the broad shade bands. Additional detail navigation remained loading; no successful detail/Back acceptance is claimed.
+- APK: `Mobile/build/apk/2026-10-21/MangaDock-0.1.0-hero-smooth-gradient-arm64.apk`. [Report](Mobile/docs/2026-10-21-hero-shade.md), [ADR032](docs/adr/032-mobile-hero-continuous-shade.md). QA debug/LAN configuration retained. No commit/push/deployment.
+- ภาษาไทย: แก้เงาปกที่เป็นขีดจากแถบดำ20ชั้นเป็น gradient ต่อเนื่อง tests234/types/env/buildผ่าน ติดตั้งบน Z Flip4 และตรวจ hash ตรงกัน ภาพก่อน–หลังปกเดียวกันไม่เห็นแถบเดิม การเปิดรายละเอียดเพิ่มเติมยังโหลดไม่เสร็จ ไม่อ้าง navigation ผ่าน ไม่ commit/push/deploy
+
 ## PR #782 scrutiny follow-up — 2026-10-20
 
 - Final combined-head checks: clean npm ci, Mobile **235/235**, types/env/format, tooling **58/58**, Android Hermes export **773 modules/11 assets** pass; corrected bundle contains the new helper and excludes checked private values. No replacement APK or new physical-device acceptance.
