@@ -3,6 +3,22 @@
 
 ---
 
+## #861 MangaDex fetches time out (2026-10-21)
+
+**What:** every MangaDex call goes through `MangaDexService.mangadexFetch`, which had no `signal` — a hung request held the
+caller (e.g. `/books/landing` on a cold cache) for as long as the connection lived. It now passes
+`AbortSignal.timeout(mangadexTimeoutMs)` (6 s, below the frontend's 8 s server-render budget from #858; overridable in
+tests like `fetchFn`), so a hung request rejects into the callers' existing error handling. All 10 call sites are JSON API
+calls (manga, feed, cover, tag, at-home server) — no image bytes go through it.
+
+**Validated:** `mangadex-fetch-timeout.spec.ts` red → green (3: a never-answering MangaDex rejects in < 1 s at a 30 ms
+timeout; headers and `no-store` kept; default < 8 s). `src/books` jest: 337 pass, 0 fail. Rebuilt backend live: landing
+200 (4 rows / 80 items), chapters 200 (48), an uncached genre page fetched fresh from MangaDex in 182 ms. Found on the way:
+an uncached search still hangs 30 s — traced to `findTitleIdsByAltName`, a Supabase query, not MangaDex (filed
+separately; it touches the client the auth guard uses).
+
+---
+
 ## #858 Server renders stop waiting on a hung backend (2026-10-21)
 
 **What:** `/book/[id]/reviews` is server-rendered and awaited two backend calls with no timeout; with the backend's upstream
