@@ -54,6 +54,7 @@ const tabs: Array<[ReleaseTab, string]> = [
 ];
 export type DiscoveryScreen = "home" | "new" | "categories";
 type Discovery = ReturnType<typeof createDiscovery>;
+const RANKED_COVER_WIDTH = 96;
 type CardProps = {
   book: Book;
   apiOrigin: string;
@@ -149,12 +150,14 @@ export function NativeBookRow({
         renderItem={({ item, index }) =>
           ranked ? (
             <View style={styles.ranked}>
-              <Text style={styles.rank}>{index + 1}</Text>
+              <View style={styles.rankCover}>
+                <Text style={styles.rank}>{index + 1}</Text>
+              </View>
               <NativeBookCard
                 book={item}
                 apiOrigin={apiOrigin}
                 onBook={onBook}
-                width={96}
+                width={RANKED_COVER_WIDTH}
               />
             </View>
           ) : (
@@ -176,10 +179,11 @@ function Hero({
   onBook(id: string): void;
 }) {
   const [index, setIndex] = useState(0);
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const list = useRef<FlatList<Book>>(null);
   const active = useRef(AppState.currentState === "active");
   const pageWidth = width - 32;
+  const coverWidth = Math.min(pageWidth * 0.88, 320, height * 0.6 * (2 / 3));
   useEffect(() => {
     const listener = AppState.addEventListener("change", (state) => {
       active.current = state === "active";
@@ -233,7 +237,7 @@ function Hero({
                 accessibilityRole="button"
                 accessibilityLabel={`ดูรายละเอียด ${item.title}`}
                 onPress={() => onBook(item.id)}
-                style={[styles.hero, { width: pageWidth * 0.88 }]}
+                style={[styles.hero, { width: coverWidth }]}
               >
                 {uri && item.thumbnailCached !== false && (
                   <Image
@@ -242,17 +246,7 @@ function Hero({
                     resizeMode="cover"
                   />
                 )}
-                <View pointerEvents="none" style={styles.heroShade}>
-                  {Array.from({ length: 20 }, (_, step) => (
-                    <View
-                      key={step}
-                      style={{
-                        flex: 1,
-                        backgroundColor: `rgba(0,0,0,${step * 0.045})`,
-                      }}
-                    />
-                  ))}
-                </View>
+                <View pointerEvents="none" style={styles.heroShade} />
                 <Text numberOfLines={3} style={styles.heroTitle}>
                   {item.title}
                 </Text>
@@ -670,12 +664,15 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   more: { minHeight: 44, justifyContent: "center" },
-  ranked: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  ranked: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  rankCover: {
+    height: RANKED_COVER_WIDTH * (3 / 2),
+    justifyContent: "flex-end",
+  },
   rank: {
     color: "#ffffff33",
     fontSize: 60,
     fontWeight: "900",
-    marginBottom: 55,
   },
   heroSection: { paddingHorizontal: 16, paddingTop: 16 },
   hero: {
@@ -691,6 +688,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: "40%",
+    experimental_backgroundImage:
+      "linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.855))",
   },
   heroTitle: {
     color: design.foreground,
