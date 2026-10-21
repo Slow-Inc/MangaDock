@@ -15,6 +15,7 @@ import pathlib
 import numpy as np
 
 from tools.pipeline_doctor import FAIL, OK, WARN, doctor
+from manga_translator.ocr_vlm import SFX_MAX_TOKENS
 from tools.pipeline_doctor.llm_contracts import (
     BUDGET_MEASURED_COMPLETING,
     BUDGET_MEASURED_TRUNCATING,
@@ -66,7 +67,7 @@ def test_capture_runs_the_real_call_and_records_what_it_built():
     hand-written copy of the payload would stay green through the very edit it exists to catch."""
     call = capture_sfx_call(_crop(), response=HEALTHY_RESPONSE, model='qwen3.6-35b-a3b')
     assert call.request['model'] == 'qwen3.6-35b-a3b'
-    assert call.request['max_tokens'] == 24        # the hardcode this issue is about
+    assert call.request['max_tokens'] == SFX_MAX_TOKENS   # what the shipped code sends (#881)
     assert call.result == 'SQUELCH'                # the real sanitise ran on the real reply
 
 
@@ -87,12 +88,24 @@ def test_capture_never_records_the_api_key():
 # --------------------------------------------------------------------------- 1. request
 
 def test_request_fails_on_a_budget_measured_to_truncate():
-    """Defect 1. 24/256/2048 all returned `length` with `content: None` (B1); 4096 completed."""
-    row = _stage(doctor.run(_page()), 'vlm-send')
+    """Defect 1. On the configured model 24 and 128 both returned `length` with `content: ''`
+    (re-measured 2026-10-22, #881); 192 completed. The shipped budget clears the floor, so the
+    contract is pinned at the measured truncating point."""
+    call = capture_sfx_call(_crop(), response=HEALTHY_RESPONSE)
+    call.request['max_tokens'] = BUDGET_MEASURED_TRUNCATING
+    row = _stage(doctor.run(DoctorPage(sfx_call=call)), 'vlm-send')
     assert row.status == FAIL
-    assert row.metrics['max_tokens'] == 24
+    assert row.metrics['max_tokens'] == BUDGET_MEASURED_TRUNCATING
     assert str(BUDGET_MEASURED_COMPLETING) in row.evidence
     assert 'thinking' in row.evidence          # the mechanism, not just the number
+
+
+def test_request_passes_at_the_budget_the_code_ships():
+    """#881: `SFX_MAX_TOKENS` is above the measured floor, so the probe no longer blocks the
+    budget the rescue actually sends."""
+    row = _stage(doctor.run(_page()), 'vlm-send')
+    assert row.status == OK
+    assert row.metrics['max_tokens'] == SFX_MAX_TOKENS
 
 
 def test_request_reports_the_thinking_control_as_unset():
@@ -170,7 +183,7 @@ def test_response_fails_loudly_on_the_truncation_that_was_silent():
     assert row.status == FAIL
     assert row.metrics['finish_reason'] == 'length'
     assert row.metrics['content'] == 'None'
-    assert '24' in row.evidence            # names the budget that truncated it
+    assert str(SFX_MAX_TOKENS) in row.evidence   # names the budget that truncated it
 
 
 def test_response_passes_on_a_completed_reply():
@@ -233,8 +246,12 @@ def test_the_probes_stand_down_for_a_page_that_carries_no_llm_call():
 
 def test_one_run_surfaces_all_three_defects_of_2026_07_28():
     """#685's falsifiable bar. Three defects, three distinct lines, each naming its own
-    evidence — asserted on the rendered table, because the table is what a developer reads."""
-    run = doctor.run(_page())
+    evidence — asserted on the rendered table, because the table is what a developer reads.
+    Defect 1 is pinned with a budget at the measured truncating point: #881 fixed the shipped
+    budget, so the default call no longer truncates."""
+    page = _page()
+    page.sfx_call.request['max_tokens'] = BUDGET_MEASURED_TRUNCATING
+    run = doctor.run(page)
     table = run.to_table()
 
     assert run.ok is False

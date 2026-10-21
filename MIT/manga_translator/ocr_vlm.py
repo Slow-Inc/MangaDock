@@ -29,6 +29,12 @@ logger = logging.getLogger('manga_translator')
 #: the configured model cannot serve the rescue, #693) stop calling: each call cost ~2.5-3 s of
 #: page latency for nothing (doctor timing, 2026-10-20). After the cooldown one trial call is let
 #: through, so a transient gateway outage does not disable rescue for the life of the server.
+#: Completion budget for one rescue call. The configured gateway default is a thinking model
+#: (qwen3.8-27b-fp8): measured on the #881 Boku crop it spends ~154 tokens on reasoning before any
+#: visible content, so the old 24-token cap was consumed entirely by reasoning — content='' with
+#: finish_reason='length', which the caller reads as "no SFX here" (the rescue was a silent no-op).
+#: Disabling thinking is not the alternative: the same crop then reads as a junk transliteration.
+SFX_MAX_TOKENS = 512
 SFX_UNSERVED_LIMIT = 3
 SFX_BREAKER_COOLDOWN_S = 300.0
 _now = time.monotonic
@@ -275,7 +281,7 @@ def vlm_localize_sfx(
             post_fn = requests.post
         body = {
             "model": model,
-            "max_tokens": 24,
+            "max_tokens": SFX_MAX_TOKENS,
             "temperature": 0,
             "messages": [{"role": "user", "content": [
                 {"type": "text", "text": build_sfx_prompt(target_lang)},

@@ -8,7 +8,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from manga_translator.ocr_vlm import build_sfx_prompt, restore_sfx_translations, sanitize_sfx, vlm_localize_sfx
+from manga_translator.ocr_vlm import (SFX_MAX_TOKENS, build_sfx_prompt, restore_sfx_translations,
+                                       sanitize_sfx, vlm_localize_sfx)
 
 
 def _crop():
@@ -65,6 +66,32 @@ def test_localize_returns_sanitized_sfx():
     assert post.calls['headers']['Authorization'] == 'Bearer k'
     parts = post.calls['json']['messages'][0]['content']
     assert any(p.get('type') == 'image_url' and p['image_url']['url'].startswith('data:image/png;base64,') for p in parts)
+
+# ── #881: a thinking model needs a budget above its reasoning need ────────────
+# The configured gateway default (qwen3.8-27b-fp8) answers only after ~154 reasoning
+# tokens: max_tokens=24 was spent entirely on reasoning, the reply came back '' with
+# finish_reason='length', and the caller read that as "no SFX here" (measured on the
+# Boku SFX crop, 2026-10-21).
+
+class _RespFinish:
+    def __init__(self, content, finish):
+        self._c, self._f = content, finish
+    def json(self):
+        return {"choices": [{"message": {"content": self._c}, "finish_reason": self._f}]}
+
+
+def test_localize_budget_lets_a_thinking_model_answer():
+    bodies = []
+    def post(url, headers=None, json=None, timeout=None):
+        bodies.append(json)
+        if json['max_tokens'] < 200:      # the gateway spends a small budget on reasoning
+            return _RespFinish('', 'length')
+        return _RespFinish('เฮ้อ', 'stop')
+    out = vlm_localize_sfx(_crop(), api_base='https://gw/v1', api_key='k', model='m',
+                           target_lang='THA', post_fn=post)
+    assert out == 'เฮ้อ'
+    assert bodies[0]['max_tokens'] >= 200
+
 
 def test_localize_blank_creds_short_circuits_without_calling():
     called = {'n': 0}
@@ -284,7 +311,7 @@ def test_truncated_none_reply_is_logged_with_reason_budget_and_region(caplog):
     [msg] = _warnings(caplog)
     assert 'finish_reason=length' in msg
     assert 'content=None' in msg
-    assert 'max_tokens=24' in msg
+    assert f'max_tokens={SFX_MAX_TOKENS}' in msg
     assert 'crop=80x40' in msg
 
 

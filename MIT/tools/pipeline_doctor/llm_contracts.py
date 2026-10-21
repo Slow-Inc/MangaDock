@@ -33,15 +33,18 @@ from .runner import doctor
 
 # --- thresholds: every one is a measurement, and says so ---------------------------------------
 
-#: The largest completion budget **measured to truncate**: B1 tried 24, 256, 2048 and 8192 and got
-#: `finish_reason: length` with `content: None` from each. 8192 is excluded because it burned 59 s
-#: rather than returning short, so 2048 is the largest budget with a clean truncating result.
-BUDGET_MEASURED_TRUNCATING = 2048
+#: The largest completion budget **measured to truncate** on the model actually configured
+#: (`qwen3.8-27b-fp8` via gateway.9arm.co, 2026-10-22, the #881 Boku SFX crop): 24 and 128 both
+#: returned `finish_reason: length` with `content: ''` — the whole budget went to reasoning tokens.
+#: Re-measured from 2048/4096 (2026-07-28, qwen3.6-35b-a3b, whose reasoning was much longer);
+#: re-measure again if the configured model changes.
+BUDGET_MEASURED_TRUNCATING = 128
 
-#: The smallest completion budget **measured to complete**: 4096 answered in 795 tokens (B2).
-#: Between the two the behaviour is simply unmeasured, and a probe must not claim a boundary
-#: nobody located — that band is a `WARN`.
-BUDGET_MEASURED_COMPLETING = 4096
+#: The smallest completion budget **measured to complete** on that model/crop: 192 answered after
+#: 154 reasoning tokens, 256/384/512 identical. Between the two points the behaviour is unmeasured,
+#: and a probe must not claim a boundary nobody located — that band is a `WARN`. The shipped
+#: `SFX_MAX_TOKENS` (512) keeps headroom above the measured reasoning need for a larger crop.
+BUDGET_MEASURED_COMPLETING = 192
 
 #: Visual tokens for the crop the model **did** answer on. The pipeline sends the SFX crop at its
 #: native 220x130 (40 tokens by the grid below) and the model reads it as empty; the same crop
