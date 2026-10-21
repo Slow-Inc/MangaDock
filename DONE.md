@@ -16,6 +16,12 @@ complete: TTL ≥ 20 min). `src/books` jest 339 pass; eslint 0 (as main). Rebuil
 from cache, so the miss path is covered by the specs only; the landing cache was deliberately not wiped (its stale copy is
 the fallback this relies on).
 
+**Review round:** the cache-hit thumbnail patch rewrote the landing with the full TTL, undoing the 2-min retry whenever the
+image cache is on — partial landings now carry `partial: true` and both writes use `landingTtl()` (spec drives the patch
+path with an enabled image cache stub). The filled rows are logged by id; the comment states the "empty means failed"
+coupling (sound while every row is an unfiltered sort); with no stale copy an empty row is still cached briefly. Serial
+MangaDex chains (getRelated ≈ 3 × 6 s) split out to their own issue. `src/books` 340 pass.
+
 ---
 
 ## #856 Skip link past the Navbar (2026-10-21)

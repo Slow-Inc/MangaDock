@@ -95,4 +95,6 @@ export type LandingPayload = {
   staleUpdatedAt?: string;
   /** true = no cache at all and upstream API is offline */
   apiOffline?: boolean;
+  /** true = a row's fetch failed and it was filled from the stale landing; cached briefly so it is retried (#865) */
+  partial?: boolean;
 };

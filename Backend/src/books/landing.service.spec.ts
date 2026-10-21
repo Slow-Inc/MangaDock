@@ -15,6 +15,7 @@ function makeDeps(opts: {
   rowFetch?: jest.Mock;
   rowDefs?: Array<{ id: string; title: string; order: string; limit?: number }>;
   env?: Record<string, string>;
+  imageCache?: Record<string, unknown>;
 }) {
   const cache = {
     get: jest.fn(async () =>
@@ -24,7 +25,7 @@ function makeDeps(opts: {
     setMangaCacheWithTiers: jest.fn().mockResolvedValue(undefined),
     getStale: jest.fn(() => opts.stale ?? null),
   };
-  const imageCache = { enabled: false };
+  const imageCache = opts.imageCache ?? { enabled: false };
   const mangaDex = {
     mangaRowDefs: opts.rowDefs ?? [
       { id: 'r1', title: 'Row 1', order: 'latest', limit: 10 },
@@ -139,6 +140,36 @@ describe('LandingService — landing assembly + description (#231)', () => {
     expect(cache.set).toHaveBeenCalledTimes(1);
     const ttl = (cache.set.mock.calls[0] as unknown[])[2] as number;
     expect(ttl).toBeLessThan(5 * 60 * 1000); // retried soon, not held for the full landing TTL
+  });
+
+  it('keeps a partial landing on the short TTL when the thumbnail patch rewrites it (#865)', async () => {
+    const { svc, cache } = makeDeps({
+      fresh: {
+        hero: null,
+        rows: [
+          {
+            id: 'r1',
+            title: 'Row 1',
+            query: 'a',
+            items: [{ id: 'a', thumbnail: 't' }],
+          },
+        ],
+        updatedAt: 'T0',
+        partial: true,
+      },
+      imageCache: {
+        enabled: true,
+        localPathExists: jest.fn().mockResolvedValue(false),
+        localThumbnailPath: jest.fn().mockResolvedValue('/img-cache/a.jpg'),
+      },
+    });
+
+    await svc.getLandingBooks();
+    await new Promise((r) => setImmediate(r)); // the patch write is fire-and-forget
+
+    expect(cache.set).toHaveBeenCalledTimes(1);
+    const ttl = (cache.set.mock.calls[0] as unknown[])[2] as number;
+    expect(ttl).toBeLessThan(5 * 60 * 1000);
   });
 
   it('caches a complete landing for the full TTL (#865)', async () => {
