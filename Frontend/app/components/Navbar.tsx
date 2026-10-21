@@ -7,6 +7,7 @@ import MangaDockLogo from "./MangaDockLogo";
 import NavbarActions from "./NavbarActions";
 import { getActiveStudioTab, STUDIO_TABS } from "../studio/components/studioTabs";
 import { scrollBehavior } from "../hooks/reducedMotion";
+import { usePopoverDismiss } from "../hooks/popoverDismiss";
 
 const GENRES = [
   { slug: "action",        label: "แอคชัน" },
@@ -46,17 +47,8 @@ export default function Navbar() {
   const isStudioPath               = pathname.startsWith("/studio");
   const activeStudioTab            = getActiveStudioTab(pathname);
 
-  // Close genre dropdown on outside click
-  useEffect(() => {
-    if (!genreOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (genreRef.current && !genreRef.current.contains(e.target as Node)) {
-        setGenreOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [genreOpen]);
+  // Close genre dropdown on outside click or Escape (#870)
+  usePopoverDismiss(genreOpen, genreRef, () => setGenreOpen(false));
 
   // Close genre dropdown on route change
   useEffect(() => {
