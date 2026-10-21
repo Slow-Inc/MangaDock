@@ -1342,7 +1342,10 @@ class MangaTranslator:
         # Checked BEFORE region.source_lang: on a TextBlock that is a lazy langid guess, never empty,
         # so returning it first made this guard dead — 'I WONDER WHY' with one OCR-noise glyph
         # ('피 WONDER WHY..') was guessed KO and dropped (Iruma p0, 2026-10-21).
-        is_mostly_ascii = bool(text) and sum(1 for c in text if ord(c) < 128) / len(text) > 0.85
+        # Latin share over LETTERS only: punctuation ('…') says nothing about the language
+        # (Horimiya p0: 'STRANGEレY…' was 9/11 ASCII characters but 8/9 Latin letters).
+        letters = [c for c in text if c.isalpha()]
+        is_mostly_ascii = bool(letters) and sum(1 for c in letters if ord(c) < 128) / len(letters) > 0.85
         if requested_source_lang in LATIN_SCRIPT_LANGS and is_mostly_ascii:
             return requested_source_lang
 

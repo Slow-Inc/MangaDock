@@ -73,3 +73,13 @@ def test_regions_the_filter_drops_are_recorded_for_the_payload_857():
     ctx = SimpleNamespace(text_regions=[keep, drop])
     assert MangaTranslator._apply_source_lang_filter(self, ctx, config) == [keep]
     assert [(r, why[:16]) for r, why in ctx.dropped_regions] == [(drop, 'source language ')]
+
+
+def test_punctuation_does_not_count_against_english_857():
+    """Third corpus, Horimiya p0 (2026-10-21): 'STRANGELY…' read as 'STRANGEレY…' (one katakana
+    misread) was dropped as 'not English' — with the '…' only 9/11 characters were ASCII (< 0.85).
+    The share is taken over letters only: 8 of 9 letters are Latin."""
+    r = SimpleNamespace(text='STRANGEレY…', sfx_rescued=False, source_lang='ja')
+    assert _filter([r]) == [r]
+    jp = SimpleNamespace(text='ザワ…!? ザワ…', sfx_rescued=False, source_lang='ja')
+    assert _filter([jp]) == []
