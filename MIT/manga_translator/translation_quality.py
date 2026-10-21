@@ -50,13 +50,31 @@ def classify_glitch(src: str, dst: str, target: str) -> Optional[str]:
 _NOISE_GLYPHS = re.compile(r'^[ᄀ-ᇿ㄰-㆏가-힯─-◿]+$')
 
 
+# Katakana OCR reads in place of a Latin letter inside an English word (Horimiya p0: STRANGEレY).
+_KANA_LOOKALIKES = {'レ': 'L', 'ロ': 'O', 'エ': 'E'}
+
+
+def _fix_lookalikes(token: str) -> str:
+    """Map look-alike katakana back to Latin inside a token that also has Latin letters and no other
+    non-Latin letter; a Japanese word (no Latin letters) is left alone."""
+    if not any(c.isascii() and c.isalpha() for c in token):
+        return token
+    if any(c.isalpha() and not c.isascii() and c not in _KANA_LOOKALIKES for c in token):
+        return token
+    return ''.join(_KANA_LOOKALIKES.get(c, c) for c in token)
+
+
 def strip_noise_glyphs(text: str) -> str:
-    """#857: drop whitespace tokens made only of OCR-noise glyphs from otherwise Latin OCR text
-    ('피' for a lone 'I', '╩', '○'). Kept as-is, the LLM was thrown off ('피 WONDER WHY..' ->
-    'เพราะ WONDER') or copied the glyph into the Thai. Text that is not mostly ASCII (Thai, CJK) is
-    returned unchanged."""
-    if not text or sum(ord(c) < 128 for c in text) / len(text) <= 0.85:
+    """#857: clean OCR noise on Latin lettering before it is translated — look-alike katakana inside an
+    English word go back to Latin ('STRANGEレY' -> 'STRANGELY'), and whitespace tokens made only of
+    OCR-noise glyphs ('피' for a lone 'I', '╩', '○') are dropped when the text is mostly Latin letters.
+    Kept as-is, the LLM was thrown off ('피 WONDER WHY..' -> 'เพราะ WONDER') or transliterated the
+    glyph. Thai/CJK text is returned unchanged."""
+    if not text:
         return text
     tokens = text.split()
-    kept = [t for t in tokens if not _NOISE_GLYPHS.match(t)]
-    return text if len(kept) == len(tokens) else ' '.join(kept)
+    fixed = [_fix_lookalikes(t) for t in tokens]
+    letters = [c for c in ''.join(fixed) if c.isalpha()]
+    if letters and sum(c.isascii() for c in letters) / len(letters) > 0.85:
+        fixed = [t for t in fixed if not _NOISE_GLYPHS.match(t)]
+    return text if fixed == tokens else ' '.join(fixed)

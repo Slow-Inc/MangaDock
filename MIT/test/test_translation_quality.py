@@ -63,3 +63,14 @@ def test_noise_strip_keeps_real_symbols_and_names_857():
                  'MR. 田中 IS HERE NOW OK', 'WOW 😂 LOL'):
         assert strip_noise_glyphs(keep) == keep, keep
     assert strip_noise_glyphs('A\n피 WONDER') == 'A WONDER'
+
+
+def test_a_lookalike_katakana_inside_an_english_word_is_read_as_latin_857():
+    """Third corpus, Horimiya p0: OCR read STRANGELY as 'STRANGEレY…' and the LLM transliterated the kana
+    ('เล่ย์แปลกๆ…'). Inside a token that also has Latin letters, katakana that look like Latin letters
+    (レ L, ロ O, エ E) are OCR misreads; Japanese words without Latin letters are left alone."""
+    from manga_translator.translation_quality import strip_noise_glyphs
+    assert strip_noise_glyphs('STRANGEレY…') == 'STRANGELY…'
+    assert strip_noise_glyphs('GロOD MエRNING') == 'GOOD MERNING'
+    for keep in ('レロエ', 'ザワ ザワ', 'TOKYO レストラン'):
+        assert strip_noise_glyphs(keep) == keep, keep
