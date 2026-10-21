@@ -61,3 +61,24 @@ clears the threshold. Characterization: same pick as the all-pairs version on 30
 
 Stage totals now, warm: textline_merge ~0.54 s (was 0.74), rendering ~0.61 s (was 0.99–1.03),
 mask_refinement ~0.39 s (was 0.56–0.64) — about 0.8–0.9 s/page of CPU work removed, output unchanged.
+
+## Update — OpenCV threads (`2351fb15`) — the largest win
+
+The profile's top native cost was `bilateralFilter`: 2.57 s over 4 pages in the **detector's** page
+preprocessing (`detection/default.py`, d=17 on the full page). Standalone it takes 0.05 s on 20 threads.
+Cause: `import ultralytics` (the balloon and SFX YOLO loaders) runs `cv2.setNumThreads(0)` — a PyTorch
+DataLoader workaround — leaving OpenCV **single-threaded for the whole MIT process** (verified:
+`cv2.getNumThreads()` 20 → 1 after the import). MIT runs inference only, so both loaders restore
+OpenCV's default thread count right after the import.
+
+| 8 pages, warm | before (`02b7fc89`) | after (`2351fb15`) |
+|---|---|---|
+| renders | — | **byte-identical 8/8** |
+| detection | 1278 ms | **582 ms (−55 %)** |
+| rendering | 625 ms | **395 ms (−37 %)** |
+| wall | 4.85 s | **3.92 s (−19 %)** |
+
+## Round total (warm, 8 pages, LLM excluded)
+
+`7d804281` → `2351fb15`: wall **5.84 → 3.92 s/page (−33 %)**, every step byte-identical. On top of #822
+(6.30 → 4.02 s on the first corpus), the non-LLM pipeline is now about 40 % of where it started.
