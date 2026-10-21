@@ -21,8 +21,26 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 
 ## Phase-by-Phase Implementation Plan (Phase 0 – Phase 5)
 
+### Implementation Status Audit — 2026-10-22
+
+Status is based on code in the default branch, dated engineering reports, and outstanding release acceptance—not on the previous roadmap labels alone. **Completed means core implementation exists, not that production is deployed or bug-free.** Test counts below come from dated repository reports; they were not rerun for this roadmap edit.
+
+| Phase | Verified status | What the evidence supports |
+| --- | --- | --- |
+| **0–1: Core Foundation** | **COMPLETED (baseline)** | Web, Backend, MIT, authentication, reader, and cache foundations exist; further hardening is continuous. |
+| **1.5: Creator Studio & Community** | **COMPLETED (core) / POLISHING** | Studio/uploads, forum, Supabase, SSE and wallet foundations exist; ongoing QA and bug fixes remain. |
+| **2: Scaling & Cloud** | **WIP** | Multi-node cache/leader/queue exist. Xendit and R2 integrations have code, but production rollout/payment acceptance, GPU cloud and full device-security goals are not confirmed complete. |
+| **3: Hybrid Mobile** | **COMPLETED (historical) / SUPERSEDED** | The WebView shell/bridge was the transitional solution. The current Mobile app uses native views; the hybrid is no longer the release target. |
+| **4: Fully Native Mobile** | **WIP (code integrated, release pending)** | Native screens and Reader are on main without an embedded WebView. Physical-device, live-service, signing and release acceptance are still open. |
+| **5: Retention & Community 2.0** | **NOT STARTED (dedicated Phase 5 scope)** | Existing follows and in-app notifications provide reusable foundations, not a personalized Following feed, shareable custom collections or OS push service. |
+
+**Evidence:** [Native integration report](Mobile/docs/2026-10-22-main-integration.md), [Native status/acceptance audit](Mobile/docs/2026-10-16-native-status-audit.md), [test APK limitations](Mobile/docs/2026-10-20-test-apk.md), [cache leader](Backend/src/status/election.service.ts), [payment integration](Backend/src/wallet/xendit.service.ts), [R2 storage selection](Backend/src/common/storage/storage.module.ts), [user follows](Backend/src/user-follows/user-follows.service.ts), [in-app notifications](Backend/src/notifications/notifications.service.ts), and [Native release gate #753](https://github.com/Slow-Inc/MangaDock/issues/753).
+
+---
+
+
 ### Phase 0 – Phase 1: Core Foundation & Intelligent Cache Hardening
-**Status:** Completed
+**Status:** COMPLETED — Core foundation implemented (further hardening continues)
 
 1. **Core Infrastructure & Image Proxy:** Full-stack setup (Next.js 16+ / NestJS 11+) with Reverse Proxy Image system from Phase 0 for maximum security and stability.
 2. **Multi-Method Authentication (OAuth 2.0):** Multiple login methods including Google/Facebook OAuth with Profile Picture Integration — upload a custom avatar or use a photo from linked third-party accounts.
@@ -41,7 +59,7 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 7. **Reader Core Hardening:** Fixed critical bugs (broken image continuity, cannot scroll to bottom) + improved Mobile Native Experience.
 
 ### Phase 1.5: System Stabilization & Creator Studio
-**Status:** Completed / Polishing
+**Status:** COMPLETED (core scope) / POLISHING — ongoing QA and fixes
 
 1. **Manga Upload System & Studio:** Upload system for Translator/Creator with large file support + Studio Dashboard for stats management.
 2. **Standard Database Migration:** Migrated from Firebase (NoSQL) to Supabase (Relational PostgreSQL) for higher throughput ceiling, RLS support, and cost efficiency.
@@ -52,7 +70,10 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 7. **Technical Debt Cleanup (Completed):** Removed all `GoogleBooksService` (Legacy) in favor of 100% dynamic MangaDex Service + prepared Forum Soft Deletion.
 
 ### Phase 2: Architectural Scaling & Cloud Readiness
-**Status:** In Progress (Cache Upgrade Complete — remainder Planned)
+**Status:** WIP — Cache architecture implemented; cloud, payment and security rollout not fully verified
+
+**Audit (2026-10-22):** Cache leader election, write-behind queue, recovery and invalidation are implemented. Xendit/PromptPay and Cloudflare R2 adapters exist in source, but live payment acceptance and full production R2 migration are unverified. On-demand GPU cloud migration has no verified completion evidence. Native TOTP flows exist; full device-session pinning is unverified.
+
 
 1. **Multi-Layer Cache Orchestration (T4-Standard Architecture):** Complete (PRs #16/#34/#39/#49/#50/#55/#70/#71)
    - **Truth Hierarchy:** L1 (in-memory latency) → L2 (Redis, runtime source of truth) → L3 (JSON disk, per-node backup) → Supabase (long-term authority)
@@ -73,7 +94,10 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 5. **Advanced Identification:** Two-Factor Authentication (2FA) + Device Session Pinning that binds account to Hardware ID.
 
 ### Phase 3: Hybrid Mobile Framework (Minimum Development Time)
-**Status:** Next Step (Maximum development time reduction strategy)
+**Status:** COMPLETED (historical transition) / SUPERSEDED by Phase 4
+
+**Audit (2026-10-22):** The former React Native WebView shell and native auth bridge were transitional. The current Mobile entry point mounts native React Native views; this hybrid phase is not the current release target.
+
 
 1. **React Native WebViewer Shell:** React Native wrapper around existing Web App — reuses premium UI immediately.
 2. **Strategic Code Sharing:** Share portions of Codebase (Shared Logic/Types) between Web and Mobile directly — dramatically reduces development time.
@@ -81,7 +105,10 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 4. **Core OS Permissions:** Manage basic system permissions via Native Code.
 
 ### Phase 4: Fully Native Mobile Application Development
-**Status:** Planned (transition from the Phase 3 WebView shell to a fully native app)
+**Status:** WIP — Native source integrated into main; physical-device and production release acceptance pending
+
+**Audit (2026-10-22):** Mobile/App.tsx mounts NativeSessionView rather than a WebView. Native Reader, discovery, account, Community, Studio and staff flows exist. The [main integration report](Mobile/docs/2026-10-22-main-integration.md) records Mobile 235/235 and Backend 1,014/1,014 tests passing on its verified combined tree; this is **not** proof of accepted device behavior. Still required: APK rebuilt from accepted main, live MIT/payment/OAuth and device regressions, production signing/distribution ([issue #753](https://github.com/Slow-Inc/MangaDock/issues/753)); iOS release acceptance is also unverified.
+
 
 **Goal:** Build a standalone Android/iOS application with its own native UI, navigation, and manga reader instead of rendering the existing website inside a WebView. Retain the shared MangaDock backend and MIT services; do not duplicate server-side business logic.
 
@@ -94,7 +121,10 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 **Exit Criteria:** Core browsing, reading, and account journeys run in native screens without WebView dependency, while the web application continues to operate independently against the same backend.
 
 ### Phase 5: Retention Ecosystem & Community 2.0
-**Status:** Planned — Lightweight Social & Retention Features
+**Status:** NOT STARTED (dedicated Phase 5 scope) — user follows and in-app notifications already exist as reusable foundations
+
+**Audit (2026-10-22):** Current user_follows APIs and the in-app notifications service are not the planned personalized Following/ranked feed or OS-level push delivery. Existing favorites, followed series and reading history are not custom public/shareable collections. No end-to-end delivery of the new Phase 5 scope is claimed.
+
 
 **Goal:** Improve reader retention and community engagement by reusing the existing NestJS, Supabase/PostgreSQL, Redis, and multi-node infrastructure. Avoid building a custom ML recommendation service or a new message broker.
 
@@ -143,8 +173,26 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 
 ## รายละเอียดแผนการดำเนินงานรายเฟส (Phase 0 - Phase 5)
 
+### สรุปสถานะตามหลักฐานจริง — 22 ตุลาคม 2026
+
+ตรวจจาก Source Code บน Branch หลัก รายงานวิศวกรรมที่มีวันที่ และ Release Gates ที่ยังค้าง ไม่ยึดป้ายสถานะเดิมอย่างเดียว **Completed หมายถึง Core Implementation มีอยู่แล้ว ไม่ได้รับรองว่า Deploy Production หรือไม่มี Bug** ตัวเลข Tests เป็นผลจากรายงานใน Repository ไม่ใช่การรันทดสอบใหม่ในรอบแก้ Roadmap นี้
+
+| Phase | สถานะที่ตรวจสอบได้ | หลักฐานและข้อจำกัด |
+| --- | --- | --- |
+| **0–1: Core Foundation** | **COMPLETED (Baseline)** | มี Web, Backend, MIT, Auth, Reader และ Cache พื้นฐานแล้ว ยังมีงาน Hardening ต่อเนื่อง |
+| **1.5: Creator Studio & Community** | **COMPLETED (Core) / POLISHING** | มี Studio/Upload, Forum, Supabase, SSE และ Wallet แล้ว ยังต้อง QA และแก้ Bug ต่อ |
+| **2: Scaling & Cloud** | **WIP** | Multi-node Cache/Leader/Queue มีโค้ดแล้ว มี Xendit และ R2 Integration แต่ยังไม่ยืนยัน Production Rollout/Payment จริง, GPU Cloud และ Device Security ครบ |
+| **3: Hybrid Mobile** | **COMPLETED (เดิม) / SUPERSEDED** | WebView Shell/Bridge เป็นระบบช่วงเปลี่ยนผ่าน ปัจจุบันแอปใช้ Native Views แล้ว จึงไม่ใช่เป้าหมาย Release อีก |
+| **4: Fully Native Mobile** | **WIP (รวมโค้ดแล้ว; Release ยังไม่ผ่าน)** | Native UI/Reader อยู่ใน main ไม่ฝัง WebView แต่ยังต้องรับผลเครื่องจริง บริการจริง การเซ็น และ Release |
+| **5: Retention & Community 2.0** | **NOT STARTED (Scope Phase 5 ใหม่)** | มี Follow และ In-app Notifications เดิมเป็นฐาน แต่ยังไม่ได้ยืนยัน Personalized Following Feed, Custom Collections ที่แชร์ได้ และ OS Push |
+
+**หลักฐาน:** [รายงาน Native Integration](Mobile/docs/2026-10-22-main-integration.md), [Native Status/Acceptance](Mobile/docs/2026-10-16-native-status-audit.md), [ข้อจำกัด Test APK](Mobile/docs/2026-10-20-test-apk.md), [Cache Leader](Backend/src/status/election.service.ts), [Payment Integration](Backend/src/wallet/xendit.service.ts), [R2 Storage](Backend/src/common/storage/storage.module.ts), [User Follows](Backend/src/user-follows/user-follows.service.ts), [In-app Notifications](Backend/src/notifications/notifications.service.ts) และ [Native Release Gate #753](https://github.com/Slow-Inc/MangaDock/issues/753)
+
+---
+
+
 ### Phase 0 - Phase 1: Core Foundation & Intelligent Cache Hardening
-**สถานะ:** ✅ Completed
+**สถานะ:** COMPLETED — Core Foundation มีโค้ดแล้ว (ยังมี Hardening ต่อเนื่อง)
 
 1.  **Core Infrastructure & Image Proxy:** จัดวางระบบแบบ Full-stack (Next.js 16+ / NestJS 11+) พร้อมระบบ **Reverse Proxy Image** ตั้งแต่ Phase 0 เพื่อความปลอดภัยและเสถียรภาพสูงสุดในการดึงรูปภาพหลบเลี่ยงข้อจำกัดภายนอก
 2.  **Multi-Method Authentication (OAuth 2.0):** ติดตั้งระบบ Login หลากหลายรูปแบบ รวมถึง Google/Facebook OAuth และระบบ **Profile Picture Integration** ที่สามารถอัปโหลดรูปโปรไฟล์เอง หรือเลือกใช้รูปจากบัญชี Third-party ที่เชื่อมโยงไว้มาใช้งานได้ทันที
@@ -164,7 +212,7 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 7.  **Reader Core Hardening:** แก้ไข Critical Bugs ในหน้าอ่านมังงะ (เช่น ปัญหาภาพไม่ต่อเนื่อง, ไม่สามารถเลื่อนลงสุดได้) พร้อมปรับปรุง UI ให้รองรับ Mobile แบบ Native Experience 100%
 
 ### Phase 1.5: System Stabilization & Creator Studio
-**สถานะ:** ✅ Completed / ⏳ Polishing
+**สถานะ:** COMPLETED (Scope หลัก) / POLISHING — ยังมี QA และงานแก้ไข
 
 1.  **Manga Upload System & Studio:** พัฒนาระบบอัปโหลดมังงะสำหรับ Translator/Creator รองรับไฟล์ปริมาณมาก และเพิ่มหน้า **Studio Dashboard** สำหรับบริหารจัดการสถิติและผลงาน
 2.  **Standard Database Migration:** สำเร็จการย้ายชุดข้อมูลจาก Firebase (NoSQL) สู่ Supabase (Relational PostgreSQL) เพื่อขยายเพดาน Throughput, รองรับ RLS, และ **ประหยัดต้นทุน (Cost-Effective)** เนื่องจาก Supabase มี Built-in Functions ที่ครอบคลุมกว่าและลดภาระในการเชื่อมต่อ Third-party
@@ -175,7 +223,10 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 7.  **✅ Technical Debt Cleanup (Completed):** ถอดถอน `GoogleBooksService` (Legacy) ออกทั้งหมด เพื่อใช้ MangaDex Service แบบ Dynamic 100% แล้ว และเตรียมเพิ่มระบบ Soft Deletion ใน Forum
 
 ### Phase 2: Architectural Scaling & Cloud Readiness
-**สถานะ:** 🔵 In Progress (Cache Upgrade ✅ Complete — ส่วนที่เหลือ Planned)
+**สถานะ:** WIP — Cache Architecture ทำแล้ว แต่ Cloud, Payment และ Security ยังยืนยันเสร็จครบไม่ได้
+
+**ผลตรวจ (2026-10-22):** Leader Election, Write-behind Queue, Recovery และ Invalidation มีโค้ดแล้ว Xendit/PromptPay และ Cloudflare R2 Adapter มี Implementation แต่ยังไม่พบหลักฐานรับผล Payment จริงและย้าย R2 ทั้งระบบบน Production สำเร็จ ไม่พบหลักฐานยืนยัน GPU Cloud On-demand Migration เสร็จ Native รองรับ TOTP แล้ว แต่ Device Session Pinning ยังยืนยันครบไม่ได้
+
 
 1.  **Multi-Layer Cache Orchestration (T4-Standard Architecture):** ✅ Complete (PRs #16/#34/#39/#49/#50/#55/#70/#71)
     *   **Truth Hierarchy:** L1 (in-memory latency) → L2 (Redis, runtime source of truth) → L3 (JSON disk, per-node backup) → Supabase (long-term authority)
@@ -196,7 +247,10 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 5.  **Advanced Identification:** เพิ่มระบบยืนยันตัวตนสองชั้น (2FA) และระบบ Device Session Pinning ผูกบัญชีกับ Hardware ID
 
 ### Phase 3: Hybrid Mobile Framework (Shortest Workflow & Code Sharing)
-**สถานะ:** 🚀 Next Step (ยุทธศาสตร์ลดเวลาการพัฒนาขั้นสูงสุด)
+**สถานะ:** COMPLETED (ระบบช่วงเปลี่ยนผ่านเดิม) / SUPERSEDED by Phase 4
+
+**ผลตรวจ (2026-10-22):** WebView Shell และ Native Auth Bridge เป็นระบบเดิมช่วงเปลี่ยนผ่าน ปัจจุบัน Mobile Entry Point ใช้ React Native Views โดยตรงแล้ว ไม่ควรระบุเป็น Next Step หรือเป้าหมาย Release ใหม่
+
 
 1.  **React Native WebViewer Shell:** ขึ้นโครง React Native เพื่อหุ้ม Web App เดิม ทำให้สามารถนำ UI พรีเมียมมาใช้งานได้ทันที
 2.  **Strategic Code Sharing:** อนุญาตให้ **แบ่งปัน Codebase บางส่วน (Shared Logic/Types) ระหว่าง Web และ Mobile ได้โดยตรง** ลดระยะเวลาการพัฒนาลงมหาศาล
@@ -204,7 +258,10 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 4.  **Core OS Permissions:** จัดการสิทธิ์การเข้าถึงระบบพื้นฐานผ่าน Native Code
 
 ### Phase 4: Fully Native Mobile Application Development (พัฒนาแอป Native เต็มรูปแบบ)
-**สถานะ:** Planned (เปลี่ยนผ่านจาก WebView Shell ของ Phase 3 ไปสู่แอป Native)
+**สถานะ:** WIP — Native Source รวมเข้า main แล้ว แต่ Device และ Production Release Acceptance ยังไม่ผ่าน
+
+**ผลตรวจ (2026-10-22):** Mobile/App.tsx เรียก NativeSessionView ไม่ได้ฝัง WebView มี Native Reader, Discovery, Account, Community, Studio และ Staff แล้ว [รายงาน Main Integration](Mobile/docs/2026-10-22-main-integration.md) ระบุ Mobile 235/235 และ Backend 1,014/1,014 Tests ผ่านบน Tree ที่ตรวจ แต่ **ยังไม่ใช่หลักฐานว่าใช้บนเครื่องจริงหรือพร้อม Production** ยังต้องสร้าง APK จาก main ที่รับแล้ว ตรวจ MIT/Payment/OAuth จริง ทดสอบ Device/UX เซ็น Production และรับผลการแจกจ่ายตาม [Issue #753](https://github.com/Slow-Inc/MangaDock/issues/753) รวมถึงยังไม่มีหลักฐานรับรอง iOS Release
+
 
 **เป้าหมาย:** พัฒนาแอป Android/iOS ที่มี UI, Navigation และตัวอ่านมังงะเป็นของตัวเอง แทนการแสดงเว็บไซต์เดิมผ่าน WebView โดยใช้ Backend และ MIT Services ชุดเดียวกับ Web App เพื่อลดการทำ Business Logic ซ้ำซ้อน
 
@@ -217,7 +274,10 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 **เกณฑ์เสร็จสิ้น:** ผู้ใช้สามารถสำรวจมังงะ อ่านมังงะ และจัดการบัญชีผ่านหน้าจอ Native ได้โดยไม่ต้องพึ่ง WebView ขณะที่ Web App ยังทำงานแยกต่างหากบน Backend เดียวกัน
 
 ### Phase 5: Retention Ecosystem & Community 2.0
-**สถานะ:** Planned — Lightweight Social & Retention Features
+**สถานะ:** NOT STARTED (ตาม Scope Phase 5 ใหม่) — มี Follow และ In-app Notifications เดิมให้ Reuse
+
+**ผลตรวจ (2026-10-22):** มี user_follows API และ In-app Notifications จริง แต่ไม่ใช่ Personalized Following/Ranked Feed หรือ OS Push Notifications และ Favorites/Series Follows/Reading History ที่มีอยู่ไม่ใช่ Custom Collections ที่แชร์ Public Link ได้ตาม Phase 5 จึงยังไม่อ้างว่าส่งมอบ Phase 5 สำเร็จ
+
 
 **เป้าหมาย:** เพิ่มการมีส่วนร่วมและการกลับมาใช้งานของผู้อ่าน โดยใช้ NestJS, Supabase/PostgreSQL, Redis และระบบ Multi-Node ที่มีอยู่แล้วให้มากที่สุด ไม่สร้าง ML Recommendation Service หรือ Message Broker ใหม่โดยไม่จำเป็น
 
