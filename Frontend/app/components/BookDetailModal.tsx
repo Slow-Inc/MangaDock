@@ -806,7 +806,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       className={`relative h-full w-full overflow-hidden rounded-xl border transition-all duration-200 ${
                         selectedCover === displayUrl
                           ? "border-ink ring-2 ring-ink-2"
-                          : "border-line hover:border-ink-2"
+                          : "border-line hover:border-ink-2 group-hover:border-ink-2"
                       }`}
                     >
                       <Image
