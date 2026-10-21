@@ -3,6 +3,20 @@
 
 ---
 
+## #843 Cover lightbox reachable by keyboard (2026-10-21)
+
+**What:** the per-volume enlarge icon was a `<div onClick>` inside the volume `<button>` — mouse-only. The tile is now a
+wrapper holding two sibling buttons (volume, and "ขยายปก เล่ม N", shown on hover or keyboard focus); `CoverLightbox` is
+`role="dialog"` `aria-modal` with `useDialogFocus` (focus in, Tab inside, focus back to the enlarge button), standing aside
+when a layer is above it.
+
+**Validated:** production build. Keyboard: Tab from a volume reaches "ขยายปก เล่ม 1" (visible, opacity 1) → Enter opens the
+lightbox with focus inside → 6 Tabs stay inside → Escape closes it, focus back on the enlarge button, popup still open.
+Mouse: hover shows the button, tile click selects the volume, enlarge click opens, close button closes. tsc 0; eslint
+counts unchanged.
+
+---
+
 ## #840 Reader takes keyboard focus; Escape closes only the top layer (2026-10-21)
 
 **What:** the reader (portal, `fixed inset-0`) is now `role="dialog"` `aria-modal` and uses `useDialogFocus` (#837): focus
