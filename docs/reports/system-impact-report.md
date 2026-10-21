@@ -214,6 +214,10 @@ Evidence, commands and open acceptance: [public HTTPS report](../../Mobile/docs/
 
 ภาษาไทย: ดูหลักฐาน คำสั่ง และ acceptance ที่ค้างในรายงาน HTTPS ผล source suites วันเดียวกันเป็นหลักฐานเดิม รอบนี้ตรวจ build/artifact และ HTTP สาธารณะใหม่ โดยไม่มีการแก้ source ไปพร้อมกัน
 
+Correction — 2026-10-22: after review of #878, fields 13 and 18 above were corrected (the route was restored, not debt removed; the checks were one-off, not a KPI), and the Cloudflare identifier table moved off the public page. No other value changed.
+
+ภาษาไทย: แก้ไข — 2026-10-22: หลังรีวิว #878 แก้ช่อง 13 และ 18 ข้างต้น (เป็นการกู้ route ไม่ได้ลบ debt และการตรวจเป็นครั้งเดียว ไม่ใช่ KPI) และย้ายตารางรหัส Cloudflare ออกจากหน้าสาธารณะ ไม่เปลี่ยนค่าอื่น
+
 ## 2026-10-20 — Downloadable ARM64 test APK / APK ARM64 สำหรับโหลดทดสอบ
 
 | Field | English | ไทย |

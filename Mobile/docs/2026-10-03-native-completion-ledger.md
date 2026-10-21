@@ -4,7 +4,7 @@
 
 Recovered public API from 530/1033 using a dedicated healthy Cloudflare tunnel, preserved the old shared tunnel and rebuilt the unchanged native source with the HTTPS API origin. Public Reader API and complete APK download/hash pass. Debug signing and real device/MIT/production gates remain open. [Recorded artifact and runtime instructions](2026-10-20-public-https-apk.md).
 
-ภาษาไทย: กู้ API จาก 530/1033 ด้วย tunnel แยกที่ healthy คง tunnel ร่วมเดิม build native source เดิมด้วย API HTTPS ตรวจ Reader API และดาวน์โหลด APK ครบ/hash ตรงแล้ว ยังเป็นลายเซ็นทดสอบและค้างเครื่องจริง/MIT/production ดูไฟล์ใหม่และวิธีเปิดระบบในรายงาน
+ภาษาไทย: กู้ API จาก 530/1033 ด้วย tunnel แยกที่ healthy คง tunnel ร่วมเดิม build native source เดิมด้วย API HTTPS ตรวจ Reader API และดาวน์โหลด APK ครบ/hash ตรงแล้ว ยังเป็นลายเซ็นทดสอบและค้างเครื่องจริง/MIT/production ดูไฟล์ที่บันทึกไว้และวิธีเปิดระบบในรายงาน
 
 ## Test APK delivery — 2026-10-20 / ส่ง APK ทดสอบ
 
