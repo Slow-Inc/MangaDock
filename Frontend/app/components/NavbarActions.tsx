@@ -75,7 +75,7 @@ export default function NavbarActions() {
           <div ref={menuRef} className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
-              aria-haspopup="menu"
+              aria-controls="account-menu"
               aria-expanded={menuOpen}
               onPointerEnter={() => setChipLive(true)}
               onPointerLeave={() => setChipLive(false)}
@@ -105,7 +105,7 @@ export default function NavbarActions() {
               </span>
             </button>
 
-            <div className={`absolute right-0 top-11 z-50 min-w-40 overflow-hidden rounded-2xl border border-line bg-surface/80 shadow-xl backdrop-blur-2xl transition-all duration-200 origin-top-right ${
+            <div id="account-menu" inert={!menuOpen} className={`absolute right-0 top-11 z-50 min-w-40 overflow-hidden rounded-2xl border border-line bg-surface/80 shadow-xl backdrop-blur-2xl transition-all duration-200 origin-top-right ${
               menuOpen
                 ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
                 : "opacity-0 scale-95 -translate-y-2 pointer-events-none"

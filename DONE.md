@@ -17,6 +17,13 @@ opens with Enter (`aria-expanded=true`), Escape closes it with focus back on its
 items, so Tab had already left and focus was not pulled back), a mouse click opens and an outside click closes. tsc 0;
 eslint counts on the three components equal main's (net −17 lines).
 
+**Review round:** the panels are disclosures, not ARIA menus (no `menuitem`s, no arrow keys), so `aria-haspopup` would
+have announced menu keyboarding that does not exist — replaced by `aria-controls` → panel ids, as the categories button
+already did. Escape is left to a dialog opened over a lingering popover (focus inside `[role=dialog]`/`[aria-modal]`), so one
+key closes one layer. Closed panels were only faded (`opacity-0`), so Tab walked into invisible items — each panel is
+`inert` while closed. Re-verified: Tab after Escape goes to the next header control (categories → "ค้นหา"), not into the
+closed panel; open panels still Tab-reachable; mouse open/outside-close unchanged. Tests 5 pass.
+
 ---
 
 ## #865 A failed landing row no longer sits empty for 20 minutes (2026-10-21)

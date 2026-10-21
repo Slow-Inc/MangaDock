@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { popoverDismiss } from "./popoverDismiss";
 
-type Node_ = { id: string; focused?: boolean; focus?: () => void };
+type Node_ = { id: string; focus?: () => void; closest?: (sel: string) => unknown };
 
 /** A document with its own listener table and a container that "contains" a fixed set of nodes. */
 function setup() {
@@ -9,7 +9,8 @@ function setup() {
   const trigger: Node_ = { id: "trigger" };
   trigger.focus = () => { doc.activeElement = trigger; };
   const item: Node_ = { id: "item" };
-  const outside: Node_ = { id: "outside" };
+  const outside: Node_ = { id: "outside", closest: () => null };
+  const inDialog: Node_ = { id: "in-dialog", closest: () => ({ id: "dialog" }) };
   const inside = new Set<Node_>([trigger, item]);
   const container = {
     contains: (n: unknown) => inside.has(n as Node_),
@@ -23,7 +24,7 @@ function setup() {
   const fire = (t: string, e: unknown) => listeners[t]?.forEach((fn) => fn(e));
   let closed = 0;
   const stop = popoverDismiss(doc as never, () => container as never, () => { closed++; });
-  return { doc, fire, trigger, item, outside, stop, closed: () => closed };
+  return { doc, fire, trigger, item, outside, inDialog, stop, closed: () => closed };
 }
 
 describe("popoverDismiss: Navbar popovers close by keyboard as well as mouse (#870)", () => {
@@ -34,12 +35,19 @@ describe("popoverDismiss: Navbar popovers close by keyboard as well as mouse (#8
     expect(s.doc.activeElement).toBe(s.trigger);
   });
 
-  test("Escape with focus elsewhere closes without stealing focus", () => {
+  test("Escape with focus elsewhere on the page closes without stealing focus", () => {
     const s = setup();
     s.doc.activeElement = s.outside;
     s.fire("keydown", { key: "Escape" });
     expect(s.closed()).toBe(1);
     expect(s.doc.activeElement).toBe(s.outside);
+  });
+
+  test("Escape inside a dialog opened meanwhile belongs to the dialog, not the popover", () => {
+    const s = setup();
+    s.doc.activeElement = s.inDialog;
+    s.fire("keydown", { key: "Escape" });
+    expect(s.closed()).toBe(0);
   });
 
   test("a mousedown outside closes; inside does not; other keys do nothing", () => {

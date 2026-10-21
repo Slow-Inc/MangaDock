@@ -86,7 +86,7 @@ export default function NotificationBell() {
         onClick={() => setOpen((v) => !v)}
         className="relative flex h-8 w-8 items-center justify-center rounded-full border border-line bg-fill text-ink-2 transition hover:bg-raised hover:text-ink"
         aria-label="การแจ้งเตือน"
-        aria-haspopup="true"
+        aria-controls="notification-panel"
         aria-expanded={open}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4.5 w-4.5">
@@ -100,7 +100,7 @@ export default function NotificationBell() {
       </button>
 
       {/* Notification panel */}
-      <div className={`absolute right-0 top-10 z-50 w-80 overflow-hidden rounded-2xl border border-line bg-surface/85 shadow-2xl backdrop-blur-2xl transition-all duration-200 origin-top-right ${
+      <div id="notification-panel" inert={!open} className={`absolute right-0 top-10 z-50 w-80 overflow-hidden rounded-2xl border border-line bg-surface/85 shadow-2xl backdrop-blur-2xl transition-all duration-200 origin-top-right ${
         open ? "opacity-100 scale-100 translate-y-0 pointer-events-auto" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"
       }`}>
         <div className="flex items-center justify-between border-b border-line px-4 py-3">

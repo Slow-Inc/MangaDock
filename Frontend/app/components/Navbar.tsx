@@ -162,6 +162,7 @@ export default function Navbar() {
               <div
                 id="genre-dropdown"
                 role="region"
+                inert={!genreOpen} // closed panels are only faded out — keep their links out of the Tab order (#870)
                 className={`absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-line bg-surface/70 shadow-2xl backdrop-blur-sm transition-all duration-200 origin-top-left ${
                   genreOpen
                     ? "pointer-events-auto scale-100 opacity-100"

@@ -7,7 +7,8 @@ type Doc = Pick<Document, "addEventListener" | "removeEventListener"> & { active
 
 /**
  * Closes an open popover on a mousedown outside it or on Escape; Escape returns focus to the trigger (the
- * container's `[aria-expanded]` element) when focus was inside, so a keyboard user is not left in a closed panel.
+ * container's `[aria-expanded]` element) when focus was inside, so a keyboard user is not left in a closed panel,
+ * and leaves the popover alone when focus is in a dialog (that Escape is the dialog's).
  * Returns the cleanup.
  */
 export function popoverDismiss(doc: Doc, getContainer: () => Container | null, close: () => void): () => void {
@@ -19,6 +20,8 @@ export function popoverDismiss(doc: Doc, getContainer: () => Container | null, c
     if (e.key !== "Escape") return;
     const c = getContainer();
     const focusInside = !!c && c.contains(doc.activeElement);
+    // A dialog opened over a lingering popover owns this Escape — one key must not close both layers.
+    if (!focusInside && doc.activeElement?.closest?.('[role="dialog"], [aria-modal="true"]')) return;
     close();
     if (focusInside) c.querySelector("[aria-expanded]")?.focus();
   };
