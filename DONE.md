@@ -3,6 +3,13 @@
 
 ---
 
+## MIT speed loop, round 10 — OCR was paying ~2.2 s per chunk in cuDNN host work (#884) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Warm profile put OCR at 54 % of an 11.1 s page. Traced: each OCR chunk call inside the pipeline spends ~2.2-2.6 s in host-side cuDNN work (`aten::cudnn_convolution` ~16 ms x 109 calls, profiled), the same call repeated immediately is 0.3 s and in an isolated process 0.1 s. NOT padding, NOT rescue (measured separately), NOT chunk size (chunk 64 was faster but changed OCR reads — rejected), NOT shape warmup (no effect).
+- **Fix:** run the 48px OCR model's forward with cuDNN disabled (`_cudnn_flags()` scoped to the call); every other model keeps cuDNN (LaMa regressed 3-12x without it). Windows default off, non-Windows unchanged, `MIT_OCR_CUDNN` override. OCR **4656->1128, 3980->769, 4403->1311, 9643->1930 ms** on 4 warm pages; page wall 2.4x. **Reads identical: 62 regions, 0 diffs.**
+- Benchmark `2026-10-22-884-ocr-cudnn.md`. Unit test `test_ocr_cudnn.py` (torch-heavy set).
+
 ## MIT quality loop, round 9 — the SFX rescue now serves: 20 localized SFX over 39 pages (#881) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
