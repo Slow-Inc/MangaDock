@@ -498,3 +498,13 @@ def test_a_tie_between_two_dictionary_splits_goes_to_the_common_words():
         assert whole in pieces, (text, pieces)
     pieces = _insert_thai_word_breaks('เขาเป็นผู้ทรงพลัง').split(_ZWSP)
     assert 'ผู้ทรงพลัง' in pieces, pieces
+
+
+def test_a_compound_tnc_lacks_is_not_resplit():
+    """Review of 18307842: 'หน้าใหม่' is a dictionary word TNC has no count for, so it scored as unseen
+    and 'มี|หน้าใหม่' lost to 'มีหน้า|ใหม่'. A known word TNC lacks counts as its rarest part."""
+    if not _HAS_PYTHAINLP:
+        return
+    assert 'หน้าใหม่' in _insert_thai_word_breaks('ไม่มีหน้าใหม่').split(_ZWSP)
+    assert 'ลำดับ' in [p.strip() for p in _insert_thai_word_breaks('ทำเป็นลำดับ').split(_ZWSP)] or \
+        'เป็นลำดับ' in _insert_thai_word_breaks('ทำเป็นลำดับ').split(_ZWSP)

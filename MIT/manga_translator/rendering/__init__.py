@@ -192,11 +192,31 @@ def _dodge_center(c, size, lo, hi):
     return (lo + hi) / 2.0 if lo_pushed else c
 
 
-def _place_off_neighbours(cx, cy, bw, bh, dodged, free, territories):
-    """Centre for a ``bw`` x ``bh`` block after a dodge (#795). Per axis: inside ``free`` (the
-    dodged box clipped to the balloon) when the block fits it, else flush with the edge a
-    neighbour pushed in — read off ``dodged``, since the balloon clip is no push (Tsuki p1). If that move runs into another neighbour, the block is centred in the
-    gap between the two instead (Mieruko p0: flush alone pushed a sign onto the line below)."""
+def _dodged_space(cx, cy, bw, bh, territories, own):
+    """``(dodged, free)`` for a ``bw`` x ``bh`` block centred at (cx, cy): the block's box with every
+    neighbour's territory pushed out of it, and that box clipped to the region's own balloon when
+    the block sits in one (the clip is no push — Tsuki p1). None/None when it collapses."""
+    box = (cx - bw / 2.0, cy - bh / 2.0, cx + bw / 2.0, cy + bh / 2.0)
+    dodged = clamp_box_to_neighbors(box, territories, margin=2)
+    free = list(dodged)
+    if own is not None and own[0] <= cx <= own[2] and own[1] <= cy <= own[3]:
+        free = [max(free[0], own[0]), max(free[1], own[1]), min(free[2], own[2]), min(free[3], own[3])]
+    if (free[2] - free[0]) < 6 or (free[3] - free[1]) < 6:
+        return None, None
+    return dodged, free
+
+
+def _place_off_neighbours(cx, cy, bw, bh, territories, own):
+    """Centre for a ``bw`` x ``bh`` block that must stay off its neighbours (#795). Per axis: inside
+    the free space when it fits, else flush with the edge a neighbour pushed in. If that move runs
+    into another neighbour, the block is centred in the gap between the two — or, when the far side
+    was never a neighbour, sits flush against the one it hit (Mieruko p0: flush alone pushed a sign
+    onto the line below). The dodge is taken at this block's own size (a re-laid block is taller)."""
+    dodged, free = _dodged_space(cx, cy, bw, bh, territories, own)
+    if dodged is None:
+        return cx, cy
+    start = (cx - bw / 2.0, cy - bh / 2.0, cx + bw / 2.0, cy + bh / 2.0)
+
     def axis(c, size, k):
         if size <= free[k + 2] - free[k]:
             return _clamp_center(c, size, free[k], free[k + 2])
@@ -210,8 +230,12 @@ def _place_off_neighbours(cx, cy, bw, bh, dodged, free, territories):
         lo_hit, hi_hit = again[k] > moved[k] + 1e-6, again[k + 2] < moved[k + 2] - 1e-6
         if not (lo_hit or hi_hit):
             return c
-        lo = again[k] if lo_hit else dodged[k]
-        hi = again[k + 2] if hi_hit else dodged[k + 2]
+        lo = again[k] if lo_hit else (dodged[k] if dodged[k] > start[k] + 1e-6 else None)
+        hi = again[k + 2] if hi_hit else (dodged[k + 2] if dodged[k + 2] < start[k + 2] - 1e-6 else None)
+        if lo is None:
+            return hi - size / 2.0
+        if hi is None:
+            return lo + size / 2.0
         return _clamp_center(c, size, lo, hi) if size <= hi - lo else (lo + hi) / 2.0
 
     return gap(cx, bw, 0), gap(cy, bh, 1)
@@ -584,15 +608,9 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                 # laid out again to fit it (Iruma p0: re-centring alone still overlapped).
                 if anti_overlap:
                     territories = _neighbor_territories(text_regions, i)
-                    dodged = clamp_box_to_neighbors(
-                        (cx - block_w / 2.0, cy - block_h / 2.0,
-                         cx + block_w / 2.0, cy + block_h / 2.0), territories, margin=2)
-                    free = list(dodged)
                     own = _box(getattr(region, 'bubble_box', None))
-                    if own is not None and own[0] <= cx <= own[2] and own[1] <= cy <= own[3]:
-                        free = [max(free[0], own[0]), max(free[1], own[1]),
-                                min(free[2], own[2]), min(free[3], own[3])]
-                    if (free[2] - free[0]) >= 6 and (free[3] - free[1]) >= 6:
+                    _, free = _dodged_space(cx, cy, block_w, block_h, territories, own)
+                    if free is not None:
                         _free_w = free[2] - free[0]
                         if _free_w < block_w - 1 and _free_w >= 2 * font_size_minimum:
                             from types import SimpleNamespace
@@ -606,7 +624,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                                                         font_size_max, page_shape, shrink_to_fit=True)
                             if _relaid is not None and _relaid[1] <= _free_w * 1.05:
                                 clean_fs, block_w, block_h = _relaid
-                        cx, cy = _place_off_neighbours(cx, cy, block_w, block_h, dodged, free, territories)
+                        cx, cy = _place_off_neighbours(cx, cy, block_w, block_h, territories, own)
                     if own is not None:            # a dodge never takes the text out of its balloon
                         cx = _clamp_center(cx, block_w, own[0], own[2])
                         cy = _clamp_center(cy, block_h, own[1], own[3])

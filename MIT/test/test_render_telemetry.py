@@ -378,3 +378,23 @@ def test_a_dodge_that_runs_into_another_neighbour_shares_the_gap_795():
     _, y1, _, y2 = sign.render_dst_box
     assert y2 - y1 > 1206 - 1086, 'precondition: the block is taller than the gap'
     assert abs((y2 - 1206.0) - (1086.0 - y1)) <= 2, sign.render_dst_box
+
+
+def test_a_relaid_block_is_dodged_with_its_new_size_795():
+    """Review of bfc9a64d: a block re-laid to a narrower free space is taller, but it was placed
+    against the dodge of the OLD block — both edges looked pushed, so it was centred back over the
+    neighbour above (top 73.5 under a neighbour ending at 100). The dodge is redone at its new size."""
+    above = (0.0, 0.0, 200.0, 100.0)
+    cx, cy = rend._place_off_neighbours(100.0, 150.0, 60.0, 160.0, [above], None)
+    assert cy - 80.0 >= 100.0, cy
+
+
+def test_a_one_sided_second_dodge_moves_flush_not_to_a_phantom_gap_795():
+    """Review of bfc9a64d: when the move hits a neighbour on an axis the first dodge never touched,
+    the far side is no neighbour — the block sits flush against the one it hit instead of being
+    centred between it and the block's own old edge (which left it still overlapping)."""
+    left = (0.0, 90.0, 110.0, 150.0)       # pushes the 100x40 block right, flush at x=112
+    low_right = (205.0, 135.0, 300.0, 300.0)  # untouched before; the move to x 112..212 runs into it
+    cx, cy = rend._place_off_neighbours(150.0, 120.0, 100.0, 40.0, [left, low_right], None)
+    x2, y2 = cx + 50.0, cy + 20.0
+    assert x2 <= 205.0 or y2 <= 135.0, (cx, cy)

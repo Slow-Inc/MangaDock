@@ -168,22 +168,28 @@ def _retie_thai_pairs(tokens: List[str]) -> List[str]:
     """Re-split each pair of adjacent words that newmm cut at a tie: when their join also splits
     into two other dictionary words that are both more common together (TNC frequency product),
     take that split — 'นา|ทีละ' -> 'นาที|ละ', 'บอ|กว่า' -> 'บอก|ว่า' (Mieruko p0, 2026-10-21).
-    newmm breaks such ties toward the shorter first word. Only parts both seen in TNC count (a
-    compound it lacks would always lose), and a pair led by a bound prefix ('ผู้|ทรงพลัง') is left
-    to the prefix glue. A kept trailing space stays at the end of the pair."""
+    newmm breaks such ties toward the shorter first word. A new split needs both parts seen in
+    TNC; a dictionary word TNC lacks ('หน้าใหม่') counts as its rarest part, so a correct compound
+    is not re-split. A pair led by a bound prefix ('ผู้|ทรงพลัง') is left to the prefix glue. A kept
+    trailing space stays at the end of the pair."""
     freq = _thai_word_freqs()
     if not freq:
         return tokens
     from pythainlp.tokenize.core import word_dict_trie
     trie = word_dict_trie()
+    def count(w):
+        if w in freq or w not in trie:
+            return freq.get(w, 0)
+        return min((freq.get(p, 0) for p in _thai_subwords(w) or ()), default=0)
+
     out = list(tokens)
     for i in range(len(out) - 1):
         a, b = out[i], out[i + 1]
         core = b.rstrip(' ')
-        if a != a.strip() or not core.strip() or a in _THAI_PREFIXES or not _THAI_RE.search(a + core):
+        if a != a.strip() or a in _THAI_PREFIXES or not _THAI_RE.search(a + core):
             continue
         word = a + core
-        best = (freq.get(a, 0) + 1) * (freq.get(core, 0) + 1), None
+        best = (count(a) + 1) * (count(core) + 1), None
         for k in range(1, len(word)):
             x, y = word[:k], word[k:]
             if k != len(a) and freq.get(x) and freq.get(y) and x in trie and y in trie:
