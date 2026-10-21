@@ -16,6 +16,7 @@ import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
 import type { LandingBook } from "../lib/types";
 import Mascot from "../components/mascot/Mascot";
 import { scrollBehavior } from "../hooks/reducedMotion";
+import { usePageTitle } from "../hooks/pageTitle";
 
 const API_BASE = "/api/proxy";
 
@@ -204,6 +205,7 @@ function SearchResults() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const query = searchParams.get("q") ?? "";
+  usePageTitle(query ? `ค้นหา “${query}”` : "ค้นหา");
 
   const [inputValue, setInputValue]       = useState(query);
   const [source, setSource]               = useState<Source>("all");

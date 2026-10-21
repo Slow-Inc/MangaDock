@@ -7,6 +7,7 @@ import MangaGrid, { GridBook } from "../../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../../lib/apiCache";
 import Loader from "../../components/ui/Loader";
 import { scrollBehavior } from "../../hooks/reducedMotion";
+import { usePageTitle } from "../../hooks/pageTitle";
 
 const API_BASE = "/api/proxy";
 
@@ -38,6 +39,7 @@ export default function GenrePage() {
   const router = useRouter();
   const slug = typeof params.genre === "string" ? params.genre : "";
   const genreLabel = GENRES[slug] ?? slug;
+  usePageTitle(genreLabel);
 
   const [books, setBooks] = useState<GridBook[]>([]);
   const [total, setTotal] = useState(0);

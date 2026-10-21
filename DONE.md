@@ -3,6 +3,24 @@
 
 ---
 
+## #855 Every page names itself in the tab (2026-10-21)
+
+**What:** all routes shared the root title "MangaDock by Hayate | Manga Streaming Platform" (WCAG 2.4.2). Almost every
+route is a client component under a client layout, so `hooks/pageTitle.ts` adds `usePageTitle(title)` →
+`"<title> · MangaDock"`: list pages by their heading, dynamic ones by the loaded name (search query, category, post, manga
+community, the book popup), Settings/Studio/Admin by the active tab in their layout, the 404 and error page via
+`<PageTitle>`. The titles live on a small stack (newest on top, root when empty) because React unmounts a parent's effects
+before its child's — "restore what I replaced" left a page's title stuck after navigating away with the popup open. Next
+re-commits its metadata `<title>` text after hydration (traced: our write at ~115 ms reverted with no element added), so
+while a page claims the title a `MutationObserver` on `<head>` puts it back.
+
+**Validated:** `pageTitle.test.ts` red → green (6, incl. parent-first unmount). Production build: direct loads of 10 public
+routes and 14 signed-in routes (local session) each show their own title; home and pages without a hook show the root title;
+client navigation /new → popup → Escape → back → /community → / gives the expected title at every step. tsc 0; eslint
+counts on touched files equal main's; `bun test` 425 pass.
+
+---
+
 ## #852 JS smooth scrolling honours reduced motion (2026-10-21)
 
 **What:** `scroll-behavior: auto` in globals.css cannot override an explicit `behavior: "smooth"` passed from JS. All 27 call

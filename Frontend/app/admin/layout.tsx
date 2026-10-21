@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE } from '../lib/types/user';
 import { adminGate } from './components/adminGate';
+import { usePageTitle } from '../hooks/pageTitle';
 
 const NAV = [
   {
@@ -70,6 +71,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, loading, getIdToken } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const activeNav = NAV.find(({ href, exact }) => isNavActive(pathname, href, exact));
+  usePageTitle(activeNav ? `${activeNav.label} · Admin` : 'Admin');
   // The authoritative role (profiles.role): the JWT can lag for an admin promoted in the panel (#817).
   const mobileNavRef = useRef<HTMLElement>(null);
   const [profile, setProfile] = useState<{ uid: string; role: number | null } | null>(null);

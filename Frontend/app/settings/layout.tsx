@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../contexts/AuthContext";
 import { stripScrollLeft } from "../lib/stripScroll";
+import { usePageTitle } from "../hooks/pageTitle";
 
 const NAV = [
   { href: "/settings/profile",  label: "ข้อมูลส่วนตัว" },
@@ -19,6 +20,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const activeItem = NAV.find((item) => pathname.startsWith(item.href));
+  usePageTitle(activeItem ? `${activeItem.label} · ตั้งค่า` : "ตั้งค่า");
 
   useEffect(() => {
     if (!loading && !user) router.replace("/");

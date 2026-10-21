@@ -1,9 +1,12 @@
 import Link from "next/link";
 import StatusPage from "./components/ui/StatusPage";
 import { buttonClass } from "./components/ui/Button";
+import { PageTitle } from "./hooks/pageTitle";
 
 export default function NotFound() {
   return (
+    <>
+    <PageTitle title="ไม่พบหน้านี้" />
     <StatusPage
       label="404"
       mascot="search"
@@ -21,5 +24,6 @@ export default function NotFound() {
     >
       ลิงก์อาจพิมพ์ผิด หรือหน้านี้ถูกย้ายไปแล้ว ลองกลับหน้าแรก หรือค้นหามังงะที่ตามหาอยู่
     </StatusPage>
+    </>
   );
 }

@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import MangaGrid, { GridBook } from "../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import { scrollBehavior } from "../hooks/reducedMotion";
+import { usePageTitle } from "../hooks/pageTitle";
 
 const API_BASE = "/api/proxy";
 
@@ -319,6 +320,7 @@ function Section({ order }: { order: TabKey }) {
 }
 
 export default function NewBooksPage() {
+  usePageTitle("หนังสือทั้งหมด");
   return (
     <Suspense fallback={<div className="min-h-screen bg-bg" />}>
       <NewBooksPageInner />
