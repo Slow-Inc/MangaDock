@@ -292,6 +292,12 @@ def _neighbor_territories(text_regions, i):
     return out
 
 
+# The Thai column in a tall balloon starts at this share of the source column's width: the source is
+# measured at its widest line, and an elliptical balloon narrows where the Thai's first line sits
+# (Mieruko p1: 'เด็กพวกนี้' touched the outline at the full source width).
+_LETTER_W_FILL = 0.9
+
+
 def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None,
                       shrink_to_fit: bool = False):
     """Render-layout rework: lay the translated text out as an upright horizontal block
@@ -336,7 +342,7 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     _letter_h = float(getattr(region, 'letter_h', 0) or 0)
     _squeeze_h = min(box_h, _letter_h) if _letter_h > 0 else box_h
     if _letter_w > 0:
-        wrap_w = min(wrap_w, _letter_w)
+        wrap_w = min(wrap_w, _LETTER_W_FILL * _letter_w)
 
     # #183 hard gate, hyphenation-aware: the squeeze floor per TOKEN is (a) the widest
     # SYLLABLE + hyphen when the language hyphenator can split it — long words then
