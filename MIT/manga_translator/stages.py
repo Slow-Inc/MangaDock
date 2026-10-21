@@ -87,5 +87,6 @@ async def run_text_rendering(config, ctx, font_path):
                                           font_size_max=config.render.font_size_max,
                                           clean_layout=config.render.clean_layout,
                                           knuth_plass=config.render.knuth_plass,
-                                          page_shape=getattr(ctx, 'page_shape', None))
+                                          page_shape=getattr(ctx, 'page_shape', None),
+                                          font_src_scale=config.render.font_src_scale)
     return output

@@ -1584,6 +1584,9 @@ class MangaTranslator:
         # Group nearby regions so they share one crop and avoid overlap.
         # Use pad + render_extra as grouping threshold so any two regions whose
         # expanded render canvases would overlap are pre-merged into one group.
+        # #851: fix the page's dialogue font size on the whole page — each patch renders one group alone.
+        from .rendering import annotate_page_font
+        annotate_page_font(regions, config.render.font_src_scale)
         region_groups = self._group_nearby_regions(regions, pad + render_extra, img_w, img_h)
         logger.info(f'[PatchTranslate] {len(regions)} regions -> {len(region_groups)} groups after proximity merge')
 

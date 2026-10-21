@@ -241,6 +241,34 @@ def _place_off_neighbours(cx, cy, bw, bh, territories, own):
     return gap(cx, bw, 0), gap(cy, bh, 1)
 
 
+def _is_sfx_region(r) -> bool:
+    return bool(getattr(r, 'from_sfx_detection', False) or getattr(r, 'sfx_rescued', False))
+
+
+def annotate_page_font(regions, scale: float) -> None:
+    """#851: one dialogue font size per page. Sets ``region.page_font`` = ``scale`` x the median
+    source font size (``region.font_size``, the detected line height) of the page's non-SFX
+    regions. A region under half that median (credits) gets ``scale`` x its own size; one over
+    double it (a title, an SFX the detector did not tag — Iruma 'PRK') gets no page size and keeps
+    the absolute font. Run on the WHOLE page before patch grouping — a patch renders one group
+    alone and would otherwise take the median of that group. No-op at scale 0."""
+    if not scale or scale <= 0:
+        return
+    srcs = sorted(float(r.font_size) for r in regions
+                  if (getattr(r, 'font_size', 0) or 0) > 0 and not _is_sfx_region(r))
+    if not srcs:
+        return
+    n = len(srcs)
+    median = srcs[n // 2] if n % 2 else (srcs[n // 2 - 1] + srcs[n // 2]) / 2.0
+    for r in regions:
+        own = float(getattr(r, 'font_size', 0) or 0)
+        if own > 2.0 * median:
+            r.page_font = None
+            continue
+        base = own if 0 < own < 0.5 * median else median
+        r.page_font = max(1, round(scale * base))
+
+
 def _region_territory(region):
     """The box a region 'owns' for anti-overlap: its balloon (#170) if known, else its
     detection box. Returns None when neither is available."""
@@ -380,7 +408,7 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     return int(clean_fs), float(block_w), float(block_h)
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None):
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None, font_src_scale: float = 0.0):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -459,7 +487,15 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             _seen_sfx[_t] = (k, _area)
 
     dst_points_list = []
+    # #851: one dialogue size per page. The /patches path annotates the whole page before grouping;
+    # a full-page render (every region present) annotates here.
+    if font_src_scale and font_src_scale > 0 and not all(hasattr(r, 'page_font') for r in text_regions):
+        annotate_page_font(text_regions, font_src_scale)
+
     for i, region in enumerate(text_regions):
+        # the absolute font clean layout starts from: the page's dialogue size (#851) or font_size_max
+        fmax_i = (getattr(region, 'page_font', None) if font_src_scale and font_src_scale > 0
+                  else None) or font_size_max
         # #436: a deduped (blanked) duplicate renders nothing — skip layout entirely
         # (the legacy path would choke on it); keep a degenerate dst so lists align.
         if not (region.translation and region.translation.strip()):
@@ -516,7 +552,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                     xyxy=(acx - fit_w / 2.0, acy - fit_h / 2.0,
                           acx + fit_w / 2.0, acy + fit_h / 2.0))
                 _laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum,
-                                          font_size_max, page_shape, shrink_to_fit=True)
+                                          fmax_i, page_shape, shrink_to_fit=True)
                 if _laid is not None:
                     _fs, _bw, _bh = _laid
                     region.font_size = int(_fs)
@@ -529,6 +565,8 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                         np.array([centered_box(acx, acy, _bw, _bh)], dtype=np.int64))
                     continue
             region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), font_max_box_ratio)
+            if font_src_scale and font_src_scale > 0 and getattr(region, 'page_font', None):
+                region.font_size = min(region.font_size, region.page_font)   # #851: not past the page size
             hw, hh = fit_w / 2.0, fit_h / 2.0
             # #535 Phase-0c telemetry: stamp the routing decision so the /patches
             # payload can explain this region (additive attrs, no behavior change).
@@ -583,7 +621,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             continue
 
         if clean_layout and not _sfx_display and region.translation and region.translation.strip():
-            laid = _clean_layout_dst(region, img.shape, font_size_minimum, font_size_max, page_shape)
+            laid = _clean_layout_dst(region, img.shape, font_size_minimum, fmax_i, page_shape)
             # #832: a region in a balloon it does not fill (EN words stacked in a narrow column)
             # lands here, and its column floored at the widest Thai word can be wider than the
             # balloon. Lay it out again on the balloon interior, as bubble_fit_tall does (#816).
@@ -596,7 +634,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                         translation=region.translation, target_lang=getattr(region, 'target_lang', 'en_US'),
                         font_size=getattr(region, 'font_size', 0),
                         xyxy=(_acx - _fw / 2.0, _acy - _fh / 2.0, _acx + _fw / 2.0, _acy + _fh / 2.0))
-                    laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum, font_size_max,
+                    laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum, fmax_i,
                                              page_shape, shrink_to_fit=True) or laid
             if laid is not None:
                 clean_fs, block_w, block_h = laid
@@ -621,7 +659,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                                 font_size=getattr(region, 'font_size', 0),
                                 xyxy=(free[0], cy - _h / 2.0, free[2], cy + _h / 2.0))
                             _relaid = _clean_layout_dst(_proxy, img.shape, font_size_minimum,
-                                                        font_size_max, page_shape, shrink_to_fit=True)
+                                                        fmax_i, page_shape, shrink_to_fit=True)
                             if _relaid is not None and _relaid[1] <= _free_w * 1.05:
                                 clean_fs, block_w, block_h = _relaid
                         cx, cy = _place_off_neighbours(cx, cy, block_w, block_h, territories, own)
@@ -798,7 +836,8 @@ async def dispatch(
     font_size_max: int = 0,
     clean_layout: bool = False,
     knuth_plass: bool = False,
-    page_shape=None
+    page_shape=None,
+    font_src_scale: float = 0.0
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
@@ -814,7 +853,7 @@ async def dispatch(
     # (no `await`), so perf_counter here measures true compute — comparing their sum
     # to the async-wrapper's stage total isolates any async/suspension overhead.
     _t_layout = time.perf_counter()
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape, font_src_scale)
     logger.info(f"[timing-render] phase=layout_fit elapsed_ms={(time.perf_counter() - _t_layout) * 1000:.1f} regions={len(text_regions)}")
 
     # TODO: Maybe remove intersections

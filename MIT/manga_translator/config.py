@@ -180,6 +180,11 @@ class RenderConfig(BaseModel):
     scaled up by the length-ratio heuristic into an oversized block that overflows its
     panel (matches MangaTranslator's small absolute fonts). SFX is exempt. 0 → no cap
     (byte-identical)."""
+    font_src_scale: float = 0.0
+    """#851: one dialogue font size per page, scaled from the source lettering — the page's size is
+    this x the median source font size of its non-SFX regions (a region far off the median keeps
+    this x its own). Clean layout starts from it instead of the absolute font_size_max, and a
+    sole-balloon fit never exceeds it; each still shrinks to fit. 0 → off (byte-identical)."""
     anti_overlap: bool = False
     """Anti-overlap text layout: clamp each region's bubble-fit box against its
     neighbours (using the detected positions) before sizing the font, so translated

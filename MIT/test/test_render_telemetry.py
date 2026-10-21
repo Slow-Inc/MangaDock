@@ -398,3 +398,69 @@ def test_a_one_sided_second_dodge_moves_flush_not_to_a_phantom_gap_795():
     cx, cy = rend._place_off_neighbours(150.0, 120.0, 100.0, 40.0, [left, low_right], None)
     x2, y2 = cx + 50.0, cy + 20.0
     assert x2 <= 205.0 or y2 <= 135.0, (cx, cy)
+
+
+def _echo_stubs(monkeypatch):
+    monkeypatch.setattr(rend, '_bubble_interior_box',
+                        lambda region, bubble_box, shape: (60.0, 40.0, (50.0, 50.0)))
+    monkeypatch.setattr(rend, '_bubble_fit_font_size', lambda region, wh, ratio: 42)
+    monkeypatch.setattr(rend, '_clean_layout_dst',
+                        lambda region, shape, fmin, fmax, page_shape=None, **kw: (fmax, 80.0, 30.0))
+
+
+def _page():
+    lines = [FakeRegion(horizontal=True, translation='เฮ้', xyxy=(300, 100 + 60 * k, 500, 140 + 60 * k),
+                        font_size=s) for k, s in enumerate((18, 20, 16))]
+    credit = FakeRegion(horizontal=True, translation='อย่ารีโฮสต์', xyxy=(300, 700, 600, 708), font_size=8)
+    sole = FakeRegion(horizontal=True, translation='เปลี่ยนเรื่อง', xyxy=(20, 20, 100, 100),
+                      bubble_box=(10, 10, 110, 110), font_size=18)
+    return lines, credit, sole
+
+
+def test_font_src_scale_sets_one_dialogue_size_per_page_851(monkeypatch):
+    """#851: the dialogue on one page rendered at 20 px (absolute font_size_max) next to a sole balloon
+    filled to 35-37 px, both blind to the source lettering. With font_src_scale the page's dialogue
+    size is scale x the median source size; bubble_fit_sole stops above it; a region far off the
+    median (8 px credits) keeps its own scaled size."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert [r.render_font_px for r in lines] == [25, 25, 25]      # round(1.4 x median 18)
+    assert credit.render_font_px == 11                            # round(1.4 x its own 8)
+    assert sole.render_font_px == 25                              # was 42: filled past the page size
+
+
+def test_font_src_scale_zero_keeps_the_absolute_font_851(monkeypatch):
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True)
+    assert [r.render_font_px for r in lines] == [20, 20, 20] and sole.render_font_px == 42
+
+
+def test_the_page_size_survives_patch_grouping_851(monkeypatch):
+    """The /patches path renders one group of regions at a time, so the page median is fixed on the
+    whole page first (annotate_page_font) and a group alone still gets it."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    rend.annotate_page_font(lines + [credit, sole], 1.4)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, [lines[1]], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert lines[1].render_font_px == 25                          # not round(1.4 x its own 20) = 28
+
+
+def test_lettering_far_above_the_page_size_keeps_the_absolute_font_851(monkeypatch):
+    """Iruma p0 candidates (2026-10-21): an SFX the detector did not tag ('PRK', 44 px against a 13 px
+    page median) took scale x its own size — 79 px at 1.8. Only regions below the band (credits)
+    scale from their own size; one far above it keeps the absolute font as before."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    sfx = FakeRegion(horizontal=True, translation='ปึ่ก', xyxy=(600, 600, 700, 650), font_size=44)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole, sfx], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert sfx.render_font_px == 20 and lines[0].render_font_px == 25
