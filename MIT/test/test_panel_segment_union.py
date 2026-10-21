@@ -56,3 +56,27 @@ def test_cached_length_and_angle_match_their_formulas():
         for _ in range(2):
             assert s.dist() == math.sqrt(dx ** 2 + dy ** 2)
             assert s.angle() == (math.atan(dy / dx) if dx != 0 else math.pi / 2)
+
+
+def test_projected_point_matches_the_numpy_version():
+    """#822 follow-up: projected_point ran on 2-element numpy arrays for every pair union_all and
+    split compare; the plain-float version must return exactly the same dot."""
+    import numpy as np
+
+    def numpy_projected(seg, p):
+        a, b, p = np.array(seg.a), np.array(seg.b), np.array(p)
+        ap, ab = p - a, b - a
+        if ab[0] == 0 and ab[1] == 0:
+            return a
+        r = a + np.dot(ap, ab) / np.dot(ab, ab) * ab
+        return (round(r[0]), round(r[1]))
+
+    rnd = random.Random(11)
+    for _ in range(2000):
+        seg = Segment((rnd.randint(0, 2000), rnd.randint(0, 2000)), (rnd.randint(0, 2000), rnd.randint(0, 2000)))
+        p = (rnd.randint(-100, 2100), rnd.randint(-100, 2100))
+        for q in (p, np.array([p]), np.array(p)):              # tuple, polygon dot [[x, y]], array
+            got, want = seg.projected_point(q), numpy_projected(seg, q)
+            assert tuple(int(v) for v in got) == tuple(int(v) for v in want), (seg, q, got, want)
+    flat = Segment((5, 5), (5, 5))
+    assert tuple(flat.projected_point((9, 9))) == (5, 5)

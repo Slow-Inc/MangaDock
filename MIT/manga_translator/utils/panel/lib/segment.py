@@ -197,12 +197,12 @@ class Segment:
 		return dedup_segments
 
 	def projected_point(self, p):
-		a = np.array(self.a)
-		b = np.array(self.b)
-		p = np.array(p)
-		ap = p - a
-		ab = b - a
-		if ab[0] == 0 and ab[1] == 0:
-			return a
-		result = a + np.dot(ap, ab) / np.dot(ab, ab) * ab
-		return (round(result[0]), round(result[1]))
+		# plain floats, same arithmetic as the former 2-element numpy version (exact integer dot
+		# products, one true division) — it ran for every pair union_all and split compare
+		ax, ay = self.a
+		abx, aby = self.b[0] - ax, self.b[1] - ay
+		if abx == 0 and aby == 0:
+			return np.array(self.a)
+		px, py = (p[0], p[1]) if len(p) == 2 else np.ravel(p)[:2]   # a polygon dot arrives as [[x, y]]
+		t = (int(px - ax) * abx + int(py - ay) * aby) / (abx * abx + aby * aby)
+		return (round(ax + t * abx), round(ay + t * aby))
