@@ -29,6 +29,8 @@ def _load():
     if _model is None:
         from huggingface_hub import hf_hub_download
         from ultralytics import YOLO
+        from .cv_threads import restore_opencv_threads
+        restore_opencv_threads()   # the import left OpenCV single-threaded (#872)
         # token=None → huggingface_hub picks up HF_TOKEN from env (gated repo).
         path = hf_hub_download(repo_id=_REPO, filename=_FILE)
         _model = YOLO(path)
