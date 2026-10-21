@@ -796,13 +796,14 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       ? `${API_BASE}${cover.localUrl}`
                       : proxyImageUrl(cover.url);
                     return (
+                    // Wrapper, not one button: the enlarge control is a real <button> too, and buttons cannot nest (#843).
+                    <div key={i} className="group relative h-36 w-24 shrink-0">
                     <button
-                      key={i}
                       title={cover.volume ? `เล่ม ${cover.volume}` : `ปก ${i + 1}`}
                       onClick={() =>
                         setSelectedCover(selectedCover === displayUrl ? null : displayUrl)
                       }
-                      className={`group relative h-36 w-24 shrink-0 overflow-hidden rounded-xl border transition-all duration-200 ${
+                      className={`relative h-full w-full overflow-hidden rounded-xl border transition-all duration-200 ${
                         selectedCover === displayUrl
                           ? "border-ink ring-2 ring-ink-2"
                           : "border-line hover:border-ink-2"
@@ -820,16 +821,19 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                           เล่ม {cover.volume}
                         </div>
                       )}
-                      {/* Expand button */}
-                      <div
-                        onClick={(e) => { e.stopPropagation(); setLightboxSrc(displayUrl); }}
-                        className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-bg/80 text-ink opacity-100 transition-all duration-200 hover:bg-bg/90 hover:text-ink md:opacity-0 md:text-ink-2 md:group-hover:opacity-100"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
-                          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-                        </svg>
-                      </div>
                     </button>
+                    {/* Expand: its own keyboard-reachable button, shown on hover or keyboard focus (#843) */}
+                    <button
+                      type="button"
+                      aria-label={`ขยายปก${cover.volume ? ` เล่ม ${cover.volume}` : ` ${i + 1}`}`}
+                      onClick={() => setLightboxSrc(displayUrl)}
+                      className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-bg/80 text-ink opacity-100 transition-all duration-200 hover:bg-bg/90 hover:text-ink focus-visible:opacity-100 md:opacity-0 md:text-ink-2 md:group-hover:opacity-100"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3" aria-hidden>
+                        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                      </svg>
+                    </button>
+                    </div>
                     );
                   })}
                   </div>
