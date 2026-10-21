@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 4 — second corpus: narrow balloons, merged balloons, numbers, segmenter ties (2026-10-21)
+
+Branch `feat/mit-quality-loop` (PR #794). A second EN corpus (11 mid-chapter pages, 6 new series) found new defect classes; each fix replays both corpora (27 pages) and lands only with its benchmark.
+- **#832 narrow tall balloons** — a clean-layout block wider than its balloon interior is laid out again on the interior (dictionary breaks, then shrink): spill 4 → 0, same font size.
+- **#795 merged balloons** — `_place_off_neighbours`: free space = dodged box ∩ own balloon; a block wider than it is re-laid to fit; per axis the block moves flush with the edge a neighbour pushed (the balloon clip is not a push); a move that hits another neighbour centres in the gap. Replay caught two regressions of the first version (lost vertical dodge — Anta p1; flush onto the next line — Mieruko p0), each fixed red-first. Second corpus overlap 1 → 0, first unchanged.
+- **#842 numbers** — `_clean_translation_output` spaced the comma in `5,000` (`\w` matches digits) → `5, 000 เยน`. Separators between digits are kept; verified with a live run (a replay skips the cleanup).
+- **#844 Thai segmenter ties** — newmm takes the shorter first word when a compound splits into two dictionary words two ways (`นา|ทีละ`, `บอ|กว่า`, `โจม|ตีเมือง`). `_retie_thai_pairs` re-splits by TNC frequency (bundled); `longest` engine rejected (wrong far more often). 8 distinct pairs change over 651 translations, all correct.
+- **Lessons** — gate commits on the pytest summary line, not a grep of the whole log (`errors.pydantic.dev` matched `error`); corpus pages are .png *and* .jpg; replays reuse recorded text, so translation-stage fixes need a live run.
+
 ## MIT quality loop, round 3 — proven configs become defaults, scrutinize fixes (2026-10-21)
 
 Branch `feat/mit-quality-loop` (PR #794). Goal rule added 2026-10-21: a config proven on real pages becomes the MIT default without asking.
