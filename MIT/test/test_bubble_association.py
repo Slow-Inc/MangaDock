@@ -137,3 +137,40 @@ def test_translate_patches_tags_regions_when_bubble_seg_enabled():
     assert 'config.detector.det_bubble_seg' in fn.group(0)
     assert '_tag_regions_with_bubbles' in fn.group(0)
     assert 'group_regions(' in mt  # _group_nearby_regions delegates to the pure helper
+
+
+def test_bbox_prefilter_gives_the_same_associations_as_the_full_ray_cast():
+    """#822 follow-up: associate_regions_to_bubbles ray-cast every region centre against every balloon
+    polygon (pure Python). A centre outside a polygon's bbox can never be inside it, so the bbox is
+    checked first — the associations must be identical to ray-casting everything."""
+    import random
+    from manga_translator import bubble_association as ba
+
+    def reference(region_boxes, polys, min_ioa=ba.MIN_IOA):
+        bboxes = [ba._bbox_of(p) for p in polys]
+        out = []
+        for box in region_boxes:
+            cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+            containing = [i for i, p in enumerate(polys) if ba._point_in_polygon(cx, cy, p)]
+            if containing:
+                out.append(min(containing, key=lambda i: ba._polygon_area(polys[i])))
+                continue
+            match, best = None, min_ioa
+            for i, bb in enumerate(bboxes):
+                ioa = ba._intersection_over_box(box, bb)
+                if ioa >= best:
+                    best, match = ioa, i
+            out.append(match)
+        return out
+
+    rnd = random.Random(5)
+    for _ in range(60):
+        polys = []
+        for _ in range(rnd.randint(1, 8)):
+            cx, cy, r = rnd.randint(0, 800), rnd.randint(0, 800), rnd.randint(20, 200)
+            n = rnd.randint(3, 12)
+            polys.append([(cx + int(r * rnd.uniform(0.4, 1) * __import__('math').cos(6.283 * k / n)),
+                           cy + int(r * rnd.uniform(0.4, 1) * __import__('math').sin(6.283 * k / n))) for k in range(n)])
+        boxes = [(x, y, x + rnd.randint(5, 120), y + rnd.randint(5, 120))
+                 for x, y in ((rnd.randint(0, 850), rnd.randint(0, 850)) for _ in range(25))]
+        assert ba.associate_regions_to_bubbles(boxes, polys) == reference(boxes, polys)

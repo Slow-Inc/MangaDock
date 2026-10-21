@@ -171,8 +171,11 @@ def associate_regions_to_bubbles(
     for box in region_boxes:
         cx = (box[0] + box[2]) / 2
         cy = (box[1] + box[3]) / 2
+        # a centre outside a polygon's bbox is never inside it (the ray crosses an even number of
+        # edges) — skip the pure-Python ray cast for those (#822 follow-up, same result)
         containing = [i for i, poly in enumerate(bubble_polygons)
-                      if _point_in_polygon(cx, cy, poly)]
+                      if bboxes[i][0] <= cx <= bboxes[i][2] and bboxes[i][1] <= cy <= bboxes[i][3]
+                      and _point_in_polygon(cx, cy, poly)]
         if containing:
             match: Optional[int] = min(
                 containing, key=lambda i: _polygon_area(bubble_polygons[i]))
