@@ -121,8 +121,13 @@ class Model48pxOCR(OfflineOCR):
             for i, (pred_chars_index, prob, fg_pred, bg_pred, fg_ind_pred, bg_ind_pred) in enumerate(ret):
                 if prob < threshold:
                     continue
-                has_fg = (fg_ind_pred[:, 1] > fg_ind_pred[:, 0])
-                has_bg = (bg_ind_pred[:, 1] > bg_ind_pred[:, 0])
+                # #872: the beam search returns GPU tensors and the loop below reads them one value at
+                # a time (several device syncs per character) — bring them over once; the float32
+                # arithmetic is the same on either device.
+                pred_chars_index = pred_chars_index.cpu().tolist()
+                fg_pred, bg_pred = fg_pred.cpu(), bg_pred.cpu()
+                has_fg = (fg_ind_pred[:, 1] > fg_ind_pred[:, 0]).cpu()
+                has_bg = (bg_ind_pred[:, 1] > bg_ind_pred[:, 0]).cpu()
                 seq = []
                 fr = AvgMeter()
                 fg = AvgMeter()
