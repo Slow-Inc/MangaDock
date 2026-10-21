@@ -132,6 +132,32 @@ def bilateral_region(img: np.ndarray, x: int, y: int, w: int, h: int) -> np.ndar
     return out[y - y0:y - y0 + h, x - x0:x - x0 + w]
 
 
+def _component_textline(x1, y1, w1, h1, area1, polys, poly_areas, poly_bounds, textlines, keep_threshold):
+    """The textline a connected component (bbox x1, y1, w1, h1; ink area1) belongs to, or None to drop
+    it: the most-overlapped textline, else the nearest one within half a text unit. #872: the all-pairs
+    shapely work (1.2 s over 4 pages) is cut without changing the pick — a textline whose bbox is
+    disjoint from the component overlaps it by exactly 0, and distances are needed only when no
+    overlap clears ``keep_threshold``."""
+    cc_poly = Polygon([[x1, y1], [x1 + w1, y1], [x1 + w1, y1 + h1], [x1, y1 + h1]])
+    ratio = np.zeros(len(polys), dtype = np.float32)
+    for t, p in enumerate(polys):
+        bx1, by1, bx2, by2 = poly_bounds[t]
+        disjoint = bx2 < x1 or bx1 > x1 + w1 or by2 < y1 or by1 > y1 + h1
+        overlapping_area = 0.0 if disjoint else p.intersection(cc_poly).area
+        ratio[t] = overlapping_area / min(area1, poly_areas[t])
+    avg = np.argmax(ratio)
+    if area1 >= poly_areas[avg]:
+        return None
+    if ratio[avg] <= keep_threshold:
+        centroid = cc_poly.centroid
+        dist = np.array([p.distance(centroid) for p in polys], dtype = np.float32)
+        avg = np.argmin(dist)
+        unit = max(min([textlines[avg].font_size, w1, h1]), 10)
+        if dist[avg] >= 0.5 * unit:
+            return None
+    return avg
+
+
 def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilateral], keep_threshold = 1e-2, dilation_offset = 0,kernel_size=3):
     bboxes = [txtln.aabb.xywh for txtln in textlines]
     polys = [Polygon(txtln.pts) for txtln in textlines]
@@ -143,8 +169,8 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
     textline_ccs = [np.zeros_like(mask) for _ in range(M)]
     iinfo = np.iinfo(labels.dtype)
     textline_rects = np.full(shape = (M, 4), fill_value = [iinfo.max, iinfo.max, iinfo.min, iinfo.min], dtype = labels.dtype)
-    ratio_mat = np.zeros(shape = (num_labels, M), dtype = np.float32)
-    dist_mat = np.zeros(shape = (num_labels, M), dtype = np.float32)
+    poly_areas = [p.area for p in polys]
+    poly_bounds = [p.bounds for p in polys]
     valid = False
     for label in range(1, num_labels):
         # skip area too small
@@ -156,35 +182,9 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
         w1 = stats[label, cv2.CC_STAT_WIDTH]
         h1 = stats[label, cv2.CC_STAT_HEIGHT]
         area1 = stats[label, cv2.CC_STAT_AREA]
-        cc_pts = np.array([[x1, y1], [x1 + w1, y1], [x1 + w1, y1 + h1], [x1, y1 + h1]])
-        cc_poly = Polygon(cc_pts)
-
-        for tl_idx in range(M):
-            area2 = polys[tl_idx].area
-            overlapping_area = polys[tl_idx].intersection(cc_poly).area
-            ratio_mat[label, tl_idx] = overlapping_area / min(area1, area2)
-            dist_mat[label, tl_idx] = polys[tl_idx].distance(cc_poly.centroid)
-            # print(textlines[tl_idx].pts, cc_pts, '->', overlapping_area, min(area1, area2), '=', overlapping_area / min(area1, area2), '|', polys[tl_idx].distance(cc_poly))
-
-        avg = np.argmax(ratio_mat[label])
-        # print(avg, 'overlap:', ratio_mat[label, avg], '<=', keep_threshold)
-        area2 = polys[avg].area
-        if area1 >= area2:
+        avg = _component_textline(x1, y1, w1, h1, area1, polys, poly_areas, poly_bounds, textlines, keep_threshold)
+        if avg is None:
             continue
-        if ratio_mat[label, avg] <= keep_threshold:
-            avg = np.argmin(dist_mat[label])
-            area2 = polys[avg].area
-            unit = max(min([textlines[avg].font_size, w1, h1]), 10)
-            # print("unit", unit, textlines[avg].font_size, w1, h1)
-            # if area1 < 0.4 * w1 * h1:
-            #     # ccs is probably angled
-            #     unit /= 2
-            # if avg == 0:
-            # print('no intersect', area1, '>=', area2, dist_mat[label, avg], '>=', 0.5 * unit)
-            if dist_mat[label, avg] >= 0.5 * unit:
-                # print(dist_mat[label])
-                # print('CONTINUE')
-                continue
 
         textline_ccs[avg][y1:y1+h1, x1:x1+w1][labels[y1:y1+h1, x1:x1+w1] == label] = 255
         # if avg == 0:
