@@ -1,0 +1,8 @@
+{
+  "name": "mangadock-vendored-qr-core",
+  "private": true,
+  "version": "0.0.0",
+  "type": "commonjs",
+  "license": "MIT",
+  "main": "index.js"
+}
