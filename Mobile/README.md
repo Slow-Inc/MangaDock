@@ -4,6 +4,10 @@
 
 ภาษาไทย: ตรวจชุดรวม native Phase 4 กับ main แล้ว Mobile **235/235** Backend **1,014/1,014 (98 suites)** และ tooling **58/58** ผ่าน ยังแยก draft #860 และการรับผล release ไว้ ดูหลักฐานและงานค้างในรายงานด้านบน
 
+2026-10-20 historical delivery: **Public HTTPS ARM64 test APK** from source `443dc808`, before #782 and #877. API and complete download/hash checks were recorded from the host on that date; current availability has not been rechecked. This binary lacks the later QA fixes. [Recorded download, runtime commands, evidence and limits](docs/2026-10-20-public-https-apk.md). Build an APK from accepted main for current regression testing. Backend and Tunnel must stay running for hosted access; actual phone acceptance of this artifact remains open.
+
+ภาษาไทย: มี **APK ARM64 ที่ใช้ API HTTPS สาธารณะ** แล้ว ตรวจ API และดาวน์โหลดครบ/hash ตรงจากเครื่องโฮสต์ ใช้ตัวใหม่เพื่อทดสอบต่างเครือข่าย ต้องเปิด Backend กับ Tunnel ค้างไว้ ดูลิงก์ดาวน์โหลด คำสั่งเปิดระบบและข้อจำกัดในรายงาน ยังไม่รับการใช้งานบนมือถือจริง รายงาน LAN ด้านล่างเป็นไฟล์เก่า
+
 2026-10-20: **ARM64 test APK is available**, with embedded Hermes bundle and a Wi-Fi LAN Backend endpoint. Fresh Mobile 220/220, types/env, native assemble/vital lint, signature and downloaded-file hash checks pass. Actual phone installation remains unverified. [Download, installation steps and artifact identity](docs/2026-10-20-test-apk.md).
 
 ภาษาไทย: 2026-10-20 มี **APK ทดสอบ ARM64** แล้ว ฝัง Hermes และใช้ Backend ใน Wi-Fi LAN ตรวจ Mobile 220/220 types/env native build/vital lint ลายเซ็นและ hash ดาวน์โหลดผ่าน ยังไม่ตรวจติดตั้งบนมือถือ ดูลิงก์ดาวน์โหลด/วิธีติดตั้ง/รายละเอียดไฟล์ด้านบน
