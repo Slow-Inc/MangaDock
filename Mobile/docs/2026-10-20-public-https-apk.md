@@ -1,14 +1,12 @@
 # Public HTTPS test APK — 2026-10-20 / APK ทดสอบผ่านอินเทอร์เน็ต
 
-Historical delivery record: the source baseline was `443dc808`, before PR #782 and the main integration #877. This APK does not include those later fixes. The results below were recorded on 2026-10-20; publishing this report does not revalidate current endpoint availability or produce a new APK.
-
-ภาษาไทย: บันทึกการส่งย้อนหลังนี้ใช้ source `443dc808` ก่อน PR #782 และการรวม main #877 ดังนั้น APK นี้ยังไม่มี fixes ที่เพิ่มภายหลัง ผลด้านล่างตรวจเมื่อ 2026-10-20 การเผยแพร่รายงานครั้งนี้ไม่ได้ตรวจสถานะ endpoint ปัจจุบันซ้ำหรือสร้าง APK ใหม่
+Historical record / บันทึกย้อนหลัง: the source baseline was `443dc808`, before PR #782 and the main integration #877, so this APK does not include those later fixes. The results below are what the host observed on 2026-10-20; this page is not a live status check and no new APK was produced. / ใช้ source `443dc808` ก่อน PR #782 และการรวม main #877 APK นี้จึงไม่มี fixes ที่เพิ่มภายหลัง ผลด้านล่างคือสิ่งที่เครื่องโฮสต์ตรวจเมื่อ 2026-10-20 หน้านี้ไม่ใช่การตรวจสถานะปัจจุบันและไม่ได้สร้าง APK ใหม่
 
 [Download ARM64 APK](https://mobile-download.hayateotsu.space/MangaDock-0.1.0-arm64-https-test.apk) · [API status](https://api.hayateotsu.space/status)
 
-The new artifact embeds `https://api.hayateotsu.space`. It replaces the LAN-only delivery for testers on other networks. Public-domain HTTPS API, protected Reader and a complete APK download passed from the development computer. Actual installation and operation from a phone on another network remain unverified. The earlier [LAN artifact report](2026-10-20-test-apk.md) remains historical evidence for a different binary.
+The artifact embeds `https://api.hayateotsu.space`, replacing the LAN-only delivery for testers on other networks. Public-domain HTTPS API, protected Reader and a complete APK download passed from the development computer. Actual installation and operation from a phone on another network remain unverified. The earlier [LAN artifact report](2026-10-20-test-apk.md) is evidence for a different binary.
 
-ภาษาไทย: APK ใหม่นี้ฝัง API HTTPS สาธารณะ สำหรับให้ผู้ทดสอบต่างเครือข่ายติดตั้งแทนตัว LAN เดิม ตรวจ API เส้นทางอ่านที่มี CAPTCHA และดาวน์โหลด APK ครบไฟล์ผ่านโดเมนสาธารณะจากคอมพิวเตอร์แล้ว ยังไม่ได้ยืนยันการติดตั้งและใช้งานบนมือถือจริงต่างเครือข่าย รายงาน LAN เดิมเป็นหลักฐานของคนละไฟล์
+ภาษาไทย: APK นี้ฝัง API HTTPS สาธารณะ สำหรับให้ผู้ทดสอบต่างเครือข่ายติดตั้งแทนตัว LAN เดิม ตรวจ API เส้นทางอ่านที่มี CAPTCHA และดาวน์โหลด APK ครบไฟล์ผ่านโดเมนสาธารณะจากคอมพิวเตอร์แล้ว ยังไม่ได้ยืนยันการติดตั้งและใช้งานบนมือถือจริงต่างเครือข่าย รายงาน LAN เดิมเป็นหลักฐานของคนละไฟล์
 
 ## Artifact / รายละเอียดไฟล์
 
@@ -37,9 +35,9 @@ The new artifact embeds `https://api.hayateotsu.space`. It replaces the LAN-only
 
 ## Runtime commands / คำสั่งเปิดระบบ
 
-Run each process in its own PowerShell terminal from the repository root. Services were left running after verification; check `/status` first and do not start another Backend on occupied port 4001.
+Run each process in its own PowerShell terminal from the repository root. Check `/status` first; do not start a second Backend on port 4001.
 
-ภาษาไทย: เปิดแต่ละบริการคนละหน้าต่าง PowerShell จากโฟลเดอร์หลักของโปรเจกต์ ขณะส่งงานเปิดบริการไว้แล้ว ตรวจ `/status` ก่อน อย่าเปิด Backend ซ้ำเมื่อพอร์ต 4001 มีตัวเดิมทำงาน
+ภาษาไทย: เปิดแต่ละบริการคนละหน้าต่าง PowerShell จากโฟลเดอร์หลักของโปรเจกต์ ตรวจ `/status` ก่อน อย่าเปิด Backend ซ้ำเมื่อพอร์ต 4001 มีตัวเดิมทำงาน
 
 ```powershell
 # Backend: only if not already running / เปิดเมื่อยังไม่ทำงาน
@@ -54,12 +52,12 @@ npm.cmd run start:dev
 
 ```powershell
 # APK download server: repository root / เปิดให้ดาวน์โหลดไฟล์
-& "C:\Python314\python.exe" -u -m http.server 8766 --bind 127.0.0.1 --directory ".\Mobile\build\apk\2026-10-20-public"
+python -u -m http.server 8766 --bind 127.0.0.1 --directory ".\Mobile\build\apk\2026-10-20-public"
 ```
 
-The executable, private token, generated Android tree and build directory are local ignored files. A fresh Git checkout does not contain them. The token file has a restricted user/SYSTEM ACL and sits outside the served directory. This is a development-host service, without Windows service/autostart or always-on production hosting; stopping the host or connector stops public API availability.
+The recorded run used `C:\Python314\python.exe` for the last command; any Python 3 works. The executable, private token, generated Android tree and build directory are local ignored files, so a fresh Git checkout does not contain them. The token file has a restricted user/SYSTEM ACL and sits outside the served directory. This is a development-host service without Windows service/autostart or always-on production hosting; stopping the host or connector stops public API availability.
 
-ภาษาไทย: executable, token ส่วนตัว, Android ที่ generate และโฟลเดอร์ build เป็นไฟล์ local ที่ ignore จึงไม่มีใน clone ใหม่ token จำกัดสิทธิ์ผู้ใช้/SYSTEM และอยู่นอกโฟลเดอร์ที่ให้ดาวน์โหลด ระบบนี้ยังรันบนเครื่องพัฒนา ไม่ได้ติดตั้ง Windows service/autostart หรือโฮสต์ production ถาวร เมื่อปิดเครื่องหรือ connector API สาธารณะจะหยุด
+ภาษาไทย: คำสั่งสุดท้ายรันด้วย `C:\Python314\python.exe` ในเครื่องที่บันทึกไว้ ใช้ Python 3 เวอร์ชันใดก็ได้ executable, token ส่วนตัว, Android ที่ generate และโฟลเดอร์ build เป็นไฟล์ local ที่ ignore จึงไม่มีใน clone ใหม่ token จำกัดสิทธิ์ผู้ใช้/SYSTEM และอยู่นอกโฟลเดอร์ที่ให้ดาวน์โหลด ระบบนี้ยังรันบนเครื่องพัฒนา ไม่ได้ติดตั้ง Windows service/autostart หรือโฮสต์ production ถาวร เมื่อปิดเครื่องหรือ connector API สาธารณะจะหยุด
 
 ## Recovery and scope / สิ่งที่แก้และขอบเขต
 
@@ -85,24 +83,16 @@ References / อ้างอิง: [Cloudflare 1033](https://developers.cloudfl
 | Previous source evidence | Earlier same-day Mobile 220/220, types/env; Backend 90 suites/960 tests; tooling 58/58. Not rerun for this env-only artifact / หลักฐานเดิมวันเดียวกัน ไม่อ้างว่ารัน suite ใหม่รอบนี้ |
 | Device/provider/payment/MIT | NOT_RUN or BLOCKED; no attached phone or actual browser interaction; MIT unavailable / ยังไม่รับเครื่องจริง provider payment และ MIT |
 
-Build origin was overridden only in the build process, leaving local `.env` unchanged. Removed only the generated release JS bundle and used `--no-build-cache` to ensure the new embedded API origin; no source edits. Production signing and real CAPTCHA protection remain open; current CAPTCHA is the existing development test pair. Public HTTPS probes ran from the host; the external web tool could not fetch these URLs and supplies no independent network evidence. These results do not assert complete device or production acceptance. No payment or role changes were made, and no issues were closed.
+Build origin was overridden only in the build process, leaving local `.env` unchanged. Only the generated release JS bundle was removed and `--no-build-cache` was used to ensure the new embedded API origin; no source was edited. Production signing and real CAPTCHA protection remain open, and the CAPTCHA is the existing development test pair. All HTTPS probes ran from the host, so they are not independent-network evidence and do not assert phone or production acceptance. No payment or role changes were made.
 
-ภาษาไทย: override API เฉพาะ process build คง `.env` เดิม ลบเฉพาะ bundle release ที่ generate และใช้ `--no-build-cache` เพื่อไม่คืนค่าฝังเดิม ไม่แก้ source ยังขาด production signing และ CAPTCHA จริงซึ่งตอนนี้เป็นคู่ทดสอบเดิม การตรวจ HTTPS มาจากเครื่องโฮสต์ เครื่องมือ web ภายนอกดึง URL ไม่ได้จึงไม่ใช่หลักฐานจากเครือข่ายอิสระ ไม่ถือผ่านมือถือหรือ production ทั้งระบบ ไม่ทำธุรกรรม ไม่แก้ role และไม่ปิด issue
+ภาษาไทย: override API เฉพาะ process build คง `.env` เดิม ลบเฉพาะ bundle release ที่ generate และใช้ `--no-build-cache` เพื่อไม่คืนค่าฝังเดิม ไม่แก้ source ยังขาด production signing และ CAPTCHA จริงซึ่งตอนนี้เป็นคู่ทดสอบเดิม การตรวจ HTTPS ทั้งหมดมาจากเครื่องโฮสต์ จึงไม่ใช่หลักฐานจากเครือข่ายอิสระและไม่ถือผ่านมือถือหรือ production ไม่ทำธุรกรรมหรือแก้ role
 
-Redacted local evidence (ignored): `.superpowers/sdd/2026-10-16-native-acceptance-and-release/` contains `public-reader-verification.json`, `public-apk-download-verification.json`, `apk-https-inspection.json` and `apk-https-2026-10-20-build.log`. Runtime private files remain outside delivery. No new commit/push was performed for this follow-up.
+Redacted local evidence (ignored): `.superpowers/sdd/2026-10-16-native-acceptance-and-release/` contains `public-reader-verification.json`, `public-apk-download-verification.json`, `apk-https-inspection.json` and `apk-https-2026-10-20-build.log`. Runtime private files remain outside delivery. This page was committed afterwards; no source change accompanied it.
 
-ภาษาไทย: หลักฐาน local ที่ปิดข้อมูลลับแล้วอยู่ในโฟลเดอร์ ignored ด้านบน แยกไฟล์ private ออกจากการส่งดาวน์โหลด รอบแก้ HTTPS นี้ยังไม่ได้ commit/push เพิ่ม
+ภาษาไทย: หลักฐาน local ที่ปิดข้อมูลลับแล้วอยู่ในโฟลเดอร์ ignored ด้านบน แยกไฟล์ private ออกจากการส่งดาวน์โหลด หน้านี้ถูก commit ภายหลัง โดยไม่มีการแก้ source ไปพร้อมกัน
 
 ## Rollback inventory / รายการย้อนกลับ
 
-Restore only the API CNAME's old target to undo routing; keep unrelated routes untouched. Resource identifiers below are non-secret. Remove the new download record/tunnel and stop only owned connector/file-server processes if withdrawing this delivery. Do not delete the old shared tunnel.
+To undo routing, restore only the API CNAME to its previous target and leave unrelated routes untouched. To withdraw the delivery, remove the download hostname and the `mangadock-mobile-test` tunnel, and stop only the connector and file-server processes you started. Do not delete the old shared `narze-dashboard` tunnel. Non-secret Cloudflare identifiers (zone, DNS record, tunnel UUID) live in the ignored operating log rather than this public page: they identify resources but do not authenticate.
 
-ภาษาไทย: หากย้อน routing ให้คืนเฉพาะ CNAME API ไป target เดิม คงโดเมนอื่น รหัสทรัพยากรด้านล่างไม่ใช่ secret หากถอนการส่งงานนี้จึงลบ record ดาวน์โหลด/tunnel ใหม่และหยุดเฉพาะ connector/file server ที่เปิดเอง ไม่ลบ tunnel ร่วมเดิม
-
-| Resource / ทรัพยากร | Identifier / รหัส |
-| --- | --- |
-| Zone | `32af5f332b6a6dee278607de974511d0` |
-| Existing API record | `f255792b67a200c44b8901b8f1ddf9f8` |
-| Old API target | `1cc9b897-dd4d-436b-aaab-fa73ea3cd34b.cfargotunnel.com` |
-| New tunnel/target | `ab5ba8c3-4a28-431b-908f-24eef4c3350a` / same UUID `.cfargotunnel.com` |
-| New download record | `52f358a7b8d8fea6a9a4c0cc6336eb1a` |
+ภาษาไทย: หากย้อน routing ให้คืนเฉพาะ CNAME API ไป target เดิม คงโดเมนอื่นไว้ หากถอนการส่งงานนี้ให้ลบโดเมนดาวน์โหลดและ tunnel `mangadock-mobile-test` แล้วหยุดเฉพาะ connector กับ file server ที่เปิดเอง ไม่ลบ tunnel ร่วมเดิม `narze-dashboard` รหัส Cloudflare ที่ไม่ใช่ secret (zone, DNS record, tunnel UUID) เก็บใน operating log ที่ ignore แทนหน้ารายงานสาธารณะนี้ เพราะรหัสเหล่านี้ระบุทรัพยากรแต่ใช้ยืนยันตัวตนไม่ได้
