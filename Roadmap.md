@@ -94,11 +94,30 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 **Exit Criteria:** Core browsing, reading, and account journeys run in native screens without WebView dependency, while the web application continues to operate independently against the same backend.
 
 ### Phase 5: Retention Ecosystem & Community 2.0
-**Status:** Final Goal (building a sustainable ecosystem)
+**Status:** Planned — Lightweight Social & Retention Features
 
-1. **Social Graph Engine:** Advanced Follow System + personalized Feed.
-2. **Reading Collections Sharing:** Personal manga collections sharable via link.
-3. **Push Notification Framework:** OS-level notifications (New Chapter / Follower Update).
+**Goal:** Improve reader retention and community engagement by reusing the existing NestJS, Supabase/PostgreSQL, Redis, and multi-node infrastructure. Avoid building a custom ML recommendation service or a new message broker.
+
+1. **Lightweight Social Graph & Personalized Feed:**
+   - Follow/unfollow users, translators, and creators.
+   - Following Feed displays activity from followed accounts in chronological order.
+   - Personalized Feed uses lightweight rule-based ranking (recency, engagement, and user interests) rather than a trained recommendation model.
+   - Implement with existing NestJS, PostgreSQL, and Redis; no Graph Neural Network or dedicated ML infrastructure.
+2. **Reading Collections Sharing:**
+   - Create, edit, and delete personal manga collections.
+   - Support public/private visibility and sharing via URL or mobile deep link.
+   - Store collection data and enforce access controls through existing Supabase/PostgreSQL infrastructure.
+3. **Multi-Node Push Notification Framework:**
+   - Notify readers about new chapters and new followers on Android/iOS through Expo Push Service (FCM/APNs).
+   - Use a dedicated Redis notification queue with multi-node workers, bounded retries, deduplication, and a dead-letter queue.
+   - Reuse existing leader-election patterns only for singleton scheduling/coordination tasks; notification delivery must not depend on the cache leader or share the cache write-behind queue.
+   - Use a PostgreSQL transactional outbox for durable notification events, with device-token lifecycle management, notification preferences, delivery receipts, and monitoring.
+   - Treat push delivery as best-effort/at-least-once, not guaranteed exactly-once delivery.
+
+**Suggested Implementation Order:** Collections Sharing → Social Graph & Feed → Push Notification integration.
+
+**Exit Criteria:** Users can follow creators, browse their Following Feed, share manga collections, and receive relevant mobile push notifications, without a custom recommendation ML service or additional message broker.
+
 <!-- lang:end -->
 
 <!-- lang:th -->
@@ -198,9 +217,28 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 **เกณฑ์เสร็จสิ้น:** ผู้ใช้สามารถสำรวจมังงะ อ่านมังงะ และจัดการบัญชีผ่านหน้าจอ Native ได้โดยไม่ต้องพึ่ง WebView ขณะที่ Web App ยังทำงานแยกต่างหากบน Backend เดียวกัน
 
 ### Phase 5: Retention Ecosystem & Community 2.0
-**สถานะ:** 🏁 Final Goal (การสร้างระบบนิเวศที่ยั่งยืน)
+**สถานะ:** Planned — Lightweight Social & Retention Features
 
-1.  **Social Graph Engine:** ระบบ Follow System ขั้นสูง และหน้า Feed ที่ปรับแต่งเฉพาะบุคคล
-2.  **Reading Collections Sharing:** ระบบจัดหมวดหมู่มังงะส่วนตัวที่สามารถแชร์ลิงก์ได้
-3.  **Push Notification Framework:** ระบบแจ้งเตือนระดับ OS (New Chapter / Follower Update)
+**เป้าหมาย:** เพิ่มการมีส่วนร่วมและการกลับมาใช้งานของผู้อ่าน โดยใช้ NestJS, Supabase/PostgreSQL, Redis และระบบ Multi-Node ที่มีอยู่แล้วให้มากที่สุด ไม่สร้าง ML Recommendation Service หรือ Message Broker ใหม่โดยไม่จำเป็น
+
+1. **Lightweight Social Graph & Personalized Feed:**
+   - ระบบ Follow/Unfollow ผู้ใช้ นักแปล และ Creator
+   - Following Feed แสดงกิจกรรมจากบัญชีที่ติดตามโดยเรียงตามเวลา
+   - Personalized Feed จัดอันดับด้วย Rule-based Ranking จากความใหม่ (Recency), Engagement และความสนใจของผู้ใช้ โดยไม่ต้องฝึก Recommendation Model
+   - ใช้ NestJS, PostgreSQL และ Redis เดิม ไม่เพิ่ม Graph Neural Network หรือ ML Infrastructure แยกต่างหาก
+2. **Reading Collections Sharing:**
+   - สร้าง แก้ไข และลบคอลเลกชันมังงะส่วนตัว
+   - กำหนดการมองเห็นแบบ Public/Private และแชร์ผ่าน URL หรือ Mobile Deep Link
+   - จัดเก็บข้อมูลและควบคุมสิทธิ์ด้วย Supabase/PostgreSQL ที่มีอยู่แล้ว
+3. **Multi-Node Push Notification Framework:**
+   - แจ้งเตือน New Chapter และ New Follower บน Android/iOS ผ่าน Expo Push Service (FCM/APNs)
+   - ใช้ Redis Notification Queue แยกจาก Cache Queue พร้อม Multi-Node Workers, Retry Budget, Deduplication และ Dead-letter Queue
+   - Reuse รูปแบบ Leader Election เดิมเฉพาะงาน Scheduler/Coordination ที่ต้องมีตัวทำงานเพียงตัวเดียว โดยไม่ผูกการส่ง Notification กับ Cache Leader
+   - ใช้ PostgreSQL Transactional Outbox บันทึก Event อย่างทนทาน พร้อมจัดการ Device Token Lifecycle, Notification Preferences, Delivery Receipts และ Monitoring
+   - ออกแบบการส่งให้รองรับการส่งซ้ำและความล้มเหลวของบริการภายนอก ไม่สมมติว่าจะส่งถึงแบบ Exactly-once
+
+**ลำดับการพัฒนาที่แนะนำ:** Collections Sharing → Social Graph & Feed → Push Notification Integration
+
+**เกณฑ์เสร็จสิ้น:** ผู้ใช้ติดตาม Creator ดู Following Feed แชร์คอลเลกชัน และรับ Push Notification บนมือถือได้ โดยไม่ต้องสร้าง Recommendation ML Service หรือ Message Broker ใหม่
+
 <!-- lang:end -->
