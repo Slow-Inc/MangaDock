@@ -404,14 +404,22 @@ def _echo_stubs(monkeypatch):
     monkeypatch.setattr(rend, '_bubble_interior_box',
                         lambda region, bubble_box, shape: (60.0, 40.0, (50.0, 50.0)))
     monkeypatch.setattr(rend, '_bubble_fit_font_size', lambda region, wh, ratio: 42)
-    monkeypatch.setattr(rend, '_clean_layout_dst',
-                        lambda region, shape, fmin, fmax, page_shape=None, **kw: (fmax, 80.0, 30.0))
+
+    def laid(region, shape, fmin, fmax, page_shape=None, shrink_to_fit=False):
+        tall = getattr(region, 'tall', False) and not shrink_to_fit
+        return (fmax - 6, 50.0, 30.0) if shrink_to_fit else (fmax, 50.0, 90.0 if tall else 30.0)
+    monkeypatch.setattr(rend, '_clean_layout_dst', laid)
+
+
+def _in_balloon(y, font, text='เฮ้', **kw):
+    # a narrow source column in a wider balloon -> the clean_layout branch
+    return FakeRegion(horizontal=True, translation=text, xyxy=(300, y, 340, y + 40),
+                      bubble_box=(290, y - 10, 400, y + 50), font_size=font, **kw)
 
 
 def _page():
-    lines = [FakeRegion(horizontal=True, translation='เฮ้', xyxy=(300, 100 + 60 * k, 500, 140 + 60 * k),
-                        font_size=s) for k, s in enumerate((18, 20, 16))]
-    credit = FakeRegion(horizontal=True, translation='อย่ารีโฮสต์', xyxy=(300, 700, 600, 708), font_size=8)
+    lines = [_in_balloon(100 + 70 * k, s) for k, s in enumerate((18, 20, 16))]
+    credit = _in_balloon(400, 8, 'อย่ารีโฮสต์')
     sole = FakeRegion(horizontal=True, translation='เปลี่ยนเรื่อง', xyxy=(20, 20, 100, 100),
                       bubble_box=(10, 10, 110, 110), font_size=18)
     return lines, credit, sole
@@ -420,7 +428,7 @@ def _page():
 def test_font_src_scale_sets_one_dialogue_size_per_page_851(monkeypatch):
     """#851: the dialogue on one page rendered at 20 px (absolute font_size_max) next to a sole balloon
     filled to 35-37 px, both blind to the source lettering. With font_src_scale the page's dialogue
-    size is scale x the median source size; bubble_fit_sole stops above it; a region far off the
+    size is scale x the median source size; bubble_fit_sole stops above it; a region far below the
     median (8 px credits) keeps its own scaled size."""
     _echo_stubs(monkeypatch)
     lines, credit, sole = _page()
@@ -459,8 +467,34 @@ def test_lettering_far_above_the_page_size_keeps_the_absolute_font_851(monkeypat
     scale from their own size; one far above it keeps the absolute font as before."""
     _echo_stubs(monkeypatch)
     lines, credit, sole = _page()
-    sfx = FakeRegion(horizontal=True, translation='ปึ่ก', xyxy=(600, 600, 700, 650), font_size=44)
+    sfx = _in_balloon(600, 44, 'ปึ่ก')
     img = np.full((800, 800, 3), 255, np.uint8)
     rend.resize_regions_to_font_size(img, lines + [credit, sole, sfx], None, 0, 8, bubble_fit=True,
                                      font_size_max=20, clean_layout=True, font_src_scale=1.4)
     assert sfx.render_font_px == 20 and lines[0].render_font_px == 25
+
+
+def test_text_outside_any_balloon_keeps_the_absolute_font_851(monkeypatch):
+    """A/B at 1.4 (2026-10-21): balloon-less text — a table of contents, a sign — is packed tight
+    against its neighbours; growing it to the page size overlapped 10 pairs. Only text in a balloon
+    takes the page size."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    caption = FakeRegion(horizontal=True, translation='ตอนที่ 1', xyxy=(500, 600, 700, 630), font_size=18)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole, caption], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert caption.render_font_px == 20 and lines[0].render_font_px == 25
+
+
+def test_a_block_too_tall_for_its_balloon_is_relaid_851(monkeypatch):
+    """A/B at 1.4 (Akuyaku p1): a clean-layout block at the page size fit the balloon's width but not
+    its height and spilled. With the page size on, a block taller than the interior is laid out
+    again on it (wrap, then shrink) like one that is too wide (#832)."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    tall = _in_balloon(600, 18, 'ยาวมาก', tall=True)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole, tall], None, 0, 8, bubble_fit=True,
+                                     font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert tall.render_font_px == 19                              # re-laid with shrink: 25 - 6

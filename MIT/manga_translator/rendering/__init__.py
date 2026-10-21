@@ -493,9 +493,12 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         annotate_page_font(text_regions, font_src_scale)
 
     for i, region in enumerate(text_regions):
-        # the absolute font clean layout starts from: the page's dialogue size (#851) or font_size_max
-        fmax_i = (getattr(region, 'page_font', None) if font_src_scale and font_src_scale > 0
-                  else None) or font_size_max
+        # the absolute font clean layout starts from: the page's dialogue size (#851) for text in a
+        # balloon, else font_size_max — balloon-less text (contents lists, signs) sits tight against
+        # its neighbours and overlapped them when grown (A/B at 1.4: 10 new pairs)
+        _page_sized = bool(font_src_scale and font_src_scale > 0 and getattr(region, 'page_font', None)
+                           and getattr(region, 'bubble_box', None) is not None)
+        fmax_i = region.page_font if _page_sized else font_size_max
         # #436: a deduped (blanked) duplicate renders nothing — skip layout entirely
         # (the legacy path would choke on it); keep a degenerate dst so lists align.
         if not (region.translation and region.translation.strip()):
@@ -565,7 +568,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                         np.array([centered_box(acx, acy, _bw, _bh)], dtype=np.int64))
                     continue
             region.font_size = _bubble_fit_font_size(region, (fit_w, fit_h), font_max_box_ratio)
-            if font_src_scale and font_src_scale > 0 and getattr(region, 'page_font', None):
+            if _page_sized:
                 region.font_size = min(region.font_size, region.page_font)   # #851: not past the page size
             hw, hh = fit_w / 2.0, fit_h / 2.0
             # #535 Phase-0c telemetry: stamp the routing decision so the /patches
@@ -628,7 +631,8 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             _bb = getattr(region, 'bubble_box', None)
             if laid is not None and _bb is not None and region.horizontal:
                 _fw, _fh, (_acx, _acy) = _bubble_interior_box(region, _bb, img.shape)
-                if laid[1] > _fw * 1.05:
+                # with the page size (#851) a block can also outgrow the interior's height (Akuyaku p1)
+                if laid[1] > _fw * 1.05 or (_page_sized and laid[2] > _fh * 1.05):
                     from types import SimpleNamespace
                     _proxy = SimpleNamespace(
                         translation=region.translation, target_lang=getattr(region, 'target_lang', 'en_US'),
