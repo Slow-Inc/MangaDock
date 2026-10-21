@@ -94,6 +94,17 @@ All rows initially `NOT_RUN`; device/account/fixture dependencies currently prev
 
 ## Next record / แถวสำหรับตรวจต่อ
 
+### 2026-10-20 public HTTPS follow-up / ผลตรวจ HTTPS สาธารณะ
+
+| ID | Level | Role/device/input | Expected / observed | Status | Verifier/evidence |
+| --- | --- | --- | --- | --- | --- |
+| API-PUBLIC-20261020 | Public-domain HTTPS from host | Anonymous, development computer, `/status` | JSON HTTP 200 / 200; tunnel healthy | PASS | Agent, 2026-10-20; [recovery report](2026-10-20-public-https-apk.md) |
+| READER-PUBLIC-20261020 | PUBLIC_HTTPS_BACKEND_TEST_CAPTCHA_NO_REAL_BROWSER | Diagnostic device identity; existing chapter; public development CAPTCHA token | Pages 401 → verification 201 → pages 200; 30 pages, JPEG 200/811875 bytes | PASS | Agent, 2026-10-20; report and redacted local JSON; real browser/phone not tested |
+| APK-HTTPS-20261020 | Native artifact and HTTPS transfer | ARM64 0.1.0/debug certificate, host download | Build/vital lint/signature pass; public GET 200; 27760053 bytes and expected SHA-256 | PASS | Agent, 2026-10-20; report and download JSON; four public values present, checked private tokens absent |
+| PHONE-OTHER-NETWORK-20261020 | Actual phone | No attached target | Download/install/sign-in/CAPTCHA return/render on mobile data | NOT_RUN | Public-domain probes do not prove device interaction; S10/S29 remain open |
+
+ภาษาไทย: แถว PASS ใหม่ยืนยัน HTTPS/API/artifact ตามระดับที่ระบุจากเครื่องโฮสต์ ไม่แทนการติดตั้ง ล็อกอิน กลับจากเบราว์เซอร์และแสดงภาพบนมือถือจริงต่างเครือข่าย S10/S29 และ MIT ยังเปิดอยู่
+
 For every new scenario, add the full role/device/input/expected/observed/verifier/evidence details. API probes using the real Mobile controllers plus a simulated browser boundary must say `LIVE_BACKEND_TEST_CAPTCHA_MOCK_BROWSER`; they do not complete DEVICE-OS or S03 on their own. A failed row needs a discriminating repro before a Mobile code change.
 
 ภาษาไทย: เติมรายละเอียด role/device/input/expected/observed/ผู้ตรวจ/หลักฐานทุก scenario การเรียก controllers Mobile กับ Backend จริงแต่จำลอง browser ต้องระบุ LIVE_BACKEND_TEST_CAPTCHA_MOCK_BROWSER ไม่ถือผ่าน OS/S03 ทั้งหมด หาก fail ต้องมี repro แยกสาเหตุก่อนแก้โค้ด

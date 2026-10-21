@@ -1,5 +1,11 @@
 # Native completion ledger — plan: 2026-10-02-native-mobile-migration-plan.json
 
+## Public HTTPS follow-up — 2026-10-20 / ส่ง APK สำหรับต่างเครือข่าย
+
+Recovered public API from 530/1033 using a dedicated healthy Cloudflare tunnel, preserved the old shared tunnel and rebuilt the unchanged native source with the HTTPS API origin. Public Reader API and complete APK download/hash pass. Debug signing and real device/MIT/production gates remain open. [Current artifact and runtime instructions](2026-10-20-public-https-apk.md).
+
+ภาษาไทย: กู้ API จาก 530/1033 ด้วย tunnel แยกที่ healthy คง tunnel ร่วมเดิม build native source เดิมด้วย API HTTPS ตรวจ Reader API และดาวน์โหลด APK ครบ/hash ตรงแล้ว ยังเป็นลายเซ็นทดสอบและค้างเครื่องจริง/MIT/production ดูไฟล์ใหม่และวิธีเปิดระบบในรายงาน
+
 ## Test APK delivery — 2026-10-20 / ส่ง APK ทดสอบ
 
 Prepared the user-requested APK file first, without a website button. New ARM64 0.1.0 test artifact has embedded Hermes and existing debug signing; LAN Backend URL is verified in the APK. Mobile 220/220/typecheck/env and native assemble/vital lint pass. Certificate/ZIP/public values/private-token absence and streamed HTTP download hash checked. Actual Android install/interaction, MIT and production release gates remain open. [Artifact, hash, download and instructions](2026-10-20-test-apk.md).

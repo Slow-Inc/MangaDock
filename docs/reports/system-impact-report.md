@@ -187,6 +187,33 @@ Evidence and limitations: [fix report](../../Mobile/docs/2026-10-20-review-fixes
 
 ภาษาไทย: รายงานมีขั้นตอนและข้อจำกัด APK ที่ติดตั้ง hash ตรง เป็น LAN/debug ภายใน ไม่อนุมาน MITสำเร็จ/เงิน/แก้บัญชี/จอพับ/offline/sessionยาว ผู้ใช้อนุญาต commit/push/PR เข้า branch Phase4 ภายหลัง ไม่รวม deploy
 
+## 2026-10-20 — Public HTTPS APK delivery / ส่ง APK ผ่านอินเทอร์เน็ต
+
+| Field | English | ไทย |
+| --- | --- | --- |
+| 1. What changed | Dedicated Cloudflare tunnel, scoped API DNS target, new download hostname and HTTPS-origin APK | เพิ่ม tunnel แยก เปลี่ยน target DNS API เฉพาะจุด เพิ่มโดเมนดาวน์โหลดและ APK ฝัง HTTPS |
+| 2. Results / outcome | Public API/Reader/image and full APK GET/hash pass from host; tunnel healthy | API/Reader/ภาพและดาวน์โหลด APK ครบ/hash ผ่านจากเครื่องโฮสต์ tunnel healthy |
+| 3. Expected performance gain % | Not measured; connectivity recovery | ไม่วัด เป็นการกู้การเชื่อมต่อ |
+| 4. Benefits | Testers can use an internet origin across networks | ผู้ทดสอบใช้ API สาธารณะต่างเครือข่ายได้ |
+| 5. Purpose | Fulfil request to enable remote APK testing | รองรับคำขอทดสอบ APK คนละสถานที่ |
+| 6. Why + architectural impact | Old public tunnel disconnected; dedicated edge routing to existing Backend, no application redesign | Tunnel สาธารณะเดิมขาด connection จึงแยกเส้นทาง edge ไป Backend เดิม ไม่ออกแบบแอปใหม่ |
+| 7. Problems before | Public HTTP 530/1033; existing APK embedded LAN IP | API สาธารณะ 530/1033 และ APK เดิมฝัง IP LAN |
+| 8. Goals | Verified downloadable HTTPS artifact and explicit host requirements | มีไฟล์ HTTPS ที่ตรวจแล้วพร้อมข้อกำหนดเครื่องโฮสต์ |
+| 9. Architecture before | Native → LAN Backend; public shared tunnel down | Native → Backend LAN และ tunnel ร่วมสาธารณะหยุด |
+| 10. Architecture after | Native → public HTTPS → dedicated tunnel → same Backend; separate loopback file server | Native → HTTPS → tunnel แยก → Backend เดิม และ file server loopback แยก |
+| 11. Refactor list | None; source/contracts/dependencies/private app env unchanged | ไม่มี refactor คง source/contracts/dependencies/private env แอป |
+| 12. Metrics | APK 27760053 bytes; SHA-256 verified over GET; Reader 30 pages; build 2m11s, 316 tasks | APK 27760053 bytes ตรวจ hash จาก GET Reader 30 หน้า build 2m11s 316 tasks |
+| 13. Technical debt removed | Inactive public route and LAN-only artifact dependency | แก้ route สาธารณะที่หยุดและข้อจำกัดไฟล์ที่ใช้ได้เฉพาะ LAN |
+| 14. Risk reduction / rollback | Verified binary digest, private-token exclusion/ACL, dedicated routes; restore only old API CNAME target | ตรวจ digest/ไม่มี private token/ACL แยก routes ย้อนโดยคืนเฉพาะ target CNAME API เดิม |
+| 15. Developer experience impact | Bilingual runtime/download/rollback guide; no Metro for installed APK | คู่มือเปิดระบบ/ดาวน์โหลด/ย้อนกลับสองภาษา ติดตั้งแล้วไม่ต้องเปิด Metro |
+| 16. Future opportunities | Real-device cross-network acceptance, always-on hosting, production signing/CAPTCHA, MIT readiness | รับเครื่องจริงต่างเครือข่าย จัดโฮสต์ถาวร signing/CAPTCHA production และ MIT |
+| 17. Lessons learned | Connected accounts differ; verify authoritative zone; DNS convergence and artifact cache need evidence | Account ที่เชื่อมต่างกัน ต้องตรวจ zone จริง รอ DNS และตรวจค่าฝังโดยไม่เชื่อ cache |
+| 18. KPI | Public API 200; full artifact hash matches; no device/production KPI claimed | API 200 hash ไฟล์ครบตรง ไม่อ้าง KPI เครื่องจริงหรือ production |
+
+Evidence, commands, identifiers and open acceptance: [public HTTPS report](../../Mobile/docs/2026-10-20-public-https-apk.md). Earlier same-day source suites remain historical evidence; this follow-up reran native build/artifact and public HTTP checks. No source change, new commit/push or issue closure.
+
+ภาษาไทย: ดูหลักฐาน คำสั่ง รหัสทรัพยากรและ acceptance ที่ค้างในรายงาน HTTPS ผล source suites วันเดียวกันเป็นหลักฐานเดิม รอบนี้ตรวจ build/artifact และ HTTP สาธารณะใหม่ ไม่แก้ source ไม่ commit/push เพิ่มหรือปิด issue
+
 ## 2026-10-20 — Downloadable ARM64 test APK / APK ARM64 สำหรับโหลดทดสอบ
 
 | Field | English | ไทย |
