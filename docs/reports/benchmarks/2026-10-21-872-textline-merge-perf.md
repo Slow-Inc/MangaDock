@@ -46,3 +46,18 @@ to the former buffer path (6 glyphs × 2 sizes × 2 directions).
 | wall | 5.52 s | 5.03 s |
 
 Together with the textline_merge changes: wall 5.84 → ~5.0 s/page warm (−0.8 s, ~14 %), output unchanged.
+
+## Update — mask refinement (`02b7fc89`)
+
+`complete_mask` ran shapely `area`/`intersection`/`distance`/`centroid` for every (connected component ×
+textline) pair (1.2 s over 4 pages). `_component_textline` makes the same pick: textline areas/bounds
+once per page, no intersection for disjoint boxes (overlap exactly 0), distances only when no overlap
+clears the threshold. Characterization: same pick as the all-pairs version on 300 random cases.
+
+| 8 pages, warm | before (`1d906a71`) | after (`02b7fc89`) |
+|---|---|---|
+| renders | — | **byte-identical 8/8** |
+| `mask_refinement` | 559 ms | **390 ms (−30 %)** |
+
+Stage totals now, warm: textline_merge ~0.54 s (was 0.74), rendering ~0.61 s (was 0.99–1.03),
+mask_refinement ~0.39 s (was 0.56–0.64) — about 0.8–0.9 s/page of CPU work removed, output unchanged.
