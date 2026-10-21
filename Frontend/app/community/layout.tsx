@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Navbar from "../components/Navbar";
 import ForumSideMenu from "../components/ForumSideMenu";
 import { ReactLenis } from 'lenis/react';
+import { useReducedMotion } from "../hooks/reducedMotion";
 import type { ForumCategory } from "../lib/types";
 import Loader from "../components/ui/Loader";
 
@@ -14,6 +15,7 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
 
   // Derive active states from URL to keep sidebar in sync across pages
   const category = (searchParams.get('category') as ForumCategory) || undefined;
@@ -107,7 +109,7 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
           {/* Sidebar Column (Left) - Persistent and Pre-loaded */}
           <aside className="hidden lg:block lg:col-span-4 xl:col-span-3 sticky top-28 self-start h-[calc(100vh-8rem)]">
             <ReactLenis 
-              options={{ lerp: 0.08, wheelMultiplier: 1, smoothWheel: true }} 
+              options={{ lerp: 0.08, wheelMultiplier: 1, smoothWheel: !reducedMotion }} // #849 
               className="h-full overflow-y-auto overscroll-contain custom-scrollbar pr-2 pb-6"
             >
               <ForumSideMenu

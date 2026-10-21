@@ -117,9 +117,11 @@ function Dots({ total, idx, desktop, onDotClick, autoplay, onToggleAutoplay }: D
         className="ml-1 grid h-6 w-6 place-items-center rounded-full text-ink-2 transition-colors hover:text-ink"
         aria-label={autoplay ? "หยุดเลื่อนอัตโนมัติ" : "เล่นอัตโนมัติ"}
       >
+        {/* pointer-events-none: the icon swaps under the pointer on click; a hovered node that leaves the DOM
+            stops React's onMouseLeave from reaching the hero, and the hover hold would stick */}
         {autoplay
-          ? <Pause className="h-3 w-3" fill="currentColor" strokeWidth={0} aria-hidden />
-          : <Play className="h-3 w-3" fill="currentColor" strokeWidth={0} aria-hidden />}
+          ? <Pause className="pointer-events-none h-3 w-3" fill="currentColor" strokeWidth={0} aria-hidden />
+          : <Play className="pointer-events-none h-3 w-3" fill="currentColor" strokeWidth={0} aria-hidden />}
       </button>
     </div>
   );
@@ -134,9 +136,16 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
   const reducedMotion = useReducedMotion();
   const [autoplayChoice, setAutoplayChoice] = useState<boolean | null>(null);
   const autoplay = heroAutoplay(autoplayChoice, reducedMotion);
-  const toggleAutoplay = useCallback(() => setAutoplayChoice(!autoplay), [autoplay]);
-  // Keyboard focus anywhere in the hero holds the rotation, as a hovering mouse does.
-  const onFocusIn = useCallback(() => { focusInsideRef.current = true; }, []);
+  const toggleAutoplay = useCallback(() => {
+    if (!autoplay) focusInsideRef.current = false; // Play means play, even with focus on the button
+    setAutoplayChoice(!autoplay);
+  }, [autoplay]);
+  // Keyboard focus anywhere in the hero holds the rotation, as a hovering mouse does. Only keyboard focus:
+  // a click or tap also focuses the button, and that must not hold the rotation until focus moves away.
+  // Focus inside a portal (the book popup) still reaches here because React's onFocus bubbles through it.
+  const onFocusIn = useCallback((e: React.FocusEvent) => {
+    if ((e.target as Element).matches(":focus-visible")) focusInsideRef.current = true;
+  }, []);
   const onFocusOut = useCallback((e: React.FocusEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) focusInsideRef.current = false;
   }, []);

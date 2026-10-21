@@ -17,6 +17,14 @@ dot holds 11 s, leaving resumes. One wheel tick of 400: reduced → page 0 → 4
 no preference → eased (31 → 132 → 205 …, popup 59 → 152 → 220 …). Toggle 24 × 24 at 390 and 1440, focus ring whole.
 tsc 0; eslint counts on touched files equal main's; `bun test` 418 pass (the 9 local `app/docs` SSR failures unchanged).
 
+**Review round:** (1) the community sidebar is its own `<ReactLenis>` (`community/layout.tsx`), missed by the first pass —
+now `smoothWheel: !reducedMotion` (wheel 300: reduced 0 → 168 at once; default 13 → 55 → 86 …). (2) A click focuses the
+button, so the focus hold now takes keyboard focus only (`:focus-visible`), and Play clears it. (3) Found while verifying,
+proved by reading the hooks off the React fiber: Play left the **hover** hold stuck — the click swaps the Pause svg for Play
+under the pointer, and a hovered node that leaves the DOM stops React's `onMouseLeave` reaching the hero. Icons are
+`pointer-events-none`; after Play + move away the hold is false and rotation resumes in 6.5 s with focus still on the button.
+Follow-up: JS `behavior: "smooth"` scroll calls and the reader's eased `lenis.scrollTo` are a separate issue.
+
 ---
 
 ## #848 Hero carousel dots are real tap targets (2026-10-21)
