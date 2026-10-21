@@ -400,6 +400,9 @@ def test_a_one_sided_second_dodge_moves_flush_not_to_a_phantom_gap_795():
     assert x2 <= 205.0 or y2 <= 135.0, (cx, cy)
 
 
+_SHRINK_BY = {'หนึ่ง': 2, 'สอง': 2, 'ยาวมาก!': 3, 'เล็กลงมาก': 12}   # per-text shrink of the stub fit
+
+
 def _echo_stubs(monkeypatch):
     monkeypatch.setattr(rend, '_bubble_interior_box',
                         lambda region, bubble_box, shape: (60.0, 40.0, (50.0, 50.0)))
@@ -407,7 +410,9 @@ def _echo_stubs(monkeypatch):
 
     def laid(region, shape, fmin, fmax, page_shape=None, shrink_to_fit=False, **kw):
         tall = getattr(region, 'tall', False) and not shrink_to_fit
-        return (fmax - 6, 50.0, 30.0) if shrink_to_fit else (fmax, 50.0, 90.0 if tall else 30.0)
+        if shrink_to_fit:   # the shrink fit: wrap into the box, 6 px smaller (or as the region says)
+            return (fmax - _SHRINK_BY.get(region.translation, 6), min(50.0, region.xyxy[2] - region.xyxy[0]), 30.0)
+        return (fmax, 50.0, 90.0 if tall else 30.0)
     monkeypatch.setattr(rend, '_clean_layout_dst', laid)
 
 
@@ -568,10 +573,28 @@ def test_page_size_applies_only_where_it_fits_851(monkeypatch):
     balloon falls back to the absolute font — never worse than without the knob."""
     _echo_stubs(monkeypatch)
     lines, credit, sole = _page()
-    shared = [_in_balloon(600, 18, 'หนึ่ง'), _in_balloon(600, 18, 'สอง')]       # same bubble_box
+    shared = [_in_balloon(600, 18, 'ซ้าย'), _in_balloon(600, 18, 'ขวา')]       # same bubble_box
     tall = _in_balloon(500, 18, 'ยาวมาก', tall=True, horizontal=False)          # no #832 re-lay
     img = np.full((800, 800, 3), 255, np.uint8)
     rend.resize_regions_to_font_size(img, lines + [credit, sole] + shared + [tall], None, 0, 8,
                                      bubble_fit=True, font_size_max=20, clean_layout=True, font_src_scale=1.4)
     assert [r.render_font_px for r in shared] == [20, 20]
     assert tall.render_font_px == 20 and lines[0].render_font_px == 25
+
+
+def test_a_page_size_that_does_not_fit_shrinks_to_fit_before_falling_back_851(monkeypatch):
+    """A/B at 1.4 with the fallback (7cd7e0d1): a region that did not fit dropped straight to the absolute
+    20 px next to 39 px neighbours — pages got LESS consistent (Akuyaku p1 1.55x -> 1.95x). It now takes the
+    largest size <= the page size that fits its balloon interior (or, sharing a balloon, its own
+    footprint), and only below the absolute font falls back to it."""
+    _echo_stubs(monkeypatch)
+    lines, credit, sole = _page()
+    shared = [_in_balloon(600, 18, 'หนึ่ง'), _in_balloon(600, 18, 'สอง')]
+    tall = _in_balloon(500, 18, 'ยาวมาก!', tall=True, horizontal=False)
+    small = _in_balloon(300, 18, 'เล็กลงมาก', tall=True, horizontal=False)
+    img = np.full((800, 800, 3), 255, np.uint8)
+    rend.resize_regions_to_font_size(img, lines + [credit, sole] + shared + [tall, small], None, 0, 8,
+                                     bubble_fit=True, font_size_max=20, clean_layout=True, font_src_scale=1.4)
+    assert [r.render_font_px for r in shared] == [23, 23]     # fits its own 40 px footprint at 25 - 2
+    assert tall.render_font_px == 22                           # fits the interior at 25 - 3
+    assert small.render_font_px == 20                          # 25 - 12 < 20: the absolute font
