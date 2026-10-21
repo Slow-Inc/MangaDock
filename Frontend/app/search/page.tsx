@@ -15,6 +15,7 @@ import Pill from "../components/ui/Pill";
 import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
 import type { LandingBook } from "../lib/types";
 import Mascot from "../components/mascot/Mascot";
+import { scrollBehavior } from "../hooks/reducedMotion";
 
 const API_BASE = "/api/proxy";
 
@@ -151,7 +152,7 @@ function ChipBar({ categories, active, onSelect }: {
   }, [categories]);
 
   const scroll = (dir: -1 | 1) => {
-    scrollRef.current?.scrollBy({ left: dir * 200, behavior: "smooth" });
+    scrollRef.current?.scrollBy({ left: dir * 200, behavior: scrollBehavior() });
   };
 
   if (categories.length <= 1) return null;
@@ -519,14 +520,14 @@ function SearchResults() {
               </p>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
-                  onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                   disabled={page <= 1}
                   className="rounded-lg border border-line bg-fill px-3 py-2 text-xs text-ink-2 transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   «
                 </button>
                 <button
-                  onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                   disabled={page <= 1}
                   className="rounded-lg border border-line bg-fill px-4 py-2 text-sm text-ink transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
@@ -538,7 +539,7 @@ function SearchResults() {
                   return (
                     <button
                       key={p}
-                      onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                      onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                       className={`h-9 w-9 rounded-lg text-sm font-medium transition ${
                         p === page
                           ? "bg-ink text-bg"
@@ -550,14 +551,14 @@ function SearchResults() {
                   );
                 })}
                 <button
-                  onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                   disabled={page >= totalPages}
                   className="rounded-lg border border-line bg-fill px-4 py-2 text-sm text-ink transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   ถัดไป →
                 </button>
                 <button
-                  onClick={() => { setPage(totalPages); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onClick={() => { setPage(totalPages); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                   disabled={page >= totalPages}
                   className="rounded-lg border border-line bg-fill px-3 py-2 text-xs text-ink-2 transition hover:bg-raised disabled:cursor-not-allowed disabled:opacity-30"
                 >

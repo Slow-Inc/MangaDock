@@ -25,6 +25,7 @@ import ReportButton from "./ReportButton";
 import Loader from "./ui/Loader";
 import Mascot from "./mascot/Mascot";
 import { hasLayerAbove, useDialogFocus } from "../hooks/useDialogFocus";
+import { prefersReducedMotion, scrollBehavior } from "../hooks/reducedMotion";
 
 const MIT_OFFLINE_LABEL = "ระบบแปลออฟไลน์";
 
@@ -278,7 +279,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       const btnWidth = btn.offsetWidth;
       const containerWidth = container.offsetWidth;
       const scrollTo = btnLeft - containerWidth / 2 + btnWidth / 2;
-      container.scrollTo({ left: Math.max(0, scrollTo), behavior: "smooth" });
+      container.scrollTo({ left: Math.max(0, scrollTo), behavior: scrollBehavior() });
     }, 80);
   }, [page]);
 
@@ -439,6 +440,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           keyboardTargetScroll = Math.max(0, baseScroll + direction * SCROLL_SPEED);
           lenis.scrollTo(keyboardTargetScroll, {
             force: true,
+            immediate: prefersReducedMotion(), // reduced motion: follow the held key, no lerp glide (#852)
           });
         } else if (container) {
           container.scrollTop += direction * SCROLL_SPEED;
@@ -521,7 +523,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   // Scroll to page when clicking page strip in continuous mode
   const scrollToPage = (idx: number) => {
     const el = pageRefs.current[idx];
-    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    el?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
   };
 
   const chapterLabel = chapterNumber

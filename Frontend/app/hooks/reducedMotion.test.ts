@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { heroAutoplay, motionStore } from "./reducedMotion";
+import { heroAutoplay, motionStore, scrollBehavior } from "./reducedMotion";
 
 /** A stand-in for a MediaQueryList with its own listener list — no DOM globals (see pageVisibility.test.ts). */
 function fakeQuery(initial: boolean) {
@@ -41,5 +41,12 @@ describe("heroAutoplay: does the hero rotate on its own (#849)", () => {
   test("the user's pause or play wins over the preference", () => {
     expect(heroAutoplay(false, false)).toBe(false);
     expect(heroAutoplay(true, true)).toBe(true);
+  });
+});
+
+describe("scrollBehavior: JS-initiated scrolling (#852)", () => {
+  test("jumps under reduced motion, glides otherwise", () => {
+    expect(scrollBehavior(fakeQuery(true))).toBe("auto");
+    expect(scrollBehavior(fakeQuery(false))).toBe("smooth");
   });
 });

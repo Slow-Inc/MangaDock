@@ -25,6 +25,7 @@ import {
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
+import { scrollBehavior } from "../hooks/reducedMotion";
 
 type TabKey = "favorites" | "follows" | "liked" | "history";
 
@@ -168,7 +169,7 @@ function ChipBar({ categories, active, onSelect }: {
   }, [categories]);
 
   const scroll = (dir: -1 | 1) => {
-    scrollRef.current?.scrollBy({ left: dir * 200, behavior: "smooth" });
+    scrollRef.current?.scrollBy({ left: dir * 200, behavior: scrollBehavior() });
   };
 
   if (categories.length <= 1) return null;
@@ -465,7 +466,7 @@ function MyListContent() {
                     startFadeOut();
                     setCategoryFilter(cat);
                     setPage(1);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
+                    window.scrollTo({ top: 0, behavior: scrollBehavior() });
                   }}
                 />
               );
@@ -475,7 +476,7 @@ function MyListContent() {
               const handlePageChange = (p: number) => {
                 startFadeOut();
                 setPage(p);
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                window.scrollTo({ top: 0, behavior: scrollBehavior() });
               };
               return (
                 <>

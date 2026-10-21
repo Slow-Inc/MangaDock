@@ -23,6 +23,7 @@ import ReviewSection from "./ReviewSection";
 import RelatedManga from "./RelatedManga";
 import Loader from "./ui/Loader";
 import type { LandingBook, MangaDetail, MangaChapter, ActiveChapter } from "../lib/types";
+import { scrollBehavior } from "../hooks/reducedMotion";
 
 type Props = {
   book: LandingBook;
@@ -164,7 +165,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const scrollCovers = (dir: "left" | "right") => {
     const el = coverRowRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir === "left" ? -320 : 320, behavior: "smooth" });
+    el.scrollBy({ left: dir === "left" ? -320 : 320, behavior: scrollBehavior() });
   };
 
   const handleCoverRowWheel = (e: React.WheelEvent<HTMLDivElement>) => {
@@ -278,7 +279,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   useEffect(() => {
     if (scrollToChapters && !loadingChapters) {
       setTimeout(() => {
-        chaptersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        chaptersRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
       }, 150);
     }
   }, [scrollToChapters, loadingChapters]);
@@ -470,7 +471,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                   <div className="flex gap-2">
                     {isManga && (
                       <button
-                        onClick={() => chaptersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                        onClick={() => chaptersRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" })}
                         disabled={loadingChapters || chaptersEmpty}
                         className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-ink-3 py-2.5 text-xs font-semibold text-ink transition active:bg-fill disabled:opacity-40"
                       >
@@ -566,7 +567,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                         </button>
                       ) : (
                         <button
-                          onClick={() => chaptersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                          onClick={() => chaptersRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" })}
                           disabled={loadingChapters}
                           className="flex items-center gap-2 rounded-lg bg-ink px-5 py-2 text-sm font-bold text-bg transition hover:bg-ink/85 disabled:opacity-50"
                         >

@@ -13,6 +13,7 @@ import { useAuth } from "../contexts/AuthContext";
 import Loader from "./ui/Loader";
 import type { LandingBook, MangaChapter, ActiveChapter } from "../lib/types";
 import Coin from "./ui/Coin";
+import { scrollBehavior } from "../hooks/reducedMotion";
 
 const API_BASE = "/api/proxy";
 
@@ -254,7 +255,7 @@ export default function ChapterList({
   useEffect(() => {
     if (!loadingChapters && effectiveHighlightId) {
       setTimeout(() => {
-        highlightChapterRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        highlightChapterRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
       }, 400);
     }
   }, [loadingChapters, effectiveHighlightId]);

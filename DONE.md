@@ -3,6 +3,25 @@
 
 ---
 
+## #852 JS smooth scrolling honours reduced motion (2026-10-21)
+
+**What:** `scroll-behavior: auto` in globals.css cannot override an explicit `behavior: "smooth"` passed from JS. All 27 call
+sites outside `app/docs` (pagers, row arrows, popup/reader jumps, Navbar strip, `useHorizontalScroll`) now pass
+`scrollBehavior()` (`hooks/reducedMotion.ts`: `"auto"` under reduced motion, else `"smooth"`), and the reader's held-arrow
+`lenis.scrollTo` gets `immediate` under reduced motion so it follows the key without a glide.
+
+**Validated:** `reducedMotion.test.ts` red → green (5). Production build, headless Chromium 1440, sampled every 40 ms:
+`scrollBy` (home row arrow) reduced 1008 at once vs default 0 → 2 → 53 → 285 → 617 → 1008; `window.scrollTo` (`/new` pager)
+reduced 0 at once vs default 1480 → 1432 → 1136 → 819 → 0. Not measured: `scrollIntoView` (popup chapter jump stayed
+disabled — chapters did not load from the backend in the reduced run) and the reader's held arrow (needs a loaded chapter);
+both go through the same helper; a second attempt at the reader also failed because the backend's
+`/versions/title/*` upstream timed out (25 s), so the popup never offered a read button. Review: lenis 1.3.18 `scrollTo` with
+`immediate` sets target = animated scroll (no lerp), traced in `node_modules/lenis/dist/lenis.mjs`; `prefersReducedMotion()`
+reads the module's cached query (no new MediaQueryList per call, so the reader checks it per frame and follows a
+mid-chapter change). tsc 0; eslint counts on the 11 touched files equal main's; `bun test` 419 pass.
+
+---
+
 ## #849 Reduced motion reaches JS motion; the hero can be paused (2026-10-21)
 
 **What:** the CSS reduced-motion rule cannot reach motion driven from JS. `hooks/reducedMotion.ts` adds `useReducedMotion()`

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { computeScrollState } from "../lib/horizontalScroll";
+import { scrollBehavior } from "./reducedMotion";
 
 export function useHorizontalScroll() {
   const ref = useRef<HTMLDivElement>(null);
@@ -18,7 +19,7 @@ export function useHorizontalScroll() {
   const scrollBy = (dir: "left" | "right") => {
     const el = ref.current;
     if (!el) return;
-    el.scrollBy({ left: (dir === "left" ? -1 : 1) * el.clientWidth * 0.75, behavior: "smooth" });
+    el.scrollBy({ left: (dir === "left" ? -1 : 1) * el.clientWidth * 0.75, behavior: scrollBehavior() });
   };
 
   return { ref, canScrollLeft, canScrollRight, update, scrollBy };
