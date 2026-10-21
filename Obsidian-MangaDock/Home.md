@@ -62,6 +62,7 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[reference-external-docs-index]] — Catalog of knowledge-bearing MD files OUTSIDE the vault (resume points, benchmark reports, ADRs, PRDs, DONE/PIPELINE logs) — read these too; reconcile new ones in so nothing is missed
 - [[project-mangatranslator-study]] — Pointer ไป deep-scan ตัวจริงของ meangrinch/MangaTranslator ใน `docs/research/` — headline table ว่า need ไหนอ่าน doc ไหน
 - [[reference-frontend-ui-libraries]] — shadcn (UI primitives/Radix) vs React Bits (WebGL/GLSL effects) — บทบาทต่างกัน ใช้คู่กันได้ + MCP setup
+- [[reference-frontend-a11y-gotchas]] — Next 16/React 19/Tailwind v4 traps from the a11y pass: titles need a stack + head observer, `not-sr-only` resets padding, `inert` closed popovers, JS motion vs reduced-motion, server fetch deadlines
 - [[reference-gh-cli-path]] — gh CLI ไม่อยู่ใน Bash PATH — ใช้ full path `C:\Program Files\GitHub CLI\gh.exe` เสมอ
 
 ---
