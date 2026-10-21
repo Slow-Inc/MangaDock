@@ -15,6 +15,9 @@ lightbox with focus inside → 6 Tabs stay inside → Escape closes it, focus ba
 Mouse: hover shows the button, tile click selects the volume, enlarge click opens, close button closes. tsc 0; eslint
 counts unchanged.
 
+**Follow-up (#845):** the enlarge-cover buttons on grid cards, book rows and search results were `opacity-0` until hover,
+so keyboard focus landed on an invisible control; they now show on `focus-visible` too, and the tile hover border stays.
+
 ---
 
 ## #840 Reader takes keyboard focus; Escape closes only the top layer (2026-10-21)
