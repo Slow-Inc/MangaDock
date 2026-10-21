@@ -31,3 +31,18 @@ building 2-element numpy arrays), LSD 0.59 s (native), `split` 0.67 s.
 
 Per-step probes agreed: −66, −93, −102 ms on `textline_merge`, each step identical 8/8. Left for later:
 LSD (native, 0.15 s/page) and `Panel.split` (0.17 s/page) — the next candidates.
+
+## Update — rendering (`1d906a71`)
+
+The same profile showed freetype-py's `bitmap.buffer` list comprehension at 1.6 s over 4 pages: the
+glyph **stroke** (outline) bitmap in `_render_glyph_stroke` still read it twice per glyph (#822 had
+fixed only the fill glyph). It now copies the bytes via `_bitmap_bytes`. Characterization: identical
+to the former buffer path (6 glyphs × 2 sizes × 2 directions).
+
+| 8 pages, warm | before (`3d0e7f80`) | after (`1d906a71`) |
+|---|---|---|
+| renders | — | **byte-identical 8/8** |
+| `rendering` | 995 ms | **628 ms (−37 %)** |
+| wall | 5.52 s | 5.03 s |
+
+Together with the textline_merge changes: wall 5.84 → ~5.0 s/page warm (−0.8 s, ~14 %), output unchanged.
