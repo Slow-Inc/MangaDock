@@ -31,3 +31,18 @@ def test_short_ascii_name_kept():
 def test_thai_text_still_dropped_for_english_source():
     r = _region('ข้อความภาษาไทยล้วนยาวพอให้ตรวจจับได้')
     assert _filter([r]) == []
+
+
+def test_english_with_one_stray_glyph_is_kept_even_with_a_lazy_langid_guess():
+    """Iruma p0 (2026-10-21): 'I WONDER WHY...' and 'I ALREADY KNEW THAT, DUMMY.' stayed English on the
+    page. OCR misread the lone 'I' as '피' and caught a '○' — not pure ASCII, so the region went to
+    langid via TextBlock.source_lang (a lazy langid guess: KO, MT) and the mostly-ASCII Latin guard
+    in _detect_region_source_lang never ran. Both regions were dropped silently."""
+    regions = [SimpleNamespace(text=t, sfx_rescued=False, source_lang=guess)
+               for t, guess in (('피 WONDER WHY..', 'ko'), ('I AL- READY KNEW THAT, DUMMY. ○', 'mt'))]
+    assert _filter(regions) == regions
+
+
+def test_an_explicit_cjk_source_lang_still_drops_japanese():
+    r = SimpleNamespace(text='平ク ザワ ザワ', sfx_rescued=False, source_lang='ja')
+    assert _filter([r]) == []

@@ -1317,13 +1317,7 @@ class MangaTranslator:
         return ctx
 
     def _detect_region_source_lang(self, region, requested_source_lang: str = '') -> str:
-        source_lang = str(getattr(region, 'source_lang', '') or '').upper()
-        if source_lang and source_lang != 'UNKNOWN':
-            return source_lang
-
         text = str(getattr(region, 'text', '') or '').strip()
-        if not text:
-            return 'UNKNOWN'
 
         # langid is unreliable for Latin-script text — it often confuses
         # English with Polish, French, Dutch, etc. even at high confidence.
@@ -1336,9 +1330,18 @@ class MangaTranslator:
             'NOR', 'DAN', 'FIN', 'CES', 'ROM', 'HUN', 'TUR', 'IND', 'MSA',
             'VIE', 'FIL', 'MAL',
         }
-        is_mostly_ascii = sum(1 for c in text if ord(c) < 128) / max(1, len(text)) > 0.85
+        # Checked BEFORE region.source_lang: on a TextBlock that is a lazy langid guess, never empty,
+        # so returning it first made this guard dead — 'I WONDER WHY' with one OCR-noise glyph
+        # ('피 WONDER WHY..') was guessed KO and dropped (Iruma p0, 2026-10-21).
+        is_mostly_ascii = bool(text) and sum(1 for c in text if ord(c) < 128) / len(text) > 0.85
         if requested_source_lang in LATIN_SCRIPT_LANGS and is_mostly_ascii:
             return requested_source_lang
+
+        source_lang = str(getattr(region, 'source_lang', '') or '').upper()
+        if source_lang and source_lang != 'UNKNOWN':
+            return source_lang
+        if not text:
+            return 'UNKNOWN'
 
         try:
             detected_lang, confidence = langid.classify(text)
