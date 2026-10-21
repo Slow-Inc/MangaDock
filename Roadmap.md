@@ -80,12 +80,18 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 3. **Native Authentication Bridge:** Bridge connecting Token and Hardware ID from real device (Android ID/IDFV) into WebView.
 4. **Core OS Permissions:** Manage basic system permissions via Native Code.
 
-### Phase 4: Native OS Power Features
-**Status:** R&D Phase (specific points in Native Android / Java / Kotlin)
+### Phase 4: Fully Native Mobile Application Development
+**Status:** Planned (transition from the Phase 3 WebView shell to a fully native app)
 
-1. **Android MediaProjection Module:** Real-time screen capture module for other applications.
-2. **WindowManager Overlay (Native):** Floating Bubble system that overlays translated text frames on other apps on-the-fly.
-3. **Background Stream Worker:** Native-level background service for streaming image data without affecting main app performance.
+**Goal:** Build a standalone Android/iOS application with its own native UI, navigation, and manga reader instead of rendering the existing website inside a WebView. Retain the shared MangaDock backend and MIT services; do not duplicate server-side business logic.
+
+1. **Native Application Architecture:** Establish a React Native application with native screens, navigation, design system, state management, and a maintainable feature-based structure. Use native platform modules where needed.
+2. **Native Manga Reading Experience:** Implement an image-based manga reader with smooth scrolling, chapter navigation, preloading, efficient image caching, reading progress, and responsive gestures without embedding web pages.
+3. **Native Product Features & API Integration:** Rebuild the essential browsing, search, manga details, library, account, and community experiences as native screens, integrated with existing Backend/MIT APIs and shared contracts.
+4. **Authentication, Security & OS Integration:** Implement secure OAuth/deep-link handling, token storage, session restoration, and appropriate Android/iOS integrations without relying on the Phase 3 WebView authentication bridge.
+5. **Performance, Quality & Release Readiness:** Validate startup time, memory usage, scrolling performance, accessibility, offline/error states, automated tests, crash reporting, and Android/iOS release builds.
+
+**Exit Criteria:** Core browsing, reading, and account journeys run in native screens without WebView dependency, while the web application continues to operate independently against the same backend.
 
 ### Phase 5: Retention Ecosystem & Community 2.0
 **Status:** Final Goal (building a sustainable ecosystem)
@@ -178,12 +184,18 @@ MangaDock is a premium, decentralized manga platform that bridges the gap betwee
 3.  **Native Authentication Bridge:** เขียน Bridge เชื่อมต่อ Token และ Hardware ID ของอุปกรณ์จริง (Android ID/IDFV) ส่งเข้า WebView
 4.  **Core OS Permissions:** จัดการสิทธิ์การเข้าถึงระบบพื้นฐานผ่าน Native Code
 
-### Phase 4: Native OS Power Features (ไม้ตายของระบบ)
-**สถานะ:** 🚧 R&D Phase (เขียนโค้ดเจาะจงเฉพาะจุดด้วย Native Android / Java / Kotlin)
+### Phase 4: Fully Native Mobile Application Development (พัฒนาแอป Native เต็มรูปแบบ)
+**สถานะ:** Planned (เปลี่ยนผ่านจาก WebView Shell ของ Phase 3 ไปสู่แอป Native)
 
-1.  **Android MediaProjection Module:** พัฒนาโมดูลดักจับภาพหน้าจอ (Screen Capture) จากแอปพลิเคชันอื่นแบบเรียลไทม์
-2.  **WindowManager Overlay (Native):** สร้างระบบ Floating Bubble วาดกรอบคำแปลทับซ้อนหน้าจอแอปอื่นแบบ On-the-fly
-3.  **Background Stream Worker:** เขียน Service เบื้องหลังระดับ Native เพื่อสตรีมข้อมูลภาพโดยไม่กระทบประสิทธิภาพแอปหลัก
+**เป้าหมาย:** พัฒนาแอป Android/iOS ที่มี UI, Navigation และตัวอ่านมังงะเป็นของตัวเอง แทนการแสดงเว็บไซต์เดิมผ่าน WebView โดยใช้ Backend และ MIT Services ชุดเดียวกับ Web App เพื่อลดการทำ Business Logic ซ้ำซ้อน
+
+1. **Native Application Architecture:** วางโครงสร้าง React Native พร้อมหน้าจอ Native, ระบบนำทาง, Design System, State Management และการแยกโมดูลตาม Feature โดยใช้ Native Platform Module เฉพาะส่วนที่จำเป็น
+2. **Native Manga Reading Experience:** พัฒนาตัวอ่านมังงะแบบ Native รองรับการเลื่อนที่ลื่นไหล การเปลี่ยนตอน การโหลดภาพล่วงหน้า Image Cache การบันทึกความคืบหน้าการอ่าน และ Gesture โดยไม่ฝังหน้าเว็บ
+3. **Native Product Features & API Integration:** พัฒนาหน้าค้นหา สำรวจมังงะ รายละเอียดเรื่อง คลังส่วนตัว บัญชีผู้ใช้ และ Community ด้วย Native UI เชื่อมต่อ Backend/MIT API และใช้สัญญาข้อมูลร่วมกับ Web App
+4. **Authentication, Security & OS Integration:** จัดการ OAuth/Deep Link, Secure Token Storage, Session Restoration และการเชื่อมต่อ Android/iOS โดยไม่พึ่ง WebView Authentication Bridge ของ Phase 3
+5. **Performance, Quality & Release Readiness:** ตรวจสอบเวลาเปิดแอป การใช้หน่วยความจำ ความลื่นไหลของตัวอ่าน Accessibility การทำงานเมื่อ Offline/เกิดข้อผิดพลาด Automated Tests ระบบรายงาน Crash และการ Build สำหรับ Android/iOS
+
+**เกณฑ์เสร็จสิ้น:** ผู้ใช้สามารถสำรวจมังงะ อ่านมังงะ และจัดการบัญชีผ่านหน้าจอ Native ได้โดยไม่ต้องพึ่ง WebView ขณะที่ Web App ยังทำงานแยกต่างหากบน Backend เดียวกัน
 
 ### Phase 5: Retention Ecosystem & Community 2.0
 **สถานะ:** 🏁 Final Goal (การสร้างระบบนิเวศที่ยั่งยืน)
