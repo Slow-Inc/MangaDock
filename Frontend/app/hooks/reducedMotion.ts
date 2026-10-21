@@ -42,14 +42,14 @@ export function heroAutoplay(userChoice: boolean | null, reducedMotion: boolean)
 }
 
 /** Whether reduced motion is asked for right now — for event handlers and effects, where a hook cannot go. */
-export function prefersReducedMotion(query: Pick<MediaQueryList, "matches"> = matchMedia(QUERY)): boolean {
-  return query.matches;
+export function prefersReducedMotion(query?: Pick<MotionQuery, "matches">): boolean {
+  return query ? query.matches : motion().getSnapshot();
 }
 
 /**
  * `behavior` for JS-initiated scrolling (#852). globals.css sets `scroll-behavior: auto` under reduced motion, but
  * an explicit `behavior: "smooth"` passed to scrollTo/scrollBy/scrollIntoView overrides it.
  */
-export function scrollBehavior(query?: Pick<MediaQueryList, "matches">): ScrollBehavior {
+export function scrollBehavior(query?: Pick<MotionQuery, "matches">): ScrollBehavior {
   return prefersReducedMotion(query) ? "auto" : "smooth";
 }
