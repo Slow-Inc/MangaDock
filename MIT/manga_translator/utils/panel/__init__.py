@@ -1,18 +1,9 @@
 from .kumikolib import Kumiko
-import tempfile, cv2, os
+
 
 def get_panels_from_array(img_rgb, rtl=True):
-
-    tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-    path = tmp.name
-    tmp.close()  
-
-    cv2.imwrite(path, img_rgb)
-
+    """Panels of a page array. Kumiko works on the array directly — it used to be written to a temp
+    PNG and read back, a lossless round trip that returned the same bytes (#822 follow-up)."""
     k = Kumiko({'rtl': rtl})
-    k.parse_image(path)
-    infos = k.get_infos()
-
-    os.unlink(path)
-
-    return infos[0]['panels']
+    k.parse_image('page.png', img=img_rgb)
+    return k.get_infos()[0]['panels']

@@ -90,7 +90,7 @@ class Kumiko:
 				if not filename.endswith(".license"):
 					print(f"\n[ERROR] Not an image, will be ignored: {filename}\n", file = sys.stderr)
 
-	def parse_image(self, filename, url = None):
+	def parse_image(self, filename, url = None, img = None):
 		self.page_list.append(
 			Page(
 				filename,
@@ -98,6 +98,7 @@ class Kumiko:
 				url = url,
 				min_panel_size_ratio = self.options['min_panel_size_ratio'],
 				panel_expansion = self.panel_expansion,
+				img = img,
 			)
 		)
 
