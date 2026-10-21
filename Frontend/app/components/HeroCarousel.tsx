@@ -7,6 +7,8 @@ import HeroDescription from "./HeroDescription";
 import HeroDetailButton from "./HeroDetailButton";
 import type { LandingBook } from "../lib/types";
 import { resolvedThumbnail } from "../lib/imgUrl";
+import { heroAutoplay, useReducedMotion } from "../hooks/reducedMotion";
+import { Pause, Play } from "lucide-react";
 
 type Props = { books: LandingBook[] };
 
@@ -24,9 +26,11 @@ type DotsProps = {
   idx: number;
   desktop: boolean;
   onDotClick: (i: number) => void;
+  autoplay: boolean;
+  onToggleAutoplay: () => void;
 };
 
-function Dots({ total, idx, desktop, onDotClick }: DotsProps) {
+function Dots({ total, idx, desktop, onDotClick, autoplay, onToggleAutoplay }: DotsProps) {
   const pillRef = useRef<HTMLDivElement>(null);
   const dotEls = useRef<(HTMLSpanElement | null)[]>([]);
   const prevIdxRef = useRef(idx);
@@ -106,6 +110,17 @@ function Dots({ total, idx, desktop, onDotClick }: DotsProps) {
           />
         </button>
       ))}
+      {/* WCAG 2.2.2: rotation that runs on its own needs a way to stop it (#849) */}
+      <button
+        type="button"
+        onClick={onToggleAutoplay}
+        className="ml-1 grid h-6 w-6 place-items-center rounded-full text-ink-2 transition-colors hover:text-ink"
+        aria-label={autoplay ? "หยุดเลื่อนอัตโนมัติ" : "เล่นอัตโนมัติ"}
+      >
+        {autoplay
+          ? <Pause className="h-3 w-3" fill="currentColor" strokeWidth={0} aria-hidden />
+          : <Play className="h-3 w-3" fill="currentColor" strokeWidth={0} aria-hidden />}
+      </button>
     </div>
   );
 }
@@ -115,6 +130,16 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
   const [visible, setVisible] = useState(true);
   const [mobileDlOpen, setMobileDlOpen] = useState(false);
   const pausedRef = useRef(false);
+  const focusInsideRef = useRef(false);
+  const reducedMotion = useReducedMotion();
+  const [autoplayChoice, setAutoplayChoice] = useState<boolean | null>(null);
+  const autoplay = heroAutoplay(autoplayChoice, reducedMotion);
+  const toggleAutoplay = useCallback(() => setAutoplayChoice(!autoplay), [autoplay]);
+  // Keyboard focus anywhere in the hero holds the rotation, as a hovering mouse does.
+  const onFocusIn = useCallback(() => { focusInsideRef.current = true; }, []);
+  const onFocusOut = useCallback((e: React.FocusEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) focusInsideRef.current = false;
+  }, []);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const didSwipeRef = useRef(false);
   const total = books.length;
@@ -155,9 +180,9 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
   }, []);
 
   useEffect(() => {
-    if (total <= 1) return;
+    if (total <= 1 || !autoplay) return;
     const t = setInterval(() => {
-      if (!pausedRef.current) {
+      if (!pausedRef.current && !focusInsideRef.current) {
         setVisible(false);
         setTimeout(() => {
           setIdx((i) => (i + 1) % total);
@@ -166,7 +191,7 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
       }
     }, ROTATION_MS);
     return () => clearInterval(t);
-  }, [total]);
+  }, [total, autoplay]);
 
   const book = books[idx];
   const resolvedUrl = resolvedThumbnail(book);
@@ -187,7 +212,7 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
     <>
       {/* ─── Mobile ─── */}
       <section className="relative px-4 pb-2 pt-20 md:hidden">
-        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onFocus={onFocusIn} onBlur={onFocusOut}>
         <button
           type="button"
           onClick={handleMobileTap}
@@ -229,7 +254,7 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
           ))}
         </div>
 
-        {total > 1 && <Dots total={total} idx={idx} desktop={false} onDotClick={(i) => advance(i, true)} />}
+        {total > 1 && <Dots total={total} idx={idx} desktop={false} onDotClick={(i) => advance(i, true)} autoplay={autoplay} onToggleAutoplay={toggleAutoplay} />}
         </div>
       </section>
 
@@ -238,6 +263,8 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
         className="relative hidden w-full overflow-hidden pb-12 pt-28 md:block lg:pb-16 lg:pt-32"
         onMouseEnter={() => { pausedRef.current = true; }}
         onMouseLeave={() => { pausedRef.current = false; }}
+        onFocus={onFocusIn}
+        onBlur={onFocusOut}
       >
         {/* Blurred background */}
         <div className={`absolute inset-0 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
@@ -305,7 +332,7 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
             <div className="mt-7">
               <HeroDetailButton key={book.id} book={book} />
             </div>
-            {total > 1 && <Dots total={total} idx={idx} desktop={true} onDotClick={(i) => advance(i, true)} />}
+            {total > 1 && <Dots total={total} idx={idx} desktop={true} onDotClick={(i) => advance(i, true)} autoplay={autoplay} onToggleAutoplay={toggleAutoplay} />}
           </div>
         </div>
       </section>

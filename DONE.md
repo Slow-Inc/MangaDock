@@ -3,6 +3,22 @@
 
 ---
 
+## #849 Reduced motion reaches JS motion; the hero can be paused (2026-10-21)
+
+**What:** the CSS reduced-motion rule cannot reach motion driven from JS. `hooks/reducedMotion.ts` adds `useReducedMotion()`
+(`useSyncExternalStore` over the media query, injectable like `pageVisibility.ts`). Lenis — the root instance and every
+`useLocalLenis` panel — scrolls natively under reduced motion. The hero, which rotated every 5 s forever and paused only
+under a hovering mouse (WCAG 2.2.2), has a 24 px pause/play button after its dots, holds while keyboard focus is inside it,
+and starts paused under reduced motion (`heroAutoplay`: the user's choice wins, otherwise the preference decides).
+
+**Validated:** `reducedMotion.test.ts` red → green (4). Production build, headless Chromium 1440: reduced motion → hero
+still after 6.5 s, button reads "เล่นอัตโนมัติ"; no preference → advances in 6.5 s, pause holds 11 s, play resumes, focus on a
+dot holds 11 s, leaving resumes. One wheel tick of 400: reduced → page 0 → 400 at once, popup scroller 0 → 400 at once;
+no preference → eased (31 → 132 → 205 …, popup 59 → 152 → 220 …). Toggle 24 × 24 at 390 and 1440, focus ring whole.
+tsc 0; eslint counts on touched files equal main's; `bun test` 418 pass (the 9 local `app/docs` SSR failures unchanged).
+
+---
+
 ## #848 Hero carousel dots are real tap targets (2026-10-21)
 
 **What:** axe `target-size` (WCAG 2.2 AA) over 10 public routes at 390 px failed only on the hero carousel dots: 8 × 8 px

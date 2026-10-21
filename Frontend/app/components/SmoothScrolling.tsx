@@ -5,6 +5,7 @@ import type { LenisRef } from 'lenis/react';
 import { usePathname } from 'next/navigation';
 import { ReactNode, useEffect, useRef } from 'react';
 import { isModalNavigation } from '../lib/bookModalHistory';
+import { useReducedMotion } from '../hooks/reducedMotion';
 
 interface SmoothScrollingProps {
   children: ReactNode;
@@ -17,6 +18,7 @@ export default function SmoothScrolling({ children }: SmoothScrollingProps) {
   // - smoothWheel: เปิดเพื่อให้ scroll ล้อเมาส์มีความนุ่ม
 
   const lenisRef = useRef<LenisRef | null>(null);
+  const reducedMotion = useReducedMotion();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export default function SmoothScrolling({ children }: SmoothScrollingProps) {
       options={{
         lerp: 0.08, // ยิ่งน้อยยิ่งรู้สึกหนืดและมีแรงต้าน (ค่าปกติคือ ~0.1)
         wheelMultiplier: 1, // ลดความไวลูกกลิ้งเล็กน้อยให้รู้สึกหนัก
-        smoothWheel: true,
+        smoothWheel: !reducedMotion, // wheel inertia is the motion reduced-motion users opt out of (#849)
       }}
     >
       {children}

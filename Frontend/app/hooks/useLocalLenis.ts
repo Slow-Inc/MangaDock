@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Lenis from "lenis";
+import { useReducedMotion } from "./reducedMotion";
 
 export function useLocalLenis(
   ref: React.RefObject<HTMLElement | null>,
@@ -11,6 +12,7 @@ export function useLocalLenis(
   contentRef?: React.RefObject<HTMLElement | null>
 ) {
   const resolvedInstanceRef = instanceRef ?? null;
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     const el = ref.current;
@@ -25,7 +27,7 @@ export function useLocalLenis(
       gestureOrientation: "both",
       lerp: 0.08,
       wheelMultiplier: 1,
-      smoothWheel: true,
+      smoothWheel: !reducedMotion, // #849
     });
 
     if (resolvedInstanceRef) {
@@ -58,5 +60,5 @@ export function useLocalLenis(
       cancelAnimationFrame(rafId);
       lenis.destroy();
     };
-  }, [ref, orientation, active, resolvedInstanceRef, contentRef]);
+  }, [ref, orientation, active, resolvedInstanceRef, contentRef, reducedMotion]);
 }
