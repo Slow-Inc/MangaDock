@@ -276,7 +276,7 @@ def _region_territory(region):
     return _box(bb) if bb is not None else _box(getattr(region, 'xyxy', None))
 
 
-def _neighbor_territories(text_regions, i):
+def _neighbor_territories(text_regions, i, text_only=False):
     """Territories region ``i`` must stay out of. A sibling in the SAME balloon owns only its
     detection box: its territory would otherwise be that whole balloon, and clamping against it
     shoved region ``i`` out of its own balloon onto the next one (Tsuki p1, 2026-10-20)."""
@@ -286,7 +286,7 @@ def _neighbor_territories(text_regions, i):
         if j == i:
             continue
         sibling = own is not None and _box(getattr(r, 'bubble_box', None)) == own
-        t = _box(getattr(r, 'xyxy', None)) if sibling else _region_territory(r)
+        t = _box(getattr(r, 'xyxy', None)) if (sibling or text_only) else _region_territory(r)
         if t is not None:
             out.append(t)
     return out
@@ -552,7 +552,9 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             # region's territory; the font is then fit to the clamped box, so the text
             # stays in its own space instead of colliding with the next bubble.
             if anti_overlap:
-                territories = _neighbor_territories(text_regions, i)
+                # the fit box is this balloon polygon's interior: it cannot enter another balloon, only its text —
+                # a neighbour balloon's bbox can overlap it (Horimiya p0: 87 px interior clamped to 14 px)
+                territories = _neighbor_territories(text_regions, i, text_only=bool(getattr(region, 'bubble_polygon', None)))
                 cb = clamp_box_to_neighbors(
                     (acx - fit_w / 2.0, acy - fit_h / 2.0, acx + fit_w / 2.0, acy + fit_h / 2.0),
                     territories, margin=2)

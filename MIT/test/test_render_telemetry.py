@@ -628,3 +628,23 @@ def test_a_clean_block_stays_on_the_page(monkeypatch):
                    page_bounds=(10.0, 0.0, 846.0, 1200.0))
     rend.resize_regions_to_font_size(patch, [p], None, 0, 8, clean_layout=True, page_shape=(1200, 836))
     assert p.render_dst_box[0] >= 10.0, p.render_dst_box
+
+
+def test_a_balloon_interior_is_not_cut_by_the_next_balloons_bbox(monkeypatch):
+    """Third corpus, Horimiya p0 (2026-10-21): 'REJECT-ED!' in a tall box rendered at 13 px across the
+    box's left border. Its fit box (the balloon polygon's safe interior, 87 x 167) was clamped against
+    the NEXT balloon's bounding box — a big curved balloon whose bbox overlaps this one though the
+    polygons do not — leaving 14 px. Inside its own balloon interior a region only has to avoid the
+    neighbours' text."""
+    monkeypatch.setattr(rend, '_bubble_interior_box', lambda region, bubble_box, shape: (87.0, 167.0, (354.0, 98.0)))
+    monkeypatch.setattr(rend, '_clean_layout_dst',
+                        lambda region, shape, fmin, fmax, page_shape=None, **kw: (20, region.xyxy[2] - region.xyxy[0], 30.0))
+    img = np.full((600, 600, 3), 255, np.uint8)
+    a = FakeRegion(horizontal=True, translation='ถูกปฏิเสธ!', xyxy=(316.0, 85.0, 392.0, 118.0),
+                   bubble_box=(308.0, 15.0, 407.0, 201.0),
+                   bubble_polygon=[(308, 15), (407, 15), (407, 201), (308, 201)])
+    b = FakeRegion(horizontal=True, translation='โฮริ!', xyxy=(438.0, 85.0, 505.0, 198.0),
+                   bubble_box=(327.0, 3.0, 519.0, 434.0))
+    rend.resize_regions_to_font_size(img, [a, b], None, 0, 8, bubble_fit=True, anti_overlap=True, clean_layout=True)
+    x1, _, x2, _ = a.render_dst_box
+    assert x2 - x1 > 60 and x1 >= 308, a.render_dst_box
