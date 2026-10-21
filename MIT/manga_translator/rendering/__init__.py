@@ -327,6 +327,11 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # own 2×font so no degenerate sliver.
     box_h = max(1.0, y2f - y1f)
     bbox_w = max(1.0, x2f - x1f)
+    # A balloon interior: squeeze only toward the height the source lettering used, not the whole
+    # balloon (Kaoru p0: two 152 px lines in a tall octagon became a 60 px column of one word per
+    # line; Otome's 'THIS SCUMBAG' filled its tall box, so its column stays tall).
+    _letter_h = float(getattr(region, 'letter_h', 0) or 0)
+    _squeeze_h = min(box_h, _letter_h) if _letter_h > 0 else box_h
 
     # #183 hard gate, hyphenation-aware: the squeeze floor per TOKEN is (a) the widest
     # SYLLABLE + hyphen when the language hyphenator can split it — long words then
@@ -367,7 +372,7 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
                                                 int(img_shape[0]), language=lang)
             return max(1, len(ls)) * fs * _LINE_HEIGHT
         floor = _floor_w(fs)
-        used = squeeze_width(_mh, max(wrap_w, floor), floor, box_h)
+        used = squeeze_width(_mh, max(wrap_w, floor), floor, _squeeze_h)
         lines, widths = text_render.calc_horizontal(
             fs, region.translation, int(used), int(img_shape[0]), language=lang)
         bw = float(max(widths)) if widths else float(used)
@@ -552,6 +557,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                     translation=region.translation,
                     target_lang=getattr(region, 'target_lang', 'en_US'),
                     font_size=getattr(region, 'font_size', 0),
+                    letter_h=float(region.xyxy[3]) - float(region.xyxy[1]),
                     xyxy=(acx - fit_w / 2.0, acy - fit_h / 2.0,
                           acx + fit_w / 2.0, acy + fit_h / 2.0))
                 _laid = _clean_layout_dst(_proxy, img.shape, font_size_minimum,

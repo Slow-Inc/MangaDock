@@ -498,3 +498,20 @@ def test_a_block_too_tall_for_its_balloon_is_relaid_851(monkeypatch):
     rend.resize_regions_to_font_size(img, lines + [credit, sole, tall], None, 0, 8, bubble_fit=True,
                                      font_size_max=20, clean_layout=True, font_src_scale=1.4)
     assert tall.render_font_px == 19                              # re-laid with shrink: 25 - 6
+
+
+def test_a_tall_balloon_keeps_the_letterers_column_width():
+    """Kaoru p0 (2026-10-21): 'THINK OF THE SIGHTSEEING!' is lettered as two 152 px lines in a tall
+    octagon; bubble_fit_tall squeezed the Thai until it filled the interior's height — a 60 px column
+    of one word per line ('สวย / แค่ / ไหน!'). The Thai column is never narrower than the source
+    column the letterer chose: the squeeze aims at the height the source text used, not the balloon's."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1600, 1070, 3), 255, np.uint8)
+    r = FakeRegion(horizontal=True, translation='คิดดูสิว่าวิวมันจะสวยแค่ไหน!', xyxy=(843.0, 158.0, 995.0, 213.0),
+                   bubble_box=(825.0, 40.0, 1019.0, 483.0), target_lang='THA', font_size=25)
+    rend.resize_regions_to_font_size(img, [r], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    x1, _, x2, _ = r.render_dst_box
+    assert r.render_branch == 'bubble_fit_tall' and x2 - x1 >= 0.75 * 152, (r.render_dst_box, r.render_font_px)
