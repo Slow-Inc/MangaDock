@@ -175,6 +175,7 @@ function StudioUploadContent() {
         <div className="mx-auto flex max-w-3xl items-center gap-[0.52rem] px-4 py-[0.52rem] md:gap-[0.66rem] md:py-[0.86rem]">
           <button
             onClick={() => titleId ? router.push(`/studio/manga/${encodeURIComponent(titleId)}?titleName=${encodeURIComponent(titleName)}`) : router.push("/studio")}
+            aria-label="ย้อนกลับ"
             className="flex h-[1.8rem] w-[1.8rem] items-center justify-center rounded-full text-ink-2 transition hover:bg-fill hover:text-ink md:h-[2rem] md:w-[2rem]"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
@@ -234,8 +235,9 @@ function StudioUploadContent() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs text-ink-2">ตอนที่</label>
+              <label htmlFor="upload-chapter-number" className="text-xs text-ink-2">ตอนที่</label>
               <input
+                id="upload-chapter-number"
                 value={chapterNumber}
                 onChange={(e) => setChapterNumber(e.target.value)}
                 disabled={hasVersion}
@@ -244,8 +246,9 @@ function StudioUploadContent() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-ink-2">ชื่อตอน (ถ้ามี)</label>
+              <label htmlFor="upload-chapter-title" className="text-xs text-ink-2">ชื่อตอน (ถ้ามี)</label>
               <input
+                id="upload-chapter-title"
                 value={chapterTitle}
                 onChange={(e) => setChapterTitle(e.target.value)}
                 disabled={hasVersion}
@@ -268,8 +271,9 @@ function StudioUploadContent() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-ink-2">หมายเหตุของนักแปล (ไม่บังคับ)</label>
+            <label htmlFor="upload-note" className="text-xs text-ink-2">หมายเหตุของนักแปล (ไม่บังคับ)</label>
             <textarea
+              id="upload-note"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -281,8 +285,9 @@ function StudioUploadContent() {
 
           <div className="flex items-center gap-3">
             <div className="space-y-1 flex-1">
-              <label className="text-xs text-ink-2">ราคา (เหรียญ) — 0 = ฟรี</label>
+              <label htmlFor="upload-price" className="text-xs text-ink-2">ราคา (เหรียญ) — 0 = ฟรี</label>
               <input
+                id="upload-price"
                 type="number"
                 min={0}
                 value={priceCoins}

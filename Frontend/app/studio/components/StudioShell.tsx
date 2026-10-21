@@ -35,7 +35,7 @@ function StudioNav({ pathname }: { pathname: string }) {
   const active = getActiveStudioTab(pathname);
   const activeIndex = Math.max(0, STUDIO_TABS.findIndex((t) => t.key === active));
   return (
-    <nav className="relative px-3">
+    <nav aria-label="เมนูสตูดิโอ" className="relative px-3">
       <span
         aria-hidden
         className="absolute inset-x-3 top-0 rounded-[var(--r2)] bg-fill transition-transform duration-[var(--t2)] ease-[var(--ease)]"
@@ -128,7 +128,6 @@ export default function StudioShell({ children }: { children: ReactNode }) {
       <Navbar />
 
       <aside
-        aria-label="เมนูสตูดิโอ"
         className="fixed bottom-[calc(var(--mobile-nav-height)+env(safe-area-inset-bottom))] left-0 top-16 z-30 hidden w-[var(--studio-sidebar)] flex-col border-r border-line bg-bg md:flex md:bottom-0"
       >
         <div className="px-5 pb-3 pt-6">
@@ -163,7 +162,8 @@ export default function StudioShell({ children }: { children: ReactNode }) {
         />
       </aside>
 
-      <div className="flex min-h-0 flex-1 flex-col md:pl-[var(--studio-sidebar)]">
+      {/* <main>: the page's main landmark, so the title header inside is not a second banner (#846). */}
+      <main className="flex min-h-0 flex-1 flex-col md:pl-[var(--studio-sidebar)]">
         <header className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-6">
           <h1 className="min-w-0 truncate text-lg font-semibold text-ink">{studioPageTitle(pathname)}</h1>
           {role ? <Badge tone="accent">{role}</Badge> : null}
@@ -172,7 +172,7 @@ export default function StudioShell({ children }: { children: ReactNode }) {
         <div ref={scroller} data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {children}
         </div>
-      </div>
+      </main>
 
     </div>
   );

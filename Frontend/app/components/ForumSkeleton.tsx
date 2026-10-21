@@ -89,7 +89,8 @@ export function CommentSkeleton() {
  */
 export function PostDetailSkeleton() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" aria-busy="true">
+      <h1 className="sr-only">กำลังโหลดกระทู้</h1>
       <div className="w-20 h-6 rounded bg-fill mb-6 animate-pulse" />
       <div className="relative bg-surface border border-line rounded-2xl overflow-hidden h-64 flex">
         <div className="hidden sm:flex flex-col items-center p-4 bg-fill border-r border-line w-16 gap-3 animate-pulse">
