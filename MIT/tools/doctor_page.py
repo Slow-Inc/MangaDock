@@ -208,7 +208,8 @@ async def main():
         report = {**run.to_json(), 'page': path, 'flags': {str(k): v for k, v in flags.items()},
                   'regions': [{'index': r.index, 'xyxy': r.xyxy, 'src': r.text, 'dst': r.translation,
                                'container': r.bubble_idx, 'container_box': r.bubble_box,
-                               'branch': r.render_branch, 'font_px': r.render_font_px,
+                               'branch': r.render_branch, 'font_src_px': r.font_size,
+                               'font_px': r.render_font_px,
                                'dst_box': r.render_dst_box} for r in page.regions],
                   'dropped': page.dropped, 'errors': page.errors,
                   'timing_ms': {'wall': round(wall_ms), **{k: round(v) for k, v in timings.stages.items()}}}
