@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 9 — the SFX rescue now serves: 20 localized SFX over 39 pages (#881) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Full corpus replay (`_r2`, 39 pages) after the budget fix: **0 -> 20 `sfx_display` regions on 13 pages** — วูบ · ฟู่ · ฟึ่บ · วืด · ฟาด · แวบ · ซ่า · เป๊าะ · กึกกัก — where the raw Japanese art used to stay. No dialogue region changed; spill/small_font 0; overlap unchanged (Chainsaw p0 + Mieruko p0 = the #883 stacked-credit class). Benchmark `2026-10-22-881-rescued-sfx.*`.
+- The four regions that vanished were single JP glyphs the translator had transliterated (`刀`->`ดาบ`, `才`->`ซาย`, `ザワ`->`ซาวา`, `平ク`->`เฮย์ระคุ`) — now the rescued Thai SFX.
+- **Doctor false positive fixed twice**: the display branch first (`8a326900`), then the real signal — the patches payload carries an additive `sfx_rescued` key and the implausible-region probe skips it (`b8d5d8aa`), so a rescued SFX inside a balloon is no longer a detection error. Replay mode still flags recorded SFX (the replay feeds the recorded dst, so no live flag) — documented.
+- **`_r2` is the new scoreboard**: 39 pages, failures only `merge` (pre-existing split-container class), `render` (Chainsaw/Mieruko, #883), `detect` on huge art glyphs / recorded SFX.
+- **Harness notes:** (a) the corpus replay must NOT pass `--source ENG` for the `corpus` set — it enables the source-language filter and drops Japanese title art, which produced phantom "removed regions" in the first baseline; (b) rescue counts vary 20-22 between runs because the rescue is a live model call.
+
 ## MIT quality loop, round 8 — credit-block overlap traced to the readable floor (#883, no code change) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
