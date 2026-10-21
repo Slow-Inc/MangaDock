@@ -77,6 +77,26 @@
 
 ---
 
+## #874 Studio and community custom selects work by keyboard (2026-10-21)
+
+**What:** `StudioSelect` (Studio upload/works/wallet/account), `CountrySelect` (Studio account) and `MangaSearchSelector`
+(community composer tag picker) closed only on an outside mouse click and exposed no state. They now use
+`usePopoverDismiss` from #870 (Escape closes, focus back to the trigger; Escape inside a dialog stays the dialog's), carry
+`aria-expanded` + `aria-controls` (the two search inputs as `role="combobox"` + `aria-autocomplete="list"`), mark the chosen
+option `aria-current`, and keep a closing panel `inert`. Found on the way: choosing an option unmounted the focused button and
+dropped focus to `<body>` — focus now goes to the trigger (selects) or to the chip's new "เอาแท็ก … ออก" button / back to the
+input (tag picker). The two inputs open on click, typing or ArrowDown instead of on focus, so returning focus to them does not
+reopen the list. The tag picker's label is linked to its input and its clear button is named.
+
+**Validated:** production build, signed in (local session; tag-search results stubbed, backend not running), keyboard
+only: Studio language select and country combobox — focus alone keeps them closed, Enter/ArrowDown opens, Tab enters the
+list, Escape closes with focus on the trigger, choosing leaves focus on the trigger showing the choice, reopening marks it
+`aria-current`, mouse open/outside-close unchanged; tag picker — typing opens, Escape closes the list but not the composer,
+choose → focus on "เอาแท็ก One Piece ออก", clear → focus on the input. tsc 0; eslint 0 on all three (as main); `bun test`
+436 pass. TDD n-a: wiring of the hook tested in #870; no logic of its own.
+
+---
+
 ## #870 Navbar popovers close by keyboard (2026-10-21)
 
 **What:** the categories menu (`Navbar`), notifications (`NotificationBell`) and user menu (`NavbarActions`) closed only on an

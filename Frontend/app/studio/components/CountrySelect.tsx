@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback, useId } from "react";
 import { COUNTRIES } from "../lib/countries";
 import { useModalTransition } from "../../hooks/useModalTransition";
+import { usePopoverDismiss } from "../../hooks/popoverDismiss";
 
 interface CountrySelectProps {
   value: string;
@@ -22,7 +23,9 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
 
   const [search, setSearch] = useState(() => labelForValue(value));
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
 
   const filtered = COUNTRIES.filter(c => 
     c.label.toLowerCase().includes(search.toLowerCase()) || 
@@ -47,28 +50,40 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
     setOpen(false);
   }, [labelForValue, value]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        closeDropdown();
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [closeDropdown]);
+  // Outside click or Escape closes; Escape returns focus to the input (#874)
+  usePopoverDismiss(isOpen, containerRef, () => closeDropdown());
+
+  const choose = (label: string) => {
+    onChange(label);
+    closeDropdown(label);
+    inputRef.current?.focus(); // the chosen button unmounts with the panel (#874)
+  };
 
   return (
     <div ref={containerRef} className="relative w-full">
       <div className="relative">
         <input
+          ref={inputRef}
           type="text"
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          aria-autocomplete="list"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
             if (!isOpen) openDropdown();
           }}
-          onFocus={() => {
+          // Opens on click, typing or ArrowDown — not on focus, so returning focus here after a choice or Escape
+          // does not reopen the list (#874)
+          onClick={() => {
             if (!isOpen) openDropdown();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown" && !isOpen) {
+              e.preventDefault();
+              openDropdown();
+            }
           }}
           placeholder={placeholder}
           className={`w-full rounded-xl border px-3 py-2.5 text-sm transition-all duration-200 ${
@@ -87,6 +102,8 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
       {renderPanel && (
         <div
           ref={listRef}
+          id={panelId}
+          inert={!isOpen} // still mounted while it fades out
           className={`absolute left-0 right-0 z-50 overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_18px_40px_-16px_rgb(0_0_0/.3)] transition-all duration-200 ease-in-out ${
             dropUp ? "bottom-full mb-1.5 origin-bottom-left" : "top-full mt-1.5 origin-top-left"
           } ${
@@ -105,10 +122,8 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
                   <button
                     key={country.code}
                     type="button"
-                    onClick={() => {
-                      onChange(country.label);
-                      closeDropdown(country.label);
-                    }}
+                    aria-current={isSelected ? "true" : undefined}
+                    onClick={() => choose(country.label)}
                     className={`flex w-full items-center justify-between px-4 py-3 text-sm transition hover:bg-fill ${
                       isSelected ? "text-accent" : "text-ink-2 hover:text-ink"
                     }`}
@@ -127,10 +142,7 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
                 ไม่พบข้อมูลประเทศ &ldquo;{search}&rdquo;
                 <button
                   type="button"
-                  onClick={() => {
-                    onChange(search);
-                    closeDropdown(search);
-                  }}
+                  onClick={() => choose(search)}
                   className="block mx-auto mt-2 text-accent font-bold hover:underline"
                 >
                   ใช้ค่านี้แทน

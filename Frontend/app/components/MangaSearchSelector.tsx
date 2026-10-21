@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useId } from "react";
 import Image from "next/image";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import type { LandingBook } from "../lib/types";
 import Loader from "./ui/Loader";
 import { inputClass } from "./ui/Input";
+import { usePopoverDismiss } from "../hooks/popoverDismiss";
 
 interface MangaSearchSelectorProps {
   onSelect: (manga: LandingBook | null) => void;
@@ -18,6 +19,13 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
   const [searching, setSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const clearRef = useRef<HTMLButtonElement>(null);
+  // Choosing swaps the input for the chip (and clearing swaps back), so the focused control unmounts; move focus
+  // to its replacement once it renders (#874).
+  const focusAfterSwap = useRef<"clear" | "input" | null>(null);
+  const inputId = useId();
+  const panelId = useId();
 
   const searchManga = useCallback(async (q: string) => {
     if (!q.trim()) {
@@ -55,15 +63,14 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
     return () => clearTimeout(timer);
   }, [query, searchManga]);
 
+  // Outside click or Escape closes; Escape returns focus to the input (#874)
+  usePopoverDismiss(showDropdown, containerRef, () => setShowDropdown(false));
+
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    const target = focusAfterSwap.current === "clear" ? clearRef.current : focusAfterSwap.current === "input" ? inputRef.current : null;
+    focusAfterSwap.current = null;
+    target?.focus();
+  }, [selectedManga]);
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -71,7 +78,7 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
         <svg className="w-3.5 h-3.5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
         </svg>
-        <label className="block text-[10px] font-black text-ink-3 uppercase">แท็กมังงะ (เลือกได้ 1 เรื่อง)</label>
+        <label htmlFor={inputId} className="block text-[10px] font-black text-ink-3 uppercase">แท็กมังงะ (เลือกได้ 1 เรื่อง)</label>
       </div>
       
       {selectedManga ? (
@@ -85,8 +92,12 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
               <p className="text-[10px] text-ink-3 truncate font-bold uppercase">{selectedManga.authors[0] || "Unknown Artist"}</p>
             </div>
           </div>
-          <button 
+          <button
+            ref={clearRef}
+            type="button"
+            aria-label={`เอาแท็ก ${selectedManga.title} ออก`}
             onClick={() => {
+              focusAfterSwap.current = "input";
               onSelect(null);
               setQuery("");
             }}
@@ -100,13 +111,20 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
       ) : (
         <div className="relative">
           <input
+            ref={inputRef}
+            id={inputId}
             type="text"
+            role="combobox"
+            aria-expanded={showDropdown && (query.length >= 2 || results.length > 0)}
+            aria-controls={panelId}
+            aria-autocomplete="list"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setShowDropdown(true);
             }}
-            onFocus={() => setShowDropdown(true)}
+            // Opens on click or typing — not on focus, so focus returned here does not reopen the list (#874)
+            onClick={() => setShowDropdown(true)}
             placeholder="พิมพ์ชื่อมังงะเพื่อแท็กในโพสต์..."
             className={inputClass}
           />
@@ -122,13 +140,15 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
           </div>
 
           {showDropdown && (query.length >= 2 || results.length > 0) && (
-            <div className="absolute z-50 top-full mt-2 w-full bg-surface/95 border border-line rounded-2xl shadow-2xl overflow-hidden backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+            <div id={panelId} className="absolute z-50 top-full mt-2 w-full bg-surface/95 border border-line rounded-2xl shadow-2xl overflow-hidden backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 duration-300">
               {results.length > 0 ? (
                 <div className="p-1.5">
                   {results.map((manga) => (
                     <button
                       key={manga.id}
+                      type="button"
                       onClick={() => {
+                        focusAfterSwap.current = "clear";
                         onSelect(manga);
                         setShowDropdown(false);
                         setQuery("");
