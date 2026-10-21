@@ -3,6 +3,21 @@
 
 ---
 
+## #858 Server renders stop waiting on a hung backend (2026-10-21)
+
+**What:** `/book/[id]/reviews` is server-rendered and awaited two backend calls with no timeout; with the backend's upstream
+hung, the page did not render within 120 s. `lib/reviewsFetch.ts` (moved out of the page, `fetch` injectable) passes
+`AbortSignal.timeout(SERVER_FETCH_TIMEOUT_MS)` (8 s, `lib/serverFetch.ts`), so a hung backend lands in the existing
+"no reviews" fallback. The home page's landing fetch gets the same signal, landing in its cached-landing fallback on a cold
+cache. The two API routes (`img-proxy`, `docs/github`) are not page renders and are left as they are.
+
+**Validated:** `reviewsFetch.test.ts` red → green (hanging fetch → fallback in < 1 s at a 50 ms timeout; healthy backend →
+both URLs and parsed results). Production build, with the backend's `/reviews/:id/summary` still not answering in 10 s: the
+reviews page returns 200 in 8.06 s with the empty state and title "รีวิว · MangaDock"; direct reviews → /new → Back keeps
+"รีวิว · MangaDock" (the #855 path its review raised); home 200. tsc 0; eslint on touched files: the one warning is on main.
+
+---
+
 ## #855 Every page names itself in the tab (2026-10-21)
 
 **What:** all routes shared the root title "MangaDock by Hayate | Manga Streaming Platform" (WCAG 2.4.2). Almost every
