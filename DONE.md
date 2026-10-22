@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 36 — found real Japanese pages in the app uploads: the JP→TH production path is unevaluated (#897) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `Backend/uploads/chapters/752fc515-…/` holds **two real Japanese chapter pages** (vertical JP text) uploaded through the app — production-language material for the first time, since every prior experiment used EN scanlation pages.
+- Smoke run (`JP→TH`, both pages): the pipeline works but the output shows (1) **Thai squeezed into the source's vertical-column width** — 4-7 chars per line instead of filling the bubble as an official Thai edition would; (2) **an inverted translation**: `でも可愛くないなコイツ` ("this kid isn't cute") rendered `แต่เด็กนี่น่ารักดีนะ` ("cute").
+- Filed **#897** with the evidence figure and a two-step plan: build a JP→TH smoke set + source-agnostic judge first, then fix the vertical-source layout for horizontal-only target scripts (same idea as `clean_layout` for EN), verified on the real pages with no EN regression.
+- Follows the #896 finding: translation conclusions so far measure EN→TH only; this is the missing JP set's first material.
+
 ## MIT quality loop, round 35 — few-shot Thai sample A/B: built-in JP→TH wins, and the eval-set language gap (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
