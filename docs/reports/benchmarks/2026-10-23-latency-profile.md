@@ -67,3 +67,24 @@ rendered text from the page. The whole experiment was reverted (uncommitted); no
 Revised design for #1051 if it is revisited: run the **real** `_filter_regions_by_source_lang` early (same
 predicate, not a script heuristic) and gate on byte-identical replay across a corpus that includes Kage p1; if the
 only safe version changes the model's line set, an A/B with the judge is required before any default decision.
+## #1051 second attempt: the REAL filter early — still not equivalent (reverted)
+
+Replaced the script heuristic with the real `_filter_regions_by_source_lang` run once at the front stage (and the
+finish stage reuses it, so langdetect cannot flip between two calls). Replay A/B:
+
+| page | early filter | rendered PNG |
+|---|---|---|
+| Boku p0 | translated 12 (dropped 5 of 17) | byte-identical |
+| Otome p0 | translated 10 (dropped 1) | byte-identical |
+| Kage p0 | translated 7 (dropped 2) | byte-identical |
+| JP probed as ENG | translated 0 | byte-identical (both empty) |
+| **Kage p1** | translated 8 (dropped 4) | different — that run had `[replay] 2/8 texts unseen` (live fallback sampling) |
+| **Kage p1, fresh dump replay** | translated 8 | different — off arm 0 unseen, on arm **1/8 unseen**: the early filter runs *before* `_strip_source_noise`, so the kept regions' translation texts are not the same strings the dump recorded |
+
+**Verdict:** the early filter must sit **after** `_strip_source_noise` and before the translation dispatch to be
+equivalent; that is a deeper restructure of `_run_text_translation` than this experiment, and the measured upside
+is modest (translation tokens only; latency is dominated by the gateway round-trip). Reverted — no code shipped.
+
+Parked on #1051. The mask/inpaint overlap (#1050) remains blocked on it. Next step if revisited: move the filter
+between strip-noise and `_dispatch_with_context`, then gate on a fresh-dump replay with **0 unseen** on every page
+in the sample (the only clean A/B shape for this kind of change).

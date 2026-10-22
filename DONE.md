@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 80 — #1051 second design (real filter early) also not equivalent; experiment reverted (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Second attempt: run the **real** `_filter_regions_by_source_lang` at the front stage and reuse it in `_finish_patches` (so langdetect cannot flip between calls). Replay A/B: byte-identical on Boku p0, Otome p0, Kage p0 and the JP-probed-as-ENG page; **Kage p1 differed with `[replay] 2/8 texts unseen`** (live fallback sampling confound).
+- Re-tested with a **fresh dump**: off arm 0 unseen, on arm **1/8 unseen** — the early filter runs *before* `_strip_source_noise`, so the kept regions' translation texts are not the strings the dump recorded. The change is not equivalent until the filter moves between strip-noise and the translation dispatch, which is a deeper restructure than this experiment.
+- Upside is modest (translation tokens; latency is gateway-dominated), so the experiment was **reverted (no code shipped)** and parked on #1051 with the exact next design and the fresh-dump/0-unseen A/B requirement. #1050's overlap stays blocked on it.
+
 ## MIT quality loop, round 79 — #1051 early source-lang drop: tried, proved output-changing, reverted (negative result) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
