@@ -126,9 +126,13 @@ export class UsersController {
     @Body() body: { filename: string },
   ) {
     const uid = req[USER_KEY].uid;
-    const filename = body?.filename ?? '';
-    // Safety: filename must start with the user's uid to prevent deleting other users' files
-    if (!filename || !filename.startsWith(`${uid}_`)) {
+    const filename = typeof body?.filename === 'string' ? body.filename : '';
+    // Only the shape uploadAvatar generates (`<uid>_<Date.now()><ext>`): the user's own file, and never a path that
+    // could leave uploads/avatars (#1007)
+    const stamp = filename.startsWith(`${uid}_`)
+      ? filename.slice(uid.length + 1)
+      : '';
+    if (!/^\d+\.[a-z0-9]{2,5}$/i.test(stamp)) {
       throw new BadRequestException('Invalid filename');
     }
     const key = `uploads/avatars/${filename}`;

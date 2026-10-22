@@ -77,6 +77,27 @@
 
 ---
 
+## #1007 Avatar delete accepts only a generated filename; the disk provider contains relative keys (2026-10-23)
+
+**What (security, class only):** `DELETE /users/me/avatar` built a storage key under `uploads/avatars/` from the body's
+`filename`, checking only that it started with `<uid>_`. The disk storage provider joined relative keys onto its root
+without checking that the result stayed inside, so the prefix check was the only guard. Two layers now:
+- the route accepts only the shape `uploadAvatar` generates, `<uid>_<digits>.<ext>`;
+- `DiskStorageProvider.getAbsPath` refuses a relative key that resolves outside `rootDir`, for every method; absolute
+  keys from in-process callers are unchanged.
+
+No frontend code calls this route.
+
+**Validated:** Jest red (11) → green:
+- `users/users.avatar-delete.spec.ts`: separator, parent segment, backslash, no extension, a non-numeric stamp,
+  another user and empty are all rejected; the generated shape is deleted;
+- `disk-storage.provider.spec.ts`: delete, deleteDir, exists, get, put and a nested climb refuse a key outside the root;
+  in-root relative and absolute keys still work. The traversal targets don't exist, so the red run deleted nothing.
+
+users and storage suites pass (159). eslint: only the existing `options` unused-var error in the provider.
+
+---
+
 ## #1004 Admin tables: one request per debounced filter change, and only the latest answer writes (2026-10-23)
 
 **What:** in `/admin/users`, `/admin/transactions` and `/admin/content`, the page effect depended on the loader, a

@@ -98,4 +98,36 @@ describe('DiskStorageProvider', () => {
     await provider.ensureDir(dir);
     expect(fs.existsSync(dir)).toBe(true);
   });
+
+  // #1007: a relative key must stay inside the provider's root (process.cwd()). Targets below do not exist, so a
+  // run against unfixed code deletes nothing.
+  describe('relative keys are contained in the root (#1007)', () => {
+    const outside = `../__md_containment_probe_${process.pid}__/nope.bin`;
+
+    it.each([
+      ['delete', () => provider.delete(outside)],
+      ['deleteDir', () => provider.deleteDir(outside)],
+      ['exists', () => provider.exists(outside)],
+      ['get', () => provider.get(outside)],
+      ['put', () => provider.put(outside, Buffer.from('x'))],
+      [
+        'a nested climb',
+        () => provider.delete('uploads/avatars/u1_/../../../../__md_probe__/x'),
+      ],
+    ])('%s refuses a key that resolves outside the root', async (_m, call) => {
+      await expect(call()).rejects.toThrow(/outside the storage root/);
+    });
+
+    it('a relative key inside the root still works', async () => {
+      await expect(
+        provider.exists(`uploads/__md_probe_${process.pid}__.bin`),
+      ).resolves.toBe(false);
+    });
+
+    it('absolute keys keep their behaviour', async () => {
+      const key = abs('a.txt');
+      await provider.put(key, Buffer.from('ok'));
+      await expect(provider.exists(key)).resolves.toBe(true);
+    });
+  });
 });
