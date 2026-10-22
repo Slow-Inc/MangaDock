@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type Lenis from "lenis";
 import TopupModal from "./TopupModal";
 import { useChapterUnlock } from "../hooks/useChapterUnlock";
@@ -167,6 +167,7 @@ export default function ChapterList({
   const [loadingChapters, setLoadingChapters] = useState(true);
   const [langFilter, setLangFilter] = useState<string>("all");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const groupIdBase = useId(); // a popup can open over another popup: keep group ids unique per list
 
   const highlightChapterRef = useRef<HTMLButtonElement>(null);
   const chaptersListScrollRef = useRef<HTMLDivElement>(null);
@@ -363,7 +364,7 @@ export default function ChapterList({
                 groupMap.get(key)!.push(ch);
               }
 
-              return Array.from(groupMap.entries()).map(([chNum, grp]) => {
+              return Array.from(groupMap.entries()).map(([chNum, grp], groupIndex) => {
                 if (grp.length === 1) {
                   return (
                     <ChapterRowInner
@@ -385,6 +386,9 @@ export default function ChapterList({
                 return (
                   <div key={groupKey}>
                     <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={`${groupIdBase}-${groupIndex}`} // by index: user chapter numbers are free text
                       onClick={() =>
                         setExpandedGroups((prev) => {
                           const next = new Set(prev);
@@ -435,6 +439,8 @@ export default function ChapterList({
                       </svg>
                     </button>
                     <div
+                      id={`${groupIdBase}-${groupIndex}`}
+                      inert={!isOpen} // collapsed is only 0fr: keep its rows out of the Tab order (#952)
                       className="grid transition-all duration-300 ease-in-out"
                       style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
                     >
