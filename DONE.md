@@ -77,6 +77,27 @@
 
 ---
 
+## #985 A favourite or like the server refused stays pending and retries — an un-favourite no longer comes back (2026-10-22)
+
+**What:** `userCache.flush()` awaited raw `fetch` calls (which resolve on a 4xx/5xx) and then marked every item synced.
+A refused add was never re-sent. A refused removal was recorded as done while the server kept the row, so the next
+login's merge (which re-adds server favourites missing locally) brought the book back. Nothing retried. It also marked
+toggles made while a flush was in flight as synced. Now each request marks only its own item, and only on `res.ok`,
+applied after the logout-generation check. A failed item stays pending, and a flush with any failure retries on its
+own after `RETRY_DELAY` (30 s).
+
+**Validated:** bun test `lib/userCache.test.ts`, red (4) → green (6):
+- add 500 → pending, then re-sent and marked;
+- removal 500 → pending, then the DELETE is re-sent;
+- a mixed batch re-sends only the failed item;
+- a failed flush retries by itself, and a successful one schedules nothing.
+
+`identityReset.test.ts` still passes. Full suite: 474 pass; 8 fail in `docs.integration.test.ts`, which needs a live
+server on :4000 (none was running). tsc clean, and eslint is clean on both main and the branch. Not checked
+in a browser: the module has no UI of its own, and a real sync needs a signed-in session.
+
+---
+
 ## #983 Three more places no longer cache a failed load (hero read button, community manga header, studio title) (2026-10-22)
 
 **What:** a sweep of every `cacheOrFetch` call site after #981 found three fetchers that resolved on a non-ok answer, so

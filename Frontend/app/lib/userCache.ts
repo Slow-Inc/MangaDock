@@ -6,6 +6,8 @@
  *  2. A debounce timer (FLUSH_DELAY ms) is reset on each change.
  *  3. After FLUSH_DELAY with no new changes, all pending diffs are flushed
  *     to the backend in parallel.
+ *     Only a request the server stored marks its item synced; a refused one stays
+ *     pending and the flush retries after RETRY_DELAY (#985).
  *  4. On login (AuthContext calls loadUserData), server state is fetched
  *     and merged — local additions are preserved, remote state wins for removals.
  */
@@ -19,6 +21,7 @@ const LS_LIKED = "mb_liked";
 const LS_FAV_SYNCED = "mb_fav_synced"; // IDs known to be synced to server
 const LS_LIKED_SYNCED = "mb_liked_synced";
 const FLUSH_DELAY = 5_000; // ms to wait before syncing
+const RETRY_DELAY = 30_000; // a sync the server refused retries on its own, slower than the debounce (#985)
 
 export const CACHE_EVENT = "mb-cache-updated";
 
@@ -115,44 +118,49 @@ async function flush() {
 
   if (!toAddFav.length && !toRemoveFav.length && !toAddLike.length && !toRemoveLike.length) return;
 
-  try {
-    await Promise.all([
-      ...toAddFav.map((b) =>
-        fetch(`${API_BASE}/users/me/favorites`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            id: b.id,
-            title: b.title,
-            thumbnail: b.thumbnail,
-            authors: b.authors ?? [],
-            description: b.description ?? "",
-            categories: b.categories ?? [],
-            publishedDate: b.publishedDate ?? "",
-            averageRating: b.averageRating ?? 0,
-            ratingsCount: b.ratingsCount ?? 0,
-          }),
-        })
-      ),
-      ...toRemoveFav.map((id) =>
-        fetch(`${API_BASE}/users/me/favorites/${id}`, { method: "DELETE", headers })
-      ),
-      ...toAddLike.map((id) =>
-        fetch(`${API_BASE}/users/me/liked/${id}`, { method: "POST", headers })
-      ),
-      ...toRemoveLike.map((id) =>
-        fetch(`${API_BASE}/users/me/liked/${id}`, { method: "DELETE", headers })
-      ),
-    ]);
+  // fetch resolves on a 4xx/5xx too: only a request the server stored marks its own item synced, and the
+  // rest stay pending for the next flush (#985)
+  const stored = (req: Promise<Response>) => req.then((r) => r.ok, () => false);
+  const [favAdded, favRemoved, likeAdded, likeRemoved] = await Promise.all([
+    Promise.all(
+      toAddFav.map((b) =>
+        stored(
+          fetch(`${API_BASE}/users/me/favorites`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              id: b.id,
+              title: b.title,
+              thumbnail: b.thumbnail,
+              authors: b.authors ?? [],
+              description: b.description ?? "",
+              categories: b.categories ?? [],
+              publishedDate: b.publishedDate ?? "",
+              averageRating: b.averageRating ?? 0,
+              ratingsCount: b.ratingsCount ?? 0,
+            }),
+          })
+        )
+      )
+    ),
+    Promise.all(toRemoveFav.map((id) => stored(fetch(`${API_BASE}/users/me/favorites/${id}`, { method: "DELETE", headers })))),
+    Promise.all(toAddLike.map((id) => stored(fetch(`${API_BASE}/users/me/liked/${id}`, { method: "POST", headers })))),
+    Promise.all(toRemoveLike.map((id) => stored(fetch(`${API_BASE}/users/me/liked/${id}`, { method: "DELETE", headers })))),
+  ]);
 
-    if (generation !== cacheGeneration) return;
-    // Mark synced
-    syncedFavorites = new Set(favorites.keys());
-    syncedLiked = new Set(liked);
+  // Applied only now, so a request that finishes after a logout never writes into the next user's state
+  if (generation !== cacheGeneration) return;
+  toAddFav.forEach((b, i) => favAdded[i] && syncedFavorites.add(b.id));
+  toRemoveFav.forEach((id, i) => favRemoved[i] && syncedFavorites.delete(id));
+  toAddLike.forEach((id, i) => likeAdded[i] && syncedLiked.add(id));
+  toRemoveLike.forEach((id, i) => likeRemoved[i] && syncedLiked.delete(id));
+  try {
     localStorage.setItem(LS_FAV_SYNCED, JSON.stringify([...syncedFavorites]));
     localStorage.setItem(LS_LIKED_SYNCED, JSON.stringify([...syncedLiked]));
-  } catch {
-    // Network error — retry on next change
+  } catch { /* quota exceeded — the in-memory state still holds */ }
+
+  if ([favAdded, favRemoved, likeAdded, likeRemoved].flat().includes(false) && !flushTimer) {
+    flushTimer = setTimeout(flush, RETRY_DELAY);
   }
 }
 
