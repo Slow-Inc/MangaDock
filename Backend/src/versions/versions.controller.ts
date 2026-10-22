@@ -16,6 +16,7 @@ import { OptionalAuthGuard } from '../auth/optional-auth.guard';
 import { VersionsService } from './versions.service';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 import type { VersionStatus } from './versions.types';
+import { CreateVersionDto, UpdateVersionMetadataDto } from './version.dto';
 
 @Controller('versions')
 export class VersionsController {
@@ -78,18 +79,7 @@ export class VersionsController {
   @UseGuards(AuthGuard)
   createVersion(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body()
-    body: {
-      titleId: string;
-      titleName: string;
-      titleAltName?: string;
-      chapterId: string;
-      chapterNumber: string;
-      chapterTitle: string;
-      language: string;
-      description?: string;
-      priceCoins?: number;
-    },
+    @Body() body: CreateVersionDto,
   ) {
     const token = req[USER_KEY];
     return this.versions.createVersion({
@@ -105,14 +95,7 @@ export class VersionsController {
   updateMetadata(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('versionId') versionId: string,
-    @Body()
-    body: {
-      description?: string;
-      priceCoins?: number;
-      titleAltName?: string;
-      chapterTitle?: string;
-      chapterNumber?: string;
-    },
+    @Body() body: UpdateVersionMetadataDto,
   ) {
     return this.versions.updateMetadata(versionId, req[USER_KEY].uid, body);
   }
