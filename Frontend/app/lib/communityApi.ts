@@ -229,7 +229,8 @@ export async function deletePost(id: string): Promise<void> {
     method: "DELETE",
     headers: createAuthHeaders(token),
   });
-  if (!res.ok) throw new Error("Failed to delete post");
+  // 404: already deleted (another tab, a moderator) — for a delete that is done (#1023)
+  if (!res.ok && res.status !== 404) throw new Error("Failed to delete post");
   cacheInvalidate(`post:${id}`, `comments:${id}`);
   cacheClearByTag('forum_posts');
 }
@@ -242,7 +243,7 @@ export async function deleteComment(id: string, postId?: string): Promise<void> 
     method: "DELETE",
     headers: createAuthHeaders(token),
   });
-  if (!res.ok) throw new Error("Failed to delete comment");
+  if (!res.ok && res.status !== 404) throw new Error("Failed to delete comment");
   if (postId) cacheInvalidate(`comments:${postId}`);
 }
 

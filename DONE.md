@@ -77,6 +77,22 @@
 
 ---
 
+## #1023 Editing or deleting already-deleted forum content is a 404 (2026-10-23)
+
+**What:** `updatePost`, `updateComment`, `deletePost` and `deleteComment` looked their row up without a `deleted_at`
+filter. On the author's already-deleted content, `updatePost` wrote the edit and then answered 404 (its `getPost`
+re-read filters deleted posts), `updateComment` wrote and answered 200, and a second delete overwrote the original
+`deleted_at` and broadcast again. The four lookups now filter `deleted_at IS NULL`: a 404 before any write. Frontend
+`communityApi.deletePost` / `deleteComment` treat that 404 as done (content deleted in another tab or by a moderator), so
+a stale tab clears its cache instead of showing "delete failed".
+
+**Validated:** Backend Jest red (4) → green with a mock that answers like the database (the deleted row is found only
+when the query does not exclude it): each of the four is a 404 with no update and no broadcast. Forum suites 78/78.
+Frontend `communityApi.delete.test.ts` red (2) → green: a 404 resolves and clears the cache; a 503 still throws and
+keeps it. Real tsc clean both sides; eslint equal to main.
+
+---
+
 ## #1020 A comment vote needs the comment's post to be live (2026-10-23)
 
 **What:** after #1019 a vote must target a live comment, but `deletePost` does not cascade `deleted_at` to the

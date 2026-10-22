@@ -509,6 +509,7 @@ export class ForumService {
       .from('forum_posts')
       .select('author_uid')
       .eq('id', id)
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
       .single();
 
     if (fetchErr || !existing) lookupFailure(fetchErr, 'Post not found');
@@ -535,6 +536,7 @@ export class ForumService {
       .from('forum_comments')
       .select('author_uid, post_id')
       .eq('id', id)
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
       .single();
 
     if (fetchErr || !existing) lookupFailure(fetchErr, 'Comment not found');
@@ -569,6 +571,7 @@ export class ForumService {
       .from('forum_posts')
       .select('author_uid')
       .eq('id', id)
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
       .single();
 
     if (fetchErr || !existing) lookupFailure(fetchErr, 'Post not found');
@@ -612,6 +615,7 @@ export class ForumService {
       .from('forum_comments')
       .select('author_uid')
       .eq('id', id)
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
       .single();
 
     if (fetchErr || !existing) lookupFailure(fetchErr, 'Comment not found');

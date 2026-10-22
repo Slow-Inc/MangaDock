@@ -715,3 +715,44 @@ describe('ForumService.getPublicProfile', () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });
+
+// #1023: edits and deletes looked their row up without a deleted_at filter, so they wrote to already-deleted content
+describe('ForumService — writes on already-deleted content (#1023)', () => {
+  // A deleted row, as the database answers it: found only when the query does not exclude deleted rows
+  function deletedRowChain() {
+    let excludesDeleted = false;
+    const chain = buildMockChain();
+    chain.is.mockImplementation((col: string, val: unknown) => {
+      if (col === 'deleted_at' && val === null) excludesDeleted = true;
+      return chain;
+    });
+    chain.single.mockImplementation(() =>
+      Promise.resolve(
+        excludesDeleted
+          ? { data: null, error: { code: 'PGRST116', message: '0 rows' } }
+          : { data: { author_uid: 'u1', post_id: 'p1' }, error: null },
+      ),
+    );
+    return chain;
+  }
+
+  it.each([
+    [
+      'updatePost',
+      (s: ForumService) => s.updatePost('u1', 'p1', { content: 'x' } as any),
+    ],
+    [
+      'updateComment',
+      (s: ForumService) => s.updateComment('u1', 'c1', { content: 'x' } as any),
+    ],
+    ['deletePost', (s: ForumService) => s.deletePost('u1', 'p1')],
+    ['deleteComment', (s: ForumService) => s.deleteComment('u1', 'c1')],
+  ])('%s is a 404 with no write and no broadcast', async (_name, call) => {
+    const chain = deletedRowChain();
+    const service = makeService(() => chain);
+    mockForumEvents.broadcastPostEvent.mockClear();
+    await expect(call(service)).rejects.toBeInstanceOf(NotFoundException);
+    expect(chain.update).not.toHaveBeenCalled();
+    expect(mockForumEvents.broadcastPostEvent).not.toHaveBeenCalled();
+  });
+});
