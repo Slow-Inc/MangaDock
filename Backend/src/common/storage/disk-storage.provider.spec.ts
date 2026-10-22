@@ -99,35 +99,59 @@ describe('DiskStorageProvider', () => {
     expect(fs.existsSync(dir)).toBe(true);
   });
 
-  // #1007: a relative key must stay inside the provider's root (process.cwd()). Targets below do not exist, so a
-  // run against unfixed code deletes nothing.
+  // #1007: a relative key must stay inside the provider's root. The root is a temp dir (process.cwd is mocked), with
+  // a sentinel file in it and beside it, so even a build without the guard can only touch the temp tree.
   describe('relative keys are contained in the root (#1007)', () => {
-    const outside = `../__md_containment_probe_${process.pid}__/nope.bin`;
+    let root: string;
+    let contained: DiskStorageProvider;
+    let cwdSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      root = path.join(tmp, 'root');
+      fs.mkdirSync(path.join(root, 'uploads'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'sentinel.txt'), 'root');
+      fs.writeFileSync(path.join(tmp, 'outside.txt'), 'outside');
+      cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(root);
+      contained = new DiskStorageProvider();
+    });
+
+    afterEach(() => cwdSpy.mockRestore());
 
     it.each([
-      ['delete', () => provider.delete(outside)],
-      ['deleteDir', () => provider.deleteDir(outside)],
-      ['exists', () => provider.exists(outside)],
-      ['get', () => provider.get(outside)],
-      ['put', () => provider.put(outside, Buffer.from('x'))],
+      ['delete', () => contained.delete('../outside.txt')],
+      ['deleteDir', () => contained.deleteDir('../')],
+      ['deleteDir of the root itself', () => contained.deleteDir('uploads/..')],
+      ['exists', () => contained.exists('../outside.txt')],
+      ['get', () => contained.get('../outside.txt')],
+      ['put', () => contained.put('../outside.txt', Buffer.from('x'))],
       [
         'a nested climb',
-        () => provider.delete('uploads/avatars/u1_/../../../../__md_probe__/x'),
+        () => contained.delete('uploads/avatars/u1_/../../../../outside.txt'),
       ],
-    ])('%s refuses a key that resolves outside the root', async (_m, call) => {
+    ])('%s refuses a key outside the root', async (_m, call) => {
       await expect(call()).rejects.toThrow(/outside the storage root/);
+      expect(fs.readFileSync(path.join(tmp, 'outside.txt'), 'utf8')).toBe(
+        'outside',
+      );
+      expect(fs.existsSync(path.join(root, 'sentinel.txt'))).toBe(true);
+    });
+
+    it('a name that merely starts with two dots is not a climb', async () => {
+      await contained.put('..cache.bin', Buffer.from('x'));
+      await expect(contained.exists('..cache.bin')).resolves.toBe(true);
     });
 
     it('a relative key inside the root still works', async () => {
-      await expect(
-        provider.exists(`uploads/__md_probe_${process.pid}__.bin`),
-      ).resolves.toBe(false);
+      await contained.put('uploads/a.bin', Buffer.from('x'));
+      await expect(contained.get('uploads/a.bin')).resolves.toEqual(
+        Buffer.from('x'),
+      );
     });
 
     it('absolute keys keep their behaviour', async () => {
       const key = abs('a.txt');
-      await provider.put(key, Buffer.from('ok'));
-      await expect(provider.exists(key)).resolves.toBe(true);
+      await contained.put(key, Buffer.from('ok'));
+      await expect(contained.exists(key)).resolves.toBe(true);
     });
   });
 });

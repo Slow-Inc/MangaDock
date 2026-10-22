@@ -18,7 +18,12 @@ export class DiskStorageProvider implements StorageProvider {
     if (path.isAbsolute(key)) return key;
     const abs = path.resolve(this.rootDir, key);
     const rel = path.relative(this.rootDir, abs);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    if (
+      rel === '' ||
+      rel === '..' ||
+      rel.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(rel)
+    ) {
       throw new Error(`Storage key resolves outside the storage root: ${key}`);
     }
     return abs;

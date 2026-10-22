@@ -94,7 +94,14 @@ No frontend code calls this route.
 - `disk-storage.provider.spec.ts`: delete, deleteDir, exists, get, put and a nested climb refuse a key outside the root;
   in-root relative and absolute keys still work. The traversal targets don't exist, so the red run deleted nothing.
 
-users and storage suites pass (159). eslint: only the existing `options` unused-var error in the provider.
+users and storage suites pass (161). eslint: only the existing `options` unused-var error in the provider.
+
+**Review round (security-review + scrutinize, fix-then-ship):** the check is now `rel === '' || rel === '..' ||
+rel.startsWith('..' + sep) || isAbsolute(rel)`. A key resolving to the root itself is refused (`deleteDir` of it would
+wipe the working directory), and a name like `..cache` is no longer mistaken for a climb. The containment tests now
+run on a temp root (`process.cwd` mocked) with sentinel files. With the guard removed they fail 7/7 and touch only the
+temp tree. The first version targeted paths beside `Backend/` and, on the unguarded red run, `put` wrote a 1-byte
+probe file there (removed). The review also found the separate `/r2-patches` exposure (own issue).
 
 ---
 
