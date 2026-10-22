@@ -23,6 +23,14 @@ Corpus ใน repo เป็นหน้า scanlation **อังกฤษ** �
 ที่ฝังมาเป็น JP→TH) → ผล A/B คำแปลทั้งหมด (prompt v3 แพ้ 6-2, temperature 0 แพ้ 7-4, concise เสมอ 5-5,
 few-shot EN แพ้ 5-7) วัด path EN→TH เท่านั้น **ห้ามเหมาว่าใช้กับ JP→TH**
 
+## HEAD audit (2026-10-22, round 52)
+
+- EN→TH สดที่ HEAD: **113 segment, mean 1.55/2** (58% perfect / 40% minor / 3% broken) — baseline เดิม 1.51/372
+- JP→TH 2 หน้าจริง: **14 segment, mean 1.64/2**, inversion 0 (baseline 1.57 มี 1)
+- guard ที่เพิ่มในลูป (#898 negation, #901 runaway, #903 script leak) ไม่มีต้นทุนคุณภาพ
+- defect ที่เหลือเป็น **model ceiling**: stammer/fragment hallucination (`I- I DONT WANT THEM.` -> `ท้องไม่`, `W-` -> `ฉ-`) — guard แบบ deterministic จับไม่ได้
+- **ข้อจำกัด:** gateway มีโมเดลเดียว (`qwen3.8-27b-fp8`) → judge = translator; ไม่มี independent judge ใน environment นี้
+
 ## Null calibration (2026-10-22, #902)
 
 รัน config เดียวกันสองครั้งบน 11 หน้า (ต่างแค่ sampling) แล้ว judge แบบ blind: **โหวตระดับหน้า A 8 / B 3**, ระดับ
