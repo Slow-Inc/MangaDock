@@ -343,16 +343,27 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
     if (!turnstilePassed && !chapterId.startsWith("ver:")) return releaseScroll;
 
+    // The reader stays mounted across chapters: a late answer for the chapter we left must not land on this one,
+    // nor be written to reading history (#998)
+    const controller = new AbortController();
+    let cancelled = false;
+    const cleanup = () => {
+      cancelled = true;
+      controller.abort();
+      releaseScroll();
+    };
+
     // User-uploaded version: fetch pages from /versions/:versionId
     const isUserVersion = chapterId.startsWith("ver:");
     if (isUserVersion) {
       const versionId = chapterId.slice(4);
-      apiFetch(`${API_BASE}/versions/${versionId}`)
+      apiFetch(`${API_BASE}/versions/${versionId}`, { signal: controller.signal })
         .then((r) => {
           if (!r.ok) throw new Error("not ok");
           return r.json();
         })
         .then((ver: { pages?: string[]; backendAvailable?: boolean }) => {
+          if (cancelled) return;
           const pages = ver.pages ?? [];
           if (ver.backendAvailable === false || pages.length === 0) { setError(true); }
           else {
@@ -370,8 +381,11 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             }
           }
         })
-        .catch(() => { setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300); });
-      return releaseScroll;
+        .catch(() => {
+          if (cancelled) return;
+          setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300);
+        });
+      return cleanup;
     }
 
     const _pageParams = new URLSearchParams();
@@ -379,6 +393,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     if (mangaId) _pageParams.set("mangaId", mangaId);
     const _pageQuery = _pageParams.size > 0 ? `?${_pageParams.toString()}` : "";
     apiFetch(`${API_BASE}/books/chapters/${chapterId}/pages${_pageQuery}`, {
+      signal: controller.signal,
       headers: {
         'x-captcha-clearance': clearanceToken || '',
       }
@@ -392,6 +407,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
         return r.json();
       })
       .then((d: ChapterPages) => {
+        if (cancelled) return;
         // forceLocal mode: backend signals no pages are cached yet
         if (d.localCacheAvailable === false) {
           setNoCacheError(true);
@@ -411,9 +427,12 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           }
         }
       })
-      .catch(() => { setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300); });
+      .catch(() => {
+        if (cancelled) return;
+        setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300);
+      });
 
-    return releaseScroll;
+    return cleanup;
   }, [chapterId, turnstilePassed, clearanceToken, resetCaptcha, resetZoomAndPan]);
 
   const handleClose = () => { setVisible(false); setTimeout(onClose, 250); };

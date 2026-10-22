@@ -77,6 +77,20 @@
 
 ---
 
+## #998 The reader never shows (or records) the chapter it just left (2026-10-23)
+
+**What:** the reader stays mounted across chapters, and the effect that loads a chapter's pages never cancelled the
+previous request; its cleanup only released the scroll lock. When chapter A's pages answered after B's, the reader
+showed A's pages under B's header and wrote A to reading history, so "continue reading" reopened the wrong chapter. The
+effect now has an `AbortController` and a `cancelled` flag, and every `.then` and `.catch` returns early once superseded.
+
+**Validated:** production build + stand-in `READER_RACE=1` (chapter 1, an uploaded version, answers 2 s late), with a
+reader who has already passed the CAPTCHA (stored clearance token). Open chapter 1, then click "ตอนถัดไป" at ~35 ms.
+Main: counter `1 / 3`, image `p1`, history `ver:v1` (red). Fix: `1 / 2`, image `q1`, history `ver:v2` (green). The
+`reader-drawer` and `e2e919` probes still pass. Real tsc 0 errors; eslint matches main.
+
+---
+
 ## #995 Series follow, banner upload and banner position say when they fail (2026-10-23)
 
 **What:** three writes outside #987's list still failed silently. The series bell reverted correctly (#667) but with no
