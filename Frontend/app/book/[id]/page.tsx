@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Home from "../../page";
 import BookRouteModal from "../../components/BookRouteModal";
 import { SERVER_FETCH_TIMEOUT_MS } from "../../lib/serverFetch";
+import { stripMarkdown } from "../../lib/markdownText";
 import type { MangaDetail } from "../../lib/types/manga";
 
 const BACKEND = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
@@ -15,14 +16,16 @@ type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   try {
+    // Not kept by Next: the backend caches details itself, and an outage answer (200, no title) must not stick (#974)
     const r = await fetch(`${BACKEND}/books/manga/${encodeURIComponent(id)}`, {
-      next: { revalidate: 1800 },
       signal: AbortSignal.timeout(SERVER_FETCH_TIMEOUT_MS),
     });
     if (!r.ok) return {};
-    const { title, description } = (await r.json()) as MangaDetail;
+    const detail = (await r.json()) as MangaDetail;
+    const title = detail.title?.trim();
     if (!title) return {};
-    const blurb = description?.replace(/\s+/g, " ").trim().slice(0, 160) || undefined;
+    // MangaDex descriptions are markdown: the preview shows the text, not the [link](url) syntax
+    const blurb = stripMarkdown(detail.description).replace(/\s+/g, " ").trim().slice(0, 160) || undefined;
     return { title: `${title} · MangaDock`, description: blurb, openGraph: { title, description: blurb } };
   } catch {
     return {};
