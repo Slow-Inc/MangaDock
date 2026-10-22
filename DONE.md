@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 42 — a JP-specific prompt ties the shipped one; synthetic JP set built (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Built a **40-line manga-register Japanese evaluation set** (4 synthetic pages: particles/よ・ね・な・かな・ぞ, です/ます/敬語 registers, negations + idioms, fragments/names/SFX/omitted subjects) that the existing `translation_ab` harness can drive via fake `doctor.json` pages — the repo only has 14 real JP segments, this is the reusable surrogate.
+- A **Japanese-source prompt arm** (shipped v2 + a JP section: subject omission, final particles, trailing が/けど, politeness, idioms, onomatopoeia) A/B'd blind against the shipped prompt: **tie 2-2 page votes** → no default change.
+- Offline the arm is mixed: `うるせえな` and `仕方ないなあ` read more naturally, but a keigo line lost its polite `ครับ` and `お願いします！` turned into “sorry” — the politeness nuance the section was meant to protect, so the tie is not a hidden win.
+- Benchmark `2026-10-22-900-jp-prompt-ab.md`; JP arm YAML + the 40-line set kept for a future politeness-only attempt.
+
 ## MIT quality loop, round 41 — #899 corrected: the fill was dark, my "grey" reading was wrong; nothing shipped (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
