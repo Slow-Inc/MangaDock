@@ -211,6 +211,7 @@ function CommentThreadImpl({
             <VoteButtons
               targetType="comment"
               targetId={comment.id}
+              postId={comment.postId}
               initialUpvotes={comment.upvotes}
               initialDownvotes={comment.downvotes}
               initialUserVote={comment.userVote}

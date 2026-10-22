@@ -281,15 +281,26 @@ export async function vote(data: {
   targetType: 'post' | 'comment';
   targetId: string;
   voteValue: 1 | -1;
+  /** For a comment vote: the post whose cached comment list holds the old count. */
+  postId?: string;
 }) {
+  const { postId, ...body } = data;
   const token = await getAuthToken();
   if (!token) throw new Error("Unauthorized");
 
   const res = await fetch(`${API_BASE}/forum/vote`, {
     method: "POST",
     headers: createAuthHeaders(token, { "Content-Type": "application/json" }),
-    body: JSON.stringify(data),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Failed to vote");
+  // The cached copies still hold the old count and userVote: a click on one would send +1 again, which the server
+  // takes as an undo (#992)
+  if (data.targetType === 'post') {
+    cacheInvalidate(`post:${data.targetId}`);
+    cacheClearByTag('forum_posts');
+  } else if (postId) {
+    cacheInvalidate(`comments:${postId}`);
+  }
   return res.json() as Promise<{ upvotes: number; downvotes: number }>;
 }
