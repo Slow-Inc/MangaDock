@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 66 — JP render audit: vertical sources squeeze Thai to 50% font; concise does not fix it (#1006) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Font-size audit over 216 HEAD live regions: 176 are equal/upscaled, 3 are **<=0.6** — all JP vertical-source regions (worst `jp_chapter_p1` #5 at **20 px from 40 px**, at the font floor). Render metrics stay clean (overlap/spill/small_font 0), so it is readability, not overflow.
+- Tried `concise_bubbles` on the two JP pages: chars -12 % on p1 but the floor-bound region stayed 20/40, and p0's worst region got smaller (24->20) — the lever is layout, not translation length. Concise stays opt-in.
+- Filed **#1006** for the next experiment: opt-in `render.widen_vertical_columns` (grow the wrap width toward the bubble interior for floor-bound vertical-source regions), acceptance >=15 % font gain on the worst JP regions, overlap/spill 0, EN renders byte-identical, verified via deterministic replay.
+- Benchmark `2026-10-23-jp-render-font-audit.md`.
+
 ## MIT quality loop, round 65 — gate baseline over all HEAD live output + question-particle refinement (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
