@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 38 — a dropped Japanese negation is re-asked (#898) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The real JP→TH path inverted `可愛くない` in **2 of 4 runs** (`น่ารักดีนะ`) — sampling-driven. `translation_quality.negation_lost` flags a clause-final Japanese negation whose Thai output has no Thai negation marker, and the translator's existing retry loop re-asks it with an explicit "keep the negation" note.
+- Scope is deliberately **Japanese sources only**: the EN→TH path's idioms ("like there's no tomorrow") legitimately drop the word — the 372-region EN scan flagged exactly that idiom, so a source-agnostic check would only waste retries.
+- Evidence: unit tests + integration test (inverted reply -> re-ask -> correct, 2 gateway calls; EN source stays 1 call), and **5/5 real JP runs kept the negation** after the fix (2/4 inverted before). Gate **852 passed**.
+- Cost: only pages with a dropped negation pay a retry; the five JP runs measured translation 1.7-2.6 s, the same band as before.
+- Benchmark `2026-10-22-898-negation-guard.md`; #898 records it.
+
 ## MIT quality loop, round 37 — JP→TH baseline on real pages, repeatable (#897) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).

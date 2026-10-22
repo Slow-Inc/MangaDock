@@ -9,6 +9,7 @@ from manga_translator.translation_quality import (
     foreign_script,
     is_letter_name_spelling,
     is_oversized_art_glyph,
+    negation_lost,
     normalize_thai_marks,
 )
 
@@ -133,3 +134,21 @@ def test_a_repeated_mark_in_one_cluster_is_dropped_889():
 def test_valid_thai_and_other_text_are_untouched_889():
     for s in ('ที่', 'นี้', 'ก่', 'น้ำ', 'ภาษาไทย 100%', 'Hello ที่นี่', '调用', ''):
         assert normalize_thai_marks(s) == s
+
+
+def test_a_japanese_negation_missing_from_the_thai_is_flagged_898():
+    """Real JP->TH path: 可愛くない ("not cute") came out น่ารักดีนะ ("cute") in 2 of 4 runs."""
+    assert negation_lost('でも可愛くないなコイツ', 'แต่เด็กนี่น่ารักดีนะ', 'THA') is True
+    assert negation_lost('これは良くない', 'อันนี้ดี', 'THA') is True
+
+
+def test_a_kept_negation_is_not_flagged_898():
+    assert negation_lost('でも可愛くないなコイツ', 'แต่ไอ้นี่ไม่น่ารักเลยนะ', 'THA') is False
+    assert negation_lost('これは良くない', 'อันนี้ไม่ดี', 'THA') is False
+    assert negation_lost('行かない', 'ไม่ไป', 'THA') is False
+
+
+def test_english_idioms_and_clean_sources_are_not_flagged_898():
+    # EN->TH path hangs on idioms ('like there's no tomorrow' -> ราวกับวันสุดท้ายของชีวิต); only JP sources are checked
+    assert negation_lost("MEN HAVE BEEN FAWNING OVER ME LIKE THERES NO TOMORROW!", 'ผู้ชายต่างพากันหมกมุ่นกับฉันราวกับวันสุดท้ายของชีวิต!', 'THA') is False
+    assert negation_lost('可愛いな', 'น่ารักจัง', 'THA') is False

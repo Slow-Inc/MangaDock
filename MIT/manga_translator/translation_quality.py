@@ -193,3 +193,27 @@ def normalize_thai_marks(text: str) -> str:
             out.append(ch)
     flush()
     return ''.join(out)
+
+
+#: #898 — a Japanese clausal negation (measured on the real JP->TH path: 可愛くない came out as น่ารักดีนะ in
+#: 2 of 4 runs). Clause-final forms only: a bare ず/ぬ would match ordinary words like まず/はず.
+_JA_NEGATION = re.compile(r'(ない|ません|なかった|なかっ|じゃない|ではない|ありません|ないで|なくて|なく|ずに|まい)')
+_THAI_NEGATION = re.compile(r'(ไม่|ไม่ได้|ไม่ใช่|อย่า|ห้าม|ไม่เคย|มิได้|ไร้)')
+_JA_CHARS = re.compile(r'[\u3040-\u30FF\u4E00-\u9FFF]')
+
+
+def negation_lost(src: str, dst: str, target: str = 'THA') -> bool:
+    """True when a JAPANESE source has a clausal negation and the Thai output has none (#898).
+
+    Only Japanese-source segments are checked on purpose: the EN->TH path legitimately loses the word in
+    idioms ("like there's no tomorrow" -> ราวกับวันสุดท้ายของชีวิต — corpus scan: 1/372 regions, that idiom).
+    A hit makes the translator's existing re-ask loop ask the segment again, so the cost of a false
+    positive is one retry, not a wrong page."""
+    s, d = (src or ''), (dst or '')
+    if not s or not d:
+        return False
+    if not _JA_CHARS.search(s) or not _THAI_CHAR.search(d):
+        return False
+    if not _JA_NEGATION.search(s):
+        return False
+    return not _THAI_NEGATION.search(d)

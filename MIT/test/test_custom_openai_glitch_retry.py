@@ -65,3 +65,24 @@ def test_thai_uses_the_thai_manga_prompt_by_default():
 def test_other_targets_keep_the_generic_prompt():
     sys_msg = _system_message(CustomOpenAiTranslator(), 'ENG', ['こんにちは'])
     assert 'Thai editions of manga' not in sys_msg
+
+
+def test_a_dropped_japanese_negation_is_reasked_898():
+    """Real JP->TH path: 可愛くない came out น่ารักดีนะ in 2 of 4 runs; the retry loop must catch and re-ask."""
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(side_effect=[
+        _reply('<|1|>แต่เด็กนี่น่ารักดีนะ'),
+        _reply('<|1|>แต่เด็กนี่ไม่น่ารักเลยนะ'),
+    ])
+    out = asyncio.run(t.translate('JPN', 'THA', ['でも可愛くないなコイツ']))
+    assert out == ['แต่เด็กนี่ไม่น่ารักเลยนะ']
+    assert t.client.chat.completions.create.call_count == 2
+
+
+def test_an_english_source_is_not_reasked_for_a_missing_thai_negation_898():
+    """Only Japanese sources are checked: EN idioms ("like there's no tomorrow") legitimately lose the word."""
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(return_value=_reply('<|1|>ราวกับวันสุดท้ายของชีวิต!'))
+    out = asyncio.run(t.translate('ENG', 'THA', ['LIKE THERES NO TOMORROW!']))
+    assert out == ['ราวกับวันสุดท้ายของชีวิต!']
+    assert t.client.chat.completions.create.call_count == 1

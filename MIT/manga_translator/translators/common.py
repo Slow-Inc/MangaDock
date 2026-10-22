@@ -4,7 +4,7 @@ import asyncio
 from typing import List, Tuple
 from abc import abstractmethod
 
-from ..translation_quality import foreign_script, normalize_thai_marks
+from ..translation_quality import foreign_script, negation_lost, normalize_thai_marks
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -251,15 +251,21 @@ class CommonTranslator(InfererModule):
 
     def _is_glitched(self, query: str, trans: str, to_lang: str) -> bool:
         """A translation that leaks a script foreign to the target ('甚至连' inside Thai) — LLM
-        code-switching measured at random on real pages (quality loop, 2026-10-20). Counts as
-        invalid so the repeat above re-asks it."""
-        return bool(trans) and foreign_script(trans, to_lang, query)
+        code-switching measured at random on real pages (quality loop, 2026-10-20) — or that DROPS a
+        Japanese clausal negation (#898, 2 of 4 runs inverted 可愛くない on the real JP->TH path).
+        Counts as invalid so the repeat above re-asks it."""
+        if not trans:
+            return False
+        return foreign_script(trans, to_lang, query) or negation_lost(query, trans, to_lang)
 
     def _modify_invalid_translation_query(self, query: str, trans: str) -> str:
         """
         Can be overwritten if _INVALID_REPEAT_COUNT was set. It modifies the query
         for the next translation attempt.
         """
+        # #898: make the retry say WHY when the previous answer dropped the source negation.
+        if negation_lost(query, trans):
+            return query + '\n\n[note: keep the negation of the source in the Thai output — ～ない means ไม่…]'
         return query
 
     def _clean_translation_output(self, query: str, trans: str, to_lang: str) -> str:
