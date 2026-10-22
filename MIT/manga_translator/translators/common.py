@@ -5,7 +5,7 @@ from typing import List, Tuple
 from abc import abstractmethod
 
 from ..translation_quality import (foreign_script, leaked_script, negation_lost, normalize_thai_marks,
-                                   runaway_translation)
+                                   runaway_translation, spurious_filler)
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -265,6 +265,11 @@ class CommonTranslator(InfererModule):
         Can be overwritten if _INVALID_REPEAT_COUNT was set. It modifies the query
         for the next translation attempt.
         """
+        # #1039: the model added an endurance verb the source never says ('I heard your conversation' ->
+        # 'ฉันทนฟังบทสนทนา'). Tell the retry what to drop.
+        if spurious_filler(trans, query):
+            return query + ('\n\n[note: the previous answer added "ทน" (endure / put up with) although the '
+                            'source never says that. Do not add words about enduring, tolerating or timing.]')
         # #898: make the retry say WHY when the previous answer dropped the source negation.
         if negation_lost(query, trans):
             return query + '\n\n[note: keep the negation of the source in the Thai output — ～ない means ไม่…]'

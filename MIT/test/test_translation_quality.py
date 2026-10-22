@@ -195,3 +195,28 @@ def test_clean_output_and_sources_that_contain_the_script_are_not_leaks_903():
     assert leaked_script('สึกุโยมิ!', 'TSUKU- YOMI!') is None
     # a source that itself carries Cyrillic is not a leak (e.g. a Russian name in the original)
     assert leaked_script('ชื่อ ЦУКУ', 'ИМЯ ЦУКУ') is None
+
+
+def test_spurious_tolerance_flags_a_hallucinated_endurance_verb_1031():
+    from manga_translator.translation_quality import spurious_filler
+    assert spurious_filler("ฉันทนฟังบทสนทนาของเธอกับเทพธิดาแล้ว", "I HEARD YOUR CONVERSATION WITH THE GODDESS.")
+    assert spurious_filler("ฉันทนมอบพลังทั้งหมดที่มีให้เธอ", "I AM GRANTING YOU ALL THE POWER I CAN.")
+
+
+def test_spurious_tolerance_keeps_a_source_that_really_says_endure_1031():
+    from manga_translator.translation_quality import spurious_filler
+    assert not spurious_filler("ฉันทนมานานแล้ว", "I ENDURED IT FOR A LONG TIME.")
+    assert not spurious_filler("ฉันทนไม่ไหวแล้ว", "I CANT STAND IT ANYMORE.")
+
+
+def test_spurious_tolerance_ignores_other_words_and_tolerant_1031():
+    from manga_translator.translation_quality import spurious_filler
+    assert not spurious_filler("ฉันจะให้พลังเธอ", "I WILL GIVE YOU POWER.")
+    assert not spurious_filler("วัสดุนี้ทนทานมาก", "THIS MATERIAL IS VERY DURABLE.")
+
+
+def test_spurious_filler_flags_a_pronoun_glued_to_than_1031():
+    from manga_translator.translation_quality import spurious_filler
+    assert spurious_filler("ฉันทันมอบพลังทั้งหมดที่มีให้เธอ", "I AM GRANTING YOU ALL THE POWER I CAN.")
+    assert not spurious_filler("ฉันจะมอบพลังทั้งหมดที่มีให้เธอ", "I AM GRANTING YOU ALL THE POWER I CAN.")
+    assert not spurious_filler("ฉันทันเห็นมันก่อนที่มันจะหนีไป", "I SAW IT IN TIME BEFORE IT RAN AWAY.")

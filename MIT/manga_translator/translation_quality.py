@@ -256,3 +256,45 @@ def leaked_script(trans: str, query: str) -> str | None:
         if rx.search(t) and not rx.search(q):
             return name
     return None
+
+
+#: English source words that legitimately license a Thai endurance verb (ทน).
+
+_ENDURE_WORDS = ("ENDURE", "ENDURED", "BEAR", "BEARS", "BORE", "STAND", "STOOD", "TOLERATE", "TOLERATED",
+                 "SUFFER", "SUFFERED", "TOLERANCE", "PUT UP WITH", "TAKE IT", "HANDLE IT")
+_THAI_TOLERANCE = re.compile(r"(ทน(?!ทาน)(?:ฟัง|ดู|อยู่|ได้|ไม่ไหว|มานาน|มาแล้ว|อีก|กับ|อะไร)|ฉันทน|เธอทน|เราทน|ข้าทน)")
+#: A pronoun glued to ทัน ("ฉันทันมอบพลัง", observed on a live page) is the same filler class: ทัน means
+#: "in time", so it must not start a verb phrase unless the source talks about timing.
+_THAI_NOT_IN_TIME = re.compile(r"(?:ฉัน|เธอ|เรา|ข้า|แก|คุณ)ทัน(?=[\u0E01-\u0E2E])")
+_TIME_WORDS = ("IN TIME", "ON TIME", "JUST IN TIME", "TIMELY", "BEFORE IT", "IN THE NICK OF TIME")
+
+
+def spurious_filler(dst: str, query: str) -> bool:
+    """True when the Thai adds a filler word the source never said (hallucinated ทน / ทัน).
+
+    Same class as #1039: the model inserts seemly little words that make the sentence ungrammatical.
+    """
+    if spurious_tolerance(dst, query):
+        return True
+    if not dst or not _THAI_NOT_IN_TIME.search(dst):
+        return False
+    src = (query or '').upper()
+    return not any(word in src for word in _TIME_WORDS)
+
+
+def spurious_tolerance(dst: str, query: str) -> bool:
+    """True when the Thai adds an endurance verb the source never said (hallucinated "ทน").
+
+    Measured (#1039): `I HEARD YOUR CONVERSATION WITH THE GODDESS.` came back as
+    `ฉันทนฟังบทสนทนาของเธอกับเทพธิดาแล้ว` on every run, prompt version and temperature tried — the model
+    inserts `ทน` (endure). A re-ask with a note fixes it; only Thai targets use the token, so an English source
+    without an endurance word is the licence check. `ทนทาน` (durable) is a different word and is left alone.
+    """
+    if not dst or 'ทน' not in dst:
+        return False
+    if not _THAI_TOLERANCE.search(dst):
+        return False
+    src = (query or '').upper()
+    if any(word in src for word in _ENDURE_WORDS):
+        return False
+    return True

@@ -61,6 +61,8 @@ def check_page(regions, page='?'):
             if src_punct.count(mark) >= 1 and dst.count(mark) == 0:
                 if mark in ('?', '!') and ('⁈' in dst or '⁉' in dst):
                     continue  # one interrobang covers both marks
+                if mark == '!' and '?' in dst:
+                    continue  # a Thai rhetorical question keeps only the ?
                 if mark == '?' and _THAI_QUESTION.search(dst):
                     continue  # final Thai question particle carries the question
                 if mark == '…' and '...' in dst:

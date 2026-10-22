@@ -55,3 +55,7 @@ def test_a_thai_question_particle_covers_a_dropped_question_mark():
 def test_a_punctuation_marble_inside_an_ocr_word_is_not_a_question_990e():
     assert check_page([_r("IF?YOU THINK ABOUT THATS QUITE SAD.", "ถ้าคิดแบบนั้น ก็ถือว่าเศร้ามากเลยนะ")]) == []
     assert [v["kind"] for v in check_page([_r("WHY? ARE YOU SURE?", "ทำไม เธอแน่ใจ")])] == ["dropped_?"]
+
+
+def test_a_question_mark_covers_an_exclamation_in_thai_990f():
+    assert check_page([_r("IT WONT KILL ME?!", "มันจะฆ่าข้าไม่ได้งั้นเหรอ?")]) == []

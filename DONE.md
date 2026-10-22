@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 72 — judge audit of 8 fresh pages + fixed hallucinated Thai filler words (#1039) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Audit:** 8 fresh HEAD pages (85 segments) via the judge — raw mean 1.45/2, but the score distribution is dominated by the judge's known typo noise (it even quotes identical strings as "wrong"); the real meaning flags clustered on one class.
+- **Fixed (#1039):** the model inserts a Thai filler the source never says — `ฉันทันมอบพลัง...` for `I AM GRANTING YOU ALL THE POWER I CAN.`, `ฉันทันด้วยซ้ำ...` for `I CANT EVEN GIVE YOU ANY POWER`, and historically `ฉันทนฟัง...` for `I HEARD YOUR CONVERSATION...`. New `spurious_filler(dst, query)` (Thai only, licence words in the source: endure / in time) is wired into `_is_glitched` with a retry note; `ทนทาน` and honest endure/timing sources are excluded (tested).
+- **Live evidence:** 3 reruns of the page that leaked `ฉันทนฟัง` -> 0 spurious lines, 0 false re-asks; mocked translator re-asks a `ฉันทัน...` answer once and returns the corrected text. Unit tests cover both variants + the false-positive class. Suite **902 passed**.
+- **Gate refinement (#990):** `IT WONT KILL ME?!` -> `มันจะฆ่าข้าไม่ได้งั้นเหรอ?` was a false positive (Thai rhetorical question keeps the `?`); the gate now accepts `?` covering a dropped `!`.
+- Benchmark `2026-10-23-1039-spurious-filler.md`.
+
 ## MIT quality loop, round 71 — live 5-page baseline sweep + gate OCR-punctuation fix (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

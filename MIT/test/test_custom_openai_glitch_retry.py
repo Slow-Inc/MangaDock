@@ -136,3 +136,14 @@ def test_a_persistently_broken_contract_gives_up_after_two_retries_997():
     out = asyncio.run(t.translate('ENG', 'THA', ['ONE', 'TWO']))
     assert len(out) == 2
     assert t.client.chat.completions.create.call_count == 3
+
+def test_a_hallucinated_endurance_verb_is_reasked_1031():
+    """The model inserted ทน/ทัน that the source never says; the retry must be told what to drop."""
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(side_effect=[
+        _reply('<|1|>ฉันทันมอบพลังทั้งหมดที่มีให้เธอ'),
+        _reply('<|1|>ฉันจะมอบพลังทั้งหมดที่มีให้เธอ'),
+    ])
+    out = asyncio.run(t.translate('ENG', 'THA', ['I AM GRANTING YOU ALL THE POWER I CAN.']))
+    assert out == ['ฉันจะมอบพลังทั้งหมดที่มีให้เธอ']
+    assert t.client.chat.completions.create.call_count == 2
