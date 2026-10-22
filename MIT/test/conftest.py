@@ -21,6 +21,7 @@ def _has_torch() -> bool:
 
 _HEAVY_TESTS = [
     'test_async_correctness.py',     # test bodies import the pipeline (torch) at runtime
+    'test_batch_pipelined_translator.py',  # imports manga_translator (torch) for the batch phases (#905)
     'test_batch_preprocess.py',
     'test_concise_bubbles.py',       # imports translators.config_gpt -> translators/__init__ (torch)
     'test_custom_openai_none_content.py',  # imports translators.custom_openai -> translators/__init__ (torch)

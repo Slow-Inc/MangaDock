@@ -1744,6 +1744,69 @@ class MangaTranslator:
                 'regions': regions_payload(regions) + dropped_regions_payload(getattr(ctx, 'dropped_regions', None) or [])}
 
 
+    async def translate_batch_pipelined(self, images: List[Image.Image], config: Config, cancel_check=None) -> List[dict]:
+        """#905: translate a batch with the GPU phases overlapped against the gateway wait.
+'
+        Same stages, same order and same config as running :meth:`translate_patches` page by page. The only
+        change is scheduling: page i+1's FRONT phase (detect/ocr/merge) starts during page i's translation
+        wait, and page i's BACK phase (mask/inpaint/render) runs during page i+1's translation. Translations
+        stay strictly ordered, so the #159 rolling cross-page context keeps working when enabled.
+
+        Returns one patch-result dict per page, in page order.
+        """
+        import copy
+
+        from server.batch_pipeline import run_pipelined
+        from server.rolling_context import RollingContext
+
+        def _env_int(name: str, default: int) -> int:
+            try:
+                return max(0, int(os.environ.get(name, '') or default))
+            except ValueError:
+                return default
+
+        self.reset_page_context()
+        # #159: same rolling session the batch runner keeps; MIT_CONTEXT_PAGES=0 (default) disables it,
+        # which keeps the pipelined batch byte-identical in behaviour to independent pages.
+        rolling = RollingContext(max_pages=_env_int('MIT_CONTEXT_PAGES', 0),
+                                 max_chars=_env_int('MIT_CONTEXT_MAX_CHARS', 1500))
+
+        async def prepare_front(image):
+            cfg = copy.deepcopy(config)
+            icc = image.info.get('icc_profile')
+            ctx = await self._translate_until_translation(image, cfg)
+            return {'ctx': ctx, 'cfg': cfg, 'icc': icc, 'has_regions': bool(ctx.text_regions)}
+
+        async def translate(front, prev_context):
+            ctx, cfg = front['ctx'], front['cfg']
+            if not front['has_regions']:
+                return {'front': front, 'ok': False, 'block': rolling.render_block()}
+            if prev_context:
+                cfg.translator.prev_context = prev_context
+            await self._report_progress('translating')
+            try:
+                ctx.text_regions = await self._run_text_translation(cfg, ctx)
+            except Exception:
+                logger.error(f"Error during translating (batch pipeline):\n{traceback.format_exc()}")
+                if not self.ignore_errors:
+                    raise
+                ctx.text_regions = []
+            await self._report_progress('after-translating')
+            ok = bool(ctx.text_regions) and ctx.text_regions != 'cancel'
+            if ok:
+                rolling.add_page(getattr(r, 'translation', '') or '' for r in ctx.text_regions)
+            return {'front': front, 'ok': ok, 'block': rolling.render_block()}
+
+        async def finish_back(image, front, translated):
+            ctx, cfg, icc = front['ctx'], front['cfg'], front['icc']
+            if not translated['ok']:
+                img_h, img_w = ctx.img_rgb.shape[:2]
+                return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
+            return await self._finish_patches(ctx, cfg, icc)
+
+        return await run_pipelined(list(images), prepare_front=prepare_front, translate=translate,
+                                   finish_back=finish_back, cancel_check=cancel_check)
+
     async def _batch_translate_contexts(self, contexts_with_configs: List[tuple], batch_size: int) -> List[tuple]:
         """
         批量处理翻译步骤，防止内存溢出

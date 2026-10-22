@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 51 — `translate_batch_pipelined` on 6 real pages: **1.37× wall, identical structure** (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented `MangaTranslator.translate_batch_pipelined(images, config)`: the existing three phases (front detect/ocr/merge, ordered translation, back mask/inpaint/render) scheduled through `server/batch_pipeline.run_pipelined` — page i+1's front starts during page i's translation wait; translation order unchanged so #159 context still works when enabled.
+- **Real measurement** (one process, models warm, tuned config, 6 real pages): sequential `translate_patches` **39.49 s** (6.58 s/page) -> pipelined **28.91 s** (4.82 s/page) = **1.37×**. Patch counts (10/5/4/8/6/7), region counts (17/15/30/12/7/13) and page sizes identical across arms.
+- Tests: 2 new heavy tests (phase order per page; no-region page returns empty patch result) + the 5 `batch_pipeline` loop tests; gate unchanged.
+- Remaining for #905: worker endpoint + batch_runner submission behind a flag (production still sends one page per task), then the production chapter A/B (webhooks, cancellation, VRAM) and the on-by-default decision.
+- Benchmark `2026-10-22-905-pipelined-real-pages.md`.
+
 ## MIT quality loop, round 50 — #905 slice 2 start: the page pipeline is now two phases (`_finish_patches`) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
