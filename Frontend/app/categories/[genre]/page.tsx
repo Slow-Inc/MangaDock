@@ -9,6 +9,7 @@ import Loader from "../../components/ui/Loader";
 import { scrollBehavior } from "../../hooks/reducedMotion";
 import { usePageTitle } from "../../hooks/pageTitle";
 import LoadError from "../../components/ui/LoadError";
+import { goBackOr } from "../../lib/inAppBack";
 
 const API_BASE = "/api/proxy";
 
@@ -84,7 +85,7 @@ export default function GenrePage() {
         {/* Breadcrumb */}
         <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-ink-3 sm:mb-6 sm:text-sm">
           <button
-            onClick={() => router.back()}
+            onClick={() => goBackOr(router, "/")}
             className="text-ink-2 transition-colors hover:text-ink"
           >
             ← ย้อนกลับ

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { ReactNode, useEffect, useRef } from 'react';
 import { isModalNavigation } from '../lib/bookModalHistory';
 import { onPageScrollLock } from '../lib/scrollLock';
+import { notePagePath } from '../lib/inAppBack';
 import { useReducedMotion } from '../hooks/reducedMotion';
 
 interface SmoothScrollingProps {
@@ -26,6 +27,7 @@ export default function SmoothScrolling({ children }: SmoothScrollingProps) {
     // A book popup opening/closing changes the pathname (/book/<id>) but not the page
     // behind it; resetting to the top there would make that page jump.
     if (isModalNavigation()) return;
+    notePagePath(pathname); // back buttons go back only once there is a MangaDock page behind (#942)
     lenisRef.current?.lenis?.scrollTo(0, { immediate: true });
   }, [pathname]);
 
