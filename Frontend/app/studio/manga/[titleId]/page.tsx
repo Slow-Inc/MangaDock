@@ -270,6 +270,7 @@ export default function MangaDetailPage() {
         `manga:${titleId}:studio-detail`,
         async () => {
           const res = await fetch(`/api/proxy/books/manga/${titleId}`);
+          if (!res.ok) throw new Error(`manga detail ${res.status}`); // not cached as an untitled answer (#983)
           return res.json();
         },
         TTL.LONG,

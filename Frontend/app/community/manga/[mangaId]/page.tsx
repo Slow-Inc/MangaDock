@@ -50,7 +50,8 @@ export default function MangaCommunityPage() {
         `manga:${mangaId}:detail`,
         async () => {
           const res = await fetch(`/api/proxy/books/manga/${mangaId}`);
-          if (!res.ok) return null;
+          // thrown, not cached: a cached miss left the header (and new posts' manga fields) empty for 30 min (#983)
+          if (!res.ok) throw new Error(`manga detail ${res.status}`);
           return res.json();
         },
         TTL.LONG,

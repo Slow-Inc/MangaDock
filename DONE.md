@@ -77,6 +77,23 @@
 
 ---
 
+## #983 Three more places no longer cache a failed load (hero read button, community manga header, studio title) (2026-10-22)
+
+**What:** a sweep of every `cacheOrFetch` call site after #981 found three fetchers that resolved on a non-ok answer, so
+the failure was cached. `HeroDetailButton` cached the chapters error body for 5 min, which hid "อ่านเลย". The community
+manga page cached `null` for 30 min: no header title or cover, and posts created in that window were saved without
+`targetMangaTitle` / `targetMangaCover`. The studio title page cached a JSON error body for 30 min and showed
+"ไม่ระบุชื่อเรื่อง". Each now throws on a non-ok answer, as the other 21 call sites already do. The existing catch keeps
+the failure display, nothing is cached, and the next mount retries.
+
+**Validated:** production build + stand-in (`FLAKY_ONCE=<regex>`: the first matching request is a 503). The hero (switching
+slide 4 → 1 → 4 remounts it) and the community page (client navigation away and back), main build vs fix:
+`heroSecond 0 → 1`, community title `generic → "Cover Falls Back · คอมมูนิตี้ · MangaDock"`, with the request log
+`503` then no refetch on main, `503, 200` with the fix. A control run with nothing failing shows both on both visits.
+The studio page needs creator login, so it is verified by code reading only. eslint matches main, and the build passes.
+
+---
+
 ## #981 One failed related-books load no longer hides "มังงะที่คล้ายกัน" for 30 min (2026-10-22)
 
 **What:** `GET /books/:id/related` answered 200 `[]` on any failure (detail fetch, tag list, rated row), and
