@@ -10,6 +10,7 @@ import { buildTranslateMenu } from "../lib/translateMenu";
 import { activeTranslatingPage, formatEta, pillMainText, stageLabel } from "../lib/translationStages";
 import TranslateProgress from "./reader/TranslateProgress";
 import { apiFetch } from "../lib/apiFetch";
+import { isTypingTarget } from "../lib/typingTarget";
 import { useChapters, type ChapterPageItem } from "../hooks/useChapters";
 import { ZOOM_MIN, ZOOM_MAX } from "../lib/zoomLevel";
 import { useReaderViewport } from "../hooks/useReaderViewport";
@@ -120,6 +121,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [visible, setVisible] = useState(false);
   const [useSaver, setUseSaver] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
+  // Read by the reader's key handlers and Tab trap: while the drawer is open it owns Escape and Tab (#928).
+  const commentOpenRef = useRef(false);
+  useEffect(() => { commentOpenRef.current = commentOpen; }, [commentOpen]);
   const [sideBySide, setSideBySide] = useState(false);
   const [translateMenuOpen, setTranslateMenuOpen] = useState(false);
   const translateMenuRef = useRef<HTMLDivElement | null>(null);
@@ -189,8 +193,10 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [mounted, setMounted] = useState(false);
   // Full-screen layer: focus in on open, Tab stays inside, focus back to the opener on close (#840).
   const readerRef = useRef<HTMLDivElement>(null);
-  // Not on the popup's modal stack: it is "top" unless another layer (e.g. the login modal) was opened over it.
-  const readerIsTop = () => !!readerRef.current && !hasLayerAbove(readerRef.current);
+  // Not on the popup's modal stack: it is "top" unless another layer (e.g. the login modal) was opened over it, or its
+  // own comment drawer is open (#928).
+  const readerOnTop = () => !!readerRef.current && !hasLayerAbove(readerRef.current);
+  const readerIsTop = () => !commentOpenRef.current && readerOnTop();
   useDialogFocus(readerRef, readerIsTop, mounted);
   // Default to continuous mode on mobile (< 640px) for better UX
   const [continuousMode, setContinuousMode] = useState(() =>
@@ -452,7 +458,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     };
 
     const onKey = (e: KeyboardEvent) => {
-      if (continuousModeRef.current) {
+      // Not page keys while typing (the arrows move the cursor) or while the comment drawer is open over the page (#928)
+      const pageKeys = !commentOpenRef.current && !isTypingTarget(e.target);
+      if (pageKeys && continuousModeRef.current) {
         if (e.key === "ArrowDown" || e.key === "ArrowUp") {
           e.preventDefault();
           if (direction === 0) {
@@ -462,7 +470,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           }
           direction = e.key === "ArrowDown" ? 1 : -1;
         }
-      } else {
+      } else if (pageKeys) {
         if (e.key === "ArrowRight") setPage((p) => Math.min(p + 1, totalPages - 1));
         if (e.key === "ArrowLeft")  setPage((p) => Math.max(p - 1, 0));
       }
@@ -485,6 +493,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       const active = document.activeElement;
       if (readerRef.current && active && active !== document.body && !readerRef.current.contains(active)) return;
       e.stopPropagation();
+      if (commentOpenRef.current) { setCommentOpen(false); return; }
       if (showChapterPickerRef.current) { closePicker(); return; }
       handleClose();
     };
@@ -510,6 +519,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       if (continuousModeRef.current) return; // let browser scroll naturally
+      if (commentOpenRef.current) return; // the comment drawer's list scrolls; no zoom behind a dialog (#928)
       // Let the chapter picker scroll normally — don't intercept
       if (pickerRef.current?.contains(e.target as Node)) return;
       e.preventDefault();
@@ -1310,6 +1320,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       {mangaId && (
         <ReaderCommentDrawer
           open={commentOpen}
+          isTop={readerOnTop}
           onClose={() => setCommentOpen(false)}
           mangaId={mangaId}
           chapterId={chapterId}
