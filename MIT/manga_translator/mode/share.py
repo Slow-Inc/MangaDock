@@ -130,6 +130,47 @@ async def simple_execute_translate_patches(request: Request):
                 _translator._progress_hooks.remove(_h)
 
 
+
+
+@app.post("/simple_execute/translate_batch_pipeline")
+async def simple_execute_translate_batch_pipeline(request: Request):
+    """#905: run a whole page batch on this worker, front/back phases overlapped across pages."""
+    body = await request.body()
+    try:
+        data = pickle.loads(body)
+    except Exception as e:
+        raise HTTPException(422, detail=f"Cannot unpickle request body: {e}")
+
+    images = data.get("images") or []
+    config: Config = data.get("config", Config())
+    if not images:
+        raise HTTPException(422, detail="Missing 'images' in payload")
+
+    # Dev-console stage timings (#279) still apply; per-page progress webhooks are not
+    # forwarded on this path (the batch runner sends the per-page webhooks once the
+    # batch returns) — documented limitation of the opt-in pipeline path.
+    telemetry_hook = None
+    if _PARENT["url"]:
+        from server.webhook import make_telemetry_hook
+        telemetry_hook = make_telemetry_hook(_PARENT["url"], _PARENT["nonce"])
+        _translator.add_progress_hook(telemetry_hook)
+
+    try:
+        results = await _translator.translate_batch_pipelined(images, config)
+        if _PARENT["url"]:
+            from server.webhook import send_telemetry
+            report = _translator.vram_report()
+            if report:
+                await send_telemetry(_PARENT["url"], _PARENT["nonce"], {"kind": "vram", **report})
+        return StreamingResponse(io.BytesIO(pickle.dumps(results)),
+                                 media_type="application/octet-stream")
+    except Exception as e:
+        logger.error(f"Batch pipeline translation error: {e}\n{traceback.format_exc()}")
+        raise HTTPException(500, detail=str(e))
+    finally:
+        if telemetry_hook is not None and telemetry_hook in _translator._progress_hooks:
+            _translator._progress_hooks.remove(telemetry_hook)
+
 @app.post("/execute/translate")
 async def execute_translate(request: Request):
     """Streaming variant – sends progress frames then the final result."""
