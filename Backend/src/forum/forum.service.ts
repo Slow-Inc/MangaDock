@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ForbiddenException,
   InternalServerErrorException,
+  ServiceUnavailableException,
   Inject,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -86,6 +87,27 @@ export class ForumService {
 
   private get db() {
     return this.supabase.client;
+  }
+
+  /**
+   * Distinguish "this row does not exist" from "the database did not answer".
+   *
+   * `.single()` reports zero rows as PGRST116, and a malformed uuid as 22P02;
+   * both mean the row cannot exist. Every other error is an outage and must
+   * surface as 503, so the frontend retries instead of saying "not found".
+   */
+  private ensureFound<T>(
+    data: T | null,
+    error: { code?: string } | null,
+    message: string,
+  ): asserts data is T {
+    if (!error && data) return;
+    if (!error || error.code === 'PGRST116' || error.code === '22P02') {
+      throw new NotFoundException(message);
+    }
+    throw new ServiceUnavailableException(
+      'Forum storage is temporarily unavailable',
+    );
   }
 
   async listPosts(
@@ -178,7 +200,7 @@ export class ForumService {
       .is('comments.deleted_at', null)
       .single();
 
-    if (error || !data) throw new NotFoundException('Post not found');
+    this.ensureFound(data, error, 'Post not found');
 
     const userVotes = await this.getUserVotes(userUid, 'post', [id]);
 
@@ -326,8 +348,7 @@ export class ForumService {
           .in('status', ['published', 'approved']),
       ]);
 
-    if (profileRes.error || !profileRes.data)
-      throw new NotFoundException('Profile not found');
+    this.ensureFound(profileRes.data, profileRes.error, 'Profile not found');
 
     // Secondary sections degrade gracefully to empty on error, but a silently
     // empty section is indistinguishable from a real "no data" state. Log each
@@ -508,7 +529,7 @@ export class ForumService {
       .eq('id', id)
       .single();
 
-    if (fetchErr || !existing) throw new NotFoundException('Post not found');
+    this.ensureFound(existing, fetchErr, 'Post not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to delete this post');
 
@@ -534,7 +555,7 @@ export class ForumService {
       .eq('id', id)
       .single();
 
-    if (fetchErr || !existing) throw new NotFoundException('Comment not found');
+    this.ensureFound(existing, fetchErr, 'Comment not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to delete this comment');
 
@@ -568,7 +589,7 @@ export class ForumService {
       .eq('id', id)
       .single();
 
-    if (fetchErr || !existing) throw new NotFoundException('Post not found');
+    this.ensureFound(existing, fetchErr, 'Post not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to edit this post');
 
@@ -611,7 +632,7 @@ export class ForumService {
       .eq('id', id)
       .single();
 
-    if (fetchErr || !existing) throw new NotFoundException('Comment not found');
+    this.ensureFound(existing, fetchErr, 'Comment not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to edit this comment');
 

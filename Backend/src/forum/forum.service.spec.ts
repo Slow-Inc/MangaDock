@@ -1,4 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { fileTypeFromFile } from 'file-type';
 import { ForumService } from './forum.service';
 
@@ -613,5 +617,95 @@ describe('ForumService.getPublicProfile', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('posts'));
     // Only the failing 'posts' query should warn — healthy secondary queries stay quiet.
     expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── single-row lookup errors ──────────────────────────────────────────────────
+
+describe('ForumService single-row lookups distinguish missing rows from outages', () => {
+  function serviceWithSingle(result: { data: unknown; error: unknown }) {
+    const chain = buildMockChain({
+      single: jest.fn().mockResolvedValue(result),
+    });
+    return { chain, service: makeService(() => chain) };
+  }
+
+  it.each([
+    ['no row', null],
+    ['PGRST116 (zero rows from .single())', { code: 'PGRST116' }],
+    ['22P02 (malformed uuid)', { code: '22P02' }],
+  ])('getPost answers 404 for %s', async (_name, error) => {
+    const { service } = serviceWithSingle({
+      data: null,
+      error: error as { code: string } | null,
+    });
+
+    await expect(service.getPost('post-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('getPost answers 503 for a database outage', async () => {
+    const { service } = serviceWithSingle({
+      data: null,
+      error: { code: 'XX000', message: 'connection reset' },
+    });
+
+    await expect(service.getPost('post-1')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+  });
+
+  it.each([
+    [
+      'updatePost',
+      (service: ForumService) => service.updatePost('u1', 'p1', {}),
+    ],
+    ['deletePost', (service: ForumService) => service.deletePost('u1', 'p1')],
+    [
+      'updateComment',
+      (service: ForumService) =>
+        service.updateComment('u1', 'c1', { content: 'x' }),
+    ],
+    [
+      'deleteComment',
+      (service: ForumService) => service.deleteComment('u1', 'c1'),
+    ],
+  ])('%s answers 503 for a database outage', async (_name, call) => {
+    const { service } = serviceWithSingle({
+      data: null,
+      error: { code: 'XX000', message: 'connection reset' },
+    });
+
+    await expect(call(service)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+  });
+
+  it('getPublicProfile answers 503 for a database outage', async () => {
+    const outageChain = (result: { data: unknown; error: unknown }) => {
+      const chain: any = {};
+      for (const m of ['select', 'eq', 'is', 'in', 'order', 'limit'])
+        chain[m] = jest.fn(() => chain);
+      chain.single = jest.fn().mockResolvedValue(result);
+      chain.then = (
+        res: (v: unknown) => unknown,
+        rej?: (e: unknown) => unknown,
+      ) => Promise.resolve(result).then(res, rej);
+      return chain;
+    };
+    const service = makeService((table: string) => {
+      if (table === 'profiles') {
+        return outageChain({
+          data: null,
+          error: { code: 'XX000', message: 'connection reset' },
+        });
+      }
+      return outageChain({ data: [], error: null });
+    });
+
+    await expect(service.getPublicProfile('u1')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
   });
 });
