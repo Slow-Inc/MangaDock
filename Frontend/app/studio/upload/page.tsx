@@ -47,6 +47,7 @@ function StudioUploadContent() {
   // The cover URL that failed to load (#1029): a dead cover shows the no-cover glyph, not a broken image. Keyed on the
   // URL, so choosing another book tries its cover afresh.
   const [failedCover, setFailedCover] = useState<string | null>(null);
+  const coverShown = !!titleThumbnail && failedCover !== titleThumbnail;
   const [chapterId, setChapterId] = useState("");
   const [chapterNumber, setChapterNumber] = useState("");
   const [chapterTitle, setChapterTitle] = useState("");
@@ -214,13 +215,13 @@ function StudioUploadContent() {
                       : "border-dashed border-ink-3 hover:border-accent/40"
                   } disabled:cursor-default disabled:hover:border-line`}
                 >
-                  {titleThumbnail && failedCover === titleThumbnail ? (
+                  {titleThumbnail && !coverShown ? (
                     <div data-cover-fallback className="absolute inset-0 flex items-center justify-center text-ink-3">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-10 w-10" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                       </svg>
                     </div>
-                  ) : titleThumbnail ? (
+                  ) : coverShown ? (
                     <Image
                       src={titleThumbnail}
                       alt={titleName ? `ปกมังงะ ${titleName}` : "ปกมังงะ"}
@@ -235,9 +236,12 @@ function StudioUploadContent() {
                       <span className="text-xs">เลือกมังงะ</span>
                     </div>
                   )}
-                  <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-scrim/90 via-scrim/15 to-transparent" />
+                  {/* the scrim keeps the title readable over a cover; with no cover it only muddied the empty slot (#1048) */}
+                  {coverShown && (
+                    <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-scrim/90 via-scrim/15 to-transparent" />
+                  )}
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3">
-                    <p className="line-clamp-2 text-center text-sm font-semibold leading-snug text-white drop-shadow-md">
+                    <p className={`line-clamp-2 text-center text-sm font-semibold leading-snug ${coverShown ? "text-white drop-shadow-md" : "text-ink-2"}`}>
                       {titleName || "ยังไม่ได้เลือกมังงะ"}
                     </p>
                   </div>

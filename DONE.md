@@ -77,6 +77,24 @@
 
 ---
 
+## #1048 Light mode: the logo keeps its "Manga"; the empty upload slot loses its scrim (2026-10-23)
+
+**What:** a light-mode sweep for #778 (23 user-facing routes × 1440/390 px, production build, local fake session:
+overflow, broken images, text contrast against the composited background) found the theme otherwise clean — and the
+hard-coded-colour grep left only shadows and the over-image title. Two defects: `public/MangaDock.svg` draws "Manga" in
+near-white, so on the light navbar only "Dock" showed; and Studio upload drew its dark scrim even with no cover,
+turning the empty slot into a grey-to-black panel. New `MangaDock-light.svg` (those 5 fills → ink `#131316`);
+`MangaDockLogo` renders both and `globals.css` shows the one for the effective theme, mirroring the theme selectors
+(light base; dark via `data-theme="dark"` or the OS when "system"). Upload draws the scrim only when a cover shows;
+otherwise the title is `text-ink-2`.
+
+**Validated:** probe over 4 cases (light, dark, system+OS light, system+OS dark): before — always the white-text logo,
+a scrim and white title on the empty slot; after — the matching logo in each case, no scrim, an ink title. The light
+sweep's upload contrast flag is gone; crops of the light navbar and the empty slot checked. Real tsc clean; eslint
+equal to main.
+
+---
+
 ## #863 (part) A slow Supabase no longer holds up search: the alt-name lookup has a budget (2026-10-23)
 
 **What:** with Supabase slow, an uncached `GET /books/search` hung for the full client timeout on

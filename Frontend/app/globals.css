@@ -406,6 +406,17 @@ body::-webkit-scrollbar-thumb:active {
   background: var(--accent);
 }
 
+/* The logo for the effective theme (#1048): its "Manga" is near-white, so a light theme shows the ink variant.
+   Mirrors the theme selectors at the top: light is the base, dark is data-theme="dark" or the OS preference when the
+   visitor chose "system" (no data-theme). */
+.md-logo-on-light { display: none; }
+:root:not([data-theme="dark"]) .md-logo-on-light { display: block; }
+:root:not([data-theme="dark"]) .md-logo-on-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .md-logo-on-light { display: none; }
+  :root:not([data-theme="light"]) .md-logo-on-dark { display: block; }
+}
+
 /* Override focus ring to be invisible inside .no-focus-ring descendants */
 .no-focus-ring :focus-visible {
   outline: none;
