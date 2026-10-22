@@ -28,6 +28,23 @@ check would have cost a retry there for nothing.
 | real JP page, 5 runs after the fix | **5/5 kept the negation** (before: 2/4 inverted) |
 | gate | **852 passed** |
 
+## Verification after the fix (same day)
+
+| check | before | after |
+|---|---|---|
+| real JP page, `可愛くない` polarity | **2/4 runs inverted** (1 more nuanced, 1 right) | **8/8 runs keep the negation** |
+| judged quality of the two real pages (3 runs) | 1.57 (single run, with the inversion) | **1.57 / 1.57 / 1.64** (avg 1.59; the one remaining score-0 is a register issue — `あ？`->`อ๋อ`, not a negation) |
+
+Targeted probe (12 Japanese negation lines, two runs each arm, counting a missing negation):
+
+- guard off: **1/12** missing in one run (`仕方ないな` -> `ก็ทำยังไงได้ล่ะ`), 0/12 in the other;
+- guard on: **0/12** in both runs, and **no extra gateway calls** (the model kept the negation on its own in
+  these runs — the retry path is pinned by the integration test instead).
+
+**Known limitation (recorded, not fixed):** the detector checks that SOME Thai negation marker is present, not
+that the polarity is right — `大丈夫じゃない` ("not okay") rendered `ไม่เป็นไรหรอก` ("it's fine"), which contains
+`ไม่` and passes. A polarity test needs the source's clause structure, which is a different (much bigger) job.
+
 ## Cost
 
 A page is re-asked only when a negation was actually dropped (at most the existing 2 retries), so the common

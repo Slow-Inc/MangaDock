@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 39 — negation guard verified on the production path (#898) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-ran the two real JP pages after the guard: **8/8 runs keep the negation** of `可愛くない` (before: 2/4 inverted); judged quality across three runs **1.57 / 1.57 / 1.64** (avg 1.59 vs the 1.57 baseline; the single remaining score-0 is a register issue `あ？`->`อ๋อ`, not a negation).
+- Targeted probe, 12 Japanese negation lines: guard off **1/12** missing in one run, guard on **0/12** in both — and no extra gateway calls in these runs (the retry path is pinned by the integration test instead).
+- **Limitation recorded:** the detector only checks that a Thai negation marker is present, not polarity — `大丈夫じゃない` -> `ไม่เป็นไรหรอก` slips through. A polarity test would need clause structure; noted for later.
+- Benchmark updated with the before/after table.
+
 ## MIT quality loop, round 38 — a dropped Japanese negation is re-asked (#898) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
