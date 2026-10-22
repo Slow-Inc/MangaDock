@@ -5,6 +5,9 @@ type DbError = { code?: string; message?: string } | null;
 /** Supabase/Postgres codes that mean "there is no such row": `.single()` on zero rows, and an id that is not a uuid. */
 const MISSING_ROW = new Set(['PGRST116', '22P02']);
 
+/** Postgres 22P02: the id given is not a uuid — no row can match it (#963). */
+export const isInvalidId = (error: DbError): boolean => error?.code === '22P02';
+
 /**
  * Throws the right failure for a single-row lookup that found nothing (#915): a 404 only when the row does not exist.
  * Any other database error used to read as "not found" to the user (and to the frontend, which trusts a 404); it is now

@@ -39,6 +39,7 @@ import type {
   AuthenticatedRequest,
   MaybeAuthenticatedRequest,
 } from '../auth/authenticated-request';
+import { queryInt } from '../common/query-int';
 
 const ALLOWED_IMAGE_TYPES = new Set([
   'image/jpeg',
@@ -89,8 +90,8 @@ export class ForumController {
       category,
       mangaId,
       sort,
-      Math.min(100, limit ? parseInt(limit, 10) || 20 : 20),
-      offset ? parseInt(offset, 10) || 0 : 0,
+      queryInt(limit, 20, { min: 1, max: 100 }),
+      queryInt(offset, 0, { min: 0 }), // never negative or NaN into .range() (#963)
       req.uid,
       authorUid,
     );

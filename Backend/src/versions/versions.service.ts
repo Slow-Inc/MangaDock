@@ -3,7 +3,6 @@ import {
   Inject,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as path from 'path';
@@ -13,6 +12,7 @@ import {
   STORAGE_PROVIDER,
   type StorageProvider,
 } from '../common/storage/storage-provider.interface';
+import { isInvalidId, lookupFailure } from '../common/assert-found';
 
 type ChapterVersionRow = {
   version_id: string;
@@ -181,11 +181,9 @@ export class VersionsService {
       .eq('version_id', versionId)
       .maybeSingle<ChapterVersionRow>();
 
-    if (error) {
-      throw new Error(`Failed to fetch chapter version: ${error.message}`);
-    }
-    if (!data)
-      throw new NotFoundException(`Chapter version ${versionId} not found`);
+    // 404 only for a version that cannot exist (none, or an id that is not a uuid); else the database-down signal (#963)
+    if (error || !data)
+      lookupFailure(error, `Chapter version ${versionId} not found`);
     return await this.mapRow(data);
   }
 
@@ -259,6 +257,7 @@ export class VersionsService {
       .limit(50);
 
     if (error) {
+      if (isInvalidId(error)) return []; // not a uuid: no translator has it (#963)
       throw new Error(
         `Failed to list published versions by translator: ${error.message}`,
       );
