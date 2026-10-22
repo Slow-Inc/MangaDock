@@ -6,10 +6,12 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -111,9 +113,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // toast to be wiped out 300 ms later by the stale timer.
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keyRef = useRef(0);
+  // The running auto-dismiss: time left and when it started. Hover or focus on the toast holds it (WCAG 2.2.1) (#956).
+  const timing = useRef<{ left: number; since: number } | null>(null);
+  const hovered = useRef(false);
+  const focused = useRef(false);
+  const [held, setHeld] = useState(false);
+  // The toast lives in its own layer at the end of <body>, moved there whenever a toast shows: after any popup or the
+  // reader (portals appended later), so Tab from their last control reaches it, and their focus traps see a layer
+  // above them (hasLayerAbove: fixed, high z-index, holding a control) and stand aside (#956).
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const hostRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = document.createElement("div");
+    el.style.cssText = "position:fixed;z-index:9999;top:0;left:0;width:0;height:0";
+    document.body.appendChild(el);
+    hostRef.current = el;
+    setHost(el);
+    return () => { el.remove(); hostRef.current = null; };
+  }, []);
 
   const dismissToast = useCallback(() => {
     setVisible(false);
+    timing.current = null;
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
     if (closeTimer.current) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(() => {
@@ -123,29 +144,50 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }, 300);
   }, []);
 
+  const startTimer = useCallback((ms: number) => {
+    timing.current = { left: ms, since: Date.now() };
+    dismissTimer.current = setTimeout(dismissToast, ms);
+  }, [dismissToast]);
+
+  const holdTimer = () => {
+    if (!timing.current || !dismissTimer.current) return;
+    clearTimeout(dismissTimer.current);
+    dismissTimer.current = null;
+    timing.current.left -= Date.now() - timing.current.since;
+    setHeld(true);
+  };
+
+  const releaseTimer = () => {
+    if (hovered.current || focused.current || !timing.current || dismissTimer.current) return;
+    startTimer(Math.max(timing.current.left, 1500)); // a moment to read it again after letting go
+    setHeld(false);
+  };
+
   const showToast = useCallback((opts: ToastOptions) => {
     // Clear any existing auto-dismiss timer and any pending close timer from dismissToast
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
     if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+    const el = hostRef.current;
+    if (el && el !== document.body.lastElementChild) document.body.appendChild(el); // above whatever opened since
     keyRef.current += 1;
+    timing.current = null;
+    hovered.current = false;
+    focused.current = false;
+    setHeld(false);
     setToast({ ...opts, key: keyRef.current });
     // Small delay before making visible so CSS transition fires
     setTimeout(() => setVisible(true), 10);
 
     const duration = opts.duration ?? 4000;
-    if (duration > 0) {
-      dismissTimer.current = setTimeout(() => {
-        setVisible(false);
-        closeTimer.current = setTimeout(() => { setToast(null); setActionLoading(false); closeTimer.current = null; }, 300);
-      }, duration);
-    }
-  }, []);
+    if (duration > 0) startTimer(duration);
+  }, [startTimer]);
 
   const handleAction = async () => {
     if (!toast?.action) return;
     const result = toast.action.onClick();
     if (result instanceof Promise) {
       setActionLoading(true);
+      timing.current = null;
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
       try {
         await result;
@@ -165,7 +207,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
       <style>{`@keyframes mb-toast-shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }`}</style>
 
-      {/* Toast container — always rendered for CSS transition */}
+      {/* Toast container — always rendered (in its host layer) for the CSS transition and the live region */}
+      {host && createPortal(
       <div
         aria-live="polite"
         className={`fixed bottom-24 sm:bottom-10 left-1/2 z-[9999] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 transition-all duration-300 ${
@@ -173,7 +216,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         }`}
       >
         {toast && (
-          <div className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-raised px-4 py-3 shadow-2xl ${borderColor(toast.type ?? "info")}`}>
+          <div
+            onMouseEnter={() => { hovered.current = true; holdTimer(); }}
+            onMouseLeave={() => { hovered.current = false; releaseTimer(); }}
+            onFocus={() => { focused.current = true; holdTimer(); }}
+            onBlur={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              focused.current = false;
+              releaseTimer();
+            }}
+            className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-raised px-4 py-3 shadow-2xl ${borderColor(toast.type ?? "info")}`}
+          >
             {/* Icon */}
             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${iconBg(toast.type ?? "info")}`}>
               <ToastIcon type={toast.type ?? "info"} />
@@ -218,12 +271,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <div
                 key={toast.key}
                 className={`absolute bottom-0 left-0 h-0.5 w-full origin-left ${progressColor(toast.type ?? "info")}`}
-                style={{ animation: `mb-toast-shrink ${duration}ms linear forwards` }}
+                style={{ animation: `mb-toast-shrink ${duration}ms linear forwards`, animationPlayState: held ? "paused" : "running" }}
               />
             )}
           </div>
         )}
-      </div>
+      </div>,
+      host)}
     </ToastContext.Provider>
   );
 }

@@ -17,7 +17,7 @@ import { useCoverSrc } from "../hooks/useCoverSrc";
 import { lockPageScroll } from "../lib/scrollLock";
 import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { useRouter } from "next/navigation";
-import { useDialogFocus } from "../hooks/useDialogFocus";
+import { hasLayerAbove, useDialogFocus } from "../hooks/useDialogFocus";
 import { backOwnEntry, bookPath, inPopupLinkTarget, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
 import { loadMangaDetail } from "../lib/mangaDetail";
 import { translateDescription } from "../lib/translateDescription";
@@ -134,7 +134,13 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const dialogRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<Popup | null>(null);
   // Focus in on open, Tab stays inside while this is the top-most popup, focus back on close (#837).
-  useDialogFocus(dialogRef, () => !!popupRef.current && modalStack.isTop(popupRef.current), mounted);
+  // Top-most popup, and nothing shown over it: a toast (the guest login prompt) takes Tab when it is up (#956)
+  const popupIsTop = () => {
+    if (!popupRef.current || !modalStack.isTop(popupRef.current)) return false;
+    const layer = dialogRef.current?.closest("body > *");
+    return !(layer && hasLayerAbove(layer));
+  };
+  useDialogFocus(dialogRef, popupIsTop, mounted);
   const closingRef = useRef(false);
   const historyPushedRef = useRef(false);
   const router = useRouter();

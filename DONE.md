@@ -77,6 +77,23 @@
 
 ---
 
+## #956 The guest login toast is reachable from the popup and can be held (2026-10-22)
+
+**What:** a guest pressing "ถูกใจ" / "เพิ่มในรายการ" / the reviews' sign-in prompt in the book popup gets a toast offering
+"เข้าสู่ระบบ", but the popup's Tab trap (top-of-stack check only) kept focus inside the popup, and the toast's 4 s timer
+ignored hover and focus. Now the toast's timer holds while it is hovered or focused and resumes with what was left (the
+progress bar pauses with it); the toast renders in its own host layer, moved to the end of `<body>` whenever a toast
+shows, so it sits after any popup or the reader in Tab order and is a layer above them; the popup's trap stands aside
+when such a layer is up (`hasLayerAbove`, as the reader drawer since #928). `AuthContext` untouched.
+
+**Validated:** production build: before, 40 Tabs from the popup never reached the toast and a hovered toast was gone
+after 6 s; with only the trap change it took 43 Tabs (through the page behind the popup); after, Tab goes from the
+popup's last control straight to the toast (15 Tabs from "ถูกใจ"), a hovered toast stays past its timer and leaves once
+the pointer does. The reader-drawer and failed-lists probes (both raise toasts) still pass; screenshot shows the toast in
+place. tsc 0; eslint unchanged.
+
+---
+
 ## #954 Popup reviews: a failed load is not "no reviews yet" (2026-10-22)
 
 **What:** `ReviewSection.fetchPublic` wrote the summary and list only when each response was ok and had no `catch`, so a
