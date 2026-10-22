@@ -17,6 +17,7 @@ import LimitCounter from "../../../components/ui/LimitCounter";
 import VoteButtons from "../../../components/VoteButtons";
 import CommentThread from "../../../components/CommentThread";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 import { usePostStream } from "../../../hooks/useForumStream";
 import { usePageVisible } from "../../../hooks/pageVisibility";
 import { cacheInvalidate } from "../../../lib/apiCache";
@@ -70,6 +71,7 @@ export default function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user, showLoginPrompt } = useAuth();
+  const { showToast } = useToast();
   const editTitleLimitId = useId();
   const editContentLimitId = useId();
   const commentLimitId = useId();
@@ -228,8 +230,8 @@ export default function PostDetailPage() {
     try {
       await deletePost(post.id);
       router.push('/community');
-    } catch (err) {
-      console.error(err);
+    } catch {
+      showToast({ type: "error", message: "ลบโพสต์ไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
       setDeletingPost(false);
       setConfirmDeletePost(false);
     }
@@ -250,8 +252,8 @@ export default function PostDetailPage() {
       const updated = await updatePost(post.id, { title: editPostTitle, content: editPostContent });
       setPost(updated);
       setIsEditingPost(false);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      showToast({ type: "error", message: "บันทึกโพสต์ไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // the edit stays open with its text
     } finally {
       setSavingPost(false);
     }
@@ -270,9 +272,11 @@ export default function PostDetailPage() {
       const created = await createComment({ postId: post.id, content });
       if (!mountedRef.current) return;
       setComments(prev => [...prev, created]);
-    } catch (err) {
-      console.error(err);
-      if (mountedRef.current) setNewComment(content);
+    } catch {
+      if (mountedRef.current) {
+        setNewComment(content);
+        showToast({ type: "error", message: "ส่งความคิดเห็นไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
+      }
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }

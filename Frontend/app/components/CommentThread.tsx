@@ -13,6 +13,7 @@ import { createComment, updateComment, deleteComment } from "../lib/communityApi
 import { FORUM_LIMITS } from "../lib/forumLimits";
 import LimitCounter from "./ui/LimitCounter";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { useModalTransition } from "../hooks/useModalTransition";
 import type { ForumComment } from "../lib/types";
 
@@ -26,6 +27,7 @@ function CommentThreadImpl({
   onCommentAdded: (newComment: ForumComment) => void;
 }) {
   const { user, showLoginPrompt } = useAuth();
+  const { showToast } = useToast();
   const editLimitId = useId();
   const replyLimitId = useId();
   const [isReplying, setIsReplying] = useState(false);
@@ -84,7 +86,7 @@ function CommentThreadImpl({
       await deleteComment(comment.id, comment.postId);
       setIsDeleted(true);
     } catch {
-      console.error("Failed to delete comment");
+      showToast({ type: "error", message: "ลบความคิดเห็นไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
       setDeletingComment(false);
       setConfirmDelete(false);
     }
@@ -106,7 +108,7 @@ function CommentThreadImpl({
       setDisplayContent(editContent);
       setIsEditing(false);
     } catch {
-      console.error("Failed to update comment");
+      showToast({ type: "error", message: "แก้ไขความคิดเห็นไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // the text stays in the box
     } finally {
       setSavingEdit(false);
     }
@@ -115,17 +117,15 @@ function CommentThreadImpl({
   const handleReply = async () => {
     if (!replyContent.trim() || submitting) return;
 
-    const content = replyContent;
-
-    setReplyContent("");
-    setIsReplying(false);
     setSubmitting(true);
-
     try {
-      const result = await createComment({ postId: comment.postId, parentId: comment.id, content });
+      const result = await createComment({ postId: comment.postId, parentId: comment.id, content: replyContent });
+      // cleared only once stored: a failed reply used to be wiped before the request (#987)
+      setReplyContent("");
+      setIsReplying(false);
       onCommentAdded(result);
     } catch {
-      console.error("Failed to post reply");
+      showToast({ type: "error", message: "ตอบกลับไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
     } finally {
       setSubmitting(false);
     }

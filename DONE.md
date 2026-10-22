@@ -77,6 +77,35 @@
 
 ---
 
+## #987 A failed write says so and keeps the typed text — reports, replies, posts, reader comments, votes, notifications (2026-10-22)
+
+**What:** writes that failed were silent or claimed success (`fetch` resolves on a 4xx/5xx; other handlers caught the
+error and only logged it). The report dialog said "ส่งรายงานแล้ว ✅" for a refused report, and a failed reply wiped the
+typed text before the request. Every write now checks the answer; raw `fetch` callers check `res.ok`. Typed text is
+cleared only after success, and a failure shows the existing error toast (`FollowUserButton`'s "…ไม่สำเร็จ ลองใหม่อีกครั้ง").
+The report dialog shows its error inside the dialog and keeps the form. Reader-comment delete and review delete are
+guarded against a second click. Notifications are marked read only once the server accepted it, through a new `send()`
+that returns `res.ok`, because the existing `apiFetch` returns `null` both for a failure and for an empty success body.
+
+**Validated:** production build + stand-in (`WRITES=1`, `FLAKY_ONCE` fails the first matching write), signed in through
+the local fake session. Main-equivalent build (red):
+- comment: the text is restored but there is no message;
+- reply: the box closes and the text is lost;
+- vote: no message;
+- report: "ส่งรายงานแล้ว" shown for a 503.
+
+Fix (green):
+- comment: the text is kept, the toast shows, and the retry posts and clears the box;
+- reply: the box stays open with its text and the toast shows; the retry is accepted (`POST [503, 201]`) and closes the box;
+- vote: the toast shows;
+- report: the error is shown inside the dialog with the form kept, and the retry reaches "ส่งรายงานแล้ว".
+
+Not run end to end: post edit/delete, comment edit/delete, the create-post failures on `/community`, the manga page and
+the quick post, reader comments, review delete and notifications. These are checked by tsc and code reading (same
+pattern). eslint matches main on all ten files.
+
+---
+
 ## #988 Forum compose follows the server: role-filtered categories on the manga page, clipped auto titles, input limits (2026-10-22)
 
 **What:**

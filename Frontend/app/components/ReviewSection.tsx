@@ -3,6 +3,7 @@
 import { PRIMARY_FILL } from "./ui/Button";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { supabase } from "../lib/supabase";
 import { parseJsonOrNull } from "../lib/safeJson";
 import StarRating from "./StarRating";
@@ -22,6 +23,7 @@ const BASE = (id: string) => `/api/proxy/reviews/${encodeURIComponent(id)}`;
 
 export default function ReviewSection({ mangaId, mangaTitle }: Props) {
   const { user, showLoginPrompt } = useContext(AuthContext);
+  const { showToast } = useToast();
 
   const [summary, setSummary] = useState<ReviewSummary>({ averageRating: 0, count: 0 });
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
@@ -33,6 +35,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [deletingReview, setDeletingReview] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
   const fetchPublic = useCallback(async () => {
@@ -108,17 +111,24 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
   }
 
   async function handleDelete() {
-    const token = await getToken();
-    if (!token) return;
-    const res = await fetch(BASE(mangaId), {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
+    if (deletingReview) return;
+    setDeletingReview(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("no session");
+      const res = await fetch(BASE(mangaId), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`review delete ${res.status}`);
       setMyReview(null);
       setRating(0);
       setBody("");
       await fetchPublic();
+    } catch {
+      showToast({ type: "error", message: "ลบรีวิวไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // was silent, with no guard against a second click (#987)
+    } finally {
+      setDeletingReview(false);
     }
   }
 

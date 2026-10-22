@@ -8,6 +8,7 @@ import PostCard from "../../../components/PostCard";
 import { PostSkeleton } from "../../../components/ForumSkeleton";
 import { listPosts, createPost } from "../../../lib/communityApi";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 import PostImageUploader from "../../../components/PostImageUploader";
 import { useLocalLenis } from "../../../hooks/useLocalLenis";
 import { useIsMobile } from "../../../hooks/useIsMobile";
@@ -27,6 +28,7 @@ type MangaMeta = { title?: string; covers?: { url: string; localUrl?: string }[]
 export default function MangaCommunityPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
   const { user, userRole, showLoginPrompt } = useAuth();
+  const { showToast } = useToast();
   const postTitleLimitId = useId();
   const postContentLimitId = useId();
 
@@ -156,8 +158,8 @@ export default function MangaCommunityPage() {
         imageUrls: images,
       });
       setPosts((prev) => prev.map((p) => (p.id === tempId ? realPost : p)));
-    } catch (err) {
-      console.error(err);
+    } catch {
+      showToast({ type: "error", message: "โพสต์ไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // the modal reopens with the text, now with a reason (#987)
       setPosts((prev) => prev.filter((p) => p.id !== tempId));
       setNewPost(postData);
       setPostImages(images);

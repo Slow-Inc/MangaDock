@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import type { NotificationItem } from "../lib/notificationTypes";
 import Loader from "./ui/Loader";
 import { usePopoverDismiss } from "../hooks/popoverDismiss";
+import { useToast } from "../contexts/ToastContext";
 
 const POLL_INTERVAL = 60_000;
 
@@ -26,8 +27,21 @@ async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T | null> 
   return text ? JSON.parse(text) : null;
 }
 
+/** A write the server must accept: true only on an ok answer (apiFetch's null also means "empty body"). */
+async function send(path: string, opts: RequestInit): Promise<boolean> {
+  try {
+    const token = await getToken();
+    if (!token) return false;
+    const res = await fetch(path, { ...opts, headers: { ...(opts.headers ?? {}), Authorization: `Bearer ${token}` } });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export default function NotificationBell() {
   const [unread, setUnread] = useState(0);
+  const { showToast } = useToast();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,14 +72,21 @@ export default function NotificationBell() {
 
   usePopoverDismiss(open, panelRef, () => setOpen(false)); // outside click or Escape (#870)
 
+  // Marked read only once stored — a refused PATCH used to clear the badge until the next poll brought it back (#987)
   async function handleMarkRead(id: string) {
-    await apiFetch(`/api/proxy/notifications/${id}/read`, { method: "PATCH" });
+    if (!(await send(`/api/proxy/notifications/${id}/read`, { method: "PATCH" }))) {
+      showToast({ type: "error", message: "ทำเครื่องหมายว่าอ่านแล้วไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
+      return;
+    }
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     setUnread((c) => Math.max(0, c - 1));
   }
 
   async function handleMarkAllRead() {
-    await apiFetch("/api/proxy/notifications/read-all", { method: "PATCH" });
+    if (!(await send("/api/proxy/notifications/read-all", { method: "PATCH" }))) {
+      showToast({ type: "error", message: "ทำเครื่องหมายว่าอ่านแล้วไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
+      return;
+    }
     setItems((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnread(0);
   }

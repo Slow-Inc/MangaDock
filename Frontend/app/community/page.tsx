@@ -213,8 +213,8 @@ function CommunityContent() {
       });
       // Replace temp with authoritative server post
       setPosts(prev => prev.map(p => p.id === tempId ? realPost : p));
-    } catch (err) {
-      console.error(err);
+    } catch {
+      showToast({ type: "error", message: "โพสต์ไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // the modal reopens with the text, now with a reason (#987)
       // Revert: remove temp post, restore form
       setPosts(prev => prev.filter(p => p.id !== tempId));
       setNewPost(postData);
