@@ -473,13 +473,24 @@ describe('ForumService.getTrendingManga', () => {
     expect(rpc).toHaveBeenCalledWith('get_trending_manga', { p_limit: 3 });
   });
 
-  it('returns empty array on Supabase error without throwing', async () => {
+  // #978: an empty list read as "nothing is trending" and hid the trending page's load-error state (#911); a database
+  // error is the database-down signal (an Error naming Supabase → 503 SUPABASE_OFFLINE), not an empty answer.
+  it('a Supabase error rejects as a Supabase failure instead of answering an empty list', async () => {
     const rpc = jest
       .fn()
       .mockResolvedValue({ data: null, error: { message: 'DB failure' } });
     const service = makeService(() => ({}), rpc);
 
-    await expect(service.getTrendingManga()).resolves.toEqual([]);
+    await expect(service.getTrendingManga()).rejects.toThrow(
+      /Supabase.*DB failure/,
+    );
+  });
+
+  it('a failed RPC call (network) rejects too', async () => {
+    const rpc = jest.fn().mockRejectedValue(new TypeError('fetch failed'));
+    const service = makeService(() => ({}), rpc);
+
+    await expect(service.getTrendingManga()).rejects.toThrow('fetch failed');
   });
 });
 
