@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 30 — config audit: two more dead Backend keys fixed (#893), two unreachable features recorded (#894) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited every key `Backend/src/books/mit-config.ts` emits against the MIT Pydantic models: **two dead keys** — `translator.api_key` / `api_url` were dropped, so a non-gemini deployment's endpoint/key never reached MIT (wrong endpoint, or `MissingAPIKeyException` at construction although the request carried a key). Added both fields; `OpenAITranslator` builds its client from `.env` when a key exists, rebuilds it from the request in `parse_args`, and raises at request time otherwise (env-only behaviour unchanged; 3 tests).
+- Opposite direction recorded in **#894**: `detector.det_bubble_synth` (#170/#178) and `render.fit_below_floor` (#883) are implemented in MIT but no Backend field sends them — proposed `MIT_BUBBLE_SYNTH` / `MIT_FIT_BELOW_FLOOR` flags.
+- Benchmark `2026-10-22-config-audit-dead-keys.md`; gate **849 passed** (new test file marked heavy — it imports the torch-holding translators package).
+
 ## MIT quality loop, round 29 — `concise_bubbles` was a dead flag; now carried, A/B is a tie (#892) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
