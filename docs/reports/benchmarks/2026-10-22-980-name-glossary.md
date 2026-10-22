@@ -64,3 +64,21 @@ Thai (13 unit tests + prompt-carriage tests).
 
 Known limitation kept: names that appear only once on a page are pinned only after they recur; JP/kanji names are
 not extracted yet.
+## Precision pass (round 60): clause-shaped "spellings" and contraction "names" filtered
+
+A within-page scan of 60 stored pages surfaced two false-positive glossary entries: **`SHES`** was taken as a
+name (OCR of `SHE'S`) and the region's whole Thai clause as its "spelling" (TH has no spaces, so a clause is one
+run). Enforcing that could have rewritten ordinary dialogue.
+
+- `extract_glossary` now accepts a spelling only when it is **3-18 characters** (a transliterated name, not a
+  clause) and the stoplist covers common contractions (`SHES`, `IM`, `IVE`, `YOURE`, `THATS`, `DONT`, …).
+- Re-scan of the same 60 pages: **0 within-page name variants** (was 2, both false positives).
+- Unit tests pin both guards (clause not extracted; contractions not candidates).
+- Re-measured the real Tsuki pair after the change: baseline `สึกุโยมิ / ตสึกิโยมิ` (inconsistent) -> glossary
+  arm `ทสึคึโยมิ / ทสึคึโยมิ` (**consistent**); gate **883 passed**.
+
+## Negative result recorded
+
+A "dropped numbers" audit over **11,633** stored src/dst pairs found no credible digit loss: every hit was a
+formatting artefact (`20, 000` with a space after the comma), a fullwidth digit, or OCR noise inside a word
+(`60NNA`, `7BYTHE`). No guard was added — a retry trigger for those would only waste calls.

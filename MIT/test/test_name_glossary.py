@@ -103,3 +103,15 @@ def test_apply_glossary_fixes_a_realistic_vowel_consonant_drift_980():
     regions = _regions(('TSUKUYOMI!', 'ทสึคิโยมิ!'))
     assert apply_glossary(regions, {"TSUKUYOMI": "ทสึคุโยมิ"}) == 1
     assert regions[0].translation == 'ทสึคุโยมิ!'
+
+
+def test_a_clause_longer_than_a_name_is_not_a_spelling_980b():
+    regions = [
+        {"src": "SHES!", "dst": "เธอเป็นแบบนี้แม้ไม่มีใครจับตามองก็ตาม"},
+    ]
+    assert extract_glossary(regions) == {}
+
+
+def test_common_contraction_words_are_not_name_candidates_980b():
+    found = candidate_names(["SHES GOT IT", "IVE SEEN THAT", "YOURE LATE"])
+    assert "SHES" not in found and "IVE" not in found and "YOURE" not in found

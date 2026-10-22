@@ -15,6 +15,8 @@ A AN AND ARE AS AT BE BUT BY CAN COULD DO DOES DID FOR FROM GET GOT HAD HAS HAVE
 I IF IN IS IT ITS JUST KNOW LET LIKE ME MY NO NOT NOW OF ON OR OUR OUT SHE SO SOME THAT THE THEN THERE
 THEY THIS TO TOO UP US WAS WE WERE WHAT WHEN WHERE WHO WHY WILL WITH WOULD YOU YOUR MEAN ALL SAME ONLY
 EVEN MORE MOST VERY WELL STILL BACK DOWN OVER UNDER ONE TWO THREE FIVE RIGHT LEFT GOOD PLEASE THANK
+SHES IM IVE YOURE THATS ITS DONT CANT WONT DIDNT DOESNT ISNT ARENT WASNT WERENT HAVENT HASNT HADNT
+THOSE THOUGH THROUGH UNTIL WHICH WHILE WANT SAID MUST MAY OFF ONLY OVER SUCH THAN
 """.split())
 
 _LATIN_NAME = re.compile(r"\b([A-Z][a-z]{2,}|[A-Z]{3,})\b")
@@ -74,7 +76,8 @@ def extract_glossary(regions, existing=None) -> dict:
         if not runs:
             continue
         spelling = max(runs, key=len)
-        if len(spelling) >= 3:
+        # a transliterated name is short; a whole Thai clause means the region was not name-focused
+        if 3 <= len(spelling) <= 18:
             glossary[name] = spelling
     return glossary
 

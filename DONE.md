@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 60 — glossary precision pass + the digit audit's negative result (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Glossary precision:** a within-page scan of 60 stored pages found two false-positive entries — `SHES` (OCR of "SHE'S") taken as a name with the whole Thai clause as its "spelling". `extract_glossary` now accepts spellings only **3-18 chars** (a transliterated name, not a clause) and the stoplist covers common contractions; re-scan = **0 within-page variants** (was 2 FPs), real Tsuki pair still consistent, gate **883 passed**.
+- **Digit audit (negative result):** scanned **11,633** stored src/dst pairs for numbers lost from the translation — no credible case; all hits were formatting (`20, 000`), fullwidth digits, or OCR noise inside words (`60NNA`). No guard added (a retry would only waste calls).
+- Benchmark updated (`2026-10-22-980-name-glossary.md`); #980 comment with the precision guards.
+
 ## MIT quality loop, round 59 — name glossary hardened: wider drift bound, pipeline regression test, consistency tool (#980) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
