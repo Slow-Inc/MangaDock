@@ -1595,6 +1595,16 @@ class MangaTranslator:
         if not ctx.text_regions or ctx.text_regions == 'cancel':
             return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 
+        return await self._finish_patches(ctx, config, source_icc)
+
+    async def _finish_patches(self, ctx, config, source_icc):
+        """Post-translation half of `translate_patches` (#905 slice 2).
+
+        Extracted verbatim so the batch pipeline can run it as the page's *back* phase — mask, inpaint,
+        render and PNG encoding — after the ordered translation phase. Behaviour is identical to the
+        inlined body it replaces.
+        """
+        img_h, img_w = ctx.img_rgb.shape[:2]
         regions = self._apply_source_lang_filter(ctx, config)
         if not regions:
             return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
@@ -1732,6 +1742,7 @@ class MangaTranslator:
         # rolling context (#159) and translation memory (#160).
         return {'img_width': img_w, 'img_height': img_h, 'patches': patches,
                 'regions': regions_payload(regions) + dropped_regions_payload(getattr(ctx, 'dropped_regions', None) or [])}
+
 
     async def _batch_translate_contexts(self, contexts_with_configs: List[tuple], batch_size: int) -> List[tuple]:
         """

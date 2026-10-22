@@ -38,11 +38,15 @@ def test_missing_or_empty_text_degrades_to_empty_strings():
 def test_translate_patches_returns_the_text_layer():
     """Wiring check via source inspection — running the pipeline needs
     GPU/models (same pattern as test_page_context.py). The patch result dict
-    must carry regions_payload(...) alongside img/patches."""
+    must carry regions_payload(...) alongside img/patches. #905 moved that
+    phase into _finish_patches; translate_patches must delegate to it."""
     src = (Path(__file__).parent.parent / 'manga_translator' / 'manga_translator.py').read_text(encoding='utf-8')
     fn = re.search(r'async def translate_patches\(self.*?(?=\n    async def )', src, re.S)
     assert fn, 'translate_patches not found'
-    assert "'regions': regions_payload(" in fn.group(0)
+    assert 'return await self._finish_patches(ctx, config, source_icc)' in fn.group(0)
+    finish = re.search(r'async def _finish_patches\(self.*?(?=\n    async def )', src, re.S)
+    assert finish, '_finish_patches not found'
+    assert "'regions': regions_payload(" in finish.group(0)
 
 
 # ---- #535 Phase-0c: telemetry enrichment (keys appear only when the attr exists) ----

@@ -128,14 +128,18 @@ def test_detector_config_exposes_bubble_seg_flag():
 
 
 def test_translate_patches_tags_regions_when_bubble_seg_enabled():
-    """Wiring check via source inspection (no GPU/models): translate_patches
-    must gate bubble tagging on the config flag, and grouping must consume the
-    tag (delegated to group_regions)."""
+    """Wiring check via source inspection (no GPU/models): the post-translation phase
+    must gate bubble tagging on the config flag, and grouping must consume the tag
+    (delegated to group_regions). #905 moved that phase into `_finish_patches`;
+    `translate_patches` must delegate to it."""
     mt = (Path(__file__).parent.parent / 'manga_translator' / 'manga_translator.py').read_text(encoding='utf-8')
     fn = re.search(r'async def translate_patches\(self.*?(?=\n    async def )', mt, re.S)
     assert fn, 'translate_patches not found'
-    assert 'config.detector.det_bubble_seg' in fn.group(0)
-    assert '_tag_regions_with_bubbles' in fn.group(0)
+    assert 'return await self._finish_patches(ctx, config, source_icc)' in fn.group(0)
+    finish = re.search(r'async def _finish_patches\(self.*?(?=\n    async def )', mt, re.S)
+    assert finish, '_finish_patches not found'
+    assert 'config.detector.det_bubble_seg' in finish.group(0)
+    assert '_tag_regions_with_bubbles' in finish.group(0)
     assert 'group_regions(' in mt  # _group_nearby_regions delegates to the pure helper
 
 
