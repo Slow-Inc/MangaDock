@@ -66,3 +66,12 @@ On a vertical source the block may become wider than the original column footpri
 stays inside the page and no overlap/spill is measured, but that is a deliberate layout change versus the
 letterer-column convention, and it is proven on only the two real JP pages. Off by default; enable per request
 with `render.widen_vertical_columns=true`.
+## Visual check + production reach (round 68)
+
+- Cropped off/on renders for every changed region (2x upscale) were inspected: the widened Thai block is clearly
+  larger and more readable, still inside its balloon / white space, and does not overlap neighbouring text or
+  cross the panel border. The layout tradeoff (block wider than the source column) is acceptable on these pages
+  but remains a deliberate change -> the feature stays opt-in.
+- **Usable in production:** Backend `MIT_WIDEN_VERTICAL_COLUMNS=1` now maps to
+  `render.widen_vertical_columns` (same pattern as `MIT_FIT_BELOW_FLOOR`); absent -> config byte-identical.
+  Backend config spec: **46 passed** (new test added).

@@ -75,6 +75,7 @@ const ENV_KEYS = [
   'MIT_EN_FONT',
   'MIT_BUBBLE_SYNTH',
   'MIT_FIT_BELOW_FLOOR',
+  'MIT_WIDEN_VERTICAL_COLUMNS',
   'MIT_PATCH_FEATHER',
   'MIT_PATCH_CONTENT_ALPHA',
   'MIT_INPAINT_CONTEXT_PAD',
@@ -198,6 +199,12 @@ describe('BooksService.buildMitConfig', () => {
     process.env.MIT_FIT_BELOW_FLOOR = '1';
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.render.fit_below_floor).toBe(true);
+  });
+
+  it('exposes render.widen_vertical_columns via env (#1006)', () => {
+    process.env.MIT_WIDEN_VERTICAL_COLUMNS = '1';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.widen_vertical_columns).toBe(true);
   });
 
   it('keeps both absent when their envs are unset (#894)', () => {

@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 68 — widen-vertical verified visually + reachable from Backend (`MIT_WIDEN_VERTICAL_COLUMNS`) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Visual check** of the widened layouts: cropped off/on renders of every changed region (2x) show the larger Thai block inside its balloon/white space, no neighbour overlap, no panel-border crossing -> the opt-in layout is sound; the block-wider-than-column tradeoff is why it stays opt-in.
+- **Production reach:** Backend `MIT_WIDEN_VERTICAL_COLUMNS=1` maps to `render.widen_vertical_columns` (same pattern as `MIT_FIT_BELOW_FLOOR`), doc comment added; absent -> config byte-identical. Backend config spec **46 passed** (new test).
+- Benchmark updated (`2026-10-23-jp-render-font-audit.md`); #1006 updated.
+
 ## MIT quality loop, round 67 — opt-in `render.widen_vertical_columns`: JP floor-bound regions gain 20-42% font (#1006) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

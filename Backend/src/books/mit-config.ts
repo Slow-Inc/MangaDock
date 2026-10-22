@@ -188,6 +188,10 @@ export function buildJobKey(
  *   MIT_FIT_BELOW_FLOOR=1   — a clean-layout block that cannot fit between its neighbours
  *                             even at font_size_minimum is shrunk below the floor instead of
  *                             overlapping them (small text beats overlapping text).
+ *   MIT_WIDEN_VERTICAL_COLUMNS=1
+ *                           — (#1006) a vertical Japanese source may use a block up to 1.5x the
+ *                             source column so the Thai font is larger (measured 20-42% on the
+ *                             real JP pages); a layout change, so opt-in.
  */
 export function buildMitConfig(
   env: NodeJS.ProcessEnv,
@@ -396,6 +400,10 @@ export function buildMitConfig(
       // readable floor, shrink below the floor instead of overlapping them (small text beats
       // overlapping text). Absent → current behaviour, byte-identical (#894).
       ...(flagEnv('MIT_FIT_BELOW_FLOOR') ? { fit_below_floor: true } : {}),
+      // #1006 opt-in: a vertical Japanese source rendered to a horizontal-only target may grow its
+      // wrap width toward 1.5x the source column instead of squeezing to the original height, so a
+      // floor-bound region gets a larger font. Absent -> byte-identical renders.
+      ...(flagEnv('MIT_WIDEN_VERTICAL_COLUMNS') ? { widen_vertical_columns: true } : {}),
     },
   });
 }
