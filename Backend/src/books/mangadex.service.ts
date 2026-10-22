@@ -645,7 +645,10 @@ export class MangaDexService {
       return map[tagName];
     } catch (err) {
       this.logger.warn(`[MangaDex] Tag list fetch error: ${String(err)}`);
-      // An unloaded list is an outage, not "no such tag" (#981)
+      // Tags almost never change, so an expired map still answers; with none, an unloaded list is an outage,
+      // not "no such tag" (#981)
+      const stale = this.cache.getStale<Record<string, string>>(cacheKey);
+      if (stale) return stale.data[tagName];
       throw new ServiceUnavailableException('MangaDex tag list unavailable');
     }
   }

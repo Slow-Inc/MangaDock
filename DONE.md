@@ -83,11 +83,12 @@
 `RelatedManga` cached whatever resolved, including a 503 body, for `TTL.LONG` (30 min), so one outage hid the row
 until a reload. Backend: only an unknown id (`NotFoundException`), a book without genres, or a genre MangaDex has no
 tag for answers `[]`. A detail outage propagates, an unavailable rated row is a 503, and `getMangaTagId` throws 503
-itself when the tag list can't be loaded (so `getNewReleases` no longer re-reads the cache to tell the cases apart).
+itself when the tag list can't be loaded and no expired map is left to answer from (so `getNewReleases` no longer
+re-reads the cache to tell the cases apart).
 Frontend: `RelatedManga` throws on a non-ok answer, so nothing is cached. The row stays hidden on failure, and the
 next open retries.
 
-**Validated:** Jest red → green, 4 new tests in `books/books-related.spec.ts` and `books/mangadex-cache-correctness.spec.ts`;
+**Validated:** Jest red → green, 5 new tests in `books/books-related.spec.ts` and `books/mangadex-cache-correctness.spec.ts`;
 the getNewReleases tag tests are unchanged and pass. Production build + stand-in (`RELATED_FLAKY=1`): main build
 `related:[503]`, the second open makes no request and shows no row (red). With the fix it is `[503,200]` and the row
 shows "Cover Loads" and "No Cover At All". Backend full run locally: 901/901 tests; 20 suites can't load `openai`

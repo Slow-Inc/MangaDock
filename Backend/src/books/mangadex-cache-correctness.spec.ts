@@ -133,6 +133,15 @@ describe('MangaDexService.getMangaTagId — a tag list that cannot be loaded is 
     expect(cache.set).not.toHaveBeenCalled();
   });
 
+  it('a 503 with an expired tag map still answers from the stale map', async () => {
+    const { service } = makeService({
+      fetch: () => json({ result: 'error' }, 503),
+      stale: { Action: 'tag-action' },
+    });
+    await expect(service.getMangaTagId('Action')).resolves.toBe('tag-action');
+    await expect(service.getMangaTagId('Nope')).resolves.toBeUndefined();
+  });
+
   it('a loaded list without the tag → undefined', async () => {
     const { service } = makeService({
       fetch: () =>
