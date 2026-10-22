@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 50 — #905 slice 2 start: the page pipeline is now two phases (`_finish_patches`) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Spike findings: the page pipeline already has the seam the batch needs (`_translate_until_translation` = front, `_run_text_translation` = ordered translation), and the rolling cross-page context is **off by default** (`MIT_CONTEXT_PAGES=0`) — ordering only constrains batches that opt into context.
+- Extracted the long post-translation tail of `translate_patches` (mask → inpaint → render → PNG, incl. full-page inpaint, bubble tagging, per-group concurrency) **verbatim** into `_finish_patches(ctx, config, source_icc)`; `translate_patches` now delegates. No behaviour change.
+- Two source-inspection wiring tests (`test_bubble_association`, `test_text_layer`) now assert the new seam and the delegation; relevant suites **206 passed**; gate **863 passed**.
+- Next (slice 3): `translate_batch_pipelined(images, config)` driving the three phases through `run_pipelined`, worker endpoint + batch_runner submission, then the real 9-page chapter A/B and the enable/opt-in decision.
+
 ## MIT quality loop, round 49 — #905 slice 1: the pipelined batch loop, unit-tested (1.69× in simulation) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
