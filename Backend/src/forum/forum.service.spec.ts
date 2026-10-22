@@ -178,6 +178,48 @@ describe('ForumService.vote', () => {
   );
 });
 
+describe('ForumService.vote — a comment of a deleted post (#1020)', () => {
+  it('is a 404 and is not cast, though the comment row itself is live', async () => {
+    const chain = buildMockChain();
+    chain.maybeSingle
+      .mockResolvedValueOnce({ data: { post_id: 'p-deleted' }, error: null }) // the live comment
+      .mockResolvedValueOnce({ data: null, error: null }); // its post is soft-deleted
+    const rpc = jest.fn();
+    const from = jest.fn(() => chain);
+    const service = makeService(from, rpc);
+    await expect(
+      service.vote('u1', {
+        targetType: 'comment',
+        targetId: 'c1',
+        voteValue: 1,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(rpc).not.toHaveBeenCalled();
+    // the second lookup is the comment's own post, filtered on deleted_at
+    expect(from).toHaveBeenLastCalledWith('forum_posts');
+    expect(chain.eq).toHaveBeenLastCalledWith('id', 'p-deleted');
+    expect(chain.is).toHaveBeenLastCalledWith('deleted_at', null);
+  });
+
+  it('a comment of a live post is cast', async () => {
+    const chain = buildMockChain();
+    chain.maybeSingle
+      .mockResolvedValueOnce({ data: { post_id: 'p1' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'p1' }, error: null });
+    const rpc = jest
+      .fn()
+      .mockResolvedValue({ data: [{ upvotes: 1, downvotes: 0 }], error: null });
+    const service = makeService(() => chain, rpc);
+    await expect(
+      service.vote('u1', {
+        targetType: 'comment',
+        targetId: 'c1',
+        voteValue: 1,
+      }),
+    ).resolves.toEqual({ upvotes: 1, downvotes: 0 });
+  });
+});
+
 describe('ForumService.createComment — the post must exist (#1019)', () => {
   it('a comment on a missing or deleted post is a 404 and is not inserted', async () => {
     const chain = buildMockChain();

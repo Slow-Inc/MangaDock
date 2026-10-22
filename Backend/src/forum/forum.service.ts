@@ -897,6 +897,21 @@ export class ForumService {
     }
     const postId =
       dto.targetType === 'post' ? dto.targetId : (target.post_id ?? null);
+    // A comment's post must be live too: deletePost does not cascade deleted_at to its comments (#1020)
+    if (dto.targetType === 'comment') {
+      const { data: post, error: postError } = await this.db
+        .from('forum_posts')
+        .select('id')
+        .eq('id', postId)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (postError) {
+        throw new InternalServerErrorException(
+          `Failed to validate vote target: ${postError.message}`,
+        );
+      }
+      if (!post) throw new NotFoundException('Comment not found');
+    }
 
     // Atomic upsert/toggle + recalculate in a single transaction. Replaces the old
     // select-then-write, which let concurrent votes 500 on the PK or interleave
