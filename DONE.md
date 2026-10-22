@@ -7,7 +7,7 @@
 
 Branch `feat/mit-quality-loop` (PR #794).
 - **Thai wrapping audit (negative result):** 71 real Thai translations wrapped at 2 widths x 2 font sizes (284 configurations) against the renderer's own ZWSP segmentation — **0 mid-word breaks**. The tokenization path is sound, so no fix/guard was added (an earlier audit run reported 147 flags, but that checker treated the boundary after a skipped ZWSP as a mid-word break).
-- **Filler guard live check:** fresh HEAD runs of the pages whose stored history contained the hallucinated `ทน/ทัน` filler show **0 spurious-filler flags** in the new output and gate-clean (the historical runs had 24 unique flagged pairs). Records that the #1039 guard works on live traffic, not only in unit tests.
+- **Filler guard live check:** fresh HEAD output of the two Tsuki pages whose stored history contained the hallucinated `ทน/ทัน` filler has **0 spurious-filler flags**, and the quality gate run separately on them is `pages=2 violations=0 ok=True` (historical runs of those pages had 24 unique flagged pairs). The planned third page (`corpus2/en_Dungeon_..._p0.png`) does not exist in that folder, so the doctor aborted before its gate step — corrected in the benchmark rather than overclaiming.
 - Benchmark `2026-10-23-thai-wrap-and-filler-check.md`.
 
 ## MIT quality loop, round 80 — #1051 second design (real filter early) also not equivalent; experiment reverted (2026-10-23)

@@ -18,3 +18,12 @@ boundary after a skipped ZWSP as a mid-word break).
 Fresh HEAD runs of the pages whose historical output contained the hallucinated `ทน/ทัน` filler: **0 spurious-filler
 flags** in the new output (the guard re-asks such segments) and gate-clean. Historical stored runs of the same
 pages had 24 unique flagged pairs.
+### Correction on the filler check's scope
+
+The fresh run listed three pages but the third (`corpus2/en_Dungeon_..._p0.png`) does not exist in that folder
+(mixed extensions) — the doctor aborted on it before the gate step. So:
+
+- the fresh **two Tsuki pages** were produced and contain **0 spurious-filler flags**;
+- the quality gate was run **separately** on those two pages: `pages=2 violations=0 ok=True`;
+- no claim is made about the Dungeon page from this run (its historical outputs did carry the filler; the same
+  guard path applies, but it was not re-measured here).
