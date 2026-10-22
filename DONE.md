@@ -77,6 +77,28 @@
 
 ---
 
+## #915 Forum lookups: 404 only for a missing row, 503 for a database failure (2026-10-22)
+
+**What:** `ForumService` turned any Supabase error on its six single-row lookups (post, profile, post/comment edit and
+delete) into `NotFoundException`, so an outage read as "not found" — to users, and to the frontend, which since #913
+trusts a 404. `forum/assert-found.ts` `lookupFailure(error, message): never` throws a 404 only when there is no row, or
+Supabase's no-rows code `PGRST116`, or `22P02` (an id that is not a uuid cannot exist); any other error is a 503
+"Database unavailable". Returning `never` lets each site keep its `if (error || !row)` shape with `row` narrowed after it.
+
+**Validated:** `assert-found.spec.ts` red → green (5); `src/forum` jest 72 pass; eslint count on `forum.service.ts` = main's.
+Live, built backend: with `SUPABASE_URL` pointed at a dead port → post, not-a-uuid and profile all **503** (were 404);
+against the real Supabase → unknown uuid 404, `not-a-uuid` 404, an existing post 200, unknown profile 404. (Run with the
+main checkout's `node_modules` junctioned and `openai` from an isolated scratch install — D: had 0.3 GB free.)
+
+**Review round:** the hand-made 503 discarded the Postgres error (the filter logged only "Database unavailable"), and it
+carried code `INTERNAL_ERROR`, so the frontend's Supabase-down toast (keyed on `SUPABASE_OFFLINE`) never fired. Any other
+error is now a plain `Error("Supabase lookup failed (<code>): <message>")`, which `AllExceptionsFilter` already maps to its
+database-down signal — 503, code `SUPABASE_OFFLINE` — and logs as CRITICAL with the cause; the spec runs the thrown error
+through the real filter. Live: dead `SUPABASE_URL` → 503 `SUPABASE_CONNECTION_ERROR`, log "Supabase lookup failed (no code):
+TypeError: fetch failed". `src/forum` 73 pass.
+
+---
+
 ## #913 Community detail pages: "not found" only for a real 404 (2026-10-22)
 
 **What:** with the backend down, `/community/p/[id]` said "ไม่พบข้อมูลกระทู้", `/community/profile/[uid]` "ไม่พบโปรไฟล์" and
