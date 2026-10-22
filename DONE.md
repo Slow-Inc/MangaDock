@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 44 — null calibration: the judge scores 8-3 on identical configs (#902) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran the same translator config **twice** over 11 pages (only sampling differs) and judged it blind: **page votes A 8 / B 3**, segments **50 / 37 / 29 ties**. So an 8-3 page split is inside the null distribution.
+- Segment level: 50/87 decided = 57.5 %, about +1.4σ (p ≈ 0.16) with identical configs, no X/Y slot bias — per-page variance, not blind ordering.
+- **Consequence:** every earlier translation A/B (few-shot 7-5, temperature 7-4, concise 5-5, JP prompt 2-2) is indistinguishable from noise. All of them correctly ended in "no default change"; the loop now knows it cannot claim a prompt win from a 12-page A/B. Process rule recorded: ≤5-page margin at 12 pages = no effect; future A/Bs need ≥40 pages, aggregated repeats, or segment-level binomial checks.
+- Side finding that paid for the round: the null run's 4,462-character repetition loop → #901 detector.
+- Benchmark `2026-10-22-902-judge-noise-calibration.md`.
+
 ## MIT quality loop, round 43 — null experiment finds a repetition loop that escaped the hallucination check (#901) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
