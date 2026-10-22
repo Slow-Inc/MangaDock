@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 19 — a crop without lettering never reaches the SFX rescue (#887) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Measured the rescue's output: of the 20 rescued SFX regions on the corpus, **15 were art/blank crops with no lettering** — the model invented the SFX and pages rendered phantoms (Taida p0's `ฟู่` over plain armour).
+- New `ocr_vlm.crop_has_lettering`: grayscale **std >= 75 and >= 12% very-dark pixels** (real katakana: std 78-92 / 0.15-0.32; art crops: 27-74 / <=0.12). Checked **before** the vision call, so ~2.3 s per refused crop is saved too.
+- 13 affected pages replayed: rescued regions **20 -> 8**, pages with SFX **13 -> 6**, the reported page shows the art intact. Residual phantoms are 4 single thick non-lettering strokes (next: count letter strokes with cv2, at the cost of a dependency in the torch-free module).
+- Doctor LLM contracts updated: a uniform canvas now reports *no request, guard refused* as OK (the bug class is prevented upstream); test renamed. Gate **842 passed**; benchmark + figure `2026-10-22-887-phantom-sfx.md/.png`.
+
 ## MIT quality loop, round 18 — text_threshold 0.3 A/B over 39 pages: keep the default (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
