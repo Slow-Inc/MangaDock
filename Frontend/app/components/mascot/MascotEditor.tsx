@@ -16,6 +16,7 @@ import { useThrottledValue } from "../../hooks/useThrottledValue";
 import Pill from "../ui/Pill";
 import Button from "../ui/Button";
 import Loader from "../ui/Loader";
+import { canvasToPng } from "../../lib/canvasToPng";
 
 const HAT_LABEL: Record<(typeof MASCOT_HATS)[number], string> = { none: "ไม่ใส่", beret: "เบเร่ต์", beanie: "บีนนี่", party: "ปาร์ตี้", crown: "มงกุฎ" };
 const GLASSES_LABEL: Record<(typeof MASCOT_GLASSES)[number], string> = { none: "ไม่ใส่", round: "กลม", square: "เหลี่ยม", shades: "กันแดด" };
@@ -153,7 +154,7 @@ export default function MascotEditor() {
       const token = await getIdToken();
       if (!token) throw new Error("ไม่พบ token");
       await saveMyMascot(token, config);
-      const blob: Blob | null = await new Promise((resolve) => canvas.current?.toBlob(resolve, "image/png") ?? resolve(null));
+      const blob = await canvasToPng(canvas.current);
       if (!blob) throw new Error("สร้างรูปมาสคอตไม่สำเร็จ");
       const url = await uploadProfilePhoto(new File([blob], "mascot.png", { type: "image/png" }));
       await updateUserPhotoURL(url);
