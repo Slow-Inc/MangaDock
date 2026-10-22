@@ -413,8 +413,8 @@ body::-webkit-scrollbar-thumb:active {
 :root:not([data-theme="dark"]) .md-logo-on-light { display: block; }
 :root:not([data-theme="dark"]) .md-logo-on-dark { display: none; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) .md-logo-on-light { display: none; }
-  :root:not([data-theme]) .md-logo-on-dark { display: block; }
+  :root:not([data-theme="light"]) .md-logo-on-light { display: none; }
+  :root:not([data-theme="light"]) .md-logo-on-dark { display: block; }
 }
 
 /* Override focus ring to be invisible inside .no-focus-ring descendants */
