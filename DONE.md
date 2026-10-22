@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 57 — cross-page context A/B: mixed (keep default off); names still inconsistent (#980) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A/B'd the existing **rolling cross-page context** (#159, `MIT_CONTEXT_PAGES`, default 0) on 3 two-page chapter pairs via `translate_batch_pipelined`, judged with a targeted two-page prompt (name spellings, page-2 coherence, meaning errors).
+- **Mixed, not a win:** context ON fixed an invented word and raised Boku page-2 coherence 1->2, but on Tsuki page 2 it produced **four meaning errors including a garbled Thai line** — the injected prior dialogue can pull the model off the current page. Wall time unchanged within noise.
+- **Names are the real cross-page defect:** `TSUKUYOMI` came out with three different Thai spellings across two pages (สึกุโยมิ / ทสึคุโยมิ / ทสึคโยมิ) and context ON did **not** fix it.
+- Decision: `MIT_CONTEXT_PAGES` stays **0**; filed **#980** for a focused *name-glossary* context experiment (names only, extracted per page) with the name-consistency metric as the acceptance gate.
+- Benchmark `2026-10-22-905-context-ab.md`.
+
 ## MIT quality loop, round 56 — GPU inventory: the loop has been testing on the RTX 5060 Ti 16 GB; the 4070 SUPER was idle (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
