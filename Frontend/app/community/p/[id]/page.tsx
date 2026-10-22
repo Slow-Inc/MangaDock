@@ -25,6 +25,8 @@ import { isDisplayedVoteEvent } from "../../../lib/voteEvents";
 import Loader from "../../../components/ui/Loader";
 import { PRIMARY_FILL } from "../../../components/ui/Button";
 import { usePageTitle } from "../../../hooks/pageTitle";
+import LoadError from "../../../components/ui/LoadError";
+import { isNotFound } from "../../../lib/httpError";
 
 function MarqueeText({ text, textClassName, active }: { text: string; textClassName?: string; active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -160,18 +162,25 @@ export default function PostDetailPage() {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [menuOpen]);
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const fetchData = useCallback(async (silent = false) => {
     if (!id) return;
-    if (!silent) setLoading(true);
+    if (!silent) { setLoading(true); setLoadFailed(false); }
     try {
-      const [postRes, commentsRes] = await Promise.all([
-        getPost(id),
-        listComments(id)
-      ]);
+      // Both start at once, but the post decides "not found": with Promise.all a 500 from the comments could win the
+      // race against the post's 404 and turn a missing post into "failed to load" (#913)
+      const postReq = getPost(id);
+      const commentsReq = listComments(id);
+      commentsReq.catch(() => {}); // observed below; avoids an unhandled rejection when the post fails first
+      const postRes = await postReq;
+      const commentsRes = await commentsReq;
       setPost(postRes);
       setComments(commentsRes);
     } catch (err) {
       console.error(err);
+      // "not found" only for a confirmed 404; anything else is a failed load with a retry (#913)
+      if (!silent && !isNotFound(err)) setLoadFailed(true);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -197,11 +206,9 @@ export default function PostDetailPage() {
         setComments(commentsRes);
         setVoteCounts(new Map());
       })
-      .catch(() => {
-        // getPost throws the same error for every non-2xx; leave only when the post is really gone (404).
-        fetch(`/api/proxy/forum/posts/${id}`)
-          .then((res) => { if (mountedRef.current && res.status === 404) router.push("/community"); })
-          .catch(() => {});
+      .catch((err) => {
+        // Leave only when the post is really gone — getPost's error carries the status now (#913)
+        if (mountedRef.current && isNotFound(err)) router.push("/community");
       });
   }, [visible, id, router]);
 
@@ -269,7 +276,12 @@ export default function PostDetailPage() {
     return <PostDetailSkeleton />;
   }
 
-  if (!post) return (
+  if (!post) return loadFailed ? (
+    <div className="py-12">
+      <h1 className="sr-only">โหลดกระทู้ไม่สำเร็จ</h1>
+      <LoadError what="กระทู้" area="community" onRetry={() => fetchData()} />
+    </div>
+  ) : (
     <h1 className="py-20 text-center text-ink-3">ไม่พบข้อมูลกระทู้</h1>
   );
 

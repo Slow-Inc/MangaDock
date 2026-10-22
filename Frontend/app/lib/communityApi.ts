@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import type { ForumPost, ForumComment, ForumCategory, UserProfileResponse } from "./types";
 import { cacheOrFetch, cacheInvalidate, cacheClearByTag, TTL } from "./apiCache";
 import { createAuthHeaders } from "./apiUtils";
+import { HttpError } from "./httpError";
 
 const API_BASE = "/api/proxy";
 
@@ -91,7 +92,7 @@ export async function getPost(id: string) {
       const res = await fetch(`${API_BASE}/forum/posts/${id}`, {
         headers: createAuthHeaders(token),
       });
-      if (!res.ok) throw new Error("Post not found");
+      if (!res.ok) throw new HttpError(res.status, "Post not found"); // 404 vs failed load (#913)
       return res.json() as Promise<ForumPost>;
     },
     TTL.SHORT,
@@ -216,7 +217,7 @@ export async function getProfile(uid: string): Promise<UserProfileResponse> {
   const res = await fetch(`${API_BASE}/forum/profile/${uid}`, {
     headers: createAuthHeaders(token),
   });
-  if (!res.ok) throw new Error("Profile not found");
+  if (!res.ok) throw new HttpError(res.status, "Profile not found"); // 404 vs failed load (#913)
   return res.json() as Promise<UserProfileResponse>;
 }
 

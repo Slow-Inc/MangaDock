@@ -17,6 +17,8 @@ import Loader from "../../../components/ui/Loader";
 import { UidMascot } from "../../../components/mascot/Mascot";
 import { PRIMARY_FILL } from "../../../components/ui/Button";
 import { usePageTitle } from "../../../hooks/pageTitle";
+import LoadError from "../../../components/ui/LoadError";
+import { isNotFound } from "../../../lib/httpError";
 
 type Tab = "posts" | "comments" | "liked" | "translated" | "following";
 type FollowProfile = { uid: string; displayName: string | null; photoUrl: string | null };
@@ -62,6 +64,8 @@ export default function PublicProfilePage() {
   const [data, setData] = useState<UserProfileResponse | null>(null);
   usePageTitle(data ? `${data.profile.displayName ?? "ผู้ใช้ไม่ระบุชื่อ"} · คอมมูนิตี้` : null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
   // The photo URL that failed to load (Google's avatar CDN can refuse); keyed by URL so another profile starts clean.
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("posts");
@@ -107,6 +111,8 @@ export default function PublicProfilePage() {
   useEffect(() => {
     if (!uid) return;
     setLoading(true);
+    setLoadFailed(false);
+    setData(null); // a failed load must not leave the previous profile under the new URL (#913)
     setTab("posts");
     setExtraPosts([]);
     setHasMorePosts(true);
@@ -117,9 +123,12 @@ export default function PublicProfilePage() {
         setBannerYPos(d.profile.bannerPosition ?? 50);
         if (d.posts.length < POSTS_PAGE_SIZE) setHasMorePosts(false);
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        if (!isNotFound(err)) setLoadFailed(true); // "ไม่พบโปรไฟล์" only for a confirmed 404 (#913)
+      })
       .finally(() => setLoading(false));
-  }, [uid]);
+  }, [uid, retry]);
 
   if (loading) {
     return (
@@ -132,7 +141,14 @@ export default function PublicProfilePage() {
   }
 
   if (!data) {
-    return <div className="py-20 text-center text-ink-3">ไม่พบโปรไฟล์</div>;
+    return loadFailed ? (
+      <div className="py-12">
+        <h1 className="sr-only">โหลดโปรไฟล์ไม่สำเร็จ</h1>
+        <LoadError what="โปรไฟล์" area="community" onRetry={() => setRetry((n) => n + 1)} />
+      </div>
+    ) : (
+      <h1 className="py-20 text-center text-ink-3">ไม่พบโปรไฟล์</h1>
+    );
   }
 
   // ── Handlers ──────────────────────────────────────────────────────────────

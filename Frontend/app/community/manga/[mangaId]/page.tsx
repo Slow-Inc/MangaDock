@@ -17,6 +17,7 @@ import { cacheOrFetch, TTL } from "../../../lib/apiCache";
 import { proxyImageUrl } from "../../../lib/imgUrl";
 import { PRIMARY_FILL } from "../../../components/ui/Button";
 import { usePageTitle } from "../../../hooks/pageTitle";
+import LoadError from "../../../components/ui/LoadError";
 
 /** Minimal shape read from the manga-detail endpoint (title + first cover). */
 type MangaMeta = { title?: string; covers?: { url: string; localUrl?: string }[] };
@@ -27,6 +28,7 @@ export default function MangaCommunityPage() {
 
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [sort, setSort] = useState<"new" | "hot">("hot");
   const [viewMode, setViewMode] = useState<'card' | 'compact'>('card');
   const isMobile = useIsMobile();
@@ -67,6 +69,7 @@ export default function MangaCommunityPage() {
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
+    setLoadFailed(false);
     try {
       const res = await listPosts({ mangaId, sort });
       setPosts(res.items);
@@ -79,6 +82,9 @@ export default function MangaCommunityPage() {
       }
     } catch (err) {
       console.error(err);
+      setPosts([]);
+      setLoadFailed(true); // not "no posts in this community" (#913)
+      fetchMangaMeta(); // the title comes from the posts when they load; fetch it on its own so the header is not a skeleton
     } finally {
       setLoading(false);
     }
@@ -121,6 +127,7 @@ export default function MangaCommunityPage() {
     };
 
     setPosts((prev) => [tempPost, ...prev]);
+    setLoadFailed(false); // the new post is the list now — do not keep it behind the load error
     setShowCreateModal(false);
     setNewPost({ title: "", content: "", category: "general" });
     setPostImages([]);
@@ -188,7 +195,7 @@ export default function MangaCommunityPage() {
               <div className="h-7 w-48 bg-fill rounded-lg animate-pulse mb-1" />
             )}
             <p className="text-ink-3 text-xs font-semibold mt-1">
-              {loading ? "..." : `${posts.length} โพสต์`}
+              {loading ? "..." : loadFailed ? "" : `${posts.length} โพสต์`}
             </p>
           </div>
 
@@ -229,6 +236,8 @@ export default function MangaCommunityPage() {
             <PostSkeleton />
             <PostSkeleton />
           </>
+        ) : loadFailed ? (
+          <LoadError what="โพสต์" area="community" onRetry={fetchPosts} />
         ) : posts.length > 0 ? (
           posts.map((post) => <PostCard key={post.id} post={post} viewMode={viewMode} />)
         ) : (
