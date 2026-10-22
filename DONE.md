@@ -77,6 +77,19 @@
 
 ---
 
+## #993 Studio publish: one PATCH per click, the button busy while it is in flight (2026-10-23)
+
+**What:** "เผยแพร่" had no in-flight guard and was never disabled. A double-click sent two status PATCHes, and the
+backend refused the second (400 "Cannot transition from published to published"), so an error toast flashed for a
+publish that worked. The page now tracks `publishingId`. `handleSubmit` returns early while a publish is in flight,
+and the version row and the group card disable that version's button and show "กำลังเผยแพร่...".
+
+**Validated:** E2E on a production build, signed in as a creator (role 2) through the local fake session; the stand-in
+(`STUDIO=1`) changes the status on receipt and answers after 600 ms. A double-click on main sent `PATCH [400, 200]`
+(red); with the fix it sends `[200]`, with the success toast and no error (green). Real tsc 0 errors; eslint matches main.
+
+---
+
 ## #992 A vote clears the cached copies it made stale — the next click no longer undoes it (2026-10-23)
 
 **What:** `communityApi.vote()` stored the vote but invalidated nothing, while every other forum write clears its

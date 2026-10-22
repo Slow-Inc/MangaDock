@@ -35,11 +35,14 @@ function VersionRow({
   onSubmit,
   onDelete,
   isLast,
+  publishingId,
 }: {
   version: ChapterVersion;
   onSubmit: (v: ChapterVersion) => void;
   onDelete: (v: ChapterVersion) => void;
   isLast: boolean;
+  /** The version whose publish is in flight (#993): every publish button waits, this one says so. */
+  publishingId: string | null;
 }) {
   const meta = STATUS_LABEL[version.status];
   return (
@@ -96,9 +99,10 @@ function VersionRow({
           {version.status === "draft" && version.pages.length > 0 && (
             <button
               onClick={() => onSubmit(version)}
-              className={`flex-1 rounded-lg ${PRIMARY_FILL} py-1.5 text-[11px] font-semibold transition`}
+              disabled={publishingId !== null}
+              className={`flex-1 rounded-lg ${PRIMARY_FILL} py-1.5 text-[11px] font-semibold transition disabled:opacity-60`}
             >
-              เผยแพร่
+              {publishingId === version.versionId ? "กำลังเผยแพร่..." : "เผยแพร่"}
             </button>
           )}
           <button
@@ -119,11 +123,13 @@ function ChapterGroup({
   versions,
   onSubmit,
   onDelete,
+  publishingId,
 }: {
   chapterNumber: string;
   versions: ChapterVersion[];
   onSubmit: (v: ChapterVersion) => void;
   onDelete: (v: ChapterVersion) => void;
+  publishingId: string | null;
 }) {
   const [open, setOpen] = useState(versions.length === 1);
   const hasMultiple = versions.length > 1;
@@ -200,9 +206,10 @@ function ChapterGroup({
             {versions[0].status === "draft" && versions[0].pages.length > 0 && (
               <button
                 onClick={() => onSubmit(versions[0])}
-                className={`rounded-xl ${PRIMARY_FILL} px-3 py-2 text-xs font-semibold transition`}
+                disabled={publishingId !== null}
+                className={`rounded-xl ${PRIMARY_FILL} px-3 py-2 text-xs font-semibold transition disabled:opacity-60`}
               >
-                เผยแพร่
+                {publishingId === versions[0].versionId ? "กำลังเผยแพร่..." : "เผยแพร่"}
               </button>
             )}
             <button
@@ -230,6 +237,7 @@ function ChapterGroup({
                   onSubmit={onSubmit}
                   onDelete={onDelete}
                   isLast={i === versions.length - 1}
+                  publishingId={publishingId}
                 />
               ))}
             </div>
@@ -323,7 +331,12 @@ export default function MangaDetailPage() {
     }
   }, [user, fetchVersions]);
 
+  // One publish at a time: a second click used to send a second PATCH, whose 400 ("Cannot transition from
+  // published to published") showed an error next to the success (#993)
+  const [publishingId, setPublishingId] = useState<string | null>(null);
   const handleSubmit = async (version: ChapterVersion) => {
+    if (publishingId) return;
+    setPublishingId(version.versionId);
     try {
       const token = await getIdToken();
       if (!token) throw new Error("ไม่พบ token");
@@ -336,6 +349,8 @@ export default function MangaDetailPage() {
         message: e instanceof Error ? e.message : "ไม่สามารถเผยแพร่งานแปลได้",
         duration: 3000,
       });
+    } finally {
+      setPublishingId(null);
     }
   };
 
@@ -444,6 +459,7 @@ export default function MangaDetailPage() {
                   versions={grpVersions}
                   onSubmit={handleSubmit}
                   onDelete={handleDelete}
+                  publishingId={publishingId}
                 />
               ));
             })()}
