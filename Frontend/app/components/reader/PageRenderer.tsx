@@ -91,6 +91,12 @@ function PageRendererImpl({
   // keyed on the image's source, so turning to another page never shows this page's error.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  // Turning the page drops the old failure, so coming back re-tries with the spinner, not a stale error
+  const [failedPage, setFailedPage] = useState(page);
+  if (failedPage !== page) {
+    setFailedPage(page);
+    setFailedSrc(null);
+  }
 
   if (continuousMode) {
     return (
@@ -201,7 +207,7 @@ function PageRendererImpl({
           </div>
         )}
         {imgFailed && (
-          <div role="alert" className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 text-sm text-ink-2">
+          <div role="alert" className="absolute inset-0 z-10 flex min-h-48 min-w-48 flex-col items-center justify-center gap-3 bg-bg text-sm text-ink-2">
             โหลดหน้านี้ไม่สำเร็จ
             <button
               type="button"
@@ -221,7 +227,7 @@ function PageRendererImpl({
             alt={`หน้า ${page + 1}`}
             draggable={false}
             onContextMenu={(e) => e.preventDefault()}
-            className={`block max-h-[calc(100vh-120px)] max-w-full transition-opacity duration-200 ${imgLoading ? "opacity-0" : "opacity-100"}`}
+            className={`block max-h-[calc(100vh-120px)] max-w-full transition-opacity duration-200 ${imgLoading || imgFailed ? "opacity-0" : "opacity-100"}`}
             onLoad={() => { setImgLoading(false); setFailedSrc((f) => (f === pageSrc ? null : f)); }}
             onLoadStart={() => setImgLoading(true)}
             onError={() => { setImgLoading(false); setFailedSrc(pageSrc); }}
