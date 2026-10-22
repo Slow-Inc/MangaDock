@@ -77,6 +77,25 @@
 
 ---
 
+## #921 A cover that fails to load shows a placeholder, not a broken image (2026-10-22)
+
+**What:** six cover cards (search, `MangaGrid`, `BookRow`, `TopTenCard`, `RelatedManga`, `ContinueReadingRow`) and the
+home hero each had their own one-shot fallback; when the fallback also failed — or there was no cover at all — the browser
+drew its broken-image icon (search used an external `placehold.co` "No Cover" image instead). `coverSources(book)`
+(`lib/imgUrl`) lists every source a card may try, in order and without repeats; `useCoverSrc(book)` steps to the next one
+on each error and returns `null` when none is left, keyed on the sources so a reused card (the hero rotating) restarts.
+Cards then show `CoverPlaceholder` (book glyph + title on the surface tokens); the hero keeps its existing quiet gradient.
+The expand-cover button and lightbox are hidden when there is no cover. Removes `placehold.co`, a DOM `src` mutation, the
+hero's set-state-in-effect (an eslint error on main) and `MangaGrid`'s private `cdnFallback`.
+
+**Validated:** `imgUrl.test.ts` 16 pass (4 new for `coverSources`). Production build against a stand-in backend with four
+books — cover loads / local copy 404 then proxy works / every source 404 / no cover: on `/search`, `/categories/action`,
+`/new` and `/` at 1440 and 390 px, 0 broken `<img>`, the working cover loads, the two dead books show the placeholder, and
+0 requests to placehold.co. The fallback book loads from `/api/img-proxy` on every page; on `/` at 390 px it is off-screen
+in a lazy row and loads once scrolled into view. tsc 0; eslint: no new findings (HeroCarousel goes from 1 error to 0).
+
+---
+
 ## #919 A direct /book link: "book not found" only for a real 404 (2026-10-22)
 
 **What:** `BookRouteModal` (direct `/book/<id>` visits) turned every failure into "ไม่พบข้อมูลหนังสือ", because

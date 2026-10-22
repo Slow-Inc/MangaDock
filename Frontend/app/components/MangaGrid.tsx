@@ -6,7 +6,8 @@ import BookDetailModal from "./BookDetailModal";
 import CoverLightbox from "./CoverLightbox";
 import MangaReader from "./MangaReader";
 import { getHistory } from "../lib/readingHistory";
-import { resolvedThumbnail } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import CoverPlaceholder from "./ui/CoverPlaceholder";
 
 export type GridBook = {
   id: string;
@@ -27,19 +28,11 @@ interface Props {
   books: GridBook[];
 }
 
-function cdnFallback(book: GridBook): string {
-  if (!book.thumbnail) return "";
-  return book.thumbnail.includes("mangadex.org")
-    ? `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`
-    : book.thumbnail;
-}
-
 function GridCard({ book }: { book: GridBook }) {
   const [showModal, setShowModal] = useState(false);
   const [showCover, setShowCover] = useState(false);
   const [showReader, setShowReader] = useState(false);
-  const [thumbSrc, setThumbSrc] = useState(() => resolvedThumbnail(book));
-  const [thumbFellBack, setThumbFellBack] = useState(false);
+  const cover = useCoverSrc(book);
 
   // Same source as BookDetailModal — read from history directly, no extra props needed
   const historyEntry = getHistory().find((h) => h.id === book.id);
@@ -60,15 +53,17 @@ function GridCard({ book }: { book: GridBook }) {
                 <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
               </svg>
             </div>
-          ) : (
+          ) : cover.src ? (
             <Image
-              src={thumbSrc}
+              src={cover.src}
               alt={book.title}
               fill
               className="object-cover transition duration-300 group-hover:scale-105"
               sizes="(max-width: 640px) 45vw, (max-width: 1024px) 20vw, 14vw"
-              onError={() => { if (!thumbFellBack) { setThumbFellBack(true); setThumbSrc(cdnFallback(book)); } }}
+              onError={cover.onError}
             />
+          ) : (
+            <CoverPlaceholder title={book.title} />
           )}
           <div className="absolute inset-0 bg-linear-to-t from-bg/70 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
           {/* Continue reading button */}
@@ -84,7 +79,7 @@ function GridCard({ book }: { book: GridBook }) {
             </button>
           )}
           {/* Expand cover button */}
-          <button
+          {cover.src && <button
             onClick={(e) => { e.stopPropagation(); setShowCover(true); }}
             title="ดูหน้าปกขนาดใหญ่"
             className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/75 text-ink-2 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-bg/80 hover:text-ink focus-visible:opacity-100"
@@ -92,7 +87,7 @@ function GridCard({ book }: { book: GridBook }) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
               <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
             </svg>
-          </button>
+          </button>}
         </div>
 
         {/* Info */}
@@ -121,8 +116,8 @@ function GridCard({ book }: { book: GridBook }) {
       {showModal && (
         <BookDetailModal book={book} onClose={() => setShowModal(false)} />
       )}
-      {showCover && (
-        <CoverLightbox src={thumbSrc} alt={book.title} onClose={() => setShowCover(false)} />
+      {showCover && cover.src && (
+        <CoverLightbox src={cover.src} alt={book.title} onClose={() => setShowCover(false)} />
       )}
       {showReader && lastChapterId && (
         <MangaReader

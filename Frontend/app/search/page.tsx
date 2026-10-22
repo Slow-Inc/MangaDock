@@ -8,7 +8,8 @@ import CoverLightbox from "../components/CoverLightbox";
 import Navbar from "../components/Navbar";
 import { getFavorites, type CachedBook } from "../lib/userCache";
 import { getHistory, type HistoryBook } from "../lib/readingHistory";
-import { resolvedThumbnail } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import CoverPlaceholder from "../components/ui/CoverPlaceholder";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import { inputClass } from "../components/ui/Input";
 import Pill from "../components/ui/Pill";
@@ -61,29 +62,28 @@ function mergeLocal(): LandingBook[] {
 // ─── SearchResultCard ────────────────────────────────────────────────────────
 function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () => void }) {
   const [showCover, setShowCover] = useState(false);
-  const thumb = resolvedThumbnail(book) || "https://placehold.co/200x300/1a1a1a/ffffff?text=No+Cover";
+  const cover = useCoverSrc(book);
   return (
     <>
       <div className="group flex flex-col gap-2 text-left cursor-pointer" onClick={onSelect}>
         <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-line smooth-hover group-hover:scale-[1.03] group-hover:border-ink-3">
-          <Image
-            src={thumb}
-            alt={book.title}
-            fill
-            onError={(e) => {
-              if (book.thumbnailLocal && book.thumbnail) {
-                (e.currentTarget as HTMLImageElement).src =
-                  `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`;
-              }
-            }}
-            className="object-cover"
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
-          />
+          {cover.src ? (
+            <Image
+              src={cover.src}
+              alt={book.title}
+              fill
+              onError={cover.onError}
+              className="object-cover"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
+            />
+          ) : (
+            <CoverPlaceholder title={book.title} />
+          )}
           <div className="absolute inset-0 flex items-end bg-linear-to-t from-bg/80 via-transparent to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
             <span className="text-xs font-semibold text-ink">ดูรายละเอียด</span>
           </div>
           {/* Expand cover button */}
-          <button
+          {cover.src && <button
             onClick={(e) => { e.stopPropagation(); setShowCover(true); }}
             title="ดูหน้าปกขนาดใหญ่"
             className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/75 text-ink-2 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-bg/80 hover:text-ink focus-visible:opacity-100"
@@ -91,7 +91,7 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
               <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
             </svg>
-          </button>
+          </button>}
         </div>
         <div>
           <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">{book.title}</p>
@@ -99,7 +99,7 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
           {book.categories.length > 0 && <p className="mt-1 truncate text-xs text-accent/70">{book.categories[0]}</p>}
         </div>
       </div>
-      {showCover && <CoverLightbox src={thumb} alt={book.title} onClose={() => setShowCover(false)} />}
+      {showCover && cover.src && <CoverLightbox src={cover.src} alt={book.title} onClose={() => setShowCover(false)} />}
     </>
   );
 }

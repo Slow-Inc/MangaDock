@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { useState } from "react";
 import BookDetailModal from "./BookDetailModal";
-import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import CoverPlaceholder from "./ui/CoverPlaceholder";
 import type { LandingBook } from "../lib/types";
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
 export default function TopTenCard({ book, index }: Props) {
   const [isLandscape, setIsLandscape] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const cover = useCoverSrc(book);
 
   return (
     <article className="group relative flex min-w-[10.5rem] items-end gap-2 sm:min-w-[12rem] md:min-w-[15rem] md:gap-3">
@@ -33,24 +35,23 @@ export default function TopTenCard({ book, index }: Props) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-6 w-6"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" /><path d="M16 3v4M8 3v4" /></svg>
             <span className="text-[9px] font-medium">ไม่มีใน Cache</span>
           </div>
-        ) : (
+        ) : cover.src ? (
         <Image
-          src={resolvedThumbnail(book)}
+          src={cover.src}
           alt={book.title}
           fill
           onLoad={(e) => {
             const img = e.currentTarget as HTMLImageElement;
             if (img.naturalWidth > img.naturalHeight) setIsLandscape(true);
           }}
-          onError={(e) => {
-            const fallback = thumbnailFallbackSrc(book);
-            if (fallback) (e.currentTarget as HTMLImageElement).src = fallback;
-          }}
+          onError={cover.onError}
           className={`transition duration-300 group-hover:scale-105 ${
             isLandscape ? "object-contain" : "object-cover"
           }`}
           sizes="192px"
         />
+        ) : (
+          <CoverPlaceholder title={book.title} />
         )}
       </button>
 

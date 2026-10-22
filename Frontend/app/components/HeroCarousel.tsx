@@ -6,7 +6,7 @@ import BookDetailModal from "./BookDetailModal";
 import HeroDescription from "./HeroDescription";
 import HeroDetailButton from "./HeroDetailButton";
 import type { LandingBook } from "../lib/types";
-import { resolvedThumbnail } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
 import { heroAutoplay, useReducedMotion } from "../hooks/reducedMotion";
 import { Pause, Play } from "lucide-react";
 
@@ -203,18 +203,9 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
   }, [total, autoplay]);
 
   const book = books[idx];
-  const resolvedUrl = resolvedThumbnail(book);
-  const [imgUrl, setImgUrl] = useState(resolvedUrl);
-  const [imgFellBack, setImgFellBack] = useState(false);
-  useEffect(() => { setImgUrl(resolvedUrl); setImgFellBack(false); }, [resolvedUrl]);
-  const handleImgError = () => {
-    if (!imgFellBack && book.thumbnail) {
-      setImgFellBack(true);
-      setImgUrl(book.thumbnail.includes("mangadex.org")
-        ? `/api/img-proxy?url=${encodeURIComponent(book.thumbnail)}`
-        : book.thumbnail);
-    }
-  };
+  // null once every source failed: the poster shows the same quiet gradient as an uncached cover (#921)
+  const cover = useCoverSrc(book);
+  const poster = book.thumbnailCached === false ? null : cover.src;
   const [titleMain, titleSub] = splitTitle(book);
 
   return (
@@ -229,17 +220,17 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
           className="group relative mx-auto block aspect-2/3 w-full max-w-[88%] overflow-hidden rounded-2xl text-left"
         >
           <div className={`absolute inset-0 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-            {book.thumbnailCached === false ? (
+            {!poster ? (
               <div className="absolute inset-0 bg-linear-to-br from-fill to-transparent" />
             ) : (
               <Image
-                src={imgUrl}
+                src={poster}
                 alt="" // the button's aria-label and the h1 below already name the book
                 fill
                 priority={idx === 0}
                 sizes="88vw"
                 className="object-cover object-center transition duration-300 group-active:scale-[0.985]"
-                onError={handleImgError}
+                onError={cover.onError}
               />
             )}
           </div>
@@ -277,16 +268,16 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
       >
         {/* Blurred background */}
         <div className={`absolute inset-0 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-          {book.thumbnailCached !== false && (
+          {poster && (
             <Image
-              src={imgUrl}
+              src={poster}
               alt=""
               fill
               priority={idx === 0}
               sizes="100vw"
               aria-hidden
               className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
-              onError={handleImgError}
+              onError={cover.onError}
             />
           )}
         </div>
@@ -297,17 +288,17 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
           {/* Poster */}
           <div className="relative aspect-2/3 w-64 shrink-0 overflow-hidden rounded-2xl ring-1 ring-line lg:w-72 xl:w-80">
             <div className={`absolute inset-0 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}>
-              {book.thumbnailCached === false ? (
+              {!poster ? (
                 <div className="absolute inset-0 bg-linear-to-br from-fill to-transparent" />
               ) : (
                 <Image
-                  src={imgUrl}
+                  src={poster}
                   alt={book.title}
                   fill
                   priority={idx === 0}
                   sizes="320px"
                   className="object-cover object-center"
-                  onError={handleImgError}
+                  onError={cover.onError}
                 />
               )}
             </div>
