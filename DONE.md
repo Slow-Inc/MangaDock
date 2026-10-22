@@ -3,6 +3,14 @@
 
 ---
 
+## MIT speed loop, round 23 — warm profile at HEAD: one gateway call per page, and the overlap that cannot be done (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Warm, single-process profile: wall ~3.9-6.3 s/page, of which **translation 1.7-4.2 s (45-60 %)**; pipeline (detection ~0.4-0.7, OCR ~0.2-0.9, merge ~0.2-0.6, mask ~0.1-0.2, inpaint ~0.1-0.8, render ~0.1-0.4) is ~1.5-2.0 s.
+- Instrumented the translator: **exactly one gateway request per page, no retries** — the stage time is one round trip, not duplicated work.
+- Rejected with reasons: overlapping mask+inpaint with the translation call (the mask must follow the post-translation region list, or dropped junk/art regions get inpainted — behaviour change, not a speed tweak); OCR chunk 32 (5-20 % OCR, inside noise, read risk); panel downscale (round 22); thinking-off (measured no-op on this gateway).
+- Benchmark `2026-10-22-warm-profile-at-head.md`. Next levers are model/detection-resolution trades or Backend cross-page pipelining — user-level decisions.
+
 ## MIT quality loop, round 22 — current-state audit of all 39 pages, plus a rejected speed idea (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
