@@ -97,9 +97,11 @@ export default function Navbar() {
         <div className="flex items-center gap-3 sm:gap-8">
           {pathname.startsWith("/community") && (
             <button 
+              type="button"
               onClick={() => window.dispatchEvent(new Event('toggleMobileMenu'))}
               className="lg:hidden p-2 -ml-1 rounded-xl bg-fill border border-line text-ink-2 hover:text-ink transition-colors"
-              aria-label="Open Community Menu"
+              aria-label="เปิดเมนูคอมมูนิตี้"
+              aria-haspopup="dialog"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />

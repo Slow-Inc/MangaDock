@@ -6,6 +6,8 @@ import Navbar from "../components/Navbar";
 import ForumSideMenu from "../components/ForumSideMenu";
 import { ReactLenis } from 'lenis/react';
 import { useReducedMotion } from "../hooks/reducedMotion";
+import { useDialogFocus } from "../hooks/useDialogFocus";
+import { lockPageScroll } from "../lib/scrollLock";
 import type { ForumCategory } from "../lib/types";
 import Loader from "../components/ui/Loader";
 
@@ -31,15 +33,10 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('toggleMobileMenu', handleToggle);
   }, []);
 
-  // Focus trap: move focus to first focusable element when drawer opens
-  useEffect(() => {
-    if (isMobileMenuOpen) {
-      const firstFocusable = drawerRef.current?.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      firstFocusable?.focus();
-    }
-  }, [isMobileMenuOpen]);
+  // The drawer is a dialog (#940): focus moves in, Tab stays inside, focus returns to the menu button; the page behind
+  // is locked while it is open.
+  useDialogFocus(drawerRef, () => true, isMobileMenuOpen);
+  useEffect(() => (isMobileMenuOpen ? lockPageScroll() : undefined), [isMobileMenuOpen]);
 
   // Escape key handler: close drawer when Escape is pressed
   useEffect(() => {
@@ -69,7 +66,8 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
       <Navbar />
       
       {/* Mobile Drawer Overlay */}
-      <div 
+      <div
+        inert={!isMobileMenuOpen} // only faded and slid out while closed: keep its controls out of the Tab order
         className={`fixed inset-0 z-50 bg-scrim/80 transition-opacity duration-300 lg:hidden ${
           isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
@@ -77,10 +75,11 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
       >
         <div
           ref={drawerRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-label="เมนู"
-          className={`absolute top-0 left-0 w-[300px] h-full bg-surface shadow-2xl border-r border-line transition-transform duration-300 ease-out overflow-y-auto custom-scrollbar p-6 ${
+          className={`absolute top-0 left-0 w-[300px] h-full bg-surface shadow-2xl border-r border-line outline-none transition-transform duration-300 ease-out overflow-y-auto custom-scrollbar p-6 ${
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
           onClick={(e) => e.stopPropagation()}
