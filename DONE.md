@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 37 — JP→TH baseline on real pages, repeatable (#897) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `tools/judge_translations.py` is now **source-language agnostic** ("any source language", `SR:` prefix), so the judge can score JP→TH.
+- Baseline on the two real Japanese pages: **14 segments, mean 1.57/2** (p0 1.71, p1 1.43; EN corpus reference 1.51). Repeatable commands recorded in the benchmark.
+- Data-driven finding: the priority JP→TH defect is **negation handling** — `可愛くない` ("not cute") came out inverted on p0 (`น่ารักดีนะ`) and as a different negative on p1 (`ดูไม่ได้เลย`); two `が` nuances dropped, one register shift.
+- Layout (narrow Thai column on vertical JP regions) is **#183 by design**, not an oversight — a typesetting choice to take up with the product, recorded rather than changed inline.
+- Benchmark `2026-10-22-897-jp-th-baseline.md`.
+
 ## MIT quality loop, round 36 — found real Japanese pages in the app uploads: the JP→TH production path is unevaluated (#897) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).

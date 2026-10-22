@@ -25,8 +25,9 @@ sys.path.insert(0, MIT)
 from manga_translator import initialize as _initialize_env  # noqa: E402
 
 _SYSTEM = (
-    "You are a strict bilingual editor for EN->TH manga translations. You receive the English source "
-    "segments of ONE page and the Thai translation of each. Grade EACH segment's faithfulness on 0-2: "
+    "You are a strict bilingual editor for manga translations into Thai. You receive the source "
+    "segments of ONE page (any source language) and the Thai translation of each. Grade EACH segment's "
+    "faithfulness on 0-2: "
     "2 = meaning fully preserved and idiomatic Thai; 1 = mostly preserved but awkward/literal/missing "
     "nuance; 0 = wrong/garbled/meaning lost/duplicated. Also give the main problem type when score < 2: "
     "'garbled', 'literal', 'wrong', 'dup', 'name', 'fragment' (a cut-off word like 'AGAI-' or 'W-' "
@@ -43,7 +44,7 @@ def _pairs(doctor):
 def _judge(pairs, off, base, key, model, timeout=180):
     import requests
     user = "SOURCE AND TRANSLATION:\n" + "\n".join(
-        f'<|{off + i}|> EN: {en}\n     TH: {th}' for i, (en, th) in enumerate(pairs))
+        f'<|{off + i}|> SR: {en}\n     TH: {th}' for i, (en, th) in enumerate(pairs))
     body = {"model": model, "max_tokens": 4096, "temperature": 0,
             "messages": [{"role": "system", "content": _SYSTEM},
                          {"role": "user", "content": user}]}
