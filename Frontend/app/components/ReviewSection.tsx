@@ -8,6 +8,7 @@ import { parseJsonOrNull } from "../lib/safeJson";
 import StarRating from "./StarRating";
 import ReviewCard from "./ReviewCard";
 import Loader from "./ui/Loader";
+import LoadError from "./ui/LoadError";
 import type { ReviewItem, ReviewSummary } from "../lib/reviewTypes";
 
 type Props = { mangaId: string; mangaTitle: string };
@@ -26,6 +27,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [myReview, setMyReview] = useState<ReviewItem | null>(null);
   const [loadingReviews, setLoadingReviews] = useState(true);
+  const [reviewsFailed, setReviewsFailed] = useState(false); // a failed load is not "no reviews yet" (#954)
 
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState("");
@@ -35,13 +37,19 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
 
   const fetchPublic = useCallback(async () => {
     setLoadingReviews(true);
+    setReviewsFailed(false);
     try {
       const [sumRes, listRes] = await Promise.all([
         fetch(`${BASE(mangaId)}/summary`),
         fetch(BASE(mangaId)),
       ]);
-      if (sumRes.ok) setSummary(await sumRes.json());
-      if (listRes.ok) setReviews(await listRes.json());
+      if (!sumRes.ok || !listRes.ok) throw new Error(`reviews: ${sumRes.status}/${listRes.status}`);
+      // Both parsed before either is shown: the header and the list come from the same answer
+      const [nextSummary, nextReviews] = await Promise.all([sumRes.json(), listRes.json()]);
+      setSummary(nextSummary);
+      setReviews(nextReviews);
+    } catch {
+      setReviewsFailed(true);
     } finally {
       setLoadingReviews(false);
     }
@@ -121,7 +129,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-base font-semibold text-ink">รีวิวจากผู้อ่าน</h3>
         <div className="flex items-center gap-2">
-          {summary.count > 0 && (
+          {summary.count > 0 && !reviewsFailed && ( // a failed reload must not keep showing the old count
             <span className="text-sm text-ink-2">
               {summary.averageRating.toFixed(1)} / 5 · {summary.count} รีวิว
             </span>
@@ -204,6 +212,8 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
         <div className="flex justify-center py-6 text-ink-3">
           <Loader context="section" label="กำลังโหลดรีวิว" />
         </div>
+      ) : reviewsFailed ? (
+        <LoadError what="รีวิว" onRetry={fetchPublic} />
       ) : others.length === 0 && !myReview ? (
         <div className="py-6 text-center text-sm text-ink-3">ยังไม่มีรีวิว เป็นคนแรกที่รีวิว!</div>
       ) : (
