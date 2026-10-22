@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 12 — letter-name spellings are dropped, the junk `ซีไอไอ` is gone (#882) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Boku p0's bubble-letter SFX `Siiigh` was read as `Siiig` and the translator spelled the letters out into `ซีไอไอ` — junk rendered over the art. New pure guard `is_letter_name_spelling` (Thai-only translation that fully segments into >=3 letter-name syllables via DP; source is one 4-10 letter ASCII token, not all-caps, with a repeated letter) wired into the drop filter with reason *Letter-name spelling of stylized art*. The region is not inpainted, so the original art stays.
+- **Corpus scan (39 pages): exactly 1 drop, 0 false positives**; replay Boku p0: regions 12 -> 11, junk gone; gate 830 passed. Negatives pinned in tests (`SOR`->`ขอ...`, `OMG`->`โอเอ็มจี`, `OK`->`โอเค`, `LOOM`->`ลูม`).
+- Benchmark `2026-10-22-882-letter-name-spelling.md` + before/after PNG. Follow-up recorded in #882: localize such art as a Thai SFX via the vision rescue (needs a discriminator for letter-read art, which the provenance gate refuses today).
+
 ## MIT speed loop, round 11 — the merge stage ran its dispatch twice (dead) + a stage-timer caveat (#885) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
