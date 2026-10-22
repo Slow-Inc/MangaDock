@@ -729,6 +729,15 @@ export class MangaDexService {
         if (text.includes('href="/maintenance-')) {
           this.logger.error(`[MangaDex] MangaDex API กำลังปิดปรับปรุง`);
           this.statusService.broadcastStatus('mangadex', 'maintenance');
+        } else if (
+          response.status >= 400 &&
+          response.status < 500 &&
+          response.status !== 429
+        ) {
+          // Our own bad request (one client's query), not an outage: every user's status banner stays as it is (#958)
+          this.logger.warn(
+            `[MangaDex] Rejected request ${response.status}: ${text.substring(0, 200)}`,
+          );
         } else {
           this.logger.error(`[MangaDex] Error: ${text.substring(0, 200)}`);
           this.statusService.broadcastStatus('mangadex', 'offline');

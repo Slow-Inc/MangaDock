@@ -25,6 +25,7 @@ import {
 } from '../auth/turnstile.guard';
 import { resolveTurnstileConfig } from '../auth/turnstile.config';
 import { verifyTurnstileToken } from '../auth/turnstile.verify';
+import { queryInt } from '../common/query-int';
 
 @Controller('books')
 export class BooksController {
@@ -87,8 +88,8 @@ export class BooksController {
     @Query('tag') tag?: string,
   ) {
     return this.booksService.getNewReleases(
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 35,
+      queryInt(page, 1, { min: 1 }),
+      queryInt(limit, 35, { min: 1, max: 100 }),
       tag,
     );
   }
@@ -101,8 +102,8 @@ export class BooksController {
   ) {
     return this.booksService.getGenreManga(
       slug,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 28,
+      queryInt(page, 1, { min: 1 }),
+      queryInt(limit, 28, { min: 1, max: 100 }),
     );
   }
 
@@ -373,20 +374,20 @@ export class BooksController {
     return this.booksService.searchBooks(
       query ?? '',
       lang,
-      limit ? Math.min(parseInt(limit, 10), 100) : 100,
-      offset ? parseInt(offset, 10) : 0,
+      queryInt(limit, 100, { min: 1, max: 100 }),
+      queryInt(offset, 0, { min: 0 }),
       status,
-      yearFrom ? parseInt(yearFrom, 10) : undefined,
-      yearTo ? parseInt(yearTo, 10) : undefined,
+      queryInt(yearFrom, 0, { min: 0 }) || undefined,
+      queryInt(yearTo, 0, { min: 0 }) || undefined,
     );
   }
 
   @Get(':id/related')
-  getRelated(
-    @Param('id') id: string,
-    @Query('limit') limit?: string,
-  ) {
-    return this.booksService.getRelated(id, limit ? Math.min(parseInt(limit, 10), 50) : 10);
+  getRelated(@Param('id') id: string, @Query('limit') limit?: string) {
+    return this.booksService.getRelated(
+      id,
+      queryInt(limit, 10, { min: 1, max: 50 }),
+    );
   }
 
   /** Proxy external images (e.g. MangaDex CDN) to avoid hotlink blocking. */

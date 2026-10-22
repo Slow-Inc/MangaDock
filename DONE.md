@@ -77,6 +77,22 @@
 
 ---
 
+## #958 Book query params validated; a bad request no longer reports "MangaDex offline" to everyone (2026-10-22)
+
+**What:** `/books/new-releases`, `/books/genre/:slug`, `/books/search` and `/books/:id/related` passed `parseInt(...)`
+straight on (`?limit=abc` → NaN; no upper bound on new-releases/genre; negative page/offset), and
+`MangaDexService.fetchMangaWithParamsPaged` broadcast any non-2xx MangaDex answer as `mangadex: offline` to every SSE
+client — so one client's bad query, answered with a MangaDex 400, put the outage banner in front of every user. New
+`common/query-int.queryInt(value, fallback, { min, max })` parses and clamps each param; a 4xx other than 429 is logged
+as our own rejected request and no longer broadcast (5xx, 429 and network errors still are).
+
+**Validated:** Jest red → green: `query-int.spec.ts` (5), `mangadex-status-4xx.spec.ts` (400 no broadcast; 503 and 429
+still "offline"), `books-query-params.spec.ts` (4: junk → defaults, clamps, never NaN). `src/books` + `src/common`: 51
+suites / 476 tests pass (with the scratchpad `openai` on NODE_PATH, as the worktree lacks it). tsc: no errors in touched
+files (pre-existing spec errors elsewhere). eslint: books.controller 2 → 0 findings, mangadex.service unchanged.
+
+---
+
 ## #956 The guest login toast is reachable from the popup and can be held (2026-10-22)
 
 **What:** a guest pressing "ถูกใจ" / "เพิ่มในรายการ" / the reviews' sign-in prompt in the book popup gets a toast offering
