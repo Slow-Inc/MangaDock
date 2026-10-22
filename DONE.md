@@ -77,6 +77,25 @@
 
 ---
 
+## #932 Home row cards work by keyboard (2026-10-22)
+
+**What:** on desktop, Tab walked through five invisible controls per `BookRow` card (the hover info panel's buttons and
+the expand-cover button, whose `focus-visible:opacity-100` lost to `md:opacity-0`); on mobile the cover was a
+`<div onClick>`, so nothing could open a book; `ContinueReadingRow` had the same structure plus an "อ่านต่อ" badge that was
+a `<div onClick>`. Both rows now give the cover a real `<button>` overlay named "ดูรายละเอียด <title>" (as the Top 10 cards
+are named), open the hover state on keyboard focus with `has-[:focus-visible]` / `group-has-[:focus-visible]` next to each
+`hover` variant (a mouse click does not pin it), re-check the panel side on focus, and make the badge a `<button>`.
+Review follow-ups: the panel's duplicate "ดูรายละเอียด" leaves the Tab order, the badge is named per book, and focus from
+inside a portaled popup no longer runs the card's hover logic.
+
+**Validated:** production build, stand-in rows plus a local reading history, Tab walk measuring each stop inside a row
+card after the 300 ms fade: before, 6 stops at effective opacity 0 at 1440 px and no control named after a book at either
+width; after, 0 invisible stops, 3 row openers per walk, the "อ่านต่อ" badge reachable, Enter on an opener opens the
+popup, at 1440 and 390 px; mouse probe: cover -> popup, expand -> lightbox, badge -> reader at both widths. Screenshot:
+the focused card shows its panel and an inset accent ring. tsc 0; eslint identical to main on both files.
+
+---
+
 ## #930 Popup discussion and reader comments: a failed load is not "none yet" (2026-10-22)
 
 **What:** the book popup's discussion (`MangaDiscussion`) caught a failed `listPosts`, logged it and said

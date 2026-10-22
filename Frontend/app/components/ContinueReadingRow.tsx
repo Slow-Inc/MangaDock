@@ -93,13 +93,16 @@ function HistoryCard({
     <article
       ref={articleRef}
       onMouseEnter={handleHover}
-      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-line bg-fill md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-ink-3 ${expandRight ? "origin-left" : "origin-right"} ${isNew ? "cr-card-enter" : ""}`}
+      onFocus={(e) => { if (e.currentTarget.contains(e.target as Node)) handleHover(); }} // not focus inside a portaled popup
+      // Keyboard focus inside the card opens the same state as hover (#932): has-[:focus-visible] next to each hover
+      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-line bg-fill md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-ink-3 md:has-[:focus-visible]:z-30 md:has-[:focus-visible]:scale-[1.08] md:has-[:focus-visible]:border-ink-3 ${expandRight ? "origin-left" : "origin-right"} ${isNew ? "cr-card-enter" : ""}`}
     >
       {/* Cover */}
       <div
-        onClick={openDetail}
-        className={`relative w-full cursor-pointer overflow-hidden rounded-2xl transition-all duration-300 ${
-          expandRight ? "group-hover:rounded-r-none" : "group-hover:rounded-l-none"
+        className={`relative w-full overflow-hidden rounded-2xl transition-all duration-300 ${
+          expandRight
+            ? "group-hover:rounded-r-none group-has-[:focus-visible]:rounded-r-none"
+            : "group-hover:rounded-l-none group-has-[:focus-visible]:rounded-l-none"
         } ${isLandscape ? "aspect-4/3" : "aspect-2/3"}`}
       >
         {cover.src ? (
@@ -125,28 +128,37 @@ function HistoryCard({
         ) : (
           <CoverPlaceholder title={book.title} />
         )}
-        <div className="absolute inset-0 bg-linear-to-t from-bg/70 via-transparent to-transparent opacity-100 transition duration-300 md:opacity-0 md:group-hover:opacity-100" />
+        <div className="absolute inset-0 bg-linear-to-t from-bg/70 via-transparent to-transparent opacity-100 transition duration-300 md:opacity-0 md:group-hover:opacity-100 md:group-has-[:focus-visible]:opacity-100" />
+        {/* The card's control for keyboard and screen readers (#932): opens the book, named like the Top 10 cards */}
+        <button
+          type="button"
+          onClick={openDetail}
+          aria-label={`ดูรายละเอียด ${book.title}`}
+          className="absolute inset-0 cursor-pointer rounded-[inherit]"
+        />
 
         {/* "อ่านต่อ" badge */}
-        <div
-          onClick={(e) => { e.stopPropagation(); openContinue(); }}
-          className="absolute bottom-2 left-2 right-2 opacity-100 transition duration-300 md:opacity-0 md:group-hover:opacity-100"
+        <button
+          type="button"
+          onClick={openContinue}
+          aria-label={`อ่านต่อ ${book.title}`}
+          className="absolute bottom-2 left-2 right-2 z-10 text-left opacity-100 transition duration-300 md:opacity-0 md:group-hover:opacity-100 md:group-has-[:focus-visible]:opacity-100"
         >
-          <div className="flex items-center gap-1.5 rounded-lg bg-ink/90 px-2.5 py-1.5">
+          <span className="flex items-center gap-1.5 rounded-lg bg-ink/90 px-2.5 py-1.5">
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 shrink-0 translate-x-px text-bg">
               <path d="M8 5v14l11-7z" />
             </svg>
             <span className="text-[11px] font-bold text-bg">อ่านต่อ</span>
-          </div>
-        </div>
+          </span>
+        </button>
       </div>
 
       {/* Info panel */}
       <div
-        className={`pointer-events-none absolute top-0 z-20 hidden h-full w-56 flex-col justify-between bg-surface p-4 opacity-0 shadow-2xl ring-1 ring-line transition-all duration-300 md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 ${
+        className={`pointer-events-none absolute top-0 z-20 hidden h-full w-56 flex-col justify-between bg-surface p-4 opacity-0 shadow-2xl ring-1 ring-line transition-all duration-300 md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 md:group-has-[:focus-visible]:pointer-events-auto md:group-has-[:focus-visible]:opacity-100 ${
           expandRight
-            ? "left-full -translate-x-2 rounded-r-2xl group-hover:translate-x-0"
-            : "right-full translate-x-2 rounded-l-2xl group-hover:translate-x-0"
+            ? "left-full -translate-x-2 rounded-r-2xl group-hover:translate-x-0 group-has-[:focus-visible]:translate-x-0"
+            : "right-full translate-x-2 rounded-l-2xl group-hover:translate-x-0 group-has-[:focus-visible]:translate-x-0"
         }`}
       >
         <div className="flex items-center gap-2">
@@ -234,6 +246,7 @@ function HistoryCard({
         </div>
 
         <button
+          tabIndex={-1} // the cover's button does the same, once per card for the keyboard (#932)
           onClick={openDetail}
           className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-line py-1.5 text-[11px] text-ink-2 transition hover:border-ink-3 hover:text-ink"
         >
