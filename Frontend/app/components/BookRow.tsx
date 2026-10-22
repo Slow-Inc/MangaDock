@@ -96,13 +96,16 @@ function BookCard({
       ref={articleRef}
       key={`${rowId}-${book.id}`}
       onMouseEnter={handleHover}
-      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-line bg-fill md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-ink-3 ${expandRight ? "origin-left" : "origin-right"}`}
+      onFocus={handleHover}
+      // Keyboard focus inside the card opens the same state as hover (#932): has-[:focus-visible] next to each hover
+      className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-line bg-fill md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-ink-3 md:has-[:focus-visible]:z-30 md:has-[:focus-visible]:scale-[1.08] md:has-[:focus-visible]:border-ink-3 ${expandRight ? "origin-left" : "origin-right"}`}
     >
       {/* Cover image */}
       <div
-        onClick={() => setShowModal(true)}
-        className={`relative w-full cursor-pointer overflow-hidden rounded-2xl transition-all duration-300 ${
-          expandRight ? "group-hover:rounded-r-none" : "group-hover:rounded-l-none"
+        className={`relative w-full overflow-hidden rounded-2xl transition-all duration-300 ${
+          expandRight
+            ? "group-hover:rounded-r-none group-has-[:focus-visible]:rounded-r-none"
+            : "group-hover:rounded-l-none group-has-[:focus-visible]:rounded-l-none"
         } ${isLandscape ? "aspect-4/3" : "aspect-2/3"}`}
       >
         {book.thumbnailCached === false ? (
@@ -131,12 +134,19 @@ function BookCard({
         ) : (
           <CoverPlaceholder title={book.title} className="min-h-40" />
         )}
-        <div className="absolute inset-0 bg-linear-to-t from-bg/70 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+        <div className="absolute inset-0 bg-linear-to-t from-bg/70 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100" />
+        {/* The card's control for keyboard and screen readers (#932): opens the book, named like the Top 10 cards */}
+        <button
+          type="button"
+          onClick={() => setShowModal(true)}
+          aria-label={`ดูรายละเอียด ${book.title}`}
+          className="absolute inset-0 cursor-pointer rounded-[inherit]"
+        />
         {/* Expand cover button */}
         {cover.src && <button
           onClick={(e) => { e.stopPropagation(); setShowCover(true); }}
           title="ดูหน้าปกขนาดใหญ่"
-          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/75 text-ink-2 opacity-100 transition-all duration-200 hover:bg-bg/80 hover:text-ink md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
+          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/75 text-ink-2 opacity-100 transition-all duration-200 hover:bg-bg/80 hover:text-ink md:opacity-0 md:group-hover:opacity-100 md:group-has-[:focus-visible]:opacity-100"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
             <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
@@ -146,10 +156,10 @@ function BookCard({
 
       {/* Info panel — expands right unless near the right edge */}
       <div
-        className={`pointer-events-none absolute top-0 z-20 hidden h-full w-56 flex-col justify-between bg-surface p-4 opacity-0 shadow-2xl ring-1 ring-line transition-all duration-300 md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 ${
+        className={`pointer-events-none absolute top-0 z-20 hidden h-full w-56 flex-col justify-between bg-surface p-4 opacity-0 shadow-2xl ring-1 ring-line transition-all duration-300 md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 md:group-has-[:focus-visible]:pointer-events-auto md:group-has-[:focus-visible]:opacity-100 ${
           expandRight
-            ? "left-full -translate-x-2 rounded-r-2xl group-hover:translate-x-0"
-            : "right-full translate-x-2 rounded-l-2xl group-hover:translate-x-0"
+            ? "left-full -translate-x-2 rounded-r-2xl group-hover:translate-x-0 group-has-[:focus-visible]:translate-x-0"
+            : "right-full translate-x-2 rounded-l-2xl group-hover:translate-x-0 group-has-[:focus-visible]:translate-x-0"
         }`}
       >
         {/* Action buttons */}
