@@ -77,6 +77,21 @@
 
 ---
 
+## #935 Studio ConfirmDialog holds and returns focus (2026-10-23)
+
+**What:** `app/studio/components/ConfirmDialog.tsx` declared `aria-modal="true"` but Tab walked out to the page behind
+it, and after Escape or Cancel focus fell to the skip link instead of the "ลบ" button that opened it. It now uses the
+app's `useDialogFocus` (#837), like `BookRouteModal`: Tab and Shift+Tab stay inside, focus returns to the opener on
+close. The hook runs before the existing focus-Cancel effect, so it records the opener first; the root gets
+`tabIndex={-1}` / `outline-none` for the hook's initial focus.
+
+**Validated:** E2E on a production build, signed in as a creator through the local fake session, stand-in `STUDIO=1`
+(probe `confirm935.cjs`): before — Tab reached the skip link and the page, and focus after closing was the skip link;
+after — 4 Tab + 3 Shift+Tab stay on ยกเลิก/ยืนยัน, and focus is back on "ลบ" after Escape and after Cancel. Real tsc clean;
+eslint clean. (Build output on C: through a `.next` junction — D: is full.)
+
+---
+
 ## #1025 Profile bodies are DTOs (2026-10-23)
 
 **What:** `PATCH /users/me`, `POST /users/me/become-translator`, `PATCH /users/me/translator-profile` and
