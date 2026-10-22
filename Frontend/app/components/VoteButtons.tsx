@@ -5,16 +5,16 @@ import { vote } from "../lib/communityApi";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 
-interface VoteButtonsProps {
-  targetType: 'post' | 'comment';
+/** A comment vote must name its post: that post's cached comment list is cleared after the vote (#992). */
+type VoteTarget = { targetType: 'post'; postId?: never } | { targetType: 'comment'; postId: string };
+
+type VoteButtonsProps = VoteTarget & {
   targetId: string;
-  /** A comment's post: its cached comment list is cleared after the vote (#992). */
-  postId?: string;
   initialUpvotes: number;
   initialDownvotes: number;
   initialUserVote: number;
   externalCounts?: { upvotes: number; downvotes: number };
-}
+};
 
 export default function VoteButtons({
   targetType,
