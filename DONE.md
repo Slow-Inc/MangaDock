@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 45 — script audit finds Cyrillic leaks; the retry now names the script (#903) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A script audit over **11,128 stored src/dst pairs** (every run) found **5 segments on 3 pages** where the output uses a script the source does not: the model transliterates **Tsukuyomi into Cyrillic** (`ЦУКУโยมิ`) and "CHEATS" into `ЧИТ`. The 169 raw hits were those 5 segments repeated across ~34 historical runs.
+- The `foreign_script` guard already detects them; the model repeated itself through every retry, so they shipped. The retry now carries an explicit note (`leaked_script` -> "the previous answer used cyrillic letters… write the whole answer in the target script only — transliterate names into Thai letters").
+- Evidence: 2 units + 1 integration test (Cyrillic reply -> retry with note -> clean Thai, 2 calls); the 3 affected pages re-run **twice** (92 segments) → **0 leaks** (baseline 5); gate **858 passed**.
+- Benchmark `2026-10-22-903-cyrillic-leak.md`; #903 records it.
+
 ## MIT quality loop, round 44 — null calibration: the judge scores 8-3 on identical configs (#902) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).

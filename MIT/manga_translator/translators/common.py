@@ -4,7 +4,8 @@ import asyncio
 from typing import List, Tuple
 from abc import abstractmethod
 
-from ..translation_quality import foreign_script, negation_lost, normalize_thai_marks, runaway_translation
+from ..translation_quality import (foreign_script, leaked_script, negation_lost, normalize_thai_marks,
+                                   runaway_translation)
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -267,6 +268,12 @@ class CommonTranslator(InfererModule):
         # #898: make the retry say WHY when the previous answer dropped the source negation.
         if negation_lost(query, trans):
             return query + '\n\n[note: keep the negation of the source in the Thai output — ～ない means ไม่…]'
+        # #903: the model transliterated a name into Cyrillic and repeated itself through every retry.
+        leaked = leaked_script(trans, query)
+        if leaked:
+            return query + (f'\n\n[note: the previous answer used {leaked} letters that do not appear in the '
+                            'source. Write the whole answer in the target script only — transliterate names '
+                            'into Thai letters (Tsukuyomi -> สึกุโยมิ).]')
         return query
 
     def _clean_translation_output(self, query: str, trans: str, to_lang: str) -> str:

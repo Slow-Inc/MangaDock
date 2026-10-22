@@ -6,6 +6,7 @@ segments (`_INVALID_REPEAT_COUNT`, custom_openai = 2) and overwrites ONLY those;
 segment must count as invalid so it gets that repeat. A clean page makes exactly one call.
 """
 import asyncio
+import json
 from types import SimpleNamespace
 from unittest import mock
 
@@ -99,3 +100,17 @@ def test_a_runaway_page_output_is_reasked_901():
     out = asyncio.run(t.translate('ENG', 'THA', ['YOU WERE SPOT ON, GOD- MOTHER!']))
     assert out == ['แม่นยายโหราศาสตร์!']
     assert t.client.chat.completions.create.call_count == 2
+
+
+def test_a_cyrillic_leak_is_reasked_with_an_explicit_note_903():
+    """Real corpus leak: the model transliterated Tsukuyomi into Cyrillic (ЦУКУโยมิ) through every retry."""
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(side_effect=[
+        _reply('<|1|>ЦУКУโยมิ!'),
+        _reply('<|1|>สึกุโยมิ!'),
+    ])
+    out = asyncio.run(t.translate('ENG', 'THA', ['TSUKU- YOMI!']))
+    assert out == ['สึกุโยมิ!']
+    assert t.client.chat.completions.create.call_count == 2
+    second = json.dumps(t.client.chat.completions.create.call_args_list[1].kwargs, ensure_ascii=False)
+    assert 'target script only' in second and 'transliterate names' in second

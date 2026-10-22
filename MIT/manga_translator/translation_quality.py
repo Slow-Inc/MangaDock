@@ -238,3 +238,21 @@ def runaway_translation(src: str, dst: str) -> bool:
     if not s:
         return False
     return len(d) > _RUNAWAY_RATIO * len(s)
+
+
+#: #903: scripts that leaked into the output while absent from the source (the model transliterated the name
+#: Tsukuyomi into Cyrillic: ЦУКУ + Thai โยมิ). Ordered most-specific first.
+_LEAKED_SCRIPT_RANGES = (
+    ('cyrillic', re.compile(r'[\u0400-\u04FF]')),
+    ('hangul', re.compile(r'[\uAC00-\uD7AF\u1100-\u11FF]')),
+    ('cjk', re.compile(r'[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF]')),
+)
+
+
+def leaked_script(trans: str, query: str) -> str | None:
+    """Name of a script present in the output but not in the source (#903), else None."""
+    t, q = (trans or ''), (query or '')
+    for name, rx in _LEAKED_SCRIPT_RANGES:
+        if rx.search(t) and not rx.search(q):
+            return name
+    return None

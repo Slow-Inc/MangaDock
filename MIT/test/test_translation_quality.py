@@ -9,6 +9,7 @@ from manga_translator.translation_quality import (
     foreign_script,
     is_letter_name_spelling,
     is_oversized_art_glyph,
+    leaked_script,
     negation_lost,
     normalize_thai_marks,
     runaway_translation,
@@ -180,3 +181,17 @@ def test_short_outputs_and_empty_sources_are_never_runaway_901():
 
 def test_a_long_output_from_a_short_source_is_runaway_901():
     assert runaway_translation('!', 'โอ๊ย!' * 40) is True
+
+
+def test_cyrillic_and_cjk_leaks_are_named_903():
+    """Real corpus leaks: the model transliterated Tsukuyomi into Cyrillic and CHEATS into ЧИТ."""
+    assert leaked_script('ЦУКУโยมิ!', 'TSUKU- YOMI!') == 'cyrillic'
+    assert leaked_script("เรียกว่า ' ЧИТ' (โกง) ได้เลย,", "THEYRE'SO STRONG THAT THEY CAN BE CALLED' CHEATS,") == 'cyrillic'
+    assert leaked_script('ถ้ามีศาสนาที่ก่อตั้งขึ้น围绕สึกุโยมิ', 'IF THERE WAS A RELIGION FORMED AROUND TSUKUYOMI') == 'cjk'
+    assert leaked_script('한국어 이름', 'KOREAN NAME') == 'hangul'
+
+
+def test_clean_output_and_sources_that_contain_the_script_are_not_leaks_903():
+    assert leaked_script('สึกุโยมิ!', 'TSUKU- YOMI!') is None
+    # a source that itself carries Cyrillic is not a leak (e.g. a Russian name in the original)
+    assert leaked_script('ชื่อ ЦУКУ', 'ИМЯ ЦУКУ') is None
