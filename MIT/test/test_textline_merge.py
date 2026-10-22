@@ -415,3 +415,20 @@ def test_stamp_text_raw_tolerates_none_and_empty_885():
     from manga_translator.textline_merge import stamp_text_raw
     stamp_text_raw(None)
     stamp_text_raw([])
+
+
+def test_merged_region_records_its_source_line_direction_1006():
+    """#1006: the renderer must know a region came from a vertical SOURCE (target presets report horizontal)."""
+    import asyncio
+    tall = np.array([[10, 10], [14, 10], [14, 120], [10, 120]], dtype=float)
+    regions = asyncio.run(dispatch_merge([Quadrilateral(tall, 'あ', 1.0)], 200, 200))
+    assert regions
+    assert regions[0].source_direction == 'v'
+
+
+def test_merged_region_records_a_horizontal_source_direction_1006():
+    import asyncio
+    wide = np.array([[10, 10], [120, 10], [120, 20], [10, 20]], dtype=float)
+    regions = asyncio.run(dispatch_merge([Quadrilateral(wide, 'A', 1.0)], 200, 200))
+    assert regions
+    assert regions[0].source_direction == 'h'

@@ -186,6 +186,11 @@ class RenderConfig(BaseModel):
     this x its own). Clean layout starts from it instead of the absolute font_size_max, and a
     sole-balloon fit never exceeds it; each still shrinks to fit. 0 → off (byte-identical)."""
     fit_below_floor: bool = False
+    widen_vertical_columns: bool = False
+    """#1006 opt-in: a vertical Japanese source rendered to a horizontal-only target (Thai/Latin) may
+    grow its wrap width toward 1.5x the source column instead of squeezing to the original height —
+    fewer, longer lines allow a larger font on regions that currently land at the font floor (measured:
+    20 px from a 40 px source on the real JP pages). Off -> byte-identical renders."""
     """#883: when a block cannot fit between its neighbours even at ``font_size_minimum``, shrink
     below the floor to the size that fits instead of overlapping them. Off → current behavior
     (a block taller than its gap is centred in it, overlapping). Opt-in: small text is a quality

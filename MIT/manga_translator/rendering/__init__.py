@@ -299,7 +299,7 @@ _LETTER_W_FILL = 0.9
 
 
 def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: int, page_shape=None,
-                      shrink_to_fit: bool = False, grow: bool = True):
+                      shrink_to_fit: bool = False, grow: bool = True, widen_vertical: bool | None = None):
     """Render-layout rework: lay the translated text out as an upright horizontal block
     at a *small absolute* font, wrapped to a compact width, ready to be placed on the
     region's centre. Returns ``(font_size, block_w, block_h)`` — or ``None`` when the
@@ -309,6 +309,8 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
 
     ``font_size_max`` (MIT_FONT_SIZE_MAX) sets the absolute font when >0, else a small
     page-scaled default (≈ MangaTranslator's 12–16px on a typical page)."""
+    if widen_vertical is None:
+        widen_vertical = bool(getattr(region, 'widen_vertical_columns', False))
     xy = getattr(region, 'xyxy', None)
     if xy is None:
         return None
@@ -323,6 +325,9 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # small crop, whose 45% cap would strangle a wide caption (and the 11% floor
     # under-floor). Use the page width when the caller threads it.
     _ps = page_shape if page_shape is not None else img_shape
+    # #1006: a vertical source rendered to a horizontal-only target may use a wider block (fewer lines ->
+    # larger font) instead of squeezing to the source column's height.
+    _widen = bool(widen_vertical) and getattr(region, 'source_direction', '') == 'v'
     wrap_w = clean_wrap_width(x2f - x1f, _ps[1])
     lang = getattr(region, 'target_lang', 'en_US')
     # #535/#183 (user vs target): a tall original footprint (vertical-JP narration /
@@ -341,8 +346,10 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     _letter_w = float(getattr(region, 'letter_w', 0) or 0)
     _letter_h = float(getattr(region, 'letter_h', 0) or 0)
     _squeeze_h = min(box_h, _letter_h) if _letter_h > 0 else box_h
+    _squeeze_h_base = _squeeze_h
     if _letter_w > 0:
         wrap_w = min(wrap_w, _LETTER_W_FILL * _letter_w)
+    _wrap_w_base = wrap_w
 
     # #183 hard gate, hyphenation-aware: the squeeze floor per TOKEN is (a) the widest
     # SYLLABLE + hyphen when the language hyphenator can split it — long words then
@@ -395,19 +402,41 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     # lettering whose squeezed column still fits the original footprint (width AND
     # height). Falls back to the flat size (current behavior) when nothing larger
     # fits — a short/wide caption keeps the flat look unchanged.
-    orig_fs = int(getattr(region, 'font_size', 0) or 0)
+    _orig_fs = int(getattr(region, 'font_size', 0) or 0)
     # grow=False (#851 page size): the page's size is the ceiling, not a floor to grow from
-    hi = min(max(orig_fs, clean_fs), 120) if grow else clean_fs
-    fs = hi
-    while fs > clean_fs:
-        bw, bh = _layout_at(fs)
-        if bh <= box_h and bw <= bbox_w * 1.05:
-            block_w, block_h, clean_fs = bw, bh, fs
-            return int(clean_fs), float(block_w), float(block_h)
-        fs -= 2
+    hi = min(max(_orig_fs, clean_fs), 120) if grow else clean_fs
 
-    # flat fallback: squeeze at the flat size (tall-narrow, height-bounded as before).
-    block_w, block_h = _layout_at(clean_fs)
+    def _search(cap_w, squeeze_h, start_wrap):
+        def _layout(fs):
+            floor = _floor_w(fs)
+            def _mh(w):
+                ls, _ = text_render.calc_horizontal(fs, region.translation, int(w),
+                                                    int(img_shape[0]), language=lang)
+                return max(1, len(ls)) * fs * _LINE_HEIGHT
+            used = squeeze_width(_mh, max(start_wrap, floor), floor, squeeze_h)
+            lines, widths = text_render.calc_horizontal(fs, region.translation, int(used),
+                                                        int(img_shape[0]), language=lang)
+            bw = float(max(widths)) if widths else float(used)
+            bh = max(1, len(lines)) * fs * _LINE_HEIGHT
+            return bw, bh
+
+        fs = hi
+        while fs > clean_fs:
+            bw, bh = _layout(fs)
+            if bh <= box_h and bw <= cap_w:
+                return fs, bw, bh
+            fs -= 2
+        bw, bh = _layout(clean_fs)
+        return clean_fs, bw, bh
+
+    # #535 (user vs target): pick the LARGEST font <= the original lettering that fits the source
+    # footprint. #1006 (opt-in): a tall narrow source may also try a WIDER block (fewer lines, larger
+    # font); the wider layout is used only when it yields a bigger font, so no region gets smaller.
+    clean_fs, block_w, block_h = _search(bbox_w * 1.05, _squeeze_h_base, _wrap_w_base)
+    if _widen:
+        _wide_fs, _wide_w, _wide_h = _search(bbox_w * 1.5, 10 ** 7, _wrap_w_base * 1.5)
+        if _wide_fs > clean_fs:
+            clean_fs, block_w, block_h = _wide_fs, _wide_w, _wide_h
     # #816: when the box is a balloon interior (bubble_fit_tall), a block that still overflows at
     # the flat size spills past the balloon edge. Wrap straight to the interior width — the
     # wrapper then breaks a too-long word at its dictionary parts, giving a taller column at the
@@ -425,7 +454,8 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     return int(clean_fs), float(block_w), float(block_h)
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None, font_src_scale: float = 0.0, fit_below_floor: bool = False):
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None, font_src_scale: float = 0.0, fit_below_floor: bool = False,
+                          widen_vertical_columns: bool = False):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -509,6 +539,9 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
     if font_src_scale and font_src_scale > 0 and not all(hasattr(r, 'page_font') for r in text_regions):
         annotate_page_font(text_regions, font_src_scale)
 
+    if widen_vertical_columns:
+        for _r in text_regions:
+            _r.widen_vertical_columns = True
     for i, region in enumerate(text_regions):
         # the absolute font clean layout starts from: the page's dialogue size (#851) for text in a
         # balloon, else font_size_max — balloon-less text (contents lists, signs) sits tight against
@@ -923,7 +956,8 @@ async def dispatch(
     knuth_plass: bool = False,
     page_shape=None,
     font_src_scale: float = 0.0,
-    fit_below_floor: bool = False
+    fit_below_floor: bool = False,
+    widen_vertical_columns: bool = False
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
@@ -939,7 +973,7 @@ async def dispatch(
     # (no `await`), so perf_counter here measures true compute — comparing their sum
     # to the async-wrapper's stage total isolates any async/suspension overhead.
     _t_layout = time.perf_counter()
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape, font_src_scale, fit_below_floor)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape, font_src_scale, fit_below_floor, widen_vertical_columns)
     logger.info(f"[timing-render] phase=layout_fit elapsed_ms={(time.perf_counter() - _t_layout) * 1000:.1f} regions={len(text_regions)}")
 
     # TODO: Maybe remove intersections

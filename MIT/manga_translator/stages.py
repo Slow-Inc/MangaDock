@@ -89,5 +89,6 @@ async def run_text_rendering(config, ctx, font_path):
                                           knuth_plass=config.render.knuth_plass,
                                           page_shape=getattr(ctx, 'page_shape', None),
                                           font_src_scale=config.render.font_src_scale,
-                                          fit_below_floor=config.render.fit_below_floor)
+                                          fit_below_floor=config.render.fit_below_floor,
+                                          widen_vertical_columns=config.render.widen_vertical_columns)
     return output

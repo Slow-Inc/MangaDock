@@ -233,6 +233,10 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
         # VLM rescue), NOT `is_sfx`. So `is_sfx` is
         # inert for the render/rescue path here — kept only as provenance. Unify to one
         # is_display_sfx_region helper: tracked in #629.
+        # #1006: the merged region's SOURCE line direction ('v' for a Japanese column); the
+        # renderer uses it to tell vertical sources from captions (target presets hide it).
+        _dirs = [getattr(t, 'direction', None) for t in txtlns]
+        region.source_direction = Counter(d for d in _dirs if d).most_common(1)[0][0] if any(_dirs) else ''
         region.is_sfx = from_sfx
         # Speculative only when EVERY line is a detector guess (a det_sfx box or an empty-balloon /
         # ink-cluster placeholder): a real line merged with a det_sfx fragment is dialogue, and

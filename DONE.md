@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 67 — opt-in `render.widen_vertical_columns`: JP floor-bound regions gain 20-42% font (#1006) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented the #1006 experiment **opt-in (default off)**: `region.source_direction` is stamped by textline merge ('v' for a Japanese column; `region.horizontal` follows the target preset and cannot tell), and with `render.widen_vertical_columns=true` a vertical-source region also tries a wider layout (wrap up to 1.5x the source column, no height-fill squeeze), used **only if it yields a larger font**, so nothing can shrink.
+- **Deterministic replay (same translations, only layout can differ):** p0 #5 24->**34 px (+42 %)**, p0 #6 22->**30**, p1 #4 21->**27 (+29 %)**, p1 #5 20->**24 px (+20 %)**; all other regions unchanged. overlap 0, spill 0, gate 0 both arms.
+- **EN regression:** an EN page replayed with the flag on/off renders **byte-identical** (sha1 match). 2 new unit tests for the direction stamp; full suite **894 passed**.
+- Tradeoff recorded -> opt-in: the block can become wider than the original column (up to 1.5x), a deliberate layout change versus the letterer-column convention, proven on 2 real JP pages.
+- Benchmark `2026-10-23-jp-render-font-audit.md`; #1006 updated.
+
 ## MIT quality loop, round 66 — JP render audit: vertical sources squeeze Thai to 50% font; concise does not fix it (#1006) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
