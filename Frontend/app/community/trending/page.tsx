@@ -86,12 +86,12 @@ export default function TrendingPage() {
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
+    setLoadFailed(false);
     const cached = cacheGet<TrendingManga[]>("community:trending");
     if (cached) { setTrending(cached); setLoading(false); return; }
 
     let mounted = true;
     setLoading(true);
-    setLoadFailed(false);
 
     getTrendingManga(20)
       .then((items) => {

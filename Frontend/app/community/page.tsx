@@ -98,21 +98,28 @@ function CommunityContent() {
 
   const [loadFailed, setLoadFailed] = useState(false);
 
+  // Only the latest request may write: a slow answer for the previous category must not overwrite this one (#911)
+  const fetchSeq = useRef(0);
   const fetchPosts = useCallback(async () => {
+    const seq = ++fetchSeq.current;
     setLoading(true);
     setLoadFailed(false);
     setOffset(0);
     try {
       const res = await listPosts({ category, mangaId, sort, offset: 0, limit: LIMIT });
+      if (seq !== fetchSeq.current) return;
       setPosts(res.items);
       setTotal(res.total);
       setOffset(res.items.length);
     } catch {
-      // Shown inline with a retry (#911), not as "no posts" — and the previous category's posts must not linger
+      if (seq !== fetchSeq.current) return;
+      // Shown inline with a retry (#911), not as "no posts" — and the previous category's posts (and their
+      // total, which drives "load more") must not linger
       setPosts([]);
+      setTotal(0);
       setLoadFailed(true);
     } finally {
-      setLoading(false);
+      if (seq === fetchSeq.current) setLoading(false);
     }
   }, [category, mangaId, sort]);
 
@@ -176,6 +183,7 @@ function CommunityContent() {
 
     // Optimistic: prepend post + close modal with animation
     setPosts(prev => [tempPost, ...prev]);
+    setLoadFailed(false); // the new post is the feed now — do not keep it behind the load error
     setNewPost({ title: "", content: "", category: "general" });
     setSelectedManga(null);
     setPostImages([]);

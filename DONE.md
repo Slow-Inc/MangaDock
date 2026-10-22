@@ -95,6 +95,13 @@ message. Then a stand-in backend on :4001 (books for search/genre/new-releases, 
 shows the books; a tab that failed earlier shows its own error and recovers on its retry. tsc 0; eslint per file = main's;
 `bun test` 436 pass.
 
+**Review round:** a failed search followed by an empty query kept the error next to the start prompt — cleared in the
+empty-query branch; a failed community switch kept the old `total`, so "โหลดโพสต์เพิ่ม" sat next to the error and loaded
+into a page still marked failed — `total` reset too; only the latest feed request may write (a slow answer for the previous
+category used to only toast, now it would have wiped the new one); an optimistic new post clears the failed state; trending
+resets its failed flag before the cache check. Re-verified: failed search → clear query → no alert, prompt shown; failed
+community load → no load-more button; the five-page down/retry check unchanged.
+
 ---
 
 ## #909 Home is never blank when the backend is down (2026-10-22)

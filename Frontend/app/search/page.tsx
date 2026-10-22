@@ -240,7 +240,7 @@ function SearchResults() {
   // fetch from API
   useEffect(() => {
     if (source !== "all") return;
-    if (!query.trim()) { setApiResults([]); setApiTotal(0); setSearched(false); return; }
+    if (!query.trim()) { setApiResults([]); setApiTotal(0); setSearched(false); setApiFailed(false); return; }
 
     abortRef.current?.abort();
     const ctrl = new AbortController();
