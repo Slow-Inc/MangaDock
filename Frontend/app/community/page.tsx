@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense, useId } from "react";
 import { ROLE } from "../lib/types/user";
 import { useSearchParams, useRouter } from "next/navigation";
 import PostCard from "../components/PostCard";
@@ -15,6 +15,8 @@ import { useModalTransition } from "../hooks/useModalTransition";
 import { useFeedStream } from "../hooks/useForumStream";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "../lib/forumCategories";
+import { FORUM_LIMITS, clipToLimit } from "../lib/forumLimits";
+import LimitCounter from "../components/ui/LimitCounter";
 import { useToast } from "../contexts/ToastContext";
 import { CommunityErrorBoundary } from "./components/CommunityErrorBoundary";
 import Loader from "../components/ui/Loader";
@@ -25,6 +27,8 @@ import LoadError from "../components/ui/LoadError";
 
 function CommunityContent() {
   const { user, userRole, showLoginPrompt } = useAuth();
+  const postTitleLimitId = useId();
+  const postContentLimitId = useId();
   const { showToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -166,6 +170,8 @@ function CommunityContent() {
     const manga = selectedManga;
     const images = [...postImages];
     const tempId = `temp-${Date.now()}`;
+    // the DTO caps targetMangaTitle at 200 — a long manga title must not fail the post (#988)
+    const targetMangaTitle = manga?.title ? clipToLimit(manga.title, FORUM_LIMITS.title) : null;
 
     const tempPost: ForumPost = {
       id: tempId,
@@ -173,7 +179,7 @@ function CommunityContent() {
       content: postData.content,
       category: postData.category,
       targetMangaId: manga?.id ?? null,
-      targetMangaTitle: manga?.title ?? null,
+      targetMangaTitle,
       targetMangaCover: manga?.thumbnail ?? null,
       imageUrls: images,
       authorUid: user?.uid ?? '',
@@ -201,7 +207,7 @@ function CommunityContent() {
       const realPost = await createPost({
         ...postData,
         targetMangaId: manga?.id,
-        targetMangaTitle: manga?.title,
+        targetMangaTitle: targetMangaTitle ?? undefined,
         targetMangaCover: manga?.thumbnail,
         imageUrls: images,
       });
@@ -464,9 +470,12 @@ function CommunityContent() {
                   type="text"
                   value={newPost.title}
                   onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+                  maxLength={FORUM_LIMITS.title}
+                  aria-describedby={postTitleLimitId}
                   placeholder="เขียนหัวข้อโพสต์ที่นี่..."
                   className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm text-ink focus:outline-none focus:border-accent transition-all"
                 />
+                <LimitCounter id={postTitleLimitId} value={newPost.title} max={FORUM_LIMITS.title} />
               </div>
 
               <div>
@@ -474,10 +483,13 @@ function CommunityContent() {
                 <textarea
                   value={newPost.content}
                   onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+                  maxLength={FORUM_LIMITS.content}
+                  aria-describedby={postContentLimitId}
                   placeholder="รายละเอียดสิ่งที่คุณต้องการจะพูดคุย..."
                   rows={4}
                   className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm text-ink focus:outline-none focus:border-accent transition-all resize-none"
                 />
+                <LimitCounter id={postContentLimitId} value={newPost.content} max={FORUM_LIMITS.content} />
               </div>
 
               <PostImageUploader images={postImages} onChange={setPostImages} />

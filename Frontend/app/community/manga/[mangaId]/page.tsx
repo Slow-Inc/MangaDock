@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useId } from "react";
 import { ROLE } from "../../../lib/types/user";
 import Image from "next/image";
 import { useParams } from "next/navigation";
@@ -12,7 +12,9 @@ import PostImageUploader from "../../../components/PostImageUploader";
 import { useLocalLenis } from "../../../hooks/useLocalLenis";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import type { ForumPost, ForumCategory } from "../../../lib/types";
-import { CATEGORY_LIST } from "../../../lib/forumCategories";
+import { availableCategories, isRestrictedCategory } from "../../../lib/forumCategories";
+import { FORUM_LIMITS, clipToLimit } from "../../../lib/forumLimits";
+import LimitCounter from "../../../components/ui/LimitCounter";
 import { cacheOrFetch, TTL } from "../../../lib/apiCache";
 import { proxyImageUrl } from "../../../lib/imgUrl";
 import { PRIMARY_FILL } from "../../../components/ui/Button";
@@ -24,7 +26,9 @@ type MangaMeta = { title?: string; covers?: { url: string; localUrl?: string }[]
 
 export default function MangaCommunityPage() {
   const { mangaId } = useParams<{ mangaId: string }>();
-  const { user, showLoginPrompt } = useAuth();
+  const { user, userRole, showLoginPrompt } = useAuth();
+  const postTitleLimitId = useId();
+  const postContentLimitId = useId();
 
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,12 +103,21 @@ export default function MangaCommunityPage() {
     if (isMobile) setViewMode('compact');
   }, [isMobile]);
 
+  // The picker offers only what this role may post in (as on /community); a category that became unavailable
+  // falls back to 'general' — the backend refuses an announcement from a non-admin (#988)
+  useEffect(() => {
+    if (isRestrictedCategory(newPost.category) && !availableCategories(userRole).includes(newPost.category)) {
+      setNewPost((prev) => ({ ...prev, category: "general" }));
+    }
+  }, [userRole, newPost.category]);
+
   const handleCreatePost = async () => {
     if (!newPost.title.trim() || !newPost.content.trim() || submitting) return;
 
     const postData = { ...newPost };
     const images = [...postImages];
     const tempId = `temp-${Date.now()}`;
+    const targetMangaTitle = mangaTitle ? clipToLimit(mangaTitle, FORUM_LIMITS.title) : null;
 
     const tempPost: ForumPost = {
       id: tempId,
@@ -112,7 +125,7 @@ export default function MangaCommunityPage() {
       content: postData.content,
       category: postData.category,
       targetMangaId: mangaId,
-      targetMangaTitle: mangaTitle,
+      targetMangaTitle,
       targetMangaCover: mangaCover,
       imageUrls: images,
       authorUid: user?.uid ?? "",
@@ -138,7 +151,7 @@ export default function MangaCommunityPage() {
       const realPost = await createPost({
         ...postData,
         targetMangaId: mangaId,
-        targetMangaTitle: mangaTitle ?? undefined,
+        targetMangaTitle: targetMangaTitle ?? undefined,
         targetMangaCover: mangaCover ?? undefined,
         imageUrls: images,
       });
@@ -278,7 +291,7 @@ export default function MangaCommunityPage() {
               <div>
                 <label className="block text-xs font-bold text-ink-3 uppercase mb-2">หมวดหมู่</label>
                 <div className="flex flex-wrap gap-2">
-                  {CATEGORY_LIST.map((cat) => (
+                  {availableCategories(userRole).map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setNewPost({ ...newPost, category: cat })}
@@ -300,9 +313,12 @@ export default function MangaCommunityPage() {
                   type="text"
                   value={newPost.title}
                   onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+                  maxLength={FORUM_LIMITS.title}
+                  aria-describedby={postTitleLimitId}
                   placeholder="เขียนหัวข้อโพสต์ที่นี่..."
                   className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-ink focus:outline-none focus:border-accent transition-all"
                 />
+                <LimitCounter id={postTitleLimitId} value={newPost.title} max={FORUM_LIMITS.title} />
               </div>
 
               <div>
@@ -310,10 +326,13 @@ export default function MangaCommunityPage() {
                 <textarea
                   value={newPost.content}
                   onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+                  maxLength={FORUM_LIMITS.content}
+                  aria-describedby={postContentLimitId}
                   placeholder="รายละเอียดสิ่งที่คุณต้องการจะพูดคุย..."
                   rows={5}
                   className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-ink focus:outline-none focus:border-accent transition-all resize-none"
                 />
+                <LimitCounter id={postContentLimitId} value={newPost.content} max={FORUM_LIMITS.content} />
               </div>
 
               <PostImageUploader images={postImages} onChange={setPostImages} />
