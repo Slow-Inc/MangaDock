@@ -77,6 +77,20 @@
 
 ---
 
+## #1033 /admin/transactions no longer scrolls sideways on a phone (2026-10-23)
+
+**What:** found by a High Craft sweep of every route at 1280 / 390 px. At 390 px the page was 686 px wide (+296): the
+last header cell's `<span className="sr-only">` is `position: absolute`, and the table's `overflow-x-auto` wrapper was
+not positioned, so the span's containing block lay outside the scroller — it was not clipped and stretched the page.
+Found by hiding elements one at a time (only that span / its `<th>` brought `scrollWidth` back). The wrapper is now
+`relative`.
+
+**Validated:** production build, signed in as admin (role 8) via the local fake session: page `scrollWidth` 686 → 390;
+the table still scrolls inside its wrapper (704 in 356); the sr-only label is intact; all five admin pages 0 overflow at
+both widths.
+
+---
+
 ## #1029 Studio upload's selected cover falls back on a dead cover (2026-10-23)
 
 **What:** after choosing a manga in `app/studio/upload/page.tsx`, the big selected-cover `<Image unoptimized>` had no

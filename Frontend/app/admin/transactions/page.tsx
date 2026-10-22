@@ -125,7 +125,7 @@ export default function AdminTransactionsPage() {
       {loadFailed && <AdminLoadError what="transactions" onRetry={() => load(page)} />}
 
       {/* Table */}
-      <div tabIndex={0} role="region" aria-label="Transactions table" className="border border-line rounded-xl overflow-x-auto">
+      <div tabIndex={0} role="region" aria-label="Transactions table" className="relative border border-line rounded-xl overflow-x-auto">
         <table className="w-full min-w-[44rem] text-sm">
           <thead>
             <tr className="border-b border-line bg-fill">
