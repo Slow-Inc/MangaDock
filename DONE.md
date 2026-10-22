@@ -3,6 +3,14 @@
 
 ---
 
+## MIT speed loop, round 11 — the merge stage ran its dispatch twice (dead) + a stage-timer caveat (#885) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `_run_textline_merge` dispatched `dispatch_textline_merge` **twice**; the first result was stamped with `text_raw` and then dropped (`dispatch()` builds new TextBlock objects). Removed the dead pass: ~0.1 s/page, and the merge module's profiled cost is 0.185 s for two calls — the 2-5 s the stage timer showed was host contention.
+- Replay A/B with the change stashed: **renders byte-identical** on the two deterministic pages (Boku p1, Dungeon p1). Horimiya p0 differs only through live model calls — proved by running the same code twice and getting the same two diffs (SFX rescue `ฟึ่บ` vs `วูบ`; live translation of `STRANGELY…`).
+- **Measurement caveat (the real lesson):** `timing_ms` stage numbers vary up to **6x** for the same page and code (merge 782 ms vs 4828 ms). Rank by profiler cumulative + repeated medians; never time with another job running. The round-4 'textline_merge 35 %' was such a reading, not a real stage cost.
+- Filed **#885**: `text_raw` lands on thrown-away regions, so the render box and page-translation record never see the raw OCR text. Restoring it needs a 39-page replay A/B (recorded in the issue).
+
 ## MIT speed loop, round 10 — OCR was paying ~2.2 s per chunk in cuDNN host work (#884) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
