@@ -756,3 +756,44 @@ describe('ForumService — writes on already-deleted content (#1023)', () => {
     expect(mockForumEvents.broadcastPostEvent).not.toHaveBeenCalled();
   });
 });
+
+// #1023 (review): a live comment of a deleted post — editing or deleting it is a 404 too, like voting (#1020)
+describe('ForumService — comment writes when the post is deleted (#1023)', () => {
+  function chainFor(postLive: boolean) {
+    const chain = buildMockChain();
+    chain.single.mockResolvedValue({
+      data: { author_uid: 'u1', post_id: 'p1', id: 'c1', content: 'x' },
+      error: null,
+    });
+    chain.maybeSingle.mockResolvedValue({
+      data: postLive ? { id: 'p1' } : null,
+      error: null,
+    });
+    return chain;
+  }
+
+  it.each([
+    [
+      'updateComment',
+      (s: ForumService) => s.updateComment('u1', 'c1', { content: 'x' } as any),
+    ],
+    ['deleteComment', (s: ForumService) => s.deleteComment('u1', 'c1')],
+  ])('%s is a 404 with no write and no broadcast', async (_name, call) => {
+    const chain = chainFor(false);
+    const from = jest.fn(() => chain);
+    const service = makeService(from);
+    mockForumEvents.broadcastPostEvent.mockClear();
+    await expect(call(service)).rejects.toBeInstanceOf(NotFoundException);
+    expect(chain.update).not.toHaveBeenCalled();
+    expect(mockForumEvents.broadcastPostEvent).not.toHaveBeenCalled();
+    expect(from).toHaveBeenLastCalledWith('forum_posts');
+    expect(chain.eq).toHaveBeenLastCalledWith('id', 'p1');
+  });
+
+  it('deleteComment of a live post still deletes', async () => {
+    const chain = chainFor(true);
+    const service = makeService(() => chain);
+    await service.deleteComment('u1', 'c1');
+    expect(chain.update).toHaveBeenCalled();
+  });
+});

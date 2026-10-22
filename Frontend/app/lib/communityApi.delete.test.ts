@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 /**
  * #1023: deleting already-deleted content is now a 404 on the server. For a delete, "already gone" is done — a stale
@@ -12,6 +12,10 @@ const { deletePost, deleteComment } = await import("./communityApi");
 const { cacheSet, cacheGet } = await import("./apiCache");
 
 let status: number;
+const realFetch = globalThis.fetch;
+afterAll(() => {
+  globalThis.fetch = realFetch;
+});
 
 beforeEach(() => {
   status = 200;
