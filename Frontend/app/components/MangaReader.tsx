@@ -130,6 +130,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const translateMenuRef = useRef<HTMLDivElement | null>(null);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
+  // Read by the reader's Escape handler: an open toolbar menu closes before the reader does (#950)
+  const translateMenuOpenRef = useRef(false);
+  const moreMenuOpenRef = useRef(false);
 
   // Translate from the SAME derivative the Reader displays (#156) — a patch
   // generated from a different encode of the page sits in a visibly
@@ -228,6 +231,24 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
   // Sync picker open state to ref for ESC handler
   useEffect(() => { showChapterPickerRef.current = pickerMounted; }, [pickerMounted]);
+
+  useEffect(() => {
+    translateMenuOpenRef.current = translateMenuOpen && !translating; // the panel shows only then
+    moreMenuOpenRef.current = moreMenuOpen;
+  }, [translateMenuOpen, moreMenuOpen, translating]);
+  // A menu item closes its menu and hands focus back to the toggle (the panel turns inert under it) (#950)
+  const closeTranslateMenu = () => {
+    setTranslateMenuOpen(false);
+    translateMenuRef.current?.querySelector("button")?.focus();
+  };
+  const closeMoreMenu = () => {
+    setMoreMenuOpen(false);
+    moreMenuRef.current?.querySelector("button")?.focus();
+  };
+  // Keyboard focus leaving a menu closes it, as an outside click does (a null target is a click inside the panel)
+  const closeOnFocusLeave = (close: () => void) => (e: React.FocusEvent<HTMLElement>) => {
+    if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) close();
+  };
 
   // Close translate dropdown on outside click
   useEffect(() => {
@@ -496,6 +517,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       if (readerRef.current && active && active !== document.body && !readerRef.current.contains(active)) return;
       e.stopPropagation();
       if (commentOpenRef.current) { setCommentOpen(false); return; }
+      if (translateMenuOpenRef.current) { setTranslateMenuOpen(false); translateMenuRef.current?.querySelector("button")?.focus(); return; }
+      if (moreMenuOpenRef.current) { setMoreMenuOpen(false); moreMenuRef.current?.querySelector("button")?.focus(); return; }
       if (showChapterPickerRef.current) { closePicker(); return; }
       handleClose();
     };
@@ -627,7 +650,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                   : "border-ink-3 text-ink-2 hover:border-ink-2 hover:text-ink";
 
               return (
-                <div ref={translateMenuRef} className="relative hidden sm:block">
+                <div ref={translateMenuRef} onBlur={closeOnFocusLeave(() => setTranslateMenuOpen(false))} className="relative hidden sm:block">
                   {/* Trigger button */}
                   <button
                     onClick={() => {
@@ -638,6 +661,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       }
                     }}
                     title={translating ? "หยุดแปล" : "เมนูการแปล"}
+                    aria-expanded={translateMenuOpen && !translating}
+                    aria-controls="reader-translate-menu"
                     className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition ${triggerColorCls}`}
                   >
                     {/* Status indicator — MIT offline: the reader's droid asleep (Epic D #783) */}
@@ -673,6 +698,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
                   {/* Dropdown panel — Navbar style, always in DOM, shown via CSS transition */}
                   <div
+                    id="reader-translate-menu"
+                    inert={!(translateMenuOpen && !translating)} // only faded out while closed: keep its items out of the Tab order (#950)
                     className={`absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-line bg-bg/70 shadow-2xl backdrop-blur-sm transition-all duration-200 origin-top-right ${
                       translateMenuOpen && !translating
                         ? "pointer-events-auto scale-100 opacity-100"
@@ -748,7 +775,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         <>
                           {/* Single-page translate */}
                           <button
-                            onClick={() => { translateCurrentPage(); setTranslateMenuOpen(false); }}
+                            onClick={() => { translateCurrentPage(); closeTranslateMenu(); }}
                             disabled={translatingCurrentPage}
                             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-accent/90 transition-colors duration-150 hover:bg-fill hover:text-accent disabled:opacity-50"
                           >
@@ -767,7 +794,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
                           {/* Batch translate */}
                           <button
-                            onClick={() => { startTranslate(); setTranslateMenuOpen(false); }}
+                            onClick={() => { startTranslate(); closeTranslateMenu(); }}
                             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink-2 transition-colors duration-150 hover:bg-fill hover:text-ink"
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M4 6h16M4 10h16M4 14h10M4 18h6" /></svg>
@@ -781,7 +808,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         <>
                           {translateMenu.showTranslateButtons && <div className="my-1 border-t border-line" />}
                           <button
-                            onClick={() => { setShowTranslation((s) => !s); setTranslateMenuOpen(false); }}
+                            onClick={() => { setShowTranslation((s) => !s); closeTranslateMenu(); }}
                             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink-2 transition-colors duration-150 hover:bg-fill hover:text-ink"
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
@@ -793,7 +820,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         <>
                           <div className="my-1 border-t border-line" />
                           <button
-                            onClick={() => { setSideBySide((s) => !s); setTranslateMenuOpen(false); }}
+                            onClick={() => { setSideBySide((s) => !s); closeTranslateMenu(); }}
                             className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors duration-150 hover:bg-fill ${sideBySide ? "text-accent" : "text-ink-2 hover:text-ink"}`}
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0">
@@ -845,10 +872,12 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
             </div>
 
             {/* Mobile more menu (⋮) — visible only on mobile */}
-            <div ref={moreMenuRef} className="relative sm:hidden">
+            <div ref={moreMenuRef} onBlur={closeOnFocusLeave(() => setMoreMenuOpen(false))} className="relative sm:hidden">
               <button
                 onClick={() => setMoreMenuOpen((o) => !o)}
                 title="เพิ่มเติม"
+                aria-expanded={moreMenuOpen}
+                aria-controls="reader-more-menu"
                 className={`flex h-9 w-9 items-center justify-center rounded-full border text-ink-2 transition hover:bg-raised hover:text-ink ${
                   moreMenuOpen ? "border-ink-2 bg-fill text-ink" : "border-ink-3"
                 }`}
@@ -862,6 +891,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
               {/* Mobile dropdown panel */}
               <div
+                id="reader-more-menu"
+                inert={!moreMenuOpen} // only faded out while closed: keep its items out of the Tab order (#950)
                 className={`absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-line bg-bg/95 shadow-2xl backdrop-blur-xl transition-all duration-200 origin-top-right ${
                   moreMenuOpen
                     ? "pointer-events-auto scale-100 opacity-100"
@@ -872,13 +903,13 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                 <div className="border-b border-line px-4 py-3">
                   <p className="mb-2 text-xs font-semibold uppercase text-ink-3">ซูม</p>
                   <div className="flex items-center gap-2">
-                    <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-ink-2 transition hover:bg-raised hover:text-ink disabled:opacity-30">
+                    <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} aria-label="ย่อ" className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-ink-2 transition hover:bg-raised hover:text-ink disabled:opacity-30">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M5 12h14" /></svg>
                     </button>
                     <button onClick={zoomReset} className="flex-1 rounded-lg bg-fill py-1.5 text-center text-xs text-ink-2 transition hover:bg-raised hover:text-ink">
                       {Math.round(zoom * 100)}%
                     </button>
-                    <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-ink-2 transition hover:bg-raised hover:text-ink disabled:opacity-30">
+                    <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} aria-label="ขยาย" className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-ink-2 transition hover:bg-raised hover:text-ink disabled:opacity-30">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M12 5v14M5 12h14" /></svg>
                     </button>
                   </div>
@@ -993,7 +1024,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       <div className="space-y-1">
                         {translateMenu.showTranslateButtons && (<>
                         <button
-                          onClick={() => { translateCurrentPage(); setMoreMenuOpen(false); }}
+                          onClick={() => { translateCurrentPage(); closeMoreMenu(); }}
                           disabled={translatingCurrentPage || translating}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-accent/90 transition hover:bg-fill hover:text-accent disabled:opacity-50"
                         >
@@ -1010,7 +1041,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                           )}
                         </button>
                         <button
-                          onClick={() => { if (translating) { cancelTranslate(); } else { startTranslate(); setMoreMenuOpen(false); } }}
+                          onClick={() => { if (translating) { cancelTranslate(); } else { startTranslate(); closeMoreMenu(); } }}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink-2 transition hover:bg-fill hover:text-ink"
                         >
                           {translating ? (
@@ -1028,7 +1059,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         </>)}
                         {translateMenu.viewToggleLabel && (
                           <button
-                            onClick={() => { setShowTranslation((s) => !s); setMoreMenuOpen(false); }}
+                            onClick={() => { setShowTranslation((s) => !s); closeMoreMenu(); }}
                             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink-2 transition hover:bg-fill hover:text-ink"
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
@@ -1037,7 +1068,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                         )}
                         {showTranslation && !continuousMode && (
                           <button
-                            onClick={() => { setSideBySide((s) => !s); setMoreMenuOpen(false); }}
+                            onClick={() => { setSideBySide((s) => !s); closeMoreMenu(); }}
                             className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition hover:bg-fill ${sideBySide ? "text-accent" : "text-ink-2 hover:text-ink"}`}
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 shrink-0">
