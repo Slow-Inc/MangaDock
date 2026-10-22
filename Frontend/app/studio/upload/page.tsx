@@ -240,6 +240,7 @@ function StudioUploadContent() {
               <input
                 id="upload-chapter-number"
                 value={chapterNumber}
+                maxLength={20} // CreateVersionDto's cap (#1017)
                 onChange={(e) => setChapterNumber(e.target.value)}
                 disabled={hasVersion}
                 placeholder="เช่น 1, 2, 1.5"

@@ -77,6 +77,22 @@
 
 ---
 
+## #1017 Chapter-version create and update share one validated price rule (2026-10-23)
+
+**What:** `POST /versions` typed its body as a plain object, so a negative `priceCoins` was stored (PATCH refused it,
+and unlock treats a negative price as free). A fractional or int4-overflowing price was a 500, as were non-string text
+fields, and text was unbounded. `CreateVersionDto` / `UpdateVersionMetadataDto` now require:
+- a price that is a whole number from 0 to the int4 maximum (a database bound, not a product limit);
+- typed, bounded strings (description 1,000 = the studio's cap);
+- `chapterId` optional, as the studio sends.
+
+**Validated:** Jest `versions/version.dto.spec.ts` red (module missing) → green. The studio's create (with or without
+`chapterId`, or minimal) and metadata payloads validate; a negative, fractional or overflowing price, a numeric
+description or title, a description over 1,000 and a numeric chapter number are rejected. versions suites pass 21/21.
+Real tsc clean; eslint clean.
+
+---
+
 ## #1015 Write bodies are validated; malformed ids are 400, an unknown followee 404 (2026-10-23)
 
 **What:** four write routes typed `@Body()` as plain objects, so the global `ValidationPipe` checked nothing:
