@@ -77,6 +77,22 @@
 
 ---
 
+## #863 (part) A slow Supabase no longer holds up search: the alt-name lookup has a budget (2026-10-23)
+
+**What:** with Supabase slow, an uncached `GET /books/search` hung for the full client timeout on
+`MangaCatalogService.findTitleIdsByAltName` (the `chapter_versions` alt-name query; the Supabase client has no request
+timeout). That lookup is best-effort — searchBooks already catches its failure and keeps the MangaDex results — so it
+now gives up after `altNameTimeoutMs` = 3 s (`.abortSignal(AbortSignal.timeout(...))`). This is #863's option (c),
+scoped to that one read: the shared client used by auth and wallet is unchanged. The issue stays open for the
+developer's decision on the client-wide timeout (auth/writes) and the versions read path, where a timeout turns a slow
+answer into a failure.
+
+**Validated:** Jest `manga-catalog.service.spec.ts` red → green: a query that only settles when its abort signal fires
+(Supabase hanging) — search returns the MangaDex results, the query was aborted, no extra fetch. The existing 12 tests
+pass with the reworked mock (eq awaitable, abortSignal chained). Real tsc clean; eslint on the spec one better than main.
+
+---
+
 ## #1044 Fields keep the app's focus ring (2026-10-23)
 
 **What:** a High Craft keyboard-focus sweep (Tab through 21 routes, production build, local fake session) plus a

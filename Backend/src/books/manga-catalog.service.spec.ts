@@ -11,11 +11,13 @@ function makeSupabase(
   rows: Array<{ title_id: string }> | null,
   error?: unknown,
 ) {
-  const builder: any = {
-    select: jest.fn(() => builder),
-    or: jest.fn(() => builder),
-    eq: jest.fn(async () => ({ data: rows, error: error ?? null })),
-  };
+  const result = { data: rows, error: error ?? null };
+  // eq() is awaitable (no timeout) and chains to abortSignal() (with one, #863)
+  const builder: Record<string, jest.Mock> = {};
+  builder.select = jest.fn(() => builder);
+  builder.or = jest.fn(() => builder);
+  builder.eq = jest.fn(() => Object.assign(Promise.resolve(result), builder));
+  builder.abortSignal = jest.fn(() => Promise.resolve(result));
   return { client: { from: jest.fn(() => builder) } };
 }
 
@@ -333,5 +335,47 @@ describe('MangaCatalogService — search + passthrough (#231)', () => {
       undefined,
     );
     expect(out).toEqual({ items: [{ id: 'a' }], total: 1 });
+  });
+});
+
+describe('MangaCatalogService — a slow alt-name lookup does not hold up search (#863)', () => {
+  it('gives up on the chapter_versions query at its budget and returns the MangaDex results', async () => {
+    let aborted = false;
+    // Supabase hangs (it did, 2026-10-21): the query settles only when its abort signal fires
+    const builder: Record<string, jest.Mock> = {};
+    builder.select = jest.fn(() => builder);
+    builder.or = jest.fn(() => builder);
+    builder.eq = jest.fn(() => builder);
+    builder.abortSignal = jest.fn(
+      (signal: AbortSignal) =>
+        new Promise((resolve) =>
+          signal.addEventListener('abort', () => {
+            aborted = true;
+            resolve({ data: null, error: { message: 'AbortError' } });
+          }),
+        ),
+    );
+    const supabase = { client: { from: jest.fn(() => builder) } };
+    const mangaDex = {
+      searchManga: jest
+        .fn()
+        .mockResolvedValue({ items: [{ id: 'a' }], total: 1 }),
+      fetchMangaByIds: jest.fn(),
+    };
+    const svc = new MangaCatalogService(
+      mangaDex as any,
+      supabase as any,
+      makeCache(null) as any,
+    );
+    (svc as unknown as { altNameTimeoutMs: number }).altNameTimeoutMs = 50;
+
+    const started = Date.now();
+    await expect(svc.searchBooks('naruto')).resolves.toEqual({
+      items: [{ id: 'a' }],
+      total: 1,
+    });
+    expect(aborted).toBe(true);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(mangaDex.fetchMangaByIds).not.toHaveBeenCalled();
   });
 });
