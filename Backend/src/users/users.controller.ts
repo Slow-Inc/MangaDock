@@ -307,7 +307,7 @@ export class UsersController {
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Body() body: TranslatorProfileDto,
   ) {
-    await this.users.becomeTranslator(req[USER_KEY].uid, body ?? {});
+    await this.users.becomeTranslator(req[USER_KEY].uid, body);
     return { ok: true };
   }
 
@@ -317,7 +317,7 @@ export class UsersController {
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Body() body: TranslatorProfileDto,
   ) {
-    await this.users.updateTranslatorProfile(req[USER_KEY].uid, body ?? {});
+    await this.users.updateTranslatorProfile(req[USER_KEY].uid, body);
     return { ok: true };
   }
 

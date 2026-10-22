@@ -54,6 +54,9 @@ describe('PATCH /users/me (#1025)', () => {
       photoURL: 'https://x/' + 'a'.repeat(2048),
     });
     await rejects('updateMyProfile', { photoURL: 42 });
+    // null is not a value here: the service would store it or call a string method on it
+    await rejects('updateMyProfile', { displayName: null });
+    await rejects('updateMyProfile', { photoURL: null });
   });
 });
 
@@ -67,6 +70,7 @@ describe('translator profile bodies (#1025)', () => {
 
   it('take what the studio sends', async () => {
     await accepts('becomeTranslator', {});
+    await accepts('becomeTranslator', undefined); // studio layout sends no body
     await accepts('updateTranslatorProfile', studioSave);
     await accepts('updateTranslatorProfile', {
       ...studioSave,
@@ -83,6 +87,9 @@ describe('translator profile bodies (#1025)', () => {
     ['too many languages', { translatorLanguages: Array(21).fill('th') }],
     ['an over-long country', { country: 'c'.repeat(101) }],
     ['an over-long preferred language', { preferredLanguage: 'p'.repeat(36) }],
+    ['a null bio', { bio: null }],
+    ['null languages', { translatorLanguages: null }],
+    ['a null country', { country: null }],
   ])('refuse %s', async (_name, body) => {
     await rejects('updateTranslatorProfile', body);
     await rejects('becomeTranslator', body);
