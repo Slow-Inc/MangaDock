@@ -77,6 +77,21 @@
 
 ---
 
+## #919 A direct /book link: "book not found" only for a real 404 (2026-10-22)
+
+**What:** `BookRouteModal` (direct `/book/<id>` visits) turned every failure into "ไม่พบข้อมูลหนังสือ", because
+`loadMangaDetail` threw the same error for a 404 and a 500; the overlay was also not a dialog (no role, no focus, no Escape).
+`loadMangaDetail` now throws `HttpError(status)` (#913's `lib/httpError`); the modal has a third state, "failed", shown as the
+shared `LoadError` with a retry; "missing" stays for a 404 or an unusable detail. Both overlays are a small `NoticeDialog`
+— `role="dialog"`, `aria-modal`, focus on the first button, Escape and the scrim close it, like the loading skeleton.
+
+**Validated:** `mangaDetail.test.ts` red → green (404 → isNotFound, 503 → not). Production build, direct link: backend down
+→ dialog "โหลดหนังสือไม่สำเร็จ", focus on "ลองใหม่"; a stand-in answering 404 → "ไม่พบข้อมูลหนังสือ", focus on "← กลับหน้าแรก";
+the real backend → the book popup; Escape closes each back to "/". Start the backend, press Enter on the focused "ลองใหม่"
+→ the book popup opens. tsc 0; eslint 0 on both files.
+
+---
+
 ## #915 Forum lookups: 404 only for a missing row, 503 for a database failure (2026-10-22)
 
 **What:** `ForumService` turned any Supabase error on its six single-row lookups (post, profile, post/comment edit and
