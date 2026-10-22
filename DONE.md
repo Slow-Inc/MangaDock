@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 70 — contract guard verified quiet on clean pages; residual shift audited to zero (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Guard is quiet in normal operation:** 3 live pages with the #1026 guard active produced **0 contract-mismatch re-asks**, gate 0 violations, translation time unchanged within noise (the check is a pure block count).
+- **Residual-risk audit:** a count-equal corruption (one block merged + one split) would slip past the guard. A digit-anchor scan for it (source number missing from its own balloon but present in the next one) over **12,004 stored regions** found **0 cases** — no evidence to justify a second, heuristic guard (avoided per the North Star).
+- Fallback for persistent breakage stays the previous normalizer: missing items become empty translations (blank balloon), never literal `[Missing item N]` text.
+- Benchmark `2026-10-23-1026-numbered-contract-shift.md` updated; #1026 comment with the verification.
+
 ## MIT quality loop, round 69 — fixed a page-wide translation line shift + glossary extraction precision (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -39,3 +39,14 @@ silently shifted every later balloon.
 
 This is the merge/split class the original contract normalizer was not designed for (it targeted dropped
 indices). The guard costs one extra request only when the model actually breaks the contract.
+## Verification on clean pages + residual-risk audit (round 70)
+
+- **No spurious retries:** three live pages (Horimiya p0, Mieruko p0, Tsuki p0) with the guard active ->
+  **0 contract-mismatch re-asks**, gate 0 violations, translation time unchanged within noise (9.4 s / 4.4 s / 2.5 s
+  under machine load; the guard is a pure block count).
+- **Residual risk audited:** a count-equal corruption (one merged + one split block) would pass the guard. A
+  digit-anchor scan for it (a source number missing from its own translation but present in the next balloon's)
+  over **12,004 stored regions** found **0 cases** — no such artifact in the corpus, so no further guard is added
+  (avoids a heuristic that would cost retries without evidence).
+- Persistent breakage fallback stays the previous normalizer: missing items become empty translations
+  (blank balloon), never literal `[Missing item N]` text.
