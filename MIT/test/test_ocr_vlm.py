@@ -8,12 +8,19 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from manga_translator.ocr_vlm import (SFX_MAX_TOKENS, build_sfx_prompt, restore_sfx_translations,
-                                       sanitize_sfx, vlm_localize_sfx)
+from manga_translator.ocr_vlm import (SFX_MAX_TOKENS, build_sfx_prompt, crop_has_lettering,
+                                       restore_sfx_translations, sanitize_sfx, vlm_localize_sfx)
 
 
 def _crop():
-    return np.zeros((40, 80, 3), dtype=np.uint8)
+    """A white crop with two thick dark strokes - the ink profile of a real SFX crop (#887).
+
+    The rescue refuses crops without lettering before spending a vision call, so the contract tests
+    below must feed it the shape of a crop it was built for."""
+    crop = np.full((40, 80, 3), 250, dtype=np.uint8)
+    crop[6:34, 10:24] = 28
+    crop[6:34, 30:44] = 28
+    return crop
 
 
 class _Resp:
@@ -484,3 +491,46 @@ def test_a_low_confidence_placeholder_read_is_junk():
     assert placeholder_junk(SimpleNamespace(rescue_placeholder=True, prob=0.6))
     assert not placeholder_junk(SimpleNamespace(rescue_placeholder=True, prob=0.97))
     assert not placeholder_junk(SimpleNamespace(rescue_placeholder=False, prob=0.1))  # DBNet text
+
+
+def _blank_crop(w=120, h=90, lines=0):
+    """A near-white crop with a few thin panel/armour lines - the det_sfx false-positive shape
+    the rescue was inventing SFX on (#887)."""
+    crop = np.full((h, w, 3), 250, np.uint8)
+    for i in range(lines):
+        y = int(h * (i + 1) / (lines + 1))
+        crop[max(0, y - 1):y + 1, :] = 60
+    return crop
+
+
+def _lettered_crop(w=120, h=90):
+    """White crop with two thick dark strokes: the ink profile of real lettering."""
+    crop = np.full((h, w, 3), 250, np.uint8)
+    crop[20:70, 20:32] = 30
+    crop[20:70, 45:57] = 30
+    crop[30:42, 70:110] = 30
+    return crop
+
+
+def test_a_blank_art_crop_has_no_lettering_887():
+    """Taida p0: a det_sfx box on plain armour (mean 248, 4.8% dark, std 30) became a rendered
+    phantom 'ฟู่'. Blank/line-only crops must not reach the vision call."""
+    assert crop_has_lettering(_blank_crop(lines=0)) is False
+    assert crop_has_lettering(_blank_crop(lines=3)) is False
+
+
+def test_a_lettered_crop_has_lettering_887():
+    assert crop_has_lettering(_lettered_crop()) is True
+
+
+def test_a_blank_crop_is_never_sent_to_the_vision_endpoint_887():
+    calls = []
+    import requests
+    orig = requests.post
+    try:
+        requests.post = lambda *a, **k: calls.append(1)
+        out = vlm_localize_sfx(_blank_crop(lines=2), api_base='http://x/v1', api_key='k', model='m')
+    finally:
+        requests.post = orig
+    assert out == ''
+    assert calls == []

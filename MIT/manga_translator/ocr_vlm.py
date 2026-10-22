@@ -256,6 +256,30 @@ def restore_sfx_translations(regions) -> None:
             region.translation = region.text
 
 
+#: #887 — a crop with no lettering (blank art, panel borders, clothing lines) must never reach the
+#: vision call: the model invents an onomatopoeia for it and the page renders a phantom SFX
+#: (Taida p0: 'ฟู่' over plain armour). Measured over the corpus' 20 rescued crops, the 5 real
+#: katakana SFX score std >= 78 and >= 15% very-dark pixels; the 15 art/blank crops score lower.
+_SFX_MIN_STD = 75.0
+_SFX_MIN_DARK = 0.12
+_LUMA = (0.299, 0.587, 0.114)
+
+
+def crop_has_lettering(crop_rgb: np.ndarray) -> bool:
+    """True when a crop has the ink profile of lettering: high contrast and a solid dark core.
+
+    Blank art, panel borders and clothing lines have low contrast and a thin dark fraction - exactly
+    the crops the vision model hallucinates SFX on (#887). Pure (numpy only), so the guard is
+    testable without a network call."""
+    if crop_rgb is None or getattr(crop_rgb, 'size', 0) == 0:
+        return False
+    gray = np.asarray(crop_rgb, dtype=np.float32)
+    if gray.ndim == 3:
+        gray = gray[..., :3] @ np.asarray(_LUMA, dtype=np.float32)
+    if gray.size == 0:
+        return False
+    return bool(gray.std() >= _SFX_MIN_STD and (gray < 128).mean() >= _SFX_MIN_DARK)
+
 def vlm_localize_sfx(
     crop_rgb: np.ndarray,
     *,
@@ -272,6 +296,9 @@ def vlm_localize_sfx(
     `post_fn(url, headers=, json=, timeout=)` defaults to `requests.post`; inject
     a fake in tests. The response is parsed as an OpenAI chat completion."""
     if not (api_base and api_key and model):
+        return ''
+    if not crop_has_lettering(crop_rgb):
+        logger.debug('[OcrVLM] SFX crop has no lettering - skipped (#887)')
         return ''
     if not _breaker.allows():
         return ''

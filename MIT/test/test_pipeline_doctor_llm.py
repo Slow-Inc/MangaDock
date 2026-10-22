@@ -155,12 +155,13 @@ def test_image_passes_at_the_size_measured_to_be_answered():
     assert row.status == OK
 
 
-def test_image_fails_on_a_blank_canvas():
-    """Not provisional: sending a uniform crop is our bug, and B3 shows the model answers
-    confidently over one, so it cannot be caught downstream."""
+def test_a_blank_canvas_is_never_sent_887():
+    """B3: the model answers confidently over a uniform crop, so a blank canvas cannot be caught
+    downstream. Since #887 the crop guard refuses it before any request is built — the contract is
+    now met upstream, and the probe reports that instead of pretending an empty request is a bug."""
     row = _stage(doctor.run(_page(crop=_crop(fill=255))), 'vlm-image')
-    assert row.status == FAIL
-    assert 'blank' in row.evidence.lower()
+    assert row.status == OK
+    assert 'lettering' in row.evidence.lower()
 
 
 def test_image_fails_when_the_sent_image_is_not_rgb():
