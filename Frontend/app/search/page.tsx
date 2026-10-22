@@ -94,7 +94,14 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
           </button>}
         </div>
         <div>
-          <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">{book.title}</p>
+          {/* The card's keyboard/screen-reader entry point, as in MangaGrid (#838, #926): the div's click is mouse-only. */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSelect(); }}
+            className="block w-full rounded-sm text-left text-xs font-semibold leading-snug text-ink"
+          >
+            <span className="line-clamp-2">{book.title}</span>
+          </button>
           {book.authors.length > 0 && <p className="mt-0.5 truncate text-xs text-ink-3">{book.authors[0]}</p>}
           {book.categories.length > 0 && <p className="mt-1 truncate text-xs text-accent/70">{book.categories[0]}</p>}
         </div>
