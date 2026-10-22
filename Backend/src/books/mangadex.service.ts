@@ -420,11 +420,15 @@ export class MangaDexService {
         ...(title ? { title } : {}),
         authors,
         artists,
-        covers: covers ?? [],
+        // Covers down: the last known covers if there are any. Either way the detail is served but not kept — a cached
+        // cover-less detail outlived the outage (#976)
+        covers:
+          covers ??
+          this.cache.getStale<MangaDetail>(cacheKey)?.data.covers ??
+          [],
         genres,
         description,
       };
-      // With the covers down the detail is served but not kept: a cached cover-less detail outlived the outage (#976)
       if (covers) await this.cache.set(cacheKey, detail, CACHE_TTL_MS);
       const enhanced = await this.enhanceMangaDetail(mangaId, detail);
       return forceLocal ? this.applyForceLocalMangaDetail(enhanced) : enhanced;
@@ -703,17 +707,22 @@ export class MangaDexService {
       const res = await this.mangadexFetch(
         `https://api.mangadex.org/manga/${mangaId}?${params.toString()}`,
       );
-      if (!res.ok)
+      if (!res.ok) {
+        // 400 is MangaDex rejecting a malformed id: no such manga either. Logged, since our own params could cause it.
+        if (res.status === 400)
+          this.logger.warn(`[MangaDex] Manga ${mangaId} rejected (400)`);
         return {
           ...none,
-          // 400 is MangaDex rejecting a malformed id: no such manga either
           failure:
             res.status === 404 || res.status === 400
               ? 'notFound'
               : 'unavailable',
         };
+      }
 
       const data = (await res.json()) as { data?: MangaDexManga };
+      // A 200 without the manga (an interstitial, a changed shape) is not a manga with no details
+      if (!data.data) return { ...none, failure: 'unavailable' };
       const rels = data.data?.relationships ?? [];
       const authors = rels
         .filter((r) => r.type === 'author')

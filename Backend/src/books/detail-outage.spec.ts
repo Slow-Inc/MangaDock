@@ -100,6 +100,29 @@ describe('MangaDexService.getMangaDetail — not found, outage and partial answe
     expect(cache.set).not.toHaveBeenCalled();
   });
 
+  it('covers down with a stale detail → its covers, still not cached', async () => {
+    const lastCovers = [{ volume: '1', url: 'https://old/cover.jpg' }];
+    const { service, cache } = makeService(
+      { manga: () => manga.clone(), covers: () => json({}, 503) },
+      { id: 'x', covers: lastCovers },
+    );
+    const detail = await service.getMangaDetail('x');
+    expect(detail.title).toBe('Title');
+    expect(detail.covers).toEqual(lastCovers);
+    expect(cache.set).not.toHaveBeenCalled();
+  });
+
+  it('a 200 without the manga (interstitial, changed shape) is an outage, not an empty detail to cache', async () => {
+    const { service, cache } = makeService({
+      manga: () => json({ result: 'ok' }),
+      covers: () => covers.clone(),
+    });
+    await expect(service.getMangaDetail('x')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(cache.set).not.toHaveBeenCalled();
+  });
+
   it('both parts fine → cached as before', async () => {
     const { service, cache } = makeService({
       manga: () => manga.clone(),

@@ -84,13 +84,13 @@ failure into empty fields. An unknown id (MangaDex 404/400) and an outage both a
 the book popup's #919 "not found" vs "load failed" split never saw a real 404, and the browser kept the empty answer
 30 min; a detail with only covers (manga fetch down) or only the manga (covers down) was cached the full 20 min. The
 fetches now say why they are empty (`fetchMangaCovers` → `null`; `fetchMangaAuthors` → `failure: notFound |
-unavailable`): not found → `NotFoundException`; manga down → stale detail or `ServiceUnavailableException`; covers down
-→ served without covers, uncached; only a detail whose two parts answered is cached. Related books, series context and
+unavailable`, also for a 200 without the manga): not found → `NotFoundException`; manga down → stale detail or `ServiceUnavailableException`; covers down
+→ served with the stale covers if any, uncached; only a detail whose two parts answered is cached. Related books, series context and
 the cover proxy already catch and degrade.
 
-**Validated:** Jest red (5 of 6) → green, `books/detail-outage.spec.ts`: 404 and 400 → 404 with no cache write; manga
-503 → 503, or the stale detail when there is one; covers 503 → served with its title, uncached; both fine → cached.
-Full Backend suite 108 suites / 1,062 tests; eslint unchanged on the service, clean on the new spec.
+**Validated:** Jest red → green, `books/detail-outage.spec.ts` (8): 404 and 400 → 404 with no cache write; manga
+503 → 503, or the stale detail when there is one; a 200 without the manga → 503; covers 503 → served with its title (stale covers if any), uncached;
+both fine → cached. Full Backend suite 108 suites / 1,064 tests; eslint unchanged on the service, clean on the new spec.
 
 ---
 
