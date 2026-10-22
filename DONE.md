@@ -77,6 +77,22 @@
 
 ---
 
+## #961 MangaDex cache: no cut-short chapter lists, no untagged answers under a tag (2026-10-22)
+
+**What:** `getMangaChapters` paged the feed 500 at a time and `break`-ed on a failed page, then cached whatever it had —
+a list missing every chapter past 500 stayed cached for the TTL. `getNewReleases` with a tag it could not resolve
+(tag list down, or no such tag) dropped the filter and read/wrote the untagged cache key. Now only a complete chapter list
+is cached for the full TTL (a cut-short one is served from the stale copy if there is one, otherwise as is and kept only
+60 s — review: so a failing MangaDex is not re-fetched in full on every request), and an unresolved
+tag answers 404 when the tag list is known but lacks it, 503 when the list could not be loaded — `/new` shows that as a
+failed load with a retry — never the untagged rows.
+
+**Validated:** `mangadex-cache-correctness.spec.ts` red → green: failed second page → partial list returned and cached
+60 s only; stale full list preferred; complete list still cached; unresolved tag → 503 / 404 with no untagged cache
+read and no `/manga?` fetch. `src/books` + `src/common`: 52 suites / 483 tests pass. eslint unchanged.
+
+---
+
 ## #958 Book query params validated; a bad request no longer reports "MangaDex offline" to everyone (2026-10-22)
 
 **What:** `/books/new-releases`, `/books/genre/:slug`, `/books/search` and `/books/:id/related` passed `parseInt(...)`
