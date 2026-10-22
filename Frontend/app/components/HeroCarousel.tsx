@@ -7,6 +7,7 @@ import HeroDescription from "./HeroDescription";
 import HeroDetailButton from "./HeroDetailButton";
 import type { LandingBook } from "../lib/types";
 import { useCoverSrc } from "../hooks/useCoverSrc";
+import { modalStack } from "../lib/bookModalHistory";
 import { heroAutoplay, useReducedMotion } from "../hooks/reducedMotion";
 import { Pause, Play } from "lucide-react";
 
@@ -130,7 +131,8 @@ function Dots({ total, idx, desktop, onDotClick, autoplay, onToggleAutoplay }: D
 export default function HeroCarousel({ books }: { books: LandingBook[] }) {
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
-  const [mobileDlOpen, setMobileDlOpen] = useState(false);
+  // The book the mobile popup was opened on: a snapshot, so the rotation behind the popup cannot change it (#948)
+  const [openBook, setOpenBook] = useState<LandingBook | null>(null);
   const pausedRef = useRef(false);
   const focusInsideRef = useRef(false);
   const reducedMotion = useReducedMotion();
@@ -185,13 +187,14 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
 
   const handleMobileTap = useCallback(() => {
     if (didSwipeRef.current) return;
-    setMobileDlOpen(true);
-  }, []);
+    setOpenBook(books[idx]);
+  }, [books, idx]);
 
   useEffect(() => {
     if (total <= 1 || !autoplay) return;
     const t = setInterval(() => {
-      if (!pausedRef.current && !focusInsideRef.current) {
+      // Not behind an open book popup: rotating there remounts the desktop detail button and drops its popup (#948)
+      if (!pausedRef.current && !focusInsideRef.current && !modalStack.anyOpen()) {
         setVisible(false);
         setTimeout(() => {
           setIdx((i) => (i + 1) % total);
@@ -337,8 +340,8 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
         </div>
       </section>
 
-      {mobileDlOpen && (
-        <BookDetailModal book={book} onClose={() => setMobileDlOpen(false)} />
+      {openBook && (
+        <BookDetailModal book={openBook} onClose={() => setOpenBook(null)} />
       )}
     </>
   );

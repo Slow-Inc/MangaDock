@@ -47,6 +47,10 @@ export const modalStack = {
   isTop(popup: Popup) {
     return open[open.length - 1] === popup;
   },
+  /** Whether any book popup is open — the hero carousel holds still behind one (#948). */
+  anyOpen() {
+    return open.length > 0;
+  },
 };
 
 /** A popup closing its own history entry (X, Escape, backdrop). The popstate this causes is
