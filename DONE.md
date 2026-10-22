@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 56 — GPU inventory: the loop has been testing on the RTX 5060 Ti 16 GB; the 4070 SUPER was idle (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Answered the standing question with real hardware data: every doctor/A-B/worker run in this loop used `CUDA_VISIBLE_DEVICES=1` = **RTX 5060 Ti 16 GB**; the **RTX 4070 SUPER 12 GB** (GPU0) had been idle.
+- Both cards fit the production pipeline with ease (peak torch alloc **2.6 GB**, reserved 3.3 GB vs 4.1 GB). Replay benchmarks (GPU-compute only) show the same speed class — 4070 SUPER marginally ahead on detection/render in the sample, 5060 Ti ahead on some OCR runs; differences are inside run-to-run noise and translation (the dominant phase) is gateway-bound.
+- Recommendation recorded: keep the loop and production workers on the **5060 Ti** for the VRAM headroom (batch pipeline keeps two page contexts); the 4070 SUPER is a valid second single-page worker.
+- Benchmark `2026-10-22-gpu-inventory.md`.
+
 ## MIT quality loop, round 55 — #905 production-path chapter A/B: 9 pages, 1.16×, structure identical (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
