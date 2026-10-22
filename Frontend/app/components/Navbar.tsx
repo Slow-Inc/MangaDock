@@ -8,27 +8,7 @@ import NavbarActions from "./NavbarActions";
 import { getActiveStudioTab, STUDIO_TABS } from "../studio/components/studioTabs";
 import { scrollBehavior } from "../hooks/reducedMotion";
 import { usePopoverDismiss } from "../hooks/popoverDismiss";
-
-const GENRES = [
-  { slug: "action",        label: "แอคชัน" },
-  { slug: "adventure",     label: "ผจญภัย" },
-  { slug: "comedy",        label: "ตลก" },
-  { slug: "romance",       label: "โรแมนติก" },
-  { slug: "fantasy",       label: "แฟนตาซี" },
-  { slug: "drama",         label: "ดราม่า" },
-  { slug: "horror",        label: "สยองขวัญ" },
-  { slug: "sci-fi",        label: "ไซไฟ" },
-  { slug: "slice-of-life", label: "ชีวิตประจำวัน" },
-  { slug: "sports",        label: "กีฬา" },
-  { slug: "mystery",       label: "ลึกลับ" },
-  { slug: "psychological", label: "จิตวิทยา" },
-  { slug: "supernatural",  label: "เหนือธรรมชาติ" },
-  { slug: "historical",    label: "ประวัติศาสตร์" },
-  { slug: "isekai",        label: "อิเซไค" },
-  { slug: "mecha",         label: "หุ่นยนต์" },
-  { slug: "school-life",   label: "ชีวิตนักเรียน" },
-  { slug: "thriller",      label: "ระทึกขวัญ" },
-];
+import { GENRES } from "../lib/genres";
 
 const navItems = [
   { label: "หน้าหลัก",     href: "/",                    scrollId: undefined },

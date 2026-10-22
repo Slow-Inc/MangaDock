@@ -77,6 +77,25 @@
 
 ---
 
+## #971 An unknown genre slug is the 404 page, and the genre list lives in one place (2026-10-22)
+
+**What:** `/categories/<anything>` rendered a genre page named after the slug ("nope") with an empty grid — the
+backend answers an unknown slug with an empty list — so a stale or mistyped link looked like a real, empty genre and
+was indexable. The 18 genres were also written twice (`Navbar.tsx`, the genre page). Now `app/lib/genres.ts` is the
+one list; `categories/[genre]/page.tsx` is a server page that calls `notFound()` for any other slug and renders the
+client `GenrePage.tsx` otherwise. The status stays 200: the root `app/loading.tsx` streams the shell before the page
+resolves, so Next serves the 404 page with `noindex` instead (a 404 status would need a proxy rewrite or dropping the
+root loading state; `notFound()` from `generateMetadata` was tried too — Googlebot still gets 200).
+`dynamicParams = false` + `generateStaticParams` was tried first and had no effect on this dynamically rendered
+route. The page passes the validated genre to `GenrePage` as props (no `useParams`), and `generateMetadata` puts
+"แอคชัน · MangaDock" in the server HTML.
+
+**Validated:** production build: before, `/categories/nope` → heading "nope", no noindex; after, `nope` and `ACTION`
+→ "ไม่พบหน้านี้" + `noindex`, `action` → "แอคชัน" without noindex; the navbar still links all 18 genres. tsc 0; eslint
+clean on the touched files.
+
+---
+
 ## #970 A MangaDex outage is a 503 for search and genre, not "200, no results" (2026-10-22)
 
 **What:** `fetchMangaWithParamsPaged` and `getGenreManga` turned a MangaDex 5xx / 403 / 429 / maintenance page /
