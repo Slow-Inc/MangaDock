@@ -674,11 +674,10 @@ class MangaTranslator:
     async def _run_textline_merge(self, config: Config, ctx: Context):
         current_time = time.time()
         self._model_usage_tracker.touch("textline_merge", "textline_merge", current_time)
-        text_regions = await dispatch_textline_merge(ctx.textlines, ctx.img_rgb.shape[1], ctx.img_rgb.shape[0],
-                                                     verbose=self.verbose)
-        for region in text_regions:
-            if not hasattr(region, "text_raw"):
-                region.text_raw = region.text      # <- Save the initial OCR results to expand the render detection box. Also, prevent affecting the forbidden translation function.       
+        # #885: the merge used to run TWICE here - a first dispatch whose regions were then thrown
+        # away after stamping `text_raw` on them (dispatch() builds new TextBlocks, so the stamp
+        # never reached the regions the pipeline keeps). That dead pass cost about half of this
+        # stage; the real dispatch below is the only one whose output is used.
         # Filter out languages to skip  
         if config.translator.skip_lang is not None:  
             skip_langs = [lang.strip().upper() for lang in config.translator.skip_lang.split(',')]  
