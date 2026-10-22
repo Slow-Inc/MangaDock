@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import BookDetailModal from "./BookDetailModal";
 import { bookFromDetail } from "../lib/bookFromDetail";
@@ -8,6 +8,9 @@ import { loadMangaDetail } from "../lib/mangaDetail";
 import type { LandingBook } from "../lib/types";
 import Loader from "./ui/Loader";
 import { DOT_FIELD } from "./skeletonDots";
+import LoadError from "./ui/LoadError";
+import { isNotFound } from "../lib/httpError";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 
 /**
  * The book popup for a direct /book/<id> visit (shared link, refresh, new tab): there is
@@ -16,7 +19,10 @@ import { DOT_FIELD } from "./skeletonDots";
  */
 export default function BookRouteModal({ id }: { id: string }) {
   const router = useRouter();
-  const [state, setState] = useState<"loading" | "missing" | LandingBook>("loading");
+  // "missing" only for a 404, or a detail bookFromDetail cannot use; any other failure — a network error, a 5xx, a 200 of
+  // the wrong shape — is "failed", with a retry (#919)
+  const [state, setState] = useState<"loading" | "missing" | "failed" | LandingBook>("loading");
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,13 +30,13 @@ export default function BookRouteModal({ id }: { id: string }) {
       .then((detail) => {
         if (!cancelled) setState(bookFromDetail(detail) ?? "missing");
       })
-      .catch(() => {
-        if (!cancelled) setState("missing");
+      .catch((err) => {
+        if (!cancelled) setState(isNotFound(err) ? "missing" : "failed");
       });
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, retry]);
 
   const close = useCallback(() => router.replace("/"), [router]);
 
@@ -38,17 +44,33 @@ export default function BookRouteModal({ id }: { id: string }) {
 
   if (state === "missing") {
     return (
-      <div className="fixed inset-0 z-200 flex items-center justify-center bg-scrim/75 p-4">
-        <div className="rounded-2xl bg-surface p-8 text-center shadow-2xl">
-          <p className="text-ink-2">ไม่พบข้อมูลหนังสือ</p>
-          <button
-            onClick={close}
-            className="mt-4 rounded-lg border border-ink-3 px-4 py-2 text-sm text-ink-2 hover:bg-fill"
-          >
-            ← กลับหน้าแรก
-          </button>
-        </div>
-      </div>
+      <NoticeDialog label="ไม่พบข้อมูลหนังสือ" onClose={close}>
+        <p className="text-ink-2">ไม่พบข้อมูลหนังสือ</p>
+        <button
+          onClick={close}
+          className="mt-4 rounded-lg border border-ink-3 px-4 py-2 text-sm text-ink-2 hover:bg-fill"
+        >
+          ← กลับหน้าแรก
+        </button>
+      </NoticeDialog>
+    );
+  }
+
+  if (state === "failed") {
+    return (
+      <NoticeDialog label="โหลดหนังสือไม่สำเร็จ" onClose={close}>
+        <LoadError
+          what="หนังสือ"
+          framed={false}
+          onRetry={() => {
+            setState("loading");
+            setRetry((n) => n + 1);
+          }}
+        />
+        <button onClick={close} className="mt-3 text-sm text-ink-2 hover:text-ink">
+          ← กลับหน้าแรก
+        </button>
+      </NoticeDialog>
     );
   }
 
@@ -61,6 +83,8 @@ export default function BookRouteModal({ id }: { id: string }) {
  */
 function PopupSkeleton({ onClose }: { onClose: () => void }) {
   const cover = "relative aspect-2/3 shrink-0 overflow-hidden rounded-xl bg-fill ring-1 ring-line";
+  const root = useRef<HTMLDivElement>(null);
+  useDialogFocus(root, () => true); // aria-modal: Tab stays inside (#919 review)
   // A slow fetch must not trap anyone: Escape and a close button work as in the popup itself.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -70,7 +94,7 @@ function PopupSkeleton({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div role="dialog" aria-modal="true" aria-label="กำลังโหลดหนังสือ" className="fixed inset-0 z-200 flex items-center justify-center md:p-4">
+    <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="กำลังโหลดหนังสือ" className="fixed inset-0 z-200 flex items-center justify-center outline-none md:p-4">
       <div className="absolute inset-0 bg-bg md:bg-scrim/90" onClick={onClose} />
       <div className="relative z-10 flex h-full w-full flex-col overflow-hidden bg-surface shadow-2xl md:h-auto md:max-h-[90vh] md:max-w-3xl md:rounded-3xl">
         <button
@@ -104,6 +128,32 @@ function PopupSkeleton({ onClose }: { onClose: () => void }) {
           <div className="h-3 w-4/5 rounded bg-fill" />
           <div className="h-3 w-3/5 rounded bg-fill" />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The small "not found" / "could not load" window for a direct /book link (#919): a real dialog — focus starts on its
+ * first button, Escape and the scrim close it — as the loading skeleton and the popup itself already are.
+ */
+function NoticeDialog({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
+  const root = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    box.current?.querySelector<HTMLElement>("button")?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  useDialogFocus(root, () => true); // aria-modal: Tab stays inside (#837)
+  return (
+    <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label={label} className="fixed inset-0 z-200 flex items-center justify-center p-4 outline-none">
+      <div className="absolute inset-0 bg-scrim/75" onClick={onClose} />
+      <div ref={box} className="relative w-full max-w-sm rounded-2xl bg-surface p-6 text-center shadow-2xl">
+        {children}
       </div>
     </div>
   );

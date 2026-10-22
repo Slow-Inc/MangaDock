@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { loadMangaDetail } from "./mangaDetail";
+import { isNotFound } from "./httpError";
 
 /** The book popup and the direct-link route that opens it both load the manga detail; the
  *  second caller must be a cache hit, and a bad response must never be cached. */
@@ -43,6 +44,13 @@ describe("loadMangaDetail", () => {
   test("a non-OK response rejects", async () => {
     respond = () => new Response("nope", { status: 502 });
     await expect(loadMangaDetail(freshId())).rejects.toThrow();
+  });
+
+  test("the rejection carries the status, so a direct /book link can tell 'not found' from 'failed' (#919)", async () => {
+    respond = () => new Response("gone", { status: 404 });
+    expect(isNotFound(await loadMangaDetail(freshId()).catch((e) => e))).toBe(true);
+    respond = () => new Response("down", { status: 503 });
+    expect(isNotFound(await loadMangaDetail(freshId()).catch((e) => e))).toBe(false);
   });
 
   test("a 200 with the wrong shape rejects and is not cached (it would crash every reopen for the whole TTL)", async () => {

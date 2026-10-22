@@ -12,14 +12,20 @@ export default function LoadError({
   what,
   onRetry,
   area = "error",
+  framed = true,
 }: {
   what: string;
   onRetry: () => unknown;
   area?: MascotArea;
+  /** false inside a dialog that already frames and names it: no card, and no alert repeating the dialog's label */
+  framed?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   return (
-    <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface px-6 py-12 text-center">
+    <div
+      role={framed ? "alert" : undefined}
+      className={`flex flex-col items-center gap-3 text-center ${framed ? "rounded-2xl border border-line bg-surface px-6 py-12" : "py-2"}`}
+    >
       <Mascot area={area} state="sleeping" size={64} />
       <p className="text-sm font-medium text-ink">โหลด{what}ไม่สำเร็จ</p>
       <p className="text-xs text-ink-3">ลองโหลดใหม่อีกครั้ง</p>

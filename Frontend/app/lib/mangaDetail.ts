@@ -1,5 +1,6 @@
 import { cacheOrFetch, TTL } from "./apiCache";
 import type { MangaDetail } from "./types";
+import { HttpError } from "./httpError";
 
 const API_BASE = "/api/proxy";
 
@@ -18,7 +19,7 @@ export function loadMangaDetail(id: string): Promise<MangaDetail> {
     `manga:${id}:modal-detail${forceLocal ? ":local" : ""}`,
     () =>
       fetch(`${API_BASE}/books/manga/${encodeURIComponent(id)}${qs}`).then(async (r) => {
-        if (!r.ok) throw new Error("detail fetch failed");
+        if (!r.ok) throw new HttpError(r.status, "detail fetch failed"); // 404 vs failed load (#919)
         const d: MangaDetail = await r.json();
         // Guard the render's `[...detail.authors, ...detail.artists]` spread — a
         // 200-with-bad-shape must throw (not cache), else it would crash the
