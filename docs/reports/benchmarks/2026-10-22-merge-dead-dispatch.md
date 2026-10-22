@@ -28,3 +28,17 @@ pipeline running) — it is not a real stage cost.
 
 **Rule for speed work here:** rank stages by profiler cumulative time (and repeated medians), never by a
 single `timing_ms` reading, and never time while another job is running on the machine.
+
+## Where the merge stage's seconds actually go (cold profile, one page)
+
+| callee | time |
+|---|---|
+| `sort_regions` -> `get_panels_from_array` (**Kumiko** panel detection) | **2.04 s** |
+| `dispatch_textline_merge` (the merge itself) | 0.185 s for two calls |
+| `_textline_containers` (bubble association) | 0.016 s |
+
+So the stage that report called "textline_merge" is mostly **panel detection for reading order**
+(`sort_regions` runs Kumiko on the page at `manga_translator.py:856`, inside the merge stage). That is the
+next real target: panel detection is CPU-bound Python on the full-resolution page, and a downscale is the
+obvious lossless-looking lever — but it changes panel boxes, which changes reading order, so it needs a
+39-page replay A/B before it can default.
