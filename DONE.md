@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 71 — live 5-page baseline sweep + gate OCR-punctuation fix (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Fresh live sweep at HEAD over 5 pages with the gate: wall **16.1 s cold / 3.6 / 3.8 / 4.8 / 7.9 s**, translation **1.3-2.6 s** — the pipeline is in its normal performance band.
+- Gate flagged 2 dropped `?`; triage found one **false positive** (`IF?YOU` — OCR punctuation embedded inside a word) and one benign style variation (`YKNOW?` -> `มันไม่แฟร์เลยนะ!`, rhetorical tone carried by `!`).
+- Refinement: the gate strips punctuation embedded in an OCR word before comparing; re-gate = **1 flag** (the style case). 8 gate tests green.
+- Initial baseline recorded: 5 live pages -> 0 hard violations after the refinement, 1 documented style flag.
+
 ## MIT quality loop, round 70 — contract guard verified quiet on clean pages; residual shift audited to zero (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

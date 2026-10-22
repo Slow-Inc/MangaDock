@@ -24,6 +24,8 @@ _LATIN = re.compile(r'[A-Za-z]{3,}')
 _THAI = re.compile(r'[\u0E00-\u0E7F]')
 _PUNCT = ('!', '?', '…')
 #: Thai manga often drops the '?' when the sentence ends on a question particle; those count as preserved.
+#: OCR sometimes lands punctuation INSIDE a word ('IF?YOU THINK') - not a real question mark.
+_OCR_EMBEDDED_PUNCT = re.compile(r'(?<=[A-Za-z])\?(?=[A-Za-z])')
 _THAI_QUESTION = re.compile(r'(เหรอ|หรอ|หรือ|ไหม|มั้ย|รึ|รึเปล่า|เปล่า|ไหน|งั้นเหรอ|จริงเหรอ)\s*[.!…]*$')
 
 
@@ -54,8 +56,9 @@ def check_page(regions, page='?'):
             out.append({'page': page, 'index': i, 'kind': 'control_chars', 'detail': repr(dst[:60])})
         if thai and _LATIN.search(dst):
             out.append({'page': page, 'index': i, 'kind': 'added_latin', 'detail': dst[:60]})
+        src_punct = _OCR_EMBEDDED_PUNCT.sub('', src)
         for mark in _PUNCT:
-            if src.count(mark) >= 1 and dst.count(mark) == 0:
+            if src_punct.count(mark) >= 1 and dst.count(mark) == 0:
                 if mark in ('?', '!') and ('⁈' in dst or '⁉' in dst):
                     continue  # one interrobang covers both marks
                 if mark == '?' and _THAI_QUESTION.search(dst):

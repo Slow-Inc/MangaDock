@@ -50,3 +50,8 @@ def test_a_thai_question_particle_covers_a_dropped_question_mark():
     assert check_page([_r("YOURE COMING?", "เธอจะมางั้นเหรอ")]) == []
     assert check_page([_r("YOURE COMING?", "เธอจะมาไหม")]) == []
     assert [v["kind"] for v in check_page([_r("YOURE COMING?", "เธอจะมา")])] == ["dropped_?"]
+
+
+def test_a_punctuation_marble_inside_an_ocr_word_is_not_a_question_990e():
+    assert check_page([_r("IF?YOU THINK ABOUT THATS QUITE SAD.", "ถ้าคิดแบบนั้น ก็ถือว่าเศร้ามากเลยนะ")]) == []
+    assert [v["kind"] for v in check_page([_r("WHY? ARE YOU SURE?", "ทำไม เธอแน่ใจ")])] == ["dropped_?"]
