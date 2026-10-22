@@ -190,6 +190,16 @@ def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height, contain
         # yield overall bbox and sorted indices
         yield txtlns, (fg_r, fg_g, fg_b), (bg_r, bg_g, bg_b)
 
+def stamp_text_raw(regions) -> None:
+    """#885: keep the raw OCR text on each merged region BEFORE the pre-translation dictionary
+    rewrites ``text``. Renderers scale a longer translation against it (rendering:792) and the
+    page-translation record keys on it; the old stamp landed on a dispatch whose regions were
+    thrown away, so every consumer silently saw the rewritten text instead."""
+    for region in regions or []:
+        if not hasattr(region, "text_raw"):
+            region.text_raw = region.text
+
+
 async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verbose: bool = False,
                    containers=None) -> List[TextBlock]:
     # print(width, height)

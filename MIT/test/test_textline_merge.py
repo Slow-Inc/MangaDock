@@ -1,6 +1,7 @@
 import os
 import cv2
 import pytest
+from types import SimpleNamespace
 from typing import List
 import numpy as np
 from manga_translator.textline_merge import dispatch as dispatch_merge
@@ -390,3 +391,27 @@ async def test_a_real_line_merged_with_a_det_sfx_line_is_not_speculative():
              Quadrilateral(np.array(_box(520, 712, 773, 721)), 'THIS CHAPTER', 1, is_sfx=True)]
     regions = await dispatch_merge(lines, 800, 800)
     assert len(regions) == 1 and not regions[0].speculative
+
+
+def test_stamp_text_raw_keeps_the_raw_ocr_text_885():
+    """#885: the raw OCR text has to survive on the FINAL merged regions, before the
+    pre-translation dictionary rewrites `text` (the old stamp landed on a dispatch whose regions
+    were thrown away, so every consumer silently saw the rewritten text)."""
+    from manga_translator.textline_merge import stamp_text_raw
+    raw = SimpleNamespace(text="I'VE BEEN KILLED BY IT")
+    stamp_text_raw([raw])
+    assert raw.text_raw == "I'VE BEEN KILLED BY IT"
+
+
+def test_stamp_text_raw_never_overwrites_an_existing_value_885():
+    from manga_translator.textline_merge import stamp_text_raw
+    r = SimpleNamespace(text='raw', text_raw='first')
+    r.text = 'rewritten by the pre-translation dictionary'
+    stamp_text_raw([r])
+    assert r.text_raw == 'first'
+
+
+def test_stamp_text_raw_tolerates_none_and_empty_885():
+    from manga_translator.textline_merge import stamp_text_raw
+    stamp_text_raw(None)
+    stamp_text_raw([])

@@ -85,7 +85,7 @@ from .translation_quality import strip_noise_glyphs
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
 from .ocr import dispatch as dispatch_ocr, prepare as prepare_ocr, unload as unload_ocr
-from .textline_merge import dispatch as dispatch_textline_merge
+from .textline_merge import dispatch as dispatch_textline_merge, stamp_text_raw
 from .mask_refinement import dispatch as dispatch_mask_refinement
 from .inpainting import dispatch as dispatch_inpainting, prepare as prepare_inpainting, unload as unload_inpainting
 from .translators import (
@@ -704,6 +704,8 @@ class MangaTranslator:
         text_regions = await dispatch_textline_merge(ctx.textlines, ctx.img_rgb.shape[1], ctx.img_rgb.shape[0],  
                                                      verbose=self.verbose,
                                                      containers=self._textline_containers(config, ctx))
+
+        stamp_text_raw(text_regions)
 
         new_text_regions = []
         from .ocr_vlm import placeholder_junk, sfx_false_positive, speculative_box
