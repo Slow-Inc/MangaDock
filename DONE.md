@@ -77,6 +77,25 @@
 
 ---
 
+## #988 Forum compose follows the server: role-filtered categories on the manga page, clipped auto titles, input limits (2026-10-22)
+
+**What:**
+- The manga community page offered every category to every role. A regular user saw ประกาศ, which the backend
+  refuses from non-admins (403), and อัปเดตมังงะ, which needs role ≥ 1. The page now uses `availableCategories(userRole)`,
+  as `/community` does, and falls back to `general` when the chosen category becomes unavailable.
+- The popup's quick post built `พูดคุยเกี่ยวกับเรื่อง ${title}`, which a long manga title pushes past the DTO's 200.
+  The title and `targetMangaTitle` are now cut with `clipToLimit`, which counts code points as class-validator does.
+- No forum input had a limit. Every post / comment / reply / edit field now has the server's `maxLength`
+  (`lib/forumLimits.ts`: title 200, content 10,000, comment 5,000) and a `LimitCounter` from 90 % of the limit.
+
+**Validated:** bun test `lib/forumLimits.test.ts`: red (module missing) → green, 4 tests (limits mirror the DTOs; unchanged
+within the limit; cut to exactly 200 with an ellipsis; an emoji is never split). Production build + stand-in, signed in
+through a local fake session (Playwright answers every Supabase-host request locally, 0 reached the network). Main
+build: the picker shows ทั่วไป / ประกาศ / สปอยล์ / อัปเดตมังงะ and no `maxlength` (red). Fix: ทั่วไป / สปอยล์, `maxlength` 200 /
+10000, counter "195 / 200" (green). tsc clean; eslint matches main.
+
+---
+
 ## #985 A favourite or like the server refused stays pending and retries — an un-favourite no longer comes back (2026-10-22)
 
 **What:** `userCache.flush()` awaited raw `fetch` calls (which resolve on a 4xx/5xx) and then marked every item synced.

@@ -10,6 +10,8 @@ import PostCard from "./PostCard";
 import { PostSkeleton } from "./ForumSkeleton";
 import LoadError from "./ui/LoadError";
 import type { ForumPost } from "../lib/types";
+import { FORUM_LIMITS, clipToLimit } from "../lib/forumLimits";
+import LimitCounter from "./ui/LimitCounter";
 
 export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: string, title: string, cover?: string }) {
   const { user } = useAuth();
@@ -45,11 +47,12 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
     const tempId = `temp-${Date.now()}`;
     const tempPost: ForumPost = {
       id: tempId,
-      title: `พูดคุยเกี่ยวกับเรื่อง ${title}`,
+      // a long manga title would push these past the server's 200 (#988)
+      title: clipToLimit(`พูดคุยเกี่ยวกับเรื่อง ${title}`, FORUM_LIMITS.title),
       content,
       category: 'general',
       targetMangaId: mangaId,
-      targetMangaTitle: title,
+      targetMangaTitle: clipToLimit(title, FORUM_LIMITS.title),
       targetMangaCover: cover ?? null,
       imageUrls: [],
       authorUid: user?.uid ?? '',
@@ -76,7 +79,7 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
         content,
         category: 'general',
         targetMangaId: mangaId,
-        targetMangaTitle: title,
+        targetMangaTitle: clipToLimit(title, FORUM_LIMITS.title),
         targetMangaCover: cover,
       });
       // Replace temp with authoritative server post
@@ -112,11 +115,13 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
           <textarea
             value={newPostContent}
             onChange={(e) => setNewPostContent(e.target.value)}
+            maxLength={FORUM_LIMITS.content}
             placeholder="คุณคิดยังไงกับเรื่องนี้..."
             className="w-full bg-transparent border-none text-sm text-ink placeholder:text-ink-3 focus:ring-0 resize-none"
             rows={3}
             autoFocus
           />
+          <LimitCounter value={newPostContent} max={FORUM_LIMITS.content} />
           <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-line">
             <button 
               onClick={() => setIsPosting(false)}

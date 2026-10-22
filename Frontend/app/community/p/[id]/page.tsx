@@ -12,6 +12,8 @@ import { PostDetailSkeleton } from "../../../components/ForumSkeleton";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import { getPost, listComments, createComment, updatePost, deletePost } from "../../../lib/communityApi";
+import { FORUM_LIMITS } from "../../../lib/forumLimits";
+import LimitCounter from "../../../components/ui/LimitCounter";
 import VoteButtons from "../../../components/VoteButtons";
 import CommentThread from "../../../components/CommentThread";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -446,16 +448,20 @@ export default function PostDetailPage() {
                 <input
                   value={editPostTitle}
                   onChange={(e) => setEditPostTitle(e.target.value)}
+                  maxLength={FORUM_LIMITS.title}
                   className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-xl sm:text-2xl font-black text-ink focus:outline-none focus:border-accent transition-colors mb-3"
                   placeholder="หัวข้อกระทู้"
                 />
+                <LimitCounter value={editPostTitle} max={FORUM_LIMITS.title} />
                 <textarea
                   value={editPostContent}
                   onChange={(e) => setEditPostContent(e.target.value)}
+                  maxLength={FORUM_LIMITS.content}
                   rows={8}
                   className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm sm:text-base text-ink focus:outline-none focus:border-accent transition-colors resize-none leading-relaxed"
                   placeholder="เนื้อหากระทู้"
                 />
+                <LimitCounter value={editPostContent} max={FORUM_LIMITS.content} />
                 <div className="flex justify-end gap-2 mt-3">
                   <button
                     onClick={() => setIsEditingPost(false)}
@@ -577,10 +583,12 @@ export default function PostDetailPage() {
                 <textarea
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
+                  maxLength={FORUM_LIMITS.comment}
                   placeholder="ร่วมแสดงความคิดเห็นของคุณ..."
                   rows={3}
                   className="w-full bg-fill border border-line rounded-xl p-3 text-ink text-sm focus:outline-none focus:border-accent transition-all resize-none mb-3"
                 />
+                <LimitCounter value={newComment} max={FORUM_LIMITS.comment} />
                 <div className="flex justify-end">
                   <button
                     onClick={handlePostComment}

@@ -10,6 +10,8 @@ import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import VoteButtons from "./VoteButtons";
 import { createComment, updateComment, deleteComment } from "../lib/communityApi";
+import { FORUM_LIMITS } from "../lib/forumLimits";
+import LimitCounter from "./ui/LimitCounter";
 import { useAuth } from "../contexts/AuthContext";
 import { useModalTransition } from "../hooks/useModalTransition";
 import type { ForumComment } from "../lib/types";
@@ -167,9 +169,11 @@ function CommentThreadImpl({
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
+                  maxLength={FORUM_LIMITS.comment}
                   rows={3}
                   className="w-full bg-fill border border-line rounded-lg p-3 text-sm text-ink focus:outline-none focus:border-ink-3 smooth-hover resize-none"
                 />
+                <LimitCounter value={editContent} max={FORUM_LIMITS.comment} />
                 <div className="flex justify-end gap-2 mt-2">
                   <button
                     onClick={() => setIsEditing(false)}
@@ -267,10 +271,12 @@ function CommentThreadImpl({
               <textarea
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
+                maxLength={FORUM_LIMITS.comment}
                 placeholder="เขียนข้อความตอบกลับ..."
                 className="w-full bg-fill border border-line rounded-lg p-3 text-sm text-ink focus:outline-none focus:border-ink-3 smooth-hover resize-none"
                 rows={3}
               />
+              <LimitCounter value={replyContent} max={FORUM_LIMITS.comment} />
               <div className="flex justify-end gap-2 mt-2">
                 <button
                   onClick={() => setIsReplying(false)}
