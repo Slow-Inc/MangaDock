@@ -126,7 +126,7 @@ export default function MascotEditor() {
     if (!uid) return;
     let cancelled = false;
     (async () => {
-      const token = await getIdToken();
+      const token = await getIdToken().catch(() => null); // a rejected session falls back to the default mascot (#1013)
       const res = token ? await getMyMascot(token).catch(() => null) : null;
       if (cancelled) return;
       setConfig(res?.mascot ?? mascotFromUid(uid));

@@ -77,6 +77,27 @@
 
 ---
 
+## #1013 Spinners that never stopped: empty search after an in-flight one, a failed page image, the notification list (2026-10-23)
+
+**What:**
+- `/search`: going back to an empty query while a search was in flight aborted it, the `AbortError` path skipped the
+  reset, and the empty branch never cleared `loading`, so 12 skeletons stayed up and the prompt stayed hidden. The empty
+  branch now clears it.
+- Reader `PageRenderer`: the page `<img>` had no `onError`, so a failed page spun forever over an invisible image. It
+  now shows "โหลดหน้านี้ไม่สำเร็จ" with a retry. The failure is keyed on the image source, so another page never shows it,
+  and a later successful load clears it.
+- `NotificationBell.fetchList`: a throw skipped `setLoading(false)`; it is now in `finally`.
+- Token awaits outside any try (`useSeriesFollow`, the mascot config load, the studio edit load) are caught, so a
+  rejected session cannot leave a flag set.
+- The admin "Apply" (wallet adjust) button has the same shape but is left to the developer (wallet path).
+
+**Validated:** production build + stand-in `STUCK1013=1`. Main: no prompt (skeletons), no page error and the page never
+loads, the notification spinner stuck (red). Fix: the prompt shows; "โหลดหน้านี้ไม่สำเร็จ" shows and the retry loads the
+page; the spinner stops (green). The reader998, reader-drawer and related-retry probes pass. The token-await cases are
+checked by reading. Real tsc 0 errors; eslint matches or improves on main (`NotificationBell`'s error is gone).
+
+---
+
 ## #1011 A mascot save no longer always fails (2026-10-23)
 
 **What:** `MascotEditor.save` made the PNG with `new Promise(r => canvas.toBlob(r, "image/png") ?? r(null))`.

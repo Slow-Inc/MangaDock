@@ -87,6 +87,16 @@ function PageRendererImpl({
   // Per-instance (#662): side-by-side mounts two PageRenderers, and a shared
   // flag let one panel's onLoad/onLoadStart flip the other's spinner.
   const [imgLoading, setImgLoading] = useState(true);
+  // A page image that fails stops the spinner and offers a retry; `retry` re-requests it (#1013). The failure is
+  // keyed on the image's source, so turning to another page never shows this page's error.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  // Turning the page drops the old failure, so coming back re-tries with the spinner, not a stale error
+  const [failedPage, setFailedPage] = useState(page);
+  if (failedPage !== page) {
+    setFailedPage(page);
+    setFailedSrc(null);
+  }
 
   if (continuousMode) {
     return (
@@ -183,28 +193,44 @@ function PageRendererImpl({
 
   if (totalPages === 0) return null;
 
+  const pageSrc = showTranslation && translatedPages.has(page) ? translatedPages.get(page)! : pages[page];
+  const imgFailed = failedSrc !== null && failedSrc === pageSrc;
+
   return (
     <>
       {/* Zoom/pan CSS vars are inherited from the paged container in
           MangaReader (zoomWrapperRef), so both side-by-side panels move together (#662). */}
       <div className="manga-zoom-wrapper relative flex items-center justify-center select-none">
-        {imgLoading && (
+        {imgLoading && !imgFailed && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader context="section" />
+          </div>
+        )}
+        {imgFailed && (
+          <div role="alert" className="absolute inset-0 z-10 flex min-h-48 min-w-48 flex-col items-center justify-center gap-3 bg-bg text-sm text-ink-2">
+            โหลดหน้านี้ไม่สำเร็จ
+            <button
+              type="button"
+              onClick={() => { setFailedSrc(null); setImgLoading(true); setRetry((n) => n + 1); }}
+              className="rounded-lg border border-line px-4 py-1.5 text-xs font-semibold text-ink transition hover:bg-fill"
+            >
+              ลองใหม่
+            </button>
           </div>
         )}
         {/* Tight wrapper so absolute-positioned patches are relative to the img */}
         <div className="relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            key={showTranslation && translatedPages.has(page) ? `tr-${pages[page]}` : pages[page]}
-            src={showTranslation && translatedPages.has(page) ? translatedPages.get(page)! : pages[page]}
+            key={`${showTranslation && translatedPages.has(page) ? `tr-${pages[page]}` : pages[page]}#${retry}`}
+            src={pageSrc}
             alt={`หน้า ${page + 1}`}
             draggable={false}
             onContextMenu={(e) => e.preventDefault()}
-            className={`block max-h-[calc(100vh-120px)] max-w-full transition-opacity duration-200 ${imgLoading ? "opacity-0" : "opacity-100"}`}
-            onLoad={() => setImgLoading(false)}
+            className={`block max-h-[calc(100vh-120px)] max-w-full transition-opacity duration-200 ${imgLoading || imgFailed ? "opacity-0" : "opacity-100"}`}
+            onLoad={() => { setImgLoading(false); setFailedSrc((f) => (f === pageSrc ? null : f)); }}
             onLoadStart={() => setImgLoading(true)}
+            onError={() => { setImgLoading(false); setFailedSrc(pageSrc); }}
           />
           {/* Patch overlay: translated text regions overlaid on the original image */}
           {showTranslation && patchedPages.has(page) && patchedPages.get(page)!.map((p, pi) => (

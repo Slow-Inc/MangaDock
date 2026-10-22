@@ -94,7 +94,7 @@ export function useSeriesFollow(book: { id: string; title: string; thumbnail: st
     if (!user) { showLoginPrompt(); return; }
     if (busy.current) return;
     busy.current = true;
-    const token = await getToken();
+    const token = await getToken().catch(() => null); // a rejected session must not leave busy set (#1013)
     if (!token) {
       busy.current = false;
       showLoginPrompt(); // signed in on screen but the session is gone: a silent no-op read as a missed click (#995)

@@ -7,6 +7,7 @@ import type { NotificationItem } from "../lib/notificationTypes";
 import Loader from "./ui/Loader";
 import { usePopoverDismiss } from "../hooks/popoverDismiss";
 import { useToast } from "../contexts/ToastContext";
+import LoadError from "./ui/LoadError";
 
 const POLL_INTERVAL = 60_000;
 
@@ -42,6 +43,7 @@ async function send(path: string, opts: RequestInit): Promise<boolean> {
 export default function NotificationBell() {
   const [unread, setUnread] = useState(0);
   const [markingAll, setMarkingAll] = useState(false);
+  const [listFailed, setListFailed] = useState(false); // a failed load is not "no notifications" (#1013, cf. #911)
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -55,9 +57,17 @@ export default function NotificationBell() {
 
   const fetchList = useCallback(async () => {
     setLoading(true);
-    const data = await apiFetch<NotificationItem[]>("/api/proxy/notifications");
-    if (data) setItems(data);
-    setLoading(false);
+    setListFailed(false);
+    try {
+      // a successful list is always a JSON array; apiFetch's null means a non-ok answer
+      const data = await apiFetch<NotificationItem[]>("/api/proxy/notifications");
+      if (data) setItems(data);
+      else setListFailed(true);
+    } catch {
+      setListFailed(true);
+    } finally {
+      setLoading(false); // a throw (network, bad JSON) used to leave the panel loading forever (#1013)
+    }
   }, []);
 
   useEffect(() => {
@@ -140,6 +150,10 @@ export default function NotificationBell() {
           {loading ? (
             <div className="flex justify-center py-8 text-ink-3">
               <Loader context="section" label="กำลังโหลดการแจ้งเตือน" />
+            </div>
+          ) : listFailed ? (
+            <div className="px-4 py-4">
+              <LoadError what="การแจ้งเตือน" onRetry={fetchList} framed={false} />
             </div>
           ) : items.length === 0 ? (
             <div className="py-8 text-center text-sm text-ink-3">ไม่มีการแจ้งเตือน</div>
