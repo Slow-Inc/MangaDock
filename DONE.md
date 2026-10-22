@@ -84,12 +84,13 @@ straight on (`?limit=abc` → NaN; no upper bound on new-releases/genre; negativ
 `MangaDexService.fetchMangaWithParamsPaged` broadcast any non-2xx MangaDex answer as `mangadex: offline` to every SSE
 client — so one client's bad query, answered with a MangaDex 400, put the outage banner in front of every user. New
 `common/query-int.queryInt(value, fallback, { min, max })` parses and clamps each param; a 4xx other than 429 is logged
-as our own rejected request and no longer broadcast (5xx, 429 and network errors still are).
+as our own rejected request and no longer broadcast — only 400 and 404, after review: 403 (blocked), 429, 5xx and
+network errors still are. Also from review: the reported `total` is capped at the 10,000 results MangaDex can page to.
 
-**Validated:** Jest red → green: `query-int.spec.ts` (5), `mangadex-status-4xx.spec.ts` (400 no broadcast; 503 and 429
-still "offline"), `books-query-params.spec.ts` (4: junk → defaults, clamps, never NaN). `src/books` + `src/common`: 51
-suites / 476 tests pass (with the scratchpad `openai` on NODE_PATH, as the worktree lacks it). tsc: no errors in touched
-files (pre-existing spec errors elsewhere). eslint: books.controller 2 → 0 findings, mangadex.service unchanged.
+**Validated:** Jest red → green: `query-int.spec.ts` (5), `mangadex-status-4xx.spec.ts` (5: 400 no broadcast; 403, 429,
+503 still "offline"; total capped), `books-query-params.spec.ts` (4: junk → defaults, clamps, never NaN). `src/books` + `src/common`: 51
+suites / 478 tests pass (with the scratchpad `openai` on NODE_PATH, as the worktree lacks it). tsc: no errors in touched
+files (pre-existing spec errors elsewhere). eslint: books.controller 2 → 0 findings, mangadex.service 6 → 5.
 
 ---
 

@@ -46,4 +46,30 @@ describe('MangaDexService — which failures are an outage (#958)', () => {
     await service.fetchMangaWithParamsPaged(new URLSearchParams(), 'test');
     expect(broadcastStatus).toHaveBeenCalledWith('mangadex', 'offline');
   });
+
+  it('a 403 (MangaDex or its CDN blocking us) is an outage too', async () => {
+    const { service, broadcastStatus } = makeService(403);
+    await service.fetchMangaWithParamsPaged(new URLSearchParams(), 'test');
+    expect(broadcastStatus).toHaveBeenCalledWith('mangadex', 'offline');
+  });
+
+  it('reports at most the 10,000 results MangaDex can page to', async () => {
+    const broadcastStatus = jest.fn();
+    const service = new MangaDexService(
+      {} as never,
+      {} as never,
+      { broadcastStatus } as never,
+    ) as unknown as Internals;
+    service.fetchFn = () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ data: [], total: 54321 }), {
+          status: 200,
+        }),
+      );
+    const res = await service.fetchMangaWithParamsPaged(
+      new URLSearchParams(),
+      'test',
+    );
+    expect(res.total).toBe(10000);
+  });
 });
