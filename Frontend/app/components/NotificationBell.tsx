@@ -49,6 +49,7 @@ export default function NotificationBell() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
 
   const fetchCount = useCallback(async () => {
     const data = await apiFetch<{ count: number }>("/api/proxy/notifications/unread-count");
@@ -117,6 +118,7 @@ export default function NotificationBell() {
   return (
     <div ref={panelRef} className="relative">
       <button
+        ref={bellRef}
         onClick={() => setOpen((v) => !v)}
         className="relative flex h-8 w-8 items-center justify-center rounded-full border border-line bg-fill text-ink-2 transition hover:bg-raised hover:text-ink"
         aria-label="การแจ้งเตือน"
@@ -159,23 +161,26 @@ export default function NotificationBell() {
             <div className="py-8 text-center text-sm text-ink-3">ไม่มีการแจ้งเตือน</div>
           ) : (
             items.map((n) => {
+              // The row itself is the control (#934): a link, or a button when there is nowhere to go — reachable from
+              // the keyboard, and Enter on it marks it read (the handler used to sit on an inner div the key never hit)
+              const pick = () => { if (!n.read) handleMarkRead(n.id); setOpen(false); };
+              // a row with no link stays on the page: the panel goes inert, so focus goes back to the bell (as on Escape)
+              const pickHere = () => { pick(); bellRef.current?.focus(); };
+              const rowClass = `flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-fill ${!n.read ? "bg-accent/10" : ""}`;
               const inner = (
-                <div
-                  className={`flex items-start gap-3 px-4 py-3 transition hover:bg-fill ${!n.read ? "bg-accent/10" : ""}`}
-                  onClick={() => { if (!n.read) handleMarkRead(n.id); setOpen(false); }}
-                >
-                  <div className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-transparent" : "bg-accent"}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm leading-snug ${n.read ? "text-ink-2" : "text-ink"}`}>{n.title}</p>
-                    {n.body && <p className="mt-0.5 text-xs text-ink-3 line-clamp-2">{n.body}</p>}
-                    <p className="mt-1 text-xs text-ink-3">{timeAgo(n.createdAt)}</p>
-                  </div>
-                </div>
+                <>
+                  <span className={`mt-0.5 block h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-transparent" : "bg-accent"}`} />
+                  <span className="block flex-1 min-w-0">
+                    <span className={`block text-sm leading-snug ${n.read ? "text-ink-2" : "text-ink"}`}>{n.title}</span>
+                    {n.body && <span className="mt-0.5 block text-xs text-ink-3 line-clamp-2">{n.body}</span>}
+                    <span className="mt-1 block text-xs text-ink-3">{timeAgo(n.createdAt)}</span>
+                  </span>
+                </>
               );
               return n.link ? (
-                <Link key={n.id} href={n.link}>{inner}</Link>
+                <Link key={n.id} href={n.link} onClick={pick} className={rowClass}>{inner}</Link>
               ) : (
-                <div key={n.id}>{inner}</div>
+                <button key={n.id} type="button" onClick={pickHere} className={rowClass}>{inner}</button>
               );
             })
           )}

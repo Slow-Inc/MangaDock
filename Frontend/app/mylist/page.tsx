@@ -14,6 +14,7 @@ import {
 import {
   getFollows,
   loadFollows,
+  followsLoadFailed,
   FOLLOW_EVENT,
   type FollowedSeries,
 } from "../hooks/useSeriesFollow";
@@ -27,6 +28,8 @@ import { supabase } from "../lib/supabase";
 import { DOT_FIELD, shimmerDelay } from "../components/skeletonDots";
 import { scrollBehavior } from "../hooks/reducedMotion";
 import { usePageTitle } from "../hooks/pageTitle";
+import LoadError from "../components/ui/LoadError";
+import { useToast } from "../contexts/ToastContext";
 
 type TabKey = "favorites" | "follows" | "liked" | "history";
 
@@ -260,6 +263,8 @@ function MyListContent() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [favorites, setFavorites]   = useState<GridBook[]>([]);
   const [follows, setFollows]       = useState<GridBook[]>([]);
+  const [followsFailed, setFollowsFailed] = useState(false);
+  const { showToast } = useToast();
   const [likedBooks, setLikedBooks] = useState<GridBook[]>([]);
   const [history, setHistory]       = useState<GridBook[]>([]);
   const [visible, setVisible] = useState(true);
@@ -301,6 +306,7 @@ function MyListContent() {
       setFavorites(favs);
       setHistory(hist);
       setFollows(getFollows().map(followToGrid));
+      setFollowsFailed(followsLoadFailed());
 
       // Liked = books in favs OR hist whose ID is liked
       const seen = new Set<string>();
@@ -364,11 +370,17 @@ function MyListContent() {
   const handleExport = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    const res = await fetch('/api/proxy/users/me/history/export', {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-    if (!res.ok) return;
-    const blob = await res.blob();
+    let blob: Blob;
+    try {
+      const res = await fetch('/api/proxy/users/me/history/export', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) throw new Error(`export ${res.status}`);
+      blob = await res.blob();
+    } catch {
+      showToast({ type: "error", message: "ส่งออกประวัติการอ่านไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // #934
+      return;
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -457,6 +469,10 @@ function MyListContent() {
           <div key={activeTab} className="tab-fade-in">
             {(() => {
               const books = tabBooks[activeTab];
+              // a failed follows load is not "no series followed" (#934)
+              if (books.length === 0 && activeTab === "follows" && followsFailed) {
+                return <LoadError what="series ที่ติดตาม" onRetry={loadFollows} />;
+              }
               if (books.length === 0) return <EmptyState label={emptyMessages[activeTab]} />;
 
               // Category filter chips

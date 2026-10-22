@@ -14,6 +14,8 @@ export const FOLLOW_EVENT = "mb-follow-updated";
 let followedIds: Set<string> = new Set();
 let followItems: FollowedSeries[] = [];
 let loaded = false;
+/** The last load failed (#934): a failed load is not "no series followed". */
+let loadFailed = false;
 
 function notify() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(FOLLOW_EVENT));
@@ -32,27 +34,37 @@ export function loadFollows(): Promise<void> {
 }
 
 async function fetchFollows(isCurrent: () => boolean): Promise<void> {
-  const token = await getToken();
-  if (!isCurrent()) return; // signed out meanwhile — this result belongs to the previous user
-  if (!token) {
-    followedIds = new Set();
-    followItems = [];
-    loaded = true;
-    notify();
-    return;
-  }
   try {
+    const token = await getToken();
+    if (!isCurrent()) return; // signed out meanwhile — this result belongs to the previous user
+    if (!token) {
+      followedIds = new Set();
+      followItems = [];
+      loaded = true;
+      loadFailed = false;
+      notify();
+      return;
+    }
     const res = await fetch("/api/proxy/users/me/follows", {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) return;
+    if (!res.ok) throw new Error(`follows ${res.status}`);
     const data: FollowedSeries[] = await res.json();
     if (!isCurrent()) return;
     followItems = data;
     followedIds = new Set(data.map((f) => f.id));
     loaded = true;
+    loadFailed = false;
     notify();
-  } catch { /* ignore */ }
+  } catch {
+    if (!isCurrent()) return;
+    loadFailed = true;
+    notify();
+  }
+}
+
+export function followsLoadFailed(): boolean {
+  return loadFailed;
 }
 
 export function clearFollowCache() {
@@ -60,6 +72,7 @@ export function clearFollowCache() {
   followedIds = new Set();
   followItems = [];
   loaded = false;
+  loadFailed = false;
   notify();
 }
 
