@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 46 — live quality sweep clean; fresh warm latency profile (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran 8 risk pages **live** (names, long captions, SFX) plus the #903 verification runs and scanned all 139 fresh segments: **0 hits** on foreign-script leaks, runaway length, truncation, duplicate outputs, doubled marks, name inconsistency or empty segments (1 passthrough = SFX). Render metrics on those pages: overlap/spill/small_font all **0**.
+- Fresh warm profile (one process, pages 2-4): wall 4.2 / 7.6 / 8.6 s — **translation 1.6-5.4 s (39-63 %)** dominates; non-translation is ~2.3-3.0 s (detection 0.45, OCR 1.0-1.6 (the #884 cuDNN-off cost), merge 0.2-0.6, mask 0.25, inpaint 0.3, render 0.2); cold start ≈3.6 s of detection.
+- Next candidate designed for the #902 calibration: **thinking on/off** measured on ~150 segments (40-line JP set + 11-page EN set) with segment-level binomial counts — the largest remaining latency lever, testable only at that sample size.
+- Benchmark `2026-10-22-live-quality-and-latency-sweep.md`.
+
 ## MIT quality loop, round 45 — script audit finds Cyrillic leaks; the retry now names the script (#903) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
