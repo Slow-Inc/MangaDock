@@ -41,11 +41,12 @@ HEALTHY_RESPONSE = {
 
 
 def _crop(w=CROP_W, h=CROP_H, fill=None):
-    """A crop with structure in it, so the blank-canvas check is not what a size test trips."""
+    """A crop with the ink profile of lettering, so the #887 crop guard does not refuse it."""
     if fill is not None:
         return np.full((h, w, 3), fill, dtype=np.uint8)
-    crop = np.zeros((h, w, 3), dtype=np.uint8)
-    crop[h // 4:3 * h // 4, w // 4:3 * w // 4] = 255
+    crop = np.full((h, w, 3), 250, dtype=np.uint8)
+    crop[h // 4:3 * h // 4, w // 8:3 * w // 8] = 28      # two separate thick strokes
+    crop[h // 4:3 * h // 4, 5 * w // 8:7 * w // 8] = 28
     return crop
 
 

@@ -262,6 +262,10 @@ def restore_sfx_translations(regions) -> None:
 #: katakana SFX score std >= 78 and >= 15% very-dark pixels; the 15 art/blank crops score lower.
 _SFX_MIN_STD = 75.0
 _SFX_MIN_DARK = 0.12
+#: Lettering is SEVERAL separate strokes: real katakana crops measured 2-7 components >= 1% of the
+#: crop, while the single thick arcs/ovals that still slipped through the contrast test scored 1
+#: (round 2 of #887).
+_SFX_MIN_COMPONENTS = 2
 _LUMA = (0.299, 0.587, 0.114)
 
 
@@ -278,7 +282,25 @@ def crop_has_lettering(crop_rgb: np.ndarray) -> bool:
         gray = gray[..., :3] @ np.asarray(_LUMA, dtype=np.float32)
     if gray.size == 0:
         return False
-    return bool(gray.std() >= _SFX_MIN_STD and (gray < 128).mean() >= _SFX_MIN_DARK)
+    if not (gray.std() >= _SFX_MIN_STD and (gray < 128).mean() >= _SFX_MIN_DARK):
+        return False
+    return _ink_stroke_count(gray) >= _SFX_MIN_COMPONENTS
+
+
+def _ink_stroke_count(gray: np.ndarray) -> int:
+    """How many separate dark strokes cover at least 1% of the crop: lettering is several, a
+    single thick arc or oval - the phantoms that survived the contrast test - is one.
+
+    cv2 is a MIT dependency already; it is imported here so the module stays cheap to import and
+    the guard falls back to the contrast verdict rather than dropping rescues if it is missing."""
+    try:
+        import cv2
+    except Exception:  # pragma: no cover - cv2 ships with MIT
+        return _SFX_MIN_COMPONENTS
+    dark = (gray < 128).astype(np.uint8)
+    _count, _labels, stats, _centroids = cv2.connectedComponentsWithStats(dark, connectivity=8)
+    min_area = max(8, int(dark.size * 0.01))
+    return sum(1 for area in stats[1:, cv2.CC_STAT_AREA] if area >= min_area)
 
 def vlm_localize_sfx(
     crop_rgb: np.ndarray,

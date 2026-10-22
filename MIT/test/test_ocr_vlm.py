@@ -534,3 +534,22 @@ def test_a_blank_crop_is_never_sent_to_the_vision_endpoint_887():
         requests.post = orig
     assert out == ''
     assert calls == []
+
+
+def _single_stroke_crop(w=120, h=90):
+    """One thick connected stroke (a panel arc / a thick oval) - high ink, no lettering. These
+    were the 4 phantoms that survived the contrast guard (#887)."""
+    crop = np.full((h, w, 3), 250, np.uint8)
+    crop[34:58, 8:112] = 30          # thicker than the contrast floor, still ONE stroke
+    return crop
+
+
+def test_one_thick_non_lettering_stroke_has_no_lettering_887():
+    """Contrast alone admits a thick arc or oval; lettering is SEVERAL separate strokes."""
+    assert crop_has_lettering(_single_stroke_crop()) is False
+
+
+def test_lettering_is_several_strokes_887():
+    """Two separate thick strokes (the shape of real katakana) are lettering; the ink amount is the
+    same as the single-stroke crop, so this pins the component rule rather than the contrast rule."""
+    assert crop_has_lettering(_lettered_crop()) is True
