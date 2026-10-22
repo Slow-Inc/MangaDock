@@ -125,13 +125,20 @@ function CommunityContent() {
 
   const loadMore = async () => {
     if (loadingMore) return;
+    const seq = fetchSeq.current; // a feed reload (another category, sort or manga) since then makes this answer stale
     setLoadingMore(true);
     try {
       const res = await listPosts({ category, mangaId, sort, offset, limit: LIMIT });
-      setPosts(prev => [...prev, ...res.items]);
+      if (seq !== fetchSeq.current) return;
+      // Offset paging shifts when posts arrive meanwhile: the next page can repeat the last one — keep each post once
+      setPosts(prev => {
+        const seen = new Set(prev.map(p => p.id));
+        return [...prev, ...res.items.filter(p => !seen.has(p.id))];
+      });
       setOffset(prev => prev + res.items.length);
       setTotal(res.total);
     } catch {
+      if (seq !== fetchSeq.current) return;
       showToast({ type: "error", message: "โหลดโพสต์เพิ่มไม่สำเร็จ กรุณาลองใหม่", duration: 4000 });
     } finally {
       setLoadingMore(false);
@@ -286,8 +293,8 @@ function CommunityContent() {
                 const params = new URLSearchParams(window.location.search);
                 params.delete('mangaId');
                 router.push(`/community?${params.toString()}`);
-              }} className="hover:text-ink transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              }} type="button" aria-label="ล้างตัวกรองมังงะ" className="hover:text-ink transition-colors">
+                <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6L18 18" />
                 </svg>
               </button>
@@ -300,8 +307,8 @@ function CommunityContent() {
                 const params = new URLSearchParams(window.location.search);
                 params.delete('category');
                 router.push(`/community?${params.toString()}`);
-              }} className="hover:text-ink transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              }} type="button" aria-label="ล้างตัวกรองหมวด" className="hover:text-ink transition-colors">
+                <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6L18 18" />
                 </svg>
               </button>

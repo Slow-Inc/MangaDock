@@ -77,6 +77,21 @@
 
 ---
 
+## #946 Community feed: a stale "load more" no longer mixes categories (2026-10-22)
+
+**What:** `/community`'s `loadMore` had no sequence check (#911 guarded only `fetchPosts`), so pressing "โหลดโพสต์เพิ่ม" and
+switching category before the answer arrived appended the previous category's posts to the new feed. It now captures
+`fetchSeq` and drops its answer (or its error toast) once a newer feed request has started. The icon-only ✕ buttons
+clearing the manga and category filters are named ("ล้างตัวกรองมังงะ" / "ล้างตัวกรองหมวด"). Review follow-up (pre-existing):
+offset paging repeated a post when posts arrived between pages; `loadMore` now appends only posts not already listed.
+
+**Validated:** production build, stand-in feed answering "load more" after 2 s: before, the announcement feed held the
+20 old-category posts; after, only the 20 announcement posts; the category clear button is named; with page 2 starting
+one row early, post 19 showed twice before and once after. The #940 drawer probe
+still passes. tsc 0; eslint identical to main.
+
+---
+
 ## #944 Genre page and /new: page and tab kept in the URL, stale answers ignored (2026-10-22)
 
 **What:** the genre page's and `/new`'s list effects never cancelled, so two quick "next" clicks could leave page 2's books
