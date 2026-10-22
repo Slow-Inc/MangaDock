@@ -41,7 +41,7 @@ function VersionRow({
   onSubmit: (v: ChapterVersion) => void;
   onDelete: (v: ChapterVersion) => void;
   isLast: boolean;
-  /** The version whose publish is in flight (#993). */
+  /** The version whose publish is in flight (#993): every publish button waits, this one says so. */
   publishingId: string | null;
 }) {
   const meta = STATUS_LABEL[version.status];
@@ -99,7 +99,7 @@ function VersionRow({
           {version.status === "draft" && version.pages.length > 0 && (
             <button
               onClick={() => onSubmit(version)}
-              disabled={publishingId === version.versionId}
+              disabled={publishingId !== null}
               className={`flex-1 rounded-lg ${PRIMARY_FILL} py-1.5 text-[11px] font-semibold transition disabled:opacity-60`}
             >
               {publishingId === version.versionId ? "กำลังเผยแพร่..." : "เผยแพร่"}
@@ -206,7 +206,7 @@ function ChapterGroup({
             {versions[0].status === "draft" && versions[0].pages.length > 0 && (
               <button
                 onClick={() => onSubmit(versions[0])}
-                disabled={publishingId === versions[0].versionId}
+                disabled={publishingId !== null}
                 className={`rounded-xl ${PRIMARY_FILL} px-3 py-2 text-xs font-semibold transition disabled:opacity-60`}
               >
                 {publishingId === versions[0].versionId ? "กำลังเผยแพร่..." : "เผยแพร่"}
