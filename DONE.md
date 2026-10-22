@@ -77,6 +77,22 @@
 
 ---
 
+## #974 A shared /book/<id> link carries the book's title, not the site's (2026-10-22)
+
+**What:** a direct `/book/<id>` (the URL the book popup pushes, so the one people share) served the site title and
+description; the book's name was only set client-side after hydration, so link previews and crawlers saw every book
+as the same page. `app/book/[id]/page.tsx` now has `generateMetadata`: it fetches `/books/manga/<id>` (server timeout
+#858; not cached by Next — the backend caches details, an outage answer must not stick) and returns "<book> ·
+MangaDock" (trimmed), the first 160 characters of the markdown-stripped description, and `og:title` / `og:description`. Any miss keeps the site defaults. No `og:image` — the site has no `metadataBase` / OG
+setup yet.
+
+**Validated:** production build: before, `/book/cover-fallback` → site title; after, `<title>Cover Falls Back ·
+MangaDock</title>` + `og:title`, and an unknown id keeps the site title. The #919 book-route probe (backend down / real
+404 / healthy) still passes; a markdown description reaches the preview as plain text; closing the popup returns
+to `/` with the site title. tsc 0; eslint clean on the file.
+
+---
+
 ## #971 An unknown genre slug is the 404 page, and the genre list lives in one place (2026-10-22)
 
 **What:** `/categories/<anything>` rendered a genre page named after the slug ("nope") with an empty grid — the
