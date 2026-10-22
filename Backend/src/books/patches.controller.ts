@@ -9,6 +9,7 @@ import {
 import type { Request, Response } from 'express';
 import { STORAGE_PROVIDER } from '../common/storage/storage-provider.interface';
 import type { StorageProvider } from '../common/storage/storage-provider.interface';
+import { isServablePatchKey } from './patch-store';
 
 /**
  * Serves R2-stored patch PNGs via StorageProvider.
@@ -25,7 +26,10 @@ export class PatchesController {
   @Get('*')
   async serve(@Req() req: Request, @Res() res: Response): Promise<void> {
     const r2Key = req.path.replace(/^\/r2-patches\//, '');
-    if (!r2Key || r2Key === req.path) throw new NotFoundException();
+    // Public route: serve patches and nothing else the storage provider can read (#1009)
+    if (!r2Key || r2Key === req.path || !isServablePatchKey(r2Key)) {
+      throw new NotFoundException();
+    }
     try {
       const buf = await this.storage.get(r2Key);
       res.setHeader('content-type', 'image/png');

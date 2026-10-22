@@ -25,6 +25,17 @@ const OWNED_NAME = /__p\d+__r\d+\.png$/;
  *  DiskStorageProvider join, so `/`, `\` and `..` must never pass. */
 const SAFE_SEGMENT = /^[\w.-]+$/;
 
+/** True only for a key in the store's own layout — `uploads/patches/<safe segments>/<name>.png`. The public patch
+ *  route serves nothing else: no other prefix, no `..`, no absolute or empty segment (#1009). */
+export function isServablePatchKey(key: string): boolean {
+  if (!key.startsWith(`${ROOT}/`)) return false;
+  const segments = key.slice(ROOT.length + 1).split('/');
+  return (
+    segments.every((s) => SAFE_SEGMENT.test(s) && !s.includes('..')) &&
+    segments[segments.length - 1].endsWith('.png')
+  );
+}
+
 function assertSafeSegment(value: string, what: string): void {
   if (!SAFE_SEGMENT.test(value) || value.includes('..')) {
     throw new Error(
