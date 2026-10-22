@@ -14,6 +14,7 @@ import {
   type StorageProvider,
 } from '../common/storage/storage-provider.interface';
 import type { MascotDto } from './mascot.dto';
+import { PROFILE_LIMITS } from './profile.dto';
 
 export const ROLE = {
   USER: 0,
@@ -204,6 +205,14 @@ export class UsersService {
     },
   ) {
     const now = new Date().toISOString();
+    // The token's name / picture are user-editable Supabase metadata: bounded like PATCH /users/me (#1025). A cut URL
+    // would be broken, so an over-long one is dropped.
+    const displayName =
+      data.displayName?.slice(0, PROFILE_LIMITS.displayName) ?? null;
+    const photoURL =
+      data.photoURL && data.photoURL.length <= PROFILE_LIMITS.photoURL
+        ? data.photoURL
+        : null;
 
     // Atomic create-if-missing (INSERT ... ON CONFLICT (uid) DO NOTHING). Removes the
     // read-then-write window that let concurrent logins race into a duplicate-key error.
@@ -212,8 +221,8 @@ export class UsersService {
       {
         uid,
         email: data.email ?? null,
-        display_name: data.displayName ?? null,
-        photo_url: data.photoURL ?? null,
+        display_name: displayName,
+        photo_url: photoURL,
         created_at: now,
         updated_at: now,
       },
@@ -234,18 +243,18 @@ export class UsersService {
 
     // Backfill display_name / photo_url only when still empty — never overwrite a value
     // the user already has. The `.is(col, null)` filter makes this a no-op otherwise.
-    if (data.displayName) {
+    if (displayName) {
       const { error } = await this.db
         .from('profiles')
-        .update({ display_name: data.displayName })
+        .update({ display_name: displayName })
         .eq('uid', uid)
         .is('display_name', null);
       if (error) {
         throw new Error(`Failed to backfill display name: ${error.message}`);
       }
     }
-    if (data.photoURL) {
-      if (isSocialCdnUrl(data.photoURL)) {
+    if (photoURL) {
+      if (isSocialCdnUrl(photoURL)) {
         // Social CDN URLs (Google lh3, Facebook fbcdn) carry signed tokens that
         // expire. Refresh on every login — but only when the stored URL is also
         // social CDN or null; never overwrite a custom uploaded avatar.
@@ -261,7 +270,7 @@ export class UsersService {
         if (currentUrl === null || isSocialCdnUrl(currentUrl)) {
           const { error } = await this.db
             .from('profiles')
-            .update({ photo_url: data.photoURL })
+            .update({ photo_url: photoURL })
             .eq('uid', uid);
           if (error) {
             throw new Error(`Failed to refresh photo URL: ${error.message}`);
@@ -271,7 +280,7 @@ export class UsersService {
         // Non-social URL (uploaded avatar): original behavior — only write when null.
         const { error } = await this.db
           .from('profiles')
-          .update({ photo_url: data.photoURL })
+          .update({ photo_url: photoURL })
           .eq('uid', uid)
           .is('photo_url', null);
         if (error) {

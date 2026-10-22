@@ -77,6 +77,26 @@
 
 ---
 
+## #1025 Profile bodies are DTOs (2026-10-23)
+
+**What:** `PATCH /users/me`, `POST /users/me/become-translator`, `PATCH /users/me/translator-profile` and
+`POST /users/me/photo-history` took plain types under a 50 MB JSON limit: a multi-MB `displayName` / `photoURL` was
+stored and joined into every forum feed as the author; a non-string `bio` 500'd on `.trim()`; photo-history 500'd on a
+non-string entry and kept social URLs uncapped. New `Backend/src/users/profile.dto.ts` (`UpdateProfileDto`,
+`TranslatorProfileDto`, `PhotoHistoryDto`) bounds every field above what the UI sends (name 100, URL 2048, bio 500 = what
+was already kept, languages ≤ 20 × 35 for 13 offered, country 100, preferred language 35, photos ≤ 50 × 2048). The
+manual photos array check went (the DTO covers it). `ProfileTab` display-name input gets `maxLength={100}`.
+From the review: a field may be absent but not null (`ValidateIf(v !== undefined)`; `{bio:null}` still 500'd), and the
+login backfill `upsertUser` (token name / picture = user-editable Supabase metadata) cuts the name at 100 and drops a
+URL over 2048 — it bypassed the DTO and fed the same feed columns. Limits shared as `PROFILE_LIMITS`.
+
+**Validated:** `profile.dto.spec.ts` runs the app's own `ValidationPipe` against the controller's real parameter types:
+red (the bodies were plain `Object`) → green. AuthContext's and the studio's real payloads validate; wrong types and
+over-long values and nulls are refused, an absent body passes; `upsertUser` caps a 5 000-char token name and drops a
+2 048+ URL (red → green). Users suites 106/106; real tsc clean both sides; eslint clean on the touched files.
+
+---
+
 ## #1023 Editing or deleting already-deleted forum content is a 404 (2026-10-23)
 
 **What:** `updatePost`, `updateComment`, `deletePost` and `deleteComment` looked their row up without a `deleted_at`

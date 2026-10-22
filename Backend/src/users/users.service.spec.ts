@@ -406,6 +406,24 @@ describe('UsersService.upsertUser — atomic upsert', () => {
 
   beforeEach(buildChain);
 
+  // #1025: the token's name / picture come from user-editable Supabase metadata — bounded like PATCH /users/me
+  it('caps a long token name at 100 and drops an over-long picture URL', async () => {
+    const longUrl = 'https://lh3.googleusercontent.com/' + 'a'.repeat(2048);
+    await service.upsertUser('u1', {
+      email: 'e@x.com',
+      displayName: 'n'.repeat(5_000),
+      photoURL: longUrl,
+    });
+    const created = upsertMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(created.display_name).toBe('n'.repeat(100));
+    expect(created.photo_url).toBeNull();
+    const writes = updateMock.mock.calls.map(
+      (c: unknown[]) => c[0] as Record<string, unknown>,
+    );
+    expect(writes).toContainEqual({ display_name: 'n'.repeat(100) });
+    expect(writes.some((w) => 'photo_url' in w)).toBe(false);
+  });
+
   it('creates via atomic upsert on conflict uid with ignoreDuplicates (no existence read)', async () => {
     await service.upsertUser('u1', {
       email: 'e@x.com',
@@ -497,7 +515,12 @@ describe('UsersService.getProfile — parallel queries', () => {
 describe('UsersService.deleteUserAccount — parallel deletes', () => {
   it('dispatches the four child-table deletes in parallel, profile only after', async () => {
     const resolvers: Record<string, (v: unknown) => void> = {};
-    const childTables = ['user_favorites', 'user_liked', 'user_history', 'series_follows'];
+    const childTables = [
+      'user_favorites',
+      'user_liked',
+      'user_history',
+      'series_follows',
+    ];
     const childChains: Record<string, any> = {};
     for (const t of childTables) {
       childChains[t] = {
