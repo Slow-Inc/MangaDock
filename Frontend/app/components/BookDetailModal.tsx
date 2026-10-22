@@ -14,6 +14,7 @@ import FollowSeriesButton from "./FollowSeriesButton";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
 import { useCoverSrc } from "../hooks/useCoverSrc";
+import { lockPageScroll } from "../lib/scrollLock";
 import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { useRouter } from "next/navigation";
 import { useDialogFocus } from "../hooks/useDialogFocus";
@@ -226,7 +227,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
       if (e.key === "Escape" && modalStack.isTop(popup)) handleClose(); // only the top-most popup
     };
     window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockPageScroll(); // shared with the reader opened over it (#936)
 
     // Auto-translate description (#151) via the shared cached helper (F7): start
     // from the card's description, only falling back to the detail fetch's when
@@ -264,7 +265,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     return () => {
       window.removeEventListener("keydown", onKey);
       modalStack.remove(popup);
-      document.body.style.overflow = "";
+      releaseScroll();
     };
   }, []);
 

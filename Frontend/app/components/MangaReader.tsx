@@ -11,6 +11,7 @@ import { activeTranslatingPage, formatEta, pillMainText, stageLabel } from "../l
 import TranslateProgress from "./reader/TranslateProgress";
 import { apiFetch } from "../lib/apiFetch";
 import { isTypingTarget } from "../lib/typingTarget";
+import { lockPageScroll } from "../lib/scrollLock";
 import { useChapters, type ChapterPageItem } from "../hooks/useChapters";
 import { ZOOM_MIN, ZOOM_MAX } from "../lib/zoomLevel";
 import { useReaderViewport } from "../hooks/useReaderViewport";
@@ -316,9 +317,10 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     resetZoomAndPan();
     /* eslint-enable react-hooks/set-state-in-effect */
     requestAnimationFrame(() => setVisible(true));
-    document.body.style.overflow = "hidden";
+    // Released on every exit below, including before the CAPTCHA has passed (#936)
+    const releaseScroll = lockPageScroll();
 
-    if (!turnstilePassed && !chapterId.startsWith("ver:")) return;
+    if (!turnstilePassed && !chapterId.startsWith("ver:")) return releaseScroll;
 
     // User-uploaded version: fetch pages from /versions/:versionId
     const isUserVersion = chapterId.startsWith("ver:");
@@ -348,7 +350,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
           }
         })
         .catch(() => { setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300); });
-      return () => { document.body.style.overflow = ""; };
+      return releaseScroll;
     }
 
     const _pageParams = new URLSearchParams();
@@ -390,7 +392,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       })
       .catch(() => { setError(true); setLoading(false); contentReadyTimerRef.current = setTimeout(() => setContentReady(true), 300); });
 
-    return () => { document.body.style.overflow = ""; };
+    return releaseScroll;
   }, [chapterId, turnstilePassed, clearanceToken, resetCaptcha, resetZoomAndPan]);
 
   const handleClose = () => { setVisible(false); setTimeout(onClose, 250); };

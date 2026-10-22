@@ -77,6 +77,23 @@
 
 ---
 
+## #936 Page scroll lock shared by the reader and the book popup (2026-10-22)
+
+**What:** closing the reader before passing its CAPTCHA left `body` at `overflow: hidden` (the load effect locked and
+then returned early without a cleanup), so the page could not scroll until a reload; closing a reader opened from the
+book popup unlocked the page while the popup was still open (each layer wrote `body.style.overflow` directly). New
+`lib/scrollLock`: a ref-counted lock where each holder releases once and the page unlocks with the last release; the
+reader releases on every exit of its effect, the popup on unmount. `LoginModal` / `LinkAccountModal` (parked auth files)
+and the Studio picker still write the style directly.
+
+**Validated:** `scrollLock.test.ts` red (module missing) → green, 4 tests. Production build, stand-in backend, the
+Cloudflare challenge host blocked (the widget never loads): before, the page stayed `hidden` after closing a
+CAPTCHA-gated reader, and was unlocked under the open popup after closing its reader; after, the page scrolls again,
+stays locked under the popup, and unlocks when the popup closes. The #928 reader probe still passes. tsc 0; eslint
+identical to main on both files.
+
+---
+
 ## #932 Home row cards work by keyboard (2026-10-22)
 
 **What:** on desktop, Tab walked through five invisible controls per `BookRow` card (the hover info panel's buttons and
