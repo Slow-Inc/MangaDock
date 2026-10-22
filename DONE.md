@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 32 — concise targeted A/B + a real render bug: stacked Thai marks vanish on the page (#895) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Concise targeted A/B** (#892 follow-up): on the 21 segments whose base translation is >= 1.25x the source chars (the tight-bubble pain set), concise is **-17 % chars** and the blind judge prefers it **8-3 (10 ties)**; overall the 12-page A/B was a 5-5 tie. Direction is right but not enough for a default flip (which also needs a patch-cache version bump), so it stays opt-in.
+- **New render bug found while zooming Kumo p0**: the caption line `ครั้งนั้น` renders as `ครงนัน` — the stacked marks (ั+้, and ้) disappear in the final page image, while the payload text is correct and a direct `text_render.put_text_horizontal(29, …)` shows the marks. Ruled out: `compact_special_symbols`, line-splitting (cluster stays whole at widths 180-340), and `_stacked_mark_lift` math (10 px lift, manual draw correct). Filed **#895** with the figure and the next instrumentation step (supersampling/warp path in `render()`).
+- Benchmark/figure `2026-10-22-895-thai-stacked-marks.png`.
+
 ## MIT quality loop, round 31 — the two unreachable levers are reachable from the Backend now (#894) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
