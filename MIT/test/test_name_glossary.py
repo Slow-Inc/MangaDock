@@ -115,3 +115,18 @@ def test_a_clause_longer_than_a_name_is_not_a_spelling_980b():
 def test_common_contraction_words_are_not_name_candidates_980b():
     found = candidate_names(["SHES GOT IT", "IVE SEEN THAT", "YOURE LATE"])
     assert "SHES" not in found and "IVE" not in found and "YOURE" not in found
+
+
+def test_candidate_names_finds_katakana_names_for_jp_sources_980c():
+    found = candidate_names(["アリス、こっちだ！", "リリスの部屋"])
+    assert "アリス" in found and "リリス" in found
+    assert not [n for n in found if n in ("こっち", "部屋")], found
+
+
+def test_extract_glossary_pairs_a_katakana_name_with_its_thai_spelling_980c():
+    # extraction takes the longest Thai run of a region whose output is essentially the name alone
+    regions = [
+        {"src": "アリス、こっちだ！", "dst": "อลิส!"},
+        {"src": "アリスはどこ？", "dst": "อลิส?"},
+    ]
+    assert extract_glossary(regions).get("アリス") == "อลิส"

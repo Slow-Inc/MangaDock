@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 61 — name glossary covers JP katakana names too (#980) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `candidate_names` now also returns **katakana runs (2-8 chars)** from Japanese sources, so the extract → prompt → deterministic-enforce pipeline covers JP→TH characters (the production path), with the same contraction/stoplist and two-occurrence filters.
+- **Real-page safety check** on the two uploaded JP pages: candidates are `ガキ` / `コイツ` / `フッ`, each appearing once — recurring set empty, so **no enforcement can fire** there (extracted entries are filtered at apply time); no output change on the current JP corpus.
+- Unit tests for katakana candidates (hiragana/kanji excluded) and `アリス -> อลิส` extraction; gate **885 passed**.
+- Caveat recorded: extraction still needs a region whose output is essentially the name alone; name+particle outputs may not be extractable yet.
+
 ## MIT quality loop, round 60 — glossary precision pass + the digit audit's negative result (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).

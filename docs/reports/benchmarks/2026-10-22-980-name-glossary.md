@@ -82,3 +82,14 @@ run). Enforcing that could have rewritten ordinary dialogue.
 A "dropped numbers" audit over **11,633** stored src/dst pairs found no credible digit loss: every hit was a
 formatting artefact (`20, 000` with a space after the comma), a fullwidth digit, or OCR noise inside a word
 (`60NNA`, `7BYTHE`). No guard was added — a retry trigger for those would only waste calls.
+## JP->TH support (round 61): katakana names
+
+- `candidate_names` now also returns **katakana runs** (2-8 chars) from Japanese sources, so the same
+  extract -> prompt -> enforce pipeline covers JP names (the production path). Contractions/stoplist and the
+  two-occurrence filter apply exactly as before.
+- Real-page safety check (the two uploaded JP pages): candidates are `ガキ`, `コイツ`, `フッ`, each appearing
+  **once** — recurring set empty, so **no enforcement can fire** on these pages (verified: extracted entries are
+  filtered at apply time). No output change on the current JP corpus.
+- Unit tests: katakana candidates, hiragana/kanji excluded, `アリス -> อลิส` extraction. Gate **885 passed**.
+- Limitation kept: extraction takes the longest Thai run of a region whose output is essentially the name alone
+  (a name followed by particles may not be extractable yet); this matches the EN behaviour validated on Tsuki.

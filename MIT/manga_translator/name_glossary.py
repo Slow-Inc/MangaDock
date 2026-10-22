@@ -23,6 +23,9 @@ _LATIN_NAME = re.compile(r"\b([A-Z][a-z]{2,}|[A-Z]{3,})\b")
 #: A name broken by a stammer hyphen or a line break ("TSUKU- YOMI", "TSUKU - YOMI") is one name.
 _HYPHEN_BREAK = re.compile(r"(?<=[A-Z])-\s*(?=[A-Z])")
 _THAI_RUN = re.compile("[\\u0E00-\\u0E7F]{3,}")
+#: JP->TH (#980c): a Japanese character name is a katakana run. 2-8 chars keeps short SFX-ish runs
+#: (pinned too — consistent SFX is fine) and drops long loanwords; the two-occurrence filter is the second net.
+_KATAKANA = re.compile("[\\u30A1-\\u30FA]{2,8}")
 
 
 def glossary_enabled(env=None) -> bool:
@@ -46,6 +49,10 @@ def candidate_names(srcs) -> list:
                 continue
             if key not in found:
                 found.append(key)
+        # Japanese sources: katakana runs are names (or repeated SFX, which consistency also helps).
+        for tok in _KATAKANA.findall(src or ""):
+            if tok not in found:
+                found.append(tok)
     return found
 
 
