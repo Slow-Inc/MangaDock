@@ -9,7 +9,8 @@ from types import SimpleNamespace
 import numpy as np
 
 from manga_translator.ocr_vlm import (SFX_MAX_TOKENS, build_sfx_prompt, crop_has_lettering,
-                                       restore_sfx_translations, sanitize_sfx, vlm_localize_sfx)
+                                       restore_sfx_translations, sanitize_sfx, swallows_dialogue,
+                                       vlm_localize_sfx)
 
 
 def _crop():
@@ -553,3 +554,19 @@ def test_lettering_is_several_strokes_887():
     """Two separate thick strokes (the shape of real katakana) are lettering; the ink amount is the
     same as the single-stroke crop, so this pins the component rule rather than the contrast rule."""
     assert crop_has_lettering(_lettered_crop()) is True
+
+
+def test_a_container_that_swallows_a_dialogue_line_is_not_rescued_887():
+    """Akuyaku p1: the merge produced a big container region whose own OCR read was junk while it
+    fully contained the balloon's `NYA` line. The rescue turned it into a second `เหมียว`, so the
+    bubble showed two meows. A region that fully contains real dialogue must not be rescued."""
+    container = (969, 580, 1158, 812)
+    nya = (997, 678, 1074, 717)
+    assert swallows_dialogue(container, [nya]) is True
+
+
+def test_a_normal_sfx_box_does_not_swallow_dialogue_887():
+    sfx = (1084, 440, 1160, 477)
+    other = (997, 678, 1074, 717)
+    assert swallows_dialogue(sfx, [other]) is False
+    assert swallows_dialogue(sfx, []) is False

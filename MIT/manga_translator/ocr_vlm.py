@@ -287,6 +287,26 @@ def crop_has_lettering(crop_rgb: np.ndarray) -> bool:
     return _ink_stroke_count(gray) >= _SFX_MIN_COMPONENTS
 
 
+def swallows_dialogue(box, dialogue_boxes, min_fraction: float = 0.7) -> bool:
+    """True when ``box`` fully contains another region's box (>= ``min_fraction`` of it).
+
+    A merge can produce one container region whose own OCR read is junk while it fully covers the
+    balloon's dialogue line; rescuing that region lettered a SECOND meow over the bubble (Akuyaku
+    p1, #887 round 3). A region that swallows real dialogue is not an SFX. Pure.
+    """
+    x1, y1, x2, y2 = box
+    for other in dialogue_boxes:
+        ox1, oy1, ox2, oy2 = other
+        iw = min(x2, ox2) - max(x1, ox1)
+        ih = min(y2, oy2) - max(y1, oy1)
+        if iw <= 0 or ih <= 0:
+            continue
+        other_area = max(1.0, (ox2 - ox1) * (oy2 - oy1))
+        if iw * ih >= min_fraction * other_area:
+            return True
+    return False
+
+
 def _ink_stroke_count(gray: np.ndarray) -> int:
     """How many separate dark strokes cover at least 1% of the crop: lettering is several, a
     single thick arc or oval - the phantoms that survived the contrast test - is one.

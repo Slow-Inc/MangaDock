@@ -710,6 +710,7 @@ class MangaTranslator:
         new_text_regions = []
         from .ocr_vlm import placeholder_junk, sfx_false_positive, speculative_box
         dialogue_boxes = [r.xyxy for r in text_regions if not speculative_box(r)]
+        dialogue_regions = [(r.xyxy, r) for r in text_regions if not speculative_box(r)]
         for region in text_regions:
             # Remove leading spaces after pre-translation dictionary replacement                
             original_text = region.text  
@@ -805,10 +806,14 @@ class MangaTranslator:
             # — i.e. English — so SFX were dropped, leaving the raw JP glyph, for TH/ZH/KO.)
             # #693: gated by should_rescue_sfx — det_sfx provenance + ADR 026 Addendum real-text
             # guard (no phantom SFX over an ASCII-read bubble) + size. See ADR 026.
-            from .ocr_vlm import should_rescue_sfx
+            from .ocr_vlm import should_rescue_sfx, swallows_dialogue
             x1, y1, x2, y2 = (int(v) for v in region.xyxy)
-            if should_rescue_sfx(region.text, getattr(region, 'from_sfx_detection', False),
-                                 x2 - x1, y2 - y1, config.ocr.vlm_rescue):
+            # #887 round 3: a merge container can fully cover a dialogue line while its own OCR read
+            # is junk; rescuing it lettered a SECOND meow over the bubble (Akuyaku p1).
+            swallows = swallows_dialogue((x1, y1, x2, y2),
+                                        [box for box, other in dialogue_regions if other is not region])
+            if not swallows and should_rescue_sfx(region.text, getattr(region, 'from_sfx_detection', False),
+                                                  x2 - x1, y2 - y1, config.ocr.vlm_rescue):
                 from .ocr_vlm import vlm_localize_sfx
                 from .translators.keys import (CUSTOM_OPENAI_API_BASE,
                                                CUSTOM_OPENAI_API_KEY, CUSTOM_OPENAI_MODEL)
