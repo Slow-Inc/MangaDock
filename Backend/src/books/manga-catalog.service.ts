@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { MangaDexService } from './mangadex.service';
@@ -130,7 +130,7 @@ export class MangaCatalogService {
           status,
           inYearRange,
         )
-      : await this.mangaDex.searchManga(query, lang, limit, offset, status);
+      : await this.searchPage(query, lang, limit, offset, status);
 
     // Enhance: also match user-uploaded alt names in chapter_versions. First page only — appended to
     // every page they repeated on each one and pushed later pages past `limit` (#661).
@@ -183,7 +183,7 @@ export class MangaCatalogService {
       page < YEAR_SCAN_MAX_PAGES && matches.length <= offset + limit;
       page++, upstreamOffset += YEAR_SCAN_PAGE_SIZE
     ) {
-      const { items, total } = await this.mangaDex.searchManga(
+      const { items, total } = await this.searchPage(
         query,
         lang,
         YEAR_SCAN_PAGE_SIZE,
@@ -201,6 +201,19 @@ export class MangaCatalogService {
       items: matches.slice(offset, offset + limit),
       total: matches.length,
     };
+  }
+
+  /**
+   * One MangaDex search page. An outage is a 503, never an empty result: shown as "ไม่พบหนังสือ" and cached (a
+   * year-range miss for 20 min), it hid the query long after MangaDex was back (#970).
+   */
+  private async searchPage(
+    ...args: Parameters<MangaDexService['searchManga']>
+  ): Promise<{ items: LandingBook[]; total: number }> {
+    const { unavailable, ...page } = await this.mangaDex.searchManga(...args);
+    if (unavailable)
+      throw new ServiceUnavailableException('MangaDex search unavailable');
+    return page;
   }
 
   /** Query chapter_versions for title_name / title_alt_name matching the search query. */

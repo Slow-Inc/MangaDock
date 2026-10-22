@@ -533,7 +533,7 @@ export class MangaDexService {
       const response = await this.mangadexFetch(
         `https://api.mangadex.org/manga?${params.toString()}`,
       );
-      if (!response.ok) return { items: [], total: 0, slug };
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = (await response.json()) as MangaDexResponse & {
         total?: number;
       };
@@ -546,7 +546,10 @@ export class MangaDexService {
       this.logger.warn(
         `[MangaDex] Genre fetch error (${slug}): ${String(err)}`,
       );
-      return { items: [], total: 0, slug };
+      // Not "this genre is empty": the browser shows its retry state and caches nothing (#970)
+      throw new ServiceUnavailableException(
+        'MangaDex genre listing unavailable',
+      );
     }
   }
 
@@ -556,7 +559,7 @@ export class MangaDexService {
     limit = 100,
     offset = 0,
     status?: 'ongoing' | 'completed' | 'hiatus',
-  ): Promise<{ items: LandingBook[]; total: number }> {
+  ): Promise<{ items: LandingBook[]; total: number; unavailable?: true }> {
     const params = new URLSearchParams();
     params.set('limit', String(Math.min(limit, 100))); // MangaDex API max is 100
     params.set('offset', String(offset));
@@ -733,10 +736,14 @@ export class MangaDexService {
     }
   }
 
+  /**
+   * One page of the MangaDex manga list. A failure answers no items; when MangaDex itself is down (not our own bad
+   * request) the page says `unavailable`, so a caller can tell an outage from "nothing matched" (#970).
+   */
   private async fetchMangaWithParamsPaged(
     params: URLSearchParams,
     label: string,
-  ): Promise<{ items: LandingBook[]; total: number }> {
+  ): Promise<{ items: LandingBook[]; total: number; unavailable?: true }> {
     const lang = this.getMangaLanguage();
     this.logger.log(`[MangaDex] Fetching: ${label} | lang=${lang}`);
 
@@ -760,11 +767,12 @@ export class MangaDexService {
           this.logger.warn(
             `[MangaDex] Rejected request ${response.status}: ${text.substring(0, 200)}`,
           );
+          return { items: [], total: 0 };
         } else {
           this.logger.error(`[MangaDex] Error: ${text.substring(0, 200)}`);
           this.statusService.broadcastStatus('mangadex', 'offline');
         }
-        return { items: [], total: 0 };
+        return { items: [], total: 0, unavailable: true };
       }
 
       const data = (await response.json()) as MangaDexResponse & {
@@ -783,7 +791,7 @@ export class MangaDexService {
     } catch (err) {
       this.logger.error(`[MangaDex] Fetch error: ${String(err)}`);
       this.statusService.broadcastStatus('mangadex', 'offline');
-      return { items: [], total: 0 };
+      return { items: [], total: 0, unavailable: true };
     }
   }
 
