@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 59 — name glossary hardened: wider drift bound, pipeline regression test, consistency tool (#980) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A real run showed the model copying `ทสึคุโยมิ` as `ทสึคิโยมิ`, so the deterministic enforcement bound widened to **edit distance <=3 / similarity >=0.6** (still only on regions whose source contains the name; unrelated Thai untouched, tested).
+- **Pipeline-level regression test** (`test_batch_pipelined_translator.py`): page 1 spells the name, page 2 drifts, batch pipeline must correct page 2 to page 1's spelling; also pins the two-occurrence filter.
+- **New tool** `tools/name_consistency.py`: takes page doctor JSONs, prints every name's per-page Thai spelling, exits 1 on inconsistency — a re-runnable chapter-level gate.
+- Re-measured on the real Tsuki pair: baseline `สึกุโยมิ / ตสึกิโยมิ` (inconsistent) -> glossary arm `ทสึคุโยมิ / ทสึคุโยมิ` (**consistent**). Gate **881 passed**.
+- Known limits: names that appear only once are pinned once they recur; JP/kanji names not extracted yet.
+
 ## MIT quality loop, round 58 — name glossary: TSUKUYOMI consistent across pages, default ON (#980) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).

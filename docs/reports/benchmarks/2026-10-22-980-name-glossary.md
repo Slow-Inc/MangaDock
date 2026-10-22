@@ -49,3 +49,18 @@ Thai (13 unit tests + prompt-carriage tests).
   conservative by construction, but a mis-extracted glossary could pin a wrong spelling; that is why the
   two-occurrence filter and the edit-distance bound exist.
 - Measured on one consistent chapter pair plus two controls; the metric is deterministic, the judge is noisy.
+## Follow-up (round 59): tighter coverage, regression test, tool
+
+- **Prompt-only enforcement was not enough in practice**: a real run copied `ทสึคุโยมิ` as `ทสึคิโยมิ`, so the
+  deterministic replacement bound was widened from edit distance <=2 / similarity >=0.7 to **<=3 / >=0.6** (still
+  requiring the region's source to contain the name; unrelated Thai is untouched — tested).
+- **Regression test** added at the pipeline level (`test_batch_pipelined_translator.py`): page 1 spells the name,
+  page 2 drifts, and the batch pipeline must correct page 2 to the page-1 spelling. It also pins the
+  two-occurrence filter (a name seen once on the first page is not pinned yet).
+- **Tool**: `tools/name_consistency.py <page1.json> <page2.json> …` reports per-name spellings and exits 1 when a
+  name is inconsistent — usable as a regression gate on a produced chapter.
+- Re-measured on the real Tsuki pair with the widened bound: baseline `สึกุโยมิ / ตสึกิโยมิ` (inconsistent) ->
+  glossary arm `ทสึคุโยมิ / ทสึคุโยมิ` (**consistent**). Gate **881 passed**.
+
+Known limitation kept: names that appear only once on a page are pinned only after they recur; JP/kanji names are
+not extracted yet.

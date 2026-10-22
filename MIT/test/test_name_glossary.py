@@ -96,3 +96,10 @@ def test_the_glossary_is_on_by_default_and_can_be_disabled_980():
     assert glossary_enabled({'MIT_NAME_GLOSSARY': '0'}) is False
     assert glossary_enabled({'MIT_NAME_GLOSSARY': 'false'}) is False
     assert glossary_enabled({'MIT_NAME_GLOSSARY': 'off'}) is False
+
+
+def test_apply_glossary_fixes_a_realistic_vowel_consonant_drift_980():
+    # observed drift on real pages: ทสึคิโยมิ for ทสึคุโยมิ (2 substitutions + 1 insertion)
+    regions = _regions(('TSUKUYOMI!', 'ทสึคิโยมิ!'))
+    assert apply_glossary(regions, {"TSUKUYOMI": "ทสึคุโยมิ"}) == 1
+    assert regions[0].translation == 'ทสึคุโยมิ!'

@@ -97,7 +97,7 @@ def apply_glossary(regions, glossary) -> int:
 
     Prompt-level instructions are not reliable (the model copied ทสึคุโยมิ as ทสึคิโยมิ in one run), so on a
     region whose SOURCE contains a glossary name, a Thai token within edit distance of the glossary spelling
-    is replaced with the exact spelling. Only near matches are touched: the token must be within 2 edits for
+    is replaced with the exact spelling. Only near matches are touched: the token must be within 3 edits for
     spellings up to 8 chars (1 for longer ones) and cover at least 70 % of the length, so unrelated words that
     merely share a few letters are left alone.
     """
@@ -130,7 +130,7 @@ def apply_glossary(regions, glossary) -> int:
                     continue
                 ratio = SequenceMatcher(None, tok, target).ratio()
                 # same name, small drift: high similarity and only a couple of character edits
-                if ratio >= 0.7 and _edit_distance(tok, target) <= 2 and ratio > best_ratio:
+                if ratio >= 0.6 and _edit_distance(tok, target) <= 3 and ratio > best_ratio:
                     best, best_ratio = tok, ratio
             if best is not None:
                 new_dst = new_dst.replace(best, target, 1)
