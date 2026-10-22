@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 28 — pipeline determinism verified; DBNet needs no cuDNN-off (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- 3 pages replayed twice each (`--replay`, `--set ocr.vlm_rescue=0`): **identical regions, boxes, sources, translations** — the pipeline is deterministic once live gateway calls are excluded.
+- Following #884's OCR pattern, DBNet's forward was re-run with cuDNN disabled: **identical boxes**, and slower (3726/3692 ms vs 3466/3612 ms cold) — no code change; detection is already deterministic and cuDNN-off would only cost time.
+- **Corrected #891's note** that claimed DBNet is not bit-deterministic: its corpus diff was `_final` (2560) vs `_d3200` (3200), i.e. a config change, not nondeterminism. Benchmark + rule `2026-10-22-detection-determinism.md`: with replay + rescue off, every difference is attributable to config/code/live calls.
+
 ## MIT quality loop, round 27 — detection_size 3200: recovers missed lines, but it is a tradeoff (#891) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
