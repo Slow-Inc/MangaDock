@@ -80,7 +80,7 @@ from .utils import (
 )
 from .utils.lang_ratio import target_script_ratio
 from .text_layer import regions_payload, dropped_regions_payload, empty_patch_result
-from .translation_quality import strip_noise_glyphs
+from .translation_quality import runaway_translation, strip_noise_glyphs
 
 from .detection import dispatch as dispatch_detection, prepare as prepare_detection, unload as unload_detection
 from .upscaling import dispatch as dispatch_upscaling, prepare as prepare_upscaling, unload as unload_upscaling
@@ -991,11 +991,13 @@ class MangaTranslator:
             for region in ctx.text_regions:
                 if region.translation and region.translation.strip():
                     # 只检查重复内容幻觉，不进行页面级目标语言检查
+                    # #901: a looping output cycles a short pattern and slips past the consecutive-repeat
+                    # check (4,462 chars of it did); an absurd length is the source-anchored signal.
                     if await self._check_repetition_hallucination(
                         region.translation, 
                         config.translator.post_check_repetition_threshold,
                         silent=False
-                    ):
+                    ) or runaway_translation(region.text, region.translation):
                         failed_regions.append(region)
             
             # 对失败的区域进行重试

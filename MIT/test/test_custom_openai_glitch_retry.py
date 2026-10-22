@@ -86,3 +86,16 @@ def test_an_english_source_is_not_reasked_for_a_missing_thai_negation_898():
     out = asyncio.run(t.translate('ENG', 'THA', ['LIKE THERES NO TOMORROW!']))
     assert out == ['ราวกับวันสุดท้ายของชีวิต!']
     assert t.client.chat.completions.create.call_count == 1
+
+
+def test_a_runaway_page_output_is_reasked_901():
+    """#901: a looping page output (short pattern cycling) is far longer than the source; the page is re-asked."""
+    t = CustomOpenAiTranslator()
+    loop = '<|1|>' + ('แม่นดูหมั้นแม่นดูรัก' * 20)
+    t.client.chat.completions.create = mock.AsyncMock(side_effect=[
+        _reply(loop),
+        _reply('<|1|>แม่นยายโหราศาสตร์!')
+    ])
+    out = asyncio.run(t.translate('ENG', 'THA', ['YOU WERE SPOT ON, GOD- MOTHER!']))
+    assert out == ['แม่นยายโหราศาสตร์!']
+    assert t.client.chat.completions.create.call_count == 2

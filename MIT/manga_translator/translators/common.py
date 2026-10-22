@@ -4,7 +4,7 @@ import asyncio
 from typing import List, Tuple
 from abc import abstractmethod
 
-from ..translation_quality import foreign_script, negation_lost, normalize_thai_marks
+from ..translation_quality import foreign_script, negation_lost, normalize_thai_marks, runaway_translation
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -256,7 +256,8 @@ class CommonTranslator(InfererModule):
         Counts as invalid so the repeat above re-asks it."""
         if not trans:
             return False
-        return foreign_script(trans, to_lang, query) or negation_lost(query, trans, to_lang)
+        return (foreign_script(trans, to_lang, query) or negation_lost(query, trans, to_lang)
+                or runaway_translation(query, trans))
 
     def _modify_invalid_translation_query(self, query: str, trans: str) -> str:
         """

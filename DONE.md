@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 43 — null experiment finds a repetition loop that escaped the hallucination check (#901) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran a **null A/A experiment** (same config twice, to calibrate judge noise) and it produced one segment of **4,462 chars** of a cycling phrase for a 30-char line. The pipeline's repetition check **passed it**: `check_repetition_hallucination` only flags consecutive identical tokens, and the loop cycles a short pattern.
+- Added `translation_quality.runaway_translation(src, dst)` — longer than 3x the source **and** over 120 chars — wired into the per-region post-translation retry and the translator's page-level glitch loop. A 4.4k-character segment would otherwise reach the renderer (font floor/clip).
+- Verification: 4 units + 1 integration test (runaway page reply -> re-ask, 2 calls), **0/372** real EN translations flagged, gate **856 passed**.
+- Harness note: `translation_ab` measures raw translator output (no pipeline post-checks), so its arm votes need that caveat — recorded in the benchmark.
+- Benchmark `2026-10-22-901-runaway-repetition.md`; #901 records it.
+
 ## MIT quality loop, round 42 — a JP-specific prompt ties the shipped one; synthetic JP set built (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).

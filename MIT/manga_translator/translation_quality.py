@@ -217,3 +217,24 @@ def negation_lost(src: str, dst: str, target: str = 'THA') -> bool:
     if not _JA_NEGATION.search(s):
         return False
     return not _THAI_NEGATION.search(d)
+
+
+#: #901: a repetition loop cycles a short pattern, so the consecutive-repeat check misses it. No faithful
+#: translation of a short line is thousands of characters: longer than 3x the source AND over 120 chars.
+_RUNAWAY_MIN_LEN = 120
+_RUNAWAY_RATIO = 3.0
+
+
+def runaway_translation(src: str, dst: str) -> bool:
+    """True when dst is far too long to be a translation of src (#901).
+
+    Observed on real EN->TH output: YOU WERE SPOT ON, GOD- MOTHER! came back as 4,462 characters of a
+    cycling phrase, and check_repetition_hallucination (consecutive repeats only) passed it. A runaway
+    length is the cheap, source-anchored signal that catches it without flagging normal dialogue.
+    """
+    s, d = (src or '').strip(), (dst or '').strip()
+    if len(d) < _RUNAWAY_MIN_LEN:
+        return False
+    if not s:
+        return False
+    return len(d) > _RUNAWAY_RATIO * len(s)

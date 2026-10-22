@@ -11,6 +11,7 @@ from manga_translator.translation_quality import (
     is_oversized_art_glyph,
     negation_lost,
     normalize_thai_marks,
+    runaway_translation,
 )
 
 
@@ -152,3 +153,30 @@ def test_english_idioms_and_clean_sources_are_not_flagged_898():
     # EN->TH path hangs on idioms ('like there's no tomorrow' -> ราวกับวันสุดท้ายของชีวิต); only JP sources are checked
     assert negation_lost("MEN HAVE BEEN FAWNING OVER ME LIKE THERES NO TOMORROW!", 'ผู้ชายต่างพากันหมกมุ่นกับฉันราวกับวันสุดท้ายของชีวิต!', 'THA') is False
     assert negation_lost('可愛いな', 'น่ารักจัง', 'THA') is False
+
+
+def _loop_text(n: int = 60) -> str:
+    """The observed #901 output: a short pattern cycling forever."""
+    return 'แม่นดูหมั้นแม่นดูรักแม่นดูงานแม่นดูเงิน' * n
+
+
+def test_a_repetition_loop_far_longer_than_its_source_is_runaway_901():
+    assert runaway_translation('YOU WERE SPOT ON, GOD- MOTHER!', _loop_text()) is True
+
+
+def test_a_normal_translation_is_not_runaway_901():
+    src = 'YOU WERE SPOT ON, GOD- MOTHER!'
+    assert runaway_translation(src, 'แม่นยายโหราศาสตร์! ทายแม่นเป๊ะทุกข้อเลย!') is False
+    long_src = 'I have been looking at this scenery for a very, very long time now, and I still cannot understand it.'
+    long_dst = 'ฉันมองทิวทัศน์นี้มานานมากแล้ว และก็ยังไม่เข้าใจมันอยู่ดี'
+    assert runaway_translation(long_src, long_dst) is False
+
+
+def test_short_outputs_and_empty_sources_are_never_runaway_901():
+    # under the 120-char floor nothing is a loop, however different the source and translation are
+    assert runaway_translation('!', 'โอ๊ย!' * 20) is False
+    assert runaway_translation('', 'โอ๊ย!') is False
+
+
+def test_a_long_output_from_a_short_source_is_runaway_901():
+    assert runaway_translation('!', 'โอ๊ย!' * 40) is True
