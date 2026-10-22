@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 21 — a container that swallows dialogue is never rescued as an SFX (#887) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Akuyaku p1 rendered a **second meow**: a merge container region (its own OCR read junk) fully covered the balloon's `NYA` line, so the rescue lettered `เหมียว` over the bubble next to the real `เมี๊ยว`.
+- New `ocr_vlm.swallows_dialogue(box, dialogue_boxes)`: a region containing >= 70 % of another region's dialogue box is not an SFX; wired into the rescue gate beside `should_rescue_sfx` (dialogue boxes exclude the region itself).
+- Replay of the page: 9 regions, **no Thai source text** (duplicate gone), both bubbles keep their `เมี๊ยว`. Figure + benchmark section `2026-10-22-887-double-meow.png`. Gate **846 passed**.
+
 ## MIT quality loop, round 20 — the last phantom SFX are gone: lettering is several strokes (#887) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
