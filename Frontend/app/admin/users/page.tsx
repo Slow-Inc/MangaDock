@@ -73,7 +73,10 @@ export default function AdminUsersPage() {
     return fetch(url, { ...init, headers: { ...(init?.headers as Record<string, string>), ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
   }, [getIdToken]);
 
+  // Only the latest request writes the table: a slower answer for an older filter or page is dropped (#1004)
+  const loadSeq = useRef(0);
   const loadUsers = useCallback(async (p: number) => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setLoadFailed(false);
     const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
@@ -92,22 +95,29 @@ export default function AdminUsersPage() {
         TTL.SHORT,
         { tags: ['admin:users'] },
       );
+      if (seq !== loadSeq.current) return;
       setUsers(d.users);
       setTotal(d.total);
     } catch {
+      if (seq !== loadSeq.current) return;
       setLoadFailed(true); // keep stale data
     }
-    setLoading(false);
+    if (seq === loadSeq.current) setLoading(false);
   }, [authFetch, search, filterRole, filterPlan, filterBanned]);
+
+  // The loader through a ref: both effects below must not re-run when a filter, or the session, rebuilds it —
+  // that fired requests per keystroke and repeated the first load (#1004)
+  const loadRef = useRef(loadUsers);
+  useEffect(() => { loadRef.current = loadUsers; }, [loadUsers]);
 
   useEffect(() => {
     if (!didMount.current) { didMount.current = true; return; }
     clearTimeout(searchRef.current);
-    searchRef.current = setTimeout(() => { setPagePersist(1); loadUsers(1); }, 300);
+    searchRef.current = setTimeout(() => { setPagePersist(1); loadRef.current(1); }, 300);
     return () => clearTimeout(searchRef.current);
-  }, [search, filterRole, filterPlan, filterBanned, loadUsers]);
+  }, [search, filterRole, filterPlan, filterBanned]);
 
-  useEffect(() => { loadUsers(page); }, [page, loadUsers]);
+  useEffect(() => { loadRef.current(page); }, [page]);
 
   const openDetail = async (uid: string) => {
     const res = await authFetch(`/api/proxy/admin/users/${uid}`);

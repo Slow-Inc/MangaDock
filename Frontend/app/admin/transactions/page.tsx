@@ -51,7 +51,10 @@ export default function AdminTransactionsPage() {
     return fetch(url, { ...init, headers: { ...(init?.headers as Record<string, string>), ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
   }, [getIdToken]);
 
+  // Only the latest request writes the table: a slower answer for an older filter or page is dropped (#1004)
+  const loadSeq = useRef(0);
   const load = useCallback(async (p: number) => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setLoadFailed(false);
     const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
@@ -70,22 +73,29 @@ export default function AdminTransactionsPage() {
         TTL.SHORT,
         { tags: ['admin:tx'] },
       );
+      if (seq !== loadSeq.current) return;
       setTransactions(d.transactions);
       setTotal(d.total);
     } catch {
+      if (seq !== loadSeq.current) return;
       setLoadFailed(true); // keep stale
     }
-    setLoading(false);
+    if (seq === loadSeq.current) setLoading(false);
   }, [authFetch, filterUid, filterType, filterFrom, filterTo]);
+
+  // The loader through a ref: both effects below must not re-run when a filter, or the session, rebuilds it —
+  // that fired requests per keystroke and repeated the first load (#1004)
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; }, [load]);
 
   useEffect(() => {
     if (!didMount.current) { didMount.current = true; return; }
     clearTimeout(searchRef.current);
-    searchRef.current = setTimeout(() => { setPagePersist(1); load(1); }, 300);
+    searchRef.current = setTimeout(() => { setPagePersist(1); loadRef.current(1); }, 300);
     return () => clearTimeout(searchRef.current);
-  }, [filterUid, filterType, filterFrom, filterTo, load]);
+  }, [filterUid, filterType, filterFrom, filterTo]);
 
-  useEffect(() => { load(page); }, [page, load]);
+  useEffect(() => { loadRef.current(page); }, [page]);
 
   const openDetail = async (id: string) => {
     const res = await authFetch(`/api/proxy/admin/transactions/${id}`);
