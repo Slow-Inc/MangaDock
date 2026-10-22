@@ -81,6 +81,7 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
       });
       // Replace temp with authoritative server post
       setPosts(prev => prev.map(p => p.id === tempId ? realPost : p));
+      if (failed) fetchPosts(); // the list had failed: reload it, or the new post stays behind the error (#930)
     } catch (err) {
       console.error(err);
       // Revert: remove temp post, restore form

@@ -83,11 +83,13 @@
 "ยังไม่มีบทสนทนา"; the reader's comment drawer treated a non-ok answer as no data ("ยังไม่มีความคิดเห็น") and rethrew a
 network error from its effect (unhandled rejection). Both now show the shared `LoadError` with a retry, as #911 did for
 the public pages: the discussion retries `fetchPosts`, the drawer an attempt counter in its load effect, and the drawer
-no longer rethrows. "None yet" stays for a real, successful empty answer.
+no longer rethrows. "None yet" stays for a real, successful empty answer. Review follow-up: a post that succeeds while
+the list shows the failure reloads the list (it stayed hidden behind the error); closing the drawer resets the failure.
 
 **Validated:** production build, stand-in backend failing the first request of each list with 503: before, both said
 "ยังไม่มี…"; after, "โหลดบทสนทนาไม่สำเร็จ" / "โหลดความคิดเห็นไม่สำเร็จ" with "ลองใหม่", and the retry shows the real answer
-(the empty discussion; the 30 comments), 0 page errors. tsc 0; eslint 0 on both files (as on main).
+(the empty discussion; the 30 comments), 0 page errors; the #928 drawer probe still passes. The post-while-failed reload
+needs a signed-in user and was not exercised in a browser. tsc 0; eslint 0 on both files (as on main).
 
 ---
 

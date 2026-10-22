@@ -81,6 +81,7 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
     if (!open) {
       setComments([]);
       setText("");
+      setFailed(false);
       return;
     }
     const controller = new AbortController();
@@ -105,6 +106,7 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
         const newComment: Comment = await res.json();
         setComments((prev) => [...prev, newComment]);
         setText("");
+        if (failed) setAttempt((n) => n + 1); // the list had failed: reload it, or the comment stays hidden (#930)
       }
     } finally {
       setPosting(false);
