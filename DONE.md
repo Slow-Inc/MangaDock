@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 40 — JP visual review: outlined lettering averages to grey (#899) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Reviewed every region of the two real JP pages at high zoom (generous crops, the #895 lesson). What held: all 14 regions contain their Thai, no overflow, narrow columns are the #183 design, negation guard keeps meaning.
+- **Found a real production-path readability defect (#899):** region #5 (p0) straddles black hair and white paper; the source lettering is white fill + black outline (readable on both), but the renderer uses the sampled **average** colour — mid grey — so the Thai is washed out on the black half and nearly invisible on the white half. Source histogram is bimodal (20 % near 0, 74 % near 224), and `merge_bboxes_text_region` averages per-textline colours.
+- Filed #899 with evidence, a proposal (snap the fill to the dominant cluster when the sample is bimodal; fallback worst-case contrast) and the acceptance bar (unit test + real page + 39-page EN replay) — **not implemented** this round: colour changes ship with corpus evidence (#266's attempt was rolled back).
+- Benchmark `2026-10-22-jp-visual-review.md`.
+
 ## MIT quality loop, round 39 — negation guard verified on the production path (#898) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
