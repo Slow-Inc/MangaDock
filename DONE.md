@@ -77,6 +77,18 @@
 
 ---
 
+## #1020 A comment vote needs the comment's post to be live (2026-10-23)
+
+**What:** after #1019 a vote must target a live comment, but `deletePost` does not cascade `deleted_at` to the
+post's comments, so a live comment of a deleted post could still be voted through the API (stored against content no
+one can see). `vote` now, for a comment target, also requires its post to exist and not be deleted (404 "Comment not
+found"): one extra primary-key read on comment votes only. No migration; `deletePost` unchanged.
+
+**Validated:** Jest `forum/forum.service.spec.ts` red (1) → green: a comment of a deleted post is a 404 with no RPC; a
+comment of a live post is cast. Forum suites 76/76; real tsc clean; eslint equal to main.
+
+---
+
 ## #1019 Comments and votes need a live target (2026-10-23)
 
 **What:**
