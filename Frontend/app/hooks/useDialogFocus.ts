@@ -18,10 +18,27 @@ export function focusWrapTarget({ index, count, backwards, focusInOtherLayer = f
   return null;
 }
 
+/**
+ * Tab and Shift+Tab over one cycle, wrapping at both ends — used while a toast is up (#956): its controls follow the
+ * dialog's in the cycle, so the browser's DOM order (the toast sits elsewhere) can't be used. -1 = focus was lost.
+ */
+export function cycleTarget({ index, count, backwards }: { index: number; count: number; backwards: boolean }): number {
+  if (index === -1) return backwards ? count - 1 : 0;
+  return (index + (backwards ? -1 : 1) + count) % count;
+}
+
+/** The controls of a toast on screen (ToastContext marks its card while shown) — reachable from any open dialog. */
+const toastControls = (dialog: HTMLElement) =>
+  [...document.querySelectorAll<HTMLElement>("[data-toast-card] button:not(:disabled)")].filter(
+    (el) => !dialog.contains(el) && el.getClientRects().length > 0,
+  );
+
 /** A shown overlay: fixed, visible (opacity > 0), holding controls — a login prompt bar, a modal, a lightbox. */
 const isOverlayLayer = (n: Element) => {
   if (!(n instanceof HTMLElement)) return false;
   const cs = getComputedStyle(n);
+  // The toast is not a layer to stand aside for: dialogs fold its controls into their own cycle instead (#956)
+  if (n.hasAttribute("data-toast-layer")) return false;
   return cs.position === "fixed" && cs.visibility !== "hidden" && Number(cs.opacity) > 0 &&
     n.getClientRects().length > 0 && !!n.querySelector("input, button, a[href], textarea, select");
 };
@@ -60,10 +77,25 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, isTop: () => 
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !isTop() || !ref.current) return;
-      const items = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0); // visible (offsetParent is null for fixed elements)
+      // visible (offsetParent is null for fixed elements) and not inside an inert part (a collapsed group, a closed menu):
+      // the browser skips those, and the toast cycle below moves focus itself, so it must skip them too
+      const own = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+        (el) => el.getClientRects().length > 0 && !el.closest("[inert]"),
+      );
+      const toast = toastControls(ref.current);
+      const items = [...own, ...toast];
       const active = document.activeElement;
       const index = items.indexOf(active as HTMLElement);
-      const focusInOtherLayer = !!active && active !== document.body && !ref.current.contains(active);
+      const focusInOtherLayer = !!active && active !== document.body && index === -1 && !ref.current.contains(active);
+      if (toast.length > 0) {
+        // A toast is up: the dialog stays sealed, and its controls join the cycle right after the dialog's own —
+        // only for the dialog nothing else is layered above (a popup under the reader or a lightbox must not act)
+        const layer = ref.current.closest("body > *");
+        if (focusInOtherLayer || items.length === 0 || (layer && hasLayerAbove(layer))) return;
+        e.preventDefault();
+        items[cycleTarget({ index, count: items.length, backwards: e.shiftKey })].focus();
+        return;
+      }
       const target = focusWrapTarget({ index, count: items.length, backwards: e.shiftKey, focusInOtherLayer });
       if (target === null) return;
       e.preventDefault();

@@ -77,6 +77,32 @@
 
 ---
 
+## #956 The guest login toast is reachable from the popup and can be held (2026-10-22)
+
+**What:** a guest pressing "ถูกใจ" / "เพิ่มในรายการ" / the reviews' sign-in prompt in the book popup gets a toast offering
+"เข้าสู่ระบบ", but the popup's Tab trap kept focus inside the popup and the toast's 4 s timer ignored hover and focus.
+Now `useDialogFocus` adds a shown toast's controls (`[data-toast-card]`) to the open dialog's Tab cycle and walks that
+cycle itself while a toast is up (`cycleTarget`; the dialog stays sealed); the cycle skips controls inside `[inert]`
+parts (collapsed groups, closed menus). The toast holds its timer while hovered or focused and resumes with exactly what
+was left (the progress bar pauses with it), a new toast under a resting pointer or focus is held at once, a toast with an
+action stays at least 8 s (a keyboard user must Tab to it first), and closing it from its own button returns focus to
+where it came from (not after its action, which opens the login modal). The toast stays where it was in the DOM (its
+live region untouched) and is not a "layer above" for `hasLayerAbove` (`data-toast-layer`); a dialog folds it into its
+cycle only when nothing else is layered above it. `AuthContext` untouched.
+
+**Validated:** `useDialogFocus.test.ts` 16 pass (5 new `cycleTarget`, red → green). Production build: before, 40 Tabs
+from the popup never reached the toast and a hovered toast was gone after 6 s. A first version (portal + the popup's trap
+standing aside) reached it but let focus wander behind the aria-modal popup — replaced after review. After: Tab goes
+from the popup's controls to the toast and back into the popup (never the page behind), closing it by keyboard returns
+focus into the popup, and a hovered toast outlives its 8 s and leaves after the pointer. The probe also caught the new
+cycle sticking on an inert collapsed chapter group, fixed by the `[inert]` filter. Reader-drawer, failed-lists, popup,
+chapter-groups, community-drawer and reader-menu probes pass. A second review found two stacked-layer problems, both
+reproduced on the previous build then fixed: from a toast raised in the reader's comment drawer (reader over the popup)
+Tab went into the popup behind the reader, now it cycles drawer <-> toast only; after the toast's action focus jumped to a
+popup button behind the login modal, now it stays off the popup. tsc 0; eslint 0 on the touched files.
+
+---
+
 ## #954 Popup reviews: a failed load is not "no reviews yet" (2026-10-22)
 
 **What:** `ReviewSection.fetchPublic` wrote the summary and list only when each response was ok and had no `catch`, so a

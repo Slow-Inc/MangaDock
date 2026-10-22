@@ -98,6 +98,15 @@ function progressColor(type: ToastType) {
   return "bg-ink-3";
 }
 
+/**
+ * How long a toast stays (0 = until closed). One with an action gets at least 8 s: a keyboard user has to Tab to it,
+ * past the controls of whatever dialog is open, before it can be held by focus (#956).
+ */
+const toastDuration = (opts: ToastOptions) => {
+  const d = opts.duration ?? 4000;
+  return d > 0 && opts.action ? Math.max(d, 8000) : d;
+};
+
 // ── Provider ───────────────────────────────────────────────────────────────
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -111,41 +120,80 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // toast to be wiped out 300 ms later by the stale timer.
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keyRef = useRef(0);
+  // The running auto-dismiss: time left and when it started. Hover or focus on the toast holds it (WCAG 2.2.1) (#956).
+  const timing = useRef<{ left: number; since: number } | null>(null);
+  const hovered = useRef(false);
+  const focused = useRef(false);
+  const [held, setHeld] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const returnTo = useRef<HTMLElement | null>(null); // where focus came from, for when the toast closes under it
+  const returnFocus = useRef(true); // false once its action ran: the action decides where focus goes (e.g. a login modal)
 
   const dismissToast = useCallback(() => {
     setVisible(false);
+    timing.current = null;
+    const hadFocus = !!cardRef.current?.contains(document.activeElement);
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
     if (closeTimer.current) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(() => {
       setToast(null);
       setActionLoading(false);
       closeTimer.current = null;
+      // Closed by its ✕ or the timer with focus inside: focus goes back where it came from, not to <body>
+      const back = returnTo.current;
+      if (hadFocus && returnFocus.current && back?.isConnected && !back.closest("[inert]")) back.focus({ preventScroll: true });
     }, 300);
   }, []);
+
+  const startTimer = useCallback((ms: number) => {
+    timing.current = { left: ms, since: Date.now() };
+    dismissTimer.current = setTimeout(dismissToast, ms);
+  }, [dismissToast]);
+
+  const holdTimer = useCallback(() => {
+    if (!timing.current || !dismissTimer.current) return;
+    clearTimeout(dismissTimer.current);
+    dismissTimer.current = null;
+    timing.current.left -= Date.now() - timing.current.since;
+    setHeld(true);
+  }, []);
+
+  const releaseTimer = useCallback(() => {
+    if (hovered.current || focused.current || !timing.current || dismissTimer.current) return;
+    startTimer(Math.max(timing.current.left, 0)); // exactly what was left: the progress bar resumes from there too
+    setHeld(false);
+  }, [startTimer]);
 
   const showToast = useCallback((opts: ToastOptions) => {
     // Clear any existing auto-dismiss timer and any pending close timer from dismissToast
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
     if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
     keyRef.current += 1;
+    timing.current = null;
+    returnTo.current = null;
+    returnFocus.current = true;
+    setHeld(false);
     setToast({ ...opts, key: keyRef.current });
+    const duration = toastDuration(opts);
+    if (duration > 0) startTimer(duration);
     // Small delay before making visible so CSS transition fires
-    setTimeout(() => setVisible(true), 10);
-
-    const duration = opts.duration ?? 4000;
-    if (duration > 0) {
-      dismissTimer.current = setTimeout(() => {
-        setVisible(false);
-        closeTimer.current = setTimeout(() => { setToast(null); setActionLoading(false); closeTimer.current = null; }, 300);
-      }, duration);
-    }
-  }, []);
+    setTimeout(() => {
+      setVisible(true);
+      // The card is reused: a pointer resting on it, or focus still in it, holds this toast too
+      const card = cardRef.current;
+      hovered.current = !!card?.matches(":hover");
+      focused.current = !!card?.contains(document.activeElement);
+      if (hovered.current || focused.current) holdTimer();
+    }, 10);
+  }, [startTimer, holdTimer]);
 
   const handleAction = async () => {
     if (!toast?.action) return;
+    returnFocus.current = false;
     const result = toast.action.onClick();
     if (result instanceof Promise) {
       setActionLoading(true);
+      timing.current = null;
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
       try {
         await result;
@@ -156,7 +204,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     // If not a Promise, caller handles dismiss themselves
   };
 
-  const duration = toast?.duration ?? 4000;
+  const duration = toast ? toastDuration(toast) : 4000;
   const showProgress = duration > 0 && !actionLoading;
 
   return (
@@ -168,12 +216,32 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Toast container — always rendered for CSS transition */}
       <div
         aria-live="polite"
+        data-toast-layer="" // not a layer dialogs stand aside for: they fold its controls into their Tab cycle (#956)
         className={`fixed bottom-24 sm:bottom-10 left-1/2 z-[9999] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 transition-all duration-300 ${
           visible && toast ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"
         }`}
       >
         {toast && (
-          <div className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-raised px-4 py-3 shadow-2xl ${borderColor(toast.type ?? "info")}`}>
+          <div
+            ref={cardRef}
+            data-toast-card={visible ? "" : undefined} // while shown, an open dialog's Tab cycle includes its controls (#956)
+            // A mouse resting on it holds it; a tap on a touch screen does not (no "leave" would follow)
+            onPointerEnter={(e) => { if (e.pointerType === "mouse") { hovered.current = true; holdTimer(); } }}
+            onPointerLeave={(e) => { if (e.pointerType === "mouse") { hovered.current = false; releaseTimer(); } }}
+            onFocus={(e) => {
+              if (!focused.current && e.relatedTarget instanceof HTMLElement && !e.currentTarget.contains(e.relatedTarget)) {
+                returnTo.current = e.relatedTarget;
+              }
+              focused.current = true;
+              holdTimer();
+            }}
+            onBlur={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              focused.current = false;
+              releaseTimer();
+            }}
+            className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-raised px-4 py-3 shadow-2xl ${borderColor(toast.type ?? "info")}`}
+          >
             {/* Icon */}
             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${iconBg(toast.type ?? "info")}`}>
               <ToastIcon type={toast.type ?? "info"} />
@@ -218,7 +286,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <div
                 key={toast.key}
                 className={`absolute bottom-0 left-0 h-0.5 w-full origin-left ${progressColor(toast.type ?? "info")}`}
-                style={{ animation: `mb-toast-shrink ${duration}ms linear forwards` }}
+                style={{ animation: `mb-toast-shrink ${duration}ms linear forwards`, animationPlayState: held ? "paused" : "running" }}
               />
             )}
           </div>
