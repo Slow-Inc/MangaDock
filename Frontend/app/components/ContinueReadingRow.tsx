@@ -9,7 +9,8 @@ import ModelBadge from "./ModelBadge";
 import Loader from "./ui/Loader";
 import MangaReader from "./MangaReader";
 import { useBookActions } from "../hooks/useBookActions";
-import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
 import { translateDescription } from "../lib/translateDescription";
 import { stripMarkdown } from "../lib/markdownText";
@@ -39,6 +40,7 @@ function HistoryCard({
   isNew: boolean;
 }) {
   const [isLandscape, setIsLandscape] = useState(false);
+  const cover = useCoverSrc(book);
   const [showModal, setShowModal] = useState(false);
   const [scrollToChapters, setScrollToChapters] = useState(false);
   const [showReader, setShowReader] = useState(false);
@@ -100,27 +102,29 @@ function HistoryCard({
           expandRight ? "group-hover:rounded-r-none" : "group-hover:rounded-l-none"
         } ${isLandscape ? "aspect-4/3" : "aspect-2/3"}`}
       >
+        {cover.src ? (
         <Image
-          src={resolvedThumbnail(book)}
+          src={cover.src}
           alt={book.title}
           fill
           onLoad={(e) => {
             const img = e.currentTarget as HTMLImageElement;
             if (img.naturalWidth > img.naturalHeight) setIsLandscape(true);
           }}
-          onError={(e) => {
-            const fallback = thumbnailFallbackSrc(book);
-            if (fallback) {
-              // Clear the stale path from localStorage so future loads skip it
-              patchThumbnailLocal(book.id);
-              (e.currentTarget as HTMLImageElement).src = fallback;
-            }
+          onError={() => {
+            // The local copy failed: clear the stale path from localStorage so future loads skip it. This mutates the
+            // `book` prop itself, so the next render's sources start at the proxy — either way the card lands on it.
+            if (book.thumbnailLocal) patchThumbnailLocal(book.id);
+            cover.onError();
           }}
           className={`transition duration-300 group-hover:scale-105 ${
             isLandscape ? "object-contain" : "object-cover"
           }`}
           sizes="220px"
         />
+        ) : (
+          <CoverPlaceholder title={book.title} />
+        )}
         <div className="absolute inset-0 bg-linear-to-t from-bg/70 via-transparent to-transparent opacity-100 transition duration-300 md:opacity-0 md:group-hover:opacity-100" />
 
         {/* "อ่านต่อ" badge */}

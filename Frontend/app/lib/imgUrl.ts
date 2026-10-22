@@ -103,3 +103,16 @@ export function resolvedThumbnail(book: {
 
   return toRelativeProxyUrl(book.thumbnail);
 }
+
+/**
+ * Every cover a card may try, in order, before it shows its placeholder (#921): the resolved thumbnail, then the
+ * fallback — without repeats (a MangaDex cover with no local copy resolves to the proxy both ways) and without a
+ * third-party "no cover" image when the book has none.
+ */
+export function coverSources(book: { thumbnail?: string; thumbnailLocal?: string }): string[] {
+  const candidates = [
+    book.thumbnail || book.thumbnailLocal ? resolvedThumbnail({ thumbnail: book.thumbnail ?? "", thumbnailLocal: book.thumbnailLocal }) : "",
+    thumbnailFallbackSrc(book) ?? "",
+  ];
+  return [...new Set(candidates.filter(Boolean))];
+}

@@ -3,15 +3,15 @@
 import { useEffect, useState } from "react";
 import BookDetailModal from "./BookDetailModal";
 import { useHorizontalScroll } from "../hooks/useHorizontalScroll";
-import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import type { LandingBook } from "../lib/types";
 
 const API_BASE = "/api/proxy";
 
 function RelatedCard({ book }: { book: LandingBook }) {
-  const [thumbSrc, setThumbSrc] = useState(() => resolvedThumbnail(book));
-  const [thumbFellBack, setThumbFellBack] = useState(false);
+  const cover = useCoverSrc(book);
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -21,19 +21,17 @@ function RelatedCard({ book }: { book: LandingBook }) {
         className="group flex w-[7.5rem] min-w-[7.5rem] shrink-0 flex-col gap-2 text-left"
       >
         <div className="relative aspect-2/3 w-full overflow-hidden rounded-xl border border-line bg-fill">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={thumbSrc}
-            alt="" // the title is the text right below, inside the same button
-            onError={() => {
-              if (!thumbFellBack) {
-                const fallback = thumbnailFallbackSrc(book);
-                setThumbFellBack(true);
-                if (fallback) setThumbSrc(fallback);
-              }
-            }}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          />
+          {cover.src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={cover.src}
+              alt="" // the title is the text right below, inside the same button
+              onError={cover.onError}
+              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <CoverPlaceholder title={book.title} decorative />
+          )}
           <div className="absolute inset-0 bg-linear-to-t from-bg/60 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
         </div>
         <p className="line-clamp-2 text-[11px] leading-snug text-ink-2 transition group-hover:text-ink">

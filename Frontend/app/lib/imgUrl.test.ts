@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resolvedThumbnail, proxyImageUrl, toRelativeProxyUrl, thumbnailFallbackSrc } from "./imgUrl";
+import { resolvedThumbnail, proxyImageUrl, toRelativeProxyUrl, thumbnailFallbackSrc, coverSources } from "./imgUrl";
 
 const MANGADEX_URL =
   "https://uploads.mangadex.org/covers/abc123/cover.jpg";
@@ -72,5 +72,28 @@ describe("thumbnailFallbackSrc", () => {
 
   test("empty thumbnail string → null", () => {
     expect(thumbnailFallbackSrc({ thumbnail: "" })).toBeNull();
+  });
+});
+
+describe("coverSources: every cover a card may try, in order, before its placeholder (#921)", () => {
+  test("local cache first, then the CDN through the proxy", () => {
+    expect(coverSources({ thumbnail: MANGADEX_URL, thumbnailLocal: LOCAL_PATH })).toEqual([
+      `/api/proxy${LOCAL_PATH}`,
+      `/api/img-proxy?url=${encodeURIComponent(MANGADEX_URL)}`,
+    ]);
+  });
+
+  test("the same URL is not tried twice (a MangaDex cover without a local copy has one source)", () => {
+    expect(coverSources({ thumbnail: MANGADEX_URL })).toEqual([
+      `/api/img-proxy?url=${encodeURIComponent(MANGADEX_URL)}`,
+    ]);
+  });
+
+  test("an external cover is tried as-is", () => {
+    expect(coverSources({ thumbnail: GOOGLE_URL })).toEqual([GOOGLE_URL]);
+  });
+
+  test("no cover at all → nothing to try (the card shows its placeholder, no third-party image)", () => {
+    expect(coverSources({ thumbnail: "" })).toEqual([]);
   });
 });

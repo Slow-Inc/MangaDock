@@ -10,7 +10,8 @@ import ModelBadge from "./ModelBadge";
 import Loader from "./ui/Loader";
 import MangaReader from "./MangaReader";
 import { useBookActions } from "../hooks/useBookActions";
-import { resolvedThumbnail, thumbnailFallbackSrc } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { getHistory } from "../lib/readingHistory";
 import { translateDescription } from "../lib/translateDescription";
 import { stripMarkdown } from "../lib/markdownText";
@@ -35,8 +36,7 @@ function BookCard({
   book: LandingBook;
   rowId: string;
 }) {
-  const [thumbSrc, setThumbSrc] = useState(() => resolvedThumbnail(book));
-  const [thumbFellBack, setThumbFellBack] = useState(false);
+  const cover = useCoverSrc(book);
   const [isLandscape, setIsLandscape] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showCover, setShowCover] = useState(false);
@@ -113,31 +113,27 @@ function BookCard({
             </svg>
             <span className="text-[9px] font-medium">ไม่มีใน Cache</span>
           </div>
-        ) : (
+        ) : cover.src ? (
           <Image
-            src={thumbSrc}
+            src={cover.src}
             alt={book.title}
             fill
             onLoad={(e) => {
               const img = e.currentTarget as HTMLImageElement;
               if (img.naturalWidth > img.naturalHeight) setIsLandscape(true);
             }}
-            onError={() => {
-              if (!thumbFellBack) {
-                const fallback = thumbnailFallbackSrc(book);
-                setThumbFellBack(true);
-                if (fallback) setThumbSrc(fallback);
-              }
-            }}
+            onError={cover.onError}
             className={`transition duration-300 group-hover:scale-105 ${
               isLandscape ? "object-contain" : "object-cover"
             }`}
             sizes="220px"
           />
+        ) : (
+          <CoverPlaceholder title={book.title} className="min-h-40" />
         )}
         <div className="absolute inset-0 bg-linear-to-t from-bg/70 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
         {/* Expand cover button */}
-        <button
+        {cover.src && <button
           onClick={(e) => { e.stopPropagation(); setShowCover(true); }}
           title="ดูหน้าปกขนาดใหญ่"
           className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/75 text-ink-2 opacity-100 transition-all duration-200 hover:bg-bg/80 hover:text-ink md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
@@ -145,7 +141,7 @@ function BookCard({
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
             <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
           </svg>
-        </button>
+        </button>}
       </div>
 
       {/* Info panel — expands right unless near the right edge */}
@@ -258,9 +254,9 @@ function BookCard({
       {showModal && (
         <BookDetailModal book={book} onClose={() => setShowModal(false)} />
       )}
-      {showCover && (
+      {showCover && cover.src && (
         <CoverLightbox
-          src={thumbSrc}
+          src={cover.src}
           alt={book.title}
           onClose={() => setShowCover(false)}
         />
