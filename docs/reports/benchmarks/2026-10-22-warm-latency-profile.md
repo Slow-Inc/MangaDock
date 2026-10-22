@@ -30,3 +30,7 @@ Per page (lines = detected textlines):
 - **OCR is 54 %**, and part of it is the vision SFX rescue: each served crop is a ~2.3 s gateway call inside the OCR stage (Horimiya p0 has `sfx=1`, Dungeon p1 `sfx=2`). Split before optimizing: measure OCR with `MIT_OCR_VLM_RESCUE=0` vs on.
 - The OCR line model runs ~4–6 s for 22–72 textlines (~150 ms/line warm) — the next question is whether the crops are batched into GPU forwards or run one at a time; a batch that does not change the reads is the obvious lossless win, and #872's own note ("OCR chunk 64 rejected: slower, changes reads") says the chunk size was tuned before, so re-measure rather than assume.
 - Cold-vs-warm gap is ~10 s of model load per process: any latency number taken from a one-page doctor run is meaningless for the goal.
+
+> **Caveat (2026-10-22, #885):** these single-run stage timers vary up to 6x under host contention —
+> `textline_merge` measured 782 ms and 4828 ms for the same page and code. Use profiler cumulative time and
+> repeated medians to rank stages; see `2026-10-22-merge-dead-dispatch.md`.
