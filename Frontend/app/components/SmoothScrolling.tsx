@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { ReactNode, useEffect, useRef } from 'react';
 import { isModalNavigation } from '../lib/bookModalHistory';
 import { onPageScrollLock } from '../lib/scrollLock';
+import { markLandingPage } from '../lib/inAppBack';
 import { useReducedMotion } from '../hooks/reducedMotion';
 
 interface SmoothScrollingProps {
@@ -23,6 +24,7 @@ export default function SmoothScrolling({ children }: SmoothScrollingProps) {
   const pathname = usePathname();
 
   useEffect(() => {
+    markLandingPage(); // the first page's history entry: back buttons there go to a parent page, not off the site (#942)
     // A book popup opening/closing changes the pathname (/book/<id>) but not the page
     // behind it; resetting to the top there would make that page jump.
     if (isModalNavigation()) return;

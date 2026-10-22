@@ -77,6 +77,24 @@
 
 ---
 
+## #942 Back buttons stay in MangaDock when the page was opened directly (2026-10-22)
+
+**What:** the genre page's "← ย้อนกลับ" and the community post's "ย้อนกลับ" called `router.back()` unconditionally, so a
+page opened directly (a shared link in a fresh tab) sent the visitor off the site; `history.length` cannot tell (a fresh
+tab already has two entries). New `lib/inAppBack`: on the document's first render `SmoothScrolling` marks that history
+entry (`replaceState`, keeping Next's own state) as where the visitor landed; `goBackOr(router, fallback)` pushes the
+parent page (`/`, `/community`) on that entry and goes back on every other. (A first version tracked "moved inside the
+app" + a same-origin referrer; the review showed it still left the site after browser-back to the landing page and did
+nothing in a tab opened by Ctrl-click from MangaDock.)
+
+**Validated:** `inAppBack.test.ts` red → green, 5 tests. Production build, stand-in backend: before, a genre page and a
+post opened in a fresh tab went to `about:blank` on back, as did the landing page after a browser-back and a post opened
+with a same-origin referrer; after, they land on `/` and `/community`; Next keeps the marker through client navigation
+and browser-back; `/search` → genre via the Navbar menu → back still returns to `/search`. tsc 0; eslint 0 on the
+touched files.
+
+---
+
 ## #940 Community mobile drawer is a real dialog (2026-10-22)
 
 **What:** the community drawer (`app/community/layout.tsx`) was `role="dialog"` + `aria-modal` but, closed, it was only

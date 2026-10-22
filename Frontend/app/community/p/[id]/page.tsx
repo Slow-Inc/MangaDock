@@ -27,6 +27,7 @@ import { PRIMARY_FILL } from "../../../components/ui/Button";
 import { usePageTitle } from "../../../hooks/pageTitle";
 import LoadError from "../../../components/ui/LoadError";
 import { isNotFound } from "../../../lib/httpError";
+import { goBackOr } from "../../../lib/inAppBack";
 
 function MarqueeText({ text, textClassName, active }: { text: string; textClassName?: string; active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -300,7 +301,7 @@ export default function PostDetailPage() {
         }`}
       >
         <button
-          onClick={() => router.back()}
+          onClick={() => goBackOr(router, "/community")}
           className="group relative flex items-center gap-2 h-9 px-3 sm:px-5 rounded-full overflow-hidden shrink-0
             bg-fill hover:bg-raised
             border border-line hover:border-ink-3
