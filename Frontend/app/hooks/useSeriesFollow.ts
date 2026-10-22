@@ -34,17 +34,17 @@ export function loadFollows(): Promise<void> {
 }
 
 async function fetchFollows(isCurrent: () => boolean): Promise<void> {
-  const token = await getToken();
-  if (!isCurrent()) return; // signed out meanwhile — this result belongs to the previous user
-  if (!token) {
-    followedIds = new Set();
-    followItems = [];
-    loaded = true;
-    loadFailed = false;
-    notify();
-    return;
-  }
   try {
+    const token = await getToken();
+    if (!isCurrent()) return; // signed out meanwhile — this result belongs to the previous user
+    if (!token) {
+      followedIds = new Set();
+      followItems = [];
+      loaded = true;
+      loadFailed = false;
+      notify();
+      return;
+    }
     const res = await fetch("/api/proxy/users/me/follows", {
       headers: { Authorization: `Bearer ${token}` },
     });

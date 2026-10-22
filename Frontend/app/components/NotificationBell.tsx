@@ -49,6 +49,7 @@ export default function NotificationBell() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
 
   const fetchCount = useCallback(async () => {
     const data = await apiFetch<{ count: number }>("/api/proxy/notifications/unread-count");
@@ -117,6 +118,7 @@ export default function NotificationBell() {
   return (
     <div ref={panelRef} className="relative">
       <button
+        ref={bellRef}
         onClick={() => setOpen((v) => !v)}
         className="relative flex h-8 w-8 items-center justify-center rounded-full border border-line bg-fill text-ink-2 transition hover:bg-raised hover:text-ink"
         aria-label="การแจ้งเตือน"
@@ -162,6 +164,8 @@ export default function NotificationBell() {
               // The row itself is the control (#934): a link, or a button when there is nowhere to go — reachable from
               // the keyboard, and Enter on it marks it read (the handler used to sit on an inner div the key never hit)
               const pick = () => { if (!n.read) handleMarkRead(n.id); setOpen(false); };
+              // a row with no link stays on the page: the panel goes inert, so focus goes back to the bell (as on Escape)
+              const pickHere = () => { pick(); bellRef.current?.focus(); };
               const rowClass = `flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-fill ${!n.read ? "bg-accent/10" : ""}`;
               const inner = (
                 <>
@@ -176,7 +180,7 @@ export default function NotificationBell() {
               return n.link ? (
                 <Link key={n.id} href={n.link} onClick={pick} className={rowClass}>{inner}</Link>
               ) : (
-                <button key={n.id} type="button" onClick={pick} className={rowClass}>{inner}</button>
+                <button key={n.id} type="button" onClick={pickHere} className={rowClass}>{inner}</button>
               );
             })
           )}

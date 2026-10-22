@@ -370,17 +370,17 @@ function MyListContent() {
   const handleExport = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    const failed = () => showToast({ type: "error", message: "ส่งออกประวัติการอ่านไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // #934
-    let res: Response;
+    let blob: Blob;
     try {
-      res = await fetch('/api/proxy/users/me/history/export', {
+      const res = await fetch('/api/proxy/users/me/history/export', {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
+      if (!res.ok) throw new Error(`export ${res.status}`);
+      blob = await res.blob();
     } catch {
-      return failed();
+      showToast({ type: "error", message: "ส่งออกประวัติการอ่านไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // #934
+      return;
     }
-    if (!res.ok) return failed();
-    const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
