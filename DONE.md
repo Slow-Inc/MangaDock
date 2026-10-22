@@ -77,6 +77,19 @@
 
 ---
 
+## #1029 Studio upload's selected cover falls back on a dead cover (2026-10-23)
+
+**What:** after choosing a manga in `app/studio/upload/page.tsx`, the big selected-cover `<Image unoptimized>` had no
+`onError`, so a cover that 404s showed the browser's broken-image icon (the pickers fall back since #925). The page
+now remembers the URL that failed (`failedCover`) and shows the book glyph for it; keyed on the URL, so choosing
+another book tries its cover afresh. The title overlay stays.
+
+**Validated:** E2E on a production build, signed in as a creator via the local fake session, stand-in search (probe
+`upload1029.cjs`): before — selecting "Cover Broken Everywhere" left a broken `<img>`; after — the glyph, and then
+selecting "Cover Falls Back" loads its cover. Screenshot checked. Real tsc clean; eslint equal to main.
+
+---
+
 ## #934 Signed-in failures that stayed silent: follows load, CSV export, notification rows (2026-10-23)
 
 **What (the items #987/#991/#1013 had not covered):**
