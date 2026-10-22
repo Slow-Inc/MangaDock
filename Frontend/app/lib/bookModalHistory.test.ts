@@ -184,3 +184,18 @@ describe("modal navigation marker (lets SmoothScrolling skip its scroll-to-top)"
     expect(isModalNavigation(11_500)).toBe(false);
   });
 });
+
+describe("modalStack.anyOpen: the hero carousel holds still while a book popup is open (#948)", () => {
+  test("open while at least one popup is on the stack", async () => {
+    const { modalStack } = await fresh();
+    expect(modalStack.anyOpen()).toBe(false);
+    const a = popup();
+    const b = popup();
+    modalStack.push(a);
+    modalStack.push(b);
+    modalStack.remove(b);
+    expect(modalStack.anyOpen()).toBe(true);
+    modalStack.remove(a);
+    expect(modalStack.anyOpen()).toBe(false);
+  });
+});

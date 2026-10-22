@@ -82,11 +82,14 @@
 **What:** on mobile, the home hero rendered `<BookDetailModal book={book}>` with the live `books[idx]` while autoplay kept
 rotating behind it, so within 5 s the open popup's title, cover and chapters became the next hero book while its URL
 and the details loaded on open stayed from the first. The popup now opens on a snapshot of the tapped book (`openBook`
-state replaces the `mobileDlOpen` flag).
+state replaces the `mobileDlOpen` flag). Review follow-up (traced, then reproduced): on desktop, rotation remounted
+`HeroDetailButton` (`key={book.id}`) and dropped its open popup without the close path (URL `/book/<id>` left behind);
+the carousel now skips its tick while `modalStack.anyOpen()` (new).
 
 **Validated:** production build at 390 px: before, the popup opened on "Cover Loads" showed "No Cover At All" 11 s later
-with the URL still `/book/cover-ok`; after, it still shows "Cover Loads". The desktop hero's detail button kept the right
-book before and after. tsc 0; eslint unchanged (one pre-existing warning).
+with the URL still `/book/cover-ok`; after, it still shows "Cover Loads". Desktop, popup open, pointer leaving the window,
+11 s: before gone with the URL left behind, after still open. Rotation resumes once the popup is closed and focus leaves
+the hero. `bookModalHistory.test.ts` 14 pass (new `anyOpen`). tsc 0; eslint unchanged (one pre-existing warning).
 
 ---
 
