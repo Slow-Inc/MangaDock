@@ -87,6 +87,7 @@ export default function ForumSideMenu({
     const seq = ++searchSeq.current;
     if (!q.trim()) {
       setSearchResults([]);
+      setSearching(false); // the search this one superseded will no longer reset it
       return;
     }
     setSearching(true);

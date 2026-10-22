@@ -33,6 +33,7 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
     const seq = ++searchSeq.current;
     if (!q.trim()) {
       setResults([]);
+      setSearching(false); // the search this one superseded will no longer reset it
       return;
     }
     setSearching(true);
