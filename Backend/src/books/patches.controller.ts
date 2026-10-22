@@ -9,12 +9,12 @@ import {
 import type { Request, Response } from 'express';
 import { STORAGE_PROVIDER } from '../common/storage/storage-provider.interface';
 import type { StorageProvider } from '../common/storage/storage-provider.interface';
+import { isServablePatchKey } from './patch-store';
 
 /**
- * Serves R2-stored patch PNGs via StorageProvider.
- * Only reachable when Worker routing is active (WORKER_URL set) — patch URLs
- * are constructed as `{backendOrigin}/r2-patches/{r2Key}` in that path.
- * Disk mode continues to serve patches via express.static (/uploads/).
+ * Serves patch PNGs via StorageProvider at `/r2-patches/{key}`. PatchStore itself now returns `{origin}/uploads/...`
+ * URLs, so this route is kept only for anything (e.g. a deployed Worker) still addressing patches this way. It is
+ * public, so it serves keys in the patch store's layout and nothing else (#1009).
  */
 @Controller('r2-patches')
 export class PatchesController {
@@ -25,7 +25,10 @@ export class PatchesController {
   @Get('*')
   async serve(@Req() req: Request, @Res() res: Response): Promise<void> {
     const r2Key = req.path.replace(/^\/r2-patches\//, '');
-    if (!r2Key || r2Key === req.path) throw new NotFoundException();
+    // Public route: serve patches and nothing else the storage provider can read (#1009)
+    if (!r2Key || r2Key === req.path || !isServablePatchKey(r2Key)) {
+      throw new NotFoundException();
+    }
     try {
       const buf = await this.storage.get(r2Key);
       res.setHeader('content-type', 'image/png');

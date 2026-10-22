@@ -77,6 +77,22 @@
 
 ---
 
+## #1009 The public patch route serves patches only (2026-10-23)
+
+**What (security, class only):** `GET /r2-patches/*` is public and registered in every storage mode. It handed the rest
+of the path to `StorageProvider.get` with no check that the key was a patch, so any readable object or file could be
+served. It now serves only `isServablePatchKey` keys: `uploads/patches/` followed by `PatchStore`'s safe segments
+(`[\w.-]`, never `..`), ending in `.png`. Everything else, including absolute keys, is a 404 before storage is touched.
+`PatchStore` URLs are always `${origin}/uploads/patches/...`, so real patches are unaffected.
+
+**Validated:** Jest `books/patches.controller.spec.ts`, red (10 of 11 bad keys read storage) → green (12/12). A real
+patch is served. Outside the store, `..` (shallow and deep), POSIX absolute, a Windows drive, a backslash, an encoded
+separator, an empty segment, a non-PNG, the store root and empty are all 404 with no storage read. The patch-store
+suites pass (27). The local backend logs show no requests to the route; the 20 matches are startup route registrations.
+The developer was notified to consider rotating `Backend/.env` secrets if a disk-mode backend was publicly reachable.
+
+---
+
 ## #1007 Avatar delete accepts only a generated filename; the disk provider contains relative keys (2026-10-23)
 
 **What (security, class only):** `DELETE /users/me/avatar` built a storage key under `uploads/avatars/` from the body's
