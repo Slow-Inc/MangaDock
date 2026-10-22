@@ -77,6 +77,22 @@
 
 ---
 
+## #944 Genre page and /new: page and tab kept in the URL, stale answers ignored (2026-10-22)
+
+**What:** the genre page's and `/new`'s list effects never cancelled, so two quick "next" clicks could leave page 2's books
+under a "3" label; the genre page's page lived only in `useState` (a refresh or a back from a book returned to page 1);
+`/new` read `?tab=` but never wrote it. Both effects now drop a superseded answer (a cancel flag in the cleanup); the genre
+page derives its page from `?page=` (in a `Suspense` boundary, as `/new` already was) and changes it with `router.push`;
+`/new` writes its tab with `router.replace`.
+
+**Validated:** production build, stand-in backend answering each genre page (page 2 delayed 1.5 s): before, `?page=3`
+opened page 1, the race ended with page 2's books under "3", a reload went back to page 1, and `/new` kept no tab; after,
+`?page=3` opens page 3, the race ends on page 3's books with `?page=3` in the URL, a reload keeps it, and `/new`'s tab is
+written as `?tab=latest` and survives a reload. The #942 back-button probe still passes. tsc 0; eslint identical to
+main on both files.
+
+---
+
 ## #942 Back buttons stay in MangaDock when the page was opened directly (2026-10-22)
 
 **What:** the genre page's "← ย้อนกลับ" and the community post's "ย้อนกลับ" called `router.back()` unconditionally, so a
