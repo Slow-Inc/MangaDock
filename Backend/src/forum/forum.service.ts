@@ -782,7 +782,9 @@ export class ForumService {
     // Not an empty list: that read as "nothing is trending" and hid the page's load-error state (#978). An Error
     // naming Supabase is the database-down signal (AllExceptionsFilter → 503 SUPABASE_OFFLINE).
     if (error)
-      throw new Error(`Supabase error fetching trending: ${error.message}`);
+      throw new Error(
+        `Supabase error fetching trending (${error.code || 'no code'}): ${error.message}`,
+      );
 
     // post_count arrives as a bigint string over PostgREST — coerce to number.
     return ((data ?? []) as any[]).map((row) => ({
