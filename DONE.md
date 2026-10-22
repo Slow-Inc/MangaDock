@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 41 — #899 corrected: the fill was dark, my "grey" reading was wrong; nothing shipped (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Built the proposed #899 rule (bimodal patch + mid-grey fill -> white fill + black outline) with six unit tests, then **traced the real page**: the OCR colour head predicts a **dark** fill (RGB 8-50) with a white outline on every region — never mid grey. Rendered dark-fill + white-outline stays legible over the black hair (the white outline carries the letters) and the judge scored the page 1.71/2 with no contrast complaint. The "washed-out grey" reading came from a zoomed crop, not from the pixel values.
+- Since the rule cannot fire on the case it was written for, shipping it would be an unproven render change — **reverted the implementation and tests; nothing shipped** (second time this loop catches itself; the #895 lesson applied before commit instead of after).
+- #899 corrected: the real (smaller) observation is that colour is sampled over the whole textline bbox, so an outlined white-fill lettering over mostly-white paper can get a dark fill (the source style inverted). Recorded with the measurement needed next (sample under the ink, 39-page EN replay).
+- Benchmark rewritten as the correction record.
+
 ## MIT quality loop, round 40 — JP visual review: outlined lettering averages to grey (#899) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
