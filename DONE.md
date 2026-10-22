@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 18 — text_threshold 0.3 A/B over 39 pages: keep the default (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Chainsaw p0's missed credits are recovered by `detector.text_threshold` 0.5 -> 0.3, so the whole corpus was run both ways (replay, rescue off). **20/39 pages change** textline structure, **134 region source texts** shift with the boxes; new text includes 4 real dialogue lines, the credit paragraphs — and 6 newly detected CJK art glyphs (`ザ`, `平ク`, `ベ`, `才`, `刀`, `禁`).
+- Decision: **0.5 stays the default** — not a pure recall win, and credits left in English are acceptable; the knob is documented for maximum-recall setups. Benchmark `2026-10-22-text-threshold-39-pages.md`.
+- Phantom SFX found while auditing Taida p0 (a det_sfx false positive on plain armour got an invented `ฟู่`) — filed as **#887** with the rejected prompt-hardening A/B (it refused 15/20 real SFX) and the pixel signals that do not separate it.
+
 ## MIT quality loop, round 17 — #883's leftover English is detection recall, not the mask (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
