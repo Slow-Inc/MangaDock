@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 49 — #905 slice 1: the pipelined batch loop, unit-tested (1.69× in simulation) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Spike answer for #905: two-phase API across the worker process boundary is the wrong shape (the ctx would have to cross an HTTP boundary); the batch loop belongs **inside the worker**. `#905` body updated with that design.
+- Built slice 1: `server/batch_pipeline.run_pipelined` — translation stays strictly ordered and chains the #159 rolling context, page i+1's **front** GPU stages start before page i's translation awaits, page i's **back** stages run during page i+1's translation, cancellation polled between pages, results in page order. Heavy work is injected → unit-testable without the ML stack.
+- Evidence: **5 unit tests** (order, strict translation order + context chaining, overlap ordering, cancellation, failure propagation); simulation with warm-profile numbers (8 pages, front 2.05 s / translate 3.2 s / back 0.75 s) → sequential 48.2 s vs pipelined **28.5 s = 1.69×** (ceiling 1.88×). Gate **863 passed**.
+- Remaining for #905: worker task type that runs the loop inside the worker + real 9-page chapter A/B (byte-identical patches, flat VRAM, cancellation/webhooks intact).
+- Benchmark `2026-10-22-905-pipelined-loop.md`.
+
 ## MIT quality loop, round 48 — concurrency dependency analysis; safe stage-pipelining design scoped (#905) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
