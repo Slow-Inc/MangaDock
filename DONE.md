@@ -3,13 +3,21 @@
 
 ---
 
+## MIT quality loop, round 34 — #895 was a phantom: the marks were there, the crop was wrong (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Re-checked the #895 claim **before** trusting it: pixel comparison of the same Kumo p0 render across three runs gives **identical images (0 changed pixels)**, and a crop that includes the mark rows shows `ครั้งนั้น` with both mark pairs. The original crops started below the marks, so the line only *looked* mark-less.
+- The leading-reserve fix from round 33 was **reverted** (`2f8a5e92`): with the defect unproven and the change unnecessary (it did not alter Kumo p0 at all, yet moved line spacing on 8/11 other pages), it must not ship.
+- Investigation record + corrected figure `2026-10-22-895-stacked-marks-fix.md` / `-phantom-investigation.png`; issue closed as invalid with the reason.
+- **Lessons recorded:** crop bounds are part of the evidence — include the rows the marks live in; a pixel-identical page across runs proves a rendering change did not happen (the difference is in observation); a render change motivated by an unproven defect does not ship.
+
 ## MIT quality loop, round 33 — Thai stacked marks get the leading they need (#895) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
 - **Root cause found:** the horizontal renderer's line pitch is `font_size`; a Thai tone mark stacked on an upper vowel is lifted (#793) above its own row and drawn over the previous line. Where that row has ink at the same x the mark is dark-on-dark and vanishes — Kumo p0's `ครั้งนั้น` rendered as `ครงนัน`.
 - **Fix:** `_stacked_mark_overhead(line, font_size)` (excess over one row + an 8 % descent allowance) added only to lines that need it — canvas height, first-line offset and per-line advance. Latin text and fonts whose marks already sit high add nothing (byte-identical).
 - Kumo p0 re-render: line 7 reads `ครั้งนั้น` with both mark pairs (figure `2026-10-22-895-stacked-marks-fix.png`). 2 new tests, gate **851 passed**.
-- **Corpus verification pending** (39-page deterministic replay `_marksfix` was started with this round and is checked next round before the issue is closed).
+- ~~Corpus verification pending~~ — **round 34 closed this as a phantom defect and reverted the fix**; see the entry above.
 
 ## MIT quality loop, round 32 — concise targeted A/B + a real render bug: stacked Thai marks vanish on the page (#895) (2026-10-22)
 
