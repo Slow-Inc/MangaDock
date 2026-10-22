@@ -85,10 +85,14 @@ source scan: ~21 text fields / selects and the admin filter bars' shared `inputC
 (often to mid-grey `border-ink-3`). The opt-out is removed so the standard 2 px accent ring sits on the field's border;
 the border cue stays. Left alone: the navbar `SearchBar` (its wrapper has a `focus-within` ring), the disabled profile
 email, and the admin wallet-adjust inputs (wallet path, parked).
+From review: the profile `inputClass` and four Studio upload fields swapped the ring for a 1 px ring at 30–40 % alpha
+(likely under 3:1) — also back on the standard ring; and on the search year filters the ring covered the invalid red
+border, so an invalid field's ring is now `outline-danger`. (`DocsClient` has the same weak ring but is the developer's WIP.)
 
 **Validated:** the focus sweep before — 10 focus stops with no indicator; after — 1, the Studio sidebar resize handle,
 whose indicator is its `::after` line (pseudo-elements are invisible to the check). Screenshot of a focused admin field
-checked. Real tsc clean; eslint per file equal to main; indentation of every edited line unchanged.
+checked; the profile and upload fields now get a 2 px accent ring (after the 150 ms colour transition) and an invalid year
+field's ring is the danger red. Real tsc clean; eslint per file equal to main; indentation of every edited line unchanged.
 
 ---
 

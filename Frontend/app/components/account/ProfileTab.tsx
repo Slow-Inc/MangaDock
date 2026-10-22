@@ -13,7 +13,7 @@ interface ProfileTabProps {
   isOpen: boolean;
 }
 
-const inputClass = "w-full rounded-xl border border-line bg-fill px-4 py-2.5 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/40";
+const inputClass = "w-full rounded-xl border border-line bg-fill px-4 py-2.5 text-sm text-ink placeholder:text-ink-3 transition focus:border-accent/40";
 const labelClass = "block text-xs font-medium text-ink-2 mb-1.5";
 
 export default function ProfileTab({ formState, dispatch, isOpen }: ProfileTabProps) {
