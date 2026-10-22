@@ -11,7 +11,7 @@ import { getStudioStats, type StudioStats } from "../../lib/studioApi";
 import Pill from "../../components/ui/Pill";
 import Loader from "../../components/ui/Loader";
 import Mascot from "../../components/mascot/Mascot";
-import LoadError from "../../components/ui/LoadError";
+import StudioLoadError from "./StudioLoadError";
 import RollingNumber from "./RollingNumber";
 import StudioAreaChart from "./charts/StudioAreaChart";
 import { sparklinePoints } from "../lib/shellMath";
@@ -102,7 +102,7 @@ export default function StatsOverview() {
         </div>
       ) : result?.failed ? (
         // a retry, like every other failed load (#1034); clearing the result shows the loader meanwhile
-        <LoadError what="สถิติ" area="studio" onRetry={() => { setResult(null); setReload((n) => n + 1); }} />
+        <StudioLoadError what="สถิติ" onRetry={() => { setResult(null); setReload((n) => n + 1); }} />
       ) : empty ? (
         <div className="flex items-center gap-5 rounded-[var(--r-card)] border border-line bg-surface p-6">
           <Mascot area="studio" size={72} />
