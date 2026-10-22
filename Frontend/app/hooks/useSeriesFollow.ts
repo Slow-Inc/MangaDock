@@ -2,6 +2,7 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { supabase } from "../lib/supabase";
 import { removeFollowItem, restoreFollowItem, singleFlight, type FollowedSeries, type RemovedFollow } from "./seriesFollowState";
 
@@ -73,6 +74,7 @@ export function getFollows(): FollowedSeries[] {
 // ─── Hook ──────────────────────────────────────────────────────────────────
 export function useSeriesFollow(book: { id: string; title: string; thumbnail: string }) {
   const { user, showLoginPrompt } = useContext(AuthContext);
+  const { showToast } = useToast();
   const [following, setFollowing] = useState(() => followedIds.has(book.id));
   const [toggling, setToggling] = useState(false);
   const busy = useRef(false); // re-entry guard; `toggling` state is stale inside a double click (#669)
@@ -95,6 +97,7 @@ export function useSeriesFollow(book: { id: string; title: string; thumbnail: st
     const token = await getToken();
     if (!token) {
       busy.current = false;
+      showLoginPrompt(); // signed in on screen but the session is gone: a silent no-op read as a missed click (#995)
       return;
     }
 
@@ -138,11 +141,13 @@ export function useSeriesFollow(book: { id: string; title: string; thumbnail: st
       }
       setFollowing(wasFollowing);
       notify();
+      // the bell flipping back alone reads as a missed click (#995)
+      showToast({ type: "error", message: wasFollowing ? "เลิกติดตามไม่สำเร็จ ลองใหม่อีกครั้ง" : "ติดตามไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
     } finally {
       busy.current = false;
       setToggling(false);
     }
-  }, [user, book, showLoginPrompt]);
+  }, [user, book, showLoginPrompt, showToast]);
 
   return { following, toggling, toggle };
 }

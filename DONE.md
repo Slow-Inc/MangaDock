@@ -77,6 +77,28 @@
 
 ---
 
+## #995 Series follow, banner upload and banner position say when they fail (2026-10-23)
+
+**What:** three writes outside #987's list still failed silently. The series bell reverted correctly (#667) but with no
+message, so the user thought the click had not registered. The banner upload and the banner position save only logged
+to the console. Each failure now shows the error toast (`"…ไม่สำเร็จ ลองใหม่อีกครั้ง"`). The revert and the reposition mode
+are unchanged, so a failed position save can be saved again.
+
+**Validated:** production build, local fake session. The stand-in's `FLAKY_ONCE` now takes an optional method
+(`"POST ^/users/me/follows$"`), so the follow-list GET is not the request that fails. Main: the follow revert and a
+failed position save show nothing (red). Fix: "ติดตามไม่สำเร็จ ลองใหม่อีกครั้ง" and the bell reverts, then follows on
+retry; "บันทึกตำแหน่งภาพปกไม่สำเร็จ ลองใหม่อีกครั้ง" and it stays in reposition mode (green). The banner upload is checked by
+reading only (uploads are not triggered). Real tsc 0 errors; eslint clean on both files; hooks tests 105/105.
+
+**Review round:**
+- A banner (and a forum image) over the server's 5 MB is refused before upload, with a toast naming the limit, instead
+  of "try again" for a file that can never pass (`lib/uploadLimits.ts`, unit-tested). E2E: a 6 MB banner shows the toast and
+  sends no upload request.
+- A dead session (`Unauthorized`) in the banner handlers, and a missing token in the series toggle, open the login
+  prompt instead of "try again" or a silent no-op.
+
+---
+
 ## #993 Studio publish: one PATCH per click, the button busy while it is in flight (2026-10-23)
 
 **What:** "เผยแพร่" had no in-flight guard and was never disabled. A double-click sent two status PATCHes, and the

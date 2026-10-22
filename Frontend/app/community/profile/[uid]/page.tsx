@@ -10,6 +10,8 @@ import { th } from "date-fns/locale";
 import { getProfile, uploadProfileBanner, updateBannerPosition, listPostsByUser } from "../../../lib/communityApi";
 import PostCard from "../../../components/PostCard";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
+import { tooLargeToUpload } from "../../../lib/uploadLimits";
 import type { UserProfileResponse, ForumPost } from "../../../lib/types";
 import { isSocialCdnUrl } from '../../../lib/avatarUpload';
 import FollowUserButton from '../../../components/FollowUserButton';
@@ -59,7 +61,8 @@ const POSTS_PAGE_SIZE = 20;
 
 export default function PublicProfilePage() {
   const { uid } = useParams<{ uid: string }>();
-  const { user } = useAuth();
+  const { user, showLoginPrompt } = useAuth();
+  const { showToast } = useToast();
 
   const [data, setData] = useState<UserProfileResponse | null>(null);
   usePageTitle(data ? `${data.profile.displayName ?? "ผู้ใช้ไม่ระบุชื่อ"} · คอมมูนิตี้` : null);
@@ -156,6 +159,11 @@ export default function PublicProfilePage() {
   const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (tooLargeToUpload(file)) {
+      showToast({ type: "error", message: "ไฟล์ใหญ่เกิน 5 MB เลือกไฟล์ที่เล็กกว่านี้", duration: 4000 }); // the server refuses it every time (#995)
+      e.target.value = "";
+      return;
+    }
     setUploadingBanner(true);
     try {
       const { bannerUrl } = await uploadProfileBanner(file);
@@ -165,7 +173,9 @@ export default function PublicProfilePage() {
       // Enter reposition mode automatically after upload
       openReposition();
     } catch (err) {
-      console.error("Failed to upload banner", err);
+      // a dead session needs the login prompt, not "try again" (communityApi throws "Unauthorized" without a token)
+      if (err instanceof Error && err.message === "Unauthorized") showLoginPrompt();
+      else showToast({ type: "error", message: "อัปโหลดภาพปกไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // was console-only (#995)
     } finally {
       setUploadingBanner(false);
       e.target.value = "";
@@ -209,7 +219,9 @@ export default function PublicProfilePage() {
       );
       closeReposition();
     } catch (err) {
-      console.error("Failed to save banner position", err);
+      // still in reposition mode, so the user can save again (#995)
+      if (err instanceof Error && err.message === "Unauthorized") showLoginPrompt();
+      else showToast({ type: "error", message: "บันทึกตำแหน่งภาพปกไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
     } finally {
       setSavingPos(false);
     }

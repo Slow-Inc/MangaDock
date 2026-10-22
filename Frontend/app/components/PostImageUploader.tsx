@@ -6,6 +6,7 @@ import { uploadForumImage } from "../lib/communityApi";
 import Loader from "./ui/Loader";
 import { PRIMARY_FILL } from "./ui/Button";
 import { useToast } from "../contexts/ToastContext";
+import { tooLargeToUpload } from "../lib/uploadLimits";
 
 interface PostImageUploaderProps {
   images: string[];
@@ -40,6 +41,10 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
 
   const handleFileUpload = async (file: File) => {
     if (!canAddMore || uploading) return;
+    if (tooLargeToUpload(file)) {
+      showToast({ type: "error", message: "ไฟล์ใหญ่เกิน 5 MB เลือกไฟล์ที่เล็กกว่านี้", duration: 4000 }); // the hint says 5MB; the server refuses more every time (#995)
+      return;
+    }
     setUploading(true);
     try {
       const { imageUrl } = await uploadForumImage(file);
