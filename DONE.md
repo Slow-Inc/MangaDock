@@ -82,7 +82,8 @@
 **What:** in the book popup's `ChapterList`, a chapter with several versions is a collapsible "ตอนที่ N · N เวอร์ชัน"
 group; collapsed it was only `grid-template-rows: 0fr` + `overflow-hidden`, so its version rows stayed in the Tab order,
 and its toggle had no expanded state. The collapsible part now has an id (`useId`-prefixed: a popup can open over
-another) and is `inert` while collapsed; the toggle is `type="button"` with `aria-expanded` / `aria-controls`.
+another, and indexed by position, since user chapter numbers are free text) and is `inert` while collapsed; the toggle
+is `type="button"` with `aria-expanded` / `aria-controls`.
 
 **Validated:** production build, stand-in chapter 2 in two versions: before, 2 Tab stops inside the collapsed group and
 no `aria-expanded`; after, 0 while collapsed, the toggle reads `false` → `true`, and both rows are reachable once open.

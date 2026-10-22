@@ -364,7 +364,7 @@ export default function ChapterList({
                 groupMap.get(key)!.push(ch);
               }
 
-              return Array.from(groupMap.entries()).map(([chNum, grp]) => {
+              return Array.from(groupMap.entries()).map(([chNum, grp], groupIndex) => {
                 if (grp.length === 1) {
                   return (
                     <ChapterRowInner
@@ -388,7 +388,7 @@ export default function ChapterList({
                     <button
                       type="button"
                       aria-expanded={isOpen}
-                      aria-controls={`${groupIdBase}-${groupKey}`}
+                      aria-controls={`${groupIdBase}-${groupIndex}`} // by index: user chapter numbers are free text
                       onClick={() =>
                         setExpandedGroups((prev) => {
                           const next = new Set(prev);
@@ -439,7 +439,7 @@ export default function ChapterList({
                       </svg>
                     </button>
                     <div
-                      id={`${groupIdBase}-${groupKey}`}
+                      id={`${groupIdBase}-${groupIndex}`}
                       inert={!isOpen} // collapsed is only 0fr: keep its rows out of the Tab order (#952)
                       className="grid transition-all duration-300 ease-in-out"
                       style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
