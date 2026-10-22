@@ -37,6 +37,14 @@ function CommunityLayoutContent({ children }: { children: React.ReactNode }) {
   // is locked while it is open.
   useDialogFocus(drawerRef, () => true, isMobileMenuOpen);
   useEffect(() => (isMobileMenuOpen ? lockPageScroll() : undefined), [isMobileMenuOpen]);
+  // Widening past lg hides the drawer (lg:hidden) and its button: close it, or its lock would outlive it unseen
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const wide = window.matchMedia("(min-width: 1024px)");
+    const close = () => { if (wide.matches) setIsMobileMenuOpen(false); };
+    wide.addEventListener("change", close);
+    return () => wide.removeEventListener("change", close);
+  }, [isMobileMenuOpen]);
 
   // Escape key handler: close drawer when Escape is pressed
   useEffect(() => {

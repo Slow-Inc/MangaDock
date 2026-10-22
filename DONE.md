@@ -83,11 +83,13 @@
 faded and slid out, so its 8 controls stayed in the Tab order; open, Tab escaped it, focus did not return to the menu
 button, and the page behind scrolled; the Navbar's menu button had an English name. Now `useDialogFocus` replaces the
 ad-hoc "focus the first control" effect, the drawer is `inert` while closed and holds the shared page scroll lock (#936)
-while open, and the button is "เปิดเมนูคอมมูนิตี้" with `aria-haspopup="dialog"`.
+while open, and the button is "เปิดเมนูคอมมูนิตี้" with `aria-haspopup="dialog"`. Found by measurement and the review:
+widening past `lg` hid the open drawer and its button but kept the page locked; a `matchMedia` listener closes it.
 
 **Validated:** production build, `/community` at 390 px: before, 8 Tab stops inside the closed drawer, Tab escaped the
 open one, the page was not locked, focus did not return; after, 0 stops while closed, focus moves in, 12 Tabs stay
-inside, `<html>` is locked while open, Escape closes it with focus on the menu button and the page unlocked. The #938
+inside, `<html>` is locked while open, Escape closes it with focus on the menu button and the page unlocked; open at
+390 then resized to 1280: before `<html>` stayed hidden, after it unlocks and the drawer is inert. The #938
 mobile-nav probe still passes. tsc 0; eslint 0 on both files (as on main).
 
 ---
