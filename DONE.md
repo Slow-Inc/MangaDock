@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 75 — opt-in model preload at worker boot (#1047) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Measured the cold-start cost: one real page takes **19.4 s** cold vs **14.6 s** after an explicit preload (~1.9 s) — the weight load is ~5 s of the first page's latency.
+- Added **opt-in** `MIT_PRELOAD=1`: `MangaTranslatorShared.start()` warms the heavy models while uvicorn boots via an asyncio task (`_model_lifecycle.preload(Config(), device, 0)`), logs `[share] models preloaded in N ms`, and swallows failures so preload can never break boot.
+- Gate is a pure helper `server/readiness.preload_enabled(env)` with a unit test; default behaviour unchanged (lazy loading). Opt-in because preloading holds GPU/RAM while idle and slows boot.
+- Benchmark `2026-10-23-1047-preload.md`; e2e check on a real worker restart remains the open follow-up on #1047.
+
 ## MIT quality loop, round 74 — JP audit: the two JP pages are one page twice; gate-clean, one model-ceiling sense flip (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

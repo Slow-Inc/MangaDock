@@ -282,6 +282,23 @@ class MangaTranslatorShared:
         # Create the translator engine
         _translator = MangaTranslator(params)
 
+        # #1047 (opt-in MIT_PRELOAD=1): load the heavy models while uvicorn boots so the first page does not
+        # pay the model-load time. Off by default (costs GPU/RAM while idle, slows boot).
+        try:
+            from server.readiness import preload_enabled
+            if preload_enabled():
+                async def _warm_models():
+                    import time as _time
+                    _t0 = _time.perf_counter()
+                    try:
+                        await _translator._model_lifecycle.preload(Config(), _translator.device, 0)
+                        logger.info(f"[share] models preloaded in {(_time.perf_counter() - _t0) * 1000:.0f} ms")
+                    except Exception as exc:  # preload is an optimisation, never a boot failure
+                        logger.warning(f"[share] model preload skipped: {exc}")
+                asyncio.create_task(_warm_models())
+        except Exception as exc:
+            logger.warning(f"[share] preload hook skipped: {exc}")
+
         # Register with parent if a report URL was given
         if report:
             await _register_with_parent(report, host, port, nonce)

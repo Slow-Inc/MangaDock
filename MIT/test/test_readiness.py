@@ -85,3 +85,10 @@ def test_worker_answering_non_200_is_not_counted_alive(monkeypatch):
     alive = asyncio.run(readiness.count_alive([_worker()]))
 
     assert alive == 0
+
+
+def test_preload_enabled_is_opt_in_1049():
+    from server.readiness import preload_enabled
+    assert preload_enabled({}) is False
+    assert preload_enabled({'MIT_PRELOAD': '0'}) is False
+    assert preload_enabled({'MIT_PRELOAD': '1'}) is True
