@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 35 — few-shot Thai sample A/B: built-in JP→TH wins, and the eval-set language gap (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The built-in Thai few-shot is a **JP→TH** page while our corpus is **EN→TH**. Built an EN→TH sample from the judged-audit patterns and A/B'd it on 12 pages (blind, chunked judge): **built-in won 7 pages to 5** — the EN sample fixed the Iruma-1 stammer hallucinations offline but lost elsewhere.
+- No change (the built-in sample is the correct one for the JP→TH production path); `thai_manga_v2_en_fewshot.yaml` kept as the experiment record. Issue **#896** records the result.
+- **Methodology caveat recorded (vault note `project-translation-eval-set`):** every translation A/B so far measures the EN→TH path, while production for Japanese chapters is JP→TH — a real JP→TH evaluation set is the missing piece before further prompt/sample/temperature work. Baseline on record: 372 segments, mean 1.51/2.
+- Benchmarks `2026-10-22-896-fewshot-ab.md`; gate unchanged (no code change).
+
 ## MIT quality loop, round 34 — #895 was a phantom: the marks were there, the crop was wrong (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
