@@ -77,6 +77,26 @@
 
 ---
 
+## #907 Save, check-in and review messages are announced (2026-10-22)
+
+**What:** status messages rendered as plain `<div>`/`<p>` (WCAG 4.1.3) — a screen-reader user pressing Save / Check in /
+Submit heard nothing. Settings → profile success/error, the daily check-in error and the review submit error now sit in
+always-mounted `role="status"` / `role="alert"` containers that are filled when there is a message (a region inserted together
+with its text is not announced reliably). Unstyled wrappers: 0 px when empty, so layout is unchanged. `PasswordTab` and
+`AccountsTab` have the same pattern but are in the auth boundary — parked with the auth-flow files (#776).
+
+**Validated:** production build, signed in (local session), Settings → profile: before Save both regions exist, empty,
+0 px tall; Save → the status region receives "อัปเดตชื่อผู้ใช้สำเร็จ ✓" (MutationObserver on live regions). The check-in
+modal and the review form were not triggered (both need the backend, not running locally) — same wrapper, checked by
+reading. tsc 0; eslint 0 on the three files.
+
+**Review round:** no double announcement (none of the three calls the toast), regions exist before any text, no parked file
+touched. ProfileTab returns a fragment, so its two regions became two children of the page's `space-y-5` — grouped in one
+wrapper. Measured: no message → wrapper 0 px and the gap above the form stays one 20 px step; with a message → 20 px from
+the box to the form.
+
+---
+
 ## #874 Studio and community custom selects work by keyboard (2026-10-21)
 
 **What:** `StudioSelect` (Studio upload/works/wallet/account), `CountrySelect` (Studio account) and `MangaSearchSelector`

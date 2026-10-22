@@ -146,7 +146,7 @@ export default function DailyCheckinModal() {
             </div>
           </div>
 
-          {error && <p className="mb-3 text-center text-xs text-danger">{error}</p>}
+          <div role="alert">{error && <p className="mb-3 text-center text-xs text-danger">{error}</p>}</div>
 
           {claimed ? (
             <button
