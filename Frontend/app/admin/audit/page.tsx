@@ -73,8 +73,11 @@ export default function AdminAuditPage() {
     [getIdToken],
   );
 
+  // Only the latest request writes the table: a slower answer for an older filter or page is dropped (#1004)
+  const loadSeq = useRef(0);
   const load = useCallback(
     async (p: number) => {
+      const seq = ++loadSeq.current;
       setLoading(true);
       setLoadFailed(false);
       const params = new URLSearchParams({
@@ -88,12 +91,14 @@ export default function AdminAuditPage() {
         const res = await authFetch(`/api/proxy/admin/audit?${params}`);
         if (!res.ok) throw new Error('Failed');
         const data: AuditLog[] = await res.json();
+        if (seq !== loadSeq.current) return;
         setHasMore(data.length > LIMIT);
         setLogs(data.slice(0, LIMIT));
       } catch {
+        if (seq !== loadSeq.current) return;
         setLoadFailed(true); // keep stale data on error
       }
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     },
     [authFetch, filterAction, debouncedActor],
   );

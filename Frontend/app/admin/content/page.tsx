@@ -40,7 +40,10 @@ export default function AdminContentPage() {
     return fetch(url, { ...init, headers: { ...(init?.headers as Record<string, string>), ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
   }, [getIdToken]);
 
+  // Only the latest request writes the table: a slower answer for an older filter or page is dropped (#1004)
+  const loadSeq = useRef(0);
   const load = useCallback(async (p: number) => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setLoadFailed(false);
     const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
@@ -58,22 +61,29 @@ export default function AdminContentPage() {
         TTL.SHORT,
         { tags: ['admin:content'] },
       );
+      if (seq !== loadSeq.current) return;
       setPosts(d.posts);
       setTotal(d.total);
     } catch {
+      if (seq !== loadSeq.current) return;
       setLoadFailed(true); // keep stale
     }
-    setLoading(false);
+    if (seq === loadSeq.current) setLoading(false);
   }, [authFetch, search, filterCategory, filterAuthor]);
+
+  // The loader through a ref: both effects below must not re-run when a filter, or the session, rebuilds it —
+  // that fired requests per keystroke and repeated the first load (#1004)
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; }, [load]);
 
   useEffect(() => {
     if (!didMount.current) { didMount.current = true; return; }
     clearTimeout(searchRef.current);
-    searchRef.current = setTimeout(() => { setPagePersist(1); load(1); }, 300);
+    searchRef.current = setTimeout(() => { setPagePersist(1); loadRef.current(1); }, 300);
     return () => clearTimeout(searchRef.current);
-  }, [search, filterCategory, filterAuthor, load]);
+  }, [search, filterCategory, filterAuthor]);
 
-  useEffect(() => { load(page); }, [page, load]);
+  useEffect(() => { loadRef.current(page); }, [page]);
 
   const togglePin = async (post: AdminPost) => {
     await authFetch(`/api/proxy/admin/content/posts/${post.id}/pin`, {

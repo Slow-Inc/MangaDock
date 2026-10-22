@@ -77,6 +77,27 @@
 
 ---
 
+## #1004 Admin tables: one request per debounced filter change, and only the latest answer writes (2026-10-23)
+
+**What:** in `/admin/users`, `/admin/transactions` and `/admin/content`, the page effect depended on the loader, a
+`useCallback` over the filters. Every keystroke rebuilt it and fired a request at once, which defeated the 300 ms
+debounce, and whichever answer landed last filled the table, so it could show rows for a half-typed search. `/admin/audit`
+loaded the current page and then page 1 on a filter change, with no guard.
+
+All four loaders now have a request counter, so only the latest request writes rows, total and loading/error. In the
+three filtered pages, the page effect and the debounced filter effect call the loader through a ref and depend only on
+`page` or the filters. eslint also lost an error each of these three pages had on main.
+
+**Validated:** production build + stand-in `ADMIN_RACE=1` (a search for "a" answers 2 s late), with an admin (role 8)
+through the local fake session. Typing "ab" in `/admin/users`:
+- main sent `["a", "ab"]` and showed the stale "a" rows (red);
+- the fix sends `["ab"]` once, after the debounce, and shows only "ab"'s rows (green);
+- the first visit sends exactly 1 request.
+
+transactions / content / audit are the same pattern, checked by reading. Real tsc 0 errors; eslint clean on all four.
+
+---
+
 ## #1001 A translation for the chapter the reader left never lands on the new chapter (2026-10-23)
 
 **What:** `useChapterTranslation` resets on a chapter, target-language or derivative change and aborts the batch, but
