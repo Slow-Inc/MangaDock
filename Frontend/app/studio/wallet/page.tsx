@@ -293,6 +293,7 @@ export default function WalletPage() {
                     <div className="flex gap-2">
                       <div className="min-w-[10rem]">
                         <StudioSelect
+                          label="เดือน"
                           value={String(selectedMonth)}
                           onChange={(value) => setSelectedMonth(Number(value))}
                           options={THAI_MONTHS.map((monthLabel, monthIndex) => ({ value: String(monthIndex), label: monthLabel }))}
@@ -300,6 +301,7 @@ export default function WalletPage() {
                       </div>
                       <div className="min-w-[8rem]">
                         <StudioSelect
+                          label="ปี"
                           value={String(selectedYear)}
                           onChange={(value) => setSelectedYear(Number(value))}
                           options={availableYears.map((year) => ({ value: String(year), label: String(year) }))}

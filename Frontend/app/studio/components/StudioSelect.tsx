@@ -16,12 +16,15 @@ export function StudioSelect({
   options,
   placeholder = "-- เลือก --",
   disabled = false,
+  label,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: StudioSelectOption[];
   placeholder?: string;
   disabled?: boolean;
+  /** What the select chooses (#1041): the trigger reads "label: value" — its text alone is only the value */
+  label?: string;
 }) {
   const [wantOpen, setWantOpen] = useState(false);
   const { mounted: renderPanel, visible: open } = useModalTransition(wantOpen, { duration: 200 });
@@ -69,6 +72,7 @@ export function StudioSelect({
         disabled={disabled}
         aria-expanded={open}
         aria-controls={panelId}
+        aria-label={label ? `${label}: ${selected ? selected.label : placeholder}` : undefined}
         onClick={() => {
           if (disabled) return;
           if (open) {

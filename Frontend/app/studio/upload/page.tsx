@@ -269,8 +269,9 @@ function StudioUploadContent() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-ink-2">ภาษาที่แปล</label>
+              <p className="text-xs text-ink-2">ภาษาที่แปล</p>
               <StudioSelect
+                label="ภาษาที่แปล"
                 value={language}
                 onChange={setLanguage}
                 disabled={hasVersion}

@@ -46,6 +46,7 @@ function LanguageSelect({
 }) {
   return (
     <StudioSelect
+      label="ภาษาหลัก"
       value={value}
       onChange={onChange}
       options={[
@@ -245,19 +246,27 @@ export default function StudioAccountPage() {
 
             {/* Languages */}
             <div className="rounded-2xl border border-line bg-fill p-5">
-              <label className="mb-1 block text-sm font-semibold">ภาษาที่แปลได้</label>
-              <p className="mb-3 text-xs text-ink-3">เลือกภาษาที่คุณสามารถแปลได้ (สูงสุด 10 ภาษา)</p>
-              <div className="flex flex-wrap gap-2">
+              <p id="studio-langs-label" className="mb-1 block text-sm font-semibold">ภาษาที่แปลได้</p>
+              <p id="studio-langs-hint" className="mb-3 text-xs text-ink-3">เลือกภาษาที่คุณสามารถแปลได้ (สูงสุด 10 ภาษา)</p>
+              {/* a group of toggles, not one field: named by its heading, each toggle states whether it is on (#1041) */}
+              <div role="group" aria-labelledby="studio-langs-label" aria-describedby="studio-langs-hint" className="flex flex-wrap gap-2">
                 {LANGUAGE_OPTIONS.map((lang) => {
                   const selected = languages.includes(lang.code);
+                  // at the cap a press does nothing: say so instead of staying silent (#1041)
+                  const atCap = !selected && languages.length >= 10;
                   return (
                     <button
                       key={lang.code}
+                      type="button"
+                      aria-pressed={selected}
+                      aria-disabled={atCap || undefined}
                       onClick={() => toggleLanguage(lang.code)}
                       className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition ${
                         selected
                           ? "border-accent/40 bg-accent/10 text-accent"
-                          : "border-line bg-fill text-ink-2 hover:border-ink-3 hover:text-ink-2"
+                          : atCap
+                            ? "cursor-not-allowed border-line bg-fill text-ink-3 opacity-50"
+                            : "border-line bg-fill text-ink-2 hover:border-ink-3 hover:text-ink-2"
                       }`}
                     >
                       {lang.label}
@@ -279,7 +288,7 @@ export default function StudioAccountPage() {
                 />
               </div>
               <div className="rounded-2xl border border-line bg-fill p-5">
-                <label className="mb-2 block text-sm font-semibold">ภาษาหลัก</label>
+                <p className="mb-2 block text-sm font-semibold">ภาษาหลัก</p>
                 <LanguageSelect
                   value={preferredLanguage}
                   onChange={setPreferredLanguage}
