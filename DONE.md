@@ -95,6 +95,14 @@ list, Escape closes with focus on the trigger, choosing leaves focus on the trig
 choose → focus on "เอาแท็ก One Piece ออก", clear → focus on the input. tsc 0; eslint 0 on all three (as main); `bun test`
 436 pass. TDD n-a: wiring of the hook tested in #870; no logic of its own.
 
+**Review round:** returning focus to the country input after *any* choice would raise a phone's soft keyboard after a tap
+— it now refocuses only on a keyboard choice. "Focus is in the list" did not tell them apart (a click focuses the option
+button too, measured: mouse choice still refocused), so the signal is `:focus-visible` on the chosen option; re-measured:
+mouse choice → focus stays where the click left it (as before #874), keyboard choice → input. The tag picker's open
+condition is derived once (`expanded`) instead of pasted into the attribute and the render; the "ประเทศ" label names the
+country combobox (`id` prop); comments corrected (the panel turns inert while fading, it does not unmount). An earlier
+probe ran against a stale server from the previous session still holding port 4000 — caught by its start time and redone.
+
 ---
 
 ## #870 Navbar popovers close by keyboard (2026-10-21)

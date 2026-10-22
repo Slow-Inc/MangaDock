@@ -63,6 +63,8 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
     return () => clearTimeout(timer);
   }, [query, searchManga]);
 
+  const expanded = showDropdown && (query.length >= 2 || results.length > 0);
+
   // Outside click or Escape closes; Escape returns focus to the input (#874)
   usePopoverDismiss(showDropdown, containerRef, () => setShowDropdown(false));
 
@@ -115,7 +117,7 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
             id={inputId}
             type="text"
             role="combobox"
-            aria-expanded={showDropdown && (query.length >= 2 || results.length > 0)}
+            aria-expanded={expanded}
             aria-controls={panelId}
             aria-autocomplete="list"
             value={query}
@@ -139,7 +141,7 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
             )}
           </div>
 
-          {showDropdown && (query.length >= 2 || results.length > 0) && (
+          {expanded && (
             <div id={panelId} className="absolute z-50 top-full mt-2 w-full bg-surface/95 border border-line rounded-2xl shadow-2xl overflow-hidden backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 duration-300">
               {results.length > 0 ? (
                 <div className="p-1.5">

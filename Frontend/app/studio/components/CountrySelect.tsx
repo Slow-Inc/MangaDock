@@ -9,9 +9,11 @@ interface CountrySelectProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** id for the input, so a page's <label htmlFor> names the combobox */
+  id?: string;
 }
 
-export function CountrySelect({ value, onChange, placeholder = "ค้นหาหรือเลือกประเทศ..." }: CountrySelectProps) {
+export function CountrySelect({ value, onChange, id, placeholder = "ค้นหาหรือเลือกประเทศ..." }: CountrySelectProps) {
   const [open, setOpen] = useState(false);
   const { mounted: renderPanel, visible: isOpen } = useModalTransition(open, { duration: 200 });
   const [dropUp, setDropUp] = useState(false);
@@ -54,9 +56,14 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
   usePopoverDismiss(isOpen, containerRef, () => closeDropdown());
 
   const choose = (label: string) => {
+    // A keyboard choice leaves focus on a button that turns inert as the panel closes — put it back on the input.
+    // Only then: refocusing after a tap would raise a phone's soft keyboard. A click focuses the button too, so the
+    // signal is :focus-visible, not "focus is in the list" (#874).
+    const active = document.activeElement;
+    const fromKeyboard = !!active && !!listRef.current?.contains(active) && active.matches(":focus-visible");
     onChange(label);
     closeDropdown(label);
-    inputRef.current?.focus(); // the chosen button unmounts with the panel (#874)
+    if (fromKeyboard) inputRef.current?.focus();
   };
 
   return (
@@ -64,6 +71,7 @@ export function CountrySelect({ value, onChange, placeholder = "ค้นหา�
       <div className="relative">
         <input
           ref={inputRef}
+          id={id}
           type="text"
           role="combobox"
           aria-expanded={isOpen}

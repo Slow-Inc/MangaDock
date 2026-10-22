@@ -124,7 +124,7 @@ export function StudioSelect({
                     onClick={() => {
                       onChange(option.value);
                       setWantOpen(false);
-                      triggerRef.current?.focus(); // the chosen button unmounts with the panel (#874)
+                      triggerRef.current?.focus(); // the chosen button turns inert as the panel closes (#874)
                     }}
                     className={`flex w-full items-center justify-between px-4 py-3 text-sm transition hover:bg-fill ${
                       isSelected ? "text-accent" : "text-ink-2 hover:text-ink"
