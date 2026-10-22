@@ -77,6 +77,21 @@
 
 ---
 
+## #1040 Form fields named only by a placeholder get a real name (2026-10-23)
+
+**What:** a High Craft accessibility sweep (every route × 1280/390 px, production build, local fake session; checks
+unnamed buttons/links, unlabelled fields, images without `alt`, duplicate ids) found one class: 12 fields named only by
+their placeholder — community search, book search, the post comment box, the Studio works filter, both Studio manga
+searches, the Studio bio (its visible "แนะนำตัว" label was not associated) and five admin filters. Each now has an
+`aria-label`, and the bio label is tied to its textarea (`htmlFor` / `id`). No unnamed controls, missing `alt` or
+duplicate ids were found anywhere.
+
+**Validated:** the same sweep after the change: the only fields left are the two on the parked `settings/password`;
+the picker modal's search has its accessible name (`getByRole('textbox', { name })` = 1). Real tsc clean; eslint per
+file equal to main.
+
+---
+
 ## #1034 Studio sales stats error offers a retry (2026-10-23)
 
 **What:** found by the High Craft sweep. A failed stats load in `app/studio/components/StatsOverview.tsx` showed a

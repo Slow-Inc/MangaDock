@@ -142,6 +142,7 @@ export default function AdminAuditPage() {
         <input
           value={filterActorUid}
           onChange={e => setFilterActorUid(e.target.value)}
+          aria-label="กรองตาม UID ผู้ดำเนินการ"
           placeholder="Actor UID…"
           className={`${inputCls} w-72 font-mono text-xs`}
         />

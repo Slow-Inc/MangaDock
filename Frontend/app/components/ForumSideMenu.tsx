@@ -134,6 +134,7 @@ export default function ForumSideMenu({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          aria-label="ค้นหาชุมชนมังงะ"
           placeholder="ค้นหาชุมชนมังงะ..."
           className="relative w-full bg-fill border border-line rounded-2xl px-4 py-3 pl-11 text-xs text-ink placeholder-ink-3 focus:outline-none focus:border-accent/50 focus:bg-raised transition-all smooth-hover"
         />

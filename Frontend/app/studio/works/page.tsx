@@ -225,6 +225,7 @@ export default function WorksPage() {
                 {/* Title search */}
                 <input
                   type="text"
+                  aria-label="กรองตามชื่อเรื่อง"
                   placeholder="ชื่อเรื่อง..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}

@@ -113,7 +113,7 @@ export default function AdminTransactionsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2.5 p-4 bg-fill border border-line rounded-xl">
-        <input value={filterUid} onChange={e => setFilterUidPersist(e.target.value)} placeholder="Filter by UID…" className={`${inputCls} w-60`} />
+        <input value={filterUid} onChange={e => setFilterUidPersist(e.target.value)} aria-label="Filter by user UID" placeholder="Filter by UID…" className={`${inputCls} w-60`} />
         <select aria-label="Filter by type" value={filterType} onChange={e => setFilterTypePersist(e.target.value)} className={`${inputCls} text-ink-2`}>
           <option value="">All types</option>
           {TX_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
