@@ -729,6 +729,12 @@ export class MangaDexService {
         if (text.includes('href="/maintenance-')) {
           this.logger.error(`[MangaDex] MangaDex API กำลังปิดปรับปรุง`);
           this.statusService.broadcastStatus('mangadex', 'maintenance');
+        } else if (response.status === 400 || response.status === 404) {
+          // Our own bad request (one client's query), not an outage: every user's status banner stays as it is.
+          // 403 (blocked) and 429 (rate limited) do mean we can't reach MangaDex, so they still count (#958).
+          this.logger.warn(
+            `[MangaDex] Rejected request ${response.status}: ${text.substring(0, 200)}`,
+          );
         } else {
           this.logger.error(`[MangaDex] Error: ${text.substring(0, 200)}`);
           this.statusService.broadcastStatus('mangadex', 'offline');
@@ -740,7 +746,8 @@ export class MangaDexService {
         total?: number;
       };
       const items = this.mapManga(data);
-      const total = (data as any).total ?? items.length;
+      // MangaDex pages only up to offset + limit = 10,000: report no more, so no page past that is offered (#958)
+      const total = Math.min((data as any).total ?? items.length, 10_000);
       this.logger.log(
         `[MangaDex] Found ${items.length}/${total} manga for ${label}`,
       );
