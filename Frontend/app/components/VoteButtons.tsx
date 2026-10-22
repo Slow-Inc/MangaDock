@@ -8,6 +8,8 @@ import { useToast } from "../contexts/ToastContext";
 interface VoteButtonsProps {
   targetType: 'post' | 'comment';
   targetId: string;
+  /** A comment's post: its cached comment list is cleared after the vote (#992). */
+  postId?: string;
   initialUpvotes: number;
   initialDownvotes: number;
   initialUserVote: number;
@@ -17,6 +19,7 @@ interface VoteButtonsProps {
 export default function VoteButtons({
   targetType,
   targetId,
+  postId,
   initialUpvotes,
   initialDownvotes,
   initialUserVote,
@@ -75,7 +78,7 @@ export default function VoteButtons({
 
     setLoading(true);
     try {
-      const result = await vote({ targetType, targetId, voteValue: value });
+      const result = await vote({ targetType, targetId, voteValue: value, postId });
       // Sync with authoritative server counts
       setUpvotes(result.upvotes);
       setDownvotes(result.downvotes);

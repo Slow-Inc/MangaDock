@@ -77,6 +77,22 @@
 
 ---
 
+## #992 A vote clears the cached copies it made stale — the next click no longer undoes it (2026-10-23)
+
+**What:** `communityApi.vote()` stored the vote but invalidated nothing, while every other forum write clears its
+entries. For up to 60 s, the cached post (`post:<id>`), the feed (tag `forum_posts`) and the comment list
+(`comments:<postId>`) showed the old count and `userVote`. A click there sent `+1` again, the server took it as an
+undo, and the button showed "voted" against a server with no vote. A successful post vote now clears `post:<id>`
+and the feed. A comment vote clears `comments:<postId>`, passed from `CommentThread` through `VoteButtons`'
+new `postId`. A failed vote clears nothing.
+
+**Validated:** bun test `lib/communityApi.vote.test.ts` red (2) → green (3): a post vote clears the post and the feed
+but not other posts; a comment vote clears its list; a failed vote keeps everything. E2E on a production build, signed in
+through the local fake session: vote, go to `/community`, go back (same document). Main-equivalent build:
+`GET /forum/posts/abc` 0 times (the cached copy was served). Fix: 1 time. Real tsc 0 errors; eslint matches main.
+
+---
+
 ## #987 A failed write says so and keeps the typed text — reports, replies, posts, reader comments, votes, notifications (2026-10-22)
 
 **What:** writes that failed were silent or claimed success (`fetch` resolves on a 4xx/5xx; other handlers caught the
