@@ -126,3 +126,17 @@ def test_real_dialogue_is_not_dropped_by_the_spelling_guard_882():
                      ('LOOM', 'ลูม')):
         r = _r(src, dst)
         assert filter_translated_regions([r], _cfg()) == [r], (src, dst)
+
+
+def test_an_art_scale_cjk_glyph_is_dropped_886():
+    """Tsuki p0: the title logo `月が導く異世界道中` was detected as the single glyph `月` and rendered
+    as `เดือน`, mangling the logo. Art-scale single glyphs are dropped so the art stays."""
+    r = SimpleNamespace(text='月', translation='เดือน', font_size=120)
+    kept, dropped = filter_translated_regions_with_drops([r], _cfg())
+    assert kept == []
+    assert [reason for _, reason in dropped] == ['Oversized art glyph (logo/title)']
+
+
+def test_small_cjk_text_is_not_treated_as_art_886():
+    r = SimpleNamespace(text='月', translation='เดือน', font_size=40)
+    assert filter_translated_regions([r], _cfg()) == [r]

@@ -4,7 +4,12 @@ Measured on 6 runs x 17 real pages: the LLM leaks other scripts into Thai ('Чи
 leaves segments untranslated, or empties them — at random, under every prompt tried. These are
 detectable without a judge, so the translator can re-ask instead of shipping them.
 """
-from manga_translator.translation_quality import classify_glitch, foreign_script, is_letter_name_spelling
+from manga_translator.translation_quality import (
+    classify_glitch,
+    foreign_script,
+    is_letter_name_spelling,
+    is_oversized_art_glyph,
+)
 
 
 def test_foreign_script_flags_other_scripts_but_not_the_target_or_latin():
@@ -94,3 +99,20 @@ def test_spelling_guard_needs_a_stylized_source_882():
     assert is_letter_name_spelling('Aaaah', 'ซีไอไอ') is True       # stylized read
     assert is_letter_name_spelling('Hmm', 'ซีไอไอ') is False        # too short
     assert is_letter_name_spelling('TOWELS', 'ซีไอไอ') is False     # no repeated letter
+
+
+def test_a_logo_scale_single_cjk_glyph_is_art_not_dialogue_886():
+    """Tsuki ga Michibiku Isekai Douchuu p0: the title logo `月が導く異世界道中` was detected as a
+    single `月` glyph and rendered as `เดือน` over the logo, mangling it. Mushoku p1's `을` (OCR noise
+    on art) rendered `อูล`. Art-scale single glyphs are left as art."""
+    assert is_oversized_art_glyph('月', 120) is True
+    assert is_oversized_art_glyph('을', 120) is True
+
+
+def test_small_or_non_art_glyphs_are_kept_886():
+    assert is_oversized_art_glyph('月', 40) is False          # small = readable text, keep
+    assert is_oversized_art_glyph('あ', 80) is False         # below art scale
+    assert is_oversized_art_glyph('AB', 120) is False        # ASCII is not a CJK art glyph
+    assert is_oversized_art_glyph('月', 120, rescued=True) is False    # the rescue localized it already
+    assert is_oversized_art_glyph('月光の下', 120) is False   # phrase, not a single glyph
+    assert is_oversized_art_glyph('ドン', 150, rescued=False) is True  # big SFX the rescue could not serve -> art

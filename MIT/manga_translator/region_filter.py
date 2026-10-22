@@ -13,7 +13,7 @@ from typing import List
 import regex as re
 
 from .config import Translator
-from .translation_quality import is_letter_name_spelling
+from .translation_quality import is_letter_name_spelling, is_oversized_art_glyph
 
 logger = logging.getLogger('manga_translator')
 
@@ -53,6 +53,12 @@ def filter_translated_regions_with_drops(text_regions: List, config):
         if not region.translation.strip():
             should_filter = True
             filter_reason = "Translation contain blank areas"
+        elif is_oversized_art_glyph(getattr(region, 'text', ''), getattr(region, 'font_size', 0),
+                                     getattr(region, 'sfx_rescued', False)):
+            # #886: one or two CJK/Hangul glyphs at art scale are a piece of a logo/title, not
+            # dialogue - replacing a single glyph mangles the artwork, so keep the art.
+            should_filter = True
+            filter_reason = 'Oversized art glyph (logo/title)'
         elif config.translator.translator != Translator.none:
             if region.translation.isnumeric():
                 should_filter = True

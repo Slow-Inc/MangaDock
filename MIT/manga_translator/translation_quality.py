@@ -132,3 +132,24 @@ def is_letter_name_spelling(source: str, translation: str) -> bool:
     if len(thai) < 3:
         return False
     return (_letter_name_count(thai) or 0) >= 3
+
+
+#: #886 — a single CJK/Hangul glyph detected at ART scale. Detection often picks up one glyph of a
+#: logo/title artwork (the rest of the lettering was never detected), so translating it replaces one
+#: glyph of the logo and mangles it (the `月` of Tsuki's logo rendered as `เดือน`). Below this font
+#: size the glyph is ordinary readable text and must be translated normally.
+_ART_GLYPH_MIN_FONT = 100
+_CJK_HANGUL = re.compile(r'[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]{1,2}')
+
+
+def is_oversized_art_glyph(text: str, font_size: float, rescued: bool = False) -> bool:
+    """#886: True for one or two CJK/Hangul glyphs at art scale (>=100 px source lettering).
+
+    Such a region is a piece of a logo/title, not dialogue: keep the art instead of replacing a
+    single glyph of it. A region the vision rescue already localized (``rescued``) is excluded —
+    that IS the SFX path and it produced a target-language onomatopoeia; only when it could not
+    serve is the glyph left as art."""
+    s = (text or '').strip()
+    if rescued or not s or not _CJK_HANGUL.fullmatch(s):
+        return False
+    return float(font_size or 0) >= _ART_GLYPH_MIN_FONT
