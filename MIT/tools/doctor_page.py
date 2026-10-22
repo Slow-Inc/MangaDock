@@ -156,6 +156,8 @@ async def main():
     ap.add_argument('--set', action='append', default=[], metavar='SECTION.KEY=VALUE',
                     help='override one config knob, e.g. --set detector.det_bubble_merge=true')
     ap.add_argument('--tag', default='', help='suffix for output files (A/B runs)')
+    ap.add_argument('--gate', action='store_true',
+                    help='after the pages, run the deterministic chapter quality gate; the command exits 1 if the gate finds violations (or the doctor flags a page)')
     ap.add_argument('--replay', metavar='DOCTOR_JSON',
                     help='reuse the translations a previous run recorded (deterministic render A/B; '
                          'single page). Unseen texts still go to the live translator.')
@@ -188,6 +190,7 @@ async def main():
     if mt_logger.level > logging.INFO or mt_logger.level == logging.NOTSET:
         mt_logger.setLevel(logging.INFO)
     worst = 0
+    gate_pages = []
     for path in args.pages:
         source = Image.open(path).convert('RGB')
         timings.stages = {}
@@ -213,6 +216,8 @@ async def main():
                                'dst_box': r.render_dst_box} for r in page.regions],
                   'dropped': page.dropped, 'errors': page.errors,
                   'timing_ms': {'wall': round(wall_ms), **{k: round(v) for k, v in timings.stages.items()}}}
+        gate_pages.append((os.path.basename(path),
+                          [{'src': r.text, 'dst': r.translation} for r in page.regions]))
         with open(stem + '.doctor.json', 'w', encoding='utf-8') as fh:
             json.dump(report, fh, ensure_ascii=False, indent=1)
         print(f'== {os.path.basename(path)}')
@@ -220,6 +225,18 @@ async def main():
         print('timing_ms ' + ' '.join(f'{k}={v}' for k, v in report['timing_ms'].items()))
         print(f'-> {stem}.doctor.png / .doctor.json\n')
         worst = max(worst, run.exit_code)
+
+    if args.gate:
+        from manga_translator.quality_gate import check_chapter
+        report = check_chapter(gate_pages)
+        for v in report['violations']:
+            if v['kind'] == 'inconsistent_name':
+                print(f"[gate] inconsistent_name: {v['name']} -> {v['spellings']}")
+            else:
+                print(f"[gate] {v['kind']}: {v['page']} #{v['index']} {v['detail']}")
+        print(f"[gate] pages={report['pages']} violations={len(report['violations'])} ok={report['ok']}")
+        if not report["ok"]:
+            worst = max(worst, 1)
     return worst
 
 

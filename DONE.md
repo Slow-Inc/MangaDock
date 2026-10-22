@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 63 — quality gate wired into doctor replays (`--gate`) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `--gate` to `tools/doctor_page.py`: after processing the pages of one invocation (reading order) it runs the #990 gate and prints violations; the command exits 1 on a gate violation (or on the doctor's own page flags, which share the signal by design). No pipeline change.
+- Validated both ways: replaying the legacy Tsuki page that shipped the Cyrillic bug prints `foreign_script` #5/#6 with `violations=2 ok=False` -> **exit 1**; two fresh live pages print `pages=2 violations=0 ok=True`.
+- Benchmark `2026-10-22-990-doctor-gate-flag.md`; #990's wiring acceptance item is now satisfied.
+
 ## MIT quality loop, round 62 — deterministic chapter quality gate (#990) + three clean integrity scans (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
