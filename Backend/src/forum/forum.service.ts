@@ -30,6 +30,7 @@ import {
   UserProfileEarnings,
   UserProfileResponse,
 } from './forum.types';
+import { lookupFailure } from './assert-found';
 
 type ForumPostRow = {
   id: string;
@@ -178,7 +179,7 @@ export class ForumService {
       .is('comments.deleted_at', null)
       .single();
 
-    if (error || !data) throw new NotFoundException('Post not found');
+    if (error || !data) lookupFailure(error, 'Post not found'); // 404 only for a missing row (#915)
 
     const userVotes = await this.getUserVotes(userUid, 'post', [id]);
 
@@ -327,7 +328,7 @@ export class ForumService {
       ]);
 
     if (profileRes.error || !profileRes.data)
-      throw new NotFoundException('Profile not found');
+      lookupFailure(profileRes.error, 'Profile not found'); // 404 only for a missing row (#915)
 
     // Secondary sections degrade gracefully to empty on error, but a silently
     // empty section is indistinguishable from a real "no data" state. Log each
@@ -508,7 +509,7 @@ export class ForumService {
       .eq('id', id)
       .single();
 
-    if (fetchErr || !existing) throw new NotFoundException('Post not found');
+    if (fetchErr || !existing) lookupFailure(fetchErr, 'Post not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to delete this post');
 
@@ -534,7 +535,7 @@ export class ForumService {
       .eq('id', id)
       .single();
 
-    if (fetchErr || !existing) throw new NotFoundException('Comment not found');
+    if (fetchErr || !existing) lookupFailure(fetchErr, 'Comment not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to delete this comment');
 
@@ -568,7 +569,7 @@ export class ForumService {
       .eq('id', id)
       .single();
 
-    if (fetchErr || !existing) throw new NotFoundException('Post not found');
+    if (fetchErr || !existing) lookupFailure(fetchErr, 'Post not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to edit this post');
 
@@ -611,7 +612,7 @@ export class ForumService {
       .eq('id', id)
       .single();
 
-    if (fetchErr || !existing) throw new NotFoundException('Comment not found');
+    if (fetchErr || !existing) lookupFailure(fetchErr, 'Comment not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to edit this comment');
 
