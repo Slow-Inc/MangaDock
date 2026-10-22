@@ -84,11 +84,12 @@ value ("-- เลือกภาษา --", "ไทย"), so its visible label (
 status / language filters, wallet month / year) was never announced. It takes an optional `label` and the trigger reads
 "label: value"; all six call sites pass one. The account page's "ภาษาที่แปลได้" toggles were a bare `<label>` over a row
 of buttons: now `role="group"` named by that heading (hint as its description), each toggle `type="button"` with
-`aria-pressed`.
+`aria-pressed`. From review: at the 10-language cap an 11th press did nothing, silently — the toggles still off are now
+`aria-disabled` and muted; the two leftover unassociated `<label>`s (now duplicated by the `label` prop) became `<p>`.
 
 **Validated:** E2E on a production build, signed in as a creator via the local fake session: before — no select
 reachable by its name, 4 unnamed triggers, no group; after — every select found by `getByRole('button', { name })`,
-0 unnamed triggers on all four pages (wallet on its กราฟ tab), the group found by name with 13 pressable toggles. Real
+0 unnamed triggers on all four pages (wallet on its กราฟ tab), the group found by name with 13 pressable toggles; after pressing 10, the other 3 are `aria-disabled` (0 before). Real
 tsc clean; eslint per file equal to main.
 
 ---
