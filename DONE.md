@@ -77,6 +77,23 @@
 
 ---
 
+## #970 A MangaDex outage is a 503 for search and genre, not "200, no results" (2026-10-22)
+
+**What:** `fetchMangaWithParamsPaged` and `getGenreManga` turned a MangaDex 5xx / 403 / 429 / maintenance page /
+network error into an empty list. The browser showed "ไม่พบหนังสือ" or an empty genre instead of its load-error retry
+(#911) and cached the empty answer (search 5 min, genre 30 min); a year-range search cached it server-side for 20 min,
+and a scan failing partway cached partial matches as complete. The paged fetch now marks an outage `unavailable` (a
+400/404 — our own bad request — stays a plain empty answer); `MangaCatalogService.searchPage` (both search paths)
+turns it into a 503 before anything is cached; the genre listing answers 503 on a failed fetch; new releases
+answer 503 when all four rows are down, otherwise serve the rest uncached, never with the flag in the JSON (review).
+
+**Validated:** Jest red → green, `books/search-outage.spec.ts` (9): 503 and network error marked unavailable, 400
+not; search and a year scan failing on its second page answer 503 with no cache write; genre 503 on both failures.
+Full Backend suite 107 suites / 1,056 tests. eslint unchanged on the services, clean on the new spec. The browser side
+needs no change: both pages already show the retry state for a non-ok answer and never cache it (#911).
+
+---
+
 ## #967 A guest's reading history opens on /mylist instead of a login wall (2026-10-22)
 
 **What:** a guest's reading history lives on the device (`mangadock_reading_history`; logout clears it via
