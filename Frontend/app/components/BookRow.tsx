@@ -96,7 +96,7 @@ function BookCard({
       ref={articleRef}
       key={`${rowId}-${book.id}`}
       onMouseEnter={handleHover}
-      onFocus={handleHover}
+      onFocus={(e) => { if (e.currentTarget.contains(e.target as Node)) handleHover(); }} // not focus inside a portaled popup
       // Keyboard focus inside the card opens the same state as hover (#932): has-[:focus-visible] next to each hover
       className={`group relative w-[9.5rem] min-w-[9.5rem] shrink-0 rounded-2xl border border-line bg-fill md:w-[13.75rem] md:min-w-[13.75rem] md:transition md:duration-300 md:hover:z-30 md:hover:scale-[1.08] md:hover:border-ink-3 md:has-[:focus-visible]:z-30 md:has-[:focus-visible]:scale-[1.08] md:has-[:focus-visible]:border-ink-3 ${expandRight ? "origin-left" : "origin-right"}`}
     >
@@ -251,6 +251,7 @@ function BookCard({
         {/* Expand to detail */}
         <button
           title="ดูรายละเอียด"
+          tabIndex={-1} // the cover's button does the same, once per card for the keyboard (#932)
           onClick={() => setShowModal(true)}
           className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-line py-1.5 text-[11px] text-ink-2 transition hover:border-ink-3 hover:text-ink"
         >

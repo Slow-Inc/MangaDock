@@ -85,12 +85,14 @@ the expand-cover button, whose `focus-visible:opacity-100` lost to `md:opacity-0
 a `<div onClick>`. Both rows now give the cover a real `<button>` overlay named "ดูรายละเอียด <title>" (as the Top 10 cards
 are named), open the hover state on keyboard focus with `has-[:focus-visible]` / `group-has-[:focus-visible]` next to each
 `hover` variant (a mouse click does not pin it), re-check the panel side on focus, and make the badge a `<button>`.
+Review follow-ups: the panel's duplicate "ดูรายละเอียด" leaves the Tab order, the badge is named per book, and focus from
+inside a portaled popup no longer runs the card's hover logic.
 
 **Validated:** production build, stand-in rows plus a local reading history, Tab walk measuring each stop inside a row
 card after the 300 ms fade: before, 6 stops at effective opacity 0 at 1440 px and no control named after a book at either
 width; after, 0 invisible stops, 3 row openers per walk, the "อ่านต่อ" badge reachable, Enter on an opener opens the
-popup, at 1440 and 390 px. Screenshot: the focused card shows its panel and an inset accent ring. tsc 0; eslint
-identical to main on both files.
+popup, at 1440 and 390 px; mouse probe: cover -> popup, expand -> lightbox, badge -> reader at both widths. Screenshot:
+the focused card shows its panel and an inset accent ring. tsc 0; eslint identical to main on both files.
 
 ---
 
