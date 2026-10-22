@@ -5,6 +5,7 @@ import type { LenisRef } from 'lenis/react';
 import { usePathname } from 'next/navigation';
 import { ReactNode, useEffect, useRef } from 'react';
 import { isModalNavigation } from '../lib/bookModalHistory';
+import { onPageScrollLock } from '../lib/scrollLock';
 import { useReducedMotion } from '../hooks/reducedMotion';
 
 interface SmoothScrollingProps {
@@ -27,6 +28,17 @@ export default function SmoothScrolling({ children }: SmoothScrollingProps) {
     if (isModalNavigation()) return;
     lenisRef.current?.lenis?.scrollTo(0, { immediate: true });
   }, [pathname]);
+
+  // Lenis scrolls the page itself, so a body overflow lock alone does not stop the wheel behind a popup (#936).
+  useEffect(
+    () =>
+      onPageScrollLock((locked) => {
+        const lenis = lenisRef.current?.lenis;
+        if (locked) lenis?.stop();
+        else lenis?.start();
+      }),
+    [],
+  );
 
   useEffect(() => {
     let resizeFrame = 0;
