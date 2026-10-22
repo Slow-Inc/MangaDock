@@ -77,6 +77,20 @@
 
 ---
 
+## #1011 A mascot save no longer always fails (2026-10-23)
+
+**What:** `MascotEditor.save` made the PNG with `new Promise(r => canvas.toBlob(r, "image/png") ?? r(null))`.
+`toBlob` returns `undefined` and calls back later, so `?? r(null)` always settled the promise with `null` first. Every
+save threw "สร้างรูปมาสคอตไม่สำเร็จ" after the mascot config was already stored, and the profile picture never changed.
+`lib/canvasToPng.ts` now resolves with the blob from the callback, and with `null` only without a canvas.
+
+**Validated:** bun test `lib/canvasToPng.test.ts`, red (module missing) → green, 3 tests: an asynchronously delivered blob
+comes back (not `null`), a `null` encode stays `null`, and no canvas gives `null`. The mascot tests still pass. Real tsc
+0 errors; eslint clean. **Not driven in the browser:** the save applies the mascot as the profile picture, which tests
+don't do, per the developer's instruction.
+
+---
+
 ## #1009 The public patch route serves patches only (2026-10-23)
 
 **What (security, class only):** `GET /r2-patches/*` is public and registered in every storage mode. It handed the rest
