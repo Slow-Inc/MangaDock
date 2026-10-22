@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 15 — 39-page replay sweep: no dialogue lost, and a replay caveat (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Set-based comparison (region source-text multisets, not indices) of all 39 corpus pages against `_r2`: **16 pages changed, all explained** — 2 expected guard drops (`Siiig` #882, `月` #886), 1 rescue upgrade (`을` -> `เคี้ยว`), 11 pages of rescue nondeterminism, 2 pages of one-character OCR read variance (`IIMF`/`IIM`, `ZBYTHE`/`7BYTHE`; #884 numerics). **No dialogue region lost on any page.**
+- **Rule recorded:** `--replay` still runs the vision SFX rescue live, so SFX pages vary between runs — accept that noise or run with `--set ocr.vlm_rescue=0`; index-based render diffs on those pages are not regression evidence.
+- Vault note `project-art-text-handling` written (the three art/SFX guards, rescue precedence, the rule for adding a 4th).
+
 ## MIT quality loop, round 14 — a single logo glyph is dropped, the artwork stays (#886) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
