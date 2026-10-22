@@ -10,6 +10,7 @@ import Loader from "./ui/Loader";
 import { DOT_FIELD } from "./skeletonDots";
 import LoadError from "./ui/LoadError";
 import { isNotFound } from "../lib/httpError";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 
 /**
  * The book popup for a direct /book/<id> visit (shared link, refresh, new tab): there is
@@ -18,7 +19,8 @@ import { isNotFound } from "../lib/httpError";
  */
 export default function BookRouteModal({ id }: { id: string }) {
   const router = useRouter();
-  // "missing" only for a 404 (or an unusable detail); any other failure is "failed", with a retry (#919)
+  // "missing" only for a 404, or a detail bookFromDetail cannot use; any other failure — a network error, a 5xx, a 200 of
+  // the wrong shape — is "failed", with a retry (#919)
   const [state, setState] = useState<"loading" | "missing" | "failed" | LandingBook>("loading");
   const [retry, setRetry] = useState(0);
 
@@ -59,6 +61,7 @@ export default function BookRouteModal({ id }: { id: string }) {
       <NoticeDialog label="โหลดหนังสือไม่สำเร็จ" onClose={close}>
         <LoadError
           what="หนังสือ"
+          framed={false}
           onRetry={() => {
             setState("loading");
             setRetry((n) => n + 1);
@@ -80,6 +83,8 @@ export default function BookRouteModal({ id }: { id: string }) {
  */
 function PopupSkeleton({ onClose }: { onClose: () => void }) {
   const cover = "relative aspect-2/3 shrink-0 overflow-hidden rounded-xl bg-fill ring-1 ring-line";
+  const root = useRef<HTMLDivElement>(null);
+  useDialogFocus(root, () => true); // aria-modal: Tab stays inside (#919 review)
   // A slow fetch must not trap anyone: Escape and a close button work as in the popup itself.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -89,7 +94,7 @@ function PopupSkeleton({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div role="dialog" aria-modal="true" aria-label="กำลังโหลดหนังสือ" className="fixed inset-0 z-200 flex items-center justify-center md:p-4">
+    <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label="กำลังโหลดหนังสือ" className="fixed inset-0 z-200 flex items-center justify-center outline-none md:p-4">
       <div className="absolute inset-0 bg-bg md:bg-scrim/90" onClick={onClose} />
       <div className="relative z-10 flex h-full w-full flex-col overflow-hidden bg-surface shadow-2xl md:h-auto md:max-h-[90vh] md:max-w-3xl md:rounded-3xl">
         <button
@@ -133,6 +138,7 @@ function PopupSkeleton({ onClose }: { onClose: () => void }) {
  * first button, Escape and the scrim close it — as the loading skeleton and the popup itself already are.
  */
 function NoticeDialog({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
+  const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     box.current?.querySelector<HTMLElement>("button")?.focus();
@@ -142,8 +148,9 @@ function NoticeDialog({ label, onClose, children }: { label: string; onClose: ()
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+  useDialogFocus(root, () => true); // aria-modal: Tab stays inside (#837)
   return (
-    <div role="dialog" aria-modal="true" aria-label={label} className="fixed inset-0 z-200 flex items-center justify-center p-4">
+    <div ref={root} tabIndex={-1} role="dialog" aria-modal="true" aria-label={label} className="fixed inset-0 z-200 flex items-center justify-center p-4 outline-none">
       <div className="absolute inset-0 bg-scrim/75" onClick={onClose} />
       <div ref={box} className="relative w-full max-w-sm rounded-2xl bg-surface p-6 text-center shadow-2xl">
         {children}

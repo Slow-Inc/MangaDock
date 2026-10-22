@@ -90,6 +90,12 @@ shared `LoadError` with a retry; "missing" stays for a 404 or an unusable detail
 the real backend → the book popup; Escape closes each back to "/". Start the backend, press Enter on the focused "ลองใหม่"
 → the book popup opens. tsc 0; eslint 0 on both files.
 
+**Review round:** the dialogs declared `aria-modal` but Tab walked into the page behind — `NoticeDialog` and the loading
+skeleton now use the app's `useDialogFocus` (#837); the failed dialog no longer nests `LoadError`'s card or repeats its label
+as an alert (`LoadError framed={false}`); the comment now says a 200 of the wrong shape is "failed" (with a retry), not
+"missing". Re-verified: down → focus "ลองใหม่", 6 Tabs stay inside (ลองใหม่ ⇄ กลับหน้าแรก), Escape → "/", no alert inside the
+dialog, a single card (screenshot); 404 → focus and Tab stay on "← กลับหน้าแรก".
+
 ---
 
 ## #915 Forum lookups: 404 only for a missing row, 503 for a database failure (2026-10-22)
