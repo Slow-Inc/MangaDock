@@ -85,8 +85,10 @@ was indexable. The 18 genres were also written twice (`Navbar.tsx`, the genre pa
 one list; `categories/[genre]/page.tsx` is a server page that calls `notFound()` for any other slug and renders the
 client `GenrePage.tsx` otherwise. The status stays 200: the root `app/loading.tsx` streams the shell before the page
 resolves, so Next serves the 404 page with `noindex` instead (a 404 status would need a proxy rewrite or dropping the
-root loading state). `dynamicParams = false` + `generateStaticParams` was tried first and had no effect on this
-dynamically rendered route.
+root loading state; `notFound()` from `generateMetadata` was tried too — Googlebot still gets 200).
+`dynamicParams = false` + `generateStaticParams` was tried first and had no effect on this dynamically rendered
+route. The page passes the validated genre to `GenrePage` as props (no `useParams`), and `generateMetadata` puts
+"แอคชัน · MangaDock" in the server HTML.
 
 **Validated:** production build: before, `/categories/nope` → heading "nope", no noindex; after, `nope` and `ACTION`
 → "ไม่พบหน้านี้" + `noindex`, `action` → "แอคชัน" without noindex; the navbar still links all 18 genres. tsc 0; eslint

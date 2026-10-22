@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import MangaGrid, { GridBook } from "../../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../../lib/apiCache";
@@ -10,26 +10,25 @@ import { scrollBehavior } from "../../hooks/reducedMotion";
 import { usePageTitle } from "../../hooks/pageTitle";
 import LoadError from "../../components/ui/LoadError";
 import { goBackOr, replaceUrl } from "../../lib/inAppBack";
-import { GENRES } from "../../lib/genres";
 
 const API_BASE = "/api/proxy";
 
 const PAGE_SIZE = 28;
 
-export default function GenrePage() {
+type Genre = { slug: string; label: string };
+
+/** A genre the app offers; page.tsx has already turned any other slug into the 404 page (#971). */
+export default function GenrePage(genre: Genre) {
   // useSearchParams (the page number) needs a Suspense boundary, as on /new
   return (
     <Suspense fallback={<div className="min-h-screen bg-bg" />}>
-      <GenrePageInner />
+      <GenrePageInner {...genre} />
     </Suspense>
   );
 }
 
-function GenrePageInner() {
-  const params = useParams();
+function GenrePageInner({ slug, label: genreLabel }: Genre) {
   const router = useRouter();
-  const slug = typeof params.genre === "string" ? params.genre : "";
-  const genreLabel = GENRES.find((g) => g.slug === slug)?.label ?? slug;
   usePageTitle(genreLabel);
 
   const [books, setBooks] = useState<GridBook[]>([]);
@@ -45,7 +44,6 @@ function GenrePageInner() {
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    if (!slug) return;
     let superseded = false; // a slower answer for an earlier page must not replace this one (#944)
     queueMicrotask(() => {
       setLoading(true);
