@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 47 — translation latency levers measured: cap tuning dead, bounded concurrency real (#904) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Cap tuning is a dead end:** `CUSTOM_OPENAI_MAX_COMPLETION_TOKENS` 4096 / 8192 / 1024 on the same 4 pages — per-call 2.5-3.3 / 2.9-4.1 / **3.7-4.4 s**, 0 empty outputs. The gateway emits reasoning regardless of the disable levers, so a smaller cap does not save time and risks #623. No change.
+- **Bounded page concurrency is the remaining speed lever:** 3 pages sequential 9.39 s -> concurrent (K=3) **5.22 s (1.80×)**; 5-page test ~2× effective at K=2-3; **K=5 chokes** (44.8 s, timeouts + retries). Per-call latency inflates only 10-45 %; single-page latency unaffected.
+- Filed **#904** with the numbers and the design sketch: Backend batch bounded concurrency K=2-3 (`MIT_BATCH_CONCURRENCY`, default 2) + MIT server overlapping page N+1 translation with page N GPU stages, verified on chapter wall time / VRAM / output identity.
+- Benchmark `2026-10-22-904-translation-concurrency.md`.
+
 ## MIT quality loop, round 46 — live quality sweep clean; fresh warm latency profile (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
