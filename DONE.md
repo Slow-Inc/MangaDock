@@ -77,6 +77,21 @@
 
 ---
 
+## #926 Search results open by keyboard (2026-10-22)
+
+**What:** `SearchResultCard` was a `<div onClick>` with no control for the book itself, so Tab passed every result
+(reaching only the hover-only "ดูหน้าปกขนาดใหญ่" buttons) and a screen reader found nothing named after the book.
+`MangaGrid` fixed the same thing in #838; the search card now mirrors it: the title is a `<button type="button">`
+(stops propagation) and the card's click stays the mouse target. No visual change. Review nit applied here: the
+expand-cover button (search and `MangaGrid`) is `type="button"` and named per book ("ดูหน้าปกขนาดใหญ่: <title>").
+
+**Validated:** production build, stand-in results: before, a Tab walk from the search box never focused a result; after,
+it reaches "Cover Loads" by its title, Enter opens one popup, Escape closes it, and a mouse click on the cover still opens
+exactly one. The focused title shows the app's 2 px accent outline (screenshot). tsc 0; eslint unchanged (2 pre-existing
+`as any` errors in the file).
+
+---
+
 ## #923 The book popup shows a placeholder when a cover fails to load (2026-10-22)
 
 **What:** after #921 the cards showed a placeholder, but opening one showed `BookDetailModal` with two broken images (the
