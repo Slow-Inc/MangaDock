@@ -34,6 +34,7 @@ _HEAVY_TESTS = [
     'test_page_context.py',
     'test_pipeline_orchestrator.py',
     'test_pipeline_params.py',
+    'test_translator_credentials.py',  # imports translators.chatgpt -> translators/__init__ (torch) (#893)
     'test_prev_context_prompt.py',   # test body imports translators.config_gpt -> translators/__init__ (torch)
     'test_registry_trim.py',
     'test_source_lang_filter.py',    # imports MangaTranslator (torch)

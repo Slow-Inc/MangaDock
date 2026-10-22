@@ -316,6 +316,12 @@ class TranslatorConfig(BaseModel):
     seam as series_context so every GPT-family translator carries it. The worker
     resets its own per-request memory, so this is the batch path's only carrier.
     Absent → prompts identical to today."""
+    api_key: Optional[str] = None
+    """#893: per-request credential the Backend sends when LLM_PROVIDER is not gemini
+    (Backend/.env LLM_API_KEY). Dropped silently before; the OpenAI-compatible client rebuilds
+    from it when present. Absent -> the translator keeps its .env client."""
+    api_url: Optional[str] = None
+    """#893: per-request endpoint (LLM_BASE_URL) for the same path. Absent -> .env base."""
     concise_bubbles: bool = False
     """#892 (P7/#526): ask the translator for the shortest faithful phrasing — the #1 render defect
     on tight bubbles is a translation physically too long for the balloon. The Backend has sent this
