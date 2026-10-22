@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getTrendingManga, type TrendingManga } from "../lib/communityApi";
@@ -81,7 +81,10 @@ export default function ForumSideMenu({
       .finally(() => setLoading(false));
   }, []);
 
+  // Only the latest search writes: an older query answering late (or after the box was cleared) is dropped (#999)
+  const searchSeq = useRef(0);
   const handleSearch = useCallback(async (q: string) => {
+    const seq = ++searchSeq.current;
     if (!q.trim()) {
       setSearchResults([]);
       return;
@@ -102,18 +105,22 @@ export default function ForumSideMenu({
         },
         TTL.MEDIUM,
       );
-      setSearchResults(items);
+      if (seq === searchSeq.current) setSearchResults(items);
     } catch (err) {
       console.error(err);
     } finally {
-      setSearching(false);
+      if (seq === searchSeq.current) setSearching(false);
     }
   }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchQuery.length >= 2) handleSearch(searchQuery);
-      else setSearchResults([]);
+      else {
+        searchSeq.current++; // a search still in flight must not refill the cleared list
+        setSearchResults([]);
+        setSearching(false);
+      }
     }, 500);
     return () => clearTimeout(timer);
   }, [searchQuery, handleSearch]);

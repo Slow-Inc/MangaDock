@@ -27,7 +27,10 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
   const inputId = useId();
   const panelId = useId();
 
+  // Only the latest search writes: an older query answering late is dropped (#999)
+  const searchSeq = useRef(0);
   const searchManga = useCallback(async (q: string) => {
+    const seq = ++searchSeq.current;
     if (!q.trim()) {
       setResults([]);
       return;
@@ -48,11 +51,11 @@ export default function MangaSearchSelector({ onSelect, selectedManga }: MangaSe
         },
         TTL.MEDIUM,
       );
-      setResults(items);
+      if (seq === searchSeq.current) setResults(items);
     } catch (err) {
       console.error(err);
     } finally {
-      setSearching(false);
+      if (seq === searchSeq.current) setSearching(false);
     }
   }, []);
 
