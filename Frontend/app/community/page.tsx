@@ -15,7 +15,7 @@ import { useModalTransition } from "../hooks/useModalTransition";
 import { useFeedStream } from "../hooks/useForumStream";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { availableCategories, isRestrictedCategory, CATEGORY_LIST } from "../lib/forumCategories";
-import { FORUM_LIMITS } from "../lib/forumLimits";
+import { FORUM_LIMITS, clipToLimit } from "../lib/forumLimits";
 import LimitCounter from "../components/ui/LimitCounter";
 import { useToast } from "../contexts/ToastContext";
 import { CommunityErrorBoundary } from "./components/CommunityErrorBoundary";
@@ -170,6 +170,8 @@ function CommunityContent() {
     const manga = selectedManga;
     const images = [...postImages];
     const tempId = `temp-${Date.now()}`;
+    // the DTO caps targetMangaTitle at 200 — a long manga title must not fail the post (#988)
+    const targetMangaTitle = manga?.title ? clipToLimit(manga.title, FORUM_LIMITS.title) : null;
 
     const tempPost: ForumPost = {
       id: tempId,
@@ -177,7 +179,7 @@ function CommunityContent() {
       content: postData.content,
       category: postData.category,
       targetMangaId: manga?.id ?? null,
-      targetMangaTitle: manga?.title ?? null,
+      targetMangaTitle,
       targetMangaCover: manga?.thumbnail ?? null,
       imageUrls: images,
       authorUid: user?.uid ?? '',
@@ -205,7 +207,7 @@ function CommunityContent() {
       const realPost = await createPost({
         ...postData,
         targetMangaId: manga?.id,
-        targetMangaTitle: manga?.title,
+        targetMangaTitle: targetMangaTitle ?? undefined,
         targetMangaCover: manga?.thumbnail,
         imageUrls: images,
       });
