@@ -84,8 +84,10 @@ function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () 
           </div>
           {/* Expand cover button */}
           {cover.src && <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); setShowCover(true); }}
             title="ดูหน้าปกขนาดใหญ่"
+            aria-label={`ดูหน้าปกขนาดใหญ่: ${book.title}`}
             className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-bg/75 text-ink-2 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-bg/80 hover:text-ink focus-visible:opacity-100"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">

@@ -82,7 +82,8 @@
 **What:** `SearchResultCard` was a `<div onClick>` with no control for the book itself, so Tab passed every result
 (reaching only the hover-only "ดูหน้าปกขนาดใหญ่" buttons) and a screen reader found nothing named after the book.
 `MangaGrid` fixed the same thing in #838; the search card now mirrors it: the title is a `<button type="button">`
-(stops propagation) and the card's click stays the mouse target. No visual change.
+(stops propagation) and the card's click stays the mouse target. No visual change. Review nit applied here: the
+expand-cover button (search and `MangaGrid`) is `type="button"` and named per book ("ดูหน้าปกขนาดใหญ่: <title>").
 
 **Validated:** production build, stand-in results: before, a Tab walk from the search box never focused a result; after,
 it reaches "Cover Loads" by its title, Enter opens one popup, Escape closes it, and a mouse click on the cover still opens
