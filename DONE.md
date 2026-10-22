@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 33 — Thai stacked marks get the leading they need (#895) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Root cause found:** the horizontal renderer's line pitch is `font_size`; a Thai tone mark stacked on an upper vowel is lifted (#793) above its own row and drawn over the previous line. Where that row has ink at the same x the mark is dark-on-dark and vanishes — Kumo p0's `ครั้งนั้น` rendered as `ครงนัน`.
+- **Fix:** `_stacked_mark_overhead(line, font_size)` (excess over one row + an 8 % descent allowance) added only to lines that need it — canvas height, first-line offset and per-line advance. Latin text and fonts whose marks already sit high add nothing (byte-identical).
+- Kumo p0 re-render: line 7 reads `ครั้งนั้น` with both mark pairs (figure `2026-10-22-895-stacked-marks-fix.png`). 2 new tests, gate **851 passed**.
+- **Corpus verification pending** (39-page deterministic replay `_marksfix` was started with this round and is checked next round before the issue is closed).
+
 ## MIT quality loop, round 32 — concise targeted A/B + a real render bug: stacked Thai marks vanish on the page (#895) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
