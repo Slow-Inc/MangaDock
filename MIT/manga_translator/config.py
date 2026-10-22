@@ -316,6 +316,11 @@ class TranslatorConfig(BaseModel):
     seam as series_context so every GPT-family translator carries it. The worker
     resets its own per-request memory, so this is the batch path's only carrier.
     Absent → prompts identical to today."""
+    concise_bubbles: bool = False
+    """#892 (P7/#526): ask the translator for the shortest faithful phrasing — the #1 render defect
+    on tight bubbles is a translation physically too long for the balloon. The Backend has sent this
+    flag since #526 but Pydantic dropped it because the field was missing; it rides the same
+    chatgpt_config seam as the context fields now. False → prompts byte-identical."""
 
     # 译后检查配置项
     enable_post_translation_check: bool = True
@@ -358,6 +363,9 @@ class TranslatorConfig(BaseModel):
             overrides['series_context'] = self.series_context
         if self.prev_context:
             overrides['prev_context'] = self.prev_context
+        if self.concise_bubbles:
+            # #892: the Backend flag used to die here; carry it to the OmegaConf ConfigGPT reads.
+            overrides['concise_bubbles'] = True
         if overrides:
             ctx = OmegaConf.create(overrides)
             return OmegaConf.merge(self._gpt_config, ctx) if self._gpt_config is not None else ctx
