@@ -77,6 +77,19 @@
 
 ---
 
+## #1034 Studio sales stats error offers a retry (2026-10-23)
+
+**What:** found by the High Craft sweep. A failed stats load in `app/studio/components/StatsOverview.tsx` showed a
+plain "โหลดสถิติไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง" card with no way to retry (only switching the range or reloading the
+page). It now uses `LoadError` like every other failed load: the retry clears the result (the loader shows) and bumps a
+reload counter in the effect's deps.
+
+**Validated:** E2E on a production build, signed in as a creator via the local fake session, stand-in `STATS1034=1`
+(stats fail once, then answer): before — the card had no retry; after — ลองใหม่ loads the stats (the empty-range
+state). Real tsc clean; eslint equal to main.
+
+---
+
 ## #1033 /admin/transactions no longer scrolls sideways on a phone (2026-10-23)
 
 **What:** found by a High Craft sweep of every route at 1280 / 390 px. At 390 px the page was 686 px wide (+296): the

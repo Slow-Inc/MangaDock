@@ -11,6 +11,7 @@ import { getStudioStats, type StudioStats } from "../../lib/studioApi";
 import Pill from "../../components/ui/Pill";
 import Loader from "../../components/ui/Loader";
 import Mascot from "../../components/mascot/Mascot";
+import LoadError from "../../components/ui/LoadError";
 import RollingNumber from "./RollingNumber";
 import StudioAreaChart from "./charts/StudioAreaChart";
 import { sparklinePoints } from "../lib/shellMath";
@@ -45,6 +46,7 @@ export default function StatsOverview() {
   const { getIdToken } = useAuth();
   const [range, setRange] = useState<Range>(30);
   const [result, setResult] = useState<{ range: Range; stats: StudioStats | null; failed: boolean } | null>(null);
+  const [reload, setReload] = useState(0); // bumped by LoadError's retry (#1034)
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +63,7 @@ export default function StatsOverview() {
     return () => {
       cancelled = true;
     };
-  }, [getIdToken, range]);
+  }, [getIdToken, range, reload]);
 
   const loading = result?.range !== range;
   const stats = loading ? null : result?.stats ?? null;
@@ -99,7 +101,8 @@ export default function StatsOverview() {
           <Loader context="section" label="กำลังโหลดสถิติ" className="text-ink-2" />
         </div>
       ) : result?.failed ? (
-        <div className="rounded-[var(--r-card)] border border-line bg-surface p-6 text-sm text-ink-2">โหลดสถิติไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง</div>
+        // a retry, like every other failed load (#1034); clearing the result shows the loader meanwhile
+        <LoadError what="สถิติ" area="studio" onRetry={() => { setResult(null); setReload((n) => n + 1); }} />
       ) : empty ? (
         <div className="flex items-center gap-5 rounded-[var(--r-card)] border border-line bg-surface p-6">
           <Mascot area="studio" size={72} />
