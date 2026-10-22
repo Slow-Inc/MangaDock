@@ -77,6 +77,26 @@
 
 ---
 
+## #928 Reader comment drawer: typing, Escape and focus (2026-10-22)
+
+**What:** in the reader, ←/→ turned the page while the cursor was in the comment box (the window `keydown` handler never
+looked at the target), and the drawer then reloaded another page's comments; Escape inside the drawer closed the whole
+reader; the drawer was no dialog — no role/name, focus stayed behind, its controls stayed in the Tab order while closed
+off-screen, and its ✕ / 🗑 buttons had no name. Now: `lib/typingTarget.isTypingTarget` (input/textarea/select/editable)
+gates the reader's page keys; Escape closes the drawer first (`commentOpenRef`, like the chapter picker); the drawer is
+`role="dialog"` + `aria-modal`, named by its heading, uses `useDialogFocus` (the reader's Tab trap stands aside while it is
+open) and is `inert` while closed; the icon buttons are named.
+
+**Validated:** `typingTarget.test.ts` red (module missing) → green, 4 tests. Production build, stand-in backend, reader
+opened on an uploaded version (no CAPTCHA) from a continue-reading button: before — arrows in a text field moved 2/3 →
+3/3, the closed drawer had 2 Tab stops, no dialog, Escape closed the reader; after — arrows in the text field leave 2/3
+(outside one they still turn the page), 0 Tab stops in the closed drawer, the open drawer is a named dialog holding focus
+and Tab, Escape closes only the drawer and focus returns to its button. The comment box itself needs a signed-in reader,
+so the probe uses a stand-in textarea inside the reader (the bug lives in the reader's key handler). tsc 0; eslint
+identical to main on both files.
+
+---
+
 ## #926 Search results open by keyboard (2026-10-22)
 
 **What:** `SearchResultCard` was a `<div onClick>` with no control for the book itself, so Tab passed every result

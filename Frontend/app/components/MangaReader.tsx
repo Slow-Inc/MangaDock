@@ -10,6 +10,7 @@ import { buildTranslateMenu } from "../lib/translateMenu";
 import { activeTranslatingPage, formatEta, pillMainText, stageLabel } from "../lib/translationStages";
 import TranslateProgress from "./reader/TranslateProgress";
 import { apiFetch } from "../lib/apiFetch";
+import { isTypingTarget } from "../lib/typingTarget";
 import { useChapters, type ChapterPageItem } from "../hooks/useChapters";
 import { ZOOM_MIN, ZOOM_MAX } from "../lib/zoomLevel";
 import { useReaderViewport } from "../hooks/useReaderViewport";
@@ -120,6 +121,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [visible, setVisible] = useState(false);
   const [useSaver, setUseSaver] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
+  // Read by the reader's key handlers and Tab trap: while the drawer is open it owns Escape and Tab (#928).
+  const commentOpenRef = useRef(false);
+  useEffect(() => { commentOpenRef.current = commentOpen; }, [commentOpen]);
   const [sideBySide, setSideBySide] = useState(false);
   const [translateMenuOpen, setTranslateMenuOpen] = useState(false);
   const translateMenuRef = useRef<HTMLDivElement | null>(null);
@@ -189,8 +193,9 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const [mounted, setMounted] = useState(false);
   // Full-screen layer: focus in on open, Tab stays inside, focus back to the opener on close (#840).
   const readerRef = useRef<HTMLDivElement>(null);
-  // Not on the popup's modal stack: it is "top" unless another layer (e.g. the login modal) was opened over it.
-  const readerIsTop = () => !!readerRef.current && !hasLayerAbove(readerRef.current);
+  // Not on the popup's modal stack: it is "top" unless another layer (e.g. the login modal) was opened over it, or its
+  // own comment drawer is open (#928).
+  const readerIsTop = () => !commentOpenRef.current && !!readerRef.current && !hasLayerAbove(readerRef.current);
   useDialogFocus(readerRef, readerIsTop, mounted);
   // Default to continuous mode on mobile (< 640px) for better UX
   const [continuousMode, setContinuousMode] = useState(() =>
@@ -452,6 +457,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
     };
 
     const onKey = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return; // the arrows move the cursor in a text field, not the page (#928)
       if (continuousModeRef.current) {
         if (e.key === "ArrowDown" || e.key === "ArrowUp") {
           e.preventDefault();
@@ -485,6 +491,7 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       const active = document.activeElement;
       if (readerRef.current && active && active !== document.body && !readerRef.current.contains(active)) return;
       e.stopPropagation();
+      if (commentOpenRef.current) { setCommentOpen(false); return; }
       if (showChapterPickerRef.current) { closePicker(); return; }
       handleClose();
     };
