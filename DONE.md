@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 25 — prompt v3 lost the blind A/B; the A/B exposed a mark-order defect (#888, #889) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Blind pairwise A/B (9 pages: the audit's lowest + 3 controls; `translation_ab.py` translate/packet + a segment-level judge): **v2 won 6 pages to 2, 1 tie** — v3's stammer/fragment rules helped those lines but the longer rule list made other lines literal. No default change; `thai_manga_v3.yaml` kept as the experiment record.
+- **Real defect the A/B exposed (#889):** the model emits Thai tone marks before their above-vowel (`ท่ี`, `น้ี`) — 1 segment/9 pages in the v2 arm, 3 in v3. New `translation_quality.normalize_thai_marks` (canonical order + drop a repeated mark in one cluster) wired into `_clean_translation_output`: both arms normalise to 0 invalid sequences, the 372-segment corpus dump is byte-identical, gate **849 passed**.
+- Benchmarks `2026-10-22-888-prompt-v3-ab.md`, `2026-10-22-889-thai-mark-order.md`.
+
 ## MIT quality loop, round 24 — LLM-judged translation audit: 372 segments, mean 1.51/2, five patterns (#888) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
