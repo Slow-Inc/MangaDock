@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 14 — a single logo glyph is dropped, the artwork stays (#886) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tsuki p0: detection caught only the `月` of the title logo `月が導く異世界道中`; the page rendered a big Thai `เดือน` in its place while the rest of the logo stayed Japanese. New `is_oversized_art_glyph` (1-2 CJK/Hangul glyphs, source lettering >= 100 px) drops such regions in the post-translation filter, so they are not inpainted and the art stays.
+- Replay: Tsuki regions 16 -> 15 with the `月` drop, logo intact (figure). Mushoku c110 p0's `을` was RESCUED meanwhile (`เคี้ยว`, sfx_display) — rescued regions are excluded from the guard, so the SFX path wins when it can serve.
+- Tests for the predicate + filter; benchmark `2026-10-22-886-logo-glyph.md`; corpus scan: exactly 2 art-scale single-glyph regions.
+
 ## MIT quality loop, round 13 — `text_raw` now reaches the regions the pipeline keeps (#885) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
