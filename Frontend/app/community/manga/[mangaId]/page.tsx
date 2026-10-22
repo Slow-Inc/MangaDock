@@ -74,11 +74,16 @@ export default function MangaCommunityPage() {
     }
   }, [mangaId]);
 
+  // Only the latest request writes: switching hot ⇄ new while the other sort is still loading must not let the
+  // slower answer replace the chosen list (#999)
+  const fetchSeq = useRef(0);
   const fetchPosts = useCallback(async () => {
+    const seq = ++fetchSeq.current;
     setLoading(true);
     setLoadFailed(false);
     try {
       const res = await listPosts({ mangaId, sort });
+      if (seq !== fetchSeq.current) return;
       setPosts(res.items);
       const infoPost = res.items.find((p) => p.targetMangaTitle);
       if (infoPost) {
@@ -88,12 +93,13 @@ export default function MangaCommunityPage() {
         fetchMangaMeta();
       }
     } catch (err) {
+      if (seq !== fetchSeq.current) return;
       console.error(err);
       setPosts([]);
       setLoadFailed(true); // not "no posts in this community" (#913)
       fetchMangaMeta(); // the title comes from the posts when they load; fetch it on its own so the header is not a skeleton
     } finally {
-      setLoading(false);
+      if (seq === fetchSeq.current) setLoading(false);
     }
   }, [mangaId, sort, fetchMangaMeta]);
 

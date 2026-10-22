@@ -77,6 +77,26 @@
 
 ---
 
+## #999 The latest sort or search wins — manga community hot/new, forum side-menu search, manga picker search (2026-10-23)
+
+**What:** three effects wrote the answer for a sort or query the user had already left:
+- the manga community page's hot ⇄ new switch: the slower sort's posts replaced the chosen list;
+- `ForumSideMenu` search: older results, and a cleared box could be refilled by an in-flight search;
+- `MangaSearchSelector`: older results in the manga picker.
+
+Each now has a request counter (a ref): a response or failure applies only if it belongs to the latest request, and
+clearing the side-menu query invalidates an in-flight search. This is the same pattern as the search page, `/new` and
+the community feed.
+
+**Validated:** production build + stand-in `RACE999=1` (the first sort/search answers 2 s late).
+- Main: after switching to "New" the hot post was shown; after typing "ab" the "aa" result was shown (red).
+- Fix: only the new post and only the "ab" result (green).
+- The clear-the-box check passes on both builds (by then "aa" was already cached), so it does not prove that part.
+- `MangaSearchSelector` is the same code, checked by reading.
+- Real tsc 0 errors; eslint clean on all three files.
+
+---
+
 ## #998 The reader never shows (or records) the chapter it just left (2026-10-23)
 
 **What:** the reader stays mounted across chapters, and the effect that loads a chapter's pages never cancelled the
