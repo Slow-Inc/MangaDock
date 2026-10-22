@@ -490,13 +490,29 @@ export class MangaDexService {
         this.fetchMangaForRow('rating', limit, offset, tagId),
       ]);
 
+    // An outage is a 503 when every row is down; a row that is down is served empty but never cached (#970)
+    const rows = [newResult, latestResult, popularResult, topRatedResult];
+    if (rows.every((r) => r.unavailable))
+      throw new ServiceUnavailableException(
+        'MangaDex new releases unavailable',
+      );
+    const served = ({
+      items,
+      total,
+    }: {
+      items: LandingBook[];
+      total: number;
+    }) => ({ items, total });
     const result = {
-      new: newResult,
-      latest: latestResult,
-      popular: popularResult,
-      'top-rated': topRatedResult,
+      new: served(newResult),
+      latest: served(latestResult),
+      popular: served(popularResult),
+      'top-rated': served(topRatedResult),
     };
-    if (newResult.items.length > 0 || latestResult.items.length > 0) {
+    if (
+      !rows.some((r) => r.unavailable) &&
+      (newResult.items.length > 0 || latestResult.items.length > 0)
+    ) {
       await this.cache.set(cacheKey, result, CACHE_TTL_MS);
     }
     return result;
@@ -529,6 +545,7 @@ export class MangaDexService {
     params.append('contentRating[]', 'suggestive');
     params.set('order[followedCount]', 'desc');
 
+    let result: { items: LandingBook[]; total: number; slug: string };
     try {
       const response = await this.mangadexFetch(
         `https://api.mangadex.org/manga?${params.toString()}`,
@@ -539,9 +556,7 @@ export class MangaDexService {
       };
       const items = this.mapManga(data);
       const total = (data as any).total ?? items.length;
-      const result = { items, total, slug };
-      await this.cache.set(cacheKey, result, 1000 * 60 * 15);
-      return result;
+      result = { items, total, slug };
     } catch (err) {
       this.logger.warn(
         `[MangaDex] Genre fetch error (${slug}): ${String(err)}`,
@@ -551,6 +566,8 @@ export class MangaDexService {
         'MangaDex genre listing unavailable',
       );
     }
+    await this.cache.set(cacheKey, result, 1000 * 60 * 15);
+    return result;
   }
 
   async searchManga(
@@ -598,7 +615,7 @@ export class MangaDexService {
     limit = 10,
     offset = 0,
     tagId?: string,
-  ): Promise<{ items: LandingBook[]; total: number }> {
+  ): Promise<{ items: LandingBook[]; total: number; unavailable?: true }> {
     const params = new URLSearchParams();
     params.set('limit', String(limit));
     if (offset > 0) params.set('offset', String(offset));

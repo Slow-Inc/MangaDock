@@ -100,4 +100,28 @@ describe('MangaDex outage → 503, never an empty result (#970)', () => {
       expect(cache.set).not.toHaveBeenCalled();
     },
   );
+
+  it('new releases answer 503 when every row is down', async () => {
+    const { service, cache } = makeMangaDex(down);
+    await expect(service.getNewReleases()).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(cache.set).not.toHaveBeenCalled();
+  });
+
+  it('new releases with one row down: the rest is served, nothing cached, no flag in the answer', async () => {
+    const ok = JSON.stringify({ data: [], total: 0 });
+    const { service, cache } = makeMangaDex(() =>
+      Promise.reject(new Error('unused')),
+    );
+    let calls = 0;
+    (service as unknown as { fetchFn: () => Promise<Response> }).fetchFn =
+      () =>
+        ++calls === 3
+          ? down()
+          : Promise.resolve(new Response(ok, { status: 200 }));
+    const res = await service.getNewReleases();
+    expect(JSON.stringify(res)).not.toContain('unavailable');
+    expect(cache.set).not.toHaveBeenCalled();
+  });
 });
