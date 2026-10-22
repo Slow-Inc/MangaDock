@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 26 — sampling temperature A/B: 0.5 stays, 0.0 rejected (#890) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Blind pairwise A/B on 12 pages (audit's lowest + 3 controls), same v2 prompt, arms differing only in `temperature: 0.0`: **0.5 won 7 pages, 0.0 won 4, 1 tie**.
+- Offline check: the arms are **identical on most segments** (122 segments, a handful differ) — the gateway's sampling is already near-deterministic — and the differing lines favour 0.5. No default change; `thai_manga_v2_t0.yaml` kept as the record.
+- Reading recorded: prompt (#888, v2 won 6-2) and temperature are at a local optimum **under this judge**; the judge is the production model, so the next quality step is reference-based (gold) data, not self-grading.
+- Benchmark `2026-10-22-890-temperature-ab.md`; issue #890 closed with the result.
+
 ## MIT quality loop, round 25 — prompt v3 lost the blind A/B; the A/B exposed a mark-order defect (#888, #889) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
