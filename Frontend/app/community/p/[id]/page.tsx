@@ -594,7 +594,8 @@ export default function PostDetailPage() {
                   onChange={(e) => setNewComment(e.target.value)}
                   maxLength={FORUM_LIMITS.comment}
                   aria-describedby={commentLimitId}
-                  aria-label="ความคิดเห็นของคุณ" placeholder="ร่วมแสดงความคิดเห็นของคุณ..."
+                  aria-label="ความคิดเห็นของคุณ"
+                  placeholder="ร่วมแสดงความคิดเห็นของคุณ..."
                   rows={3}
                   className="w-full bg-fill border border-line rounded-xl p-3 text-ink text-sm focus:outline-none focus:border-accent transition-all resize-none mb-3"
                 />

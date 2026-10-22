@@ -378,7 +378,8 @@ function SearchResults() {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              aria-label="ค้นหาหนังสือหรือมังงะ" placeholder="ค้นหาหนังสือ, มังงะ..."
+              aria-label="ค้นหาหนังสือหรือมังงะ"
+              placeholder="ค้นหาหนังสือ, มังงะ..."
               autoFocus
               className={`${inputClass} pl-12`}
             />

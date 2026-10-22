@@ -131,7 +131,8 @@ function SearchContent() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              aria-label="ค้นหาชื่อมังงะ" placeholder="ค้นหาชื่อมังงะ..."
+              aria-label="ค้นหาชื่อมังงะ"
+              placeholder="ค้นหาชื่อมังงะ..."
               className="w-full rounded-2xl border border-line bg-fill py-3 pl-12 pr-12 text-base text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 focus:bg-raised"
             />
             {searching && (
