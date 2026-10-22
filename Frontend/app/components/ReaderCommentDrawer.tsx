@@ -19,6 +19,8 @@ type Comment = {
 
 type Props = {
   open: boolean;
+  /** The reader's "nothing is shown over me" check: the login toast/modal over the reader takes Tab from the drawer. */
+  isTop: () => boolean;
   onClose: () => void;
   mangaId: string;
   chapterId: string;
@@ -40,7 +42,7 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)} วันที่แล้ว`;
 }
 
-export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId, pageNumber }: Props) {
+export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, chapterId, pageNumber }: Props) {
   const { user, showLoginPrompt } = useContext(AuthContext);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,7 +52,7 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
   // A dialog over the reader (#928): focus moves in, Tab stays inside, focus returns to the comment button on close.
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  useDialogFocus(panelRef, () => true, open);
+  useDialogFocus(panelRef, isTop, open);
 
   const fetchComments = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
@@ -145,8 +147,8 @@ export default function ReaderCommentDrawer({ open, onClose, mangaId, chapterId,
           </button>
         </div>
 
-        {/* Comment list */}
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* Comment list — data-lenis-prevent: the app-wide smooth scroll would swallow its wheel (#928) */}
+        <div data-lenis-prevent className="flex-1 overflow-y-auto p-4">
           {loading ? (
             <div className="flex justify-center py-6 text-ink-3">
               <Loader context="section" label="กำลังโหลดความคิดเห็น" />
