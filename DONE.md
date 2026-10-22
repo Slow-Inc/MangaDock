@@ -90,6 +90,11 @@ with its text is not announced reliably). Unstyled wrappers: 0 px when empty, so
 modal and the review form were not triggered (both need the backend, not running locally) — same wrapper, checked by
 reading. tsc 0; eslint 0 on the three files.
 
+**Review round:** no double announcement (none of the three calls the toast), regions exist before any text, no parked file
+touched. ProfileTab returns a fragment, so its two regions became two children of the page's `space-y-5` — grouped in one
+wrapper. Measured: no message → wrapper 0 px and the gap above the form stays one 20 px step; with a message → 20 px from
+the box to the form.
+
 ---
 
 ## #874 Studio and community custom selects work by keyboard (2026-10-21)

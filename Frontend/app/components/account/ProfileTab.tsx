@@ -44,20 +44,23 @@ export default function ProfileTab({ formState, dispatch, isOpen }: ProfileTabPr
 
   return (
     <>
-      {/* Always-mounted live regions, filled when there is a message — announced on Save (#907) */}
-      <div role="status">
-        {successMessage && (
-          <div className="mb-4 rounded-xl bg-ok/10 border border-ok/40 px-4 py-2.5 text-sm text-ok">
-            {successMessage}
-          </div>
-        )}
-      </div>
-      <div role="alert">
-        {errorMessage && (
-          <div className="mb-4 rounded-xl bg-danger/10 border border-danger/40 px-4 py-2.5 text-sm text-danger">
-            {errorMessage}
-          </div>
-        )}
+      {/* Always-mounted live regions, filled when there is a message — announced on Save (#907). One wrapper, so the
+          page's space-y stack gains one (empty, 0 px) child, not two. */}
+      <div>
+        <div role="status">
+          {successMessage && (
+            <div className="mb-4 rounded-xl bg-ok/10 border border-ok/40 px-4 py-2.5 text-sm text-ok">
+              {successMessage}
+            </div>
+          )}
+        </div>
+        <div role="alert">
+          {errorMessage && (
+            <div className="mb-4 rounded-xl bg-danger/10 border border-danger/40 px-4 py-2.5 text-sm text-danger">
+              {errorMessage}
+            </div>
+          )}
+        </div>
       </div>
       <div className="space-y-4">
         <div>
