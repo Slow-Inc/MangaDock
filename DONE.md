@@ -77,6 +77,19 @@
 
 ---
 
+## #978 /forum/trending-manga: a database error is the database-down signal, not "nothing trending" (2026-10-22)
+
+**What:** `getTrendingManga` answered `[]` when the `get_trending_manga` RPC failed (database error or network), so
+`/community/trending` said nothing was trending, `communityApi` cached that for 5 min, and the page's own load-error
+state (#911) never showed. A database error now throws an Error naming Supabase (`AllExceptionsFilter` → 503
+`SUPABASE_OFFLINE`, the app's database-down toast) and a failed call propagates; the frontend already throws on a
+non-ok answer without caching and shows its retry.
+
+**Validated:** Jest red → green in `forum/forum.service.spec.ts` — the old "returns empty array on Supabase error"
+test now asserts a Supabase rejection, plus a rejected-call case; forum suites 70/70. eslint unchanged.
+
+---
+
 ## #976 Book detail: an unknown id is a 404, an outage a 503 (or stale), half a detail is not cached (2026-10-22)
 
 **What:** `getMangaDetail` builds the detail from two MangaDex fetches (the manga; its covers) and each turned any

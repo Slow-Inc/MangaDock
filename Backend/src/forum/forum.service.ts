@@ -770,32 +770,27 @@ export class ForumService {
   }
 
   async getTrendingManga(limit = 5): Promise<TrendingManga[]> {
-    try {
-      // Group + rank in Postgres. The old path pulled a 200-row sample into Node and
-      // tallied it, which undercounted / mis-ranked once a manga's within-window posts
-      // spilled past the sample. The RPC reproduces the same filter semantics
-      // (non-null id, non-empty title, created within the last 7 days) but counts and
-      // orders across the full table (FR-16).
-      const { data, error } = await this.db.rpc('get_trending_manga', {
-        p_limit: limit,
-      });
+    // Group + rank in Postgres. The old path pulled a 200-row sample into Node and
+    // tallied it, which undercounted / mis-ranked once a manga's within-window posts
+    // spilled past the sample. The RPC reproduces the same filter semantics
+    // (non-null id, non-empty title, created within the last 7 days) but counts and
+    // orders across the full table (FR-16).
+    const { data, error } = await this.db.rpc('get_trending_manga', {
+      p_limit: limit,
+    });
 
-      if (error) {
-        this.logger.error(`Supabase error fetching trending: ${error.message}`);
-        return []; // Fallback to empty list instead of crashing
-      }
+    // Not an empty list: that read as "nothing is trending" and hid the page's load-error state (#978). An Error
+    // naming Supabase is the database-down signal (AllExceptionsFilter → 503 SUPABASE_OFFLINE).
+    if (error)
+      throw new Error(`Supabase error fetching trending: ${error.message}`);
 
-      // post_count arrives as a bigint string over PostgREST — coerce to number.
-      return ((data ?? []) as any[]).map((row) => ({
-        mangaId: row.manga_id,
-        mangaTitle: row.manga_title || 'Unknown',
-        mangaCover: row.manga_cover,
-        postCount: Number(row.post_count),
-      }));
-    } catch (err) {
-      this.logger.error(`Unexpected error in getTrendingManga: ${String(err)}`);
-      return [];
-    }
+    // post_count arrives as a bigint string over PostgREST — coerce to number.
+    return ((data ?? []) as any[]).map((row) => ({
+      mangaId: row.manga_id,
+      mangaTitle: row.manga_title || 'Unknown',
+      mangaCover: row.manga_cover,
+      postCount: Number(row.post_count),
+    }));
   }
 
   async createComment(
