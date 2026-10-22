@@ -473,7 +473,7 @@ function SearchResults() {
                   aria-describedby={yearFromBad ? "year-hint" : undefined}
                   placeholder="จาก"
                   min={1900} max={2100}
-                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
+                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
                 />
                 <span className="text-xs text-ink-3">–</span>
                 <input
@@ -484,7 +484,7 @@ function SearchResults() {
                   aria-describedby={yearToBad ? "year-hint" : undefined}
                   placeholder="ถึง"
                   min={1900} max={2100}
-                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
+                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
                 />
                 {(yearFromDraft || yearToDraft) && (
                   <button onClick={clearYear} className="text-xs text-ink-2 hover:text-ink transition">ล้าง</button>

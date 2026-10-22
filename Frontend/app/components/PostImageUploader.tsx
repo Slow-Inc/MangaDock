@@ -163,7 +163,7 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
                 onChange={(e) => setUrlInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleUrlAdd()}
                 placeholder="https://example.com/image.jpg"
-                className="flex-1 bg-fill border border-line rounded-lg px-3 py-2 text-ink text-xs focus:outline-none focus:border-accent transition-all"
+                className="flex-1 bg-fill border border-line rounded-lg px-3 py-2 text-ink text-xs focus:border-accent transition-all"
               />
               <button
                 type="button"

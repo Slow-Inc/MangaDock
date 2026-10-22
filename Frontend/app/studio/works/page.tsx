@@ -229,7 +229,7 @@ export default function WorksPage() {
                   placeholder="ชื่อเรื่อง..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent"
+                  className="flex-1 rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 transition focus:border-accent"
                 />
                 {/* Status filter */}
                 <div className="flex gap-2">

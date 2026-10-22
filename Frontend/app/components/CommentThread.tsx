@@ -174,7 +174,7 @@ function CommentThreadImpl({
                   maxLength={FORUM_LIMITS.comment}
                   aria-describedby={editLimitId}
                   rows={3}
-                  className="w-full bg-fill border border-line rounded-lg p-3 text-sm text-ink focus:outline-none focus:border-ink-3 smooth-hover resize-none"
+                  className="w-full bg-fill border border-line rounded-lg p-3 text-sm text-ink focus:border-ink-3 smooth-hover resize-none"
                 />
                 <LimitCounter id={editLimitId} value={editContent} max={FORUM_LIMITS.comment} />
                 <div className="flex justify-end gap-2 mt-2">
@@ -279,7 +279,7 @@ function CommentThreadImpl({
                 maxLength={FORUM_LIMITS.comment}
                 aria-describedby={replyLimitId}
                 placeholder="เขียนข้อความตอบกลับ..."
-                className="w-full bg-fill border border-line rounded-lg p-3 text-sm text-ink focus:outline-none focus:border-ink-3 smooth-hover resize-none"
+                className="w-full bg-fill border border-line rounded-lg p-3 text-sm text-ink focus:border-ink-3 smooth-hover resize-none"
                 rows={3}
               />
               <LimitCounter id={replyLimitId} value={replyContent} max={FORUM_LIMITS.comment} />

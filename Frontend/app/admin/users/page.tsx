@@ -36,7 +36,7 @@ function PlanBadge({ plan }: { plan: string }) {
   return <span className={`whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{plan}</span>;
 }
 
-const inputCls = 'bg-fill border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 focus:bg-raised transition-colors';
+const inputCls = 'bg-fill border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-ink-3 focus:bg-raised transition-colors';
 
 export default function AdminUsersPage() {
   const { getIdToken } = useAuth();
@@ -227,7 +227,7 @@ export default function AdminUsersPage() {
                     {u.role < 8 && (
                       <>
                         <select aria-label={`Role of ${u.displayName || u.email}`} defaultValue={u.role} onChange={e => { setConfirmRoleUid(u.uid); setConfirmRole(Number(e.target.value)); }}
-                          className="bg-fill border border-line rounded px-2 py-1 text-xs text-ink-2 focus:outline-none">
+                          className="bg-fill border border-line rounded px-2 py-1 text-xs text-ink-2">
                           {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                         </select>
                         {u.banned ? (

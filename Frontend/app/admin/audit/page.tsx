@@ -42,7 +42,7 @@ const ACTION_COLOR: Record<string, string> = {
 const LIMIT = 20;
 
 const inputCls =
-  'bg-fill border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 focus:bg-raised transition-colors';
+  'bg-fill border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-ink-3 focus:bg-raised transition-colors';
 
 function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n) + '…' : s;

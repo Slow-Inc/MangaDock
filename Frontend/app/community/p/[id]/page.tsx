@@ -457,7 +457,7 @@ export default function PostDetailPage() {
                   onChange={(e) => setEditPostTitle(e.target.value)}
                   maxLength={FORUM_LIMITS.title}
                   aria-describedby={editTitleLimitId}
-                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-xl sm:text-2xl font-black text-ink focus:outline-none focus:border-accent transition-colors mb-3"
+                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-xl sm:text-2xl font-black text-ink focus:border-accent transition-colors mb-3"
                   placeholder="หัวข้อกระทู้"
                 />
                 <LimitCounter id={editTitleLimitId} value={editPostTitle} max={FORUM_LIMITS.title} />
@@ -467,7 +467,7 @@ export default function PostDetailPage() {
                   maxLength={FORUM_LIMITS.content}
                   aria-describedby={editContentLimitId}
                   rows={8}
-                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm sm:text-base text-ink focus:outline-none focus:border-accent transition-colors resize-none leading-relaxed"
+                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm sm:text-base text-ink focus:border-accent transition-colors resize-none leading-relaxed"
                   placeholder="เนื้อหากระทู้"
                 />
                 <LimitCounter id={editContentLimitId} value={editPostContent} max={FORUM_LIMITS.content} />
@@ -597,7 +597,7 @@ export default function PostDetailPage() {
                   aria-label="ความคิดเห็นของคุณ"
                   placeholder="ร่วมแสดงความคิดเห็นของคุณ..."
                   rows={3}
-                  className="w-full bg-fill border border-line rounded-xl p-3 text-ink text-sm focus:outline-none focus:border-accent transition-all resize-none mb-3"
+                  className="w-full bg-fill border border-line rounded-xl p-3 text-ink text-sm focus:border-accent transition-all resize-none mb-3"
                 />
                 <LimitCounter id={commentLimitId} value={newComment} max={FORUM_LIMITS.comment} />
                 <div className="flex justify-end">

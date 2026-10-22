@@ -473,7 +473,7 @@ function CommunityContent() {
                   maxLength={FORUM_LIMITS.title}
                   aria-describedby={postTitleLimitId}
                   placeholder="เขียนหัวข้อโพสต์ที่นี่..."
-                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm text-ink focus:outline-none focus:border-accent transition-all"
+                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm text-ink focus:border-accent transition-all"
                 />
                 <LimitCounter id={postTitleLimitId} value={newPost.title} max={FORUM_LIMITS.title} />
               </div>
@@ -487,7 +487,7 @@ function CommunityContent() {
                   aria-describedby={postContentLimitId}
                   placeholder="รายละเอียดสิ่งที่คุณต้องการจะพูดคุย..."
                   rows={4}
-                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm text-ink focus:outline-none focus:border-accent transition-all resize-none"
+                  className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm text-ink focus:border-accent transition-all resize-none"
                 />
                 <LimitCounter id={postContentLimitId} value={newPost.content} max={FORUM_LIMITS.content} />
               </div>
