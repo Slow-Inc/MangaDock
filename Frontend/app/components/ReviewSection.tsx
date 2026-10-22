@@ -115,7 +115,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
     setDeletingReview(true);
     try {
       const token = await getToken();
-      if (!token) throw new Error("no session");
+      if (!token) { showLoginPrompt(); return; } // as handleSubmit does: retrying can't help a dead session
       const res = await fetch(BASE(mangaId), {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -213,7 +213,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       {/* Own review preview */}
       {myReview && !showForm && (
         <div className="mb-4">
-          <ReviewCard review={myReview} isOwn onDelete={handleDelete} />
+          <ReviewCard review={myReview} isOwn onDelete={handleDelete} deleting={deletingReview} />
         </div>
       )}
 

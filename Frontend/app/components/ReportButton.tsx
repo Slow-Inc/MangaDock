@@ -49,7 +49,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
     setError("");
     try {
       const token = await getToken();
-      if (!token) throw new Error("no session");
+      if (!token) { setOpen(false); showLoginPrompt(); return; } // retrying can't help a dead session
       const res = await fetch("/api/proxy/content-reports", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

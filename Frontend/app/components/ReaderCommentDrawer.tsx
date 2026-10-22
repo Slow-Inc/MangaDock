@@ -122,7 +122,7 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
     setDeleting((prev) => new Set(prev).add(id));
     try {
       const token = await getToken();
-      if (!token) throw new Error("no session");
+      if (!token) { showLoginPrompt(); return; } // retrying can't help a dead session
       const res = await fetch(`/api/proxy/reader-comments/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -195,7 +195,7 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-xs text-ink-3">{timeAgo(c.createdAt)}</span>
                           {isOwn && (
-                            <button type="button" onClick={() => handleDelete(c.id)} aria-label="ลบความคิดเห็น" className="text-ink-2 transition hover:text-danger">
+                            <button type="button" onClick={() => handleDelete(c.id)} disabled={deleting.has(c.id)} aria-label="ลบความคิดเห็น" className="text-ink-2 transition hover:text-danger disabled:opacity-40">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
                                 <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>

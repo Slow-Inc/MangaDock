@@ -104,6 +104,21 @@ Not run end to end: post edit/delete, comment edit/delete, the create-post failu
 the quick post, reader comments, review delete and notifications. These are checked by tsc and code reading (same
 pattern). eslint matches main on all ten files.
 
+**Review round:**
+- The database-down toast (`SupabaseGuard`, 10 s) was replaced by the caller's generic toast for the same 503.
+  Toasts now carry a `priority`, and the outage toasts are 1, so a lower one never replaces them. E2E with
+  `FLAKY_CODE=SUPABASE_OFFLINE`: red showed the generic toast, green keeps the DB toast and the text.
+- A reply is read-only while it is being sent.
+- Opening a notification marks it read quietly; only "read all" reports a failure, and it is guarded.
+- A dead session opens the login prompt instead of "try again".
+- The in-flight deletes disable their buttons.
+- A failed forum image upload shows a toast.
+
+**Typecheck correction:** `npx tsc` in Frontend prints npm's "not the tsc command" notice instead of type-checking, so
+earlier "tsc clean" claims (#985, #988) were empty greps. The real compiler is `node node_modules/typescript/bin/tsc`.
+It was proven to run (284 app files; a planted error is caught) and reports 0 errors on main + #987, which re-verifies
+#985 and #988.
+
 ---
 
 ## #988 Forum compose follows the server: role-filtered categories on the manga page, clipped auto titles, input limits (2026-10-22)

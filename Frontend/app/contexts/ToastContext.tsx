@@ -22,6 +22,9 @@ export type ToastOptions = {
   type?: ToastType;
   /** Auto-dismiss duration in ms. 0 = no auto-dismiss. Defaults to 4000. */
   duration?: number;
+  /** A toast never replaces one of higher priority that is still showing (default 0). The database-down
+   *  toast is 1, so the generic "…ไม่สำเร็จ" a caller shows for the same failed response does not hide it (#987). */
+  priority?: number;
   /** Optional action button. If onClick returns a Promise the button shows a
    *  spinner while pending and the toast dismisses when it resolves/rejects. */
   action?: {
@@ -120,6 +123,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // toast to be wiped out 300 ms later by the stale timer.
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keyRef = useRef(0);
+  const shownPriority = useRef<number | null>(null); // priority of the toast on screen; null once it closed
   // The running auto-dismiss: time left and when it started. Hover or focus on the toast holds it (WCAG 2.2.1) (#956).
   const timing = useRef<{ left: number; since: number } | null>(null);
   const hovered = useRef(false);
@@ -131,6 +135,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const dismissToast = useCallback(() => {
     setVisible(false);
+    shownPriority.current = null;
     timing.current = null;
     const hadFocus = !!cardRef.current?.contains(document.activeElement);
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
@@ -165,6 +170,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, [startTimer]);
 
   const showToast = useCallback((opts: ToastOptions) => {
+    const priority = opts.priority ?? 0;
+    if (shownPriority.current !== null && priority < shownPriority.current) return;
+    shownPriority.current = priority;
     // Clear any existing auto-dismiss timer and any pending close timer from dismissToast
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
     if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }

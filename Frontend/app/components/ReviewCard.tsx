@@ -8,6 +8,8 @@ type Props = {
   review: ReviewItem;
   isOwn?: boolean;
   onDelete?: () => void;
+  /** The delete is in flight: the button is disabled (#987). */
+  deleting?: boolean;
 };
 
 function timeAgo(iso: string): string {
@@ -22,7 +24,7 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
 }
 
-export default function ReviewCard({ review, isOwn, onDelete }: Props) {
+export default function ReviewCard({ review, isOwn, onDelete, deleting }: Props) {
 
   return (
     <div className={`rounded-xl border p-4 ${isOwn ? "border-accent/40 bg-accent/10" : "border-line bg-fill"}`}>
@@ -42,7 +44,8 @@ export default function ReviewCard({ review, isOwn, onDelete }: Props) {
           {isOwn && onDelete && (
             <button
               onClick={onDelete}
-              className="rounded-lg p-1 text-ink-2 transition hover:text-danger"
+              disabled={deleting}
+              className="rounded-lg p-1 text-ink-2 transition hover:text-danger disabled:opacity-40"
               title="ลบรีวิวของฉัน"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">

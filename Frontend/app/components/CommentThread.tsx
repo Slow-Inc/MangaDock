@@ -274,6 +274,7 @@ function CommentThreadImpl({
               <textarea
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
+                readOnly={submitting}
                 maxLength={FORUM_LIMITS.comment}
                 aria-describedby={replyLimitId}
                 placeholder="เขียนข้อความตอบกลับ..."
