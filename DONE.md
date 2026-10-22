@@ -77,6 +77,18 @@
 
 ---
 
+## #954 Popup reviews: a failed load is not "no reviews yet" (2026-10-22)
+
+**What:** `ReviewSection.fetchPublic` wrote the summary and list only when each response was ok and had no `catch`, so a
+failed load showed "ยังไม่มีรีวิว เป็นคนแรกที่รีวิว!" with no retry (the #911 / #930 class). A `reviewsFailed` state (either
+response not ok, or the fetch throws) now shows the shared `LoadError` with a retry of `fetchPublic`. The unhandled
+rejection a throwing fetch would have caused was not observed — the Next proxy turns a backend failure into a 502.
+
+**Validated:** production build, stand-in reviews endpoints dropping their first connection: before, "ยังไม่มีรีวิว…";
+after, "โหลดรีวิวไม่สำเร็จ" + "ลองใหม่", and the retry shows the real (empty) answer; no page errors. tsc 0; eslint 0.
+
+---
+
 ## #952 Collapsed chapter-version groups out of the Tab order (2026-10-22)
 
 **What:** in the book popup's `ChapterList`, a chapter with several versions is a collapsible "ตอนที่ N · N เวอร์ชัน"
