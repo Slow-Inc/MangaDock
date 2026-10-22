@@ -77,6 +77,19 @@
 
 ---
 
+## #952 Collapsed chapter-version groups out of the Tab order (2026-10-22)
+
+**What:** in the book popup's `ChapterList`, a chapter with several versions is a collapsible "ตอนที่ N · N เวอร์ชัน"
+group; collapsed it was only `grid-template-rows: 0fr` + `overflow-hidden`, so its version rows stayed in the Tab order,
+and its toggle had no expanded state. The collapsible part now has an id (`useId`-prefixed: a popup can open over
+another) and is `inert` while collapsed; the toggle is `type="button"` with `aria-expanded` / `aria-controls`.
+
+**Validated:** production build, stand-in chapter 2 in two versions: before, 2 Tab stops inside the collapsed group and
+no `aria-expanded`; after, 0 while collapsed, the toggle reads `false` → `true`, and both rows are reachable once open.
+The #923 popup probe still passes. tsc 0; eslint 0 (as on main).
+
+---
+
 ## #950 Reader toolbar menus: out of the Tab order while closed, named zoom, Escape closes the menu (2026-10-22)
 
 **What:** the reader's translate dropdown and mobile "เพิ่มเติม" menu were hidden only with `pointer-events-none
