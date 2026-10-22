@@ -47,6 +47,7 @@ function StudioUploadContent() {
   // The cover URL that failed to load (#1029): a dead cover shows the no-cover glyph, not a broken image. Keyed on the
   // URL, so choosing another book tries its cover afresh.
   const [failedCover, setFailedCover] = useState<string | null>(null);
+  const coverShown = !!titleThumbnail && failedCover !== titleThumbnail;
   const [chapterId, setChapterId] = useState("");
   const [chapterNumber, setChapterNumber] = useState("");
   const [chapterTitle, setChapterTitle] = useState("");
@@ -235,9 +236,12 @@ function StudioUploadContent() {
                       <span className="text-xs">เลือกมังงะ</span>
                     </div>
                   )}
-                  <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-scrim/90 via-scrim/15 to-transparent" />
+                  {/* the scrim keeps the title readable over a cover; with no cover it only muddied the empty slot (#1048) */}
+                  {coverShown && (
+                    <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-scrim/90 via-scrim/15 to-transparent" />
+                  )}
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3">
-                    <p className="line-clamp-2 text-center text-sm font-semibold leading-snug text-white drop-shadow-md">
+                    <p className={`line-clamp-2 text-center text-sm font-semibold leading-snug ${coverShown ? "text-white drop-shadow-md" : "text-ink-2"}`}>
                       {titleName || "ยังไม่ได้เลือกมังงะ"}
                     </p>
                   </div>
