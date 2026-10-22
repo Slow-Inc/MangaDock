@@ -335,15 +335,21 @@ function SearchResults() {
     [sourceResults, categoryFilter],
   );
   const filtersOn = langFilter !== "all" || statusFilter !== "all" || !!yearFrom || !!yearTo || categoryFilter !== "all";
-  const clearFilters = () => {
-    setLangFilter("all");
-    setStatusFilter("all");
-    setCategoryFilter("all");
+  const clearYear = () => {
     setYearFromDraft("");
     setYearToDraft("");
     setYearFrom("");
     setYearTo("");
   };
+  const clearFilters = () => {
+    setLangFilter("all");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    clearYear();
+  };
+  // A typed year that cannot apply yet (partial or out of range) is flagged, not silently ignored (#965)
+  const yearFromBad = !!yearFromDraft && !completeYear(yearFromDraft);
+  const yearToBad = !!yearToDraft && !completeYear(yearToDraft);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -461,28 +467,35 @@ function SearchResults() {
                   type="number"
                   value={yearFromDraft}
                   onChange={(e) => setYearFromDraft(e.target.value)}
+                  aria-invalid={yearFromBad || undefined}
+                  aria-describedby={yearFromBad ? "year-hint" : undefined}
                   placeholder="จาก"
                   min={1900} max={2100}
-                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
                 />
                 <span className="text-xs text-ink-3">–</span>
                 <input
                   type="number"
                   value={yearToDraft}
                   onChange={(e) => setYearToDraft(e.target.value)}
+                  aria-invalid={yearToBad || undefined}
+                  aria-describedby={yearToBad ? "year-hint" : undefined}
                   placeholder="ถึง"
                   min={1900} max={2100}
-                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
                 />
                 {(yearFromDraft || yearToDraft) && (
-                  <button onClick={() => { setYearFromDraft(''); setYearToDraft(''); setYearFrom(''); setYearTo(''); }} className="text-xs text-ink-2 hover:text-ink transition">ล้าง</button>
+                  <button onClick={clearYear} className="text-xs text-ink-2 hover:text-ink transition">ล้าง</button>
+                )}
+                {(yearFromBad || yearToBad) && (
+                  <span id="year-hint" className="w-full pl-16 text-[11px] text-ink-3">ใส่ปี ค.ศ. 4 หลัก (1900–2100)</span>
                 )}
               </div>
 
               {/* Reset all */}
               {(statusFilter !== 'all' || yearFromDraft || yearToDraft) && (
                 <button
-                  onClick={() => { setStatusFilter('all'); setYearFromDraft(''); setYearToDraft(''); setYearFrom(''); setYearTo(''); }}
+                  onClick={() => { setStatusFilter('all'); clearYear(); }}
                   className="text-xs text-ink-2 underline underline-offset-2 hover:text-ink transition"
                 >
                   ล้างตัวกรองทั้งหมด
