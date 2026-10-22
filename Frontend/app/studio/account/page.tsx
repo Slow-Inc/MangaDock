@@ -231,8 +231,9 @@ export default function StudioAccountPage() {
 
             {/* Bio */}
             <div className="rounded-2xl border border-line bg-fill p-5">
-              <label className="mb-2 block text-sm font-semibold">แนะนำตัว</label>
+              <label htmlFor="studio-bio" className="mb-2 block text-sm font-semibold">แนะนำตัว</label>
               <textarea
+                id="studio-bio"
                 value={bio}
                 onChange={(e) => setBio(e.target.value.slice(0, 500))}
                 placeholder="เล่าเกี่ยวกับตัวคุณให้ผู้อ่านรู้จัก..."

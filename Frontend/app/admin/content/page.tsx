@@ -114,12 +114,12 @@ export default function AdminContentPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2.5 p-4 bg-fill border border-line rounded-xl">
-        <input value={search} onChange={e => setSearchPersist(e.target.value)} placeholder="Search title or content…" className={`${inputCls} w-60`} />
+        <input value={search} onChange={e => setSearchPersist(e.target.value)} aria-label="Search posts by title or content" placeholder="Search title or content…" className={`${inputCls} w-60`} />
         <select aria-label="Filter by category" value={filterCategory} onChange={e => setFilterCategoryPersist(e.target.value)} className={`${inputCls} text-ink-2`}>
           <option value="">All categories</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <input value={filterAuthor} onChange={e => setFilterAuthorPersist(e.target.value)} placeholder="Author UID…" className={`${inputCls} w-52`} />
+        <input value={filterAuthor} onChange={e => setFilterAuthorPersist(e.target.value)} aria-label="Filter by author UID" placeholder="Author UID…" className={`${inputCls} w-52`} />
       </div>
 
       {loadFailed && <AdminLoadError what="posts" onRetry={() => load(page)} />}

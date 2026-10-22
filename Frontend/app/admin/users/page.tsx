@@ -174,7 +174,7 @@ export default function AdminUsersPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2.5 p-4 bg-fill border border-line rounded-xl">
-        <input value={search} onChange={e => setSearchPersist(e.target.value)} placeholder="Search email or name…" className={`${inputCls} w-60`} />
+        <input value={search} onChange={e => setSearchPersist(e.target.value)} aria-label="Search users by email or name" placeholder="Search email or name…" className={`${inputCls} w-60`} />
         <select aria-label="Filter by role" value={filterRole} onChange={e => setFilterRolePersist(e.target.value)} className={`${inputCls} text-ink-2`}>
           <option value="">All roles</option>
           {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}

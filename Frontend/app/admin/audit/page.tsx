@@ -142,7 +142,7 @@ export default function AdminAuditPage() {
         <input
           value={filterActorUid}
           onChange={e => setFilterActorUid(e.target.value)}
-          placeholder="Actor UID…"
+          aria-label="Filter by actor UID" placeholder="Actor UID…"
           className={`${inputCls} w-72 font-mono text-xs`}
         />
         {(filterAction || filterActorUid) && (
