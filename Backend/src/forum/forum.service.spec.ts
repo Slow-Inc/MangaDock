@@ -185,7 +185,8 @@ describe('ForumService.vote — a comment of a deleted post (#1020)', () => {
       .mockResolvedValueOnce({ data: { post_id: 'p-deleted' }, error: null }) // the live comment
       .mockResolvedValueOnce({ data: null, error: null }); // its post is soft-deleted
     const rpc = jest.fn();
-    const service = makeService(() => chain, rpc);
+    const from = jest.fn(() => chain);
+    const service = makeService(from, rpc);
     await expect(
       service.vote('u1', {
         targetType: 'comment',
@@ -194,6 +195,10 @@ describe('ForumService.vote — a comment of a deleted post (#1020)', () => {
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(rpc).not.toHaveBeenCalled();
+    // the second lookup is the comment's own post, filtered on deleted_at
+    expect(from).toHaveBeenLastCalledWith('forum_posts');
+    expect(chain.eq).toHaveBeenLastCalledWith('id', 'p-deleted');
+    expect(chain.is).toHaveBeenLastCalledWith('deleted_at', null);
   });
 
   it('a comment of a live post is cast', async () => {
