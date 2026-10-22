@@ -9,7 +9,7 @@ import Loader from "../../components/ui/Loader";
 import { scrollBehavior } from "../../hooks/reducedMotion";
 import { usePageTitle } from "../../hooks/pageTitle";
 import LoadError from "../../components/ui/LoadError";
-import { goBackOr } from "../../lib/inAppBack";
+import { goBackOr, replaceUrl } from "../../lib/inAppBack";
 
 const API_BASE = "/api/proxy";
 
@@ -54,10 +54,12 @@ function GenrePageInner() {
 
   const [books, setBooks] = useState<GridBook[]>([]);
   const [total, setTotal] = useState(0);
-  // The page lives in the URL (#944): a refresh, a back from a book or a shared link keeps it; each change is a history entry
-  const page = Math.max(1, Math.floor(Number(useSearchParams().get("page"))) || 1);
-  const goToPage = (p: number) =>
-    router.push(p > 1 ? `/categories/${slug}?page=${p}` : `/categories/${slug}`, { scroll: false });
+  // The page lives in the URL (#944): a refresh, a back from a book or a shared link keeps it. Replaced, not pushed, so
+  // "← ย้อนกลับ" leaves the genre instead of stepping back through its pages; replaceUrl keeps #942's landing mark,
+  // which router.replace would drop.
+  const requested = parseInt(useSearchParams().get("page") ?? "", 10);
+  const page = requested > 0 ? requested : 1;
+  const goToPage = (p: number) => replaceUrl(p > 1 ? `/categories/${slug}?page=${p}` : `/categories/${slug}`);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -89,6 +91,12 @@ function GenrePageInner() {
   }, [slug, page, retryCount]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // A ?page= past the end (an old link, a typo) moves to the last page once the total is known
+  useEffect(() => {
+    if (total > 0 && page > totalPages) goToPage(totalPages);
+    // goToPage is rebuilt each render; total/page/totalPages are what decide
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total, page, totalPages]);
   const isPrevDisabled = page <= 1;
   const isNextDisabled = page >= totalPages;
 
