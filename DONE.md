@@ -83,12 +83,15 @@
 blurred background and the cover) — it rendered `selectedCover ?? resolvedThumbnail(book)` with no `onError`, so it
 never even tried the proxy fallback. It now uses #921's `useCoverSrc(book)`: a picked alternative cover still wins (its
 error does not advance the book's sources); when every source fails both covers show `CoverPlaceholder` and the blurred
-background is left out.
+background is left out. Scrutinize follow-ups in the same PR: a picked alternative cover that fails returns to the book's
+own cover, and an alternative-cover tile that fails shows a placeholder and can no longer be picked or enlarged.
 
 **Validated:** production build, stand-in backend with four books, popup opened from `/search` at 1440 and 390 px:
 before the fix 6 of 8 checks failed (2 broken images each, the fallback book included); after, 8/8 — 0 broken images, the
-working and fallback covers load, the two dead ones show the placeholder found by `getByRole('img', { name })`. tsc 0;
-eslint unchanged from main (3 pre-existing findings in the file).
+working and fallback covers load, the two dead ones show the placeholder found by `getByRole('img', { name })`. Alternative
+covers (stand-in: volume 1 loads, 2 dead, 3 serves once): before the follow-up, tile 2 was a broken image and picking 3
+left three broken images; after, 0 broken — tile 2 is a disabled placeholder, picking 1 shows it, picking 3 falls back to
+the book's own cover and disables tile 3. tsc 0; eslint unchanged from main (3 pre-existing findings in the file).
 
 ---
 

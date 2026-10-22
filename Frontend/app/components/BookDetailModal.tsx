@@ -104,6 +104,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [detail, setDetail] = useState<MangaDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [selectedCover, setSelectedCover] = useState<string | null>(null);
+  // Alternative covers that failed to load: their tile shows a placeholder and cannot be picked (#923)
+  const [failedCovers, setFailedCovers] = useState<ReadonlySet<string>>(() => new Set());
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [loadingChapters, setLoadingChapters] = useState(true);
   const [firstReadableChapter, setFirstReadableChapter] = useState<MangaChapter | undefined>();
@@ -304,10 +306,13 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   };
 
   // A picked alternative cover wins; otherwise step through the book's own sources, and show the placeholder once none
-  // is left (#923). A picked cover's error must not advance the book's sources.
-  const cover = useCoverSrc(book);
-  const displayThumbnail = selectedCover ?? cover.src;
-  const onCoverError = selectedCover ? undefined : cover.onError;
+  // is left (#923). A picked cover that fails goes back to the book's own cover without advancing its sources.
+  const bookCover = useCoverSrc(book);
+  const displayThumbnail = selectedCover ?? bookCover.src;
+  const markCoverFailed = (url: string) => setFailedCovers((prev) => new Set(prev).add(url));
+  const onCoverError = selectedCover
+    ? () => { markCoverFailed(selectedCover); setSelectedCover(null); }
+    : bookCover.onError;
 
   // Prefer book.categories; fall back to genres from MangaDex detail; last resort "E-Book"
   const categories = book.categories.length
@@ -817,11 +822,13 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                     const displayUrl = cover.localUrl
                       ? `${API_BASE}${cover.localUrl}`
                       : proxyImageUrl(cover.url);
+                    const failed = failedCovers.has(displayUrl);
                     return (
                     // Wrapper, not one button: the enlarge control is a real <button> too, and buttons cannot nest (#843).
                     <div key={i} className="group relative h-36 w-24 shrink-0">
                     <button
                       title={cover.volume ? `เล่ม ${cover.volume}` : `ปก ${i + 1}`}
+                      disabled={failed}
                       onClick={() =>
                         setSelectedCover(selectedCover === displayUrl ? null : displayUrl)
                       }
@@ -831,13 +838,18 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                           : "border-line hover:border-ink-2 group-hover:border-ink-2"
                       }`}
                     >
-                      <Image
-                        src={displayUrl}
-                        alt={cover.volume ? "" : `ปก ${i + 1}`} // the caption below already says "เล่ม N"
-                        fill
-                        className="object-cover transition duration-200 group-hover:scale-105"
-                        sizes="96px"
-                      />
+                      {failed ? (
+                        <CoverPlaceholder title="" decorative />
+                      ) : (
+                        <Image
+                          src={displayUrl}
+                          alt={cover.volume ? "" : `ปก ${i + 1}`} // the caption below already says "เล่ม N"
+                          fill
+                          className="object-cover transition duration-200 group-hover:scale-105"
+                          sizes="96px"
+                          onError={() => markCoverFailed(displayUrl)}
+                        />
+                      )}
                       {cover.volume && (
                         <div className="absolute inset-x-0 bottom-0 bg-bg/75 py-0.5 text-center text-xs font-semibold text-ink">
                           เล่ม {cover.volume}
@@ -845,7 +857,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       )}
                     </button>
                     {/* Expand: its own keyboard-reachable button, shown on hover or keyboard focus (#843) */}
-                    <button
+                    {!failed && <button
                       type="button"
                       aria-label={`ขยายปก${cover.volume ? ` เล่ม ${cover.volume}` : ` ${i + 1}`}`}
                       onClick={() => setLightboxSrc(displayUrl)}
@@ -854,7 +866,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3" aria-hidden>
                         <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
                       </svg>
-                    </button>
+                    </button>}
                     </div>
                     );
                   })}
