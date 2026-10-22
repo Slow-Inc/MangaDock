@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 16 — opt-in `fit_below_floor` for a block that cannot fit its gap (#883) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Chainsaw p0's `NOTICE:` credits: three 9 px lines 6-15 px apart, floor lifts each block to 20 px (~48 px) which cannot fit the gap, so the anti-overlap pass (designed to centre a too-tall block) leaves them overlapping. New `render.fit_below_floor` (default **off** — byte-identical) re-lays such a block below `font_size_minimum` and takes the largest size that fits.
+- Replay A/B (rescue off, same dump): **overlap 2 → 0**, regions 8/9 20 px → **10 px**, boxes moved into the gaps. Figure + benchmark `2026-10-22-883-below-floor-fit.md`.
+- Opt-in by the goal's tradeoff rule (small text is a readability call). Caveat recorded: the original English credits stay partly visible because thin lines get tight inpaint masks — that half of #883 is still open.
+- Self-caught during the A/B: the new stage kwarg landed before the `dispatch()` signature did, so rendering silently no-op'd (0 ms). Fixed, and the check is now explicit in the signature. 2 new tests, gate **839 passed**.
+
 ## MIT quality loop, round 15 — 39-page replay sweep: no dialogue lost, and a replay caveat (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
