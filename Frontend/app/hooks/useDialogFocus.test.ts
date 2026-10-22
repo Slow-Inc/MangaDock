@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { focusWrapTarget, hasLayerAbove } from "./useDialogFocus";
+import { cycleTarget, focusWrapTarget, hasLayerAbove } from "./useDialogFocus";
 
 describe("focusWrapTarget: Tab stays inside the dialog (#837)", () => {
   test("Tab on the last control wraps to the first", () => {
@@ -49,5 +49,25 @@ describe("hasLayerAbove: another layer shown over this one (#840)", () => {
   });
   test("hidden prompts (not layers) do not count", () => {
     expect(ask({ layer: false, z: 9999 }, { layer: true, z: 300, self: true })).toBe(false);
+  });
+});
+
+describe("cycleTarget: with a toast up, Tab walks the dialog's and the toast's controls as one cycle (#956)", () => {
+  // 5 dialog controls (0-4) then the toast's "เข้าสู่ระบบ" (5) and "ปิด" (6)
+  test("Tab from the dialog's last control reaches the toast", () => {
+    expect(cycleTarget({ index: 4, count: 7, backwards: false })).toBe(5);
+  });
+  test("Tab from the toast's last control comes back to the dialog's first", () => {
+    expect(cycleTarget({ index: 6, count: 7, backwards: false })).toBe(0);
+  });
+  test("Shift+Tab from the dialog's first control reaches the toast's last", () => {
+    expect(cycleTarget({ index: 0, count: 7, backwards: true })).toBe(6);
+  });
+  test("Shift+Tab from the toast's first control goes back into the dialog", () => {
+    expect(cycleTarget({ index: 5, count: 7, backwards: true })).toBe(4);
+  });
+  test("focus lost (on <body>) is pulled in at the start or the end", () => {
+    expect(cycleTarget({ index: -1, count: 7, backwards: false })).toBe(0);
+    expect(cycleTarget({ index: -1, count: 7, backwards: true })).toBe(6);
   });
 });

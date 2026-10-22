@@ -6,12 +6,10 @@ import React, {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useRef,
   useState,
   ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -100,6 +98,15 @@ function progressColor(type: ToastType) {
   return "bg-ink-3";
 }
 
+/**
+ * How long a toast stays (0 = until closed). One with an action gets at least 8 s: a keyboard user has to Tab to it,
+ * past the controls of whatever dialog is open, before it can be held by focus (#956).
+ */
+const toastDuration = (opts: ToastOptions) => {
+  const d = opts.duration ?? 4000;
+  return d > 0 && opts.action ? Math.max(d, 8000) : d;
+};
+
 // ── Provider ───────────────────────────────────────────────────────────────
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -118,29 +125,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const hovered = useRef(false);
   const focused = useRef(false);
   const [held, setHeld] = useState(false);
-  // The toast lives in its own layer at the end of <body>, moved there whenever a toast shows: after any popup or the
-  // reader (portals appended later), so Tab from their last control reaches it, and their focus traps see a layer
-  // above them (hasLayerAbove: fixed, high z-index, holding a control) and stand aside (#956).
-  const [host, setHost] = useState<HTMLElement | null>(null);
-  const hostRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    const el = document.createElement("div");
-    el.style.cssText = "position:fixed;z-index:9999;top:0;left:0;width:0;height:0";
-    document.body.appendChild(el);
-    hostRef.current = el;
-    setHost(el);
-    return () => { el.remove(); hostRef.current = null; };
-  }, []);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const returnTo = useRef<HTMLElement | null>(null); // where focus came from, for when the toast closes under it
 
   const dismissToast = useCallback(() => {
     setVisible(false);
     timing.current = null;
+    const hadFocus = !!cardRef.current?.contains(document.activeElement);
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
     if (closeTimer.current) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(() => {
       setToast(null);
       setActionLoading(false);
       closeTimer.current = null;
+      // Closed from its own button: focus goes back where it came from, not to <body>
+      if (hadFocus && returnTo.current?.isConnected) returnTo.current.focus({ preventScroll: true });
     }, 300);
   }, []);
 
@@ -149,38 +148,40 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     dismissTimer.current = setTimeout(dismissToast, ms);
   }, [dismissToast]);
 
-  const holdTimer = () => {
+  const holdTimer = useCallback(() => {
     if (!timing.current || !dismissTimer.current) return;
     clearTimeout(dismissTimer.current);
     dismissTimer.current = null;
     timing.current.left -= Date.now() - timing.current.since;
     setHeld(true);
-  };
+  }, []);
 
-  const releaseTimer = () => {
+  const releaseTimer = useCallback(() => {
     if (hovered.current || focused.current || !timing.current || dismissTimer.current) return;
-    startTimer(Math.max(timing.current.left, 1500)); // a moment to read it again after letting go
+    startTimer(Math.max(timing.current.left, 0)); // exactly what was left: the progress bar resumes from there too
     setHeld(false);
-  };
+  }, [startTimer]);
 
   const showToast = useCallback((opts: ToastOptions) => {
     // Clear any existing auto-dismiss timer and any pending close timer from dismissToast
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
     if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
-    const el = hostRef.current;
-    if (el && el !== document.body.lastElementChild) document.body.appendChild(el); // above whatever opened since
     keyRef.current += 1;
     timing.current = null;
-    hovered.current = false;
-    focused.current = false;
     setHeld(false);
     setToast({ ...opts, key: keyRef.current });
-    // Small delay before making visible so CSS transition fires
-    setTimeout(() => setVisible(true), 10);
-
-    const duration = opts.duration ?? 4000;
+    const duration = toastDuration(opts);
     if (duration > 0) startTimer(duration);
-  }, [startTimer]);
+    // Small delay before making visible so CSS transition fires
+    setTimeout(() => {
+      setVisible(true);
+      // The card is reused: a pointer resting on it, or focus still in it, holds this toast too
+      const card = cardRef.current;
+      hovered.current = !!card?.matches(":hover");
+      focused.current = !!card?.contains(document.activeElement);
+      if (hovered.current || focused.current) holdTimer();
+    }, 10);
+  }, [startTimer, holdTimer]);
 
   const handleAction = async () => {
     if (!toast?.action) return;
@@ -198,7 +199,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     // If not a Promise, caller handles dismiss themselves
   };
 
-  const duration = toast?.duration ?? 4000;
+  const duration = toast ? toastDuration(toast) : 4000;
   const showProgress = duration > 0 && !actionLoading;
 
   return (
@@ -207,8 +208,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
       <style>{`@keyframes mb-toast-shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }`}</style>
 
-      {/* Toast container — always rendered (in its host layer) for the CSS transition and the live region */}
-      {host && createPortal(
+      {/* Toast container — always rendered for CSS transition */}
       <div
         aria-live="polite"
         className={`fixed bottom-24 sm:bottom-10 left-1/2 z-[9999] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 transition-all duration-300 ${
@@ -217,9 +217,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       >
         {toast && (
           <div
+            ref={cardRef}
+            data-toast-card={visible ? "" : undefined} // while shown, an open dialog's Tab cycle includes its controls (#956)
             onMouseEnter={() => { hovered.current = true; holdTimer(); }}
             onMouseLeave={() => { hovered.current = false; releaseTimer(); }}
-            onFocus={() => { focused.current = true; holdTimer(); }}
+            onFocus={(e) => {
+              if (!focused.current && e.relatedTarget instanceof HTMLElement && !e.currentTarget.contains(e.relatedTarget)) {
+                returnTo.current = e.relatedTarget;
+              }
+              focused.current = true;
+              holdTimer();
+            }}
             onBlur={(e) => {
               if (e.currentTarget.contains(e.relatedTarget as Node)) return;
               focused.current = false;
@@ -276,8 +284,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             )}
           </div>
         )}
-      </div>,
-      host)}
+      </div>
     </ToastContext.Provider>
   );
 }

@@ -80,17 +80,21 @@
 ## #956 The guest login toast is reachable from the popup and can be held (2026-10-22)
 
 **What:** a guest pressing "ถูกใจ" / "เพิ่มในรายการ" / the reviews' sign-in prompt in the book popup gets a toast offering
-"เข้าสู่ระบบ", but the popup's Tab trap (top-of-stack check only) kept focus inside the popup, and the toast's 4 s timer
-ignored hover and focus. Now the toast's timer holds while it is hovered or focused and resumes with what was left (the
-progress bar pauses with it); the toast renders in its own host layer, moved to the end of `<body>` whenever a toast
-shows, so it sits after any popup or the reader in Tab order and is a layer above them; the popup's trap stands aside
-when such a layer is up (`hasLayerAbove`, as the reader drawer since #928). `AuthContext` untouched.
+"เข้าสู่ระบบ", but the popup's Tab trap kept focus inside the popup and the toast's 4 s timer ignored hover and focus.
+Now `useDialogFocus` adds a shown toast's controls (`[data-toast-card]`) to the open dialog's Tab cycle and walks that
+cycle itself while a toast is up (`cycleTarget`; the dialog stays sealed); the cycle skips controls inside `[inert]`
+parts (collapsed groups, closed menus). The toast holds its timer while hovered or focused and resumes with exactly what
+was left (the progress bar pauses with it), a new toast under a resting pointer or focus is held at once, a toast with an
+action stays at least 8 s (a keyboard user must Tab to it first), and closing it from its own button returns focus to
+where it came from. The toast stays where it was in the DOM (its live region untouched); `AuthContext` untouched.
 
-**Validated:** production build: before, 40 Tabs from the popup never reached the toast and a hovered toast was gone
-after 6 s; with only the trap change it took 43 Tabs (through the page behind the popup); after, Tab goes from the
-popup's last control straight to the toast (15 Tabs from "ถูกใจ"), a hovered toast stays past its timer and leaves once
-the pointer does. The reader-drawer and failed-lists probes (both raise toasts) still pass; screenshot shows the toast in
-place. tsc 0; eslint unchanged.
+**Validated:** `useDialogFocus.test.ts` 16 pass (5 new `cycleTarget`, red → green). Production build: before, 40 Tabs
+from the popup never reached the toast and a hovered toast was gone after 6 s. A first version (portal + the popup's trap
+standing aside) reached it but let focus wander behind the aria-modal popup — replaced after review. After: Tab goes
+from the popup's controls to the toast and back into the popup (never the page behind), closing it by keyboard returns
+focus into the popup, and a hovered toast outlives its 8 s and leaves after the pointer. The probe also caught the new
+cycle sticking on an inert collapsed chapter group, fixed by the `[inert]` filter. Reader-drawer, failed-lists, popup,
+chapter-groups, community-drawer and reader-menu probes pass. tsc 0; eslint 0 on the touched files.
 
 ---
 
