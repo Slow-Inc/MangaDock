@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 52 — HEAD quality audit: EN 1.55/2, JP 1.64/2 — no regression (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Judged **fresh live runs at HEAD** (no replay) with the source-agnostic judge: **EN 1.55/2** over 113 segments / 8 unique pages (baseline 1.51/372), distribution 58 % perfect / 40 % minor / 3 % broken (baseline 54/43/3); **JP 1.64/2** over the two real pages (baseline 1.57) with **0 inversions** (was 1).
+- The guards added this loop (#898 negation, #901 runaway, #903 script leak) show no quality cost on either path. Remaining score-0 cases are model-ceiling items (Iruma stammer `I- I DONT WANT THEM.` -> `ท้องไม่`; `W-` -> `ฉ-`) plus one judge spell-check false alarm — recorded, not guard-able.
+- Limitation re-confirmed: the gateway exposes **one model**, so judge == translator; per #902 only ≥~5 page-vote margins are meaningful, and this was a status check, not an A/B.
+- Benchmark `2026-10-22-head-quality-audit.md`.
+
 ## MIT quality loop, round 51 — `translate_batch_pipelined` on 6 real pages: **1.37× wall, identical structure** (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
