@@ -89,6 +89,23 @@ function scheduleFlush() {
   flushTimer = setTimeout(flush, FLUSH_DELAY);
 }
 
+/** The differences between local state and what the server is known to hold. */
+function pendingChanges() {
+  const toAddFav: CachedBook[] = [];
+  const toRemoveFav: string[] = [];
+  const toAddLike: string[] = [];
+  const toRemoveLike: string[] = [];
+  for (const [id, book] of favorites) if (!syncedFavorites.has(id)) toAddFav.push(book);
+  for (const id of syncedFavorites) if (!favorites.has(id)) toRemoveFav.push(id);
+  for (const id of liked) if (!syncedLiked.has(id)) toAddLike.push(id);
+  for (const id of syncedLiked) if (!liked.has(id)) toRemoveLike.push(id);
+  return { toAddFav, toRemoveFav, toAddLike, toRemoveLike };
+}
+
+function hasPending(): boolean {
+  return Object.values(pendingChanges()).some((list) => list.length > 0);
+}
+
 async function flush() {
   const generation = cacheGeneration;
   flushTimer = null;
@@ -97,30 +114,24 @@ async function flush() {
 
   const headers = createAuthHeaders(token, { "Content-Type": "application/json" });
 
-  // Compute diffs vs last known database state
-  const toAddFav: CachedBook[] = [];
-  const toRemoveFav: string[] = [];
-  const toAddLike: string[] = [];
-  const toRemoveLike: string[] = [];
-
-  for (const [id, book] of favorites) {
-    if (!syncedFavorites.has(id)) toAddFav.push(book);
-  }
-  for (const id of syncedFavorites) {
-    if (!favorites.has(id)) toRemoveFav.push(id);
-  }
-  for (const id of liked) {
-    if (!syncedLiked.has(id)) toAddLike.push(id);
-  }
-  for (const id of syncedLiked) {
-    if (!liked.has(id)) toRemoveLike.push(id);
-  }
-
+  const { toAddFav, toRemoveFav, toAddLike, toRemoveLike } = pendingChanges();
   if (!toAddFav.length && !toRemoveFav.length && !toAddLike.length && !toRemoveLike.length) return;
 
-  // fetch resolves on a 4xx/5xx too: only a request the server stored marks its own item synced, and the
-  // rest stay pending for the next flush (#985)
-  const stored = (req: Promise<Response>) => req.then((r) => r.ok, () => false);
+  // fetch resolves on a 4xx/5xx too: only a request the server stored marks its own item synced, and the rest stay
+  // pending for the next flush. A 4xx other than auth / timeout / rate limit will never succeed, so it is settled
+  // (logged) instead of retried forever (#985).
+  const stored = (req: Promise<Response>) =>
+    req.then(
+      (r) => {
+        if (r.ok) return true;
+        if (r.status >= 400 && r.status < 500 && ![401, 408, 429].includes(r.status)) {
+          console.warn(`[userCache] sync request refused for good (${r.status}): ${r.url}`);
+          return true;
+        }
+        return false;
+      },
+      () => false
+    );
   const [favAdded, favRemoved, likeAdded, likeRemoved] = await Promise.all([
     Promise.all(
       toAddFav.map((b) =>
@@ -143,9 +154,9 @@ async function flush() {
         )
       )
     ),
-    Promise.all(toRemoveFav.map((id) => stored(fetch(`${API_BASE}/users/me/favorites/${id}`, { method: "DELETE", headers })))),
-    Promise.all(toAddLike.map((id) => stored(fetch(`${API_BASE}/users/me/liked/${id}`, { method: "POST", headers })))),
-    Promise.all(toRemoveLike.map((id) => stored(fetch(`${API_BASE}/users/me/liked/${id}`, { method: "DELETE", headers })))),
+    Promise.all(toRemoveFav.map((id) => stored(fetch(`${API_BASE}/users/me/favorites/${encodeURIComponent(id)}`, { method: "DELETE", headers })))),
+    Promise.all(toAddLike.map((id) => stored(fetch(`${API_BASE}/users/me/liked/${encodeURIComponent(id)}`, { method: "POST", headers })))),
+    Promise.all(toRemoveLike.map((id) => stored(fetch(`${API_BASE}/users/me/liked/${encodeURIComponent(id)}`, { method: "DELETE", headers })))),
   ]);
 
   // Applied only now, so a request that finishes after a logout never writes into the next user's state
@@ -159,9 +170,9 @@ async function flush() {
     localStorage.setItem(LS_LIKED_SYNCED, JSON.stringify([...syncedLiked]));
   } catch { /* quota exceeded — the in-memory state still holds */ }
 
-  if ([favAdded, favRemoved, likeAdded, likeRemoved].flat().includes(false) && !flushTimer) {
-    flushTimer = setTimeout(flush, RETRY_DELAY);
-  }
+  // Whatever is still unsent — a refused request, or a toggle made while this flush was in flight that the
+  // overlapping flush saw as already synced — gets a retry of its own
+  if (hasPending() && !flushTimer) flushTimer = setTimeout(flush, RETRY_DELAY);
 }
 
 // ─── Load from server (called on login) ────────────────────────────────────
