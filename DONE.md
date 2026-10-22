@@ -83,6 +83,8 @@
 failed load showed "ยังไม่มีรีวิว เป็นคนแรกที่รีวิว!" with no retry (the #911 / #930 class). A `reviewsFailed` state (either
 response not ok, or the fetch throws) now shows the shared `LoadError` with a retry of `fetchPublic`. The unhandled
 rejection a throwing fetch would have caused was not observed — the Next proxy turns a backend failure into a 502.
+Review follow-up: both responses are parsed before either is shown, and the stars/count header hides while failed (a
+failed reload after a delete kept the old count); a failed summary now also hides a loaded list (accepted).
 
 **Validated:** production build, stand-in reviews endpoints dropping their first connection: before, "ยังไม่มีรีวิว…";
 after, "โหลดรีวิวไม่สำเร็จ" + "ลองใหม่", and the retry shows the real (empty) answer; no page errors. tsc 0; eslint 0.

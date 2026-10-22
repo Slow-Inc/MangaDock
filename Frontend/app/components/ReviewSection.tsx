@@ -44,8 +44,10 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
         fetch(BASE(mangaId)),
       ]);
       if (!sumRes.ok || !listRes.ok) throw new Error(`reviews: ${sumRes.status}/${listRes.status}`);
-      setSummary(await sumRes.json());
-      setReviews(await listRes.json());
+      // Both parsed before either is shown: the header and the list come from the same answer
+      const [nextSummary, nextReviews] = await Promise.all([sumRes.json(), listRes.json()]);
+      setSummary(nextSummary);
+      setReviews(nextReviews);
     } catch {
       setReviewsFailed(true);
     } finally {
@@ -127,7 +129,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-base font-semibold text-ink">รีวิวจากผู้อ่าน</h3>
         <div className="flex items-center gap-2">
-          {summary.count > 0 && (
+          {summary.count > 0 && !reviewsFailed && ( // a failed reload must not keep showing the old count
             <span className="text-sm text-ink-2">
               {summary.averageRating.toFixed(1)} / 5 · {summary.count} รีวิว
             </span>
