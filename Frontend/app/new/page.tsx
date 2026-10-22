@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../components/Navbar";
 import MangaGrid, { GridBook } from "../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
@@ -112,6 +112,7 @@ function useSectionPage(order: TabKey, tagFilter: string) {
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
+    let superseded = false; // a slower answer for an earlier page must not replace this one (#944)
     setLoading(true);
     setError(false);
     const qs = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
@@ -125,9 +126,10 @@ function useSectionPage(order: TabKey, tagFilter: string) {
       },
       TTL.MEDIUM,
     )
-      .then((res) => setData(res[order]))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .then((res) => { if (!superseded) setData(res[order]); })
+      .catch(() => { if (!superseded) setError(true); })
+      .finally(() => { if (!superseded) setLoading(false); });
+    return () => { superseded = true; };
   }, [page, order, tagFilter, retryCount]);
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
@@ -332,6 +334,7 @@ export default function NewBooksPage() {
 }
 
 function NewBooksPageInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") ?? "new") as TabKey;
   const [activeTab, setActiveTab] = useState<TabKey>(
@@ -358,7 +361,10 @@ function NewBooksPageInner() {
           {TABS.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => {
+                setActiveTab(tab.key);
+                router.replace(`/new?tab=${tab.key}`, { scroll: false }); // a refresh keeps the tab (#944)
+              }}
               className={`relative shrink-0 px-4 py-2.5 text-sm font-medium transition-colors sm:px-5 ${
                 activeTab === tab.key
                   ? "text-ink"

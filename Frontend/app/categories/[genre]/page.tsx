@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import MangaGrid, { GridBook } from "../../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../../lib/apiCache";
@@ -9,7 +9,7 @@ import Loader from "../../components/ui/Loader";
 import { scrollBehavior } from "../../hooks/reducedMotion";
 import { usePageTitle } from "../../hooks/pageTitle";
 import LoadError from "../../components/ui/LoadError";
-import { goBackOr } from "../../lib/inAppBack";
+import { goBackOr, replaceUrl } from "../../lib/inAppBack";
 
 const API_BASE = "/api/proxy";
 
@@ -37,6 +37,15 @@ const GENRES: Record<string, string> = {
 const PAGE_SIZE = 28;
 
 export default function GenrePage() {
+  // useSearchParams (the page number) needs a Suspense boundary, as on /new
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-bg" />}>
+      <GenrePageInner />
+    </Suspense>
+  );
+}
+
+function GenrePageInner() {
   const params = useParams();
   const router = useRouter();
   const slug = typeof params.genre === "string" ? params.genre : "";
@@ -45,13 +54,19 @@ export default function GenrePage() {
 
   const [books, setBooks] = useState<GridBook[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  // The page lives in the URL (#944): a refresh, a back from a book or a shared link keeps it. Replaced, not pushed, so
+  // "← ย้อนกลับ" leaves the genre instead of stepping back through its pages; replaceUrl keeps #942's landing mark,
+  // which router.replace would drop.
+  const requested = parseInt(useSearchParams().get("page") ?? "", 10);
+  const page = requested > 0 ? requested : 1;
+  const goToPage = (p: number) => replaceUrl(p > 1 ? `/categories/${slug}?page=${p}` : `/categories/${slug}`);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!slug) return;
+    let superseded = false; // a slower answer for an earlier page must not replace this one (#944)
     queueMicrotask(() => {
       setLoading(true);
       setError(false);
@@ -66,14 +81,22 @@ export default function GenrePage() {
       TTL.LONG,
     )
       .then((data) => {
+        if (superseded) return;
         setBooks(data.items ?? []);
         setTotal(data.total ?? 0);
       })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!superseded) setError(true); })
+      .finally(() => { if (!superseded) setLoading(false); });
+    return () => { superseded = true; };
   }, [slug, page, retryCount]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // A ?page= past the end (an old link, a typo) moves to the last page once the total is known
+  useEffect(() => {
+    if (total > 0 && page > totalPages) goToPage(totalPages);
+    // goToPage is rebuilt each render; total/page/totalPages are what decide
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total, page, totalPages]);
   const isPrevDisabled = page <= 1;
   const isNextDisabled = page >= totalPages;
 
@@ -112,7 +135,7 @@ export default function GenrePage() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 disabled={isPrevDisabled}
-                onClick={() => setPage((p) => p - 1)}
+                onClick={() => goToPage(page - 1)}
                 className="rounded-lg border border-line px-3 py-1.5 text-sm transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 text-ink-2"
               >
                 ← ก่อนหน้า
@@ -122,7 +145,7 @@ export default function GenrePage() {
               </span>
               <button
                 disabled={isNextDisabled}
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => goToPage(page + 1)}
                 className="rounded-lg border border-line px-3 py-1.5 text-sm transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 text-ink-2"
               >
                 ถัดไป →
@@ -155,14 +178,14 @@ export default function GenrePage() {
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button
                 disabled={isPrevDisabled}
-                onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
+                onClick={() => { goToPage(1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                 className="rounded-lg border border-line px-3 py-2 text-xs text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
               >
                 «
               </button>
               <button
                 disabled={isPrevDisabled}
-                onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
+                onClick={() => { goToPage(page - 1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                 className="rounded-lg border border-line px-4 py-2 text-sm transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 text-ink-2"
               >
                 ← ก่อนหน้า
@@ -175,7 +198,7 @@ export default function GenrePage() {
                 return (
                   <button
                     key={p}
-                    onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
+                    onClick={() => { goToPage(p); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                     className={`h-9 w-9 rounded-lg text-sm transition ${
                       p === page
                         ? "bg-ink text-bg font-semibold"
@@ -189,14 +212,14 @@ export default function GenrePage() {
 
               <button
                 disabled={isNextDisabled}
-                onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
+                onClick={() => { goToPage(page + 1); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                 className="rounded-lg border border-line px-4 py-2 text-sm transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 text-ink-2"
               >
                 ถัดไป →
               </button>
               <button
                 disabled={isNextDisabled}
-                onClick={() => { setPage(totalPages); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
+                onClick={() => { goToPage(totalPages); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}
                 className="rounded-lg border border-line px-3 py-2 text-xs text-ink-2 transition hover:border-ink-3 hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
               >
                 »

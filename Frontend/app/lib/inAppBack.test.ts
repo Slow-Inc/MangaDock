@@ -56,4 +56,24 @@ describe("in-app back (#942)", () => {
     nav.goBackOr(r, "/");
     expect(r.calls).toEqual(["push /"]);
   });
+
+  test("replacing the URL keeps the landing mark but not the router's own keys (#944)", () => {
+    const calls: { data: unknown; url?: string }[] = [];
+    const h = {
+      state: { __NA: true, tree: "t" } as unknown,
+      replaceState(data: unknown, _unused: string, url?: string) { calls.push({ data, url }); this.state = data; },
+    };
+    const nav = createInAppBack(h);
+    nav.markLanding();
+    nav.replaceUrl("/categories/action?page=2");
+    expect(calls.at(-1)).toEqual({ data: { mangadockLanding: true }, url: "/categories/action?page=2" });
+  });
+
+  test("replacing the URL off the landing entry passes no state", () => {
+    const calls: { data: unknown; url?: string }[] = [];
+    const h = { state: { __NA: true } as unknown, replaceState(data: unknown, _u: string, url?: string) { calls.push({ data, url }); } };
+    createInAppBack(h).replaceUrl("/categories/action?page=3");
+    expect(calls.at(-1)).toEqual({ data: null, url: "/categories/action?page=3" });
+  });
 });
+
