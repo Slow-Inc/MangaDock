@@ -77,6 +77,50 @@
 
 ---
 
+## #987 A failed write says so and keeps the typed text — reports, replies, posts, reader comments, votes, notifications (2026-10-22)
+
+**What:** writes that failed were silent or claimed success (`fetch` resolves on a 4xx/5xx; other handlers caught the
+error and only logged it). The report dialog said "ส่งรายงานแล้ว ✅" for a refused report, and a failed reply wiped the
+typed text before the request. Every write now checks the answer; raw `fetch` callers check `res.ok`. Typed text is
+cleared only after success, and a failure shows the existing error toast (`FollowUserButton`'s "…ไม่สำเร็จ ลองใหม่อีกครั้ง").
+The report dialog shows its error inside the dialog and keeps the form. Reader-comment delete and review delete are
+guarded against a second click. Notifications are marked read only once the server accepted it, through a new `send()`
+that returns `res.ok`, because the existing `apiFetch` returns `null` both for a failure and for an empty success body.
+
+**Validated:** production build + stand-in (`WRITES=1`, `FLAKY_ONCE` fails the first matching write), signed in through
+the local fake session. Main-equivalent build (red):
+- comment: the text is restored but there is no message;
+- reply: the box closes and the text is lost;
+- vote: no message;
+- report: "ส่งรายงานแล้ว" shown for a 503.
+
+Fix (green):
+- comment: the text is kept, the toast shows, and the retry posts and clears the box;
+- reply: the box stays open with its text and the toast shows; the retry is accepted (`POST [503, 201]`) and closes the box;
+- vote: the toast shows;
+- report: the error is shown inside the dialog with the form kept, and the retry reaches "ส่งรายงานแล้ว".
+
+Not run end to end: post edit/delete, comment edit/delete, the create-post failures on `/community`, the manga page and
+the quick post, reader comments, review delete and notifications. These are checked by tsc and code reading (same
+pattern). eslint matches main on all ten files.
+
+**Review round:**
+- The database-down toast (`SupabaseGuard`, 10 s) was replaced by the caller's generic toast for the same 503.
+  Toasts now carry a `priority`, and the outage toasts are 1, so a lower one never replaces them. E2E with
+  `FLAKY_CODE=SUPABASE_OFFLINE`: red showed the generic toast, green keeps the DB toast and the text.
+- A reply is read-only while it is being sent.
+- Opening a notification marks it read quietly; only "read all" reports a failure, and it is guarded.
+- A dead session opens the login prompt instead of "try again".
+- The in-flight deletes disable their buttons.
+- A failed forum image upload shows a toast.
+
+**Typecheck correction:** `npx tsc` in Frontend prints npm's "not the tsc command" notice instead of type-checking, so
+earlier "tsc clean" claims (#985, #988) were empty greps. The real compiler is `node node_modules/typescript/bin/tsc`.
+It was proven to run (284 app files; a planted error is caught) and reports 0 errors on main + #987, which re-verifies
+#985 and #988.
+
+---
+
 ## #988 Forum compose follows the server: role-filtered categories on the manga page, clipped auto titles, input limits (2026-10-22)
 
 **What:**

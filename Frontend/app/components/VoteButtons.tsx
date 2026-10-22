@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { vote } from "../lib/communityApi";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 
 interface VoteButtonsProps {
   targetType: 'post' | 'comment';
@@ -27,6 +28,7 @@ export default function VoteButtons({
   const [loading, setLoading] = useState(false);
 
   const { user, showLoginPrompt } = useAuth();
+  const { showToast } = useToast();
 
   // Resync when the target changes (e.g. VoteButtons reused across different posts).
   // Intentionally omits initialUpvotes/Downvotes from deps — those update via externalCounts,
@@ -82,6 +84,7 @@ export default function VoteButtons({
       setUpvotes(prevUpvotes);
       setDownvotes(prevDownvotes);
       setUserVote(prevUserVote);
+      showToast({ type: "error", message: "โหวตไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // the count jumping back alone reads as a missed click (#987)
     } finally {
       setLoading(false);
     }

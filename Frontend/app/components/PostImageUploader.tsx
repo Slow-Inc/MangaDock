@@ -5,6 +5,7 @@ import PostImage from "./PostImage";
 import { uploadForumImage } from "../lib/communityApi";
 import Loader from "./ui/Loader";
 import { PRIMARY_FILL } from "./ui/Button";
+import { useToast } from "../contexts/ToastContext";
 
 interface PostImageUploaderProps {
   images: string[];
@@ -16,6 +17,7 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
   const [tab, setTab] = useState<'upload' | 'url'>('upload');
   const [urlInput, setUrlInput] = useState('');
   const [uploading, setUploading] = useState(false);
+  const { showToast } = useToast();
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,8 +44,8 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
     try {
       const { imageUrl } = await uploadForumImage(file);
       onChange([...images, imageUrl]);
-    } catch (err) {
-      console.error('Forum image upload error:', err);
+    } catch {
+      showToast({ type: "error", message: "อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // was console-only (#987)
     } finally {
       setUploading(false);
     }

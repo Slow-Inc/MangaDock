@@ -62,6 +62,7 @@ export default function SupabaseGuard() {
                   "⚠️ ตรวจพบปัญหาการเชื่อมต่อฐานข้อมูล: โครงการ Supabase ของคุณอาจถูกหยุดชั่วคราว (Paused) กรุณาเปิดใช้งานที่ Supabase Dashboard",
                 type: "error",
                 duration: 10000,
+                priority: 1, // a caller's own failure toast must not hide this (#987)
               });
             }
           } catch {
@@ -82,6 +83,7 @@ export default function SupabaseGuard() {
                 "❌ ไม่สามารถติดต่อฐานข้อมูล Supabase ได้โดยตรง: กรุณาตรวจสอบว่าโครงการไม่ได้ถูก Pause ไว้",
               type: "error",
               duration: 10000,
+              priority: 1, // a caller's own failure toast must not hide this (#987)
             });
           }
         }

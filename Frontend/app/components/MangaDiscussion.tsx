@@ -6,6 +6,7 @@ import { ROLE } from "../lib/types/user";
 import Link from "next/link";
 import { listPosts, createPost } from "../lib/communityApi";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import PostCard from "./PostCard";
 import { PostSkeleton } from "./ForumSkeleton";
 import LoadError from "./ui/LoadError";
@@ -15,6 +16,7 @@ import LimitCounter from "./ui/LimitCounter";
 
 export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: string, title: string, cover?: string }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const quickPostLimitId = useId();
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,8 +88,8 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
       // Replace temp with authoritative server post
       setPosts(prev => prev.map(p => p.id === tempId ? realPost : p));
       if (failed) fetchPosts(); // the list had failed: reload it, or the new post stays behind the error (#930)
-    } catch (err) {
-      console.error(err);
+    } catch {
+      showToast({ type: "error", message: "โพสต์ไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
       // Revert: remove temp post, restore form
       setPosts(prev => prev.filter(p => p.id !== tempId));
       setNewPostContent(content);

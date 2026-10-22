@@ -5,6 +5,7 @@ import UserAvatar from "./ui/UserAvatar";
 import Loader from "./ui/Loader";
 import { useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import { supabase } from "../lib/supabase";
 import { useDialogFocus } from "../hooks/useDialogFocus";
 import LoadError from "./ui/LoadError";
@@ -45,7 +46,9 @@ function timeAgo(iso: string): string {
 
 export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, chapterId, pageNumber }: Props) {
   const { user, showLoginPrompt } = useContext(AuthContext);
+  const { showToast } = useToast();
   const [comments, setComments] = useState<Comment[]>([]);
+  const [deleting, setDeleting] = useState<Set<string>>(new Set()); // ids with a delete in flight (#987)
   const [loading, setLoading] = useState(false);
   // A failed load says so, with a retry — never "no comments yet" (#930). `attempt` re-runs the load effect.
   const [failed, setFailed] = useState(false);
@@ -102,25 +105,39 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ mangaId, chapterId, pageNumber, body: text.trim() }),
       });
-      if (res.ok) {
-        const newComment: Comment = await res.json();
-        setComments((prev) => [...prev, newComment]);
-        setText("");
-        if (failed) setAttempt((n) => n + 1); // the list had failed: reload it, or the comment stays hidden (#930)
-      }
+      if (!res.ok) throw new Error(`reader comment ${res.status}`);
+      const newComment: Comment = await res.json();
+      setComments((prev) => [...prev, newComment]);
+      setText("");
+      if (failed) setAttempt((n) => n + 1); // the list had failed: reload it, or the comment stays hidden (#930)
+    } catch {
+      showToast({ type: "error", message: "ส่งความคิดเห็นไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 }); // the text stays in the box (#987)
     } finally {
       setPosting(false);
     }
   }
 
   async function handleDelete(id: string) {
-    const token = await getToken();
-    if (!token) return;
-    const res = await fetch(`/api/proxy/reader-comments/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) setComments((prev) => prev.filter((c) => c.id !== id));
+    if (deleting.has(id)) return;
+    setDeleting((prev) => new Set(prev).add(id));
+    try {
+      const token = await getToken();
+      if (!token) { showLoginPrompt(); return; } // retrying can't help a dead session
+      const res = await fetch(`/api/proxy/reader-comments/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`reader comment delete ${res.status}`);
+      setComments((prev) => prev.filter((c) => c.id !== id));
+    } catch {
+      showToast({ type: "error", message: "ลบความคิดเห็นไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
+    } finally {
+      setDeleting((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   }
 
   return (
@@ -178,7 +195,7 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-xs text-ink-3">{timeAgo(c.createdAt)}</span>
                           {isOwn && (
-                            <button type="button" onClick={() => handleDelete(c.id)} aria-label="ลบความคิดเห็น" className="text-ink-2 transition hover:text-danger">
+                            <button type="button" onClick={() => handleDelete(c.id)} disabled={deleting.has(c.id)} aria-label="ลบความคิดเห็น" className="text-ink-2 transition hover:text-danger disabled:opacity-40">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
                                 <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>

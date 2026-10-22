@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import type { NotificationItem } from "../lib/notificationTypes";
 import Loader from "./ui/Loader";
 import { usePopoverDismiss } from "../hooks/popoverDismiss";
+import { useToast } from "../contexts/ToastContext";
 
 const POLL_INTERVAL = 60_000;
 
@@ -26,8 +27,22 @@ async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T | null> 
   return text ? JSON.parse(text) : null;
 }
 
+/** A write the server must accept: true only on an ok answer (apiFetch's null also means "empty body"). */
+async function send(path: string, opts: RequestInit): Promise<boolean> {
+  try {
+    const token = await getToken();
+    if (!token) return false;
+    const res = await fetch(path, { ...opts, headers: { ...(opts.headers ?? {}), Authorization: `Bearer ${token}` } });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export default function NotificationBell() {
   const [unread, setUnread] = useState(0);
+  const [markingAll, setMarkingAll] = useState(false);
+  const { showToast } = useToast();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,14 +73,23 @@ export default function NotificationBell() {
 
   usePopoverDismiss(open, panelRef, () => setOpen(false)); // outside click or Escape (#870)
 
+  // Marked read only once stored — a refused PATCH used to clear the badge until the next poll brought it back (#987).
+  // Opening an item does this on the way to another page, so a failure just leaves it unread, without a toast.
   async function handleMarkRead(id: string) {
-    await apiFetch(`/api/proxy/notifications/${id}/read`, { method: "PATCH" });
+    if (!(await send(`/api/proxy/notifications/${id}/read`, { method: "PATCH" }))) return;
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     setUnread((c) => Math.max(0, c - 1));
   }
 
   async function handleMarkAllRead() {
-    await apiFetch("/api/proxy/notifications/read-all", { method: "PATCH" });
+    if (markingAll) return;
+    setMarkingAll(true);
+    const ok = await send("/api/proxy/notifications/read-all", { method: "PATCH" });
+    setMarkingAll(false);
+    if (!ok) {
+      showToast({ type: "error", message: "ทำเครื่องหมายว่าอ่านแล้วไม่สำเร็จ ลองใหม่อีกครั้ง", duration: 3500 });
+      return;
+    }
     setItems((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnread(0);
   }
@@ -106,7 +130,7 @@ export default function NotificationBell() {
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <p className="text-sm font-semibold text-ink">การแจ้งเตือน</p>
           {unread > 0 && (
-            <button onClick={handleMarkAllRead} className="text-xs text-accent transition hover:text-ink">
+            <button onClick={handleMarkAllRead} disabled={markingAll} className="text-xs text-accent transition hover:text-ink disabled:opacity-50">
               อ่านทั้งหมด
             </button>
           )}

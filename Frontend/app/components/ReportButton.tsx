@@ -30,12 +30,14 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
   const [details, setDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
 
   function handleOpen() {
     if (!user) { showLoginPrompt(); return; }
     setOpen(true);
     setDone(false);
+    setError("");
     setReason("");
     setDetails("");
   }
@@ -44,14 +46,20 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
     e.preventDefault();
     if (!reason || submitting) return;
     setSubmitting(true);
+    setError("");
     try {
       const token = await getToken();
-      await fetch("/api/proxy/content-reports", {
+      if (!token) { setOpen(false); showLoginPrompt(); return; } // retrying can't help a dead session
+      const res = await fetch("/api/proxy/content-reports", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ contentType, contentId, reason, details }),
       });
+      // "ส่งรายงานแล้ว" only for a report that was stored — it used to show for a 401/500 too (#987)
+      if (!res.ok) throw new Error(`report ${res.status}`);
       setDone(true);
+    } catch {
+      setError("ส่งรายงานไม่สำเร็จ ลองใหม่อีกครั้ง");
     } finally {
       setSubmitting(false);
     }
@@ -134,6 +142,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
                     className="mb-3 w-full resize-none rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder-ink-3 outline-none focus:border-ink-3"
                   />
                 )}
+                <div role="alert">{error && <p className="mb-3 text-sm text-danger">{error}</p>}</div>
                 <button
                   type="submit"
                   disabled={!reason || submitting}
