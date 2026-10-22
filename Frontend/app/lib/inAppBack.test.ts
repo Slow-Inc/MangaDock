@@ -1,60 +1,59 @@
 import { describe, expect, test } from "bun:test";
-import { createInAppHistory } from "./inAppBack";
+import { createInAppBack } from "./inAppBack";
 
-const ORIGIN = "https://mangadock.example";
+/** A stand-in for window.history: one current entry whose state replaceState overwrites. */
+const fakeHistory = (state: unknown = null) => ({
+  state,
+  replaceState(data: unknown) { this.state = data; },
+});
 const router = () => {
   const calls: string[] = [];
   return { calls, back: () => calls.push("back"), push: (href: string) => calls.push(`push ${href}`) };
 };
 
 describe("in-app back (#942)", () => {
-  test("a page opened directly, from no referrer, goes to its parent", () => {
-    const h = createInAppHistory();
-    h.notePath("/categories/action");
+  test("on the entry the visitor landed on (a direct link, a new tab), back goes to the parent page", () => {
+    const h = fakeHistory({ __NA: true });
+    const nav = createInAppBack(h);
+    nav.markLanding();
     const r = router();
-    h.goBackOr(r, "/", { referrer: "", origin: ORIGIN });
-    expect(r.calls).toEqual(["push /"]);
-  });
-
-  test("a page reached from another site also goes to its parent, not back to that site", () => {
-    const h = createInAppHistory();
-    h.notePath("/community/p/abc");
-    const r = router();
-    h.goBackOr(r, "/community", { referrer: "https://social.example/feed", origin: ORIGIN });
+    nav.goBackOr(r, "/community");
     expect(r.calls).toEqual(["push /community"]);
   });
 
-  test("after moving between pages inside the app, it goes back", () => {
-    const h = createInAppHistory();
-    h.notePath("/");
-    h.notePath("/categories/action");
+  test("marking keeps the router's own state on the entry", () => {
+    const h = fakeHistory({ __NA: true, tree: "t" });
+    createInAppBack(h).markLanding();
+    expect(h.state).toMatchObject({ __NA: true, tree: "t" });
+  });
+
+  test("on any later entry (reached inside the app), back goes back", () => {
+    const h = fakeHistory({ __NA: true });
+    const nav = createInAppBack(h);
+    nav.markLanding();
+    h.state = { __NA: true }; // a client navigation pushed a new, unmarked entry
     const r = router();
-    h.goBackOr(r, "/", { referrer: "", origin: ORIGIN });
+    nav.goBackOr(r, "/");
     expect(r.calls).toEqual(["back"]);
   });
 
-  test("a same-origin referrer (a full page load from our own page) goes back", () => {
-    const h = createInAppHistory();
-    h.notePath("/community/p/abc");
+  test("only the first page of the document is the landing: later marks are ignored", () => {
+    const h = fakeHistory({});
+    const nav = createInAppBack(h);
+    nav.markLanding();
+    h.state = { __NA: true };
+    nav.markLanding();
     const r = router();
-    h.goBackOr(r, "/community", { referrer: `${ORIGIN}/community`, origin: ORIGIN });
+    nav.goBackOr(r, "/");
     expect(r.calls).toEqual(["back"]);
   });
 
-  test("the same path noted again (a re-render) is not a move", () => {
-    const h = createInAppHistory();
-    h.notePath("/categories/action");
-    h.notePath("/categories/action");
+  test("a null history state is handled", () => {
+    const h = fakeHistory(null);
+    const nav = createInAppBack(h);
+    nav.markLanding();
     const r = router();
-    h.goBackOr(r, "/", { referrer: "", origin: ORIGIN });
-    expect(r.calls).toEqual(["push /"]);
-  });
-
-  test("an unparsable referrer counts as none", () => {
-    const h = createInAppHistory();
-    h.notePath("/x");
-    const r = router();
-    h.goBackOr(r, "/", { referrer: "not a url", origin: ORIGIN });
+    nav.goBackOr(r, "/");
     expect(r.calls).toEqual(["push /"]);
   });
 });
