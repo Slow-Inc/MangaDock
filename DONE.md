@@ -77,6 +77,25 @@
 
 ---
 
+## #934 Signed-in failures that stayed silent: follows load, CSV export, notification rows (2026-10-23)
+
+**What (the items #987/#991/#1013 had not covered):**
+- `hooks/useSeriesFollow.ts`: a failed follows load (non-ok or network) was swallowed, so mylist's ติดตาม tab read
+  "ยังไม่มี series ที่ติดตาม". The store now records `loadFailed` (`followsLoadFailed()`); mylist shows `LoadError` with a
+  retry (`loadFollows`) instead of the empty message.
+- `mylist/page.tsx`: a failed CSV export did nothing; it now shows an error toast (network or non-ok).
+- `components/NotificationBell.tsx`: a notification without a link was a `<div onClick>` the keyboard never reached,
+  and on a linked one the mark-read handler sat on an inner div that a keyboard Enter on the link never hit. Each row
+  is now the control itself — a `<Link>` or a `<button>` with the handler — with the inner markup as block spans.
+
+**Validated:** E2E on a production build, signed in via the local fake session, stand-in `MYLIST934=1` (probe
+`mylist934.cjs`): before — empty message on a failed follows load, no feedback on a failed export, Tab skipped the
+no-link row and neither row was marked read from the keyboard; after — LoadError then the empty state after a working
+retry, the export toast, the no-link row reached by Tab, and Enter marks both n1 and n2 read. Screenshot of the panel
+checked. Real tsc clean; eslint clean; hook tests 105/105.
+
+---
+
 ## #925 Studio manga pickers fall back to the glyph on a dead cover (2026-10-23)
 
 **What:** the Studio pickers (`app/studio/search/page.tsx`, `app/studio/components/MangaPickerModal.tsx`) showed the
