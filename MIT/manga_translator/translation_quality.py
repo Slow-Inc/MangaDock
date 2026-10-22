@@ -78,3 +78,57 @@ def strip_noise_glyphs(text: str) -> str:
     if letters and sum(c.isascii() for c in letters) / len(letters) > 0.85:
         fixed = [t for t in fixed if not _NOISE_GLYPHS.match(t)]
     return text if fixed == tokens else ' '.join(fixed)
+
+
+#: #882 — Thai letter-name syllables. A translator that reads stylized art lettering as separate
+#: letters spells them out ('Siiig' -> 'ซีไอไอ'), which renders as unreadable junk over the artwork.
+#: The list is the standard Thai consonant/vowel/letter names a Thai speaker reads a Latin word with.
+_THAI_LETTER_NAMES = tuple(
+    'กอ ขอ คอ ฆอ งอ จอ ฉอ ชอ ซอ ฌอ ญอ ฎอ ฏอ ฐอ ฑอ ฒอ ณอ ดอ ตอ ถอ ทอ ธอ นอ บอ ปอ ผอ ฝอ พอ ฟอ ภอ มอ '
+    'ยอ รอ ลอ วอ ศอ ษอ สอ หอ ฬอ ออ ฮอ เอ บี ซี ดี อี เอฟ จี เอช ไอ เจ เค แอล เอ็ม เอ็น โอ พี คิว '
+    'อาร์ เอส ที ยู วี ดับเบิลยู เอ็กซ์ วาย แซด'.split()
+)
+_THAI_CHAR = re.compile(r'[\u0E00-\u0E7F]')
+_ASCII_TOKEN = re.compile(r'^[A-Za-z]{4,10}$')
+_REPEATED_CHAR = re.compile(r'(.)\1')
+
+
+def _letter_name_count(thai: str):
+    """How many letter-name syllables cover ``thai`` completely (None when they cannot).
+
+    Dynamic programming because the names are not prefix-free ('เอ' vs 'เอฟ', 'เอส'): a greedy
+    scan would either miss a valid split or count one syllable twice."""
+    n = len(thai)
+    best = [None] * (n + 1)
+    best[0] = 0
+    for i in range(n):
+        if best[i] is None:
+            continue
+        for name in _THAI_LETTER_NAMES:
+            if thai.startswith(name, i):
+                j = i + len(name)
+                cand = best[i] + 1
+                if best[j] is None or cand > best[j]:
+                    best[j] = cand
+    return best[n]
+
+
+def is_letter_name_spelling(source: str, translation: str) -> bool:
+    """#882: True when a stylized-looking source token was translated by SPELLING it out in Thai
+    letter names ('Siiig' -> 'ซีไอไอ').
+
+    All four signals are needed, measured against the 39-page corpus (only the one real case passes;
+    'SOR'->'ขอ...', 'OMG'->'โอเอ็มจี', 'OK'->'โอเค' are not flagged):
+
+    - the translation is Thai-only and splits COMPLETELY into letter names, at least three of them;
+    - the source is a single 4-10 letter ASCII token that is not all-caps (all-caps tokens are
+      abbreviations, which legitimately get spelled: OMG, RTSD);
+    - the source repeats a letter, the shape of a stylized-art read ('Siiig', 'Aaaah').
+    """
+    src = (source or '').strip()
+    if not _ASCII_TOKEN.match(src) or src == src.upper() or not _REPEATED_CHAR.search(src):
+        return False
+    thai = ''.join(_THAI_CHAR.findall(translation or ''))
+    if len(thai) < 3:
+        return False
+    return (_letter_name_count(thai) or 0) >= 3

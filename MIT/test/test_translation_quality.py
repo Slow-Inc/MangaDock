@@ -4,7 +4,7 @@ Measured on 6 runs x 17 real pages: the LLM leaks other scripts into Thai ('Чи
 leaves segments untranslated, or empties them — at random, under every prompt tried. These are
 detectable without a judge, so the translator can re-ask instead of shipping them.
 """
-from manga_translator.translation_quality import classify_glitch, foreign_script
+from manga_translator.translation_quality import classify_glitch, foreign_script, is_letter_name_spelling
 
 
 def test_foreign_script_flags_other_scripts_but_not_the_target_or_latin():
@@ -74,3 +74,23 @@ def test_a_lookalike_katakana_inside_an_english_word_is_read_as_latin_857():
     assert strip_noise_glyphs('GロOD MエRNING') == 'GOOD MERNING'
     for keep in ('レロエ', 'ザワ ザワ', 'TOKYO レストラン'):
         assert strip_noise_glyphs(keep) == keep, keep
+
+
+def test_a_letter_name_spelling_of_stylized_art_is_flagged_882():
+    """Boku p0: the bubble-letter SFX `Siiigh` was OCR-read as `Siiig` and the translator spelled the
+    letters out into `ซีไอไอ`, which rendered as junk over the art (#882)."""
+    assert is_letter_name_spelling('Siiig', 'ซีไอไอ') is True
+
+
+def test_real_dialogue_and_abbreviations_are_not_spellings_882():
+    assert is_letter_name_spelling('SOR', 'ขอ...') is False        # one letter name, real word
+    assert is_letter_name_spelling('OMG', 'โอเอ็มจี') is False      # all-caps abbreviation
+    assert is_letter_name_spelling('OK', 'โอเค') is False          # two syllables, real abbreviation
+    assert is_letter_name_spelling('LOOM', 'ลูม') is False          # not letter names
+    assert is_letter_name_spelling('MAN', 'โธ่...') is False
+
+
+def test_spelling_guard_needs_a_stylized_source_882():
+    assert is_letter_name_spelling('Aaaah', 'ซีไอไอ') is True       # stylized read
+    assert is_letter_name_spelling('Hmm', 'ซีไอไอ') is False        # too short
+    assert is_letter_name_spelling('TOWELS', 'ซีไอไอ') is False     # no repeated letter

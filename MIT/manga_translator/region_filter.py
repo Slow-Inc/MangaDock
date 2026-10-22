@@ -13,6 +13,7 @@ from typing import List
 import regex as re
 
 from .config import Translator
+from .translation_quality import is_letter_name_spelling
 
 logger = logging.getLogger('manga_translator')
 
@@ -64,6 +65,11 @@ def filter_translated_regions_with_drops(text_regions: List, config):
                 if text_equal:
                     should_filter = True
                     filter_reason = "Translation identical to original"
+                elif is_letter_name_spelling(region.text, region.translation):
+                    # #882: the translator spelled stylized art lettering out in Thai letter names
+                    # ('Siiig' -> 'ซีไอไอ'). Dropping keeps the original art instead of junk text.
+                    should_filter = True
+                    filter_reason = "Letter-name spelling of stylized art"
 
         if should_filter:
             dropped.append((region, filter_reason))
