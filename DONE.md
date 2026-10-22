@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 13 — `text_raw` now reaches the regions the pipeline keeps (#885) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The raw-OCR-text stamp now runs on the single surviving dispatch (extracted helper `textline_merge.stamp_text_raw`). Instrumented replay: **6/6** merged regions carry `text_raw`, and it differs from `text`: raw `I'VE BEEN KILLED BY IT SO MANY TIMES...` vs the normalised `IVE BEEN...` that every consumer used to see.
+- **No render change:** A/B with the change stashed on 3 deterministic replay pages gives byte-identical renders and 0 region diffs (no pre-translation dictionary in this config); the helper refactor is byte-identical to the inline version. Value is correctness: with a configured dictionary, render scaling (rendering:792) and the page-translation record key on the raw text again.
+- Benchmark `2026-10-22-885-text-raw-restored.md`; 3 new tests; torch-free gate **833 passed**.
+
 ## MIT quality loop, round 12 — letter-name spellings are dropped, the junk `ซีไอไอ` is gone (#882) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
