@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 79 — #1051 early source-lang drop: tried, proved output-changing, reverted (negative result) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented a deterministic front-stage drop (non-Latin text when the source is Latin-script) behind `MIT_FILTER_BEFORE_TRANSLATE=1` and replay-A/B'd it (same recorded translations, so only the region set can differ).
+- **Result: output-changing on real pages.** Byte-identical on Boku p0, Otome p0, the JP page probed as ENG, Kage p0 — but **Kage p1 differs**: the early drop removed 2 regions that the real filter keeps and the off-arm renders (the ザワ / 「平ク」 SFX), so the page changed.
+- Root cause: the post-translation filter keeps some non-Latin regions (vision-rescued SFX, UNKNOWN language detection), so a **script-only heuristic is not equivalent to the filter**. The uncommitted experiment was reverted; **no code shipped**.
+- Evidence recorded in `2026-10-23-latency-profile.md`; revised design left on #1051 (run the real filter early + byte-identical gate across a corpus that includes Kage p1, and a judge A/B before any default).
+
 ## MIT quality loop, round 78 — #1050 probe: the region list really changes after translation; split out "translate only rendered regions" (#1051) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

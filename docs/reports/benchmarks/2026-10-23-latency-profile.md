@@ -46,3 +46,24 @@ would therefore erase text that is never re-rendered (blank balloons). The overl
 the shared fix is to move the filter to the front stage, which is a behaviour change split into **#1051**
 (translate only the regions that will be rendered — fewer tokens/latency on mixed pages, and it makes the region
 list stable so the overlap becomes possible).
+## Experiment: deterministic front-stage source-language drop (#1051) — **rejected, output changes**
+
+Tried dropping regions whose text is non-Latin (CJK/Kana/Hangul/Cyrillic/Thai) BEFORE translation when the
+requested source is Latin-script, to stop translating lines the post-translation filter discards. Replay A/B
+(same recorded translations, so only the region set can differ) on real pages:
+
+| page | early filter | rendered PNG |
+|---|---|---|
+| Boku p0 | translated 13, dropped 1 | **byte-identical** |
+| Otome p0 | translated 10, dropped 1 | **byte-identical** |
+| JP page probed as ENG | translated 0, dropped 7 | **byte-identical** (both empty) |
+| Kage p0 | translated 7, dropped 1 | **byte-identical** |
+| **Kage p1** | translated 6, dropped 2 | **DIFFERENT** (off renders the ザワ/「平ク」 SFX, on dropped them) |
+
+Verdict: **a script-only pre-drop is not equivalent to the real filter** — the post-translation filter keeps
+non-Latin regions in some cases (vision-rescued SFX, UNKNOWN language detection), and dropping them early removes
+rendered text from the page. The whole experiment was reverted (uncommitted); no code shipped.
+
+Revised design for #1051 if it is revisited: run the **real** `_filter_regions_by_source_lang` early (same
+predicate, not a script heuristic) and gate on byte-identical replay across a corpus that includes Kage p1; if the
+only safe version changes the model's line set, an A/B with the judge is required before any default decision.
