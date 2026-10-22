@@ -56,6 +56,7 @@ Obsidian vault ที่รวม MD ทั้งหมดที่ agent ต้
 - [[project-gal-yome-en-benchmark]] — Gal Yome no Himitsu มี 2 version (ไทย+EN) — ต้องเลือก EN version ก่อน benchmark EN→ไทย
 - [[project-mit-worker-restart-gotcha]] — restart MIT --start-instance worker บน Windows ต้อง kill by PORT OWNER ทั้ง 5003+5004 (process ชื่อ python3.11.exe ไม่ใช่ python.exe)
 - [[project-gateway-thinking-model]] — gateway (qwen3.8-27b-fp8) เป็น thinking model ใช้ ~154 token คิดก่อนตอบ: max_tokens ต่ำกว่า ~256 = คำตอบว่าง; ห้ามปิด thinking (คุณภาพตก)
+- [[project-art-text-handling]] — งานอาร์ตที่ถูกอ่านเป็นข้อความ (โลโก้/SFX ตัวพอง): guard 3 ตัว (#882 spelling, #886 art glyph, vision rescue) + ลำดับความสำคัญ (rescue ชนะ) + กฎก่อนเพิ่ม guard ใหม่
 - [[project-mit-opencv-threads-ultralytics]] — `import ultralytics` leaves OpenCV single-threaded for the whole MIT process; YOLO loaders restore it (`restore_opencv_threads`) — detection −55 %, identical renders (#872)
 
 
