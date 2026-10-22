@@ -84,7 +84,9 @@ home hero each had their own one-shot fallback; when the fallback also failed �
 drew its broken-image icon (search used an external `placehold.co` "No Cover" image instead). `coverSources(book)`
 (`lib/imgUrl`) lists every source a card may try, in order and without repeats; `useCoverSrc(book)` steps to the next one
 on each error and returns `null` when none is left, keyed on the sources so a reused card (the hero rotating) restarts.
-Cards then show `CoverPlaceholder` (book glyph + title on the surface tokens); the hero keeps its existing quiet gradient.
+Cards then show `CoverPlaceholder` (book glyph + title on the surface tokens), named like the image was — `role="img"`
+`aria-label={title}`, or `decorative` where the image had `alt=""` (on mobile BookRow/ContinueReading have no other
+visible name); the hero keeps its existing quiet gradient.
 The expand-cover button and lightbox are hidden when there is no cover. Removes `placehold.co`, a DOM `src` mutation, the
 hero's set-state-in-effect (an eslint error on main) and `MangaGrid`'s private `cdnFallback`.
 
@@ -92,7 +94,9 @@ hero's set-state-in-effect (an eslint error on main) and `MangaGrid`'s private `
 books — cover loads / local copy 404 then proxy works / every source 404 / no cover: on `/search`, `/categories/action`,
 `/new` and `/` at 1440 and 390 px, 0 broken `<img>`, the working cover loads, the two dead books show the placeholder, and
 0 requests to placehold.co. The fallback book loads from `/api/img-proxy` on every page; on `/` at 390 px it is off-screen
-in a lazy row and loads once scrolled into view. tsc 0; eslint: no new findings (HeroCarousel goes from 1 error to 0).
+in a lazy row and loads once scrolled into view; the dead cover is a named `img` in the accessibility tree on every page.
+tsc 0; eslint: no new findings (HeroCarousel goes from 1 error to 0). Scrutinize: one should-fix (the placeholder was
+`aria-hidden`, leaving mobile row cards unnamed) fixed in this PR; stale-error, mutation and proxy paths checked OK.
 
 ---
 

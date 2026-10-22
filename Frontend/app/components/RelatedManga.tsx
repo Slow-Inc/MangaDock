@@ -30,7 +30,7 @@ function RelatedCard({ book }: { book: LandingBook }) {
               className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
             />
           ) : (
-            <CoverPlaceholder title={book.title} />
+            <CoverPlaceholder title={book.title} decorative />
           )}
           <div className="absolute inset-0 bg-linear-to-t from-bg/60 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
         </div>

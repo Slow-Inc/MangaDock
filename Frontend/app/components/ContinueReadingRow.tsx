@@ -112,7 +112,8 @@ function HistoryCard({
             if (img.naturalWidth > img.naturalHeight) setIsLandscape(true);
           }}
           onError={() => {
-            // The local copy failed: clear the stale path from localStorage so future loads skip it
+            // The local copy failed: clear the stale path from localStorage so future loads skip it. This mutates the
+            // `book` prop itself, so the next render's sources start at the proxy — either way the card lands on it.
             if (book.thumbnailLocal) patchThumbnailLocal(book.id);
             cover.onError();
           }}
