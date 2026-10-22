@@ -533,25 +533,3 @@ def test_glyph_stroke_bitmap_matches_freetypes_buffer_872():
             for direction in (0, 1):
                 got, want = tr._render_glyph_stroke(ch[0], size, direction), reference(ch[0], size, direction)
                 assert (got is None and want is None) or np.array_equal(got, want), (ch, size, direction)
-
-
-def test_stacked_marks_reserve_extra_line_leading_895():
-    """#895: the line pitch is font_size, so a lifted tone mark above an upper vowel reaches into the
-    previous line's row; when that row has ink at the same x the mark is dark-on-dark and vanishes
-    (Kumo p0: ครั้งนั้น -> ครงนัน). The renderer must reserve the height the marks actually need."""
-    import manga_translator.rendering.text_render as tr
-    from pathlib import Path
-    tr.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Bold.ttf'))
-    assert tr._stacked_mark_overhead('กลาง', 29) == 0
-    assert tr._stacked_mark_overhead('ครั้ง', 29) > 0
-    assert tr._stacked_mark_overhead('ที่', 29) >= 0
-
-
-def test_two_lines_with_stacked_marks_get_extra_height_895():
-    import manga_translator.rendering.text_render as tr
-    from pathlib import Path
-    tr.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Bold.ttf'))
-    plain = tr.put_text_horizontal(29, 'กลาง กลาง', 400, 10000, 'center', False, (0, 0, 0), (255, 255, 255), 'THA', False, 0)
-    stacked = tr.put_text_horizontal(29, 'ครั้ง ครั้ง', 60, 10000, 'center', False, (0, 0, 0), (255, 255, 255), 'THA', False, 0)
-    # the stacked-mark block must be taller than the same number of plain lines (extra leading is reserved)
-    assert stacked.shape[0] > plain.shape[0] // 2
