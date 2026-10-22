@@ -97,6 +97,7 @@ export function useSeriesFollow(book: { id: string; title: string; thumbnail: st
     const token = await getToken();
     if (!token) {
       busy.current = false;
+      showLoginPrompt(); // signed in on screen but the session is gone: a silent no-op read as a missed click (#995)
       return;
     }
 
