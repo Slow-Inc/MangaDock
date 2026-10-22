@@ -77,6 +77,20 @@
 
 ---
 
+## #925 Studio manga pickers fall back to the glyph on a dead cover (2026-10-23)
+
+**What:** the Studio pickers (`app/studio/search/page.tsx`, `app/studio/components/MangaPickerModal.tsx`) showed the
+book glyph only when a book had no `thumbnail`, and rendered `<Image>` with no `onError` otherwise — a cover that 404s
+showed the browser's broken-image icon. New `app/studio/components/PickerCover.tsx` uses `useCoverSrc` like the public
+cards (#921): every source tried, then the glyph. Both pickers use it; their duplicated glyph markup and the now-unused
+`Image` / `resolvedThumbnail` imports went (the search page's `book as any` with them — eslint one better than main).
+
+**Validated:** E2E on a production build, signed in as a creator via the local fake session, stand-in search
+(probe `picker925.cjs`): before — "Cover Broken Everywhere" was a broken `<img>` in both pickers; after — the glyph, no
+broken image, and the working cover still loads (screenshot checked). Real tsc clean.
+
+---
+
 ## #935 Studio ConfirmDialog holds and returns focus (2026-10-23)
 
 **What:** `app/studio/components/ConfirmDialog.tsx` declared `aria-modal="true"` but Tab walked out to the page behind
