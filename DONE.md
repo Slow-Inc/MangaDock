@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 24 — LLM-judged translation audit: 372 segments, mean 1.51/2, five patterns (#888) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- New reusable `tools/judge_translations.py`: grades each page's source/translation pairs 0-2 with a strict editor prompt, chunked (a whole dense page truncates a thinking model). First full run: **39/39 pages, 372 segments, mean 1.51/2** (54 % perfect, 43 % minor, 3 % broken).
+- **Judge caveat recorded:** its character-level "typo" notes are noise (it flagged correctly stacked Thai marks; a code-point scan found 0 doubled marks) — only meaning-level notes are usable.
+- Five repeatable patterns → **#888** (prompt v3 + blind pairwise A/B): stammer/hesitation flattened (`U-UM` -> `อ-อ๋อ`), cut-off fragments dropped or wrong initial (`AGAI-`, `W-`, `BA`, `THE`), names guessed from a familiar reading (`Plicia`), sense slips (`carefree`, `paragons`), one inverted self-correction.
+- Benchmark `2026-10-22-translation-judge-audit.md`; lowest pages listed (Iruma p1 0.88, Taida/Kage/Kumo/Otome/Tsuki 1.00).
+
 ## MIT speed loop, round 23 — warm profile at HEAD: one gateway call per page, and the overlap that cannot be done (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
