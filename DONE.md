@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 27 — detection_size 3200: recovers missed lines, but it is a tradeoff (#891) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Chainsaw p0: at `detection_size` 2560 the `NOTICE: You can read this chapter…` paragraph is never detected (15 textlines); at **3200** it is (19 textlines) — the #883 leftover-English gap can be closed without touching thresholds.
+- Warm cost: detection ~473 -> **584 ms** (+23 %, ~+110 ms/page). Corpus replay (39 pages): **24-37 pages change** their region source texts (mostly tiny re-reads from shifted boxes), a handful of genuinely recovered lines (credits, Mieruko fortune lines, a few dialogue lines) — plus new kana/CJK art-glyph candidates (`ん`, `刀`, `ベ`, `才`).
+- Verdict per the tradeoff rule: **not default**; `MIT_DETECTION_SIZE=3200` / `--set detector.detection_size=3200` documented for maximum-recall use. Benchmark `2026-10-22-891-detection-size-3200.md`; #891 records it.
+- Also learned: **detection is not bit-deterministic** (cuDNN DBNet) — identical configs differ by a few textlines and small OCR re-reads between runs, so detection A/Bs must compare duplicate-tolerant sets, not counts.
+
 ## MIT quality loop, round 26 — sampling temperature A/B: 0.5 stays, 0.0 rejected (#890) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
