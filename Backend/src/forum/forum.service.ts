@@ -799,6 +799,21 @@ export class ForumService {
     uid: string,
     dto: CreateCommentDto,
   ): Promise<ForumComment> {
+    // The post must exist and not be deleted: a missing one hit the foreign key (500), a deleted one took the
+    // comment (#1019)
+    const { data: post, error: postError } = await this.db
+      .from('forum_posts')
+      .select('id')
+      .eq('id', dto.postId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (postError) {
+      throw new InternalServerErrorException(
+        `Failed to validate post: ${postError.message}`,
+      );
+    }
+    if (!post) throw new NotFoundException('Post not found');
+
     if (dto.parentId) {
       const { data: parentComment, error: parentError } = await this.db
         .from('forum_comments')
@@ -862,6 +877,27 @@ export class ForumService {
     uid: string,
     dto: VoteDto,
   ): Promise<{ upvotes: number; downvotes: number }> {
+    // The target must exist and not be deleted: forum_votes has no foreign key, so a vote on a missing or deleted
+    // target was stored as an orphan row (#1019). The comment lookup also gives the post for the broadcast.
+    const { data: target, error: targetError } = await this.db
+      .from(dto.targetType === 'post' ? 'forum_posts' : 'forum_comments')
+      .select(dto.targetType === 'post' ? 'id' : 'post_id')
+      .eq('id', dto.targetId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id?: string; post_id?: string }>();
+    if (targetError) {
+      throw new InternalServerErrorException(
+        `Failed to validate vote target: ${targetError.message}`,
+      );
+    }
+    if (!target) {
+      throw new NotFoundException(
+        dto.targetType === 'post' ? 'Post not found' : 'Comment not found',
+      );
+    }
+    const postId =
+      dto.targetType === 'post' ? dto.targetId : (target.post_id ?? null);
+
     // Atomic upsert/toggle + recalculate in a single transaction. Replaces the old
     // select-then-write, which let concurrent votes 500 on the PK or interleave
     // delete/update/insert into an inconsistent state (FR-9).
@@ -880,19 +916,6 @@ export class ForumService {
       upvotes: Number(row?.upvotes ?? 0),
       downvotes: Number(row?.downvotes ?? 0),
     };
-
-    // Resolve postId for the broadcast (comment votes need a lookup)
-    let postId: string | null = null;
-    if (dto.targetType === 'post') {
-      postId = dto.targetId;
-    } else {
-      const { data: commentRow } = await this.db
-        .from('forum_comments')
-        .select('post_id')
-        .eq('id', dto.targetId)
-        .single();
-      postId = commentRow?.post_id ?? null;
-    }
 
     if (postId) {
       this.forumEvents

@@ -77,6 +77,23 @@
 
 ---
 
+## #1019 Comments and votes need a live target (2026-10-23)
+
+**What:**
+- `createComment` checked a reply's parent but never the post. A missing post hit the foreign key (500), and a
+  soft-deleted post still took comments. It now requires the post to exist and not be deleted (404 "Post not found").
+- `vote` cast through `cast_vote_atomic` into `forum_votes`, which has no foreign key on `target_id`, so a vote on a
+  missing or deleted post or comment was stored as an orphan row (200). It now resolves the target first, requiring it
+  to exist and not be deleted (404). That lookup also yields the comment's post for the broadcast, replacing the
+  post-RPC lookup: no extra query for a comment vote, one PK read for a post vote. No migration.
+
+**Validated:** Jest `forum/forum.service.spec.ts` red (4) → green. A vote on a missing or deleted post or comment is a
+404 with no RPC; a comment on a missing or deleted post is a 404 with no insert; a live post takes the comment; the
+existing vote and broadcast tests pass with the target present. Forum suites 74/74; real tsc clean; eslint one better
+than main.
+
+---
+
 ## #1017 Chapter-version create and update share one validated price rule (2026-10-23)
 
 **What:** `POST /versions` typed its body as a plain object, so a negative `priceCoins` was stored (PATCH refused it,
