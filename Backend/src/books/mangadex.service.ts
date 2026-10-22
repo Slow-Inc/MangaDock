@@ -76,6 +76,11 @@ const MANGA_GENRE_TAGS: Record<string, string> = {
 
 import { StatusService } from '../status/status.service';
 
+/** The MangaDex tag name → id map (getMangaTagId); getNewReleases reads it to tell an unknown tag from an unloaded list. */
+const TAG_MAP_KEY = 'mangadex:tags:v1';
+/** How long a chapter list cut short by a failed feed page is kept (#961). */
+const PARTIAL_CHAPTERS_TTL_MS = 60_000;
+
 @Injectable()
 export class MangaDexService {
   private readonly logger = new Logger(MangaDexService.name);
@@ -216,6 +221,10 @@ export class MangaDexService {
           );
           return this.attachLocalStatus(stale.data, true, forceLocal);
         }
+        // No stale copy: keep the cut-short list briefly, so every request does not re-fetch the whole feed while
+        // MangaDex is failing; the complete list is retried after that (#961)
+        if (chapters.length > 0)
+          await this.cache.set(cacheKey, chapters, PARTIAL_CHAPTERS_TTL_MS);
       }
 
       return this.attachLocalStatus(chapters, false, forceLocal);
@@ -460,7 +469,7 @@ export class MangaDexService {
     if (tag && !tagId) {
       // Never fall back to the untagged rows (or their cache entry) under a tag the user picked (#961)
       const tagListLoaded =
-        await this.cache.get<Record<string, string>>('mangadex:tags:v1');
+        await this.cache.get<Record<string, string>>(TAG_MAP_KEY);
       if (tagListLoaded) throw new NotFoundException(`Unknown tag: ${tag}`);
       throw new ServiceUnavailableException('MangaDex tag list unavailable');
     }
@@ -604,7 +613,7 @@ export class MangaDexService {
   }
 
   async getMangaTagId(tagName: string): Promise<string | undefined> {
-    const cacheKey = 'mangadex:tags:v1';
+    const cacheKey = TAG_MAP_KEY;
     const cached = await this.cache.get<Record<string, string>>(cacheKey);
     if (cached) return cached.data[tagName];
 

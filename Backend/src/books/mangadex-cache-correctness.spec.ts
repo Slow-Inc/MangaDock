@@ -52,11 +52,13 @@ describe('MangaDexService.getMangaChapters — a cut-short list is not cached (#
         })
       : json({ result: 'error' }, 503);
 
-  it('a failed second page: the 500 chapters are not cached as the whole list', async () => {
+  it('a failed second page: the 500 chapters are cached only briefly, not for the full TTL', async () => {
     const { service, cache } = makeService({ fetch: pagedFeed });
     const chapters = await service.getMangaChapters('m1');
-    expect(cache.set).not.toHaveBeenCalled();
-    expect(chapters).toHaveLength(500); // still shown, just not cached as complete
+    expect(chapters).toHaveLength(500); // still shown
+    // a short entry spares MangaDex a full re-fetch on every request while it is failing, then the full list is retried
+    expect(cache.set).toHaveBeenCalledTimes(1);
+    expect((cache.set.mock.calls[0] as unknown[])[2]).toBe(60_000);
   });
 
   it('a failed second page with a stale full list: the stale list is served', async () => {
