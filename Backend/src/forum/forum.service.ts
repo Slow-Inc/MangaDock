@@ -30,7 +30,7 @@ import {
   UserProfileEarnings,
   UserProfileResponse,
 } from './forum.types';
-import { lookupFailure } from './assert-found';
+import { isInvalidId, lookupFailure } from '../common/assert-found';
 
 type ForumPostRow = {
   id: string;
@@ -129,10 +129,12 @@ export class ForumService {
       offset + limit - 1,
     );
 
-    if (error)
+    if (error) {
+      if (isInvalidId(error)) return { items: [], total: 0 }; // an author id that is not a uuid has no posts (#963)
       throw new InternalServerErrorException(
         `Failed to list posts: ${error.message}`,
       );
+    }
 
     const userVotes = await this.getUserVotes(
       userUid,

@@ -77,6 +77,20 @@
 
 ---
 
+## #963 Malformed ids and paging values no longer answer 500 (2026-10-22)
+
+**What:** `GET /versions/<not a uuid>` and `/versions/translator/<not a uuid>` turned Postgres 22P02 into a plain
+`Error` (500); `/forum/posts?authorUid=<not a uuid>` answered 500; forum and reviews list params went straight into
+`.range()` (negative or NaN). `lookupFailure` (#915) moves from `forum/` to `common/` with a small `isInvalidId`;
+`getVersion` uses it (an id that cannot exist → 404, other failures → the database-down signal); the translator and
+author filters answer an empty list for a non-uuid id; forum and reviews paging go through `queryInt` (#958).
+
+**Validated:** Jest red (8 of 14) → green: `assert-found.spec` (+2 `isInvalidId`), `versions-invalid-id.spec` (3),
+`forum-invalid-input.spec` (2), `reviews-paging.spec` (1). Full Backend suite: 106 suites / 1,047 tests pass. eslint
+unchanged or lower on every touched file.
+
+---
+
 ## #961 MangaDex cache: no cut-short chapter lists, no untagged answers under a tag (2026-10-22)
 
 **What:** `getMangaChapters` paged the feed 500 at a time and `break`-ed on a failed page, then cached whatever it had —

@@ -6,8 +6,8 @@
  */
 import { HttpStatus, Logger, NotFoundException } from '@nestjs/common';
 import type { ArgumentsHost } from '@nestjs/common';
-import { AllExceptionsFilter } from '../common/filters/all-exceptions.filter';
-import { lookupFailure } from './assert-found';
+import { AllExceptionsFilter } from './filters/all-exceptions.filter';
+import { isInvalidId, lookupFailure } from './assert-found';
 
 /** Runs what lookupFailure throws through the app's real exception filter. */
 function respond(error: { code?: string; message?: string } | null) {
@@ -90,5 +90,20 @@ describe('lookupFailure — 404 only for a missing row (#915)', () => {
       status: 503,
       body: { code: 'SUPABASE_OFFLINE' },
     });
+  });
+});
+
+describe('isInvalidId — an id that is not a uuid (#963)', () => {
+  it('22P02 is an invalid id', () => {
+    expect(
+      isInvalidId({
+        code: '22P02',
+        message: 'invalid input syntax for type uuid',
+      }),
+    ).toBe(true);
+  });
+  it('anything else, or no error, is not', () => {
+    expect(isInvalidId({ code: '57014', message: 'timeout' })).toBe(false);
+    expect(isInvalidId(null)).toBe(false);
   });
 });
