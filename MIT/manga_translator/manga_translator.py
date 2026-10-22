@@ -1605,7 +1605,12 @@ class MangaTranslator:
         inlined body it replaces.
         """
         img_h, img_w = ctx.img_rgb.shape[:2]
+        _n_before_filter = len(ctx.text_regions or [])
         regions = self._apply_source_lang_filter(ctx, config)
+        if os.environ.get('MIT_LOG_REGION_FILTER'):
+            # #1050 probe: can a pre-translation mask be built safely? Needs the region list to be stable
+            # between the front stage and this point.
+            print(f'[region-filter] before={_n_before_filter} after={len(regions or [])}', flush=True)
         if not regions:
             return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 

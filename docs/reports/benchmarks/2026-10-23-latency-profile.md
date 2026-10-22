@@ -25,3 +25,24 @@
    single-page lever left without changing quality.
 4. **OCR ~1.4 s** — cuDNN is off for a quality reason (#884); re-enabling would trade quality for speed, so it stays.
 5. **Rendering** — supersampling 4 is a quality choice; lowering it is a tradeoff, not a free win.
+## Probe: can the mask/inpaint overlap be built safely? (round 78, #1050)
+
+Added an env-gated `[region-filter] before=N after=M` log to `_finish_patches` (`MIT_LOG_REGION_FILTER=1`) and
+ran 7 real pages:
+
+| page | before filter | after filter |
+|---|---|---|
+| Boku p0 | 13 | **12** |
+| Horimiya p0 | 25 | 25 |
+| Mieruko p0 | 11 | 11 |
+| Akuyaku p0 | 11 | 11 |
+| Otome p0 | 11 | **10** |
+| JP page probed as ENG | 7 | **0** |
+| Mairimashita Iruma p1 | 8 | 8 |
+
+**Verdict: the region list is NOT stable** — the post-translation filter really drops regions on 2 of 7 pages (and
+all of them on a mixed-source JP page probed with the wrong source language). A mask built before translation
+would therefore erase text that is never re-rendered (blank balloons). The overlap (#1050) is blocked as designed;
+the shared fix is to move the filter to the front stage, which is a behaviour change split into **#1051**
+(translate only the regions that will be rendered — fewer tokens/latency on mixed pages, and it makes the region
+list stable so the overlap becomes possible).

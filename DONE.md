@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 78 — #1050 probe: the region list really changes after translation; split out "translate only rendered regions" (#1051) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added an env-gated probe (`MIT_LOG_REGION_FILTER=1`) printing `[region-filter] before=N after=M` in `_finish_patches` and ran 7 real pages: the post-translation `_apply_source_lang_filter` **does drop regions** — 13->12 (Boku p0), 11->10 (Otome p0), and 7->0 on the JP page probed with the wrong source language.
+- **#1050 verdict:** a mask precomputed before translation would erase text that is never re-rendered (blank balloons) — the overlap is unsafe as-is and stays blocked, with the evidence recorded in the latency-profile benchmark.
+- **Split out #1051:** the shared fix is to apply the source-language filter at the **front** stage (opt-in experiment) — translate only the regions that will be rendered (fewer tokens/latency on mixed pages) and make the region list stable, which unblocks the overlap. A/B acceptance: same rendered region set, judge not worse, translation chars lower on dropped-region pages, byte-identical on clean pages.
+
 ## MIT quality loop, round 77 — latency profile from 8 real pages + overlap opportunity scoped (#1050) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
