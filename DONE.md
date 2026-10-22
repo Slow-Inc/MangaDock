@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 29 — `concise_bubbles` was a dead flag; now carried, A/B is a tie (#892) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Found a dead flag:** the Backend has sent `translator.concise_bubbles` since #526 and `ConfigGPT` implements the directive, but `TranslatorConfig` had no field and `chatgpt_config` carried only the context fields — Pydantic dropped it, so `MIT_CONCISE_BUBBLES` did nothing. Added the field + carriage (absent → byte-identical, 3 tests).
+- A/B (12 pages, blind, chunked judge): translation **-7.2 % chars** (56 segments shorter) and the judge is **dead even 5-5 (2 ties)**. Not enough to flip a default that changes every translation — kept opt-in; the flag now actually works.
+- Benchmark `2026-10-22-892-concise-bubbles-ab.md`; gate **849 passed**.
+
 ## MIT quality loop, round 28 — pipeline determinism verified; DBNet needs no cuDNN-off (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
