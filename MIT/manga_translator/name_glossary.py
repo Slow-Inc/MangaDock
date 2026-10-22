@@ -10,21 +10,53 @@ Pure logic only, so it unit-tests without the ML stack.
 import re
 
 #: Latin words that look like names but are ordinary dialogue words (all-caps manga lettering is loud).
-_NAME_STOP = frozenset("""
-A AN AND ARE AS AT BE BUT BY CAN COULD DO DOES DID FOR FROM GET GOT HAD HAS HAVE HE HER HERE HIM HIS HOW
-I IF IN IS IT ITS JUST KNOW LET LIKE ME MY NO NOT NOW OF ON OR OUR OUT SHE SO SOME THAT THE THEN THERE
-THEY THIS TO TOO UP US WAS WE WERE WHAT WHEN WHERE WHO WHY WILL WITH WOULD YOU YOUR MEAN ALL SAME ONLY
-EVEN MORE MOST VERY WELL STILL BACK DOWN OVER UNDER ONE TWO THREE FIVE RIGHT LEFT GOOD PLEASE THANK
-SHES IM IVE YOURE THATS ITS DONT CANT WONT DIDNT DOESNT ISNT ARENT WASNT WERENT HAVENT HASNT HADNT
-THOSE THOUGH THROUGH UNTIL WHICH WHILE WANT SAID MUST MAY OFF ONLY OVER SUCH THAN
+#: A curated common-word list keeps the prompt block to real names: without it a page produced junk entries
+#: like MAN = เฮ้อ..., RUNS = ..., FAMOUS = ... (round 69 coverage experiment).
+_COMMON_WORDS = frozenset("""
+A AN AND ARE AS AT BE BEEN BEING BUT BY CAN COULD DID DO DOES DOING DONE FOR FROM GET GETS GOT HAD HAS HAVE
+HE HER HERE HERS HIM HIS HOW I IF IN INTO IS IT ITS JUST KNOW KNOWS LET LIKE MADE MAKE MANY MAY ME MIGHT MORE
+MOST MUCH MUST MY NO NOT NOW OF ON ONCE ONE ONLY OR OTHER OUR OUT OVER OWN SAID SAME SAY SAYS SEE SEES SHE
+SHOULD SO SOME STILL SUCH TAKE TAKES TELL TELLS THAN THAT THE THEIR THEM THEN THERE THESE THEY THING THINGS
+THIS THOSE THOUGH THROUGH TO TOO UNDER UP US VERY WAS WAY WE WELL WENT WERE WHAT WHEN WHERE WHETHER WHICH
+WHILE WHO WHY WILL WITH WOULD YES YOU YOUR YOURS
+ABOUT AFTER AGAIN AGAINST ALL ALREADY ALSO ALWAYS AROUND AWAY BACK BAD BEFORE BEHIND BETTER BIG BLACK BOTH
+BOY BROUGHT CALLED CAME CANNOT CLOSE COLD COME COMES COMING COULD NOT DARK DAY DAYS DEAD DIFFERENT DOING DOWN
+EACH EARLY EASY EAT EATS ELSE END ENOUGH EVEN EVER EVERY EVERYONE EVERYTHING FAMOUS FAR FAST FEW FIND FINE
+FIRST FOUND FRIEND FRIENDS GAVE GIRL GIVE GIVES GIVING GO GOES GOING GOOD GOT GREAT GUTS HAD HANDS HAPPEN
+HAPPENED HAPPY HARD HEAR HEARD HELP HIMSELF HOME HOPE HOUR HOURS HOUSE HOWEVER HUGE IDEA IMPORTANT KEEP KEPT
+KIND KNEW KNOWN LAST LATE LATER LEAVE LEAVING LEFT LET LIFE LIGHT LITTLE LIVE LONG LOOK LOOKS LOOKED LOT
+LOUD LOVE LOVED LOW MADE MANS MEAN MEANS MEET MET MIND MINUTE MINUTES MONEY MORNING MORNIN NICE NIGHT NOPE
+NOTHING NOWHERE NUMBER OFFER OK OKAY OLD ONCE OPEN OPENED OPENS ORDER OTHERWISE OUTSIDE PART PEOPLE PERHAPS
+PERSON PICK PLACE PLACES PLAY PLEASE POINT POLITE POWER PREVIOUS PROBLEM PROPERLY PUT QUICK QUICKLY RAN
+REALLY REJECTED REMEMBER RIGHT ROOM RUN RUNNING RUNS SAD SAFE SCHOOL SEE SEEM SEEMS SENSE SHARE SHOW SHOWS
+SHOWN SICK SIDE SIGHT SIMPLE SINCE SLOW SMALL SOMEONE SOMETHING SOMETIMES SOON SORRY SOUND START STARTED
+STILL STOP STOPPED STRANGE STRANGELY STUFF SURE TALK TALKED TELLING THINK THINKING THOUGHT TIME TIMES TODAY
+TOGETHER TOLD TOMORROW TONIGHT TOOK TOWARD TROUBLE TRUE TRY TRYING TURN TURNED TWICE UHM UH OH AH EH HEY HA
+HAHA WOW YEAH YEP UGLY USED USUALLY WAIT WAITING WAKE WALK WALKING WALL WANNA WANT WANTED WANTS WATCH
+WATER WHATS WHAAT WHATEVER WHOLE WIFE WISH WOMAN WOMEN WONDER WORD WORDS WORK WORKED WORKS WORLD WORRIED
+WRONG YESTERDAY YOUNG
+ANY DAMN DROP FORMED GODDESS GROUND HEIGHT JOIN SKY SKYS SKYSCRAPER SIT SNACKS
+ITD ALLERGIES BAND CDS HOMEWORK RELEASING IMMEDIATELY SHITTY VOICE FACE HANDS EYES HEAD BODY
+DOOR TABLE CHAIR WINDOW STREET TRAIN FLOOR FRIEND SHADOW SILENCE FEAR HOPE PAIN
 """.split())
+
+#: OCR noise that the all-caps matcher would otherwise read as a name (apostrophe/letter mash).
+_OCR_JUNK = frozenset("""
+ILL IVE IM ID YOURE THATS THERES WHATS SHES WEVE THEYRE YOUVE LETS ITS ALRIGHT
+DONT CANT WONT DIDNT DOESNT ISNT ARENT WASNT WERENT HAVENT HASNT HADNT COULDNT SHOULDNT WOULDNT
+WANNA GONNA GOTTA THATLL
+HHI HNEM ORSOIT PPOPERLY TELICANI THEIPOWER VVENEVER HELPME ICANT
+SIIIG SOR MORNIN MAN GRANTING LEAVING DISGUSTING SURVIVE SKYSCRAPER ANYTHING THERES PRETTM RFLIGION
+""".split())
+
+_NAME_STOP = _COMMON_WORDS | _OCR_JUNK
 
 _LATIN_NAME = re.compile(r"\b([A-Z][a-z]{2,}|[A-Z]{3,})\b")
 #: A name broken by a stammer hyphen or a line break ("TSUKU- YOMI", "TSUKU - YOMI") is one name.
 _HYPHEN_BREAK = re.compile(r"(?<=[A-Z])-\s*(?=[A-Z])")
 _THAI_RUN = re.compile("[\\u0E00-\\u0E7F]{3,}")
 #: JP->TH (#980c): a Japanese character name is a katakana run. 2-8 chars keeps short SFX-ish runs
-#: (pinned too — consistent SFX is fine) and drops long loanwords; the two-occurrence filter is the second net.
+#: (pinned too - consistent SFX is fine) and drops long loanwords; the two-occurrence filter is the second net.
 _KATAKANA = re.compile("[\\u30A1-\\u30FA]{2,8}")
 
 
@@ -39,7 +71,7 @@ def glossary_enabled(env=None) -> bool:
 
 
 def candidate_names(srcs) -> list:
-    """Canonical (uppercase) romaji name candidates from the page's source lines, in first-seen order."""
+    """Canonical (uppercase) name candidates from the page's source lines, in first-seen order."""
     found = []
     for src in srcs or []:
         text = _HYPHEN_BREAK.sub("", src or "")
@@ -64,22 +96,15 @@ def extract_glossary(regions, existing=None) -> dict:
     always wins, so a page never overrides the glossary it inherited.
     """
     glossary = dict(existing or {})
-    for region in regions or []:
-        if isinstance(region, dict):
-            src = region.get("src") or ""
-        else:
-            src = getattr(region, "src", "") or getattr(region, "text", "")
-        if isinstance(region, dict):
-            dst = region.get("dst") or ""
-        else:
-            dst = getattr(region, "dst", "") or getattr(region, "translation", "")
+    for region in _pairs(regions):
+        src, dst = region
         names = candidate_names([src])
         if len(names) != 1:
             continue
         name = names[0]
         if name in glossary:
             continue
-        runs = _THAI_RUN.findall(dst or "")
+        runs = _THAI_RUN.findall(dst)
         if not runs:
             continue
         spelling = max(runs, key=len)
@@ -92,11 +117,7 @@ def extract_glossary(regions, existing=None) -> dict:
 def count_candidates(regions) -> dict:
     """How many times each name candidate occurs on one page (used to keep only recurring names)."""
     counts = {}
-    for region in regions or []:
-        if isinstance(region, dict):
-            src = region.get("src") or ""
-        else:
-            src = getattr(region, "src", "") or getattr(region, "text", "")
+    for src, _dst in _pairs(regions):
         for name in candidate_names([src]):
             counts[name] = counts.get(name, 0) + 1
     return counts
@@ -107,22 +128,21 @@ def apply_glossary(regions, glossary) -> int:
 
     Prompt-level instructions are not reliable (the model copied ทสึคุโยมิ as ทสึคิโยมิ in one run), so on a
     region whose SOURCE contains a glossary name, a Thai token within edit distance of the glossary spelling
-    is replaced with the exact spelling. Only near matches are touched: the token must be within 3 edits for
-    spellings up to 8 chars (1 for longer ones) and cover at least 70 % of the length, so unrelated words that
-    merely share a few letters are left alone.
+    is replaced with the exact spelling. Only near matches are touched: the token must be within 3 edits and
+    60% similar, so unrelated words that merely share a few letters are left alone.
     """
     if not glossary:
         return 0
     from difflib import SequenceMatcher
 
     fixed = 0
-    for region in regions or []:
-        if isinstance(region, dict):
-            src = region.get("src") or ""
-            dst = region.get("dst") or ""
+    for item in regions or []:
+        if isinstance(item, dict):
+            src = item.get("src") or ""
+            dst = item.get("dst") or ""
         else:
-            src = getattr(region, "text", "") or getattr(region, "src", "")
-            dst = getattr(region, "dst", "") or getattr(region, "translation", "")
+            src = getattr(item, "text", "") or getattr(item, "src", "")
+            dst = getattr(item, "dst", "") or getattr(item, "translation", "")
         if not src or not dst:
             continue
         present = [n for n in candidate_names([src]) if n in glossary]
@@ -139,20 +159,28 @@ def apply_glossary(regions, glossary) -> int:
                 if abs(len(tok) - len(target)) > 2:
                     continue
                 ratio = SequenceMatcher(None, tok, target).ratio()
-                # same name, small drift: high similarity and only a couple of character edits
                 if ratio >= 0.6 and _edit_distance(tok, target) <= 3 and ratio > best_ratio:
                     best, best_ratio = tok, ratio
             if best is not None:
                 new_dst = new_dst.replace(best, target, 1)
                 fixed += 1
         if new_dst != dst:
-            if isinstance(region, dict):
-                region["dst"] = new_dst
-            elif hasattr(region, 'translation'):
-                region.translation = new_dst
+            if isinstance(item, dict):
+                item["dst"] = new_dst
+            elif hasattr(item, 'translation'):
+                item.translation = new_dst
             else:
-                setattr(region, "dst", new_dst)
+                setattr(item, "dst", new_dst)
     return fixed
+
+
+def _pairs(regions):
+    for item in regions or []:
+        if isinstance(item, dict):
+            yield (item.get("src") or ""), (item.get("dst") or "")
+        else:
+            yield (getattr(item, "src", "") or getattr(item, "text", "")), \
+                (getattr(item, "dst", "") or getattr(item, "translation", ""))
 
 
 def _edit_distance(a: str, b: str) -> int:

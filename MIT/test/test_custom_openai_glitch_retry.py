@@ -114,3 +114,25 @@ def test_a_cyrillic_leak_is_reasked_with_an_explicit_note_903():
     assert t.client.chat.completions.create.call_count == 2
     second = json.dumps(t.client.chat.completions.create.call_args_list[1].kwargs, ensure_ascii=False)
     assert 'target script only' in second and 'transliterate names' in second
+
+def test_a_split_numbered_block_is_reasked_and_the_alignment_is_kept_997():
+    """A live page shifted every translation by one line: the model split line 1 into two numbered blocks,
+    so index normalization mapped block 2 onto line 2. The block count must be checked against the batch
+    size and the batch re-asked."""
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(side_effect=[
+        _reply('<|1|>สวัสดี\n<|2|>ครับ\n<|3|>ลาก่อน'),
+        _reply('<|1|>สวัสดี\n<|2|>ลาก่อน'),
+    ])
+    out = asyncio.run(t.translate('ENG', 'THA', ['HELLO', 'BYE']))
+    assert out == ['สวัสดี', 'ลาก่อน']
+    assert t.client.chat.completions.create.call_count == 2
+
+
+def test_a_persistently_broken_contract_gives_up_after_two_retries_997():
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(
+        return_value=_reply('<|1|>หนึ่ง\n<|2|>สอง\n<|3|>สาม'))
+    out = asyncio.run(t.translate('ENG', 'THA', ['ONE', 'TWO']))
+    assert len(out) == 2
+    assert t.client.chat.completions.create.call_count == 3

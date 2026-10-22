@@ -130,3 +130,14 @@ def test_extract_glossary_pairs_a_katakana_name_with_its_thai_spelling_980c():
         {"src": "アリスはどこ？", "dst": "อลิส?"},
     ]
     assert extract_glossary(regions).get("アリス") == "อลิส"
+
+
+def test_common_manga_words_are_not_name_candidates_980d():
+    found = candidate_names(["MAN, YOURE FAMOUS", "OPENS AT 3", "RUNS FAST", "SKY IS BLUE", "SIT DOWN"])
+    for junk in ("MAN", "FAMOUS", "OPENS", "RUNS", "SKY", "SIT"):
+        assert junk not in found, (junk, found)
+
+
+def test_real_names_survive_the_common_word_filter_980d():
+    found = candidate_names(["TSUKUYOMI!", "MIYAMURA, WAIT!", "HORI SHOW ME"])
+    assert "TSUKUYOMI" in found and "MIYAMURA" in found and "HORI" in found

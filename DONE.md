@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 69 — fixed a page-wide translation line shift + glossary extraction precision (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Found a real page-wide defect while reviewing a live page:** a 2-page batch run shipped Tsuki c2 p1 with every Thai translation shifted one balloon down (`I HEARD YOUR CONVERSATION WITH THE GODDESS` split across two balloons). Direct translator calls on the same 21 lines were correct 3/3, so the model had **split one numbered block into two**; `normalize_numbered_output` guarantees the count but the extra block silently shifted every later balloon.
+- **Fix (#1026):** pure `numbered_contract.contract_gap(raw, n)` (missing/duplicate/extra block) checked before normalizing; `custom_openai` re-asks that batch (bounded 2 retries, then the old fallback). Unit tests: `contract_gap` cases + a mocked gateway that returns a 3-block answer for 2 lines -> one re-ask, aligned output; persistent breakage stops after 2 retries.
+- **Live rerun after the guard:** page-2 alignment correct, TSUKUYOMI consistent across the pair, gate clean. Full suite **896 passed**.
+- **Glossary extraction precision (#980):** the prompt block was polluted by ordinary ALL-CAPS words (`MAN`, `RUNS`, `FAMOUS`, `OPENS`, ...). Added a curated common-word/OCR-junk stoplist: candidates per page dropped from 34/31/16 to 2/2/0-1 while real names (`TSUKUYOMI`, `HORI`, `MIYAMURA`, `コトラ`) survive; live two-page run stays consistent. 20 glossary tests green.
+- Benchmarks `2026-10-23-1026-numbered-contract-shift.md` (new) and `2026-10-22-980-name-glossary.md` (round-69 section).
+
 ## MIT quality loop, round 68 — widen-vertical verified visually + reachable from Backend (`MIT_WIDEN_VERTICAL_COLUMNS`) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -59,6 +59,22 @@ def normalize_numbered_output(raw: str, n: int, missing: str = '[Missing item {n
     return out
 
 
+def contract_gap(raw: str, n: int) -> bool:
+    """True when a numbered response cannot be mapped 1:1 to ``n`` queries.
+
+    A dropped index, a duplicate index, or an extra block all mean the model merged or split lines, and
+    index-based normalization would then produce a page-wide line shift (seen live: page 2's translations moved
+    one region down, e.g. a Thai fragment about a goddess landed in the next balloon). One retry fixes it.
+    """
+    if n <= 1:
+        return False
+    matches = _BLOCK_RE.findall(raw or '')
+    if len(matches) != n:
+        return True
+    indices = [int(m) for m in matches]
+    return len(set(indices)) != n or set(indices) != set(range(1, n + 1))
+
+
 def is_deterministic_decode(temperature: Optional[float],
                             top_p: Optional[float] = None,
                             top_k: Optional[int] = None) -> bool:

@@ -93,3 +93,21 @@ formatting artefact (`20, 000` with a space after the comma), a fullwidth digit,
 - Unit tests: katakana candidates, hiragana/kanji excluded, `アリス -> อลิส` extraction. Gate **885 passed**.
 - Limitation kept: extraction takes the longest Thai run of a region whose output is essentially the name alone
   (a name followed by particles may not be extractable yet); this matches the EN behaviour validated on Tsuki.
+## Round 69: extraction precision (curated common-word list)
+
+Audited the glossary entries actually produced on the 3 chapter pairs: single-candidate extraction was pinning
+ordinary ALL-CAPS words with arbitrary Thai fragments (`MAN = เฮ้อ…`, `RUNS = …`, `FAMOUS = …`, `OPENS = …`),
+which polluted the prompt block (enforcement was already protected by the two-occurrence filter, but the block
+itself read as nonsense).
+
+Added a curated `_COMMON_WORDS`/`_OCR_JUNK` stoplist to `candidate_names` (common pronouns/verbs/nouns/adjectives
++ frequent OCR mangles). Before/after candidates on page 1 of each pair:
+
+| chapter | candidates before | after | real names kept |
+|---|---|---|---|
+| Tsuki c2 | 34 | 2 (`TSUKUYOMI`, `コトラ`) | yes |
+| Boku c9 | 16 | 0-1 (`ITD` -> filtered) | — (no names) |
+| Horimiya c10 | 31 | 2 (`HORI`, `MIYAMURA`) | yes |
+
+Real names survive (unit-tested), and the live two-page rerun stays consistent (`ทสึคุโยมิ / ทสึคุโยมิ`) with 0
+contract retries. 20 glossary unit tests green.
