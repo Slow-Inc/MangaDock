@@ -59,6 +59,9 @@ function mergeLocal(): LandingBook[] {
   return out;
 }
 
+/** A year typed in a filter box, once it is whole: 4 digits, 1900-2100; anything else is no filter yet (#965). */
+const completeYear = (v: string) => (/^\d{4}$/.test(v) && +v >= 1900 && +v <= 2100 ? v : "");
+
 // ─── SearchResultCard ────────────────────────────────────────────────────────
 function SearchResultCard({ book, onSelect }: { book: LandingBook; onSelect: () => void }) {
   const [showCover, setShowCover] = useState(false);
@@ -223,7 +226,9 @@ function SearchResults() {
   const [statusFilter, setStatusFilter]   = useState<'ongoing' | 'completed' | 'hiatus' | 'all'>('all');
   const [yearFrom, setYearFrom]           = useState('');
   const [yearTo, setYearTo]               = useState('');
-  const [ratingMin, setRatingMin]         = useState(0);
+  // What is typed in the year boxes; it applies once it is a whole year (#965)
+  const [yearFromDraft, setYearFromDraft] = useState('');
+  const [yearToDraft, setYearToDraft]     = useState('');
   const [showAdvanced, setShowAdvanced]   = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
 
@@ -244,7 +249,17 @@ function SearchResults() {
   useEffect(() => { setInputValue(query); }, [query]);
 
   // reset page when query / lang / status / year / rating / source changes
-  useEffect(() => { setPage(1); }, [query, langFilter, statusFilter, yearFrom, yearTo, ratingMin, source]);
+  useEffect(() => { setPage(1); }, [query, langFilter, statusFilter, yearFrom, yearTo, source]);
+
+  // A year applies once it is complete (4 digits, 1900-2100), after a pause: typing "2015" searches once, not for
+  // 2, 20 and 201 on the way (#965)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setYearFrom(completeYear(yearFromDraft));
+      setYearTo(completeYear(yearToDraft));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [yearFromDraft, yearToDraft]);
 
   // fetch from API
   useEffect(() => {
@@ -291,7 +306,7 @@ function SearchResults() {
   }, [query, langFilter, statusFilter, yearFrom, yearTo, source, page, retry]);
 
   // reset category when base changes
-  useEffect(() => { setCategoryFilter("all"); }, [query, langFilter, statusFilter, yearFrom, yearTo, ratingMin, source]);
+  useEffect(() => { setCategoryFilter("all"); }, [query, langFilter, statusFilter, yearFrom, yearTo, source]);
 
   // local books (favorites + history) — must be client-only to avoid hydration mismatch
   const [localBooks, setLocalBooks] = useState<LandingBook[]>([]);
@@ -314,12 +329,27 @@ function SearchResults() {
     return [...cats].sort();
   }, [sourceResults]);
 
-  // final displayed (category + rating filter)
-  const displayed = useMemo(() => {
-    let r = categoryFilter === "all" ? sourceResults : sourceResults.filter((b) => b.categories.includes(categoryFilter));
-    if (ratingMin > 0) r = r.filter((b) => (b.averageRating ?? 0) >= ratingMin);
-    return r;
-  }, [sourceResults, categoryFilter, ratingMin]);
+  // final displayed (category filter). No rating filter: search results carry no rating yet (#965)
+  const displayed = useMemo(
+    () => (categoryFilter === "all" ? sourceResults : sourceResults.filter((b) => b.categories.includes(categoryFilter))),
+    [sourceResults, categoryFilter],
+  );
+  const filtersOn = langFilter !== "all" || statusFilter !== "all" || !!yearFrom || !!yearTo || categoryFilter !== "all";
+  const clearYear = () => {
+    setYearFromDraft("");
+    setYearToDraft("");
+    setYearFrom("");
+    setYearTo("");
+  };
+  const clearFilters = () => {
+    setLangFilter("all");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    clearYear();
+  };
+  // A typed year that cannot apply yet (partial or out of range) is flagged, not silently ignored (#965)
+  const yearFromBad = !!yearFromDraft && !completeYear(yearFromDraft);
+  const yearToBad = !!yearToDraft && !completeYear(yearToDraft);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -385,7 +415,7 @@ function SearchResults() {
                   <button
                     onClick={() => setShowAdvanced((s) => !s)}
                     className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                      showAdvanced || statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0
+                      showAdvanced || statusFilter !== 'all' || yearFrom || yearTo
                         ? "border-accent/40 bg-accent/10 text-accent"
                         : "border-line text-ink-2 hover:border-ink-3 hover:text-ink"
                     }`}
@@ -394,9 +424,9 @@ function SearchResults() {
                       <path strokeLinecap="round" d="M3 6h18M7 12h10M11 18h2" />
                     </svg>
                     ตัวกรองขั้นสูง
-                    {(statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0) && (
+                    {(statusFilter !== 'all' || yearFrom || yearTo) && (
                       <span className="flex h-4 w-4 items-center justify-center rounded-full bg-ink text-xs font-bold text-bg">
-                        {[statusFilter !== 'all', !!yearFrom || !!yearTo, ratingMin > 0].filter(Boolean).length}
+                        {[statusFilter !== 'all', !!yearFrom || !!yearTo].filter(Boolean).length}
                       </span>
                     )}
                   </button>
@@ -435,40 +465,37 @@ function SearchResults() {
                 <span className="w-14 shrink-0 text-xs font-medium text-ink-3">ปี</span>
                 <input
                   type="number"
-                  value={yearFrom}
-                  onChange={(e) => setYearFrom(e.target.value)}
+                  value={yearFromDraft}
+                  onChange={(e) => setYearFromDraft(e.target.value)}
+                  aria-invalid={yearFromBad || undefined}
+                  aria-describedby={yearFromBad ? "year-hint" : undefined}
                   placeholder="จาก"
                   min={1900} max={2100}
-                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
                 />
                 <span className="text-xs text-ink-3">–</span>
                 <input
                   type="number"
-                  value={yearTo}
-                  onChange={(e) => setYearTo(e.target.value)}
+                  value={yearToDraft}
+                  onChange={(e) => setYearToDraft(e.target.value)}
+                  aria-invalid={yearToBad || undefined}
+                  aria-describedby={yearToBad ? "year-hint" : undefined}
                   placeholder="ถึง"
                   min={1900} max={2100}
-                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
                 />
-                {(yearFrom || yearTo) && (
-                  <button onClick={() => { setYearFrom(''); setYearTo(''); }} className="text-xs text-ink-2 hover:text-ink transition">ล้าง</button>
+                {(yearFromDraft || yearToDraft) && (
+                  <button onClick={clearYear} className="text-xs text-ink-2 hover:text-ink transition">ล้าง</button>
+                )}
+                {(yearFromBad || yearToBad) && (
+                  <span id="year-hint" className="w-full pl-16 text-[11px] text-ink-3">ใส่ปี ค.ศ. 4 หลัก (1900–2100)</span>
                 )}
               </div>
 
-              {/* คะแนน */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 shrink-0 text-xs font-medium text-ink-3">คะแนน</span>
-                {([0, 3, 4, 4.5] as const).map((r) => (
-                  <FilterChip key={r} active={ratingMin === r} onClick={() => setRatingMin(r)}>
-                    {r === 0 ? 'ทั้งหมด' : `≥ ${r}★`}
-                  </FilterChip>
-                ))}
-              </div>
-
               {/* Reset all */}
-              {(statusFilter !== 'all' || yearFrom || yearTo || ratingMin > 0) && (
+              {(statusFilter !== 'all' || yearFromDraft || yearToDraft) && (
                 <button
-                  onClick={() => { setStatusFilter('all'); setYearFrom(''); setYearTo(''); setRatingMin(0); }}
+                  onClick={() => { setStatusFilter('all'); clearYear(); }}
                   className="text-xs text-ink-2 underline underline-offset-2 hover:text-ink transition"
                 >
                   ล้างตัวกรองทั้งหมด
@@ -598,11 +625,29 @@ function SearchResults() {
           <div className="flex flex-col items-center gap-4 py-24 text-center text-ink-3">
             <Mascot area="search" size={96} />
             <p className="text-lg font-semibold">
-              {isMyList ? (query ? `ไม่พบรายการที่ตรงกับ "${query}"` : "ยังไม่มีรายการในคลังของคุณ") : `ไม่พบหนังสือที่ตรงกับ "${query}"`}
+              {isMyList
+                ? (query ? `ไม่พบรายการที่ตรงกับ "${query}"` : "ยังไม่มีรายการในคลังของคุณ")
+                : filtersOn
+                  ? `ไม่พบ "${query}" ที่ตรงกับตัวกรองที่เลือก`
+                  : `ไม่พบหนังสือที่ตรงกับ "${query}"`}
             </p>
             <p className="text-sm">
-              {isMyList ? "เพิ่มหนังสือลงรายการของฉัน หรือลองค้นหาจากทั้งหมด" : "ลองใช้คำค้นหาอื่น หรือตรวจสอบการสะกด"}
+              {isMyList
+                ? "เพิ่มหนังสือลงรายการของฉัน หรือลองค้นหาจากทั้งหมด"
+                : filtersOn
+                  ? "ลองล้างตัวกรองเพื่อดูผลทั้งหมด"
+                  : "ลองใช้คำค้นหาอื่น หรือตรวจสอบการสะกด"}
             </p>
+            {/* A filter emptied the list, not the search words: offer the way back (#965) */}
+            {!isMyList && filtersOn && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="rounded-xl border border-line bg-fill px-4 py-2 text-sm font-medium text-ink smooth-hover-fast hover:border-ink-3 hover:bg-raised"
+              >
+                ล้างตัวกรอง
+              </button>
+            )}
           </div>
         )}
 

@@ -77,6 +77,22 @@
 
 ---
 
+## #965 Search filters: no dead rating filter, one search per year, honest empty state (2026-10-22)
+
+**What:** on `/search` the "≥ 3★ / ≥ 4★ / ≥ 4.5★" filter could only empty the list — every search result (and every
+"my list" item) has `averageRating: 0`, MangaDex search carries no rating; typing a year sent one backend search per
+keystroke (`2`, `20`, `201`, `2015`); a list emptied by filters still said "ลองใช้คำค้นหาอื่น หรือตรวจสอบการสะกด" with no
+way to clear them. The rating filter is removed (until results carry real ratings — a separate decision); the year
+boxes keep a draft and apply only a complete 4-digit year in range after a 400 ms pause; with any filter on, the empty
+state says no book matches the selected filters and offers "ล้างตัวกรอง".
+
+**Validated:** production build, stand-in search that answers empty under a year filter: before, ≥ 3★ took 4 results
+to 0, "2015" sent 4 searches, the empty text blamed spelling; after, no rating filter, one search (`yearFrom=2015`), the
+empty state names the filters and its button brings the 4 results back. The #926 search keyboard probe still passes.
+tsc 0; eslint identical to main.
+
+---
+
 ## #963 Malformed ids and paging values no longer answer 500 (2026-10-22)
 
 **What:** `GET /versions/<not a uuid>` and `/versions/translator/<not a uuid>` turned Postgres 22P02 into a plain
