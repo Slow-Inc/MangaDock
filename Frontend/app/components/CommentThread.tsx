@@ -3,7 +3,7 @@
 import { PRIMARY_FILL } from "./ui/Button";
 import UserAvatar from "./ui/UserAvatar";
 import Loader from "./ui/Loader";
-import { useState, useRef, memo } from "react";
+import { useState, useRef, memo, useId } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -26,6 +26,8 @@ function CommentThreadImpl({
   onCommentAdded: (newComment: ForumComment) => void;
 }) {
   const { user, showLoginPrompt } = useAuth();
+  const editLimitId = useId();
+  const replyLimitId = useId();
   const [isReplying, setIsReplying] = useState(false);
   const [replyContent, setReplyContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -170,10 +172,11 @@ function CommentThreadImpl({
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   maxLength={FORUM_LIMITS.comment}
+                  aria-describedby={editLimitId}
                   rows={3}
                   className="w-full bg-fill border border-line rounded-lg p-3 text-sm text-ink focus:outline-none focus:border-ink-3 smooth-hover resize-none"
                 />
-                <LimitCounter value={editContent} max={FORUM_LIMITS.comment} />
+                <LimitCounter id={editLimitId} value={editContent} max={FORUM_LIMITS.comment} />
                 <div className="flex justify-end gap-2 mt-2">
                   <button
                     onClick={() => setIsEditing(false)}
@@ -272,11 +275,12 @@ function CommentThreadImpl({
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
                 maxLength={FORUM_LIMITS.comment}
+                aria-describedby={replyLimitId}
                 placeholder="เขียนข้อความตอบกลับ..."
                 className="w-full bg-fill border border-line rounded-lg p-3 text-sm text-ink focus:outline-none focus:border-ink-3 smooth-hover resize-none"
                 rows={3}
               />
-              <LimitCounter value={replyContent} max={FORUM_LIMITS.comment} />
+              <LimitCounter id={replyLimitId} value={replyContent} max={FORUM_LIMITS.comment} />
               <div className="flex justify-end gap-2 mt-2">
                 <button
                   onClick={() => setIsReplying(false)}

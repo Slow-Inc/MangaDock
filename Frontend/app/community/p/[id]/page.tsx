@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useId } from "react";
 import PostImage from "../../../components/PostImage";
 import Mascot from "../../../components/mascot/Mascot";
 import UserAvatar from "../../../components/ui/UserAvatar";
@@ -70,6 +70,9 @@ export default function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user, showLoginPrompt } = useAuth();
+  const editTitleLimitId = useId();
+  const editContentLimitId = useId();
+  const commentLimitId = useId();
   
   const [post, setPost] = useState<ForumPost | null>(null);
   usePageTitle(post?.title);
@@ -449,19 +452,21 @@ export default function PostDetailPage() {
                   value={editPostTitle}
                   onChange={(e) => setEditPostTitle(e.target.value)}
                   maxLength={FORUM_LIMITS.title}
+                  aria-describedby={editTitleLimitId}
                   className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-xl sm:text-2xl font-black text-ink focus:outline-none focus:border-accent transition-colors mb-3"
                   placeholder="หัวข้อกระทู้"
                 />
-                <LimitCounter value={editPostTitle} max={FORUM_LIMITS.title} />
+                <LimitCounter id={editTitleLimitId} value={editPostTitle} max={FORUM_LIMITS.title} />
                 <textarea
                   value={editPostContent}
                   onChange={(e) => setEditPostContent(e.target.value)}
                   maxLength={FORUM_LIMITS.content}
+                  aria-describedby={editContentLimitId}
                   rows={8}
                   className="w-full bg-fill border border-line rounded-xl px-4 py-3 text-sm sm:text-base text-ink focus:outline-none focus:border-accent transition-colors resize-none leading-relaxed"
                   placeholder="เนื้อหากระทู้"
                 />
-                <LimitCounter value={editPostContent} max={FORUM_LIMITS.content} />
+                <LimitCounter id={editContentLimitId} value={editPostContent} max={FORUM_LIMITS.content} />
                 <div className="flex justify-end gap-2 mt-3">
                   <button
                     onClick={() => setIsEditingPost(false)}
@@ -584,11 +589,12 @@ export default function PostDetailPage() {
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   maxLength={FORUM_LIMITS.comment}
+                  aria-describedby={commentLimitId}
                   placeholder="ร่วมแสดงความคิดเห็นของคุณ..."
                   rows={3}
                   className="w-full bg-fill border border-line rounded-xl p-3 text-ink text-sm focus:outline-none focus:border-accent transition-all resize-none mb-3"
                 />
-                <LimitCounter value={newComment} max={FORUM_LIMITS.comment} />
+                <LimitCounter id={commentLimitId} value={newComment} max={FORUM_LIMITS.comment} />
                 <div className="flex justify-end">
                   <button
                     onClick={handlePostComment}

@@ -1,7 +1,7 @@
 "use client";
 
 import { PRIMARY_FILL } from "./ui/Button";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useId } from "react";
 import { ROLE } from "../lib/types/user";
 import Link from "next/link";
 import { listPosts, createPost } from "../lib/communityApi";
@@ -15,6 +15,7 @@ import LimitCounter from "./ui/LimitCounter";
 
 export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: string, title: string, cover?: string }) {
   const { user } = useAuth();
+  const quickPostLimitId = useId();
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false); // a failed load is not "no discussion yet" (#930)
@@ -116,12 +117,13 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
             value={newPostContent}
             onChange={(e) => setNewPostContent(e.target.value)}
             maxLength={FORUM_LIMITS.content}
+            aria-describedby={quickPostLimitId}
             placeholder="คุณคิดยังไงกับเรื่องนี้..."
             className="w-full bg-transparent border-none text-sm text-ink placeholder:text-ink-3 focus:ring-0 resize-none"
             rows={3}
             autoFocus
           />
-          <LimitCounter value={newPostContent} max={FORUM_LIMITS.content} />
+          <LimitCounter id={quickPostLimitId} value={newPostContent} max={FORUM_LIMITS.content} />
           <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-line">
             <button 
               onClick={() => setIsPosting(false)}
