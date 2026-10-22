@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
 import { ImageCacheService } from '../cache/image-cache.service';
 import {
@@ -157,6 +162,7 @@ export class MangaDexService {
       const allItems: MdChapter[] = [];
       let offset = 0;
       let total = Infinity;
+      let complete = true; // false once a page fails partway: never cache that as the whole list (#961)
 
       while (offset < total) {
         const params = new URLSearchParams();
@@ -171,7 +177,10 @@ export class MangaDexService {
         const res = await this.mangadexFetch(
           `https://api.mangadex.org/manga/${mangaId}/feed?${params.toString()}`,
         );
-        if (!res.ok) break;
+        if (!res.ok) {
+          complete = false;
+          break;
+        }
 
         const data = (await res.json()) as {
           total?: number;
@@ -194,11 +203,11 @@ export class MangaDexService {
         pageCount: c.attributes.pages ?? 0,
       }));
 
-      if (chapters.length > 0) {
+      if (chapters.length > 0 && complete) {
         await this.cache.set(cacheKey, chapters, CACHE_TTL_MS);
       } else {
         this.logger.warn(
-          '[MangaDex] Chapters empty — attempting stale cache fallback',
+          `[MangaDex] Chapters ${chapters.length ? 'cut short' : 'empty'} — attempting stale cache fallback`,
         );
         const stale = this.cache.getStale<MangaChapter[]>(cacheKey);
         if (stale) {
@@ -448,6 +457,13 @@ export class MangaDexService {
   }> {
     const offset = (page - 1) * limit;
     const tagId = tag ? await this.getMangaTagId(tag) : undefined;
+    if (tag && !tagId) {
+      // Never fall back to the untagged rows (or their cache entry) under a tag the user picked (#961)
+      const tagListLoaded =
+        await this.cache.get<Record<string, string>>('mangadex:tags:v1');
+      if (tagListLoaded) throw new NotFoundException(`Unknown tag: ${tag}`);
+      throw new ServiceUnavailableException('MangaDex tag list unavailable');
+    }
     const cacheKey = `new-releases:v3:${page}:${limit}${tagId ? `:tag:${tagId}` : ''}`;
     const cached = await this.cache.get<{
       new: { items: LandingBook[]; total: number };
