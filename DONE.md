@@ -77,6 +77,22 @@
 
 ---
 
+## #950 Reader toolbar menus: out of the Tab order while closed, named zoom, Escape closes the menu (2026-10-22)
+
+**What:** the reader's translate dropdown and mobile "เพิ่มเติม" menu were hidden only with `pointer-events-none
+opacity-0`, so their items stayed in the Tab order (13 of 18 reader stops invisible at 390 px, 8 of 23 at 1440 px); their
+toggles had no expanded state; the mobile zoom −/+ (the only zoom control on mobile) were unnamed; Escape with a menu open
+closed the whole reader. Now both panels are `inert` while closed with an id, the toggles carry `aria-expanded` /
+`aria-controls`, the zoom buttons are "ย่อ" / "ขยาย" (as on desktop), and the reader's Escape closes an open menu first
+(refs, like `commentOpenRef`) and returns focus to its toggle.
+
+**Validated:** production build, reader on an uploaded version: before, 13/18 (390 px) and 8/23 (1440 px) invisible stops
+and 2 unnamed buttons; after, 0 invisible at both widths (5 and 15 stops), 0 unnamed, each menu opens by keyboard with
+its items reachable, and Escape closes only the menu with focus on its toggle. The #928 drawer probe still passes. tsc
+0; eslint identical to main.
+
+---
+
 ## #948 Mobile hero popup keeps the book it was opened on (2026-10-22)
 
 **What:** on mobile, the home hero rendered `<BookDetailModal book={book}>` with the live `books[idx]` while autoplay kept

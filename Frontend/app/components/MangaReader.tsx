@@ -130,6 +130,13 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
   const translateMenuRef = useRef<HTMLDivElement | null>(null);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
+  // Read by the reader's Escape handler: an open toolbar menu closes before the reader does (#950)
+  const translateMenuOpenRef = useRef(false);
+  const moreMenuOpenRef = useRef(false);
+  useEffect(() => {
+    translateMenuOpenRef.current = translateMenuOpen;
+    moreMenuOpenRef.current = moreMenuOpen;
+  }, [translateMenuOpen, moreMenuOpen]);
 
   // Translate from the SAME derivative the Reader displays (#156) — a patch
   // generated from a different encode of the page sits in a visibly
@@ -496,6 +503,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
       if (readerRef.current && active && active !== document.body && !readerRef.current.contains(active)) return;
       e.stopPropagation();
       if (commentOpenRef.current) { setCommentOpen(false); return; }
+      if (translateMenuOpenRef.current) { setTranslateMenuOpen(false); translateMenuRef.current?.querySelector("button")?.focus(); return; }
+      if (moreMenuOpenRef.current) { setMoreMenuOpen(false); moreMenuRef.current?.querySelector("button")?.focus(); return; }
       if (showChapterPickerRef.current) { closePicker(); return; }
       handleClose();
     };
@@ -638,6 +647,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                       }
                     }}
                     title={translating ? "หยุดแปล" : "เมนูการแปล"}
+                    aria-expanded={translateMenuOpen && !translating}
+                    aria-controls="reader-translate-menu"
                     className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition ${triggerColorCls}`}
                   >
                     {/* Status indicator — MIT offline: the reader's droid asleep (Epic D #783) */}
@@ -673,6 +684,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
                   {/* Dropdown panel — Navbar style, always in DOM, shown via CSS transition */}
                   <div
+                    id="reader-translate-menu"
+                    inert={!(translateMenuOpen && !translating)} // only faded out while closed: keep its items out of the Tab order (#950)
                     className={`absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-line bg-bg/70 shadow-2xl backdrop-blur-sm transition-all duration-200 origin-top-right ${
                       translateMenuOpen && !translating
                         ? "pointer-events-auto scale-100 opacity-100"
@@ -849,6 +862,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
               <button
                 onClick={() => setMoreMenuOpen((o) => !o)}
                 title="เพิ่มเติม"
+                aria-expanded={moreMenuOpen}
+                aria-controls="reader-more-menu"
                 className={`flex h-9 w-9 items-center justify-center rounded-full border text-ink-2 transition hover:bg-raised hover:text-ink ${
                   moreMenuOpen ? "border-ink-2 bg-fill text-ink" : "border-ink-3"
                 }`}
@@ -862,6 +877,8 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
 
               {/* Mobile dropdown panel */}
               <div
+                id="reader-more-menu"
+                inert={!moreMenuOpen} // only faded out while closed: keep its items out of the Tab order (#950)
                 className={`absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-line bg-bg/95 shadow-2xl backdrop-blur-xl transition-all duration-200 origin-top-right ${
                   moreMenuOpen
                     ? "pointer-events-auto scale-100 opacity-100"
@@ -872,13 +889,13 @@ export default function MangaReader({ chapterId: initialChapterId, chapterNumber
                 <div className="border-b border-line px-4 py-3">
                   <p className="mb-2 text-xs font-semibold uppercase text-ink-3">ซูม</p>
                   <div className="flex items-center gap-2">
-                    <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-ink-2 transition hover:bg-raised hover:text-ink disabled:opacity-30">
+                    <button onClick={zoomOut} disabled={zoom <= ZOOM_MIN} aria-label="ย่อ" className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-ink-2 transition hover:bg-raised hover:text-ink disabled:opacity-30">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M5 12h14" /></svg>
                     </button>
                     <button onClick={zoomReset} className="flex-1 rounded-lg bg-fill py-1.5 text-center text-xs text-ink-2 transition hover:bg-raised hover:text-ink">
                       {Math.round(zoom * 100)}%
                     </button>
-                    <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-ink-2 transition hover:bg-raised hover:text-ink disabled:opacity-30">
+                    <button onClick={zoomIn} disabled={zoom >= ZOOM_MAX} aria-label="ขยาย" className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-ink-2 transition hover:bg-raised hover:text-ink disabled:opacity-30">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M12 5v14M5 12h14" /></svg>
                     </button>
                   </div>
