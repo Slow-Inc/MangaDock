@@ -77,6 +77,26 @@
 
 ---
 
+## #1015 Write bodies are validated; malformed ids are 400, an unknown followee 404 (2026-10-23)
+
+**What:** four write routes typed `@Body()` as plain objects, so the global `ValidationPipe` checked nothing:
+`POST /reviews/:mangaId`, `/reader-comments`, `/content-reports`, `/translation-feedback`. A wrong type became a 500
+(`.trim` on a number, a non-integer into an int column), translation feedback stored `vote: 0` or `5`, and text was
+unbounded (50 MB body limit). Each now has a class-validator DTO:
+- text up to 5,000 (review, comment), details up to 1,000, title up to 500, ids up to 100;
+- page an integer from 0 to 10,000; rating 1–5; vote exactly 1 or −1;
+- the services keep their allow-lists.
+
+Malformed ids on `DELETE /reader-comments/:id`, `PATCH /notifications/:id/read` and follow/unfollow, which Postgres
+rejects with 22P02, are now 400 via `isInvalidId`, without assuming the column type. A follow of a user with no profile
+(foreign key, 23503) is 404.
+
+**Validated:** Jest `common/write-dtos.spec.ts` (22) and `common/write-id-errors.spec.ts` (5, a real supabase-js
+client with a stubbed fetch) red → green; the module suites pass (40). Real tsc clean. eslint improved on main in four
+files; the remaining unused `Param` import in the translation-feedback controller predates this.
+
+---
+
 ## #1013 Spinners that never stopped: empty search after an in-flight one, a failed page image, the notification list (2026-10-23)
 
 **What:**

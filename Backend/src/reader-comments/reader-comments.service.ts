@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { isInvalidId } from '../common/assert-found';
 
 export type ReaderComment = {
   id: string;
@@ -112,6 +113,7 @@ export class ReaderCommentsService {
       .eq('id', id)
       .eq('uid', uid);
 
+    if (isInvalidId(error)) throw new BadRequestException('Invalid comment id'); // not a 500 (#1015)
     if (error) throw new Error(`Failed to delete comment: ${error.message}`);
   }
 }

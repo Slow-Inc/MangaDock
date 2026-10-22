@@ -13,6 +13,7 @@ import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 import { ReviewsService } from './reviews.service';
 import { queryInt } from '../common/query-int';
+import { UpsertReviewDto } from './review.dto';
 
 @Controller('reviews')
 export class ReviewsController {
@@ -50,7 +51,7 @@ export class ReviewsController {
   upsertReview(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
     @Param('mangaId') mangaId: string,
-    @Body() body: { mangaTitle: string; rating: number; body: string },
+    @Body() body: UpsertReviewDto,
   ) {
     return this.reviews.upsertReview(req[USER_KEY].uid, mangaId, body);
   }
