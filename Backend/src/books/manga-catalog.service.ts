@@ -157,7 +157,9 @@ export class MangaCatalogService {
           );
         }
       } catch (err) {
-        this.logger.warn(`Alt-name lookup failed: ${String(err)}`);
+        this.logger.warn(
+          `Alt-name lookup failed: ${(err as { message?: string })?.message ?? String(err)}`, // Supabase errors are plain objects
+        );
       }
     }
 
@@ -224,6 +226,13 @@ export class MangaCatalogService {
     return page;
   }
 
+  /**
+   * Budget for the alt-name lookup (#863). The Supabase client has no request timeout, so a slow upstream held every
+   * uncached search for the full client timeout; this lookup only adds extra matches (best-effort, see searchBooks),
+   * so it gives up instead. Scoped to this read — the client shared with auth and wallet is unchanged.
+   */
+  private altNameTimeoutMs = 3000;
+
   /** Query chapter_versions for title_name / title_alt_name matching the search query. */
   private async findTitleIdsByAltName(query: string): Promise<string[]> {
     const pattern = `%${query}%`;
@@ -231,7 +240,8 @@ export class MangaCatalogService {
       .from('chapter_versions')
       .select('title_id')
       .or(`title_name.ilike.${pattern},title_alt_name.ilike.${pattern}`)
-      .eq('status', 'published');
+      .eq('status', 'published')
+      .abortSignal(AbortSignal.timeout(this.altNameTimeoutMs));
     if (error) throw error;
     // Deduplicate title_ids
     return [...new Set((data ?? []).map((row: any) => row.title_id as string))];
