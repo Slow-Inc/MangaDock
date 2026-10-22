@@ -1434,6 +1434,32 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
 
     return char_offset_x  # Return horizontal advance 返回水平步进距离
 
+
+def _stacked_mark_overhead(line_text: str, font_size: int) -> int:
+    """Extra leading (px) a line needs so its lifted tone marks stay inside its own row (#895).
+
+    The line pitch is ``font_size``, but a tone mark stacked on an upper vowel reaches
+    ``bitmap_top + lift`` above the baseline. When that exceeds one row the mark is drawn into the
+    previous line's row; over that line's ink it is dark-on-dark and disappears (Kumo p0: ครั้งนั้น
+    rendered as ครงนัน). Reserving only the excess keeps every mark inside its own row and leaves
+    lines that need nothing byte-identical (Latin text: no marks at all).
+    """
+    need = 0
+    for k, ch in enumerate(line_text):
+        lift = _stacked_mark_lift(line_text, k, font_size)
+        if not lift:
+            continue
+        glyph = get_char_glyph(ch, font_size, 0)
+        above = glyph.bitmap_top + lift
+        need = max(need, above - font_size)
+    if not need:
+        return 0
+    # The row above also descends below its own baseline; clear that too, or the mark still lands
+    # on its glyph bodies and reads as dark-on-dark.
+    descent = max(2, int(round(font_size * 0.08)))
+    return max(0, need + descent)
+
+
 def put_text_horizontal(font_size: int, text: str, width: int, height: int, alignment: str,
                         reversed_direction: bool, fg: Tuple[int, int, int], bg: Tuple[int, int, int],
                         lang: str = 'en_US', hyphenate: bool = True, line_spacing: int = 0):
@@ -1447,21 +1473,25 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
     # print(width)
     line_text_list, line_width_list = calc_horizontal(font_size, text, width, height, lang, hyphenate)
 
+    # #895: stacked Thai marks reach above one row; reserve only the excess (0 for everything else).
+    line_extras = [max(0, _stacked_mark_overhead(line, font_size) - spacing_y) for line in line_text_list]
+    extra_total = sum(line_extras)
+
     # make large canvas
     canvas_w = max(line_width_list) + (font_size + bg_size) * 2
-    canvas_h = font_size * len(line_width_list) + spacing_y * (len(line_width_list) - 1) + (font_size + bg_size) * 2
+    canvas_h = font_size * len(line_width_list) + spacing_y * (len(line_width_list) - 1) + extra_total + (font_size + bg_size) * 2
     canvas_text = np.zeros((canvas_h, canvas_w), dtype=np.uint8)
     canvas_border = canvas_text.copy()
 
     # pen (x, y)
-    pen_orig = [font_size + bg_size, font_size + bg_size]
+    pen_orig = [font_size + bg_size, font_size + bg_size + line_extras[0]]
     if reversed_direction:
         # right to left languages have to be rendered in the correct order (starting from right)
         # so that the white outline of characters dont go over black parts of neighbouring characters
         pen_orig[0] = canvas_w - bg_size - 10
 
     # write stuff
-    for line_text, line_width in zip(line_text_list, line_width_list):
+    for line_idx, (line_text, line_width) in enumerate(zip(line_text_list, line_width_list)):
         pen_line = pen_orig.copy()
         if alignment == 'center':
             pen_line[0] += (max(line_width_list) - line_width) // 2 * (-1 if reversed_direction else 1)
@@ -1484,7 +1514,7 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
             offset_x = put_char_horizontal(font_size, c, pen_char, canvas_text, canvas_border, border_size=bg_size)
             if not reversed_direction:
                 pen_line[0] += offset_x
-        pen_orig[1] += spacing_y + font_size
+        pen_orig[1] += spacing_y + font_size + (line_extras[line_idx + 1] if line_idx + 1 < len(line_extras) else 0)
 
     # colorize
     canvas_border = np.clip(canvas_border, 0, 255)
