@@ -137,6 +137,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
                   <textarea
                     value={details}
                     onChange={(e) => setDetails(e.target.value)}
+                    maxLength={1000} // the server's SubmitReportDto cap (#1015)
                     placeholder="อธิบายเพิ่มเติม..."
                     rows={2}
                     className="mb-3 w-full resize-none rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder-ink-3 outline-none focus:border-ink-3"

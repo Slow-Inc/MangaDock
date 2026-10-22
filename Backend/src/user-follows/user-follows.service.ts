@@ -58,7 +58,10 @@ export class UserFollowsService {
       );
     // a malformed uid is a 400 and one with no profile (foreign-key violation) a 404, not a 500 (#1015)
     if (isInvalidId(error)) throw new BadRequestException('Invalid user id');
-    if (error?.code === '23503') throw new NotFoundException('User not found');
+    // only the followee's key: a missing row for the follower is not "that user does not exist"
+    if (error?.code === '23503' && /following_uid/.test(error.details ?? '')) {
+      throw new NotFoundException('User not found');
+    }
     if (error) throw new Error(`Failed to follow: ${error.message}`);
     this.logger.log(`${followerUid} followed ${followingUid}`);
   }
