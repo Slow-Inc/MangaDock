@@ -57,7 +57,8 @@ function loadCachedLanding(): LandingBook[] {
 }
 
 export default function HomeCachedLanding() {
-  const [cachedBooks, setCachedBooks] = useState<LandingBook[]>([]);
+  // null until this browser's cache has been read — otherwise first paint shows "can't load" to a user who has books (#909)
+  const [cachedBooks, setCachedBooks] = useState<LandingBook[] | null>(null);
   const router = useRouter();
   const [retrying, startRetry] = useTransition();
 
@@ -76,7 +77,7 @@ export default function HomeCachedLanding() {
 
   return (
     <section>
-      {cachedBooks.length > 0 ? (
+      {cachedBooks === null ? null : cachedBooks.length > 0 ? (
         <BookRow
           rowId="local-cache"
           rowTitle="จากแคชในเครื่อง"
