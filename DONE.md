@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 55 — #905 production-path chapter A/B: 9 pages, 1.16×, structure identical (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Drove a standalone worker over HTTP with the real endpoints: 9 pages serial = **98.42 s** vs one batch request = **84.66 s** = **1.16×**; all 9 pages returned identical patch counts, region counts and page sizes.
+- Host load was 45-100 % CPU, which is why this measured 1.16× rather than the quiet-host in-process **1.37×** (round 42) — CPU-bound phases are what the overlap cannot hide.
+- A second run failed on **host commit exhaustion** (numpy 40 MiB allocation) — the batch path holds two page contexts, so its peak memory is higher than serial. That is a real operational tradeoff.
+- Decision: remains **opt-in** (`MIT_BATCH_PIPELINE`, default off) — faster with identical output, but loses live per-page progress and needs the memory headroom. Benchmark `2026-10-22-905-chapter-ab.md`.
+
 ## MIT quality loop, round 54 — #905 worker HTTP path verified structurally; today's timings are host-load noise (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
