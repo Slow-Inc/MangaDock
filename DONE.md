@@ -77,6 +77,19 @@
 
 ---
 
+## #967 A guest's reading history opens on /mylist instead of a login wall (2026-10-22)
+
+**What:** a guest's reading history lives on the device (`mangadock_reading_history`; logout clears it via
+`identityReset`), and home shows it in the "อ่านต่อ" row with "ดูเพิ่มเติม" → `/mylist?tab=history` — which showed only
+"เข้าสู่ระบบเพื่อดูรายการของคุณ", because `mylist/page.tsx` gated every tab on `user`. The history tab now shows the
+local history to a guest; favorites / follows / liked (guests can't add to them) keep the login prompt, and CSV export
+stays signed-in only.
+
+**Validated:** production build, guest with one local history entry: before, "ดูเพิ่มเติม" landed on the login wall;
+after, the book shows on the history tab and `?tab=favorites` still asks to log in. tsc 0; eslint clean on the file.
+
+---
+
 ## #965 Search filters: no dead rating filter, one search per year, honest empty state (2026-10-22)
 
 **What:** on `/search` the "≥ 3★ / ≥ 4★ / ≥ 4.5★" filter could only empty the list — every search result (and every

@@ -450,7 +450,8 @@ function MyListContent() {
               </div>
             ))}
           </div>
-        ) : !user ? (
+        ) : !user && activeTab !== "history" ? (
+          /* Reading history lives on the device, so a guest sees theirs; the other tabs are account-backed (#967) */
           <LoginPrompt onLogin={openLoginModal} />
         ) : (
           <div key={activeTab} className="tab-fade-in">
