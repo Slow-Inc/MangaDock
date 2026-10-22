@@ -239,7 +239,7 @@ export default function StudioAccountPage() {
                 onChange={(e) => setBio(e.target.value.slice(0, 500))}
                 placeholder="เล่าเกี่ยวกับตัวคุณให้ผู้อ่านรู้จัก..."
                 rows={3}
-                className="w-full resize-none rounded-xl border border-line bg-fill px-3 py-2.5 text-sm text-ink placeholder:text-ink-3 outline-none focus:border-accent"
+                className="w-full resize-none rounded-xl border border-line bg-fill px-3 py-2.5 text-sm text-ink placeholder:text-ink-3 focus:border-accent"
               />
               <p className="mt-1 text-right text-[10px] text-ink-3">{bio.length}/500</p>
             </div>

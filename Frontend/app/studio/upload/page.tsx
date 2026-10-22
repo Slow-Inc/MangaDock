@@ -254,7 +254,7 @@ function StudioUploadContent() {
                 onChange={(e) => setChapterNumber(e.target.value)}
                 disabled={hasVersion}
                 placeholder="เช่น 1, 2, 1.5"
-                className="w-full rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/60 focus:ring-1 focus:ring-accent/30 disabled:opacity-40"
+                className="w-full rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 transition focus:border-accent/60 disabled:opacity-40"
               />
             </div>
             <div className="space-y-1">
@@ -265,7 +265,7 @@ function StudioUploadContent() {
                 onChange={(e) => setChapterTitle(e.target.value)}
                 disabled={hasVersion}
                 placeholder="ชื่อตอน"
-                className="w-full rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/60 focus:ring-1 focus:ring-accent/30 disabled:opacity-40"
+                className="w-full rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 transition focus:border-accent/60 disabled:opacity-40"
               />
             </div>
             <div className="space-y-1">
@@ -292,7 +292,7 @@ function StudioUploadContent() {
               rows={3}
               maxLength={1000}
               placeholder="บันทึกเพิ่มเติมจากนักแปล..."
-              className="w-full resize-none rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
+              className="w-full resize-none rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-ink-3 transition focus:border-accent/60"
             />
           </div>
 
@@ -305,7 +305,7 @@ function StudioUploadContent() {
                 min={0}
                 value={priceCoins}
                 onChange={(e) => setPriceCoins(e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink outline-none transition focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
+                className="w-full rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink transition focus:border-accent/60"
               />
             </div>
             {hasVersion && (

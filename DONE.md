@@ -77,6 +77,25 @@
 
 ---
 
+## #1044 Fields keep the app's focus ring (2026-10-23)
+
+**What:** a High Craft keyboard-focus sweep (Tab through 21 routes, production build, local fake session) plus a
+source scan: ~21 text fields / selects and the admin filter bars' shared `inputCls` set `outline-none` /
+`focus:outline-none`, dropping the app's standard field ring (`globals.css`, WCAG 2.4.7) for a faint border shift
+(often to mid-grey `border-ink-3`). The opt-out is removed so the standard 2 px accent ring sits on the field's border;
+the border cue stays. Left alone: the navbar `SearchBar` (its wrapper has a `focus-within` ring), the disabled profile
+email, and the admin wallet-adjust inputs (wallet path, parked).
+From review: the profile `inputClass` and four Studio upload fields swapped the ring for a 1 px ring at 30–40 % alpha
+(likely under 3:1) — also back on the standard ring; and on the search year filters the ring covered the invalid red
+border, so an invalid field's ring is now `outline-danger`. (`DocsClient` has the same weak ring but is the developer's WIP.)
+
+**Validated:** the focus sweep before — 10 focus stops with no indicator; after — 1, the Studio sidebar resize handle,
+whose indicator is its `::after` line (pseudo-elements are invisible to the check). Screenshot of a focused admin field
+checked; the profile and upload fields now get a 2 px accent ring (after the 150 ms colour transition) and an invalid year
+field's ring is the danger red. Real tsc clean; eslint per file equal to main; indentation of every edited line unchanged.
+
+---
+
 ## #1041 Studio selects have a name; the translator-language toggles are a named group (2026-10-23)
 
 **What:** from the #1040 review — the sweep only saw native fields. `StudioSelect`'s trigger was named only by its

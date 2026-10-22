@@ -136,7 +136,7 @@ export default function ForumSideMenu({
           onChange={(e) => setSearchQuery(e.target.value)}
           aria-label="ค้นหาชุมชนมังงะ"
           placeholder="ค้นหาชุมชนมังงะ..."
-          className="relative w-full bg-fill border border-line rounded-2xl px-4 py-3 pl-11 text-xs text-ink placeholder-ink-3 focus:outline-none focus:border-accent/50 focus:bg-raised transition-all smooth-hover"
+          className="relative w-full bg-fill border border-line rounded-2xl px-4 py-3 pl-11 text-xs text-ink placeholder-ink-3 focus:border-accent/50 focus:bg-raised transition-all smooth-hover"
         />
         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-3 group-hover:text-accent transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

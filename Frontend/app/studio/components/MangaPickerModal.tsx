@@ -143,7 +143,7 @@ export function MangaPickerModal({
         onChange={(e) => setQuery(e.target.value)}
         aria-label="ค้นหาชื่อมังงะ"
         placeholder="ค้นหาชื่อมังงะ..."
-        className="w-full rounded-2xl border border-line bg-fill py-3 pl-12 pr-12 text-base text-ink placeholder:text-ink-3 outline-none transition focus:border-ink-3 focus:bg-raised"
+        className="w-full rounded-2xl border border-line bg-fill py-3 pl-12 pr-12 text-base text-ink placeholder:text-ink-3 transition focus:border-ink-3 focus:bg-raised"
       />
       {searching && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2">

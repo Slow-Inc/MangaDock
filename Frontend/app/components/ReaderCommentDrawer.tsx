@@ -224,7 +224,7 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePost(e); } }}
                 placeholder="เขียนความคิดเห็น..."
                 rows={2}
-                className="flex-1 resize-none rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder-ink-3 outline-none transition focus:border-ink-3"
+                className="flex-1 resize-none rounded-xl border border-line bg-fill px-3 py-2 text-sm text-ink placeholder-ink-3 transition focus:border-ink-3"
               />
               <button
                 type="submit"

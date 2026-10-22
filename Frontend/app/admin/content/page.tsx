@@ -14,7 +14,7 @@ interface AdminPost {
 
 const CATEGORIES = ['general', 'announcement', 'spoiler', 'manga_update'];
 const LIMIT = 20;
-const inputCls = 'bg-fill border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:border-ink-3 focus:bg-raised transition-colors';
+const inputCls = 'bg-fill border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-ink-3 focus:bg-raised transition-colors';
 
 export default function AdminContentPage() {
   const { getIdToken } = useAuth();
