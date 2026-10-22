@@ -30,7 +30,11 @@ export default function HeroDetailButton({ book }: Props) {
 
     cacheOrFetch<MangaChapterSummary[]>(
       `chapters:summary:${book.id}:${forceLocal ? "local" : "cdn"}`,
-      () => apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => r.json()),
+      // a failed load must not be cached — it would hide อ่านเลย until the entry expires (#983)
+      () => apiFetch(`${API_BASE}/books/manga/${book.id}/chapters${qs}`).then((r) => {
+        if (!r.ok) throw new Error(`chapters ${r.status}`);
+        return r.json();
+      }),
       TTL.MEDIUM,
     )
       .then((d) => {
