@@ -157,7 +157,9 @@ export class MangaCatalogService {
           );
         }
       } catch (err) {
-        this.logger.warn(`Alt-name lookup failed: ${String(err)}`);
+        this.logger.warn(
+          `Alt-name lookup failed: ${(err as { message?: string })?.message ?? String(err)}`, // Supabase errors are plain objects
+        );
       }
     }
 
