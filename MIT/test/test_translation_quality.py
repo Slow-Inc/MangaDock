@@ -9,6 +9,7 @@ from manga_translator.translation_quality import (
     foreign_script,
     is_letter_name_spelling,
     is_oversized_art_glyph,
+    normalize_thai_marks,
 )
 
 
@@ -116,3 +117,19 @@ def test_small_or_non_art_glyphs_are_kept_886():
     assert is_oversized_art_glyph('月', 120, rescued=True) is False    # the rescue localized it already
     assert is_oversized_art_glyph('月光の下', 120) is False   # phrase, not a single glyph
     assert is_oversized_art_glyph('ドン', 150, rescued=False) is True  # big SFX the rescue could not serve -> art
+
+
+def test_tone_before_vowel_is_reordered_889():
+    """The model emits 'ท่ี' (tone then vowel); no shaper renders that order correctly."""
+    assert normalize_thai_marks('ท่ี') == 'ที่'
+    assert normalize_thai_marks('น้ี') == 'นี้'
+
+
+def test_a_repeated_mark_in_one_cluster_is_dropped_889():
+    assert normalize_thai_marks('ก้้') == 'ก้'
+    assert normalize_thai_marks('ฟูู่่') == 'ฟู่'
+
+
+def test_valid_thai_and_other_text_are_untouched_889():
+    for s in ('ที่', 'นี้', 'ก่', 'น้ำ', 'ภาษาไทย 100%', 'Hello ที่นี่', '调用', ''):
+        assert normalize_thai_marks(s) == s

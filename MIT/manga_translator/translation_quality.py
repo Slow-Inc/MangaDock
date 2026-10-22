@@ -153,3 +153,43 @@ def is_oversized_art_glyph(text: str, font_size: float, rescued: bool = False) -
     if rescued or not s or not _CJK_HANGUL.fullmatch(s):
         return False
     return float(font_size or 0) >= _ART_GLYPH_MIN_FONT
+
+
+#: #889 — Thai combining marks, in the order a shaper expects them: above/below vowels first, then
+#: tone marks. Unicode canonical ordering puts vowels (ccc 103) before tones (ccc 107); the model
+#: occasionally emits the reverse ('ท่ี'), which no shaper can render.
+_THAI_TONES = frozenset('\u0E48\u0E49\u0E4A\u0E4B')
+_THAI_MARKS = frozenset('\u0E31\u0E34\u0E35\u0E36\u0E37\u0E38\u0E39\u0E47') | _THAI_TONES
+
+
+def normalize_thai_marks(text: str) -> str:
+    """Put Thai combining marks into canonical order and drop an exact duplicate in one cluster.
+
+    Only runs of combining marks that follow a base character are touched: vowels keep their relative
+    order and move before the tone marks ('ท่ี' -> 'ที่'); an exactly repeated mark in the same cluster is
+    dropped ('ก้้' -> 'ก้'). Everything else (Latin, other scripts, spacing vowels like 'ำ') is untouched.
+    Pure."""
+    if not text or not any(ch in _THAI_MARKS for ch in text):
+        return text
+    out = []
+    run = []
+
+    def flush():
+        if not run:
+            return
+        ordered = [c for c in run if c not in _THAI_TONES] + [c for c in run if c in _THAI_TONES]
+        deduped = []
+        for mark in ordered:
+            if not deduped or deduped[-1] != mark:
+                deduped.append(mark)
+        out.extend(deduped)
+        run.clear()
+
+    for ch in text:
+        if ch in _THAI_MARKS:
+            run.append(ch)
+        else:
+            flush()
+            out.append(ch)
+    flush()
+    return ''.join(out)

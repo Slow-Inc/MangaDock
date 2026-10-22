@@ -4,7 +4,7 @@ import asyncio
 from typing import List, Tuple
 from abc import abstractmethod
 
-from ..translation_quality import foreign_script
+from ..translation_quality import foreign_script, normalize_thai_marks
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -268,6 +268,10 @@ class CommonTranslator(InfererModule):
         """
         if not query or not trans:
             return ''
+
+        # #889: Thai combining marks out of canonical order ('ท่ี') cannot be shaped correctly; normalise
+        # every translation here so no renderer sees the broken sequence. No-op for other scripts.
+        trans = normalize_thai_marks(trans)
 
         # '  ' -> ' '
         trans = re.sub(r'\s+', r' ', trans)
