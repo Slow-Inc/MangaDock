@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 17 — #883's leftover English is detection recall, not the mask (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Dumped the pipeline's real mask + inpainted page (driver-level monkeypatch, return values saved): every detected credit line has **100 % mask coverage**, so the leftover English is not an inpaint bug — the white `You can read this chapter…` pair and `PLEASE DON'T SUPPORT WEBSITES THAT DO.` are **never detected** (15 textlines).
+- `detector.text_threshold` 0.5 → **0.3** recovers them (18 textlines, white line present); `box_threshold` changes nothing. Not shipped: a lower threshold is corpus-wide and needs a 39-page A/B (false textlines on artwork change masks and renders), recorded as next step on #883.
+- Method note for future traces: patch the stage functions in the DRIVER module (binds at import), and call `initialize()` (`.env`) before importing the driver — otherwise translator keys are empty (#614) and live calls fail with `APIConnectionError`.
+
 ## MIT quality loop, round 16 — opt-in `fit_below_floor` for a block that cannot fit its gap (#883) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
