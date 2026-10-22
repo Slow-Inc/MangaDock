@@ -12,10 +12,9 @@ import type { StorageProvider } from '../common/storage/storage-provider.interfa
 import { isServablePatchKey } from './patch-store';
 
 /**
- * Serves R2-stored patch PNGs via StorageProvider.
- * Only reachable when Worker routing is active (WORKER_URL set) — patch URLs
- * are constructed as `{backendOrigin}/r2-patches/{r2Key}` in that path.
- * Disk mode continues to serve patches via express.static (/uploads/).
+ * Serves patch PNGs via StorageProvider at `/r2-patches/{key}`. PatchStore itself now returns `{origin}/uploads/...`
+ * URLs, so this route is kept only for anything (e.g. a deployed Worker) still addressing patches this way. It is
+ * public, so it serves keys in the patch store's layout and nothing else (#1009).
  */
 @Controller('r2-patches')
 export class PatchesController {
