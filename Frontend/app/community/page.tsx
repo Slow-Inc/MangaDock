@@ -130,7 +130,11 @@ function CommunityContent() {
     try {
       const res = await listPosts({ category, mangaId, sort, offset, limit: LIMIT });
       if (seq !== fetchSeq.current) return;
-      setPosts(prev => [...prev, ...res.items]);
+      // Offset paging shifts when posts arrive meanwhile: the next page can repeat the last one — keep each post once
+      setPosts(prev => {
+        const seen = new Set(prev.map(p => p.id));
+        return [...prev, ...res.items.filter(p => !seen.has(p.id))];
+      });
       setOffset(prev => prev + res.items.length);
       setTotal(res.total);
     } catch {
