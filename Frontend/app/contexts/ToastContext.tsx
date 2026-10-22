@@ -127,6 +127,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [held, setHeld] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const returnTo = useRef<HTMLElement | null>(null); // where focus came from, for when the toast closes under it
+  const returnFocus = useRef(true); // false once its action ran: the action decides where focus goes (e.g. a login modal)
 
   const dismissToast = useCallback(() => {
     setVisible(false);
@@ -138,8 +139,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       setToast(null);
       setActionLoading(false);
       closeTimer.current = null;
-      // Closed from its own button: focus goes back where it came from, not to <body>
-      if (hadFocus && returnTo.current?.isConnected) returnTo.current.focus({ preventScroll: true });
+      // Closed by its ✕ or the timer with focus inside: focus goes back where it came from, not to <body>
+      const back = returnTo.current;
+      if (hadFocus && returnFocus.current && back?.isConnected && !back.closest("[inert]")) back.focus({ preventScroll: true });
     }, 300);
   }, []);
 
@@ -168,6 +170,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
     keyRef.current += 1;
     timing.current = null;
+    returnTo.current = null;
+    returnFocus.current = true;
     setHeld(false);
     setToast({ ...opts, key: keyRef.current });
     const duration = toastDuration(opts);
@@ -185,6 +189,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const handleAction = async () => {
     if (!toast?.action) return;
+    returnFocus.current = false;
     const result = toast.action.onClick();
     if (result instanceof Promise) {
       setActionLoading(true);
@@ -211,6 +216,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Toast container — always rendered for CSS transition */}
       <div
         aria-live="polite"
+        data-toast-layer="" // not a layer dialogs stand aside for: they fold its controls into their Tab cycle (#956)
         className={`fixed bottom-24 sm:bottom-10 left-1/2 z-[9999] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 transition-all duration-300 ${
           visible && toast ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"
         }`}
@@ -219,8 +225,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             ref={cardRef}
             data-toast-card={visible ? "" : undefined} // while shown, an open dialog's Tab cycle includes its controls (#956)
-            onMouseEnter={() => { hovered.current = true; holdTimer(); }}
-            onMouseLeave={() => { hovered.current = false; releaseTimer(); }}
+            // A mouse resting on it holds it; a tap on a touch screen does not (no "leave" would follow)
+            onPointerEnter={(e) => { if (e.pointerType === "mouse") { hovered.current = true; holdTimer(); } }}
+            onPointerLeave={(e) => { if (e.pointerType === "mouse") { hovered.current = false; releaseTimer(); } }}
             onFocus={(e) => {
               if (!focused.current && e.relatedTarget instanceof HTMLElement && !e.currentTarget.contains(e.relatedTarget)) {
                 returnTo.current = e.relatedTarget;

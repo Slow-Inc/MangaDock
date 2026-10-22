@@ -37,6 +37,8 @@ const toastControls = (dialog: HTMLElement) =>
 const isOverlayLayer = (n: Element) => {
   if (!(n instanceof HTMLElement)) return false;
   const cs = getComputedStyle(n);
+  // The toast is not a layer to stand aside for: dialogs fold its controls into their own cycle instead (#956)
+  if (n.hasAttribute("data-toast-layer")) return false;
   return cs.position === "fixed" && cs.visibility !== "hidden" && Number(cs.opacity) > 0 &&
     n.getClientRects().length > 0 && !!n.querySelector("input, button, a[href], textarea, select");
 };
@@ -86,8 +88,10 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, isTop: () => 
       const index = items.indexOf(active as HTMLElement);
       const focusInOtherLayer = !!active && active !== document.body && index === -1 && !ref.current.contains(active);
       if (toast.length > 0) {
-        // A toast is up: the dialog stays sealed, and its controls join the cycle right after the dialog's own
-        if (focusInOtherLayer || items.length === 0) return;
+        // A toast is up: the dialog stays sealed, and its controls join the cycle right after the dialog's own —
+        // only for the dialog nothing else is layered above (a popup under the reader or a lightbox must not act)
+        const layer = ref.current.closest("body > *");
+        if (focusInOtherLayer || items.length === 0 || (layer && hasLayerAbove(layer))) return;
         e.preventDefault();
         items[cycleTarget({ index, count: items.length, backwards: e.shiftKey })].focus();
         return;
