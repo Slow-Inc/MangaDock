@@ -44,4 +44,16 @@ describe("createScrollLock (#936)", () => {
     second();
     expect(style.overflow).toBe("");
   });
+
+  test("reports each change of state once, so the smooth-scroll engine can stop and start (#936)", () => {
+    const style = { overflow: "" };
+    const changes: boolean[] = [];
+    const lock = createScrollLock(style, (locked) => changes.push(locked));
+    const popup = lock();
+    const reader = lock();
+    reader();
+    popup();
+    popup();
+    expect(changes).toEqual([true, false]);
+  });
 });

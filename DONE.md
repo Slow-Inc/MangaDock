@@ -83,14 +83,18 @@
 then returned early without a cleanup), so the page could not scroll until a reload; closing a reader opened from the
 book popup unlocked the page while the popup was still open (each layer wrote `body.style.overflow` directly). New
 `lib/scrollLock`: a ref-counted lock where each holder releases once and the page unlocks with the last release; the
-reader releases on every exit of its effect, the popup on unmount. `LoginModal` / `LinkAccountModal` (parked auth files)
-and the Studio picker still write the style directly.
+reader releases on every exit of its effect, the popup on unmount. Found while verifying: the lock never stopped the
+wheel at all — Lenis scrolls the page itself, so a wheel over the popup's backdrop moved the page behind it (300 -> 695
+px); `SmoothScrolling` now stops/starts the root Lenis on the lock's changes. The lock sits on `<html>`, so the parked
+`LoginModal` / `LinkAccountModal`, which still write `body.style.overflow`, cannot unlock the page under a popup. The
+Studio picker is unchanged.
 
-**Validated:** `scrollLock.test.ts` red (module missing) → green, 4 tests. Production build, stand-in backend, the
+**Validated:** `scrollLock.test.ts` red → green, 5 tests (the last for the lock-change hook). Production build, stand-in backend, the
 Cloudflare challenge host blocked (the widget never loads): before, the page stayed `hidden` after closing a
 CAPTCHA-gated reader, and was unlocked under the open popup after closing its reader; after, the page scrolls again,
-stays locked under the popup, and unlocks when the popup closes. The #928 reader probe still passes. tsc 0; eslint
-identical to main on both files.
+stays locked under the popup, and unlocks when the popup closes; a real wheel over the popup's backdrop no longer moves
+the page (before 300 -> 695, after 700 -> 700) and scrolls it again once the popup is closed. The #928 reader probe still
+passes. tsc 0; eslint identical to main on the touched files.
 
 ---
 
