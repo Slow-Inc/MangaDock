@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 54 — #905 worker HTTP path verified structurally; today's timings are host-load noise (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Stood up a real standalone worker and drove the new endpoints over HTTP: `translate_patches` x4 sequential vs one `translate_batch_pipeline` request. **Structural parity exact** (patches 10/5/4/8, regions 17/15/30/12, page sizes) — the endpoint/client/worker plumbing works end-to-end.
+- Timings are **not a verdict**: sequential 45.61 s vs batch 50.18 s (0.91×) while host CPU load sat at **84 %**. The same in-process A/B that measured **1.37×** on a quiet host re-measured **1.06× / 1.02×** today with per-page wall rising 6.58 s -> 9.2 s — CPU-side phases dominate under desktop/agent load.
+- One transient numpy OOM (60 MiB) in the worker under host RAM pressure: the batch path holds two pages of context, so peak RAM is higher than serial — flagged for the production 9-page run.
+- Decision unchanged: **opt-in**, default off until a quiet-machine chapter A/B (CPU <20 %, 9 pages, VRAM/webhooks/cancel checked).
+- Benchmark `2026-10-22-905-worker-http-check.md`.
+
 ## MIT quality loop, round 53 — #905 opt-in production path wired: worker endpoint + client + batch_runner flag (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
