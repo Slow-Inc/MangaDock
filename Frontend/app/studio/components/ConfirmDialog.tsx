@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Loader from "../../components/ui/Loader";
+import { useDialogFocus } from "../../hooks/useDialogFocus";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -14,6 +15,10 @@ export function ConfirmDialog({ open, title, onConfirm, onCancel }: ConfirmDialo
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // aria-modal: Tab stays inside, and focus goes back to the control that opened it (#935). Before the effect below,
+  // so the opener is recorded before focus moves to Cancel.
+  useDialogFocus(dialogRef, () => true, open);
 
   useEffect(() => {
     if (open) {
@@ -39,10 +44,12 @@ export function ConfirmDialog({ open, title, onConfirm, onCancel }: ConfirmDialo
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label="ยืนยันการดำเนินการ"
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 outline-none transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div className={`w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl transition-transform duration-200 ${visible ? "scale-100" : "scale-95"}`}>

@@ -260,6 +260,17 @@ export default function MangaDetailPage() {
   const [allVersions, setAllVersions] = useState<ChapterVersion[]>(() => getCached<ChapterVersion[]>("studio:versions") ?? []);
   const [loadingVersions, setLoadingVersions] = useState(() => getCached("studio:versions") === null);
   const hasFetched = useRef(false);
+  // A confirmed delete removes the row whose "ลบ" opened the dialog, and focus with it (#935): once the list has
+  // re-rendered without it (the cached list comes first and still has it), focus that fell to <body> goes to the page
+  // heading instead
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const deletedVersionId = useRef<string | null>(null);
+  useEffect(() => {
+    const id = deletedVersionId.current;
+    if (!id || allVersions.some((v) => v.versionId === id)) return;
+    deletedVersionId.current = null;
+    if (!document.activeElement || document.activeElement === document.body) headingRef.current?.focus({ preventScroll: true });
+  }, [allVersions]);
   const [confirmDelete, setConfirmDelete] = useState<ChapterVersion | null>(null);
 
   const versions = allVersions.filter((v) => v.titleId === titleId);
@@ -368,6 +379,7 @@ export default function MangaDetailPage() {
       await deleteVersion(token, version.versionId);
       setConfirmDelete(null); // close on success
       showToast({ type: "success", message: "ลบงานแปลแล้ว", duration: 2200 });
+      deletedVersionId.current = version.versionId;
       await fetchVersions();
     } catch (e: unknown) {
       setConfirmDelete(null); // also close on error
@@ -414,7 +426,7 @@ export default function MangaDetailPage() {
               />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-bold">{displayTitle}</h2>
+              <h2 ref={headingRef} tabIndex={-1} className="text-xl font-bold outline-none">{displayTitle}</h2>
               <p className="mt-0.5 text-sm text-ink-3">
                 {loadingVersions ? "กำลังโหลด..." : `${versions.length} ตอนที่อัปโหลด`}
               </p>
