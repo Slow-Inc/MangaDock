@@ -504,11 +504,28 @@ export class ForumService {
     };
   }
 
+  /** 404 unless a comment's post exists and is not deleted: deletePost does not cascade deleted_at to comments (#1020, #1023). */
+  private async assertCommentPostLive(postId: string | null): Promise<void> {
+    const { data: post, error } = await this.db
+      .from('forum_posts')
+      .select('id')
+      .eq('id', postId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) {
+      throw new InternalServerErrorException(
+        `Failed to validate post: ${error.message}`,
+      );
+    }
+    if (!post) throw new NotFoundException('Comment not found');
+  }
+
   async deletePost(uid: string, id: string): Promise<void> {
     const { data: existing, error: fetchErr } = await this.db
       .from('forum_posts')
       .select('author_uid')
       .eq('id', id)
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
       .single();
 
     if (fetchErr || !existing) lookupFailure(fetchErr, 'Post not found');
@@ -535,11 +552,13 @@ export class ForumService {
       .from('forum_comments')
       .select('author_uid, post_id')
       .eq('id', id)
-      .single();
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
+      .single<{ author_uid: string; post_id: string }>();
 
     if (fetchErr || !existing) lookupFailure(fetchErr, 'Comment not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to delete this comment');
+    await this.assertCommentPostLive(existing.post_id);
 
     const { error } = await this.db
       .from('forum_comments')
@@ -569,6 +588,7 @@ export class ForumService {
       .from('forum_posts')
       .select('author_uid')
       .eq('id', id)
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
       .single();
 
     if (fetchErr || !existing) lookupFailure(fetchErr, 'Post not found');
@@ -610,13 +630,15 @@ export class ForumService {
   ): Promise<ForumComment> {
     const { data: existing, error: fetchErr } = await this.db
       .from('forum_comments')
-      .select('author_uid')
+      .select('author_uid, post_id')
       .eq('id', id)
-      .single();
+      .is('deleted_at', null) // already-deleted content is a 404, not a write (#1023)
+      .single<{ author_uid: string; post_id: string }>();
 
     if (fetchErr || !existing) lookupFailure(fetchErr, 'Comment not found');
     if (existing.author_uid !== uid)
       throw new ForbiddenException('Not authorized to edit this comment');
+    await this.assertCommentPostLive(existing.post_id);
 
     const { data, error } = await this.db
       .from('forum_comments')
@@ -897,21 +919,7 @@ export class ForumService {
     }
     const postId =
       dto.targetType === 'post' ? dto.targetId : (target.post_id ?? null);
-    // A comment's post must be live too: deletePost does not cascade deleted_at to its comments (#1020)
-    if (dto.targetType === 'comment') {
-      const { data: post, error: postError } = await this.db
-        .from('forum_posts')
-        .select('id')
-        .eq('id', postId)
-        .is('deleted_at', null)
-        .maybeSingle();
-      if (postError) {
-        throw new InternalServerErrorException(
-          `Failed to validate vote target: ${postError.message}`,
-        );
-      }
-      if (!post) throw new NotFoundException('Comment not found');
-    }
+    if (dto.targetType === 'comment') await this.assertCommentPostLive(postId);
 
     // Atomic upsert/toggle + recalculate in a single transaction. Replaces the old
     // select-then-write, which let concurrent votes 500 on the PK or interleave
