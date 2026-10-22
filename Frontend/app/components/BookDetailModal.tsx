@@ -13,6 +13,8 @@ import { useBookActions } from "../hooks/useBookActions";
 import FollowSeriesButton from "./FollowSeriesButton";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { useRouter } from "next/navigation";
 import { useDialogFocus } from "../hooks/useDialogFocus";
 import { backOwnEntry, bookPath, inPopupLinkTarget, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
@@ -102,6 +104,8 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
   const [detail, setDetail] = useState<MangaDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [selectedCover, setSelectedCover] = useState<string | null>(null);
+  // Alternative covers that failed to load: their tile shows a placeholder and cannot be picked (#923)
+  const [failedCovers, setFailedCovers] = useState<ReadonlySet<string>>(() => new Set());
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [loadingChapters, setLoadingChapters] = useState(true);
   const [firstReadableChapter, setFirstReadableChapter] = useState<MangaChapter | undefined>();
@@ -301,7 +305,14 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     }, delay);
   };
 
-  const displayThumbnail = selectedCover ?? resolvedThumbnail(book);
+  // A picked alternative cover wins; otherwise step through the book's own sources, and show the placeholder once none
+  // is left (#923). A picked cover that fails goes back to the book's own cover without advancing its sources.
+  const bookCover = useCoverSrc(book);
+  const displayThumbnail = selectedCover ?? bookCover.src;
+  const markCoverFailed = (url: string) => setFailedCovers((prev) => new Set(prev).add(url));
+  const onCoverError = selectedCover
+    ? () => { markCoverFailed(selectedCover); setSelectedCover(null); }
+    : bookCover.onError;
 
   // Prefer book.categories; fall back to genres from MangaDex detail; last resort "E-Book"
   const categories = book.categories.length
@@ -379,14 +390,17 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
             <div className="relative w-full overflow-hidden">
               {/* Blurred background */}
               <div className="absolute inset-0 overflow-hidden">
-                <Image
-                  src={displayThumbnail}
-                  alt=""
-                  fill
-                  aria-hidden
-                  sizes="768px"
-                  className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
-                />
+                {displayThumbnail && (
+                  <Image
+                    src={displayThumbnail}
+                    alt=""
+                    fill
+                    aria-hidden
+                    sizes="768px"
+                    className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
+                    onError={onCoverError}
+                  />
+                )}
               </div>
               <div className="absolute inset-0 bg-linear-to-b from-surface/60 via-transparent to-surface" />
 
@@ -394,14 +408,19 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               <div className="relative z-10 md:hidden flex flex-col items-center px-5 pb-6 pt-9">
                 {/* Cover */}
                 <div className="relative aspect-2/3 w-36 overflow-hidden rounded-xl shadow-2xl ring-1 ring-line">
-                  <Image
-                    src={displayThumbnail}
-                    alt={book.title}
-                    fill
-                    className="object-cover object-center"
-                    sizes="144px"
-                    priority
-                  />
+                  {displayThumbnail ? (
+                    <Image
+                      src={displayThumbnail}
+                      alt={book.title}
+                      fill
+                      className="object-cover object-center"
+                      sizes="144px"
+                      priority
+                      onError={onCoverError}
+                    />
+                  ) : (
+                    <CoverPlaceholder title={book.title} />
+                  )}
                 </div>
 
                 {/* Title */}
@@ -520,14 +539,19 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               <div className="relative z-10 hidden md:flex gap-5 px-5 pb-6 pt-14">
                 {/* Portrait thumbnail */}
                 <div className="relative aspect-2/3 w-40 shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-line">
-                  <Image
-                    src={displayThumbnail}
-                    alt={book.title}
-                    fill
-                    className="object-cover object-center"
-                    sizes="160px"
-                    priority
-                  />
+                  {displayThumbnail ? (
+                    <Image
+                      src={displayThumbnail}
+                      alt={book.title}
+                      fill
+                      className="object-cover object-center"
+                      sizes="160px"
+                      priority
+                      onError={onCoverError}
+                    />
+                  ) : (
+                    <CoverPlaceholder title={book.title} />
+                  )}
                 </div>
 
                 {/* Info panel */}
@@ -798,11 +822,13 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                     const displayUrl = cover.localUrl
                       ? `${API_BASE}${cover.localUrl}`
                       : proxyImageUrl(cover.url);
+                    const failed = failedCovers.has(displayUrl);
                     return (
                     // Wrapper, not one button: the enlarge control is a real <button> too, and buttons cannot nest (#843).
                     <div key={i} className="group relative h-36 w-24 shrink-0">
                     <button
                       title={cover.volume ? `เล่ม ${cover.volume}` : `ปก ${i + 1}`}
+                      disabled={failed}
                       onClick={() =>
                         setSelectedCover(selectedCover === displayUrl ? null : displayUrl)
                       }
@@ -812,13 +838,18 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                           : "border-line hover:border-ink-2 group-hover:border-ink-2"
                       }`}
                     >
-                      <Image
-                        src={displayUrl}
-                        alt={cover.volume ? "" : `ปก ${i + 1}`} // the caption below already says "เล่ม N"
-                        fill
-                        className="object-cover transition duration-200 group-hover:scale-105"
-                        sizes="96px"
-                      />
+                      {failed ? (
+                        <CoverPlaceholder title="" decorative />
+                      ) : (
+                        <Image
+                          src={displayUrl}
+                          alt={cover.volume ? "" : `ปก ${i + 1}`} // the caption below already says "เล่ม N"
+                          fill
+                          className="object-cover transition duration-200 group-hover:scale-105"
+                          sizes="96px"
+                          onError={() => markCoverFailed(displayUrl)}
+                        />
+                      )}
                       {cover.volume && (
                         <div className="absolute inset-x-0 bottom-0 bg-bg/75 py-0.5 text-center text-xs font-semibold text-ink">
                           เล่ม {cover.volume}
@@ -826,7 +857,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       )}
                     </button>
                     {/* Expand: its own keyboard-reachable button, shown on hover or keyboard focus (#843) */}
-                    <button
+                    {!failed && <button
                       type="button"
                       aria-label={`ขยายปก${cover.volume ? ` เล่ม ${cover.volume}` : ` ${i + 1}`}`}
                       onClick={() => setLightboxSrc(displayUrl)}
@@ -835,7 +866,7 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3" aria-hidden>
                         <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
                       </svg>
-                    </button>
+                    </button>}
                     </div>
                     );
                   })}
