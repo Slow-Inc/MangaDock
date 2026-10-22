@@ -7,6 +7,7 @@ import MangaGrid, { GridBook } from "../components/MangaGrid";
 import { cacheOrFetch, TTL } from "../lib/apiCache";
 import { scrollBehavior } from "../hooks/reducedMotion";
 import { usePageTitle } from "../hooks/pageTitle";
+import LoadError from "../components/ui/LoadError";
 
 const API_BASE = "/api/proxy";
 
@@ -108,6 +109,7 @@ function useSectionPage(order: TabKey, tagFilter: string) {
   const [data, setData]       = useState<SectionData>({ items: [], total: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     setLoading(true);
@@ -126,10 +128,11 @@ function useSectionPage(order: TabKey, tagFilter: string) {
       .then((res) => setData(res[order]))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [page, order, tagFilter]);
+  }, [page, order, tagFilter, retryCount]);
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
-  return { page, setPage, data, loading, error, totalPages };
+  const retry = () => setRetryCount((n) => n + 1);
+  return { page, setPage, data, loading, error, totalPages, retry };
 }
 
 function Pagination({
@@ -210,7 +213,7 @@ const TRANSITION_MS = 300;
 
 function Section({ order }: { order: TabKey }) {
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const { page, setPage, data, loading, error, totalPages } =
+  const { page, setPage, data, loading, error, totalPages, retry } =
     useSectionPage(order, categoryFilter);
 
   // Stable chip list — only captured from the unfiltered ("all") results so
@@ -299,9 +302,9 @@ function Section({ order }: { order: TabKey }) {
         }`}
       >
         {error ? (
-          <p className="py-16 text-center text-sm text-ink-3">
-            ไม่สามารถโหลดข้อมูลได้
-          </p>
+          <div className="py-8">
+            <LoadError what="รายการมังงะ" onRetry={retry} />
+          </div>
         ) : (
           <MangaGrid books={data.items} />
         )}
@@ -375,6 +378,8 @@ function NewBooksPageInner() {
           {TABS.map((tab) => (
             <div
               key={tab.key}
+              // Hidden tabs stay mounted (their pagination survives) but must not be read or tabbed into (#911)
+              inert={activeTab !== tab.key}
               className={`transition-all duration-300 ease-out ${
                 activeTab === tab.key
                   ? "relative translate-y-0 opacity-100"

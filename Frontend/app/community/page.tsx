@@ -21,6 +21,7 @@ import Loader from "../components/ui/Loader";
 import { PRIMARY_FILL } from "../components/ui/Button";
 import Mascot from "../components/mascot/Mascot";
 import { usePageTitle } from "../hooks/pageTitle";
+import LoadError from "../components/ui/LoadError";
 
 function CommunityContent() {
   const { user, userRole, showLoginPrompt } = useAuth();
@@ -95,8 +96,11 @@ function CommunityContent() {
     }, []),
   });
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const fetchPosts = useCallback(async () => {
     setLoading(true);
+    setLoadFailed(false);
     setOffset(0);
     try {
       const res = await listPosts({ category, mangaId, sort, offset: 0, limit: LIMIT });
@@ -104,11 +108,13 @@ function CommunityContent() {
       setTotal(res.total);
       setOffset(res.items.length);
     } catch {
-      showToast({ type: "error", message: "โหลดโพสต์ไม่สำเร็จ กรุณาลองใหม่", duration: 4000 });
+      // Shown inline with a retry (#911), not as "no posts" — and the previous category's posts must not linger
+      setPosts([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
-  }, [category, mangaId, sort, showToast]);
+  }, [category, mangaId, sort]);
 
   const loadMore = async () => {
     if (loadingMore) return;
@@ -338,6 +344,8 @@ function CommunityContent() {
             <PostSkeleton viewMode={viewMode} />
             <PostSkeleton viewMode={viewMode} />
           </>
+        ) : loadFailed ? (
+          <LoadError what="โพสต์" area="community" onRetry={fetchPosts} />
         ) : posts.length > 0 ? (
           posts.map(post => <PostCard key={post.id} post={post} viewMode={viewMode} />)
         ) : (

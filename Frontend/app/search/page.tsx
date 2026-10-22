@@ -17,6 +17,7 @@ import type { LandingBook } from "../lib/types";
 import Mascot from "../components/mascot/Mascot";
 import { scrollBehavior } from "../hooks/reducedMotion";
 import { usePageTitle } from "../hooks/pageTitle";
+import LoadError from "../components/ui/LoadError";
 
 const API_BASE = "/api/proxy";
 
@@ -222,6 +223,9 @@ function SearchResults() {
   const [page, setPage]             = useState(1);
   const [loading, setLoading]       = useState(false);
   const [searched, setSearched]     = useState(false);
+  // A failed search is not "no results" (#911): kept apart, with a retry counter the fetch effect depends on
+  const [apiFailed, setApiFailed]   = useState(false);
+  const [retry, setRetry]           = useState(0);
   const [selectedBook, setSelectedBook] = useState<LandingBook | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -244,6 +248,7 @@ function SearchResults() {
 
     setLoading(true);
     setSearched(false);
+    setApiFailed(false);
     setApiResults([]);
     setApiTotal(0);
 
@@ -259,6 +264,7 @@ function SearchResults() {
       cacheKey,
       async () => {
         const r = await fetch(`${API_BASE}/books/search?${qs}`, { signal: ctrl.signal });
+        if (!r.ok) throw new Error(`search ${r.status}`); // an error body is not an empty result (and is not cached)
         return r.json();
       },
       TTL.MEDIUM,
@@ -270,10 +276,10 @@ function SearchResults() {
         setSearched(true);
         setLoading(false);
       })
-      .catch((e) => { if ((e as Error).name !== "AbortError") { setApiResults([]); setApiTotal(0); setSearched(true); setLoading(false); } });
+      .catch((e) => { if ((e as Error).name !== "AbortError") { setApiResults([]); setApiTotal(0); setApiFailed(true); setSearched(true); setLoading(false); } });
 
     return () => ctrl.abort();
-  }, [query, langFilter, statusFilter, yearFrom, yearTo, source, page]);
+  }, [query, langFilter, statusFilter, yearFrom, yearTo, source, page, retry]);
 
   // reset category when base changes
   useEffect(() => { setCategoryFilter("all"); }, [query, langFilter, statusFilter, yearFrom, yearTo, ratingMin, source]);
@@ -571,8 +577,15 @@ function SearchResults() {
           );
         })()}
 
+        {/* ── Load error (#911) — a failed search, not an empty one ────── */}
+        {!isLoading && apiFailed && !isMyList && displayed.length === 0 && (
+          <div className="py-12">
+            <LoadError what="ผลการค้นหา" area="search" onRetry={() => setRetry((n) => n + 1)} />
+          </div>
+        )}
+
         {/* ── Empty state ───────────────────────────────────────────── */}
-        {!isLoading && (searched || isMyList) && displayed.length === 0 && (query || isMyList) && (
+        {!isLoading && !(apiFailed && !isMyList) && (searched || isMyList) && displayed.length === 0 && (query || isMyList) && (
           <div className="flex flex-col items-center gap-4 py-24 text-center text-ink-3">
             <Mascot area="search" size={96} />
             <p className="text-lg font-semibold">
