@@ -12,6 +12,7 @@ import {
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import type { SupabaseAuthUser } from '../auth/auth.types';
 import { ReaderCommentsService } from './reader-comments.service';
+import { AddReaderCommentDto } from './reader-comment.dto';
 
 @Controller('reader-comments')
 export class ReaderCommentsController {
@@ -30,7 +31,7 @@ export class ReaderCommentsController {
   @UseGuards(AuthGuard)
   addComment(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { mangaId: string; chapterId: string; pageNumber: number; body: string },
+    @Body() body: AddReaderCommentDto,
   ) {
     return this.svc.addComment(
       req[USER_KEY].uid,

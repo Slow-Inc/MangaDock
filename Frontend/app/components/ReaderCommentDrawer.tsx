@@ -220,6 +220,7 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
                 ref={textareaRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
+                maxLength={5000} // the server's AddReaderCommentDto cap (#1015)
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePost(e); } }}
                 placeholder="เขียนความคิดเห็น..."
                 rows={2}

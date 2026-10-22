@@ -59,7 +59,7 @@ export class ReviewsService {
   async upsertReview(
     uid: string,
     mangaId: string,
-    data: { mangaTitle: string; rating: number; body: string },
+    data: { mangaTitle?: string; rating: number; body?: string },
   ): Promise<void> {
     if (!mangaId) throw new BadRequestException('mangaId is required');
     if (data.rating < 1 || data.rating > 5) {

@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { isInvalidId } from '../common/assert-found';
 
 export type NotificationItem = {
   id: string;
@@ -51,7 +52,8 @@ export class NotificationsService {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (error) throw new Error(`Failed to fetch notifications: ${error.message}`);
+    if (error)
+      throw new Error(`Failed to fetch notifications: ${error.message}`);
     return (data ?? []).map((r) => this.map(r as NotifRow));
   }
 
@@ -62,7 +64,8 @@ export class NotificationsService {
       .eq('uid', uid)
       .eq('read', false);
 
-    if (error) throw new Error(`Failed to count notifications: ${error.message}`);
+    if (error)
+      throw new Error(`Failed to count notifications: ${error.message}`);
     return count ?? 0;
   }
 
@@ -73,7 +76,10 @@ export class NotificationsService {
       .eq('uid', uid)
       .eq('id', id);
 
-    if (error) throw new Error(`Failed to mark notification read: ${error.message}`);
+    if (isInvalidId(error))
+      throw new BadRequestException('Invalid notification id'); // not a 500 (#1015)
+    if (error)
+      throw new Error(`Failed to mark notification read: ${error.message}`);
   }
 
   async markAllRead(uid: string): Promise<void> {
@@ -83,7 +89,10 @@ export class NotificationsService {
       .eq('uid', uid)
       .eq('read', false);
 
-    if (error) throw new Error(`Failed to mark all notifications read: ${error.message}`);
+    if (error)
+      throw new Error(
+        `Failed to mark all notifications read: ${error.message}`,
+      );
   }
 
   async createNotification(
@@ -98,7 +107,8 @@ export class NotificationsService {
       link: data.link ?? '',
     });
 
-    if (error) throw new Error(`Failed to create notification: ${error.message}`);
+    if (error)
+      throw new Error(`Failed to create notification: ${error.message}`);
     this.logger.log(`Notification created for user ${uid}: ${data.type}`);
   }
 }

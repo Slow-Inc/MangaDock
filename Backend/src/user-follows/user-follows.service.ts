@@ -1,5 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { isInvalidId } from '../common/assert-found';
 
 export type UserProfile = {
   uid: string;
@@ -50,6 +56,12 @@ export class UserFollowsService {
         { follower_uid: followerUid, following_uid: followingUid },
         { onConflict: 'follower_uid,following_uid' },
       );
+    // a malformed uid is a 400 and one with no profile (foreign-key violation) a 404, not a 500 (#1015)
+    if (isInvalidId(error)) throw new BadRequestException('Invalid user id');
+    // only the followee's key: a missing row for the follower is not "that user does not exist"
+    if (error?.code === '23503' && /following_uid/.test(error.details ?? '')) {
+      throw new NotFoundException('User not found');
+    }
     if (error) throw new Error(`Failed to follow: ${error.message}`);
     this.logger.log(`${followerUid} followed ${followingUid}`);
   }
@@ -60,6 +72,7 @@ export class UserFollowsService {
       .delete()
       .eq('follower_uid', followerUid)
       .eq('following_uid', followingUid);
+    if (isInvalidId(error)) throw new BadRequestException('Invalid user id');
     if (error) throw new Error(`Failed to unfollow: ${error.message}`);
   }
 

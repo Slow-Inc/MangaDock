@@ -181,6 +181,7 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            maxLength={5000} // the server's UpsertReviewDto cap (#1015)
             placeholder="แสดงความคิดเห็นเพิ่มเติม (ไม่บังคับ)"
             rows={3}
             className="w-full resize-none rounded-lg border border-line bg-fill px-3 py-2 text-sm text-ink placeholder-ink-3 outline-none transition focus:border-ink-3 focus:bg-raised"
