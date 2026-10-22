@@ -1,0 +1,85 @@
+"""Deterministic quality gate for a translated chapter (#980 follow-up).
+
+Consolidates the checks that this quality loop built and validated on real pages, so a chapter replay can be
+gated without a judge model:
+
+- foreign-script leaks (`foreign_script`, #903 path) and runaway repetition (#901),
+- Thai orthography: doubled combining marks and a leading combining mark,
+- control/zero-width characters and unexpected Latin words,
+- dropped `!` / `?` / `…` punctuation (with the Thai interrobang accepted),
+- cross-page character-name spellings (`name_glossary`).
+
+Pure logic; the CLI in tools/quality_gate.py just loads doctor JSONs.
+"""
+import re
+
+from .name_glossary import extract_glossary
+from .translation_quality import foreign_script, runaway_translation
+
+_COMBINING = set('\u0E31\u0E34\u0E35\u0E36\u0E37\u0E38\u0E39\u0E3A\u0E47\u0E48\u0E49\u0E4A\u0E4B\u0E4C\u0E4D\u0E4E')
+_DOUBLED = re.compile(r'([\u0E31\u0E34-\u0E3A\u0E47-\u0E4E])\1')
+_CTRL = re.compile(r'[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]')
+_LATIN = re.compile(r'[A-Za-z]{3,}')
+_THAI = re.compile(r'[\u0E00-\u0E7F]')
+_PUNCT = ('!', '?', '…')
+
+
+def _thai_target(query, dst):
+    return bool(_THAI.search(dst or '')) and not _THAI.search(query or '')
+
+
+def check_page(regions, page='?'):
+    """Return a list of violation dicts for one page's ``{src, dst}`` regions."""
+    out = []
+    for i, region in enumerate(regions or []):
+        src = (region.get("src") or "").strip()
+        dst = (region.get("dst") or "").strip()
+        if not src or not dst:
+            if src and not dst:
+                out.append({"page": page, "index": i, "kind": "empty_translation", "detail": src[:60]})
+            continue
+        if _thai_target(src, dst) and foreign_script(dst, 'THA', src):
+            out.append({"page": page, "index": i, "kind": "foreign_script", "detail": dst[:60]})
+        if _thai_target(src, dst) and runaway_translation(src, dst):
+            out.append({"page": page, "index": i, "kind": "runaway", "detail": f"{len(src)}->{len(dst)}"})
+        if _thai_target(src, dst) and _DOUBLED.search(dst):
+            out.append({"page": page, "index": i, "kind": "doubled_mark", "detail": dst[:60]})
+        if _thai_target(src, dst) and dst[0] in _COMBINING:
+            out.append({"page": page, "index": i, "kind": "leading_combining", "detail": dst[:60]})
+        if _CTRL.search(dst):
+            out.append({"page": page, "index": i, "kind": "control_chars", "detail": repr(dst[:60])})
+        if _thai_target(src, dst) and _LATIN.search(dst):
+            out.append({"page": page, "index": i, "kind": "added_latin", "detail": dst[:60]})
+        for mark in _PUNCT:
+            if src.count(mark) >= 1 and dst.count(mark) == 0:
+                if mark in ('?', '!') and ('⁈' in dst or '⁉' in dst):
+                    continue  # one interrobang covers both marks
+                if mark == "…" and "..." in dst:
+                    continue
+                out.append({"page": page, "index": i, "kind": f"dropped_{mark}", "detail": dst[:60]})
+    return out
+
+
+def check_names(pages):
+    """Cross-page name spellings: ``pages`` is a list of (page_label, regions)."""
+    out = []
+    per_page = [(label, extract_glossary(regions)) for label, regions in pages]
+    names = set()
+    for _label, glossary in per_page:
+        names |= set(glossary)
+    for name in sorted(names):
+        spellings = [(label, g[name]) for label, g in per_page if name in g]
+        if len(spellings) < 2:
+            continue
+        if len({sp for _label, sp in spellings}) > 1:
+            out.append({"kind": "inconsistent_name", "name": name, "spellings": spellings})
+    return out
+
+
+def check_chapter(pages):
+    """Run every check over ``[(page_label, regions), ...]``; returns a report dict."""
+    violations = []
+    for label, regions in pages:
+        violations.extend(check_page(regions, label))
+    violations.extend(check_names(pages))
+    return {"pages": len(pages), "violations": violations, "ok": not violations}

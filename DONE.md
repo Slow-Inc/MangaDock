@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 62 — deterministic chapter quality gate (#990) + three clean integrity scans (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **New gate** `quality_gate.py` + `tools/quality_gate.py`: one deterministic command over chapter doctor JSONs that re-checks every defect class this loop found — foreign-script leaks (#903), runaway repetition (#901), doubled/leading Thai marks, control/Latin leaks, dropped `! ? …`, and cross-page name spellings (#980). Exit 1 on violation, `--json` output.
+- Validation: 4 HEAD live pages -> **0 violations**; the legacy Tsuki pair that shipped the Cyrillic bug -> **5 violations, exit 1** (4 foreign-script + 1 inconsistent name). 6 unit tests; full suite **891 passed**.
+- **Three clean scans recorded as negative results** (no guard added because the data does not justify one): punctuation drops 9/11,633 all false positives (`…`->`...`, `?!`->`⁈`); Thai-integrity violations 0/11,633; unexpected Latin words 0/11,633.
+- Issue **#990** carries the gate; follow-up is wiring it into the chapter replay workflow. Benchmark `2026-10-22-990-quality-gate.md`.
+
 ## MIT quality loop, round 61 — name glossary covers JP katakana names too (#980) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
