@@ -56,9 +56,10 @@ def _install_replay(tr, recorded):
     Thai-ratio batch retry (`_batch_translate_texts`), which otherwise re-translated the whole page
     live and made a replay A/B non-deterministic (2026-10-20: a retry dropped 'CHAINSAWMAN')."""
     fresh_cache = {}
+    _get_recorded = recorded if callable(recorded) else (lambda: recorded)
 
     async def replay(texts, call_live):
-        out, missing = replay_translations(list(texts), recorded)
+        out, missing = replay_translations(list(texts), _get_recorded())
         unseen = [i for i in missing if texts[i] not in fresh_cache]
         if unseen:
             print(f'[replay] {len(unseen)}/{len(texts)} texts unseen -> live translator')
@@ -156,11 +157,14 @@ async def main():
     ap.add_argument('--set', action='append', default=[], metavar='SECTION.KEY=VALUE',
                     help='override one config knob, e.g. --set detector.det_bubble_merge=true')
     ap.add_argument('--tag', default='', help='suffix for output files (A/B runs)')
+    ap.add_argument('--gate-only', action='store_true',
+                    help='like --gate but exit nonzero only for gate violations (the doctor page flags still print)')
     ap.add_argument('--gate', action='store_true',
                     help='after the pages, run the deterministic chapter quality gate; the command exits 1 if the gate finds violations (or the doctor flags a page)')
-    ap.add_argument('--replay', metavar='DOCTOR_JSON',
-                    help='reuse the translations a previous run recorded (deterministic render A/B; '
-                         'single page). Unseen texts still go to the live translator.')
+    ap.add_argument('--replay', nargs='+', metavar='DOCTOR_JSON',
+                    help='reuse the translations a previous run recorded (deterministic A/B): one dump for '
+                         'all pages, or one per page in reading order. Unseen texts still go to the live '
+                         'translator.')
     args = ap.parse_args()
 
     stats = {'textlines': 0, 'sfx_lines': 0, 'empty_reads': 0}
@@ -180,8 +184,14 @@ async def main():
     font = os.path.join(MIT, 'fonts', 'Prompt-Regular.ttf')  # the prod default (mode/share.py)
     tr = MangaTranslator({'use_gpu': True, 'kernel_size': 3, 'model_dir': os.path.join(MIT, 'models'),
                           'font_path': font if os.path.isfile(font) else None})
+    replay_dumps = None
     if args.replay:
-        _install_replay(tr, json.load(open(args.replay, encoding='utf-8')))
+        replay_dumps = [json.load(open(path, encoding='utf-8')) for path in args.replay]
+        if len(replay_dumps) not in (1, len(args.pages)):
+            raise SystemExit(f'--replay: {len(replay_dumps)} dump(s) for {len(args.pages)} page(s) - '
+                             'give one dump for all pages or one per page')
+        _replay_state = {'dump': replay_dumps[0]}
+        _install_replay(tr, lambda: _replay_state['dump'])
 
     os.makedirs(args.out, exist_ok=True)
     timings = _Timings()
@@ -191,7 +201,9 @@ async def main():
         mt_logger.setLevel(logging.INFO)
     worst = 0
     gate_pages = []
-    for path in args.pages:
+    for page_pos, path in enumerate(args.pages):
+        if replay_dumps is not None and len(replay_dumps) > 1:
+            _replay_state['dump'] = replay_dumps[page_pos]
         source = Image.open(path).convert('RGB')
         timings.stages = {}
         timings.errors = []
@@ -226,7 +238,7 @@ async def main():
         print(f'-> {stem}.doctor.png / .doctor.json\n')
         worst = max(worst, run.exit_code)
 
-    if args.gate:
+    if args.gate or args.gate_only:
         from manga_translator.quality_gate import check_chapter
         report = check_chapter(gate_pages)
         for v in report['violations']:
@@ -235,7 +247,9 @@ async def main():
             else:
                 print(f"[gate] {v['kind']}: {v['page']} #{v['index']} {v['detail']}")
         print(f"[gate] pages={report['pages']} violations={len(report['violations'])} ok={report['ok']}")
-        if not report["ok"]:
+        if args.gate_only:
+            worst = 0 if report["ok"] else 1
+        elif not report["ok"]:
             worst = max(worst, 1)
     return worst
 

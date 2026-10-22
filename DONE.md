@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 64 — chapter-level deterministic replay + `--gate-only` (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- `doctor_page.py --replay` now takes **one or more dumps** — one for all pages (previous behaviour) or **one per page in reading order**; `_install_replay` accepts a getter for the current page's dump, so stacked installs no longer cross-map pages.
+- Added **`--gate-only`**: exit nonzero only for gate violations (the doctor's own page flags still print), so CI can gate on quality without the diagnostic table flipping the code.
+- Validated: two-page **legacy** Tsuki chapter replay -> `[gate] violations=5 ok=False` (4 foreign-script + 1 inconsistent name), exit 1; two-page **clean** live chapter replay -> `[gate] violations=0 ok=True`, exit 0 with `--gate-only`.
+- Benchmark `2026-10-22-990-doctor-gate-flag.md`; this closes #990's replay-wiring follow-up.
+
 ## MIT quality loop, round 63 — quality gate wired into doctor replays (`--gate`) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).

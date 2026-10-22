@@ -16,3 +16,18 @@ page diagnosis and the gate share the exit signal by design).
 So the wiring catches a historically shipped defect class on replay and stays quiet on clean pages. Replay is
 still per-page (`--replay` takes one dump); for a multi-page chapter A/B the dump-based replay remains
 single-page, which is why the gate lives on the whole invocation's pages.
+## Follow-up (round 7): chapter-level deterministic replay + `--gate-only`
+
+- **`--replay` now accepts one or more dumps** (`nargs='+'`): one dump for all pages (previous behaviour) or
+  **one per page in reading order**. `_install_replay` takes a recorded dict *or a callable* returning the
+  current page's dict — without that, stacking installs would capture the previous wrapper and cross-map pages.
+- **`--gate-only`**: exit nonzero **only for gate violations** (the doctor's page flags still print), so CI can
+  gate on quality without being flipped by the diagnostic table.
+
+| validation | result |
+|---|---|
+| two-page legacy Tsuki chapter replay (dumps from the runs that shipped the Cyrillic bug) | `[gate] violations=5 ok=False` (4 foreign-script + 1 inconsistent name) -> **exit 1** |
+| two-page clean chapter replay (live dumps) | `[gate] pages=2 violations=0 ok=True` -> **exit 0** with `--gate-only` |
+
+Multi-page replay is deterministic for recorded texts; unseen texts still go live once (printed as
+`[replay] N/M texts unseen`).
