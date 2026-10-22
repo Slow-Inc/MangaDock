@@ -77,6 +77,20 @@
 
 ---
 
+## #938 Mobile genre panel: out of the Tab order while closed (2026-10-22)
+
+**What:** on every mobile page the collapsed genre panel above the bottom nav (`max-h-0 opacity-0`) kept its 18 links in
+the Tab order, its "หมวดหมู่" toggle had no expanded state, and the open panel could not be closed by Escape or a tap
+outside. Mirrors #870's desktop fix: the panel is `inert` while closed, has an id, `role="region"` and a name; the toggle
+is `type="button"` with `aria-expanded` / `aria-controls`; `usePopoverDismiss` on the bottom nav closes it on Escape
+(focus back to the toggle) or an outside tap.
+
+**Validated:** production build, `/search` at 390 px, Tab walk keyed on elements: before, 37 stops of which 18 invisible
+(every genre link); after, 19 stops, 0 invisible; the toggle reads `aria-expanded="false"`, opens to `"true"` with its
+links reachable, and Escape closes it with focus on the toggle. tsc 0; eslint 0 on `Navbar.tsx` (as on main).
+
+---
+
 ## #936 Page scroll lock shared by the reader and the book popup (2026-10-22)
 
 **What:** closing the reader before passing its CAPTCHA left `body` at `overflow: hidden` (the load effect locked and
