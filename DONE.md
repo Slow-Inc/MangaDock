@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 73 — filler guard precision: reviewed every corpus flag, removed 9 false positives, JP-safe (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Applied `spurious_filler` offline to **1,239 stored THA doctor pages** and reviewed all unique flags: first regex 33 flags of which **9 were false positives**; after narrowing, **24 flags and all 24 are genuinely broken Thai** (historical Tsuki/Dungeon shapes: `ฉันทนมัน...`, `ฉันทนเลือดในกาย`, `ฉันทันด้วยซ้ำ`, `ฉันทนฟัง...`).
+- Fixed false positives now pinned as regression tests: `ทันที` (immediately), `ทนไม่ได้...`/`ทนไม่ไหว` (natural idioms — `ฉันทนไม่ได้ที่จะมอบพลัง` for `I CANT EVEN...` is no longer re-asked), `เข้าทันที` (no pronoun adjacency).
+- **Japanese-source safety:** the licence check reads English words, so the detector returns False for non-Latin sources (a JP line that really says 我慢 must not be re-asked). Two JP-source tests.
+- 32 translation-quality tests green; benchmark `2026-10-23-1039-spurious-filler.md` updated.
+
 ## MIT quality loop, round 72 — judge audit of 8 fresh pages + fixed hallucinated Thai filler words (#1039) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

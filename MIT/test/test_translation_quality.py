@@ -220,3 +220,25 @@ def test_spurious_filler_flags_a_pronoun_glued_to_than_1031():
     assert spurious_filler("ฉันทันมอบพลังทั้งหมดที่มีให้เธอ", "I AM GRANTING YOU ALL THE POWER I CAN.")
     assert not spurious_filler("ฉันจะมอบพลังทั้งหมดที่มีให้เธอ", "I AM GRANTING YOU ALL THE POWER I CAN.")
     assert not spurious_filler("ฉันทันเห็นมันก่อนที่มันจะหนีไป", "I SAW IT IN TIME BEFORE IT RAN AWAY.")
+
+
+def test_spurious_filler_does_not_judge_a_japanese_source_1039b():
+    from manga_translator.translation_quality import spurious_filler
+    assert not spurious_filler("ฉันทนมันมานานแล้ว", "もう我慢できない")
+    assert not spurious_filler("ฉันทนฟังจนจบ", "最後まで聞いた")
+
+
+def test_spurious_filler_keeps_natural_thai_idioms_1039c():
+    from manga_translator.translation_quality import spurious_filler
+    # real translations from the corpus that are NOT broken Thai
+    assert not spurious_filler("ฉันทนไม่ได้ที่จะมอบพลังอะไรให้เธอเลย", "ICANT EVEN GIVE YOU ANY POWER")
+    assert not spurious_filler("อย่ามามองหน้าฉันทันทีเลย เธอช่างน่ารังเกียจจริงๆ", "JUST GET OUT OF MY SIGHT YOURE DISGUSTING.")
+    assert not spurious_filler("ถ้ามีศาสนาที่บูชาสึกูโยมิ ฉันคงจะเข้าทันที", "IF THERE WAS R RFLIGION FORMED AROUND TSUKUYOMI, I")
+    assert not spurious_filler("ฉันทนไม่ไหวแล้ว", "I CANT STAND IT ANYMORE.")
+
+
+def test_spurious_filler_still_flags_broken_glued_shapes_1039c():
+    from manga_translator.translation_quality import spurious_filler
+    assert spurious_filler("ฉันทนมันมาหลายครั้งแล้ว", "IVE BEEN KILLED BY IT SO MANY TIMES...")
+    assert spurious_filler("นี่ก้อวิธีที่ฉันทนเลือดในกาย...", "THIS IS HOW I DRAIN THE BLOOD IN MY BODY..")
+    assert spurious_filler("ฉันทันมอบพลังทั้งหมดที่มีให้เธอ", "I AM GRANTING YOU ALL THE POWER I CAN.")

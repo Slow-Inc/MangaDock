@@ -262,10 +262,9 @@ def leaked_script(trans: str, query: str) -> str | None:
 
 _ENDURE_WORDS = ("ENDURE", "ENDURED", "BEAR", "BEARS", "BORE", "STAND", "STOOD", "TOLERATE", "TOLERATED",
                  "SUFFER", "SUFFERED", "TOLERANCE", "PUT UP WITH", "TAKE IT", "HANDLE IT")
-_THAI_TOLERANCE = re.compile(r"(ทน(?!ทาน)(?:ฟัง|ดู|อยู่|ได้|ไม่ไหว|มานาน|มาแล้ว|อีก|กับ|อะไร)|ฉันทน|เธอทน|เราทน|ข้าทน)")
-#: A pronoun glued to ทัน ("ฉันทันมอบพลัง", observed on a live page) is the same filler class: ทัน means
-#: "in time", so it must not start a verb phrase unless the source talks about timing.
-_THAI_NOT_IN_TIME = re.compile(r"(?:ฉัน|เธอ|เรา|ข้า|แก|คุณ)ทัน(?=[\u0E01-\u0E2E])")
+#: Only clearly broken shapes: a name/pronoun glued to ทน followed by an object-ish verb, or a bare "pronoun + ทน + verb". "ทนไม่ได้" (cannot bear to) and "ทนไม่ไหว" are natural Thai idioms and are NOT flagged.
+_THAI_TOLERANCE = re.compile(r"(ฉันทน(?!ที|ไม่|ได)(?=[ก-๙])|เธอทน(?!ที|ไม่|ได)(?=[ก-๙])|เราทน(?!ที|ไม่|ได)(?=[ก-๙])|ข้าทน(?!ที|ไม่|ได)(?=[ก-๙])|ทน(?:ฟัง|ดู|อยู่|มานาน|มาแล้ว)(?=[ก-๙]?))")
+_THAI_NOT_IN_TIME = re.compile(r"(?:ฉัน|เธอ|เรา|ข้า|แก|คุณ)ทัน(?!ที)(?=[\u0E01-\u0E2E])")
 _TIME_WORDS = ("IN TIME", "ON TIME", "JUST IN TIME", "TIMELY", "BEFORE IT", "IN THE NICK OF TIME")
 
 
@@ -274,6 +273,11 @@ def spurious_filler(dst: str, query: str) -> bool:
 
     Same class as #1039: the model inserts seemly little words that make the sentence ungrammatical.
     """
+    # the licence check reads English words, so it must not run on a non-Latin source (a JP line that
+    # really says 我慢 would otherwise be flagged as an invented filler).
+    src_text = query or ''
+    if not re.search(r'[A-Za-z]', src_text) or re.search(r'[\u3040-\u30FF\u4E00-\u9FFF]', src_text):
+        return False
     if spurious_tolerance(dst, query):
         return True
     if not dst or not _THAI_NOT_IN_TIME.search(dst):
