@@ -56,10 +56,19 @@ export default async function Home({
       <main id="main">
       {topRankedBooks.length > 0 && <HeroCarousel books={topRankedBooks} />}
 
-      <div className="relative z-10 space-y-10 px-6 pb-20 md:pb-16 lg:px-12">
-        <HomeStatusLine serverUnavailable={backendUnavailable} staleTimestamp={staleTimestamp} />
+      {/* The hero owns the top offset; without one (no landing data) the content would start under the fixed
+          Navbar and hide the status line (#909) — take the page-shell-nav offset instead. */}
+      <div className={`relative z-10 space-y-10 px-6 pb-20 md:pb-16 lg:px-12 ${topRankedBooks.length > 0 ? "" : "pt-22 md:pt-28"}`}>
+        {/* Keyed on the server's verdict: router.refresh() keeps it mounted, and its initial state is read once —
+            without the key a successful retry left the old "backend down" line under the restored hero (#909). */}
+        <HomeStatusLine
+          key={backendUnavailable ? "down" : staleTimestamp ?? "ok"}
+          serverUnavailable={backendUnavailable}
+          staleTimestamp={staleTimestamp}
+        />
 
-        {backendUnavailable && <HomeCachedLanding />}
+        {/* Down, or up but with nothing to show: cached books or the empty state, never a blank page (#909) */}
+        {(backendUnavailable || !hasData) && <HomeCachedLanding />}
 
         <ContinueReadingRow />
 
