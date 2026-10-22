@@ -115,3 +115,31 @@ describe('MangaDexService.getNewReleases — an unresolved tag never uses the un
     expect(cache.get).not.toHaveBeenCalledWith(untaggedKey);
   });
 });
+
+describe('MangaDexService.getMangaTagId — a tag list that cannot be loaded is an outage (#981)', () => {
+  it.each([
+    ['a 503', () => json({ result: 'error' }, 503)],
+    [
+      'a failed call',
+      () => {
+        throw new Error('fetch failed');
+      },
+    ],
+  ])('%s → 503, nothing cached', async (_label, fetch) => {
+    const { service, cache } = makeService({ fetch });
+    await expect(service.getMangaTagId('Action')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(cache.set).not.toHaveBeenCalled();
+  });
+
+  it('a loaded list without the tag → undefined', async () => {
+    const { service } = makeService({
+      fetch: () =>
+        json({
+          data: [{ id: 'tag-action', attributes: { name: { en: 'Action' } } }],
+        }),
+    });
+    await expect(service.getMangaTagId('Nope')).resolves.toBeUndefined();
+  });
+});

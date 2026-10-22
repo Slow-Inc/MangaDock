@@ -85,6 +85,8 @@ export default function RelatedManga({ mangaId }: { mangaId: string }) {
       `related:${mangaId}`,
       async () => {
         const r = await fetch(`${API_BASE}/books/${mangaId}/related?limit=10`);
+        // a failed load must not be cached as "no related titles" — the next open tries again (#981)
+        if (!r.ok) throw new Error(`related ${r.status}`);
         return r.json();
       },
       TTL.LONG,
