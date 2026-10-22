@@ -425,7 +425,7 @@ def _clean_layout_dst(region, img_shape, font_size_minimum: int, font_size_max: 
     return int(clean_fs), float(block_w), float(block_h)
 
 
-def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None, font_src_scale: float = 0.0):
+def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int, bubble_fit: bool = False, font_max_box_ratio: float = _MAX_FONT_BOX_RATIO, anti_overlap: bool = False, font_size_max: int = 0, clean_layout: bool = False, page_shape=None, font_src_scale: float = 0.0, fit_below_floor: bool = False):
     """
     Adjust text region size to accommodate font size and translated text length.
     
@@ -718,6 +718,27 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
                             if _relaid is not None and _relaid[1] <= _free_w * 1.05:
                                 clean_fs, block_w, block_h = _relaid
                         cx, cy = _place_off_neighbours(cx, cy, block_w, block_h, territories, own)
+                    # #883 (opt-in): the block still does not fit the space the neighbours leave
+                    # (a block taller than its gap is centred in it and overlaps). Shrink below the
+                    # readable floor to the size that does fit; small text beats overlapping text.
+                    if fit_below_floor and not _page_sized and (free is None or block_w > (free[2] - free[0]) + 1
+                                                                or block_h > (free[3] - free[1]) + 1):
+                        _sub_min = max(6, font_size_minimum // 2)
+                        _bx = tuple(float(v) for v in region.xyxy)
+                        for _fs_try in range(int(clean_fs) - 2, _sub_min - 1, -2):
+                            from types import SimpleNamespace as _NS
+                            _proxy = _NS(translation=region.translation,
+                                         target_lang=getattr(region, 'target_lang', 'en_US'),
+                                         font_size=getattr(region, 'font_size', 0), xyxy=_bx)
+                            _re = _clean_layout_dst(_proxy, img.shape, _sub_min, _fs_try, page_shape,
+                                                    shrink_to_fit=True, grow=False)
+                            if _re is None:
+                                break
+                            _bw, _bh = float(_re[1]), float(_re[2])
+                            _d2, _f2 = _dodged_space(cx, cy, _bw, _bh, territories, own)
+                            if _f2 is not None and _bw <= (_f2[2] - _f2[0]) + 1 and _bh <= (_f2[3] - _f2[1]) + 1:
+                                clean_fs, block_w, block_h, free = int(_re[0]), _bw, _bh, _f2
+                                break
                     if own is not None:            # a dodge never takes the text out of its balloon
                         cx = _clamp_center(cx, block_w, own[0], own[2])
                         cy = _clamp_center(cy, block_h, own[1], own[3])
@@ -901,7 +922,8 @@ async def dispatch(
     clean_layout: bool = False,
     knuth_plass: bool = False,
     page_shape=None,
-    font_src_scale: float = 0.0
+    font_src_scale: float = 0.0,
+    fit_below_floor: bool = False
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
@@ -917,7 +939,7 @@ async def dispatch(
     # (no `await`), so perf_counter here measures true compute — comparing their sum
     # to the async-wrapper's stage total isolates any async/suspension overhead.
     _t_layout = time.perf_counter()
-    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape, font_src_scale)
+    dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum, bubble_fit, font_max_box_ratio, anti_overlap, font_size_max, clean_layout, page_shape, font_src_scale, fit_below_floor)
     logger.info(f"[timing-render] phase=layout_fit elapsed_ms={(time.perf_counter() - _t_layout) * 1000:.1f} regions={len(text_regions)}")
 
     # TODO: Maybe remove intersections

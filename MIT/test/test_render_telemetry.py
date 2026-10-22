@@ -648,3 +648,42 @@ def test_a_balloon_interior_is_not_cut_by_the_next_balloons_bbox(monkeypatch):
     rend.resize_regions_to_font_size(img, [a, b], None, 0, 8, bubble_fit=True, anti_overlap=True, clean_layout=True)
     x1, _, x2, _ = a.render_dst_box
     assert x2 - x1 > 60 and x1 >= 308, a.render_dst_box
+
+
+def test_fit_below_floor_shrinks_a_block_that_cannot_fit_its_gap_883():
+    """Mieruko p0 geometry from #795: the block is taller than the gap between its neighbours, so the
+    default path centres it in the gap and it overlaps. With the #883 opt-in the block shrinks below
+    the readable floor until it fits — small text beats overlapping text."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1500, 1000, 3), 255, np.uint8)
+    above = FakeRegion(horizontal=True, translation='ฉันจะกลับมาอีกแน่นอน!', xyxy=(146.0, 879.0, 265.0, 984.0),
+                       bubble_box=(90.0, 801.0, 312.0, 1084.0), target_lang='THA', font_size=14)
+    sign = FakeRegion(horizontal=True, translation='ดูดวง นาทีละ 5, 000 เยน นาทีละ 10, 000 เยน',
+                      xyxy=(65.0, 1051.0, 200.0, 1211.0), target_lang='THA', font_size=14)
+    below = FakeRegion(horizontal=True, translation='คอร์สปิเศษ 30, 000 เยน', xyxy=(62.0, 1208.0, 223.0, 1281.0),
+                       target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [above, sign, below], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True, fit_below_floor=True)
+    _, y1, _, y2 = sign.render_dst_box
+    assert y2 - y1 <= (1206 - 1086) + 2          # fits between the neighbours instead of overlapping
+    assert sign.render_font_px < 20              # below the readable floor
+
+
+def test_fit_below_floor_is_off_by_default_883():
+    """The opt-in must leave the default untouched: same fixture, flag off -> the #795 behaviour
+    (taller block centred in the gap, font at the floor)."""
+    from pathlib import Path
+    from manga_translator.rendering import text_render
+    text_render.set_font(str(Path(__file__).parent.parent / 'fonts' / 'Prompt-Regular.ttf'))
+    img = np.full((1500, 1000, 3), 255, np.uint8)
+    above = FakeRegion(horizontal=True, translation='ฉันจะกลับมาอีกแน่นอน!', xyxy=(146.0, 879.0, 265.0, 984.0),
+                       bubble_box=(90.0, 801.0, 312.0, 1084.0), target_lang='THA', font_size=14)
+    sign = FakeRegion(horizontal=True, translation='ดูดวง นาทีละ 5, 000 เยน นาทีละ 10, 000 เยน',
+                      xyxy=(65.0, 1051.0, 200.0, 1211.0), target_lang='THA', font_size=14)
+    below = FakeRegion(horizontal=True, translation='คอร์สปิเศษ 30, 000 เยน', xyxy=(62.0, 1208.0, 223.0, 1281.0),
+                       target_lang='THA', font_size=14)
+    rend.resize_regions_to_font_size(img, [above, sign, below], None, 0, 8, bubble_fit=True, anti_overlap=True,
+                                     font_size_max=20, clean_layout=True)
+    assert sign.render_font_px >= 18             # floor respected

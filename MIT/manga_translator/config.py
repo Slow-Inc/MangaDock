@@ -185,6 +185,11 @@ class RenderConfig(BaseModel):
     this x the median source font size of its non-SFX regions (a region far off the median keeps
     this x its own). Clean layout starts from it instead of the absolute font_size_max, and a
     sole-balloon fit never exceeds it; each still shrinks to fit. 0 → off (byte-identical)."""
+    fit_below_floor: bool = False
+    """#883: when a block cannot fit between its neighbours even at ``font_size_minimum``, shrink
+    below the floor to the size that fits instead of overlapping them. Off → current behavior
+    (a block taller than its gap is centred in it, overlapping). Opt-in: small text is a quality
+    call, so the default stays byte-identical."""
     anti_overlap: bool = False
     """Anti-overlap text layout: clamp each region's bubble-fit box against its
     neighbours (using the detected positions) before sizing the font, so translated
