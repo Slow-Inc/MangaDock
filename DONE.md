@@ -77,6 +77,23 @@
 
 ---
 
+## #976 Book detail: an unknown id is a 404, an outage a 503 (or stale), half a detail is not cached (2026-10-22)
+
+**What:** `getMangaDetail` builds the detail from two MangaDex fetches (the manga; its covers) and each turned any
+failure into empty fields. An unknown id (MangaDex 404/400) and an outage both answered 200 with an empty detail, so
+the book popup's #919 "not found" vs "load failed" split never saw a real 404, and the browser kept the empty answer
+30 min; a detail with only covers (manga fetch down) or only the manga (covers down) was cached the full 20 min. The
+fetches now say why they are empty (`fetchMangaCovers` → `null`; `fetchMangaAuthors` → `failure: notFound |
+unavailable`): not found → `NotFoundException`; manga down → stale detail or `ServiceUnavailableException`; covers down
+→ served without covers, uncached; only a detail whose two parts answered is cached. Related books, series context and
+the cover proxy already catch and degrade.
+
+**Validated:** Jest red (5 of 6) → green, `books/detail-outage.spec.ts`: 404 and 400 → 404 with no cache write; manga
+503 → 503, or the stale detail when there is one; covers 503 → served with its title, uncached; both fine → cached.
+Full Backend suite 108 suites / 1,062 tests; eslint unchanged on the service, clean on the new spec.
+
+---
+
 ## #974 A shared /book/<id> link carries the book's title, not the site's (2026-10-22)
 
 **What:** a direct `/book/<id>` (the URL the book popup pushes, so the one people share) served the site title and

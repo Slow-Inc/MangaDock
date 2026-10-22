@@ -405,42 +405,33 @@ export class MangaDexService {
       return forceLocal ? this.applyForceLocalMangaDetail(enhanced) : enhanced;
     }
 
-    const [coversData, authorsData] = await Promise.allSettled([
+    const [covers, info] = await Promise.all([
       this.fetchMangaCovers(mangaId),
       this.fetchMangaAuthors(mangaId),
     ]);
+    // An id MangaDex doesn't know is a 404, not an empty detail (#976)
+    if (info.failure === 'notFound')
+      throw new NotFoundException(`Manga ${mangaId} not found`);
 
-    const covers = coversData.status === 'fulfilled' ? coversData.value : [];
-    const { title, authors, artists, genres, description } =
-      authorsData.status === 'fulfilled'
-        ? authorsData.value
-        : { title: '', authors: [], artists: [], genres: [], description: '' };
-
-    const detail: MangaDetail = {
-      id: mangaId,
-      ...(title ? { title } : {}),
-      authors,
-      artists,
-      covers,
-      genres,
-      description,
-    };
-
-    const hasUsefulData =
-      detail.covers.length > 0 ||
-      detail.authors.length > 0 ||
-      detail.artists.length > 0 ||
-      detail.genres.length > 0 ||
-      !!detail.description;
-
-    if (hasUsefulData) {
-      await this.cache.set(cacheKey, detail, CACHE_TTL_MS);
+    if (!info.failure) {
+      const { title, authors, artists, genres, description } = info;
+      const detail: MangaDetail = {
+        id: mangaId,
+        ...(title ? { title } : {}),
+        authors,
+        artists,
+        covers: covers ?? [],
+        genres,
+        description,
+      };
+      // With the covers down the detail is served but not kept: a cached cover-less detail outlived the outage (#976)
+      if (covers) await this.cache.set(cacheKey, detail, CACHE_TTL_MS);
       const enhanced = await this.enhanceMangaDetail(mangaId, detail);
       return forceLocal ? this.applyForceLocalMangaDetail(enhanced) : enhanced;
     }
 
     this.logger.warn(
-      '[MangaDex] Manga detail empty — attempting stale cache fallback',
+      '[MangaDex] Manga detail unavailable — attempting stale cache fallback',
     );
     const stale = this.cache.getStale<MangaDetail>(cacheKey);
     if (stale) {
@@ -451,7 +442,7 @@ export class MangaDexService {
       return forceLocal ? this.applyForceLocalMangaDetail(enhanced) : enhanced;
     }
 
-    return detail;
+    throw new ServiceUnavailableException('MangaDex manga detail unavailable');
   }
 
   async getNewReleases(
@@ -658,7 +649,10 @@ export class MangaDexService {
     }
   }
 
-  private async fetchMangaCovers(mangaId: string): Promise<MangaCover[]> {
+  /** The manga's covers; `null` when they could not be loaded (not "it has none", #976). */
+  private async fetchMangaCovers(
+    mangaId: string,
+  ): Promise<MangaCover[] | null> {
     try {
       const params = new URLSearchParams();
       params.append('manga[]', mangaId);
@@ -668,7 +662,7 @@ export class MangaDexService {
       const res = await this.mangadexFetch(
         `https://api.mangadex.org/cover?${params.toString()}`,
       );
-      if (!res.ok) return [];
+      if (!res.ok) return null;
 
       const data = (await res.json()) as MangaDexCoverResponse;
       return (
@@ -681,7 +675,7 @@ export class MangaDexService {
       this.logger.warn(
         `[MangaDex] Covers fetch error (${mangaId}): ${String(err)}`,
       );
-      return [];
+      return null;
     }
   }
 
@@ -691,7 +685,16 @@ export class MangaDexService {
     artists: string[];
     genres: string[];
     description: string;
+    /** Set when the fields are empty because the fetch failed, not because the manga has none (#976). */
+    failure?: 'notFound' | 'unavailable';
   }> {
+    const none = {
+      title: '',
+      authors: [],
+      artists: [],
+      genres: [],
+      description: '',
+    };
     try {
       const params = new URLSearchParams();
       params.append('includes[]', 'author');
@@ -702,11 +705,12 @@ export class MangaDexService {
       );
       if (!res.ok)
         return {
-          title: '',
-          authors: [],
-          artists: [],
-          genres: [],
-          description: '',
+          ...none,
+          // 400 is MangaDex rejecting a malformed id: no such manga either
+          failure:
+            res.status === 404 || res.status === 400
+              ? 'notFound'
+              : 'unavailable',
         };
 
       const data = (await res.json()) as { data?: MangaDexManga };
@@ -743,13 +747,7 @@ export class MangaDexService {
       this.logger.warn(
         `[MangaDex] Authors fetch error (${mangaId}): ${String(err)}`,
       );
-      return {
-        title: '',
-        authors: [],
-        artists: [],
-        genres: [],
-        description: '',
-      };
+      return { ...none, failure: 'unavailable' };
     }
   }
 
