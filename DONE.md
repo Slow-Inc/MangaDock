@@ -77,6 +77,28 @@
 
 ---
 
+## #1001 A translation for the chapter the reader left never lands on the new chapter (2026-10-23)
+
+**What:** `useChapterTranslation` resets on a chapter, target-language or derivative change and aborts the batch, but
+two paths escaped it:
+- **Single-page translation** had no abort and no check after its `await`. Chapter A's patches were written at the same
+  page index of chapter B, and that page was marked done, so B's "แปลทั้งตอน" skipped it.
+- **Whole-chapter translation** awaited `checkMitHealth()` before creating its `AbortController`, so a chapter change
+  during the check let it run with the old `pages` and `chapterId`.
+
+A `generationRef`, bumped by both reset effects, is captured at the start of each path and checked after every `await`
+(and in the single-page `finally`, so a stale run doesn't clear a newer run's busy flags).
+
+**Validated:** production build + stand-in `TRANS_RACE=1` (no real MIT: two English uploads, health OK, chapter 1's
+single-page patch answers 2 s late). Start "แปลหน้านี้" on chapter 1, then click "ตอนถัดไป":
+- main: chapter 2 shows `patch-ver-v1` (red); fix: no overlay (green);
+- control (stay on chapter 1): the patch shows, so the normal path is intact;
+- `reader998` and `reader-drawer` pass.
+
+The whole-chapter health-check window is checked by reading. Real tsc 0 errors; eslint clean.
+
+---
+
 ## #999 The latest sort or search wins — manga community hot/new, forum side-menu search, manga picker search (2026-10-23)
 
 **What:** three effects wrote the answer for a sort or query the user had already left:
