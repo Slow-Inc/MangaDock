@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 76 — e2e proof for the opt-in preload: first page 21.5 s -> 18.1 s (#1047) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Started the real worker twice on the same page and measured the **first HTTP request**: lazy arm **21.5 s**; `MIT_PRELOAD=1` arm **18.1 s** with `[share] models preloaded in 1878 ms` in the log -> **3.4 s (16 %)** off the first user page on this loaded host (single samples, directional).
+- The preload timing line now goes to stdout (a default-level `logger.info` was being filtered, which hid the evidence).
+- #1047's e2e acceptance item is satisfied; the feature stays **opt-in** (idle GPU/RAM + slower boot are real costs).
+- Benchmark `2026-10-23-1047-preload.md` updated.
+
 ## MIT quality loop, round 75 — opt-in model preload at worker boot (#1047) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

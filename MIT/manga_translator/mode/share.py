@@ -292,12 +292,12 @@ class MangaTranslatorShared:
                     _t0 = _time.perf_counter()
                     try:
                         await _translator._model_lifecycle.preload(Config(), _translator.device, 0)
-                        logger.info(f"[share] models preloaded in {(_time.perf_counter() - _t0) * 1000:.0f} ms")
+                        print(f"[share] models preloaded in {(_time.perf_counter() - _t0) * 1000:.0f} ms", flush=True)
                     except Exception as exc:  # preload is an optimisation, never a boot failure
-                        logger.warning(f"[share] model preload skipped: {exc}")
+                        print(f"[share] model preload skipped: {exc}", flush=True)
                 asyncio.create_task(_warm_models())
         except Exception as exc:
-            logger.warning(f"[share] preload hook skipped: {exc}")
+            print(f"[share] preload hook skipped: {exc}", flush=True)
 
         # Register with parent if a report URL was given
         if report:
