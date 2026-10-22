@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 20 — the last phantom SFX are gone: lettering is several strokes (#887) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The 4 phantoms that survived the contrast rule were each **one connected dark stroke** (arc, thick oval, `刀` art glyph, `あせ` art). `crop_has_lettering` now also requires **>= 2 dark components covering >= 1% of the crop** (cv2 connected components, lazily imported; falls back to the contrast verdict if unavailable).
+- 13 affected pages replayed again: rescued regions **8 -> 5**, pages with SFX **6 -> 4**, and all 5 remaining are real lettering (`ザッ` x2, `ドン`, `Dash!`, `あせ`) — **phantom count 0** (was 15 at the start of #887).
+- Tests: 2 new stroke-rule tests + the contract fixture now uses a lettered crop; gate **844 passed**. Benchmark updated (`2026-10-22-887-phantom-sfx.md`).
+
 ## MIT quality loop, round 19 — a crop without lettering never reaches the SFX rescue (#887) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
