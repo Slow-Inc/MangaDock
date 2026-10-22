@@ -91,6 +91,13 @@ not-found states carry an `h1`.
 (post/profile with "โหลด…ไม่สำเร็จ" headings); a stand-in backend answering real 404s and an empty manga list → "ไม่พบข้อมูลกระทู้",
 "ไม่พบโปรไฟล์" and "ยังไม่มีโพสต์ในชุมชนนี้". tsc 0; eslint 0 on the touched files (as main); `bun test` 440 pass.
 
+**Review round:** the manga header still said "0 โพสต์" on a failed load — no count then; a post created after a failed
+load hid behind the error — creating clears the failed state; the title skeleton kept pulsing — the failure path fetches the
+manga's title on its own; with `Promise.all` a 500 from the comments could beat the post's 404 and turn "not found" into
+"failed" — the post's own result decides now (both still start together). Re-verified: down/404/empty matrix unchanged; no
+post count on failure; stand-in with post 404 + comments 500 → "ไม่พบข้อมูลกระทู้". The backend maps every Supabase error on
+these two lookups to a 404 — filed separately.
+
 ---
 
 ## #911 A failed load says so, with a retry — never "no results" (2026-10-22)

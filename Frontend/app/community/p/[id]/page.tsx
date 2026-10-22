@@ -168,10 +168,13 @@ export default function PostDetailPage() {
     if (!id) return;
     if (!silent) { setLoading(true); setLoadFailed(false); }
     try {
-      const [postRes, commentsRes] = await Promise.all([
-        getPost(id),
-        listComments(id)
-      ]);
+      // Both start at once, but the post decides "not found": with Promise.all a 500 from the comments could win the
+      // race against the post's 404 and turn a missing post into "failed to load" (#913)
+      const postReq = getPost(id);
+      const commentsReq = listComments(id);
+      commentsReq.catch(() => {}); // observed below; avoids an unhandled rejection when the post fails first
+      const postRes = await postReq;
+      const commentsRes = await commentsReq;
       setPost(postRes);
       setComments(commentsRes);
     } catch (err) {

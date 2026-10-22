@@ -84,6 +84,7 @@ export default function MangaCommunityPage() {
       console.error(err);
       setPosts([]);
       setLoadFailed(true); // not "no posts in this community" (#913)
+      fetchMangaMeta(); // the title comes from the posts when they load; fetch it on its own so the header is not a skeleton
     } finally {
       setLoading(false);
     }
@@ -126,6 +127,7 @@ export default function MangaCommunityPage() {
     };
 
     setPosts((prev) => [tempPost, ...prev]);
+    setLoadFailed(false); // the new post is the list now — do not keep it behind the load error
     setShowCreateModal(false);
     setNewPost({ title: "", content: "", category: "general" });
     setPostImages([]);
@@ -193,7 +195,7 @@ export default function MangaCommunityPage() {
               <div className="h-7 w-48 bg-fill rounded-lg animate-pulse mb-1" />
             )}
             <p className="text-ink-3 text-xs font-semibold mt-1">
-              {loading ? "..." : `${posts.length} โพสต์`}
+              {loading ? "..." : loadFailed ? "" : `${posts.length} โพสต์`}
             </p>
           </div>
 
