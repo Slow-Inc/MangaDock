@@ -8,23 +8,27 @@ import { listPosts, createPost } from "../lib/communityApi";
 import { useAuth } from "../contexts/AuthContext";
 import PostCard from "./PostCard";
 import { PostSkeleton } from "./ForumSkeleton";
+import LoadError from "./ui/LoadError";
 import type { ForumPost } from "../lib/types";
 
 export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: string, title: string, cover?: string }) {
   const { user } = useAuth();
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false); // a failed load is not "no discussion yet" (#930)
   const [isPosting, setIsPosting] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
       const res = await listPosts({ mangaId, sort: 'new', limit: 5 });
       setPosts(res.items);
     } catch (err) {
       console.error(err);
+      setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -77,6 +81,7 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
       });
       // Replace temp with authoritative server post
       setPosts(prev => prev.map(p => p.id === tempId ? realPost : p));
+      if (failed) fetchPosts(); // the list had failed: reload it, or the new post stays behind the error (#930)
     } catch (err) {
       console.error(err);
       // Revert: remove temp post, restore form
@@ -136,6 +141,8 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
             <PostSkeleton />
             <PostSkeleton />
           </>
+        ) : failed ? (
+          <LoadError what="บทสนทนา" onRetry={fetchPosts} />
         ) : posts.length > 0 ? (
           posts.map(post => <PostCard key={post.id} post={post} />)
         ) : (

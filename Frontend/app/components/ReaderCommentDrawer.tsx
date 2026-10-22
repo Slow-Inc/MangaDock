@@ -7,6 +7,7 @@ import { useCallback, useContext, useEffect, useId, useRef, useState } from "rea
 import { AuthContext } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { useDialogFocus } from "../hooks/useDialogFocus";
+import LoadError from "./ui/LoadError";
 
 type Comment = {
   id: string;
@@ -46,6 +47,9 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
   const { user, showLoginPrompt } = useContext(AuthContext);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(false);
+  // A failed load says so, with a retry — never "no comments yet" (#930). `attempt` re-runs the load effect.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -56,16 +60,18 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
 
   const fetchComments = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
+    setFailed(false);
     try {
       const res = await fetch(
         `/api/proxy/reader-comments?mangaId=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chapterId)}&page=${pageNumber}`,
         { signal },
       );
-      const data = res.ok ? await res.json() : null;
+      if (!res.ok) throw new Error(`reader comments: ${res.status}`);
+      const data = await res.json();
       // A newer page's request superseded this one — never let it overwrite.
-      if (data && !signal.aborted) setComments(data);
-    } catch (err) {
-      if (!signal.aborted) throw err;
+      if (!signal.aborted) setComments(data);
+    } catch {
+      if (!signal.aborted) setFailed(true); // aborted = superseded, not failed
     } finally {
       if (!signal.aborted) setLoading(false);
     }
@@ -75,13 +81,14 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
     if (!open) {
       setComments([]);
       setText("");
+      setFailed(false);
       return;
     }
     const controller = new AbortController();
     fetchComments(controller.signal);
     setTimeout(() => textareaRef.current?.focus(), 300);
     return () => controller.abort();
-  }, [open, fetchComments]);
+  }, [open, fetchComments, attempt]);
 
   async function handlePost(e: React.FormEvent) {
     e.preventDefault();
@@ -99,6 +106,7 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
         const newComment: Comment = await res.json();
         setComments((prev) => [...prev, newComment]);
         setText("");
+        if (failed) setAttempt((n) => n + 1); // the list had failed: reload it, or the comment stays hidden (#930)
       }
     } finally {
       setPosting(false);
@@ -153,6 +161,8 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
             <div className="flex justify-center py-6 text-ink-3">
               <Loader context="section" label="กำลังโหลดความคิดเห็น" />
             </div>
+          ) : failed ? (
+            <LoadError what="ความคิดเห็น" onRetry={() => setAttempt((n) => n + 1)} />
           ) : comments.length === 0 ? (
             <p className="text-center text-sm text-ink-3">ยังไม่มีความคิดเห็น</p>
           ) : (
