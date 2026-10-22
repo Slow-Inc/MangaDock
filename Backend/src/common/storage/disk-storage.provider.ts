@@ -13,9 +13,20 @@ export class DiskStorageProvider implements StorageProvider {
   private readonly rootDir = process.cwd();
 
   private getAbsPath(key: string): string {
-    // If it's already an absolute path and within rootDir, use it.
-    // Otherwise, join with rootDir.
-    return path.isAbsolute(key) ? key : path.join(this.rootDir, key);
+    // An absolute key comes from in-process callers and is used as-is. A relative key must stay inside rootDir:
+    // a key built from request data must not climb out of it with `..` (#1007).
+    if (path.isAbsolute(key)) return key;
+    const abs = path.resolve(this.rootDir, key);
+    const rel = path.relative(this.rootDir, abs);
+    if (
+      rel === '' ||
+      rel === '..' ||
+      rel.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(rel)
+    ) {
+      throw new Error(`Storage key resolves outside the storage root: ${key}`);
+    }
+    return abs;
   }
 
   async put(
