@@ -130,7 +130,8 @@ function Dots({ total, idx, desktop, onDotClick, autoplay, onToggleAutoplay }: D
 export default function HeroCarousel({ books }: { books: LandingBook[] }) {
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
-  const [mobileDlOpen, setMobileDlOpen] = useState(false);
+  // The book the mobile popup was opened on: a snapshot, so the rotation behind the popup cannot change it (#948)
+  const [openBook, setOpenBook] = useState<LandingBook | null>(null);
   const pausedRef = useRef(false);
   const focusInsideRef = useRef(false);
   const reducedMotion = useReducedMotion();
@@ -185,8 +186,8 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
 
   const handleMobileTap = useCallback(() => {
     if (didSwipeRef.current) return;
-    setMobileDlOpen(true);
-  }, []);
+    setOpenBook(books[idx]);
+  }, [books, idx]);
 
   useEffect(() => {
     if (total <= 1 || !autoplay) return;
@@ -337,8 +338,8 @@ export default function HeroCarousel({ books }: { books: LandingBook[] }) {
         </div>
       </section>
 
-      {mobileDlOpen && (
-        <BookDetailModal book={book} onClose={() => setMobileDlOpen(false)} />
+      {openBook && (
+        <BookDetailModal book={openBook} onClose={() => setOpenBook(null)} />
       )}
     </>
   );

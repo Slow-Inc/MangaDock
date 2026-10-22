@@ -77,6 +77,19 @@
 
 ---
 
+## #948 Mobile hero popup keeps the book it was opened on (2026-10-22)
+
+**What:** on mobile, the home hero rendered `<BookDetailModal book={book}>` with the live `books[idx]` while autoplay kept
+rotating behind it, so within 5 s the open popup's title, cover and chapters became the next hero book while its URL
+and the details loaded on open stayed from the first. The popup now opens on a snapshot of the tapped book (`openBook`
+state replaces the `mobileDlOpen` flag).
+
+**Validated:** production build at 390 px: before, the popup opened on "Cover Loads" showed "No Cover At All" 11 s later
+with the URL still `/book/cover-ok`; after, it still shows "Cover Loads". The desktop hero's detail button kept the right
+book before and after. tsc 0; eslint unchanged (one pre-existing warning).
+
+---
+
 ## #946 Community feed: a stale "load more" no longer mixes categories (2026-10-22)
 
 **What:** `/community`'s `loadMore` had no sequence check (#911 guarded only `fetchPosts`), so pressing "โหลดโพสต์เพิ่ม" and
