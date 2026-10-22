@@ -38,6 +38,10 @@ describe('CreateVersionDto (#1017)', () => {
     void description;
     void titleAltName;
     expect(await errorsFor(CreateVersionDto, minimal)).toEqual([]);
+    const { chapterTitle, titleName, ...noTitles } = studioCreate;
+    void chapterTitle;
+    void titleName;
+    expect(await errorsFor(CreateVersionDto, noTitles)).toEqual([]);
   });
 
   it.each([
@@ -66,6 +70,13 @@ describe('UpdateVersionMetadataDto (#1017)', () => {
         priceCoins: 0,
       }),
     ).toEqual([]);
+  });
+
+  it('rejects null text (absent is fine)', async () => {
+    expect(
+      await errorsFor(UpdateVersionMetadataDto, { description: null }),
+    ).toEqual(['description']);
+    expect(await errorsFor(UpdateVersionMetadataDto, {})).toEqual([]);
   });
 
   it.each([

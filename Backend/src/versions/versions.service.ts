@@ -118,11 +118,11 @@ export class VersionsService {
 
   async createVersion(data: {
     titleId: string;
-    titleName: string;
+    titleName?: string;
     titleAltName?: string;
     chapterId?: string;
     chapterNumber: string;
-    chapterTitle: string;
+    chapterTitle?: string;
     language: string;
     translatorUid: string;
     translatorName: string | null;

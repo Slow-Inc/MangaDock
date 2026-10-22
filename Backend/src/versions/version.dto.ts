@@ -6,6 +6,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 /** The price column is an int4: beyond this an insert fails (a 500). A database bound, not a product limit. */
@@ -18,9 +19,11 @@ export class CreateVersionDto {
   @MaxLength(100)
   titleId!: string;
 
+  /** Optional, as the service treats it (`?? ''`). */
+  @IsOptional()
   @IsString()
   @MaxLength(500)
-  titleName!: string;
+  titleName?: string;
 
   @IsOptional()
   @IsString()
@@ -37,9 +40,11 @@ export class CreateVersionDto {
   @MaxLength(20)
   chapterNumber!: string;
 
+  /** Optional, as the service treats it and the studio labels it ("ถ้ามี"). */
+  @IsOptional()
   @IsString()
   @MaxLength(500)
-  chapterTitle!: string;
+  chapterTitle?: string;
 
   @IsString()
   @MinLength(2)
@@ -60,7 +65,7 @@ export class CreateVersionDto {
 
 /** PATCH /versions/:versionId — same bounds as create (#1017). */
 export class UpdateVersionMetadataDto {
-  @IsOptional()
+  @ValidateIf((_o, v) => v !== undefined) // absent is fine; null would reach .trim() and 500
   @IsString()
   @MaxLength(1_000)
   description?: string;
@@ -71,17 +76,17 @@ export class UpdateVersionMetadataDto {
   @Max(INT4_MAX)
   priceCoins?: number;
 
-  @IsOptional()
+  @ValidateIf((_o, v) => v !== undefined) // absent is fine; null would reach .trim() and 500
   @IsString()
   @MaxLength(500)
   titleAltName?: string;
 
-  @IsOptional()
+  @ValidateIf((_o, v) => v !== undefined) // absent is fine; null would reach .trim() and 500
   @IsString()
   @MaxLength(500)
   chapterTitle?: string;
 
-  @IsOptional()
+  @ValidateIf((_o, v) => v !== undefined) // absent is fine; null would reach .trim() and 500
   @IsString()
   @MaxLength(20)
   chapterNumber?: string;
