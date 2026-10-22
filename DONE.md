@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 58 — name glossary: TSUKUYOMI consistent across pages, default ON (#980) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Implemented `name_glossary.py` and wired it into `translate_batch_pipelined`: after each page, romaji names are extracted with the Thai spelling the page used (existing spelling wins), filtered to names seen at least twice (one-off ALL-CAPS words like SKY/GROUND are not characters), fed to the next page's prompt through the same `chatgpt_config` seam, and then **deterministically enforced** after translation — prompt-only enforcement proved unreliable (the model copied `ทสึคุโยมิ` as `ทสึคิโยมิ` in one run).
+- **Measured result** (real 2-page pairs): TSUKUYOMI `สึกุโยมิ / ตสึกิโยมิ` (inconsistent) -> `สึกิโยมิ / สึกิโยมิ` (**consistent**); targeted judge shows **0 mistranslations in both arms**; wall time unchanged within noise (no extra model call). 13 new unit tests + prompt-carriage tests; gate **880 passed**.
+- **Default ON** for the batch path (`MIT_NAME_GLOSSARY=0` disables; single-page requests unaffected) — no model call, no measurable latency, and the only new behaviour is deterministic spelling enforcement. Caveats: romaji names only (JP kanji not covered yet); conservative extraction (two-occurrence filter + edit-distance bound).
+- Benchmark `2026-10-22-980-name-glossary.md`; #980 updated with the result.
+
 ## MIT quality loop, round 57 — cross-page context A/B: mixed (keep default off); names still inconsistent (#980) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).

@@ -264,7 +264,13 @@ class ConfigGPT:
         if self._config_get('concise_bubbles'):
             base = base + self._CONCISE_DIRECTIVE
         template = append_series_context(base, self._config_get('series_context'))
-        return append_series_context(template, self._config_get('prev_context'))
+        template = append_series_context(template, self._config_get('prev_context'))
+        # #980: the cross-page name glossary. Text is brace-escaped because the template is later
+        # .format(to_lang=...)ed; absent -> byte-identical.
+        glossary = self._config_get('name_glossary')
+        if glossary:
+            template = template + str(glossary).replace('{', '{{').replace('}', '}}')
+        return template
 
     @property
     def chat_sample(self) -> Dict[str, List[str]]:

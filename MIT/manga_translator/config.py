@@ -316,6 +316,10 @@ class TranslatorConfig(BaseModel):
     seam as series_context so every GPT-family translator carries it. The worker
     resets its own per-request memory, so this is the batch path's only carrier.
     Absent → prompts identical to today."""
+    name_glossary: Optional[str] = None
+    """#980: cross-page character-name glossary rendered by name_glossary.format_glossary
+(source name -> Thai spelling). Rides the same chatgpt_config seam as series_context/prev_context so
+every GPT-family translator appends it to its system prompt. Absent -> prompts byte-identical."""
     api_key: Optional[str] = None
     """#893: per-request credential the Backend sends when LLM_PROVIDER is not gemini
     (Backend/.env LLM_API_KEY). Dropped silently before; the OpenAI-compatible client rebuilds
@@ -369,6 +373,8 @@ class TranslatorConfig(BaseModel):
             overrides['series_context'] = self.series_context
         if self.prev_context:
             overrides['prev_context'] = self.prev_context
+        if self.name_glossary:
+            overrides['name_glossary'] = self.name_glossary
         if self.concise_bubbles:
             # #892: the Backend flag used to die here; carry it to the OmegaConf ConfigGPT reads.
             overrides['concise_bubbles'] = True

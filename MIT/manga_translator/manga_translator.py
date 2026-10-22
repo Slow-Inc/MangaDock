@@ -1759,6 +1759,9 @@ class MangaTranslator:
         from server.batch_pipeline import run_pipelined
         from server.rolling_context import RollingContext
 
+        from .name_glossary import (apply_glossary, count_candidates, extract_glossary, format_glossary,
+                                    glossary_enabled as _name_glossary_enabled)
+
         def _env_int(name: str, default: int) -> int:
             try:
                 return max(0, int(os.environ.get(name, '') or default))
@@ -1770,6 +1773,13 @@ class MangaTranslator:
         # which keeps the pipelined batch byte-identical in behaviour to independent pages.
         rolling = RollingContext(max_pages=_env_int('MIT_CONTEXT_PAGES', 0),
                                  max_chars=_env_int('MIT_CONTEXT_MAX_CHARS', 1500))
+        # #980: cross-page name glossary (off until measured — MIT_NAME_GLOSSARY=1 opts in). A name's Thai
+        # spelling is picked up from the page that produced it and enforced on every later page.
+        # #980: on by default — no extra model call, deterministic enforcement; MIT_NAME_GLOSSARY=0 disables.
+        glossary_enabled = _name_glossary_enabled()
+        glossary = {}
+        name_counts = {}
+        prev_regions = None
 
         async def prepare_front(image):
             cfg = copy.deepcopy(config)
@@ -1779,10 +1789,19 @@ class MangaTranslator:
 
         async def translate(front, prev_context):
             ctx, cfg = front['ctx'], front['cfg']
+            nonlocal prev_regions, glossary
             if not front['has_regions']:
                 return {'front': front, 'ok': False, 'block': rolling.render_block()}
             if prev_context:
                 cfg.translator.prev_context = prev_context
+            if glossary_enabled and prev_regions:
+                glossary = extract_glossary(prev_regions, existing=glossary)
+                # Only names seen at least twice become constraints: a one-off ALL-CAPS word is probably not
+                # a character (SKY, GROUND) and pinning it would only constrain ordinary vocabulary.
+                enforced = {n: sp for n, sp in glossary.items() if name_counts.get(n, 0) >= 2}
+                cfg.translator.name_glossary = format_glossary(enforced) or None
+            else:
+                enforced = None
             await self._report_progress('translating')
             try:
                 ctx.text_regions = await self._run_text_translation(cfg, ctx)
@@ -1793,8 +1812,15 @@ class MangaTranslator:
                 ctx.text_regions = []
             await self._report_progress('after-translating')
             ok = bool(ctx.text_regions) and ctx.text_regions != 'cancel'
+            if ok and glossary_enabled and enforced:
+                # Deterministic follow-up: prompt instructions are not reliable for exact spellings.
+                apply_glossary(ctx.text_regions, enforced)
             if ok:
                 rolling.add_page(getattr(r, 'translation', '') or '' for r in ctx.text_regions)
+                prev_regions = ctx.text_regions
+                page_counts = count_candidates(ctx.text_regions)
+                for name, n in page_counts.items():
+                    name_counts[name] = name_counts.get(name, 0) + n
             return {'front': front, 'ok': ok, 'block': rolling.render_block()}
 
         async def finish_back(image, front, translated):
