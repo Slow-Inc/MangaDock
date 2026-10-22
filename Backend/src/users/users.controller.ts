@@ -23,6 +23,11 @@ import { memoryStorage } from 'multer';
 import { AuthGuard, USER_KEY } from '../auth/auth.guard';
 import { UsersService } from './users.service';
 import { MascotDto } from './mascot.dto';
+import {
+  PhotoHistoryDto,
+  TranslatorProfileDto,
+  UpdateProfileDto,
+} from './profile.dto';
 import { detectAllowedImage } from '../common/storage/detect-image';
 import { ALLOWED_IMAGE_MIME } from '../common/storage/image-mime';
 import type { SupabaseAuthUser } from '../auth/auth.types';
@@ -55,7 +60,7 @@ export class UsersController {
   @Patch('me')
   async updateMyProfile(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { displayName?: string; photoURL?: string },
+    @Body() body: UpdateProfileDto,
   ) {
     await this.users.updateUserProfile(req[USER_KEY].uid, body);
     return { ok: true };
@@ -289,10 +294,8 @@ export class UsersController {
   @Post('me/photo-history')
   updatePhotoHistory(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { photos: string[] },
+    @Body() body: PhotoHistoryDto,
   ) {
-    if (!Array.isArray(body?.photos))
-      throw new BadRequestException('photos must be an array');
     return this.users.updatePhotoHistory(req[USER_KEY].uid, body.photos);
   }
 
@@ -302,7 +305,7 @@ export class UsersController {
   @Post('me/become-translator')
   async becomeTranslator(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body() body: { bio?: string; translatorLanguages?: string[] },
+    @Body() body: TranslatorProfileDto,
   ) {
     await this.users.becomeTranslator(req[USER_KEY].uid, body ?? {});
     return { ok: true };
@@ -312,13 +315,7 @@ export class UsersController {
   @Patch('me/translator-profile')
   async updateTranslatorProfile(
     @Req() req: Request & { [USER_KEY]: SupabaseAuthUser },
-    @Body()
-    body: {
-      bio?: string;
-      translatorLanguages?: string[];
-      country?: string;
-      preferredLanguage?: string;
-    },
+    @Body() body: TranslatorProfileDto,
   ) {
     await this.users.updateTranslatorProfile(req[USER_KEY].uid, body ?? {});
     return { ok: true };

@@ -77,6 +77,22 @@
 
 ---
 
+## #1025 Profile bodies are DTOs (2026-10-23)
+
+**What:** `PATCH /users/me`, `POST /users/me/become-translator`, `PATCH /users/me/translator-profile` and
+`POST /users/me/photo-history` took plain types under a 50 MB JSON limit: a multi-MB `displayName` / `photoURL` was
+stored and joined into every forum feed as the author; a non-string `bio` 500'd on `.trim()`; photo-history 500'd on a
+non-string entry and kept social URLs uncapped. New `Backend/src/users/profile.dto.ts` (`UpdateProfileDto`,
+`TranslatorProfileDto`, `PhotoHistoryDto`) bounds every field above what the UI sends (name 100, URL 2048, bio 500 = what
+was already kept, languages ≤ 20 × 35 for 13 offered, country 100, preferred language 35, photos ≤ 50 × 2048). The
+manual photos array check went (the DTO covers it). `ProfileTab` display-name input gets `maxLength={100}`.
+
+**Validated:** `profile.dto.spec.ts` runs the app's own `ValidationPipe` against the controller's real parameter types:
+red (the bodies were plain `Object`) → green. AuthContext's and the studio's real payloads validate; wrong types and
+over-long values are refused. Users suites 102/102; real tsc clean both sides; eslint clean on the touched files.
+
+---
+
 ## #1023 Editing or deleting already-deleted forum content is a 404 (2026-10-23)
 
 **What:** `updatePost`, `updateComment`, `deletePost` and `deleteComment` looked their row up without a `deleted_at`

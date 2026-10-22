@@ -70,6 +70,7 @@ export default function ProfileTab({ formState, dispatch, isOpen }: ProfileTabPr
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
+            maxLength={100}
             placeholder="ชื่อของคุณ"
             className={inputClass}
           />
