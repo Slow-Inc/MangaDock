@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 31 — the two unreachable levers are reachable from the Backend now (#894) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `MIT_BUBBLE_SYNTH=1` -> `detector.det_bubble_synth` (#170/#178 synthesized balloons) and `MIT_FIT_BELOW_FLOOR=1` -> `render.fit_below_floor` (#883 overlap opt-in) to `Backend/src/books/mit-config.ts`, following the existing `flagEnv` pattern; unset → payload byte-identical.
+- Documented both in the env block; `renderConfigHash` already hashes every `MIT_*` key, so patch caches roll when either is switched.
+- 3 new spec tests, `books-mit-config.spec.ts` **45 passed**; MIT side unchanged (both Pydantic fields already existed). Everyone of this loop's MIT quality levers now has a Backend path.
+- Benchmark `2026-10-22-894-backend-env-exposure.md`.
+
 ## MIT quality loop, round 30 — config audit: two more dead Backend keys fixed (#893), two unreachable features recorded (#894) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
