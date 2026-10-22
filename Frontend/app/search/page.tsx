@@ -264,7 +264,8 @@ function SearchResults() {
   // fetch from API
   useEffect(() => {
     if (source !== "all") return;
-    if (!query.trim()) { setApiResults([]); setApiTotal(0); setSearched(false); setApiFailed(false); return; }
+    // also clear `loading`: a search aborted by going back to an empty query never resets it (#1013)
+    if (!query.trim()) { setApiResults([]); setApiTotal(0); setSearched(false); setApiFailed(false); setLoading(false); return; }
 
     abortRef.current?.abort();
     const ctrl = new AbortController();

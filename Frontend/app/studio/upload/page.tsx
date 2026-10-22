@@ -104,7 +104,8 @@ function StudioUploadContent() {
   // Load existing version data if editing
   useEffect(() => {
     if (!existingVersionId || !user) return;
-    getIdTokenRef.current().then(async (token) => {
+    // a rejected session resolves to null, so the finally below still ends the loading state (#1013)
+    getIdTokenRef.current().catch(() => null).then(async (token) => {
       try {
         if (!token) return;
         // Routed through studioApi.getVersion so this HWID-gated /versions/:id

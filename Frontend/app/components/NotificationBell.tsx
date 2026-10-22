@@ -55,9 +55,14 @@ export default function NotificationBell() {
 
   const fetchList = useCallback(async () => {
     setLoading(true);
-    const data = await apiFetch<NotificationItem[]>("/api/proxy/notifications");
-    if (data) setItems(data);
-    setLoading(false);
+    try {
+      const data = await apiFetch<NotificationItem[]>("/api/proxy/notifications");
+      if (data) setItems(data);
+    } catch {
+      /* the list keeps what it had; reopening retries */
+    } finally {
+      setLoading(false); // a throw (network, bad JSON) used to leave the panel loading forever (#1013)
+    }
   }, []);
 
   useEffect(() => {
