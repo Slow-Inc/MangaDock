@@ -1,3 +1,4 @@
+import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { MangaCatalogService } from './manga-catalog.service';
 
 /**
@@ -80,9 +81,11 @@ function makeMangaDex(
 }
 
 describe('MangaCatalogService.getRelated (#325)', () => {
-  it('returns [] for unknown ID (getMangaDetail throws)', async () => {
+  it('returns [] for unknown ID (getMangaDetail throws NotFound)', async () => {
     const mangaDex = makeMangaDex({
-      getMangaDetail: jest.fn().mockRejectedValue(new Error('not found')),
+      getMangaDetail: jest
+        .fn()
+        .mockRejectedValue(new NotFoundException('not found')),
     });
     const svc = new MangaCatalogService(
       mangaDex as any,
@@ -160,5 +163,45 @@ describe('MangaCatalogService.getRelated (#325)', () => {
       0,
       'tag-uuid-action',
     );
+  });
+});
+
+// #981: an outage must not answer "no related titles" — the browser cached that for 30 min
+describe('MangaCatalogService.getRelated — an outage is not an empty list (#981)', () => {
+  const svcWith = (mangaDex: ReturnType<typeof makeMangaDex>) =>
+    new MangaCatalogService(
+      mangaDex as any,
+      makeSupabase() as any,
+      makeCache() as any,
+    );
+
+  it('a detail outage rejects with 503', async () => {
+    const mangaDex = makeMangaDex({
+      getMangaDetail: jest
+        .fn()
+        .mockRejectedValue(new ServiceUnavailableException('down')),
+    });
+    await expect(svcWith(mangaDex).getRelated('src')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+  });
+
+  it('an unavailable rated row rejects with 503', async () => {
+    const mangaDex = makeMangaDex({
+      fetchMangaForRow: jest
+        .fn()
+        .mockResolvedValue({ items: [], total: 0, unavailable: true }),
+    });
+    await expect(svcWith(mangaDex).getRelated('src')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+  });
+
+  it('a genre MangaDex has no tag for still answers []', async () => {
+    const mangaDex = makeMangaDex({
+      getMangaTagId: jest.fn().mockResolvedValue(undefined),
+    });
+    await expect(svcWith(mangaDex).getRelated('src')).resolves.toEqual([]);
+    expect(mangaDex.fetchMangaForRow).not.toHaveBeenCalled();
   });
 });

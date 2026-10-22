@@ -76,7 +76,7 @@ const MANGA_GENRE_TAGS: Record<string, string> = {
 
 import { StatusService } from '../status/status.service';
 
-/** The MangaDex tag name → id map (getMangaTagId); getNewReleases reads it to tell an unknown tag from an unloaded list. */
+/** The MangaDex tag name → id map (getMangaTagId). */
 const TAG_MAP_KEY = 'mangadex:tags:v1';
 /** How long a chapter list cut short by a failed feed page is kept (#961). */
 const PARTIAL_CHAPTERS_TTL_MS = 60_000;
@@ -461,13 +461,9 @@ export class MangaDexService {
   }> {
     const offset = (page - 1) * limit;
     const tagId = tag ? await this.getMangaTagId(tag) : undefined;
-    if (tag && !tagId) {
-      // Never fall back to the untagged rows (or their cache entry) under a tag the user picked (#961)
-      const tagListLoaded =
-        await this.cache.get<Record<string, string>>(TAG_MAP_KEY);
-      if (tagListLoaded) throw new NotFoundException(`Unknown tag: ${tag}`);
-      throw new ServiceUnavailableException('MangaDex tag list unavailable');
-    }
+    // Never fall back to the untagged rows (or their cache entry) under a tag the user picked (#961);
+    // a tag list that can't be loaded already threw 503 (#981)
+    if (tag && !tagId) throw new NotFoundException(`Unknown tag: ${tag}`);
     const cacheKey = `new-releases:v3:${page}:${limit}${tagId ? `:tag:${tagId}` : ''}`;
     const cached = await this.cache.get<{
       new: { items: LandingBook[]; total: number };
@@ -636,7 +632,7 @@ export class MangaDexService {
       const res = await this.mangadexFetch(
         'https://api.mangadex.org/manga/tag',
       );
-      if (!res.ok) return undefined;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as {
         data: { id: string; attributes: { name: { en?: string } } }[];
       };
@@ -649,7 +645,11 @@ export class MangaDexService {
       return map[tagName];
     } catch (err) {
       this.logger.warn(`[MangaDex] Tag list fetch error: ${String(err)}`);
-      return undefined;
+      // Tags almost never change, so an expired map still answers; with none, an unloaded list is an outage,
+      // not "no such tag" (#981)
+      const stale = this.cache.getStale<Record<string, string>>(cacheKey);
+      if (stale) return stale.data[tagName];
+      throw new ServiceUnavailableException('MangaDex tag list unavailable');
     }
   }
 

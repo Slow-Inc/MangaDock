@@ -1,4 +1,8 @@
-import { Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { CacheOrchestratorService } from '../cache/cache-orchestrator.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { MangaDexService } from './mangadex.service';
@@ -68,20 +72,24 @@ export class MangaCatalogService {
     try {
       const detail = await this.mangaDex.getMangaDetail(id);
       genres = detail.genres ?? [];
-    } catch {
-      return [];
+    } catch (err) {
+      // Only an unknown id has no related titles; an outage must not read as "none" (#981)
+      if (err instanceof NotFoundException) return [];
+      throw err;
     }
     if (genres.length === 0) return [];
 
     const tagId = await this.mangaDex.getMangaTagId(genres[0]);
     if (!tagId) return [];
 
-    const { items } = await this.mangaDex.fetchMangaForRow(
+    const { items, unavailable } = await this.mangaDex.fetchMangaForRow(
       'rating',
       limit + 1,
       0,
       tagId,
     );
+    if (unavailable)
+      throw new ServiceUnavailableException('MangaDex related row unavailable');
     return items.filter((b) => b.id !== id).slice(0, limit);
   }
 
