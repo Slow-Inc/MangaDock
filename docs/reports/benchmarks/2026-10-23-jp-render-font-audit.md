@@ -75,3 +75,9 @@ with `render.widen_vertical_columns=true`.
 - **Usable in production:** Backend `MIT_WIDEN_VERTICAL_COLUMNS=1` now maps to
   `render.widen_vertical_columns` (same pattern as `MIT_FIT_BELOW_FLOOR`); absent -> config byte-identical.
   Backend config spec: **46 passed** (new test added).
+## Correction (round 74): the "two" JP pages are one page uploaded twice
+
+`result/jp/jp_chapter_p0.jpg` and `jp_chapter_p1.jpg` are **byte-identical** (same sha1, 343,806 bytes). Every "two
+page" JP measurement in this loop is therefore **one real page measured twice** — the runs differ by detection/OCR
+and by translation sampling, not by page content. The widen evidence stays valid (same image, same recorded
+translations -> only layout changed) but the sample is one page, not two.

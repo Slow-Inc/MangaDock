@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 74 — JP audit: the two JP pages are one page twice; gate-clean, one model-ceiling sense flip (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Corpus correction:** `jp_chapter_p0.jpg` and `jp_chapter_p1.jpg` are **byte-identical** (same sha1) — all JP→TH measurements in this loop are **one real page run multiple times**, not two pages. Recorded in the render-audit benchmark and the team vault.
+- **Fresh JP run:** wall 13.1 s cold / 5.2 s warm, translation 1.2 / 2.8 s, **gate 0 violations**.
+- **Judge audit** (14 segments over both runs): mean **1.57/2** (earlier 1.64 was the same page; delta = judge noise). Flags are model-level: じゃねーか rhetorical flattening, あ？ variants, and one **sense flip** — `でも可愛くないなコイツ` came out `...ไม่น่ารัก...` (correct) in one run and `...ไม่ไร้เดียงสา...` (wrong concept) in the other. The negation is preserved, so no deterministic guard can catch it; recorded as model-ceiling, with self-consistency sampling as a future opt-in idea (+1 call/page).
+- **Negative result:** across **1,241 stored pages**, 73 contain duplicate source lines and all groups already translate identically — no dedupe/memory feature needed.
+- Benchmarks: `2026-10-23-jp-audit-and-stability.md` (new), `2026-10-23-jp-render-font-audit.md` (correction).
+
 ## MIT quality loop, round 73 — filler guard precision: reviewed every corpus flag, removed 9 false positives, JP-safe (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

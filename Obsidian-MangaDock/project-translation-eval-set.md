@@ -47,3 +47,5 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 3. ถ้าจะปรับ prompt/sample/temperature ต่อ ต้องมี **ชุดประเมิน JP→TH จริง** ก่อน
 
 เกี่ยวข้อง: [[project-art-text-handling]] · [[feedback-verify-before-claiming]] · [[feedback-benchmark-md-report-with-image]]
+
+- **JP corpus caveat (2026-10-23):** `result/jp/jp_chapter_p0.jpg` and `_p1.jpg` are byte-identical — the JP→TH baseline is one real page run multiple times, not two pages (same sha1, 343,806 bytes).
