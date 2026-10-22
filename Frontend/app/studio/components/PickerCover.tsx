@@ -6,11 +6,12 @@ import { useCoverSrc } from "../../hooks/useCoverSrc";
 /**
  * A manga picker row's cover (#925): the book glyph when there is no cover or every source fails to load, like the
  * public cards (#921) — never the browser's broken-image icon. A component because the hook cannot run in a `.map`.
+ * Decorative (`alt=""`): the row's button already reads the title.
  */
-export function PickerCover({ book, sizes }: { book: { title: string; thumbnail?: string }; sizes: string }) {
+export function PickerCover({ book, sizes }: { book: { thumbnail?: string }; sizes: string }) {
   const cover = useCoverSrc(book);
   if (cover.src) {
-    return <Image src={cover.src} alt={book.title} fill loading="lazy" sizes={sizes} onError={cover.onError} className="object-cover" />;
+    return <Image src={cover.src} alt="" fill loading="lazy" sizes={sizes} onError={cover.onError} className="object-cover" />;
   }
   return (
     <div className="flex h-full w-full items-center justify-center text-ink-3">
