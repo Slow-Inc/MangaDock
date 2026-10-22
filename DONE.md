@@ -77,6 +77,22 @@
 
 ---
 
+## #1041 Studio selects have a name; the translator-language toggles are a named group (2026-10-23)
+
+**What:** from the #1040 review — the sweep only saw native fields. `StudioSelect`'s trigger was named only by its
+value ("-- เลือกภาษา --", "ไทย"), so its visible label (account "ภาษาหลัก", upload "ภาษาที่แปล") or its purpose (works
+status / language filters, wallet month / year) was never announced. It takes an optional `label` and the trigger reads
+"label: value"; all six call sites pass one. The account page's "ภาษาที่แปลได้" toggles were a bare `<label>` over a row
+of buttons: now `role="group"` named by that heading (hint as its description), each toggle `type="button"` with
+`aria-pressed`.
+
+**Validated:** E2E on a production build, signed in as a creator via the local fake session: before — no select
+reachable by its name, 4 unnamed triggers, no group; after — every select found by `getByRole('button', { name })`,
+0 unnamed triggers on all four pages (wallet on its กราฟ tab), the group found by name with 13 pressable toggles. Real
+tsc clean; eslint per file equal to main.
+
+---
+
 ## #1040 Form fields named only by a placeholder get a real name (2026-10-23)
 
 **What:** a High Craft accessibility sweep (every route × 1280/390 px, production build, local fake session; checks

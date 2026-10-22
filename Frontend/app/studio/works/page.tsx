@@ -235,6 +235,7 @@ export default function WorksPage() {
                 <div className="flex gap-2">
                   <div className="min-w-[10rem]">
                     <StudioSelect
+                      label="สถานะ"
                       value={statusFilter}
                       onChange={(value) => setStatusFilter(value as "" | VersionStatus)}
                       options={STATUS_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
@@ -242,6 +243,7 @@ export default function WorksPage() {
                   </div>
                   <div className="min-w-[10rem]">
                     <StudioSelect
+                      label="ภาษา"
                       value={langFilter}
                       onChange={setLangFilter}
                       options={[
