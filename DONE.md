@@ -84,11 +84,12 @@ network error into an empty list. The browser showed "ไม่พบหนั�
 (#911) and cached the empty answer (search 5 min, genre 30 min); a year-range search cached it server-side for 20 min,
 and a scan failing partway cached partial matches as complete. The paged fetch now marks an outage `unavailable` (a
 400/404 — our own bad request — stays a plain empty answer); `MangaCatalogService.searchPage` (both search paths)
-turns it into a 503 before anything is cached; the genre listing answers 503 on a failed fetch.
+turns it into a 503 before anything is cached; the genre listing answers 503 on a failed fetch; new releases
+answer 503 when all four rows are down, otherwise serve the rest uncached, never with the flag in the JSON (review).
 
-**Validated:** Jest red (6 of 7) → green, `books/search-outage.spec.ts`: 503 and network error marked unavailable, 400
+**Validated:** Jest red → green, `books/search-outage.spec.ts` (9): 503 and network error marked unavailable, 400
 not; search and a year scan failing on its second page answer 503 with no cache write; genre 503 on both failures.
-Full Backend suite 107 suites / 1,054 tests. eslint unchanged on the services, clean on the new spec. The browser side
+Full Backend suite 107 suites / 1,056 tests. eslint unchanged on the services, clean on the new spec. The browser side
 needs no change: both pages already show the retry state for a non-ok answer and never cache it (#911).
 
 ---
