@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 48 — concurrency dependency analysis; safe stage-pipelining design scoped (#905) (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Read the real batch path: Backend `submitBatch` → MIT `server/batch_runner.py`, which loops pages **serially on purpose** — page i+1's translation is conditioned on page i's translated dialogue (#159 rolling `prev_context`, name/pronoun consistency). Page-level parallelism would break that context or need speculative re-translation, and the per-page pipeline is monolithic (`get_ctx` → one worker call) with no seam to overlap.
+- **Safe design filed as #905:** keep translation ordered, but pipeline the **front GPU stages of page i+1** into the **gateway wait of page i** (translation needs only the previous page's translation result). Ceiling from the warm profile: GPU ~2.8 s/page vs translation 1.6-5.4 s → wall/page ≈ max(GPU, translation) = **1.5-1.8×** per chapter with identical outputs.
+- #905 carries the acceptance bar: 9-page chapter ≥1.4× faster, byte-identical patches/prompts/context, peak VRAM unchanged, cancellation/progress intact, `batch_runner` no-ML unit tests extended.
+- #904 updated (measurement record + pointer to the safe implementation).
+
 ## MIT quality loop, round 47 — translation latency levers measured: cap tuning dead, bounded concurrency real (#904) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
