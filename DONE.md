@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 22 — current-state audit of all 39 pages, plus a rejected speed idea (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Replayed the whole corpus at HEAD (`_final`): 39/39 pages, **372 regions, 6 SFX renders (was 20 before #887), 0 phantoms, 0 duplicate-over-balloon**. Every remaining doctor flag is a documented tradeoff (Chainsaw overlap = #883 default, Latin credits, Kage title shrink) or a replay artifact (stale pre-#763 recordings on Otome/Tsuki). Report: `2026-10-22-corpus-audit-39-pages.md`.
+- **Rejected:** panel-detection downscale (#888 idea). Measured warm: full-res Kumiko panels **406 ms**/page (not the ~2 s a cold profile suggested); max_side 1200 saves 86 ms but changes reading order on 1/39 pages, 1000/800 on 5 and 7. Reverted, benchmark `2026-10-22-panel-downscale-rejected.md`.
+- Method notes: payload anomaly scans find real defects (font ratio, Thai src in non-SFX region); check page extensions (.jpg vs .png) when scripting sweeps.
+
 ## MIT quality loop, round 21 — a container that swallows dialogue is never rescued as an SFX (#887) (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
