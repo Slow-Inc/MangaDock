@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getTrendingManga, type TrendingManga } from "../../lib/communityApi";
-import { useToast } from "../../contexts/ToastContext";
 import { cacheGet, cacheSet, TTL } from "../../lib/apiCache";
 import Mascot from "../../components/mascot/Mascot";
 import { usePageTitle } from "../../hooks/pageTitle";
+import LoadError from "../../components/ui/LoadError";
 
 function TrendingMangaCard({ item, rank }: { item: TrendingManga; rank: number }) {
   const router = useRouter();
@@ -82,9 +82,11 @@ export default function TrendingPage() {
   usePageTitle("ยอดนิยม · คอมมูนิตี้");
   const [trending, setTrending] = useState<TrendingManga[]>([]);
   const [loading, setLoading] = useState(true);
-  const { showToast } = useToast();
+  const [loadFailed, setLoadFailed] = useState(false); // shown with a retry, not as "nothing trending" (#911)
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
+    setLoadFailed(false);
     const cached = cacheGet<TrendingManga[]>("community:trending");
     if (cached) { setTrending(cached); setLoading(false); return; }
 
@@ -98,15 +100,14 @@ export default function TrendingPage() {
         setTrending(items);
       })
       .catch(() => {
-        if (!mounted) return;
-        showToast({ type: "error", message: "โหลดมังงะ trending ไม่สำเร็จ", duration: 4000 });
+        if (mounted) setLoadFailed(true);
       })
       .finally(() => {
         if (mounted) setLoading(false);
       });
 
     return () => { mounted = false; };
-  }, [showToast]);
+  }, [retry]);
 
   return (
     <div>
@@ -125,6 +126,8 @@ export default function TrendingPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
           {Array.from({ length: 10 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
+      ) : loadFailed ? (
+        <LoadError what="มังงะที่กำลังเป็นที่นิยม" area="community" onRetry={() => setRetry((n) => n + 1)} />
       ) : trending.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
           {trending.map((item, i) => (

@@ -77,6 +77,33 @@
 
 ---
 
+## #911 A failed load says so, with a retry — never "no results" (2026-10-22)
+
+**What:** with the backend down, `/search` said "ไม่พบหนังสือที่ตรงกับ …", `/community` "ยังไม่มีโพสต์ในหมวดหมู่นี้" and
+`/community/trending` "ยังไม่มีมังงะที่กำลังเป็นที่นิยม" — a failed request shown as an empty result — while `/new` and
+`/categories/[genre]` said they could not load but offered no retry. `components/ui/LoadError` (promoted from
+`StudioLoadError`, #828 — now a thin wrapper with the Studio mascot) shows the sleeping mascot, "โหลด…ไม่สำเร็จ" and a
+"ลองใหม่" with a busy state (`role="alert"`); each page keeps an explicit failed state and re-runs its own fetch. Found on the
+way: search parsed error bodies as results (`r.json()` without `r.ok`) and would cache them 5 min; the community feed kept
+the previous category's posts after a failed switch; its failure toasts duplicated the inline state (dropped for the initial
+load); `/new` kept all four tab panels mounted at `opacity-0`, so screen readers read every grid and Tab walked through
+invisible books — hidden panels are `inert` (pagination state survives).
+
+**Validated:** production build, backend not running: all five pages show the load error, none shows an empty-result
+message. Then a stand-in backend on :4001 (books for search/genre/new-releases, genuinely empty forum + trending) and
+"ลองใหม่": search and categories show the books, community and trending show their real empty states, `/new`'s active tab
+shows the books; a tab that failed earlier shows its own error and recovers on its retry. tsc 0; eslint per file = main's;
+`bun test` 436 pass.
+
+**Review round:** a failed search followed by an empty query kept the error next to the start prompt — cleared in the
+empty-query branch; a failed community switch kept the old `total`, so "โหลดโพสต์เพิ่ม" sat next to the error and loaded
+into a page still marked failed — `total` reset too; only the latest feed request may write (a slow answer for the previous
+category used to only toast, now it would have wiped the new one); an optimistic new post clears the failed state; trending
+resets its failed flag before the cache check. Re-verified: failed search → clear query → no alert, prompt shown; failed
+community load → no load-more button; the five-page down/retry check unchanged.
+
+---
+
 ## #909 Home is never blank when the backend is down (2026-10-22)
 
 **What:** with the backend unreachable the home page was blank below the Navbar. Measured: `<main>` started at y = 0, and the

@@ -8,6 +8,7 @@ import { cacheOrFetch, TTL } from "../../lib/apiCache";
 import Loader from "../../components/ui/Loader";
 import { scrollBehavior } from "../../hooks/reducedMotion";
 import { usePageTitle } from "../../hooks/pageTitle";
+import LoadError from "../../components/ui/LoadError";
 
 const API_BASE = "/api/proxy";
 
@@ -46,6 +47,7 @@ export default function GenrePage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!slug) return;
@@ -68,7 +70,7 @@ export default function GenrePage() {
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [slug, page]);
+  }, [slug, page, retryCount]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const isPrevDisabled = page <= 1;
@@ -136,9 +138,9 @@ export default function GenrePage() {
         )}
 
         {!loading && error && (
-          <p className="py-20 text-center text-sm text-ink-3">
-            ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง
-          </p>
+          <div className="py-8">
+            <LoadError what="รายการมังงะ" onRetry={() => setRetryCount((n) => n + 1)} />
+          </div>
         )}
 
         {!loading && !error && <MangaGrid books={books} />}
