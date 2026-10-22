@@ -56,7 +56,9 @@ export default async function Home({
       <main id="main">
       {topRankedBooks.length > 0 && <HeroCarousel books={topRankedBooks} />}
 
-      <div className="relative z-10 space-y-10 px-6 pb-20 md:pb-16 lg:px-12">
+      {/* The hero owns the top offset; without one (no landing data) the content would start under the fixed
+          Navbar and hide the status line (#909) — take the page-shell-nav offset instead. */}
+      <div className={`relative z-10 space-y-10 px-6 pb-20 md:pb-16 lg:px-12 ${topRankedBooks.length > 0 ? "" : "pt-22 md:pt-28"}`}>
         <HomeStatusLine serverUnavailable={backendUnavailable} staleTimestamp={staleTimestamp} />
 
         {backendUnavailable && <HomeCachedLanding />}

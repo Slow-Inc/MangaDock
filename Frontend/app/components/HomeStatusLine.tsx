@@ -66,7 +66,8 @@ export default function HomeStatusLine({ serverUnavailable, staleTimestamp }: Pr
       : `MangaDex API ใช้งานไม่ได้ชั่วคราว · ข้อมูลอัปเดตล่าสุด ${formatThaiTime(status.timestamp)}น.`;
 
   return (
-    <div className="mx-auto max-w-5xl px-1">
+    // On the content edge, like the rows below it (#909) — not a centred max-w box.
+    <div>
       <p className="flex items-center justify-center gap-2 text-center text-[11px] leading-relaxed text-ink-3 sm:justify-start sm:text-left sm:text-sm">
         <span
           aria-hidden="true"

@@ -77,6 +77,24 @@
 
 ---
 
+## #909 Home is never blank when the backend is down (2026-10-22)
+
+**What:** with the backend unreachable the home page was blank below the Navbar. Measured: `<main>` started at y = 0, and the
+only explanation — `HomeStatusLine`'s "CAUTION · ไม่สามารถเชื่อมต่อ backend ได้…" — rendered at y = 0, under the fixed 65 px
+Navbar (`elementFromPoint` hit the header): the hero normally owns the top offset and there is no hero without landing data.
+`HomeCachedLanding` then rendered an empty `<section>` when the browser had nothing cached. Now: with no hero the content takes
+the `page-shell-nav` offset (`pt-22 md:pt-28`); the no-cache branch shows the sleeping error mascot, "ยังโหลดรายการมังงะไม่ได้"
+and "ลองใหม่" (`router.refresh()` in a transition — `/` is dynamic and a failed fetch is not data-cached, so it really
+re-fetches); the status line sits on the content edge instead of a centred `max-w-5xl` box (it started 164 px right of the
+rows at 1440).
+
+**Validated:** production build, backend not running, 1440 and 390: status line at y 112 / 88 (header bottom 65) and
+hit-test visible; empty state and retry visible; "ลองใหม่" issues an RSC refetch and shows "กำลังโหลด…" while it runs;
+status line left edge = card left edge (48 / 24). Not exercised: home with the backend up (no backend here) — the offset class
+applies only when there is no hero, so the hero path is unchanged by construction. tsc 0; eslint warnings = main's (1 + 1).
+
+---
+
 ## #907 Save, check-in and review messages are announced (2026-10-22)
 
 **What:** status messages rendered as plain `<div>`/`<p>` (WCAG 4.1.3) — a screen-reader user pressing Save / Check in /
