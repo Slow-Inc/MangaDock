@@ -49,6 +49,9 @@ export default function Navbar() {
 
   // Close genre dropdown on outside click or Escape (#870)
   usePopoverDismiss(genreOpen, genreRef, () => setGenreOpen(false));
+  // The mobile genre panel and its toggle both live in the bottom nav: Escape / a tap outside close it, as on desktop
+  const mobileNavRef = useRef<HTMLElement>(null);
+  usePopoverDismiss(mobileGenreOpen, mobileNavRef, () => setMobileGenreOpen(false));
 
   // Close genre dropdown on route change
   useEffect(() => {
@@ -206,7 +209,7 @@ export default function Navbar() {
     </header>
 
     {/* ── Mobile bottom navigation (Webtoon-style) ── */}
-    <nav aria-label="เมนูด้านล่าง" className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-bg md:hidden">
+    <nav ref={mobileNavRef} aria-label="เมนูด้านล่าง" className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-bg md:hidden">
       {isStudioPath ? (
         <div className="flex h-16 items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
           {STUDIO_TABS.slice(0, 2).map((tab) => {
@@ -255,6 +258,10 @@ export default function Navbar() {
         <>
       {/* Genre dropdown (slides up from bottom nav) */}
       <div
+        id="mobile-genre-panel"
+        role="region"
+        aria-label="หมวดหมู่"
+        inert={!mobileGenreOpen} // collapsed is only max-h-0: keep its links out of the Tab order, like the desktop panel (#870)
         className={`overflow-hidden border-b border-line transition-all duration-300 ${
           mobileGenreOpen ? "max-h-60 opacity-100" : "max-h-0 opacity-0 border-b-0"
         }`}
@@ -316,7 +323,10 @@ export default function Navbar() {
 
         {/* หมวดหมู่ */}
         <button
+          type="button"
           onClick={() => setMobileGenreOpen((v) => !v)}
+          aria-expanded={mobileGenreOpen}
+          aria-controls="mobile-genre-panel"
           className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors duration-200 ${
             mobileGenreOpen || pathname.startsWith("/categories") ? "text-ink" : "text-ink-2"
           }`}
