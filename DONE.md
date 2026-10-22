@@ -84,11 +84,13 @@ opacity-0`, so their items stayed in the Tab order (13 of 18 reader stops invisi
 toggles had no expanded state; the mobile zoom −/+ (the only zoom control on mobile) were unnamed; Escape with a menu open
 closed the whole reader. Now both panels are `inert` while closed with an id, the toggles carry `aria-expanded` /
 `aria-controls`, the zoom buttons are "ย่อ" / "ขยาย" (as on desktop), and the reader's Escape closes an open menu first
-(refs, like `commentOpenRef`) and returns focus to its toggle.
+(refs, like `commentOpenRef`) and returns focus to its toggle. Review follow-ups: items close their menu through a helper
+that refocuses the toggle; keyboard focus leaving an open menu closes it; the Escape ref tracks the visible state.
 
 **Validated:** production build, reader on an uploaded version: before, 13/18 (390 px) and 8/23 (1440 px) invisible stops
 and 2 unnamed buttons; after, 0 invisible at both widths (5 and 15 stops), 0 unnamed, each menu opens by keyboard with
-its items reachable, and Escape closes only the menu with focus on its toggle. The #928 drawer probe still passes. tsc
+its items reachable, and Escape closes only the menu with focus on its toggle; walking out of an open menu closes it; a
+view item activated by keyboard leaves focus on the toggle. The #928 drawer probe still passes. tsc
 0; eslint identical to main.
 
 ---
