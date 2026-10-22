@@ -90,6 +90,13 @@ Live, built backend: with `SUPABASE_URL` pointed at a dead port → post, not-a-
 against the real Supabase → unknown uuid 404, `not-a-uuid` 404, an existing post 200, unknown profile 404. (Run with the
 main checkout's `node_modules` junctioned and `openai` from an isolated scratch install — D: had 0.3 GB free.)
 
+**Review round:** the hand-made 503 discarded the Postgres error (the filter logged only "Database unavailable"), and it
+carried code `INTERNAL_ERROR`, so the frontend's Supabase-down toast (keyed on `SUPABASE_OFFLINE`) never fired. Any other
+error is now a plain `Error("Supabase lookup failed (<code>): <message>")`, which `AllExceptionsFilter` already maps to its
+database-down signal — 503, code `SUPABASE_OFFLINE` — and logs as CRITICAL with the cause; the spec runs the thrown error
+through the real filter. Live: dead `SUPABASE_URL` → 503 `SUPABASE_CONNECTION_ERROR`, log "Supabase lookup failed (no code):
+TypeError: fetch failed". `src/forum` 73 pass.
+
 ---
 
 ## #913 Community detail pages: "not found" only for a real 404 (2026-10-22)
