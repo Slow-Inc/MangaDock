@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 53 — #905 opt-in production path wired: worker endpoint + client + batch_runner flag (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added the worker endpoint `/simple_execute/translate_batch_pipeline` (pickled `{images, config}` -> pipelined patch list on the existing streaming/pickle contract), `fetch_batch_data` + `ExecutorInstance.sent_batch_pipeline` on the server side, and an `MIT_BATCH_PIPELINE` opt-in branch in `batch_runner`: the whole batch goes to **one worker**, results come back in page order, then the existing per-page webhook delivery + cancellation drop semantics run unchanged.
+- Known limitation of the opt-in path (documented in the endpoint): per-page **live progress** events are not forwarded mid-batch (the worker's hook channel is per request); per-page completion webhooks still arrive. Default stays **off** until the production chapter A/B.
+- Tests: 4 new light batch_runner tests (single worker call, worker released, per-page webhooks in order, worker failure reported per page, cancellation drops remaining deliveries, flag default off) — **12 passed** in that file; gate **867 passed**.
+- Remaining: start the server/worker and run the 9-page chapter A/B (wall time, webhooks, VRAM, cancellation), then the on/off decision.
+
 ## MIT quality loop, round 52 — HEAD quality audit: EN 1.55/2, JP 1.64/2 — no regression (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).
