@@ -269,8 +269,9 @@ export default function StudioAccountPage() {
             {/* Country & Preferred Language */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-line bg-fill p-5">
-                <label className="mb-2 block text-sm font-semibold">ประเทศ</label>
+                <label htmlFor="studio-country" className="mb-2 block text-sm font-semibold">ประเทศ</label>
                 <CountrySelect
+                  id="studio-country"
                   value={country}
                   onChange={setCountry}
                   placeholder="ค้นหาหรือเลือกประเทศ..."

@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useLocalLenis } from "../../hooks/useLocalLenis";
 import { useModalTransition } from "../../hooks/useModalTransition";
+import { usePopoverDismiss } from "../../hooks/popoverDismiss";
 
 export type StudioSelectOption = {
   value: string;
@@ -26,7 +27,9 @@ export function StudioSelect({
   const { mounted: renderPanel, visible: open } = useModalTransition(wantOpen, { duration: 200 });
   const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const panelId = useId();
 
   useLocalLenis(listRef as React.RefObject<HTMLElement | null>, "vertical", open && !disabled);
 
@@ -38,14 +41,8 @@ export function StudioSelect({
     setDropUp(spaceBelow < dropdownHeight + 12);
   }, [options.length]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setWantOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  // Outside click or Escape closes; Escape returns focus to the trigger (#874)
+  usePopoverDismiss(open, containerRef, () => setWantOpen(false));
 
   useEffect(() => {
     if (!open) return;
@@ -67,8 +64,11 @@ export function StudioSelect({
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
+        aria-expanded={open}
+        aria-controls={panelId}
         onClick={() => {
           if (disabled) return;
           if (open) {
@@ -101,6 +101,8 @@ export function StudioSelect({
 
       {renderPanel && (
         <div
+          id={panelId}
+          inert={!open} // still mounted while it fades out
           className={`absolute left-0 right-0 z-50 overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_18px_40px_-16px_rgb(0_0_0/.3)] transition-all duration-200 ease-in-out ${
             dropUp ? "bottom-full mb-1.5 origin-bottom-left" : "top-full mt-1.5 origin-top-left"
           } ${
@@ -118,9 +120,11 @@ export function StudioSelect({
                 <li key={option.value}>
                   <button
                     type="button"
+                    aria-current={isSelected ? "true" : undefined}
                     onClick={() => {
                       onChange(option.value);
                       setWantOpen(false);
+                      triggerRef.current?.focus(); // the chosen button turns inert as the panel closes (#874)
                     }}
                     className={`flex w-full items-center justify-between px-4 py-3 text-sm transition hover:bg-fill ${
                       isSelected ? "text-accent" : "text-ink-2 hover:text-ink"

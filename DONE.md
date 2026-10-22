@@ -77,6 +77,34 @@
 
 ---
 
+## #874 Studio and community custom selects work by keyboard (2026-10-21)
+
+**What:** `StudioSelect` (Studio upload/works/wallet/account), `CountrySelect` (Studio account) and `MangaSearchSelector`
+(community composer tag picker) closed only on an outside mouse click and exposed no state. They now use
+`usePopoverDismiss` from #870 (Escape closes, focus back to the trigger; Escape inside a dialog stays the dialog's), carry
+`aria-expanded` + `aria-controls` (the two search inputs as `role="combobox"` + `aria-autocomplete="list"`), mark the chosen
+option `aria-current`, and keep a closing panel `inert`. Found on the way: choosing an option unmounted the focused button and
+dropped focus to `<body>` — focus now goes to the trigger (selects) or to the chip's new "เอาแท็ก … ออก" button / back to the
+input (tag picker). The two inputs open on click, typing or ArrowDown instead of on focus, so returning focus to them does not
+reopen the list. The tag picker's label is linked to its input and its clear button is named.
+
+**Validated:** production build, signed in (local session; tag-search results stubbed, backend not running), keyboard
+only: Studio language select and country combobox — focus alone keeps them closed, Enter/ArrowDown opens, Tab enters the
+list, Escape closes with focus on the trigger, choosing leaves focus on the trigger showing the choice, reopening marks it
+`aria-current`, mouse open/outside-close unchanged; tag picker — typing opens, Escape closes the list but not the composer,
+choose → focus on "เอาแท็ก One Piece ออก", clear → focus on the input. tsc 0; eslint 0 on all three (as main); `bun test`
+436 pass. TDD n-a: wiring of the hook tested in #870; no logic of its own.
+
+**Review round:** returning focus to the country input after *any* choice would raise a phone's soft keyboard after a tap
+— it now refocuses only on a keyboard choice. "Focus is in the list" did not tell them apart (a click focuses the option
+button too, measured: mouse choice still refocused), so the signal is `:focus-visible` on the chosen option; re-measured:
+mouse choice → focus stays where the click left it (as before #874), keyboard choice → input. The tag picker's open
+condition is derived once (`expanded`) instead of pasted into the attribute and the render; the "ประเทศ" label names the
+country combobox (`id` prop); comments corrected (the panel turns inert while fading, it does not unmount). An earlier
+probe ran against a stale server from the previous session still holding port 4000 — caught by its start time and redone.
+
+---
+
 ## #870 Navbar popovers close by keyboard (2026-10-21)
 
 **What:** the categories menu (`Navbar`), notifications (`NotificationBell`) and user menu (`NavbarActions`) closed only on an
