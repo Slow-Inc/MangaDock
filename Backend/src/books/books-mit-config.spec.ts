@@ -73,6 +73,8 @@ const ENV_KEYS = [
   'MIT_EN_UPPERCASE',
   'MIT_FONT_MAX_BOX_RATIO',
   'MIT_EN_FONT',
+  'MIT_BUBBLE_SYNTH',
+  'MIT_FIT_BELOW_FLOOR',
   'MIT_PATCH_FEATHER',
   'MIT_PATCH_CONTENT_ALPHA',
   'MIT_INPAINT_CONTEXT_PAD',
@@ -184,6 +186,24 @@ describe('BooksService.buildMitConfig', () => {
     const svc = makeService();
     const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
     expect(cfg.ocr).toEqual({ prob: 0.05 });
+  });
+
+  it('exposes det_bubble_synth via env (#894)', () => {
+    process.env.MIT_BUBBLE_SYNTH = '1';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.detector.det_bubble_synth).toBe(true);
+  });
+
+  it('exposes render.fit_below_floor via env (#894)', () => {
+    process.env.MIT_FIT_BELOW_FLOOR = '1';
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.render.fit_below_floor).toBe(true);
+  });
+
+  it('keeps both absent when their envs are unset (#894)', () => {
+    const cfg = JSON.parse(buildMitConfig(process.env, 'ANY', 'THA', ''));
+    expect(cfg.detector.det_bubble_synth).toBeUndefined();
+    expect(cfg.render.fit_below_floor).toBeUndefined();
   });
 
   it('exposes detector rescue knobs via env (#167)', () => {
