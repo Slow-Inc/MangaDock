@@ -13,6 +13,8 @@ import { useBookActions } from "../hooks/useBookActions";
 import FollowSeriesButton from "./FollowSeriesButton";
 import { useLocalLenis } from "../hooks/useLocalLenis";
 import { resolvedThumbnail, proxyImageUrl } from "../lib/imgUrl";
+import { useCoverSrc } from "../hooks/useCoverSrc";
+import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { useRouter } from "next/navigation";
 import { useDialogFocus } from "../hooks/useDialogFocus";
 import { backOwnEntry, bookPath, inPopupLinkTarget, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
@@ -301,7 +303,11 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     }, delay);
   };
 
-  const displayThumbnail = selectedCover ?? resolvedThumbnail(book);
+  // A picked alternative cover wins; otherwise step through the book's own sources, and show the placeholder once none
+  // is left (#923). A picked cover's error must not advance the book's sources.
+  const cover = useCoverSrc(book);
+  const displayThumbnail = selectedCover ?? cover.src;
+  const onCoverError = selectedCover ? undefined : cover.onError;
 
   // Prefer book.categories; fall back to genres from MangaDex detail; last resort "E-Book"
   const categories = book.categories.length
@@ -379,14 +385,17 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
             <div className="relative w-full overflow-hidden">
               {/* Blurred background */}
               <div className="absolute inset-0 overflow-hidden">
-                <Image
-                  src={displayThumbnail}
-                  alt=""
-                  fill
-                  aria-hidden
-                  sizes="768px"
-                  className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
-                />
+                {displayThumbnail && (
+                  <Image
+                    src={displayThumbnail}
+                    alt=""
+                    fill
+                    aria-hidden
+                    sizes="768px"
+                    className="scale-110 object-cover object-center blur-2xl brightness-[0.25] saturate-150"
+                    onError={onCoverError}
+                  />
+                )}
               </div>
               <div className="absolute inset-0 bg-linear-to-b from-surface/60 via-transparent to-surface" />
 
@@ -394,14 +403,19 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               <div className="relative z-10 md:hidden flex flex-col items-center px-5 pb-6 pt-9">
                 {/* Cover */}
                 <div className="relative aspect-2/3 w-36 overflow-hidden rounded-xl shadow-2xl ring-1 ring-line">
-                  <Image
-                    src={displayThumbnail}
-                    alt={book.title}
-                    fill
-                    className="object-cover object-center"
-                    sizes="144px"
-                    priority
-                  />
+                  {displayThumbnail ? (
+                    <Image
+                      src={displayThumbnail}
+                      alt={book.title}
+                      fill
+                      className="object-cover object-center"
+                      sizes="144px"
+                      priority
+                      onError={onCoverError}
+                    />
+                  ) : (
+                    <CoverPlaceholder title={book.title} />
+                  )}
                 </div>
 
                 {/* Title */}
@@ -520,14 +534,19 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
               <div className="relative z-10 hidden md:flex gap-5 px-5 pb-6 pt-14">
                 {/* Portrait thumbnail */}
                 <div className="relative aspect-2/3 w-40 shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-line">
-                  <Image
-                    src={displayThumbnail}
-                    alt={book.title}
-                    fill
-                    className="object-cover object-center"
-                    sizes="160px"
-                    priority
-                  />
+                  {displayThumbnail ? (
+                    <Image
+                      src={displayThumbnail}
+                      alt={book.title}
+                      fill
+                      className="object-cover object-center"
+                      sizes="160px"
+                      priority
+                      onError={onCoverError}
+                    />
+                  ) : (
+                    <CoverPlaceholder title={book.title} />
+                  )}
                 </div>
 
                 {/* Info panel */}

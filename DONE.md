@@ -77,6 +77,21 @@
 
 ---
 
+## #923 The book popup shows a placeholder when a cover fails to load (2026-10-22)
+
+**What:** after #921 the cards showed a placeholder, but opening one showed `BookDetailModal` with two broken images (the
+blurred background and the cover) — it rendered `selectedCover ?? resolvedThumbnail(book)` with no `onError`, so it
+never even tried the proxy fallback. It now uses #921's `useCoverSrc(book)`: a picked alternative cover still wins (its
+error does not advance the book's sources); when every source fails both covers show `CoverPlaceholder` and the blurred
+background is left out.
+
+**Validated:** production build, stand-in backend with four books, popup opened from `/search` at 1440 and 390 px:
+before the fix 6 of 8 checks failed (2 broken images each, the fallback book included); after, 8/8 — 0 broken images, the
+working and fallback covers load, the two dead ones show the placeholder found by `getByRole('img', { name })`. tsc 0;
+eslint unchanged from main (3 pre-existing findings in the file).
+
+---
+
 ## #921 A cover that fails to load shows a placeholder, not a broken image (2026-10-22)
 
 **What:** six cover cards (search, `MangaGrid`, `BookRow`, `TopTenCard`, `RelatedManga`, `ContinueReadingRow`) and the
