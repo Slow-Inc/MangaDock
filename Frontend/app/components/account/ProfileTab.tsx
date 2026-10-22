@@ -6,6 +6,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { errMessage } from "@/lib/errMessage";
 import type { FormState, FormAction } from "./formReducer";
 import { PRIMARY_FILL } from "../ui/Button";
+import StatusMessage from "../ui/StatusMessage";
 
 interface ProfileTabProps {
   formState: FormState;
@@ -44,16 +45,16 @@ export default function ProfileTab({ formState, dispatch, isOpen }: ProfileTabPr
 
   return (
     <>
-      {successMessage && (
-        <div className="mb-4 rounded-xl bg-ok/10 border border-ok/40 px-4 py-2.5 text-sm text-ok">
-          {successMessage}
-        </div>
-      )}
-      {errorMessage && (
-        <div className="mb-4 rounded-xl bg-danger/10 border border-danger/40 px-4 py-2.5 text-sm text-danger">
-          {errorMessage}
-        </div>
-      )}
+      <StatusMessage
+        kind="status"
+        message={successMessage}
+        className="mb-4 rounded-xl bg-ok/10 border border-ok/40 px-4 py-2.5 text-sm text-ok"
+      />
+      <StatusMessage
+        kind="alert"
+        message={errorMessage}
+        className="mb-4 rounded-xl bg-danger/10 border border-danger/40 px-4 py-2.5 text-sm text-danger"
+      />
       <div className="space-y-4">
         <div>
           <label htmlFor="profile-name" className={labelClass}>ชื่อผู้ใช้</label>

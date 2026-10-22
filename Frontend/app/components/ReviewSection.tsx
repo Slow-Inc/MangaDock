@@ -8,6 +8,7 @@ import { parseJsonOrNull } from "../lib/safeJson";
 import StarRating from "./StarRating";
 import ReviewCard from "./ReviewCard";
 import Loader from "./ui/Loader";
+import StatusMessage from "./ui/StatusMessage";
 import type { ReviewItem, ReviewSummary } from "../lib/reviewTypes";
 
 type Props = { mangaId: string; mangaTitle: string };
@@ -167,7 +168,11 @@ export default function ReviewSection({ mangaId, mangaTitle }: Props) {
             rows={3}
             className="w-full resize-none rounded-lg border border-line bg-fill px-3 py-2 text-sm text-ink placeholder-ink-3 outline-none transition focus:border-ink-3 focus:bg-raised"
           />
-          {submitError && <p className="mt-2 text-xs text-danger">{submitError}</p>}
+          <StatusMessage
+            kind="alert"
+            message={submitError}
+            className="mt-2 text-xs text-danger"
+          />
           <div className="mt-3 flex items-center justify-end gap-2">
             <button
               type="button"

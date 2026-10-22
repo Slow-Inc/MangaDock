@@ -7,6 +7,7 @@ import { PRIMARY_FILL } from "./ui/Button";
 import { Flame } from "lucide-react";
 import Coin from "./ui/Coin";
 import Mascot from "./mascot/Mascot";
+import StatusMessage from "./ui/StatusMessage";
 import { checkinErrorMessage, utcDayKey } from "../lib/dailyCheckin";
 import { getWalletBalance } from "../lib/studioApi";
 import type { CoinBalanceUpdate } from "../lib/coinBalanceEvent";
@@ -146,7 +147,11 @@ export default function DailyCheckinModal() {
             </div>
           </div>
 
-          {error && <p className="mb-3 text-center text-xs text-danger">{error}</p>}
+          <StatusMessage
+            kind="alert"
+            message={error}
+            className="mb-3 text-center text-xs text-danger"
+          />
 
           {claimed ? (
             <button
