@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 65 — gate baseline over all HEAD live output + question-particle refinement (2026-10-22)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Ran the deterministic gate over **every HEAD live output** (19 files / 237 regions, EN and JP): exactly **1 flag** — `Mornin?` -> `อ้าว...` on Horimiya p0, a Thai interjection with a trailing ellipsis. Triaged as a benign style variation (a greeting, not a true question) and recorded, not whitelisted.
+- One real refinement from the data: a **final Thai question particle** (เหรอ/หรอ/หรือ/ไหม/มั้ย/รึ/เปล่า/ไหน) now counts as carrying the question when `?` is absent (Thai manga routinely drops the mark). Unit-tested both ways; gate tests **7 passed**.
+- Benchmark updated (`2026-10-22-990-quality-gate.md`).
+
 ## MIT quality loop, round 64 — chapter-level deterministic replay + `--gate-only` (2026-10-22)
 
 Branch `feat/mit-quality-loop` (PR #794).

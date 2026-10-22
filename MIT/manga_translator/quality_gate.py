@@ -1,15 +1,16 @@
-"""Deterministic quality gate for a translated chapter (#980 follow-up).
+"""Deterministic quality gate for a translated chapter (#990 follow-up).
 
 Consolidates the checks that this quality loop built and validated on real pages, so a chapter replay can be
 gated without a judge model:
 
-- foreign-script leaks (`foreign_script`, #903 path) and runaway repetition (#901),
+- foreign-script leaks and runaway repetition (#903 / #901),
 - Thai orthography: doubled combining marks and a leading combining mark,
 - control/zero-width characters and unexpected Latin words,
-- dropped `!` / `?` / `…` punctuation (with the Thai interrobang accepted),
+- dropped `!` / `?` / `…` punctuation (an interrobang covers both marks, `...` covers `…`, and a final Thai
+  question particle such as เหรอ/ไหม carries a question without the mark),
 - cross-page character-name spellings (`name_glossary`).
 
-Pure logic; the CLI in tools/quality_gate.py just loads doctor JSONs.
+Pure logic, so it unit-tests without the ML stack.
 """
 import re
 
@@ -22,6 +23,8 @@ _CTRL = re.compile(r'[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]')
 _LATIN = re.compile(r'[A-Za-z]{3,}')
 _THAI = re.compile(r'[\u0E00-\u0E7F]')
 _PUNCT = ('!', '?', '…')
+#: Thai manga often drops the '?' when the sentence ends on a question particle; those count as preserved.
+_THAI_QUESTION = re.compile(r'(เหรอ|หรอ|หรือ|ไหม|มั้ย|รึ|รึเปล่า|เปล่า|ไหน|งั้นเหรอ|จริงเหรอ)\s*[.!…]*$')
 
 
 def _thai_target(query, dst):
@@ -32,31 +35,34 @@ def check_page(regions, page='?'):
     """Return a list of violation dicts for one page's ``{src, dst}`` regions."""
     out = []
     for i, region in enumerate(regions or []):
-        src = (region.get("src") or "").strip()
-        dst = (region.get("dst") or "").strip()
+        src = (region.get('src') or '').strip()
+        dst = (region.get('dst') or '').strip()
         if not src or not dst:
             if src and not dst:
-                out.append({"page": page, "index": i, "kind": "empty_translation", "detail": src[:60]})
+                out.append({'page': page, 'index': i, 'kind': 'empty_translation', 'detail': src[:60]})
             continue
-        if _thai_target(src, dst) and foreign_script(dst, 'THA', src):
-            out.append({"page": page, "index": i, "kind": "foreign_script", "detail": dst[:60]})
-        if _thai_target(src, dst) and runaway_translation(src, dst):
-            out.append({"page": page, "index": i, "kind": "runaway", "detail": f"{len(src)}->{len(dst)}"})
-        if _thai_target(src, dst) and _DOUBLED.search(dst):
-            out.append({"page": page, "index": i, "kind": "doubled_mark", "detail": dst[:60]})
-        if _thai_target(src, dst) and dst[0] in _COMBINING:
-            out.append({"page": page, "index": i, "kind": "leading_combining", "detail": dst[:60]})
+        thai = _thai_target(src, dst)
+        if thai and foreign_script(dst, 'THA', src):
+            out.append({'page': page, 'index': i, 'kind': 'foreign_script', 'detail': dst[:60]})
+        if thai and runaway_translation(src, dst):
+            out.append({'page': page, 'index': i, 'kind': 'runaway', 'detail': f'{len(src)}->{len(dst)}'})
+        if thai and _DOUBLED.search(dst):
+            out.append({'page': page, 'index': i, 'kind': 'doubled_mark', 'detail': dst[:60]})
+        if thai and dst[0] in _COMBINING:
+            out.append({'page': page, 'index': i, 'kind': 'leading_combining', 'detail': dst[:60]})
         if _CTRL.search(dst):
-            out.append({"page": page, "index": i, "kind": "control_chars", "detail": repr(dst[:60])})
-        if _thai_target(src, dst) and _LATIN.search(dst):
-            out.append({"page": page, "index": i, "kind": "added_latin", "detail": dst[:60]})
+            out.append({'page': page, 'index': i, 'kind': 'control_chars', 'detail': repr(dst[:60])})
+        if thai and _LATIN.search(dst):
+            out.append({'page': page, 'index': i, 'kind': 'added_latin', 'detail': dst[:60]})
         for mark in _PUNCT:
             if src.count(mark) >= 1 and dst.count(mark) == 0:
                 if mark in ('?', '!') and ('⁈' in dst or '⁉' in dst):
                     continue  # one interrobang covers both marks
-                if mark == "…" and "..." in dst:
+                if mark == '?' and _THAI_QUESTION.search(dst):
+                    continue  # final Thai question particle carries the question
+                if mark == '…' and '...' in dst:
                     continue
-                out.append({"page": page, "index": i, "kind": f"dropped_{mark}", "detail": dst[:60]})
+                out.append({'page': page, 'index': i, 'kind': f'dropped_{mark}', 'detail': dst[:60]})
     return out
 
 
@@ -72,7 +78,7 @@ def check_names(pages):
         if len(spellings) < 2:
             continue
         if len({sp for _label, sp in spellings}) > 1:
-            out.append({"kind": "inconsistent_name", "name": name, "spellings": spellings})
+            out.append({'kind': 'inconsistent_name', 'name': name, 'spellings': spellings})
     return out
 
 
@@ -82,4 +88,4 @@ def check_chapter(pages):
     for label, regions in pages:
         violations.extend(check_page(regions, label))
     violations.extend(check_names(pages))
-    return {"pages": len(pages), "violations": violations, "ok": not violations}
+    return {'pages': len(pages), 'violations': violations, 'ok': not violations}

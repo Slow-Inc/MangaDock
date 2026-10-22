@@ -44,3 +44,9 @@ def test_a_consistent_chapter_passes():
     page2 = [_r('TSUKUYOMI!', 'สึกุโยมิ!'), _r('WHAT?', 'อะไร?')]
     report = check_chapter([('p1', page1), ('p2', page2)])
     assert report["violations"] == [] and report["ok"] is True
+
+
+def test_a_thai_question_particle_covers_a_dropped_question_mark():
+    assert check_page([_r("YOURE COMING?", "เธอจะมางั้นเหรอ")]) == []
+    assert check_page([_r("YOURE COMING?", "เธอจะมาไหม")]) == []
+    assert [v["kind"] for v in check_page([_r("YOURE COMING?", "เธอจะมา")])] == ["dropped_?"]
