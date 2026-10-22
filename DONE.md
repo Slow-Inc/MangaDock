@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 77 — latency profile from 8 real pages + overlap opportunity scoped (#1050) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Consolidated a **latency profile** from the round's live sweeps (8 pages): wall **8.98 s** avg (warm 3.6-7.9 s), translation **1.91 s**, mask_refinement+inpainting **0.70 s**, OCR ~1.4 s, detection 0.5 s warm / 5-6 s cold, rendering 0.1-1.9 s.
+- Ranked the remaining opportunities with evidence and wrote them down (`2026-10-23-latency-profile.md`): (1) overlap mask+inpaint with the translation wait — **up to 0.70 s/page (~8 % wall, ~14 % warm)**; (2) cold start — opt-in preload already shipped (#1047); (3) translation wait — batch pipeline opt-in only; (4) OCR — cuDNN-off is a deliberate quality choice; (5) rendering supersampling 4 — a quality tradeoff.
+- **Filed #1050** for (1) with the blocker made explicit: `_finish_patches` re-derives the region list after translation, so a pre-translation mask could erase un-rendered text. Proposed opt-in `MIT_OVERLAP_PREP=1` + byte-identical-render acceptance; no code change yet (an unproven render-timing refactor is exactly the phantom-class risk this loop avoids).
+
 ## MIT quality loop, round 76 — e2e proof for the opt-in preload: first page 21.5 s -> 18.1 s (#1047) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
