@@ -314,8 +314,12 @@ export function useChapterTranslation(
       if (translateControllerRef.current === controller) {
         translateControllerRef.current = null;
       }
-      pageStartRef.current = null;
-      setCurrentStage(null);
+      // A run the reader left (chapter / language reset) must not clear the timer of a translation started since;
+      // a manual stop keeps the generation, so it still clears here (#1001 review)
+      if (generation === generationRef.current) {
+        pageStartRef.current = null;
+        setCurrentStage(null);
+      }
       if (!controller.signal.aborted) {
         if (failedMap.size > 0) {
           const firstError = failedMap.values().next().value ?? "";
