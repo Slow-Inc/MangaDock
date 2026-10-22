@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { fileTypeFromFile } from 'file-type';
 import { ForumService } from './forum.service';
 
@@ -62,6 +62,11 @@ describe('ForumService.vote', () => {
 
   beforeEach(() => {
     mockChain = buildMockChain();
+    // the target exists and is not deleted (checked before the RPC, #1019)
+    mockChain.maybeSingle.mockResolvedValue({
+      data: { id: 'p1', post_id: 'p9' },
+      error: null,
+    });
     mockRpc = jest
       .fn()
       .mockResolvedValue({ data: [{ upvotes: 5, downvotes: 2 }], error: null });
@@ -138,7 +143,7 @@ describe('ForumService.vote', () => {
       targetId: 'c1',
       voteValue: 1 as const,
     };
-    mockChain.single.mockResolvedValue({
+    mockChain.maybeSingle.mockResolvedValue({
       data: { post_id: 'p9' },
       error: null,
     });
@@ -157,6 +162,48 @@ describe('ForumService.vote', () => {
         targetId: 'c1',
       }),
     );
+  });
+
+  // #1019: forum_votes has no foreign key, so a vote on a missing or deleted target was stored as an orphan
+  it.each(['post', 'comment'] as const)(
+    'a vote on a missing or deleted %s is a 404 and is not cast',
+    async (targetType) => {
+      mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
+      await expect(
+        service.vote('u1', { targetType, targetId: 'gone', voteValue: 1 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockChain.is).toHaveBeenCalledWith('deleted_at', null);
+    },
+  );
+});
+
+describe('ForumService.createComment — the post must exist (#1019)', () => {
+  it('a comment on a missing or deleted post is a 404 and is not inserted', async () => {
+    const chain = buildMockChain();
+    chain.maybeSingle.mockResolvedValue({ data: null, error: null });
+    const service = makeService(() => chain);
+    await expect(
+      service.createComment('u1', { postId: 'p-gone', content: 'hi' } as any),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(chain.insert).not.toHaveBeenCalled();
+    expect(chain.is).toHaveBeenCalledWith('deleted_at', null);
+  });
+
+  it('a comment on a live post is inserted', async () => {
+    const chain = buildMockChain();
+    chain.maybeSingle.mockResolvedValue({ data: { id: 'p1' }, error: null });
+    chain.single.mockResolvedValue({
+      data: { id: 'c1', post_id: 'p1', author_uid: 'u1', content: 'hi' },
+      error: null,
+    });
+    const service = makeService(() => chain);
+    const created = await service.createComment('u1', {
+      postId: 'p1',
+      content: 'hi',
+    } as any);
+    expect(chain.insert).toHaveBeenCalled();
+    expect(created.postId).toBe('p1');
   });
 });
 
