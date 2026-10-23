@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 265 — remaining latency cost is whole-page glitch retries; candidate queued (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Post-optimization timing on corpus pages: textline_merge now 0.4-0.9 s (SFX batching holds), and the translation stage dominates (7-17 s) because the default retry policy re-sends the whole page for every invalid segment (MIT_SEGMENT_RETRY stays opt-in for context quality).
+- Measured Tsuki: one foreign_script glitch -> 11.0 s translation vs 3-4 s clean (attempts 2 and 3 each 3x traffic). Queued a proposal needing a forced-glitch A/B: whole-page for attempt 2, flagged subset for attempt 3. No code change.
+
+---
+
 ## MIT quality loop, round 264 — SFX vision calls batched: textline_merge 32 s -> 8.4 s, page wall 54-68 -> 26 s (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
