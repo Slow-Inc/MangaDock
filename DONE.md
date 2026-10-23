@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 263 — fourth unseen series: gate 0; A/B shows the dropped-question hit was a real catch (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Oshi no Ko (4 pages): gate 0 everywhere, render telemetry clean. One dropped_question trigger on `ARENT THEY TOTALLY VISIBLE!?` looked like a licence candidate, but a direct A/B shows the model normally keeps the agreement marker (`ไม่ใช่หรือ!?`/`ใช่ไหม!?`) — the guard caught a rare bad sample, so no licence change. Content-loss hit was an OCR-truncated line, retried clean.
+- Unseen-data aggregate now 4 series / 16 pages. No code change.
+
+---
+
 ## MIT quality loop, round 262 — third unseen series: gate 0 on all pages; unseen-data aggregate recorded (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

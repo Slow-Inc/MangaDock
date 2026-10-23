@@ -52,3 +52,24 @@ custom_openai change with its own tests, so it is queued rather than patched at 
 
 Translation quality generalises cleanly; the repeatable costs are render-side spills on free-standing text (rare) and
 retry churn on legitimate Latin names (queued).
+## Fourth unseen series (Oshi no Ko, 4 pages)
+
+- **4/4 pages: gate 0**, render telemetry all zeros; wall 16.5-47.3 s (first page includes cold load and a 32 s merge
+  outlier; the rest 16-22 s).
+- Two guard triggers on page 2, both legitimate:
+  - `dropped_question` on `ARENT THEY TOTALLY VISIBLE!?` - the initial sample shipped an assertion (`...นะ!`); direct A/B
+    showed the model normally renders it with the agreement marker (`ไม่ใช่หรือ!?`/`ใช่ไหม!?`), so the retry caught a rare
+    variance rather than a false positive.
+  - `content_loss` on an OCR-truncated line (`...DIFFICULT TO SEE F`), retried to a clean page.
+
+## Aggregate on unseen data (4 series, 16 pages)
+
+| series | pages | gate | render | guard notes |
+|---|---|---|---|---|
+| Kaguya-sama ch.11 | 5 | 0 | one 7 px spill | none after the SEE tag licence |
+| Bocchi the Rock! | 4 | 3 (legitimate Latin names) | clean | retry churn on `KLIMTS NIGHT`/`TIKTOK` (queued) |
+| Yotsuba to! | 4 | 0 | clean | one content-loss retry on a credits strip |
+| Oshi no Ko | 4 | 0 | clean | one dropped-question retry on a rare variance; one content-loss retry on an OCR-truncated line |
+
+Translation/guard behaviour generalises; the repeatable costs remain the rare free-standing-text spill and retry churn on
+legitimate Latin names.
