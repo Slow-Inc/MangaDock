@@ -111,4 +111,4 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 - **series memory bug (#1065)**: `apply_glossary` เช็ค substring ทำให้ variant ที่มีชื่อเดิมฝังอยู่ (`ทสึคุโยมิ` มี `สึคุโยมิ` ข้างใน) ไม่ถูกแก้ → แก้เป็น token-level; production run ยืนยัน page 2 `applied 2 name fix(es)` และสะกดตรง page 1
 - **Vercel deploy (#1064)**: docs function trace รูปใน `docs/` รวม 253MB → เกิน limit; เพิ่ม `outputFileTracingExcludes` ให้ `/docs` แล้ว deploy ผ่าน (คืนรูปต้นฉบับ)
 - **omission pass (opt-in)**: schema 2 passes, replay proof clause กลับมา, clean-page FP 0/19, cost ~2 verifier requests + re-ask
-- suite **979 passed**; PR #794: CI เขียว (Vercel ติด external quota เป็นช่วง)
+- suite **989 passed**; PR #794: CI เขียว (Vercel ติด external quota เป็นช่วง)

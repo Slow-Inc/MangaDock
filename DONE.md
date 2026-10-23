@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 254 — hand-off index and vault synced to the final state (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Hand-off index now lists 989 tests, the rendered-PNG acceptance and the stability-report refactor; vault test count synced (989). No code change.
+
+---
+
 ## MIT quality loop, round 253 — rendered-PNG acceptance: real outputs, zero layout telemetry, gate 0 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

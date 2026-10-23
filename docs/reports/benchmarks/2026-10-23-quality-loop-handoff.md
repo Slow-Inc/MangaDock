@@ -10,9 +10,9 @@ names the state, the knobs and the things that were already tried and rejected (
 | branch / PR | `feat/mit-quality-loop`, PR #794 (draft, base `integrate/render-reconcile`, MERGEABLE) |
 | end-state sweep | **v7**: 39 pages / 369 regions, page gate `{}`, leftover `{}`, 3 guard triggers (all true positives), wall 7.83 s avg / 6.62 s median |
 | judge | raw **1.42-1.44/2** across runs; strict-adjusted **1.53-1.60**; broken share **2.2 %** (best) |
-| tests | **985 passed**, 4 skipped (fast suite, torch-free stub) |
+| tests | **989 passed**, 4 skipped (fast suite, torch-free stub) |
 | CI | logic gate / heavy ML / backend green; Vercel green on `16ff6e43`, later heads blocked by its external build-rate limit |
-| merge readiness | `merge-tree` diff vs main: only the three append-only docs conflict; merged tree fast suite 985 |
+| merge readiness | `merge-tree` diff vs main: only the three append-only docs conflict; merged tree fast suite 985 (pre-refactor) |
 
 ## Defaults that were turned ON in this loop (quality first)
 
