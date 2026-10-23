@@ -55,7 +55,8 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 ### ตัวเลขที่ต้องใช้
 - **Judge typo noise:** judge ลดคะแนนให้สตริงที่เหมือนกัน/ใกล้กัน = Thai tokenizer artefact. ใช้ `MIT/tools/audit_summary.py` แยก noise; classifier ถูก tighten ให้ถือ real pair = real finding (conservative) → 480 segment: raw **1.44/2**, adjusted **1.55 (strict) / 1.70 (lenient)**; 367 segment end-state: raw **1.44**, strict **1.55** (13/138/216 = broken 3.5% / partial 37.6% / perfect 58.9%) — quote ช่วง 1.55-1.70 พร้อม caveat
 - **Final end-state baseline (2026-10-23, 39-page sweep, 367 segment):** raw **1.44/2** → strict-adjusted **1.55/2** (lenient 1.68), distribution **13/138/216 = broken 3.5% / partial 37.6% / perfect 58.9%**; 1 หน้าไม่มี segment ที่ judge ให้คะแนนได้ (all-filtered)
-- Final full-corpus sweep (39/39 หน้า, defaults สุดท้าย): **guard ยิงจริง 9 ครั้ง** (foreign_script 3, content_loss 3, untranslated_word 2, dropped_question 1) และ **leftover 0**; gate เหลือ 2 (dropped_! nuance + name inconsistency ที่ต้องมี series_context); wall avg 7.65s / median 6.96s
+- Final full-corpus sweep (39/39 หน้า, defaults สุดท้าย): **guard ยิงจริง 9 ครั้ง** (foreign_script 3, content_loss 3, untranslated_word 2, dropped_question 1) และ **leftover 0**; wall avg 7.65s / median 6.96s
+- **อัปเดต v3 (หลัง OCR pass + tag licence):** gate เหลือ **1 (`dropped_!` จริง)** + **leftover {}**; wall 8.03s (รันเดียว, variance)
 
 ### Guard inventory (default ON ทั้งหมด, มี env ปิด)
 - `foreign_script` + leaked-script salvage (#903) · `negation_lost` (#898) · `runaway` (#901) · `spurious_filler` (#1039) · `lost_as_rare` (#1052) · `dropped_question` (#1056) · `untranslated_word` (#1057) · `content_loss` (#1058) · numbered-contract (#1026) · series name memory (#980)
@@ -70,3 +71,29 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 ### เอกสารอ้างอิง
 - `docs/reports/benchmarks/2026-10-23-*.md` (quality-loop-status, final-corpus-sweep, judge-noise-adjusted-profile, guard-cost-and-gate-dashboard, prod-wiring-verification, 1057/1058 guards, 1050-overlap-decision, jp-prompt-ab, detection-size-ab)
 - `DONE.md` entries round 87–120 = ลำดับงานทั้งหมดของลูป
+
+## Round 3 additions (2026-10-23 late) — OCR second pass + v3 state
+
+### OCR second pass (default ON, `MIT_OCR_REREAD=0` ปิด)
+- **Root cause:** detector box ที่ `detection_size 2560` ตัดขอบตัวอักษร (`F` ใน DEFEND) → 48px OCR อ่าน `DEEEND` → คำแปลกลายเป็นความหมายตรงข้าม (`ทำลาย` แทน `ปกป้อง`)
+- **Fix:** re-read เฉพาะบรรทัดละตินที่ confidence < 0.75 ด้วย box pad 30% (pixel เดิม) รวม candidate ทั้งหน้าเป็น canvas เดียว → **1 model call/หน้า**; cap 8; รับค่าใหม่เมื่อ confidence ดีขึ้น ≥0.12
+- **หลักฐาน:** text-level A/B 88% ของบรรทัดที่เปลี่ยนดีขึ้น (30/34); sweep: ~10% ของ source strings ถูกซ่อม, layout เปลี่ยน 1-2 หน้า (จาก merge), OCR stage +69ms/หน้า (batching; per-line version แพง +1.45s/หน้า)
+- **Tools:** `MIT/tools/ocr_text_ab.py` (A/B OCR text ระหว่าง doctor dirs), `tools/acceptance` prod run 2 หน้า gate 0
+- **Tuning record:** threshold 0.65→0.75 ให้ net +8 บรรทัดดีขึ้น (A/B 11/3/6, รันซ้ำ 10/4/6) ที่ +69ms/หน้า
+
+### คลาสที่ทดสอบแล้วไม่สำเร็จ (อย่าสร้างซ้ำ)
+- pad box ทุกหน้า (`MIT_OCR_BOX_PAD`): 45.7% source เปลี่ยน, 24/39 layout เปลี่ยน, A/B 25 vs 13 → **reject + ลบโค้ด**
+- `unclip_ratio` 2.6: แก้ DEFEND ได้เฉพาะจุด แต่ 32.6% source/8 หน้า layout เปลี่ยน, judge parity → **default คง 2.3**
+- same-crop re-read: ได้ junk (`TODe`) → ยืนยันว่าปัญหาอยู่ที่ box geometry ไม่ใช่ resolution
+
+### Guard/gate consistency
+- เพิ่ม licence **tag question** (`YKNOW/RIGHT/EH/HUH/OK/OKAY/HMM`) ให้ `dropped_question` **และ** gate ใช้ `is_tag_question` ตัวเดียวกัน → leftover เหลือ {} (เคสจริง: `..., YKNOW?` → `นะเนี่ย!` ไม่ใช่คำถาม)
+- typo normalizer: `แล่ว/ไม/ให/ไมใช` แก้ token-level 219/15,590 region (1.4%), live-validated 0 occurrence; gate มี `common_typo`
+- leak-script salvage ครอบ **22 scripts** (Arabic ฯลฯ) + `_TARGET_OWN_SCRIPTS` กันตัดสคริปต์ target; fast path ทำให้ guard cost 0.40ms/หน้า
+
+### ตัวเลข v3 (ต้อง quote เป็นช่วง)
+- raw **1.44/2**; strict-adjusted **1.55–1.60** (v2 dashboard 1.60; movement มาจาก noise-flag count 77 vs 138 ไม่ใช่หลักฐาน OCR gain)
+- 39 หน้า / 369 region, leftover {}, gate 1 (`dropped_!`), wall 8.03s (run เดียว)
+- defect คงเหลือ: model-ceiling sense/nuance ในบรรทัดที่ลื่น + ชื่อที่ `series_context` แก้ใน production
+
+เกี่ยวข้อง: [[project-art-text-handling]] · [[feedback-verify-before-claiming]] · [[feedback-root-cause-before-fix]]

@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 189 — team memory updated with round-3 (OCR pass, rejects, v3 numbers) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Updated `Obsidian-MangaDock/project-translation-eval-set.md`: OCR second-pass root cause/fix/evidence/tuning, the three rejected OCR experiments (global box pad, unclip 2.6, same-crop re-read), guard/gate tag-question alignment, typo normalizer/leak coverage, and the v3 numbers (raw 1.44, adjusted range 1.55-1.60, gate 1 dropped_!, leftover {}).
+- Corrected the older line that still quoted gate 2 so the note has one current state. No code change.
+
+---
+
 ## MIT quality loop, round 188 — gate aligned with the tag licence; v3 end state gate/leftover clean (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
