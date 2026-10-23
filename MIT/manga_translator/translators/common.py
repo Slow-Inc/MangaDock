@@ -329,7 +329,7 @@ class CommonTranslator(InfererModule):
         # 'ฉันทนฟังบทสนทนา'). Tell the retry what to drop.
         if spurious_filler(trans, query):
             return query + ('\n\n[note: the previous answer added "ทน" (endure / put up with) although the '
-                            'source never says that. Do not add words about enduring, tolerating or timing.]')
+                            'source never says that. Do not add words about enduring, tolerating or timing. Translate the source verb literally and never use the word ทน in this answer.]')
         # #898: make the retry say WHY when the previous answer dropped the source negation.
         if negation_lost(query, trans):
             return query + '\n\n[note: keep the negation of the source in the Thai output — ～ない means ไม่…]'

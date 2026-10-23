@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 191 — spurious_filler note strengthened: natural `ทน` misses fixed 3/3 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Audited the 10 zero-score judge segments from the latest sweep; two were `ทน` insertions the `spurious_filler` guard flagged every time but the model kept re-producing, so the retry note was not strong enough.
+- Added one sentence to the retry note ("Translate the source verb literally and never use the word ทน in this answer."). Three independent runs on the Dungeon page's `IVE BEEN KILLED BY IT...` line now render `ตาย/ถูกฆ่า` without `ทน` (3/3), where every earlier run shipped a `ทน` variant.
+- Note only applies after the guard fires (rare), so no ordinary translation is affected. Benchmark `2026-10-23-spurious-filler-note.md`; suite re-run.
+
+---
+
 ## MIT quality loop, round 190 — OCR pass mapping robustness test (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
