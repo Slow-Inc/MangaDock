@@ -1607,6 +1607,19 @@ class MangaTranslator:
         if not ctx.text_regions or ctx.text_regions == 'cancel':
             return empty_patch_result(img_w, img_h, getattr(ctx, 'dropped_regions', None))
 
+
+        # #980 follow-up (opt-in MIT_SERIES_GLOSSARY=1): the single-page production path has no batch context, so
+        # remember character-name spellings per series (keyed by the Backend's series_context) and apply them
+        # before rendering. Off -> byte-identical pages.
+        try:
+            from .series_glossary_memory import remember_and_apply, series_memory_enabled
+            if series_memory_enabled():
+                _fixed = remember_and_apply(ctx.text_regions, getattr(config.translator, 'series_context', None))
+                if _fixed:
+                    print(f'[series-glossary] applied {_fixed} name fix(es)', flush=True)
+        except Exception:
+            logger.warning(f'[series-glossary] skipped:\n{traceback.format_exc()}')
+
         return await self._finish_patches(ctx, config, source_icc)
 
     async def _finish_patches(self, ctx, config, source_icc):

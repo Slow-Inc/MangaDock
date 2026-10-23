@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 102 — series-scoped name memory for the single-page production path (#980 follow-up) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Production translates page-by-page, so the batch glossary never runs there and names drift across pages (measured: `สึกุโยมิ` page 1 vs `ทสึคึโยมิ` page 2, gate `inconsistent_name`).
+- Added opt-in `MIT_SERIES_GLOSSARY=1`: `series_glossary_memory` keys a 32-series LRU by the Backend's stable `series_context` (#157), learns name->spelling votes from name-focused lines only (3-12 char Thai run, no clause lines), and applies the remembered spellings deterministically before rendering on later pages. No key -> no-op; `MIT_NAME_GLOSSARY=0` disables.
+- **Evidence:** 4 pure-Python unit tests (learn/first page, cross-page fix, series isolation, opt-in gating); live 2-page Tsuki run logged `applied 2 name fix(es)` and produced **consistent `สึกุโยมิ` on both pages** versus the inconsistent baseline.
+- **Opt-in:** it changes rendered output and can freeze an imperfect spelling series-wide (the same tradeoff as the batch glossary). Benchmark `2026-10-23-series-name-memory.md`; #980 updated.
+
 ## MIT quality loop, round 101 — batch pipeline vs single-page: 1.46x faster, names consistent, quality within judge noise (#905) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
