@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 210 — omission pass count configurable; default stays 2 because single-pass misses the case (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `MIT_OMISSION_VERIFY_PASSES` (1-3, default 2, documented in `MIT/.env.example`) + parse/clamp test.
+- Measured single-pass on the Akuyaku page: 21.1 s vs 25.2 s, but the curiosity clause was **not restored** — one sample did not flag it. The two-pass agreement is therefore load-bearing; default stays 2, single-pass is an explicit cost trade.
+
+---
+
 ## MIT quality loop, round 209 — omission pass: concurrent verifier passes save 7.3 s/page (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

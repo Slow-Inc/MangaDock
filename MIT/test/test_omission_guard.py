@@ -72,3 +72,9 @@ def test_verify_candidates_needs_every_pass_to_agree(monkeypatch):
     monkeypatch.setattr(og, '_call', fake_call)
     assert asyncio.run(og.verify_candidates(cands, 'http://x', 'k', 'm', passes=2)) == {}
 
+
+def test_passes_option_parses_and_clamps():
+    assert og.passes({}) == 2
+    assert og.passes({'MIT_OMISSION_VERIFY_PASSES': '1'}) == 1
+    assert og.passes({'MIT_OMISSION_VERIFY_PASSES': '9'}) == 3
+    assert og.passes({'MIT_OMISSION_VERIFY_PASSES': 'x'}) == 2

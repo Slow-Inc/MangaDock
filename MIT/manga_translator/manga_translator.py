@@ -1638,13 +1638,15 @@ class MangaTranslator:
 
     async def _verify_omissions(self, config, ctx):
         """Opt-in: re-ask long lines whose Thai answer the verifier says dropped a clause."""
-        from .omission_guard import (apply_results, build_query, collect_candidates, verify_candidates)
+        from .omission_guard import (apply_results, build_query, collect_candidates, passes as omission_passes,
+                                     verify_candidates)
         candidates = collect_candidates(ctx.text_regions)
         if not candidates:
             return
         from .translators import keys
         base = keys.CUSTOM_OPENAI_API_BASE.rstrip('/') + '/chat/completions'
-        agreed = await verify_candidates(candidates, base, keys.CUSTOM_OPENAI_API_KEY, keys.CUSTOM_OPENAI_MODEL)
+        agreed = await verify_candidates(candidates, base, keys.CUSTOM_OPENAI_API_KEY, keys.CUSTOM_OPENAI_MODEL,
+                                         passes=omission_passes())
         if not agreed:
             return
         src_lang = str(getattr(config.translator, 'source_lang', '') or '').strip()

@@ -28,6 +28,16 @@ def enabled(env=None):
     return value in ('1', 'true', 'yes', 'on')
 
 
+def passes(env=None):
+    """MIT_OMISSION_VERIFY_PASSES (default 2): verifier passes that must agree; 1 halves the cost."""
+    raw = str((env or os.environ).get('MIT_OMISSION_VERIFY_PASSES', '')).strip()
+    try:
+        value = int(raw) if raw else 2
+    except ValueError:
+        return 2
+    return min(max(value, 1), 3)
+
+
 def collect_candidates(regions, min_words=8):
     """[{"idx", "src", "dst"}] for long source lines with a non-empty Thai answer."""
     out = []

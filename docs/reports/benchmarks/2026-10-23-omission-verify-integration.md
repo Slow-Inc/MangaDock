@@ -60,3 +60,17 @@ Same agreement requirement, half the round-trips:
 
 Still ~10 s over the default pipeline (one verifier round-trip plus the re-ask call), so it stays opt-in; the next
 lever would be a single-pass mode for chapters where the extra confidence is not worth a round-trip.
+## Pass count is configurable — single-pass is NOT the default (round 210)
+
+`MIT_OMISSION_VERIFY_PASSES` (1-3, default 2) lets a cost-sensitive run trade confidence for a round-trip. Measured on the
+same Akuyaku page:
+
+| passes | wall | clause restored? |
+|---|---|---|
+| 1 | **21.1 s** | **no** (`แล้วอีกอย่าง... ตอนก่อนหน้าในโรงอาหารนี้` — flagged nowhere, verifier noise) |
+| 2 (default) | 25.2 s | yes |
+| sequential 2 | 32.5 s | yes |
+
+So the second pass is doing real work: the verifier can miss the clause in a single sample, and the agreement rule is
+what keeps the signal stable. **Default stays 2**; single-pass exists only as an explicit cost trade for chapters where
+a missed omission is acceptable.
