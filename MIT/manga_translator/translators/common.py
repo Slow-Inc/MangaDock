@@ -6,7 +6,7 @@ from typing import List, Tuple
 from abc import abstractmethod
 
 from ..translation_quality import (foreign_script, leaked_script, negation_lost, normalize_thai_marks,
-                                   runaway_translation, spurious_filler, lost_as_rare)
+                                   runaway_translation, spurious_filler, lost_as_rare, strip_leaked_script)
 from ..utils import InfererModule, ModelWrapper, repeating_sequence, is_valuable_text
 
 try:
@@ -310,6 +310,11 @@ class CommonTranslator(InfererModule):
         # #889: Thai combining marks out of canonical order ('ท่ี') cannot be shaped correctly; normalise
         # every translation here so no renderer sees the broken sequence. No-op for other scripts.
         trans = normalize_thai_marks(trans)
+
+        # Last-resort salvage (#903 follow-up): the guards re-ask a leaked script, but when the repeat budget is
+        # exhausted the last answer ships. Remove leaked-script characters (never a script the source uses) so
+        # foreign glyphs do not end up on the artwork.
+        trans = strip_leaked_script(trans, query, to_lang)
 
         # '  ' -> ' '
         trans = re.sub(r'\s+', r' ', trans)

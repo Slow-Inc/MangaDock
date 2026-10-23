@@ -321,3 +321,34 @@ def lost_as_rare(dst: str, query: str) -> bool:
     if 'LOST' not in src:
         return False
     return not any(word in src for word in ('RARE', 'RARELY', 'SCARCE'))
+
+
+#: Characters of scripts that must never appear in a Thai (or other non-CJK) target unless the source used them.
+_LEAK_SCRIPT_CHARS = {
+    'cjk': re.compile('[㐀-䶿一-鿿々-〇]'),
+    'kana': re.compile('[぀-ヿ]'),
+    'hangul': re.compile('[가-힯ᄀ-ᇿ]'),
+    'cyrillic': re.compile('[Ѐ-ӿ]'),
+}
+
+
+def strip_leaked_script(trans: str, query: str = '', to_lang: str = '') -> str:
+    """Last-resort salvage: delete leaked-script characters when the retries could not fix them.
+
+    The guards re-ask a segment that leaks a foreign script, but when the repeat budget is exhausted the last
+    answer ships as-is (measured: a CJK leak survived two retries on a real page). Removing the leaked
+    characters leaves broken-but-thai text instead of foreign glyphs on the artwork; it never touches a script
+    the source itself uses (a JP kana SFX copied into a Thai line is legitimate).
+    """
+    if not trans:
+        return trans
+    src = query or ''
+    out = trans
+    for script, pattern in _LEAK_SCRIPT_CHARS.items():
+        if pattern.search(src):
+            continue  # the source uses this script; copied text is not a leak
+        out = pattern.sub('', out)
+    if out == trans:
+        return trans
+    cleaned = re.sub(r'[ 	]{2,}', ' ', out).strip()
+    return cleaned or trans

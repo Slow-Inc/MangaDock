@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 88 — leaked-script salvage for retry-exhausted answers (#903 follow-up) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Problem:** the round-87 audit observed Tsuki p0 going CJK leak -> CJK leak -> filler across the three attempts; with the repeat budget exhausted the last, still-glitched answer shipped (Chinese glyphs on the page).
+- **Fix:** `strip_leaked_script` runs in the final clean pass: removes CJK/Kana/Hangul/Cyrillic characters **only when the source does not use that script** (JP kana SFX copied into Thai stays), no model call, no latency.
+- **Evidence:** all **182** stored leaked regions become foreign-script-free (e.g. `ЦУคุโยมิ..` -> `คุโยมิ..`, `1 รょう` -> `1 ร`); a mocked translator that leaks on all three attempts returns Thai-only output with `call_count == 3`; fresh clean pages show no unexpected stripping (pre-existing English title region untouched). 35 translation-quality tests green.
+- **Default:** on — the only affected answers already violated the script contract; clean output is byte-identical, so there is no tradeoff to gate behind a flag. Benchmark `2026-10-23-leaked-script-salvage.md`.
+
 ## MIT quality loop, round 87 — full-corpus audit complete: 39/39 pages, 1.44/2, 2.7 % broken; filler FP fixed (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

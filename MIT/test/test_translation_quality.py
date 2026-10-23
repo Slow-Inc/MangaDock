@@ -278,3 +278,11 @@ def test_spurious_filler_keeps_the_word_tough_ton_tan_1039d():
     # live false positive: "IM PRETTY TOUGH" -> "ข้าทนทานดี" (ทนทาน = tough/durable), caught in a sweep
     assert not spurious_filler("นางบอกว่าข้าทนทานดี แล้วเหวี่ยงข้าจากที่สูง", "SHE SAID IM PRETTY TOUGH AND DROPPED ME FROM A HEIGHT")
     assert spurious_filler("ฉันทนฟังบทสนทนา", "I HEARD YOUR CONVERSATION WITH THE GODDESS.")
+
+
+def test_leaked_script_salvage_removes_foreign_glyphs_but_keeps_thai_903b():
+    from manga_translator.translation_quality import strip_leaked_script
+    assert strip_leaked_script("ฉัน甚至连พลังให้เธอไม่ได้", "I CANT EVEN GIVE YOU ANY POWER") == "ฉันพลังให้เธอไม่ได้"
+    assert strip_leaked_script("สึกุโยมิ!", "TSUKUYOMI!") == "สึกุโยมิ!"
+    assert strip_leaked_script("ドン! ลาก่อน", "ドン! さようなら") == "ドン! ลาก่อน"   # source uses kana
+    assert strip_leaked_script("Привет!", "HELLO") == "!"

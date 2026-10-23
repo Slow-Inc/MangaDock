@@ -159,3 +159,17 @@ def test_a_lost_as_rare_translation_is_reasked_1055():
     out = asyncio.run(t.translate('ENG', 'THA', ['LOST ITEMS.']))
     assert out == ['ของหาย']
     assert t.client.chat.completions.create.call_count == 2
+
+
+def test_a_leak_that_survives_every_retry_is_salvaged_903b():
+    """The repeat budget is 2; the third (last) answer ships — but foreign glyphs must not reach the artwork."""
+    t = CustomOpenAiTranslator()
+    t.client.chat.completions.create = mock.AsyncMock(side_effect=[
+        _reply('<|1|>ฉัน甚至连พลังให้เธอไม่ได้'),
+        _reply('<|1|>ฉัน甚至连พลังไม่ให้เธอ'),
+        _reply('<|1|>ฉัน甚至连พลังให้ไม่ได้'),
+    ])
+    out = asyncio.run(t.translate('ENG', 'THA', ['I CANT EVEN GIVE YOU ANY POWER']))
+    assert t.client.chat.completions.create.call_count == 3
+    assert all(ch < '\u0400' or ch > '\u04ff' for ch in out[0]), out[0]
+    assert not any('\u4e00' <= ch <= '\u9fff' for ch in out[0]), out[0]
