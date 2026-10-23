@@ -46,6 +46,9 @@ with the acceptance rule for each.
 - detection_size 2048/3200 (recall changes), in-page mask/inpaint overlap (#1050 superseded by the batch pipeline),
 - JP rhetorical prompt (no difference on the one page), hedging-lost guard (mostly false positives),
 - exclamation-lost guard (2 candidates in 15,578 segments), clause-omission word-ratio guard,
+- laughter normalisation (2026-10-23): mined strict laughter lines across the corpus — 4 lines, 3 without a Thai laugh
+  marker, but only 1 is a real defect (`HEHE.` -> `เข่าเข่า.`; `NYA` -> `เนีย` is a sound transliteration). One case
+  does not justify a normaliser; leave it to the model,
 - segment-only retry as default (quality risk), neighbour-context retry hint (no reproducible recovery).
 ## New evidence (2026-10-23): OCR errors are resolution-bound — a targeted second-pass lever
 

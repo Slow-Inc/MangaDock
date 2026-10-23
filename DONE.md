@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 193 — laughter normalisation measured and rejected (1 real case of 4) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mined strict laughter lines across the v3 corpus: 4 lines, 3 without a Thai laugh marker, but only **one real defect** (`HEHE.` -> `เข่าเข่า.`; `NYA` -> `เนีย` is a legitimate sound transliteration). Not worth a normaliser/guard; recorded in the do-not-repeat list.
+- No code change.
+
+---
+
 ## MIT quality loop, round 192 — PR body round-4 section; CI green on the tuned head (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
