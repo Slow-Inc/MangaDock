@@ -63,3 +63,9 @@ def test_a_question_mark_covers_an_exclamation_in_thai_990f():
 
 def test_ocr_punctuation_between_letters_and_digits_is_not_a_question_990g():
     assert check_page([_r("Episode?3", "ตอนที่ 3")]) == []
+
+
+def test_latin_names_shared_with_the_source_are_not_an_added_language_990h():
+    assert check_page([_r("TRANSLATED BY DALE", "แปลโดย DALE")]) == []
+    assert check_page([_r("TYPESETTING BY RTSD, ZERO", "จัดหน้าโดย RTSD, ZERO")]) == []
+    assert [v["kind"] for v in check_page([_r("GO!", "ไปเลย GOING!")])] == ["added_latin"]

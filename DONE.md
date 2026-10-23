@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 84 — live 10-page guard sweep: guards fire correctly, gate refined twice (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Guards (after round-83 wiring fix):** on 10 real pages the env-gated log recorded **2 glitch triggers, both true positives** (`spurious_filler` on Dungeon p0: `ฉันทนมันมาหลายครั้ง...`, `นี่แหละว่่าวิธีที่ฉันทนอยู่...`). The lines were re-asked and the shipped output differs (filler removed); one replacement is still model-imperfect (`ทดเลือด` for drain), which is outside what the guard promises.
+- **Gate triage of the mixed-series batch (6 flags):** 3 `added_latin` were **false positives** (Chainsaw credits keep Latin names — `แปลโดย DALE`, `จัดหน้าโดย RTSD, ZERO`); the rule now only flags Latin tokens absent from the source. 1 `inconsistent_name` was **tool misuse** (name consistency is per chapter; the sweep mixed series) and 2 `dropped_?` were the known benign Thai rhetorical style.
+- After the refinement, gating each page separately: **9/10 clean**, only Boku p1 with its two documented style flags. Gate tests 11 green.
+- Benchmark `2026-10-23-guard-live-sweep.md`; #990 updated with the Latin-credit refinement and the per-chapter usage note.
+
 ## MIT quality loop, round 83 — found and fixed our own guard-wiring bug: filler/lost were notes-only, not retry triggers (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

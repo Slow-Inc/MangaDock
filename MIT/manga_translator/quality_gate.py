@@ -55,7 +55,12 @@ def check_page(regions, page='?'):
         if _CTRL.search(dst):
             out.append({'page': page, 'index': i, 'kind': 'control_chars', 'detail': repr(dst[:60])})
         if thai and _LATIN.search(dst):
-            out.append({'page': page, 'index': i, 'kind': 'added_latin', 'detail': dst[:60]})
+            # credits and names legitimately stay in Latin ("TRANSLATED BY DALE" -> "แปลโดย DALE");
+            # only Latin words the source never had are an added-language leak.
+            _src_latin = {w.upper() for w in _LATIN.findall(src)}
+            _added = [w for w in _LATIN.findall(dst) if w.upper() not in _src_latin]
+            if _added:
+                out.append({'page': page, 'index': i, 'kind': 'added_latin', 'detail': ','.join(_added[:3])})
         src_punct = _OCR_EMBEDDED_PUNCT.sub('', src)
         for mark in _PUNCT:
             if src_punct.count(mark) >= 1 and dst.count(mark) == 0:
