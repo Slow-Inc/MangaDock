@@ -31,3 +31,10 @@ Re-running the five pages that had suspicious singles showed the expected Iruma 
 worthless churn: `TREASURE DOWN HERE S` (0.29) was re-read as `TREASURE DOWN HERE F` (0.54) and accepted through the
 **confidence margin** path, i.e. garbled to garbled. `better_read` now returns early for a suspicious old line: the only
 acceptable outcome is a read with **no** suspicious single left. Test added; suite 984 passed.
+## Wider crop for suspicious lines (round 242)
+
+Suspicious lines are re-read with a 1.7x wider padded box (0.51 of the line instead of 0.30): the missing letter is
+often just outside the detector box, and `better_read` only accepts a read that removes the garble anyway.
+Measured on the Iruma page: the same corrections are found with a much better confidence (`YOU N` -> `YOU NOT` at
+**0.95** vs 0.68; `AH- DO` at 0.91 vs 0.82); the Osoraku line still cannot be recovered (`DOWN HERE S`, accepted 0), and
+both pages keep gate 0. Test asserts the suspicious crop is wider; suite 985 passed.

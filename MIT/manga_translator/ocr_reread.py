@@ -111,7 +111,10 @@ async def reread_textlines(image, textlines, ocr_key, ocr_config, device, dispat
             old_prob = float(old_prob)  # normalize tensors/numpy scalars before comparisons and formatting
         if not needs_reread(old_text, old_prob, threshold):
             continue
-        x1, y1, x2, y2 = expand_box(np.array(textline.pts), width, height, pad_ratio)
+        # Suspicious (single-letter garble) lines get a wider crop: the missing letter is often outside the
+        # detector box, and `better_read` only accepts a read that removes the garble.
+        line_pad = pad_ratio * 1.7 if has_suspicious_single(old_text) else pad_ratio
+        x1, y1, x2, y2 = expand_box(np.array(textline.pts), width, height, line_pad)
         crop = image[y1:y2, x1:x2]
         if crop.size == 0:
             continue

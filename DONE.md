@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 242 — suspicious OCR lines re-read with a wider crop (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Suspicious (single-letter garble) lines now use a 1.7x wider padded crop: the missing letter is usually just outside the detector box, and acceptance already requires the garble to be gone.
+- Measured on Iruma: same corrections at much better confidence (`YOU N` -> `YOU NOT` 0.95 vs 0.68). The Osoraku `DOWN HERE S` line remains unrecoverable (accepted 0); both pages keep gate 0. Crop-width test added; suite 985 passed. Benchmark updated.
+
+---
+
 ## MIT quality loop, round 241 — garble-to-garble churn blocked in the OCR re-read (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

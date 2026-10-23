@@ -112,3 +112,21 @@ def test_a_suspicious_line_never_swaps_one_garble_for_another():
     # measured: `DOWN HERE S` re-read as `DOWN HERE F`; both are garbles, so no change may be applied
     assert not better_read("TREASURE DOWN HERE S", 0.29, "TREASURE DOWN HERE F", 0.54)
     assert better_read("TREASURE DOWN HERE S", 0.29, "TREASURE DOWN HERE.", 0.54)
+
+
+def test_suspicious_lines_get_a_wider_re_read_crop():
+    image = np.zeros((200, 400, 3), dtype=np.uint8)
+    normal = types.SimpleNamespace(text='TO DEEEND', prob=0.40,
+                                   pts=np.array([[100, 40], [260, 40], [260, 70], [100, 70]], dtype=np.float32))
+    suspicious = types.SimpleNamespace(text='YOU N', prob=0.40,
+                                       pts=np.array([[100, 120], [260, 120], [260, 150], [100, 150]], dtype=np.float32))
+    shapes = []
+
+    async def fake_dispatch(ocr_key, canvas, quads, cfg, device, verbose):
+        shapes.append((canvas.shape[1], canvas.shape[0]))
+        return [types.SimpleNamespace(text='TO DEFEND', prob=0.9, pts=np.array(quads[0].pts))] * len(quads)
+
+    asyncio.run(reread_textlines(image, [normal, suspicious], '48px', None, 'cpu', fake_dispatch))
+    assert len(shapes) == 1
+    # both crops are pasted on one canvas; its width must fit the wider (suspicious) crop
+    assert shapes[0][0] >= int((260 - 100) * (1 + 2 * 0.3 * 1.7))
