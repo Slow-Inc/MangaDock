@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 113 — guard cost measured (0.43 ms/page) and the corpus gate dashboard is clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Timed all nine deterministic guards over **15,071 real stored segments**: **0.025 ms/segment, 0.43 ms per 17-region page** (~0.005 % of a 9 s page) — the quality-first guard set is effectively latency-free; the retry cost is only paid where a guard fires.
+- Ran the deterministic gate over the **latest output of every corpus page** (44 rendered payloads): **0 violations** — every stored rendering passes every gate rule the loop built, with the judge baseline at 1.44-1.48/2.
+- Benchmark `2026-10-23-guard-cost-and-gate-dashboard.md`.
+
 ## MIT quality loop, round 112 — issue bodies refreshed to current state (DoD handoff) + PR status comment (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
