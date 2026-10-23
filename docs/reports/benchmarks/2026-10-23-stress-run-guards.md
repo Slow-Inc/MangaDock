@@ -59,3 +59,13 @@ distinguishable), so the bad batch did not degrade final quality after the guard
 
 This class (OCR garble → plausible-but-wrong translation) is recorded as a future detection/OCR item, not a
 translation-guard one.
+## Deterministic OCR-noise repair: measured, not worth it
+
+The one real error of the run (`DEEEND` read as `DEEEND` -> translated as destroy) suggested a "fix OCR-noise words
+in the source" guard. Before building anything, mined the final corpus for **digit-in-word OCR noise** (the usual
+`60NNA`/`Y0U` shape): only **7 occurrences in 368 regions**, and half are legitimate (`3RD`, `Part1`, `ZER0` as a
+name), so a look-alike substitution would add risk for at most 3-4 tokens. The `DEEEND` case is a letter/letter
+misread (`F` -> `E`), which no digit map would catch anyway.
+
+**Decision:** no deterministic source-repair guard. The class (OCR garble -> fluent but wrong translation) needs an
+OCR-confidence signal or a detection/OCR campaign, not a translation predicate; recorded as such.

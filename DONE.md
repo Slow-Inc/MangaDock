@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 171 — deterministic OCR-noise repair measured and rejected (7 tokens total) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Mined the corpus for digit-in-word OCR noise (`60NNA`/`Y0U` shape) before building a repair guard: **7 occurrences in 368 regions**, half legitimate (`3RD`, `Part1`, `ZER0` as a name). The stress-run error (`DEEEND` for DEFEND) is a letter/letter misread, which no digit map would catch.
+- **No deterministic source-repair guard**; the OCR-garble class needs an OCR-confidence signal or a detection/OCR campaign. Documented in the stress-run benchmark.
+
+---
+
 ## MIT quality loop, round 170 — stress-run quality judged: -0.06 inside the noise band; one OCR-garble error explained (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
