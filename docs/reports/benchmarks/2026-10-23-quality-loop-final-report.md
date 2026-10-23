@@ -65,5 +65,14 @@ cd MIT && .venv/Scripts/python.exe tools/doctor_page.py <pages> --target THA --s
 
 PR: #794 (draft, mergeable). CI: logic gate / heavy ML / backend green; Vercel is an external rate limit.
 
-Latest test count: **982 passed** (omit the torch-contract test). All end-state numbers above are from the v4 sweep;
+Latest test count: **991 passed** (omit the torch-contract test). All end-state numbers above are from the v4 sweep;
 the omission pass is opt-in and not part of those numbers.
+## Late latency fix: SFX vision calls batched (round 264)
+
+Profiling an unseen page showed `textline_merge` spending 25-37 s because it made one blocking 4-5 s vision request per
+SFX candidate, sequentially, with full-resolution PNG uploads. Candidates are now localised concurrently
+(`ocr_vlm.localize_candidates`, order preserved, empty answers cached so the loop cannot re-ask them) and crops upload as
+768 px JPEG. Same page: **textline_merge 32.4-37.4 s -> 8.4-8.8 s, page wall 54-68 s -> 25.8-26.0 s, gate 0**.
+
+The remaining latency lever is the whole-page glitch retry (measured, A/B neutral for a subset-retry variant, so the
+policy stays as-is); in a bad model window the retries, not the pipeline stages, dominate the wall time.

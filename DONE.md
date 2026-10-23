@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 268 — final report includes the SFX batching fix and the v9 latency note (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Final report now records the round-264 optimization (textline_merge 32-37 s -> 8.4-8.8 s via concurrent SFX vision calls + 768 px JPEG uploads), the v9 wall-time note (retries dominate in a bad model window), and the current test count (991). No code change.
+
+---
+
 ## MIT quality loop, round 267 — v9 sweep after SFX batching: gate/lleftover empty, 11 glitches cost retries (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
