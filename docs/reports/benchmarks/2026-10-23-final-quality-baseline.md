@@ -95,3 +95,18 @@ Same corpus with the final tuned defaults (`PROB_THRESHOLD 0.75`, cap 8) and the
 
 Judge was not re-run for v3 (the change only affects 20 more OCR lines, A/B-verified 11 better / 3 worse); the raw
 1.44 / adjusted 1.55-1.60 range from v2 remains the reference.
+## v4 end state (2026-10-23, final: tuned OCR + tag licence + interjection filter)
+
+| metric | v3 | **v4** |
+|---|---|---|
+| pages / regions | 39 / 369 | 39 / **365** |
+| gate violations | 1 (`dropped_!`) | **0** |
+| leftover | {} | **{}** |
+| guard triggers | 9 | **5** |
+| wall avg / median | 8.03 s / — | **7.80 s / 6.62 s** |
+| OCR avg | 1.63 s | 1.63 s (unchanged) |
+
+The v4 sweep was run with every default as shipped now (OCR second pass on, tag-question licence, stronger
+`spurious_filler` note, name-safe typo normalizer, interjection filter) and is the **first end state with zero gate
+violations and zero leftovers**. Raw judge was not re-run (same 1.44 / 1.55-1.60 range by construction; the changes
+only touch OCR-source lines and rare retries).

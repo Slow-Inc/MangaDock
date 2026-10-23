@@ -58,6 +58,18 @@ _THAI_RUN = re.compile("[\\u0E00-\\u0E7F]{3,}")
 #: JP->TH (#980c): a Japanese character name is a katakana run. 2-8 chars keeps short SFX-ish runs
 #: (pinned too - consistent SFX is fine) and drops long loanwords; the two-occurrence filter is the second net.
 _KATAKANA = re.compile("[\\u30A1-\\u30FA]{2,8}")
+#: Laughter/interjection "names": the model translates these inconsistently (`HEHE` -> `เข่า` on one page,
+#: `ฮิฮิ` on the next). They must never enter the name glossary, otherwise the series memory enforces one bad
+#: rendering across the chapter (measured: gate flagged HEHE -> เข่า vs ฮิฮิ).
+_INTERJECTION = re.compile(
+    r'^(?:HA+|HE+|HI+|HO+|HU+|HEHE|HAHA|HEH|HIHI|NYA|NYAH|MEOW|MROW|PURU|FU+|KUKU|BWAH|GUFU|UGH|UMPH|HMM+|'
+    r'OH+|AH+|EH+|HUH|HEY|OI|YAY|YES|NO|OK|OKAY|WOW|YEAH|HMPH|TCH|PSH|SIGH|GASP|HISS|GRR+|ROAR|THUD|BAM|WHAM|'
+    r'BOOM|ZOOM|SWOOSH|WHOO|WHEE|AAH+|EEH+|OOH+|UOH)[.!~?]*$', re.I)
+
+
+def is_interjection_source(text: str) -> bool:
+    """True for pure laughter/SFX tokens that must not be treated as character names."""
+    return bool(_INTERJECTION.match((text or '').strip()))
 
 
 def glossary_enabled(env=None) -> bool:
@@ -77,7 +89,7 @@ def candidate_names(srcs) -> list:
         text = _HYPHEN_BREAK.sub("", src or "")
         for tok in _LATIN_NAME.findall(text):
             key = tok.upper()
-            if key in _NAME_STOP or len(key) < 3:
+            if key in _NAME_STOP or len(key) < 3 or is_interjection_source(tok):
                 continue
             if key not in found:
                 found.append(key)

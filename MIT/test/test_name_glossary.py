@@ -141,3 +141,15 @@ def test_common_manga_words_are_not_name_candidates_980d():
 def test_real_names_survive_the_common_word_filter_980d():
     found = candidate_names(["TSUKUYOMI!", "MIYAMURA, WAIT!", "HORI SHOW ME"])
     assert "TSUKUYOMI" in found and "MIYAMURA" in found and "HORI" in found
+
+def test_laughter_and_sfx_are_not_name_candidates_1031():
+    from manga_translator.name_glossary import candidate_names, extract_glossary, is_interjection_source
+    assert is_interjection_source('HEHE.')
+    assert is_interjection_source('NYA')
+    assert not is_interjection_source('TSUKUYOMI')
+    assert candidate_names(['HEHE.']) == []
+    assert candidate_names(['NYA']) == []
+    assert candidate_names(['TSUKUYOMI']) == ['TSUKUYOMI']
+    assert extract_glossary([{'src': 'HEHE.', 'dst': 'เข่า'}]) == {}
+    assert extract_glossary([{'src': 'TSUKUYOMI!', 'dst': 'สึคุโยมิ!'}]) == {'TSUKUYOMI': 'สึคุโยมิ'}
+

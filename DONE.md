@@ -3,6 +3,16 @@
 
 ---
 
+## MIT quality loop, round 200 — interjection filter: v4 end state has ZERO gate violations and ZERO leftovers (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- The v4 sweep's only gate finding (`inconsistent_name: HEHE`) exposed a real risk: laughter tokens matched the Latin name pattern, so `extract_glossary` would learn `HEHE -> เข่า` and the default series memory would enforce that nonsense rendering on later pages.
+- Added an interjection denylist (`is_interjection_source`) to `candidate_names`: HEHE/NYA/UGH/HEY/OK... are no longer name candidates; real names still learn.
+- Re-ran the dashboard on the v4 outputs: **gate 0 violations, leftover {}, 365 regions, wall 7.80 s / median 6.62 s, 5 guard triggers**. Suite 967 passed (new test).
+- First end state with a completely clean gate; final baseline doc gained the v4 row.
+
+---
+
 ## MIT quality loop, round 199 — typo normalizer name-safety guard for `ไม` (Mai) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
