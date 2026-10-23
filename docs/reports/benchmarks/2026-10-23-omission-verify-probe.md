@@ -40,3 +40,19 @@ with `--passes 2` (33 pages with long lines, 85 pairs, 66 verifier calls):
 So two-pass agreement keeps the high-confidence omissions and drops the borderline ones — usable for an opt-in
 audit/retry path, at 2x verifier calls (66 calls / 39 pages). Still report-only in the pipeline; integration needs the
 forced-injection proof next.
+## 3-pass majority sample (12 pages) and final decision
+
+Added `--min-votes N` (0 = every pass must agree; N = majority threshold) and ran 12 pages with `--passes 3
+--min-votes 2`:
+
+- 11 pages had long lines (26 pairs), **3 agreed**: the known Akuyaku curiosity clause; a new Akuyaku candidate
+  (`ANIMALS HAVE HATED ME...` missing `my guts`); and the borderline Horimiya `won't give my pen back` nuance.
+- **0 disagreements** (majority absorbs the borderline flags — recall up, precision down).
+- **2 of 11 pages had a PARSE-FAIL** (one of the three JSON-only replies was not a JSON array, ~18 %): for a
+  production retry path that failure rate is unacceptable without structured-output retries, and a missing pass can
+  skew a majority.
+
+**Final decision: the verifier stays a report-only QA tool.** Auto-retry integration is closed for now: parse-fail
+reliability + the need for a context-preserving whole-page re-ask + only ~2-3 true positives per corpus mean the
+quality gain does not justify production complexity. Revisit only with a strict JSON mode / structured output and a
+larger precision sample (backlog P1).

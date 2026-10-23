@@ -74,27 +74,31 @@ def flagged(pairs, verdicts):
     return out
 
 
-def combine_passes(pass_verdicts, pairs):
-    """(agreed, disagreed) omission hits across multiple verifier passes.
+def combine_passes(pass_verdicts, pairs, min_votes=None):
+    """(kept, disagreed) omission hits across multiple verifier passes.
 
-    pass_verdicts is a list of verdict lists (one per pass). A hit is agreed when every pass flags the same pair
-    index; an index flagged by some but not all passes is a disagreement (the measured instability).
+    pass_verdicts is a list of verdict lists (one per pass). By default a hit is kept only when every pass flags
+    the same pair index; pass min_votes to use a majority threshold instead. Returned disagreements are the
+    indexes flagged by some but not enough passes.
     """
     per_pass = []
     for verdicts in pass_verdicts:
         per_pass.append({h[0] for h in flagged(pairs, verdicts)})
     if not per_pass:
         return [], []
-    agreed_idx = set.intersection(*per_pass)
-    any_idx = set.union(*per_pass)
+    threshold = min_votes if min_votes is not None else len(per_pass)
+    votes = {}
+    for idxs in per_pass:
+        for i in idxs:
+            votes[i] = votes.get(i, 0) + 1
+    kept_idx = {i for i, v in votes.items() if v >= threshold}
     missing_text = {}
     for verdicts in pass_verdicts:
         for i, _src, _dst, m in flagged(pairs, verdicts):
             if m:
                 missing_text.setdefault(i, m)
-    agreed = [(i, pairs[i][0], pairs[i][1], missing_text.get(i, '')) for i in sorted(agreed_idx)]
-    return agreed, sorted(any_idx - agreed_idx)
-
+    kept = [(i, pairs[i][0], pairs[i][1], missing_text.get(i, '')) for i in sorted(kept_idx)]
+    return kept, sorted(set(votes) - kept_idx)
 def verify_page(pairs, offset, base, key, model, timeout=180):
     import requests
     body = {'model': model, 'max_tokens': 2048, 'temperature': 0,
@@ -111,6 +115,7 @@ def main():
     ap.add_argument('--min-words', type=int, default=8)
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--passes', type=int, default=1, help='verifier passes per page; flags need all passes to agree')
+    ap.add_argument('--min-votes', type=int, default=0, help='0 = all passes must agree; N = majority threshold')
     args = ap.parse_args()
 
     from manga_translator import initialize as _initialize_env
@@ -131,7 +136,7 @@ def main():
             continue
         verdicts_list = [verify_page(pairs, 0, base, keys.CUSTOM_OPENAI_API_KEY, keys.CUSTOM_OPENAI_MODEL)
                          for _ in range(max(1, args.passes))]
-        hits, disagreements = combine_passes(verdicts_list, pairs)
+        hits, disagreements = combine_passes(verdicts_list, pairs, args.min_votes or None)
         total_pairs += len(pairs)
         total_flags += len(hits)
         page = os.path.basename(path)

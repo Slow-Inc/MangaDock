@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 156 — omission verifier 3-pass majority: 18% parse-fail, auto-retry closed (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `--min-votes N` majority support (+test) and ran a 3-pass sample: 11 pages/26 long pairs, **3 agreed** (Akuyaku curiosity clause, a new Akuyaku `my guts` candidate, the borderline Horimiya `won't` nuance), 0 disagreements, but **2/11 pages had a PARSE-FAIL** (JSON-only reply not parseable, ~18 %).
+- **Closes auto-retry integration**: parse-fail reliability + need for a context-preserving whole-page re-ask + only 2-3 true positives per corpus make it not worth production complexity. The tool stays report-only; revisit only with strict JSON mode and a larger sample.
+
+---
+
 ## MIT quality loop, round 155 — omission-verifier pipeline integration deferred with a concrete design note (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

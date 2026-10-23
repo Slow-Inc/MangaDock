@@ -49,3 +49,14 @@ def test_combine_passes_keeps_only_agreed_hits():
     assert agreed[0][3] == 'x'
     assert disagreed == [1]
     assert combine_passes([], pairs) == ([], [])
+
+
+def test_combine_passes_supports_a_majority_threshold():
+    pairs = [('A', 'a'), ('B', 'b'), ('C', 'c')]
+    p1 = [{'i': 0, 'omitted': True}, {'i': 1, 'omitted': True}]
+    p2 = [{'i': 0, 'omitted': True}]
+    p3 = [{'i': 0, 'omitted': True}, {'i': 1, 'omitted': True}]
+    kept, _disagreed = combine_passes([p1, p2, p3], pairs, min_votes=2)
+    assert [k[0] for k in kept] == [0, 1]
+    strictly, _ = combine_passes([p1, p2, p3], pairs)
+    assert [k[0] for k in strictly] == [0]
