@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 238 — final-state PR comment; GitHub CI green on e73c98ee (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Posted a final-state comment (v6 numbers, leftovers definition, retort licence, JP sanity, series-memory verification, deploy status, 982 tests, 0 secret-like hits) so a reviewer can read the current state without scrolling the history.
+- CI on head `e73c98ee`: **logic gate / heavy ML / backend all pass**; Vercel remains its external build-rate limit. No code change.
+
+---
+
 ## MIT quality loop, round 237 — JP-path sanity: one real JP page, gate 0, no regressions (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
