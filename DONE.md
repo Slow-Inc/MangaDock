@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 236 — branch hygiene/security scan clean (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Scanned all 312 changed files in the branch diff for secret-like patterns (API keys, AWS ids, private keys): **0 hits**. Binary additions are only benchmark evidence images under docs/reports; no models/archives.
+- Change mix: docs/reports 170, MIT/test 53, MIT/manga_translator 46, MIT/tools 22, MIT/server 5, Backend/src 3, vault 2 — consistent with a tested quality/ops change set. No code change.
+
+---
+
 ## MIT quality loop, round 235 — leftover definition documented; dashboard named as source of truth (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
