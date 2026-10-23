@@ -84,3 +84,15 @@ def test_reread_maps_multiple_candidates_by_slot_even_when_the_model_returns_the
     assert changed == 2
     assert first.text == 'TO DEFEND'
     assert second.text == 'ISLAND AND'
+
+
+def test_a_dispatch_failure_never_breaks_the_ocr_stage():
+    image = np.zeros((100, 100, 3), dtype=np.uint8)
+    line = types.SimpleNamespace(text='TO DEEEND', prob=0.40,
+                                 pts=np.array([[10, 10], [60, 10], [60, 30], [10, 30]], dtype=np.float32))
+
+    async def exploding_dispatch(*args, **kwargs):
+        raise RuntimeError('model exploded')
+
+    assert asyncio.run(reread_textlines(image, [line], '48px', None, 'cpu', exploding_dispatch)) == 0
+    assert line.text == 'TO DEEEND'  # first read kept, OCR stage continues

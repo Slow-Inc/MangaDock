@@ -109,3 +109,9 @@ single batched canvas. Swept 39 pages at 0.75 with the cap raised to 8 and A/B-j
 OCR confidence can arrive as a numpy scalar or a torch tensor depending on the model path. The pass now converts both
 the old and the new confidence to `float` right where they are read, so the comparisons and the debug log
 (`f'{prob:.2f}'`) can never fail on a non-Python scalar while the flag is on. Suite unchanged at 964.
+## Fail-open guard (round 198)
+
+Code review of the default-ON path found one production risk: if the second dispatch raised (model error, OOM, a bad
+crop), the exception would propagate out of `_run_ocr` and fail the whole page's OCR stage. The extra pass is an
+enhancement, so it now catches any dispatch failure, logs a warning, keeps the first reads and returns 0. Test: an
+exploding fake dispatch leaves the lines untouched and the function returns 0 instead of raising. Suite 965 passed.

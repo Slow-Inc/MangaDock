@@ -118,7 +118,11 @@ async def reread_textlines(image, textlines, ocr_key, ocr_config, device, dispat
                                                dtype=np.float32), '', 1.0))
         top += ch + gap
 
-    out = await dispatch(ocr_key, canvas, quads, ocr_config, device, verbose)
+    try:
+        out = await dispatch(ocr_key, canvas, quads, ocr_config, device, verbose)
+    except Exception:  # the pass is an extra: never let it break the page's OCR stage
+        logger.warning('OCR second pass failed; keeping the first reads', exc_info=True)
+        return 0
     changed = 0
     for quad_out in out or []:
         pts = np.array(quad_out.pts)

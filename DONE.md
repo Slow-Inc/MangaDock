@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 198 — OCR pass made fail-open (dispatch errors cannot fail the page) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Self-review of the now-default OCR second pass found a production risk: an exception from the extra dispatch (model/OOM/crop) would propagate and fail the whole OCR stage. It now catches any dispatch exception, logs a warning, keeps the first reads and returns 0 — the pass is an enhancement, never a failure source.
+- Test: exploding fake dispatch leaves lines untouched, returns 0; suite 965 passed. Benchmark note added.
+
+---
+
 ## MIT quality loop, round 197 — OCR pass hardening: confidence normalized to float (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
