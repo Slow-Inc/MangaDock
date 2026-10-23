@@ -36,3 +36,16 @@ and credits may stay). Same predicate -> trigger -> note discipline as #1039/#10
 
 Natural occurrences are rare and the guard has only been proven on unit/credit-page samples; a forced-guard
 injection (inject the observed line, prove the retry translates it) plus a wider sweep should come before defaulting.
+## Promoted to default
+
+Evidence that let it default ON (`MIT_LEAK_LATIN_GUARD=0` disables):
+
+- **Forced injection:** corrupted one answer to `มีใครเอาENOUGH มาบ้างไหม?` — the guard fired
+  (`[glitch] untranslated_word`), the translator re-asked (**2 requests**) and the final payload had **0**
+  untranslated-source-word regions.
+- **False-positive sweep:** 16 pages with the flag on (13-page dialogue sweep + the 3 credit/title pages) produced
+  **0 `untranslated_word` triggers** — the credit/title/acronym/partial-copy licence held.
+- Trigger test now pins the default: glitched-by-default, and `MIT_LEAK_LATIN_GUARD=0` switches it off.
+
+The guard only acts when a Thai line keeps an English source word, so clean pages are untouched; the one-retry cost
+is paid only on the defect it exists for.

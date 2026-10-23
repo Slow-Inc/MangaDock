@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 108 — untranslated-word guard promoted to default after forced proof + 16-page FP sweep (#1057) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- **Forced injection:** corrupted an answer to `มีใครเอาENOUGH มาบ้างไหม?` -> guard fired (`untranslated_word`), retry (**2 requests**) left **0** untranslated-source-word regions in the final payload.
+- **False positives:** 16 pages with the flag on (13-page sweep + 3 credit/title pages) -> **0 triggers**; the credit/title/acronym/partial-copy licence rules held.
+- **Default ON** (`MIT_LEAK_LATIN_GUARD=0` disables); trigger test now pins the default. It only acts when a Thai line keeps an English source word, so clean pages are untouched. Heavy glitch suite 18 green; benchmark updated; #1057 updated.
+
 ## MIT quality loop, round 107 — opt-in guard for an untranslated English word inside Thai (#1057) (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
