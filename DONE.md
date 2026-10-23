@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 136 — dashboard pinned on real payload fixtures (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Committed two **trimmed real doctor payloads** (Iruma p1 with the known `dropped_!` nuance, Mieruko p0 clean) as dashboard fixtures and added an aggregation test: 2 pages, 19 rendered regions, exactly one `dropped_!` gate finding, **leftover {}**, non-zero timing sum. Synthetic-dict tests remain, but the real payload shape (regions/dropped/timing keys) is now pinned.
+- No behaviour change.
+
+---
+
 ## MIT quality loop, round 135 — one-command quality dashboard added (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
