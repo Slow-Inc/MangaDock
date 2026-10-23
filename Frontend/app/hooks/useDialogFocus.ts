@@ -121,8 +121,7 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, isTop: () => 
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !isTop() || !ref.current) return;
       // a dialog opened inside this one (a report form in the reader) runs its own Tab cycle (#1073)
-      const inner = innermostModal(document.activeElement);
-      if (inner && inner !== ref.current && ref.current.contains(inner)) return;
+      if (focusInNestedDialog(ref.current)) return;
       // visible (offsetParent is null for fixed elements) and not inside an inert part (a collapsed group, a closed menu):
       // the browser skips those, and the toast cycle below moves focus itself, so it must skip them too
       const own = keepTabStops(
@@ -171,21 +170,39 @@ export function ownsKeyboard<T>(dialog: T, active: T | null, body: T, innermost:
 }
 
 /**
+ * `ownsKeyboard` for an aria-modal `root` on the live page: is this Escape its to act on (#1073)? Focus on a toast's
+ * button counts as no layer's — the toast joins the open dialog's Tab cycle (#956), so Escape still closes the dialog.
+ */
+export function ownsEscapeNow(root: Element | null): boolean {
+  const el = document.activeElement?.closest("[data-toast-card]") ? document.body : document.activeElement;
+  return !!root && ownsKeyboard<Element>(root, el, document.body, innermostModal(el));
+}
+
+/**
+ * Whether focus is in a dialog opened inside `root` (a report form in the reader, a top-up in the book popup): that
+ * dialog owns Tab and Escape, and `root` stands aside (#1073).
+ */
+export function focusInNestedDialog(root: Element | null): boolean {
+  const inner = innermostModal(document.activeElement);
+  return !!root && !!inner && inner !== root && root.contains(inner);
+}
+
+/**
  * An aria-modal dialog's keyboard (#1073): `useDialogFocus` plus Escape calling `onClose` while the dialog owns the
- * keyboard. Listened in the capture phase and stopped, so a dialog or reader underneath (which listens on window)
- * does not close too. `active` = the dialog is open (a dialog that animates out stays mounted after it closes).
+ * keyboard. Listened in the bubble phase: a popover inside it (a search dropdown) closes first and consumes the key
+ * (`preventDefault`), so one Escape closes one layer. `active` = the dialog is open (one that animates out stays
+ * mounted after it closes).
  */
 export function useModalDialog(ref: RefObject<HTMLElement | null>, onClose: () => void, active = true) {
   useDialogFocus(ref, () => true, active);
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement;
-      if (e.key !== "Escape" || !ref.current || !ownsKeyboard<Element>(ref.current, el, document.body, innermostModal(el))) return;
-      e.stopPropagation();
+      if (e.key !== "Escape" || e.defaultPrevented || !ownsEscapeNow(ref.current)) return;
+      e.preventDefault();
       onClose();
     };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [ref, onClose, active]);
 }

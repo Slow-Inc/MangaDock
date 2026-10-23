@@ -17,7 +17,7 @@ import { useCoverSrc } from "../hooks/useCoverSrc";
 import { lockPageScroll } from "../lib/scrollLock";
 import CoverPlaceholder from "./ui/CoverPlaceholder";
 import { useRouter } from "next/navigation";
-import { useDialogFocus } from "../hooks/useDialogFocus";
+import { ownsEscapeNow, useDialogFocus } from "../hooks/useDialogFocus";
 import { backOwnEntry, bookPath, inPopupLinkTarget, markModalNavigation, modalStack, type Popup } from "../lib/bookModalHistory";
 import { loadMangaDetail } from "../lib/mangaDetail";
 import { translateDescription } from "../lib/translateDescription";
@@ -225,7 +225,9 @@ export default function BookDetailModal({ book, onClose, scrollToChapters = fals
     }
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && modalStack.isTop(popup)) handleClose(); // only the top-most popup
+      // only the top-most popup, and only while it holds focus: a dialog inside it (the top-up) or over it (the login
+      // prompt) owns that Escape (#1073)
+      if (e.key === "Escape" && modalStack.isTop(popup) && ownsEscapeNow(dialogRef.current)) handleClose();
     };
     window.addEventListener("keydown", onKey);
     const releaseScroll = lockPageScroll(); // shared with the reader opened over it (#936)

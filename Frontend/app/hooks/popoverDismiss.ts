@@ -22,6 +22,8 @@ export function popoverDismiss(doc: Doc, getContainer: () => Container | null, c
     const focusInside = !!c && c.contains(doc.activeElement);
     // A dialog opened over a lingering popover owns this Escape — one key must not close both layers.
     if (!focusInside && doc.activeElement?.closest?.('[role="dialog"], [aria-modal="true"]')) return;
+    // consumed: a dialog around the popover (a post form) leaves this Escape alone (#1073)
+    e.preventDefault();
     close();
     if (focusInside) c.querySelector("[aria-expanded]")?.focus();
   };
