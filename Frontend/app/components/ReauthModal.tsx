@@ -101,7 +101,7 @@ export default function ReauthModal({
         <div className="mt-4 space-y-2">
           {hasPassword && (
             <>
-              <input
+              <input aria-label="รหัสผ่านของคุณ"
                 type="password"
                 value={password}
                 onChange={(e) => {

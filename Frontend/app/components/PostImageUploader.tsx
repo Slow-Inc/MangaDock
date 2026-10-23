@@ -158,7 +158,7 @@ export default function PostImageUploader({ images, onChange, maxImages = 4 }: P
 
           {tab === 'url' && (
             <div className="p-3 flex gap-2">
-              <input
+              <input aria-label="ลิงก์รูปภาพ"
                 type="url"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}

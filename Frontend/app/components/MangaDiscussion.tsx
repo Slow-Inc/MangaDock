@@ -115,7 +115,7 @@ export default function MangaDiscussion({ mangaId, title, cover }: { mangaId: st
 
       {isPosting && (
         <div className="bg-fill border border-line rounded-2xl p-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-300">
-          <textarea
+          <textarea aria-label="คุณคิดยังไงกับเรื่องนี้"
             value={newPostContent}
             onChange={(e) => setNewPostContent(e.target.value)}
             maxLength={FORUM_LIMITS.content}

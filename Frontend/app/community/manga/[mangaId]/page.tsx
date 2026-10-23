@@ -323,7 +323,7 @@ export default function MangaCommunityPage() {
 
               <div>
                 <label className="block text-xs font-bold text-ink-3 uppercase mb-2">หัวข้อ</label>
-                <input
+                <input aria-label="หัวข้อ"
                   type="text"
                   value={newPost.title}
                   onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
@@ -337,7 +337,7 @@ export default function MangaCommunityPage() {
 
               <div>
                 <label className="block text-xs font-bold text-ink-3 uppercase mb-2">เนื้อหา</label>
-                <textarea
+                <textarea aria-label="เนื้อหา"
                   value={newPost.content}
                   onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
                   maxLength={FORUM_LIMITS.content}

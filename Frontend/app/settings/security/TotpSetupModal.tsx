@@ -150,7 +150,7 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
             <p className="text-center text-xs text-ink-2">
               กรอกรหัส 6 หลักจาก Authenticator app เพื่อยืนยัน
             </p>
-            <input
+            <input aria-label="รหัส 6 หลักจาก Authenticator app"
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"

@@ -202,7 +202,7 @@ export default function TopupModal({ isOpen, onClose }: { isOpen: boolean; onClo
                 ))}
               </div>
               <div className="mb-4">
-                <input
+                <input aria-label="จำนวนอื่น (ขั้นต่ำ 20)"
                   type="number"
                   min="20"
                   placeholder="จำนวนอื่น (≥20)"

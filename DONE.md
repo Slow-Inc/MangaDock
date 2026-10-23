@@ -77,6 +77,24 @@
 
 ---
 
+## #1078 / #1079 Form fields have names; login modal's hidden forms leave the Tab order (2026-10-23)
+
+**What:**
+- **#1078.** 35 fields had no accessible name. About half had a visible `<label>` next to them that wasn't linked, and
+  the rest relied on a placeholder. Each now has an `aria-label` taken from its visible label, or from the placeholder's
+  words when no label is shown (label in name). The 3 hidden file inputs are untouched. The search page's
+  "ตัวกรองขั้นสูง" toggle also gets `aria-expanded`.
+- **#1079.** `LoginModal` keeps all three forms mounted for the slide. The inactive ones are now `inert`, where before
+  Tab walked into 7 invisible fields.
+
+**Validated:** production build, fake session, API answered locally.
+- **Before:** 0 named in the sampled set (login, register, navbar search, post form, search year filters).
+- **After:** all named, the advanced toggle is expanded, and the login modal has 0 invisible Tab stops (7 before).
+- Switching to register still accepts typing, and the login dialog probe from #1073 still passes.
+- Unit 493/493 and test:auth 12/12. Real tsc is clean, and eslint matches main per file.
+
+---
+
 ## #1076 Icon-only buttons have names; hover-only delete buttons reachable (2026-10-23)
 
 **What:** six icon-only controls (`✕` or an X `svg`) had no accessible name: the post-image remove button, the

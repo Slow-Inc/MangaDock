@@ -216,7 +216,7 @@ export default function ReaderCommentDrawer({ open, isTop, onClose, mangaId, cha
         <div className="border-t border-line p-3">
           {user ? (
             <form onSubmit={handlePost} className="flex gap-2">
-              <textarea
+              <textarea aria-label="เขียนความคิดเห็น"
                 ref={textareaRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}

@@ -74,7 +74,7 @@ export default function MfaVerifyScreen({ factorId, onClose }: MfaVerifyScreenPr
           </div>
         )}
 
-        <input
+        <input aria-label="รหัสยืนยัน 6 หลัก"
           ref={inputRef}
           type="text"
           inputMode="numeric"
