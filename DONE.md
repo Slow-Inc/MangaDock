@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 246 — one-page branch hand-off index written (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added `2026-10-23-quality-loop-handoff.md`: current state (v7 numbers, judge band, tests, CI), defaults turned on, opt-ins, evidence index, open items and pointers to the do-not-repeat list, so a successor does not need to replay the loop.
+- No code change.
+
+---
+
 ## MIT quality loop, round 245 — pre-merge re-verified against main cb30e950: 3 docs conflicts, merged suite 985 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
