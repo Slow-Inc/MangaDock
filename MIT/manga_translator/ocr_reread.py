@@ -9,6 +9,7 @@ confidence improves materially. Pure helpers are unit-tested without the OCR mod
 """
 import logging
 import os
+import re
 
 import numpy as np
 
@@ -46,10 +47,22 @@ def _is_latin_line(text):
     return latin >= 0.8 * len(letters)
 
 
+#: A standalone capital letter (not I or A) between words is almost always an OCR mangle of a small function
+#: word (`N` for NOT, `T` for IT/TO). Those lines are re-read even at high confidence, because losing a negation is
+#: a meaning error (measured: `AH-DO YOU N LIKE THESE SNACKS?` shipped as a positive question).
+_SUSPICIOUS_SINGLE = re.compile(r'(?<![A-Za-z])[B-DF-HJ-NP-Z](?![A-Za-z])')
+
+
+def has_suspicious_single(text):
+    return bool(_SUSPICIOUS_SINGLE.search(text or ''))
+
+
 def needs_reread(text, prob, threshold=PROB_THRESHOLD):
-    if prob is None:
-        return False
     if not _is_latin_line(text):
+        return False
+    if has_suspicious_single(text):
+        return True
+    if prob is None:
         return False
     return float(prob) < threshold
 
@@ -72,6 +85,9 @@ def better_read(old_text, old_prob, new_text, new_prob, margin=PROB_MARGIN):
         return False
     if new_text == (old_text or '').strip():
         return False
+    # Correcting a mangled single-letter word is a meaning fix even without a confidence jump.
+    if has_suspicious_single(old_text) and not has_suspicious_single(new_text):
+        return True
     return float(new_prob) >= float(old_prob) + margin
 
 

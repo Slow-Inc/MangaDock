@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 240 — OCR single-letter garbles (N=NOT) re-read: negation loss fixed 3/3 (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- A v6 zero-score segment shipped a positive question because OCR mangled `NOT` to a lone `N`; the line's confidence (0.78) was above the re-read threshold, so the pass skipped it.
+- The OCR second pass now treats a standalone capital letter (not I/A) between words as a re-read candidate regardless of confidence, and accepts a correction that removes the garbled token even without a confidence jump. Measured on the Iruma page **3/3 runs**: OCR `AH- DO YOU NOT LIKE THESE SNACKS?`, Thai `อ๋อ- เธอไม่ชอบขนมพวกนี้หรอ?` (negation preserved; previously a positive question).
+- Tests added; benchmark `2026-10-23-ocr-single-letter-garble.md`. This also removes the `AGAI-`? no — that fragment is unchanged; only the function-word garble class.
+
+---
+
 ## MIT quality loop, round 239 — v6 judge: raw 1.44 stable, adjusted band widens to 1.53-1.60 (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

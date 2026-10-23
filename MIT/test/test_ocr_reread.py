@@ -4,8 +4,8 @@ import types
 
 import numpy as np
 
-from manga_translator.ocr_reread import (better_read, expand_box, needs_reread, reread_enabled,
-                                         reread_textlines)
+from manga_translator.ocr_reread import (better_read, expand_box, has_suspicious_single, needs_reread,
+                                         reread_enabled, reread_textlines)
 
 
 def test_reread_enabled_flag():
@@ -96,3 +96,13 @@ def test_a_dispatch_failure_never_breaks_the_ocr_stage():
 
     assert asyncio.run(reread_textlines(image, [line], '48px', None, 'cpu', exploding_dispatch)) == 0
     assert line.text == 'TO DEEEND'  # first read kept, OCR stage continues
+
+
+def test_single_letter_ocr_garbles_are_reread_even_at_high_confidence():
+    # measured: `AH-DO YOU N LIKE THESE SNACKS?` lost the NOT; re-read restored it 3/3 runs
+    assert has_suspicious_single("AH-DO YOU N LIKE THESE SNACKS?")
+    assert not has_suspicious_single("I AM HERE")
+    assert not has_suspicious_single("A GOOD IDEA")
+    assert needs_reread("AH-DO YOU N LIKE THESE SNACKS?", 0.95)
+    assert better_read("AH-DO YOU N LIKE THESE SNACKS?", 0.78, "AH- DO YOU NOT LIKE THESE SNACKS?", 0.68)
+    assert not better_read("AH-DO YOU N LIKE THESE SNACKS?", 0.78, "AH-DO YOU N LIKE THESE SNACKS?", 0.99)
