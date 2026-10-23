@@ -65,7 +65,7 @@ segment **50 / 37 / tie 29** (50/87 = 57.5% ≈ +1.4σ) → **margin ≤5 หน
 ### Performance ที่ตัดสินแล้ว
 - **Default ON:** source-language filter ย้ายไปหลัง `_strip_source_noise` ก่อน translation (#1051): replay byte-identical + translation 3.62→2.12s
 - **Opt-in:** batch pipeline (#905) วัดได้ 1.46× + ชื่อสม่ำเสมอ แต่ไม่มี per-page progress; preload (#1047 หน้าแรก 21.5→18.1s); widen columns (#1006); segment retry (#1055 20-25% เร็วขึ้นแต่เสี่ยง context)
-- **Rejected with evidence:** detection_size 2048 (region sets เปลี่ยน = recall change), 3200 (คุณภาพ), in-page mask/inpaint overlap (#1050 ปิดเป็น superseded — batch pipeline overlap อยู่แล้ว), JP rhetorical prompt (A/B ไม่ต่าง), hedging guard (FP สูง), exclamation guard (เจอ 2/15,578 segment)
+- **Rejected with evidence:** detection_size 2048 (region sets เปลี่ยน = recall change), 3200 (คุณภาพ), in-page mask/inpaint overlap (#1050 ปิดเป็น superseded — batch pipeline overlap อยู่แล้ว), JP rhetorical prompt (A/B ไม่ต่าง), hedging guard (FP สูง), exclamation guard (เจอ 2/15,578 segment)\n- **Temperature 0.5 vs 0.2 (2026-10-23):** paired ทั้ง corpus — 0.2 raw 1.45/adj 1.58 + guard hits 10→6 เทียบ 0.5 raw 1.41/adj 1.51; แต่ paired page wins 17-12-8 อยู่ที่ noise boundary → **คง default 0.5**, เปิดเป็น opt-in `MIT_TEMPERATURE` (Backend → translator.temperature → ConfigGPT; absent = 0.5)
 
 ### เอกสารอ้างอิง
 - `docs/reports/benchmarks/2026-10-23-*.md` (quality-loop-status, final-corpus-sweep, judge-noise-adjusted-profile, guard-cost-and-gate-dashboard, prod-wiring-verification, 1057/1058 guards, 1050-overlap-decision, jp-prompt-ab, detection-size-ab)

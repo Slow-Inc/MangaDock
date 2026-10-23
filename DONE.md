@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 141 — temperature result propagated to PR + vault (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR #794 body now carries the temperature experiment (EN + Thai mirror): full paired numbers, why the default stays 0.5, and the `MIT_TEMPERATURE` opt-in path.
+- Vault note (`project-translation-eval-set.md`) records the same decision in the quality-loop consolidation section, so a future session will not re-run the experiment blindly.
+- No code change.
+
+---
+
 ## MIT quality loop, round 140 — Backend spec for MIT_TEMPERATURE (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
