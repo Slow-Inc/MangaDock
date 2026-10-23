@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cycleTarget, focusWrapTarget, hasLayerAbove, ownsKeyboard, pickOpener } from "./useDialogFocus";
+import { cycleTarget, focusWrapTarget, hasLayerAbove, keepTabStops, ownsKeyboard, pickOpener } from "./useDialogFocus";
 
 describe("focusWrapTarget: Tab stays inside the dialog (#837)", () => {
   test("Tab on the last control wraps to the first", () => {
@@ -99,5 +99,20 @@ describe("pickOpener: focus goes back to the control that opened the dialog (#10
   });
   test("nothing held focus: nothing", () => {
     expect(pickOpener(dialog, null, "button")).toBeNull();
+  });
+});
+
+describe("keepTabStops: a radio group is one Tab stop, as the browser treats it (#1073)", () => {
+  type El = { id: string; group: string | null; checked: boolean };
+  const el = (id: string, group: string | null = null, checked = false): El => ({ id, group, checked });
+  const ids = (xs: El[]) => keepTabStops(xs, (x) => x.group, (x) => x.checked).map((x) => x.id);
+  test("no radio checked: the group's first radio is its stop", () => {
+    expect(ids([el("close"), el("a", "reason"), el("b", "reason"), el("c", "reason")])).toEqual(["close", "a"]);
+  });
+  test("a radio checked: that one is the stop", () => {
+    expect(ids([el("close"), el("a", "reason"), el("b", "reason", true), el("c", "reason"), el("send")])).toEqual(["close", "b", "send"]);
+  });
+  test("other controls and separate groups are kept", () => {
+    expect(ids([el("x"), el("a", "g1"), el("b", "g2", true), el("c", "g2"), el("y")])).toEqual(["x", "a", "b", "y"]);
   });
 });

@@ -79,6 +79,26 @@ if (typeof document !== "undefined") {
   }, true);
 }
 
+/**
+ * The controls Tab actually stops on (#1073): the browser treats a radio group as one stop — its checked radio, or its
+ * first when none is — so the wrap at either end must too, or Tab off the group leaves the dialog.
+ */
+export function keepTabStops<T>(items: T[], group: (el: T) => string | null, checked: (el: T) => boolean): T[] {
+  const stop = new Map<string, T>();
+  for (const el of items) {
+    const g = group(el);
+    if (g === null) continue;
+    const current = stop.get(g);
+    if (current === undefined || (checked(el) && !checked(current))) stop.set(g, el);
+  }
+  return items.filter((el) => {
+    const g = group(el);
+    return g === null || stop.get(g) === el;
+  });
+}
+const radioGroup = (el: HTMLElement) => (el instanceof HTMLInputElement && el.type === "radio" && el.name ? el.name : null);
+const isChecked = (el: HTMLElement) => el instanceof HTMLInputElement && el.checked;
+
 /** The innermost aria-modal dialog holding `el` — the one whose keyboard it is (#1073). */
 const innermostModal = (el: Element | null) => el?.closest('[aria-modal="true"]') ?? null;
 
@@ -105,8 +125,12 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, isTop: () => 
       if (inner && inner !== ref.current && ref.current.contains(inner)) return;
       // visible (offsetParent is null for fixed elements) and not inside an inert part (a collapsed group, a closed menu):
       // the browser skips those, and the toast cycle below moves focus itself, so it must skip them too
-      const own = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-        (el) => el.getClientRects().length > 0 && !el.closest("[inert]"),
+      const own = keepTabStops(
+        [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+          (el) => el.getClientRects().length > 0 && !el.closest("[inert]"),
+        ),
+        radioGroup,
+        isChecked,
       );
       const toast = toastControls(ref.current);
       const items = [...own, ...toast];
