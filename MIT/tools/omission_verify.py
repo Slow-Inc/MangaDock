@@ -99,13 +99,25 @@ def combine_passes(pass_verdicts, pairs, min_votes=None):
                 missing_text.setdefault(i, m)
     kept = [(i, pairs[i][0], pairs[i][1], missing_text.get(i, '')) for i in sorted(kept_idx)]
     return kept, sorted(set(votes) - kept_idx)
-def verify_page(pairs, offset, base, key, model, timeout=180):
+def verify_page(pairs, offset, base, key, model, timeout=180, retries=1):
+    """One verifier call (JSON mode), with a plain-mode retry when the reply is not parseable."""
     import requests
-    body = {'model': model, 'max_tokens': 2048, 'temperature': 0,
-            'messages': [{'role': 'system', 'content': _SYSTEM},
-                         {'role': 'user', 'content': build_user(pairs, offset)}]}
-    resp = requests.post(base, headers={'Authorization': 'Bearer ' + key}, json=body, timeout=timeout)
-    return parse_verdicts(resp.json()['choices'][0]['message']['content'])
+    def _call(json_mode):
+        body = {'model': model, 'max_tokens': 2048, 'temperature': 0,
+                'messages': [{'role': 'system', 'content': _SYSTEM},
+                             {'role': 'user', 'content': build_user(pairs, offset)}]}
+        if json_mode:
+            body['response_format'] = {'type': 'json_object'}
+        resp = requests.post(base, headers={'Authorization': 'Bearer ' + key}, json=body, timeout=timeout)
+        if resp.status_code != 200:
+            return None
+        return parse_verdicts(resp.json()['choices'][0]['message']['content'])
+    verdicts = _call(True)
+    for _ in range(max(0, retries)):
+        if verdicts is not None:
+            break
+        verdicts = _call(False)
+    return verdicts
 
 
 def main():

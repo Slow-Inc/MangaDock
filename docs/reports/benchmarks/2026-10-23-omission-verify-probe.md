@@ -56,3 +56,15 @@ Added `--min-votes N` (0 = every pass must agree; N = majority threshold) and ra
 reliability + the need for a context-preserving whole-page re-ask + only ~2-3 true positives per corpus mean the
 quality gain does not justify production complexity. Revisit only with a strict JSON mode / structured output and a
 larger precision sample (backlog P1).
+## JSON-mode hardening (follow-up): parse-fail fixed, agreement lower
+
+The gateway supports `response_format: {"type": "json_object"}` (verified). `verify_page` now requests JSON mode and
+falls back to plain mode with one retry if a reply is unparseable. Re-ran the same 12-page / 3-pass / majority sample:
+
+- **PARSE-FAIL: 0/11 pages** (was 2/11) — the structured-output path fixes the failure that closed auto-retry.
+- **Agreed flags: 1** (only the stable Akuyaku curiosity clause), **4 disagreements** (previously 3 agreed / 0
+  disagreements): JSON mode makes the verifier stricter and exposes the remaining model variance instead of
+  masking it as agreement.
+
+Conclusion unchanged: report-only QA tool, now more robust (no parse failures) and more honest about uncertainty.
+Automatic retry stays closed — the flag code has to be reproducible page-to-page before it can drive a re-ask.

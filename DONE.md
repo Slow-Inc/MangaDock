@@ -3,6 +3,15 @@
 
 ---
 
+## MIT quality loop, round 157 — omission verifier JSON mode: parse-fail 0/11, agreement more honest (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Gateway accepts `response_format json_object` (verified); `verify_page` now uses JSON mode with a plain-mode retry on unparseable output.
+- Same 12-page/3-pass sample: **PARSE-FAIL 0/11** (was 2/11) — the reliability blocker is gone. Agreed flags dropped to 1 with **4 disagreements** (was 3 agreed/0): JSON mode is stricter and surfaces the real model variance instead of masking it.
+- Conclusion unchanged: report-only tool (now robust); auto-retry stays closed until flags are page-to-page reproducible.
+
+---
+
 ## MIT quality loop, round 156 — omission verifier 3-pass majority: 18% parse-fail, auto-retry closed (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
