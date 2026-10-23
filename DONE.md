@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 140 — Backend spec for MIT_TEMPERATURE (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Added the missing Backend coverage for the new opt-in: `buildMitConfig` omits `temperature` by default, passes a valid `MIT_TEMPERATURE=0.2` through, and drops invalid/out-of-range values (`abc`, `-1`, `5`). mit-config spec **28 passed**.
+- No behaviour change.
+
+---
+
 ## MIT quality loop, round 139 — temperature A/B completed: 0.2 within noise, kept opt-in as MIT_TEMPERATURE (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
