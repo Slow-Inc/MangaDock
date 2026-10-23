@@ -74,15 +74,15 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-2xl">
+    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/80 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-3xl border border-ink-3 bg-raised p-6 shadow-2xl backdrop-blur-2xl">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm font-semibold text-white">เปิดใช้งาน 2FA</p>
+          <p className="text-sm font-semibold text-ink">เปิดใช้งาน 2FA</p>
           <button
             onClick={onClose}
             aria-label="ปิด"
-            className="text-white/40 transition hover:text-white"
+            className="text-ink-3 transition hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
               <path d="M18.3 5.71a1 1 0 0 0-1.42 0L12 10.59 7.12 5.7A1 1 0 0 0 5.7 7.12L10.59 12 5.7 16.88a1 1 0 1 0 1.42 1.42L12 13.41l4.88 4.89a1 1 0 0 0 1.42-1.42L13.41 12l4.89-4.88a1 1 0 0 0 0-1.41z" />
@@ -91,7 +91,7 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
         </div>
 
         {error && (
-          <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/15 px-3 py-2 text-xs text-red-300">
+          <div className="mb-3 rounded-xl border border-danger/30 bg-danger/15 px-3 py-2 text-xs text-danger">
             {error}
           </div>
         )}
@@ -99,7 +99,7 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
         {/* ── Step: loading / scan ── */}
         {(step === "loading" || step === "scan") && (
           <div className="space-y-4 text-center">
-            <p className="text-xs text-white/50">
+            <p className="text-xs text-ink-2">
               สแกน QR code ด้วย Google Authenticator, Authy หรือแอปคล้ายกัน
             </p>
 
@@ -122,16 +122,16 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
             </div>
 
             {secret && (
-              <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                <p className="mb-1 text-[10px] text-white/30">หรือกรอก secret key ด้วยตนเอง</p>
-                <p className="break-all font-mono text-xs text-white/70">{secret}</p>
+              <div className="rounded-xl border border-line bg-fill px-3 py-2">
+                <p className="mb-1 text-[10px] text-ink-3">หรือกรอก secret key ด้วยตนเอง</p>
+                <p className="break-all font-mono text-xs text-ink-2">{secret}</p>
               </div>
             )}
 
             <button
               onClick={() => setStep("verify")}
               disabled={!qrCode || loading}
-              className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50"
+              className="w-full rounded-xl bg-ink py-2.5 text-sm font-semibold text-bg transition hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] disabled:opacity-50"
             >
               สแกนแล้ว ไปยืนยัน →
             </button>
@@ -141,7 +141,7 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
         {/* ── Step: verify ── */}
         {step === "verify" && (
           <div className="space-y-3">
-            <p className="text-center text-xs text-white/50">
+            <p className="text-center text-xs text-ink-2">
               กรอกรหัส 6 หลักจาก Authenticator app เพื่อยืนยัน
             </p>
             <input
@@ -158,18 +158,18 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
               }}
               onKeyDown={(e) => e.key === "Enter" && handleVerify()}
               placeholder="000000"
-              className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] text-white placeholder-white/20 outline-none transition focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/30"
+              className="w-full rounded-xl border border-ink-3 bg-fill px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
             />
             <button
               onClick={handleVerify}
               disabled={code.length !== 6 || loading}
-              className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50"
+              className="w-full rounded-xl bg-ink py-2.5 text-sm font-semibold text-bg transition hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] disabled:opacity-50"
             >
               {loading ? "กำลังยืนยัน…" : "ยืนยันและเปิดใช้ 2FA"}
             </button>
             <button
               onClick={() => setStep("scan")}
-              className="w-full text-xs text-white/30 transition hover:text-white/60"
+              className="w-full text-xs text-ink-3 transition hover:text-ink-2"
             >
               ← กลับไปสแกน QR
             </button>
@@ -179,9 +179,9 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
         {/* ── Step: done ── */}
         {step === "done" && (
           <div className="space-y-4 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-500/20">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-ok/20">
               <svg
-                className="h-7 w-7 text-green-400"
+                className="h-7 w-7 text-ok"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -190,8 +190,8 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-sm font-semibold text-white">เปิดใช้งาน 2FA สำเร็จ!</p>
-            <p className="text-xs text-white/50">
+            <p className="text-sm font-semibold text-ink">เปิดใช้งาน 2FA สำเร็จ!</p>
+            <p className="text-xs text-ink-2">
               ทุกครั้งที่เข้าสู่ระบบด้วยรหัสผ่าน จะต้องกรอกรหัสจาก Authenticator app ด้วย
             </p>
             <button
@@ -199,7 +199,7 @@ export default function TotpSetupModal({ isOpen, onClose, onSuccess }: TotpSetup
                 onSuccess();
                 onClose();
               }}
-              className="w-full rounded-xl bg-green-600 py-2.5 text-sm font-semibold text-white transition hover:bg-green-500"
+              className="w-full rounded-xl bg-ok py-2.5 text-sm font-semibold text-bg transition hover:bg-ok/85"
             >
               เสร็จสิ้น
             </button>

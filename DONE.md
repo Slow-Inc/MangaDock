@@ -77,6 +77,25 @@
 
 ---
 
+## #776 The auth-flow screens on the Strata tokens (2026-10-23)
+
+**What:** the developer lifted the parking of the auth files. The login / link / MFA / re-auth modals, the OAuth
+callback, the security page with its session list, activity log and TOTP modal moved from dark-tuned classes to the
+Strata tokens — ~130 class edits, styling only (`git diff` has no non-class line): `text-white/…` → `ink` / `ink-2` /
+`ink-3`, `bg-white/5|10` → `fill` / `raised`, `border-white/…` → `line` / `ink-3`, blue primary buttons → the ink
+`PRIMARY_FILL`, red / green → `danger` / `ok`, black scrims → `scrim`, and the dead v3 `placeholder-white/*` →
+`placeholder:text-ink-3`. Six hand-drawn spinners became `Loader` (inline in buttons, a section loader while the OAuth
+window is open), and the callback shows a `Loader page` while it completes. The login and link modals' panels were
+translucent glass over the dark scrim — black in light mode — and are now an opaque `bg-surface` (blur dropped). Brand
+colours (Google, Facebook) and the TOTP QR's white backing stay. The callback test's import allow-list gained the Loader.
+
+**Validated:** production build, both themes: the light sweep's white-on-light texts on `/settings/security` gone; a
+contrast check of the login modal and the security / accounts pages finds 0 low-contrast texts in light and dark;
+screenshots checked. Frontend tests: the callback suite 8/8 (the docs-page SSR tests that need a docs server fail as
+on main); real tsc clean; eslint per file equal to main.
+
+---
+
 ## #1060 The book popup closes smoothly instead of warping; 5 more transition lists fixed (2026-10-23)
 
 **What:** the developer saw `BookDetailModal` "warp" shut — shrink at once, then vanish. Measured per frame: on desktop

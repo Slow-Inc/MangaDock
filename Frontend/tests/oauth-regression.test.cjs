@@ -38,6 +38,7 @@ function loadComponent(relativePath, {auth, window, fetch} = {}) {
     require: name => {
       if (name === 'react') return react;
       if (name === 'next/link') return () => null;
+      if (name.endsWith('/ui/Loader')) return () => null; // the callback's page loader (#776)
       if (name.endsWith('/supabase')) return {supabase: {auth}};
       if (name.endsWith('/ToastContext')) return {useToast: () => ({showToast: noop, dismissToast: noop})};
       if (name.endsWith('/emailValidation')) return {};

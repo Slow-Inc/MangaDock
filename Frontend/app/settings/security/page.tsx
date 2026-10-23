@@ -96,20 +96,20 @@ export default function SecuritySettingsPage() {
       />
 
       <div>
-        <h2 className="text-base font-semibold text-white">ความปลอดภัย</h2>
-        <p className="mt-1 text-xs text-white/40">
+        <h2 className="text-base font-semibold text-ink">ความปลอดภัย</h2>
+        <p className="mt-1 text-xs text-ink-3">
           จัดการ 2FA อุปกรณ์ที่เข้าสู่ระบบ และประวัติกิจกรรม
         </p>
       </div>
 
       {/* ── 2FA Section ──────────────────────────────────────────────────── */}
-      <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5">
+      <div className="space-y-3 rounded-2xl border border-line bg-fill p-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-white">
+            <p className="text-sm font-semibold text-ink">
               การยืนยันตัวตนสองขั้นตอน (2FA)
             </p>
-            <p className="mt-0.5 text-xs text-white/40">
+            <p className="mt-0.5 text-xs text-ink-3">
               {isOAuthOnly
                 ? "2FA จัดการโดย Google/Facebook แทน"
                 : !hasPassword
@@ -125,14 +125,14 @@ export default function SecuritySettingsPage() {
             totpFactor ? (
               <button
                 onClick={handleUnenroll}
-                className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/20"
+                className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger transition hover:bg-danger/20"
               >
                 ปิด 2FA
               </button>
             ) : (
               <button
                 onClick={handleOpenSetup}
-                className="rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"
+                className="rounded-xl bg-ink px-3 py-1.5 text-xs font-semibold text-bg transition hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))]"
               >
                 เปิด 2FA
               </button>
@@ -141,17 +141,17 @@ export default function SecuritySettingsPage() {
         </div>
 
         {totpFactor && (
-          <div className="flex items-center gap-2 rounded-xl border border-green-500/20 bg-green-500/10 px-3 py-2">
-            <div className="h-2 w-2 rounded-full bg-green-400" />
-            <p className="text-xs text-green-300">
+          <div className="flex items-center gap-2 rounded-xl border border-ok/20 bg-ok/10 px-3 py-2">
+            <div className="h-2 w-2 rounded-full bg-ok" />
+            <p className="text-xs text-ok">
               2FA เปิดใช้งานอยู่ — ต้องกรอกรหัส 6 หลักทุกครั้งที่ login
             </p>
           </div>
         )}
 
         {isOAuthOnly && (
-          <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-            <p className="text-xs text-white/50">
+          <div className="rounded-xl border border-line bg-fill px-3 py-2">
+            <p className="text-xs text-ink-2">
               บัญชีนี้เข้าสู่ระบบผ่าน Google หรือ Facebook
               ซึ่งมีระบบ 2FA ของตัวเอง คุณสามารถจัดการ 2FA
               ได้ในการตั้งค่าของแต่ละ provider
@@ -162,13 +162,13 @@ export default function SecuritySettingsPage() {
 
       {/* ── Sessions ─────────────────────────────────────────────────────── */}
       <div className="space-y-3">
-        <p className="text-sm font-semibold text-white">อุปกรณ์ที่เข้าสู่ระบบ</p>
+        <p className="text-sm font-semibold text-ink">อุปกรณ์ที่เข้าสู่ระบบ</p>
         <SessionList />
       </div>
 
       {/* ── Activity Log ─────────────────────────────────────────────────── */}
       <div className="space-y-3">
-        <p className="text-sm font-semibold text-white">ประวัติการเข้าสู่ระบบ</p>
+        <p className="text-sm font-semibold text-ink">ประวัติการเข้าสู่ระบบ</p>
         <ActivityLog />
       </div>
     </div>

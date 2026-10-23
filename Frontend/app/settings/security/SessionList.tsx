@@ -49,21 +49,21 @@ export default function SessionList() {
     }
   };
 
-  if (loading) return <div className="h-20 animate-pulse rounded-xl bg-white/5" />;
+  if (loading) return <div className="h-20 animate-pulse rounded-xl bg-fill" />;
 
   return (
     <div className="space-y-2">
       {devices.length === 0 && (
-        <p className="text-xs text-white/30">ไม่พบข้อมูลอุปกรณ์</p>
+        <p className="text-xs text-ink-3">ไม่พบข้อมูลอุปกรณ์</p>
       )}
       {devices.map((d) => (
         <div
           key={d.id}
-          className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+          className="flex items-center justify-between rounded-xl border border-line bg-fill px-4 py-3"
         >
           <div>
-            <p className="text-sm font-medium text-white">{parseUA(d.user_agent)}</p>
-            <p className="text-xs text-white/40">
+            <p className="text-sm font-medium text-ink">{parseUA(d.user_agent)}</p>
+            <p className="text-xs text-ink-3">
               ล่าสุด:{" "}
               {new Date(d.last_seen).toLocaleDateString("th-TH", {
                 day: "numeric",
@@ -80,7 +80,7 @@ export default function SessionList() {
         <button
           onClick={handleSignOutOthers}
           disabled={signingOut}
-          className="mt-1 w-full rounded-xl border border-red-500/20 bg-red-500/10 py-2 text-xs font-medium text-red-300 transition hover:bg-red-500/15 disabled:opacity-50"
+          className="mt-1 w-full rounded-xl border border-danger/20 bg-danger/10 py-2 text-xs font-medium text-danger transition hover:bg-danger/15 disabled:opacity-50"
         >
           {signingOut ? "กำลังออกจากระบบ…" : "ออกจากระบบทุกอุปกรณ์อื่น"}
         </button>

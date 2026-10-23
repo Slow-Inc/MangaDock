@@ -38,12 +38,12 @@ export default function MfaVerifyScreen({ factorId, onClose }: MfaVerifyScreenPr
   };
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/90 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-3xl border border-white/20 bg-white/10 p-8 text-center shadow-2xl backdrop-blur-2xl">
+    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-scrim/90 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-3xl border border-ink-3 bg-raised p-8 text-center shadow-2xl backdrop-blur-2xl">
         {/* Icon */}
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600/20">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent/20">
           <svg
-            className="h-7 w-7 text-blue-400"
+            className="h-7 w-7 text-accent"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -58,13 +58,13 @@ export default function MfaVerifyScreen({ factorId, onClose }: MfaVerifyScreenPr
           </svg>
         </div>
 
-        <p className="text-base font-semibold text-white">การยืนยันสองขั้นตอน</p>
-        <p className="mt-1 text-xs text-white/50">
+        <p className="text-base font-semibold text-ink">การยืนยันสองขั้นตอน</p>
+        <p className="mt-1 text-xs text-ink-2">
           กรอกรหัส 6 หลักจาก Authenticator app ของคุณ
         </p>
 
         {error && (
-          <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/15 px-3 py-2 text-xs text-red-300">
+          <div className="mt-3 rounded-xl border border-danger/30 bg-danger/15 px-3 py-2 text-xs text-danger">
             {error}
           </div>
         )}
@@ -84,20 +84,20 @@ export default function MfaVerifyScreen({ factorId, onClose }: MfaVerifyScreenPr
           }}
           onKeyDown={(e) => e.key === "Enter" && handleVerify()}
           placeholder="000000"
-          className="mt-4 w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] text-white placeholder-white/20 outline-none transition focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/30"
+          className="mt-4 w-full rounded-xl border border-ink-3 bg-fill px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] text-ink placeholder:text-ink-3 outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
         />
 
         <button
           onClick={handleVerify}
           disabled={code.length !== 6 || loading}
-          className="mt-3 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50"
+          className="mt-3 w-full rounded-xl bg-ink py-3 text-sm font-semibold text-bg transition hover:bg-[color-mix(in_srgb,var(--ink)_88%,var(--accent))] disabled:opacity-50"
         >
           {loading ? "กำลังยืนยัน…" : "ยืนยัน"}
         </button>
 
         <button
           onClick={onClose}
-          className="mt-2 text-xs text-white/30 transition hover:text-white/60"
+          className="mt-2 text-xs text-ink-3 transition hover:text-ink-2"
         >
           ยกเลิกและออกจากระบบ
         </button>
