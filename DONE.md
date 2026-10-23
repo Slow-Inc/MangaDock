@@ -97,6 +97,25 @@
 - Against the real project, supabase-js 2.99.1 with a 1 ms `db.timeout` aborted (`AbortError`) in 23 ms, so the
   option really cuts requests.
 - Live, through the frontend proxy: `/versions/title/<id>` returned 200 in 0.37 s.
+## #1094 Forum post image viewer: large view, arrows on hover, swipe on phones (2026-10-24)
+
+**What:** the developer asked for a large view of post images, because clicking one opened the raw file in a new tab,
+and for IG-style navigation when a post has several images. `PostImageViewer` is a dialog built on `useModalDialog`.
+- **Navigation:**
+  - previous/next arrows, shown on hover or keyboard focus and hidden on touch screens;
+  - ← and → keys;
+  - an IG swipe on touch: the image follows the finger, the ends resist, there is no wrap, and a fast flick counts.
+- **Position:** an "n / m" counter (aria-live) and dots.
+- **Closing:** Escape or a backdrop click; focus returns to the image that opened it.
+- The math is in `lib/imageViewer.ts`, unit-tested 8/8. The grid images are now buttons, disabled while a spoiler
+  is hidden. `PostImage` gained `fit="contain"`.
+
+**Validated:** production build on a real 4-image post.
+- **Desktop:** clicking opens the viewer at "2 / 4" with no new tab. The arrow is opacity 1 on hover. Clicking
+  next goes to 3, → goes to 4, and there is no next arrow at the end. Focus stays on an arrow at the end. Escape
+  closes the viewer and focus returns.
+- **Phone** (390 px touch, CDP touch events): no arrows. Swipes go 1 → 2 → 3 → 2, and the viewer stays open.
+- Screenshots were sent to the developer. Unit 504/504. Real tsc is clean, and eslint matches main.
 ## #1092 Post page sticky bar sits under the drawer and spans the phone width (2026-10-24)
 
 **What:** the developer reported two problems with the post page's sticky title bar on a phone.
