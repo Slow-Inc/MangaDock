@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 126 — fixed the heavy-CI regression our branch introduced in test_stages (#1006 follow-up) (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- PR #794 is **mergeable**; CI: logic gate (torch-free) pass, backend jest pass, frontend/mobile skip, Vercel rate-limited (external), heavy ML report-only **failed** on `test_stages.py::test_run_rendering_default_dispatch_forwards_all_kwargs`.
+- Root cause is ours: commit `54ba1fb4` (#1006) started forwarding `fit_below_floor` and `widen_vertical_columns` through the rendering stage, but the test's `_render_config` SimpleNamespace and expected-kwargs assertion were not updated — the local fast gate skips heavy tests, so only CI caught it.
+- Updated the helper + expected kwargs; `test/test_stages.py` **9 passed** locally. CI re-runs on the push.
+
 ## MIT quality loop, round 125 — render/layout telemetry is clean on all 39 pages (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
