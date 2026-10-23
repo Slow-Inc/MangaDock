@@ -77,6 +77,22 @@
 
 ---
 
+## #1060 The book popup closes smoothly instead of warping; 5 more transition lists fixed (2026-10-23)
+
+**What:** the developer saw `BookDetailModal` "warp" shut — shrink at once, then vanish. Measured per frame: on desktop
+its panel's `opacity` faded over 22 frames but `scale` (1 → 0.9) and `translate` (0 → 32 px) had 0 in-between frames;
+on a phone the bottom-sheet slide had 0 frames (it just appeared/disappeared). The panel's `transition-[transform,opacity]`
+doesn't name Tailwind v4's separate `scale` / `translate` properties — #1053's class again. The close timer was fine
+(400 / 300 ms). Same list-without-the-property in the post page's menu, `ui/Button`, `ui/Pill` (press) and
+`ui/CopyButton` (icon swap): all six lists now name `translate,scale,rotate` next to `transform`.
+
+**Validated:** production build. Modal per-frame probe — desktop open and close: scale 20 / translate 22 / opacity 22
+in-between frames (was 0 / 0 / 22); phone sheet slide 17 in / 16 out (was 0). A whole-app snap detector (16 routes,
+every element using a scale/translate/rotate utility whose transition names `transform` but not that property): 4
+snapping groups → 0. tsc clean.
+
+---
+
 ## #1053 Hover scale animates instead of snapping on /new, /mylist, /categories (2026-10-23)
 
 **What:** the developer saw low-fps hover on the `MangaGrid` pages but smooth hover on Home. Measured per frame on a

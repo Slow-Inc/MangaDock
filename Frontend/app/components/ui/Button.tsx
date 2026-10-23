@@ -6,7 +6,7 @@ type Size = "sm" | "md" | "lg";
 
 const BASE =
   "inline-flex items-center justify-center gap-2 rounded-full border font-medium whitespace-nowrap select-none " +
-  "transition-[transform,background-color,border-color,color] duration-[var(--t1)] ease-[var(--ease)] " +
+  "transition-[transform,translate,scale,rotate,background-color,border-color,color] duration-[var(--t1)] ease-[var(--ease)] " +
   "active:translate-y-px disabled:opacity-45 disabled:cursor-not-allowed disabled:active:translate-y-0";
 
 /** The primary fill on its own, for buttons whose size and shape stay their own (inline forms, FABs). */
