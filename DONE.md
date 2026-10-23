@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 114 — JP rhetorical-prompt A/B: no measurable difference, rule not shipped (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Tested whether a prompt rule for Japanese rhetorical/tag endings (じゃないか/じゃねーか/じゃん/だろ/よね/かよ) fixes the previously reported flattening, via a temporary `MIT_PROMPT_EXTRA` seam.
+- **2 runs per arm on the real JP page:** both arms already keep the attitude (`ไปทำไม` / `สิ` / `สักหน่อย`); the flat sample did not reproduce. No measurable improvement -> **rule not shipped**, seam reverted (shipped prompt byte-identical).
+- Recorded the negative result in `2026-10-23-jp-prompt-ab.md`; the only gate finding in all runs is the expected empty translation of a source-language-filtered `X` region.
+
 ## MIT quality loop, round 113 — guard cost measured (0.43 ms/page) and the corpus gate dashboard is clean (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
