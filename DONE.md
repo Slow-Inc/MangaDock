@@ -3,6 +3,13 @@
 
 ---
 
+## MIT quality loop, round 262 — third unseen series: gate 0 on all pages; unseen-data aggregate recorded (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Four unseen Yotsuba pages: gate 0 everywhere, render telemetry clean, warm pages under 4 s; one content-loss retry on a credits strip. Aggregate over three unseen series (12 pages): translation generalises, remaining costs are the rare free-standing-text spill and retry churn on legitimate Latin names. No code change.
+
+---
+
 ## MIT quality loop, round 261 — second unseen series: clean renders, but Latin proper names cost two retries (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

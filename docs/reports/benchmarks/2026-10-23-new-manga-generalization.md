@@ -36,3 +36,19 @@ In both observed cases where an untranslated Latin token survived retries (Bocch
 "stop retrying `untranslated_word` when the identical Latin token survives the first retry" would save one gateway call
 on name/brand lines with no measured quality loss, but it needs the retry loop to remember tokens per class - a
 custom_openai change with its own tests, so it is queued rather than patched at the end of this loop.
+## Third unseen series (Yotsuba to!, 4 pages)
+
+- **4/4 pages: gate 0**, render telemetry all zeros; wall 3.9-15.3 s (warm pages with little text run under 4 s).
+- One `content_loss` trigger on a credits/promo strip (`RELEASING BACK-TO-BACK ... VOLUME4` -> `43 ตื่น`), retried to a
+  clean page; no other guard hits.
+
+## Aggregate on unseen data (3 series, 12 pages)
+
+| series | pages | gate | render | guard notes |
+|---|---|---|---|---|
+| Kaguya-sama ch.11 | 5 | 0 | one 7 px spill (free-standing text) | none after the SEE tag licence |
+| Bocchi the Rock! | 4 | 3 (legitimate Latin names) | clean | untranslated-word retries on `KLIMTS NIGHT`/`TIKTOK` (queued per-class retry candidate) |
+| Yotsuba to! | 4 | 0 | clean | one content-loss retry on a credits strip |
+
+Translation quality generalises cleanly; the repeatable costs are render-side spills on free-standing text (rare) and
+retry churn on legitimate Latin names (queued).
