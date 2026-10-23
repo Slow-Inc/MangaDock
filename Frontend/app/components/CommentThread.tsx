@@ -171,7 +171,7 @@ function CommentThreadImpl({
 
             {isEditing ? (
               <div className="mb-2 animate-in fade-in duration-200">
-                <textarea
+                <textarea aria-label="แก้ไขความคิดเห็น"
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   maxLength={FORUM_LIMITS.comment}
@@ -275,7 +275,7 @@ function CommentThreadImpl({
 
           {isReplying && (
             <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-300">
-              <textarea
+              <textarea aria-label="เขียนข้อความตอบกลับ"
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
                 readOnly={submitting}

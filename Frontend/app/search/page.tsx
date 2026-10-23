@@ -415,7 +415,7 @@ function SearchResults() {
                     ))}
                   </div>
                   <button
-                    onClick={() => setShowAdvanced((s) => !s)}
+                    onClick={() => setShowAdvanced((s) => !s)} aria-expanded={showAdvanced}
                     className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                       showAdvanced || statusFilter !== 'all' || yearFrom || yearTo
                         ? "border-accent/40 bg-accent/10 text-accent"
@@ -465,7 +465,7 @@ function SearchResults() {
               {/* ปี */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="w-14 shrink-0 text-xs font-medium text-ink-3">ปี</span>
-                <input
+                <input aria-label="ปี จาก"
                   type="number"
                   value={yearFromDraft}
                   onChange={(e) => setYearFromDraft(e.target.value)}
@@ -476,7 +476,7 @@ function SearchResults() {
                   className="w-20 rounded-xl border border-line bg-fill px-2 py-1.5 text-xs text-ink placeholder:text-ink-3 transition focus:border-ink-3 aria-[invalid=true]:outline-danger [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none aria-[invalid=true]:border-danger"
                 />
                 <span className="text-xs text-ink-3">–</span>
-                <input
+                <input aria-label="ปี ถึง"
                   type="number"
                   value={yearToDraft}
                   onChange={(e) => setYearToDraft(e.target.value)}

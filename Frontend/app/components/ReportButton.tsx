@@ -138,7 +138,7 @@ export default function ReportButton({ contentType, contentId, variant = "icon" 
                   ))}
                 </div>
                 {reason === "other" && (
-                  <textarea
+                  <textarea aria-label="อธิบายเพิ่มเติม"
                     value={details}
                     onChange={(e) => setDetails(e.target.value)}
                     maxLength={1000} // the server's SubmitReportDto cap (#1015)

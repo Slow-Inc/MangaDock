@@ -216,7 +216,7 @@ export default function LinkAccountModal({
                 <label className="mb-1.5 block text-xs font-medium text-ink-2">
                   รหัสผ่าน
                 </label>
-                <input
+                <input aria-label="รหัสผ่าน"
                   ref={inputRef}
                   type="password"
                   value={password}

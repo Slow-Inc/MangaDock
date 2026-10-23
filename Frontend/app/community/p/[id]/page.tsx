@@ -452,7 +452,7 @@ export default function PostDetailPage() {
 
             {isEditingPost ? (
               <div className="mb-4 sm:mb-6 animate-in fade-in duration-200">
-                <input
+                <input aria-label="หัวข้อกระทู้"
                   value={editPostTitle}
                   onChange={(e) => setEditPostTitle(e.target.value)}
                   maxLength={FORUM_LIMITS.title}
@@ -461,7 +461,7 @@ export default function PostDetailPage() {
                   placeholder="หัวข้อกระทู้"
                 />
                 <LimitCounter id={editTitleLimitId} value={editPostTitle} max={FORUM_LIMITS.title} />
-                <textarea
+                <textarea aria-label="เนื้อหากระทู้"
                   value={editPostContent}
                   onChange={(e) => setEditPostContent(e.target.value)}
                   maxLength={FORUM_LIMITS.content}
