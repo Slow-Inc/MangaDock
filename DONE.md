@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 196 — latency outlier re-triage on v3 defaults (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Per-page stage breakdown (median wall 6.63 s): the 19.2 s page is the **cold-start page of the sweep** (detection 6.1 s + OCR 3.9 s of lazy model loads); merge spikes (4.7-8.8 s) move between runs and do not correlate with page/Kumiko cost — the earlier transient-contention conclusion stands; translation spikes are gateway-side.
+- Nothing actionable beyond the opt-in `MIT_PRELOAD`; benchmark updated.
+
+---
+
 ## MIT quality loop, round 195 — Kumiko profile: 509 ms/page concentrated in the recursive split; no safe micro-opt (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).
