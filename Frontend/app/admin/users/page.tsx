@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cacheOrFetch, cacheClearByTag, TTL } from '../../lib/apiCache';
 import AdminTableSkeleton from '../components/AdminTableSkeleton';
 import AdminLoadError from '../components/AdminLoadError';
+import AdminDialog from '../components/AdminDialog';
 import { PRIMARY_FILL } from '../../components/ui/Button';
 
 const savedUsers = { search: '', filterRole: '', filterPlan: '', filterBanned: '', page: 1 };
@@ -226,7 +227,7 @@ export default function AdminUsersPage() {
                     <button onClick={() => openDetail(u.uid)} className="text-xs text-ink-2 hover:text-ink transition-colors smooth-hover-fast">Detail</button>
                     {u.role < 8 && (
                       <>
-                        <select aria-label={`Role of ${u.displayName || u.email}`} defaultValue={u.role} onChange={e => { setConfirmRoleUid(u.uid); setConfirmRole(Number(e.target.value)); }}
+                        <select aria-label={`Role of ${u.displayName || u.email}`} value={u.role} onChange={e => { setConfirmRoleUid(u.uid); setConfirmRole(Number(e.target.value)); }}
                           className="bg-fill border border-line rounded px-2 py-1 text-xs text-ink-2">
                           {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                         </select>
@@ -256,8 +257,7 @@ export default function AdminUsersPage() {
 
       {/* Detail slide-over */}
       {detailOpen && detail && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-scrim/80" onClick={() => setDetailOpen(false)} />
+        <AdminDialog side label="User details" onClose={() => setDetailOpen(false)}>
           <div className="relative w-96 bg-surface border-l border-line h-full overflow-y-auto p-6 space-y-5">
             <button onClick={() => setDetailOpen(false)} aria-label="Close user details" className="absolute top-4 right-4 text-ink-2 hover:text-ink transition-colors text-lg leading-none">✕</button>
             <div>
@@ -318,13 +318,12 @@ export default function AdminUsersPage() {
               })}
             </div>
           </div>
-        </div>
+        </AdminDialog>
       )}
 
       {/* Role confirm */}
       {confirmRoleUid && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-scrim/80" onClick={() => setConfirmRoleUid(null)} />
+        <AdminDialog label="Confirm role change" onClose={() => setConfirmRoleUid(null)}>
           <div className="relative bg-surface border border-line rounded-xl p-6 w-80 space-y-4 shadow-2xl">
             <p className="text-sm text-ink">Change role to <strong className="text-ink">{ROLE_LABEL[confirmRole]}</strong>?</p>
             <div className="flex gap-3 justify-end">
@@ -332,13 +331,12 @@ export default function AdminUsersPage() {
               <button onClick={submitRoleChange} className={`text-sm px-4 py-1.5 rounded-lg transition-colors font-medium ${PRIMARY_FILL}`}>Confirm</button>
             </div>
           </div>
-        </div>
+        </AdminDialog>
       )}
 
       {/* Ban confirm */}
       {confirmBanUid && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-scrim/80" onClick={() => setConfirmBanUid(null)} />
+        <AdminDialog label={confirmBanAction === 'ban' ? 'Confirm ban' : 'Confirm unban'} onClose={() => setConfirmBanUid(null)}>
           <div className="relative bg-surface border border-line rounded-xl p-6 w-80 space-y-4 shadow-2xl">
             <p className="text-sm text-ink">
               {confirmBanAction === 'ban'
@@ -352,7 +350,7 @@ export default function AdminUsersPage() {
               </button>
             </div>
           </div>
-        </div>
+        </AdminDialog>
       )}
     </div>
   );

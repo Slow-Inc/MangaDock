@@ -77,6 +77,22 @@
 
 ---
 
+## #1069 Admin overlays are real dialogs (2026-10-23)
+
+**What:** five admin overlays behaved as modals without being dialogs: the user drawer, the role and ban confirms,
+the content delete confirm, and the transaction panel. They had no role or name, Escape did nothing, and focus
+stayed on the page behind them. `admin/components/AdminDialog` adds `role="dialog"`, `aria-modal` and an
+`aria-label`, and uses `useDialogFocus` (#837). Escape and a scrim click close it, and focus returns to the opener.
+The transaction row's "Detail →" is now a button, so the panel opens from the keyboard. The role select is
+controlled: Cancel used to leave it showing the unapplied role.
+
+**Validated:** production build, fake admin session, admin APIs answered by Playwright with every write refused
+(0 sent). The dialog probe went from 0/5 to 5/5: named dialog, focus in, Tab stays inside, Escape closes, focus back
+on the opener. After Cancel the role select showed 2 against an applied 0 before the fix, and 0 after. Real tsc is
+clean, and eslint matches main.
+
+---
+
 ## #1068 Admin wallet-adjust inputs: real names and the focus ring (2026-10-23)
 
 **What:** #1040 / #1044 left the admin user drawer's coin-adjust amount and reason inputs alone while the wallet area
