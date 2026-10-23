@@ -3,6 +3,14 @@
 
 ---
 
+## MIT quality loop, round 249 — English negation-lost guard evaluated and rejected (2026-10-23)
+
+Branch `feat/mit-quality-loop` (PR #794).
+- Scanned v7: 40 regions carry an English negation, 4 lacked a Thai marker; inspection plus a direct A/B (3 baselines + retry-note sample per candidate) showed idiomatic renderings (`without holding back`), a prohibition marker the scan lacked (`ห้าม`), tag-question variance, and one rare glitch whose source kept the negation 3/3 on re-sampling.
+- A marker-based guard would retry on false positives and almost never hit a real defect; rejected and recorded in the do-not-repeat backlog (revisit only with a semantic verifier). No code change.
+
+---
+
 ## MIT quality loop, round 248 — number-preservation guard evaluated and rejected (2026-10-23)
 
 Branch `feat/mit-quality-loop` (PR #794).

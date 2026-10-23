@@ -87,3 +87,17 @@ looked like a missing number, and all three were **OCR garbles of words**, with 
 
 A number guard would fire on OCR noise, not on translation defects. Revisit only if a future run shows a genuinely
 lost numeric fact (price, count, time) - and then scope it to standalone numbers, not digit-bearing tokens.
+### Evaluated 2026-10-23 (round 190): English negation-lost guard - **rejected**
+
+Scanned v7: 40 regions have an English negation; only 4 Thai outputs lacked a negation marker, and none was systematic:
+
+- `WITHOUT HOLDING BACK` -> `จนหมดรูป` / `จนแหลกสลาย` / `โดยไม่ไว้หน้า`: idiomatic, meaning kept; a guard would fire without
+  a defect (the direct A/B baseline kept negation in 2 of 3 samples and the marker-less one is still correct).
+- `DO NOT REHOST THIS CHAPTER.` -> `ห้ามนำบทนี้ไปเผยแพร่ต่อ`: the Thai uses `ห้าม` (prohibition), which the scan's marker
+  list lacked - a false positive by construction.
+- `WONT IT TURN INTO...` -> `มันจะกลายเป็น...`: tag-question style; the direct A/B kept a marker in 2 of 3 baselines.
+- `I DONT WANT THEM.` -> `ฉ-ฉันท้องอยากได้มัน`: a real one-off glitch, but the same source kept the negation in **3 of 3**
+  baseline samples and in the retry-note sample - rarity, not a class.
+
+A negation guard would have retried on idiomatic/threshold false positives while almost never meeting a real defect.
+Revisit only with a semantic verifier, not a marker scan.
